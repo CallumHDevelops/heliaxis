@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -51,6 +52,10 @@ const resources = [
 export function Navigation() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const pathname = usePathname();
+  
+  // Check if we're on the subcontractor form page
+  const isSubcontractorPage = pathname === '/subcontractor-form';
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -60,11 +65,14 @@ export function Navigation() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+  
+  // Force navbar to always be solid on subcontractor form page
+  const shouldShowSolidNav = isScrolled || isSubcontractorPage;
 
   return (
     <header className={cn(
       "fixed top-0 z-50 w-full transition-all duration-300",
-      isScrolled 
+      shouldShowSolidNav 
         ? "border-b border-heliaxis-navy/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-sm" 
         : "border-b border-white/10 bg-transparent"
     )}>
@@ -78,7 +86,7 @@ export function Navigation() {
             height={50}
             className={cn(
               "h-12 w-auto transition-all duration-300",
-              isScrolled ? "" : "brightness-0 invert"
+              shouldShowSolidNav ? "" : "brightness-0 invert"
             )}
             priority
           />
@@ -92,7 +100,7 @@ export function Navigation() {
                 <NavigationMenuLink asChild className={cn(
                   navigationMenuTriggerStyle(), 
                   "bg-transparent hover:bg-heliaxis-gold/30 focus:bg-heliaxis-gold/30 hover:text-heliaxis-navy text-base font-medium rounded-[5px] transition-all",
-                  isScrolled ? "text-heliaxis-navy" : "text-white"
+                  shouldShowSolidNav ? "text-heliaxis-navy" : "text-white"
                 )}>
                   <Link href="/">Home</Link>
                 </NavigationMenuLink>
@@ -101,7 +109,7 @@ export function Navigation() {
               <NavigationMenuItem>
                 <NavigationMenuTrigger className={cn(
                   "bg-transparent hover:bg-heliaxis-gold/30 focus:bg-heliaxis-gold/30 data-[state=open]:bg-heliaxis-gold/30 text-base font-medium rounded-[5px] transition-all",
-                  isScrolled ? "text-heliaxis-navy" : "text-white"
+                  shouldShowSolidNav ? "text-heliaxis-navy" : "text-white"
                 )}>Solutions</NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
@@ -121,7 +129,7 @@ export function Navigation() {
               <NavigationMenuItem>
                 <NavigationMenuTrigger className={cn(
                   "bg-transparent hover:bg-heliaxis-gold/30 focus:bg-heliaxis-gold/30 data-[state=open]:bg-heliaxis-gold/30 text-base font-medium rounded-[5px] transition-all",
-                  isScrolled ? "text-heliaxis-navy" : "text-white"
+                  shouldShowSolidNav ? "text-heliaxis-navy" : "text-white"
                 )}>Resources</NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2">
@@ -142,7 +150,7 @@ export function Navigation() {
                 <NavigationMenuLink asChild className={cn(
                   navigationMenuTriggerStyle(), 
                   "bg-transparent hover:bg-heliaxis-gold/30 focus:bg-heliaxis-gold/30 hover:text-heliaxis-navy text-base font-medium rounded-[5px] transition-all",
-                  isScrolled ? "text-heliaxis-navy" : "text-white"
+                  shouldShowSolidNav ? "text-heliaxis-navy" : "text-white"
                 )}>
                   <Link href="/about">About</Link>
                 </NavigationMenuLink>
@@ -157,7 +165,7 @@ export function Navigation() {
             href="/contact"
             className={cn(
               "px-4 py-2 bg-transparent hover:bg-heliaxis-gold/30 focus:bg-heliaxis-gold/30 hover:text-heliaxis-navy text-base font-medium rounded-[5px] transition-all",
-              isScrolled ? "text-heliaxis-navy" : "text-white"
+              shouldShowSolidNav ? "text-heliaxis-navy" : "text-white"
             )}
           >
             Contact Us
@@ -175,7 +183,7 @@ export function Navigation() {
           <SheetTrigger asChild className="lg:hidden">
             <Button variant="ghost" size="icon" className={cn(
               "transition-colors",
-              isScrolled ? "text-heliaxis-navy" : "text-white"
+              shouldShowSolidNav ? "text-heliaxis-navy" : "text-white"
             )}>
               <Menu className="h-6 w-6" />
               <span className="sr-only">Toggle menu</span>
