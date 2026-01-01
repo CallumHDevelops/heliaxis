@@ -26,7 +26,7 @@ export default function ContactPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative min-h-[50vh] flex items-center">
+      <section className="relative min-h-[50vh] flex items-center pt-10">
         <div className="absolute inset-0">
           <Image
             src="https://images.unsplash.com/photo-1423666639041-f56000c27a9a?w=1920&h=1080&fit=crop"

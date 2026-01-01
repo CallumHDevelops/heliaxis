@@ -39,7 +39,7 @@ export default function ResidentialPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative min-h-[60vh] flex items-center">
+      <section className="relative min-h-[60vh] flex items-center pt-10">
         <div className="absolute inset-0">
           <Image
             src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&h=1080&fit=crop"

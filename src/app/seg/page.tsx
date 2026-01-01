@@ -37,7 +37,7 @@ export default function SEGPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative min-h-[60vh] flex items-center">
+      <section className="relative min-h-[60vh] flex items-center pt-10">
         <div className="absolute inset-0">
           <Image
             src="https://images.unsplash.com/photo-1558449028-b53a39d100fc?w=1920&h=1080&fit=crop"

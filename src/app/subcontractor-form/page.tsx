@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 // Zod validation schema
 const formSchema = z.object({
@@ -195,14 +197,38 @@ export default function SubcontractorOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pt-32 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <Card className="p-8 shadow-xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Subcontractor Onboarding</h1>
-          </div>
+    <>
+      {/* Hero Section with Background */}
+      <section className="relative min-h-screen flex items-center pt-10">
+        <div className="absolute inset-0">
+          <Image
+            src="https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1920&h=1080&fit=crop"
+            alt="Professional construction and installation team"
+            fill
+            priority
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-heliaxis-navy/85" />
+        </div>
+        
+        <div className="container mx-auto px-4 lg:px-8 py-20 relative z-10">
+          <div className="max-w-3xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <Badge className="bg-heliaxis-gold/20 text-heliaxis-gold border-heliaxis-gold/30 mb-6">
+                Partner with Us
+              </Badge>
+              <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight mb-4">
+                Subcontractor <span className="text-heliaxis-gold">Onboarding</span>
+              </h1>
+              <p className="text-lg text-white/80 leading-relaxed mb-8">
+                Join our network of trusted subcontractors. Complete the form below to begin your partnership with Heliaxis.
+              </p>
+            </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Form Card */}
+            <Card className="p-8 shadow-2xl bg-white/95 backdrop-blur">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* 1. Company Name */}
             <div>
               <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -551,8 +577,10 @@ export default function SubcontractorOnboarding() {
             </div>
           </form>
         </Card>
-      </div>
-    </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
 

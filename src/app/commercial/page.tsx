@@ -40,7 +40,7 @@ export default function CommercialPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative min-h-[60vh] flex items-center">
+      <section className="relative min-h-[60vh] flex items-center pt-10">
         <div className="absolute inset-0">
           <Image
             src="https://images.unsplash.com/photo-1497440001374-f26997328c1b?w=1920&h=1080&fit=crop"
