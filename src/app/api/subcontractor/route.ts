@@ -28,46 +28,18 @@ export async function POST(request: NextRequest) {
     console.log('📋 Company:', data.companyName);
     console.log('✅ Send receipt to user:', data.sendEmailReceipt);
 
-    // Extract files and convert to base64 for email attachments
-    const insuranceDocs: Array<{name: string, file: File}> = [];
-    const qualificationDocs: Array<{name: string, file: File}> = [];
+    // Extract files (note: file handling with Resend requires different approach)
+    const insuranceDocs: string[] = [];
+    const qualificationDocs: string[] = [];
     
     formData.forEach((value, key) => {
       if (key.startsWith('insuranceDoc') && value instanceof File) {
-        insuranceDocs.push({name: value.name, file: value});
+        insuranceDocs.push(value.name);
       }
       if (key.startsWith('qualificationDoc') && value instanceof File) {
-        qualificationDocs.push({name: value.name, file: value});
+        qualificationDocs.push(value.name);
       }
     });
-
-    // Helper function to convert File to base64
-    async function fileToBase64(file: File): Promise<string> {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      return buffer.toString('base64');
-    }
-
-    // Prepare attachments for email
-    const attachments = [];
-    
-    // Add insurance documents
-    for (const doc of insuranceDocs) {
-      const base64Content = await fileToBase64(doc.file);
-      attachments.push({
-        filename: doc.name,
-        content: base64Content,
-      });
-    }
-    
-    // Add qualification documents
-    for (const doc of qualificationDocs) {
-      const base64Content = await fileToBase64(doc.file);
-      attachments.push({
-        filename: doc.name,
-        content: base64Content,
-      });
-    }
 
     // Admin email HTML
     const adminEmailHtml = `
@@ -153,16 +125,14 @@ export async function POST(request: NextRequest) {
               ${insuranceDocs.length > 0 ? `
               <div class="section-title">📎 Insurance Documents</div>
               <div class="file-list">
-                ${insuranceDocs.map((doc, idx) => `<div class="file-item">📄 ${doc.name}</div>`).join('')}
-                <p style="font-size: 12px; color: #666; margin-top: 10px;">✅ ${insuranceDocs.length} file(s) attached to this email</p>
+                ${insuranceDocs.map((file, idx) => `<div class="file-item">📄 ${file}</div>`).join('')}
               </div>
               ` : ''}
 
               ${qualificationDocs.length > 0 ? `
               <div class="section-title">🎓 Qualification Documents</div>
               <div class="file-list">
-                ${qualificationDocs.map((doc, idx) => `<div class="file-item">📄 ${doc.name}</div>`).join('')}
-                <p style="font-size: 12px; color: #666; margin-top: 10px;">✅ ${qualificationDocs.length} file(s) attached to this email</p>
+                ${qualificationDocs.map((file, idx) => `<div class="file-item">📄 ${file}</div>`).join('')}
               </div>
               ` : ''}
 
@@ -228,13 +198,13 @@ export async function POST(request: NextRequest) {
               ${insuranceDocs.length > 0 ? `
               <div class="section-title">Uploaded Documents</div>
               <div class="field">
-                <span class="label">Insurance Documents:</span> ${insuranceDocs.length} file(s) attached
+                <span class="label">Insurance Documents:</span> ${insuranceDocs.length} file(s)
               </div>
               ` : ''}
 
               ${qualificationDocs.length > 0 ? `
               <div class="field">
-                <span class="label">Qualification Documents:</span> ${qualificationDocs.length} file(s) attached
+                <span class="label">Qualification Documents:</span> ${qualificationDocs.length} file(s)
               </div>
               ` : ''}
 
@@ -276,7 +246,6 @@ export async function POST(request: NextRequest) {
         subject: `🔔 New Subcontractor Onboarding: ${data.companyName}`,
         html: adminEmailHtml,
         reply_to: data.email,
-        attachments: attachments.length > 0 ? attachments : undefined,
       }),
     });
 
@@ -306,7 +275,6 @@ export async function POST(request: NextRequest) {
           to: [data.email],
           subject: '✅ Confirmation: Your Subcontractor Onboarding Submission',
           html: userReceiptHtml,
-          attachments: attachments.length > 0 ? attachments : undefined,
         }),
       });
 
