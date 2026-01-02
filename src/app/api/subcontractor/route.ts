@@ -28,124 +28,135 @@ export async function POST(request: NextRequest) {
     console.log('📋 Company:', data.companyName);
     console.log('✅ Send receipt to user:', data.sendEmailReceipt);
 
-    // Extract files (note: file handling with Resend requires different approach)
-    const insuranceDocs: string[] = [];
-    const qualificationDocs: string[] = [];
+    // Extract files and prepare for email attachments
+    const insuranceDocs: File[] = [];
+    const qualificationDocs: File[] = [];
     
     formData.forEach((value, key) => {
       if (key.startsWith('insuranceDoc') && value instanceof File) {
-        insuranceDocs.push(value.name);
+        insuranceDocs.push(value);
       }
       if (key.startsWith('qualificationDoc') && value instanceof File) {
-        qualificationDocs.push(value.name);
+        qualificationDocs.push(value);
       }
     });
 
-    // Admin email HTML
+    // Convert files to base64 for Resend attachments
+    const attachments = [];
+    
+    for (const file of insuranceDocs) {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      attachments.push({
+        filename: file.name,
+        content: buffer.toString('base64'),
+      });
+    }
+    
+    for (const file of qualificationDocs) {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      attachments.push({
+        filename: file.name,
+        content: buffer.toString('base64'),
+      });
+    }
+
+    // Admin email HTML - Simple and Clean
     const adminEmailHtml = `
       <!DOCTYPE html>
       <html>
         <head>
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
-            .field { margin-bottom: 20px; }
-            .label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
-            .value { background: white; padding: 10px; border-radius: 5px; border: 1px solid #e0e0e0; }
-            .section-title { font-size: 18px; font-weight: bold; color: #667eea; margin-top: 25px; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 5px; }
-            .file-list { background: white; padding: 10px; border-radius: 5px; border: 1px solid #e0e0e0; }
-            .file-item { padding: 5px 0; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f5f5f5; }
+            .container { max-width: 650px; margin: 20px auto; background: white; }
+            .header { background: #2563eb; color: white; padding: 25px; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .content { padding: 30px; }
+            .info-row { margin: 15px 0; padding: 12px; background: #f9fafb; border-radius: 5px; }
+            .label { font-weight: bold; color: #374151; }
+            .value { color: #1f2937; margin-top: 5px; }
+            .section { margin: 25px 0; }
+            .section-title { font-size: 16px; font-weight: bold; color: #1f2937; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid #e5e7eb; }
+            .footer { background: #f9fafb; padding: 15px; text-align: center; color: #6b7280; font-size: 12px; }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="header">
-              <h1>🔔 New Subcontractor Onboarding Submission</h1>
-              <p>A new subcontractor has submitted their onboarding form</p>
+              <h1>📋 New Subcontractor Form Submission</h1>
+              <p style="margin: 5px 0; opacity: 0.9;">Company: ${data.companyName}</p>
             </div>
             <div class="content">
-              <div class="section-title">📋 Company Information</div>
-              
-              <div class="field">
-                <span class="label">Company Name</span>
-                <div class="value">${data.companyName}</div>
-              </div>
-              
-              <div class="field">
-                <span class="label">Business Registration Number</span>
-                <div class="value">${data.businessRegNumber}</div>
-              </div>
-              
-              <div class="field">
-                <span class="label">Registered Business Address</span>
-                <div class="value">${data.businessAddress}</div>
-              </div>
-              
-              <div class="field">
-                <span class="label">VAT Number</span>
-                <div class="value">${data.vatNumber || 'Not provided'}</div>
-              </div>
-              
-              <div class="field">
-                <span class="label">CIS Number</span>
-                <div class="value">${data.cisNumber || 'Not applicable'}</div>
+              <div class="section">
+                <div class="section-title">Contact Information</div>
+                <div class="info-row">
+                  <div class="label">Full Name</div>
+                  <div class="value">${data.fullName}</div>
+                </div>
+                <div class="info-row">
+                  <div class="label">Email</div>
+                  <div class="value"><a href="mailto:${data.email}">${data.email}</a></div>
+                </div>
+                <div class="info-row">
+                  <div class="label">Phone</div>
+                  <div class="value"><a href="tel:${data.contactNumber}">${data.contactNumber}</a></div>
+                </div>
               </div>
 
-              <div class="section-title">👤 Contact Information</div>
-              
-              <div class="field">
-                <span class="label">Full Name</span>
-                <div class="value">${data.fullName}</div>
-              </div>
-              
-              <div class="field">
-                <span class="label">Email Address</span>
-                <div class="value"><a href="mailto:${data.email}">${data.email}</a></div>
-              </div>
-              
-              <div class="field">
-                <span class="label">Contact Number</span>
-                <div class="value"><a href="tel:${data.contactNumber}">${data.contactNumber}</a></div>
-              </div>
-
-              <div class="section-title">💰 Financial Information</div>
-              
-              <div class="field">
-                <span class="label">Bank Details</span>
-                <div class="value">${data.bankDetails}</div>
-              </div>
-              
-              <div class="field">
-                <span class="label">Payment Terms</span>
-                <div class="value">${data.paymentTerms}</div>
+              <div class="section">
+                <div class="section-title">Company Details</div>
+                <div class="info-row">
+                  <div class="label">Business Registration Number</div>
+                  <div class="value">${data.businessRegNumber}</div>
+                </div>
+                <div class="info-row">
+                  <div class="label">Business Address</div>
+                  <div class="value">${data.businessAddress}</div>
+                </div>
+                <div class="info-row">
+                  <div class="label">VAT Number</div>
+                  <div class="value">${data.vatNumber || 'Not provided'}</div>
+                </div>
+                <div class="info-row">
+                  <div class="label">CIS Number</div>
+                  <div class="value">${data.cisNumber || 'Not provided'}</div>
+                </div>
               </div>
 
-              ${insuranceDocs.length > 0 ? `
-              <div class="section-title">📎 Insurance Documents</div>
-              <div class="file-list">
-                ${insuranceDocs.map((file, idx) => `<div class="file-item">📄 ${file}</div>`).join('')}
+              <div class="section">
+                <div class="section-title">Payment Information</div>
+                <div class="info-row">
+                  <div class="label">Bank Details</div>
+                  <div class="value">${data.bankDetails}</div>
+                </div>
+                <div class="info-row">
+                  <div class="label">Payment Terms</div>
+                  <div class="value">${data.paymentTerms}</div>
+                </div>
               </div>
-              ` : ''}
-
-              ${qualificationDocs.length > 0 ? `
-              <div class="section-title">🎓 Qualification Documents</div>
-              <div class="file-list">
-                ${qualificationDocs.map((file, idx) => `<div class="file-item">📄 ${file}</div>`).join('')}
-              </div>
-              ` : ''}
 
               ${data.additionalInfo ? `
-              <div class="section-title">📝 Additional Information</div>
-              <div class="field">
-                <div class="value">${data.additionalInfo}</div>
+              <div class="section">
+                <div class="section-title">Additional Information</div>
+                <div class="info-row">
+                  <div class="value">${data.additionalInfo}</div>
+                </div>
               </div>
               ` : ''}
 
-              <p style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; color: #666; font-size: 12px;">
-                This form was submitted on ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}
-              </p>
+              ${attachments.length > 0 ? `
+              <div class="section">
+                <div class="section-title">📎 Attachments</div>
+                <div class="info-row">
+                  <div class="value">${attachments.length} file(s) attached to this email</div>
+                </div>
+              </div>
+              ` : ''}
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 5px 0;">Submitted: ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</p>
             </div>
           </div>
         </body>
@@ -158,73 +169,72 @@ export async function POST(request: NextRequest) {
       <html>
         <head>
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border: 1px solid #ddd; }
-            .success-icon { font-size: 48px; margin-bottom: 10px; }
-            .field { margin-bottom: 15px; }
-            .label { font-weight: bold; color: #555; }
-            .value { color: #333; }
-            .section-title { font-size: 18px; font-weight: bold; color: #667eea; margin-top: 25px; margin-bottom: 15px; }
-            .note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 20px; border-radius: 5px; }
+            body { font-family: Arial, sans-serif; line-height: 1.8; color: #374151; background: #f9fafb; }
+            .container { max-width: 600px; margin: 30px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px 30px; text-align: center; }
+            .success-icon { font-size: 60px; margin-bottom: 15px; animation: bounce 1s; }
+            .content { padding: 40px 30px; background: white; }
+            .greeting { font-size: 18px; color: #111827; margin-bottom: 20px; }
+            .summary-card { background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px; padding: 20px; margin: 25px 0; }
+            .summary-card h3 { color: #065f46; margin: 0 0 15px 0; }
+            .field { margin: 10px 0; padding: 5px 0; }
+            .label { font-weight: 600; color: #6b7280; font-size: 14px; }
+            .value { color: #111827; font-size: 15px; }
+            .timeline { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 25px 0; border-radius: 5px; }
+            .timeline h3 { color: #1e40af; margin: 0 0 15px 0; }
+            .timeline-step { margin: 10px 0; padding-left: 10px; }
+            .help-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 5px; }
+            .footer { background: #f9fafb; padding: 25px; text-align: center; color: #6b7280; font-size: 13px; }
+            @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-20px); } 60% { transform: translateY(-10px); } }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="header">
               <div class="success-icon">✅</div>
-              <h1>Submission Confirmed!</h1>
-              <p>Thank you for completing your subcontractor onboarding form</p>
+              <h1 style="margin: 0; font-size: 28px;">Application Received!</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.95; font-size: 16px;">Thank you for submitting your information</p>
             </div>
             <div class="content">
-              <p>Dear <strong>${data.fullName}</strong>,</p>
+              <p class="greeting">Dear <strong>${data.fullName}</strong>,</p>
               
-              <p>We have successfully received your subcontractor onboarding form submission. Below is a copy of the information you provided for your records:</p>
+              <p>Great news! We've successfully received your subcontractor onboarding application for <strong>${data.companyName}</strong>.</p>
 
-              <div class="section-title">Company Information</div>
-              <div class="field"><span class="label">Company Name:</span> ${data.companyName}</div>
-              <div class="field"><span class="label">Business Registration Number:</span> ${data.businessRegNumber}</div>
-              <div class="field"><span class="label">Business Address:</span> ${data.businessAddress}</div>
-              <div class="field"><span class="label">VAT Number:</span> ${data.vatNumber || 'Not provided'}</div>
-              
-              <div class="section-title">Contact Details</div>
-              <div class="field"><span class="label">Email:</span> ${data.email}</div>
-              <div class="field"><span class="label">Phone:</span> ${data.contactNumber}</div>
-              
-              <div class="section-title">Payment Information</div>
-              <div class="field"><span class="label">Payment Terms:</span> ${data.paymentTerms}</div>
-
-              ${insuranceDocs.length > 0 ? `
-              <div class="section-title">Uploaded Documents</div>
-              <div class="field">
-                <span class="label">Insurance Documents:</span> ${insuranceDocs.length} file(s)
-              </div>
-              ` : ''}
-
-              ${qualificationDocs.length > 0 ? `
-              <div class="field">
-                <span class="label">Qualification Documents:</span> ${qualificationDocs.length} file(s)
-              </div>
-              ` : ''}
-
-              <div class="note">
-                <strong>⏰ What happens next?</strong><br>
-                Our team will review your submission within 2-3 business days. You will receive an email from us once the review is complete.
+              <div class="summary-card">
+                <h3>📋 Your Submission Summary</h3>
+                <div class="field"><span class="label">Company:</span> <span class="value">${data.companyName}</span></div>
+                <div class="field"><span class="label">Contact Email:</span> <span class="value">${data.email}</span></div>
+                <div class="field"><span class="label">Phone:</span> <span class="value">${data.contactNumber}</span></div>
+                <div class="field"><span class="label">Payment Terms:</span> <span class="value">${data.paymentTerms}</span></div>
+                ${attachments.length > 0 ? `<div class="field"><span class="label">Documents Uploaded:</span> <span class="value">${attachments.length} file(s)</span></div>` : ''}
               </div>
 
-              <p style="margin-top: 30px;">
-                If you have any questions or need to make changes to your submission, please don't hesitate to contact us.
+              <div class="timeline">
+                <h3>⏰ What Happens Next?</h3>
+                <div class="timeline-step"><strong>1-2 Days:</strong> Our team reviews your application and documents</div>
+                <div class="timeline-step"><strong>3 Days:</strong> We'll contact you via email or phone</div>
+                <div class="timeline-step"><strong>Next Steps:</strong> If approved, we'll send you the onboarding documents</div>
+              </div>
+
+              <div class="help-box">
+                <strong>💬 Need Help?</strong><br>
+                If you have any questions or need to update your information, please reply to this email. We're here to help!
+              </div>
+
+              <p style="margin: 30px 0 0 0; color: #6b7280;">
+                Thank you for choosing to work with us. We look forward to a successful partnership!
               </p>
 
-              <p style="margin-top: 20px;">
-                Best regards,<br>
-                <strong>The Team</strong>
+              <p style="margin: 15px 0 0 0; color: #111827;">
+                <strong>Best regards,</strong><br>
+                The Heliaxis Team
               </p>
-
-              <p style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; color: #666; font-size: 12px;">
-                Submitted on: ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}
-              </p>
+            </div>
+            
+            <div class="footer">
+              <p style="margin: 5px 0;"><strong>Submitted:</strong> ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</p>
+              <p style="margin: 10px 0;">Keep this email for your records</p>
+              <p style="margin: 10px 0; font-size: 11px; color: #9ca3af;">This is an automated confirmation from Subcontractor Portal</p>
             </div>
           </div>
         </body>
@@ -246,6 +256,7 @@ export async function POST(request: NextRequest) {
         subject: `🔔 New Subcontractor Onboarding: ${data.companyName}`,
         html: adminEmailHtml,
         reply_to: data.email,
+        attachments: attachments.length > 0 ? attachments : undefined,
       }),
     });
 
@@ -275,6 +286,7 @@ export async function POST(request: NextRequest) {
           to: [data.email],
           subject: '✅ Confirmation: Your Subcontractor Onboarding Submission',
           html: userReceiptHtml,
+          attachments: attachments.length > 0 ? attachments : undefined,
         }),
       });
 
