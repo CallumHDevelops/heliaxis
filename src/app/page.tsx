@@ -78,7 +78,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center">
             <div className="text-center">
-              <div className="text-3xl md:text-4xl font-bold text-heliaxis-navy">MCS</div>
+              <div className="text-3xl md:text-4xl font-bold text-heliaxis-navy">MCS*</div>
               <div className="text-sm text-gray-600">Certified Installer</div>
             </div>
             <div className="text-center">
@@ -836,7 +836,7 @@ export default function HomePage() {
                 <div className="text-white/80">Years Combined Experience</div>
               </div>
               <div>
-                <div className="text-4xl md:text-5xl font-bold text-heliaxis-gold mb-2">MCS</div>
+                <div className="text-4xl md:text-5xl font-bold text-heliaxis-gold mb-2">MCS*</div>
                 <div className="text-white/80">Certified Installer</div>
               </div>
               <div>
@@ -854,6 +854,15 @@ export default function HomePage() {
 
       {/* Contact Form Section */}
       <ContactSection />
+
+      {/* MCS Accreditation Notice */}
+      <section className="py-8 bg-gray-50">
+        <div className="container mx-auto px-4 lg:px-8">
+          <p className="text-sm text-gray-600 text-center">
+            *MCS Accreditation pending
+          </p>
+        </div>
+      </section>
 
       {/* CTA Section */}
       <section className="py-20 lg:py-28 bg-heliaxis-navy relative overflow-hidden">

@@ -201,7 +201,7 @@ export default function SEGPage() {
                 <div className="w-14 h-14 rounded-[5px] bg-heliaxis-gold/10 flex items-center justify-center mx-auto mb-4">
                   <FileText className="w-7 h-7 text-heliaxis-gold" />
                 </div>
-                <CardTitle className="text-lg text-heliaxis-navy">MCS Certification</CardTitle>
+                <CardTitle className="text-lg text-heliaxis-navy">MCS* Certification</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-gray-600">
@@ -549,7 +549,7 @@ export default function SEGPage() {
                 </AccordionTrigger>
                 <AccordionContent className="text-gray-600">
                   No. You must apply to a supplier offering a SEG tariff and meet eligibility 
-                  requirements including MCS certification and appropriate export metering. 
+                  requirements including MCS* certification and appropriate export metering. 
                   SEG registration is a separate process from solar installation.
                 </AccordionContent>
               </AccordionItem>
@@ -605,6 +605,15 @@ export default function SEGPage() {
 
       {/* Contact Form Section */}
       <ContactSection />
+
+      {/* MCS Accreditation Notice */}
+      <section className="py-8 bg-gray-50">
+        <div className="container mx-auto px-4 lg:px-8">
+          <p className="text-sm text-gray-600 text-center">
+            *MCS Accreditation pending
+          </p>
+        </div>
+      </section>
 
       {/* CTA Section */}
       <section className="py-20 lg:py-28 bg-heliaxis-navy relative overflow-hidden">
