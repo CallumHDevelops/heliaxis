@@ -466,7 +466,7 @@ export default function ResidentialPage() {
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-white/5 rounded-[5px]">
                   <TrendingDown className="w-5 h-5 text-heliaxis-gold" />
-                  <span className="text-white">Immediate bill savings</span>
+                  <span className="text-white">Long Term bill savings</span>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-white/5 rounded-[5px]">
                   <Clock className="w-5 h-5 text-heliaxis-gold" />
@@ -497,7 +497,7 @@ export default function ResidentialPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/5 border-white/10">
+              {/* <Card className="bg-white/5 border-white/10">
                 <CardHeader>
                   <div className="w-12 h-12 rounded-[5px] bg-heliaxis-gold/20 flex items-center justify-center mb-4">
                     <Zap className="w-6 h-6 text-heliaxis-gold" />
@@ -511,7 +511,7 @@ export default function ResidentialPage() {
                     understand eligibility, metering and how export works alongside batteries.
                   </CardDescription>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           </div>
         </div>

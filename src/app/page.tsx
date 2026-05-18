@@ -829,7 +829,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="bg-heliaxis-navy rounded-[5px] p-8 md:p-12">
+          {/* <div className="bg-heliaxis-navy rounded-[5px] p-8 md:p-12">
             <div className="grid md:grid-cols-4 gap-8 text-center">
               <div>
                 <div className="text-4xl md:text-5xl font-bold text-heliaxis-gold mb-2">10+</div>
@@ -848,7 +848,7 @@ export default function HomePage() {
                 <div className="text-white/80">& South West Coverage</div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </section>
 
