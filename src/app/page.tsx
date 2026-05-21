@@ -856,13 +856,13 @@ export default function HomePage() {
       <ContactSection />
 
       {/* MCS Accreditation Notice */}
-      <section className="py-8 bg-gray-50">
+      {/* <section className="py-8 bg-gray-50">
         <div className="container mx-auto px-4 lg:px-8">
           <p className="text-sm text-gray-600 text-center">
             *MCS Accreditation pending
           </p>
         </div>
-      </section>
+      </section> */}
 
       {/* CTA Section */}
       <section className="py-20 lg:py-28 bg-heliaxis-navy relative overflow-hidden">
