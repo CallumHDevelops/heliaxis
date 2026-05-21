@@ -74,7 +74,7 @@ export default function HomePage() {
       </section>
 
       {/* Trust Indicators */}
-      <section className="py-12 bg-white border-b border-gray-100">
+      {/* <section className="py-12 bg-white border-b border-gray-100">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center">
             <div className="text-center">
@@ -95,7 +95,7 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Introduction Section */}
       <section className="py-20 lg:py-28 bg-white">
