@@ -1,61 +1,97 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { updateSession } from '@/lib/supabase/middleware';
 
-export function middleware(request: NextRequest) {
+const AUTH_PATHS = ['/login', '/register', '/pending'];
+
+export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
-  
-  // Check if the request is coming from the subcontract subdomain
-  const isSubcontractDomain = hostname.includes('subcontract.heliaxis.co.uk') || 
-                               hostname.includes('subcontract.localhost'); // For local testing
-  
-  // If on subcontract domain
+
+  // --- Subcontractor subdomain routing (unchanged) ---
+  const isSubcontractDomain =
+    hostname.includes('subcontract.heliaxis.co.uk') ||
+    hostname.includes('subcontract.localhost');
+
   if (isSubcontractDomain) {
-    // Redirect /subcontractor-form to root (keeps URL clean)
     if (pathname === '/subcontractor-form') {
       const url = request.nextUrl.clone();
       url.pathname = '/';
-      console.log(`↩️  Redirecting ${hostname}/subcontractor-form → /`);
       return NextResponse.redirect(url);
     }
-    
-    // Rewrite root to the subcontractor-form page
     if (pathname === '/') {
       const url = request.nextUrl.clone();
       url.pathname = '/subcontractor-form';
-      console.log(`🔄 Rewriting ${hostname}/ → /subcontractor-form`);
       return NextResponse.rewrite(url);
     }
-  } else {
-    // On main domain (heliaxis.co.uk) - BLOCK access to /subcontractor-form
-    if (pathname === '/subcontractor-form') {
-      console.log(`🚫 Blocking access to /subcontractor-form on ${hostname}`);
-      
-      // Redirect to main site with a message
+    return NextResponse.next();
+  } else if (pathname === '/subcontractor-form') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    url.searchParams.set('message', 'form-access-denied');
+    return NextResponse.redirect(url);
+  }
+
+  // --- Admin auth (only when Supabase is configured) ---
+  const supabaseConfigured =
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isAuthPath = AUTH_PATHS.includes(pathname);
+
+  if (!supabaseConfigured || (!isAdminPath && !isAuthPath)) {
+    return NextResponse.next();
+  }
+
+  const { response, supabase, user } = await updateSession(request);
+
+  if (isAdminPath) {
+    if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = '/';
-      url.searchParams.set('message', 'form-access-denied');
-      
+      url.pathname = '/login';
+      url.searchParams.set('next', pathname);
+      return NextResponse.redirect(url);
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, status')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || profile.status !== 'approved') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/pending';
+      return NextResponse.redirect(url);
+    }
+
+    // The approvals dashboard is admin-only.
+    if (pathname.startsWith('/admin/approvals') && profile.role !== 'admin') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/admin';
       return NextResponse.redirect(url);
     }
   }
-  
-  // For all other requests, continue normally
-  return NextResponse.next();
+
+  // Already-signed-in approved users skip the login/register screens.
+  if (isAuthPath && user && pathname !== '/pending') {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('status')
+      .eq('id', user.id)
+      .single();
+    if (profile?.status === 'approved') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/admin';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  return response;
 }
 
-// Configure which routes the middleware should run on
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - api routes (api/*)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, fonts, etc.)
-     */
     '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|woff|woff2|ttf|otf)$).*)',
   ],
 };
-
