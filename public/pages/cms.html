@@ -1084,7 +1084,22 @@ window.doPublish = async function(){
   m.style.color = 'var(--muted)'; m.textContent = 'Saving & publishing…';
   try {
     if (typeof save === 'function') { await save(); }
-    await window.publishSite();
+    // Extract the block CSS the same way exportHTML/pageHTML does.
+    var full = document.querySelector('style').textContent;
+    var css = full.split('/* ---------- PREVIEW (brand) ---------- */')[1]
+      .split('.modal{')[0].replace(/\.preview /g,'').replace(/\.pv-block[^}]*}/g,'');
+    // Render each page's blocks to static HTML (reuses the CMS renderer).
+    var pages = STATE.pages.map(function(pg){
+      return {
+        slug: pg.slug, name: pg.name, theme: pg.theme || '', seo: pg.seo || {},
+        html: pg.blocks.map(function(b){ return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>'; }).join('\n')
+      };
+    });
+    var r = await fetch('/api/cms/publish', {
+      method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+      body: JSON.stringify({ rendered: { css: css, pages: pages } })
+    });
+    if (!r.ok) { var em='Publish failed'; try { em=(await r.json()).error||em; } catch(e){} throw new Error(em); }
     m.style.color = 'var(--ok)';
     m.textContent = '✓ Published — your changes are now live.';
   } catch (e) {

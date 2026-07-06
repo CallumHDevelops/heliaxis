@@ -4,28 +4,32 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 const DRAFT_KEY = 'heliaxis-cms-v1';
 const PUBLISHED_KEY = 'heliaxis-cms-published';
+const RENDERED_KEY = 'heliaxis-cms-rendered';
 
-// Snapshot the current draft as the published (live) version.
-export async function POST() {
+// Publish: snapshot the draft as published, and store the client-rendered
+// page HTML + CSS that the live (site) route serves.
+export async function POST(req: Request) {
   const { user, profile } = await getSessionProfile();
   if (!user || profile?.status !== 'approved') {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from('cms_kv')
-    .select('value')
-    .eq('key', DRAFT_KEY)
-    .maybeSingle();
+  const now = new Date().toISOString();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!data?.value) return NextResponse.json({ error: 'Nothing to publish yet.' }, { status: 400 });
+  // 1. Snapshot the draft document as the published version (data backup).
+  const { data } = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
+  if (data?.value) {
+    await admin.from('cms_kv').upsert({ key: PUBLISHED_KEY, value: data.value, updated_at: now });
+  }
 
-  const { error: upErr } = await admin
-    .from('cms_kv')
-    .upsert({ key: PUBLISHED_KEY, value: data.value, updated_at: new Date().toISOString() });
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+  // 2. Store the rendered pages (HTML + CSS) the browser generated.
+  const body = await req.json().catch(() => null);
+  if (body?.rendered) {
+    await admin
+      .from('cms_kv')
+      .upsert({ key: RENDERED_KEY, value: JSON.stringify(body.rendered), updated_at: now });
+  }
 
   return NextResponse.json({ ok: true });
 }
