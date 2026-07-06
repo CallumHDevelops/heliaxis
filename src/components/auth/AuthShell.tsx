@@ -21,7 +21,11 @@ export function AuthShell({
         alignItems: 'center',
         justifyContent: 'center',
         padding: '2rem 1rem',
-        background: brand.paper,
+        backgroundColor: brand.paper,
+        backgroundImage: 'url(/assets/heliaxis-card-fill-light.svg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'top right',
+        backgroundRepeat: 'no-repeat',
         fontFamily: brand.body,
         color: brand.ink,
       }}
