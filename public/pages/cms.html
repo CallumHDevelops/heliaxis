@@ -255,7 +255,7 @@ button{font-family:inherit;cursor:pointer}
 
 
 
-.mm-preview{border:1px solid var(--line);border-radius:5px;overflow:hidden;margin-bottom:24px}
+.mm-preview{border:1px solid var(--line);border-radius:5px;overflow:hidden;margin-bottom:24px;position:sticky;top:8px;z-index:20;background:var(--paper);box-shadow:0 12px 30px -18px rgba(0,0,0,.5)}
 .mm-bar{background:var(--ink);display:flex;gap:4px;padding:12px 18px;flex-wrap:wrap}
 .mm-nav{color:var(--paper);font-family:var(--body);font-weight:600;font-size:.92rem;padding:8px 13px;border-radius:2px;cursor:pointer;background:none;border:0}
 .mm-nav.on{color:var(--solar);box-shadow:inset 0 -2px 0 var(--solar)}
@@ -271,9 +271,16 @@ button{font-family:inherit;cursor:pointer}
 .mm-featured p{color:var(--muted-d);font-size:.86rem;margin-top:8px;position:relative;max-width:26ch}
 .mm-featured .mm-ft-cta{margin-top:16px;align-self:flex-start;position:relative;font-family:var(--display);font-weight:700;font-size:.88rem;color:var(--ink);background:var(--solar);padding:9px 14px;border-radius:2px}
 .mm-featured .mm-spark{position:relative;margin-bottom:12px}
-.mm-itemrow{display:grid;grid-template-columns:34px 1fr 1.1fr auto;gap:7px;align-items:center;margin-bottom:7px}
-.mm-itemrow .icp{width:34px;height:34px;border:1px solid var(--line);border-radius:2px;background:var(--paper-2);display:grid;place-items:center}
+.mm-itemrow{display:grid;grid-template-columns:18px 34px 1fr 1.1fr auto;gap:7px;align-items:center;margin-bottom:7px}
+.mm-itemrow .icp{width:34px;height:34px;border:1px solid var(--line);border-radius:2px;background:var(--paper-2);display:grid;place-items:center;cursor:pointer;padding:0}
+.mm-itemrow .icp:hover{border-color:var(--solar)}
 .mm-itemrow select,.mm-itemrow input{font-size:.82rem;padding:7px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper)}
+.mm-grip{cursor:grab;color:var(--muted);user-select:none;text-align:center;font-size:.9rem;line-height:1}
+.mm-nav[draggable]{cursor:grab}
+.mm-item .mm-d{font-size:.72rem;color:var(--muted);display:block;font-weight:400;margin-top:1px}
+.mm-featured.light{background:var(--paper-2);color:var(--ink)}
+.mm-featured.light p{color:var(--muted)}
+.mm-featured.light .mm-ft-t{color:var(--ink)}
 .mp-prevbox{border:1px solid var(--line);border-radius:4px;overflow:hidden;margin-bottom:14px}
 .mp-label{font-family:var(--mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 10px;background:var(--paper-2);border-bottom:1px solid var(--line)}
 .mp-bar{display:flex;gap:2px;background:var(--ink);padding:8px 10px;flex-wrap:wrap}
@@ -1015,52 +1022,87 @@ function saveAsTemplate(){if(MODE!=='edit'){alert('Open a page in the editor fir
 function makeFromTemplate(i){var t=(STATE.templates||[])[i];if(!t)return;var b=JSON.parse(JSON.stringify(t.blocks));b.forEach(function(bl){bl.id=uid()});STATE.pages.push({id:uid(),name:t.name,slug:'/'+t.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+uid().slice(0,4),type:'page',theme:t.theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();}
 
 /* ===== dedicated mega-menu editor page ===== */
-var MEGA_PI=0;
+var MEGA_PI=0, MDRAG=null;
 function showMega(){MODE='mega';setMode();renderMega();}
 function pageName(slug){var p=STATE.pages.filter(function(x){return x.slug===slug})[0];return p?p.name:slug;}
 function pageOpts(cur){return '<option value="">— link to a page —</option>'+STATE.pages.map(function(p){return '<option value="'+esc(p.slug)+'"'+(cur===p.slug?' selected':'')+'>'+esc(p.name)+'</option>'}).join('');}
-function iconOpts(cur){return ICONKEYS.map(function(k){return '<option value="'+k+'"'+(k===cur?' selected':'')+'>'+k+'</option>'}).join('');}
-function featOf(m){if(!m.featured)m.featured={img:'',title:'Book a free survey',text:'No obligation, no pushy sales — just honest advice.',cta:'Get a quote',ctaPage:''};return m.featured;}
+function featOf(m){if(!m.featured)m.featured={img:'',title:'Book a free survey',text:'No obligation, no pushy sales — just honest advice.',cta:'Get a quote',ctaPage:'',bg:'dark'};if(!m.featured.bg)m.featured.bg='dark';return m.featured;}
+function megaOn(m){return m.megaEnabled!==false;}
 function setMenuIcon(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].icon=v;renderMega();save();}
 function setMenuPage(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].page=v;renderMega();save();}
 function setMenuLabel(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].label=v;renderMega();save();}
+function setMenuDesc(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].desc=v;renderMega();save();}
+function toggleMega(mi,v){var m=STATE.site.menu[mi];m.megaEnabled=v;if(v&&(!m.cols||!m.cols.length))m.cols=[{ey:'Column',items:[{icon:'solar',label:'Item',page:''}]}];renderMega();save();}
+function setTopPage(mi,v){STATE.site.menu[mi].page=v;renderMega();save();}
+function setFeatBg(mi,v){featOf(STATE.site.menu[mi]).bg=v;renderMega();save();}
+/* icon popup picker */
+function openMenuIcon(mi,ci,ii){var cur=STATE.site.menu[mi].cols[ci].items[ii].icon||'solar';var mb=document.getElementById('modalbox');mb.className='modalbox';
+ mb.innerHTML='<button class="close" onclick="closeModal()">×</button><h2>Choose an icon</h2><input id="iconsearch" placeholder="Search icons…" style="width:100%;padding:.55rem;border:1px solid var(--line);border-radius:3px;margin:10px 0" oninput="filterIconModal(this.value)"><div class="iconpick" id="iconmodalgrid" style="grid-template-columns:repeat(8,1fr)">'+ICONKEYS.map(function(k){return '<button data-k="'+k+'" class="'+(k===cur?'on':'')+'" title="'+k+'" onclick="pickMenuIcon('+mi+','+ci+','+ii+',\''+k+'\')">'+icon(k,18)+'</button>'}).join('')+'</div>';
+ document.getElementById('modal').classList.add('show');}
+function filterIconModal(q){q=(q||'').toLowerCase();var g=document.getElementById('iconmodalgrid');if(!g)return;g.querySelectorAll('button').forEach(function(b){b.style.display=b.dataset.k.indexOf(q)>=0?'':'none'})}
+function pickMenuIcon(mi,ci,ii,k){STATE.site.menu[mi].cols[ci].items[ii].icon=k;closeModal();renderMega();save();}
+/* drag reorder — top-level items + links within a column */
+function mDragStart(type,mi,ci,idx){MDRAG={type:type,mi:mi,ci:ci,idx:idx}}
+function mDragOver(e){e.preventDefault()}
+function mDragEnd(){MDRAG=null}
+function mDrop(type,mi,ci,idx){if(!MDRAG||MDRAG.type!==type){MDRAG=null;return}
+ if(type==='top'){var a=STATE.site.menu;if(MDRAG.idx===idx){MDRAG=null;return}var m=a.splice(MDRAG.idx,1)[0];a.splice(idx,0,m);MEGA_PI=a.indexOf(m);}
+ else{if(MDRAG.mi!==mi||MDRAG.ci!==ci){MDRAG=null;return}var a=STATE.site.menu[mi].cols[ci].items;if(MDRAG.idx===idx){MDRAG=null;return}var m=a.splice(MDRAG.idx,1)[0];a.splice(idx,0,m);}
+ MDRAG=null;renderMega();save();}
+/* featured image pickers */
 function setFeatImg(id){var im=(STATE.site.images||[]).filter(function(x){return x.id===id})[0];featOf(STATE.site.menu[MEGA_PI]).img=im?im.data:'';renderMega();save();}
 function clearFeatImg(){featOf(STATE.site.menu[MEGA_PI]).img='';renderMega();save();}
 function menuFeatImgs(feat){var imgs=STATE.site.images||[];if(!imgs.length)return '<div class="hint" style="font-size:.8rem">No images yet — add some in the <b>Media library</b>, then pick one here.</div>';
  return '<div class="iconpick" style="grid-template-columns:repeat(6,1fr)">'+imgs.map(function(im){return '<button class="'+(feat.img===im.data?'on':'')+'" style="aspect-ratio:4/3;overflow:hidden;padding:0" onclick="setFeatImg(\''+im.id+'\')"><img src="'+im.data+'" style="width:100%;height:100%;object-fit:cover"></button>'}).join('')+'</div>'+(feat.img?'<button class="rm" style="margin-top:6px" onclick="clearFeatImg()">remove image</button>':'');
 }
 function renderMega(){var el=document.getElementById('megaedit');var M=STATE.site.menu||[];
- if(!M.length){el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1></div></div><div class="honest">No menu items yet. <button class="tbtn2" onclick="STATE.site.menu=[{label:\'New item\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]}];renderMega();save()">Add one</button></div></div>';return;}
- if(MEGA_PI>=M.length)MEGA_PI=0;var sel=M[MEGA_PI];var feat=featOf(sel);
- var nav=M.map(function(t,i){return '<button class="mm-nav'+(i===MEGA_PI?' on':'')+'" onclick="MEGA_PI='+i+';renderMega()">'+esc(t.label)+'</button>';}).join('');
- var cols=sel.cols.map(function(c){return '<div class="mm-col"><div class="mm-ey">'+esc(c.ey)+'</div>'+c.items.map(function(it){return '<div class="mm-item"><span class="ic">'+icon(it.icon||'solar',18)+'</span><div><b>'+esc(it.label)+'</b>'+(it.page?'<span class="pg">→ '+esc(pageName(it.page))+'</span>':'<span class="pg" style="color:#b4462f">no link set</span>')+'</div></div>';}).join('')+'</div>';}).join('');
- var fbg=feat.img?' style="background-image:linear-gradient(rgba(20,18,14,.5),rgba(20,18,14,.82)),url('+feat.img+');background-size:cover;background-position:center"':'';
- var featured='<div class="mm-featured"'+fbg+'>'+(feat.img?'':'<svg class="mm-spark" viewBox="0 0 24 24" fill="#F8BC1E" width="32" height="32">'+[0,90,180,270].map(function(a){return '<g transform="rotate('+a+' 12 12)">'+RAY+'</g>'}).join('')+'</svg>')+'<div class="mm-ft-t">'+esc(feat.title)+'</div><p>'+esc(feat.text)+'</p><span class="mm-ft-cta">'+esc(feat.cta)+' →</span></div>';
- var preview='<div class="mm-preview"><div class="mm-bar">'+nav+'</div><div class="mm-panel" style="grid-template-columns:repeat('+sel.cols.length+',1fr) 1.15fr">'+cols+featured+'</div></div>';
+ if(!M.length){el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1></div></div><div class="honest">No menu items yet. <button class="tbtn2" onclick="STATE.site.menu=[{label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]}];MEGA_PI=0;renderMega();save()">Add one</button></div></div>';return;}
+ if(MEGA_PI>=M.length)MEGA_PI=0;var sel=M[MEGA_PI];var mega=megaOn(sel);var feat=featOf(sel);
+ var nav=M.map(function(t,i){return '<button class="mm-nav'+(i===MEGA_PI?' on':'')+'" draggable="true" ondragstart="mDragStart(\'top\','+i+',0,'+i+')" ondragover="mDragOver(event)" ondrop="mDrop(\'top\',0,0,'+i+')" ondragend="mDragEnd()" onclick="MEGA_PI='+i+';renderMega()" title="Drag to reorder">'+esc(t.label)+(megaOn(t)?'':' ↗')+'</button>';}).join('');
+ var panel;
+ if(mega){
+   var cols=sel.cols.map(function(c){return '<div class="mm-col"><div class="mm-ey">'+esc(c.ey)+'</div>'+c.items.map(function(it){return '<div class="mm-item"><span class="ic">'+icon(it.icon||'solar',18)+'</span><div><b>'+esc(it.label)+'</b>'+(it.desc?'<span class="mm-d">'+esc(it.desc)+'</span>':'')+'</div></div>';}).join('')+'</div>';}).join('');
+   var fbg=feat.img?' style="background-image:linear-gradient(rgba(20,18,14,.5),rgba(20,18,14,.82)),url('+feat.img+');background-size:cover;background-position:center"':'';
+   var featured='<div class="mm-featured'+(feat.bg==='light'&&!feat.img?' light':'')+'"'+fbg+'>'+(feat.img?'':'<svg class="mm-spark" viewBox="0 0 24 24" fill="#F8BC1E" width="32" height="32">'+[0,90,180,270].map(function(a){return '<g transform="rotate('+a+' 12 12)">'+RAY+'</g>'}).join('')+'</svg>')+'<div class="mm-ft-t">'+esc(feat.title)+'</div><p>'+esc(feat.text)+'</p><span class="mm-ft-cta">'+esc(feat.cta)+' →</span></div>';
+   panel='<div class="mm-panel" style="grid-template-columns:repeat('+sel.cols.length+',1fr) 1.15fr">'+cols+featured+'</div>';
+ } else {
+   panel='<div style="padding:22px 24px;background:var(--card);font-family:var(--mono);font-size:.75rem;color:var(--muted)">Direct link → '+(sel.page?esc(pageName(sel.page)):'<span style="color:#b4462f">no page set</span>')+' · no mega panel</div>';
+ }
+ var preview='<div class="mm-preview"><div class="mm-bar">'+nav+'</div>'+panel+'</div>';
 
  var ed='<div class="panelcard"><h3>Top-level item “'+esc(sel.label)+'”</h3>'+
    '<div class="fld"><label>Label</label><input value="'+esc(sel.label)+'" onchange="STATE.site.menu['+MEGA_PI+'].label=this.value;renderMega();save()"></div>'+
-   '<div class="fld"><label>Featured image (shows on the right of the mega panel)</label>'+menuFeatImgs(feat)+'</div>'+
-   '<div class="fld"><label>Featured title</label><input value="'+esc(feat.title)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).title=this.value;renderMega();save()"></div>'+
-   '<div class="fld"><label>Featured text</label><textarea rows="2" onchange="featOf(STATE.site.menu['+MEGA_PI+']).text=this.value;renderMega();save()">'+esc(feat.text)+'</textarea></div>'+
-   '<div class="row2"><div class="fld"><label>CTA label</label><input value="'+esc(feat.cta)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).cta=this.value;renderMega();save()"></div><div class="fld"><label>CTA links to</label><select onchange="featOf(STATE.site.menu['+MEGA_PI+']).ctaPage=this.value;save()">'+pageOpts(feat.ctaPage)+'</select></div></div>'+
-   '<button class="rm" onclick="if(confirm(\'Remove this top-level item?\')){STATE.site.menu.splice('+MEGA_PI+',1);MEGA_PI=0;renderMega();save()}">Remove top-level item</button></div>';
+   '<label class="chk"><input type="checkbox" '+(mega?'checked':'')+' onchange="toggleMega('+MEGA_PI+',this.checked)"> Enable mega menu (columns, links &amp; featured panel)</label>';
+ if(!mega){
+   ed+='<div class="fld"><label>This item links directly to</label><select onchange="setTopPage('+MEGA_PI+',this.value)">'+pageOpts(sel.page||'')+'</select></div>';
+ } else {
+   ed+='<div class="fld"><label>Featured panel — background</label><div class="seg"><button class="'+(feat.bg!=='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'dark\')">Dark</button><button class="'+(feat.bg==='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'light\')">Light</button></div></div>'+
+     '<div class="fld"><label>Featured image (optional — overrides the background)</label>'+menuFeatImgs(feat)+'</div>'+
+     '<div class="fld"><label>Featured title</label><input value="'+esc(feat.title)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).title=this.value;renderMega();save()"></div>'+
+     '<div class="fld"><label>Featured text</label><textarea rows="2" onchange="featOf(STATE.site.menu['+MEGA_PI+']).text=this.value;renderMega();save()">'+esc(feat.text)+'</textarea></div>'+
+     '<div class="row2"><div class="fld"><label>CTA label</label><input value="'+esc(feat.cta)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).cta=this.value;renderMega();save()"></div><div class="fld"><label>CTA links to</label><select onchange="featOf(STATE.site.menu['+MEGA_PI+']).ctaPage=this.value;save()">'+pageOpts(feat.ctaPage)+'</select></div></div>';
+ }
+ ed+='<button class="rm" onclick="if(confirm(\'Remove this top-level item?\')){STATE.site.menu.splice('+MEGA_PI+',1);MEGA_PI=0;renderMega();save()}">Remove top-level item</button></div>';
 
- sel.cols.forEach(function(c,ci){
-   ed+='<div class="panelcard"><h3 style="display:flex;justify-content:space-between">Column '+(ci+1)+'<button class="rm" onclick="STATE.site.menu['+MEGA_PI+'].cols.splice('+ci+',1);renderMega();save()">remove column</button></h3>'+
-     '<div class="fld"><label>Column heading</label><input value="'+esc(c.ey)+'" onchange="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].ey=this.value;renderMega();save()"></div>';
-   c.items.forEach(function(it,ii){
-     ed+='<div class="mm-itemrow"><span class="icp">'+icon(it.icon||'solar',18)+'</span>'+
-       '<input value="'+esc(it.label)+'" placeholder="Label" onchange="setMenuLabel('+MEGA_PI+','+ci+','+ii+',this.value)">'+
-       '<select onchange="setMenuPage('+MEGA_PI+','+ci+','+ii+',this.value)">'+pageOpts(it.page||'')+'</select>'+
-       '<button class="rm" onclick="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].items.splice('+ii+',1);renderMega();save()">×</button></div>'+
-       '<div style="margin:0 0 10px 41px"><select style="font-size:.78rem;padding:5px 7px;border:1px solid var(--line);border-radius:2px" onchange="setMenuIcon('+MEGA_PI+','+ci+','+ii+',this.value)"><optgroup label="icon">'+iconOpts(it.icon||'solar')+'</optgroup></select></div>';
+ if(mega){
+   sel.cols.forEach(function(c,ci){
+     ed+='<div class="panelcard"><h3 style="display:flex;justify-content:space-between">Column '+(ci+1)+'<button class="rm" onclick="STATE.site.menu['+MEGA_PI+'].cols.splice('+ci+',1);renderMega();save()">remove column</button></h3>'+
+       '<div class="fld"><label>Column heading</label><input value="'+esc(c.ey)+'" onchange="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].ey=this.value;renderMega();save()"></div><div class="hint" style="font-size:.76rem">Drag the ⋮⋮ handle to reorder links.</div>';
+     c.items.forEach(function(it,ii){
+       ed+='<div class="mm-itemrow" ondragover="mDragOver(event)" ondrop="mDrop(\'item\','+MEGA_PI+','+ci+','+ii+')">'+
+         '<span class="mm-grip" draggable="true" ondragstart="mDragStart(\'item\','+MEGA_PI+','+ci+','+ii+')" ondragend="mDragEnd()" title="Drag to reorder">⋮⋮</span>'+
+         '<button class="icp" title="Click to choose an icon" onclick="openMenuIcon('+MEGA_PI+','+ci+','+ii+')">'+icon(it.icon||'solar',18)+'</button>'+
+         '<input value="'+esc(it.label)+'" placeholder="Label" onchange="setMenuLabel('+MEGA_PI+','+ci+','+ii+',this.value)">'+
+         '<select onchange="setMenuPage('+MEGA_PI+','+ci+','+ii+',this.value)">'+pageOpts(it.page||'')+'</select>'+
+         '<button class="rm" onclick="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].items.splice('+ii+',1);renderMega();save()">×</button></div>'+
+         '<div style="margin:0 0 10px 26px"><input placeholder="Excerpt (optional — shows under the label)" value="'+esc(it.desc||'')+'" onchange="setMenuDesc('+MEGA_PI+','+ci+','+ii+',this.value)" style="width:100%;font-size:.78rem;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper)"></div>';
+     });
+     ed+='<button class="miniadd" onclick="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].items.push({icon:\'solar\',label:\'New link\',page:\'\'});renderMega();save()">+ Add link</button></div>';
    });
-   ed+='<button class="miniadd" onclick="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].items.push({icon:\'solar\',label:\'New link\',page:\'\'});renderMega();save()">+ Add link</button></div>';
- });
- ed+='<div class="dash-actions"><button class="dact" onclick="STATE.site.menu['+MEGA_PI+'].cols.push({ey:\'New column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]});renderMega();save()"><b>+ Add column</b><span>to this item</span></button><button class="dact" onclick="STATE.site.menu.push({label:\'New item\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]});MEGA_PI=STATE.site.menu.length-1;renderMega();save()"><b>+ Add top-level item</b><span>new nav entry</span></button></div>';
+ }
+ ed+='<div class="dash-actions">'+(mega?'<button class="dact" onclick="STATE.site.menu['+MEGA_PI+'].cols.push({ey:\'New column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]});renderMega();save()"><b>+ Add column</b><span>to this item</span></button>':'')+'<button class="dact" onclick="STATE.site.menu.push({label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]});MEGA_PI=STATE.site.menu.length-1;renderMega();save()"><b>+ Add top-level item</b><span>new nav entry</span></button></div>';
 
- el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1><p>Design your navigation — pick icons, link each item to a page, and set the featured image on the right.</p></div></div>'+preview+ed+'</div>';
+ el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1><p>Design your navigation — drag to reorder, click an icon to change it, toggle the mega panel per item, choose the featured background, and link each item to a page.</p></div></div>'+preview+ed+'</div>';
 }
 
 boot();
@@ -1107,6 +1149,70 @@ window.doPublish = async function(){
     m.textContent = '⚠ ' + (e && e.message ? e.message : 'Publish failed') + '. Are you signed in as an admin?';
   }
 };
+</script>
+<script>
+/* ---- Report an issue (bug / feature) -> /api/feedback ---- */
+(function(){
+  var btn=document.createElement('button');
+  btn.textContent='🐛 Report';
+  btn.style.cssText='position:fixed;right:16px;bottom:16px;z-index:9999;background:var(--ink);color:var(--paper);border:1px solid var(--line-d,rgba(247,242,231,.18));border-radius:999px;padding:.6rem 1rem;font-family:var(--body);font-weight:600;font-size:.85rem;cursor:pointer;box-shadow:0 8px 24px -8px rgba(0,0,0,.5)';
+  document.body.appendChild(btn);
+
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(33,31,24,.5);display:none;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="background:var(--card,#fffdf8);color:var(--ink);border-radius:6px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:22px;font-family:var(--body)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><b style="font-size:1.1rem">Report an issue</b><button id="fbClose" style="background:none;border:0;font-size:1.3rem;cursor:pointer;color:var(--muted)">&times;</button></div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:10px"><button id="fbBug" class="fbtab">&#128027; Bug</button><button id="fbFeat" class="fbtab">&#10024; Feature</button></div>'
+    +'<input id="fbTitle" placeholder="Short summary *" style="width:100%;padding:.6rem;border:1px solid var(--line);border-radius:3px;margin-bottom:8px;font-family:var(--body);box-sizing:border-box">'
+    +'<textarea id="fbDetail" rows="4" placeholder="What happened / what would you like? Steps, which page, expected vs actual…" style="width:100%;padding:.6rem;border:1px solid var(--line);border-radius:3px;margin-bottom:8px;font-family:var(--body);box-sizing:border-box"></textarea>'
+    +'<div id="fbMsg" style="font-size:.85rem;margin-bottom:8px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:space-between;align-items:center"><button id="fbList" style="background:none;border:1px solid var(--line);border-radius:3px;padding:.5rem .8rem;cursor:pointer;font-weight:600;font-family:var(--body)">View reports</button><button id="fbSend" style="background:var(--solar);color:var(--ink);border:0;border-radius:3px;padding:.55rem 1.1rem;cursor:pointer;font-weight:700;font-family:var(--body)">Send report</button></div>'
+    +'<div id="fbReports" style="margin-top:14px"></div></div>';
+  document.body.appendChild(ov);
+
+  var st=document.createElement('style');
+  st.textContent='.fbtab{flex:1;padding:.5rem;border:1px solid var(--line);border-radius:3px;background:var(--paper-2);cursor:pointer;font-weight:600;font-family:var(--body)}.fbtab.on{background:var(--solar);border-color:var(--solar)}';
+  document.head.appendChild(st);
+
+  var esc2=(typeof esc==='function')?esc:function(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')};
+  var type='bug';
+  function setType(t){type=t;document.getElementById('fbBug').classList.toggle('on',t==='bug');document.getElementById('fbFeat').classList.toggle('on',t==='feature');}
+  function openM(){ov.style.display='flex';}
+  function closeM(){ov.style.display='none';document.getElementById('fbReports').innerHTML='';document.getElementById('fbMsg').textContent='';}
+  setType('bug');
+  btn.onclick=openM;
+  ov.addEventListener('click',function(e){if(e.target===ov)closeM();});
+  document.getElementById('fbClose').onclick=closeM;
+  document.getElementById('fbBug').onclick=function(){setType('bug')};
+  document.getElementById('fbFeat').onclick=function(){setType('feature')};
+
+  document.getElementById('fbSend').onclick=async function(){
+    var title=document.getElementById('fbTitle').value.trim();
+    var detail=document.getElementById('fbDetail').value.trim();
+    var msg=document.getElementById('fbMsg');
+    if(!title){msg.style.color='var(--amber-2)';msg.textContent='Please add a short summary.';return;}
+    msg.style.color='var(--muted)';msg.textContent='Sending…';
+    try{
+      var r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({type:type,title:title,detail:detail,page_url:location.pathname})});
+      if(!r.ok){var em='Failed';try{em=(await r.json()).error||em}catch(e){}throw new Error(em);}
+      msg.style.color='var(--ok)';msg.textContent='✓ Thanks — report sent.';
+      document.getElementById('fbTitle').value='';document.getElementById('fbDetail').value='';
+    }catch(e){msg.style.color='var(--amber-2)';msg.textContent='⚠ '+(e.message||'Failed to send');}
+  };
+
+  document.getElementById('fbList').onclick=async function(){
+    var box=document.getElementById('fbReports');box.innerHTML='<div style="color:var(--muted);font-size:.85rem">Loading…</div>';
+    try{
+      var r=await fetch('/api/feedback',{credentials:'same-origin',cache:'no-store'});
+      var d=await r.json();var items=(d&&d.items)||[];
+      if(!items.length){box.innerHTML='<div style="color:var(--muted);font-size:.85rem">No reports yet.</div>';return;}
+      box.innerHTML='<div style="font-weight:700;margin:8px 0;font-size:.9rem">Reports ('+items.length+')</div>'+items.map(function(it){
+        var col=it.status==='fixed'?'var(--ok)':(it.status==='open'?'var(--amber-2)':'var(--muted)');
+        return '<div style="border-top:1px solid var(--line);padding:8px 0"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:.9rem">'+(it.type==='feature'?'✨ ':'🐛 ')+esc2(it.title)+'</b><span style="color:'+col+';font-size:.72rem;font-family:var(--mono);text-transform:uppercase">'+esc2(it.status)+'</span></div>'+(it.detail?'<div style="color:var(--muted);font-size:.82rem;margin-top:3px">'+esc2(it.detail)+'</div>':'')+'</div>';
+      }).join('');
+    }catch(e){box.innerHTML='<div style="color:var(--amber-2);font-size:.85rem">Failed to load.</div>';}
+  };
+})();
 </script>
 </body>
 </html>

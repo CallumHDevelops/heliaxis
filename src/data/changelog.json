@@ -1,0 +1,30 @@
+[
+  {
+    "version": "0.4.0",
+    "date": "2026-07-06",
+    "type": "feature",
+    "title": "Report a bug or request a feature from the CMS",
+    "detail": "You can now raise issues and ideas straight from the admin. They land in a queue we work through, and every fix or new feature gets logged here."
+  },
+  {
+    "version": "0.3.0",
+    "date": "2026-07-06",
+    "type": "feature",
+    "title": "The CMS goes live",
+    "detail": "The page-builder now saves to the database and publishes real pages to the website, with an admin login and approval flow for the team."
+  },
+  {
+    "version": "0.2.0",
+    "date": "2026-07-06",
+    "type": "feature",
+    "title": "Enquiries dashboard",
+    "detail": "Every quote-form submission is captured and shown in the admin with lead statuses, alongside an email alert."
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-07-06",
+    "type": "improvement",
+    "title": "New site foundation",
+    "detail": "New marketing pages, the shared mega-menu header, brand fonts and the free-quote form wired to email."
+  }
+]

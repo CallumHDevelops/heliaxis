@@ -94,3 +94,18 @@ create table if not exists public.cms_kv (
 
 alter table public.cms_kv enable row level security;
 -- No policies: only the service-role key (server code) can read/write.
+
+-- 8. Feedback: bug reports & feature requests raised from the CMS.
+create table if not exists public.feedback (
+  id         uuid primary key default gen_random_uuid(),
+  type       text not null default 'bug'  check (type in ('bug','feature')),
+  title      text not null,
+  detail     text,
+  page_url   text,
+  status     text not null default 'open'
+             check (status in ('open','in_progress','fixed','wontfix')),
+  created_at timestamptz not null default now()
+);
+
+alter table public.feedback enable row level security;
+-- No policies: only the service-role key (server code) can read/write.
