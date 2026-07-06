@@ -407,6 +407,32 @@ button{font-family:inherit;cursor:pointer}
 <div class="modal" id="modal"><div class="modalbox" id="modalbox"></div></div>
 
 <script>
+/* ---- Supabase-backed storage shim: wires the page-builder to /api/cms ---- */
+window.storage = {
+  async get(key){
+    try {
+      const r = await fetch('/api/cms?key=' + encodeURIComponent(key), { credentials:'same-origin' });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return (d && d.value != null) ? { value: d.value } : null;
+    } catch (e) { return null; }
+  },
+  async set(key, value){
+    const r = await fetch('/api/cms', {
+      method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+      body: JSON.stringify({ key, value: String(value) })
+    });
+    if (!r.ok) throw new Error('save failed');
+    return true;
+  }
+};
+window.publishSite = async function(){
+  const r = await fetch('/api/cms/publish', { method:'POST', credentials:'same-origin' });
+  if (!r.ok) { let m='Publish failed'; try { m=(await r.json()).error||m; } catch(e){} throw new Error(m); }
+  return true;
+};
+</script>
+<script>
 /* ============ ICON SET ============ */
 const ICONS={
  solar:{o:['M4 16l2-9h12l2 9z','M3 16h18','M9 7L8 16','M15 7l1 9','M6 11.5h12'],f:'M4 16l2-9h12l2 9z'},
@@ -1038,6 +1064,34 @@ function renderMega(){var el=document.getElementById('megaedit');var M=STATE.sit
 }
 
 boot();
+</script>
+<script>
+/* ---- Real Publish: snapshot the draft live via /api/cms/publish ---- */
+window.openPublish = function(){
+  var box = document.getElementById('modalbox');
+  box.innerHTML = '<button class="close" onclick="closeModal()">×</button>'
+    + '<h2>Publish to your site</h2>'
+    + '<p>This makes your saved changes live on the website. Make sure you\'ve saved first.</p>'
+    + '<div id="pubmsg" style="margin:12px 0;font-size:.9rem"></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +   '<button class="tbtn solar" style="color:var(--ink)" onclick="doPublish()">Publish now</button>'
+    +   '<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="exportJSON()">Download data (JSON)</button>'
+    + '</div>';
+  document.getElementById('modal').classList.add('show');
+};
+window.doPublish = async function(){
+  var m = document.getElementById('pubmsg');
+  m.style.color = 'var(--muted)'; m.textContent = 'Saving & publishing…';
+  try {
+    if (typeof save === 'function') { await save(); }
+    await window.publishSite();
+    m.style.color = 'var(--ok)';
+    m.textContent = '✓ Published — your changes are now live.';
+  } catch (e) {
+    m.style.color = 'var(--amber-2)';
+    m.textContent = '⚠ ' + (e && e.message ? e.message : 'Publish failed') + '. Are you signed in as an admin?';
+  }
+};
 </script>
 </body>
 </html>

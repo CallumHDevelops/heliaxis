@@ -83,3 +83,14 @@ create table if not exists public.enquiries (
 alter table public.enquiries enable row level security;
 -- No policies: only the service-role key (server code) can read/write.
 -- The public/anon key has no access, so leads can't be scraped from the browser.
+
+-- 7. CMS key/value store: holds the page-builder document(s) as JSON text.
+--    key 'heliaxis-cms-v1' = working draft, 'heliaxis-cms-published' = live snapshot.
+create table if not exists public.cms_kv (
+  key        text primary key,
+  value      text,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.cms_kv enable row level security;
+-- No policies: only the service-role key (server code) can read/write.
