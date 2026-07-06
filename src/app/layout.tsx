@@ -2,9 +2,6 @@ import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { Navigation } from "@/components/Navigation";
-import { Footer } from "@/components/Footer";
-import { ConditionalChrome } from "@/components/ConditionalChrome";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -110,13 +107,7 @@ export default function RootLayout({
           `}
         </Script>
 
-        <ConditionalChrome>
-          <Navigation />
-        </ConditionalChrome>
-        <main className="min-h-screen">{children}</main>
-        <ConditionalChrome>
-          <Footer />
-        </ConditionalChrome>
+        {children}
       </body>
     </html>
   );

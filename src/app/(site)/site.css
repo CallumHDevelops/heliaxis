@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* Ezra display face — self-hosted (weights extracted from the design deliverables) */
+@font-face { font-family:'Ezra'; font-weight:400; font-style:normal; font-display:swap; src:url('/fonts/Ezra-400.woff2') format('woff2'); }
+@font-face { font-family:'Ezra'; font-weight:500; font-style:normal; font-display:swap; src:url('/fonts/Ezra-500.woff2') format('woff2'); }
+@font-face { font-family:'Ezra'; font-weight:600; font-style:normal; font-display:swap; src:url('/fonts/Ezra-600.woff2') format('woff2'); }
+@font-face { font-family:'Ezra'; font-weight:700; font-style:normal; font-display:swap; src:url('/fonts/Ezra-700.woff2') format('woff2'); }
+@font-face { font-family:'Ezra'; font-weight:800; font-style:normal; font-display:swap; src:url('/fonts/Ezra-800.woff2') format('woff2'); }
+@font-face { font-family:'Ezra'; font-weight:900; font-style:normal; font-display:swap; src:url('/fonts/Ezra-900.woff2') format('woff2'); }
+
+/* Brand tokens are scoped to .site so they never collide with the shadcn/Tailwind
+   theme used by the admin + auth pages. */
+.site {
+  --ink:#211F18; --ink-2:#2c2820;
+  --solar:#F8BC1E; --amber:#E39A0C; --amber-2:#C77F04;
+  --paper:#F7F2E7; --paper-2:#EFE8D8; --card:#FFFDF8;
+  --muted:#6E6A5E; --muted-d:#A69F8E; --ok:#3F7D4E;
+  --line:rgba(33,31,24,.14); --line-d:rgba(247,242,231,.16);
+  --display:'Ezra', system-ui, sans-serif;
+  --body:'Hanken Grotesk', system-ui, sans-serif;
+  --mono:'JetBrains Mono', monospace;
+
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+}
+.site h1, .site h2, .site h3, .site h4 {
+  font-family: var(--display);
+  letter-spacing: -.015em;
+  line-height: 1.02;
+  margin: 0;
+}
