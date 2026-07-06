@@ -64,3 +64,22 @@ create trigger on_auth_user_created
 -- 5. Seed the FIRST admin (you). Register once at /register first, then run:
 --    update public.profiles set role = 'admin', status = 'approved'
 --    where email = 'callum@heliaxis.co.uk';
+
+-- 6. Enquiries: captured from the website "free quote" form.
+create table if not exists public.enquiries (
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  email         text not null,
+  phone         text,
+  postcode      text,
+  interest      text,
+  property_type text,
+  source        text not null default 'quote-form',
+  status        text not null default 'new'
+                check (status in ('new','contacted','qualified','won','lost')),
+  created_at    timestamptz not null default now()
+);
+
+alter table public.enquiries enable row level security;
+-- No policies: only the service-role key (server code) can read/write.
+-- The public/anon key has no access, so leads can't be scraped from the browser.

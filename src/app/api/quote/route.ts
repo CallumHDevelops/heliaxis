@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // Handles the "Get my free quote" form on the landing page (public/pages/home.html).
 // Mirrors the subcontractor route: sends an admin notification via Resend.
@@ -21,6 +22,26 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Name and email are required.' },
         { status: 400 }
       );
+    }
+
+    // Best-effort: capture the enquiry in Supabase so it shows in the admin
+    // dashboard. Never blocks the email path if Supabase isn't configured.
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const supabase = createAdminClient();
+        const { error } = await supabase.from('enquiries').insert({
+          name: data.name,
+          email: data.email,
+          phone: data.phone || null,
+          postcode: data.postcode || null,
+          interest: data.interest || null,
+          property_type: data.propertyType || null,
+          source: 'quote-form',
+        });
+        if (error) console.error('❌ Supabase enquiry insert failed:', error.message);
+      } catch (e) {
+        console.error('❌ Supabase enquiry insert threw:', e);
+      }
     }
 
     if (!process.env.RESEND_API_KEY) {
