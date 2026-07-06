@@ -1,18 +1,6 @@
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import { brand } from './authStyles';
-
-function Spark({ size = 26 }: { size?: number }) {
-  const ray = 'M11 9.6 L13 9.6 L13 0.8 L11 3 Z';
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill={brand.solar} aria-hidden="true">
-      {[0, 90, 180, 270].map((a) => (
-        <g key={a} transform={`rotate(${a} 12 12)`}>
-          <path d={ray} />
-        </g>
-      ))}
-    </svg>
-  );
-}
 
 export function AuthShell({
   title,
@@ -39,19 +27,15 @@ export function AuthShell({
       }}
     >
       <div style={{ width: '100%', maxWidth: 420 }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '.5rem',
-            justifyContent: 'center',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <Spark />
-          <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '.02em' }}>
-            HELIAXIS
-          </span>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <Image
+            src="/assets/heliaxis-logo.png"
+            alt="Heliaxis"
+            width={180}
+            height={41}
+            style={{ width: 180, height: 'auto' }}
+            priority
+          />
         </div>
 
         <div
