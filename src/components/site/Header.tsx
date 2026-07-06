@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
+import type { MenuTop } from '@/lib/menu-types';
 import styles from './Header.module.css';
 
 /* Monopitch spark */
@@ -50,14 +51,9 @@ function Icon({ name, size = 22 }: { name: string; size?: number }) {
   );
 }
 
-/* Menu data — hrefs mapped to current routes. Items without a dedicated page yet
-   point at the closest section/anchor; update as pages are built. */
-type NavItem = { icon: string; label: string; href: string; desc?: string };
-type NavCol = { title: string; items: NavItem[] };
-type Featured = { title: string; text: string; cta: string; href: string };
-type Top = { label: string; href?: string; cols?: NavCol[]; featured?: Featured };
-
-const MENU: Top[] = [
+/* Default menu — used until the CMS publishes one (see src/lib/cms.ts). Items
+   without a dedicated page yet point at the closest section/anchor. */
+const DEFAULT_MENU: MenuTop[] = [
   {
     label: 'Residential',
     cols: [
@@ -120,7 +116,8 @@ const MENU: Top[] = [
   { label: 'Contact', href: '/#quote' },
 ];
 
-export default function Header() {
+export default function Header({ menu }: { menu?: MenuTop[] }) {
+  const MENU = menu && menu.length ? menu : DEFAULT_MENU;
   const [open, setOpen] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpand, setMobileExpand] = useState<number | null>(null);
@@ -232,8 +229,19 @@ export default function Header() {
                   </div>
                 ))}
                 {t.featured && (
-                  <div className={styles.megafeat}>
-                    <Spark size={34} />
+                  <div
+                    className={`${styles.megafeat}${t.featured.bg === 'light' && !t.featured.img ? ` ${styles.light}` : ''}`}
+                    style={
+                      t.featured.img
+                        ? {
+                            backgroundImage: `linear-gradient(rgba(20,18,14,.5),rgba(20,18,14,.82)),url(${t.featured.img})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }
+                        : undefined
+                    }
+                  >
+                    {!t.featured.img && <Spark size={34} />}
                     <div className={styles.ftT}>{t.featured.title}</div>
                     <p>{t.featured.text}</p>
                     <Link className={styles.ftCta} href={t.featured.href}>

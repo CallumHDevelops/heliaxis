@@ -172,9 +172,9 @@
 }
 .megaitem:hover .miD { max-height: 7em; opacity: 1; margin-top: 4px; }
 
-/* featured panel */
+/* featured panel — uses the brand card-fill texture (dark by default) */
 .megafeat {
-  background: var(--ink);
+  background: var(--ink) url('/assets/heliaxis-card-fill-dark.svg') top right / cover no-repeat;
   color: var(--paper, #f7f2e7);
   padding: 28px 30px;
   position: relative;
@@ -183,18 +183,16 @@
   flex-direction: column;
   justify-content: center;
 }
-.megafeat::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(rgba(247, 242, 231, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(247, 242, 231, 0.05) 1px, transparent 1px);
-  background-size: 44px 44px;
-  -webkit-mask-image: linear-gradient(150deg, #000, transparent 80%);
-  mask-image: linear-gradient(150deg, #000, transparent 80%);
-}
 .megafeat > * { position: relative; }
 .megafeat :global(svg) { color: var(--solar); fill: var(--solar); margin-bottom: 14px; }
+
+/* light variant of the featured panel — light card-fill texture */
+.megafeat.light {
+  background: var(--paper-2, #efe8d8) url('/assets/heliaxis-card-fill-light.svg') top right / cover no-repeat;
+  color: var(--ink);
+}
+.megafeat.light .ftT { color: var(--ink); }
+.megafeat.light p { color: var(--muted, #6e6a5e); }
 .ftT { font-family: var(--display); font-weight: 800; font-size: 1.3rem; max-width: 16ch; }
 .megafeat p { color: var(--muted-d, #a69f8e); font-size: 0.86rem; margin-top: 8px; max-width: 26ch; }
 .ftCta {

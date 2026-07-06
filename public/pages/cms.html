@@ -1062,7 +1062,8 @@ function renderMega(){var el=document.getElementById('megaedit');var M=STATE.sit
  var panel;
  if(mega){
    var cols=sel.cols.map(function(c){return '<div class="mm-col"><div class="mm-ey">'+esc(c.ey)+'</div>'+c.items.map(function(it){return '<div class="mm-item"><span class="ic">'+icon(it.icon||'solar',18)+'</span><div><b>'+esc(it.label)+'</b>'+(it.desc?'<span class="mm-d">'+esc(it.desc)+'</span>':'')+'</div></div>';}).join('')+'</div>';}).join('');
-   var fbg=feat.img?' style="background-image:linear-gradient(rgba(20,18,14,.5),rgba(20,18,14,.82)),url('+feat.img+');background-size:cover;background-position:center"':'';
+   var _tex=feat.bg==='light'?'/assets/heliaxis-card-fill-light.svg':'/assets/heliaxis-card-fill-dark.svg';
+   var fbg=feat.img?' style="background-image:linear-gradient(rgba(20,18,14,.5),rgba(20,18,14,.82)),url('+feat.img+');background-size:cover;background-position:center"':' style="background-image:url('+_tex+');background-size:cover;background-position:top right;background-repeat:no-repeat"';
    var featured='<div class="mm-featured'+(feat.bg==='light'&&!feat.img?' light':'')+'"'+fbg+'>'+(feat.img?'':'<svg class="mm-spark" viewBox="0 0 24 24" fill="#F8BC1E" width="32" height="32">'+[0,90,180,270].map(function(a){return '<g transform="rotate('+a+' 12 12)">'+RAY+'</g>'}).join('')+'</svg>')+'<div class="mm-ft-t">'+esc(feat.title)+'</div><p>'+esc(feat.text)+'</p><span class="mm-ft-cta">'+esc(feat.cta)+' →</span></div>';
    panel='<div class="mm-panel" style="grid-template-columns:repeat('+sel.cols.length+',1fr) 1.15fr">'+cols+featured+'</div>';
  } else {
@@ -1076,8 +1077,8 @@ function renderMega(){var el=document.getElementById('megaedit');var M=STATE.sit
  if(!mega){
    ed+='<div class="fld"><label>This item links directly to</label><select onchange="setTopPage('+MEGA_PI+',this.value)">'+pageOpts(sel.page||'')+'</select></div>';
  } else {
-   ed+='<div class="fld"><label>Featured panel — background</label><div class="seg"><button class="'+(feat.bg!=='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'dark\')">Dark</button><button class="'+(feat.bg==='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'light\')">Light</button></div></div>'+
-     '<div class="fld"><label>Featured image (optional — overrides the background)</label>'+menuFeatImgs(feat)+'</div>'+
+   ed+='<div class="fld"><label>Featured panel — background</label><div class="seg"><button class="'+(feat.bg!=='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'dark\')">Dark texture</button><button class="'+(feat.bg==='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'light\')">Light texture</button></div><div class="hint" style="font-size:.75rem;margin-top:4px">Uses the brand card-fill background we designed — grid + warm glow, in dark or light.</div></div>'+
+     '<div class="fld"><label>Or a custom photo (optional — overrides the texture)</label>'+menuFeatImgs(feat)+'</div>'+
      '<div class="fld"><label>Featured title</label><input value="'+esc(feat.title)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).title=this.value;renderMega();save()"></div>'+
      '<div class="fld"><label>Featured text</label><textarea rows="2" onchange="featOf(STATE.site.menu['+MEGA_PI+']).text=this.value;renderMega();save()">'+esc(feat.text)+'</textarea></div>'+
      '<div class="row2"><div class="fld"><label>CTA label</label><input value="'+esc(feat.cta)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).cta=this.value;renderMega();save()"></div><div class="fld"><label>CTA links to</label><select onchange="featOf(STATE.site.menu['+MEGA_PI+']).ctaPage=this.value;save()">'+pageOpts(feat.ctaPage)+'</select></div></div>';
