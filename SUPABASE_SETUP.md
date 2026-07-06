@@ -11,7 +11,10 @@ following one-time setup (only you can — it needs your Supabase account + secr
 ## 2. Create the database tables
 1. In the project, open **SQL Editor → New query**.
 2. Paste the contents of [`supabase/schema.sql`](supabase/schema.sql) and **Run**.
-   This creates the `profiles` table, the approval trigger, and security policies.
+   This creates `profiles` (users/approval), `enquiries` (leads from the quote form),
+   and `cms_kv` (the CMS page-builder documents), plus security policies.
+   The script is safe to re-run — if you set it up earlier, run it again to add the
+   newer `enquiries` and `cms_kv` tables.
 
 ## 3. Turn off email confirmation (for now)
 Our gate is *admin approval*, so email verification just adds friction.
