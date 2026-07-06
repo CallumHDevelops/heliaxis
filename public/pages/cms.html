@@ -411,7 +411,7 @@ button{font-family:inherit;cursor:pointer}
 window.storage = {
   async get(key){
     try {
-      const r = await fetch('/api/cms?key=' + encodeURIComponent(key), { credentials:'same-origin' });
+      const r = await fetch('/api/cms?key=' + encodeURIComponent(key), { credentials:'same-origin', cache:'no-store' });
       if (!r.ok) return null;
       const d = await r.json();
       return (d && d.value != null) ? { value: d.value } : null;

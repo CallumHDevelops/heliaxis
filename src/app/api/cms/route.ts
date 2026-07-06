@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+// Never cache CMS reads/writes — the editor must always see the latest saved doc.
+export const dynamic = 'force-dynamic';
+const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' };
+
 // Only approved, signed-in users may read/write CMS content.
 async function requireApproved() {
   const { user, profile } = await getSessionProfile();
@@ -19,9 +23,9 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient();
   const { data, error } = await admin.from('cms_kv').select('value').eq('key', key).maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
 
-  return NextResponse.json({ value: data?.value ?? null });
+  return NextResponse.json({ value: data?.value ?? null }, { headers: NO_STORE });
 }
 
 // Save a CMS document (window.storage.set).
