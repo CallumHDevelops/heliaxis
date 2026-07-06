@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Heliaxis Website <onboarding@resend.dev>',
+        from: 'Heliaxis <noreply@heliaxis.co.uk>',
         to: [process.env.ADMIN_EMAIL || 'your-email@example.com'],
         subject: `☀️ New quote request: ${data.name}${data.postcode ? ` (${data.postcode})` : ''}`,
         html: adminEmailHtml,

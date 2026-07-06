@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Subcontractor Portal <onboarding@resend.dev>',
+        from: 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
         to: [process.env.ADMIN_EMAIL || 'your-email@example.com'],
         subject: `🔔 New Subcontractor Onboarding: ${data.companyName}`,
         html: adminEmailHtml,
@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
           'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: 'Subcontractor Portal <onboarding@resend.dev>',
+          from: 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
           to: [data.email],
           subject: '✅ Confirmation: Your Subcontractor Onboarding Submission',
           html: userReceiptHtml,
