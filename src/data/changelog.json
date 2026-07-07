@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.4.1",
+    "date": "2026-07-07",
+    "type": "fix",
+    "title": "CMS editor: type freely again",
+    "detail": "Editing text in the page-builder no longer loses focus after each keystroke — you can type normally, and saves are batched instead of firing on every key."
+  },
+  {
     "version": "0.4.0",
     "date": "2026-07-06",
     "type": "feature",
