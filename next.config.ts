@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
         { source: '/warehousing', destination: '/pages/warehousing.html' },
         { source: '/solar-estimator', destination: '/pages/solar-estimator.html' },
         { source: '/roof-designer', destination: '/pages/roof-designer.html' },
+        { source: '/brand', destination: '/pages/brand.html' },
         { source: '/admin', destination: '/pages/cms.html' },
       ],
     };

@@ -587,8 +587,8 @@ function renderBuild(){
  if(SEL){const bl=b.find(x=>x.id===SEL);if(bl)h+='<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"><div class="ph">'+SPARK+'Edit: '+BLOCKNAMES[bl.t]+'</div>'+inspector(bl)+'</div>';}
  el.innerHTML=h;
 }
-function txt(label,val,path){return '<div class="fld"><label>'+label+'</label><input value="'+esc(val)+'" oninput="upd(\''+path+'\',this.value)"></div>'}
-function area(label,val,path){return '<div class="fld"><label>'+label+'</label><textarea rows="2" oninput="upd(\''+path+'\',this.value)">'+esc(val)+'</textarea></div>'}
+function txt(label,val,path){return '<div class="fld"><label>'+label+'</label><input value="'+esc(val)+'" oninput="updT(\''+path+'\',this.value)"></div>'}
+function area(label,val,path){return '<div class="fld"><label>'+label+'</label><textarea rows="2" oninput="updT(\''+path+'\',this.value)">'+esc(val)+'</textarea></div>'}
 function chk(label,val,path){return '<label class="chk"><input type="checkbox" '+(val?'checked':'')+' onchange="upd(\''+path+'\',this.checked)">'+label+'</label>'}
 function iconPicker(cur,path){const uid2='ip'+Math.random().toString(36).slice(2,7);
  return '<div class="fld"><label>Icon (library — '+ICONKEYS.length+')</label><input placeholder="search icons…" style="margin-bottom:5px" oninput="filterIcons(this,\''+uid2+'\')"><div class="iconpick" id="'+uid2+'">'+ICONKEYS.map(k=>'<button data-k="'+k+'" class="'+(k===cur?'on':'')+'" onclick="upd(\''+path+'\',\''+k+'\')" title="'+k+'">'+icon(k,18)+'</button>').join('')+'</div></div>'}
@@ -606,7 +606,7 @@ function inspector(bl){const p=bl.p,id=bl.id;let h='';
  else if(bl.t==='split'){h+='<div class="hint"><b>Left card</b></div>'+txt('Title',p.lt,id+'.lt')+area('Text',p.ld,id+'.ld')+bulletsEd(id,'lb',p.lb)+txt('Button',p.lc,id+'.lc');
    h+='<div class="hint"><b>Right card (dark)</b></div>'+txt('Title',p.rt,id+'.rt')+area('Text',p.rd,id+'.rd')+bulletsEd(id,'rb',p.rb)+txt('Button',p.rc,id+'.rc');}
  else if(bl.t==='testi'){h+='<div class="hint">Add testimonials. <b>More than 3 turns it into an auto-scrolling slider.</b></div>';
-   h+='<div class="fld"><label>Slider speed — '+(p.speed||36)+'s per loop (lower = faster)</label><input type="range" min="12" max="80" value="'+(p.speed||36)+'" oninput="upd(\''+id+'.speed\',+this.value)"></div>';
+   h+='<div class="fld"><label>Slider speed — '+(p.speed||36)+'s per loop (lower = faster)</label><input type="range" min="12" max="80" value="'+(p.speed||36)+'" oninput="updT(\''+id+'.speed\',+this.value)"></div>';
    p.items.forEach((tt,i)=>{h+='<div class="sub"><div class="sh"><b>#'+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+area('Quote',tt.quote,id+'.items.'+i+'.quote')+'<div class="row2">'+txt('Name',tt.name,id+'.items.'+i+'.name')+txt('Location',tt.loc,id+'.items.'+i+'.loc')+'</div><div class="fld"><label>Stars — '+(tt.stars||5)+'</label><div class="seg">'+[1,2,3,4,5].map(s=>'<button class="'+((tt.stars||5)===s?'on':'')+'" onclick="upd(\''+id+'.items.'+i+'.stars\','+s+')">'+s+'★</button>').join('')+'</div></div></div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{stars:5,quote:\'Great service.\',name:\'Name\',loc:\'Town\'})">+ Add testimonial</button>';
    if(p.items.length>3)h+='<div class="hint" style="color:var(--ok)">✓ Slider active ('+p.items.length+' testimonials)</div>';}
@@ -627,10 +627,15 @@ function bulletsEd(id,key,arr){let h='<div class="fld"><label>Bullets</label>';a
 
 /* ============ MUTATIONS ============ */
 function spacingStyle(p){let s='';if(p._pt)s+='padding-top:'+p._pt+'px;';if(p._pb)s+='padding-bottom:'+p._pb+'px;';if(p._mt)s+='margin-top:'+p._mt+'px;';if(p._mb)s+='margin-bottom:'+p._mb+'px;';return s;}
-function spacingEd(id,p){function n(l,k){return '<div class="fld"><label>'+l+' (px)</label><input type="number" value="'+(p[k]||'')+'" placeholder="0" oninput="upd(\''+id+'.'+k+'\',this.value===\'\'?0:+this.value)"></div>'}
+function spacingEd(id,p){function n(l,k){return '<div class="fld"><label>'+l+' (px)</label><input type="number" value="'+(p[k]||'')+'" placeholder="0" oninput="updT(\''+id+'.'+k+'\',this.value===\'\'?0:+this.value)"></div>'}
  return '<div class="sub" style="background:var(--paper-2)"><div class="sh"><b>Spacing</b></div><div class="row2">'+n('Pad top','_pt')+n('Pad bottom','_pb')+'</div><div class="row2">'+n('Margin top','_mt')+n('Margin bottom','_mb')+'</div></div>'}
 function findBlock(id){return page().blocks.find(b=>b.id===id)}
 function upd(path,val){const parts=path.split('.');const bl=findBlock(parts[0]);if(!bl)return;let o=bl.p;for(let i=1;i<parts.length-1;i++){o=o[parts[i]]}o[parts[parts.length-1]]=val;renderPreview();renderBuild();save();}
+/* Text/number/range updater: updates preview + saves WITHOUT rebuilding the
+   inspector (rebuilding recreates the input and steals focus after one char). */
+let _debSaveTimer;
+function debSave(){clearTimeout(_debSaveTimer);_debSaveTimer=setTimeout(function(){save();},500);}
+function updT(path,val){const parts=path.split('.');const bl=findBlock(parts[0]);if(!bl)return;let o=bl.p;for(let i=1;i<parts.length-1;i++){o=o[parts[i]]}o[parts[parts.length-1]]=val;renderPreview();debSave();}
 function updArr(id,key,i,val){findBlock(id).p[key][i]=val;renderPreview();save();}
 function updArr2(id,key,i,f,val){findBlock(id).p[key][i][f]=val;renderPreview();save();}
 function addItem(id,key,obj){findBlock(id).p[key].push(typeof obj==='object'?JSON.parse(JSON.stringify(obj)):obj);renderPreview();renderBuild();save();}
