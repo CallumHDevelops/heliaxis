@@ -32,14 +32,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // --- Admin auth (only when Supabase is configured) ---
+  // --- Admin auth ---
   const supabaseConfigured =
     !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
   const isAuthPath = AUTH_PATHS.includes(pathname);
 
-  if (!supabaseConfigured || (!isAdminPath && !isAuthPath)) {
+  // Anything outside admin/auth is public — let it through.
+  if (!isAdminPath && !isAuthPath) {
+    return NextResponse.next();
+  }
+
+  // Fail closed: without Supabase there's no way to authenticate, so admin
+  // must NOT be open. Send admin requests to the login screen.
+  if (!supabaseConfigured) {
+    if (isAdminPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('next', pathname);
+      return NextResponse.redirect(url);
+    }
     return NextResponse.next();
   }
 
