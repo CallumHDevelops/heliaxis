@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
 export type Profile = {
@@ -22,4 +23,35 @@ export async function getSessionProfile() {
     .single();
 
   return { user, profile: (profile as Profile | null) ?? null };
+}
+
+/** Approved users only — returns null otherwise. */
+export async function requireApproved() {
+  const session = await getSessionProfile();
+  if (!session.user || session.profile?.status !== 'approved') return null;
+  return session as { user: NonNullable<typeof session.user>; profile: Profile };
+}
+
+/** Redirect unauthenticated / unapproved users away from admin routes. */
+export async function guardAdmin(nextPath = '/admin') {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, status')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || profile.status !== 'approved') {
+    redirect('/pending');
+  }
+
+  return { user, profile: profile as Profile };
 }

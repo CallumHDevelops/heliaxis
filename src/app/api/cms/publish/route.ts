@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSessionProfile } from '@/lib/auth';
+import { requireApproved } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const DRAFT_KEY = 'heliaxis-cms-v1';
@@ -9,8 +9,8 @@ const RENDERED_KEY = 'heliaxis-cms-rendered';
 // Publish: snapshot the draft as published, and store the client-rendered
 // page HTML + CSS that the live (site) route serves.
 export async function POST(req: Request) {
-  const { user, profile } = await getSessionProfile();
-  if (!user || profile?.status !== 'approved') {
+  const session = await requireApproved();
+  if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

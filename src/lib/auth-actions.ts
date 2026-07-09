@@ -2,12 +2,14 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { safeAdminPath } from '@/lib/auth-utils';
 
 export type AuthState = { error: string } | null;
 
 export async function login(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const email = String(formData.get('email') || '').trim();
   const password = String(formData.get('password') || '');
+  const next = safeAdminPath(String(formData.get('next') || ''));
 
   if (!email || !password) return { error: 'Please enter your email and password.' };
 
@@ -26,7 +28,7 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
     redirect('/pending');
   }
 
-  redirect('/admin');
+  redirect(next);
 }
 
 export async function register(_prev: AuthState, formData: FormData): Promise<AuthState> {

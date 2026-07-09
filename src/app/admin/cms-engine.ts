@@ -6,7 +6,8 @@
  * All original JS logic, executed after the DOM shell mounts.
  * Functions are attached to window so onclick attributes continue working.
  */
-export function initCms(): void {
+export function initCms(options?: { initialPageSlug?: string | null }): void {
+var CMS_INITIAL_SLUG = options?.initialPageSlug || null;
 /* ---- Supabase-backed storage shim: wires the page-builder to /api/cms ---- */
 window.storage = {
   async get(key){
@@ -22,7 +23,12 @@ window.storage = {
       method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
       body: JSON.stringify({ key, value: String(value) })
     });
-    if (!r.ok) throw new Error('save failed');
+    if (!r.ok) {
+      let msg = 'Save failed';
+      try { const d = await r.json(); msg = d.error || msg; } catch (e) {}
+      if (r.status === 401) throw new Error('Sign in as an approved admin to save to Supabase.');
+      throw new Error(msg);
+    }
     return true;
   }
 };
@@ -109,11 +115,27 @@ function homeBlocks(){return [
 function newState(){return {pages:[{id:uid(),name:'Home',slug:'/',type:'page',blocks:homeBlocks()}],current:0,site:defaultSite()}}
 
 /* ============ persistence ============ */
-async function save(){DIRTY=true;setSaved('saving…');try{if(window.storage){await window.storage.set('heliaxis-cms-v1',JSON.stringify(STATE),false);setSaved('✓ all changes saved');}else{setSaved('saved (this session)');}DIRTY=false;}catch(e){setSaved('⚠ save failed — retry');}}
-function setSaved(t){const e=document.getElementById('savestate');if(e)e.textContent=t}
+async function save(){
+  DIRTY=true;
+  setSaved('Saving to Supabase…');
+  try{
+    if(!window.storage)throw new Error('Storage unavailable');
+    await window.storage.set('heliaxis-cms-v1',JSON.stringify(STATE),false);
+    setSaved('Saved to Supabase');
+    DIRTY=false;
+  }catch(e){
+    setSaved(e&&e.message?e.message:'Save failed');
+  }
+}
+function setSaved(t){const e=document.getElementById('savestate');if(!e)return;const label=e.querySelector('.save-label');if(label)label.textContent=t;else e.textContent=t;e.classList.toggle('is-dirty',/saving|failed|unsaved/i.test(t));e.classList.toggle('is-saving',/saving/i.test(t));e.classList.toggle('is-ok',/saved/i.test(t)&&!/failed|unsaved|saving/i.test(t));}
 async function boot(){
   try{if(window.storage){const r=await window.storage.get('heliaxis-cms-v1');if(r&&r.value){STATE=JSON.parse(r.value);}}}catch(e){}
   if(!STATE)STATE=newState();
+  if(ensureUniquePageTitles())save();
+  if(repairLegacyUntitledSlugs())save();
+  var slug=CMS_INITIAL_SLUG||getSlugFromPath();
+  CMS_INITIAL_SLUG=null;
+  if(slug){var idx=findPageByEditSlug(slug);if(idx>=0){STATE.current=idx;SEL=null;MODE='edit';setMode();renderAll();tab('build');syncCmsUrl(true);return;}}
   MODE='dash';setMode();renderAll();
 }
 function page(){return STATE.pages[STATE.current]}
@@ -128,7 +150,7 @@ function btn(label,cls,pulse,ic,ep,edit){if(!label)return '';return '<span class
 function eyebrow(t,ep,edit){return '<span class="pv-eyebrow">'+SPARK+'<span'+ce(ep,edit)+'>'+esc(t)+'</span></span>'}
 function renderBlock(b,edit){
  const p=b.p;const id=b.id;
- if(b.t==='hero')return '<div class="pv-hero'+(p.dark?'':' light')+'"><div class="z">'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h1'+ce(id+'.headline',edit)+'>'+esc(p.headline)+'</h1><p class="sub"'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p><div class="pv-btnrow">'+btn(p.ctaLabel,'solar',p.ctaPulse,null,id+'.ctaLabel',edit)+btn(p.cta2,p.dark?'':'dark ghost',false,null,id+'.cta2',edit)+'</div></div></div>';
+ if(b.t==='hero')return '<div class="pv-hero'+(p.dark?'':' light')+'"><div class="z">'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h1'+ce(id+'.headline',edit)+'>'+esc(p.headline)+'</h1><p class="pv-sub"'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p><div class="pv-btnrow">'+btn(p.ctaLabel,'solar',p.ctaPulse,null,id+'.ctaLabel',edit)+btn(p.cta2,p.dark?'':'dark ghost',false,null,id+'.cta2',edit)+'</div></div></div>';
  if(b.t==='stats')return '<div class="pv-stats" style="grid-template-columns:repeat('+(p.items.length)+',1fr)">'+p.items.map((s,i)=>'<div class="pv-stat"><div class="n"'+ce(id+'.items.'+i+'.n',edit)+'>'+esc(s.n)+'</div><div class="k"'+ce(id+'.items.'+i+'.k',edit)+'>'+esc(s.k)+'</div></div>').join('')+'</div>';
  if(b.t==='grid'){const gc=(it,i)=>'<div class="pv-card"><span class="ic">'+icon(it.icon)+'</span><h3'+ce(id+'.items.'+i+'.title',edit)+'>'+esc(it.title)+'</h3><p'+ce(id+'.items.'+i+'.desc',edit)+'>'+esc(it.desc)+'</p></div>';
    let inner;
@@ -205,7 +227,7 @@ function renderBuild(){
  }
  h+=b.map((bl,i)=>
    '<div class="blkrow'+(SEL===bl.id?' sel':'')+'" draggable="true" data-i="'+i+'" onmouseenter="blockRowPrev(\''+bl.id+'\',this)" onmouseleave="blockRowLeave(event)" ondragstart="dstart(event,'+i+')" ondragover="dover(event,'+i+',this)" ondragleave="dleave(this)" ondrop="ddrop(event,'+i+')" ondragend="dend()" onclick="selectBlock(\''+bl.id+'\')">'+
-   '<span class="gr">⋮⋮</span><span class="nm">'+BLOCKNAMES[bl.t]+'</span><span class="ty">'+bl.t+'</span><button class="x" onclick="event.stopPropagation();delBlock(\''+bl.id+'\')">×</button></div>').join('')+'</div>';
+   '<span class="gr">⋮⋮</span><span class="nm">'+BLOCKNAMES[bl.t]+'</span><span class="ty">'+bl.t+'</span><button class="x" onclick="event.stopPropagation();confirmDelBlock(\''+bl.id+'\')">×</button></div>').join('')+'</div>';
  h+='<div class="addwrap"><button class="addbtn" onclick="document.getElementById(\'addmenu\').classList.toggle(\'hide\')">+ Add section</button>'+
    '<div class="addmenu hide" id="addmenu">'+Object.keys(BLOCKNAMES).map(t=>'<button draggable="true" ondragstart="dstartNew(event,\''+t+'\')" ondragend="dend()" onmouseenter="sectionPrev(\''+t+'\',this)" onmouseleave="blockRowLeave(event)" onclick="addBlock(\''+t+'\')" title="Click to add, or drag onto the layout">'+BLOCKNAMES[t]+'</button>').join('')+'</div></div>';
  // inspector
@@ -286,6 +308,28 @@ function addBlock(t){const bl=makeBlock(t);page().blocks.push(bl);SEL=bl.id;
 function addBlockAt(t,idx){const b=page().blocks;if(idx==null||idx<0||idx>b.length)idx=b.length;const bl=makeBlock(t);b.splice(idx,0,bl);SEL=bl.id;
  const am=document.getElementById('addmenu');if(am)am.classList.add('hide');renderPreview();renderBuild();save();}
 function delBlock(id){page().blocks=page().blocks.filter(b=>b.id!==id);if(SEL===id)SEL=null;renderPreview();renderBuild();save();}
+function confirmDelBlock(id){
+  var bl=findBlock(id);
+  if(!bl)return;
+  var name=BLOCKNAMES[bl.t]||bl.t;
+  var box=document.getElementById('modalbox');
+  box.className='modalbox modal-confirm';
+  box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+    +'<div class="modal-confirm-head">'
+    +'<div class="modal-confirm-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></div>'
+    +'<div><h2>Delete section?</h2><p>Are you sure you want to delete this section? This cannot be undone.</p></div>'
+    +'</div>'
+    +'<div class="modal-confirm-body">'
+    +'<div class="modal-confirm-label">Section to remove</div>'
+    +'<div class="modal-confirm-target"><span class="gr">⋮⋮</span><span class="nm">'+esc(name)+'</span><span class="ty">'+esc(bl.t)+'</span></div>'
+    +'</div>'
+    +'<div class="modal-confirm-foot">'
+    +'<button type="button" class="mbtn mbtn-ghost" onclick="closeModal()">Cancel</button>'
+    +'<button type="button" class="mbtn mbtn-danger" onclick="doDelBlock(\''+id+'\')">Delete section</button>'
+    +'</div>';
+  document.getElementById('modal').classList.add('show');
+}
+function doDelBlock(id){closeModal();delBlock(id);}
 /* drag reorder (existing blocks) + drag-to-add (new sections from the add menu) */
 let dragNewType=null;
 function clearDropCues(){document.querySelectorAll('.blkrow.dropbefore,.blkrow.dropafter').forEach(function(el){el.classList.remove('dropbefore','dropafter');});const o=document.getElementById('outline');if(o)o.classList.remove('dropzone');document.querySelectorAll('.outline-empty.dropzone').forEach(function(el){el.classList.remove('dropzone');});}
@@ -310,9 +354,65 @@ function ddropEnd(e){if(e)e.preventDefault();
 function dend(){clearDropCues();pvClear();dragIdx=null;dragNewType=null;}
 
 /* ============ PAGES ============ */
-function renderPageSel(){const s=document.getElementById('pagesel');s.innerHTML=STATE.pages.map((p,i)=>'<option value="'+i+'"'+(i===STATE.current?' selected':'')+'>'+esc(p.name)+(p.type==='landing'?' (LP)':'')+'</option>').join('')}
-function switchPage(i){STATE.current=+i;SEL=null;renderAll();save();}
-function addPage(){const name=prompt('Page name:','New page');if(!name)return;STATE.pages.push({id:uid(),name,slug:'/'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),type:'page',blocks:[]});STATE.current=STATE.pages.length-1;SEL=null;renderAll();save();}
+let PAGE_PICKER_SEARCH='';
+function pagePickerMatches(pg,q){if(!q)return true;q=q.toLowerCase();return (pg.name||'').toLowerCase().indexOf(q)>=0||(pg.slug||'').toLowerCase().indexOf(q)>=0;}
+function pagePickerIndices(){var out=[];STATE.pages.forEach(function(pg,i){if(pagePickerMatches(pg,PAGE_PICKER_SEARCH))out.push(i);});out.sort(function(a,b){var na=(STATE.pages[a].name||'').toLowerCase();var nb=(STATE.pages[b].name||'').toLowerCase();return na<nb?-1:na>nb?1:a-b;});return out;}
+function renderPagePickerList(){var el=document.getElementById('pagePickerList');var countEl=document.getElementById('pagePickerCount');if(!el)return;var indices=pagePickerIndices();var cur=STATE.current;var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page'};if(countEl)countEl.textContent=PAGE_PICKER_SEARCH?indices.length+' of '+STATE.pages.length:STATE.pages.length+' pages';if(!indices.length){el.innerHTML='<div class="page-picker-empty">No pages match</div>';return;}el.innerHTML=indices.map(function(i){var pg=STATE.pages[i];var kind=dashPageBadge(pg);return '<button type="button" class="page-picker-item'+(i===cur?' on':'')+'" role="option" aria-selected="'+(i===cur)+'" onclick="pagePickerPick('+i+')"><span class="page-picker-item-name">'+esc(pg.name)+'</span><span class="page-picker-item-meta">'+esc(pg.slug||'/')+' · '+labels[kind]+'</span></button>';}).join('');}
+function renderPageSel(){var lbl=document.getElementById('pagePickerLabel');if(lbl&&page())lbl.textContent=page().name;var menu=document.getElementById('pagePickerMenu');if(menu&&menu.classList.contains('open'))renderPagePickerList();}
+function togglePagePicker(ev){if(ev)ev.stopPropagation();var menu=document.getElementById('pagePickerMenu');var btn=document.getElementById('pagePickerTrigger');if(!menu)return;if(menu.classList.contains('open')){closePagePicker();return;}closeToolbarMore();menu.classList.add('open');if(btn)btn.setAttribute('aria-expanded','true');PAGE_PICKER_SEARCH='';var inp=document.getElementById('pagePickerSearch');if(inp){inp.value='';inp.focus();}renderPagePickerList();}
+function closePagePicker(){var menu=document.getElementById('pagePickerMenu');var btn=document.getElementById('pagePickerTrigger');if(menu)menu.classList.remove('open');if(btn)btn.setAttribute('aria-expanded','false');PAGE_PICKER_SEARCH='';}
+function pagePickerSearch(q){PAGE_PICKER_SEARCH=q;renderPagePickerList();}
+function pagePickerPick(i){closePagePicker();switchPage(i);}
+function renderToolbarPageType(){var el=document.getElementById('toolbarPageType');if(!el)return;if(MODE!=='edit'||!page()){el.innerHTML='';return;}var kind=dashPageBadge(page());var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page'};el.innerHTML='<span class="toolbar-type-badge toolbar-type-'+kind+'">'+labels[kind]+'</span>';var lbl=document.getElementById('toolbarPageLabel');if(lbl)lbl.textContent=page().name;}
+function toggleToolbarMore(ev){if(ev)ev.stopPropagation();var menu=document.getElementById('toolbarMore');var btn=document.getElementById('toolbarMoreBtn');if(!menu)return;var open=menu.classList.toggle('open');if(btn)btn.setAttribute('aria-expanded',open?'true':'false');}
+function closeToolbarMore(){var menu=document.getElementById('toolbarMore');var btn=document.getElementById('toolbarMoreBtn');if(menu)menu.classList.remove('open');if(btn)btn.setAttribute('aria-expanded','false');}
+function switchPage(i){STATE.current=+i;SEL=null;renderAll();save();syncCmsUrl(false);}
+function addPage(){
+  var box=document.getElementById('modalbox');
+  box.className='modalbox';
+  var defaultName=uniquePageTitle('New page');
+  var defaultSlug=titleToSlug(defaultName);
+  box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+    +'<h2>Create new page</h2>'
+    +'<p>Give your page a title. The URL slug updates automatically to match.</p>'
+    +'<div class="fld"><label for="new-page-name">Page title</label>'
+    +'<input id="new-page-name" type="text" value="'+esc(defaultName)+'" placeholder="e.g. Solar Panels Cardiff" oninput="newPageNameInput(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();confirmNewPage()}"></div>'
+    +'<div class="fld"><label for="new-page-slug">URL slug</label>'
+    +'<input id="new-page-slug" type="text" value="'+esc(defaultSlug)+'" placeholder="/solar-panels-cardiff" oninput="newPageSlugInput()"></div>'
+    +'<div id="new-page-err" class="modal-err" role="alert"></div>'
+    +'<div class="modal-actions">'
+    +'<button type="button" class="tbtn modal-btn-ghost" onclick="closeModal()">Cancel</button>'
+    +'<button type="button" class="tbtn solar modal-btn-primary" onclick="confirmNewPage()">Create page</button>'
+    +'</div>';
+  document.getElementById('modal').classList.add('show');
+  var inp=document.getElementById('new-page-name');
+  if(inp){inp.focus();inp.select();}
+}
+function newPageNameInput(v){var slugInp=document.getElementById('new-page-slug');if(!slugInp||slugInp.dataset.manual==='1')return;slugInp.value=titleToSlug(normTitle(v));}
+function newPageSlugInput(){var slugInp=document.getElementById('new-page-slug');if(slugInp)slugInp.dataset.manual='1';}
+function slugFromInput(v,fallbackName){var slug=normTitle(v);if(!slug)slug=titleToSlug(fallbackName);if(!slug.startsWith('/'))slug='/'+slug.replace(/^\/+/,'');return slug;}
+function confirmNewPage(){
+  var inp=document.getElementById('new-page-name');
+  var slugInp=document.getElementById('new-page-slug');
+  var err=document.getElementById('new-page-err');
+  if(!inp)return;
+  var name=normTitle(inp.value);
+  if(!name){if(err)err.textContent='Please enter a page name.';inp.focus();return;}
+  if(pageTitleTaken(name)){if(err)err.textContent='A page titled “'+name+'” already exists. Choose a different title.';inp.focus();return;}
+  var slug=slugFromInput(slugInp?slugInp.value:'',name);
+  STATE.pages.push({id:uid(),name,slug,type:'page',blocks:[]});
+  var np=STATE.pages[STATE.pages.length-1];
+  np.seo={slug:np.slug};
+  STATE.current=STATE.pages.length-1;
+  SEL=null;
+  closeModal();
+  MODE='edit';
+  setMode();
+  renderAll();
+  tab('build');
+  save();
+  syncCmsUrl(false);
+}
 
 /* ============ MENU TAB ============ */
 function renderMenu(){const el=document.getElementById('panel-menu');let h='<div class="ph">'+SPARK+'Mega menu editor</div><div class="hint">Edit the top-level items and their columns. This drives the site nav &amp; mega panel.</div>'+megaPreview();
@@ -459,12 +559,16 @@ function imgMetaUpd(i,k,v){STATE.site.images[i][k]=v;save();if(k==='cat'){render
 function imgRm(i){STATE.site.images.splice(i,1);renderImages();if(MODE==='library')renderLibrary();save();}
 
 /* ============ SEO TAB ============ */
+function setPageTheme(t){const pg=page();pg.theme=t;renderPreview();renderSEO();save();}
+function setPageType(kind){var pg=page();var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return;if(kind==='page')pg.type='page';else if(kind==='landing')pg.type='landing';else if(kind==='case')pg.type='casestudy';renderSEO();renderToolbarPageType();save();}
+function pageTypePickerHtml(pg){var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return '<div class="fld"><label>Page type</label><div class="hint" style="margin:0">Homepage — set automatically because the URL slug is <code>/</code>.</div></div>';var kind=dashPageBadge(pg);return '<div class="fld"><label>Page type</label><div class="seg"><button type="button" class="'+(kind==='page'?'on':'')+'" onclick="setPageType(\'page\')">Page</button><button type="button" class="'+(kind==='landing'?'on':'')+'" onclick="setPageType(\'landing\')">Landing</button><button type="button" class="'+(kind==='case'?'on':'')+'" onclick="setPageType(\'case\')">Case study</button></div><div class="hint" style="margin-top:6px;margin-bottom:0">Used for dashboard badges and filters. Create shortcuts: <b>+ Landing page</b> or <b>+ Case study</b> on the dashboard.</div></div>';}
 function renderSEO(){const el=document.getElementById('panel-seo');const pg=page();pg.seo=pg.seo||{};const s=pg.seo;
- function f(l,k,ph){return '<div class="fld"><label>'+l+'</label><input value="'+esc(s[k]||'')+'" placeholder="'+ph+'" oninput="seoUpd(\''+k+'\',this.value)"></div>'}
- let h='<div class="ph">'+SPARK+'Page settings — '+esc(pg.name)+'</div><div class="fld"><label>Theme</label><div class="seg"><button class="'+(pg.theme!=='dark'?'on':'')+'" onclick="page().theme=\'light\';renderPreview();renderSEO();save()">Light</button><button class="'+(pg.theme==='dark'?'on':'')+'" onclick="page().theme=\'dark\';renderPreview();renderSEO();save()">Dark</button></div></div><div class="hint">Everything an agency needs to rank the page. These write into the exported page\'s &lt;head&gt;.</div>';
- h+=f('Page title (SEO)','title','Solar Panels Cardiff | Heliaxis')+'<div class="fld"><label>Meta description</label><textarea rows="3" oninput="seoUpd(\'desc\',this.value)" placeholder="150–160 characters…">'+esc(s.desc||'')+'</textarea></div>'+f('URL slug','slug','/solar-panels-cardiff')+f('Social share image URL','ogImage','https://…')+f('Canonical URL','canonical','https://heliaxis.co.uk/…')+'<label class="chk"><input type="checkbox" '+(s.noindex?'checked':'')+' onchange="seoUpd(\'noindex\',this.checked)"> Hide from search engines (noindex)</label>';
+ function f(l,k,ph){var val=s[k]||'';if(k==='slug'&&!val&&pg.slug)val=pg.slug;return '<div class="fld"><label>'+l+'</label><input value="'+esc(val)+'" placeholder="'+ph+'" oninput="seoUpd(\''+k+'\',this.value)"></div>'}
+ var slugVal=s.slug||pg.slug||'';
+ let h='<div class="ph">'+SPARK+'Page settings — '+esc(pg.name)+'</div><div class="fld"><label>Page title</label><input id="seo-page-name" value="'+esc(pg.name)+'" placeholder="Home" oninput="pageNameInput(this.value)" onchange="pageNameUpd(this.value)"><div class="hint" style="margin-top:4px">Must be unique — used in the admin URL and page list. URL slug updates to match.</div></div>'+pageTypePickerHtml(pg)+'<div class="fld"><label>Theme</label><div class="seg"><button class="'+(pg.theme!=='dark'?'on':'')+'" onclick="setPageTheme(\'light\')">Light</button><button class="'+(pg.theme==='dark'?'on':'')+'" onclick="setPageTheme(\'dark\')">Dark</button></div></div><div class="hint">Everything an agency needs to rank the page. These write into the exported page\'s &lt;head&gt;.</div>';
+ h+=f('Page title (SEO)','title','Solar Panels Cardiff | Heliaxis')+'<div class="fld"><label>Meta description</label><textarea rows="3" oninput="seoUpd(\'desc\',this.value)" placeholder="150–160 characters…">'+esc(s.desc||'')+'</textarea></div><div class="fld"><label>URL slug</label><input id="seo-slug-input" value="'+esc(slugVal)+'" placeholder="/solar-panels-cardiff" oninput="seoUpd(\'slug\',this.value)"></div>'+f('Social share image URL','ogImage','https://…')+f('Canonical URL','canonical','https://heliaxis.co.uk/…')+'<label class="chk"><input type="checkbox" '+(s.noindex?'checked':'')+' onchange="seoUpd(\'noindex\',this.checked)"> Hide from search engines (noindex)</label>';
  el.innerHTML=h;}
-function seoUpd(k,v){const pg=page();pg.seo=pg.seo||{};pg.seo[k]=v;if(k==='slug'&&v)pg.slug=v;save();}
+function seoUpd(k,v){const pg=page();pg.seo=pg.seo||{};pg.seo[k]=v;if(k==='slug')pg.slug=v;save();}
 
 /* ============ DASHBOARD TAB ============ */
 const SAMPLE_SUBS=[{n:'Emily Watkins',e:'emily@…',p:'CF24',src:'Home hero',t:'2h ago'},{n:'Rhys Davies',e:'rhys@…',p:'SA1',src:'PPA landing',t:'5h ago'},{n:'Morgan Ltd',e:'ops@morgan…',p:'NP19',src:'Commercial',t:'Yesterday'},{n:'Sian Hughes',e:'sian@…',p:'CF31',src:'Estimator',t:'Yesterday'}];
@@ -518,41 +622,120 @@ function tplPrev(i,elm){const blocks=landingBlocks(CAMPAIGNS[i],TEMPLATE_MAP[i])
 function tplHide(){const p=document.getElementById('tplpop');if(p)p.remove();window._tplHoverEl=null;}
 function blockRowLeave(ev){if(ev.relatedTarget&&ev.currentTarget.contains(ev.relatedTarget))return;tplHide();}
 function blockRowPrev(id,elm){if(SEL===id){tplHide();return;}window._tplHoverEl=elm;var bl=findBlock(id);if(bl)popAt(elm,'Preview · '+BLOCKNAMES[bl.t],renderBlock(bl));}
-function makeLanding(i){tplHide();const c=CAMPAIGNS[i];STATE.pages.push({id:uid(),name:c[0],slug:'/lp/'+c[0].toLowerCase().replace(/[^a-z0-9]+/g,'-'),type:'landing',theme:THEME_BY_TPL[TEMPLATE_MAP[i]],blocks:landingBlocks(c,TEMPLATE_MAP[i])});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();if(0)console.log('Landing page “'+c[0]+'” created — now showing in the preview. Edit it in the Sections tab.');}
+function makeLanding(i){tplHide();const c=CAMPAIGNS[i];var name=uniquePageTitle(c[0]);STATE.pages.push({id:uid(),name:name,slug:titleToSlug(name),type:'landing',theme:THEME_BY_TPL[TEMPLATE_MAP[i]],blocks:landingBlocks(c,TEMPLATE_MAP[i])});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);if(0)console.log('Landing page “'+name+'” created — now showing in the preview. Edit it in the Sections tab.');}
 
 /* ============ TABS / VIEW ============ */
 function tab(t){['build','images','seo'].forEach(x=>{document.getElementById('panel-'+x).classList.toggle('hide',x!==t);document.querySelector('.tab[data-tab="'+x+'"]').classList.toggle('on',x===t)});
  if(t==='images')renderImages();if(t==='seo')renderSEO();}
 function setView(v){VIEW=v;document.getElementById('vw-desk').classList.toggle('on',v==='desk');document.getElementById('vw-mob').classList.toggle('on',v==='mob');renderPreview();}
-function renderAll(){renderPageSel();if(MODE==='dash'){renderDashboard();}else{renderPreview();renderBuild();}}
+function renderAll(){renderPageSel();renderToolbarPageType();if(MODE==='dash'){renderDashboard();}else{renderPreview();renderBuild();}}
 
 /* ============ EXPORT / PUBLISH ============ */
-function pageHTML(pg){
- const css=document.querySelector('style').textContent.split('/* ---------- PREVIEW (brand) ---------- */')[1].split('.modal{')[0].replace(/\.preview /g,'').replace(/\.pv-block[^}]*}/g,'');
+let PUBLISH_STYLES={root:'',preview:''};
+async function ensurePublishStyles(){
+  if(PUBLISH_STYLES.preview)return PUBLISH_STYLES;
+  var r=await fetch('/api/cms/publish-styles',{credentials:'same-origin',cache:'no-store'});
+  if(!r.ok){var em='Could not load publish styles';try{em=(await r.json()).error||em;}catch(e){}throw new Error(em);}
+  PUBLISH_STYLES=await r.json();
+  if(!PUBLISH_STYLES.preview)throw new Error('Publish styles response was empty');
+  return PUBLISH_STYLES;
+}
+async function pageHTML(pg){
+ await ensurePublishStyles();
+ const css=PUBLISH_STYLES.preview;
  const body=pg.blocks.map(b=>'<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>').join('\n');
  const seo=pg.seo||{};const meta=(seo.desc?'<meta name="description" content="'+esc(seo.desc)+'">':'')+(seo.noindex?'<meta name="robots" content="noindex">':'')+(seo.canonical?'<link rel="canonical" href="'+esc(seo.canonical)+'">':'')+(seo.ogImage?'<meta property="og:image" content="'+esc(seo.ogImage)+'">':'')+'<meta property="og:title" content="'+esc(seo.title||pg.name)+'">';
  return '<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>'+esc(seo.title||pg.name+' — Heliaxis')+'</title>'+meta+
   '<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">'+
-  '<style>'+document.querySelector('style').textContent.split(':root')[1].split('/* app shell */')[0].replace(/^/,':root')+
-  'body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink)}body.dk{background:var(--ink)}'+css+'</style></head><body'+(pg.theme==='dark'?' class="dk"':'')+'>'+body+'</body></html>';
+  '<style>'+PUBLISH_STYLES.root+'body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink)}body.dk{background:var(--ink)}'+css+'</style></head><body'+(pg.theme==='dark'?' class="dk"':'')+'>'+body+'</body></html>';
 }
 function download(name,text){const b=new Blob([text],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
-function exportHTML(){download(page().slug.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'')+'.html'||'page.html',pageHTML(page()));}
+async function exportHTML(){var pg=page();var slug=(pg.slug||'/').replace(/^\//,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'')||'page';download(slug+'.html',await pageHTML(pg));}
 function exportJSON(){const b=new Blob([JSON.stringify(STATE,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='heliaxis-site.json';a.click();URL.revokeObjectURL(u);}
-function openPublish(){document.getElementById('modalbox').innerHTML='<button class="close" onclick="closeModal()">×</button>'+
- '<h2>Publish to your site</h2><p>This editor runs in your browser, so it can\'t push to GitHub on its own — that needs one small connection step. Here\'s the cleanest setup:</p>'+
- '<p><b>Option A — Git-based CMS (recommended).</b> Host this editor at <code>/admin</code> on your repo and add <b>Decap CMS</b> (free). It authenticates with GitHub and commits your changes straight to the repo; your host (Netlify / Vercel / GitHub Pages) rebuilds automatically. Every “Publish” becomes a real commit.</p>'+
- '<p><b>Option B — GitHub Action.</b> Export the site JSON below, commit it, and let an Action render the pages and deploy:</p>'+
- '<pre>name: build\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: node render.js   # turns site.json into /public/*.html\n      - uses: actions/deploy-pages@v4</pre>'+
- '<p>For now you can ship today with the buttons below:</p>'+
- '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="tbtn solar" style="color:var(--ink)" onclick="exportHTML()">Download this page (HTML)</button><button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="exportJSON()">Download site data (JSON)</button></div>'+
- '<p style="margin-top:14px;font-size:.82rem">Want me to wire up Option A on your repo so “Publish” commits live? Just say the word.</p>';
- document.getElementById('modal').classList.add('show');}
+function openPublish(){
+  var box=document.getElementById('modalbox');
+  box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+    +'<h2>Publish to your site</h2>'
+    +'<p>This makes your saved changes live on the website. Make sure you\'ve saved first.</p>'
+    +'<div id="pubmsg" style="margin:12px 0;font-size:.9rem"></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="tbtn solar" style="color:var(--ink)" onclick="doPublish()">Publish now</button>'
+    +'<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="exportJSON()">Download data (JSON)</button>'
+    +'</div>';
+  document.getElementById('modal').classList.add('show');
+}
+async function doPublish(){
+  var m=document.getElementById('pubmsg');
+  m.style.color='var(--muted)';m.textContent='Saving & publishing…';
+  try{
+    await save();
+    await ensurePublishStyles();
+    var css=PUBLISH_STYLES.preview;
+    var pages=STATE.pages.map(function(pg){
+      return{slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
+        html:pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')};
+    });
+    var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
+      body:JSON.stringify({rendered:{css:css,pages:pages}})});
+    if(!r.ok){var em='Publish failed';try{em=(await r.json()).error||em;}catch(e){}if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');throw new Error(em);}
+    m.style.color='var(--ok)';
+    m.textContent='✓ Published — your changes are now live.';
+  }catch(e){
+    m.style.color='var(--amber-2)';
+    m.textContent='⚠ '+(e&&e.message?e.message:'Publish failed');
+  }
+}
 function closeModal(){document.getElementById('modal').classList.remove('show')}
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
+document.addEventListener('keydown',function(e){if(MODE!=='dash')return;if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes((document.activeElement&&document.activeElement.tagName)||'')){e.preventDefault();var el=document.getElementById('dash-page-search');if(el)el.focus();}});
+document.addEventListener('click',function(e){var wrap=document.querySelector('.toolbar-more-wrap');if(wrap&&!wrap.contains(e.target))closeToolbarMore();var picker=document.getElementById('pagePicker');if(picker&&!picker.contains(e.target))closePagePicker();});
+window.addEventListener('popstate',function(){var slug=getSlugFromPath();if(!slug){goDash(true);return;}var idx=findPageByEditSlug(slug);if(idx>=0){STATE.current=idx;SEL=null;MODE='edit';setMode();renderAll();tab('build');}else goDash(true);});
 
+/* ===== dashboard URL routing ===== */
+function normTitle(s){return (s||'').trim();}
+function titleKey(s){return normTitle(s).toLowerCase();}
+function pageTitleTaken(name,exceptIdx){var k=titleKey(name);if(!k)return false;for(var i=0;i<STATE.pages.length;i++){if(i===exceptIdx)continue;if(titleKey(STATE.pages[i].name)===k)return true;}return false;}
+function uniquePageTitle(base,exceptIdx){base=normTitle(base)||'Untitled page';if(!pageTitleTaken(base,exceptIdx))return base;var n=2;while(pageTitleTaken(base+' '+n,exceptIdx))n++;return base+' '+n;}
+function ensureUniquePageTitles(){var changed=false;for(var i=0;i<STATE.pages.length;i++){if(!pageTitleTaken(STATE.pages[i].name,i))continue;STATE.pages[i].name=uniquePageTitle(STATE.pages[i].name,i);changed=true;}return changed;}
+function trySetPageName(idx,name){name=normTitle(name);if(!name){alert('Page title cannot be empty.');return false;}if(pageTitleTaken(name,idx)){alert('A page titled “'+name+'” already exists. Choose a different title.');return false;}STATE.pages[idx].name=name;syncPageSlugFromTitle(STATE.pages[idx]);save();renderAll();if(MODE==='edit'&&STATE.current===idx){renderSEO();syncCmsUrl(false);}return true;}
+function pageNameUpd(v){if(!trySetPageName(STATE.current,v))renderSEO();}
+function slugifyTitle(s){return (s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+function titleToSlug(name){var base=slugifyTitle(name)||'page';return '/'+base;}
+function isHomePage(pg){var cur=(pg.slug||'/').replace(/\/$/,'')||'/';return cur==='/'||cur==='';}
+function slugFromPageTitle(pg){if(isHomePage(pg))return '/';return titleToSlug(pg.name);}
+function syncPageSlugFromTitle(pg){var next=slugFromPageTitle(pg);pg.slug=next;pg.seo=pg.seo||{};pg.seo.slug=next;}
+function repairLegacyUntitledSlugs(){var changed=false;STATE.pages.forEach(function(pg){if(!pg.name||isHomePage(pg))return;if(!/^\/untitled-[a-z0-9]+$/i.test(pg.slug||''))return;syncPageSlugFromTitle(pg);changed=true;});return changed;}
+function pageNameInput(v){var pg=page();var cur=(pg.slug||'').replace(/\/$/,'')||'/';if(cur==='/'||cur==='')return;var slugInp=document.getElementById('seo-slug-input');if(!slugInp)return;slugInp.value=slugFromPageTitle({name:normTitle(v),slug:pg.slug,type:pg.type});}
+function pageEditSlug(pg){var base=slugifyTitle(pg.name);if(!base)base=slugifyTitle((pg.slug||'/').replace(/^\//,''))||'page';return base;}
+function getSlugFromPath(){var parts=location.pathname.replace(/\/+$/,'').split('/');if(parts.length<3||parts[1]!=='admin')return null;var s=decodeURIComponent(parts[2]);if(!s||s==='enquiries'||s==='approvals')return null;return s;}
+function findPageByEditSlug(slug){if(!slug)return -1;slug=decodeURIComponent(slug).toLowerCase();return STATE.pages.findIndex(function(pg){return pageEditSlug(pg).toLowerCase()===slug;});}
+function cmsAdminPath(slug){return '/admin/'+encodeURIComponent(slug);}
+function syncCmsUrl(replace){var path='/admin';if(MODE==='edit'&&page())path=cmsAdminPath(pageEditSlug(page()));if(location.pathname===path){document.title=MODE==='edit'&&page()?page().name+' · Heliaxis CMS':'Heliaxis CMS';return;}var state={cmsMode:MODE,slug:MODE==='edit'&&page()?pageEditSlug(page()):null};if(replace)history.replaceState(state,'',path);else history.pushState(state,'',path);document.title=MODE==='edit'&&page()?page().name+' · Heliaxis CMS':'Heliaxis CMS';}
 /* ===== extension: template variety, case studies, section preview ===== */
 let IMGFILTER='';
+let DASH_PAGE_SEARCH='';
+let DASH_PAGE_NUM=1;
+let DASH_PAGE_SORT='az';
+let DASH_PAGE_TYPE='';
+const DASH_PAGE_SIZE=12;
+var dashSearchTimer=null;
+function dashPageTypeMatches(pg){if(!DASH_PAGE_TYPE)return true;return dashPageBadge(pg)===DASH_PAGE_TYPE;}
+function dashTypeCounts(){var c={all:STATE.pages.length,home:0,landing:0,case:0,page:0};STATE.pages.forEach(function(pg){c[dashPageBadge(pg)]++;});return c;}
+function dashPageMatches(pg){if(!DASH_PAGE_SEARCH)return true;var q=DASH_PAGE_SEARCH.toLowerCase();return (pg.name||'').toLowerCase().indexOf(q)>=0||(pg.slug||'').toLowerCase().indexOf(q)>=0;}
+function dashFilteredIndices(){var out=[];STATE.pages.forEach(function(pg,i){if(dashPageMatches(pg)&&dashPageTypeMatches(pg))out.push(i);});out.sort(function(a,b){var na=(STATE.pages[a].name||'').toLowerCase();var nb=(STATE.pages[b].name||'').toLowerCase();if(na===nb)return a-b;return DASH_PAGE_SORT==='za'?(na<nb?1:-1):(na<nb?-1:1);});return out;}
+function dashPageSearch(q){DASH_PAGE_SEARCH=q;DASH_PAGE_NUM=1;clearTimeout(dashSearchTimer);dashSearchTimer=setTimeout(renderDashPages,200);}
+function dashPageTypeSet(v){DASH_PAGE_TYPE=v;DASH_PAGE_NUM=1;renderDashPages();}
+function dashPageFilterHtml(){var tc=dashTypeCounts();return '<select class="dash-sort" id="dash-page-type" onchange="dashPageTypeSet(this.value)" title="Filter by page type"><option value="">All pages ('+tc.all+')</option><option value="home"'+(DASH_PAGE_TYPE==='home'?' selected':'')+'>Home ('+tc.home+')</option><option value="landing"'+(DASH_PAGE_TYPE==='landing'?' selected':'')+'>Landing ('+tc.landing+')</option><option value="case"'+(DASH_PAGE_TYPE==='case'?' selected':'')+'>Case study ('+tc.case+')</option><option value="page"'+(DASH_PAGE_TYPE==='page'?' selected':'')+'>Page ('+tc.page+')</option></select>';}
+function dashPagesHeadCount(total){if(DASH_PAGE_SEARCH||DASH_PAGE_TYPE)return total+' of '+STATE.pages.length;return ''+STATE.pages.length;}
+function dashClearSearch(){DASH_PAGE_SEARCH='';var el=document.getElementById('dash-page-search');if(el)el.value='';DASH_PAGE_NUM=1;renderDashPages();}
+function dashPageGo(n){DASH_PAGE_NUM=Math.max(1,+n||1);renderDashPages();var sec=document.getElementById('dash-pages-sec');if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});}
+function dashPageBadge(pg){var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return 'home';var t=(pg.type||'page').toLowerCase();if(t==='landing')return 'landing';if(t==='casestudy'||t==='case')return 'case';if(t==='home')return 'home';var name=(pg.name||'').toLowerCase();if(name.indexOf('landing')>=0)return 'landing';if(slug.indexOf('case-study')>=0||name.indexOf('case study')>=0)return 'case';return 'page';}
+function dashPageBadgeHtml(kind){var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page'};return '<span class="pbadge pbadge-'+kind+'">'+labels[kind]+'</span>';}
+function dashPageCard(i){var pg=STATE.pages[i];var secs=(pg.blocks||[]).length;var badge=dashPageBadge(pg);return '<article class="pcard" onclick="editPage('+i+')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();editPage('+i+')}"><div class="pthumb"><div class="pthumb-frame"><div class="zi" id="thumb'+i+'"></div></div><div class="pthumb-shade"></div>'+dashPageBadgeHtml(badge)+'<span class="pthumb-open"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>Open editor</span></div><div class="pcard-body"><h3 class="pcard-name">'+esc(pg.name)+'</h3><div class="pcard-meta-row"><span class="pcard-secs">'+secs+' section'+(secs===1?'':'s')+'</span></div><div class="pcard-actions" onclick="event.stopPropagation()"><button type="button" class="pcard-btn pcard-btn-primary" onclick="editPage('+i+')">Edit page</button><button type="button" class="pcard-btn pcard-btn-danger" onclick="delPage('+i+')" title="Delete page">Delete</button></div></div></article>';}
+function dashStatsHtml(){var nc=newCount();var imgs=(STATE.site&&STATE.site.images)?STATE.site.images.length:0;return '<div class="dash-stats"><div class="dash-stat"><span class="dash-stat-n">'+STATE.pages.length+'</span><span class="dash-stat-l">Pages</span></div><div class="dash-stat'+(nc?' dash-stat-hot':'')+'"><span class="dash-stat-n">'+nc+'</span><span class="dash-stat-l">New leads</span></div><div class="dash-stat"><span class="dash-stat-n">'+imgs+'</span><span class="dash-stat-l">Images</span></div><a class="dash-stat dash-stat-link" href="/" target="_blank" rel="noopener"><span class="dash-stat-n">↗</span><span class="dash-stat-l">View live site</span></a></div>';}
+function renderDashThumb(i){var pg=STATE.pages[i];var t=document.getElementById('thumb'+i);if(!t)return;t.className='zi'+(pg.theme==='dark'?' dk':'');t.innerHTML=pg.blocks.length?pg.blocks.map(renderBlock).join(''):'<div class="pthumb-empty">Empty page — click to add sections</div>';}
+function renderDashPages(){var indices=dashFilteredIndices();var total=indices.length;var pages=Math.max(1,Math.ceil(total/DASH_PAGE_SIZE));if(DASH_PAGE_NUM>pages)DASH_PAGE_NUM=pages;var start=(DASH_PAGE_NUM-1)*DASH_PAGE_SIZE;var slice=indices.slice(start,start+DASH_PAGE_SIZE);var searchEl=document.getElementById('dash-page-search');var hadFocus=searchEl&&document.activeElement===searchEl;var selStart=hadFocus?searchEl.selectionStart:0;var selEnd=hadFocus?searchEl.selectionEnd:0;var hEl=document.getElementById('dash-pages-h');if(hEl)hEl.innerHTML=SPARK+'Your pages ('+dashPagesHeadCount(total)+')';var clr=document.getElementById('dash-search-clear');if(clr)clr.style.display=DASH_PAGE_SEARCH?'inline-flex':'none';var typeEl=document.getElementById('dash-page-type');if(typeEl){var tc=dashTypeCounts();typeEl.innerHTML='<option value="">All pages ('+tc.all+')</option><option value="home"'+(DASH_PAGE_TYPE==='home'?' selected':'')+'>Home ('+tc.home+')</option><option value="landing"'+(DASH_PAGE_TYPE==='landing'?' selected':'')+'>Landing ('+tc.landing+')</option><option value="case"'+(DASH_PAGE_TYPE==='case'?' selected':'')+'>Case study ('+tc.case+')</option><option value="page"'+(DASH_PAGE_TYPE==='page'?' selected':'')+'>Page ('+tc.page+')</option>';}var grid=document.getElementById('dash-pages-grid');if(!grid)return;var h='';if(!total)h+='<div class="dash-empty">'+(DASH_PAGE_SEARCH||DASH_PAGE_TYPE?'No pages match your filters. <button type="button" class="dash-link-btn" onclick="dashClearFilters()">Clear filters</button>':'No pages yet. Create one above.')+'</div>';else slice.forEach(function(i){h+=dashPageCard(i);});grid.innerHTML=h;var pager=document.getElementById('dash-pages-pager');if(pager){if(total<=DASH_PAGE_SIZE)pager.innerHTML='';else pager.innerHTML='<div class="dash-pager"><button type="button" class="dash-pg-btn"'+(DASH_PAGE_NUM<=1?' disabled':'')+' onclick="dashPageGo('+(DASH_PAGE_NUM-1)+')">← Previous</button><span class="dash-pg-info">Page '+DASH_PAGE_NUM+' of '+pages+' · '+total+' page'+(total===1?'':'s')+'</span><button type="button" class="dash-pg-btn"'+(DASH_PAGE_NUM>=pages?' disabled':'')+' onclick="dashPageGo('+(DASH_PAGE_NUM+1)+')">Next →</button></div>';}slice.forEach(renderDashThumb);if(hadFocus){var el2=document.getElementById('dash-page-search');if(el2){el2.focus();try{el2.setSelectionRange(selStart,selEnd);}catch(e){}}}}
+function dashClearFilters(){DASH_PAGE_SEARCH='';DASH_PAGE_TYPE='';DASH_PAGE_NUM=1;var el=document.getElementById('dash-page-search');if(el)el.value='';renderDashPages();}
 var TEMPLATE_MAP=['product','dark','image','finance','minimal','grant','image','sector','product','grant','image','dark','minimal','sector','image'];
 var THEME_BY_TPL={product:'light',dark:'dark',image:'light',minimal:'light',finance:'light',grant:'light',sector:'light'};
 var TPL_LABEL={product:'Light · classic',dark:'Dark · bold',image:'Image-led',minimal:'Minimal · typographic',finance:'Finance · pricing',grant:'Grant · steps',sector:'Sector · case studies'};
@@ -620,7 +803,7 @@ const CASE_TEMPLATES=[
 function caseSection(){return '<div class="ph" style="margin-top:22px">'+SPARK+'Case studies</div><div class="hint">Press add, pick a template, then edit it like any page.</div><button class="addbtn" onclick="openCaseModal()">+ Add case study</button>';}
 function openCaseModal(){document.getElementById('modalbox').innerHTML='<button class="close" onclick="closeModal()">×</button><h2>Choose a case-study template</h2><p>Pick a layout — hover to preview, click to create. Everything is editable after.</p><div class="tplgrid" style="margin-top:14px">'+CASE_TEMPLATES.map((c,i)=>'<button class="tpl" onmouseenter="casePrev('+i+',this)" onmouseleave="tplHide()" onclick="makeCase('+i+')"><span><b>'+c.name+'</b><div class="d">'+c.desc+'</div></span><span class="go">Use →</span></button>').join('')+'</div>';document.getElementById('modal').classList.add('show');}
 function casePrev(i,elm){popAt(elm,'Preview · '+CASE_TEMPLATES[i].name,CASE_TEMPLATES[i].build().map(renderBlock).join(''));}
-function makeCase(i){tplHide();closeModal();const b=CASE_TEMPLATES[i].build();STATE.pages.push({id:uid(),name:CASE_TEMPLATES[i].name,slug:'/case-study/'+uid(),type:'casestudy',theme:CASE_TEMPLATES[i].theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();}
+function makeCase(i){tplHide();closeModal();const b=CASE_TEMPLATES[i].build();var name=uniquePageTitle(CASE_TEMPLATES[i].name);STATE.pages.push({id:uid(),name:name,slug:titleToSlug(name),type:'casestudy',theme:CASE_TEMPLATES[i].theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);}
 
 /* ===== dashboard / editor modes ===== */
 var MODE='dash';
@@ -632,22 +815,27 @@ function setMode(){var m=MODE;
  var eq=document.getElementById('enquiries');if(eq)eq.style.display=m==='enq'?'block':'none';
  var lg=document.getElementById('logoslib');if(lg)lg.style.display=m==='logos'?'block':'none';
  var me=document.getElementById('megaedit');if(me)me.style.display=m==='mega'?'block':'none';
- var b=document.getElementById('backbtn');if(b)b.style.display=m==='dash'?'none':'inline-flex';
- var et=document.getElementById('editorTools');if(et)et.style.display=m==='edit'?'flex':'none';}
-function goDash(){MODE='dash';setMode();renderDashboard();}
-function editPage(i){STATE.current=+i;SEL=null;MODE='edit';setMode();renderAll();tab('build');}
+ var tb=document.getElementById('cmsToolbar');if(tb)tb.classList.toggle('toolbar--edit',m==='edit');
+ var et=document.getElementById('editorTools');if(et)et.style.display=m==='edit'?'flex':'none';
+ var crumb=document.getElementById('toolbarCrumb');if(crumb)crumb.style.display=m==='edit'?'flex':'none';
+ closeToolbarMore();
+ renderToolbarPageType();}
+function goDash(skipUrl){MODE='dash';setMode();renderDashboard();if(!skipUrl)syncCmsUrl(false);}
+function editPage(i){STATE.current=+i;SEL=null;MODE='edit';setMode();renderAll();tab('build');syncCmsUrl(false);}
 function editTab(t){MODE='edit';setMode();renderAll();tab(t);}
 function delPage(i){if(STATE.pages.length<=1){alert('Keep at least one page.');return;}if(!confirm('Delete this page?'))return;STATE.pages.splice(i,1);if(STATE.current>=STATE.pages.length)STATE.current=STATE.pages.length-1;renderDashboard();save();}
-function dashNewPage(){var n=STATE.pages.filter(function(p){return /Untitled/.test(p.name)}).length;var name='Untitled page'+(n?' '+(n+1):'');STATE.pages.push({id:uid(),name:name,slug:'/untitled-'+uid(),type:'page',blocks:[{id:uid(),t:'hero',p:{eyebrow:'New page',headline:'Your headline here',sub:'Start building — add sections from the left.',dark:true,ctaLabel:'Get a quote',ctaPulse:false,cta2:''}}]});editPage(STATE.pages.length-1);save();}
+function dashNewPage(){var name=uniquePageTitle('Untitled page');var slug=titleToSlug(name);STATE.pages.push({id:uid(),name:name,slug:slug,type:'page',seo:{slug:slug},blocks:[{id:uid(),t:'hero',p:{eyebrow:'New page',headline:'Your headline here',sub:'Start building — add sections from the left.',dark:true,ctaLabel:'Get a quote',ctaPulse:false,cta2:''}}]});editPage(STATE.pages.length-1);save();}
 function renderDashboard(){var el=document.getElementById('dashboard');
  var h='<div class="dash-wrap"><div class="dash-head"><h1>Dashboard</h1><p>Your whole site at a glance. Open a page to edit it, or create something new.</p></div>';
+ h+=dashStatsHtml();
  h+='<div class="dash-sec-h">'+SPARK+'Create</div><div class="dash-actions">'+
-   '<button class="dact" onclick="dashNewPage()"><b>+ New page</b><span>Start from a blank canvas</span></button>'+
-   '<button class="dact" onclick="openGallery(\'landing\')"><b>+ Landing page</b><span>15 campaign templates</span></button>'+
-   '<button class="dact" onclick="openGallery(\'case\')"><b>+ Case study</b><span>3 layouts, scrollable previews</span></button>'+'<button class="dact" onclick="openGallery(\'template\')"><b>+ From template</b><span>Your saved layouts</span></button></div>';
- h+='<div class="dash-sec-h">'+SPARK+'Your pages ('+STATE.pages.length+')</div><div class="dash-grid">';
- STATE.pages.forEach(function(pg,i){h+='<div class="pcard"><div class="pthumb"><div class="zi" id="thumb'+i+'"></div></div><div class="pcard-b"><div><b>'+esc(pg.name)+'</b><span class="ptype">'+(pg.type||'page')+' · '+esc(pg.slug||'')+'</span></div><div class="pcard-act"><button class="tbtn2" onclick="editPage('+i+')">Edit →</button><button class="rm" onclick="delPage('+i+')">Delete</button></div></div></div>';});
- h+='</div>';
+   '<button class="dact dact-icon" onclick="dashNewPage()"><span class="dact-ic">'+icon('home',22)+'</span><b>+ New page</b><span>Start from a blank canvas</span></button>'+
+   '<button class="dact dact-icon" onclick="openGallery(\'landing\')"><span class="dact-ic">'+icon('target',22)+'</span><b>+ Landing page</b><span>15 campaign templates</span></button>'+
+   '<button class="dact dact-icon" onclick="openGallery(\'case\')"><span class="dact-ic">'+icon('building',22)+'</span><b>+ Case study</b><span>3 layouts, scrollable previews</span></button>'+
+   '<button class="dact dact-icon" onclick="openGallery(\'template\')"><span class="dact-ic">'+icon('grant',22)+'</span><b>+ From template</b><span>Your saved layouts</span></button></div>';
+ h+='<div id="dash-pages-sec" class="dash-panel"><div class="dash-sec-h" id="dash-pages-h">'+SPARK+'Your pages ('+STATE.pages.length+')</div>';
+ h+='<div class="dash-pages-toolbar"><div class="dash-search"><input id="dash-page-search" type="search" placeholder="Search by title or path…" value="'+esc(DASH_PAGE_SEARCH)+'" oninput="dashPageSearch(this.value)"><button type="button" class="dash-search-clear" id="dash-search-clear" style="display:'+(DASH_PAGE_SEARCH?'inline-flex':'none')+'" onclick="dashClearSearch()" title="Clear search">×</button></div><div class="dash-toolbar-filters">'+dashPageFilterHtml()+'</div></div>';
+ h+='<div class="dash-grid" id="dash-pages-grid"></div><div id="dash-pages-pager"></div></div>';
  h+=leadsCard();
  h+='<div class="dash-sec-h">'+SPARK+'Site &amp; admin</div><div class="dash-actions">'+
    '<button class="dact" onclick="showMega()"><b>Mega menu</b><span>Links, icons &amp; featured image</span></button>'+
@@ -657,7 +845,7 @@ function renderDashboard(){var el=document.getElementById('dashboard');
    '<button class="dact" onclick="showEnquiries()"><b>Enquiries</b><span>Leads &amp; statuses</span></button>'+
    '<button class="dact" onclick="showAnalytics()"><b>Analytics &amp; SEO</b><span>Traffic, engagement, rankings</span></button></div>';
  h+='</div>';el.innerHTML=h;
- STATE.pages.forEach(function(pg,i){var t=document.getElementById('thumb'+i);if(t){t.className='zi'+(pg.theme==='dark'?' dk':'');}if(t)t.innerHTML=pg.blocks.length?pg.blocks.map(renderBlock).join(''):'<div style="padding:60px;font-family:var(--mono);color:var(--muted-d)">Empty page</div>';});
+ renderDashPages();
 }
 /* scrollable-preview gallery for landing + case study creation */
 function openGallery(kind){
@@ -701,7 +889,7 @@ function openLead(i){var l=leads()[i];l.isnew=false;save();
  if(MODE==='dash')renderDashboard();
 }
 /* ===== standalone image library ===== */
-function showLibrary(){MODE='library';setMode();renderLibrary();}
+function showLibrary(){MODE='library';setMode();renderLibrary();syncCmsUrl(false);}
 function renderLibrary(){var el=document.getElementById('library');var imgs=STATE.site.images||[];var cats=[];imgs.forEach(function(im){if(im.cat&&cats.indexOf(im.cat)<0)cats.push(im.cat)});
  var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · auto-converted to WebP. Upload once, then add SEO per section when you use an image.</p></div><div><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
  h+='<div class="dash-actions" style="margin-bottom:16px"><select onchange="IMGFILTER=this.value;renderLibrary()" style="padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--card);max-width:260px"><option value="">All categories ('+imgs.length+')</option>'+cats.map(function(c){return '<option'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>';
@@ -711,7 +899,7 @@ function renderLibrary(){var el=document.getElementById('library');var imgs=STAT
 }
 /* ===== analytics + SEO ===== */
 var SEO_KW=[['solar panels cardiff',3,'Google',1420,118,'+2'],['battery storage wales',6,'Google',910,44,'+4'],['commercial solar newport',4,'Google',680,59,'-1'],['solar grants wales',7,'Google',540,28,'+6'],['infrared heating wales',9,'Bing',260,11,'new'],['smart export guarantee wales',5,'Google',330,19,'+3'],['led lighting upgrade cardiff',8,'Google',210,9,'+1'],['housing association solar',6,'Google',180,12,'+2']];
-function showAnalytics(){MODE='analytics';setMode();renderAnalytics();}
+function showAnalytics(){MODE='analytics';setMode();renderAnalytics();syncCmsUrl(false);}
 function renderAnalytics(){var el=document.getElementById('analytics');
  var days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],vals=[280,340,410,390,520,300,278];var mx=Math.max.apply(null,vals);
  var pages=[['/ (Home)',5210,'2m 14s','68%','1.9%'],['/lp/ppa-power-purchase',1840,'1m 52s','74%','3.2%'],['/commercial',1420,'2m 41s','61%','2.1%'],['/estimator',980,'3m 06s','82%','5.4%'],['/case-study/...',540,'2m 22s','70%','1.4%']];
@@ -728,7 +916,7 @@ function renderAnalytics(){var el=document.getElementById('analytics');
 
 /* ===== unsaved guard ===== */
 var DIRTY=false;
-function forceSave(){save();}
+async function forceSave(){await save();}
 window.addEventListener('beforeunload',function(e){if(DIRTY){e.preventDefault();e.returnValue='You have unsaved changes.';return e.returnValue;}});
 /* ===== mega-menu live preview ===== */
 var MENU_PI=0;
@@ -741,7 +929,7 @@ function megaPreview(){var m=(STATE.site&&STATE.site.menu)||[];if(!m.length)retu
 var STATUSES=['New','Contacted','Quoted','Won','Lost'];
 function ensureStatuses(){leads().forEach(function(l,i){if(!l.status)l.status=['New','New','Contacted','Quoted','Won'][i]||'New';});}
 function setLeadStatus(id,s){var l=leads().filter(function(x){return x.id===id})[0];if(l){l.status=s;save();renderEnquiries();}}
-function showEnquiries(){MODE='enq';setMode();renderEnquiries();}
+function showEnquiries(){MODE='enq';setMode();renderEnquiries();syncCmsUrl(false);}
 function renderEnquiries(){ensureStatuses();var el=document.getElementById('enquiries');var L=leads();
  var counts={};STATUSES.forEach(function(s){counts[s]=0});L.forEach(function(l){counts[l.status]=(counts[l.status]||0)+1});
  var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Enquiries</h1><p>'+L.length+' leads · give each a status and track it through the pipeline.</p></div></div>';
@@ -751,7 +939,7 @@ function renderEnquiries(){ensureStatuses();var el=document.getElementById('enqu
  h+='</div>';el.innerHTML=h;
 }
 /* ===== brand-logo library (standalone, like media) ===== */
-function showLogos(){MODE='logos';setMode();renderLogosLib();}
+function showLogos(){MODE='logos';setMode();renderLogosLib();syncCmsUrl(false);}
 function renderLogosLib(){var el=document.getElementById('logoslib');var L=STATE.site.logos||[];var inb=L.filter(function(l){return l.bnr}).length;
  var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Brand logos</h1><p>'+L.length+' logos · '+inb+' in the manufacturer banner. Tick to add or remove — the banner updates live.</p></div><div><label class="tbtn2" style="cursor:pointer">+ Add logo<input type="file" accept="image/*" style="display:none" onchange="logoFileAdd(this)"></label></div></div>';
  h+='<div class="libgrid">'+L.map(function(l,i){return '<div class="libcard"><button class="lc-x" onclick="STATE.site.logos.splice('+i+',1);renderLogosLib();save()">×</button><div style="height:90px;display:grid;place-items:center;background:var(--paper-2);border-bottom:1px solid var(--line)">'+(l.img?'<img src="'+l.img+'" style="max-width:80%;max-height:70px">':'<span style="font-family:var(--display);font-weight:800;color:var(--muted)">'+esc(l.name)+'</span>')+'</div><div class="lc-b" style="display:flex;align-items:center;justify-content:space-between;gap:6px"><input value="'+esc(l.name)+'" onchange="STATE.site.logos['+i+'].name=this.value;save()"><label style="font-family:var(--mono);font-size:.54rem;display:flex;align-items:center;gap:3px;white-space:nowrap"><input type="checkbox" '+(l.bnr?'checked':'')+' onchange="STATE.site.logos['+i+'].bnr=this.checked;save()"> banner</label></div></div>';}).join('')+'</div></div>';
@@ -772,12 +960,59 @@ function openKeyword(i){var k=SEO_KW[i];var base=k[1];var wks=8;var series=[];va
  document.getElementById('modal').classList.add('show');
 }
 /* ===== save as template + create from template ===== */
-function saveAsTemplate(){if(MODE!=='edit'){alert('Open a page in the editor first.');return;}var name=prompt('Template name:',page().name+' template');if(!name)return;STATE.templates=STATE.templates||[];STATE.templates.push({id:uid(),name:name,theme:page().theme||'light',blocks:JSON.parse(JSON.stringify(page().blocks))});save();alert('Saved “'+name+'” — find it under Create → From template.');}
-function makeFromTemplate(i){var t=(STATE.templates||[])[i];if(!t)return;var b=JSON.parse(JSON.stringify(t.blocks));b.forEach(function(bl){bl.id=uid()});STATE.pages.push({id:uid(),name:t.name,slug:'/'+t.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+uid().slice(0,4),type:'page',theme:t.theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();}
+function templateNameTaken(name){var k=normTitle(name).toLowerCase();if(!k)return false;return (STATE.templates||[]).some(function(t){return normTitle(t.name).toLowerCase()===k;});}
+function saveAsTemplate(){
+  closeToolbarMore();
+  var box=document.getElementById('modalbox');
+  box.className='modalbox';
+  if(MODE!=='edit'||!page()){
+    box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+      +'<h2>Save as template</h2>'
+      +'<p>Open a page in the editor first, then save its layout as a reusable template.</p>'
+      +'<div class="modal-actions"><button type="button" class="tbtn solar modal-btn-primary" onclick="closeModal()">OK</button></div>';
+    document.getElementById('modal').classList.add('show');
+    return;
+  }
+  var pg=page();
+  var defaultName=normTitle(pg.name)+' template';
+  var secCount=(pg.blocks||[]).length;
+  box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+    +'<h2>Save as template</h2>'
+    +'<p>Save this page layout so you can reuse it when creating new pages.</p>'
+    +'<p class="modal-note">From <b>'+esc(pg.name)+'</b> · '+secCount+' section'+(secCount===1?'':'s')+'</p>'
+    +'<div class="fld"><label for="template-name">Template name</label>'
+    +'<input id="template-name" type="text" value="'+esc(defaultName)+'" placeholder="e.g. Commercial landing template" onkeydown="if(event.key===\'Enter\'){event.preventDefault();confirmSaveTemplate()}"></div>'
+    +'<div id="template-save-err" class="modal-err" role="alert"></div>'
+    +'<div class="modal-actions">'
+    +'<button type="button" class="tbtn modal-btn-ghost" onclick="closeModal()">Cancel</button>'
+    +'<button type="button" class="tbtn solar modal-btn-primary" onclick="confirmSaveTemplate()">Save template</button>'
+    +'</div>';
+  document.getElementById('modal').classList.add('show');
+  var inp=document.getElementById('template-name');
+  if(inp){inp.focus();inp.select();}
+}
+function confirmSaveTemplate(){
+  var inp=document.getElementById('template-name');
+  var err=document.getElementById('template-save-err');
+  if(!inp)return;
+  var name=normTitle(inp.value);
+  if(!name){if(err)err.textContent='Please enter a template name.';inp.focus();return;}
+  if(templateNameTaken(name)){if(err)err.textContent='A template named “'+name+'” already exists. Choose a different name.';inp.focus();return;}
+  STATE.templates=STATE.templates||[];
+  STATE.templates.push({id:uid(),name:name,theme:page().theme||'light',blocks:JSON.parse(JSON.stringify(page().blocks))});
+  save();
+  var box=document.getElementById('modalbox');
+  box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+    +'<h2>Template saved</h2>'
+    +'<p class="modal-success">“'+esc(name)+'” is ready to reuse.</p>'
+    +'<p class="modal-note">Find it on the dashboard under <b>Create → From template</b>.</p>'
+    +'<div class="modal-actions"><button type="button" class="tbtn solar modal-btn-primary" onclick="closeModal()">Done</button></div>';
+}
+function makeFromTemplate(i){var t=(STATE.templates||[])[i];if(!t)return;var b=JSON.parse(JSON.stringify(t.blocks));b.forEach(function(bl){bl.id=uid()});var name=uniquePageTitle(t.name);var slug=titleToSlug(name);STATE.pages.push({id:uid(),name:name,slug:slug,type:'page',seo:{slug:slug},theme:t.theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);}
 
 /* ===== dedicated mega-menu editor page ===== */
 var MEGA_PI=0, MDRAG=null;
-function showMega(){MODE='mega';setMode();renderMega();}
+function showMega(){MODE='mega';setMode();renderMega();syncCmsUrl(false);}
 function pageName(slug){var p=STATE.pages.filter(function(x){return x.slug===slug})[0];return p?p.name:slug;}
 function pageOpts(cur){return '<option value="">— link to a page —</option>'+STATE.pages.map(function(p){return '<option value="'+esc(p.slug)+'"'+(cur===p.slug?' selected':'')+'>'+esc(p.name)+'</option>'}).join('');}
 function featOf(m){if(!m.featured)m.featured={img:'',title:'Book a free survey',text:'No obligation, no pushy sales — just honest advice.',cta:'Get a quote',ctaPage:'',bg:'dark'};if(!m.featured.bg)m.featured.bg='dark';return m.featured;}
@@ -861,48 +1096,7 @@ function renderMega(){var el=document.getElementById('megaedit');var M=STATE.sit
 }
 
 boot();
-
-/* ---- Real Publish: snapshot the draft live via /api/cms/publish ---- */
-window.openPublish = function(){
-  var box = document.getElementById('modalbox');
-  box.innerHTML = '<button class="close" onclick="closeModal()">×</button>'
-    + '<h2>Publish to your site</h2>'
-    + '<p>This makes your saved changes live on the website. Make sure you\'ve saved first.</p>'
-    + '<div id="pubmsg" style="margin:12px 0;font-size:.9rem"></div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +   '<button class="tbtn solar" style="color:var(--ink)" onclick="doPublish()">Publish now</button>'
-    +   '<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="exportJSON()">Download data (JSON)</button>'
-    + '</div>';
-  document.getElementById('modal').classList.add('show');
-};
-window.doPublish = async function(){
-  var m = document.getElementById('pubmsg');
-  m.style.color = 'var(--muted)'; m.textContent = 'Saving & publishing…';
-  try {
-    if (typeof save === 'function') { await save(); }
-    // Extract the block CSS the same way exportHTML/pageHTML does.
-    var full = document.querySelector('style').textContent;
-    var css = full.split('/* ---------- PREVIEW (brand) ---------- */')[1]
-      .split('.modal{')[0].replace(/\.preview /g,'').replace(/\.pv-block[^}]*}/g,'');
-    // Render each page's blocks to static HTML (reuses the CMS renderer).
-    var pages = STATE.pages.map(function(pg){
-      return {
-        slug: pg.slug, name: pg.name, theme: pg.theme || '', seo: pg.seo || {},
-        html: pg.blocks.map(function(b){ return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>'; }).join('\n')
-      };
-    });
-    var r = await fetch('/api/cms/publish', {
-      method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
-      body: JSON.stringify({ rendered: { css: css, pages: pages } })
-    });
-    if (!r.ok) { var em='Publish failed'; try { em=(await r.json()).error||em; } catch(e){} throw new Error(em); }
-    m.style.color = 'var(--ok)';
-    m.textContent = '✓ Published — your changes are now live.';
-  } catch (e) {
-    m.style.color = 'var(--amber-2)';
-    m.textContent = '⚠ ' + (e && e.message ? e.message : 'Publish failed') + '. Are you signed in as an admin?';
-  }
-};
+ensurePublishStyles().catch(function(){});
 
 /* ---- Report an issue (bug / feature) -> /api/feedback ---- */
 (function(){
@@ -970,17 +1164,31 @@ window.doPublish = async function(){
 // Attach all functions referenced by inline event handlers to window
 const w = window as any;
 w.goDash = goDash;
+w.toggleToolbarMore = toggleToolbarMore;
+w.closeToolbarMore = closeToolbarMore;
 w.switchPage = switchPage;
+w.togglePagePicker = togglePagePicker;
+w.closePagePicker = closePagePicker;
+w.pagePickerSearch = pagePickerSearch;
+w.pagePickerPick = pagePickerPick;
 w.addPage = addPage;
+w.confirmNewPage = confirmNewPage;
+w.newPageNameInput = newPageNameInput;
+w.newPageSlugInput = newPageSlugInput;
 w.saveAsTemplate = saveAsTemplate;
+w.confirmSaveTemplate = confirmSaveTemplate;
 w.forceSave = forceSave;
 w.exportJSON = exportJSON;
 w.exportHTML = exportHTML;
 w.openPublish = openPublish;
+w.doPublish = doPublish;
 w.tab = tab;
 w.setView = setView;
 w.selectBlock = selectBlock;
 w.addBlock = addBlock;
+w.delBlock = delBlock;
+w.confirmDelBlock = confirmDelBlock;
+w.doDelBlock = doDelBlock;
 w.addItem = addItem;
 w.rmItem = rmItem;
 w.upd = upd;
@@ -1029,11 +1237,26 @@ w.confirmImgMeta = confirmImgMeta;
 w.imgMetaSetLoading = imgMetaSetLoading;
 w.imgMetaLivePreview = imgMetaLivePreview;
 w.seoUpd = seoUpd;
-w.openPublish = openPublish;
-w.doPublish = doPublish;
+w.setPageTheme = setPageTheme;
+w.setPageType = setPageType;
+w.save = save;
+w.renderPreview = renderPreview;
+w.renderSEO = renderSEO;
+w.renderBuild = renderBuild;
+w.renderImages = renderImages;
+w.renderMega = renderMega;
+w.renderLogosLib = renderLogosLib;
 w.closeModal = closeModal;
 w.makeLanding = makeLanding;
 w.dashNewPage = dashNewPage;
+w.dashPageTypeSet = dashPageTypeSet;
+w.dashClearFilters = dashClearFilters;
+w.dashPageSearch = dashPageSearch;
+w.dashClearSearch = dashClearSearch;
+w.dashPageGo = dashPageGo;
+w.DASH_PAGE_SEARCH = DASH_PAGE_SEARCH;
+w.pageNameUpd = pageNameUpd;
+w.pageNameInput = pageNameInput;
 w.editPage = editPage;
 w.delPage = delPage;
 w.showLibrary = showLibrary;

@@ -24,7 +24,7 @@ function Wordmark({ className, style }: { className?: string; style?: React.CSSP
 export function BrandContent() {
   useEffect(() => {
     document.querySelectorAll('[data-spark]').forEach((el) => {
-      el.innerHTML = SPARK_SVG;
+        el.innerHTML = SPARK_SVG;
     });
 
     const grid = document.getElementById('icgrid');
@@ -178,7 +178,7 @@ export function BrandContent() {
             <div className="sw" style={{ background: '#6E6A5E', color: '#F7F2E7' }}><div className="sw-n">Muted</div><div><div className="sw-h">#6E6A5E</div><div className="sw-u">Secondary text</div></div></div>
             <div className="sw" style={{ background: '#A69F8E', color: '#211F18' }}><div className="sw-n">Muted light</div><div><div className="sw-h">#A69F8E</div><div className="sw-u">Text on charcoal</div></div></div>
             <div className="sw" style={{ background: '#3F7D4E', color: '#F7F2E7' }}><div className="sw-n">Success</div><div><div className="sw-h">#3F7D4E</div><div className="sw-u">Confirmations only</div></div></div>
-          </div>
+            </div>
           <div className="sec-h" style={{ marginTop: 44 }}>
             <h2 style={{ fontSize: '1.2rem' }}>Cross-hatch card fills</h2>
             <p>The signature background: a fine 30px grid with a warm gold glow in the top-right, fading diagonally. Use behind hero sections, social posts and featured panels. Two variants — dark and light.</p>
@@ -254,9 +254,9 @@ export function BrandContent() {
           </div>
           <div className="postgrid">
             <div>
-              <div className="post fill-dark xhatch">
+            <div className="post fill-dark xhatch">
                 <div className="p-top"><Wordmark /><span className="sx-mark" data-spark /></div>
-                <div>
+              <div>
                   <div className="p-eye"><svg><use href="#ic-percent" /></svg>Limited-time saving</div>
                   <h3>0% VAT on <em>home</em> solar</h3>
                   <div className="p-sub">Until March 2027 — installed by your local MCS team.</div>
@@ -267,9 +267,9 @@ export function BrandContent() {
               <div className="postcap">Dark · Offer</div>
             </div>
             <div>
-              <div className="post fill-light xhatch">
+            <div className="post fill-light xhatch">
                 <div className="p-top"><Wordmark style={{ color: 'var(--ink)' }} /><span className="sx-mark" data-spark /></div>
-                <div>
+              <div>
                   <div className="p-eye"><svg><use href="#ic-percent" /></svg>Limited-time saving</div>
                   <h3 style={{ color: 'var(--ink)' }}>0% VAT on <em>home</em> solar</h3>
                   <div className="p-sub">Until March 2027 — installed by your local MCS team.</div>
@@ -280,9 +280,9 @@ export function BrandContent() {
               <div className="postcap">Light · Offer</div>
             </div>
             <div>
-              <div className="post fill-dark xhatch">
+            <div className="post fill-dark xhatch">
                 <div className="p-top"><Wordmark /><span className="sx-mark" data-spark /></div>
-                <div className="p-mid">
+              <div className="p-mid">
                   <div className="p-eye"><svg><use href="#ic-quote" /></svg>Customer story · Cardiff</div>
                   <div className="p-stat">£1,400</div>
                   <h3 style={{ fontSize: '9cqw' }}>saved every year.</h3>
@@ -293,7 +293,7 @@ export function BrandContent() {
               <div className="postcap">Dark · Customer story</div>
             </div>
             <div>
-              <div className="post fill-light xhatch">
+            <div className="post fill-light xhatch">
                 <div className="p-top"><Wordmark style={{ color: 'var(--ink)' }} /><span className="sx-mark" data-spark /></div>
                 <div className="p-mid">
                   <div className="p-eye"><svg><use href="#ic-quote" /></svg>Customer story · Cardiff</div>
@@ -306,9 +306,9 @@ export function BrandContent() {
               <div className="postcap">Light · Customer story</div>
             </div>
             <div>
-              <div className="post fill-dark xhatch">
+            <div className="post fill-dark xhatch">
                 <div className="p-top"><Wordmark /><span className="sx-mark" data-spark /></div>
-                <div>
+              <div>
                   <div className="p-eye"><svg><use href="#ic-calculator" /></svg>Free online tool</div>
                   <h3>Draw your roof. <em>See your savings.</em></h3>
                   <div className="p-sub">In 20 seconds. No forms.</div>
@@ -318,9 +318,9 @@ export function BrandContent() {
               <div className="postcap">Dark · Tool promo</div>
             </div>
             <div>
-              <div className="post fill-light xhatch">
+            <div className="post fill-light xhatch">
                 <div className="p-top"><Wordmark style={{ color: 'var(--ink)' }} /><span className="sx-mark" data-spark /></div>
-                <div>
+              <div>
                   <div className="p-eye"><svg><use href="#ic-calculator" /></svg>Free online tool</div>
                   <h3 style={{ color: 'var(--ink)' }}>Draw your roof. <em>See your savings.</em></h3>
                   <div className="p-sub">In 20 seconds. No forms.</div>
