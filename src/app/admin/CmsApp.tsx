@@ -6,7 +6,14 @@ import { CmsAuthBar } from './CmsAuthBar';
 import type { Profile } from '@/lib/auth';
 
 const CMS_HTML = `
-<div class="app">
+<div id="cmsBoot" class="cms-boot" aria-busy="true" aria-live="polite">
+  <div class="cms-boot-card">
+    <img class="cms-boot-logo" src="/assets/heliaxis-logo.png" alt="Heliaxis">
+    <div class="cms-boot-bar" aria-hidden="true"><span></span></div>
+    <p class="cms-boot-copy">Loading your workspace…</p>
+  </div>
+</div>
+<div class="app" id="cmsAppRoot">
   <div class="toolbar" id="cmsToolbar">
     <div class="toolbar-left">
       <a class="toolbar-brand" href="/admin" onclick="goDash();return false" title="Back to dashboard">

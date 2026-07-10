@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { signOut } from '@/lib/auth-actions';
 import { brand } from '@/components/auth/authStyles';
 
-type Tab = 'enquiries' | 'approvals';
+type Tab = 'enquiries' | 'approvals' | 'blog';
 
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
@@ -69,6 +69,7 @@ export function AdminShell({
         </a>
         <nav style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
           <NavLink href="/admin/enquiries" label="Enquiries" active={active === 'enquiries'} />
+          <NavLink href="/admin/blog" label="Blog" active={active === 'blog'} />
           {isAdmin && (
             <NavLink href="/admin/approvals" label="Approvals" active={active === 'approvals'} />
           )}

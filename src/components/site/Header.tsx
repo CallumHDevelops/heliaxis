@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { label: 'Business', href: '/#business' },
   { label: 'Funding', href: '/commercial-funding' },
   { label: 'Estimator', href: '/solar-estimator' },
+  { label: 'Blog', href: '/blog' },
   { label: 'FAQs', href: '/#faq' },
   { label: 'Contact', href: '/#quote' },
 ];

@@ -3,7 +3,7 @@ import '../cms.css';
 import { CmsApp } from '../CmsApp';
 import { getSessionProfile } from '@/lib/auth';
 
-const RESERVED = new Set(['enquiries', 'approvals']);
+const RESERVED = new Set(['enquiries', 'approvals', 'blog']);
 
 function titleFromSlug(slug: string) {
   return decodeURIComponent(slug)

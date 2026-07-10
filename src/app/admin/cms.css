@@ -8,6 +8,32 @@ body{margin:0;font-family:var(--body);background:#e7e1d2;color:var(--ink);height
 h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.01em}
 button{font-family:inherit;cursor:pointer}
 textarea{resize:none}
+
+/* Boot loader — hides empty shell until Supabase state is ready */
+.cms-boot{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;background:
+  radial-gradient(ellipse 70% 50% at 80% 0%,rgba(248,188,30,.18),transparent 55%),
+  linear-gradient(165deg,var(--paper) 0%,var(--paper-2) 55%,#e7e1d2 100%);
+  transition:opacity .35s ease,visibility .35s ease}
+.cms-boot.is-done{opacity:0;visibility:hidden;pointer-events:none}
+.cms-boot-card{text-align:center;padding:28px 32px;max-width:320px}
+.cms-boot-logo{height:36px;width:auto;display:block;margin:0 auto 18px}
+.cms-boot-bar{height:3px;width:140px;margin:0 auto 14px;border-radius:2px;background:rgba(33,31,24,.1);overflow:hidden}
+.cms-boot-bar span{display:block;height:100%;width:40%;border-radius:2px;background:var(--solar);
+  animation:cmsBootSlide 1.05s ease-in-out infinite}
+.cms-boot-copy{margin:0;font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+@keyframes cmsBootSlide{
+  0%{transform:translateX(-120%)}
+  100%{transform:translateX(320%)}
+}
+body:not(.cms-ready) .app,
+body:not(.cms-ready) .dashboard,
+body:not(.cms-ready) #gallery,
+body:not(.cms-ready) #modal{visibility:hidden!important}
+@media (prefers-reduced-motion:reduce){
+  .cms-boot-bar span{animation:none;width:100%}
+  .cms-boot{transition:none}
+}
+
 /* app shell */
 .app{display:grid;grid-template-rows:auto 1fr;height:100vh}
 .toolbar{background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid #000;min-height:56px;flex-wrap:nowrap;position:relative;z-index:30}
@@ -238,11 +264,16 @@ textarea{resize:none}
 .pv-hero.light{background:var(--paper);color:var(--ink)}
 .pv-hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(247,242,231,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(247,242,231,.05) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:linear-gradient(150deg,#000,transparent 72%);mask-image:linear-gradient(150deg,#000,transparent 72%)}
 .pv-hero.light::before{opacity:.5}
-.pv-hero .z{position:relative;z-index:2;max-width:40ch}
+.pv-hero .z{position:relative;z-index:2;max-width:min(36rem,92%)}
+.pv-hero.wide .z{max-width:100%}
+.pv-hero-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0 0 14px}
+.pv-hero-tag{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--solar)}
+.pv-hero.light .pv-hero-tag{color:var(--amber-2)}
+.pv-hero-tag-sep{color:var(--muted-d);font-size:.7rem;opacity:.7}
 .pv-eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--amber-2);display:inline-flex;gap:.5rem;align-items:center}
 .pv-hero .pv-eyebrow{color:var(--solar)}
 .pv-hero.light .pv-eyebrow{color:var(--amber-2)}
-.pv-hero h1{font-size:clamp(2rem,4vw,3.2rem);font-weight:900;margin-top:12px}
+.pv-hero h1{font-size:clamp(2rem,4vw,3.2rem);font-weight:900;margin-top:0;max-width:none}
 .pv-hero .pv-sub{margin-top:14px;font-size:1.08rem;opacity:.9;line-height:1.55}
 .pv-btnrow{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}
 .pv-btn{font-family:var(--display);font-weight:700;font-size:.95rem;padding:.8rem 1.3rem;border-radius:2px;display:inline-flex;gap:.4rem;align-items:center;position:relative}
@@ -313,6 +344,12 @@ textarea{resize:none}
 .pv-qa .a{color:var(--muted);font-size:.92rem;margin-top:8px;padding-left:34px}
 .pv-form input,.pv-form textarea{font-family:var(--body);font-size:.95rem;padding:11px 13px;border:1px solid var(--line);border-radius:2px;background:var(--paper)}
 .pv-form .pv-btn{justify-content:center}
+.pv-fgroup{margin-top:4px}
+.pv-fgroup label{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.pv-pills,.pv-checks{display:flex;flex-wrap:wrap;gap:8px}
+.pv-pill{border:1px solid var(--line);border-radius:2px;padding:8px 12px;font-size:.86rem;background:var(--paper);display:inline-block}
+.pv-check{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:2px;padding:8px 12px;font-size:.86rem;background:var(--paper)}
+.pv-check svg{color:var(--amber-2);flex:none}
 
 .dk .pv-sec,.dk .pv-faq{background:var(--ink);color:var(--paper)}
 .dk .pv-sec h2,.dk .pv-faq h2,.dk .pv-card h3,.dk .pv-qa .q{color:var(--paper)}
@@ -336,6 +373,8 @@ textarea{resize:none}
 .pv-contact .pv-btn{margin-top:14px;align-self:flex-start}
 .pv-plan-hl{border-color:var(--solar)!important;box-shadow:0 0 0 1px var(--solar)}
 .pv-rich{padding:44px}
+.pv-rich[contenteditable="true"]{cursor:text;outline:none;border-radius:2px}
+.pv-rich[contenteditable="true"]:focus{box-shadow:inset 0 0 0 2px var(--solar)}
 .pv-rich p{color:var(--muted);line-height:1.7;margin-bottom:12px}
 .modal{position:fixed;inset:0;background:rgba(20,18,14,.6);display:none;place-items:center;z-index:100}
 .modal.show{display:grid}
@@ -521,11 +560,6 @@ textarea{resize:none}
 .stat-ov .so .n{font-family:var(--display);font-weight:900;font-size:1.7rem}
 .stat-ov .so .k{font-family:var(--mono);font-size:.56rem;text-transform:uppercase;color:var(--muted);margin-top:2px}
 .kw-chart{height:150px;display:flex;align-items:flex-end;gap:0;position:relative;border-left:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 0}
-.pv-fgroup label{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.pv-pills,.pv-checks{display:flex;flex-wrap:wrap;gap:8px}
-.pv-pill{border:1px solid var(--line);border-radius:2px;padding:8px 12px;font-size:.86rem;background:var(--paper)}
-.pv-check{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:2px;padding:8px 12px;font-size:.86rem;background:var(--paper)}
-.pv-check svg{color:var(--amber-2)}
 /* leads card */
 .leads-card{border:1px solid var(--line);background:var(--card);border-radius:5px;overflow:hidden;margin-bottom:6px}
 .leads-card.hot{border-color:var(--solar);box-shadow:0 0 0 1px var(--solar),0 0 30px -10px rgba(248,188,30,.5)}

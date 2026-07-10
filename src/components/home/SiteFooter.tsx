@@ -27,6 +27,7 @@ export function SiteFooter() {
             <h4>More</h4>
             <a href="/commercial-funding">Funding &amp; finance</a>
             <a href="/solar-estimator">Solar estimator</a>
+            <a href="/blog">Blog</a>
             <a href="#faq">FAQs</a>
             <a href="#quote">Free quote</a>
           </div>
