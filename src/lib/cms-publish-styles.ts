@@ -16,13 +16,14 @@ export function extractPublishStylesFromCss(full: string): PublishStyles {
     .replace(/\.preview /g, '')
     .replace(/\.pv-block[^}]*}/g, '');
 
-  const rootPart = full.split(':root')[1]?.split('/* app shell */')[0];
-  if (!rootPart) {
+  // Only the CSS variables — do NOT include admin shell rules like
+  // body{height:100vh;overflow:hidden} which break scrolling on the live site.
+  const rootMatch = full.match(/:root\{[^}]*\}/);
+  if (!rootMatch) {
     throw new Error('Publish root styles not found in cms.css');
   }
-  const root = ':root' + rootPart;
 
-  return { root, preview };
+  return { root: rootMatch[0], preview };
 }
 
 export function getPublishStyles(): PublishStyles {

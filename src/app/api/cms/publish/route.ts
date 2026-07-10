@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { requireApproved } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -30,6 +31,9 @@ export async function POST(req: Request) {
       .from('cms_kv')
       .upsert({ key: RENDERED_KEY, value: JSON.stringify(body.rendered), updated_at: now });
   }
+
+  // Clear any cached site pages so visitors see the new content immediately.
+  revalidatePath('/', 'layout');
 
   return NextResponse.json({ ok: true });
 }

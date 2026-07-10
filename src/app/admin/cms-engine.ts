@@ -133,6 +133,7 @@ async function boot(){
   if(!STATE)STATE=newState();
   if(ensureUniquePageTitles())save();
   if(repairLegacyUntitledSlugs())save();
+  if(ensureUniquePageSlugs())save();
   var slug=CMS_INITIAL_SLUG||getSlugFromPath();
   CMS_INITIAL_SLUG=null;
   if(slug){var idx=findPageByEditSlug(slug);if(idx>=0){STATE.current=idx;SEL=null;MODE='edit';setMode();renderAll();tab('build');syncCmsUrl(true);return;}}
@@ -388,9 +389,9 @@ function addPage(){
   var inp=document.getElementById('new-page-name');
   if(inp){inp.focus();inp.select();}
 }
-function newPageNameInput(v){var slugInp=document.getElementById('new-page-slug');if(!slugInp||slugInp.dataset.manual==='1')return;slugInp.value=titleToSlug(normTitle(v));}
+function newPageNameInput(v){var slugInp=document.getElementById('new-page-slug');if(!slugInp||slugInp.dataset.manual==='1')return;slugInp.value=uniquePageSlug(titleToSlug(normTitle(v)));}
 function newPageSlugInput(){var slugInp=document.getElementById('new-page-slug');if(slugInp)slugInp.dataset.manual='1';}
-function slugFromInput(v,fallbackName){var slug=normTitle(v);if(!slug)slug=titleToSlug(fallbackName);if(!slug.startsWith('/'))slug='/'+slug.replace(/^\/+/,'');return slug;}
+function slugFromInput(v,fallbackName){var slug=normTitle(v);if(!slug)slug=titleToSlug(fallbackName);return normSlug(slug);}
 function confirmNewPage(){
   var inp=document.getElementById('new-page-name');
   var slugInp=document.getElementById('new-page-slug');
@@ -400,6 +401,8 @@ function confirmNewPage(){
   if(!name){if(err)err.textContent='Please enter a page name.';inp.focus();return;}
   if(pageTitleTaken(name)){if(err)err.textContent='A page titled “'+name+'” already exists. Choose a different title.';inp.focus();return;}
   var slug=slugFromInput(slugInp?slugInp.value:'',name);
+  if(slug==='/'&&pageSlugTaken('/')){if(err)err.textContent='The URL slug / is already used by the homepage. Only one page can use /.';if(slugInp)slugInp.focus();return;}
+  if(slug!=='/'&&pageSlugTaken(slug)){if(err)err.textContent='URL slug “'+slug+'” is already used by another page. Choose a different slug.';if(slugInp)slugInp.focus();return;}
   STATE.pages.push({id:uid(),name,slug,type:'page',blocks:[]});
   var np=STATE.pages[STATE.pages.length-1];
   np.seo={slug:np.slug};
@@ -566,9 +569,38 @@ function renderSEO(){const el=document.getElementById('panel-seo');const pg=page
  function f(l,k,ph){var val=s[k]||'';if(k==='slug'&&!val&&pg.slug)val=pg.slug;return '<div class="fld"><label>'+l+'</label><input value="'+esc(val)+'" placeholder="'+ph+'" oninput="seoUpd(\''+k+'\',this.value)"></div>'}
  var slugVal=s.slug||pg.slug||'';
  let h='<div class="ph">'+SPARK+'Page settings — '+esc(pg.name)+'</div><div class="fld"><label>Page title</label><input id="seo-page-name" value="'+esc(pg.name)+'" placeholder="Home" oninput="pageNameInput(this.value)" onchange="pageNameUpd(this.value)"><div class="hint" style="margin-top:4px">Must be unique — used in the admin URL and page list. URL slug updates to match.</div></div>'+pageTypePickerHtml(pg)+'<div class="fld"><label>Theme</label><div class="seg"><button class="'+(pg.theme!=='dark'?'on':'')+'" onclick="setPageTheme(\'light\')">Light</button><button class="'+(pg.theme==='dark'?'on':'')+'" onclick="setPageTheme(\'dark\')">Dark</button></div></div><div class="hint">Everything an agency needs to rank the page. These write into the exported page\'s &lt;head&gt;.</div>';
- h+=f('Page title (SEO)','title','Solar Panels Cardiff | Heliaxis')+'<div class="fld"><label>Meta description</label><textarea rows="3" oninput="seoUpd(\'desc\',this.value)" placeholder="150–160 characters…">'+esc(s.desc||'')+'</textarea></div><div class="fld"><label>URL slug</label><input id="seo-slug-input" value="'+esc(slugVal)+'" placeholder="/solar-panels-cardiff" oninput="seoUpd(\'slug\',this.value)"></div>'+f('Social share image URL','ogImage','https://…')+f('Canonical URL','canonical','https://heliaxis.co.uk/…')+'<label class="chk"><input type="checkbox" '+(s.noindex?'checked':'')+' onchange="seoUpd(\'noindex\',this.checked)"> Hide from search engines (noindex)</label>';
+ h+=f('Page title (SEO)','title','Solar Panels Cardiff | Heliaxis')+'<div class="fld"><label>Meta description</label><textarea rows="3" oninput="seoUpd(\'desc\',this.value)" placeholder="150–160 characters…">'+esc(s.desc||'')+'</textarea></div><div class="fld"><label>URL slug</label><input id="seo-slug-input" value="'+esc(slugVal)+'" placeholder="/solar-panels-cardiff" onchange="seoSlugCommit(this.value)"><div id="seo-slug-err" class="seo-slug-err" role="alert" hidden></div><div class="hint" style="margin-top:4px">Must be unique — no two pages can share the same URL.</div></div>'+f('Social share image URL','ogImage','https://…')+f('Canonical URL','canonical','https://heliaxis.co.uk/…')+'<label class="chk"><input type="checkbox" '+(s.noindex?'checked':'')+' onchange="seoUpd(\'noindex\',this.checked)"> Hide from search engines (noindex)</label>';
  el.innerHTML=h;}
-function seoUpd(k,v){const pg=page();pg.seo=pg.seo||{};pg.seo[k]=v;if(k==='slug')pg.slug=v;save();}
+function seoUpd(k,v){const pg=page();pg.seo=pg.seo||{};pg.seo[k]=v;if(k==='slug')return;save();}
+function showSeoSlugHomeOnlyErr(msg){
+  var inp=document.getElementById('seo-slug-input');
+  var err=document.getElementById('seo-slug-err');
+  var pg=page();
+  if(inp){inp.value=pg.slug||'/';inp.classList.add('is-invalid');inp.focus();inp.select();}
+  if(err){err.hidden=false;err.textContent=msg||'The URL slug / is already used by another page. Only one page can be the homepage.';}
+}
+function clearSeoSlugErr(){
+  var inp=document.getElementById('seo-slug-input');
+  var err=document.getElementById('seo-slug-err');
+  if(inp)inp.classList.remove('is-invalid');
+  if(err){err.hidden=true;err.textContent='';}
+}
+function seoSlugCommit(v){
+  var pg=page();
+  var next=normSlug(v);
+  clearSeoSlugErr();
+  if(!next){alert('URL slug cannot be empty.');renderSEO();return;}
+  // `/` is allowed when free — that page becomes the homepage. Block only if another page already owns it.
+  if(next==='/'&&pageSlugTaken('/',STATE.current)){showSeoSlugHomeOnlyErr('The URL slug / is already used by the homepage. Only one page can use /.');return;}
+  if(pageSlugTaken(next,STATE.current)){alert('URL slug “'+next+'” is already used by another page. Choose a different slug.');renderSEO();return;}
+  pg.seo=pg.seo||{};
+  pg.slug=next;
+  pg.seo.slug=next;
+  save();
+  renderPreview();
+  renderSEO();
+  renderToolbarPageType();
+}
 
 /* ============ DASHBOARD TAB ============ */
 const SAMPLE_SUBS=[{n:'Emily Watkins',e:'emily@…',p:'CF24',src:'Home hero',t:'2h ago'},{n:'Rhys Davies',e:'rhys@…',p:'SA1',src:'PPA landing',t:'5h ago'},{n:'Morgan Ltd',e:'ops@morgan…',p:'NP19',src:'Commercial',t:'Yesterday'},{n:'Sian Hughes',e:'sian@…',p:'CF31',src:'Estimator',t:'Yesterday'}];
@@ -622,7 +654,7 @@ function tplPrev(i,elm){const blocks=landingBlocks(CAMPAIGNS[i],TEMPLATE_MAP[i])
 function tplHide(){const p=document.getElementById('tplpop');if(p)p.remove();window._tplHoverEl=null;}
 function blockRowLeave(ev){if(ev.relatedTarget&&ev.currentTarget.contains(ev.relatedTarget))return;tplHide();}
 function blockRowPrev(id,elm){if(SEL===id){tplHide();return;}window._tplHoverEl=elm;var bl=findBlock(id);if(bl)popAt(elm,'Preview · '+BLOCKNAMES[bl.t],renderBlock(bl));}
-function makeLanding(i){tplHide();const c=CAMPAIGNS[i];var name=uniquePageTitle(c[0]);STATE.pages.push({id:uid(),name:name,slug:titleToSlug(name),type:'landing',theme:THEME_BY_TPL[TEMPLATE_MAP[i]],blocks:landingBlocks(c,TEMPLATE_MAP[i])});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);if(0)console.log('Landing page “'+name+'” created — now showing in the preview. Edit it in the Sections tab.');}
+function makeLanding(i){tplHide();const c=CAMPAIGNS[i];var name=uniquePageTitle(c[0]);var slug=uniquePageSlug(titleToSlug(name));STATE.pages.push({id:uid(),name:name,slug:slug,type:'landing',seo:{slug:slug},theme:THEME_BY_TPL[TEMPLATE_MAP[i]],blocks:landingBlocks(c,TEMPLATE_MAP[i])});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);if(0)console.log('Landing page “'+name+'” created — now showing in the preview. Edit it in the Sections tab.');}
 
 /* ============ TABS / VIEW ============ */
 function tab(t){['build','images','seo'].forEach(x=>{document.getElementById('panel-'+x).classList.toggle('hide',x!==t);document.querySelector('.tab[data-tab="'+x+'"]').classList.toggle('on',x===t)});
@@ -633,7 +665,7 @@ function renderAll(){renderPageSel();renderToolbarPageType();if(MODE==='dash'){r
 /* ============ EXPORT / PUBLISH ============ */
 let PUBLISH_STYLES={root:'',preview:''};
 async function ensurePublishStyles(){
-  if(PUBLISH_STYLES.preview)return PUBLISH_STYLES;
+  // Always refetch so publish CSS stays in sync with cms.css (e.g. scroll fixes).
   var r=await fetch('/api/cms/publish-styles',{credentials:'same-origin',cache:'no-store'});
   if(!r.ok){var em='Could not load publish styles';try{em=(await r.json()).error||em;}catch(e){}throw new Error(em);}
   PUBLISH_STYLES=await r.json();
@@ -642,35 +674,75 @@ async function ensurePublishStyles(){
 }
 async function pageHTML(pg){
  await ensurePublishStyles();
- const css=PUBLISH_STYLES.preview;
+ const css=buildPublishCss();
  const body=pg.blocks.map(b=>'<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>').join('\n');
  const seo=pg.seo||{};const meta=(seo.desc?'<meta name="description" content="'+esc(seo.desc)+'">':'')+(seo.noindex?'<meta name="robots" content="noindex">':'')+(seo.canonical?'<link rel="canonical" href="'+esc(seo.canonical)+'">':'')+(seo.ogImage?'<meta property="og:image" content="'+esc(seo.ogImage)+'">':'')+'<meta property="og:title" content="'+esc(seo.title||pg.name)+'">';
  return '<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>'+esc(seo.title||pg.name+' — Heliaxis')+'</title>'+meta+
   '<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">'+
-  '<style>'+PUBLISH_STYLES.root+'body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink)}body.dk{background:var(--ink)}'+css+'</style></head><body'+(pg.theme==='dark'?' class="dk"':'')+'>'+body+'</body></html>';
+  '<style>'+css+'</style></head><body'+(pg.theme==='dark'?' class="dk"':'')+'>'+body+'</body></html>';
 }
 function download(name,text){const b=new Blob([text],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
 async function exportHTML(){var pg=page();var slug=(pg.slug||'/').replace(/^\//,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'')||'page';download(slug+'.html',await pageHTML(pg));}
 function exportJSON(){const b=new Blob([JSON.stringify(STATE,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='heliaxis-site.json';a.click();URL.revokeObjectURL(u);}
+function siteOrigin(){var env=(typeof process!=='undefined'&&process.env.NEXT_PUBLIC_SITE_URL)||'';if(env)return String(env).replace(/\/$/,'');return (location.origin||'').replace(/\/$/,'');}
+function publicPageUrl(slug){var s=(slug||'/').trim()||'/';if(s==='/'||s==='')return siteOrigin()+'/';if(s.charAt(0)!=='/')s='/'+s;return siteOrigin()+s;}
+function buildPublishCss(){return PUBLISH_STYLES.root+'*,*::before,*::after{box-sizing:border-box}html,body{height:auto;overflow:auto}body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink)}body.dk{background:var(--ink)}'+PUBLISH_STYLES.preview;}
 function openPublish(){
   var box=document.getElementById('modalbox');
+  box.className='modalbox';
+  var pg=page();
+  var liveUrl=pg?publicPageUrl(pg.slug):siteOrigin()+'/';
   box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
     +'<h2>Publish to your site</h2>'
-    +'<p>This makes your saved changes live on the website. Make sure you\'ve saved first.</p>'
+    +'<p>This makes your saved changes live on the website. Preview first to see exactly how the page will look.</p>'
+    +'<div class="pub-live-url" title="Live URL after publish"><span>Will go live at</span><code>'+esc(liveUrl)+'</code></div>'
     +'<div id="pubmsg" style="margin:12px 0;font-size:.9rem"></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="openPublishPreview()">Preview before publish</button>'
     +'<button class="tbtn solar" style="color:var(--ink)" onclick="doPublish()">Publish now</button>'
     +'<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="exportJSON()">Download data (JSON)</button>'
     +'</div>';
   document.getElementById('modal').classList.add('show');
 }
+async function openPublishPreview(pageIdx){
+  var idx=typeof pageIdx==='number'?pageIdx:STATE.current;
+  var pg=STATE.pages[idx];
+  if(!pg)return;
+  var msg=document.getElementById('pubmsg');
+  // Open synchronously on the click so the browser does not block the tab.
+  var win=window.open('about:blank','_blank');
+  if(!win){
+    var tip='Allow pop-ups for this site to open the preview in a new tab.';
+    if(msg){msg.style.color='var(--amber-2)';msg.textContent='⚠ '+tip;}
+    else alert(tip);
+    return;
+  }
+  try{
+    win.document.write('<!DOCTYPE html><html><head><title>Building preview…</title></head><body style="font-family:system-ui;padding:40px;color:#666">Building live preview…</body></html>');
+    win.document.close();
+    if(msg){msg.style.color='var(--muted)';msg.textContent='Opening preview…';}
+    var html=await pageHTML(pg);
+    html=html.replace(/<title>[^<]*<\/title>/i,'<title>'+esc(pg.name||'Page')+' · Preview (not published)</title>');
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    if(msg){msg.style.color='var(--ok)';msg.textContent='✓ Preview opened in a new tab — not published yet.';}
+  }catch(e){
+    var err=e&&e.message?e.message:'Could not open preview';
+    try{win.document.open();win.document.write('<!DOCTYPE html><html><body style="font-family:system-ui;padding:40px;color:#b33">⚠ '+String(err).replace(/</g,'&lt;')+'</body></html>');win.document.close();}catch(e2){}
+    if(msg){msg.style.color='var(--amber-2)';msg.textContent='⚠ '+err;}
+    else alert(err);
+  }
+}
 async function doPublish(){
+  if(!document.getElementById('modal')||!document.getElementById('modal').classList.contains('show')||!document.getElementById('pubmsg'))openPublish();
   var m=document.getElementById('pubmsg');
+  if(!m)return;
   m.style.color='var(--muted)';m.textContent='Saving & publishing…';
   try{
     await save();
     await ensurePublishStyles();
-    var css=PUBLISH_STYLES.preview;
+    var css=buildPublishCss();
     var pages=STATE.pages.map(function(pg){
       return{slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
         html:pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')};
@@ -678,8 +750,12 @@ async function doPublish(){
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
       body:JSON.stringify({rendered:{css:css,pages:pages}})});
     if(!r.ok){var em='Publish failed';try{em=(await r.json()).error||em;}catch(e){}if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');throw new Error(em);}
+    var liveUrl=publicPageUrl(page()?page().slug:'/');
     m.style.color='var(--ok)';
-    m.textContent='✓ Published — your changes are now live.';
+    m.innerHTML='✓ <b>Published — live on your site</b>'
+      +'<div style="margin-top:10px"><a href="'+esc(liveUrl)+'" target="_blank" rel="noopener" style="color:var(--amber-2);font-weight:700;text-decoration:underline">View live page →</a></div>'
+      +'<div style="margin-top:6px;font-family:var(--mono);font-size:.72rem;color:var(--muted);word-break:break-all">'+esc(liveUrl)+'</div>'
+      +'<div style="margin-top:10px;color:var(--muted);font-size:.82rem">No Vercel redeploy needed — content is live now (including the homepage when you publish Home).</div>';
   }catch(e){
     m.style.color='var(--amber-2)';
     m.textContent='⚠ '+(e&&e.message?e.message:'Publish failed');
@@ -697,15 +773,19 @@ function titleKey(s){return normTitle(s).toLowerCase();}
 function pageTitleTaken(name,exceptIdx){var k=titleKey(name);if(!k)return false;for(var i=0;i<STATE.pages.length;i++){if(i===exceptIdx)continue;if(titleKey(STATE.pages[i].name)===k)return true;}return false;}
 function uniquePageTitle(base,exceptIdx){base=normTitle(base)||'Untitled page';if(!pageTitleTaken(base,exceptIdx))return base;var n=2;while(pageTitleTaken(base+' '+n,exceptIdx))n++;return base+' '+n;}
 function ensureUniquePageTitles(){var changed=false;for(var i=0;i<STATE.pages.length;i++){if(!pageTitleTaken(STATE.pages[i].name,i))continue;STATE.pages[i].name=uniquePageTitle(STATE.pages[i].name,i);changed=true;}return changed;}
-function trySetPageName(idx,name){name=normTitle(name);if(!name){alert('Page title cannot be empty.');return false;}if(pageTitleTaken(name,idx)){alert('A page titled “'+name+'” already exists. Choose a different title.');return false;}STATE.pages[idx].name=name;syncPageSlugFromTitle(STATE.pages[idx]);save();renderAll();if(MODE==='edit'&&STATE.current===idx){renderSEO();syncCmsUrl(false);}return true;}
+function trySetPageName(idx,name){name=normTitle(name);if(!name){alert('Page title cannot be empty.');return false;}if(pageTitleTaken(name,idx)){alert('A page titled “'+name+'” already exists. Choose a different title.');return false;}STATE.pages[idx].name=name;syncPageSlugFromTitle(STATE.pages[idx],idx);save();renderAll();if(MODE==='edit'&&STATE.current===idx){renderSEO();syncCmsUrl(false);}return true;}
 function pageNameUpd(v){if(!trySetPageName(STATE.current,v))renderSEO();}
 function slugifyTitle(s){return (s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
 function titleToSlug(name){var base=slugifyTitle(name)||'page';return '/'+base;}
+function normSlug(s){s=normTitle(s);if(!s||s==='/')return '/';s=s.replace(/^\/+/,'');var base=slugifyTitle(s)||'page';return '/'+base;}
+function pageSlugTaken(slug,exceptIdx){var k=normSlug(slug);if(!k)return false;for(var i=0;i<STATE.pages.length;i++){if(i===exceptIdx)continue;if(normSlug(STATE.pages[i].slug)===k)return true;}return false;}
+function uniquePageSlug(base,exceptIdx){base=normSlug(base);if(base==='/')return '/';if(!pageSlugTaken(base,exceptIdx))return base;var n=2;while(pageSlugTaken(base+'-'+n,exceptIdx))n++;return base+'-'+n;}
+function ensureUniquePageSlugs(){var changed=false;for(var i=0;i<STATE.pages.length;i++){var pg=STATE.pages[i];var cur=normSlug(pg.slug);if(cur==='/'&&!pageSlugTaken('/',i)){if(pg.slug!=='/'){pg.slug='/';pg.seo=pg.seo||{};pg.seo.slug='/';changed=true;}continue;}if(cur==='/'&&pageSlugTaken('/',i)){var next=uniquePageSlug(titleToSlug(pg.name||'page'),i);if(next==='/')next=uniquePageSlug('/page',i);pg.slug=next;pg.seo=pg.seo||{};pg.seo.slug=next;changed=true;continue;}if(!pageSlugTaken(cur,i)){if(pg.slug!==cur){pg.slug=cur;pg.seo=pg.seo||{};pg.seo.slug=cur;changed=true;}continue;}var fixed=uniquePageSlug(cur,i);pg.slug=fixed;pg.seo=pg.seo||{};pg.seo.slug=fixed;changed=true;}return changed;}
 function isHomePage(pg){var cur=(pg.slug||'/').replace(/\/$/,'')||'/';return cur==='/'||cur==='';}
 function slugFromPageTitle(pg){if(isHomePage(pg))return '/';return titleToSlug(pg.name);}
-function syncPageSlugFromTitle(pg){var next=slugFromPageTitle(pg);pg.slug=next;pg.seo=pg.seo||{};pg.seo.slug=next;}
-function repairLegacyUntitledSlugs(){var changed=false;STATE.pages.forEach(function(pg){if(!pg.name||isHomePage(pg))return;if(!/^\/untitled-[a-z0-9]+$/i.test(pg.slug||''))return;syncPageSlugFromTitle(pg);changed=true;});return changed;}
-function pageNameInput(v){var pg=page();var cur=(pg.slug||'').replace(/\/$/,'')||'/';if(cur==='/'||cur==='')return;var slugInp=document.getElementById('seo-slug-input');if(!slugInp)return;slugInp.value=slugFromPageTitle({name:normTitle(v),slug:pg.slug,type:pg.type});}
+function syncPageSlugFromTitle(pg,idx){if(isHomePage(pg)){pg.slug='/';pg.seo=pg.seo||{};pg.seo.slug='/';return;}var except=typeof idx==='number'?idx:STATE.pages.indexOf(pg);var next=uniquePageSlug(slugFromPageTitle(pg),except);pg.slug=next;pg.seo=pg.seo||{};pg.seo.slug=next;}
+function repairLegacyUntitledSlugs(){var changed=false;STATE.pages.forEach(function(pg,i){if(!pg.name||isHomePage(pg))return;if(!/^\/untitled-[a-z0-9]+$/i.test(pg.slug||''))return;syncPageSlugFromTitle(pg,i);changed=true;});return changed;}
+function pageNameInput(v){var pg=page();var cur=(pg.slug||'').replace(/\/$/,'')||'/';if(cur==='/'||cur==='')return;var slugInp=document.getElementById('seo-slug-input');if(!slugInp)return;slugInp.value=uniquePageSlug(titleToSlug(normTitle(v)),STATE.current);}
 function pageEditSlug(pg){var base=slugifyTitle(pg.name);if(!base)base=slugifyTitle((pg.slug||'/').replace(/^\//,''))||'page';return base;}
 function getSlugFromPath(){var parts=location.pathname.replace(/\/+$/,'').split('/');if(parts.length<3||parts[1]!=='admin')return null;var s=decodeURIComponent(parts[2]);if(!s||s==='enquiries'||s==='approvals')return null;return s;}
 function findPageByEditSlug(slug){if(!slug)return -1;slug=decodeURIComponent(slug).toLowerCase();return STATE.pages.findIndex(function(pg){return pageEditSlug(pg).toLowerCase()===slug;});}
@@ -731,7 +811,7 @@ function dashClearSearch(){DASH_PAGE_SEARCH='';var el=document.getElementById('d
 function dashPageGo(n){DASH_PAGE_NUM=Math.max(1,+n||1);renderDashPages();var sec=document.getElementById('dash-pages-sec');if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});}
 function dashPageBadge(pg){var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return 'home';var t=(pg.type||'page').toLowerCase();if(t==='landing')return 'landing';if(t==='casestudy'||t==='case')return 'case';if(t==='home')return 'home';var name=(pg.name||'').toLowerCase();if(name.indexOf('landing')>=0)return 'landing';if(slug.indexOf('case-study')>=0||name.indexOf('case study')>=0)return 'case';return 'page';}
 function dashPageBadgeHtml(kind){var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page'};return '<span class="pbadge pbadge-'+kind+'">'+labels[kind]+'</span>';}
-function dashPageCard(i){var pg=STATE.pages[i];var secs=(pg.blocks||[]).length;var badge=dashPageBadge(pg);return '<article class="pcard" onclick="editPage('+i+')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();editPage('+i+')}"><div class="pthumb"><div class="pthumb-frame"><div class="zi" id="thumb'+i+'"></div></div><div class="pthumb-shade"></div>'+dashPageBadgeHtml(badge)+'<span class="pthumb-open"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>Open editor</span></div><div class="pcard-body"><h3 class="pcard-name">'+esc(pg.name)+'</h3><div class="pcard-meta-row"><span class="pcard-secs">'+secs+' section'+(secs===1?'':'s')+'</span></div><div class="pcard-actions" onclick="event.stopPropagation()"><button type="button" class="pcard-btn pcard-btn-primary" onclick="editPage('+i+')">Edit page</button><button type="button" class="pcard-btn pcard-btn-danger" onclick="delPage('+i+')" title="Delete page">Delete</button></div></div></article>';}
+function dashPageCard(i){var pg=STATE.pages[i];var secs=(pg.blocks||[]).length;var badge=dashPageBadge(pg);return '<article class="pcard" onclick="editPage('+i+')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();editPage('+i+')}"><div class="pthumb"><div class="pthumb-frame"><div class="zi" id="thumb'+i+'"></div></div><div class="pthumb-shade"></div>'+dashPageBadgeHtml(badge)+'<span class="pthumb-open"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>Open editor</span></div><div class="pcard-body"><h3 class="pcard-name">'+esc(pg.name)+'</h3><div class="pcard-meta-row"><span class="pcard-secs">'+secs+' section'+(secs===1?'':'s')+'</span></div><div class="pcard-actions" onclick="event.stopPropagation()"><button type="button" class="pcard-btn pcard-btn-primary" onclick="editPage('+i+')">Edit page</button><button type="button" class="pcard-btn" onclick="openPublishPreview('+i+')" title="Preview how this page will look when published">Preview</button><button type="button" class="pcard-btn pcard-btn-danger" onclick="delPage('+i+')" title="Delete page">Delete</button></div></div></article>';}
 function dashStatsHtml(){var nc=newCount();var imgs=(STATE.site&&STATE.site.images)?STATE.site.images.length:0;return '<div class="dash-stats"><div class="dash-stat"><span class="dash-stat-n">'+STATE.pages.length+'</span><span class="dash-stat-l">Pages</span></div><div class="dash-stat'+(nc?' dash-stat-hot':'')+'"><span class="dash-stat-n">'+nc+'</span><span class="dash-stat-l">New leads</span></div><div class="dash-stat"><span class="dash-stat-n">'+imgs+'</span><span class="dash-stat-l">Images</span></div><a class="dash-stat dash-stat-link" href="/" target="_blank" rel="noopener"><span class="dash-stat-n">↗</span><span class="dash-stat-l">View live site</span></a></div>';}
 function renderDashThumb(i){var pg=STATE.pages[i];var t=document.getElementById('thumb'+i);if(!t)return;t.className='zi'+(pg.theme==='dark'?' dk':'');t.innerHTML=pg.blocks.length?pg.blocks.map(renderBlock).join(''):'<div class="pthumb-empty">Empty page — click to add sections</div>';}
 function renderDashPages(){var indices=dashFilteredIndices();var total=indices.length;var pages=Math.max(1,Math.ceil(total/DASH_PAGE_SIZE));if(DASH_PAGE_NUM>pages)DASH_PAGE_NUM=pages;var start=(DASH_PAGE_NUM-1)*DASH_PAGE_SIZE;var slice=indices.slice(start,start+DASH_PAGE_SIZE);var searchEl=document.getElementById('dash-page-search');var hadFocus=searchEl&&document.activeElement===searchEl;var selStart=hadFocus?searchEl.selectionStart:0;var selEnd=hadFocus?searchEl.selectionEnd:0;var hEl=document.getElementById('dash-pages-h');if(hEl)hEl.innerHTML=SPARK+'Your pages ('+dashPagesHeadCount(total)+')';var clr=document.getElementById('dash-search-clear');if(clr)clr.style.display=DASH_PAGE_SEARCH?'inline-flex':'none';var typeEl=document.getElementById('dash-page-type');if(typeEl){var tc=dashTypeCounts();typeEl.innerHTML='<option value="">All pages ('+tc.all+')</option><option value="home"'+(DASH_PAGE_TYPE==='home'?' selected':'')+'>Home ('+tc.home+')</option><option value="landing"'+(DASH_PAGE_TYPE==='landing'?' selected':'')+'>Landing ('+tc.landing+')</option><option value="case"'+(DASH_PAGE_TYPE==='case'?' selected':'')+'>Case study ('+tc.case+')</option><option value="page"'+(DASH_PAGE_TYPE==='page'?' selected':'')+'>Page ('+tc.page+')</option>';}var grid=document.getElementById('dash-pages-grid');if(!grid)return;var h='';if(!total)h+='<div class="dash-empty">'+(DASH_PAGE_SEARCH||DASH_PAGE_TYPE?'No pages match your filters. <button type="button" class="dash-link-btn" onclick="dashClearFilters()">Clear filters</button>':'No pages yet. Create one above.')+'</div>';else slice.forEach(function(i){h+=dashPageCard(i);});grid.innerHTML=h;var pager=document.getElementById('dash-pages-pager');if(pager){if(total<=DASH_PAGE_SIZE)pager.innerHTML='';else pager.innerHTML='<div class="dash-pager"><button type="button" class="dash-pg-btn"'+(DASH_PAGE_NUM<=1?' disabled':'')+' onclick="dashPageGo('+(DASH_PAGE_NUM-1)+')">← Previous</button><span class="dash-pg-info">Page '+DASH_PAGE_NUM+' of '+pages+' · '+total+' page'+(total===1?'':'s')+'</span><button type="button" class="dash-pg-btn"'+(DASH_PAGE_NUM>=pages?' disabled':'')+' onclick="dashPageGo('+(DASH_PAGE_NUM+1)+')">Next →</button></div>';}slice.forEach(renderDashThumb);if(hadFocus){var el2=document.getElementById('dash-page-search');if(el2){el2.focus();try{el2.setSelectionRange(selStart,selEnd);}catch(e){}}}}
@@ -803,7 +883,7 @@ const CASE_TEMPLATES=[
 function caseSection(){return '<div class="ph" style="margin-top:22px">'+SPARK+'Case studies</div><div class="hint">Press add, pick a template, then edit it like any page.</div><button class="addbtn" onclick="openCaseModal()">+ Add case study</button>';}
 function openCaseModal(){document.getElementById('modalbox').innerHTML='<button class="close" onclick="closeModal()">×</button><h2>Choose a case-study template</h2><p>Pick a layout — hover to preview, click to create. Everything is editable after.</p><div class="tplgrid" style="margin-top:14px">'+CASE_TEMPLATES.map((c,i)=>'<button class="tpl" onmouseenter="casePrev('+i+',this)" onmouseleave="tplHide()" onclick="makeCase('+i+')"><span><b>'+c.name+'</b><div class="d">'+c.desc+'</div></span><span class="go">Use →</span></button>').join('')+'</div>';document.getElementById('modal').classList.add('show');}
 function casePrev(i,elm){popAt(elm,'Preview · '+CASE_TEMPLATES[i].name,CASE_TEMPLATES[i].build().map(renderBlock).join(''));}
-function makeCase(i){tplHide();closeModal();const b=CASE_TEMPLATES[i].build();var name=uniquePageTitle(CASE_TEMPLATES[i].name);STATE.pages.push({id:uid(),name:name,slug:titleToSlug(name),type:'casestudy',theme:CASE_TEMPLATES[i].theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);}
+function makeCase(i){tplHide();closeModal();const b=CASE_TEMPLATES[i].build();var name=uniquePageTitle(CASE_TEMPLATES[i].name);var slug=uniquePageSlug(titleToSlug(name));STATE.pages.push({id:uid(),name:name,slug:slug,type:'casestudy',seo:{slug:slug},theme:CASE_TEMPLATES[i].theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);}
 
 /* ===== dashboard / editor modes ===== */
 var MODE='dash';
@@ -818,13 +898,14 @@ function setMode(){var m=MODE;
  var tb=document.getElementById('cmsToolbar');if(tb)tb.classList.toggle('toolbar--edit',m==='edit');
  var et=document.getElementById('editorTools');if(et)et.style.display=m==='edit'?'flex':'none';
  var crumb=document.getElementById('toolbarCrumb');if(crumb)crumb.style.display=m==='edit'?'flex':'none';
+ var pp=document.getElementById('btnPublishPreview');if(pp)pp.style.display=m==='edit'?'':'none';
  closeToolbarMore();
  renderToolbarPageType();}
 function goDash(skipUrl){MODE='dash';setMode();renderDashboard();if(!skipUrl)syncCmsUrl(false);}
 function editPage(i){STATE.current=+i;SEL=null;MODE='edit';setMode();renderAll();tab('build');syncCmsUrl(false);}
 function editTab(t){MODE='edit';setMode();renderAll();tab(t);}
 function delPage(i){if(STATE.pages.length<=1){alert('Keep at least one page.');return;}if(!confirm('Delete this page?'))return;STATE.pages.splice(i,1);if(STATE.current>=STATE.pages.length)STATE.current=STATE.pages.length-1;renderDashboard();save();}
-function dashNewPage(){var name=uniquePageTitle('Untitled page');var slug=titleToSlug(name);STATE.pages.push({id:uid(),name:name,slug:slug,type:'page',seo:{slug:slug},blocks:[{id:uid(),t:'hero',p:{eyebrow:'New page',headline:'Your headline here',sub:'Start building — add sections from the left.',dark:true,ctaLabel:'Get a quote',ctaPulse:false,cta2:''}}]});editPage(STATE.pages.length-1);save();}
+function dashNewPage(){var name=uniquePageTitle('Untitled page');var slug=uniquePageSlug(titleToSlug(name));STATE.pages.push({id:uid(),name:name,slug:slug,type:'page',seo:{slug:slug},blocks:[{id:uid(),t:'hero',p:{eyebrow:'New page',headline:'Your headline here',sub:'Start building — add sections from the left.',dark:true,ctaLabel:'Get a quote',ctaPulse:false,cta2:''}}]});editPage(STATE.pages.length-1);save();}
 function renderDashboard(){var el=document.getElementById('dashboard');
  var h='<div class="dash-wrap"><div class="dash-head"><h1>Dashboard</h1><p>Your whole site at a glance. Open a page to edit it, or create something new.</p></div>';
  h+=dashStatsHtml();
@@ -1008,7 +1089,7 @@ function confirmSaveTemplate(){
     +'<p class="modal-note">Find it on the dashboard under <b>Create → From template</b>.</p>'
     +'<div class="modal-actions"><button type="button" class="tbtn solar modal-btn-primary" onclick="closeModal()">Done</button></div>';
 }
-function makeFromTemplate(i){var t=(STATE.templates||[])[i];if(!t)return;var b=JSON.parse(JSON.stringify(t.blocks));b.forEach(function(bl){bl.id=uid()});var name=uniquePageTitle(t.name);var slug=titleToSlug(name);STATE.pages.push({id:uid(),name:name,slug:slug,type:'page',seo:{slug:slug},theme:t.theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);}
+function makeFromTemplate(i){var t=(STATE.templates||[])[i];if(!t)return;var b=JSON.parse(JSON.stringify(t.blocks));b.forEach(function(bl){bl.id=uid()});var name=uniquePageTitle(t.name);var slug=uniquePageSlug(titleToSlug(name));STATE.pages.push({id:uid(),name:name,slug:slug,type:'page',seo:{slug:slug},theme:t.theme,blocks:b});STATE.current=STATE.pages.length-1;SEL=null;MODE='edit';setMode();renderAll();save();syncCmsUrl(false);}
 
 /* ===== dedicated mega-menu editor page ===== */
 var MEGA_PI=0, MDRAG=null;
@@ -1181,6 +1262,7 @@ w.forceSave = forceSave;
 w.exportJSON = exportJSON;
 w.exportHTML = exportHTML;
 w.openPublish = openPublish;
+w.openPublishPreview = openPublishPreview;
 w.doPublish = doPublish;
 w.tab = tab;
 w.setView = setView;
@@ -1237,6 +1319,7 @@ w.confirmImgMeta = confirmImgMeta;
 w.imgMetaSetLoading = imgMetaSetLoading;
 w.imgMetaLivePreview = imgMetaLivePreview;
 w.seoUpd = seoUpd;
+w.seoSlugCommit = seoSlugCommit;
 w.setPageTheme = setPageTheme;
 w.setPageType = setPageType;
 w.save = save;

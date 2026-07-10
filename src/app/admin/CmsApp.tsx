@@ -55,6 +55,7 @@ const CMS_HTML = `
           <button type="button" role="menuitem" onclick="exportHTML();closeToolbarMore()">Export HTML</button>
         </div>
       </div>
+      <button type="button" class="tbtn tbtn-quiet" onclick="openPublishPreview()" title="Open publish preview in a new tab" id="btnPublishPreview">Preview</button>
       <button type="button" class="tbtn tbtn-publish" onclick="openPublish()" title="Publish site live">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         Publish
