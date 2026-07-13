@@ -46,7 +46,8 @@ You fill a FIXED blog article template. Return ONLY valid JSON with this exact s
   "businessTitle": string,         // usually "For your business"
   "businessDesc": string,          // 1 short sentence for the business card
   "businessBullets": [string, string, string], // 2–3 short benefit bullets for businesses
-  "businessBtn": string            // e.g. "Explore business funding"
+  "businessBtn": string,           // e.g. "Explore business funding"
+  "imageQuery": string             // 2–6 concrete nouns for Unsplash — must MATCH the article visually
 }
 
 Rules:
@@ -56,11 +57,17 @@ Rules:
 - Prefer an empty hero "sub" unless a short line is clearly useful.
 - slug must be unique-looking kebab-case related to the title.
 
+SEO, AEO & GEO (required — write for search engines, answer engines, and generative AI):
+- SEO: Put the primary topic/keyword naturally in title, seoTitle, slug, headline, introTitle, and early in introText/bodyHtml1. Use related UK/South Wales terms (MCS, solar PV, battery storage, export tariff, etc.) without stuffing. seoTitle ~50–60 chars; seoDescription 120–160 chars with a clear benefit + topic.
+- AEO (answer engines / snippets): Open introText or the first bodyHtml1 paragraph with a direct 1–2 sentence answer to the reader’s likely question. Prefer concrete facts (who, what, where, when, cost ranges, eligibility) that can stand alone as a featured snippet or voice answer. Use clear, plain language — not fluff.
+- GEO (generative engines): Be quotable and citeable — specific claims, local context (South Wales / UK regulations where relevant), and practical takeaways an AI assistant would reuse. Prefer original, trustworthy installer insight over generic blog filler. Name entities clearly (Heliaxis, MCS, South Wales). End bodyHtml2’s short paragraph with a crisp summary or next-step line worth citing.
+- Across all copy: answer real search intent; avoid vague marketing; keep British English; never invent statistics, grants, prices, or certifications.
+
 Rich text lengths (strict):
-- bodyHtml1: EXACTLY two <p> paragraphs, each medium length (~70–110 words / 3–5 sentences). No headings, lists, or extra paragraphs.
-- bodyHtml2: EXACTLY two <p> paragraphs — first medium (~70–110 words), second short (~25–45 words / 1–2 sentences). No headings or lists.
+- bodyHtml1: EXACTLY two <p> paragraphs, each medium-long (~140–200 words / 7–10 sentences). No headings, lists, or extra paragraphs.
+- bodyHtml2: EXACTLY two <p> paragraphs — first medium-long (~140–200 words), second short (~25–45 words / 4–5 sentences). No headings or lists.
 - Allowed tags only: <p>, <strong>, <em>, <a>, <br> (prefer <p> + occasional <strong> / <a>).
-- Use <strong> on a few key phrases; include 1–2 internal <a href="/…"> links when natural (e.g. /solar-estimator, /commercial-funding, /newport-net-zero-grant, /#quote).
+- Use <strong> on a few key phrases (especially primary keywords and answer phrases); include 1–2 internal <a href="/…"> links when natural (e.g. /solar-estimator, /commercial-funding, /newport-net-zero-grant, /#quote).
 - No inline styles, classes, images, <h2>, <h3>, <ul>, or <ol>.
 
 Split cards:

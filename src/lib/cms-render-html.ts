@@ -71,14 +71,31 @@ function imgSrc(val: unknown): string {
   return '';
 }
 
-function imgTag(val: unknown, style: string): string {
+function clampFocus(n: unknown): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 50;
+  return Math.max(0, Math.min(100, v));
+}
+
+function clampZoom(n: unknown): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(1, Math.min(3, Math.round(v * 100) / 100));
+}
+
+function mediaFrameHtml(val: unknown): string {
   const src = imgSrc(val);
-  if (!src) return '';
+  if (!src) {
+    return '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
+  }
   let alt = '';
   let decorative = false;
   let title = '';
   let caption = '';
   let loading = 'lazy';
+  let focusX = 50;
+  let focusY = 50;
+  let zoom = 1;
   if (typeof val === 'object' && val) {
     const m = val as Record<string, unknown>;
     alt = String(m.alt || '');
@@ -86,18 +103,21 @@ function imgTag(val: unknown, style: string): string {
     title = String(m.title || '');
     caption = String(m.caption || '');
     loading = String(m.loading || 'lazy');
+    focusX = clampFocus(m.focusX);
+    focusY = clampFocus(m.focusY);
+    zoom = clampZoom(m.zoom);
   }
-  const attrs =
-    `src="${esc(src)}" alt="${esc(decorative ? '' : alt)}"` +
+  const imgStyle =
+    `object-position:${focusX}% ${focusY}%;transform:scale(${zoom});transform-origin:${focusX}% ${focusY}%`;
+  const img =
+    `<img class="pv-media-frame-img" src="${esc(src)}" alt="${esc(decorative ? '' : alt)}"` +
     (decorative ? ' aria-hidden="true"' : '') +
     (title ? ` title="${esc(title)}"` : '') +
-    ` loading="${esc(loading)}" decoding="async"` +
-    (style ? ` style="${style}"` : '');
-  const img = `<img ${attrs}>`;
-  if (caption) {
-    return `<figure style="margin:0">${img}<figcaption style="font-size:.82rem;color:var(--muted);margin-top:8px;text-align:center">${esc(caption)}</figcaption></figure>`;
-  }
-  return img;
+    ` loading="${esc(loading)}" decoding="async" style="${imgStyle}">`;
+  const cap = caption
+    ? `<figcaption class="pv-media-frame-cap">${esc(caption)}</figcaption>`
+    : '';
+  return `<div class="pv-media-frame">${img}${cap}</div>`;
 }
 
 function iconStub(size = 18): string {
@@ -129,8 +149,8 @@ function renderBlock(b: LooseBlock): string {
 
   if (t === 'media') {
     const im = p.img
-      ? imgTag(p.img, 'width:100%;border-radius:3px;display:block')
-      : '<div style="aspect-ratio:4/3;background:linear-gradient(135deg,#26324c,#171d2b);border-radius:3px;display:grid;place-items:center;color:var(--muted-d);font-family:var(--mono);font-size:.7rem">IMAGE</div>';
+      ? mediaFrameHtml(p.img)
+      : '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
     const ctaBtn = p.ctaDisabled ? '' : btn(p.cta, 'solar');
     const cols = p.textWide
       ? p.side === 'left'
@@ -143,7 +163,7 @@ function renderBlock(b: LooseBlock): string {
       `<p style="color:var(--muted);margin-top:12px;line-height:1.6">${esc(p.text)}</p>` +
       (ctaBtn ? `<div class="pv-btnrow">${ctaBtn}</div>` : '') +
       '</div>';
-    return `<div class="pv-media" style="display:grid;grid-template-columns:${cols};gap:34px;align-items:center">${p.side === 'left' ? im + tx : tx + im}</div>`;
+    return `<div class="pv-media is-blog" style="display:grid;grid-template-columns:${cols};gap:34px;align-items:center">${p.side === 'left' ? im + tx : tx + im}</div>`;
   }
 
   if (t === 'rich') {

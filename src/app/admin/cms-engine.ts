@@ -287,11 +287,12 @@ function renderBlock(b,edit){
    return '<div class="pv-banner"><div class="bh"'+ce(id+'.heading',edit)+'>'+esc(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+ls.map(chip).join('')+ls.map(chip).join('')+'</div></div></div>';}
  if(b.t==='cta')return '<div class="pv-cta"><div class="z"><h2'+ce(id+'.headline',edit)+'>'+esc(p.headline)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p>'+(p.ctaDisabled?'':'<div class="pv-btnrow" style="justify-content:center">'+btn(p.btn,'solar',p.pulse,null,id+'.btn',edit)+'</div>')+'</div></div>';
  if(b.t==='faq')return '<div class="pv-faq"><div class="shead center">'+eyebrow('Good to know')+'<h2>Your questions, answered</h2></div>'+p.items.map((q,i)=>'<div class="pv-qa"><div class="q"><span class="ix">Q/0'+(i+1)+'</span><span'+ce(id+'.items.'+i+'.q',edit)+'>'+esc(q.q)+'</span></div><div class="a"'+ce(id+'.items.'+i+'.a',edit)+'>'+esc(q.a)+'</div></div>').join('')+'</div>';
-if(b.t==='media'){const im=p.img?imgTag(p.img,'width:100%;border-radius:3px;display:block',edit,id+'.img'):'<div style="aspect-ratio:4/3;background:linear-gradient(135deg,#26324c,#171d2b);border-radius:3px;display:grid;place-items:center;color:var(--muted-d);font-family:var(--mono);font-size:.7rem">IMAGE</div>';
+if(b.t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img'):'<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
    const ctaBtn=p.ctaDisabled?'':btn(p.cta,'solar',false,null,id+'.cta',edit);
    const cols=p.textWide?(p.side==='left'?'0.75fr 1.25fr':'1.25fr 0.75fr'):'1fr 1fr';
    const tx='<div>'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px"'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2><p style="color:var(--muted);margin-top:12px;line-height:1.6"'+ce(id+'.text',edit)+'>'+esc(p.text)+'</p>'+(ctaBtn?'<div class="pv-btnrow">'+ctaBtn+'</div>':'')+'</div>';
-   return '<div class="pv-media" style="display:grid;grid-template-columns:'+cols+';gap:34px;align-items:center">'+(p.side==='left'?im+tx:tx+im)+'</div>';}
+   const blogCls=isCmsBlogPage(page())?' is-blog':'';
+   return '<div class="pv-media'+blogCls+'" style="display:grid;grid-template-columns:'+cols+';gap:34px;align-items:center">'+(p.side==='left'?im+tx:tx+im)+'</div>';}
  if(b.t==='form'){
    const fld=function(label,req,ph,type,name){
      const lab='<label for="pv-'+name+'">'+label+(req?' <span class="req">*</span>':'')+'</label>';
@@ -592,14 +593,39 @@ function logoAdd(){const name=document.getElementById('newlogo').value.trim();if
 /* ============ IMAGES TAB ============ */
 function getAtPath(path){const parts=path.split('.');const bl=findBlock(parts[0]);if(!bl)return undefined;let o=bl.p;for(let i=1;i<parts.length;i++){if(o==null)return undefined;o=o[parts[i]];}return o;}
 function suggestAltFromName(name){return String(name||'').replace(/\.webp$/i,'').replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim();}
-function imgMetaEmpty(){return {src:'',alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false};}
+function clampFocus(n){n=Number(n);if(!isFinite(n))return 50;return Math.max(0,Math.min(100,n));}
+function clampZoom(n){n=Number(n);if(!isFinite(n))return 1;return Math.max(1,Math.min(3,Math.round(n*100)/100));}
+function imgMetaEmpty(){return {src:'',alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1};}
 function imgResolve(val){
  if(!val)return imgMetaEmpty();
- if(typeof val==='string')return {src:val,alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false};
- return {src:val.src||'',alt:val.alt||'',title:val.title||'',desc:val.desc||'',caption:val.caption||'',keywords:val.keywords||'',loading:val.loading||'lazy',decorative:!!val.decorative};
+ if(typeof val==='string')return {src:val,alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1};
+ return {src:val.src||'',alt:val.alt||'',title:val.title||'',desc:val.desc||'',caption:val.caption||'',keywords:val.keywords||'',loading:val.loading||'lazy',decorative:!!val.decorative,focusX:clampFocus(val.focusX),focusY:clampFocus(val.focusY),zoom:clampZoom(val.zoom)};
 }
 function imgSrc(val){return imgResolve(val).src;}
 function pvImgClick(ev,path){ev.stopPropagation();const blockId=path.split('.')[0];if(blockId)selectBlock(blockId);editPlacementImgMeta(path);}
+function mediaImgCss(fx,fy,zoom){
+ fx=clampFocus(fx);fy=clampFocus(fy);zoom=clampZoom(zoom);
+ return 'object-position:'+fx+'% '+fy+'%;transform:scale('+zoom+');transform-origin:'+fx+'% '+fy+'%';
+}
+function applyMediaImgStyle(img,fx,fy,zoom){
+ if(!img)return;
+ img.style.objectPosition=clampFocus(fx)+'% '+clampFocus(fy)+'%';
+ img.style.transform='scale('+clampZoom(zoom)+')';
+ img.style.transformOrigin=clampFocus(fx)+'% '+clampFocus(fy)+'%';
+}
+function writeMediaImgMeta(path, partial, opts){
+ opts=opts||{};
+ var cur=imgResolve(getAtPath(path));
+ var next={src:cur.src,alt:cur.alt,title:cur.title,desc:cur.desc,caption:cur.caption,keywords:cur.keywords,loading:cur.loading,decorative:cur.decorative,focusX:cur.focusX,focusY:cur.focusY,zoom:cur.zoom};
+ if(partial){if(partial.focusX!=null)next.focusX=clampFocus(partial.focusX);if(partial.focusY!=null)next.focusY=clampFocus(partial.focusY);if(partial.zoom!=null)next.zoom=clampZoom(partial.zoom);}
+ var parts=path.split('.');var bl=findBlock(parts[0]);
+ if(!bl)return next;
+ var o=bl.p;for(var i=1;i<parts.length-1;i++)o=o[parts[i]];
+ o[parts[parts.length-1]]=next;
+ debSave();
+ if(!opts.silent)renderBuild();
+ return next;
+}
 function imgTag(val,style,edit,path){
  const m=imgResolve(val);if(!m.src)return '';
  const alt=m.decorative?'':m.alt;
@@ -610,6 +636,88 @@ function imgTag(val,style,edit,path){
  else out=img;
  if(edit&&path)return '<div class="pv-img-hit" onclick="pvImgClick(event,\''+path+'\')" title="Click to edit image SEO">'+out+'</div>';
  return out;
+}
+/** Fixed 4:3 crop frame for Image + text — cover-fit with drag + zoom in edit mode. */
+function mediaFrameHtml(val,edit,path){
+ const m=imgResolve(val);
+ if(!m.src)return '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
+ const fx=clampFocus(m.focusX);const fy=clampFocus(m.focusY);const zoom=clampZoom(m.zoom);
+ const alt=m.decorative?'':m.alt;
+ const img='<img class="pv-media-frame-img" src="'+m.src+'" alt="'+esc(alt)+'"'+(m.decorative?' aria-hidden="true"':'')+(m.title?' title="'+esc(m.title)+'"':'')+' loading="'+esc(m.loading||'lazy')+'" decoding="async" style="'+mediaImgCss(fx,fy,zoom)+'">';
+ const cap=m.caption?'<figcaption class="pv-media-frame-cap">'+esc(m.caption)+'</figcaption>':'';
+ if(edit&&path){
+  const zoomPct=Math.round(zoom*100);
+  return '<div class="pv-media-frame is-edit" data-img-path="'+esc(path)+'" onpointerdown="mediaFocusStart(event,\''+path+'\')" onwheel="mediaFocusWheel(event,\''+path+'\')" title="Drag to pan · scroll or +/- to zoom · click for SEO">'+
+   '<span class="pv-media-frame-hint">Drag · scroll to zoom</span>'+
+   '<div class="pv-media-zoom" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()">'+
+    '<button type="button" class="pv-media-zoom-btn" title="Zoom out" aria-label="Zoom out" onclick="mediaZoomStep(\''+path+'\',-0.1)">−</button>'+
+    '<span class="pv-media-zoom-val" data-zoom-label>'+zoomPct+'%</span>'+
+    '<button type="button" class="pv-media-zoom-btn" title="Zoom in" aria-label="Zoom in" onclick="mediaZoomStep(\''+path+'\',0.1)">+</button>'+
+   '</div>'+img+cap+'</div>';
+ }
+ return '<div class="pv-media-frame">'+img+cap+'</div>';
+}
+var _mediaFocus=null;
+function mediaFocusStart(ev,path){
+ if(ev.button!=null&&ev.button!==0)return;
+ if(ev.target&&ev.target.closest&&ev.target.closest('.pv-media-zoom'))return;
+ ev.preventDefault();ev.stopPropagation();
+ var frame=ev.currentTarget;
+ var img=frame.querySelector('.pv-media-frame-img');
+ var m=imgResolve(getAtPath(path));
+ _mediaFocus={path:path,frame:frame,img:img,startX:ev.clientX,startY:ev.clientY,focusX:clampFocus(m.focusX),focusY:clampFocus(m.focusY),zoom:clampZoom(m.zoom),moved:false,w:Math.max(1,frame.clientWidth),h:Math.max(1,frame.clientHeight),curX:null,curY:null};
+ try{frame.setPointerCapture(ev.pointerId);}catch(e){}
+ frame.classList.add('is-dragging');
+ window.addEventListener('pointermove',mediaFocusMove);
+ window.addEventListener('pointerup',mediaFocusEnd);
+ window.addEventListener('pointercancel',mediaFocusEnd);
+}
+function mediaFocusMove(ev){
+ if(!_mediaFocus)return;
+ var d=_mediaFocus;
+ var dx=ev.clientX-d.startX;var dy=ev.clientY-d.startY;
+ if(Math.abs(dx)+Math.abs(dy)>4)d.moved=true;
+ // Dragging the image right reveals more of the left → lower focusX; scale pan by zoom
+ var sens=100/Math.max(1,d.zoom);
+ var fx=clampFocus(d.focusX-(dx/d.w)*sens);
+ var fy=clampFocus(d.focusY-(dy/d.h)*sens);
+ d.curX=fx;d.curY=fy;
+ applyMediaImgStyle(d.img,fx,fy,d.zoom);
+}
+function mediaFocusEnd(ev){
+ if(!_mediaFocus)return;
+ var d=_mediaFocus;
+ window.removeEventListener('pointermove',mediaFocusMove);
+ window.removeEventListener('pointerup',mediaFocusEnd);
+ window.removeEventListener('pointercancel',mediaFocusEnd);
+ try{if(ev&&ev.pointerId!=null)d.frame.releasePointerCapture(ev.pointerId);}catch(e){}
+ d.frame.classList.remove('is-dragging');
+ _mediaFocus=null;
+ var blockId=d.path.split('.')[0];
+ if(d.moved){
+  writeMediaImgMeta(d.path,{focusX:d.curX!=null?d.curX:d.focusX,focusY:d.curY!=null?d.curY:d.focusY,zoom:d.zoom});
+  if(blockId)selectBlock(blockId);
+ }else{
+  if(blockId)selectBlock(blockId);
+  editPlacementImgMeta(d.path);
+ }
+}
+function mediaZoomStep(path,delta){
+ var m=imgResolve(getAtPath(path));
+ var next=clampZoom(m.zoom+delta);
+ if(next===m.zoom)return;
+ writeMediaImgMeta(path,{zoom:next},{silent:true});
+ var frame=document.querySelector('.pv-media-frame[data-img-path="'+path.replace(/"/g,'')+'"]');
+ if(frame){
+  applyMediaImgStyle(frame.querySelector('.pv-media-frame-img'),m.focusX,m.focusY,next);
+  var label=frame.querySelector('[data-zoom-label]');
+  if(label)label.textContent=Math.round(next*100)+'%';
+ }
+}
+function mediaFocusWheel(ev,path){
+ ev.preventDefault();ev.stopPropagation();
+ var delta=ev.deltaY>0?-0.1:0.1;
+ mediaZoomStep(path,delta);
 }
 function imgMetaPreviewCode(m){
  const alt=m.decorative?'(decorative — empty alt)':(m.alt||'…');
@@ -650,22 +758,30 @@ function sectionImgMeta(cur,path){
  const m=imgResolve(cur);
  if(!m.src)return '<div class="hint" style="margin-top:8px">Pick an image above — you\'ll add SEO &amp; meta details for <b>this section</b> when you use it.</div>';
  const tags=[];if(m.alt)tags.push('Alt');if(m.title)tags.push('Title');if(m.caption)tags.push('Caption');if(m.desc)tags.push('Meta desc');if(m.keywords)tags.push('Keywords');
- return '<div class="imgseo-card" onclick="editPlacementImgMeta(\''+path+'\')" title="Edit SEO for this section"><img src="'+m.src+'"><div class="imgseo-card-body"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="imgseo-pill">'+SPARK+' Section SEO</span>'+(tags.length?'<span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">'+tags.join(' · ')+'</span>':'')+'</div><div class="imgseo-card-row"><b>Alt</b> '+(m.alt?esc(m.alt):'<span style="opacity:.55">Not set</span>')+'</div>'+(m.title?'<div class="imgseo-card-row"><b>Title</b> '+esc(m.title)+'</div>':'')+(m.caption?'<div class="imgseo-card-row"><b>Caption</b> '+esc(m.caption)+'</div>':'')+'<div class="imgseo-card-hint">Click image in preview or here to edit SEO</div></div></div>';
+ return '<div class="imgseo-card" onclick="editPlacementImgMeta(\''+path+'\')" title="Edit SEO for this section"><img src="'+m.src+'"><div class="imgseo-card-body"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="imgseo-pill">'+SPARK+' Section SEO</span>'+(tags.length?'<span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">'+tags.join(' · ')+'</span>':'')+'</div><div class="imgseo-card-row"><b>Alt</b> '+(m.alt?esc(m.alt):'<span style="opacity:.55">Not set</span>')+'</div>'+(m.title?'<div class="imgseo-card-row"><b>Title</b> '+esc(m.title)+'</div>':'')+(m.caption?'<div class="imgseo-card-row"><b>Caption</b> '+esc(m.caption)+'</div>':'')+'<div class="imgseo-card-hint">Drag image in preview to reposition · click here for SEO</div></div></div>';
 }
 function imagePicker(cur,path){const imgs=STATE.site.images||[];const src=imgSrc(cur);
  let h='<div class="fld"><label>Image</label><label class="miniadd" style="display:inline-block;cursor:pointer;margin-bottom:6px">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this,\''+path+'\')"></label>';
- if(imgs.length){h+='<div class="iconpick" style="grid-template-columns:repeat(4,1fr)">'+imgs.map(im=>'<button class="'+(src===im.data?'on':'')+'" style="aspect-ratio:4/3;overflow:hidden" onclick="pickImg(\''+path+'\',\''+im.id+'\')" title="'+esc(im.name||im.cat||'Image')+'"><img src="'+im.data+'" style="width:100%;height:100%;object-fit:cover"></button>').join('')+'</div>';}
- else{h+='<div class="hint">No images yet — upload one above.</div>';}
+ if(imgs.length){
+  h+='<div class="img-lib-pick">'+imgs.map(function(im,i){
+   return '<div class="img-lib-thumb'+(src===im.data?' is-on':'')+'">'+
+    '<button type="button" class="img-lib-pick-btn" onclick="pickImg(\''+path+'\',\''+im.id+'\')" title="'+esc(im.name||im.cat||'Image')+'">'+
+     '<img src="'+im.data+'" alt="">'+
+    '</button>'+
+    '<button type="button" class="img-lib-rm" title="Remove from library" aria-label="Remove from library" onclick="event.stopPropagation();imgRmAsk('+i+')">×</button>'+
+   '</div>';
+  }).join('')+'</div>';
+ }else{h+='<div class="hint">No images yet — upload one above.</div>';}
  h+=sectionImgMeta(cur,path)+'</div>';return h;}
 function pickImg(path,imgId){const im=(STATE.site.images||[]).find(x=>x.id===imgId);if(!im)return;const cur=getAtPath(path);const existing=imgSrc(cur)===im.data?imgResolve(cur):{...imgMetaEmpty(),src:im.data};openPlacementImgMeta(path,im.data,im.name,existing);}
 function editPlacementImgMeta(path){const cur=getAtPath(path);const m=imgResolve(cur);if(!m.src){alert('Pick an image first.');return;}openPlacementImgMeta(path,m.src,'',m);}
-function openPlacementImgMeta(path,src,name,existing){const ex=imgResolve(existing);ex.src=src;window._imgMetaPlacementPath=path;showImgMetaModal({data:src,name:name||'',alt:ex.alt,title:ex.title,desc:ex.desc,caption:ex.caption,keywords:ex.keywords,loading:ex.loading,decorative:ex.decorative},{placement:true,suggestedAlt:ex.alt||suggestAltFromName(name)});}
+function openPlacementImgMeta(path,src,name,existing){const ex=imgResolve(existing);ex.src=src;window._imgMetaPlacementPath=path;showImgMetaModal({data:src,name:name||'',alt:ex.alt,title:ex.title,desc:ex.desc,caption:ex.caption,keywords:ex.keywords,loading:ex.loading,decorative:ex.decorative,focusX:ex.focusX,focusY:ex.focusY},{placement:true,suggestedAlt:ex.alt||suggestAltFromName(name)});}
 function renderImages(){const el=document.getElementById('panel-images');const imgs=STATE.site.images||[];const cats=[...new Set(imgs.map(im=>im.cat).filter(Boolean))];
  let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once, then reuse them in any section. <b>SEO metadata</b> (alt text, title) is added when you pick an image in the <b>Sections</b> tab — each section can have its own SEO for the same file.</div>';
  h+='<div class="fld"><label>Upload image(s)</label><input type="file" accept="image/*" multiple id="imgup" onchange="imgUpload(this)"></div>';
  h+='<div class="fld"><label>Filter by category</label><select onchange="IMGFILTER=this.value;renderImages()"><option value="">All ('+imgs.length+')</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>';
  const shown=imgs.map((im,i)=>({im,i})).filter(x=>!IMGFILTER||x.im.cat===IMGFILTER);
- h+=shown.length?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+shown.map(({im,i})=>'<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden;position:relative"><img src="'+im.data+'" style="width:100%;height:68px;object-fit:cover;display:block"><button class="rm" style="position:absolute;top:2px;right:4px;background:rgba(0,0,0,.55);color:#fff;border-radius:2px;padding:1px 5px" onclick="imgRm('+i+')">×</button><div style="font-size:.68rem;padding:5px 7px;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div></div>').join('')+'</div>':'<div class="hint">No images yet — upload one above.</div>';
+ h+=shown.length?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+shown.map(({im,i})=>'<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden;position:relative"><img src="'+im.data+'" style="width:100%;height:68px;object-fit:cover;display:block"><button class="rm" style="position:absolute;top:2px;right:4px;background:rgba(0,0,0,.55);color:#fff;border-radius:2px;padding:1px 5px" onclick="imgRmAsk('+i+')" title="Remove from library">×</button><div style="font-size:.68rem;padding:5px 7px;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div></div>').join('')+'</div>':'<div class="hint">No images yet — upload one above.</div>';
  el.innerHTML=h;}
 function toWebp(dataURL,cb){try{const img=new Image();img.onload=()=>{try{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);cb(c.toDataURL('image/webp',0.82));}catch(e){cb(dataURL)}};img.onerror=()=>cb(dataURL);img.src=dataURL;}catch(e){cb(dataURL)}}
 function imgUpload(inp,pickPath){const files=[...inp.files];if(!files.length)return;inp.value='';let pending=files.length;const uploaded=[];files.forEach(f=>{const r=new FileReader();r.onload=()=>{toWebp(r.result,webp=>{const name=f.name.replace(/\.[^.]+$/,'.webp');const baseName=f.name.replace(/\.[^.]+$/,'');const id=uid();(STATE.site.images=STATE.site.images||[]).push({id,name,data:webp,cat:''});uploaded.push({id,name,baseName,data:webp});pending--;if(pending===0)finishImgUpload(uploaded,pickPath);});};r.readAsDataURL(f);});}
@@ -698,13 +814,50 @@ function showImgMetaModal(im,opts){opts=opts||{};const suggestedAlt=opts.suggest
 function closeImgMetaModal(){closeModal();document.getElementById('modalbox').className='modalbox';window._imgMetaDraft=null;window._imgMetaPlacement=false;window._imgMetaPlacementPath=null;}
 function confirmImgMeta(){const d=window._imgMetaDraft;if(!d)return;const f=imgMetaReadForm();
  if(!f.decorative&&!f.alt){alert('Please add alt text — it helps SEO and accessibility. Or mark the image as decorative.');return;}
- const placement={src:d.data,alt:f.decorative?'':f.alt,title:f.title,desc:f.desc,caption:f.caption,keywords:f.keywords,loading:f.loading||'lazy',decorative:f.decorative};
  const placementPath=window._imgMetaPlacementPath;
+ const prev=placementPath?imgResolve(getAtPath(placementPath)):imgMetaEmpty();
+ const sameSrc=prev.src&&prev.src===d.data;
+ const placement={src:d.data,alt:f.decorative?'':f.alt,title:f.title,desc:f.desc,caption:f.caption,keywords:f.keywords,loading:f.loading||'lazy',decorative:f.decorative,focusX:sameSrc?clampFocus(prev.focusX):50,focusY:sameSrc?clampFocus(prev.focusY):50,zoom:sameSrc?clampZoom(prev.zoom):1};
  closeImgMetaModal();
  if(placementPath){upd(placementPath,placement);return;}
  save();renderImages();if(MODE==='library')renderLibrary();}
 function imgMetaUpd(i,k,v){STATE.site.images[i][k]=v;save();if(k==='cat'){renderImages();if(MODE==='library')renderLibrary();}}
-function imgRm(i){STATE.site.images.splice(i,1);renderImages();if(MODE==='library')renderLibrary();save();}
+function scrubImgData(obj,data){
+ if(!obj||typeof obj!=='object')return;
+ Object.keys(obj).forEach(function(k){
+  var v=obj[k];
+  if(v===data){obj[k]='';return;}
+  if(v&&typeof v==='object'&&!Array.isArray(v)){
+   if(v.src===data){obj[k]=imgMetaEmpty();return;}
+   scrubImgData(v,data);
+  }else if(Array.isArray(v)){
+   v.forEach(function(it){if(it&&typeof it==='object')scrubImgData(it,data);});
+  }
+ });
+}
+function imgRmAsk(i){
+ var imgs=STATE.site.images||[];
+ var im=imgs[i];
+ if(!im)return;
+ if(!confirm('Remove “'+(im.name||'this image')+'” from the library?\n\nSections using it will clear that image.'))return;
+ imgRm(i);
+}
+function imgRm(i){
+ var imgs=STATE.site.images||[];
+ var im=imgs[i];
+ if(!im)return;
+ var data=im.data;
+ imgs.splice(i,1);
+ if(data){
+  (STATE.pages||[]).forEach(function(pg){
+   (pg.blocks||[]).forEach(function(bl){scrubImgData(bl.p,data);});
+  });
+ }
+ renderImages();
+ if(MODE==='library')renderLibrary();
+ if(MODE==='edit'){renderBuild();renderPreview();}
+ save();
+}
 
 /* ============ SEO TAB ============ */
 function setPageTheme(t){const pg=page();pg.theme=t;renderPreview();renderSEO();save();}
@@ -1189,7 +1342,7 @@ function renderLibrary(){var el=document.getElementById('library');var imgs=STAT
  var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · auto-converted to WebP. Upload once, then add SEO per section when you use an image.</p></div><div><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
  h+='<div class="dash-actions" style="margin-bottom:16px"><select onchange="IMGFILTER=this.value;renderLibrary()" style="padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--card);max-width:260px"><option value="">All categories ('+imgs.length+')</option>'+cats.map(function(c){return '<option'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>';
  var shown=imgs.map(function(im,i){return {im:im,i:i}}).filter(function(x){return !IMGFILTER||x.im.cat===IMGFILTER});
- h+=shown.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'+shown.map(function(o){var im=o.im;return '<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden"><img src="'+im.data+'" style="width:100%;height:100px;object-fit:cover;display:block"><div style="padding:5px 7px;font-size:.68rem;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div><button class="rm" style="margin:4px 7px 6px" onclick="imgRm('+o.i+');renderLibrary()">Remove</button></div>';}).join('')+'</div>':'<div class="honest">No images yet. Click <b>+ Upload</b> to add some.</div>';
+ h+=shown.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'+shown.map(function(o){var im=o.im;return '<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden"><img src="'+im.data+'" style="width:100%;height:100px;object-fit:cover;display:block"><div style="padding:5px 7px;font-size:.68rem;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div><button class="rm" style="margin:4px 7px 6px" onclick="imgRmAsk('+o.i+')">Remove</button></div>';}).join('')+'</div>':'<div class="honest">No images yet. Click <b>+ Upload</b> to add some.</div>';
  h+='</div>';el.innerHTML=h;
 }
 /* ===== analytics + SEO ===== */
@@ -1508,6 +1661,11 @@ w.pvLeave = pvLeave;
 w.pvDrop = pvDrop;
 w.pvDropEnd = pvDropEnd;
 w.pvImgClick = pvImgClick;
+w.mediaFocusStart = mediaFocusStart;
+w.mediaFocusMove = mediaFocusMove;
+w.mediaFocusEnd = mediaFocusEnd;
+w.mediaZoomStep = mediaZoomStep;
+w.mediaFocusWheel = mediaFocusWheel;
 w.dstart = dstart;
 w.dstartNew = dstartNew;
 w.dover = dover;
@@ -1537,6 +1695,7 @@ w.logoBnr = logoBnr;
 w.logoRm = logoRm;
 w.logoAdd = logoAdd;
 w.imgRm = imgRm;
+w.imgRmAsk = imgRmAsk;
 w.imgUpload = imgUpload;
 w.closeImgMetaModal = closeImgMetaModal;
 w.confirmImgMeta = confirmImgMeta;

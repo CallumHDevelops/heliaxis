@@ -98,8 +98,13 @@ export async function POST(req: Request) {
   }
 
   const aiForPage = { ...ai, slug: slug.replace(/^\//, '') };
-  const topic = [ai.title, ai.tags, ai.headline, ai.introTitle].filter(Boolean).join(' ');
-  const mediaImg = await resolveUnsplashBlogImage(topic);
+  const topic = [ai.title, ai.tags, ai.headline, ai.introTitle, ai.introText, ai.seoDescription]
+    .filter(Boolean)
+    .join(' ');
+  const mediaImg = await resolveUnsplashBlogImage({
+    imageQuery: ai.imageQuery,
+    topic,
+  });
   const example = findExampleBlogPage(state.pages);
   const page = example
     ? fillExampleBlogTemplate(example, aiForPage, { mediaImg })

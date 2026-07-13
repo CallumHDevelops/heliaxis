@@ -30,6 +30,8 @@ export const cmsArticleAiSchema = z.object({
   businessDesc: z.string().min(20).max(180),
   businessBullets: z.array(z.string().min(4).max(80)).min(2).max(3),
   businessBtn: z.string().min(2).max(40).default('Explore business funding'),
+  /** 2–6 word Unsplash search query that visually matches the article (not a sentence). */
+  imageQuery: z.string().min(3).max(80).optional(),
 });
 
 export type CmsArticleAi = z.infer<typeof cmsArticleAiSchema>;
@@ -172,6 +174,7 @@ export function placeholderCmsArticleAi(): CmsArticleAi {
       'Typical 3–6 year payback',
     ],
     businessBtn: 'Explore business funding',
+    imageQuery: 'rooftop solar panels',
   };
 }
 
