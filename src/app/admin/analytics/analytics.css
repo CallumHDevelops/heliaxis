@@ -1,0 +1,80 @@
+/* Analytics — full-bleed Umami iframe, single scrollbar only */
+
+/* Kill the outer page scrollbar while this route is open */
+html:has(.admin-shell--flush),
+body:has(.admin-shell--flush) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.admin-shell--flush {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.admin-shell__main--flush {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ua--setup {
+  max-width: 640px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+.ua__setup {
+  background: #fffdf8;
+  border: 1px solid rgba(33, 31, 24, 0.12);
+  border-radius: 8px;
+  padding: 1.2rem 1.3rem;
+}
+
+.ua__setup h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #211f18;
+}
+
+.ua__setup p,
+.ua__setup li {
+  color: #6e6a5e;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.ua__setup ol {
+  margin: 0 0 0.85rem;
+  padding-left: 1.15rem;
+}
+
+.ua__setup pre {
+  margin: 0;
+  padding: 10px 12px;
+  background: #f7f2e7;
+  border: 1px solid rgba(33, 31, 24, 0.12);
+  border-radius: 6px;
+  font-size: 0.76rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.ua-full__frame {
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: #111;
+  /* Only Umami scrolls inside the frame */
+  overflow: hidden;
+}

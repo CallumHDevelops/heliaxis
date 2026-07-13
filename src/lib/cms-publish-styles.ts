@@ -6,6 +6,23 @@ const PREVIEW_MARKER = '/* ---------- PREVIEW (brand) ---------- */';
 
 export type PublishStyles = { root: string; preview: string };
 
+/** Pull @import / @font-face / :root so published pages match the CMS editor fonts. */
+function extractFontAndRoot(full: string): string {
+  const parts: string[] = [];
+  const importMatch = full.match(/@import url\([^)]+\);?/);
+  if (importMatch) parts.push(importMatch[0]);
+
+  const faces = full.match(/@font-face\{[^}]*\}/g);
+  if (faces?.length) parts.push(faces.join(''));
+
+  const rootMatch = full.match(/:root\{[^}]*\}/);
+  if (!rootMatch) {
+    throw new Error('Publish root styles not found in cms.css');
+  }
+  parts.push(rootMatch[0]);
+  return parts.join('');
+}
+
 export function extractPublishStylesFromCss(full: string): PublishStyles {
   const previewPart = full.split(PREVIEW_MARKER)[1];
   if (!previewPart) {
@@ -16,17 +33,20 @@ export function extractPublishStylesFromCss(full: string): PublishStyles {
     .replace(/\.preview /g, '')
     .replace(/\.pv-block[^}]*}/g, '');
 
-  // Only the CSS variables — do NOT include admin shell rules like
-  // body{height:100vh;overflow:hidden} which break scrolling on the live site.
-  const rootMatch = full.match(/:root\{[^}]*\}/);
-  if (!rootMatch) {
-    throw new Error('Publish root styles not found in cms.css');
-  }
-
-  return { root: rootMatch[0], preview };
+  return { root: extractFontAndRoot(full), preview };
 }
 
 export function getPublishStyles(): PublishStyles {
   const full = readFileSync(CMS_CSS_PATH, 'utf8');
   return extractPublishStylesFromCss(full);
+}
+
+/** CSS bundle used by live CMS pages (matches cms-engine buildPublishCss). */
+export function buildLivePublishCss(): string {
+  const s = getPublishStyles();
+  return (
+    s.root +
+    '*,*::before,*::after{box-sizing:border-box}html,body{height:auto;overflow:auto}body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased;--pv-max:1160px;--pv-gutter:24px;--pv-pad:max(var(--pv-gutter),calc((100% - var(--pv-max)) / 2))}body.dk{background:var(--ink)}.pv-page{max-width:none;margin:0;background:var(--paper);min-height:100vh;width:100%}body.dk .pv-page{background:var(--ink)}' +
+    s.preview
+  );
 }

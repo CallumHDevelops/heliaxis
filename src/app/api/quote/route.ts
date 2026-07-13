@@ -1,22 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getResendApiKey } from '@/lib/resend';
 
-// Handles the "Get my free quote" form on the landing page (public/pages/home.html).
-// Mirrors the subcontractor route: sends an admin notification via Resend.
+function escHtml(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Handles quote / CMS contact form submissions.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    const interestsArr = Array.isArray(body.interests)
+      ? body.interests.map((x: unknown) => String(x || '').trim()).filter(Boolean)
+      : [];
+    const interestFromArr = interestsArr.join(', ');
 
     const data = {
       name: (body.name || '').toString().trim(),
       phone: (body.phone || '').toString().trim(),
       email: (body.email || '').toString().trim(),
       postcode: (body.postcode || '').toString().trim(),
-      interest: (body.interest || '').toString().trim(),
-      propertyType: (body.propertyType || '').toString().trim(), // "home" | "business"
+      organization: (body.organization || body.org || '').toString().trim(),
+      message: (body.message || '').toString().trim(),
+      sector: (body.sector || '').toString().trim(),
+      interest: (body.interest || interestFromArr || '').toString().trim(),
+      propertyType: (body.propertyType || '').toString().trim(),
+      source: (body.source || 'quote-form').toString().trim() || 'quote-form',
     };
 
-    // Basic validation
     if (!data.name || !data.email) {
       return NextResponse.json(
         { success: false, error: 'Name and email are required.' },
@@ -24,8 +40,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Best-effort: capture the enquiry in Supabase so it shows in the admin
-    // dashboard. Never blocks the email path if Supabase isn't configured.
+    // Store interests cleanly for CRM icons; fold org/message into parseable suffixes.
+    const interestParts = [
+      data.interest || interestFromArr,
+      data.organization ? `Org: ${data.organization}` : '',
+      data.message ? `Message: ${data.message}` : '',
+    ].filter(Boolean);
+    const interestStored = interestParts.join(' · ') || null;
+    const sectorStored =
+      data.sector ||
+      (data.propertyType === 'home'
+        ? 'Residential'
+        : data.propertyType === 'business'
+          ? 'Commercial'
+          : data.propertyType) ||
+      null;
+
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const supabase = createAdminClient();
@@ -34,9 +64,9 @@ export async function POST(request: NextRequest) {
           email: data.email,
           phone: data.phone || null,
           postcode: data.postcode || null,
-          interest: data.interest || null,
-          property_type: data.propertyType || null,
-          source: 'quote-form',
+          interest: interestStored,
+          property_type: sectorStored,
+          source: data.source,
         });
         if (error) console.error('❌ Supabase enquiry insert failed:', error.message);
       } catch (e) {
@@ -44,8 +74,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!process.env.RESEND_API_KEY) {
-      console.error('❌ RESEND_API_KEY is not set');
+    const resendKey = getResendApiKey();
+    if (!resendKey) {
+      console.error('❌ Heliaxis_Resend_API_Key / RESEND_API_KEY is not set');
       return NextResponse.json(
         { success: false, error: 'Email service is not configured.' },
         { status: 500 }
@@ -53,7 +84,11 @@ export async function POST(request: NextRequest) {
     }
 
     const propertyLabel =
-      data.propertyType === 'business' ? 'Business' : data.propertyType === 'home' ? 'Home' : 'Not specified';
+      data.propertyType === 'business'
+        ? 'Business'
+        : data.propertyType === 'home'
+          ? 'Home'
+          : data.sector || 'Not specified';
 
     const adminEmailHtml = `
       <!DOCTYPE html>
@@ -73,14 +108,17 @@ export async function POST(request: NextRequest) {
         </head>
         <body>
           <div class="container">
-            <div class="header"><h1>☀️ New Free Quote Request</h1></div>
+            <div class="header"><h1>☀️ New enquiry</h1></div>
             <div class="content">
-              <div class="row"><div class="label">Name</div><div class="value">${data.name}</div></div>
-              <div class="row"><div class="label">Property</div><div class="value">${propertyLabel}</div></div>
-              <div class="row"><div class="label">Email</div><div class="value"><a href="mailto:${data.email}">${data.email}</a></div></div>
-              <div class="row"><div class="label">Phone</div><div class="value">${data.phone || 'Not provided'}</div></div>
-              <div class="row"><div class="label">Postcode</div><div class="value">${data.postcode || 'Not provided'}</div></div>
-              <div class="row"><div class="label">Interested in</div><div class="value">${data.interest || 'Not specified'}</div></div>
+              <div class="row"><div class="label">Name</div><div class="value">${escHtml(data.name)}</div></div>
+              <div class="row"><div class="label">Sector / property</div><div class="value">${escHtml(propertyLabel)}</div></div>
+              ${data.organization ? `<div class="row"><div class="label">Organisation</div><div class="value">${escHtml(data.organization)}</div></div>` : ''}
+              <div class="row"><div class="label">Email</div><div class="value"><a href="mailto:${escHtml(data.email)}">${escHtml(data.email)}</a></div></div>
+              <div class="row"><div class="label">Phone</div><div class="value">${escHtml(data.phone || 'Not provided')}</div></div>
+              <div class="row"><div class="label">Postcode</div><div class="value">${escHtml(data.postcode || 'Not provided')}</div></div>
+              <div class="row"><div class="label">Interested in</div><div class="value">${escHtml(data.interest || 'Not specified')}</div></div>
+              ${data.message ? `<div class="row"><div class="label">Message</div><div class="value">${escHtml(data.message)}</div></div>` : ''}
+              <div class="row"><div class="label">Source</div><div class="value">${escHtml(data.source)}</div></div>
             </div>
             <div class="footer">Submitted: ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })} · heliaxis.co.uk</div>
           </div>
@@ -92,12 +130,12 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        Authorization: `Bearer ${resendKey}`,
       },
       body: JSON.stringify({
         from: 'Heliaxis <noreply@heliaxis.co.uk>',
-        to: [process.env.ADMIN_EMAIL || 'your-email@example.com'],
-        subject: `☀️ New quote request: ${data.name}${data.postcode ? ` (${data.postcode})` : ''}`,
+        to: [process.env.ADMIN_EMAIL || 'hello@heliaxis.co.uk'],
+        subject: `☀️ New enquiry: ${data.name}${data.postcode ? ` (${data.postcode})` : ''}`,
         html: adminEmailHtml,
         reply_to: data.email,
       }),
@@ -110,7 +148,11 @@ export async function POST(request: NextRequest) {
       throw new Error(adminEmail.message || 'Failed to send email');
     }
 
-    return NextResponse.json({ success: true, message: 'Quote request sent', id: adminEmail.id });
+    return NextResponse.json({
+      success: true,
+      message: "Thank you — we've received your enquiry and will be in touch shortly.",
+      id: adminEmail.id,
+    });
   } catch (error) {
     console.error('❌ Error processing quote request:', error);
     return NextResponse.json(

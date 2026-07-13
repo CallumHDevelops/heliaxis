@@ -1,46 +1,8 @@
 import { z } from 'zod';
-import type { BlogBodyBlock } from './types';
+import { cmsArticleAiSchema, type CmsArticleAi } from './cms-article-template';
 
-const bodyBlockSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('p'), text: z.string() }),
-  z.object({ type: z.literal('h2'), text: z.string() }),
-  z.object({ type: z.literal('h3'), text: z.string() }),
-  z.object({ type: z.literal('ul'), items: z.array(z.string()) }),
-  z.object({ type: z.literal('quote'), text: z.string() }),
-  z.object({
-    type: z.literal('cta'),
-    label: z.string(),
-    href: z.string(),
-  }),
-]);
-
-export const generatedPostSchema = z.object({
-  title: z.string().min(3),
-  slug: z.string().min(3).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  excerpt: z.string().min(20).max(160),
-  seoTitle: z.string().optional(),
-  seoDescription: z.string().optional(),
-  categorySlugs: z.array(z.string()).default([]),
-  body: z.array(bodyBlockSchema).min(2),
-});
-
-export type GeneratedPost = z.infer<typeof generatedPostSchema>;
-
-const CTA_ALLOW = new Set(['/#quote', '/commercial-funding', '/solar-estimator', '/blog', '/newport-net-zero-grant', '/warehousing']);
-
-export function isSafeCtaHref(href: string): boolean {
-  if (!href || typeof href !== 'string') return false;
-  if (href.startsWith('javascript:') || href.startsWith('data:')) return false;
-  if (href.startsWith('/')) {
-    return /^\/[a-zA-Z0-9#/?_-]*$/.test(href);
-  }
-  return false;
-}
-
-export function sanitizeCtaHref(href: string): string {
-  if (isSafeCtaHref(href)) return href;
-  return '/#quote';
-}
+export const generatedPostSchema = cmsArticleAiSchema;
+export type GeneratedPost = CmsArticleAi;
 
 function aiConfig() {
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
@@ -59,30 +21,69 @@ export function isAiConfigured(): boolean {
 
 const SYSTEM = `You are a content writer for Heliaxis, an MCS-certified solar, battery and energy installer in South Wales (UK).
 Write practical, trustworthy British English. No hype, no purple prose.
-Return ONLY valid JSON matching this shape:
+
+You fill a FIXED blog article template. Return ONLY valid JSON with this exact shape:
 {
-  "title": string,
-  "slug": "kebab-case-slug",
-  "excerpt": string (max 160 chars),
-  "seoTitle": string,
-  "seoDescription": string,
-  "categorySlugs": string[] // from: solar, battery, funding, business, home,
-  "body": Array of blocks:
-    { "type": "p", "text": "..." } |
-    { "type": "h2", "text": "..." } |
-    { "type": "h3", "text": "..." } |
-    { "type": "ul", "items": ["..."] } |
-    { "type": "quote", "text": "..." } |
-    { "type": "cta", "label": "...", "href": "/#quote" }
+  "title": string,                 // page / CMS title
+  "slug": "kebab-case-slug",       // no leading slash; letters, numbers, hyphens only
+  "seoTitle": string,              // ~50–60 chars
+  "seoDescription": string,        // 120–160 chars
+  "tags": string,                  // e.g. "Solar | Battery" (pipe-separated, 1–3 short tags) — shown as hero eyebrow
+  "headline": string,              // hero H1
+  "sub": string,                   // usually "" on the example template (optional short hero sub)
+  "introEyebrow": string,          // usually "INTRODUCTION"
+  "introTitle": string,            // intro section title (media block)
+  "introText": string,             // 2–4 sentences of plain text (not HTML)
+  "bodyHtml1": string,             // first rich block — exactly 2 medium <p> paragraphs
+  "ctaHeadline": string,           // mid-page CTA band headline
+  "ctaSub": string,                // CTA supporting line
+  "ctaBtn": string,                // CTA button label e.g. "Get my free quote"
+  "bodyHtml2": string,             // second rich block — 1 medium <p> + 1 short <p>
+  "homeTitle": string,             // usually "For your home"
+  "homeDesc": string,              // 1 short sentence for the home card
+  "homeBullets": [string, string, string], // 2–3 short benefit bullets for homes
+  "homeBtn": string,               // e.g. "Get my home quote"
+  "businessTitle": string,         // usually "For your business"
+  "businessDesc": string,          // 1 short sentence for the business card
+  "businessBullets": [string, string, string], // 2–3 short benefit bullets for businesses
+  "businessBtn": string            // e.g. "Explore business funding"
 }
-Include 1 mid-article CTA to "/#quote" or "/commercial-funding" or "/solar-estimator" when relevant.
-Aim for roughly 600–900 words across the body blocks.`;
+
+Rules:
+- The live page layout is FIXED like /example-blog-page: hero → intro media → body → CTA → closing → contact form → home/business split.
+- Do NOT invent contact forms, form fields, emails, phone numbers, or user-submitted data.
+- You MUST fill the home/business split (homeTitle, homeDesc, homeBullets, homeBtn, businessTitle, businessDesc, businessBullets, businessBtn) — tailor bullets to the article topic.
+- Prefer an empty hero "sub" unless a short line is clearly useful.
+- slug must be unique-looking kebab-case related to the title.
+
+Rich text lengths (strict):
+- bodyHtml1: EXACTLY two <p> paragraphs, each medium length (~70–110 words / 3–5 sentences). No headings, lists, or extra paragraphs.
+- bodyHtml2: EXACTLY two <p> paragraphs — first medium (~70–110 words), second short (~25–45 words / 1–2 sentences). No headings or lists.
+- Allowed tags only: <p>, <strong>, <em>, <a>, <br> (prefer <p> + occasional <strong> / <a>).
+- Use <strong> on a few key phrases; include 1–2 internal <a href="/…"> links when natural (e.g. /solar-estimator, /commercial-funding, /newport-net-zero-grant, /#quote).
+- No inline styles, classes, images, <h2>, <h3>, <ul>, or <ol>.
+
+Split cards:
+- Keep titles as "For your home" / "For your business" unless a clearer short title fits.
+- Descriptions: one plain sentence each (no HTML).
+- Bullets: 2 or 3 short lines each, concrete and UK/South Wales relevant.
+- Buttons: short CTA labels (no arrows — the UI adds them).`;
 
 function extractJson(text: string): unknown {
   const trimmed = text.trim();
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = fence ? fence[1].trim() : trimmed;
   return JSON.parse(raw);
+}
+
+function normalizeSlug(slug: string): string {
+  return String(slug || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+/, '')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 /** Provider-agnostic: OpenRouter now; Claude/OpenAI later via AI_BASE_URL + AI_API_KEY + AI_MODEL. */
@@ -120,20 +121,16 @@ export async function generateBlogPost(prompt: string): Promise<GeneratedPost> {
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('AI returned an empty response');
 
-  const parsed = extractJson(content);
-  const draft = generatedPostSchema.parse(parsed);
-  draft.body = draft.body.map((b) =>
-    b.type === 'cta' ? { ...b, href: sanitizeCtaHref(b.href) } : b,
-  );
-  // Prefer allowlisted CTAs when model invents odd paths
-  draft.body = draft.body.map((b) => {
-    if (b.type !== 'cta') return b;
-    if (CTA_ALLOW.has(b.href.split('?')[0]) || b.href.startsWith('/#')) return b;
-    return { ...b, href: '/#quote' };
-  });
-  return draft;
+  const parsed = extractJson(content) as Record<string, unknown>;
+  if (parsed && typeof parsed.slug === 'string') {
+    parsed.slug = normalizeSlug(parsed.slug);
+  }
+  return generatedPostSchema.parse(parsed);
 }
 
-export function generatedToBody(blocks: GeneratedPost['body']): BlogBodyBlock[] {
-  return blocks as BlogBodyBlock[];
+/** @deprecated free-form body blocks removed — kept for type compatibility. */
+export function generatedToBody(_blocks: unknown): never[] {
+  return [];
 }
+
+export { z };

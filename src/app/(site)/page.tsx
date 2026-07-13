@@ -20,6 +20,7 @@ import {
   AnimatedCounters,
 } from '@/components/home';
 import { findCmsPage, getCmsRendered, hasCmsHomeContent } from '@/lib/cms-rendered';
+import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,6 +77,7 @@ export default async function HomePage() {
           className={page.theme === 'dark' ? 'dk' : ''}
           dangerouslySetInnerHTML={{ __html: page.html }}
         />
+        <CmsFormRuntime />
       </>
     );
   }

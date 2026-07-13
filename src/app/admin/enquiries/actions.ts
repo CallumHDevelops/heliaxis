@@ -4,8 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-
-const STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'];
+import { labelToDbStatus } from '@/lib/enquiries';
 
 export async function updateEnquiryStatus(formData: FormData) {
   const { user, profile } = await getSessionProfile();
@@ -13,8 +12,9 @@ export async function updateEnquiryStatus(formData: FormData) {
   if (profile?.status !== 'approved') redirect('/pending');
 
   const id = String(formData.get('id') || '');
-  const status = String(formData.get('status') || '');
-  if (!id || !STATUSES.includes(status)) return;
+  const raw = String(formData.get('status') || '');
+  const status = labelToDbStatus(raw);
+  if (!id || !status) return;
 
   const admin = createAdminClient();
   await admin.from('enquiries').update({ status }).eq('id', id);

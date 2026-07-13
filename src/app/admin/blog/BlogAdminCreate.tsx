@@ -1,54 +1,68 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { brand } from '@/components/auth/authStyles';
-import { openBlogDraftPreview } from '@/lib/blog/preview';
-import type { BlogBodyBlock } from '@/lib/blog/types';
-
-type Draft = {
-  title: string;
-  slug: string;
-  excerpt: string;
-  seoTitle?: string;
-  seoDescription?: string;
-  categorySlugs: string[];
-  body: BlogBodyBlock[];
-};
+import type { CmsArticleAi } from '@/lib/blog/cms-article-template';
 
 type Props = {
-  sanityReady: boolean;
   aiReady: boolean;
 };
 
-export function BlogAdminCreate({ sanityReady, aiReady }: Props) {
+const emptyDraft = (): CmsArticleAi => ({
+  title: '',
+  slug: '',
+  seoTitle: '',
+  seoDescription: '',
+  tags: '',
+  headline: '',
+  sub: '',
+  introEyebrow: 'INTRODUCTION',
+  introTitle: '',
+  introText: '',
+  bodyHtml1: '',
+  ctaHeadline: 'Ready to start?',
+  ctaSub: 'Book a free survey today.',
+  ctaBtn: 'Get my free quote',
+  bodyHtml2: '',
+  homeTitle: 'For your home',
+  homeDesc: '',
+  homeBullets: ['', ''],
+  homeBtn: 'Get my home quote',
+  businessTitle: 'For your business',
+  businessDesc: '',
+  businessBullets: ['', ''],
+  businessBtn: 'Explore business funding',
+});
+
+export function BlogAdminCreate({ aiReady }: Props) {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [status, setStatus] = useState<'draft' | 'scheduled' | 'published'>('draft');
-  const [publishAt, setPublishAt] = useState('');
-  const [busy, setBusy] = useState<'idle' | 'gen' | 'save'>('idle');
+  const [draft, setDraft] = useState<CmsArticleAi | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [busy, setBusy] = useState<'idle' | 'gen' | 'create'>('idle');
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err' | 'muted'; text: string } | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState('');
-  const [imageAlt, setImageAlt] = useState('');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(imageFile);
-    setImagePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [imageFile]);
+  const field: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 12px',
+    border: `1px solid ${brand.line}`,
+    borderRadius: 4,
+    background: brand.paper,
+    fontFamily: brand.body,
+    fontSize: '0.95rem',
+    color: brand.ink,
+    boxSizing: 'border-box',
+  };
 
-  function clearImage() {
-    setImageFile(null);
-    setImageUrl('');
-    setImagePreview(null);
-  }
+  const label: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.72rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    color: brand.muted,
+    marginBottom: 6,
+  };
 
   async function onGenerate(e: React.FormEvent) {
     e.preventDefault();
@@ -63,9 +77,12 @@ export function BlogAdminCreate({ sanityReady, aiReady }: Props) {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Generation failed');
-      setDraft(data.draft);
-      if (!imageAlt && data.draft?.title) setImageAlt(data.draft.title);
-      setMsg({ tone: 'ok', text: 'Draft generated — add an image if you want, then save to Sanity.' });
+      setDraft({ ...emptyDraft(), ...data.draft });
+      setShowAdvanced(false);
+      setMsg({
+        tone: 'ok',
+        text: 'Draft ready — review title/slug, then create the CMS page.',
+      });
     } catch (err) {
       setMsg({ tone: 'err', text: err instanceof Error ? err.message : 'Generation failed' });
     } finally {
@@ -73,155 +90,64 @@ export function BlogAdminCreate({ sanityReady, aiReady }: Props) {
     }
   }
 
-  async function onSave() {
+  function upd<K extends keyof CmsArticleAi>(key: K, value: CmsArticleAi[K]) {
+    setDraft((d) => (d ? { ...d, [key]: value } : d));
+  }
+
+  async function onCreatePage() {
     if (!draft) return;
     setMsg(null);
-    setBusy('save');
+    setBusy('create');
     try {
-      const at =
-        status === 'published'
-          ? new Date().toISOString()
-          : status === 'scheduled'
-            ? new Date(publishAt || Date.now()).toISOString()
-            : new Date().toISOString();
-
-      const payload = {
-        ...draft,
-        status,
-        publishAt: at,
-        aiPrompt: prompt,
-        mainImageAlt: imageAlt || draft.title,
-        mainImageUrl: imageFile ? undefined : imageUrl.trim() || undefined,
-      };
-
-      let r: Response;
-      if (imageFile) {
-        const form = new FormData();
-        form.set('payload', JSON.stringify(payload));
-        form.set('image', imageFile);
-        form.set('mainImageAlt', imageAlt || draft.title);
-        r = await fetch('/api/blog', {
-          method: 'POST',
-          credentials: 'same-origin',
-          body: form,
-        });
-      } else {
-        r = await fetch('/api/blog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify(payload),
-        });
-      }
-
+      const r = await fetch('/api/blog/create-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ draft }),
+      });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Save failed');
+      if (!r.ok) throw new Error(data.error || 'Could not create CMS page');
       setMsg({
         tone: 'ok',
-        text: `Saved to Sanity (${status})${data.hasImage ? ' with image' : ''}. Preview: /blog/${data.slug}`,
+        text: `Created ${data.slug}. Opening editor…`,
       });
-      router.refresh();
+      router.push(data.editPath || `/admin${data.slug}`);
     } catch (err) {
-      setMsg({ tone: 'err', text: err instanceof Error ? err.message : 'Save failed' });
-    } finally {
+      setMsg({ tone: 'err', text: err instanceof Error ? err.message : 'Create failed' });
       setBusy('idle');
     }
   }
 
-  const field: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 12px',
-    border: `1px solid ${brand.line}`,
-    borderRadius: 4,
-    background: brand.paper,
-    fontFamily: brand.body,
-    fontSize: '0.95rem',
-    color: brand.ink,
-  };
-
-  const previewSrc = imagePreview || (imageUrl.trim().startsWith('http') ? imageUrl.trim() : null);
-
-  function onPreview() {
-    if (!draft) return;
-    openBlogDraftPreview({
-      title: draft.title,
-      slug: draft.slug,
-      excerpt: draft.excerpt,
-      body: draft.body,
-      seoTitle: draft.seoTitle,
-      seoDescription: draft.seoDescription,
-      mainImage: {
-        src:
-          previewSrc ||
-          'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=1600&q=80',
-        alt: imageAlt || draft.title,
-      },
-      categorySlugs: draft.categorySlugs,
-      status,
-      publishAt:
-        status === 'published'
-          ? new Date().toISOString()
-          : status === 'scheduled' && publishAt
-            ? new Date(publishAt).toISOString()
-            : new Date().toISOString(),
-    });
-  }
-
   return (
-    <section
-      style={{
-        background: brand.card,
-        border: `1px solid ${brand.line}`,
-        borderRadius: 4,
-        padding: '1.25rem 1.35rem',
-        marginBottom: '1.5rem',
-      }}
-    >
-      <h2 style={{ margin: '0 0 0.35rem', fontSize: '1.15rem', fontWeight: 800 }}>Create with AI</h2>
-      <p style={{ margin: '0 0 1rem', color: brand.muted, fontSize: '0.88rem', lineHeight: 1.5 }}>
-        Describe the post in plain language. AI drafts title, slug, SEO, and body. You can add your
-        own hero image, then draft / schedule / publish.
+    <section className="blog-admin__create" aria-label="Create AI article">
+      <h2>New article</h2>
+      <p className="blog-admin__create-lede">
+        Describe the topic — AI fills the example-blog CMS template. Edit in the CMS before publishing
+        or scheduling.
       </p>
 
       {!aiReady && (
-        <p style={{ color: '#b33', fontSize: '0.86rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+        <p style={{ color: '#b33', fontSize: '0.86rem', fontWeight: 600, margin: '0 0 0.75rem' }}>
           Set OPENROUTER_API_KEY (or AI_API_KEY) to enable generation.
-        </p>
-      )}
-      {!sanityReady && (
-        <p style={{ color: brand.muted, fontSize: '0.86rem', marginBottom: '0.75rem' }}>
-          Sanity not configured — you can still generate a draft to preview. Saving requires
-          NEXT_PUBLIC_SANITY_PROJECT_ID, NEXT_PUBLIC_SANITY_DATASET, and SANITY_API_TOKEN.
         </p>
       )}
 
       <form onSubmit={onGenerate}>
-        <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-          Prompt
-        </label>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          rows={3}
-          placeholder='e.g. Create a blog on solar PV for Cardiff homes, practical tone, about 800 words'
-          style={{ ...field, resize: 'vertical', minHeight: 80 }}
-          required
-        />
-        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        <div className="blog-admin__create-row">
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={3}
+            placeholder="e.g. Solar PV for Cardiff homes — practical tone, ~800 words"
+            required
+            aria-label="Article prompt"
+          />
           <button
             type="submit"
+            className="blog-admin__create-submit"
             disabled={busy !== 'idle' || !aiReady}
-            style={{
-              padding: '9px 16px',
-              background: brand.solar,
-              border: `1px solid ${brand.solar}`,
-              borderRadius: 4,
-              fontWeight: 700,
-              cursor: busy !== 'idle' || !aiReady ? 'not-allowed' : 'pointer',
-              opacity: busy !== 'idle' || !aiReady ? 0.6 : 1,
-            }}
           >
-            {busy === 'gen' ? 'Generating…' : 'Generate draft'}
+            {busy === 'gen' ? 'Generating…' : 'Generate'}
           </button>
         </div>
       </form>
@@ -229,8 +155,9 @@ export function BlogAdminCreate({ sanityReady, aiReady }: Props) {
       {msg && (
         <p
           style={{
-            marginTop: 12,
-            fontSize: '0.88rem',
+            marginTop: 10,
+            marginBottom: 0,
+            fontSize: '0.86rem',
             fontWeight: 600,
             color: msg.tone === 'err' ? '#b33' : msg.tone === 'ok' ? brand.ok : brand.muted,
           }}
@@ -240,267 +167,23 @@ export function BlogAdminCreate({ sanityReady, aiReady }: Props) {
       )}
 
       {draft && (
-        <div style={{ marginTop: 20, borderTop: `1px solid ${brand.line}`, paddingTop: 16 }}>
-          <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-            Title
-          </label>
-          <input
-            style={{ ...field, marginBottom: 12 }}
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          />
-          <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-            Slug
-          </label>
-          <input
-            style={{ ...field, marginBottom: 12, fontFamily: 'monospace', fontSize: '0.85rem' }}
-            value={draft.slug}
-            onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
-          />
-          <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-            Excerpt
-          </label>
-          <textarea
-            style={{ ...field, marginBottom: 12, resize: 'vertical' }}
-            rows={2}
-            value={draft.excerpt}
-            onChange={(e) => setDraft({ ...draft, excerpt: e.target.value })}
-          />
-          <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-            SEO title
-          </label>
-          <input
-            style={{ ...field, marginBottom: 12 }}
-            value={draft.seoTitle || ''}
-            onChange={(e) => setDraft({ ...draft, seoTitle: e.target.value })}
-            placeholder="Optional — defaults to post title"
-          />
-          <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-            SEO description
-          </label>
-          <textarea
-            style={{ ...field, marginBottom: 12, resize: 'vertical' }}
-            rows={2}
-            value={draft.seoDescription || ''}
-            onChange={(e) => setDraft({ ...draft, seoDescription: e.target.value })}
-            placeholder="Optional meta description"
-          />
-
-          <div
-            style={{
-              marginBottom: 16,
-              padding: 14,
-              border: `1px solid ${brand.line}`,
-              borderRadius: 4,
-              background: brand.paper,
-            }}
-          >
-            <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 8 }}>
-              Hero image (optional)
-            </div>
-            <p style={{ margin: '0 0 10px', fontSize: '0.84rem', color: brand.muted, lineHeight: 1.45 }}>
-              Upload a file or paste an image URL. Uploads go to Sanity. Max 8MB.
-            </p>
-
-            <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-              Upload file
-            </label>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              style={{ ...field, marginBottom: 12, padding: 8 }}
-              onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                setImageFile(f);
-                if (f) setImageUrl('');
-              }}
-            />
-
-            <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-              Or image URL
-            </label>
-            <input
-              style={{ ...field, marginBottom: 12 }}
-              type="url"
-              placeholder="https://…"
-              value={imageUrl}
-              disabled={Boolean(imageFile)}
-              onChange={(e) => {
-                setImageUrl(e.target.value);
-                if (e.target.value.trim()) setImageFile(null);
-              }}
-            />
-
-            <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-              Alt text
-            </label>
-            <input
-              style={{ ...field, marginBottom: 12 }}
-              value={imageAlt}
-              onChange={(e) => setImageAlt(e.target.value)}
-              placeholder="Describe the image for accessibility & SEO"
-            />
-
-            {previewSrc && (
-              <div style={{ marginBottom: 10 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={previewSrc}
-                  alt={imageAlt || 'Preview'}
-                  style={{
-                    width: '100%',
-                    maxHeight: 200,
-                    objectFit: 'cover',
-                    borderRadius: 4,
-                    border: `1px solid ${brand.line}`,
-                    display: 'block',
-                  }}
-                />
-              </div>
-            )}
-
-            {(imageFile || imageUrl) && (
-              <button
-                type="button"
-                onClick={clearImage}
-                style={{
-                  padding: '6px 12px',
-                  border: `1px solid ${brand.line}`,
-                  borderRadius: 4,
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                }}
-              >
-                Remove image
-              </button>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12, alignItems: 'end' }}>
+        <div className="blog-admin__draft">
+          <div className="blog-admin__draft-grid is-meta">
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as typeof status)}
-                style={field}
-              >
-                <option value="draft">Draft</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="published">Published</option>
-              </select>
+              <label style={label}>Page title</label>
+              <input style={field} value={draft.title} onChange={(e) => upd('title', e.target.value)} />
             </div>
-            {status === 'scheduled' && (
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: brand.muted, marginBottom: 6 }}>
-                  Publish at
-                </label>
-                <input
-                  type="datetime-local"
-                  value={publishAt}
-                  onChange={(e) => setPublishAt(e.target.value)}
-                  style={field}
-                  required
-                />
-              </div>
-            )}
+            <div>
+              <label style={label}>Slug (URL)</label>
+              <input style={field} value={draft.slug} onChange={(e) => upd('slug', e.target.value)} />
+            </div>
           </div>
 
-          <div
-            style={{
-              maxHeight: 360,
-              overflow: 'auto',
-              padding: 12,
-              background: brand.paper,
-              border: `1px solid ${brand.line}`,
-              borderRadius: 4,
-              fontSize: '0.86rem',
-              lineHeight: 1.5,
-              marginBottom: 12,
-            }}
-          >
-            <strong style={{ display: 'block', marginBottom: 10 }}>
-              Body ({draft.body.length} blocks) — edit before save
-            </strong>
-            {draft.body.map((b, i) => (
-              <div
-                key={i}
-                style={{
-                  marginBottom: 10,
-                  paddingBottom: 10,
-                  borderBottom: i < draft.body.length - 1 ? `1px solid ${brand.line}` : undefined,
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'monospace',
-                    fontSize: '0.68rem',
-                    color: brand.amber,
-                    marginBottom: 4,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {b.type}
-                </div>
-                {'text' in b ? (
-                  <textarea
-                    style={{ ...field, resize: 'vertical', minHeight: b.type === 'p' ? 72 : 48 }}
-                    rows={b.type === 'p' ? 3 : 2}
-                    value={b.text}
-                    onChange={(e) => {
-                      const next = [...draft.body];
-                      next[i] = { ...b, text: e.target.value };
-                      setDraft({ ...draft, body: next });
-                    }}
-                  />
-                ) : 'items' in b ? (
-                  <textarea
-                    style={{ ...field, resize: 'vertical', minHeight: 72 }}
-                    rows={3}
-                    value={b.items.join('\n')}
-                    onChange={(e) => {
-                      const items = e.target.value.split('\n').filter((line) => line.trim());
-                      const next = [...draft.body];
-                      next[i] = { type: 'ul', items: items.length ? items : [''] };
-                      setDraft({ ...draft, body: next });
-                    }}
-                  />
-                ) : (
-                  <div style={{ display: 'grid', gap: 6 }}>
-                    <input
-                      style={field}
-                      value={b.label}
-                      placeholder="CTA label"
-                      onChange={(e) => {
-                        const next = [...draft.body];
-                        next[i] = { ...b, label: e.target.value };
-                        setDraft({ ...draft, body: next });
-                      }}
-                    />
-                    <input
-                      style={field}
-                      value={b.href}
-                      placeholder="/path or https://…"
-                      onChange={(e) => {
-                        const next = [...draft.body];
-                        next[i] = { ...b, href: e.target.value };
-                        setDraft({ ...draft, body: next });
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
             <button
               type="button"
-              onClick={onSave}
-              disabled={busy !== 'idle' || !sanityReady}
+              onClick={onCreatePage}
+              disabled={busy !== 'idle' || !draft.title || !draft.slug}
               style={{
                 padding: '9px 16px',
                 background: brand.ink,
@@ -508,45 +191,207 @@ export function BlogAdminCreate({ sanityReady, aiReady }: Props) {
                 border: `1px solid ${brand.ink}`,
                 borderRadius: 4,
                 fontWeight: 700,
-                cursor: busy !== 'idle' || !sanityReady ? 'not-allowed' : 'pointer',
-                opacity: busy !== 'idle' || !sanityReady ? 0.6 : 1,
+                cursor: busy !== 'idle' ? 'not-allowed' : 'pointer',
+                opacity: busy !== 'idle' || !draft.title || !draft.slug ? 0.6 : 1,
+                fontFamily: brand.body,
               }}
             >
-              {busy === 'save' ? 'Saving…' : 'Save to Sanity'}
+              {busy === 'create' ? 'Creating…' : 'Create CMS page'}
             </button>
             <button
               type="button"
-              onClick={onPreview}
-              disabled={busy !== 'idle'}
-              style={{
-                padding: '9px 16px',
-                background: brand.solar,
-                border: `1px solid ${brand.solar}`,
-                borderRadius: 4,
-                fontWeight: 700,
-                cursor: busy !== 'idle' ? 'not-allowed' : 'pointer',
-                opacity: busy !== 'idle' ? 0.6 : 1,
-              }}
+              className="blog-admin__btn is-ghost"
+              onClick={() => setShowAdvanced((v) => !v)}
             >
-              Live preview
+              {showAdvanced ? 'Hide details' : 'Edit full draft'}
             </button>
-            <a
-              href={`/admin/blog/preview/${encodeURIComponent(draft.slug)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                padding: '9px 16px',
-                border: `1px solid ${brand.line}`,
-                borderRadius: 4,
-                fontWeight: 600,
-                textDecoration: 'none',
-                color: brand.ink,
-                fontSize: '0.9rem',
-              }}
-            >
-              Preview saved version
-            </a>
           </div>
+
+          {showAdvanced ? (
+            <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+              <div>
+                <label style={label}>SEO title</label>
+                <input
+                  style={field}
+                  value={draft.seoTitle || ''}
+                  onChange={(e) => upd('seoTitle', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>SEO description</label>
+                <textarea
+                  style={{ ...field, resize: 'vertical', minHeight: 56 }}
+                  value={draft.seoDescription || ''}
+                  onChange={(e) => upd('seoDescription', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>Hero tags</label>
+                <input
+                  style={field}
+                  value={draft.tags}
+                  onChange={(e) => upd('tags', e.target.value)}
+                  placeholder="Solar | Battery"
+                />
+              </div>
+              <div>
+                <label style={label}>Hero headline</label>
+                <input
+                  style={field}
+                  value={draft.headline}
+                  onChange={(e) => upd('headline', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>Hero sub (optional)</label>
+                <input
+                  style={field}
+                  value={draft.sub || ''}
+                  onChange={(e) => upd('sub', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>Intro eyebrow</label>
+                <input
+                  style={field}
+                  value={draft.introEyebrow}
+                  onChange={(e) => upd('introEyebrow', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>Intro title</label>
+                <input
+                  style={field}
+                  value={draft.introTitle}
+                  onChange={(e) => upd('introTitle', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>Intro text</label>
+                <textarea
+                  style={{ ...field, resize: 'vertical', minHeight: 72 }}
+                  value={draft.introText}
+                  onChange={(e) => upd('introText', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>Rich text 1</label>
+                <textarea
+                  style={{
+                    ...field,
+                    resize: 'vertical',
+                    minHeight: 120,
+                    fontFamily: 'ui-monospace, monospace',
+                    fontSize: '0.85rem',
+                  }}
+                  value={draft.bodyHtml1}
+                  onChange={(e) => upd('bodyHtml1', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>CTA headline</label>
+                <input
+                  style={field}
+                  value={draft.ctaHeadline}
+                  onChange={(e) => upd('ctaHeadline', e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={label}>CTA sub</label>
+                <input style={field} value={draft.ctaSub} onChange={(e) => upd('ctaSub', e.target.value)} />
+              </div>
+              <div>
+                <label style={label}>CTA button</label>
+                <input style={field} value={draft.ctaBtn} onChange={(e) => upd('ctaBtn', e.target.value)} />
+              </div>
+              <div>
+                <label style={label}>Rich text 2</label>
+                <textarea
+                  style={{
+                    ...field,
+                    resize: 'vertical',
+                    minHeight: 100,
+                    fontFamily: 'ui-monospace, monospace',
+                    fontSize: '0.85rem',
+                  }}
+                  value={draft.bodyHtml2}
+                  onChange={(e) => upd('bodyHtml2', e.target.value)}
+                />
+              </div>
+
+              <div style={{ borderTop: `1px solid ${brand.line}`, paddingTop: 12, marginTop: 4 }}>
+                <p style={{ ...label, marginBottom: 10 }}>Home / business cards</p>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <input
+                    style={field}
+                    value={draft.homeTitle}
+                    onChange={(e) => upd('homeTitle', e.target.value)}
+                    placeholder="For your home"
+                  />
+                  <textarea
+                    style={{ ...field, resize: 'vertical', minHeight: 48 }}
+                    value={draft.homeDesc}
+                    onChange={(e) => upd('homeDesc', e.target.value)}
+                    placeholder="Home card description"
+                  />
+                  <textarea
+                    style={{ ...field, resize: 'vertical', minHeight: 64 }}
+                    value={(draft.homeBullets || []).join('\n')}
+                    onChange={(e) =>
+                      upd(
+                        'homeBullets',
+                        e.target.value
+                          .split('\n')
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .slice(0, 3),
+                      )
+                    }
+                    placeholder="Home bullets — one per line (2–3)"
+                  />
+                  <input
+                    style={field}
+                    value={draft.homeBtn}
+                    onChange={(e) => upd('homeBtn', e.target.value)}
+                    placeholder="Get my home quote"
+                  />
+                  <input
+                    style={field}
+                    value={draft.businessTitle}
+                    onChange={(e) => upd('businessTitle', e.target.value)}
+                    placeholder="For your business"
+                  />
+                  <textarea
+                    style={{ ...field, resize: 'vertical', minHeight: 48 }}
+                    value={draft.businessDesc}
+                    onChange={(e) => upd('businessDesc', e.target.value)}
+                    placeholder="Business card description"
+                  />
+                  <textarea
+                    style={{ ...field, resize: 'vertical', minHeight: 64 }}
+                    value={(draft.businessBullets || []).join('\n')}
+                    onChange={(e) =>
+                      upd(
+                        'businessBullets',
+                        e.target.value
+                          .split('\n')
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .slice(0, 3),
+                      )
+                    }
+                    placeholder="Business bullets — one per line (2–3)"
+                  />
+                  <input
+                    style={field}
+                    value={draft.businessBtn}
+                    onChange={(e) => upd('businessBtn', e.target.value)}
+                    placeholder="Explore business funding"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </section>

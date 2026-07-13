@@ -67,6 +67,11 @@ export function CmsAuthBar({ profile }: { profile: Profile | null }) {
           Blog
         </Link>
         {isAdmin && (
+          <Link href="/admin/analytics" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
+            Analytics
+          </Link>
+        )}
+        {isAdmin && (
           <Link href="/admin/approvals" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
             Approvals
           </Link>

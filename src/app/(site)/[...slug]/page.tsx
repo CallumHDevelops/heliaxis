@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { findCmsPage, getCmsRendered } from '@/lib/cms-rendered';
+import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +42,7 @@ export default async function CmsCatchAllPage({
         className={page.theme === 'dark' ? 'dk' : ''}
         dangerouslySetInnerHTML={{ __html: page.html }}
       />
+      <CmsFormRuntime />
     </>
   );
 }

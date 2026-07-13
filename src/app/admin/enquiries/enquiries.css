@@ -1,0 +1,306 @@
+.enq-page {
+  --ink: #211f18;
+  --muted: #6e6a5e;
+  --line: rgba(33, 31, 24, 0.14);
+  --card: #fffdf8;
+  --paper: #f7f2e7;
+  --amber-2: #c77f04;
+  --ok: #3f7d4e;
+  --solar: #f8bc1e;
+  --display: 'Segoe UI', system-ui, sans-serif;
+  --mono: ui-monospace, 'Cascadia Code', Menlo, monospace;
+  color: var(--ink);
+}
+
+.enq-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.enq-head h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+}
+.enq-head p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0;
+}
+.enq-refresh {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.enq-stat-ov {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.enq-so {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 14px;
+  background: var(--card);
+  text-align: center;
+}
+.enq-so .n {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 1.7rem;
+}
+.enq-so .k {
+  margin-top: 2px;
+}
+
+.stpill {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 2px;
+  font-weight: 700;
+  display: inline-block;
+}
+.st-New {
+  background: rgba(248, 188, 30, 0.18);
+  color: var(--amber-2);
+}
+.st-Contacted {
+  background: rgba(63, 125, 78, 0.14);
+  color: var(--ok);
+}
+.st-Quoted {
+  background: rgba(33, 31, 24, 0.08);
+  color: var(--ink);
+}
+.st-Won {
+  background: var(--ok);
+  color: #fff;
+}
+.st-Lost {
+  background: rgba(180, 70, 47, 0.14);
+  color: #b4462f;
+}
+
+.enq-panel {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 4px;
+  padding: 8px 4px;
+  overflow-x: auto;
+}
+.enq-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+.enq-tbl th,
+.enq-tbl td {
+  padding: 0.75rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+  font-size: 0.88rem;
+}
+.enq-tbl th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.enq-tbl tr:last-child td {
+  border-bottom: none;
+}
+.enq-email {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.enq-empty {
+  color: var(--muted);
+  padding: 1.5rem 0.8rem !important;
+}
+.enq-tbl select {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--paper);
+}
+.enq-view {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.enq-icons {
+  display: flex;
+  gap: 3px;
+  color: var(--ink);
+}
+.enq-icon {
+  display: inline-flex;
+  opacity: 0.85;
+}
+
+.enq-map {
+  height: 200px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  background: #dfe7e2;
+  margin: 14px 0;
+}
+.enq-map iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.enq-map-label {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  z-index: 2;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 3px 7px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.enq-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 31, 24, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 80;
+  padding: 1rem;
+}
+.enq-modalbox {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1.4rem 1.5rem 1.5rem;
+  position: relative;
+}
+.enq-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+}
+.enq-modalbox h2 {
+  margin: 0 1.5rem 0 0;
+  font-size: 1.35rem;
+}
+.enq-sub {
+  color: var(--muted);
+  margin: 0.35rem 0 1rem;
+  font-size: 0.9rem;
+}
+.enq-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 0.85rem;
+  margin: 6px 0 12px;
+}
+.enq-meta span {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+}
+.enq-meta a {
+  color: var(--ink);
+}
+.enq-label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--amber-2);
+  margin: 14px 0 6px;
+}
+.enq-int-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.enq-int {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+.enq-int.on {
+  background: rgba(248, 188, 30, 0.12);
+  border-color: rgba(248, 188, 30, 0.45);
+}
+.enq-int.off {
+  opacity: 0.4;
+}
+.enq-msg {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+  color: var(--ink);
+}
+.enq-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.enq-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--card);
+}
+.enq-btn.solar {
+  background: var(--solar);
+  border-color: transparent;
+}

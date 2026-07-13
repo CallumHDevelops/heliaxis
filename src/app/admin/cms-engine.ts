@@ -6,7 +6,11 @@
  * All original JS logic, executed after the DOM shell mounts.
  * Functions are attached to window so onclick attributes continue working.
  */
+import { CMS_FORM_RUNTIME_SCRIPT, initCmsFormRuntime } from '@/lib/cms-form-runtime';
+
 export function initCms(options?: { initialPageSlug?: string | null }): void {
+window.initCmsFormRuntime = initCmsFormRuntime;
+initCmsFormRuntime();
 var CMS_INITIAL_SLUG = options?.initialPageSlug || null;
 /* ---- Supabase-backed storage shim: wires the page-builder to /api/cms ---- */
 window.storage = {
@@ -136,11 +140,75 @@ async function boot(){
   if(ensureUniquePageSlugs())save();
   var slug=CMS_INITIAL_SLUG||getSlugFromPath();
   CMS_INITIAL_SLUG=null;
+  // Capture before syncCmsUrl strips ?cmsAction=…
+  var pendingAction='';
+  var pendingScheduleAt='';
   try{
-    if(slug){var idx=findPageByEditSlug(slug);if(idx>=0){STATE.current=idx;SEL=null;MODE='edit';setMode();renderAll();tab('build');syncCmsUrl(true);return;}}
+    var bootParams=new URLSearchParams(window.location.search||'');
+    pendingAction=String(bootParams.get('cmsAction')||'').toLowerCase();
+    pendingScheduleAt=String(bootParams.get('at')||'');
+  }catch(e){}
+  try{
+    if(slug){var idx=findPageByEditSlug(slug);if(idx>=0){
+      STATE.current=idx;SEL=null;
+      // Preview from blog list: keep boot overlay up, never paint the editor chrome
+      if(pendingAction==='preview'){
+        try{window.history.replaceState({},'',window.location.pathname);}catch(e){}
+        var bootCopy=document.querySelector('#cmsBoot .cms-boot-copy');
+        if(bootCopy)bootCopy.textContent='Opening preview…';
+        await openPublishPreview(idx,{sameTab:true,returnUrl:'/admin/blog'});
+        return;
+      }
+      MODE='edit';setMode();renderAll();tab('build');syncCmsUrl(true);runCmsUrlAction(pendingAction,pendingScheduleAt);return;
+    }}
     MODE='dash';setMode();renderAll();
   }finally{
-    hideCmsBoot();
+    // Preview replaces the whole document — only hide boot if CMS UI is still showing
+    if(document.getElementById('cmsBoot')&&document.getElementById('cmsAppRoot'))hideCmsBoot();
+  }
+}
+function runCmsUrlAction(action,scheduleAt){
+  try{
+    action=String(action||'').toLowerCase();
+    scheduleAt=String(scheduleAt||'');
+    if(!action){
+      try{
+        var p=new URLSearchParams(window.location.search||'');
+        action=String(p.get('cmsAction')||'').toLowerCase();
+        if(!scheduleAt)scheduleAt=String(p.get('at')||'');
+      }catch(e){}
+    }
+    if(!action)return;
+    try{window.history.replaceState({},'',window.location.pathname);}catch(e){}
+    setTimeout(function(){
+      if(action==='preview')openPublishPreview(null,{sameTab:true});
+      else if(action==='publish'){openPublish();setTimeout(function(){doPublish();},120);}
+      else if(action==='schedule')scheduleBlogFromEditor(scheduleAt);
+    },400);
+  }catch(e){}
+}
+async function scheduleBlogFromEditor(publishAt){
+  try{
+    if(!publishAt){alert('Missing schedule time.');location.href='/admin/blog';return;}
+    var pg=page();
+    if(!pg){alert('Page not found.');return;}
+    await ensurePublishStyles();
+    var bodyHtml='<div class="pv-page">'+pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')+'</div>';
+    var r=await fetch('/api/blog/schedule',{
+      method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        id:pg.id,
+        slug:pg.slug,
+        publishAt:publishAt,
+        renderedPage:{slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},html:bodyHtml}
+      })
+    });
+    var d=await r.json().catch(function(){return {};});
+    if(!r.ok)throw new Error(d.error||'Could not schedule');
+    location.href='/admin/blog?scheduled=1';
+  }catch(e){
+    alert((e&&e.message)||'Could not schedule blog');
+    location.href='/admin/blog';
   }
 }
 function hideCmsBoot(){
@@ -194,16 +262,34 @@ function renderBlock(b,edit){
 if(b.t==='media'){const im=p.img?imgTag(p.img,'width:100%;border-radius:3px;display:block',edit,id+'.img'):'<div style="aspect-ratio:4/3;background:linear-gradient(135deg,#26324c,#171d2b);border-radius:3px;display:grid;place-items:center;color:var(--muted-d);font-family:var(--mono);font-size:.7rem">IMAGE</div>';
    const ctaBtn=p.ctaDisabled?'':btn(p.cta,'solar',false,null,id+'.cta',edit);
    const cols=p.textWide?(p.side==='left'?'0.75fr 1.25fr':'1.25fr 0.75fr'):'1fr 1fr';
-   const tx='<div>'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:800;margin-top:10px"'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2><p style="color:var(--muted);margin-top:12px;line-height:1.6"'+ce(id+'.text',edit)+'>'+esc(p.text)+'</p>'+(ctaBtn?'<div class="pv-btnrow">'+ctaBtn+'</div>':'')+'</div>';
-   return '<div class="pv-sec" style="display:grid;grid-template-columns:'+cols+';gap:34px;align-items:center">'+(p.side==='left'?im+tx:tx+im)+'</div>';}
- if(b.t==='form'){let f='';if(p.fName)f+='<input placeholder="Full name *">';if(p.fOrg)f+='<input placeholder="Organisation (optional)">';if(p.fEmail)f+='<input placeholder="Email *">';if(p.fPhone)f+='<input placeholder="Phone">';if(p.fPost)f+='<input placeholder="Postcode">';
-   if(p.fSector)f+='<div class="pv-fgroup"><label>Your sector *</label><div class="pv-pills">'+['Residential','Commercial','Public Sector','Housing Association','Other'].map(function(x){return '<span class="pv-pill">'+x+'</span>'}).join('')+'</div></div>';
-   if(p.fInterests)f+='<div class="pv-fgroup"><label>I\'m interested in <span style="color:var(--muted);text-transform:none;letter-spacing:0">(select all that apply)</span></label><div class="pv-checks">'+INTERESTS.map(function(it){return '<span class="pv-check">'+icon(it[0],18)+it[1]+'</span>'}).join('')+'</div></div>';
-   if(p.fMsg)f+='<textarea rows="3" placeholder="Message"></textarea>';
-   return '<div class="pv-sec"><div style="max-width:600px;margin:0 auto;text-align:center">'+eyebrow('Get in touch')+'<h2 style="font-weight:800;margin-top:10px"'+ce(id+'.heading',edit)+'>'+esc(p.heading)+'</h2><p style="color:var(--muted);margin-top:8px"'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p></div><div class="pv-form" style="max-width:560px;margin:22px auto 0;display:flex;flex-direction:column;gap:12px">'+f+btn(p.btn,'solar',p.pulse,null,id+'.btn',edit)+'</div></div>';}
+   const tx='<div>'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px"'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2><p style="color:var(--muted);margin-top:12px;line-height:1.6"'+ce(id+'.text',edit)+'>'+esc(p.text)+'</p>'+(ctaBtn?'<div class="pv-btnrow">'+ctaBtn+'</div>':'')+'</div>';
+   return '<div class="pv-media" style="display:grid;grid-template-columns:'+cols+';gap:34px;align-items:center">'+(p.side==='left'?im+tx:tx+im)+'</div>';}
+ if(b.t==='form'){
+   const fld=function(label,req,ph,type,name){
+     const lab='<label for="pv-'+name+'">'+label+(req?' <span class="req">*</span>':'')+'</label>';
+     if(type==='textarea')return '<div class="pv-field">'+lab+'<textarea id="pv-'+name+'" name="'+name+'" rows="4" placeholder="'+esc(ph)+'"'+(req?' required':'')+'></textarea></div>';
+     return '<div class="pv-field">'+lab+'<input id="pv-'+name+'" name="'+name+'" type="'+(type||'text')+'" placeholder="'+esc(ph)+'"'+(req?' required':'')+'></div>';
+   };
+   const sectors=[['home','Residential'],['building','Commercial'],['users','Public Sector'],['warehouse','Housing Association'],['target','Other']];
+   let rows='';
+   const pair=[];
+   if(p.fName)pair.push(fld('Name',true,'Your name','text','name'));
+   if(p.fOrg)pair.push(fld('Organization Name',false,'Company or organization','text','organization'));
+   if(pair.length){rows+='<div class="pv-fields-2">'+pair.join('')+'</div>';pair.length=0;}
+   if(p.fEmail)pair.push(fld('Email',true,'your.email@example.com','email','email'));
+   if(p.fPhone)pair.push(fld('Phone',false,'Enter phone','tel','phone'));
+   if(pair.length){rows+='<div class="pv-fields-2">'+pair.join('')+'</div>';pair.length=0;}
+   if(p.fPost)rows+=fld('Postcode',false,'e.g. CF10 1AA','text','postcode');
+   if(p.fSector)rows+='<div class="pv-fgroup"><label>Your Sector <span class="req">*</span></label><div class="pv-tiles pv-tiles-sector" role="group" aria-label="Sector">'+sectors.map(function(s){return '<button type="button" class="pv-tile" data-value="'+esc(s[1])+'">'+icon(s[0],18)+'<span>'+s[1]+'</span></button>';}).join('')+'</div></div>';
+   if(p.fInterests)rows+='<div class="pv-fgroup"><label>I am interested in <span class="req">*</span><span class="hint-inline">(Select all that apply)</span></label><div class="pv-tiles pv-tiles-interest" role="group" aria-label="Interests">'+INTERESTS.map(function(it){return '<button type="button" class="pv-tile" data-value="'+esc(it[1])+'">'+icon(it[0],18)+'<span>'+esc(it[1])+'</span></button>';}).join('')+'</div></div>';
+   if(p.fMsg)rows+=fld('Message',false,'Tell us more about your project requirements…','textarea','message');
+   const btnLabel=p.btn||'Send Enquiry';
+   const cta='<button type="submit" class="pv-btn solar'+(p.pulse?' pulse':'')+'"><span data-btn-label>'+esc(btnLabel)+'</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
+   return '<div class="pv-quote"><div class="pv-quote-inner"><form class="pv-formcard pv-cms-form" action="/api/quote" method="post" novalidate><div class="pv-quote-head"><h2'+ce(id+'.heading',edit)+'>'+esc(p.heading)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p></div>'+rows+'<div class="pv-form-msg" hidden></div><div class="pv-form-actions">'+cta+'</div><p class="pv-form-note">By submitting this form, you agree to our privacy policy and terms of service.</p></form></div></div>';
+ }
 if(b.t==='pricing')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'Options',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.plans.length+',1fr);gap:14px">'+p.plans.map((pl,i)=>'<div class="pv-card'+(pl.hl?' pv-plan-hl':'')+'"><div style="font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-2)"'+ce(id+'.plans.'+i+'.name',edit)+'>'+esc(pl.name)+'</div><div style="font-family:var(--display);font-weight:900;font-size:1.9rem;margin:6px 0"'+ce(id+'.plans.'+i+'.price',edit)+'>'+esc(pl.price)+'</div><div style="color:var(--muted);font-size:.8rem;margin-bottom:12px"'+ce(id+'.plans.'+i+'.per',edit)+'>'+esc(pl.per)+'</div>'+pl.feats.map((f,fi)=>'<div style="display:flex;gap:8px;padding:5px 0;font-size:.87rem;border-top:1px solid var(--line)"><span style="color:var(--ok)">✓</span><span'+ce(id+'.plans.'+i+'.feats.'+fi,edit)+'>'+esc(f)+'</span></div>').join('')+'<div style="margin-top:14px">'+btn(pl.cta,pl.hl?'solar':'dark ghost',false,null,id+'.plans.'+i+'.cta',edit)+'</div></div>').join('')+'</div></div>';
- if(b.t==='steps')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'How it works',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.items.length+',1fr);gap:20px">'+p.items.map((s,i)=>'<div><div style="font-family:var(--mono);font-size:.72rem;letter-spacing:.05em;color:var(--amber-2);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px">STEP 0'+(i+1)+'</div><h3 style="font-family:var(--display);font-weight:700;font-size:1.08rem"'+ce(id+'.items.'+i+'.title',edit)+'>'+esc(s.title)+'</h3><p style="color:var(--muted);font-size:.87rem;margin-top:6px;line-height:1.5"'+ce(id+'.items.'+i+'.text',edit)+'>'+esc(s.text)+'</p></div>').join('')+'</div></div>';
- if(b.t==='casestudy')return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'Our work',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+Math.min(p.items.length,3)+',1fr);gap:14px">'+p.items.map((cs,i)=>'<div class="pv-card" style="padding:0;overflow:hidden">'+(cs.img?imgTag(cs.img,'width:100%;height:150px;object-fit:cover;display:block',edit,id+'.items.'+i+'.img'):'<div style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b)"></div>')+'<div style="padding:18px"><div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)"'+ce(id+'.items.'+i+'.loc',edit)+'>'+esc(cs.loc)+'</div><h3 style="font-size:1.02rem;font-weight:700;margin-top:4px"'+ce(id+'.items.'+i+'.title',edit)+'>'+esc(cs.title)+'</h3><div style="font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:10px"'+ce(id+'.items.'+i+'.stat',edit)+'>'+esc(cs.stat)+'</div><div style="font-size:.76rem;color:var(--muted)"'+ce(id+'.items.'+i+'.statlabel',edit)+'>'+esc(cs.statlabel)+'</div></div></div>').join('')+'</div></div>';
+ if(b.t==='steps')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'How it works',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.items.length+',1fr);gap:20px">'+p.items.map((s,i)=>'<div><div style="font-family:var(--mono);font-size:.72rem;letter-spacing:.05em;color:var(--amber-2);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px">STEP 0'+(i+1)+'</div><h3 style="font-family:var(--display);font-weight:600;font-size:1.08rem"'+ce(id+'.items.'+i+'.title',edit)+'>'+esc(s.title)+'</h3><p style="color:var(--muted);font-size:.87rem;margin-top:6px;line-height:1.5"'+ce(id+'.items.'+i+'.text',edit)+'>'+esc(s.text)+'</p></div>').join('')+'</div></div>';
+ if(b.t==='casestudy')return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'Our work',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+Math.min(p.items.length,3)+',1fr);gap:14px">'+p.items.map((cs,i)=>'<div class="pv-card" style="padding:0;overflow:hidden">'+(cs.img?imgTag(cs.img,'width:100%;height:150px;object-fit:cover;display:block',edit,id+'.items.'+i+'.img'):'<div style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b)"></div>')+'<div style="padding:18px"><div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)"'+ce(id+'.items.'+i+'.loc',edit)+'>'+esc(cs.loc)+'</div><h3 style="font-size:1.02rem;font-weight:600;margin-top:4px"'+ce(id+'.items.'+i+'.title',edit)+'>'+esc(cs.title)+'</h3><div style="font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:10px"'+ce(id+'.items.'+i+'.stat',edit)+'>'+esc(cs.stat)+'</div><div style="font-size:.76rem;color:var(--muted)"'+ce(id+'.items.'+i+'.statlabel',edit)+'>'+esc(cs.statlabel)+'</div></div></div>').join('')+'</div></div>';
  if(b.t==='clientbanner'){const cs=p.clients||[];const chip=c=>'<span class="pv-brand">'+(c.img?'<img src="'+c.img+'">':esc(c.name))+'</span>';return '<div class="pv-banner"><div class="bh"'+ce(id+'.heading',edit)+'>'+esc(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+cs.map(chip).join('')+cs.map(chip).join('')+'</div></div></div>';}
  if(b.t==='rich'){
    var richCe=edit?' contenteditable="true" data-ep="'+id+'.html" data-html="1" oninput="epInput(this)" onblur="epBlur(this)" onkeydown="epKey(event,true)" onclick="richClick(event,this,\''+id+'\')"':'';
@@ -219,6 +305,7 @@ function renderPreview(){
  document.getElementById('pvname').textContent=page().name+' · '+page().slug;
  if(!b.length){pv.innerHTML='<div class="pv-empty" ondragover="pvOver(event)" ondrop="pvDropEnd(event)">Empty page — drag a section here, or add one from the left ↙</div>';return;}
  pv.innerHTML=b.map((bl,i)=>'<div class="pv-block'+(SEL===bl.id?' sel':'')+'" style="'+spacingStyle(bl.p)+'" data-idx="'+i+'" ondragover="pvOver(event,'+i+',this)" ondragleave="pvLeave(this)" ondrop="pvDrop(event,'+i+')" onclick="selectBlock(\''+bl.id+'\')">'+renderBlock(bl,true)+'</div>').join('');
+ if(typeof window.initCmsFormRuntime==='function')window.initCmsFormRuntime();
 }
 /* Inline edit: write contenteditable text back to the block model by data-ep path. */
 function epSet(el){const ep=el.getAttribute('data-ep');if(!ep)return;const parts=ep.split('.');const bl=findBlock(parts[0]);if(!bl)return;let o=bl.p;for(let i=1;i<parts.length-1;i++){o=o[parts[i]];if(o==null)return;}o[parts[parts.length-1]]=el.getAttribute('data-html')==='1'?el.innerHTML:el.textContent;}
@@ -330,7 +417,7 @@ function blockDefs(){const defs={
   faq:{items:[{q:'A question?',a:'An answer.'}]},
   rich:{html:'<p>Write anything here…</p>'},
   media:{img:'',side:'right',eyebrow:'Why choose us',title:'A section title',text:'Describe the benefit here — pair it with a real photo of your work.',cta:'Learn more',ctaDisabled:false,textWide:false},
-  form:{heading:'Start the conversation',sub:'No obligation, no pushy sales. We reply within 1 working day.',btn:'Send enquiry',pulse:true,fName:true,fEmail:true,fPhone:true,fPost:true,fOrg:true,fMsg:true,fSector:true,fInterests:true}
+  form:{heading:'Start the conversation',sub:'Whether you are a homeowner exploring solar and battery storage, a business seeking to reduce operating costs, or a public sector organisation planning decarbonisation, Heliaxis is ready to help.',btn:'Send Enquiry',pulse:true,fName:true,fEmail:true,fPhone:true,fPost:false,fOrg:true,fMsg:true,fSector:true,fInterests:true}
 };
  Object.assign(defs,window.EXTRA_DEFAULTS||{});return defs;}
 function makeBlock(t){const defs=blockDefs();return {id:uid(),t,p:JSON.parse(JSON.stringify(defs[t]))};}
@@ -388,13 +475,13 @@ function dend(){clearDropCues();pvClear();dragIdx=null;dragNewType=null;}
 let PAGE_PICKER_SEARCH='';
 function pagePickerMatches(pg,q){if(!q)return true;q=q.toLowerCase();return (pg.name||'').toLowerCase().indexOf(q)>=0||(pg.slug||'').toLowerCase().indexOf(q)>=0;}
 function pagePickerIndices(){var out=[];STATE.pages.forEach(function(pg,i){if(pagePickerMatches(pg,PAGE_PICKER_SEARCH))out.push(i);});out.sort(function(a,b){var na=(STATE.pages[a].name||'').toLowerCase();var nb=(STATE.pages[b].name||'').toLowerCase();return na<nb?-1:na>nb?1:a-b;});return out;}
-function renderPagePickerList(){var el=document.getElementById('pagePickerList');var countEl=document.getElementById('pagePickerCount');if(!el)return;var indices=pagePickerIndices();var cur=STATE.current;var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page'};if(countEl)countEl.textContent=PAGE_PICKER_SEARCH?indices.length+' of '+STATE.pages.length:STATE.pages.length+' pages';if(!indices.length){el.innerHTML='<div class="page-picker-empty">No pages match</div>';return;}el.innerHTML=indices.map(function(i){var pg=STATE.pages[i];var kind=dashPageBadge(pg);return '<button type="button" class="page-picker-item'+(i===cur?' on':'')+'" role="option" aria-selected="'+(i===cur)+'" onclick="pagePickerPick('+i+')"><span class="page-picker-item-name">'+esc(pg.name)+'</span><span class="page-picker-item-meta">'+esc(pg.slug||'/')+' · '+labels[kind]+'</span></button>';}).join('');}
+function renderPagePickerList(){var el=document.getElementById('pagePickerList');var countEl=document.getElementById('pagePickerCount');if(!el)return;var indices=pagePickerIndices();var cur=STATE.current;var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page',blog:'AI blog'};if(countEl)countEl.textContent=PAGE_PICKER_SEARCH?indices.length+' of '+STATE.pages.length:STATE.pages.length+' pages';if(!indices.length){el.innerHTML='<div class="page-picker-empty">No pages match</div>';return;}el.innerHTML=indices.map(function(i){var pg=STATE.pages[i];var kind=dashPageBadge(pg);return '<button type="button" class="page-picker-item'+(i===cur?' on':'')+'" role="option" aria-selected="'+(i===cur)+'" onclick="pagePickerPick('+i+')"><span class="page-picker-item-name">'+esc(pg.name)+'</span><span class="page-picker-item-meta">'+esc(pg.slug||'/')+' · '+labels[kind]+'</span></button>';}).join('');}
 function renderPageSel(){var lbl=document.getElementById('pagePickerLabel');if(lbl&&page())lbl.textContent=page().name;var menu=document.getElementById('pagePickerMenu');if(menu&&menu.classList.contains('open'))renderPagePickerList();}
 function togglePagePicker(ev){if(ev)ev.stopPropagation();var menu=document.getElementById('pagePickerMenu');var btn=document.getElementById('pagePickerTrigger');if(!menu)return;if(menu.classList.contains('open')){closePagePicker();return;}closeToolbarMore();menu.classList.add('open');if(btn)btn.setAttribute('aria-expanded','true');PAGE_PICKER_SEARCH='';var inp=document.getElementById('pagePickerSearch');if(inp){inp.value='';inp.focus();}renderPagePickerList();}
 function closePagePicker(){var menu=document.getElementById('pagePickerMenu');var btn=document.getElementById('pagePickerTrigger');if(menu)menu.classList.remove('open');if(btn)btn.setAttribute('aria-expanded','false');PAGE_PICKER_SEARCH='';}
 function pagePickerSearch(q){PAGE_PICKER_SEARCH=q;renderPagePickerList();}
 function pagePickerPick(i){closePagePicker();switchPage(i);}
-function renderToolbarPageType(){var el=document.getElementById('toolbarPageType');if(!el)return;if(MODE!=='edit'||!page()){el.innerHTML='';return;}var kind=dashPageBadge(page());var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page'};el.innerHTML='<span class="toolbar-type-badge toolbar-type-'+kind+'">'+labels[kind]+'</span>';var lbl=document.getElementById('toolbarPageLabel');if(lbl)lbl.textContent=page().name;}
+function renderToolbarPageType(){var el=document.getElementById('toolbarPageType');if(!el)return;if(MODE!=='edit'||!page()){el.innerHTML='';return;}var kind=dashPageBadge(page());var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page',blog:'AI blog'};el.innerHTML='<span class="toolbar-type-badge toolbar-type-'+kind+'">'+labels[kind]+'</span>';var lbl=document.getElementById('toolbarPageLabel');if(lbl)lbl.textContent=page().name;}
 function toggleToolbarMore(ev){if(ev)ev.stopPropagation();var menu=document.getElementById('toolbarMore');var btn=document.getElementById('toolbarMoreBtn');if(!menu)return;var open=menu.classList.toggle('open');if(btn)btn.setAttribute('aria-expanded',open?'true':'false');}
 function closeToolbarMore(){var menu=document.getElementById('toolbarMore');var btn=document.getElementById('toolbarMoreBtn');if(menu)menu.classList.remove('open');if(btn)btn.setAttribute('aria-expanded','false');}
 function switchPage(i){STATE.current=+i;SEL=null;renderAll();save();syncCmsUrl(false);}
@@ -594,7 +681,7 @@ function imgRm(i){STATE.site.images.splice(i,1);renderImages();if(MODE==='librar
 /* ============ SEO TAB ============ */
 function setPageTheme(t){const pg=page();pg.theme=t;renderPreview();renderSEO();save();}
 function setPageType(kind){var pg=page();var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return;if(kind==='page')pg.type='page';else if(kind==='landing')pg.type='landing';else if(kind==='case')pg.type='casestudy';renderSEO();renderToolbarPageType();save();}
-function pageTypePickerHtml(pg){var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return '<div class="fld"><label>Page type</label><div class="hint" style="margin:0">Homepage — set automatically because the URL slug is <code>/</code>.</div></div>';var kind=dashPageBadge(pg);return '<div class="fld"><label>Page type</label><div class="seg"><button type="button" class="'+(kind==='page'?'on':'')+'" onclick="setPageType(\'page\')">Page</button><button type="button" class="'+(kind==='landing'?'on':'')+'" onclick="setPageType(\'landing\')">Landing</button><button type="button" class="'+(kind==='case'?'on':'')+'" onclick="setPageType(\'case\')">Case study</button></div><div class="hint" style="margin-top:6px;margin-bottom:0">Used for dashboard badges and filters. Create shortcuts: <b>+ Landing page</b> or <b>+ Case study</b> on the dashboard.</div></div>';}
+function pageTypePickerHtml(pg){var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return '<div class="fld"><label>Page type</label><div class="hint" style="margin:0">Homepage — set automatically because the URL slug is <code>/</code>.</div></div>';if(isCmsBlogPage(pg))return '<div class="fld"><label>Page type</label><div class="hint" style="margin:0">AI blog article — managed from <a href="/admin/blog">/admin/blog</a>, not mixed with website pages.</div></div>';var kind=dashPageBadge(pg);return '<div class="fld"><label>Page type</label><div class="seg"><button type="button" class="'+(kind==='page'?'on':'')+'" onclick="setPageType(\'page\')">Page</button><button type="button" class="'+(kind==='landing'?'on':'')+'" onclick="setPageType(\'landing\')">Landing</button><button type="button" class="'+(kind==='case'?'on':'')+'" onclick="setPageType(\'case\')">Case study</button></div><div class="hint" style="margin-top:6px;margin-bottom:0">Used for dashboard badges and filters. Create shortcuts: <b>+ Landing page</b> or <b>+ Case study</b> on the dashboard.</div></div>';}
 function renderSEO(){const el=document.getElementById('panel-seo');const pg=page();pg.seo=pg.seo||{};const s=pg.seo;
  function f(l,k,ph){var val=s[k]||'';if(k==='slug'&&!val&&pg.slug)val=pg.slug;return '<div class="fld"><label>'+l+'</label><input value="'+esc(val)+'" placeholder="'+ph+'" oninput="seoUpd(\''+k+'\',this.value)"></div>'}
  var slugVal=s.slug||pg.slug||'';
@@ -707,16 +794,18 @@ async function pageHTML(pg){
  const css=buildPublishCss();
  const body=pg.blocks.map(b=>'<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>').join('\n');
  const seo=pg.seo||{};const meta=(seo.desc?'<meta name="description" content="'+esc(seo.desc)+'">':'')+(seo.noindex?'<meta name="robots" content="noindex">':'')+(seo.canonical?'<link rel="canonical" href="'+esc(seo.canonical)+'">':'')+(seo.ogImage?'<meta property="og:image" content="'+esc(seo.ogImage)+'">':'')+'<meta property="og:title" content="'+esc(seo.title||pg.name)+'">';
- return '<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>'+esc(seo.title||pg.name+' — Heliaxis')+'</title>'+meta+
+ const origin=siteOrigin()||((typeof location!=='undefined'&&location.origin)||'');
+ const base=origin?'<base href="'+esc(origin.replace(/\/$/,'')+'/')+'">':'';
+ return '<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'+base+'<title>'+esc(seo.title||pg.name+' — Heliaxis')+'</title>'+meta+
   '<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">'+
-  '<style>'+css+'</style></head><body'+(pg.theme==='dark'?' class="dk"':'')+'>'+body+'</body></html>';
+  '<style>'+css+'</style></head><body'+(pg.theme==='dark'?' class="dk"':'')+'><div class="pv-page">'+body+'</div><script>'+CMS_FORM_RUNTIME_SCRIPT+'</script></body></html>';
 }
 function download(name,text){const b=new Blob([text],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
 async function exportHTML(){var pg=page();var slug=(pg.slug||'/').replace(/^\//,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'')||'page';download(slug+'.html',await pageHTML(pg));}
 function exportJSON(){const b=new Blob([JSON.stringify(STATE,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='heliaxis-site.json';a.click();URL.revokeObjectURL(u);}
 function siteOrigin(){var env=(typeof process!=='undefined'&&process.env.NEXT_PUBLIC_SITE_URL)||'';if(env)return String(env).replace(/\/$/,'');return (location.origin||'').replace(/\/$/,'');}
 function publicPageUrl(slug){var s=(slug||'/').trim()||'/';if(s==='/'||s==='')return siteOrigin()+'/';if(s.charAt(0)!=='/')s='/'+s;return siteOrigin()+s;}
-function buildPublishCss(){return PUBLISH_STYLES.root+'*,*::before,*::after{box-sizing:border-box}html,body{height:auto;overflow:auto}body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink)}body.dk{background:var(--ink)}'+PUBLISH_STYLES.preview;}
+function buildPublishCss(){return PUBLISH_STYLES.root+'*,*::before,*::after{box-sizing:border-box}html,body{height:auto;overflow:auto}body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased;--pv-max:1160px;--pv-gutter:24px;--pv-pad:max(var(--pv-gutter),calc((100% - var(--pv-max)) / 2))}body.dk{background:var(--ink)}.pv-page{max-width:none;margin:0;background:var(--paper);min-height:100vh;width:100%}body.dk .pv-page{background:var(--ink)}'+PUBLISH_STYLES.preview;}
 function openPublish(){
   var box=document.getElementById('modalbox');
   box.className='modalbox';
@@ -734,34 +823,47 @@ function openPublish(){
     +'</div>';
   document.getElementById('modal').classList.add('show');
 }
-async function openPublishPreview(pageIdx){
+function previewBackBarHtml(returnUrl){
+  var href=esc(returnUrl||'/admin');
+  var backLabel=returnUrl==='/admin/blog'?'← Back to articles':'← Back to editor';
+  return '<div id="cms-preview-bar" style="position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:#211F18;color:#F7F2E7;font-family:system-ui,sans-serif;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.35)">'
+    +'<span style="opacity:.85">Preview — not published</span>'
+    +'<a href="'+href+'" style="background:#F8BC1E;color:#211F18;font-weight:700;text-decoration:none;padding:8px 14px;border-radius:4px">'+backLabel+'</a>'
+    +'</div><div style="height:52px"></div>';
+}
+async function openPublishPreview(pageIdx,opts){
   var idx=typeof pageIdx==='number'?pageIdx:STATE.current;
   var pg=STATE.pages[idx];
   if(!pg)return;
   var msg=document.getElementById('pubmsg');
-  // Open synchronously on the click so the browser does not block the tab.
-  var win=window.open('about:blank','_blank');
-  if(!win){
-    var tip='Allow pop-ups for this site to open the preview in a new tab.';
-    if(msg){msg.style.color='var(--amber-2)';msg.textContent='⚠ '+tip;}
-    else alert(tip);
-    return;
+  var forceSameTab=opts&&opts.sameTab;
+  var returnUrl=(opts&&opts.returnUrl)||(location.pathname+(location.search||''));
+  var win=null;
+  if(!forceSameTab){
+    try{win=window.open('about:blank','_blank');}catch(e){win=null;}
   }
   try{
-    win.document.write('<!DOCTYPE html><html><head><title>Building preview…</title></head><body style="font-family:system-ui;padding:40px;color:#666">Building live preview…</body></html>');
-    win.document.close();
     if(msg){msg.style.color='var(--muted)';msg.textContent='Opening preview…';}
     var html=await pageHTML(pg);
     html=html.replace(/<title>[^<]*<\/title>/i,'<title>'+esc(pg.name||'Page')+' · Preview (not published)</title>');
+    // Inject back bar for same-tab previews
+    if(!win){
+      html=html.replace(/<body([^>]*)>/i,function(m,attrs){return '<body'+attrs+'>'+previewBackBarHtml(returnUrl);});
+      document.open();
+      document.write(html);
+      document.close();
+      if(msg){msg.style.color='var(--ok)';msg.textContent='✓ Preview opened — use Back to editor when done.';}
+      return;
+    }
     win.document.open();
     win.document.write(html);
     win.document.close();
     if(msg){msg.style.color='var(--ok)';msg.textContent='✓ Preview opened in a new tab — not published yet.';}
   }catch(e){
     var err=e&&e.message?e.message:'Could not open preview';
-    try{win.document.open();win.document.write('<!DOCTYPE html><html><body style="font-family:system-ui;padding:40px;color:#b33">⚠ '+String(err).replace(/</g,'&lt;')+'</body></html>');win.document.close();}catch(e2){}
+    if(win){try{win.document.open();win.document.write('<!DOCTYPE html><html><body style="font-family:system-ui;padding:40px;color:#b33">⚠ '+String(err).replace(/</g,'&lt;')+'</body></html>');win.document.close();}catch(e2){}}
     if(msg){msg.style.color='var(--amber-2)';msg.textContent='⚠ '+err;}
-    else alert(err);
+    else console.error(err);
   }
 }
 async function doPublish(){
@@ -775,7 +877,7 @@ async function doPublish(){
     var css=buildPublishCss();
     var pages=STATE.pages.map(function(pg){
       return{slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
-        html:pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')};
+        html:'<div class="pv-page">'+pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')+'</div>'};
     });
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
       body:JSON.stringify({rendered:{css:css,pages:pages}})});
@@ -818,7 +920,15 @@ function repairLegacyUntitledSlugs(){var changed=false;STATE.pages.forEach(funct
 function pageNameInput(v){var pg=page();var cur=(pg.slug||'').replace(/\/$/,'')||'/';if(cur==='/'||cur==='')return;var slugInp=document.getElementById('seo-slug-input');if(!slugInp)return;slugInp.value=uniquePageSlug(titleToSlug(normTitle(v)),STATE.current);}
 function pageEditSlug(pg){var base=slugifyTitle(pg.name);if(!base)base=slugifyTitle((pg.slug||'/').replace(/^\//,''))||'page';return base;}
 function getSlugFromPath(){var parts=location.pathname.replace(/\/+$/,'').split('/');if(parts.length<3||parts[1]!=='admin')return null;var s=decodeURIComponent(parts[2]);if(!s||s==='enquiries'||s==='approvals'||s==='blog')return null;return s;}
-function findPageByEditSlug(slug){if(!slug)return -1;slug=decodeURIComponent(slug).toLowerCase();return STATE.pages.findIndex(function(pg){return pageEditSlug(pg).toLowerCase()===slug;});}
+function findPageByEditSlug(slug){
+  if(!slug)return -1;
+  slug=decodeURIComponent(String(slug)).toLowerCase().replace(/^\/+/,'');
+  return STATE.pages.findIndex(function(pg){
+    if(pageEditSlug(pg).toLowerCase()===slug)return true;
+    var urlSlug=String(pg.slug||'').replace(/^\/+/,'').toLowerCase();
+    return urlSlug===slug;
+  });
+}
 function cmsAdminPath(slug){return '/admin/'+encodeURIComponent(slug);}
 function syncCmsUrl(replace){var path='/admin';if(MODE==='edit'&&page())path=cmsAdminPath(pageEditSlug(page()));if(location.pathname===path){document.title=MODE==='edit'&&page()?page().name+' · Heliaxis CMS':'Heliaxis CMS';return;}var state={cmsMode:MODE,slug:MODE==='edit'&&page()?pageEditSlug(page()):null};if(replace)history.replaceState(state,'',path);else history.pushState(state,'',path);document.title=MODE==='edit'&&page()?page().name+' · Heliaxis CMS':'Heliaxis CMS';}
 /* ===== extension: template variety, case studies, section preview ===== */
@@ -829,20 +939,23 @@ let DASH_PAGE_SORT='az';
 let DASH_PAGE_TYPE='';
 const DASH_PAGE_SIZE=12;
 var dashSearchTimer=null;
-function dashPageTypeMatches(pg){if(!DASH_PAGE_TYPE)return true;return dashPageBadge(pg)===DASH_PAGE_TYPE;}
-function dashTypeCounts(){var c={all:STATE.pages.length,home:0,landing:0,case:0,page:0};STATE.pages.forEach(function(pg){c[dashPageBadge(pg)]++;});return c;}
-function dashPageMatches(pg){if(!DASH_PAGE_SEARCH)return true;var q=DASH_PAGE_SEARCH.toLowerCase();return (pg.name||'').toLowerCase().indexOf(q)>=0||(pg.slug||'').toLowerCase().indexOf(q)>=0;}
+function sitePageCount(){var n=0;STATE.pages.forEach(function(pg){if(!isCmsBlogPage(pg))n++;});return n;}
+function blogPageCount(){var n=0;STATE.pages.forEach(function(pg){if(isCmsBlogPage(pg))n++;});return n;}
+function dashPageTypeMatches(pg){if(isCmsBlogPage(pg))return false;if(!DASH_PAGE_TYPE)return true;return dashPageBadge(pg)===DASH_PAGE_TYPE;}
+function dashTypeCounts(){var c={all:0,home:0,landing:0,case:0,page:0,blog:0};STATE.pages.forEach(function(pg){var k=dashPageBadge(pg);if(k==='blog'){c.blog++;return;}c.all++;c[k]++;});return c;}
+function dashPageMatches(pg){if(isCmsBlogPage(pg))return false;if(!DASH_PAGE_SEARCH)return true;var q=DASH_PAGE_SEARCH.toLowerCase();return (pg.name||'').toLowerCase().indexOf(q)>=0||(pg.slug||'').toLowerCase().indexOf(q)>=0;}
 function dashFilteredIndices(){var out=[];STATE.pages.forEach(function(pg,i){if(dashPageMatches(pg)&&dashPageTypeMatches(pg))out.push(i);});out.sort(function(a,b){var na=(STATE.pages[a].name||'').toLowerCase();var nb=(STATE.pages[b].name||'').toLowerCase();if(na===nb)return a-b;return DASH_PAGE_SORT==='za'?(na<nb?1:-1):(na<nb?-1:1);});return out;}
 function dashPageSearch(q){DASH_PAGE_SEARCH=q;DASH_PAGE_NUM=1;clearTimeout(dashSearchTimer);dashSearchTimer=setTimeout(renderDashPages,200);}
 function dashPageTypeSet(v){DASH_PAGE_TYPE=v;DASH_PAGE_NUM=1;renderDashPages();}
 function dashPageFilterHtml(){var tc=dashTypeCounts();return '<select class="dash-sort" id="dash-page-type" onchange="dashPageTypeSet(this.value)" title="Filter by page type"><option value="">All pages ('+tc.all+')</option><option value="home"'+(DASH_PAGE_TYPE==='home'?' selected':'')+'>Home ('+tc.home+')</option><option value="landing"'+(DASH_PAGE_TYPE==='landing'?' selected':'')+'>Landing ('+tc.landing+')</option><option value="case"'+(DASH_PAGE_TYPE==='case'?' selected':'')+'>Case study ('+tc.case+')</option><option value="page"'+(DASH_PAGE_TYPE==='page'?' selected':'')+'>Page ('+tc.page+')</option></select>';}
-function dashPagesHeadCount(total){if(DASH_PAGE_SEARCH||DASH_PAGE_TYPE)return total+' of '+STATE.pages.length;return ''+STATE.pages.length;}
+function dashPagesHeadCount(total){var siteN=sitePageCount();if(DASH_PAGE_SEARCH||DASH_PAGE_TYPE)return total+' of '+siteN;return ''+siteN;}
 function dashClearSearch(){DASH_PAGE_SEARCH='';var el=document.getElementById('dash-page-search');if(el)el.value='';DASH_PAGE_NUM=1;renderDashPages();}
 function dashPageGo(n){DASH_PAGE_NUM=Math.max(1,+n||1);renderDashPages();var sec=document.getElementById('dash-pages-sec');if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});}
-function dashPageBadge(pg){var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return 'home';var t=(pg.type||'page').toLowerCase();if(t==='landing')return 'landing';if(t==='casestudy'||t==='case')return 'case';if(t==='home')return 'home';var name=(pg.name||'').toLowerCase();if(name.indexOf('landing')>=0)return 'landing';if(slug.indexOf('case-study')>=0||name.indexOf('case study')>=0)return 'case';return 'page';}
-function dashPageBadgeHtml(kind){var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page'};return '<span class="pbadge pbadge-'+kind+'">'+labels[kind]+'</span>';}
+function dashPageBadge(pg){var slug=(pg.slug||'').replace(/\/$/,'')||'/';if(slug==='/'||slug==='')return 'home';var t=(pg.type||'page').toLowerCase();if(t==='blog'||String(pg.origin||'').toLowerCase()==='ai-blog')return 'blog';if(t==='landing')return 'landing';if(t==='casestudy'||t==='case')return 'case';if(t==='home')return 'home';var name=(pg.name||'').toLowerCase();if(name.indexOf('landing')>=0)return 'landing';if(slug.indexOf('case-study')>=0||name.indexOf('case study')>=0)return 'case';var seq=(pg.blocks||[]).map(function(b){return b.t;}).join(',');if(slug!=='/example-blog-page'&&(seq==='hero,media,rich,cta,rich,form,split'||seq.indexOf('hero,media,rich,cta,rich,form,split')===0))return 'blog';return 'page';}
+function isCmsBlogPage(pg){return dashPageBadge(pg)==='blog';}
+function dashPageBadgeHtml(kind){var labels={home:'Home',landing:'Landing',case:'Case study',page:'Page',blog:'AI blog'};return '<span class="pbadge pbadge-'+kind+'">'+labels[kind]+'</span>';}
 function dashPageCard(i){var pg=STATE.pages[i];var secs=(pg.blocks||[]).length;var badge=dashPageBadge(pg);return '<article class="pcard" onclick="editPage('+i+')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();editPage('+i+')}"><div class="pthumb"><div class="pthumb-frame"><div class="zi" id="thumb'+i+'"></div></div><div class="pthumb-shade"></div>'+dashPageBadgeHtml(badge)+'<span class="pthumb-open"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>Open editor</span></div><div class="pcard-body"><h3 class="pcard-name">'+esc(pg.name)+'</h3><div class="pcard-meta-row"><span class="pcard-secs">'+secs+' section'+(secs===1?'':'s')+'</span></div><div class="pcard-actions" onclick="event.stopPropagation()"><button type="button" class="pcard-btn pcard-btn-primary" onclick="editPage('+i+')">Edit page</button><button type="button" class="pcard-btn" onclick="openPublishPreview('+i+')" title="Preview how this page will look when published">Preview</button><button type="button" class="pcard-btn pcard-btn-danger" onclick="delPage('+i+')" title="Delete page">Delete</button></div></div></article>';}
-function dashStatsHtml(){var nc=newCount();var imgs=(STATE.site&&STATE.site.images)?STATE.site.images.length:0;return '<div class="dash-stats"><div class="dash-stat"><span class="dash-stat-n">'+STATE.pages.length+'</span><span class="dash-stat-l">Pages</span></div><div class="dash-stat'+(nc?' dash-stat-hot':'')+'"><span class="dash-stat-n">'+nc+'</span><span class="dash-stat-l">New leads</span></div><div class="dash-stat"><span class="dash-stat-n">'+imgs+'</span><span class="dash-stat-l">Images</span></div><a class="dash-stat dash-stat-link" href="/admin/blog"><span class="dash-stat-n">✎</span><span class="dash-stat-l">Blog</span></a><a class="dash-stat dash-stat-link" href="/" target="_blank" rel="noopener"><span class="dash-stat-n">↗</span><span class="dash-stat-l">View live site</span></a></div>';}
+function dashStatsHtml(){var total=leads().length;var L=LIVE_LEADS;var leadN=(L===null?'…':String(total));var blogs=blogPageCount();return '<div class="dash-stats"><div class="dash-stat"><span class="dash-stat-n">'+sitePageCount()+'</span><span class="dash-stat-l">Website pages</span></div><a class="dash-stat dash-stat-link" href="/admin/blog"><span class="dash-stat-n">'+blogs+'</span><span class="dash-stat-l">AI blogs</span></a><a class="dash-stat dash-stat-link" href="/admin/enquiries"><span class="dash-stat-n">'+leadN+'</span><span class="dash-stat-l">Enquiries</span></a><a class="dash-stat dash-stat-link" href="/admin/analytics"><span class="dash-stat-n dash-stat-ic">'+icon('chart',28)+'</span><span class="dash-stat-l">Analytics</span></a><a class="dash-stat dash-stat-link" href="/" target="_blank" rel="noopener"><span class="dash-stat-n">↗</span><span class="dash-stat-l">View live site</span></a></div>';}
 function renderDashThumb(i){var pg=STATE.pages[i];var t=document.getElementById('thumb'+i);if(!t)return;t.className='zi'+(pg.theme==='dark'?' dk':'');t.innerHTML=pg.blocks.length?pg.blocks.map(renderBlock).join(''):'<div class="pthumb-empty">Empty page — click to add sections</div>';}
 function renderDashPages(){var indices=dashFilteredIndices();var total=indices.length;var pages=Math.max(1,Math.ceil(total/DASH_PAGE_SIZE));if(DASH_PAGE_NUM>pages)DASH_PAGE_NUM=pages;var start=(DASH_PAGE_NUM-1)*DASH_PAGE_SIZE;var slice=indices.slice(start,start+DASH_PAGE_SIZE);var searchEl=document.getElementById('dash-page-search');var hadFocus=searchEl&&document.activeElement===searchEl;var selStart=hadFocus?searchEl.selectionStart:0;var selEnd=hadFocus?searchEl.selectionEnd:0;var hEl=document.getElementById('dash-pages-h');if(hEl)hEl.innerHTML=SPARK+'Your pages ('+dashPagesHeadCount(total)+')';var clr=document.getElementById('dash-search-clear');if(clr)clr.style.display=DASH_PAGE_SEARCH?'inline-flex':'none';var typeEl=document.getElementById('dash-page-type');if(typeEl){var tc=dashTypeCounts();typeEl.innerHTML='<option value="">All pages ('+tc.all+')</option><option value="home"'+(DASH_PAGE_TYPE==='home'?' selected':'')+'>Home ('+tc.home+')</option><option value="landing"'+(DASH_PAGE_TYPE==='landing'?' selected':'')+'>Landing ('+tc.landing+')</option><option value="case"'+(DASH_PAGE_TYPE==='case'?' selected':'')+'>Case study ('+tc.case+')</option><option value="page"'+(DASH_PAGE_TYPE==='page'?' selected':'')+'>Page ('+tc.page+')</option>';}var grid=document.getElementById('dash-pages-grid');if(!grid)return;var h='';if(!total)h+='<div class="dash-empty">'+(DASH_PAGE_SEARCH||DASH_PAGE_TYPE?'No pages match your filters. <button type="button" class="dash-link-btn" onclick="dashClearFilters()">Clear filters</button>':'No pages yet. Create one above.')+'</div>';else slice.forEach(function(i){h+=dashPageCard(i);});grid.innerHTML=h;var pager=document.getElementById('dash-pages-pager');if(pager){if(total<=DASH_PAGE_SIZE)pager.innerHTML='';else pager.innerHTML='<div class="dash-pager"><button type="button" class="dash-pg-btn"'+(DASH_PAGE_NUM<=1?' disabled':'')+' onclick="dashPageGo('+(DASH_PAGE_NUM-1)+')">← Previous</button><span class="dash-pg-info">Page '+DASH_PAGE_NUM+' of '+pages+' · '+total+' page'+(total===1?'':'s')+'</span><button type="button" class="dash-pg-btn"'+(DASH_PAGE_NUM>=pages?' disabled':'')+' onclick="dashPageGo('+(DASH_PAGE_NUM+1)+')">Next →</button></div>';}slice.forEach(renderDashThumb);if(hadFocus){var el2=document.getElementById('dash-page-search');if(el2){el2.focus();try{el2.setSelectionRange(selStart,selEnd);}catch(e){}}}}
 function dashClearFilters(){DASH_PAGE_SEARCH='';DASH_PAGE_TYPE='';DASH_PAGE_NUM=1;var el=document.getElementById('dash-page-search');if(el)el.value='';renderDashPages();}
@@ -918,8 +1031,8 @@ function makeCase(i){tplHide();closeModal();const b=CASE_TEMPLATES[i].build();va
 /* ===== dashboard / editor modes ===== */
 var MODE='dash';
 function setMode(){var m=MODE;
- document.querySelector('.main').style.display=m==='edit'?'grid':'none';
- document.getElementById('dashboard').style.display=m==='dash'?'block':'none';
+ var main=document.querySelector('.main');if(main)main.style.display=m==='edit'?'grid':'none';
+ var dash=document.getElementById('dashboard');if(dash)dash.style.display=m==='dash'?'block':'none';
  var lib=document.getElementById('library');if(lib)lib.style.display=m==='library'?'block':'none';
  var an=document.getElementById('analytics');if(an)an.style.display=m==='analytics'?'block':'none';
  var eq=document.getElementById('enquiries');if(eq)eq.style.display=m==='enq'?'block':'none';
@@ -931,32 +1044,38 @@ function setMode(){var m=MODE;
  var pp=document.getElementById('btnPublishPreview');if(pp)pp.style.display=m==='edit'?'':'none';
  closeToolbarMore();
  renderToolbarPageType();}
-function goDash(skipUrl){MODE='dash';setMode();renderDashboard();if(!skipUrl)syncCmsUrl(false);}
+function goDash(skipUrl){MODE='dash';setMode();renderDashboard();startLeadsPoll();pollLeadsOnce();if(!skipUrl)syncCmsUrl(false);}
 function editPage(i){STATE.current=+i;SEL=null;MODE='edit';setMode();renderAll();tab('build');syncCmsUrl(false);}
 function editTab(t){MODE='edit';setMode();renderAll();tab(t);}
 function delPage(i){if(STATE.pages.length<=1){alert('Keep at least one page.');return;}if(!confirm('Delete this page?'))return;STATE.pages.splice(i,1);if(STATE.current>=STATE.pages.length)STATE.current=STATE.pages.length-1;renderDashboard();save();}
 function dashNewPage(){var name=uniquePageTitle('Untitled page');var slug=uniquePageSlug(titleToSlug(name));STATE.pages.push({id:uid(),name:name,slug:slug,type:'page',seo:{slug:slug},blocks:[{id:uid(),t:'hero',p:{eyebrow:'New page',headline:'Your headline here',sub:'Start building — add sections from the left.',dark:true,ctaLabel:'Get a quote',ctaPulse:false,cta2:''}}]});editPage(STATE.pages.length-1);save();}
-function renderDashboard(){var el=document.getElementById('dashboard');
+async function makeBlogArticle(){
+ try{
+  var r=await fetch('/api/blog/create-page',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({placeholder:true})});
+  var d=await r.json().catch(function(){return {};});
+  if(!r.ok)throw new Error(d.error||'Could not create blog article');
+  location.href=d.editPath||('/admin'+(d.slug||''));
+ }catch(e){alert((e&&e.message)||'Could not create blog article');}
+}
+function renderDashboard(){var el=document.getElementById('dashboard');if(!el)return;
  var h='<div class="dash-wrap"><div class="dash-head"><h1>Dashboard</h1><p>Your whole site at a glance. Open a page to edit it, or create something new.</p></div>';
  h+=dashStatsHtml();
  h+='<div class="dash-sec-h">'+SPARK+'Create</div><div class="dash-actions">'+
    '<button class="dact dact-icon" onclick="dashNewPage()"><span class="dact-ic">'+icon('home',22)+'</span><b>+ New page</b><span>Start from a blank canvas</span></button>'+
    '<button class="dact dact-icon" onclick="openGallery(\'landing\')"><span class="dact-ic">'+icon('target',22)+'</span><b>+ Landing page</b><span>15 campaign templates</span></button>'+
    '<button class="dact dact-icon" onclick="openGallery(\'case\')"><span class="dact-ic">'+icon('building',22)+'</span><b>+ Case study</b><span>3 layouts, scrollable previews</span></button>'+
-   '<button class="dact dact-icon" onclick="openGallery(\'template\')"><span class="dact-ic">'+icon('grant',22)+'</span><b>+ From template</b><span>Your saved layouts</span></button>'+
-   '<a class="dact dact-icon" href="/admin/blog" style="text-decoration:none"><span class="dact-ic">'+icon('grant',22)+'</span><b>Blog</b><span>AI posts · schedule · Sanity</span></a></div>';
- h+='<div id="dash-pages-sec" class="dash-panel"><div class="dash-sec-h" id="dash-pages-h">'+SPARK+'Your pages ('+STATE.pages.length+')</div>';
+   '<button class="dact dact-icon" onclick="openGallery(\'template\')"><span class="dact-ic">'+icon('grant',22)+'</span><b>+ From template</b><span>Your saved layouts</span></button></div>';
+ h+='<div id="dash-pages-sec" class="dash-panel"><div class="dash-sec-h" id="dash-pages-h">'+SPARK+'Website pages ('+sitePageCount()+')</div>';
+ h+='<div class="hint" style="margin:-6px 0 12px">AI blogs are listed on <a href="/admin/blog">/admin/blog</a> — not mixed here.</div>';
  h+='<div class="dash-pages-toolbar"><div class="dash-search"><input id="dash-page-search" type="search" placeholder="Search by title or path…" value="'+esc(DASH_PAGE_SEARCH)+'" oninput="dashPageSearch(this.value)"><button type="button" class="dash-search-clear" id="dash-search-clear" style="display:'+(DASH_PAGE_SEARCH?'inline-flex':'none')+'" onclick="dashClearSearch()" title="Clear search">×</button></div><div class="dash-toolbar-filters">'+dashPageFilterHtml()+'</div></div>';
  h+='<div class="dash-grid" id="dash-pages-grid"></div><div id="dash-pages-pager"></div></div>';
  h+=leadsCard();
  h+='<div class="dash-sec-h">'+SPARK+'Site &amp; admin</div><div class="dash-actions">'+
    '<button class="dact" onclick="showMega()"><b>Mega menu</b><span>Links, icons &amp; featured image</span></button>'+
-   
    '<button class="dact" onclick="showLibrary()"><b>Image library</b><span>Media, categorise &amp; filter</span></button>'+
    '<button class="dact" onclick="showLogos()"><b>Brand logos</b><span>Manufacturer banner library</span></button>'+
-   '<button class="dact" onclick="showEnquiries()"><b>Enquiries</b><span>Leads &amp; statuses</span></button>'+
-   '<a class="dact" href="/admin/blog" style="text-decoration:none"><b>Blog</b><span>AI posts · schedule · Sanity</span></a>'+
-   '<button class="dact" onclick="showAnalytics()"><b>Analytics &amp; SEO</b><span>Traffic, engagement, rankings</span></button></div>';
+   '<a class="dact" href="/admin/blog" style="text-decoration:none"><b>Blog</b><span>AI fills fixed article template</span></a>'+
+   '<a class="dact" href="/admin/analytics" style="text-decoration:none"><b>Analytics</b><span>Umami traffic &amp; engagement</span></a></div>';
  h+='</div>';el.innerHTML=h;
  renderDashPages();
 }
@@ -972,32 +1091,67 @@ function closeGallery(){document.getElementById('gallery').classList.remove('sho
 function galPick(kind,i){closeGallery();if(kind==='landing')makeLanding(i);else if(kind==='template')makeFromTemplate(i);else makeCase(i);}
 
 /* ===== interests, leads, admin views ===== */
-var INTERESTS=[['solar','Solar PV'],['battery','Battery storage'],['heatpump','Infrared heating'],['led','LED lighting'],['users','Consultation'],['coin','Funding & grants']];
-var SAMPLE_LEADS=[
- {id:'l1',name:'Emily Watkins',org:'',email:'emily.w@gmail.com',phone:'07700 900123',town:'Cardiff',postcode:'CF24 3AA',lat:51.48,lng:-3.16,sector:'Residential',interests:['solar','battery'],msg:'Interested in solar + battery for a 3-bed semi in Roath.',src:'Home hero',time:'2h ago',isnew:true},
- {id:'l2',name:'Rhys Davies',org:'Davies Joinery',email:'rhys@daviesjoinery.co.uk',phone:'07700 900456',town:'Swansea',postcode:'SA1 4PB',lat:51.62,lng:-3.94,sector:'Commercial',interests:['solar','led','coin'],msg:'Workshop roof — keen to know what grants apply.',src:'PPA landing',time:'5h ago',isnew:true},
- {id:'l3',name:'Morgan Facilities',org:'Morgan Ltd',email:'ops@morgan.co.uk',phone:'01633 900789',town:'Newport',postcode:'NP19 4TT',lat:51.58,lng:-2.98,sector:'Commercial',interests:['solar','battery','led'],msg:'55kWp warehouse rooftop enquiry.',src:'Commercial',time:'Yesterday',isnew:false},
- {id:'l4',name:'Sian Hughes',org:'',email:'sian.h@outlook.com',phone:'07700 900222',town:'Bridgend',postcode:'CF31 1AA',lat:51.505,lng:-3.58,sector:'Residential',interests:['heatpump','solar'],msg:'Infrared heating and possibly solar.',src:'Estimator',time:'Yesterday',isnew:false},
- {id:'l5',name:'Cambrian Care',org:'Cambrian Care Homes',email:'estates@cambriancare.org',phone:'01633 900333',town:'Caerphilly',postcode:'CF83 1AA',lat:51.571,lng:-3.22,sector:'Public Sector',interests:['solar','battery','led','coin'],msg:'Two care homes, decarbonisation planning.',src:'Sector page',time:'2 days ago',isnew:false}
-];
-function leads(){if(!STATE.leads)STATE.leads=JSON.parse(JSON.stringify(SAMPLE_LEADS));return STATE.leads;}
-function newCount(){return leads().filter(function(l){return l.isnew}).length;}
-function leadsCard(){var L=leads();var nc=newCount();
- var rows=L.slice(0,5).map(function(l,i){return '<div class="lead-row" onclick="openLead('+i+')"><span class="lead-dot'+(l.isnew?' new':'')+'"></span><div class="lr-main"><b>'+esc(l.name)+'</b><span>'+esc(l.town)+' · '+esc(l.sector)+' · via '+esc(l.src)+'</span></div><div class="lr-int">'+l.interests.slice(0,4).map(function(k){return icon(k,16)}).join('')+'</div><div class="lr-t">'+esc(l.time)+'</div></div>';}).join('');
- return '<div class="dash-sec-h">'+SPARK+'Leads &amp; form submissions</div><div class="leads-card'+(nc?' hot':'')+'"><div class="leads-h"><b>Recent enquiries</b><button class="tbtn2" style="padding:4px 9px;margin-left:auto" onclick="showEnquiries()">Manage all →</button>'+(nc?'<span class="newbadge">'+nc+' new</span>':'<span style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">all read</span>')+'</div>'+rows+'</div>';
+var INTERESTS=[['solar','Solar PV Installation'],['battery','Battery Storage'],['heatpump','Infrared Heating'],['led','LED Lighting'],['users','Consultation & Advisory'],['coin','Funding & Grants']];
+var LIVE_LEADS=null;
+var LIVE_LEADS_ERR='';
+var LIVE_LEADS_LOADING=false;
+var LIVE_LEADS_SIG='';
+var LEADS_POLL=null;
+function leads(){return LIVE_LEADS||[];}
+function newCount(){return leads().filter(function(l){return l.isnew||l.status==='New'}).length;}
+function leadsSig(list){return (list||[]).map(function(l){return l.id+':'+(l.status||'')}).join('|');}
+function loadLeads(){
+ if(LIVE_LEADS_LOADING)return LIVE_LEADS_LOADING;
+ LIVE_LEADS_LOADING=fetch('/api/enquiries',{credentials:'same-origin',cache:'no-store'})
+  .then(function(r){if(!r.ok)throw new Error(r.status===401?'Sign in required':'Failed to load enquiries');return r.json();})
+  .then(function(d){LIVE_LEADS=d.leads||[];LIVE_LEADS_ERR='';return LIVE_LEADS;})
+  .catch(function(e){LIVE_LEADS_ERR=(e&&e.message)||'Failed to load';LIVE_LEADS=LIVE_LEADS||[];return LIVE_LEADS;})
+  .finally(function(){LIVE_LEADS_LOADING=false;});
+ return LIVE_LEADS_LOADING;
 }
-function mapXY(l){var x=(l.lng-(-4.35))/((-2.65)-(-4.35));var y=1-((l.lat-51.30)/(51.75-51.30));return {x:Math.max(.06,Math.min(.94,x))*100,y:Math.max(.12,Math.min(.9,y))*100};}
-function openLead(i){var l=leads()[i];l.isnew=false;save();
- var xy=mapXY(l);
- var pin='<div class="lead-pin" style="left:'+xy.x+'%;top:'+xy.y+'%"><svg viewBox="0 0 24 24" fill="#F8BC1E" stroke="#211F18" stroke-width="1.2"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5" fill="#211F18" stroke="none"/></svg></div>';
- var ints=INTERESTS.map(function(it){var on=l.interests.indexOf(it[0])>=0;return '<div class="lead-int '+(on?'on':'off')+'">'+icon(it[0],18)+it[1]+'</div>';}).join('');
+function refreshLeadsUI(){
+ if(MODE==='enq')renderEnquiries();
+ if(MODE==='dash')renderDashboard();
+}
+function pollLeadsOnce(){
+ loadLeads().then(function(list){
+  var sig=leadsSig(list)+(LIVE_LEADS_ERR||'');
+  if(sig===LIVE_LEADS_SIG)return;
+  LIVE_LEADS_SIG=sig;
+  refreshLeadsUI();
+ });
+}
+function startLeadsPoll(){
+ if(LEADS_POLL)return;
+ pollLeadsOnce();
+ LEADS_POLL=setInterval(function(){
+  if(document.hidden)return;
+  if(MODE!=='dash'&&MODE!=='enq')return;
+  pollLeadsOnce();
+ },8000);
+}
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&(MODE==='dash'||MODE==='enq'))pollLeadsOnce();});
+function leadsCard(){var L=leads();var nc=newCount();
+ if(!LIVE_LEADS&&!LIVE_LEADS_ERR){loadLeads().then(function(){LIVE_LEADS_SIG=leadsSig(LIVE_LEADS);refreshLeadsUI();});startLeadsPoll();return '<div class="dash-sec-h">'+SPARK+'Leads &amp; form submissions</div><div class="leads-card"><div class="leads-h"><b>Recent enquiries</b><span style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-left:auto">Loading…</span></div></div>';}
+ startLeadsPoll();
+ var rows=L.slice(0,3).map(function(l,i){return '<div class="lead-row" onclick="openLead('+i+')"><span class="lead-dot'+(l.isnew||l.status==='New'?' new':'')+'"></span><div class="lr-main"><b>'+esc(l.name)+'</b><span>'+esc(l.town)+' · '+esc(l.sector)+' · via '+esc(l.src)+'</span></div><div class="lr-int">'+(l.interests||[]).slice(0,4).map(function(k){return icon(k,16)}).join('')+'</div><div class="lr-t">'+esc(l.time)+'</div></div>';}).join('');
+ return '<div class="dash-sec-h">'+SPARK+'Leads &amp; form submissions</div><div class="leads-card'+(nc?' hot':'')+'"><div class="leads-h"><b>Recent enquiries</b><a class="tbtn2" style="padding:4px 9px;margin-left:auto;text-decoration:none" href="/admin/enquiries">Manage all →</a>'+(LIVE_LEADS_ERR?'<span style="font-family:var(--mono);font-size:.62rem;color:#b4462f">'+esc(LIVE_LEADS_ERR)+'</span>':(nc?'<span class="newbadge">'+nc+' new</span>':'<span style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">all read</span>'))+'</div>'+(rows||'<div style="padding:14px;color:var(--muted);font-size:.85rem">No enquiries yet — submissions from the contact form appear here.</div>')+'</div>';
+}
+function mapXY(l){if(typeof l.lat!=='number'||typeof l.lng!=='number')return null;var x=(l.lng-(-4.35))/((-2.65)-(-4.35));var y=1-((l.lat-51.30)/(51.75-51.30));return {x:Math.max(.06,Math.min(.94,x))*100,y:Math.max(.12,Math.min(.9,y))*100};}
+function osmEmbed(lat,lng){var d=0.035;var left=lng-d,right=lng+d,top=lat+d*0.7,bottom=lat-d*0.7;return 'https://www.openstreetmap.org/export/embed.html?bbox='+left+'%2C'+bottom+'%2C'+right+'%2C'+top+'&layer=mapnik&marker='+lat+'%2C'+lng;}
+function openLead(i){var l=leads()[i];if(!l)return;l.isnew=false;
+ var hasGeo=typeof l.lat==='number'&&typeof l.lng==='number';
+ var mapBlock=hasGeo
+  ?('<div class="lead-map lead-map-osm"><iframe title="Map" src="'+osmEmbed(l.lat,l.lng)+'" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="lead-map-label">'+esc(l.town||'')+(l.postcode?' · '+esc(l.postcode):'')+'</div></div>')
+  :('<div class="lead-meta" style="margin-top:10px"><div><span>Postcode</span>'+esc(l.postcode||l.town||'—')+'</div><div><span>Source</span>'+esc(l.src)+'</div></div>');
+ var ints=INTERESTS.map(function(it){var on=(l.interests||[]).indexOf(it[0])>=0;return '<div class="lead-int '+(on?'on':'off')+'">'+icon(it[0],18)+it[1]+'</div>';}).join('');
  document.getElementById('modalbox').className='modalbox leadbox';
  document.getElementById('modalbox').innerHTML='<button class="close" onclick="closeModal()">×</button><h2>'+esc(l.name)+'</h2><p style="color:var(--muted)">'+esc(l.sector)+(l.org?' · '+esc(l.org):'')+' · via '+esc(l.src)+' · '+esc(l.time)+'</p>'+
-  '<div class="lead-map"><div class="mapgrid"></div><div class="coast"></div>'+pin+'<div style="position:absolute;left:10px;bottom:8px;font-family:var(--mono);font-size:.62rem;background:rgba(255,255,255,.8);padding:3px 7px;border-radius:2px">'+esc(l.town)+' · '+esc(l.postcode)+'</div></div>'+
-  '<div class="lead-meta"><div><span>Email</span>'+esc(l.email)+'</div><div><span>Phone</span>'+esc(l.phone)+'</div></div>'+
+  mapBlock+
+  '<div class="lead-meta"><div><span>Email</span>'+esc(l.email)+'</div><div><span>Phone</span>'+esc(l.phone||'—')+'</div></div>'+
   '<div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-2);margin-bottom:6px">Interested in</div><div class="lead-int-grid">'+ints+'</div>'+
-  '<div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-2);margin:14px 0 6px">Message</div><p style="font-size:.9rem;line-height:1.5">'+esc(l.msg)+'</p>'+
-  '<div style="display:flex;gap:8px;margin-top:16px"><a class="tbtn solar" style="color:var(--ink);text-decoration:none" href="mailto:'+esc(l.email)+'">Reply by email</a><a class="tbtn" style="color:var(--ink);border-color:var(--line);text-decoration:none" href="tel:'+esc(l.phone.replace(/\s/g,''))+'">Call</a></div>';
+  '<div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-2);margin:14px 0 6px">Message</div><p style="font-size:.9rem;line-height:1.5">'+(l.msg?esc(l.msg):'<span style="color:var(--muted)">No message</span>')+'</p>'+
+  '<div style="display:flex;gap:8px;margin-top:16px"><a class="tbtn solar" style="color:var(--ink);text-decoration:none" href="mailto:'+esc(l.email)+'">Reply by email</a>'+(l.phone?'<a class="tbtn" style="color:var(--ink);border-color:var(--line);text-decoration:none" href="tel:'+esc(l.phone.replace(/\s/g,''))+'">Call</a>':'')+'</div>';
  document.getElementById('modal').classList.add('show');
  if(MODE==='dash')renderDashboard();
 }
@@ -1040,16 +1194,25 @@ function megaPreview(){var m=(STATE.site&&STATE.site.menu)||[];if(!m.length)retu
 }
 /* ===== enquiries + statuses ===== */
 var STATUSES=['New','Contacted','Quoted','Won','Lost'];
-function ensureStatuses(){leads().forEach(function(l,i){if(!l.status)l.status=['New','New','Contacted','Quoted','Won'][i]||'New';});}
-function setLeadStatus(id,s){var l=leads().filter(function(x){return x.id===id})[0];if(l){l.status=s;save();renderEnquiries();}}
-function showEnquiries(){MODE='enq';setMode();renderEnquiries();syncCmsUrl(false);}
-function renderEnquiries(){ensureStatuses();var el=document.getElementById('enquiries');var L=leads();
+function setLeadStatus(id,s){
+ var l=leads().filter(function(x){return x.id===id})[0];
+ if(l){l.status=s;l.isnew=s==='New';}
+ renderEnquiries();
+ fetch('/api/enquiries',{method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:s})})
+  .then(function(r){if(!r.ok)throw new Error('status update failed');})
+  .catch(function(){loadLeads().then(refreshLeadsUI);});
+}
+function showEnquiries(){location.href='/admin/enquiries';}
+function renderEnquiries(){var el=document.getElementById('enquiries');if(!el)return;var L=leads();
  var counts={};STATUSES.forEach(function(s){counts[s]=0});L.forEach(function(l){counts[l.status]=(counts[l.status]||0)+1});
- var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Enquiries</h1><p>'+L.length+' leads · give each a status and track it through the pipeline.</p></div></div>';
- h+='<div class="stat-ov">'+STATUSES.map(function(s){return '<div class="so"><div class="n">'+counts[s]+'</div><div class="k"><span class="stpill st-'+s+'">'+s+'</span></div></div>';}).join('')+'</div>';
- h+='<div class="panelcard"><table class="tbl enq-tbl"><thead><tr><th>Name</th><th>Location</th><th>Sector</th><th>Interested in</th><th>Received</th><th>Status</th><th></th></tr></thead><tbody>'+
-   L.map(function(l,i){return '<tr><td><b>'+esc(l.name)+'</b><div style="font-size:.72rem;color:var(--muted)">'+esc(l.email)+'</div></td><td>'+esc(l.town)+'</td><td>'+esc(l.sector)+'</td><td><div style="display:flex;gap:3px">'+l.interests.map(function(k){return icon(k,15)}).join('')+'</div></td><td>'+esc(l.time)+'</td><td><select onchange="setLeadStatus(\''+l.id+'\',this.value)">'+STATUSES.map(function(s){return '<option'+(l.status===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select></td><td><button class="tbtn2" style="padding:5px 10px" onclick="openLead('+i+')">View</button></td></tr>';}).join('')+'</tbody></table></div>';
- h+='</div>';el.innerHTML=h;
+ var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Enquiries</h1><p>'+(LIVE_LEADS===null?'Loading live leads…':(L.length+' leads · give each a status and track it through the pipeline.'))+'</p></div><button class="tbtn2" onclick="loadLeads().then(refreshLeadsUI)">Refresh</button></div>';
+ if(LIVE_LEADS_ERR)h+='<div class="honest" style="margin-bottom:14px"><b>Could not load enquiries.</b> '+esc(LIVE_LEADS_ERR)+'</div>';
+ h+='<div class="stat-ov">'+STATUSES.map(function(s){return '<div class="so"><div class="n">'+(counts[s]||0)+'</div><div class="k"><span class="stpill st-'+s+'">'+s+'</span></div></div>';}).join('')+'</div>';
+ h+='<div class="panelcard"><table class="tbl enq-tbl"><thead><tr><th>Name</th><th>Location</th><th>Sector</th><th>Interested in</th><th>Received</th><th>Status</th><th></th></tr></thead><tbody>';
+ if(LIVE_LEADS===null)h+='<tr><td colspan="7" style="color:var(--muted)">Loading…</td></tr>';
+ else if(!L.length)h+='<tr><td colspan="7" style="color:var(--muted)">No enquiries yet. Submissions from the website contact form will appear here and also email hello@heliaxis.co.uk.</td></tr>';
+ else h+=L.map(function(l,i){return '<tr><td><b>'+esc(l.name)+'</b><div style="font-size:.72rem;color:var(--muted)">'+esc(l.email)+'</div></td><td>'+esc(l.town)+(l.postcode&&l.postcode!==l.town?'<div style="font-size:.72rem;color:var(--muted)">'+esc(l.postcode)+'</div>':'')+'</td><td>'+esc(l.sector)+'</td><td><div style="display:flex;gap:3px">'+(l.interests||[]).map(function(k){return icon(k,15)}).join('')+'</div></td><td>'+esc(l.time)+'</td><td><select onchange="setLeadStatus(\''+l.id+'\',this.value)">'+STATUSES.map(function(s){return '<option'+(l.status===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select></td><td><button class="tbtn2" style="padding:5px 10px" onclick="openLead('+i+')">View</button></td></tr>';}).join('');
+ h+='</tbody></table></div></div>';el.innerHTML=h;
 }
 /* ===== brand-logo library (standalone, like media) ===== */
 function showLogos(){MODE='logos';setMode();renderLogosLib();syncCmsUrl(false);}
@@ -1365,6 +1528,7 @@ w.renderLogosLib = renderLogosLib;
 w.closeModal = closeModal;
 w.makeLanding = makeLanding;
 w.dashNewPage = dashNewPage;
+w.makeBlogArticle = makeBlogArticle;
 w.dashPageTypeSet = dashPageTypeSet;
 w.dashClearFilters = dashClearFilters;
 w.dashPageSearch = dashPageSearch;

@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/blog/publish-due",
-      "schedule": "*/15 * * * *"
-    }
-  ]
-}
+{}
