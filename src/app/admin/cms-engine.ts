@@ -255,7 +255,15 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
    is on (i.e. in the live preview). Publish/export call renderBlock without edit,
    so none of this leaks into the published site. */
 function ce(ep,edit){return (edit&&ep)?' contenteditable="true" data-ep="'+ep+'" oninput="epInput(this)" onblur="epBlur(this)" onkeydown="epKey(event)" onclick="event.stopPropagation()"':'';}
-function btn(label,cls,pulse,ic,ep,edit){if(!label)return '';return '<span class="pv-btn '+cls+(pulse?' pulse':'')+'">'+(ic?icon(ic,16):'')+'<span'+ce(ep,edit)+'>'+esc(label)+'</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>'}
+function btn(label,cls,pulse,ic,ep,edit,href){
+ if(!label)return '';
+ var inner=(ic?icon(ic,16):'')+'<span'+ce(ep,edit)+'>'+esc(label)+'</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+ var clsFull='pv-btn '+cls+(pulse?' pulse':'');
+ if(href){
+  return '<a class="'+clsFull+'" href="'+esc(href)+'"'+(edit?' onclick="if(event.target.closest(\'[contenteditable]\'))event.preventDefault()"':'')+'>'+inner+'</a>';
+ }
+ return '<span class="'+clsFull+'">'+inner+'</span>';
+}
 function eyebrow(t,ep,edit){if(!(t&&String(t).trim()))return '';return '<span class="pv-eyebrow">'+SPARK+'<span'+ce(ep,edit)+'>'+esc(t)+'</span></span>'}
 function heroTags(tags){
   if(!tags)return '';
@@ -267,7 +275,7 @@ function renderBlock(b,edit){
  const p=b.p;const id=b.id;
  if(b.t==='hero'){
    var sub=(p.sub&&String(p.sub).trim())?'<p class="pv-sub"'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p>':'';
-   var btns=(p.ctaDisabled?'':btn(p.ctaLabel,'solar',p.ctaPulse,null,id+'.ctaLabel',edit))+(p.cta2Disabled?'':btn(p.cta2,p.dark?'':'dark ghost',false,null,id+'.cta2',edit));
+   var btns=(p.ctaDisabled?'':btn(p.ctaLabel,'solar',p.ctaPulse,null,id+'.ctaLabel',edit,p.ctaHref||'#quote'))+(p.cta2Disabled?'':btn(p.cta2,p.dark?'':'dark ghost',false,null,id+'.cta2',edit,p.cta2Href||''));
    var btnrow=btns?'<div class="pv-btnrow">'+btns+'</div>':'';
    return '<div class="pv-hero'+(p.dark?'':' light')+(p.textWide?' wide':'')+'"><div class="z">'+heroTags(p.tags)+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h1'+ce(id+'.headline',edit)+'>'+esc(p.headline)+'</h1>'+sub+btnrow+'</div></div>';
  }
@@ -277,7 +285,7 @@ function renderBlock(b,edit){
    if(p.fill==='balance'){inner='<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px">'+p.items.map((it,i)=>'<div class="pv-card" style="flex:0 1 calc('+(100/p.cols)+'% - 14px);min-width:220px"><span class="ic">'+icon(it.icon)+'</span><h3'+ce(id+'.items.'+i+'.title',edit)+'>'+esc(it.title)+'</h3><p'+ce(id+'.items.'+i+'.desc',edit)+'>'+esc(it.desc)+'</p></div>').join('')+'</div>';}
    else{let extra='';const rem=p.items.length%p.cols;if(rem!==0&&p.fill==='contact'){const gap=p.cols-rem;extra='<div class="pv-card pv-contact" style="grid-column:span '+gap+'"><h3'+ce(id+'.contactHeading',edit)+'>'+esc(p.contactHeading||'Get in touch')+'</h3><p'+ce(id+'.contactText',edit)+'>'+esc(p.contactText||'Not sure which option fits? Tell us your setup and we\'ll point you the right way.')+'</p><span class="pv-btn solar"'+ce(id+'.contactBtn',edit)+'>'+esc(p.contactBtn||'Contact us')+'</span></div>';}inner='<div class="pv-grid" style="grid-template-columns:repeat('+p.cols+',1fr)">'+p.items.map(gc).join('')+extra+'</div>';}
    return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div>'+inner+'</div>';}
- if(b.t==='split')return '<div class="pv-split"><div class="pv-splitcard"><h3'+ce(id+'.lt',edit)+'>'+esc(p.lt)+'</h3><p'+ce(id+'.ld',edit)+'>'+esc(p.ld)+'</p><ul>'+p.lb.map((x,i)=>'<li'+ce(id+'.lb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.lc,'dark',false,null,id+'.lc',edit)+'</div><div class="pv-splitcard dark"><h3'+ce(id+'.rt',edit)+'>'+esc(p.rt)+'</h3><p'+ce(id+'.rd',edit)+'>'+esc(p.rd)+'</p><ul>'+p.rb.map((x,i)=>'<li'+ce(id+'.rb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.rc,'solar',false,null,id+'.rc',edit)+'</div></div>';
+ if(b.t==='split')return '<div class="pv-split"><div class="pv-splitcard"><h3'+ce(id+'.lt',edit)+'>'+esc(p.lt)+'</h3><p'+ce(id+'.ld',edit)+'>'+esc(p.ld)+'</p><ul>'+p.lb.map((x,i)=>'<li'+ce(id+'.lb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.lc,'dark',false,null,id+'.lc',edit,p.lcHref||'#quote')+'</div><div class="pv-splitcard dark"><h3'+ce(id+'.rt',edit)+'>'+esc(p.rt)+'</h3><p'+ce(id+'.rd',edit)+'>'+esc(p.rd)+'</p><ul>'+p.rb.map((x,i)=>'<li'+ce(id+'.rb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.rc,'solar',false,null,id+'.rc',edit,p.rcHref||'/commercial-funding')+'</div></div>';
  if(b.t==='testi'){const cards=p.items.map((tt,i)=>'<div class="pv-tcard"><div class="st">'+'★'.repeat(tt.stars)+'</div><blockquote'+ce(id+'.items.'+i+'.quote',edit)+'>'+esc(tt.quote)+'</blockquote><div class="who"><b'+ce(id+'.items.'+i+'.name',edit)+'>'+esc(tt.name)+'</b> <span>· <span'+ce(id+'.items.'+i+'.loc',edit)+'>'+esc(tt.loc)+'</span></span></div></div>');
    let body;
    if(p.items.length>3){body='<div class="pv-tmarquee"><div class="trk" style="animation-duration:'+(p.speed||36)+'s">'+cards.join('')+cards.join('')+'</div></div>';}
@@ -285,10 +293,10 @@ function renderBlock(b,edit){
    return '<div class="pv-testi"><div class="shead center">'+eyebrow('Real customers')+'<h2>Trusted across South Wales</h2></div>'+body+'</div>';}
  if(b.t==='banner'){const ls=STATE.site.logos.filter(l=>l.bnr);const chip=l=>'<span class="pv-brand">'+(l.img?'<img src="'+l.img+'">':esc(l.name))+'</span>';
    return '<div class="pv-banner"><div class="bh"'+ce(id+'.heading',edit)+'>'+esc(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+ls.map(chip).join('')+ls.map(chip).join('')+'</div></div></div>';}
- if(b.t==='cta')return '<div class="pv-cta"><div class="z"><h2'+ce(id+'.headline',edit)+'>'+esc(p.headline)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p>'+(p.ctaDisabled?'':'<div class="pv-btnrow" style="justify-content:center">'+btn(p.btn,'solar',p.pulse,null,id+'.btn',edit)+'</div>')+'</div></div>';
+ if(b.t==='cta')return '<div class="pv-cta"><div class="z"><h2'+ce(id+'.headline',edit)+'>'+esc(p.headline)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p>'+(p.ctaDisabled?'':'<div class="pv-btnrow" style="justify-content:center">'+btn(p.btn,'solar',p.pulse,null,id+'.btn',edit,p.btnHref||'#quote')+'</div>')+'</div></div>';
  if(b.t==='faq')return '<div class="pv-faq"><div class="shead center">'+eyebrow('Good to know')+'<h2>Your questions, answered</h2></div>'+p.items.map((q,i)=>'<div class="pv-qa"><div class="q"><span class="ix">Q/0'+(i+1)+'</span><span'+ce(id+'.items.'+i+'.q',edit)+'>'+esc(q.q)+'</span></div><div class="a"'+ce(id+'.items.'+i+'.a',edit)+'>'+esc(q.a)+'</div></div>').join('')+'</div>';
 if(b.t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img'):'<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
-   const ctaBtn=p.ctaDisabled?'':btn(p.cta,'solar',false,null,id+'.cta',edit);
+   const ctaBtn=p.ctaDisabled?'':btn(p.cta,'solar',false,null,id+'.cta',edit,p.ctaHref||'#quote');
    const cols=p.textWide?(p.side==='left'?'0.75fr 1.25fr':'1.25fr 0.75fr'):'1fr 1fr';
    const tx='<div>'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px"'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2><p style="color:var(--muted);margin-top:12px;line-height:1.6"'+ce(id+'.text',edit)+'>'+esc(p.text)+'</p>'+(ctaBtn?'<div class="pv-btnrow">'+ctaBtn+'</div>':'')+'</div>';
    const blogCls=isCmsBlogPage(page())?' is-blog':'';
@@ -314,7 +322,7 @@ if(b.t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img'):'<div clas
    if(p.fMsg)rows+=fld('Message',false,'Tell us more about your project requirements…','textarea','message');
    const btnLabel=p.btn||'Send Enquiry';
    const cta='<button type="submit" class="pv-btn solar'+(p.pulse?' pulse':'')+'"><span data-btn-label>'+esc(btnLabel)+'</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
-   return '<div class="pv-quote"><div class="pv-quote-inner"><form class="pv-formcard pv-cms-form" action="/api/quote" method="post" novalidate><div class="pv-quote-head"><h2'+ce(id+'.heading',edit)+'>'+esc(p.heading)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p></div>'+rows+'<div class="pv-form-msg" hidden></div><div class="pv-form-actions">'+cta+'</div><p class="pv-form-note">By submitting this form, you agree to our privacy policy and terms of service.</p></form></div></div>';
+   return '<div class="pv-quote" id="quote"><div class="pv-quote-inner"><form class="pv-formcard pv-cms-form" action="/api/quote" method="post" novalidate><div class="pv-quote-head"><h2'+ce(id+'.heading',edit)+'>'+esc(p.heading)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p></div>'+rows+'<div class="pv-form-msg" hidden></div><div class="pv-form-actions">'+cta+'</div><p class="pv-form-note">By submitting this form, you agree to our privacy policy and terms of service.</p></form></div></div>';
  }
 if(b.t==='pricing')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'Options',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.plans.length+',1fr);gap:14px">'+p.plans.map((pl,i)=>'<div class="pv-card'+(pl.hl?' pv-plan-hl':'')+'"><div style="font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-2)"'+ce(id+'.plans.'+i+'.name',edit)+'>'+esc(pl.name)+'</div><div style="font-family:var(--display);font-weight:900;font-size:1.9rem;margin:6px 0"'+ce(id+'.plans.'+i+'.price',edit)+'>'+esc(pl.price)+'</div><div style="color:var(--muted);font-size:.8rem;margin-bottom:12px"'+ce(id+'.plans.'+i+'.per',edit)+'>'+esc(pl.per)+'</div>'+pl.feats.map((f,fi)=>'<div style="display:flex;gap:8px;padding:5px 0;font-size:.87rem;border-top:1px solid var(--line)"><span style="color:var(--ok)">✓</span><span'+ce(id+'.plans.'+i+'.feats.'+fi,edit)+'>'+esc(f)+'</span></div>').join('')+'<div style="margin-top:14px">'+btn(pl.cta,pl.hl?'solar':'dark ghost',false,null,id+'.plans.'+i+'.cta',edit)+'</div></div>').join('')+'</div></div>';
  if(b.t==='steps')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'How it works',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+esc(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.items.length+',1fr);gap:20px">'+p.items.map((s,i)=>'<div><div style="font-family:var(--mono);font-size:.72rem;letter-spacing:.05em;color:var(--amber-2);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px">STEP 0'+(i+1)+'</div><h3 style="font-family:var(--display);font-weight:600;font-size:1.08rem"'+ce(id+'.items.'+i+'.title',edit)+'>'+esc(s.title)+'</h3><p style="color:var(--muted);font-size:.87rem;margin-top:6px;line-height:1.5"'+ce(id+'.items.'+i+'.text',edit)+'>'+esc(s.text)+'</p></div>').join('')+'</div></div>';

@@ -34,12 +34,17 @@ function spacingStyle(p: Record<string, unknown> | undefined): string {
   return s;
 }
 
-function btn(label: unknown, cls: string, pulse?: boolean): string {
+function btn(label: unknown, cls: string, pulse?: boolean, href?: unknown): string {
   if (!label) return '';
-  return (
-    `<span class="pv-btn ${cls}${pulse ? ' pulse' : ''}"><span>${esc(label)}</span>` +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>'
-  );
+  const inner =
+    `<span>${esc(label)}</span>` +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  const clsFull = `pv-btn ${cls}${pulse ? ' pulse' : ''}`;
+  const link = href != null && String(href).trim() ? String(href).trim() : '';
+  if (link) {
+    return `<a class="${clsFull}" href="${esc(link)}">${inner}</a>`;
+  }
+  return `<span class="${clsFull}">${inner}</span>`;
 }
 
 function eyebrow(t: unknown): string {
@@ -136,8 +141,8 @@ function renderBlock(b: LooseBlock): string {
     const sub =
       p.sub && String(p.sub).trim() ? `<p class="pv-sub">${esc(p.sub)}</p>` : '';
     const btns =
-      (p.ctaDisabled ? '' : btn(p.ctaLabel, 'solar', !!p.ctaPulse)) +
-      (p.cta2Disabled ? '' : btn(p.cta2, p.dark ? '' : 'dark ghost'));
+      (p.ctaDisabled ? '' : btn(p.ctaLabel, 'solar', !!p.ctaPulse, p.ctaHref || '#quote')) +
+      (p.cta2Disabled ? '' : btn(p.cta2, p.dark ? '' : 'dark ghost', false, p.cta2Href || ''));
     const btnrow = btns ? `<div class="pv-btnrow">${btns}</div>` : '';
     return (
       `<div class="pv-hero${p.dark ? '' : ' light'}${p.textWide ? ' wide' : ''}"><div class="z">` +
@@ -151,7 +156,7 @@ function renderBlock(b: LooseBlock): string {
     const im = p.img
       ? mediaFrameHtml(p.img)
       : '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
-    const ctaBtn = p.ctaDisabled ? '' : btn(p.cta, 'solar');
+    const ctaBtn = p.ctaDisabled ? '' : btn(p.cta, 'solar', false, p.ctaHref || '#quote');
     const cols = p.textWide
       ? p.side === 'left'
         ? '0.75fr 1.25fr'
@@ -175,7 +180,7 @@ function renderBlock(b: LooseBlock): string {
       `<div class="pv-cta"><div class="z"><h2>${esc(p.headline)}</h2><p>${esc(p.sub)}</p>` +
       (p.ctaDisabled
         ? ''
-        : `<div class="pv-btnrow" style="justify-content:center">${btn(p.btn, 'solar', !!p.pulse)}</div>`) +
+        : `<div class="pv-btnrow" style="justify-content:center">${btn(p.btn, 'solar', !!p.pulse, p.btnHref || '#quote')}</div>`) +
       '</div></div>'
     );
   }
@@ -185,9 +190,9 @@ function renderBlock(b: LooseBlock): string {
     const rb = asStringArray(p.rb);
     return (
       '<div class="pv-split"><div class="pv-splitcard">' +
-      `<h3>${esc(p.lt)}</h3><p>${esc(p.ld)}</p><ul>${lb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.lc, 'dark')}` +
+      `<h3>${esc(p.lt)}</h3><p>${esc(p.ld)}</p><ul>${lb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.lc, 'dark', false, p.lcHref || '#quote')}` +
       '</div><div class="pv-splitcard dark">' +
-      `<h3>${esc(p.rt)}</h3><p>${esc(p.rd)}</p><ul>${rb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.rc, 'solar')}` +
+      `<h3>${esc(p.rt)}</h3><p>${esc(p.rd)}</p><ul>${rb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.rc, 'solar', false, p.rcHref || '/commercial-funding')}` +
       '</div></div>'
     );
   }
@@ -248,7 +253,7 @@ function renderBlock(b: LooseBlock): string {
       `<button type="submit" class="pv-btn solar${p.pulse ? ' pulse' : ''}"><span data-btn-label>${esc(btnLabel)}</span>` +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
     return (
-      '<div class="pv-quote"><div class="pv-quote-inner"><form class="pv-formcard pv-cms-form" action="/api/quote" method="post" novalidate>' +
+      '<div class="pv-quote" id="quote"><div class="pv-quote-inner"><form class="pv-formcard pv-cms-form" action="/api/quote" method="post" novalidate>' +
       `<div class="pv-quote-head"><h2>${esc(p.heading)}</h2><p>${esc(p.sub)}</p></div>${rows}` +
       `<div class="pv-form-msg" hidden></div><div class="pv-form-actions">${cta}</div>` +
       '<p class="pv-form-note">By submitting this form, you agree to our privacy policy and terms of service.</p></form></div></div>'

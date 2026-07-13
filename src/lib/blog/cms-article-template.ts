@@ -82,10 +82,12 @@ export function splitPropsFromAi(ai: CmsArticleAi) {
     ld: ai.homeDesc || STOCK_SPLIT_PROPS.ld,
     lb: homeBullets,
     lc: ai.homeBtn || STOCK_SPLIT_PROPS.lc,
+    lcHref: '#quote',
     rt: ai.businessTitle || STOCK_SPLIT_PROPS.rt,
     rd: ai.businessDesc || STOCK_SPLIT_PROPS.rd,
     rb: businessBullets,
     rc: ai.businessBtn || STOCK_SPLIT_PROPS.rc,
+    rcHref: '/commercial-funding',
   };
 }
 
@@ -208,6 +210,7 @@ export function buildBlogArticleBlocks(
         dark: true,
         textWide: true,
         ctaLabel: 'Get a quote',
+        ctaHref: '#quote',
         ctaPulse: false,
         cta2: '',
         ctaDisabled: false,
@@ -236,6 +239,7 @@ export function buildBlogArticleBlocks(
         headline: ai.ctaHeadline,
         sub: ai.ctaSub,
         btn: ai.ctaBtn || 'Get my free quote',
+        btnHref: '#quote',
         pulse: true,
       },
     },
@@ -289,6 +293,7 @@ export function fillExampleBlogTemplate(
       p.textWide = true;
       p.tags = '';
       if (p.ctaLabel == null) p.ctaLabel = 'Get a quote';
+      if (p.ctaHref == null) p.ctaHref = '#quote';
       if (p.ctaPulse == null) p.ctaPulse = false;
       if (p.cta2 == null) p.cta2 = '';
       if (p.ctaDisabled == null) p.ctaDisabled = false;
@@ -308,6 +313,7 @@ export function fillExampleBlogTemplate(
       p.headline = ai.ctaHeadline;
       p.sub = ai.ctaSub;
       p.btn = ai.ctaBtn || 'Get my free quote';
+      if (p.btnHref == null) p.btnHref = '#quote';
       if (p.pulse == null) p.pulse = true;
     } else if (t === 'split') {
       Object.assign(p, split);

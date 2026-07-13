@@ -300,7 +300,7 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-hero .pv-sub{margin-top:18px;font-size:1.16rem;opacity:.9;line-height:1.55;max-width:44ch;color:#E9E3D4}
 .pv-hero.light .pv-sub{color:var(--muted)}
 .pv-btnrow{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap}
-.pv-btn{font-family:var(--display);font-weight:700;font-size:1.02rem;padding:.95rem 1.5rem;border-radius:2px;display:inline-flex;gap:.5rem;align-items:center;position:relative}
+.pv-btn{font-family:var(--display);font-weight:700;font-size:1.02rem;padding:.95rem 1.5rem;border-radius:2px;display:inline-flex;gap:.5rem;align-items:center;position:relative;text-decoration:none;color:inherit;cursor:pointer;box-sizing:border-box}
 .pv-btn svg{width:1.05em;height:1.05em}
 .pv-btn.solar{background:var(--solar);color:var(--ink)}
 .pv-btn.dark{background:var(--ink);color:var(--paper)}
@@ -403,7 +403,7 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-check{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:2px;padding:8px 12px;font-size:.86rem;background:var(--paper)}
 .pv-check svg{color:var(--amber-2);flex:none}
 /* Contact form — centered card, mid scale between homepage & /contact */
-.pv-quote{padding:64px var(--pv-pad,24px);width:100%;box-sizing:border-box;background:var(--paper);display:flex;justify-content:center}
+.pv-quote{padding:64px var(--pv-pad,24px);width:100%;box-sizing:border-box;background:var(--paper);display:flex;justify-content:center;scroll-margin-top:96px}
 .pv-quote-inner{max-width:48rem;margin:0 auto;width:100%}
 .pv-quote-head{text-align:center;margin:0 0 8px;padding-bottom:16px;border-bottom:1px solid rgba(33,31,24,.08)}
 .pv-quote-head h2{font-size:clamp(1.5rem,2.6vw,1.95rem);font-weight:700;letter-spacing:-.02em;color:var(--ink)}
