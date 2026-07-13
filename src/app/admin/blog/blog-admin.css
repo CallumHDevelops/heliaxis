@@ -61,25 +61,68 @@
 }
 
 .blog-admin__panel-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-bottom: 1px solid rgba(33, 31, 24, 0.14);
+}
+
+.blog-admin__panel-top {
+  display: grid;
+  grid-template-columns: 1fr minmax(180px, 280px) 1fr;
+  align-items: center;
+  gap: 12px;
 }
 
 .blog-admin__panel-head h2 {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 800;
+  justify-self: start;
+}
+
+.blog-admin__search {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  justify-self: center;
+}
+
+.blog-admin__search input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(33, 31, 24, 0.16);
+  border-radius: 4px;
+  background: #fff;
+  color: #211f18;
+  font: inherit;
+  font-size: 0.84rem;
+  padding: 8px 11px;
+}
+
+.blog-admin__search input:focus {
+  outline: none;
+  border-color: rgba(248, 188, 30, 0.7);
+  box-shadow: 0 0 0 2px rgba(248, 188, 30, 0.2);
+}
+
+.blog-admin__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .blog-admin__filters {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
 }
 
 .blog-admin__filter {
@@ -90,15 +133,46 @@
   font: inherit;
   font-size: 0.76rem;
   font-weight: 700;
-  padding: 4px 9px;
+  padding: 5px 10px;
   border-radius: 4px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.blog-admin__filter-n {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.7;
 }
 
 .blog-admin__filter.is-active {
   background: rgba(33, 31, 24, 0.06);
   color: #211f18;
   border-color: rgba(33, 31, 24, 0.14);
+}
+
+.blog-admin__filter.is-active .blog-admin__filter-n {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .blog-admin__panel-top {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .blog-admin__panel-head h2,
+  .blog-admin__search,
+  .blog-admin__filters {
+    justify-self: stretch;
+  }
+
+  .blog-admin__filters {
+    justify-content: flex-start;
+  }
 }
 
 .blog-admin__msg {

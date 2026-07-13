@@ -112,8 +112,12 @@ function mediaFrameHtml(val: unknown): string {
     focusY = clampFocus(m.focusY);
     zoom = clampZoom(m.zoom);
   }
+  const z = clampZoom(zoom) * 1.2;
+  const maxShift = ((1 - 1 / z) / 2) * 100;
+  const tx = ((50 - focusX) / 50) * maxShift;
+  const ty = ((50 - focusY) / 50) * maxShift;
   const imgStyle =
-    `object-position:${focusX}% ${focusY}%;transform:scale(${zoom});transform-origin:${focusX}% ${focusY}%`;
+    `object-fit:cover;object-position:50% 50%;transform:translate(${tx}%,${ty}%) scale(${z});transform-origin:center center`;
   const img =
     `<img class="pv-media-frame-img" src="${esc(src)}" alt="${esc(decorative ? '' : alt)}"` +
     (decorative ? ' aria-hidden="true"' : '') +

@@ -46,7 +46,7 @@ export function buildLivePublishCss(): string {
   const s = getPublishStyles();
   return (
     s.root +
-    '*,*::before,*::after{box-sizing:border-box}html,body{height:auto;overflow:auto}body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased;--pv-max:1160px;--pv-gutter:24px;--pv-pad:max(var(--pv-gutter),calc((100% - var(--pv-max)) / 2))}body.dk{background:var(--ink)}.pv-page{max-width:none;margin:0;background:var(--paper);min-height:100vh;width:100%}body.dk .pv-page{background:var(--ink)}' +
+    '*,*::before,*::after{box-sizing:border-box}html,body{height:auto;min-height:0;overflow:auto}body{margin:0;font-family:var(--body);background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased;--pv-max:1160px;--pv-gutter:24px;--pv-pad:max(var(--pv-gutter),calc((100% - var(--pv-max)) / 2))}body.dk{background:var(--paper);color:var(--ink)}.pv-page{max-width:none;margin:0;background:var(--paper);width:100%;min-height:0}body.dk .pv-page{background:var(--paper)}' +
     s.preview
   );
 }

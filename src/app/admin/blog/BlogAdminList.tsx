@@ -128,6 +128,7 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
   const router = useRouter();
   const [posts, setPosts] = useState(initial);
   const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -210,9 +211,15 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
   }, [posts]);
 
   const visible = useMemo(() => {
-    if (filter === 'all') return posts;
-    return posts.filter((p) => statusOf(p) === filter);
-  }, [posts, filter]);
+    const q = search.trim().toLowerCase();
+    return posts.filter((p) => {
+      if (filter !== 'all' && statusOf(p) !== filter) return false;
+      if (!q) return true;
+      const name = (p.name || '').toLowerCase();
+      const slug = (p.slug || '').toLowerCase();
+      return name.includes(q) || slug.includes(q);
+    });
+  }, [posts, filter, search]);
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -223,7 +230,7 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
 
   useEffect(() => {
     setPage(1);
-  }, [filter]);
+  }, [filter, search]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -426,23 +433,36 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
   return (
     <section className="blog-admin__panel" aria-label="AI blog list">
       <div className="blog-admin__panel-head">
-        <h2>Articles</h2>
-        <div className="blog-admin__filters" role="tablist" aria-label="Filter by status">
-          {filters.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={filter === f.id}
-              className={`blog-admin__filter${filter === f.id ? ' is-active' : ''}`}
-              onClick={() => {
-                setFilter(f.id);
-                setPage(1);
-              }}
-            >
-              {f.label} {f.n}
-            </button>
-          ))}
+        <div className="blog-admin__panel-top">
+          <h2>Articles</h2>
+          <label className="blog-admin__search">
+            <span className="blog-admin__sr">Search articles</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search title or slug…"
+              aria-label="Search articles"
+            />
+          </label>
+          <div className="blog-admin__filters" role="tablist" aria-label="Filter by status">
+            {filters.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                role="tab"
+                aria-selected={filter === f.id}
+                className={`blog-admin__filter${filter === f.id ? ' is-active' : ''}`}
+                onClick={() => {
+                  setFilter(f.id);
+                  setPage(1);
+                }}
+              >
+                {f.label}
+                <span className="blog-admin__filter-n">{f.n}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -455,7 +475,11 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
           No AI blogs yet. Use <strong>New article</strong> above to generate one.
         </p>
       ) : visible.length === 0 ? (
-        <p className="blog-admin__empty">No articles in this filter.</p>
+        <p className="blog-admin__empty">
+          {search.trim()
+            ? `No articles match “${search.trim()}”.`
+            : 'No articles in this filter.'}
+        </p>
       ) : (
         <>
           <ul className="blog-admin__list">

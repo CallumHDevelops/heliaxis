@@ -3,7 +3,12 @@ import '../cms.css';
 import { CmsApp } from '../CmsApp';
 import { getSessionProfile } from '@/lib/auth';
 
-const RESERVED = new Set(['enquiries', 'approvals', 'blog']);
+const RESERVED = new Set(['enquiries', 'approvals', 'blog', 'analytics']);
+const CMS_VIEWS: Record<string, string> = {
+  library: 'Image library',
+  logos: 'Brand logos',
+  mega: 'Mega menu',
+};
 
 function titleFromSlug(slug: string) {
   return decodeURIComponent(slug)
@@ -21,6 +26,12 @@ export async function generateMetadata({
   const decoded = decodeURIComponent(pageSlug);
   if (RESERVED.has(decoded)) {
     return { title: 'Heliaxis CMS', robots: { index: false, follow: false } };
+  }
+  if (CMS_VIEWS[decoded]) {
+    return {
+      title: `${CMS_VIEWS[decoded]} · Heliaxis CMS`,
+      robots: { index: false, follow: false },
+    };
   }
   return {
     title: `${titleFromSlug(pageSlug)} · Heliaxis CMS`,
