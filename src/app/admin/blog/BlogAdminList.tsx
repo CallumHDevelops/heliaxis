@@ -1,10 +1,17 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CmsAiBlogListItem } from '@/lib/blog/cms-ai-blogs';
 
 type Filter = 'all' | 'draft' | 'scheduled' | 'published';
+
+type ConfirmKind = 'delete' | 'unschedule' | 'publish';
+
+type ConfirmState = {
+  kind: ConfirmKind;
+  post: CmsAiBlogListItem;
+};
 
 const PAGE_SIZE = 10;
 
@@ -93,6 +100,30 @@ function buildMonthCells(viewYear: number, viewMonth: number) {
   return cells;
 }
 
+function confirmCopy(c: ConfirmState): { title: string; body: string; action: string; danger?: boolean } {
+  const name = c.post.name;
+  if (c.kind === 'delete') {
+    return {
+      title: 'Delete article',
+      body: `Delete “${name}”? This removes it from the CMS${c.post.live ? ' and from the live site' : ''}. This cannot be undone.`,
+      action: 'Delete',
+      danger: true,
+    };
+  }
+  if (c.kind === 'unschedule') {
+    return {
+      title: 'Cancel schedule',
+      body: `Cancel the scheduled publish for “${name}”? It will stay as a draft.`,
+      action: 'Unschedule',
+    };
+  }
+  return {
+    title: 'Publish now',
+    body: `Publish “${name}” now? This publishes the whole CMS site (including this article) and makes it live immediately.`,
+    action: 'Publish',
+  };
+}
+
 export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }) {
   const router = useRouter();
   const [posts, setPosts] = useState(initial);
@@ -101,7 +132,11 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  const [scheduleErr, setScheduleErr] = useState<string | null>(null);
   const [scheduleFor, setScheduleFor] = useState<CmsAiBlogListItem | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [scheduleAt, setScheduleAt] = useState(() => {
     const d = new Date(Date.now() + 60 * 60 * 1000);
     d.setMinutes(0, 0, 0);
@@ -122,11 +157,35 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
       if (q.get('scheduled') === '1') {
         setMsg({ tone: 'ok', text: 'Scheduled — it will go live automatically at the set time.' });
         window.history.replaceState({}, '', '/admin/blog');
+      } else {
+        const err = q.get('scheduleError');
+        if (err) {
+          setMsg({ tone: 'err', text: err });
+          window.history.replaceState({}, '', '/admin/blog');
+        }
       }
     } catch {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    if (!menuId) return;
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuId(null);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuId(null);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuId]);
 
   const selected = useMemo(() => parseLocalInput(scheduleAt), [scheduleAt]);
   const hour12 = useMemo(() => {
@@ -178,12 +237,14 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
   function setDatePart(next: Date) {
     const base = Number.isNaN(selected.getTime()) ? new Date() : new Date(selected);
     base.setFullYear(next.getFullYear(), next.getMonth(), next.getDate());
+    setScheduleErr(null);
     setScheduleAt(toLocalInputValue(base));
   }
 
   function setTimePart(nextHour24: number, nextMinute: number) {
     const base = Number.isNaN(selected.getTime()) ? new Date() : new Date(selected);
     base.setHours(nextHour24, nextMinute, 0, 0);
+    setScheduleErr(null);
     setScheduleAt(toLocalInputValue(base));
   }
 
@@ -208,14 +269,7 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
     setCalView({ y: d.getFullYear(), m: d.getMonth() });
   }
 
-  async function onDelete(p: CmsAiBlogListItem) {
-    if (
-      !confirm(
-        `Delete “${p.name}”?\n\nThis removes it from the CMS${p.live ? ' and from the live site' : ''}. This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+  async function runDelete(p: CmsAiBlogListItem) {
     setMsg(null);
     setBusyId(p.id);
     setBusyAction('delete');
@@ -239,8 +293,7 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
     }
   }
 
-  async function onCancelSchedule(p: CmsAiBlogListItem) {
-    if (!confirm(`Cancel scheduled publish for “${p.name}”?`)) return;
+  async function runCancelSchedule(p: CmsAiBlogListItem) {
     setMsg(null);
     setBusyId(p.id);
     setBusyAction('cancel');
@@ -253,6 +306,11 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || 'Could not cancel');
+      setPosts((prev) =>
+        prev.map((row) =>
+          row.id === p.id ? { ...row, status: 'draft', publishAt: null, live: false } : row,
+        ),
+      );
       setMsg({ tone: 'ok', text: `Cancelled schedule for “${p.name}”.` });
       router.refresh();
     } catch (e) {
@@ -263,31 +321,70 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
     }
   }
 
+  async function onConfirmAction() {
+    if (!confirm) return;
+    const { kind, post } = confirm;
+    setConfirm(null);
+    if (kind === 'delete') await runDelete(post);
+    else if (kind === 'unschedule') await runCancelSchedule(post);
+    else window.location.href = `${post.editPath}?cmsAction=publish`;
+  }
+
   function openSchedule(p: CmsAiBlogListItem) {
     const base = p.publishAt ? new Date(p.publishAt) : new Date(Date.now() + 60 * 60 * 1000);
     if (!p.publishAt) base.setMinutes(0, 0, 0);
-    // Snap minutes to nearest 5 for the custom select
     base.setMinutes(Math.round(base.getMinutes() / 5) * 5, 0, 0);
     setScheduleAt(toLocalInputValue(base));
     setCalView({ y: base.getFullYear(), m: base.getMonth() });
+    setScheduleErr(null);
+    setMenuId(null);
     setScheduleFor(p);
   }
 
-  function confirmSchedule() {
+  async function confirmSchedule() {
     if (!scheduleFor) return;
     const when = parseLocalInput(scheduleAt);
     if (Number.isNaN(when.getTime())) {
-      setMsg({ tone: 'err', text: 'Pick a valid date and time.' });
+      setScheduleErr('Pick a valid date and time.');
       return;
     }
     if (when.getTime() <= Date.now() + 30_000) {
-      setMsg({ tone: 'err', text: 'Schedule time must be at least 30 seconds from now.' });
+      setScheduleErr('Choose a time at least 30 seconds from now.');
       return;
     }
     const iso = when.toISOString();
     const p = scheduleFor;
-    setScheduleFor(null);
-    window.location.href = `${p.editPath}?cmsAction=schedule&at=${encodeURIComponent(iso)}`;
+    setScheduleErr(null);
+    setBusyId(p.id);
+    setBusyAction('schedule');
+    try {
+      const r = await fetch('/api/blog/schedule', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id, slug: p.slug, publishAt: iso }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { error?: string; publishAt?: string };
+      if (!r.ok) throw new Error(d.error || 'Could not schedule');
+      setPosts((prev) =>
+        prev.map((row) =>
+          row.id === p.id
+            ? { ...row, status: 'scheduled', publishAt: d.publishAt || iso, live: false }
+            : row,
+        ),
+      );
+      setScheduleFor(null);
+      setMsg({
+        tone: 'ok',
+        text: `Scheduled “${p.name}” — it will go live automatically at the set time.`,
+      });
+      router.refresh();
+    } catch (e) {
+      setScheduleErr(e instanceof Error ? e.message : 'Could not schedule');
+    } finally {
+      setBusyId(null);
+      setBusyAction(null);
+    }
   }
 
   function goEdit(p: CmsAiBlogListItem) {
@@ -295,18 +392,8 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
   }
 
   function goPreview(p: CmsAiBlogListItem) {
+    setMenuId(null);
     window.open(`${p.editPath}?cmsAction=preview`, '_blank', 'noopener,noreferrer');
-  }
-
-  function goPublish(p: CmsAiBlogListItem) {
-    if (
-      !confirm(
-        `Publish “${p.name}” now?\n\nThis publishes the whole CMS site (including this article) and makes it live immediately.`,
-      )
-    ) {
-      return;
-    }
-    window.location.href = `${p.editPath}?cmsAction=publish`;
   }
 
   function badge(p: CmsAiBlogListItem) {
@@ -330,6 +417,11 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
 
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const confirmUi = confirm ? confirmCopy(confirm) : null;
+  const confirmBusy =
+    confirm &&
+    busyId === confirm.post.id &&
+    (busyAction === 'delete' || busyAction === 'cancel');
 
   return (
     <section className="blog-admin__panel" aria-label="AI blog list">
@@ -366,40 +458,33 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
         <p className="blog-admin__empty">No articles in this filter.</p>
       ) : (
         <>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ul className="blog-admin__list">
             {pageItems.map((p) => {
               const busy = busyId === p.id;
               const b = badge(p);
               const live = statusOf(p) === 'published';
               const scheduled = statusOf(p) === 'scheduled';
+              const menuOpen = menuId === p.id;
               return (
                 <li key={p.id} className="blog-admin__row" title={p.name}>
                   <div className="blog-admin__row-main">
-                    <span className="blog-admin__row-title">{p.name}</span>
+                    <div className="blog-admin__row-text">
+                      <span className="blog-admin__row-title">{p.name}</span>
+                      <span className="blog-admin__row-meta">{p.slug}</span>
+                    </div>
                     <span className={`blog-admin__badge ${b.cls}`}>{b.text}</span>
-                    <span className="blog-admin__row-meta">{p.slug}</span>
                   </div>
 
                   <div className={`blog-admin__actions${busy ? ' is-busy' : ''}`}>
                     <button type="button" className="blog-admin__btn" onClick={() => goEdit(p)}>
                       Edit
                     </button>
-                    <button type="button" className="blog-admin__btn is-ghost" onClick={() => goPreview(p)}>
-                      Preview
-                    </button>
-                    <span className="blog-admin__sep" aria-hidden="true" />
-                    <button
-                      type="button"
-                      className="blog-admin__btn is-primary"
-                      onClick={() => goPublish(p)}
-                    >
-                      Publish
-                    </button>
+
                     {scheduled ? (
                       <button
                         type="button"
                         className="blog-admin__btn is-ghost"
-                        onClick={() => onCancelSchedule(p)}
+                        onClick={() => setConfirm({ kind: 'unschedule', post: p })}
                       >
                         {busy && busyAction === 'cancel' ? '…' : 'Unschedule'}
                       </button>
@@ -418,18 +503,57 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
                         rel="noopener noreferrer"
                         className="blog-admin__btn is-ghost"
                       >
-                        View live
+                        View
                       </a>
                     )}
-                    <span className="blog-admin__sep" aria-hidden="true" />
-                    <button
-                      type="button"
-                      className="blog-admin__btn is-danger"
-                      onClick={() => onDelete(p)}
-                      disabled={busy}
+
+                    <div
+                      className="blog-admin__more"
+                      ref={menuOpen ? menuRef : undefined}
                     >
-                      {busy && busyAction === 'delete' ? '…' : 'Delete'}
-                    </button>
+                      <button
+                        type="button"
+                        className="blog-admin__btn is-ghost blog-admin__more-btn"
+                        aria-expanded={menuOpen}
+                        aria-haspopup="menu"
+                        aria-label={`More actions for ${p.name}`}
+                        onClick={() => setMenuId(menuOpen ? null : p.id)}
+                      >
+                        ⋯
+                      </button>
+                      {menuOpen ? (
+                        <div className="blog-admin__menu" role="menu">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => goPreview(p)}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setMenuId(null);
+                              setConfirm({ kind: 'publish', post: p });
+                            }}
+                          >
+                            Publish now
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="is-danger"
+                            onClick={() => {
+                              setMenuId(null);
+                              setConfirm({ kind: 'delete', post: p });
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </li>
               );
@@ -447,7 +571,7 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
                   type="button"
                   className="blog-admin__pager-btn"
                   disabled={safePage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => setPage((n) => Math.max(1, n - 1))}
                 >
                   Previous
                 </button>
@@ -466,7 +590,7 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
                   type="button"
                   className="blog-admin__pager-btn"
                   disabled={safePage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => setPage((n) => Math.min(totalPages, n + 1))}
                 >
                   Next
                 </button>
@@ -482,12 +606,52 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
         </>
       )}
 
+      {confirm && confirmUi ? (
+        <div
+          className="blog-sched-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="blog-confirm-title"
+          onClick={() => setConfirm(null)}
+        >
+          <div className="blog-confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="blog-confirm__body">
+              <h3 id="blog-confirm-title" className="blog-sched__title">
+                {confirmUi.title}
+              </h3>
+              <p className="blog-confirm__lede">{confirmUi.body}</p>
+            </div>
+            <div className="blog-sched__foot">
+              <button
+                type="button"
+                className="blog-admin__btn is-ghost"
+                disabled={!!confirmBusy}
+                onClick={() => setConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`blog-admin__btn ${confirmUi.danger ? 'is-danger is-solid' : 'is-primary'}`}
+                disabled={!!confirmBusy}
+                onClick={() => void onConfirmAction()}
+              >
+                {confirmBusy ? '…' : confirmUi.action}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {scheduleFor ? (
         <div
           className="blog-sched-overlay"
           role="dialog"
           aria-modal="true"
-          onClick={() => setScheduleFor(null)}
+          onClick={() => {
+            setScheduleErr(null);
+            setScheduleFor(null);
+          }}
         >
           <div className="blog-sched" onClick={(e) => e.stopPropagation()}>
             <div className="blog-sched__body">
@@ -496,6 +660,11 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
                 “{scheduleFor.name}” will go live automatically at this time.
               </p>
               <p className="blog-sched__summary">{formatSummary(scheduleAt)}</p>
+              {scheduleErr ? (
+                <p className="blog-sched__err" role="alert">
+                  {scheduleErr}
+                </p>
+              ) : null}
 
               <div className="blog-sched__pick">
                 <div>
@@ -644,12 +813,21 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
               <button
                 type="button"
                 className="blog-admin__btn is-ghost"
-                onClick={() => setScheduleFor(null)}
+                disabled={busyAction === 'schedule'}
+                onClick={() => {
+                  setScheduleErr(null);
+                  setScheduleFor(null);
+                }}
               >
                 Cancel
               </button>
-              <button type="button" className="blog-admin__btn is-primary" onClick={confirmSchedule}>
-                Confirm schedule
+              <button
+                type="button"
+                className="blog-admin__btn is-primary"
+                disabled={busyAction === 'schedule'}
+                onClick={() => void confirmSchedule()}
+              >
+                {busyAction === 'schedule' ? 'Scheduling…' : 'Confirm schedule'}
               </button>
             </div>
           </div>

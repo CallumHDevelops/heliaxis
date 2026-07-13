@@ -185,7 +185,10 @@ function deepClone<T>(v: T): T {
  *
  * Blog tags use hero `eyebrow` (as on the example page), not the separate tags field.
  */
-export function buildBlogArticleBlocks(ai: CmsArticleAi): CmsBlock[] {
+export function buildBlogArticleBlocks(
+  ai: CmsArticleAi,
+  opts?: { mediaImg?: Record<string, unknown> | string },
+): CmsBlock[] {
   const tags = (ai.tags || '').trim();
   const body1 = sanitizeArticleHtml(ai.bodyHtml1);
   const body2 = sanitizeArticleHtml(ai.bodyHtml2);
@@ -212,7 +215,7 @@ export function buildBlogArticleBlocks(ai: CmsArticleAi): CmsBlock[] {
       id: uid(),
       t: 'media',
       p: {
-        img: '',
+        img: opts?.mediaImg || '',
         side: 'right',
         eyebrow: ai.introEyebrow || 'INTRODUCTION',
         title: ai.introTitle,
@@ -261,7 +264,11 @@ type LoosePage = {
  * Clone /example-blog-page blocks and overwrite AI-filled fields.
  * Keeps the contact form stock; fills the home/business split from AI.
  */
-export function fillExampleBlogTemplate(template: LoosePage, ai: CmsArticleAi, opts?: { pageId?: string }) {
+export function fillExampleBlogTemplate(
+  template: LoosePage,
+  ai: CmsArticleAi,
+  opts?: { pageId?: string; mediaImg?: Record<string, unknown> | string },
+) {
   const blocks = deepClone(template.blocks || []);
   let richIndex = 0;
   const split = splitPropsFromAi(ai);
@@ -289,6 +296,7 @@ export function fillExampleBlogTemplate(template: LoosePage, ai: CmsArticleAi, o
       p.ctaDisabled = true;
       p.cta = '';
       if (p.side == null) p.side = 'right';
+      if (opts?.mediaImg) p.img = opts.mediaImg;
     } else if (t === 'rich') {
       if (richIndex === 0) p.html = sanitizeArticleHtml(ai.bodyHtml1);
       else if (richIndex === 1) p.html = sanitizeArticleHtml(ai.bodyHtml2);
@@ -333,7 +341,10 @@ export function findExampleBlogPage(pages: LoosePage[]): LoosePage | undefined {
   return pages.find((p) => normalizeCmsSlug(String(p.slug || '')) === EXAMPLE_BLOG_SLUG);
 }
 
-export function buildCmsArticlePage(ai: CmsArticleAi, opts?: { pageId?: string }) {
+export function buildCmsArticlePage(
+  ai: CmsArticleAi,
+  opts?: { pageId?: string; mediaImg?: Record<string, unknown> | string },
+) {
   const slug = normalizeCmsSlug(ai.slug);
   return {
     id: opts?.pageId || uid(),
@@ -349,7 +360,7 @@ export function buildCmsArticlePage(ai: CmsArticleAi, opts?: { pageId?: string }
       desc: ai.seoDescription || '',
       slug,
     },
-    blocks: buildBlogArticleBlocks(ai),
+    blocks: buildBlogArticleBlocks(ai, opts),
   };
 }
 

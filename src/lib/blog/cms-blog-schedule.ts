@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildLivePublishCss } from '@/lib/cms-publish-styles';
+import { renderCmsPageHtml } from '@/lib/cms-render-html';
 import { isCmsBlogPage, normalizeCmsSlug } from '@/lib/blog/cms-article-template';
 
 export const DRAFT_KEY = 'heliaxis-cms-v1';
@@ -106,12 +107,62 @@ function mergeRenderedPage(rendered: RenderedDoc, page: ScheduledRenderPage): Re
   };
 }
 
+async function resolveScheduleHtml(
+  admin: ReturnType<typeof createAdminClient>,
+  pg: CmsLoosePage,
+  provided?: ScheduledRenderPage,
+): Promise<ScheduledRenderPage> {
+  const slug = normalizeCmsSlug(provided?.slug || String(pg.slug || ''));
+  const name = provided?.name || String(pg.name || 'Article');
+  const theme = provided?.theme || String(pg.theme || '');
+  const seo = provided?.seo || (pg.seo as Record<string, unknown>) || {};
+
+  if (provided?.html?.trim()) {
+    return { slug, name, theme, seo, html: provided.html };
+  }
+  if (pg.scheduledRender?.html?.trim()) {
+    return {
+      slug,
+      name: pg.scheduledRender.name || name,
+      theme: pg.scheduledRender.theme || theme,
+      seo: pg.scheduledRender.seo || seo,
+      html: pg.scheduledRender.html,
+    };
+  }
+
+  const { data: renData } = await admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle();
+  if (renData?.value) {
+    try {
+      const rendered = JSON.parse(renData.value) as RenderedDoc;
+      const hit = (rendered.pages || []).find((p) => normalizeCmsSlug(String(p.slug || '')) === slug);
+      if (hit?.html?.trim()) {
+        return {
+          slug,
+          name: hit.name || name,
+          theme: hit.theme || theme,
+          seo: hit.seo || seo,
+          html: hit.html,
+        };
+      }
+    } catch {
+      /* ignore corrupt rendered */
+    }
+  }
+
+  const html = renderCmsPageHtml(Array.isArray(pg.blocks) ? pg.blocks : []);
+  if (!html.replace(/<[^>]+>/g, '').trim()) {
+    throw new Error('Nothing to publish — add sections to this article first.');
+  }
+  return { slug, name, theme, seo, html };
+}
+
 /** Save schedule + capture of rendered HTML for later auto-publish. */
 export async function scheduleCmsBlog(opts: {
   id?: string;
   slug?: string;
   publishAt: string;
-  renderedPage: ScheduledRenderPage;
+  /** Optional — when omitted, HTML is built from the draft (or reused from a prior publish). */
+  renderedPage?: Partial<ScheduledRenderPage>;
 }) {
   const at = new Date(opts.publishAt);
   if (Number.isNaN(at.getTime())) throw new Error('Invalid schedule time');
@@ -130,15 +181,23 @@ export async function scheduleCmsBlog(opts: {
   const pg = state.pages![idx];
   if (!isCmsBlogPage(pg)) throw new Error('Not an AI blog page');
 
+  const rendered = await resolveScheduleHtml(
+    admin,
+    pg,
+    opts.renderedPage
+      ? {
+          slug: String(opts.renderedPage.slug || pg.slug || ''),
+          name: String(opts.renderedPage.name || pg.name || 'Article'),
+          theme: opts.renderedPage.theme,
+          seo: opts.renderedPage.seo,
+          html: String(opts.renderedPage.html || ''),
+        }
+      : undefined,
+  );
+
   pg.blogStatus = 'scheduled';
   pg.publishAt = at.toISOString();
-  pg.scheduledRender = {
-    slug: normalizeCmsSlug(opts.renderedPage.slug || String(pg.slug || '')),
-    name: opts.renderedPage.name || String(pg.name || 'Article'),
-    theme: opts.renderedPage.theme || String(pg.theme || ''),
-    seo: opts.renderedPage.seo || (pg.seo as Record<string, unknown>) || {},
-    html: opts.renderedPage.html,
-  };
+  pg.scheduledRender = rendered;
 
   const { error: upErr } = await upsertKv(admin, DRAFT_KEY, state, now);
   if (upErr) throw new Error(upErr.message);

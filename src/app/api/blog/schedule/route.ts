@@ -4,7 +4,7 @@ import { cancelCmsBlogSchedule, scheduleCmsBlog } from '@/lib/blog/cms-blog-sche
 
 export const dynamic = 'force-dynamic';
 
-/** Schedule an AI blog for automatic publish (requires captured rendered HTML). */
+/** Schedule an AI blog for automatic publish. HTML is optional — built from draft when omitted. */
 export async function POST(req: Request) {
   const session = await requireApproved();
   if (!session || session.profile.role !== 'admin') {
@@ -32,8 +32,8 @@ export async function POST(req: Request) {
   if (!body.publishAt) {
     return NextResponse.json({ error: 'publishAt is required' }, { status: 400 });
   }
-  if (!body.renderedPage?.html) {
-    return NextResponse.json({ error: 'renderedPage.html is required' }, { status: 400 });
+  if (!body.id && !body.slug) {
+    return NextResponse.json({ error: 'id or slug is required' }, { status: 400 });
   }
 
   try {
@@ -41,13 +41,7 @@ export async function POST(req: Request) {
       id: body.id,
       slug: body.slug,
       publishAt: body.publishAt,
-      renderedPage: {
-        slug: String(body.renderedPage.slug || body.slug || ''),
-        name: String(body.renderedPage.name || 'Article'),
-        theme: body.renderedPage.theme,
-        seo: body.renderedPage.seo,
-        html: body.renderedPage.html,
-      },
+      renderedPage: body.renderedPage,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {

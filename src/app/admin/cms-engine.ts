@@ -187,11 +187,39 @@ function runCmsUrlAction(action,scheduleAt){
     },400);
   }catch(e){}
 }
+function openScheduleNotice(opts){
+  opts=opts||{};
+  var box=document.getElementById('modalbox');
+  var modal=document.getElementById('modal');
+  if(!box||!modal)return;
+  var title=opts.title||'Schedule publish';
+  var msg=opts.message||'';
+  var busy=!!opts.busy;
+  var err=!!opts.error;
+  box.className='modalbox';
+  box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+    +'<h2>'+esc(title)+'</h2>'
+    +'<p id="schedmsg" style="margin:10px 0 16px;font-size:.9rem;line-height:1.45;color:'+(err?'var(--amber-2)':'var(--muted)')+'">'
+    +(busy?'Scheduling…':esc(msg))
+    +'</p>'
+    +(busy?'':'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +'<a class="tbtn solar" style="color:var(--ink);text-decoration:none;display:inline-flex;align-items:center" href="/admin/blog">Back to articles</a>'
+      +'<button type="button" class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="closeModal()">Stay in editor</button>'
+      +'</div>');
+  modal.classList.add('show');
+}
 async function scheduleBlogFromEditor(publishAt){
   try{
-    if(!publishAt){alert('Missing schedule time.');location.href='/admin/blog';return;}
+    if(!publishAt){
+      openScheduleNotice({title:'Could not schedule',error:true,message:'Missing schedule time. Pick a date and time from Articles, then confirm again.'});
+      return;
+    }
     var pg=page();
-    if(!pg){alert('Page not found.');return;}
+    if(!pg){
+      openScheduleNotice({title:'Could not schedule',error:true,message:'Page not found. Go back to Articles and try again.'});
+      return;
+    }
+    openScheduleNotice({title:'Schedule publish',busy:true});
     await ensurePublishStyles();
     var bodyHtml='<div class="pv-page">'+pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')+'</div>';
     var r=await fetch('/api/blog/schedule',{
@@ -207,8 +235,8 @@ async function scheduleBlogFromEditor(publishAt){
     if(!r.ok)throw new Error(d.error||'Could not schedule');
     location.href='/admin/blog?scheduled=1';
   }catch(e){
-    alert((e&&e.message)||'Could not schedule blog');
-    location.href='/admin/blog';
+    var msg=(e&&e.message)||'Could not schedule blog';
+    openScheduleNotice({title:'Could not schedule',error:true,message:msg});
   }
 }
 function hideCmsBoot(){

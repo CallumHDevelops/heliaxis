@@ -11,6 +11,7 @@ import {
   placeholderCmsArticleAi,
   type CmsArticleAi,
 } from '@/lib/blog/cms-article-template';
+import { resolveUnsplashBlogImage } from '@/lib/blog/unsplash-image';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,10 +98,12 @@ export async function POST(req: Request) {
   }
 
   const aiForPage = { ...ai, slug: slug.replace(/^\//, '') };
+  const topic = [ai.title, ai.tags, ai.headline, ai.introTitle].filter(Boolean).join(' ');
+  const mediaImg = await resolveUnsplashBlogImage(topic);
   const example = findExampleBlogPage(state.pages);
   const page = example
-    ? fillExampleBlogTemplate(example, aiForPage)
-    : buildCmsArticlePage(aiForPage);
+    ? fillExampleBlogTemplate(example, aiForPage, { mediaImg })
+    : buildCmsArticlePage(aiForPage, { mediaImg });
   page.slug = slug;
   page.seo = { ...page.seo, slug };
   page.type = 'blog';
@@ -119,11 +122,12 @@ export async function POST(req: Request) {
 
   const editPath = `/admin${slug === '/' ? '' : slug}`;
   // Prefer title-based admin path (matches cms-engine pageEditSlug)
-  const editSlug = String(page.name || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || slug.replace(/^\//, '');
+  const editSlug =
+    String(page.name || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || slug.replace(/^\//, '');
   const adminEditPath = `/admin/${editSlug}`;
   return NextResponse.json({
     ok: true,
