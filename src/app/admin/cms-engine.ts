@@ -123,7 +123,14 @@ function homeBlocks(){return [
 function newState(){return {pages:[{id:uid(),name:'Home',slug:'/',type:'page',blocks:homeBlocks()}],current:0,site:defaultSite()}}
 
 /* ============ persistence ============ */
+var _saveChain=Promise.resolve();
 async function save(){
+  // Serialize saves so an older in-flight write cannot overwrite a newer menu delete.
+  var run=function(){return saveNow();};
+  _saveChain=_saveChain.then(run,run);
+  return _saveChain;
+}
+async function saveNow(){
   DIRTY=true;
   setSaved('Saving to Supabase…');
   try{
@@ -133,6 +140,7 @@ async function save(){
     DIRTY=false;
   }catch(e){
     setSaved(e&&e.message?e.message:'Save failed');
+    throw e;
   }
 }
 function setSaved(t){const e=document.getElementById('savestate');if(!e)return;const label=e.querySelector('.save-label');if(label)label.textContent=t;else e.textContent=t;e.classList.toggle('is-dirty',/saving|failed|unsaved/i.test(t));e.classList.toggle('is-saving',/saving/i.test(t));e.classList.toggle('is-ok',/saved/i.test(t)&&!/failed|unsaved|saving/i.test(t));}
@@ -1189,16 +1197,18 @@ async function doPublish(){
       return{slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
         html:'<div class="pv-page">'+pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')+'</div>'};
     });
+    // Send live STATE (incl. site.menu) so publish does not re-read a stale draft.
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
-      body:JSON.stringify({rendered:{css:css,pages:pages}})});
+      body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages}})});
     if(!r.ok){var em='Publish failed';try{em=(await r.json()).error||em;}catch(e){}if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');throw new Error(em);}
     var liveUrl=(MODE==='mega'||MODE==='library'||MODE==='logos')
       ? (siteOrigin()+'/')
       : publicPageUrl(page()?(isCmsBlogPage(page())?toPublicBlogSlug(page().slug):page().slug):'/');
     var viewLabel=(MODE==='mega')?'View site header →':'View live page →';
+    var menuN=(STATE.site&&STATE.site.menu)?STATE.site.menu.length:0;
     m.style.color='var(--ok)';
     m.innerHTML='✓ <b>Published — live on your site</b>'
-      +(MODE==='mega'?'<div style="margin-top:8px;color:var(--muted);font-size:.85rem">Mega menu is now live in the top navigation on every public page.</div>':'')
+      +(MODE==='mega'?'<div style="margin-top:8px;color:var(--muted);font-size:.85rem">Header menu published with <b>'+menuN+'</b> item'+(menuN===1?'':'s')+'. Hard-refresh the homepage if you still see an old link.</div>':'')
       +'<div style="margin-top:10px"><a href="'+esc(liveUrl)+'" target="_blank" rel="noopener" style="color:var(--amber-2);font-weight:700;text-decoration:underline">'+viewLabel+'</a></div>'
       +'<div style="margin-top:6px;font-family:var(--mono);font-size:.72rem;color:var(--muted);word-break:break-all">'+esc(liveUrl)+'</div>'
       +'<div style="margin-top:10px;color:var(--muted);font-size:.82rem">No Vercel redeploy needed — content is live now (including the homepage when you publish Home).</div>';
@@ -1792,11 +1802,12 @@ async function publishMegaMenu(){
   if(status){status.style.color='var(--muted)';status.textContent='Saving & publishing menu…';}
   try{
     await save();
+    // Send live STATE so draft-only publish still updates the published menu.
     var r=await fetch('/api/cms/publish',{
       method:'POST',
       credentials:'same-origin',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({})
+      body:JSON.stringify({state:STATE})
     });
     if(!r.ok){
       var em='Publish failed';
@@ -1897,6 +1908,7 @@ function renderMega(){var el=document.getElementById('megaedit');if(!el)return;v
  }
  ed+='<div class="dash-actions">'+(mega?'<button class="dact" onclick="STATE.site.menu['+MEGA_PI+'].cols.push({ey:\'New column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]});renderMega();save()"><b>+ Add column</b><span>to this item</span></button>':'')
    +'<button class="dact" onclick="addNavPreset(\'estimator\')"><b>+ Estimator</b><span>links to /solar-estimator</span></button>'
+   +'<button class="dact" onclick="addNavPreset(\'blog\')"><b>+ Blog</b><span>links to /blog</span></button>'
    +'<button class="dact" onclick="addNavPreset(\'funding\')"><b>+ Funding</b><span>links to /commercial-funding</span></button>'
    +'<button class="dact" onclick="addNavPreset(\'faqs\')"><b>+ FAQs</b><span>links to /#faq</span></button>'
    +'<button class="dact" onclick="addNavPreset(\'contact\')"><b>+ Contact</b><span>links to /#quote</span></button>'

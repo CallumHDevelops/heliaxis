@@ -1,4 +1,5 @@
 import 'server-only';
+import { unstable_noStore as noStore } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { MenuCol, MenuFeatured, MenuTop } from '@/lib/menu-types';
 
@@ -75,6 +76,7 @@ function menuFromKvValue(raw: unknown): MenuTop[] | null {
  * Prefers the published CMS doc; falls back to the draft if nothing is published yet.
  */
 export async function getPublishedMenu(): Promise<MenuTop[] | null> {
+  noStore();
   try {
     const admin = createAdminClient();
     for (const key of [PUBLISHED_KEY, DRAFT_KEY]) {
