@@ -2,61 +2,34 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildLivePublishCss } from '@/lib/cms-publish-styles';
 import { renderCmsPageHtml } from '@/lib/cms-render-html';
-import { isCmsBlogPage, normalizeCmsSlug } from '@/lib/blog/cms-article-template';
+import {
+  ensureCmsBlogPublicSlug,
+  isCmsBlogPage,
+  normalizeCmsSlug,
+  toPublicBlogPath,
+} from '@/lib/blog/cms-article-template';
+import {
+  DRAFT_KEY,
+  PUBLISHED_KEY,
+  RENDERED_KEY,
+  parseCmsState,
+  type CmsLoosePage,
+  type ScheduledRenderPage,
+} from '@/lib/blog/cms-blog-shared';
 
-export const DRAFT_KEY = 'heliaxis-cms-v1';
-export const PUBLISHED_KEY = 'heliaxis-cms-published';
-export const RENDERED_KEY = 'heliaxis-cms-rendered';
-
-export type BlogPublishStatus = 'draft' | 'scheduled' | 'published';
-
-export type ScheduledRenderPage = {
-  slug: string;
-  name: string;
-  theme?: string;
-  seo?: Record<string, unknown>;
-  html: string;
-};
-
-export type CmsLoosePage = {
-  id?: string;
-  name?: string;
-  slug?: string;
-  type?: string;
-  origin?: string;
-  theme?: string;
-  seo?: Record<string, unknown>;
-  blocks?: unknown[];
-  blogStatus?: BlogPublishStatus;
-  publishAt?: string | null;
-  scheduledRender?: ScheduledRenderPage | null;
-  [key: string]: unknown;
-};
+export {
+  DRAFT_KEY,
+  PUBLISHED_KEY,
+  RENDERED_KEY,
+  getBlogStatus,
+  parseCmsState,
+  type BlogPublishStatus,
+  type CmsLoosePage,
+  type ScheduledRenderPage,
+} from '@/lib/blog/cms-blog-shared';
 
 type CmsState = { pages?: CmsLoosePage[]; current?: number; [key: string]: unknown };
 type RenderedDoc = { css?: string; pages?: ScheduledRenderPage[] };
-
-export function parseCmsState(raw: string | null | undefined): CmsState {
-  if (!raw) return { pages: [] };
-  try {
-    const state = JSON.parse(raw) as CmsState;
-    if (!Array.isArray(state.pages)) state.pages = [];
-    return state;
-  } catch {
-    return { pages: [] };
-  }
-}
-
-export function getBlogStatus(pg: CmsLoosePage, live: boolean): BlogPublishStatus {
-  const s = String(pg.blogStatus || '').toLowerCase();
-  if (s === 'scheduled' && pg.publishAt) {
-    const at = new Date(String(pg.publishAt));
-    if (!Number.isNaN(at.getTime()) && at.getTime() > Date.now()) return 'scheduled';
-  }
-  if (live || s === 'published') return 'published';
-  if (s === 'scheduled') return 'scheduled';
-  return 'draft';
-}
 
 function upsertKv(
   admin: ReturnType<typeof createAdminClient>,
@@ -180,6 +153,7 @@ export async function scheduleCmsBlog(opts: {
   if (idx < 0) throw new Error('Blog page not found');
   const pg = state.pages![idx];
   if (!isCmsBlogPage(pg)) throw new Error('Not an AI blog page');
+  ensureCmsBlogPublicSlug(pg);
 
   const rendered = await resolveScheduleHtml(
     admin,
@@ -266,7 +240,8 @@ export async function publishDueScheduledBlogs(now = new Date()) {
   const slugs: string[] = [];
 
   for (const pg of due) {
-    const slug = normalizeCmsSlug(String(pg.slug || ''));
+    ensureCmsBlogPublicSlug(pg);
+    const slug = toPublicBlogPath(String(pg.slug || ''));
     const render =
       pg.scheduledRender && pg.scheduledRender.html
         ? {
@@ -311,5 +286,6 @@ export async function publishDueScheduledBlogs(now = new Date()) {
   ]);
 
   revalidatePath('/', 'layout');
+  revalidatePath('/blog');
   return { published: slugs.length, slugs };
 }

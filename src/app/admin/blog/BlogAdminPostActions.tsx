@@ -1,12 +1,16 @@
 'use client';
 
 import { brand } from '@/components/auth/authStyles';
+import { publicBlogParam, toPublicBlogPath } from '@/lib/blog/cms-article-template';
 
 type Props = {
   slug: string;
 };
 
 export function BlogAdminPostActions({ slug }: Props) {
+  const livePath = toPublicBlogPath(slug);
+  const previewParam = publicBlogParam(slug);
+
   const btn: React.CSSProperties = {
     padding: '5px 10px',
     borderRadius: 4,
@@ -24,14 +28,14 @@ export function BlogAdminPostActions({ slug }: Props) {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
       <a
-        href={`/admin/blog/preview/${encodeURIComponent(slug)}`}
+        href={`/admin/blog/preview/${encodeURIComponent(previewParam)}`}
         target="_blank"
         rel="noopener noreferrer"
         style={{ ...btn, background: brand.solar, borderColor: brand.solar }}
       >
         Preview
       </a>
-      <a href={`/blog/${slug}`} target="_blank" rel="noopener noreferrer" style={btn}>
+      <a href={livePath} target="_blank" rel="noopener noreferrer" style={btn}>
         Live
       </a>
     </div>

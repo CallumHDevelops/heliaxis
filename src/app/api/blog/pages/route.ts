@@ -135,5 +135,6 @@ export async function DELETE(req: Request) {
   }
 
   revalidatePath('/', 'layout');
+  revalidatePath('/blog');
   return NextResponse.json({ ok: true, slug: deletedSlug });
 }

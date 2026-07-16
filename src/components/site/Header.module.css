@@ -1,23 +1,11 @@
-/* Header.module.css — Heliaxis simple flat header matching legacy design.
+/* Header.module.css — Heliaxis mega menu.
    Brand CSS variables (--ink, --solar, etc.) come from the .site scope in site.css. */
 
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 60;
-  background: rgba(247, 242, 231, 0.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid transparent;
-  transition: 0.3s;
-}
-.header.scrolled {
-  border-bottom-color: var(--line, rgba(33, 31, 24, 0.14));
-  box-shadow: 0 6px 24px -18px rgba(33, 31, 24, 0.4);
-}
+.header { position: sticky; top: 0; z-index: 60; }
 
 /* utility top bar */
 .topbar {
-  background: var(--ink, #211f18);
+  background: var(--ink);
   color: var(--muted-d, #a69f8e);
   font-family: var(--mono);
   font-size: 0.68rem;
@@ -32,127 +20,249 @@
   gap: 12px;
   padding: 7px 24px;
 }
-.topbar a { color: var(--solar, #fbbf24); text-decoration: none; }
-.stars { color: var(--solar, #fbbf24); letter-spacing: 1px; }
+.topbar a { color: var(--solar); text-decoration: none; }
+.stars { color: var(--solar); letter-spacing: 1px; }
 
-/* main bar */
-.bar {
-  background: transparent;
+/* navbar */
+.navbar {
+  position: relative;
+  background: rgba(247, 242, 231, 0.96);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line, rgba(33, 31, 24, 0.14));
 }
-.bar .wrap {
+.barrow {
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 12px 24px;
+  padding: 14px 24px;
 }
+.logo { display: inline-flex; }
+.logo img { height: 27px; display: block; }
 
-.logoLink { display: inline-flex; }
-.logo { height: 26px; display: block; }
-
-/* nav */
-.nav {
-  display: flex;
-  gap: 22px;
-  align-items: center;
-}
-.navLink {
-  font-weight: 500;
-  font-size: 0.93rem;
-  color: var(--ink, #211f18);
+.nav { display: flex; gap: 6px; align-items: center; }
+.navlink {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
   text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
   position: relative;
 }
-.navLink::after {
+.navlink:hover,
+.navlink.active { color: var(--amber-2, #c77f04); }
+.caret { transition: transform 0.2s; }
+.navlink.active .caret { transform: rotate(180deg); }
+.navlink::after {
   content: "";
   position: absolute;
-  left: 0;
+  left: 14px;
   right: 100%;
-  bottom: -5px;
+  bottom: 4px;
   height: 2px;
-  background: var(--solar, #fbbf24);
+  background: var(--solar);
   transition: right 0.25s;
 }
-.navLink:hover::after {
-  right: 0;
-}
+.navlink:hover::after,
+.navlink.active::after { right: 14px; }
 
-/* head CTA area */
-.headCta {
+.headcta {
   display: flex;
   align-items: center;
   gap: 14px;
+  padding-left: 18px;
+  border-left: 1px solid var(--line, rgba(33, 31, 24, 0.14));
 }
-.headTel {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--ink, #211f18);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.headTel svg {
-  width: 1em;
-  height: 1em;
-  color: var(--amber-2, #c77f04);
-}
-.btn {
+.headtel {
   font-family: var(--display);
   font-weight: 700;
   font-size: 0.92rem;
-  background: var(--solar, #fbbf24);
-  color: var(--ink, #211f18);
+  color: var(--ink);
   text-decoration: none;
-  padding: 0.65rem 1.1rem;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.headtel svg { color: var(--amber-2, #c77f04); }
+.qbtn {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: var(--solar);
+  color: var(--ink);
+  text-decoration: none;
+  padding: 0.6rem 1.05rem;
   border-radius: 2px;
 }
 
-/* burger (mobile trigger) */
-.burger {
-  display: none;
-  width: 26px;
-  height: 20px;
+/* mega panel */
+.mega {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  background: var(--card, #fffdf8);
+  border-top: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  border-bottom: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  box-shadow: 0 26px 44px -28px rgba(33, 31, 24, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+  z-index: 80;
+}
+.mega.open { opacity: 1; visibility: visible; transform: none; }
+.inner { max-width: 1200px; margin: 0 auto; display: grid; }
+
+.megacol { padding: 26px 30px; border-right: 1px solid var(--line, rgba(33, 31, 24, 0.14)); }
+.ey {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber-2, #c77f04);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.ey svg { fill: var(--amber-2, #c77f04); }
+
+.megaitem {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 9px 0;
+  text-decoration: none;
+  color: inherit;
+}
+.miIc {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  border-radius: 2px;
+  background: var(--paper-2, #efe8d8);
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  transition: 0.18s;
+}
+.megaitem:hover .miIc { border-color: var(--solar); transform: translateY(-2px); }
+.megaitem:hover .miIc svg path[fill-opacity] { fill-opacity: 0.55; }
+.miT { display: flex; flex-direction: column; gap: 1px; padding-top: 2px; }
+.miT b { font-family: var(--display); font-weight: 700; font-size: 0.96rem; transition: color 0.15s; }
+.megaitem:hover .miT b { color: var(--amber-2, #c77f04); }
+.miD {
+  font-size: 0.78rem;
+  color: var(--muted, #6e6a5e);
+  line-height: 1.35;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.28s ease, opacity 0.22s ease, margin-top 0.28s ease;
+}
+.megaitem:hover .miD { max-height: 7em; opacity: 1; margin-top: 4px; }
+
+/* featured panel — uses the brand card-fill texture (dark by default) */
+.megafeat {
+  background: var(--ink) url('/assets/heliaxis-card-fill-dark.svg') top right / cover no-repeat;
+  color: var(--paper, #f7f2e7);
+  padding: 28px 30px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
   flex-direction: column;
+  justify-content: center;
+}
+.megafeat > * { position: relative; }
+.megafeat :global(svg) { color: var(--solar); fill: var(--solar); margin-bottom: 14px; }
+
+/* light variant of the featured panel — light card-fill texture */
+.megafeat.light {
+  background: var(--paper-2, #efe8d8) url('/assets/heliaxis-card-fill-light.svg') top right / cover no-repeat;
+  color: var(--ink);
+}
+.megafeat.light .ftT { color: var(--ink); }
+.megafeat.light p { color: var(--muted, #6e6a5e); }
+.ftT { font-family: var(--display); font-weight: 800; font-size: 1.3rem; max-width: 16ch; }
+.megafeat p { color: var(--muted-d, #a69f8e); font-size: 0.86rem; margin-top: 8px; max-width: 26ch; }
+.ftCta {
+  margin-top: 18px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: var(--solar);
+  text-decoration: none;
+  padding: 10px 15px;
+  border-radius: 2px;
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  align-self: flex-start;
+}
+.ftCta svg { color: var(--ink); margin: 0; }
+
+/* burger (mobile trigger) */
+.burger { display: none; flex-direction: column; gap: 5px; background: none; border: 0; cursor: pointer; padding: 6px; }
+.burger span { width: 22px; height: 2px; background: var(--ink); border-radius: 2px; }
+
+/* mobile accordion */
+.mobile { display: none; }
+.mSection { border-bottom: 1px solid var(--line, rgba(33, 31, 24, 0.14)); }
+.mTop {
+  width: 100%;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  cursor: pointer;
+  padding: 16px 24px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+  text-decoration: none;
   background: none;
   border: 0;
+  cursor: pointer;
 }
-.burger span {
-  height: 2px;
-  background: var(--ink, #211f18);
-  border-radius: 2px;
+.mBody { padding: 0 24px 16px; }
+.mCol { margin-bottom: 14px; }
+.mItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.95rem;
 }
+.mItem svg { color: var(--ink); }
 
 /* responsive */
 @media (max-width: 900px) {
-  .nav, .headCta, .headTel, .btn {
-    display: none;
-  }
-  .nav.navOpen {
-    display: flex;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    background: var(--card, #fffdf8);
+  .nav, .headcta { display: none; }
+  .burger { display: flex; }
+  .mega { display: none; }
+  .mobile {
+    display: block;
+    background: rgba(247, 242, 231, 0.98);
     border-bottom: 1px solid var(--line, rgba(33, 31, 24, 0.14));
-    padding: 16px 24px;
-    gap: 16px;
-    z-index: 70;
+    padding-bottom: 16px;
   }
-  .burger {
-    display: flex;
-  }
+  .mobile .qbtn { display: block; margin: 12px 24px 0; text-align: center; }
   .topbar .tl { display: none; }
   .topbar .wrap { justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .header, .navLink::after { transition: none !important; }
+  .mega, .miD, .miIc, .caret, .navlink::after { transition: none !important; }
 }

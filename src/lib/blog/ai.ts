@@ -40,11 +40,11 @@ You fill a FIXED blog article template. Return ONLY valid JSON with this exact s
   "introEyebrow": string,          // usually "INTRODUCTION"
   "introTitle": string,            // intro section title (media block)
   "introText": string,             // 2–4 sentences of plain text (not HTML)
-  "bodyHtml1": string,             // first rich block — exactly 2 medium <p> paragraphs
+  "bodyHtml1": string,             // first rich block — exactly 2 long <p> paragraphs
   "ctaHeadline": string,           // mid-page CTA band headline (topic-appropriate)
   "ctaSub": string,                // CTA supporting line
   "ctaBtn": string,                // CTA button label (topic-appropriate; not forced to solar quote)
-  "bodyHtml2": string,             // second rich block — 1 medium <p> + 1 short <p>
+  "bodyHtml2": string,             // second rich block — 1 long <p> + 1 short <p>
   "homeTitle": string,             // usually "For your home"
   "homeDesc": string,              // 1 short sentence for the home card — tailored to topic
   "homeBullets": [string, string, string], // 2–3 short benefit bullets
@@ -71,8 +71,9 @@ SEO, AEO & GEO (required — write for search engines, answer engines, and gener
 - Never invent statistics, prices, certifications, or grants. Never force solar/MCS terms onto unrelated topics.
 
 Rich text lengths (strict):
-- bodyHtml1: EXACTLY two <p> paragraphs, each medium-long (~140–200 words / 7–10 sentences). No headings, lists, or extra paragraphs.
-- bodyHtml2: EXACTLY two <p> paragraphs — first medium-long (~140–200 words), second short (~25–45 words / 1–2 sentences). No headings or lists.
+- Prefer long, thorough articles — not medium or short.
+- bodyHtml1: EXACTLY two <p> paragraphs, each long (~280–400 words / 12–18 sentences). No headings, lists, or extra paragraphs.
+- bodyHtml2: EXACTLY two <p> paragraphs — first long (~280–400 words), second short (~25–45 words / 1–2 sentences). No headings or lists.
 - Allowed tags only: <p>, <strong>, <em>, <a>, <br> (prefer <p> + occasional <strong> / <a>).
 - Use <strong> on a few key phrases (especially primary keywords and answer phrases). Internal <a href="/…"> links only when natural for the topic (energy articles may use /solar-estimator, /commercial-funding, /#quote).
 - No inline styles, classes, images, <h2>, <h3>, <ul>, or <ol>.

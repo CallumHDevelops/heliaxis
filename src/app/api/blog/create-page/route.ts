@@ -9,6 +9,8 @@ import {
   isReservedCmsSlug,
   normalizeCmsSlug,
   placeholderCmsArticleAi,
+  publicBlogParam,
+  toPublicBlogPath,
   type CmsArticleAi,
 } from '@/lib/blog/cms-article-template';
 import { resolveUnsplashBlogImage } from '@/lib/blog/unsplash-image';
@@ -33,16 +35,17 @@ function slugTaken(pages: Array<Record<string, unknown>>, slug: string, exceptId
   });
 }
 
-function uniqueSlug(pages: Array<Record<string, unknown>>, base: string): string {
-  let slug = normalizeCmsSlug(base);
-  if (isReservedCmsSlug(slug)) {
-    slug = normalizeCmsSlug(slug.replace(/^\/blog\/?/, '') || 'article');
-    if (isReservedCmsSlug(slug)) slug = '/article';
+function uniqueBlogSlug(pages: Array<Record<string, unknown>>, base: string): string {
+  let slug = toPublicBlogPath(base);
+  if (isReservedCmsSlug(slug) || slug === '/blog') {
+    slug = toPublicBlogPath('article');
   }
   if (!slugTaken(pages, slug)) return slug;
   let n = 2;
-  while (slugTaken(pages, `${slug}-${n}`)) n++;
-  return normalizeCmsSlug(`${slug.replace(/^\//, '')}-${n}`);
+  const stem = slug.replace(/\/$/, '');
+  while (slugTaken(pages, `${stem}-${n}`)) n++;
+  // Keep `/blog/{slug}` structure — never let uniqueness turn it into `/blog-{slug}-N`.
+  return toPublicBlogPath(`${stem}-${n}`);
 }
 
 export async function POST(req: Request) {
@@ -92,12 +95,12 @@ export async function POST(req: Request) {
 
   if (!Array.isArray(state.pages)) state.pages = [];
 
-  const slug = uniqueSlug(state.pages, ai.slug);
+  const slug = uniqueBlogSlug(state.pages, ai.slug);
   if (isReservedCmsSlug(slug)) {
     return NextResponse.json({ error: 'That slug is reserved' }, { status: 400 });
   }
 
-  const aiForPage = { ...ai, slug: slug.replace(/^\//, '') };
+  const aiForPage = { ...ai, slug: publicBlogParam(slug) };
   const topic = [ai.title, ai.tags, ai.headline, ai.introTitle, ai.introText, ai.seoDescription]
     .filter(Boolean)
     .join(' ');

@@ -1,6 +1,5 @@
 /* Analytics — full-bleed Umami iframe, single scrollbar only */
 
-/* Kill the outer page scrollbar while this route is open */
 html:has(.admin-shell--flush),
 body:has(.admin-shell--flush) {
   height: 100%;

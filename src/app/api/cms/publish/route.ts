@@ -34,6 +34,8 @@ export async function POST(req: Request) {
 
   // Clear any cached site pages so visitors see the new content immediately.
   revalidatePath('/', 'layout');
+  revalidatePath('/blog');
+  revalidatePath('/blog', 'layout');
 
   return NextResponse.json({ ok: true });
 }

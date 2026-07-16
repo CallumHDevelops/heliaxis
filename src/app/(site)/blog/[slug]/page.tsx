@@ -3,8 +3,14 @@ import { notFound } from 'next/navigation';
 import '../blog.css';
 import '../../home.css';
 import { BlogArticleView } from '@/components/blog/BlogArticleView';
-import { getPublicPostBySlug, getPublicPosts, getRelatedPosts } from '@/lib/blog/queries';
+import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
 import { SiteFooter } from '@/components/home/SiteFooter';
+import {
+  getCmsRenderedBlogArticle,
+  getPublicPostBySlug,
+  getPublicPosts,
+  getRelatedPosts,
+} from '@/lib/blog/queries';
 
 export const revalidate = 60;
 
@@ -17,6 +23,25 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const cms = await getCmsRenderedBlogArticle(slug);
+  if (cms) {
+    const title = cms.seo?.title || cms.post.seoTitle || `${cms.post.title} — Heliaxis`;
+    const description = cms.seo?.desc || cms.post.seoDescription || cms.post.excerpt;
+    const image = cms.post.ogImage || cms.post.mainImage.src;
+    return {
+      title,
+      description,
+      robots: cms.seo?.noindex ? { index: false, follow: false } : undefined,
+      openGraph: {
+        title,
+        description,
+        type: 'article',
+        publishedTime: cms.post.publishAt,
+        images: [{ url: image, alt: cms.post.mainImage.alt }],
+      },
+    };
+  }
+
   const post = await getPublicPostBySlug(slug);
   if (!post) return { title: 'Post not found — Heliaxis' };
   const title = post.seoTitle || `${post.title} — Heliaxis`;
@@ -37,6 +62,35 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
+
+  const cms = await getCmsRenderedBlogArticle(slug);
+  if (cms) {
+    const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: cms.post.title,
+      description: cms.post.excerpt,
+      datePublished: cms.post.publishAt,
+      author: { '@type': 'Organization', name: cms.post.author },
+      image: cms.post.mainImage.src,
+      publisher: { '@type': 'Organization', name: 'Heliaxis' },
+    };
+    return (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        {cms.css ? <style dangerouslySetInnerHTML={{ __html: cms.css }} /> : null}
+        <div
+          className={cms.theme === 'dark' ? 'dk' : ''}
+          dangerouslySetInnerHTML={{ __html: cms.html }}
+        />
+        <CmsFormRuntime />
+      </>
+    );
+  }
+
   const post = await getPublicPostBySlug(slug);
   if (!post) notFound();
 

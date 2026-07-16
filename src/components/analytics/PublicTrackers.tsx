@@ -3,10 +3,11 @@
 import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import { isTrackableAnalyticsPath } from '@/lib/analytics-paths';
+import { ClickHeatmapTracker } from '@/components/analytics/ClickHeatmapTracker';
 import { UmamiScript } from '@/components/analytics/UmamiScript';
 
 /**
- * Loads Umami + GA only on public/user pages.
+ * Loads Umami + GA + click heatmap collector on public/user pages.
  * /admin, /login, /register, /pending, /preview never get trackers.
  */
 export function PublicTrackers() {
@@ -30,6 +31,7 @@ export function PublicTrackers() {
         `}
       </Script>
       <UmamiScript />
+      <ClickHeatmapTracker />
     </>
   );
 }

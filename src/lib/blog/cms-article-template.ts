@@ -134,9 +134,61 @@ export function normalizeCmsSlug(raw: string): string {
   return '/' + s.replace(/^\/+/, '');
 }
 
+/**
+ * Public journal paths: `/blog` is the index (reserved); `/blog/{slug}` is for articles.
+ * `/admin` stays reserved. Older root article slugs are migrated via `toPublicBlogPath`.
+ */
 export function isReservedCmsSlug(slug: string): boolean {
   const s = normalizeCmsSlug(slug);
-  return s === '/blog' || s.startsWith('/blog/') || s === '/admin' || s.startsWith('/admin/');
+  return s === '/blog' || s === '/admin' || s.startsWith('/admin/');
+}
+
+/** Ensure a CMS blog page lives at `/blog/{kebab}` for the public journal. */
+export function toPublicBlogPath(raw: string): string {
+  let s = normalizeCmsSlug(raw);
+  if (!s || s === '/') s = '/article';
+
+  // Already under /blog/… — strip empty/leading hyphens in the article segment
+  if (s === '/blog') return '/blog/article';
+  if (s.startsWith('/blog/')) {
+    const rest = s.slice('/blog/'.length).replace(/^-+/, '').replace(/\/+/g, '-') || 'article';
+    return normalizeCmsSlug(`blog/${rest}`);
+  }
+
+  // Mistaken form `/blog-foo` (hyphen instead of slash) → `/blog/foo`
+  if (s.startsWith('/blog-')) {
+    const rest = s.slice('/blog-'.length).replace(/^-+/, '') || 'article';
+    return normalizeCmsSlug(`blog/${rest}`);
+  }
+
+  // Slug that already starts with "blog/" as a path segment prefix without leading slash handling
+  let rest = s.replace(/^\//, '');
+  if (rest.startsWith('blog/')) rest = rest.slice('blog/'.length);
+  else if (rest.startsWith('blog-')) rest = rest.slice('blog-'.length);
+  rest = rest.replace(/^-+/, '') || 'article';
+  return normalizeCmsSlug(`blog/${rest}`);
+}
+
+/** `/blog/foo-bar` → `foo-bar` (Next.js `[slug]` param). */
+export function publicBlogParam(cmsSlug: string): string {
+  const s = toPublicBlogPath(cmsSlug);
+  if (s.startsWith('/blog/')) return s.slice('/blog/'.length);
+  return s.replace(/^\//, '') || 'article';
+}
+
+/** Next `[slug]` param → CMS path `/blog/{slug}`. */
+export function cmsPathFromBlogParam(param: string): string {
+  return toPublicBlogPath(String(param || '').replace(/^\/+/, ''));
+}
+
+/** Mutate a loose page so its slug (and seo.slug) sit under `/blog/`. */
+export function ensureCmsBlogPublicSlug<T extends { slug?: unknown; seo?: unknown }>(pg: T): T {
+  const next = toPublicBlogPath(String(pg.slug || ''));
+  pg.slug = next;
+  if (pg.seo && typeof pg.seo === 'object') {
+    (pg.seo as { slug?: string }).slug = next;
+  }
+  return pg;
 }
 
 export function placeholderCmsArticleAi(): CmsArticleAi {

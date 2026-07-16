@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isCmsBlogPage, normalizeCmsSlug } from '@/lib/blog/cms-article-template';
+import { isCmsBlogPage, normalizeCmsSlug, toPublicBlogPath } from '@/lib/blog/cms-article-template';
 import {
   DRAFT_KEY,
   PUBLISHED_KEY,
@@ -7,7 +7,7 @@ import {
   getBlogStatus,
   parseCmsState,
   type BlogPublishStatus,
-} from '@/lib/blog/cms-blog-schedule';
+} from '@/lib/blog/cms-blog-shared';
 
 export type CmsAiBlogListItem = {
   id: string;
@@ -53,9 +53,15 @@ function publishedSlugSet(pages: LoosePage[], renderedSlugs: string[]): Set<stri
   const set = new Set<string>();
   for (const p of pages) {
     if (!isCmsBlogPage(p)) continue;
-    set.add(normalizeCmsSlug(String(p.slug || '')));
+    const s = normalizeCmsSlug(String(p.slug || ''));
+    set.add(s);
+    set.add(toPublicBlogPath(s));
   }
-  for (const s of renderedSlugs) set.add(normalizeCmsSlug(s));
+  for (const s of renderedSlugs) {
+    const n = normalizeCmsSlug(s);
+    set.add(n);
+    set.add(toPublicBlogPath(n));
+  }
   return set;
 }
 
@@ -90,9 +96,13 @@ export async function listCmsAiBlogs(): Promise<CmsAiBlogListItem[]> {
   return (draft.pages || [])
     .filter((p) => isCmsBlogPage(p))
     .map((p) => {
-      const slug = normalizeCmsSlug(String(p.slug || ''));
+      const rawSlug = normalizeCmsSlug(String(p.slug || ''));
+      const slug = toPublicBlogPath(rawSlug);
       const editSlug = cmsAdminEditSlug(String(p.name || ''), slug);
-      const live = liveSlugs.has(slug) || String(p.blogStatus || '').toLowerCase() === 'published';
+      const live =
+        liveSlugs.has(slug) ||
+        liveSlugs.has(rawSlug) ||
+        String(p.blogStatus || '').toLowerCase() === 'published';
       const status = getBlogStatus(p, live);
       return {
         id: String(p.id || slug),
@@ -100,7 +110,7 @@ export async function listCmsAiBlogs(): Promise<CmsAiBlogListItem[]> {
         slug,
         editSlug,
         editPath: `/admin/${encodeURIComponent(editSlug)}`,
-        livePath: slug === '/' ? '/' : slug,
+        livePath: slug,
         live,
         status,
         publishAt: p.publishAt ? String(p.publishAt) : null,
