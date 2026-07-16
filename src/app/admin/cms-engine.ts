@@ -1224,7 +1224,7 @@ function closeModal(){
 }
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 document.addEventListener('keydown',function(e){if(MODE!=='dash')return;if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes((document.activeElement&&document.activeElement.tagName)||'')){e.preventDefault();var el=document.getElementById('dash-page-search');if(el)el.focus();}});
-document.addEventListener('click',function(e){var wrap=document.querySelector('.toolbar-more-wrap');if(wrap&&!wrap.contains(e.target))closeToolbarMore();var picker=document.getElementById('pagePicker');if(picker&&!picker.contains(e.target))closePagePicker();});
+document.addEventListener('click',function(e){var wrap=document.querySelector('.toolbar-more-wrap');if(wrap&&!wrap.contains(e.target))closeToolbarMore();var picker=document.getElementById('pagePicker');if(picker&&!picker.contains(e.target))closePagePicker();if(!e.target.closest||!e.target.closest('.link-pick'))closeLinkPicks();});
 window.addEventListener('popstate',function(){
   var slug=getSlugFromPath();
   var viewMode=cmsViewModeFromSlug(slug);
@@ -1749,20 +1749,193 @@ var NAV_LINK_PRESETS=[
 function selectMegaTab(i){ MEGA_PI = Number(i); renderMega(); }
 function showMega(){applyCmsView('mega');}
 function pageName(slug){var p=STATE.pages.filter(function(x){return x.slug===slug})[0];if(p)return p.name;var pre=NAV_LINK_PRESETS.filter(function(x){return x.href===slug})[0];return pre?pre.label:slug;}
-function pageOpts(cur){return linkOpts(cur);}
-function linkOpts(cur){
-  var h='<option value="">— choose a link —</option>';
-  h+='<optgroup label="Site pages">';
-  NAV_LINK_PRESETS.forEach(function(p){
-    h+='<option value="'+esc(p.href)+'"'+(cur===p.href?' selected':'')+'>'+esc(p.label)+' ('+esc(p.href)+')</option>';
-  });
-  h+='</optgroup><optgroup label="CMS pages">';
+function linkCatalog(){
+  var items=[];
+  NAV_LINK_PRESETS.forEach(function(p){items.push({group:'Site pages',label:p.label,href:p.href});});
   (STATE.pages||[]).forEach(function(p){
-    h+='<option value="'+esc(p.slug)+'"'+(cur===p.slug?' selected':'')+'>'+esc(p.name)+'</option>';
+    items.push({group:isCmsBlogPage(p)?'Blog articles':'CMS pages',label:p.name||'Untitled',href:p.slug||'/'});
   });
-  h+='</optgroup>';
-  return h;
+  return items;
 }
+function linkLabelFor(href){
+  if(!href)return 'Choose a link…';
+  var hit=linkCatalog().filter(function(x){return x.href===href})[0];
+  return hit?hit.label:'Custom path';
+}
+/** Searchable link picker — sections first, then links inside a section. */
+function linkPickHtml(cur, applyExpr){
+  var id='lp'+Math.random().toString(36).slice(2,9);
+  var shown=cur
+    ?'<span class="link-pick-name">'+esc(linkLabelFor(cur))+'</span><span class="link-pick-path">'+esc(cur)+'</span>'
+    :'<span class="link-pick-name muted">Choose a link…</span>';
+  return '<div class="link-pick'+(cur?' has-val':'')+'" id="'+id+'" data-cur="'+esc(cur||'')+'" data-apply="'+esc(applyExpr)+'" data-section="">'
+    +'<button type="button" class="link-pick-btn" onclick="event.stopPropagation();toggleLinkPick(\''+id+'\')">'
+    +'<span class="link-pick-val">'+shown+'</span><span class="link-pick-chev" aria-hidden="true">▾</span></button>'
+    +'<div class="link-pick-menu" hidden>'
+    +'<div class="link-pick-search"><input type="search" placeholder="Search by name or path…" autocomplete="off" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" oninput="filterLinkPick(\''+id+'\',this.value)"></div>'
+    +'<div class="link-pick-nav" hidden></div>'
+    +'<div class="link-pick-list" role="listbox"></div>'
+    +'<div class="link-pick-foot"><span class="link-pick-hint">Pick a section, then a link</span></div>'
+    +'</div></div>';
+}
+function closeLinkPicks(exceptId){
+  document.querySelectorAll('.link-pick').forEach(function(el){
+    if(exceptId&&el.id===exceptId)return;
+    el.classList.remove('open');
+    el.setAttribute('data-section','');
+    var menu=el.querySelector('.link-pick-menu');
+    if(menu)menu.hidden=true;
+  });
+}
+function toggleLinkPick(id){
+  var root=document.getElementById(id);
+  if(!root)return;
+  var willOpen=!root.classList.contains('open');
+  closeLinkPicks(willOpen?id:null);
+  if(!willOpen){root.classList.remove('open');root.setAttribute('data-section','');var m=root.querySelector('.link-pick-menu');if(m)m.hidden=true;return;}
+  root.classList.add('open');
+  root.setAttribute('data-section','');
+  var menu=root.querySelector('.link-pick-menu');
+  if(menu)menu.hidden=false;
+  var inp=root.querySelector('.link-pick-search input');
+  if(inp)inp.value='';
+  renderLinkPick(id);
+  if(inp)setTimeout(function(){inp.focus();},20);
+}
+function openLinkPickSection(id,sectionOrEl){
+  var root=document.getElementById(id);
+  if(!root)return;
+  var section=sectionOrEl&&sectionOrEl.getAttribute?sectionOrEl.getAttribute('data-section'):sectionOrEl;
+  root.setAttribute('data-section',section||'');
+  var inp=root.querySelector('.link-pick-search input');
+  if(inp)inp.value='';
+  renderLinkPick(id);
+}
+function backLinkPickSections(id){
+  openLinkPickSection(id,'');
+}
+function filterLinkPick(id,q){
+  renderLinkPick(id,q);
+}
+function linkPickGrouped(q){
+  q=String(q||'').trim().toLowerCase();
+  var groups={};
+  var order=[];
+  linkCatalog().forEach(function(it){
+    var hay=(it.label+' '+it.href).toLowerCase();
+    if(q&&hay.indexOf(q)<0)return;
+    if(!groups[it.group]){groups[it.group]=[];order.push(it.group);}
+    groups[it.group].push(it);
+  });
+  return {groups:groups,order:order,q:q};
+}
+function renderLinkPick(id,qOverride){
+  var root=document.getElementById(id);
+  if(!root)return;
+  var list=root.querySelector('.link-pick-list');
+  var nav=root.querySelector('.link-pick-nav');
+  var foot=root.querySelector('.link-pick-hint');
+  if(!list)return;
+  var cur=root.getAttribute('data-cur')||'';
+  var section=root.getAttribute('data-section')||'';
+  var inp=root.querySelector('.link-pick-search input');
+  var q=qOverride!=null?String(qOverride):((inp&&inp.value)||'');
+  q=q.trim();
+  var data=linkPickGrouped(q);
+  var groups=data.groups;
+  var order=data.order;
+
+  // Searching: flat results across sections (skip section drill-down)
+  if(q){
+    if(nav){nav.hidden=true;nav.innerHTML='';}
+    if(foot)foot.textContent='Search results';
+    if(!order.length){
+      list.innerHTML='<div class="link-pick-empty">No matches</div>';
+      return;
+    }
+    var sh='';
+    order.forEach(function(g){
+      sh+='<div class="link-pick-group">'+esc(g)+'</div>';
+      groups[g].forEach(function(it){
+        var on=it.href===cur?' on':'';
+        sh+='<button type="button" class="link-pick-item'+on+'" role="option" data-href="'+esc(it.href)+'" onclick="event.stopPropagation();applyLinkPick(\''+id+'\',this)">'
+          +'<span class="link-pick-item-name">'+esc(it.label)+'</span>'
+          +'<span class="link-pick-item-path">'+esc(it.href)+'</span></button>';
+      });
+    });
+    list.innerHTML=sh;
+    return;
+  }
+
+  // Inside a section: show links + back
+  if(section){
+    if(nav){
+      nav.hidden=false;
+      nav.innerHTML='<button type="button" class="link-pick-back" onclick="event.stopPropagation();backLinkPickSections(\''+id+'\')"><span aria-hidden="true">←</span> All sections</button>'
+        +'<span class="link-pick-nav-title">'+esc(section)+'</span>';
+    }
+    if(foot)foot.textContent='Links in '+section;
+    var items=groups[section]||[];
+    // If section has no filtered items (shouldn't happen without q), rebuild without filter
+    if(!items.length){
+      var full=linkPickGrouped('');
+      items=full.groups[section]||[];
+    }
+    if(!items.length){
+      list.innerHTML='<div class="link-pick-empty">No links in this section</div>';
+      return;
+    }
+    var lh='';
+    items.forEach(function(it){
+      var on=it.href===cur?' on':'';
+      lh+='<button type="button" class="link-pick-item'+on+'" role="option" data-href="'+esc(it.href)+'" onclick="event.stopPropagation();applyLinkPick(\''+id+'\',this)">'
+        +'<span class="link-pick-item-name">'+esc(it.label)+'</span>'
+        +'<span class="link-pick-item-path">'+esc(it.href)+'</span></button>';
+    });
+    list.innerHTML=lh;
+    return;
+  }
+
+  // Top level: sections only
+  if(nav){nav.hidden=true;nav.innerHTML='';}
+  if(foot)foot.textContent='Pick a section, then a link';
+  var all=linkPickGrouped('');
+  if(!all.order.length){
+    list.innerHTML='<div class="link-pick-empty">No pages available</div>';
+    return;
+  }
+  var ch='';
+  all.order.forEach(function(g){
+    var n=all.groups[g].length;
+    var hasCur=all.groups[g].some(function(it){return it.href===cur;});
+    ch+='<button type="button" class="link-pick-section'+(hasCur?' has-cur':'')+'" data-section="'+esc(g)+'" onclick="event.stopPropagation();openLinkPickSection(\''+id+'\',this)">'
+      +'<span class="link-pick-section-main">'
+      +'<span class="link-pick-section-name">'+esc(g)+'</span>'
+      +'<span class="link-pick-section-meta">'+n+' link'+(n===1?'':'s')+(hasCur?' · current':'')+'</span>'
+      +'</span><span class="link-pick-section-chev" aria-hidden="true">›</span></button>';
+  });
+  list.innerHTML=ch;
+}
+function applyLinkPick(id,el){
+  var href=el&&el.getAttribute?el.getAttribute('data-href'):el;
+  var root=document.getElementById(id);
+  var apply=root?root.getAttribute('data-apply'):'';
+  closeLinkPicks();
+  if(!apply||href==null)return;
+  try{
+    if(apply.indexOf('setTopPage(')===0){
+      var mi=Number(apply.replace(/^setTopPage\(|\)$/g,''));
+      setTopPage(mi,href);
+    }else if(apply.indexOf('setMenuPage(')===0){
+      var parts=apply.replace(/^setMenuPage\(|\)$/g,'').split(',');
+      setMenuPage(Number(parts[0]),Number(parts[1]),Number(parts[2]),href);
+    }else if(apply.indexOf('setFeatCta(')===0){
+      var fi=Number(apply.replace(/^setFeatCta\(|\)$/g,''));
+      setFeatCta(fi,href);
+    }
+  }catch(e){console.error(e);}
+}
+function setFeatCta(mi,v){featOf(STATE.site.menu[mi]).ctaPage=v;renderMega();save();}
 function navHasLabel(lbl){
   var want=String(lbl||'').toLowerCase();
   return (STATE.site.menu||[]).some(function(m){return String(m.label||'').toLowerCase()===want;});
@@ -1880,13 +2053,13 @@ function renderMega(){var el=document.getElementById('megaedit');if(!el)return;v
    '<div class="fld"><label>Label</label><input value="'+esc(sel.label)+'" onchange="STATE.site.menu['+MEGA_PI+'].label=this.value;renderMega();save()"></div>'+
    '<label class="chk"><input type="checkbox" '+(mega?'checked':'')+' onchange="toggleMega('+MEGA_PI+',this.checked)"> Enable mega menu (columns, links &amp; featured panel)</label>';
  if(!mega){
-   ed+='<div class="fld"><label>This item links directly to</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input style="flex:1;min-width:160px" value="'+esc(sel.href||sel.page||'')+'" placeholder="e.g. /solar-estimator" onchange="setTopPage('+MEGA_PI+',this.value)"><select style="min-width:200px" onchange="setTopPage('+MEGA_PI+',this.value)">'+linkOpts(sel.page||sel.href||'')+'</select></div><div class="hint" style="font-size:.75rem;margin-top:4px">Pick <b>Estimator (/solar-estimator)</b> from the list, or type any path. Leave mega menu unchecked for a simple nav link.</div></div>';
+   ed+='<div class="fld"><label>This item links directly to</label><div class="link-pick-row"><input class="link-pick-path-input" value="'+esc(sel.href||sel.page||'')+'" placeholder="e.g. /solar-estimator" onchange="setTopPage('+MEGA_PI+',this.value)">'+linkPickHtml(sel.page||sel.href||'','setTopPage('+MEGA_PI+')')+'</div><div class="hint" style="font-size:.75rem;margin-top:6px">Search the list for Estimator, Blog, or any CMS page — or type a custom path. Leave mega menu unchecked for a simple nav link.</div></div>';
  } else {
    ed+='<div class="fld"><label>Featured panel — background</label><div class="seg"><button class="'+(feat.bg!=='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'dark\')">Dark texture</button><button class="'+(feat.bg==='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'light\')">Light texture</button></div><div class="hint" style="font-size:.75rem;margin-top:4px">Uses the brand card-fill background we designed — grid + warm glow, in dark or light.</div></div>'+
      '<div class="fld"><label>Or a custom photo (optional — overrides the texture)</label>'+menuFeatImgs(feat)+'</div>'+
      '<div class="fld"><label>Featured title</label><input value="'+esc(feat.title)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).title=this.value;renderMega();save()"></div>'+
      '<div class="fld"><label>Featured text</label><textarea rows="2" onchange="featOf(STATE.site.menu['+MEGA_PI+']).text=this.value;renderMega();save()">'+esc(feat.text)+'</textarea></div>'+
-     '<div class="row2"><div class="fld"><label>CTA label</label><input value="'+esc(feat.cta)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).cta=this.value;renderMega();save()"></div><div class="fld"><label>CTA links to</label><select onchange="featOf(STATE.site.menu['+MEGA_PI+']).ctaPage=this.value;save()">'+pageOpts(feat.ctaPage)+'</select></div></div>';
+     '<div class="row2"><div class="fld"><label>CTA label</label><input value="'+esc(feat.cta)+'" onchange="featOf(STATE.site.menu['+MEGA_PI+']).cta=this.value;renderMega();save()"></div><div class="fld"><label>CTA links to</label>'+linkPickHtml(feat.ctaPage||'','setFeatCta('+MEGA_PI+')')+'</div></div>';
  }
  ed+='<button class="rm" onclick="confirmRemoveMenuItem()">Remove top-level item</button></div>';
 
@@ -1899,7 +2072,7 @@ function renderMega(){var el=document.getElementById('megaedit');if(!el)return;v
          '<span class="mm-grip" draggable="true" ondragstart="mDragStart(\'item\','+MEGA_PI+','+ci+','+ii+')" ondragend="mDragEnd()" title="Drag to reorder">⋮⋮</span>'+
          '<button class="icp" title="Click to choose an icon" onclick="openMenuIcon('+MEGA_PI+','+ci+','+ii+')">'+icon(it.icon||'solar',18)+'</button>'+
          '<input value="'+esc(it.label)+'" placeholder="Label" onchange="setMenuLabel('+MEGA_PI+','+ci+','+ii+',this.value)">'+
-         '<select onchange="setMenuPage('+MEGA_PI+','+ci+','+ii+',this.value)">'+pageOpts(it.page||it.href||'')+'</select>'+
+         linkPickHtml(it.page||it.href||'','setMenuPage('+MEGA_PI+','+ci+','+ii+')')+
          '<button class="rm" onclick="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].items.splice('+ii+',1);renderMega();save()">×</button></div>'+
          '<div style="margin:0 0 10px 26px"><input placeholder="Excerpt (optional — shows under the label)" value="'+esc(it.desc||'')+'" onchange="setMenuDesc('+MEGA_PI+','+ci+','+ii+',this.value)" style="width:100%;font-size:.78rem;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper)"></div>';
      });
@@ -2117,6 +2290,13 @@ w.setMenuLabel = setMenuLabel;
 w.setMenuDesc = setMenuDesc;
 w.setMenuPage = setMenuPage;
 w.setTopPage = setTopPage;
+w.setFeatCta = setFeatCta;
+w.toggleLinkPick = toggleLinkPick;
+w.filterLinkPick = filterLinkPick;
+w.applyLinkPick = applyLinkPick;
+w.closeLinkPicks = closeLinkPicks;
+w.openLinkPickSection = openLinkPickSection;
+w.backLinkPickSections = backLinkPickSections;
 w.toggleMega = toggleMega;
 w.mDragStart = mDragStart;
 w.mDragOver = mDragOver;
