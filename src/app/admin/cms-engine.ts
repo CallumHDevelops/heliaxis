@@ -1087,6 +1087,25 @@ function buildPublishCss(){return PUBLISH_STYLES.root+'*,*::before,*::after{box-
 function openPublish(){
   var box=document.getElementById('modalbox');
   box.className='modalbox';
+  // Mega / library / logos are site chrome — not a single page. The toolbar
+  // still remembers the last edited page (e.g. a blog), which confused the URL.
+  if(MODE==='mega'||MODE==='library'||MODE==='logos'){
+    var chromeLabel=MODE==='mega'?'mega menu (site header)':MODE==='library'?'image library':'brand logos';
+    var homeUrl=siteOrigin()+'/';
+    box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
+      +'<h2>Publish to your site</h2>'
+      +'<p>This publishes your <b>'+esc(chromeLabel)+'</b> and the rest of the saved CMS. The top navigation on every public page will update.</p>'
+      +'<div class="pub-live-url" title="Check the live header"><span>See it on</span><code>'+esc(homeUrl)+'</code></div>'
+      +(MODE==='mega'?'<p style="font-size:.85rem;color:var(--muted);margin:10px 0 0">After publish, open the homepage and hover Solar &amp; Battery / Business to check the mega panels.</p>':'')
+      +'<div id="pubmsg" style="margin:12px 0;font-size:.9rem"></div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +'<button class="tbtn solar" style="color:var(--ink)" onclick="doPublish()">Publish now</button>'
+      +'<a class="tbtn" style="color:var(--ink);border-color:var(--line);text-decoration:none;display:inline-flex;align-items:center" href="/" target="_blank" rel="noopener">Open homepage</a>'
+      +'<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="exportJSON()">Download data (JSON)</button>'
+      +'</div>';
+    document.getElementById('modal').classList.add('show');
+    return;
+  }
   var pg=page();
   var liveSlug=pg?(isCmsBlogPage(pg)?toPublicBlogSlug(pg.slug):pg.slug):'/';
   var liveUrl=publicPageUrl(liveSlug);
@@ -1173,10 +1192,14 @@ async function doPublish(){
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
       body:JSON.stringify({rendered:{css:css,pages:pages}})});
     if(!r.ok){var em='Publish failed';try{em=(await r.json()).error||em;}catch(e){}if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');throw new Error(em);}
-    var liveUrl=publicPageUrl(page()?page().slug:'/');
+    var liveUrl=(MODE==='mega'||MODE==='library'||MODE==='logos')
+      ? (siteOrigin()+'/')
+      : publicPageUrl(page()?(isCmsBlogPage(page())?toPublicBlogSlug(page().slug):page().slug):'/');
+    var viewLabel=(MODE==='mega')?'View site header →':'View live page →';
     m.style.color='var(--ok)';
     m.innerHTML='✓ <b>Published — live on your site</b>'
-      +'<div style="margin-top:10px"><a href="'+esc(liveUrl)+'" target="_blank" rel="noopener" style="color:var(--amber-2);font-weight:700;text-decoration:underline">View live page →</a></div>'
+      +(MODE==='mega'?'<div style="margin-top:8px;color:var(--muted);font-size:.85rem">Mega menu is now live in the top navigation on every public page.</div>':'')
+      +'<div style="margin-top:10px"><a href="'+esc(liveUrl)+'" target="_blank" rel="noopener" style="color:var(--amber-2);font-weight:700;text-decoration:underline">'+viewLabel+'</a></div>'
       +'<div style="margin-top:6px;font-family:var(--mono);font-size:.72rem;color:var(--muted);word-break:break-all">'+esc(liveUrl)+'</div>'
       +'<div style="margin-top:10px;color:var(--muted);font-size:.82rem">No Vercel redeploy needed — content is live now (including the homepage when you publish Home).</div>';
   }catch(e){
@@ -1704,19 +1727,91 @@ function makeFromTemplate(i){var t=(STATE.templates||[])[i];if(!t)return;var b=J
 
 /* ===== dedicated mega-menu editor page ===== */
 var MEGA_PI=0, MDRAG=null;
+/** Common public routes — not always CMS pages, but needed in the header. */
+var NAV_LINK_PRESETS=[
+  {id:'estimator',label:'Estimator',href:'/solar-estimator'},
+  {id:'funding',label:'Funding',href:'/commercial-funding'},
+  {id:'faqs',label:'FAQs',href:'/#faq'},
+  {id:'contact',label:'Contact',href:'/#quote'},
+  {id:'blog',label:'Blog',href:'/blog'},
+  {id:'home',label:'Home',href:'/'}
+];
 function selectMegaTab(i){ MEGA_PI = Number(i); renderMega(); }
 function showMega(){applyCmsView('mega');}
-function pageName(slug){var p=STATE.pages.filter(function(x){return x.slug===slug})[0];return p?p.name:slug;}
-function pageOpts(cur){return '<option value="">— link to a page —</option>'+STATE.pages.map(function(p){return '<option value="'+esc(p.slug)+'"'+(cur===p.slug?' selected':'')+'>'+esc(p.name)+'</option>'}).join('');}
+function pageName(slug){var p=STATE.pages.filter(function(x){return x.slug===slug})[0];if(p)return p.name;var pre=NAV_LINK_PRESETS.filter(function(x){return x.href===slug})[0];return pre?pre.label:slug;}
+function pageOpts(cur){return linkOpts(cur);}
+function linkOpts(cur){
+  var h='<option value="">— choose a link —</option>';
+  h+='<optgroup label="Site pages">';
+  NAV_LINK_PRESETS.forEach(function(p){
+    h+='<option value="'+esc(p.href)+'"'+(cur===p.href?' selected':'')+'>'+esc(p.label)+' ('+esc(p.href)+')</option>';
+  });
+  h+='</optgroup><optgroup label="CMS pages">';
+  (STATE.pages||[]).forEach(function(p){
+    h+='<option value="'+esc(p.slug)+'"'+(cur===p.slug?' selected':'')+'>'+esc(p.name)+'</option>';
+  });
+  h+='</optgroup>';
+  return h;
+}
+function navHasLabel(lbl){
+  var want=String(lbl||'').toLowerCase();
+  return (STATE.site.menu||[]).some(function(m){return String(m.label||'').toLowerCase()===want;});
+}
+/** Add a top-level direct link (e.g. Estimator → /solar-estimator). */
+function addNavPreset(id){
+  var p=NAV_LINK_PRESETS.filter(function(x){return x.id===id})[0];
+  if(!p)return;
+  if(navHasLabel(p.label)){
+    var idx=(STATE.site.menu||[]).findIndex(function(m){return String(m.label||'').toLowerCase()===p.label.toLowerCase();});
+    if(idx>=0){
+      var m=STATE.site.menu[idx];
+      m.megaEnabled=false;
+      m.href=p.href;
+      m.page=p.href;
+      selectMegaTab(idx);
+      save();
+    }
+    return;
+  }
+  STATE.site.menu.push({label:p.label,megaEnabled:false,page:p.href,href:p.href,cols:[]});
+  selectMegaTab(STATE.site.menu.length-1);
+  save();
+}
 function featOf(m){if(!m.featured)m.featured={img:'',title:'Book a free survey',text:'No obligation, no pushy sales — just honest advice.',cta:'Get a quote',ctaPage:'',bg:'dark'};if(!m.featured.bg)m.featured.bg='dark';return m.featured;}
 function megaOn(m){return m.megaEnabled===true || (m.megaEnabled!==false && Array.isArray(m.cols) && m.cols.length > 0);}
 function setMenuIcon(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].icon=v;renderMega();save();}
-function setMenuPage(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].page=v;renderMega();save();}
+function setMenuPage(mi,ci,ii,v){var it=STATE.site.menu[mi].cols[ci].items[ii];it.page=v;it.href=v;renderMega();save();}
 function setMenuLabel(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].label=v;renderMega();save();}
 function setMenuDesc(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].desc=v;renderMega();save();}
 function toggleMega(mi,v){var m=STATE.site.menu[mi];m.megaEnabled=v;if(v&&(!m.cols||!m.cols.length))m.cols=[{ey:'Column',items:[{icon:'solar',label:'Item',page:''}]}];renderMega();save();}
 function setTopPage(mi,v){STATE.site.menu[mi].page=v;STATE.site.menu[mi].href=v;renderMega();save();}
 function setFeatBg(mi,v){featOf(STATE.site.menu[mi]).bg=v;renderMega();save();}
+/** Save draft then publish so the public Header (Solar & Battery, Business, …) updates. */
+async function publishMegaMenu(){
+  var status=document.getElementById('megaPubStatus');
+  if(status){status.style.color='var(--muted)';status.textContent='Saving & publishing menu…';}
+  try{
+    await save();
+    var r=await fetch('/api/cms/publish',{
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({})
+    });
+    if(!r.ok){
+      var em='Publish failed';
+      try{em=(await r.json()).error||em;}catch(e){}
+      if(r.status===401)throw new Error('Sign in as an approved admin to publish.');
+      throw new Error(em);
+    }
+    if(status){
+      status.style.color='var(--ok)';
+      status.innerHTML='✓ Live on the site header — <a href="/" target="_blank" rel="noopener" style="color:var(--amber-2);font-weight:700">open homepage</a> to check.';
+    }
+  }catch(e){
+    if(status){status.style.color='var(--amber-2)';status.textContent='⚠ '+(e&&e.message?e.message:'Publish failed');}
+  }
+}
 /* icon popup picker */
 function openMenuIcon(mi,ci,ii){var cur=STATE.site.menu[mi].cols[ci].items[ii].icon||'solar';var mb=document.getElementById('modalbox');mb.className='modalbox';
  mb.innerHTML='<button class="close" onclick="closeModal()">×</button><h2>Choose an icon</h2><input id="iconsearch" placeholder="Search icons…" style="width:100%;padding:.55rem;border:1px solid var(--line);border-radius:3px;margin:10px 0" oninput="filterIconModal(this.value)"><div class="iconpick" id="iconmodalgrid" style="grid-template-columns:repeat(8,1fr)">'+ICONKEYS.map(function(k){return '<button data-k="'+k+'" class="'+(k===cur?'on':'')+'" title="'+k+'" onclick="pickMenuIcon('+mi+','+ci+','+ii+',\''+k+'\')">'+icon(k,18)+'</button>'}).join('')+'</div>';
@@ -1774,7 +1869,7 @@ function renderMega(){var el=document.getElementById('megaedit');if(!el)return;v
    '<div class="fld"><label>Label</label><input value="'+esc(sel.label)+'" onchange="STATE.site.menu['+MEGA_PI+'].label=this.value;renderMega();save()"></div>'+
    '<label class="chk"><input type="checkbox" '+(mega?'checked':'')+' onchange="toggleMega('+MEGA_PI+',this.checked)"> Enable mega menu (columns, links &amp; featured panel)</label>';
  if(!mega){
-   ed+='<div class="fld"><label>This item links directly to (URL path or page slug)</label><div style="display:flex;gap:8px"><input style="flex:1" value="'+esc(sel.href||sel.page||'')+'" placeholder="e.g. /#faq or /commercial-funding" onchange="setTopPage('+MEGA_PI+',this.value)"><select style="width:200px" onchange="setTopPage('+MEGA_PI+',this.value)">'+pageOpts(sel.page||sel.href||'')+'</select></div></div>';
+   ed+='<div class="fld"><label>This item links directly to</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input style="flex:1;min-width:160px" value="'+esc(sel.href||sel.page||'')+'" placeholder="e.g. /solar-estimator" onchange="setTopPage('+MEGA_PI+',this.value)"><select style="min-width:200px" onchange="setTopPage('+MEGA_PI+',this.value)">'+linkOpts(sel.page||sel.href||'')+'</select></div><div class="hint" style="font-size:.75rem;margin-top:4px">Pick <b>Estimator (/solar-estimator)</b> from the list, or type any path. Leave mega menu unchecked for a simple nav link.</div></div>';
  } else {
    ed+='<div class="fld"><label>Featured panel — background</label><div class="seg"><button class="'+(feat.bg!=='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'dark\')">Dark texture</button><button class="'+(feat.bg==='light'?'on':'')+'" onclick="setFeatBg('+MEGA_PI+',\'light\')">Light texture</button></div><div class="hint" style="font-size:.75rem;margin-top:4px">Uses the brand card-fill background we designed — grid + warm glow, in dark or light.</div></div>'+
      '<div class="fld"><label>Or a custom photo (optional — overrides the texture)</label>'+menuFeatImgs(feat)+'</div>'+
@@ -1793,16 +1888,21 @@ function renderMega(){var el=document.getElementById('megaedit');if(!el)return;v
          '<span class="mm-grip" draggable="true" ondragstart="mDragStart(\'item\','+MEGA_PI+','+ci+','+ii+')" ondragend="mDragEnd()" title="Drag to reorder">⋮⋮</span>'+
          '<button class="icp" title="Click to choose an icon" onclick="openMenuIcon('+MEGA_PI+','+ci+','+ii+')">'+icon(it.icon||'solar',18)+'</button>'+
          '<input value="'+esc(it.label)+'" placeholder="Label" onchange="setMenuLabel('+MEGA_PI+','+ci+','+ii+',this.value)">'+
-         '<select onchange="setMenuPage('+MEGA_PI+','+ci+','+ii+',this.value)">'+pageOpts(it.page||'')+'</select>'+
+         '<select onchange="setMenuPage('+MEGA_PI+','+ci+','+ii+',this.value)">'+pageOpts(it.page||it.href||'')+'</select>'+
          '<button class="rm" onclick="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].items.splice('+ii+',1);renderMega();save()">×</button></div>'+
          '<div style="margin:0 0 10px 26px"><input placeholder="Excerpt (optional — shows under the label)" value="'+esc(it.desc||'')+'" onchange="setMenuDesc('+MEGA_PI+','+ci+','+ii+',this.value)" style="width:100%;font-size:.78rem;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper)"></div>';
      });
      ed+='<button class="miniadd" onclick="STATE.site.menu['+MEGA_PI+'].cols['+ci+'].items.push({icon:\'solar\',label:\'New link\',page:\'\'});renderMega();save()">+ Add link</button></div>';
    });
  }
- ed+='<div class="dash-actions">'+(mega?'<button class="dact" onclick="STATE.site.menu['+MEGA_PI+'].cols.push({ey:\'New column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]});renderMega();save()"><b>+ Add column</b><span>to this item</span></button>':'')+'<button class="dact" onclick="STATE.site.menu.push({label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]});selectMegaTab(STATE.site.menu.length-1);save()"><b>+ Add top-level item</b><span>new nav entry</span></button></div>';
+ ed+='<div class="dash-actions">'+(mega?'<button class="dact" onclick="STATE.site.menu['+MEGA_PI+'].cols.push({ey:\'New column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]});renderMega();save()"><b>+ Add column</b><span>to this item</span></button>':'')
+   +'<button class="dact" onclick="addNavPreset(\'estimator\')"><b>+ Estimator</b><span>links to /solar-estimator</span></button>'
+   +'<button class="dact" onclick="addNavPreset(\'funding\')"><b>+ Funding</b><span>links to /commercial-funding</span></button>'
+   +'<button class="dact" onclick="addNavPreset(\'faqs\')"><b>+ FAQs</b><span>links to /#faq</span></button>'
+   +'<button class="dact" onclick="addNavPreset(\'contact\')"><b>+ Contact</b><span>links to /#quote</span></button>'
+   +'<button class="dact" onclick="STATE.site.menu.push({label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]});selectMegaTab(STATE.site.menu.length-1);save()"><b>+ Add top-level item</b><span>new nav entry / mega panel</span></button></div>';
 
- el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1><p>Design your navigation — drag to reorder, click an icon to change it, toggle the mega panel per item, choose the featured background, and link each item to a page.</p></div></div>'+preview+ed+'</div>';
+ el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1><p>This is the top navigation on the live site (the Solar &amp; Battery / Business / Funding / Estimator bar). Add a direct link like <b>Estimator</b> below, or enable a mega panel. Then use the top <b>Publish</b> button to update the header.</p></div></div>'+preview+ed+'</div>';
 }
 
 boot();
@@ -2014,6 +2114,8 @@ w.pvLeaveZone = pvLeaveZone;
 w.setFeatImg = setFeatImg;
 w.clearFeatImg = clearFeatImg;
 w.setFeatBg = setFeatBg;
+w.publishMegaMenu = publishMegaMenu;
+w.addNavPreset = addNavPreset;
 w.featOf = featOf;
 w.logoFileAdd = logoFileAdd;
 w.page = page;

@@ -118,18 +118,22 @@ const DEFAULT_MENU: MenuTop[] = [
 ];
 
 export default function Header({ menu }: { menu?: MenuTop[] }) {
-  const rawMenu = menu && menu.length ? menu : DEFAULT_MENU;
+  const fromCms = Boolean(menu && menu.length);
+  const rawMenu = fromCms ? menu! : DEFAULT_MENU;
   const MENU = rawMenu.map((t) => {
     if (t.label === 'Residential') return { ...t, label: 'Solar & Battery' };
     if (t.label === 'Commercial') return { ...t, label: 'Business' };
     return t;
   });
 
-  const hasLabel = (lbl: string) => MENU.some((it) => it.label.toLowerCase() === lbl.toLowerCase());
-  if (!hasLabel('funding')) MENU.push({ label: 'Funding', href: '/commercial-funding' });
-  if (!hasLabel('estimator')) MENU.push({ label: 'Estimator', href: '/solar-estimator' });
-  if (!hasLabel('faqs') && !hasLabel('faq')) MENU.push({ label: 'FAQs', href: '/#faq' });
-  if (!hasLabel('contact')) MENU.push({ label: 'Contact', href: '/#quote' });
+  // Only pad missing essentials when using the built-in default — CMS menus are shown as edited.
+  if (!fromCms) {
+    const hasLabel = (lbl: string) => MENU.some((it) => it.label.toLowerCase() === lbl.toLowerCase());
+    if (!hasLabel('funding')) MENU.push({ label: 'Funding', href: '/commercial-funding' });
+    if (!hasLabel('estimator')) MENU.push({ label: 'Estimator', href: '/solar-estimator' });
+    if (!hasLabel('faqs') && !hasLabel('faq')) MENU.push({ label: 'FAQs', href: '/#faq' });
+    if (!hasLabel('contact')) MENU.push({ label: 'Contact', href: '/#quote' });
+  }
   const [open, setOpen] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpand, setMobileExpand] = useState<number | null>(null);

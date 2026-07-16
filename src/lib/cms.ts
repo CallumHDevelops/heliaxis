@@ -2,12 +2,23 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { MenuCol, MenuFeatured, MenuTop } from '@/lib/menu-types';
 
-// The CMS publishes its whole document (incl. site.menu) under this key.
+// Published snapshot is preferred; draft is a fallback so a fresh install still
+// shows the menu after Save (before the first Publish).
 const PUBLISHED_KEY = 'heliaxis-cms-published';
+const DRAFT_KEY = 'heliaxis-cms-v1';
 
 function href(slug?: string): string {
   const s = (slug || '').trim();
-  return s || '#';
+  if (!s) return '#';
+  if (
+    s.startsWith('#') ||
+    s.startsWith('/') ||
+    s.startsWith('http://') ||
+    s.startsWith('https://')
+  ) {
+    return s;
+  }
+  return '/' + s;
 }
 
 /* Map one raw CMS menu top-item → the shape the Header renders. */
@@ -47,26 +58,31 @@ function mapTop(m: Record<string, unknown>): MenuTop {
   return { label, cols: mappedCols, featured };
 }
 
+function menuFromKvValue(raw: unknown): MenuTop[] | null {
+  if (raw == null) return null;
+  try {
+    const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const menu = (state as { site?: { menu?: unknown } })?.site?.menu;
+    if (!Array.isArray(menu) || menu.length === 0) return null;
+    return menu.map((m) => mapTop(m as Record<string, unknown>));
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Load the published mega-menu from Supabase, mapped to the Header's shape.
- * Returns null on any problem (no env, no published doc, parse error) so the
- * Header falls back to its built-in default menu.
+ * Load the mega-menu for the public Header from Supabase.
+ * Prefers the published CMS doc; falls back to the draft if nothing is published yet.
  */
 export async function getPublishedMenu(): Promise<MenuTop[] | null> {
   try {
     const admin = createAdminClient();
-    const { data } = await admin
-      .from('cms_kv')
-      .select('value')
-      .eq('key', PUBLISHED_KEY)
-      .maybeSingle();
-    if (!data?.value) return null;
-
-    const state = JSON.parse(data.value as string);
-    const menu = state?.site?.menu;
-    if (!Array.isArray(menu) || menu.length === 0) return null;
-
-    return menu.map(mapTop);
+    for (const key of [PUBLISHED_KEY, DRAFT_KEY]) {
+      const { data } = await admin.from('cms_kv').select('value').eq('key', key).maybeSingle();
+      const mapped = menuFromKvValue(data?.value);
+      if (mapped?.length) return mapped;
+    }
+    return null;
   } catch {
     return null;
   }

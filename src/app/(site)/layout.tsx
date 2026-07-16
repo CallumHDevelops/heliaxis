@@ -3,7 +3,8 @@ import './site.css';
 import Header from '@/components/site/Header';
 import { getPublishedMenu } from '@/lib/cms';
 
-export const revalidate = 60;
+/** Menu comes from CMS — keep layout fresh after Publish from /admin/mega. */
+export const dynamic = 'force-dynamic';
 
 export default async function SiteLayout({ children }: { children: ReactNode }) {
   const menu = await getPublishedMenu();
@@ -14,4 +15,3 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
     </div>
   );
 }
-
