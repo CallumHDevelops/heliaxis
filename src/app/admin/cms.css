@@ -297,6 +297,8 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-hero .pv-eyebrow{color:var(--solar)}
 .pv-hero.light .pv-eyebrow{color:var(--amber-2)}
 .pv-hero h1{font-family:var(--display);font-size:clamp(2.2rem,4.6vw,3.45rem);font-weight:700;font-synthesis:none;-webkit-font-smoothing:antialiased;margin-top:14px;letter-spacing:-.025em;line-height:1;max-width:none;color:inherit}
+.pv-hero h1 .y,.pv-sec h2 .y,.pv-sec h3 .y,.pv-cta h2 .y,.pv-splitcard h3 .y,.pv-media h2 .y,.pv-quote-head h2 .y,.pv-banner .bh .y{color:var(--solar)}
+.pv-hero.light h1 .y{color:var(--amber-2)}
 .pv-hero.wide h1{font-size:clamp(2.25rem,4.9vw,3.6rem);letter-spacing:-.03em}
 .pv-hero .pv-sub{margin-top:18px;font-size:1.16rem;opacity:.9;line-height:1.55;max-width:44ch;color:#E9E3D4}
 .pv-hero.light .pv-sub{color:var(--muted)}

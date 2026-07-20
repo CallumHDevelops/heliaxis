@@ -3,6 +3,8 @@
  * Covers AI blog template blocks + common extras so schedule can run without opening the editor.
  */
 
+import { accentText } from '@/lib/cms-accent-text';
+
 type LooseBlock = { id?: string; t?: string; p?: Record<string, unknown> };
 
 const SPARK =
@@ -152,7 +154,7 @@ function renderBlock(b: LooseBlock): string {
       `<div class="pv-hero${p.dark ? '' : ' light'}${p.textWide ? ' wide' : ''}"><div class="z">` +
       heroTags(p.tags) +
       eyebrow(p.eyebrow) +
-      `<h1>${esc(p.headline)}</h1>${sub}${btnrow}</div></div>`
+      `<h1>${accentText(p.headline)}</h1>${sub}${btnrow}</div></div>`
     );
   }
 
@@ -168,7 +170,7 @@ function renderBlock(b: LooseBlock): string {
       : '1fr 1fr';
     const tx =
       `<div>${eyebrow(p.eyebrow)}` +
-      `<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px">${esc(p.title)}</h2>` +
+      `<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px">${accentText(p.title)}</h2>` +
       `<p style="color:var(--muted);margin-top:12px;line-height:1.6">${esc(p.text)}</p>` +
       (ctaBtn ? `<div class="pv-btnrow">${ctaBtn}</div>` : '') +
       '</div>';
@@ -181,7 +183,7 @@ function renderBlock(b: LooseBlock): string {
 
   if (t === 'cta') {
     return (
-      `<div class="pv-cta"><div class="z"><h2>${esc(p.headline)}</h2><p>${esc(p.sub)}</p>` +
+      `<div class="pv-cta"><div class="z"><h2>${accentText(p.headline)}</h2><p>${esc(p.sub)}</p>` +
       (p.ctaDisabled
         ? ''
         : `<div class="pv-btnrow" style="justify-content:center">${btn(p.btn, 'solar', !!p.pulse, p.btnHref || '#quote')}</div>`) +
@@ -194,9 +196,9 @@ function renderBlock(b: LooseBlock): string {
     const rb = asStringArray(p.rb);
     return (
       '<div class="pv-split"><div class="pv-splitcard">' +
-      `<h3>${esc(p.lt)}</h3><p>${esc(p.ld)}</p><ul>${lb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.lc, 'dark', false, p.lcHref || '#quote')}` +
+      `<h3>${accentText(p.lt)}</h3><p>${esc(p.ld)}</p><ul>${lb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.lc, 'dark', false, p.lcHref || '#quote')}` +
       '</div><div class="pv-splitcard dark">' +
-      `<h3>${esc(p.rt)}</h3><p>${esc(p.rd)}</p><ul>${rb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.rc, 'solar', false, p.rcHref || '/commercial-funding')}` +
+      `<h3>${accentText(p.rt)}</h3><p>${esc(p.rd)}</p><ul>${rb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.rc, 'solar', false, p.rcHref || '/commercial-funding')}` +
       '</div></div>'
     );
   }
@@ -258,7 +260,7 @@ function renderBlock(b: LooseBlock): string {
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
     return (
       '<div class="pv-quote" id="quote"><div class="pv-quote-inner"><form class="pv-formcard pv-cms-form" action="/api/quote" method="post" novalidate>' +
-      `<div class="pv-quote-head"><h2>${esc(p.heading)}</h2><p>${esc(p.sub)}</p></div>${rows}` +
+      `<div class="pv-quote-head"><h2>${accentText(p.heading)}</h2><p>${esc(p.sub)}</p></div>${rows}` +
       `<div class="pv-form-msg" hidden></div><div class="pv-form-actions">${cta}</div>` +
       '<p class="pv-form-note">By submitting this form, you agree to our privacy policy and terms of service.</p></form></div></div>'
     );
