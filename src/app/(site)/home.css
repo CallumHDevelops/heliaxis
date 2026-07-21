@@ -251,3 +251,11 @@ footer .base{margin-top:34px;padding-top:20px;border-top:1px solid var(--line-d)
   .reveal{opacity:1;transform:none}
   .btn-solar::after{display:none}
 }
+
+/* trust bar */
+.trustbar{background:var(--paper-2);border-bottom:1px solid var(--line)}
+.trustbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 24px;flex-wrap:wrap;max-width:var(--pv-max);margin:0 auto}
+.trustbar .acc{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.trustbar .ac{font-family:var(--display);font-weight:800;font-size:.82rem;letter-spacing:.02em;color:var(--ink);opacity:.62}
+.trustbar .rev{font-size:.88rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+.trustbar .stars{color:var(--amber-2)}

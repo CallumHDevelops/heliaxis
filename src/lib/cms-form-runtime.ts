@@ -30,6 +30,13 @@ function collectSector(form: HTMLFormElement): string {
   return on?.dataset.value || on?.textContent?.trim() || '';
 }
 
+function collectPropertyType(form: HTMLFormElement): string {
+  const segBtn = form.querySelector('.pv-seg button.on') as HTMLElement | null;
+  if (segBtn) return segBtn.dataset.value || 'home';
+  const hidden = form.querySelector('input[name="propertyType"]') as HTMLInputElement | null;
+  return hidden?.value || '';
+}
+
 async function submitCmsForm(form: HTMLFormElement) {
   const fd = new FormData(form);
   const name = String(fd.get('name') || '').trim();
@@ -38,8 +45,10 @@ async function submitCmsForm(form: HTMLFormElement) {
   const postcode = String(fd.get('postcode') || '').trim();
   const organization = String(fd.get('organization') || '').trim();
   const message = String(fd.get('message') || '').trim();
+  const interestField = String(fd.get('interest') || '').trim();
   const sector = collectSector(form);
   const interests = collectInterests(form);
+  const propertyType = collectPropertyType(form);
 
   if (!name) {
     setMsg(form, 'Please enter your name.', false);
@@ -81,12 +90,12 @@ async function submitCmsForm(form: HTMLFormElement) {
         message,
         sector,
         interests,
-        interest: interests.join(', '),
-        propertyType: sector.toLowerCase().includes('residential')
+        interest: interestField || interests.join(', ') || message,
+        propertyType: propertyType || (sector.toLowerCase().includes('residential')
           ? 'home'
           : sector
             ? 'business'
-            : '',
+            : ''),
         source: 'cms-form',
       }),
     });
@@ -117,6 +126,15 @@ async function submitCmsForm(form: HTMLFormElement) {
 function onDocClick(e: Event) {
   const t = e.target as HTMLElement | null;
   if (!t) return;
+  const segBtn = t.closest('.pv-seg button') as HTMLButtonElement | null;
+  if (segBtn && closestForm(segBtn)) {
+    e.preventDefault();
+    e.stopPropagation();
+    const group = segBtn.closest('.pv-seg');
+    group?.querySelectorAll('button.on').forEach((el) => el.classList.remove('on'));
+    segBtn.classList.add('on');
+    return;
+  }
   const tile = t.closest('.pv-tile') as HTMLElement | null;
   if (!tile || !closestForm(tile)) return;
   e.preventDefault();
@@ -160,8 +178,10 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
   }
   function interests(form){return Array.prototype.map.call(form.querySelectorAll('.pv-tiles-interest .pv-tile.on'),function(el){return el.getAttribute('data-value')||(el.textContent||'').trim();}).filter(Boolean);}
   function sector(form){var on=form.querySelector('.pv-tiles-sector .pv-tile.on');return on?(on.getAttribute('data-value')||(on.textContent||'').trim()):'';}
+  function propType(form){var on=form.querySelector('.pv-seg button.on');if(on)return on.getAttribute('data-value')||'home';var h=form.querySelector('input[name="propertyType"]');return h?h.value:'';}
   document.addEventListener('click',function(e){
     var t=e.target;if(!t||!t.closest)return;
+    var segBtn=t.closest('.pv-seg button');if(segBtn&&closestForm(segBtn)){e.preventDefault();e.stopPropagation();var g=segBtn.closest('.pv-seg');if(g)g.querySelectorAll('button.on').forEach(function(el){el.classList.remove('on');});segBtn.classList.add('on');return;}
     var tile=t.closest('.pv-tile');if(!tile||!closestForm(tile))return;
     e.preventDefault();e.stopPropagation();
     var group=tile.closest('.pv-tiles');if(!group)return;
@@ -178,7 +198,8 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
     var postcode=String(fd.get('postcode')||'').trim();
     var organization=String(fd.get('organization')||'').trim();
     var message=String(fd.get('message')||'').trim();
-    var sec=sector(form);var ints=interests(form);
+    var interestField=String(fd.get('interest')||'').trim();
+    var sec=sector(form);var ints=interests(form);var ptype=propType(form);
     if(!name){setMsg(form,'Please enter your name.',false);return;}
     if(!email||email.indexOf('@')<1){setMsg(form,'Please enter a valid email.',false);return;}
     if(form.querySelector('.pv-tiles-sector')&&!sec){setMsg(form,'Please select your sector.',false);return;}
@@ -189,7 +210,7 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
     setMsg(form,'',true);
     fetch('/api/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name:name,email:email,phone:phone,postcode:postcode,organization:organization,message:message,sector:sec,interests:ints,
-      interest:ints.join(', '),propertyType:/residential/i.test(sec)?'home':(sec?'business':''),source:'cms-form'
+      interest:interestField||ints.join(', ')||message,propertyType:ptype||(/residential/i.test(sec)?'home':(sec?'business':'')),source:'cms-form'
     })}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});}).then(function(x){
       if(x.ok&&x.d.success){setMsg(form,x.d.message||"Thank you — we've received your enquiry and will be in touch shortly.",true);form.reset();form.querySelectorAll('.pv-tile.on').forEach(function(el){el.classList.remove('on');});if(btn)btn.style.display='none';}
       else{setMsg(form,(x.d&&x.d.error)||'Something went wrong. Please try again.',false);if(btn){btn.removeAttribute('aria-disabled');btn.classList.remove('busy');var lab2=btn.querySelector('[data-btn-label]')||btn;lab2.textContent=(prev||'Send Enquiry').replace(/Sending…/,'').trim()||'Send Enquiry';}}
@@ -198,4 +219,61 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
       if(btn){btn.removeAttribute('aria-disabled');btn.classList.remove('busy');var lab3=btn.querySelector('[data-btn-label]')||btn;lab3.textContent=(prev||'Send Enquiry').replace(/Sending…/,'').trim()||'Send Enquiry';}
     });
   },true);
+})();`;
+
+/** Idempotent accordion binding for `.pv-faq .qa2`. */
+export function initPvFaq(root?: ParentNode | Document | null) {
+  if (typeof document === 'undefined') return;
+  const scope = root ?? document;
+  scope.querySelectorAll<HTMLElement>('.pv-faq .qa2').forEach((qa) => {
+    if (qa.dataset.faqBound) return;
+    qa.dataset.faqBound = '1';
+    const q = qa.querySelector<HTMLButtonElement>('.q');
+    const a = qa.querySelector<HTMLElement>('.a');
+    if (!q || !a) return;
+    if (qa.classList.contains('open')) a.style.maxHeight = `${a.scrollHeight}px`;
+    q.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('[contenteditable="true"]')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const faq = qa.closest('.pv-faq');
+      if (faq?.classList.contains('is-edit')) return;
+      const open = qa.classList.toggle('open');
+      faq?.querySelectorAll<HTMLElement>('.qa2.open').forEach((o) => {
+        if (o === qa) return;
+        o.classList.remove('open');
+        const ao = o.querySelector<HTMLElement>('.a');
+        if (ao) ao.style.maxHeight = '';
+      });
+      a.style.maxHeight = open ? `${a.scrollHeight}px` : '';
+    });
+  });
+}
+
+/** Inline script body for static HTML previews / exports. */
+export const CMS_FAQ_RUNTIME_SCRIPT = `(function(){
+  function bindFaq(root){
+    (root||document).querySelectorAll('.pv-faq .qa2').forEach(function(qa){
+      if(qa.dataset.faqBound)return;
+      qa.dataset.faqBound='1';
+      var q=qa.querySelector('.q'),a=qa.querySelector('.a');
+      if(!q||!a)return;
+      if(qa.classList.contains('open'))a.style.maxHeight=a.scrollHeight+'px';
+      q.addEventListener('click',function(e){
+        if(e.target&&e.target.closest&&e.target.closest('[contenteditable="true"]'))return;
+        e.preventDefault();e.stopPropagation();
+        var faq=qa.closest('.pv-faq');
+        if(faq&&faq.classList.contains('is-edit'))return;
+        var open=qa.classList.toggle('open');
+        if(faq)faq.querySelectorAll('.qa2.open').forEach(function(o){
+          if(o!==qa){o.classList.remove('open');var ao=o.querySelector('.a');if(ao)ao.style.maxHeight=null;}
+        });
+        a.style.maxHeight=open?a.scrollHeight+'px':null;
+      });
+    });
+  }
+  window.initPvFaq=function(root){bindFaq(root);};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){bindFaq();});
+  else bindFaq();
 })();`;
