@@ -675,6 +675,10 @@ button.pv-seg{font:inherit}
   .hero .wrap{grid-template-columns:1fr}
   .hero .hero-mark{display:none}
 }
+/* CMS editor: "Desktop" preview is often <960px wide — keep hero layout matching the live site */
+.preview:not(.mob) .hero .wrap{grid-template-columns:1.15fr .85fr}
+.preview:not(.mob) .hero .hero-mark{display:grid}
+.preview:not(.mob) .pv-footer .cols{grid-template-columns:1.5fr 1fr 1fr 1fr}
 
 /* --- Site footer block --- */
 .pv-footer{background:var(--ink-2);color:var(--muted-d);padding:56px 0 30px;font-size:.9rem;width:100%}
