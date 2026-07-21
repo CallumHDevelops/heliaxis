@@ -49,6 +49,20 @@ export async function POST(req: Request) {
   revalidatePath('/blog', 'layout');
   revalidatePath('/solar-estimator');
 
+  try {
+    const pages = body?.rendered?.pages;
+    if (Array.isArray(pages)) {
+      for (const pg of pages) {
+        const slug = String(pg?.slug || '').trim();
+        if (!slug || slug === '/') continue;
+        const path = slug.startsWith('/') ? slug : `/${slug}`;
+        revalidatePath(path);
+      }
+    }
+  } catch {
+    /* non-fatal */
+  }
+
   return NextResponse.json({
     ok: true,
     menuCount: (() => {

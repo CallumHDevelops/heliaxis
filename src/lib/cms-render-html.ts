@@ -169,7 +169,7 @@ function asStringArray(v: unknown): string[] {
 
 function renderBlock(b: LooseBlock): string {
   const p = (b.p || {}) as Record<string, unknown>;
-  const t = String(b.t || '');
+  const t = String(b.t || '').trim().toLowerCase();
 
   if (t === 'hero') {
     const wide = !!p.textWide;

@@ -268,6 +268,7 @@ async function boot(){
   if(ensureHomeFooter())save();
   if(ensureFooterCustomize())save();
   if(ensureGridAnchor())save();
+  if(ensureBlockTypesLowercase())save();
   var slug=CMS_INITIAL_SLUG||getSlugFromPath();
   CMS_INITIAL_SLUG=null;
   // Capture before syncCmsUrl strips ?cmsAction=…
@@ -413,9 +414,13 @@ function heroTags(tags){
   if(!list.length)return '';
   return '<div class="pv-hero-tags">'+list.map(function(t){return '<span class="pv-hero-tag">'+esc(t)+'</span>'}).join('<span class="pv-hero-tag-sep" aria-hidden="true">|</span>')+'</div>';
 }
+const BLOCKNAMES={hero:'Hero',trustbar:'Trust bar',estband:'Estimator band',stats:'Stat bar',grid:'Grid section',split:'Home / Business',media:'Image + text',pricing:'Pricing plans',funding:'Funding & finance',steps:'Process steps',casestudy:'Case-study cards',gallery:'Install gallery',clientbanner:'Client banner',testi:'Testimonials',banner:'Brand banner',form:'Quote form',cta:'CTA band',footer:'Site footer',faq:'FAQ',rich:'Rich text'};
+function blockTypeKey(t){return String(t||'').trim().toLowerCase();}
+function blockDisplayName(t){var k=blockTypeKey(t);return BLOCKNAMES[k]||k||'Section';}
 function renderBlock(b,edit){
+ const t=blockTypeKey(b.t);
  const p=b.p;const id=b.id;
- if(b.t==='hero'){
+ if(t==='hero'){
    var wide=!!p.textWide;
    var hideMark=wide||!!p.hideMark;
    var sub=(p.sub&&String(p.sub).trim())?'<p class="lead"'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p>':'';
@@ -439,18 +444,18 @@ function renderBlock(b,edit){
    var wrapCls='wrap'+(hideMark?' is-single':'');
    return '<section class="'+heroCls+'" id="top"><div class="glow"></div>'+sunHtml+'<div class="'+wrapCls+'"><div class="hero-copy">'+heroTags(p.tags)+eyebrowHtml+'<h1>'+accentText(p.headline)+'</h1>'+sub+btnrow+mthtml+rthtml+'</div>'+markHtml+'</div></section>';
  }
- if(b.t==='stats')return '<div class="pv-stats" style="grid-template-columns:repeat('+(p.items.length)+',1fr)">'+p.items.map((s,i)=>'<div class="pv-stat"><div class="n"'+ce(id+'.items.'+i+'.n',edit)+'>'+esc(s.n)+'</div><div class="k"'+ce(id+'.items.'+i+'.k',edit)+'>'+esc(s.k)+'</div></div>').join('')+'</div>';
- if(b.t==='grid'){const gc=(it,i)=>'<div class="pv-card"><span class="ic">'+icon(it.icon)+'</span><h3>'+accentText(it.title)+'</h3><p'+ce(id+'.items.'+i+'.desc',edit)+'>'+esc(it.desc)+'</p></div>';
+ if(t==='stats')return '<div class="pv-stats" style="grid-template-columns:repeat('+(p.items.length)+',1fr)">'+p.items.map((s,i)=>'<div class="pv-stat"><div class="n"'+ce(id+'.items.'+i+'.n',edit)+'>'+esc(s.n)+'</div><div class="k"'+ce(id+'.items.'+i+'.k',edit)+'>'+esc(s.k)+'</div></div>').join('')+'</div>';
+ if(t==='grid'){const gc=(it,i)=>'<div class="pv-card"><span class="ic">'+icon(it.icon)+'</span><h3>'+accentText(it.title)+'</h3><p'+ce(id+'.items.'+i+'.desc',edit)+'>'+esc(it.desc)+'</p></div>';
    let inner;
    if(p.fill==='balance'){inner='<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px">'+p.items.map((it,i)=>'<div class="pv-card" style="flex:0 1 calc('+(100/p.cols)+'% - 14px);min-width:220px"><span class="ic">'+icon(it.icon)+'</span><h3>'+accentText(it.title)+'</h3><p'+ce(id+'.items.'+i+'.desc',edit)+'>'+esc(it.desc)+'</p></div>').join('')+'</div>';}
    else{let extra='';const rem=p.items.length%p.cols;if(rem!==0&&p.fill==='contact'){const gap=p.cols-rem;extra='<div class="pv-card pv-contact" style="grid-column:span '+gap+'"><h3'+ce(id+'.contactHeading',edit)+'>'+accentText(p.contactHeading||'Get in touch')+'</h3><p'+ce(id+'.contactText',edit)+'>'+esc(p.contactText||'Not sure which option fits? Tell us your setup and we\'ll point you the right way.')+'</p>'+btn(p.contactBtn||'Contact us','solar',false,null,id+'.contactBtn',edit,p.contactHref||'#quote')+'</div>';}inner='<div class="pv-grid" style="grid-template-columns:repeat('+p.cols+',1fr)">'+p.items.map(gc).join('')+extra+'</div>';}
    return '<div class="pv-sec"'+sectionAnchorId(p.anchor)+'><div class="shead'+(p.centerHeader?' center':'')+'">'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2>'+accentText(p.title)+'</h2></div>'+inner+'</div>';}
- if(b.t==='split'){
+ if(t==='split'){
     const lIc = p.lIcon ? '<div class="pv-sc-ic">'+icon(p.lIcon)+'</div>' : '';
     const rIc = p.rIcon ? '<div class="pv-sc-ic dark">'+icon(p.rIcon)+'</div>' : '';
     return '<div class="pv-split"><div class="pv-splitcard">'+lIc+'<h3>'+accentText(p.lt)+'</h3><p'+ce(id+'.ld',edit)+'>'+esc(p.ld)+'</p><ul>'+p.lb.map((x,i)=>'<li'+ce(id+'.lb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.lc,'dark',false,null,id+'.lc',edit,p.lcHref||'#quote')+'</div><div class="pv-splitcard dark">'+rIc+'<h3>'+accentText(p.rt)+'</h3><p'+ce(id+'.rd',edit)+'>'+esc(p.rd)+'</p><ul>'+p.rb.map((x,i)=>'<li'+ce(id+'.rb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.rc,'solar',false,null,id+'.rc',edit,p.rcHref||'/commercial-funding')+'</div></div>';
   }
- if(b.t==='testi'){
+ if(t==='testi'){
    var teb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Real customers';
    var ttl=p.title||'Trusted across South Wales';
    var fn=p.footnote===''?null:(p.footnote||'Illustrative testimonials — replace with your real Google & Trustpilot reviews.');
@@ -461,7 +466,7 @@ function renderBlock(b,edit){
    else{body='<div class="tgrid">'+cards.join('')+'</div>';}
    var fnHtml=fn?'<p class="pv-testi-note"'+ce(id+'.footnote',edit)+'>'+esc(fn)+'</p>':'';
    return '<div class="pv-testi"><div class="wrap"><div class="shead center">'+eyebrow(teb,id+'.eyebrow',edit)+'<h2>'+accentText(ttl)+'</h2></div>'+body+fnHtml+'</div></div>';}
- if(b.t==='gallery'){
+ if(t==='gallery'){
    var geb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Recent work';
    var gtl=(p.title!=null&&String(p.title).trim()!=='')?p.title:'Installs across South Wales';
    var gsub=p.sub===''?null:(p.sub!=null&&String(p.sub).trim()!==''?p.sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.');
@@ -473,7 +478,7 @@ function renderBlock(b,edit){
    var subHtml=gsub?('<p'+ce(id+'.sub',edit)+'>'+esc(gsub)+'</p>'):'';
    var gfnHtml=gfn?('<p class="pv-gal-note"'+ce(id+'.footnote',edit)+'>'+esc(gfn)+'</p>'):'';
    return '<div class="pv-gallery"><div class="wrap"><div class="shead center">'+eyebrow(geb,id+'.eyebrow',edit)+'<h2>'+accentText(gtl)+'</h2>'+subHtml+'</div><div class="gallery">'+cards+'</div>'+gfnHtml+'</div></div>';}
- if(b.t==='funding'){
+ if(t==='funding'){
    var feb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Funding & finance';
    var ftl=(p.title!=null&&String(p.title).trim()!=='')?p.title:'Solar within reach, whatever your budget';
    var fsub=p.sub===''?null:(p.sub!=null&&String(p.sub).trim()!==''?p.sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.');
@@ -488,15 +493,15 @@ function renderBlock(b,edit){
      ctaHtml='<a class="pv-urgency" href="'+esc(p.ctaHref||'/commercial-funding')+'"'+(edit?' onclick="event.preventDefault()"':'')+'><span class="dot"></span><span'+ce(id+'.cta',edit)+'>'+esc(p.cta)+'</span></a>';
    }
    return '<div class="pv-funding"><div class="pv-funding-glow"></div><div class="wrap"><div class="shead">'+eyebrow(feb,id+'.eyebrow',edit,true)+'<h2>'+accentText(ftl)+'</h2>'+subHtml+'</div><div class="fgrid" style="grid-template-columns:repeat('+cols+',1fr)">'+cards+'</div>'+ctaHtml+'</div></div>';}
- if(b.t==='banner'){const ls=STATE.site.logos.filter(l=>l.bnr);const chip=l=>'<span class="pv-brand">'+(l.img?'<img src="'+l.img+'">':esc(l.name))+'</span>';
+ if(t==='banner'){const ls=STATE.site.logos.filter(l=>l.bnr);const chip=l=>'<span class="pv-brand">'+(l.img?'<img src="'+l.img+'">':esc(l.name))+'</span>';
    return '<div class="pv-banner"><div class="bh">'+accentText(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+ls.map(chip).join('')+ls.map(chip).join('')+'</div></div></div>';}
- if(b.t==='cta'){
+ if(t==='cta'){
    var btns='';
    if(!p.ctaDisabled)btns+=btn(p.btn,'solar',p.pulse,null,id+'.btn',edit,p.btnHref||'#quote');
    if(!p.cta2Disabled&&p.btn2&&String(p.btn2).trim())btns+=btn(p.btn2,'ghost on-dark',false,null,id+'.btn2',edit,p.btn2Href||'tel:01633965205',true);
    var row=btns?'<div class="pv-btnrow pv-cta-btns">'+btns+'</div>':'';
    return '<div class="pv-cta"><div class="pv-cta-glow"></div><div class="z"><h2>'+accentText(p.headline)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p>'+row+'</div></div>';}
- if(b.t==='footer'){
+ if(t==='footer'){
    var brand='';
    if(p.logoImg)brand='<img class="pv-footer-logo" src="'+esc(p.logoImg)+'" alt="'+esc(p.brandText||'Heliaxis')+'">';
    else brand='<p class="pv-footer-word"'+ce(id+'.brandText',edit)+'>'+esc(p.brandText||'Heliaxis')+'</p>';
@@ -504,7 +509,7 @@ function renderBlock(b,edit){
    var siteHref=p.siteHref||'https://heliaxis.co.uk';
    return '<footer class="pv-footer"><div class="wrap"><div class="cols"><div class="pv-footer-brand">'+brand+'<p class="pv-footer-about"'+ce(id+'.about',edit)+'>'+esc(p.about)+'</p></div>'+cols+'</div><div class="base"><span'+ce(id+'.copyright',edit)+'>'+esc(p.copyright)+'</span><a href="'+esc(siteHref)+'" class="pv-footer-url"'+(edit?' onclick="event.preventDefault()"':'')+'><span'+ce(id+'.siteUrl',edit)+'>'+esc(p.siteUrl||'heliaxis.co.uk')+'</span></a></div></div></footer>';
  }
- if(b.t==='faq'){
+ if(t==='faq'){
    var feb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Good to know';
    var ftl=(p.title!=null&&String(p.title).trim()!=='')?p.title:'Your questions, answered';
    var anchor=(p.anchor&&String(p.anchor).trim())?String(p.anchor).trim().replace(/[^a-zA-Z0-9_-]/g,''):'faq';
@@ -514,13 +519,13 @@ function renderBlock(b,edit){
      return '<div class="qa2'+(edit&&i===0?' open':'')+'"><button type="button" class="q"><span class="ix">Q/'+num+'</span><span'+ce(id+'.items.'+i+'.q',edit)+'>'+esc(q.q)+'</span><span class="tog"></span></button><div class="a"'+(edit&&i===0?' style="max-height:none"':'')+'><p'+ce(id+'.items.'+i+'.a',edit)+'>'+esc(q.a)+'</p></div></div>';
    }).join('');
    return '<div class="pv-faq'+(edit?' is-edit':'')+'" id="'+esc(anchor)+'"><div class="wrap"><div class="shead center">'+eyebrow(feb,id+'.eyebrow',edit)+'<h2>'+accentText(ftl)+'</h2></div><div class="faq">'+qa+'</div></div></div>';}
-if(b.t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img'):'<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
+if(t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img'):'<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
    const ctaBtn=p.ctaDisabled?'':btn(p.cta,'solar',false,null,id+'.cta',edit,p.ctaHref||'#quote');
    const cols=p.textWide?(p.side==='left'?'0.75fr 1.25fr':'1.25fr 0.75fr'):'1fr 1fr';
    const tx='<div>'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px">'+accentText(p.title)+'</h2><p style="color:var(--muted);margin-top:12px;line-height:1.6"'+ce(id+'.text',edit)+'>'+esc(p.text)+'</p>'+(ctaBtn?'<div class="pv-btnrow">'+ctaBtn+'</div>':'')+'</div>';
    const blogCls=isCmsBlogPage(page())?' is-blog':'';
    return '<div class="pv-media'+blogCls+'" style="display:grid;grid-template-columns:'+cols+';gap:34px;align-items:center">'+(p.side==='left'?im+tx:tx+im)+'</div>';}
- if(b.t==='form'){
+ if(t==='form'){
    if(formVariant(p)==='contact'){
    const fld=function(label,req,ph,type,name){
      const lab='<label for="pv-'+name+'">'+label+(req?' <span class="req">*</span>':'')+'</label>';
@@ -571,24 +576,23 @@ if(b.t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img'):'<div clas
    var why='<div class="pv-why">'+eyebrow(p.eyebrow||'Free, no-obligation quote',id+'.eyebrow',edit)+'<h2>'+accentText(p.title||'Ready to see what you could save?')+'</h2>'+pts+callBox+'</div>';
    var form='<form class="pv-qcard pv-cms-form" action="/api/quote" method="post" novalidate>'+seg+rows+'<div class="pv-form-msg" hidden></div><div class="pv-form-actions">'+cta+'</div>'+foot+legal+'</form>';
    return '<div class="pv-quote is-split" id="'+esc(anchor)+'"><div class="wrap"><div class="pv-qgrid">'+why+form+'</div></div></div>';}
-if(b.t==='pricing')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'Options',id+'.eyebrow',edit)+'<h2>'+accentText(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.plans.length+',1fr);gap:14px">'+p.plans.map((pl,i)=>'<div class="pv-card'+(pl.hl?' pv-plan-hl':'')+'"><div style="font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-2)"'+ce(id+'.plans.'+i+'.name',edit)+'>'+esc(pl.name)+'</div><div style="font-family:var(--display);font-weight:900;font-size:1.9rem;margin:6px 0"'+ce(id+'.plans.'+i+'.price',edit)+'>'+esc(pl.price)+'</div><div style="color:var(--muted);font-size:.8rem;margin-bottom:12px"'+ce(id+'.plans.'+i+'.per',edit)+'>'+esc(pl.per)+'</div>'+pl.feats.map((f,fi)=>'<div style="display:flex;gap:8px;padding:5px 0;font-size:.87rem;border-top:1px solid var(--line)"><span style="color:var(--ok)">✓</span><span'+ce(id+'.plans.'+i+'.feats.'+fi,edit)+'>'+esc(f)+'</span></div>').join('')+'<div style="margin-top:14px">'+btn(pl.cta,pl.hl?'solar':'dark ghost',false,null,id+'.plans.'+i+'.cta',edit,pl.ctaHref||'#quote')+'</div></div>').join('')+'</div></div>';
- if(b.t==='steps')return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'How it works',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(p.title)+'</h2></div><div class="pv-steps" style="grid-template-columns:repeat('+p.items.length+',1fr)">'+p.items.map((s,i)=>'<div class="pv-pstep"><div class="n">0'+(i+1)+'</div><h4'+ce(id+'.items.'+i+'.title',edit)+'>'+accentText(s.title)+'</h4><p'+ce(id+'.items.'+i+'.text',edit)+'>'+esc(s.text)+'</p></div>').join('')+'</div></div>';
- if(b.t==='casestudy')return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'Our work',id+'.eyebrow',edit)+'<h2>'+accentText(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+Math.min(p.items.length,3)+',1fr);gap:14px">'+p.items.map((cs,i)=>'<div class="pv-card" style="padding:0;overflow:hidden">'+(cs.img?imgTag(cs.img,'width:100%;height:150px;object-fit:cover;display:block',edit,id+'.items.'+i+'.img'):'<div style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b)"></div>')+'<div style="padding:18px"><div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)"'+ce(id+'.items.'+i+'.loc',edit)+'>'+esc(cs.loc)+'</div><h3 style="font-size:1.02rem;font-weight:600;margin-top:4px">'+accentText(cs.title)+'</h3><div style="font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:10px"'+ce(id+'.items.'+i+'.stat',edit)+'>'+esc(cs.stat)+'</div><div style="font-size:.76rem;color:var(--muted)"'+ce(id+'.items.'+i+'.statlabel',edit)+'>'+esc(cs.statlabel)+'</div></div></div>').join('')+'</div></div>';
- if(b.t==='clientbanner'){const cs=p.clients||[];const chip=c=>'<span class="pv-brand">'+(c.img?'<img src="'+c.img+'">':esc(c.name))+'</span>';return '<div class="pv-banner"><div class="bh">'+accentText(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+cs.map(chip).join('')+cs.map(chip).join('')+'</div></div></div>';}
- if(b.t==='trustbar'){
+if(t==='pricing')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'Options',id+'.eyebrow',edit)+'<h2>'+accentText(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.plans.length+',1fr);gap:14px">'+p.plans.map((pl,i)=>'<div class="pv-card'+(pl.hl?' pv-plan-hl':'')+'"><div style="font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-2)"'+ce(id+'.plans.'+i+'.name',edit)+'>'+esc(pl.name)+'</div><div style="font-family:var(--display);font-weight:900;font-size:1.9rem;margin:6px 0"'+ce(id+'.plans.'+i+'.price',edit)+'>'+esc(pl.price)+'</div><div style="color:var(--muted);font-size:.8rem;margin-bottom:12px"'+ce(id+'.plans.'+i+'.per',edit)+'>'+esc(pl.per)+'</div>'+pl.feats.map((f,fi)=>'<div style="display:flex;gap:8px;padding:5px 0;font-size:.87rem;border-top:1px solid var(--line)"><span style="color:var(--ok)">✓</span><span'+ce(id+'.plans.'+i+'.feats.'+fi,edit)+'>'+esc(f)+'</span></div>').join('')+'<div style="margin-top:14px">'+btn(pl.cta,pl.hl?'solar':'dark ghost',false,null,id+'.plans.'+i+'.cta',edit,pl.ctaHref||'#quote')+'</div></div>').join('')+'</div></div>';
+ if(t==='steps')return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'How it works',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(p.title)+'</h2></div><div class="pv-steps" style="grid-template-columns:repeat('+p.items.length+',1fr)">'+p.items.map((s,i)=>'<div class="pv-pstep"><div class="n">0'+(i+1)+'</div><h4'+ce(id+'.items.'+i+'.title',edit)+'>'+accentText(s.title)+'</h4><p'+ce(id+'.items.'+i+'.text',edit)+'>'+esc(s.text)+'</p></div>').join('')+'</div></div>';
+ if(t==='casestudy')return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'Our work',id+'.eyebrow',edit)+'<h2>'+accentText(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+Math.min(p.items.length,3)+',1fr);gap:14px">'+p.items.map((cs,i)=>'<div class="pv-card" style="padding:0;overflow:hidden">'+(cs.img?imgTag(cs.img,'width:100%;height:150px;object-fit:cover;display:block',edit,id+'.items.'+i+'.img'):'<div style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b)"></div>')+'<div style="padding:18px"><div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)"'+ce(id+'.items.'+i+'.loc',edit)+'>'+esc(cs.loc)+'</div><h3 style="font-size:1.02rem;font-weight:600;margin-top:4px">'+accentText(cs.title)+'</h3><div style="font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:10px"'+ce(id+'.items.'+i+'.stat',edit)+'>'+esc(cs.stat)+'</div><div style="font-size:.76rem;color:var(--muted)"'+ce(id+'.items.'+i+'.statlabel',edit)+'>'+esc(cs.statlabel)+'</div></div></div>').join('')+'</div></div>';
+ if(t==='clientbanner'){const cs=p.clients||[];const chip=c=>'<span class="pv-brand">'+(c.img?'<img src="'+c.img+'">':esc(c.name))+'</span>';return '<div class="pv-banner"><div class="bh">'+accentText(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+cs.map(chip).join('')+cs.map(chip).join('')+'</div></div></div>';}
+ if(t==='trustbar'){
     var logos = p.logos ? String(p.logos).split(',').map(function(l){return '<span class="ac"'+ce(id+'.logos',edit)+'>'+esc(l.trim())+'</span>'}).join('') : '';
     return '<div class="trustbar"><div class="wrap"><div class="acc">'+logos+'</div><div class="rev"><span class="stars">★★★★★</span> <span'+ce(id+'.rating',edit)+'>'+esc(p.rating||'')+'</span></div></div></div>';
 }
-if(b.t==='rich'){
+if(t==='rich'){
    var richCe=edit?' contenteditable="true" data-ep="'+id+'.html" data-html="1" oninput="epInput(this)" onblur="epBlur(this)" onkeydown="epKey(event,true)" onclick="richClick(event,this,\''+id+'\')"':'';
    return '<div class="pv-rich"'+richCe+'>'+(p.html||'<p>Rich text…</p>')+'</div>';
  }
- if(b.t==='estband'){
+ if(t==='estband'){
    return '<div class="pv-estband"><div class="pv-estband-inner"><div><h2'+ce(id+'.headline',edit)+'>'+accentText(p.headline)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p></div><div class="eb-btn">'+btn(p.btnLabel,'dark',false,null,id+'.btnLabel',edit,p.btnHref||'#quote')+'</div></div></div>';
  }
  return '';
 }
-const BLOCKNAMES={hero:'Hero',trustbar:'Trust bar',estband:'Estimator band',stats:'Stat bar',grid:'Grid section',split:'Home / Business',media:'Image + text',pricing:'Pricing plans',funding:'Funding & finance',steps:'Process steps',casestudy:'Case-study cards',gallery:'Install gallery',clientbanner:'Client banner',testi:'Testimonials',banner:'Brand banner',form:'Quote form',cta:'CTA band',footer:'Site footer',faq:'FAQ',rich:'Rich text'};
 function renderPreview(){
  const pv=document.getElementById('preview');pv.className='preview'+(VIEW==='mob'?' mob':'')+(page().theme==='dark'?' dk':'');
  pv.ondragover=function(e){pvOver(e);};pv.ondrop=function(e){pvDropEnd(e);};pv.ondragleave=function(e){pvLeaveZone(e);};
@@ -637,11 +641,11 @@ function renderBuild(){
  }
  h+=b.map((bl,i)=>
    '<div class="blkrow'+(SEL===bl.id?' sel':'')+'" draggable="true" data-i="'+i+'" onmouseenter="blockRowPrev(\''+bl.id+'\',this)" onmouseleave="blockRowLeave(event)" ondragstart="dstart(event,'+i+')" ondragover="dover(event,'+i+',this)" ondragleave="dleave(this)" ondrop="ddrop(event,'+i+')" ondragend="dend()" onclick="selectBlock(\''+bl.id+'\')">'+
-   '<span class="gr">⋮⋮</span><span class="nm">'+BLOCKNAMES[bl.t]+'</span><span class="ty">'+bl.t+'</span><button class="x" onclick="event.stopPropagation();confirmDelBlock(\''+bl.id+'\')">×</button></div>').join('')+'</div>';
+   '<span class="gr">⋮⋮</span><span class="nm">'+blockDisplayName(bl.t)+'</span><span class="ty">'+blockTypeKey(bl.t)+'</span><button class="x" onclick="event.stopPropagation();confirmDelBlock(\''+bl.id+'\')">×</button></div>').join('')+'</div>';
  h+='<div class="addwrap"><button class="addbtn" onclick="document.getElementById(\'addmenu\').classList.toggle(\'hide\')">+ Add section</button>'+
    '<div class="addmenu hide" id="addmenu">'+Object.keys(BLOCKNAMES).map(t=>'<button draggable="true" ondragstart="dstartNew(event,\''+t+'\')" ondragend="dend()" onmouseenter="sectionPrev(\''+t+'\',this)" onmouseleave="blockRowLeave(event)" onclick="addBlock(\''+t+'\')" title="Click to add, or drag onto the layout">'+BLOCKNAMES[t]+'</button>').join('')+'</div></div>';
  // inspector
- if(SEL){const bl=b.find(x=>x.id===SEL);if(bl)h+='<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"><div class="ph">'+SPARK+'Edit: '+BLOCKNAMES[bl.t]+'</div>'+inspector(bl)+'</div>';}
+ if(SEL){const bl=b.find(x=>x.id===SEL);if(bl)h+='<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"><div class="ph">'+SPARK+'Edit: '+blockDisplayName(bl.t)+'</div>'+inspector(bl)+'</div>';}
  el.innerHTML=h;
 }
 function txt(label,val,path){return '<div class="fld"><label>'+label+'</label><input value="'+esc(val)+'" oninput="updT(\''+path+'\',this.value)"></div>'}
@@ -655,16 +659,16 @@ function routeFld(label,val,path){
 function iconPicker(cur,path){const uid2='ip'+Math.random().toString(36).slice(2,7);
  return '<div class="fld"><label>Icon (library — '+ICONKEYS.length+')</label><input placeholder="search icons…" style="margin-bottom:5px" oninput="filterIcons(this,\''+uid2+'\')"><div class="iconpick" id="'+uid2+'">'+ICONKEYS.map(k=>'<button data-k="'+k+'" class="'+(k===cur?'on':'')+'" onclick="upd(\''+path+'\',\''+k+'\')" title="'+k+'">'+icon(k,18)+'</button>').join('')+'</div></div>'}
 function filterIcons(inp,id){const q=inp.value.toLowerCase();document.getElementById(id).querySelectorAll('button').forEach(b=>{b.style.display=b.dataset.k.includes(q)?'':'none'})}
-function inspector(bl){const p=bl.p,id=bl.id;let h='';
- if(bl.t==='hero'){h+=txt('Blog tags',p.tags||'',id+'.tags')+'<div class="hint">Comma or | separated — shown at the top of the hero (blog posts).</div>'+txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Headline',p.headline,id+'.headline')+area('Subheadline',p.sub,id+'.sub')+'<div class="hint">Leave subheadline empty to remove the gap under the title.</div>';
+function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='';
+ if(bt==='hero'){h+=txt('Blog tags',p.tags||'',id+'.tags')+'<div class="hint">Comma or | separated — shown at the top of the hero (blog posts).</div>'+txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Headline',p.headline,id+'.headline')+area('Subheadline',p.sub,id+'.sub')+'<div class="hint">Leave subheadline empty to remove the gap under the title.</div>';
    h+=chk('Wider text',!!p.textWide,id+'.textWide')+'<div class="hint">Wider text hides the right spark/logo and lets the headline span the full width — ideal for blog heroes.</div>';
    h+=imagePicker(p.markImg||'',id+'.markImg')+'<div class="hint">Optional custom image for the right mark. Leave empty for the default gold spark. Hidden when <b>Wider text</b> or <b>Hide right logo</b> is on.</div>';
    h+=chk('Hide right logo / mark',!!p.hideMark,id+'.hideMark')+chk('Hide sun glow',!!p.hideSun,id+'.hideSun')+chk('Hide rating row',!!p.hideRating,id+'.hideRating')+chk('Hide microtrust line',!!p.hideMicrotrust,id+'.hideMicrotrust');
    h+=chk('Disable primary button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Primary button is hidden.</div>':txt('Primary button',p.ctaLabel,id+'.ctaLabel')+routeFld('Primary button link',p.ctaHref||'#quote',id+'.ctaHref')+chk('Pulse animation on button',p.ctaPulse,id+'.ctaPulse'));
    h+=chk('Disable secondary button',!!p.cta2Disabled,id+'.cta2Disabled')+(p.cta2Disabled?'<div class="hint">Secondary button is hidden.</div>':txt('Secondary button',p.cta2,id+'.cta2')+routeFld('Secondary button link',p.cta2Href||'',id+'.cta2Href'));
    h+=txt('Microtrust bar',p.microtrust!=null?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees',id+'.microtrust')+txt('Rating value',p.ratingValue||'4.9',id+'.ratingValue')+txt('Installs count',p.ratingInstalls||'1200',id+'.ratingInstalls');}
- else if(bl.t==='stats'){h+='<div class="hint">Stat tiles</div>';p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Tile '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Number',s.n,id+'.items.'+i+'.n')+txt('Label',s.k,id+'.items.'+i+'.k')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{n:\'0\',k:\'Label\'})">+ Add tile</button>';}
- else if(bl.t==='footer'){h+=imagePicker(p.logoImg||'',id+'.logoImg')+'<div class="hint">Footer logo — leave empty to show the brand name as text.</div>'+txt('Brand name (fallback)',p.brandText||'Heliaxis',id+'.brandText')+area('About text',p.about,id+'.about');
+ else if(bt==='stats'){h+='<div class="hint">Stat tiles</div>';p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Tile '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Number',s.n,id+'.items.'+i+'.n')+txt('Label',s.k,id+'.items.'+i+'.k')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{n:\'0\',k:\'Label\'})">+ Add tile</button>';}
+ else if(bt==='footer'){h+=imagePicker(p.logoImg||'',id+'.logoImg')+'<div class="hint">Footer logo — leave empty to show the brand name as text.</div>'+txt('Brand name (fallback)',p.brandText||'Heliaxis',id+'.brandText')+area('About text',p.about,id+'.about');
    (p.cols||[]).forEach(function(col,ci){
     h+='<div class="sub"><div class="sh"><b>Column '+(ci+1)+'</b>'+(ci>0?'<button class="rm" onclick="rmFooterCol(\''+id+'\','+ci+')">remove col</button>':'')+'</div>'+txt('Heading',col.title,id+'.cols.'+ci+'.title');
     (col.links||[]).forEach(function(lk,li){
@@ -673,40 +677,40 @@ function inspector(bl){const p=bl.p,id=bl.id;let h='';
     h+='<button class="miniadd" onclick="addFooterLink(\''+id+'\','+ci+')">+ Add link</button></div>';
    });
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'cols\',{title:\'Column\',links:[{label:\'Link\',href:\'/\'}]})">+ Add column</button>'+txt('Copyright line',p.copyright,id+'.copyright')+txt('Site URL label',p.siteUrl||'heliaxis.co.uk',id+'.siteUrl')+routeFld('Site URL link',p.siteHref||'https://heliaxis.co.uk',id+'.siteHref')+'<div class="hint">Footer links use real routes — e.g. <code>/commercial-funding</code>, <code>/#faq</code>, <code>/#quote</code>.</div>';}
- else if(bl.t==='grid'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title')+txt('Section anchor ID',p.anchor||'',id+'.anchor')+'<div class="hint">Optional — used by footer/nav links, e.g. <code>services</code> → <code>/#services</code>.</div>'+chk('Center header',!!p.centerHeader,id+'.centerHeader');
+ else if(bt==='grid'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title')+txt('Section anchor ID',p.anchor||'',id+'.anchor')+'<div class="hint">Optional — used by footer/nav links, e.g. <code>services</code> → <code>/#services</code>.</div>'+chk('Center header',!!p.centerHeader,id+'.centerHeader');
    h+='<div class="fld"><label>Columns (grid width)</label><div class="seg">'+[2,3,4].map(c=>'<button class="'+(p.cols===c?'on':'')+'" onclick="upd(\''+id+'.cols\','+c+')">'+c+' wide</button>').join('')+'</div></div>';
    h+='<div class="fld"><label>If a row is incomplete</label><select onchange="upd(\''+id+'.fill\',this.value)">'+'<option value="none"'+((p.fill||'none')==='none'?' selected':'')+'>Leave empty</option>'+'<option value="contact"'+(p.fill==='contact'?' selected':'')+'>Fill gap with a get-in-touch card</option>'+'<option value="balance"'+(p.fill==='balance'?' selected':'')+'>Balance / centre the last row</option>'+'</select></div>';
    if(p.fill==='contact')h+='<div class="sub" style="background:var(--paper-2)"><div class="sh"><b>Get-in-touch card</b></div>'+txt('Heading',p.contactHeading||'Get in touch',id+'.contactHeading')+area('Text',p.contactText||'',id+'.contactText')+txt('Button',p.contactBtn||'Contact us',id+'.contactBtn')+routeFld('Button link',p.contactHref||'#quote',id+'.contactHref')+'</div>';
    h+='<div class="hint">'+p.items.length+' items × '+p.cols+' wide = '+Math.ceil(p.items.length/p.cols)+' rows. Add or remove items to change the shape (e.g. 3 items = 1×3, 6 = 2×3, 4 at 2-wide = 2×2).</div>';
    p.items.forEach((it,i)=>{h+='<div class="sub"><div class="sh"><b>Item '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+iconPicker(it.icon,id+'.items.'+i+'.icon')+txt('Title',it.title,id+'.items.'+i+'.title')+txt('Description',it.desc,id+'.items.'+i+'.desc')+'</div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{icon:\'solar\',title:\'New item\',desc:\'Description\'})">+ Add item</button>'+accentHint();}
- else if(bl.t==='split'){h+='<div class="hint"><b>Left card</b></div>'+iconPicker(p.lIcon||'home',id+'.lIcon')+txt('Title',p.lt,id+'.lt')+area('Text',p.ld,id+'.ld')+bulletsEd(id,'lb',p.lb)+txt('Button',p.lc,id+'.lc')+routeFld('Button link',p.lcHref||'#quote',id+'.lcHref');
+ else if(bt==='split'){h+='<div class="hint"><b>Left card</b></div>'+iconPicker(p.lIcon||'home',id+'.lIcon')+txt('Title',p.lt,id+'.lt')+area('Text',p.ld,id+'.ld')+bulletsEd(id,'lb',p.lb)+txt('Button',p.lc,id+'.lc')+routeFld('Button link',p.lcHref||'#quote',id+'.lcHref');
     h+='<div class="hint"><b>Right card (dark)</b></div>'+iconPicker(p.rIcon||'building',id+'.rIcon')+txt('Title',p.rt,id+'.rt')+area('Text',p.rd,id+'.rd')+bulletsEd(id,'rb',p.rb)+txt('Button',p.rc,id+'.rc')+routeFld('Button link',p.rcHref||'/commercial-funding',id+'.rcHref')+accentHint();}
- else if(bl.t==='estband'){h+=accentArea('Headline',p.headline,id+'.headline')+area('Subtext',p.sub,id+'.sub')+txt('Button label',p.btnLabel,id+'.btnLabel')+routeFld('Button link',p.btnHref||'#quote',id+'.btnHref');}
- else if(bl.t==='gallery'){var gfi=galleryFeaturedIndex(p);
+ else if(bt==='estband'){h+=accentArea('Headline',p.headline,id+'.headline')+area('Subtext',p.sub,id+'.sub')+txt('Button label',p.btnLabel,id+'.btnLabel')+routeFld('Button link',p.btnHref||'#quote',id+'.btnHref');}
+ else if(bt==='gallery'){var gfi=galleryFeaturedIndex(p);
    h+=txt('Eyebrow',p.eyebrow||'Recent work',id+'.eyebrow')+accentArea('Title',p.title||'Installs across South Wales',id+'.title')+area('Subtext (leave empty to hide)',p.sub!=null?p.sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',id+'.sub')+txt('Featured placeholder label',p.featuredLabel!=null?p.featuredLabel:'Featured install',id+'.featuredLabel')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Placeholder frames — swap in your real drone & install photography.',id+'.footnote')+'<div class="hint">Click the <b>camera icon</b> in the preview to upload a photo directly. One <b>featured</b> large frame + smaller frames.</div>';
    p.items.forEach(function(it,i){h+='<div class="sub"><div class="sh"><b>Frame '+(i+1)+'</b><span style="display:flex;gap:4px;align-items:center"><button type="button" class="rm" onclick="moveGalItem(\''+id+'\',\'items\','+i+',-1)"'+(i===0?' disabled style="opacity:.35"':'')+' title="Move up">↑</button><button type="button" class="rm" onclick="moveGalItem(\''+id+'\',\'items\','+i+',1)"'+(i===p.items.length-1?' disabled style="opacity:.35"':'')+' title="Move down">↓</button><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></span></div>';
    if(gfi!==i)h+='<button type="button" class="miniadd" style="margin-bottom:8px" onclick="setGalleryFeatured(\''+id+'\','+i+')">Make large featured frame</button>';
    else h+='<div class="hint" style="color:var(--ok);margin-bottom:8px">✓ Large featured frame</div>';
    h+=imagePicker(it.img,id+'.items.'+i+'.img')+'<div class="hint" style="font-size:.76rem;margin:-4px 0 8px">With an image: drag to pan, scroll to zoom in preview.</div>'+txt('Location label',it.loc,id+'.items.'+i+'.loc')+'</div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{img:\'\',loc:\'Town · 4.0 kWp\',featured:false})">+ Add frame</button>';}
- else if(bl.t==='funding'){h+=txt('Eyebrow',p.eyebrow||'Funding & finance',id+'.eyebrow')+accentArea('Title',p.title||'Solar within reach, whatever your budget',id+'.title')+area('Subtext (leave empty to hide)',p.sub!=null?p.sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.',id+'.sub')+'<div class="hint">Dark band with funding cards and an urgency CTA. Click text in the preview to edit.</div>';
+ else if(bt==='funding'){h+=txt('Eyebrow',p.eyebrow||'Funding & finance',id+'.eyebrow')+accentArea('Title',p.title||'Solar within reach, whatever your budget',id+'.title')+area('Subtext (leave empty to hide)',p.sub!=null?p.sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.',id+'.sub')+'<div class="hint">Dark band with funding cards and an urgency CTA. Click text in the preview to edit.</div>';
    p.items.forEach(function(it,i){h+='<div class="sub"><div class="sh"><b>Card '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+accentArea('Title',it.title,id+'.items.'+i+'.title')+area('Text',it.text,id+'.items.'+i+'.text')+'</div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'New option\',text:\'Description.\'})">+ Add card</button>'+accentHint();
    h+=chk('Hide urgency button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Urgency button is hidden on the page.</div>':txt('Urgency button',p.cta||'0% VAT ends March 2027 — see all funding routes →',id+'.cta')+routeFld('Button link',p.ctaHref||'/commercial-funding',id+'.ctaHref'));}
- else if(bl.t==='testi'){h+=txt('Eyebrow',p.eyebrow||'Real customers',id+'.eyebrow')+accentArea('Title',p.title||'Trusted across South Wales',id+'.title')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',id+'.footnote')+'<div class="hint">Add testimonials. <b>More than 3 turns it into an auto-scrolling slider.</b></div>';
+ else if(bt==='testi'){h+=txt('Eyebrow',p.eyebrow||'Real customers',id+'.eyebrow')+accentArea('Title',p.title||'Trusted across South Wales',id+'.title')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',id+'.footnote')+'<div class="hint">Add testimonials. <b>More than 3 turns it into an auto-scrolling slider.</b></div>';
    h+='<div class="fld"><label>Slider speed — '+(p.speed||36)+'s per loop (lower = faster)</label><input type="range" min="12" max="80" value="'+(p.speed||36)+'" oninput="updT(\''+id+'.speed\',+this.value)"></div>';
    p.items.forEach((tt,i)=>{h+='<div class="sub"><div class="sh"><b>#'+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+area('Quote',tt.quote,id+'.items.'+i+'.quote')+'<div class="row2">'+txt('Name',tt.name,id+'.items.'+i+'.name')+txt('Location',tt.loc,id+'.items.'+i+'.loc')+'</div><div class="fld"><label>Stars — '+(tt.stars||5)+'</label><div class="seg">'+[1,2,3,4,5].map(s=>'<button class="'+((tt.stars||5)===s?'on':'')+'" onclick="upd(\''+id+'.items.'+i+'.stars\','+s+')">'+s+'★</button>').join('')+'</div></div></div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{stars:5,quote:\'Great service.\',name:\'Name\',loc:\'Town · Solar\'})">+ Add testimonial</button>';
    if(p.items.length>3)h+='<div class="hint" style="color:var(--ok)">✓ Slider active ('+p.items.length+' testimonials)</div>';}
- else if(bl.t==='banner'){h+=accentArea('Heading',p.heading,id+'.heading')+'<div class="hint">Logos are managed in the <b>Logos</b> tab. Any logo ticked “Include in banner” shows here automatically.</div>';}
- else if(bl.t==='cta'){h+=accentArea('Headline',p.headline,id+'.headline')+area('Subtext',p.sub,id+'.sub');
+ else if(bt==='banner'){h+=accentArea('Heading',p.heading,id+'.heading')+'<div class="hint">Logos are managed in the <b>Logos</b> tab. Any logo ticked “Include in banner” shows here automatically.</div>';}
+ else if(bt==='cta'){h+=accentArea('Headline',p.headline,id+'.headline')+area('Subtext',p.sub,id+'.sub');
    h+='<div class="sub"><div class="sh"><b>Primary button</b></div>'+chk('Hide primary button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Primary button is hidden.</div>':txt('Label',p.btn,id+'.btn')+routeFld('Link / route',p.btnHref||'#quote',id+'.btnHref')+chk('Pulse animation',p.pulse,id+'.pulse'))+'</div>';
    h+='<div class="sub"><div class="sh"><b>Secondary button</b></div>'+chk('Hide secondary button',!!p.cta2Disabled,id+'.cta2Disabled')+(p.cta2Disabled?'<div class="hint">Secondary button is hidden.</div>':txt('Label',p.btn2||'Call 01633 965205',id+'.btn2')+routeFld('Link / route',p.btn2Href||'tel:01633965205',id+'.btn2Href'))+'</div>';}
- else if(bl.t==='faq'){h+=txt('Eyebrow',p.eyebrow||'Good to know',id+'.eyebrow')+accentArea('Title',p.title||'Your questions, answered',id+'.title')+txt('Section anchor ID',p.anchor||'faq',id+'.anchor')+'<div class="hint">Accordion FAQ — click questions in the preview to expand (disabled while editing). Nav links use <code>/#'+esc(p.anchor||'faq')+'</code>.</div>';
+ else if(bt==='faq'){h+=txt('Eyebrow',p.eyebrow||'Good to know',id+'.eyebrow')+accentArea('Title',p.title||'Your questions, answered',id+'.title')+txt('Section anchor ID',p.anchor||'faq',id+'.anchor')+'<div class="hint">Accordion FAQ — click questions in the preview to expand (disabled while editing). Nav links use <code>/#'+esc(p.anchor||'faq')+'</code>.</div>';
    p.items.forEach((q,i)=>{h+='<div class="sub"><div class="sh"><b>Q'+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Question',q.q,id+'.items.'+i+'.q')+area('Answer',q.a,id+'.items.'+i+'.a')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{q:\'Question?\',a:\'Answer.\'})">+ Add question</button>';}
- else if(bl.t==='rich'){h+=area('Content (HTML allowed)',p.html,id+'.html')+'<div class="hint">Or click the text in the preview to edit it directly. Enter adds a new line.</div>';}
- else if(bl.t==='form'){
+ else if(bt==='rich'){h+=area('Content (HTML allowed)',p.html,id+'.html')+'<div class="hint">Or click the text in the preview to edit it directly. Enter adds a new line.</div>';}
+ else if(bt==='form'){
    var fv=formVariant(p);
    h+='<div class="fld"><label>Layout</label><div class="seg"><button class="'+(fv==='quote'?'on':'')+'" onclick="upd(\''+id+'.variant\',\'quote\');renderBuild();renderPreview();save()">Quote (2-col)</button><button class="'+(fv==='contact'?'on':'')+'" onclick="upd(\''+id+'.variant\',\'contact\');renderBuild();renderPreview();save()">Contact (full)</button></div></div>';
    if(fv==='contact'){
@@ -725,12 +729,12 @@ function inspector(bl){const p=bl.p,id=bl.id;let h='';
      h+=chk('Interest field',p.fInterest!==false,id+'.fInterest')+(p.fInterest===false?'':txt('Interest label',p.interestLabel||'What are you interested in? (optional)',id+'.interestLabel')+txt('Interest placeholder',p.interestPh||'Solar, battery, heat pump, EV…',id+'.interestPh'));
      h+=txt('Submit button',p.btn||'Get my free quote',id+'.btn')+chk('Pulse button',p.pulse,id+'.pulse')+area('Trust footnote',p.footnote!=null?p.footnote:'No obligation and no pushy sales — we\'ll simply arrange a free survey.',id+'.footnote')+area('Legal note (optional)',p.legalNote||'',id+'.legalNote');
    }
- } else if(bl.t==='media'){h+=imagePicker(p.img,id+'.img')+'<div class="fld"><label>Image side</label><div class="seg"><button class="'+(p.side==='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'left\')">Left</button><button class="'+(p.side!=='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'right\')">Right</button></div></div>'+txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title')+'<div class="fld"><label>Text</label><textarea rows="5" oninput="updT(\''+id+'.text\',this.value)">'+esc(p.text)+'</textarea></div>'+chk('Wider text',!!p.textWide,id+'.textWide')+chk('Disable button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Button is hidden on the page.</div>':txt('Button',p.cta,id+'.cta')+routeFld('Button link / route',p.ctaHref||'#quote',id+'.ctaHref'));}
-else if(bl.t==='pricing'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.plans.forEach((pl,i)=>{h+='<div class="sub"><div class="sh"><b>Plan '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'plans\','+i+')">remove</button></div>'+txt('Name',pl.name,id+'.plans.'+i+'.name')+'<div class="row2">'+txt('Price',pl.price,id+'.plans.'+i+'.price')+txt('Per',pl.per,id+'.plans.'+i+'.per')+'</div>'+bulletsEd(id,'plans.'+i+'.feats',pl.feats)+txt('Button',pl.cta,id+'.plans.'+i+'.cta')+routeFld('Button link',pl.ctaHref||'#quote',id+'.plans.'+i+'.ctaHref')+chk('Highlight this plan',pl.hl,id+'.plans.'+i+'.hl')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'plans\',{name:\'Plan\',price:\'£0\',per:\'\',feats:[\'Feature\'],cta:\'Choose\',ctaHref:\'#quote\',hl:false})">+ Add plan</button>';}
- else if(bl.t==='steps'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Step '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Title',s.title,id+'.items.'+i+'.title')+area('Text',s.text,id+'.items.'+i+'.text')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'Step\',text:\'Detail.\'})">+ Add step</button>'+accentHint();}
- else if(bl.t==='casestudy'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((cs,i)=>{h+='<div class="sub"><div class="sh"><b>Card '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(cs.img,id+'.items.'+i+'.img')+txt('Location',cs.loc,id+'.items.'+i+'.loc')+txt('Title',cs.title,id+'.items.'+i+'.title')+'<div class="row2">'+txt('Stat',cs.stat,id+'.items.'+i+'.stat')+txt('Stat label',cs.statlabel,id+'.items.'+i+'.statlabel')+'</div></div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{img:\'\',loc:\'Town\',title:\'Project\',stat:\'0\',statlabel:\'Label\'})">+ Add card</button>'+accentHint();}
- else if(bl.t==='clientbanner'){h+=accentArea('Heading',p.heading,id+'.heading');p.clients.forEach((c,i)=>{h+='<div style="display:flex;gap:5px;margin-bottom:5px"><input value="'+esc(c.name)+'" oninput="updArr2(\''+id+'\',\'clients\','+i+',\'name\',this.value)"><button class="rm" onclick="rmItem(\''+id+'\',\'clients\','+i+')">×</button></div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'clients\',{name:\'Client name\',img:\'\'})">+ Add client</button>';}
-  else if(bl.t==='trustbar'){h+=txt('Logos',p.logos||'',id+'.logos')+'<div class="hint">Comma separated list of text logos (e.g. MCS, RECC, NICEIC).</div>'+txt('Rating text',p.rating||'',id+'.rating');}
+ } else if(bt==='media'){h+=imagePicker(p.img,id+'.img')+'<div class="fld"><label>Image side</label><div class="seg"><button class="'+(p.side==='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'left\')">Left</button><button class="'+(p.side!=='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'right\')">Right</button></div></div>'+txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title')+'<div class="fld"><label>Text</label><textarea rows="5" oninput="updT(\''+id+'.text\',this.value)">'+esc(p.text)+'</textarea></div>'+chk('Wider text',!!p.textWide,id+'.textWide')+chk('Disable button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Button is hidden on the page.</div>':txt('Button',p.cta,id+'.cta')+routeFld('Button link / route',p.ctaHref||'#quote',id+'.ctaHref'));}
+else if(bt==='pricing'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.plans.forEach((pl,i)=>{h+='<div class="sub"><div class="sh"><b>Plan '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'plans\','+i+')">remove</button></div>'+txt('Name',pl.name,id+'.plans.'+i+'.name')+'<div class="row2">'+txt('Price',pl.price,id+'.plans.'+i+'.price')+txt('Per',pl.per,id+'.plans.'+i+'.per')+'</div>'+bulletsEd(id,'plans.'+i+'.feats',pl.feats)+txt('Button',pl.cta,id+'.plans.'+i+'.cta')+routeFld('Button link',pl.ctaHref||'#quote',id+'.plans.'+i+'.ctaHref')+chk('Highlight this plan',pl.hl,id+'.plans.'+i+'.hl')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'plans\',{name:\'Plan\',price:\'£0\',per:\'\',feats:[\'Feature\'],cta:\'Choose\',ctaHref:\'#quote\',hl:false})">+ Add plan</button>';}
+ else if(bt==='steps'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Step '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Title',s.title,id+'.items.'+i+'.title')+area('Text',s.text,id+'.items.'+i+'.text')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'Step\',text:\'Detail.\'})">+ Add step</button>'+accentHint();}
+ else if(bt==='casestudy'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((cs,i)=>{h+='<div class="sub"><div class="sh"><b>Card '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(cs.img,id+'.items.'+i+'.img')+txt('Location',cs.loc,id+'.items.'+i+'.loc')+txt('Title',cs.title,id+'.items.'+i+'.title')+'<div class="row2">'+txt('Stat',cs.stat,id+'.items.'+i+'.stat')+txt('Stat label',cs.statlabel,id+'.items.'+i+'.statlabel')+'</div></div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{img:\'\',loc:\'Town\',title:\'Project\',stat:\'0\',statlabel:\'Label\'})">+ Add card</button>'+accentHint();}
+ else if(bt==='clientbanner'){h+=accentArea('Heading',p.heading,id+'.heading');p.clients.forEach((c,i)=>{h+='<div style="display:flex;gap:5px;margin-bottom:5px"><input value="'+esc(c.name)+'" oninput="updArr2(\''+id+'\',\'clients\','+i+',\'name\',this.value)"><button class="rm" onclick="rmItem(\''+id+'\',\'clients\','+i+')">×</button></div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'clients\',{name:\'Client name\',img:\'\'})">+ Add client</button>';}
+  else if(bt==='trustbar'){h+=txt('Logos',p.logos||'',id+'.logos')+'<div class="hint">Comma separated list of text logos (e.g. MCS, RECC, NICEIC).</div>'+txt('Rating text',p.rating||'',id+'.rating');}
  h+=spacingEd(id,p);
  return h;
 }
@@ -784,7 +788,7 @@ function delBlock(id){page().blocks=page().blocks.filter(b=>b.id!==id);if(SEL===
 function confirmDelBlock(id){
   var bl=findBlock(id);
   if(!bl)return;
-  var name=BLOCKNAMES[bl.t]||bl.t;
+  var name=blockDisplayName(bl.t);
   openConfirmModal({
     title:'Delete section?',
     message:'Are you sure you want to delete this section? This cannot be undone.',
@@ -1744,6 +1748,18 @@ function ensureFooterCustomize(){
         if(p[k]==null){p[k]=JSON.parse(JSON.stringify(defs[k]));changed=true;}
       });
       if(!Array.isArray(p.cols)||!p.cols.length){p.cols=JSON.parse(JSON.stringify(defs.cols));changed=true;}
+    });
+  });
+  return changed;
+}
+/** Normalize legacy block type strings (e.g. TRUSTBAR → trustbar) so render + labels work everywhere. */
+function ensureBlockTypesLowercase(){
+  var changed=false;
+  (STATE.pages||[]).forEach(function(pg){
+    (pg.blocks||[]).forEach(function(bl){
+      if(!bl||!bl.t)return;
+      var next=blockTypeKey(bl.t);
+      if(bl.t!==next){bl.t=next;changed=true;}
     });
   });
   return changed;
