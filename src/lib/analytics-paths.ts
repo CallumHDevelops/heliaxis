@@ -22,7 +22,7 @@ const BLOCKED_PREFIXES = [
 /** Fixed marketing routes that always exist (even with 0 clicks). */
 export const STATIC_PUBLIC_PATHS = [
   '/',
-  '/brand',
+  '/branding',
   '/blog',
   '/solar-estimator',
   '/roof-designer',

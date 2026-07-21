@@ -6,7 +6,7 @@ import type { HeatmapPathStat } from '@/lib/heatmap';
 function friendlyStaticLabel(path: string): string {
   if (path === '/') return 'Home';
   const map: Record<string, string> = {
-    '/brand': 'Brand',
+    '/branding': 'Brand',
     '/blog': 'Blog',
     '/solar-estimator': 'Solar estimator',
     '/roof-designer': 'Roof designer',
