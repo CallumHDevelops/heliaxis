@@ -651,10 +651,14 @@ function renderBuild(){
 function txt(label,val,path){return '<div class="fld"><label>'+label+'</label><input value="'+esc(val)+'" oninput="updT(\''+path+'\',this.value)"></div>'}
 function area(label,val,path){return '<div class="fld"><label>'+label+'</label><textarea rows="2" oninput="updT(\''+path+'\',this.value)">'+esc(val)+'</textarea></div>'}
 function chk(label,val,path){return '<label class="chk"><input type="checkbox" '+(val?'checked':'')+' onchange="upd(\''+path+'\',this.checked)">'+label+'</label>'}
-/** Button destination — site path, hash, or full URL. */
+/** Button destination — site path, hash, or full URL (picker + custom path). */
 function routeFld(label,val,path){
-  return txt(label||'Button link / route',val||'',path)
-    +'<div class="hint">Where this button goes — e.g. <code>/blog</code>, <code>/#quote</code>, <code>#quote</code>, or <code>https://…</code></div>';
+  return '<div class="fld"><label>'+(label||'Button link / route')+'</label>'
+    +'<div class="link-pick-row">'
+    +'<input class="link-pick-path-input" value="'+esc(val||'')+'" placeholder="e.g. /blog, #quote, tel:…" oninput="updT(\''+path+'\',this.value)" onchange="upd(\''+path+'\',this.value)">'
+    +linkPickHtml(val||'',"upd('"+path+"')")
+    +'</div>'
+    +'<div class="hint">Pick a page or section, or type a custom path — e.g. <code>/blog</code>, <code>#quote</code>, <code>tel:…</code>, or <code>https://…</code></div></div>';
 }
 function iconPicker(cur,path){const uid2='ip'+Math.random().toString(36).slice(2,7);
  return '<div class="fld"><label>Icon (library — '+ICONKEYS.length+')</label><input placeholder="search icons…" style="margin-bottom:5px" oninput="filterIcons(this,\''+uid2+'\')"><div class="iconpick" id="'+uid2+'">'+ICONKEYS.map(k=>'<button data-k="'+k+'" class="'+(k===cur?'on':'')+'" onclick="upd(\''+path+'\',\''+k+'\')" title="'+k+'">'+icon(k,18)+'</button>').join('')+'</div></div>'}
@@ -2228,12 +2232,24 @@ var NAV_LINK_PRESETS=[
   {id:'blog',label:'Blog',href:'/blog'},
   {id:'home',label:'Home',href:'/'}
 ];
+/** In-page anchors commonly used by CTAs / buttons. */
+var PAGE_ANCHOR_PRESETS=[
+  {label:'Quote form',href:'#quote'},
+  {label:'Services',href:'#services'},
+  {label:'FAQs',href:'#faq'},
+  {label:'How it works',href:'#how'}
+];
+var PHONE_LINK_PRESETS=[
+  {label:'Call office',href:'tel:01633965205'}
+];
 function selectMegaTab(i){ MEGA_PI = Number(i); renderMega(); }
 function showMega(){applyCmsView('mega');}
 function pageName(slug){var p=STATE.pages.filter(function(x){return x.slug===slug})[0];if(p)return p.name;var pre=NAV_LINK_PRESETS.filter(function(x){return x.href===slug})[0];return pre?pre.label:slug;}
 function linkCatalog(){
   var items=[];
   NAV_LINK_PRESETS.forEach(function(p){items.push({group:'Site pages',label:p.label,href:p.href});});
+  PAGE_ANCHOR_PRESETS.forEach(function(p){items.push({group:'On this page',label:p.label,href:p.href});});
+  PHONE_LINK_PRESETS.forEach(function(p){items.push({group:'Phone',label:p.label,href:p.href});});
   (STATE.pages||[]).forEach(function(p){
     items.push({group:isCmsBlogPage(p)?'Blog articles':'CMS pages',label:p.name||'Untitled',href:p.slug||'/'});
   });
@@ -2414,6 +2430,9 @@ function applyLinkPick(id,el){
     }else if(apply.indexOf('setFeatCta(')===0){
       var fi=Number(apply.replace(/^setFeatCta\(|\)$/g,''));
       setFeatCta(fi,href);
+    }else if(apply.indexOf('upd(')===0){
+      var um=apply.match(/^upd\('([^']+)'\)$/);
+      if(um)upd(um[1],href);
     }
   }catch(e){console.error(e);}
 }

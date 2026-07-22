@@ -165,6 +165,7 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .fld input,.fld textarea,.fld select{width:100%;font-family:var(--body);font-size:.88rem;padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink)}
 .fld textarea{resize:none}
 .fld input:focus,.fld textarea:focus,.fld select:focus{outline:none;border-color:var(--solar);box-shadow:0 0 0 2px rgba(248,188,30,.2)}
+.fld:has(.link-pick.open),.panel .sub:has(.link-pick.open){position:relative;z-index:40;overflow:visible}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .chk{display:flex;align-items:center;gap:8px;font-size:.85rem;padding:8px 0}
 .chk input{width:auto}
@@ -905,7 +906,7 @@ button.pv-seg{font:inherit}
 .link-pick-foot{padding:8px 12px;border-top:1px solid var(--line);background:var(--paper-2);flex-shrink:0}
 .link-pick-hint{font-size:.72rem;color:var(--muted)}
 .link-pick-row{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch}
-.link-pick-row .link-pick-path-input{flex:1;min-width:140px;font-size:.84rem;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--card)}
+.link-pick-row .link-pick-path-input{flex:1;min-width:140px;width:auto;font-size:.84rem;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--card)}
 .link-pick-row .link-pick{flex:1.2;min-width:200px}
 .mm-grip{cursor:grab;color:var(--muted);user-select:none;text-align:center;font-size:.9rem;line-height:1}
 .mm-nav[draggable]{cursor:grab}

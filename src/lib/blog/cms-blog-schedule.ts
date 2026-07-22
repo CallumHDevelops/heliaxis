@@ -203,6 +203,85 @@ export async function cancelCmsBlogSchedule(opts: { id?: string; slug?: string }
   return { ok: true };
 }
 
+function slugAliases(raw: string): Set<string> {
+  const n = normalizeCmsSlug(raw);
+  const pub = toPublicBlogPath(raw);
+  return new Set([n, pub, normalizeCmsSlug(pub)].filter(Boolean));
+}
+
+function pageMatchesBlog(
+  p: { id?: string; slug?: string },
+  id: string | undefined,
+  aliases: Set<string>,
+): boolean {
+  if (id && String(p.id || '') === id) return true;
+  const s = normalizeCmsSlug(String(p.slug || ''));
+  return Boolean(s && (aliases.has(s) || aliases.has(toPublicBlogPath(s))));
+}
+
+/** Take a live AI blog offline — keep the draft, remove from published + rendered. */
+export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
+  if (!opts.id && !opts.slug) throw new Error('id or slug is required');
+
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+
+  const [draftRes, pubRes, renRes] = await Promise.all([
+    admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle(),
+    admin.from('cms_kv').select('value').eq('key', PUBLISHED_KEY).maybeSingle(),
+    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
+  ]);
+
+  if (draftRes.error) throw new Error(draftRes.error.message);
+
+  const draft = parseCmsState(draftRes.data?.value);
+  const idx = findPageIndex(draft.pages || [], opts.id, opts.slug);
+  if (idx < 0) throw new Error('Blog page not found');
+  const pg = draft.pages![idx];
+  if (!isCmsBlogPage(pg)) throw new Error('Not an AI blog page');
+
+  const rawSlug = String(pg.slug || opts.slug || '');
+  const publicSlug = toPublicBlogPath(rawSlug);
+  const aliases = slugAliases(rawSlug);
+  const id = String(pg.id || opts.id || '');
+
+  pg.blogStatus = 'draft';
+  pg.publishAt = null;
+  pg.scheduledRender = null;
+
+  const published = parseCmsState(pubRes.data?.value);
+  if (Array.isArray(published.pages)) {
+    published.pages = published.pages.filter((p) => !pageMatchesBlog(p, id, aliases));
+  }
+
+  let rendered: RenderedDoc = { css: '', pages: [] };
+  try {
+    rendered = renRes.data?.value
+      ? (JSON.parse(renRes.data.value) as RenderedDoc)
+      : { pages: [] };
+  } catch {
+    rendered = { pages: [] };
+  }
+  if (Array.isArray(rendered.pages)) {
+    rendered.pages = rendered.pages.filter((p) => !pageMatchesBlog(p, undefined, aliases));
+  }
+
+  const writes = [
+    upsertKv(admin, DRAFT_KEY, draft, now),
+    upsertKv(admin, PUBLISHED_KEY, published, now),
+    upsertKv(admin, RENDERED_KEY, rendered, now),
+  ];
+  const results = await Promise.all(writes);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
+
+  revalidatePath('/', 'layout');
+  revalidatePath('/blog');
+  revalidatePath(publicSlug);
+
+  return { ok: true, slug: publicSlug };
+}
+
 /** Publish all AI blogs whose publishAt has passed. */
 export async function publishDueScheduledBlogs(now = new Date()) {
   const admin = createAdminClient();

@@ -6,7 +6,7 @@ import type { CmsAiBlogListItem } from '@/lib/blog/cms-ai-blogs';
 
 type Filter = 'all' | 'draft' | 'scheduled' | 'published';
 
-type ConfirmKind = 'delete' | 'unschedule' | 'publish';
+type ConfirmKind = 'delete' | 'unschedule' | 'publish' | 'unpublish';
 
 type ConfirmState = {
   kind: ConfirmKind;
@@ -115,6 +115,13 @@ function confirmCopy(c: ConfirmState): { title: string; body: string; action: st
       title: 'Cancel schedule',
       body: `Cancel the scheduled publish for “${name}”? It will stay as a draft.`,
       action: 'Unschedule',
+    };
+  }
+  if (c.kind === 'unpublish') {
+    return {
+      title: 'Unpublish article',
+      body: `Unpublish “${name}”? It will leave the live site and become a draft you can edit and publish again later.`,
+      action: 'Unpublish',
     };
   }
   return {
@@ -328,12 +335,41 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
     }
   }
 
+  async function runUnpublish(p: CmsAiBlogListItem) {
+    setMsg(null);
+    setBusyId(p.id);
+    setBusyAction('unpublish');
+    try {
+      const r = await fetch('/api/blog/unpublish', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id, slug: p.slug }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Could not unpublish');
+      setPosts((prev) =>
+        prev.map((row) =>
+          row.id === p.id ? { ...row, status: 'draft', publishAt: null, live: false } : row,
+        ),
+      );
+      setMsg({ tone: 'ok', text: `Unpublished “${p.name}” — it is now a draft.` });
+      router.refresh();
+    } catch (e) {
+      setMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Could not unpublish' });
+    } finally {
+      setBusyId(null);
+      setBusyAction(null);
+    }
+  }
+
   async function onConfirmAction() {
     if (!confirm) return;
     const { kind, post } = confirm;
     setConfirm(null);
     if (kind === 'delete') await runDelete(post);
     else if (kind === 'unschedule') await runCancelSchedule(post);
+    else if (kind === 'unpublish') await runUnpublish(post);
     else window.location.href = `${post.editPath}?cmsAction=publish`;
   }
 
@@ -554,16 +590,30 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
                           >
                             Preview
                           </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setMenuId(null);
-                              setConfirm({ kind: 'publish', post: p });
-                            }}
-                          >
-                            Publish now
-                          </button>
+                          {live ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              disabled={busy}
+                              onClick={() => {
+                                setMenuId(null);
+                                setConfirm({ kind: 'unpublish', post: p });
+                              }}
+                            >
+                              {busy && busyAction === 'unpublish' ? 'Unpublishing…' : 'Unpublish'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setMenuId(null);
+                                setConfirm({ kind: 'publish', post: p });
+                              }}
+                            >
+                              Publish now
+                            </button>
+                          )}
                           <button
                             type="button"
                             role="menuitem"
