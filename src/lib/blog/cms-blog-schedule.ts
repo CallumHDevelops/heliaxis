@@ -84,6 +84,7 @@ async function resolveScheduleHtml(
   admin: ReturnType<typeof createAdminClient>,
   pg: CmsLoosePage,
   provided?: ScheduledRenderPage,
+  images?: Array<{ id?: string; data?: string }>,
 ): Promise<ScheduledRenderPage> {
   const slug = normalizeCmsSlug(provided?.slug || String(pg.slug || ''));
   const name = provided?.name || String(pg.name || 'Article');
@@ -122,7 +123,7 @@ async function resolveScheduleHtml(
     }
   }
 
-  const html = renderCmsPageHtml(Array.isArray(pg.blocks) ? pg.blocks : []);
+  const html = renderCmsPageHtml(Array.isArray(pg.blocks) ? pg.blocks : [], images || []);
   if (!html.replace(/<[^>]+>/g, '').trim()) {
     throw new Error('Nothing to publish — add sections to this article first.');
   }
@@ -155,6 +156,9 @@ export async function scheduleCmsBlog(opts: {
   if (!isCmsBlogPage(pg)) throw new Error('Not an AI blog page');
   ensureCmsBlogPublicSlug(pg);
 
+  const images = Array.isArray((state as { site?: { images?: unknown } }).site?.images)
+    ? ((state as { site: { images: Array<{ id?: string; data?: string }> } }).site.images)
+    : [];
   const rendered = await resolveScheduleHtml(
     admin,
     pg,
@@ -167,6 +171,7 @@ export async function scheduleCmsBlog(opts: {
           html: String(opts.renderedPage.html || ''),
         }
       : undefined,
+    images,
   );
 
   pg.blogStatus = 'scheduled';

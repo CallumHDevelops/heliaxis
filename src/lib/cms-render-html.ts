@@ -86,11 +86,21 @@ function heroTags(tags: unknown): string {
   );
 }
 
+type LibImage = { id?: string; data?: string };
+let _libImages: LibImage[] = [];
+
 function imgSrc(val: unknown): string {
   if (!val) return '';
   if (typeof val === 'string') return val;
-  if (typeof val === 'object' && val && 'src' in val) return String((val as { src?: string }).src || '');
-  if (typeof val === 'object' && val && 'data' in val) return String((val as { data?: string }).data || '');
+  if (typeof val === 'object' && val) {
+    const m = val as { src?: string; libId?: string; data?: string };
+    if (m.libId) {
+      const hit = _libImages.find((im) => im.id === m.libId);
+      if (hit?.data) return String(hit.data);
+    }
+    if (m.src) return String(m.src);
+    if (m.data) return String(m.data);
+  }
   return '';
 }
 
@@ -595,15 +605,24 @@ function renderBlock(b: LooseBlock): string {
 }
 
 /** Build live `pv-page` HTML from draft CMS blocks. */
-export function renderCmsPageHtml(blocks: unknown[] | undefined | null): string {
-  const list = Array.isArray(blocks) ? (blocks as LooseBlock[]) : [];
-  const inner = list
-    .map((b) => {
-      const html = renderBlock(b);
-      if (!html) return '';
-      return `<div style="${spacingStyle(b.p)}">${html}</div>`;
-    })
-    .filter(Boolean)
-    .join('\n');
-  return `<div class="pv-page">${inner}</div>`;
+export function renderCmsPageHtml(
+  blocks: unknown[] | undefined | null,
+  images?: LibImage[] | null
+): string {
+  const prev = _libImages;
+  _libImages = Array.isArray(images) ? images : [];
+  try {
+    const list = Array.isArray(blocks) ? (blocks as LooseBlock[]) : [];
+    const inner = list
+      .map((b) => {
+        const html = renderBlock(b);
+        if (!html) return '';
+        return `<div style="${spacingStyle(b.p)}">${html}</div>`;
+      })
+      .filter(Boolean)
+      .join('\n');
+    return `<div class="pv-page">${inner}</div>`;
+  } finally {
+    _libImages = prev;
+  }
 }

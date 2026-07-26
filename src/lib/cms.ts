@@ -23,7 +23,7 @@ function href(slug?: string): string {
 }
 
 /* Map one raw CMS menu top-item → the shape the Header renders. */
-function mapTop(m: Record<string, unknown>): MenuTop {
+function mapTop(m: Record<string, unknown>, images: Array<{ id?: string; data?: string }> = []): MenuTop {
   const label = String((m.label as string) ?? '');
   const cols = m.cols as Array<Record<string, unknown>> | undefined;
   const megaEnabled = m.megaEnabled !== false && Array.isArray(cols) && cols.length > 0;
@@ -46,13 +46,19 @@ function mapTop(m: Record<string, unknown>): MenuTop {
   let featured: MenuFeatured | undefined;
   const f = m.featured as Record<string, unknown> | undefined;
   if (f && (f.title || f.text || f.cta)) {
+    let img = f.img ? String(f.img) : '';
+    const libId = f.imgLibId ? String(f.imgLibId) : '';
+    if (!img && libId) {
+      const hit = images.find((im) => im.id === libId);
+      if (hit?.data) img = String(hit.data);
+    }
     featured = {
       title: String((f.title as string) ?? ''),
       text: String((f.text as string) ?? ''),
       cta: String((f.cta as string) ?? ''),
       href: href((f.ctaPage as string) || (f.href as string)),
       bg: f.bg === 'light' ? 'light' : 'dark',
-      img: f.img ? String(f.img) : undefined,
+      img: img || undefined,
     };
   }
 
@@ -63,9 +69,13 @@ function menuFromKvValue(raw: unknown): MenuTop[] | null {
   if (raw == null) return null;
   try {
     const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    const menu = (state as { site?: { menu?: unknown } })?.site?.menu;
+    const site = (state as { site?: { menu?: unknown; images?: unknown } })?.site;
+    const menu = site?.menu;
+    const images = Array.isArray(site?.images)
+      ? (site!.images as Array<{ id?: string; data?: string }>)
+      : [];
     if (!Array.isArray(menu) || menu.length === 0) return null;
-    return menu.map((m) => mapTop(m as Record<string, unknown>));
+    return menu.map((m) => mapTop(m as Record<string, unknown>, images));
   } catch {
     return null;
   }

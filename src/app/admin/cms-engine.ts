@@ -25,14 +25,25 @@ window.storage = {
     } catch (e) { return null; }
   },
   async set(key, value){
-    const r = await fetch('/api/cms', {
-      method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
-      body: JSON.stringify({ key, value: String(value) })
-    });
+    const str = String(value);
+    const tooLargeHint = 'Save failed — media library too large. Use Optimize media or upload fewer/smaller images.';
+    let r;
+    try {
+      r = await fetch('/api/cms', {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+        body: JSON.stringify({ key, value: str })
+      });
+    } catch (e) {
+      if (str.length > 2000000) throw new Error(tooLargeHint);
+      throw e;
+    }
     if (!r.ok) {
       let msg = 'Save failed';
       try { const d = await r.json(); msg = d.error || msg; } catch (e) {}
       if (r.status === 401) throw new Error('Sign in as an approved admin to save to Supabase.');
+      if (r.status === 413 || str.length > 3500000 || /payload|too large|body|entity|request entity|413/i.test(String(msg))) {
+        throw new Error(tooLargeHint);
+      }
       throw new Error(msg);
     }
     return true;
@@ -973,13 +984,25 @@ function getAtPath(path){const parts=path.split('.');const bl=findBlock(parts[0]
 function suggestAltFromName(name){return String(name||'').replace(/\.webp$/i,'').replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim();}
 function clampFocus(n){n=Number(n);if(!isFinite(n))return 50;return Math.max(0,Math.min(100,n));}
 function clampZoom(n){n=Number(n);if(!isFinite(n))return 1;return Math.max(1,Math.min(3,Math.round(n*100)/100));}
-function imgMetaEmpty(){return {src:'',alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1};}
+var IMG_MAX_EDGE=1600;
+var IMG_WEBP_QUALITY=0.75;
+function imgMetaEmpty(){return {src:'',libId:'',alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1};}
+function findLibImg(id){if(!id)return null;return (STATE.site.images||[]).find(function(x){return x.id===id;})||null;}
+function findLibImgByData(data){if(!data)return null;return (STATE.site.images||[]).find(function(x){return x.data===data;})||null;}
 function imgResolve(val){
  if(!val)return imgMetaEmpty();
- if(typeof val==='string')return {src:val,alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1};
- return {src:val.src||'',alt:val.alt||'',title:val.title||'',desc:val.desc||'',caption:val.caption||'',keywords:val.keywords||'',loading:val.loading||'lazy',decorative:!!val.decorative,focusX:clampFocus(val.focusX),focusY:clampFocus(val.focusY),zoom:clampZoom(val.zoom)};
+ if(typeof val==='string')return {src:val,libId:'',alt:'',title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1};
+ var libId=val.libId||'';
+ var src=val.src||'';
+ if(libId){var im=findLibImg(libId);if(im&&im.data)src=im.data;}
+ return {src:src,libId:libId,alt:val.alt||'',title:val.title||'',desc:val.desc||'',caption:val.caption||'',keywords:val.keywords||'',loading:val.loading||'lazy',decorative:!!val.decorative,focusX:clampFocus(val.focusX),focusY:clampFocus(val.focusY),zoom:clampZoom(val.zoom)};
 }
 function imgSrc(val){return imgResolve(val).src;}
+function featImgSrc(feat){
+ if(!feat)return '';
+ if(feat.imgLibId){var im=findLibImg(feat.imgLibId);return im&&im.data?im.data:'';}
+ return feat.img||'';
+}
 function pvImgClick(ev,path){ev.stopPropagation();const blockId=path.split('.')[0];if(blockId)selectBlock(blockId);editPlacementImgMeta(path);}
 function mediaImgCss(fx,fy,zoom){
  fx=clampFocus(fx);fy=clampFocus(fy);
@@ -1004,8 +1027,10 @@ function applyMediaImgStyle(img,fx,fy,zoom){
 }
 function writeMediaImgMeta(path, partial, opts){
  opts=opts||{};
- var cur=imgResolve(getAtPath(path));
- var next={src:cur.src,alt:cur.alt,title:cur.title,desc:cur.desc,caption:cur.caption,keywords:cur.keywords,loading:cur.loading,decorative:cur.decorative,focusX:cur.focusX,focusY:cur.focusY,zoom:cur.zoom};
+ var raw=getAtPath(path);
+ var cur=imgResolve(raw);
+ var libId=(raw&&typeof raw==='object'&&raw.libId)||cur.libId||'';
+ var next={libId:libId,src:libId?'':(cur.src||''),alt:cur.alt,title:cur.title,desc:cur.desc,caption:cur.caption,keywords:cur.keywords,loading:cur.loading,decorative:cur.decorative,focusX:cur.focusX,focusY:cur.focusY,zoom:cur.zoom};
  if(partial){if(partial.focusX!=null)next.focusX=clampFocus(partial.focusX);if(partial.focusY!=null)next.focusY=clampFocus(partial.focusY);if(partial.zoom!=null)next.zoom=clampZoom(partial.zoom);}
  var parts=path.split('.');var bl=findBlock(parts[0]);
  if(!bl)return next;
@@ -1154,11 +1179,11 @@ function sectionImgMeta(cur,path){
  const tags=[];if(m.alt)tags.push('Alt');if(m.title)tags.push('Title');if(m.caption)tags.push('Caption');if(m.desc)tags.push('Meta desc');if(m.keywords)tags.push('Keywords');
  return '<div class="imgseo-card" onclick="editPlacementImgMeta(\''+path+'\')" title="Edit SEO for this section"><img src="'+m.src+'"><div class="imgseo-card-body"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="imgseo-pill">'+SPARK+' Section SEO</span>'+(tags.length?'<span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">'+tags.join(' · ')+'</span>':'')+'</div><div class="imgseo-card-row"><b>Alt</b> '+(m.alt?esc(m.alt):'<span style="opacity:.55">Not set</span>')+'</div>'+(m.title?'<div class="imgseo-card-row"><b>Title</b> '+esc(m.title)+'</div>':'')+(m.caption?'<div class="imgseo-card-row"><b>Caption</b> '+esc(m.caption)+'</div>':'')+'<div class="imgseo-card-hint">Drag image in preview to reposition · click here for SEO</div></div></div>';
 }
-function imagePicker(cur,path){const imgs=STATE.site.images||[];const src=imgSrc(cur);
+function imagePicker(cur,path){const imgs=STATE.site.images||[];const src=imgSrc(cur);const curLib=(cur&&typeof cur==='object'&&cur.libId)||'';
  let h='<div class="fld"><label>Image</label><label class="miniadd" style="display:inline-block;cursor:pointer;margin-bottom:6px">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this,\''+path+'\')"></label>';
  if(imgs.length){
   h+='<div class="img-lib-pick">'+imgs.map(function(im,i){
-   return '<div class="img-lib-thumb'+(src===im.data?' is-on':'')+'">'+
+   return '<div class="img-lib-thumb'+(src===im.data||curLib===im.id?' is-on':'')+'">'+
     '<button type="button" class="img-lib-pick-btn" onclick="pickImg(\''+path+'\',\''+im.id+'\')" title="'+esc(im.name||im.cat||'Image')+'">'+
      '<img src="'+im.data+'" alt="">'+
     '</button>'+
@@ -1167,20 +1192,22 @@ function imagePicker(cur,path){const imgs=STATE.site.images||[];const src=imgSrc
   }).join('')+'</div>';
  }else{h+='<div class="hint">No images yet — upload one above.</div>';}
  h+=sectionImgMeta(cur,path)+'</div>';return h;}
-function pickImg(path,imgId){const im=(STATE.site.images||[]).find(x=>x.id===imgId);if(!im)return;const cur=getAtPath(path);const existing=imgSrc(cur)===im.data?imgResolve(cur):{...imgMetaEmpty(),src:im.data};openPlacementImgMeta(path,im.data,im.name,existing);}
-function editPlacementImgMeta(path){const cur=getAtPath(path);const m=imgResolve(cur);if(!m.src){openNoticeModal({title:'Pick an image first',message:'Choose an image for this section before editing SEO metadata.'});return;}openPlacementImgMeta(path,m.src,'',m);}
-function openPlacementImgMeta(path,src,name,existing){const ex=imgResolve(existing);ex.src=src;window._imgMetaPlacementPath=path;showImgMetaModal({data:src,name:name||'',alt:ex.alt,title:ex.title,desc:ex.desc,caption:ex.caption,keywords:ex.keywords,loading:ex.loading,decorative:ex.decorative,focusX:ex.focusX,focusY:ex.focusY},{placement:true,suggestedAlt:ex.alt||suggestAltFromName(name)});}
+function pickImg(path,imgId){const im=findLibImg(imgId);if(!im)return;const cur=getAtPath(path);const same=(cur&&cur.libId===imgId)||imgSrc(cur)===im.data;const existing=same?imgResolve(cur):{...imgMetaEmpty(),src:im.data,libId:imgId};openPlacementImgMeta(path,im.data,im.name,existing,imgId);}
+function editPlacementImgMeta(path){const cur=getAtPath(path);const m=imgResolve(cur);if(!m.src){openNoticeModal({title:'Pick an image first',message:'Choose an image for this section before editing SEO metadata.'});return;}const libId=(cur&&typeof cur==='object'&&cur.libId)||m.libId||(findLibImgByData(m.src)||{}).id||'';openPlacementImgMeta(path,m.src,'',Object.assign({},m,{libId:libId}),libId);}
+function openPlacementImgMeta(path,src,name,existing,libId){const ex=imgResolve(existing);ex.src=src;window._imgMetaPlacementPath=path;window._imgMetaLibId=libId||ex.libId||(findLibImgByData(src)||{}).id||'';showImgMetaModal({data:src,name:name||'',libId:window._imgMetaLibId,alt:ex.alt,title:ex.title,desc:ex.desc,caption:ex.caption,keywords:ex.keywords,loading:ex.loading,decorative:ex.decorative,focusX:ex.focusX,focusY:ex.focusY},{placement:true,suggestedAlt:ex.alt||suggestAltFromName(name)});}
 function renderImages(){const el=document.getElementById('panel-images');const imgs=STATE.site.images||[];const cats=[...new Set(imgs.map(im=>im.cat).filter(Boolean))];
- let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once, then reuse them in any section. <b>SEO metadata</b> (alt text, title) is added when you pick an image in the <b>Sections</b> tab — each section can have its own SEO for the same file.</div>';
+ let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once, then reuse them in any section. Photos are auto-resized (max '+IMG_MAX_EDGE+'px) and WebP-compressed. <b>SEO metadata</b> is added when you pick an image in the <b>Sections</b> tab.</div>';
  h+='<div class="fld"><label>Upload image(s)</label><input type="file" accept="image/*" multiple id="imgup" onchange="imgUpload(this)"></div>';
+ if(imgs.length)h+='<button type="button" class="miniadd" onclick="optimizeMediaLibrary()" style="margin-bottom:12px">Optimize media library</button><div class="hint" style="margin-top:-8px">Recompress oversized photos and remove duplicate base64 copies from sections — use this if Save is failing.</div>';
  h+='<div class="fld"><label>Filter by category</label><select onchange="IMGFILTER=this.value;renderImages()"><option value="">All ('+imgs.length+')</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>';
  const shown=imgs.map((im,i)=>({im,i})).filter(x=>!IMGFILTER||x.im.cat===IMGFILTER);
  h+=shown.length?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+shown.map(({im,i})=>'<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden;position:relative"><img src="'+im.data+'" style="width:100%;height:68px;object-fit:cover;display:block"><button class="rm" style="position:absolute;top:2px;right:4px;background:rgba(0,0,0,.55);color:#fff;border-radius:2px;padding:1px 5px" onclick="imgRmAsk('+i+')" title="Remove from library">×</button><div style="font-size:.68rem;padding:5px 7px;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div></div>').join('')+'</div>':'<div class="hint">No images yet — upload one above.</div>';
  el.innerHTML=h;}
-function toWebp(dataURL,cb){try{const img=new Image();img.onload=()=>{try{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);cb(c.toDataURL('image/webp',0.82));}catch(e){cb(dataURL)}};img.onerror=()=>cb(dataURL);img.src=dataURL;}catch(e){cb(dataURL)}}
+function toWebp(dataURL,cb){try{const img=new Image();img.onload=()=>{try{var w=img.naturalWidth||img.width||1;var h=img.naturalHeight||img.height||1;var scale=1;if(w>IMG_MAX_EDGE||h>IMG_MAX_EDGE)scale=IMG_MAX_EDGE/Math.max(w,h);var cw=Math.max(1,Math.round(w*scale));var ch=Math.max(1,Math.round(h*scale));const c=document.createElement('canvas');c.width=cw;c.height=ch;c.getContext('2d').drawImage(img,0,0,cw,ch);cb(c.toDataURL('image/webp',IMG_WEBP_QUALITY));}catch(e){cb(dataURL)}};img.onerror=()=>cb(dataURL);img.src=dataURL;}catch(e){cb(dataURL)}}
+function toWebpPromise(dataURL){return new Promise(function(resolve){toWebp(dataURL,resolve);});}
 function imgUpload(inp,pickPath){const files=[...inp.files];if(!files.length)return;inp.value='';let pending=files.length;const uploaded=[];files.forEach(f=>{const r=new FileReader();r.onload=()=>{toWebp(r.result,webp=>{const name=f.name.replace(/\.[^.]+$/,'.webp');const baseName=f.name.replace(/\.[^.]+$/,'');const id=uid();(STATE.site.images=STATE.site.images||[]).push({id,name,data:webp,cat:''});uploaded.push({id,name,baseName,data:webp});pending--;if(pending===0)finishImgUpload(uploaded,pickPath);});};r.readAsDataURL(f);});}
 function finishImgUpload(uploaded,pickPath){renderImages();if(MODE==='library')renderLibrary();save();
- if(pickPath&&uploaded.length===1){const u=uploaded[0];openPlacementImgMeta(pickPath,u.data,u.baseName,{...imgMetaEmpty(),src:u.data});}
+ if(pickPath&&uploaded.length===1){const u=uploaded[0];openPlacementImgMeta(pickPath,u.data,u.baseName,{...imgMetaEmpty(),src:u.data,libId:u.id},u.id);}
  if(MODE==='edit'){renderBuild();renderPreview();}}
 function showImgMetaModal(im,opts){opts=opts||{};const suggestedAlt=opts.suggestedAlt||suggestAltFromName(im.name);
  const isPlacement=!!opts.placement;const m=imgResolve(im);m.data=im.data||m.src;m.name=im.name||'';
@@ -1205,27 +1232,28 @@ function showImgMetaModal(im,opts){opts=opts||{};const suggestedAlt=opts.suggest
   '</div>'+
   '<div class="imgseo-foot"><button class="tbtn solar" style="color:var(--ink)" onclick="confirmImgMeta()">'+(isPlacement?'Save &amp; use in section':'Save')+'</button><button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="closeImgMetaModal()">Cancel</button></div>';
  window._imgMetaDraft=im;window._imgMetaPlacement=!!isPlacement;document.getElementById('modal').classList.add('show');imgMetaLivePreview();}
-function closeImgMetaModal(){closeModal();document.getElementById('modalbox').className='modalbox';window._imgMetaDraft=null;window._imgMetaPlacement=false;window._imgMetaPlacementPath=null;}
+function closeImgMetaModal(){closeModal();document.getElementById('modalbox').className='modalbox';window._imgMetaDraft=null;window._imgMetaPlacement=false;window._imgMetaPlacementPath=null;window._imgMetaLibId=null;}
 function confirmImgMeta(){const d=window._imgMetaDraft;if(!d)return;const f=imgMetaReadForm();
  if(!f.decorative&&!f.alt){openNoticeModal({title:'Alt text required',message:'Please add alt text — it helps SEO and accessibility. Or mark the image as decorative.'});return;}
  const placementPath=window._imgMetaPlacementPath;
  const prev=placementPath?imgResolve(getAtPath(placementPath)):imgMetaEmpty();
- const sameSrc=prev.src&&prev.src===d.data;
- const placement={src:d.data,alt:f.decorative?'':f.alt,title:f.title,desc:f.desc,caption:f.caption,keywords:f.keywords,loading:f.loading||'lazy',decorative:f.decorative,focusX:sameSrc?clampFocus(prev.focusX):50,focusY:sameSrc?clampFocus(prev.focusY):50,zoom:sameSrc?clampZoom(prev.zoom):1};
+ const libId=window._imgMetaLibId||d.libId||(findLibImgByData(d.data)||{}).id||'';
+ const sameSrc=(libId&&prev.libId===libId)||(prev.src&&prev.src===d.data);
+ const placement={libId:libId||'',src:libId?'':(d.data||''),alt:f.decorative?'':f.alt,title:f.title,desc:f.desc,caption:f.caption,keywords:f.keywords,loading:f.loading||'lazy',decorative:f.decorative,focusX:sameSrc?clampFocus(prev.focusX):50,focusY:sameSrc?clampFocus(prev.focusY):50,zoom:sameSrc?clampZoom(prev.zoom):1};
  closeImgMetaModal();
  if(placementPath){upd(placementPath,placement);return;}
  save();renderImages();if(MODE==='library')renderLibrary();}
 function imgMetaUpd(i,k,v){STATE.site.images[i][k]=v;save();if(k==='cat'){renderImages();if(MODE==='library')renderLibrary();}}
-function scrubImgData(obj,data){
+function scrubImgData(obj,data,libId){
  if(!obj||typeof obj!=='object')return;
  Object.keys(obj).forEach(function(k){
   var v=obj[k];
-  if(v===data){obj[k]='';return;}
+  if(data&&v===data){obj[k]='';return;}
   if(v&&typeof v==='object'&&!Array.isArray(v)){
-   if(v.src===data){obj[k]=imgMetaEmpty();return;}
-   scrubImgData(v,data);
+   if((data&&v.src===data)||(libId&&v.libId===libId)){obj[k]=imgMetaEmpty();return;}
+   scrubImgData(v,data,libId);
   }else if(Array.isArray(v)){
-   v.forEach(function(it){if(it&&typeof it==='object')scrubImgData(it,data);});
+   v.forEach(function(it){if(it&&typeof it==='object')scrubImgData(it,data,libId);});
   }
  });
 }
@@ -1247,16 +1275,79 @@ function imgRm(i){
  var im=imgs[i];
  if(!im)return;
  var data=im.data;
+ var libId=im.id;
  imgs.splice(i,1);
- if(data){
-  (STATE.pages||[]).forEach(function(pg){
-   (pg.blocks||[]).forEach(function(bl){scrubImgData(bl.p,data);});
-  });
- }
+ (STATE.pages||[]).forEach(function(pg){
+  (pg.blocks||[]).forEach(function(bl){scrubImgData(bl.p,data,libId);});
+ });
+ (STATE.site.menu||[]).forEach(function(m){
+  if(!m.featured)return;
+  if(m.featured.imgLibId===libId||(data&&m.featured.img===data)){m.featured.img='';m.featured.imgLibId='';}
+ });
  renderImages();
  if(MODE==='library')renderLibrary();
  if(MODE==='edit'){renderBuild();renderPreview();}
  save();
+}
+function dedupePlacementsToLibIds(dataToId){
+ var count=0;
+ var byData=dataToId||{};
+ if(!dataToId){
+  byData={};
+  (STATE.site.images||[]).forEach(function(im){if(im&&im.id&&im.data)byData[im.data]=im.id;});
+ }
+ function walk(obj){
+  if(!obj||typeof obj!=='object')return;
+  if(Array.isArray(obj)){obj.forEach(walk);return;}
+  if(typeof obj.src==='string'&&obj.src&&byData[obj.src]){
+   var id=byData[obj.src];
+   if(obj.libId!==id||obj.src){obj.libId=id;obj.src='';count++;}
+  }else if(obj.libId&&obj.src){
+   obj.src='';count++;
+  }
+  Object.keys(obj).forEach(function(k){
+   if(k==='src'||k==='data')return;
+   var v=obj[k];
+   if(v&&typeof v==='object')walk(v);
+  });
+ }
+ (STATE.pages||[]).forEach(function(pg){(pg.blocks||[]).forEach(function(bl){walk(bl.p);});});
+ (STATE.site.menu||[]).forEach(function(m){
+  if(!m.featured)return;
+  var img=m.featured.img;
+  if(img&&byData[img]){m.featured.imgLibId=byData[img];m.featured.img='';count++;}
+  else if(m.featured.imgLibId&&m.featured.img){m.featured.img='';count++;}
+ });
+ return count;
+}
+async function optimizeMediaLibrary(){
+ var imgs=STATE.site.images||[];
+ if(!imgs.length){openNoticeModal({title:'Nothing to optimize',message:'Upload some images first.'});return;}
+ setSaved('Optimizing media…');
+ var compressed=0;
+ try{
+  // Capture data→id before recompress so placements with old base64 still match.
+  var beforeMap={};
+  imgs.forEach(function(im){if(im&&im.id&&im.data)beforeMap[im.data]=im.id;});
+  for(var i=0;i<imgs.length;i++){
+   var im=imgs[i];
+   if(!im||!im.data)continue;
+   var next=await toWebpPromise(im.data);
+   if(next&&next!==im.data){im.data=next;compressed++;}
+  }
+  var remapped=dedupePlacementsToLibIds(beforeMap);
+  // Also strip any leftover src that still matches the new library bytes.
+  remapped+=dedupePlacementsToLibIds();
+  await save();
+  renderImages();
+  if(MODE==='library')renderLibrary();
+  if(MODE==='edit'){renderBuild();renderPreview();}
+  if(MODE==='mega')renderMega();
+  openNoticeModal({title:'Media optimized',message:'Recompressed '+compressed+' image'+(compressed===1?'':'s')+' and linked '+remapped+' placement'+(remapped===1?'':'s')+' by library ID. Try Save / Publish again.'});
+ }catch(e){
+  setSaved(e&&e.message?e.message:'Optimize failed');
+  openNoticeModal({title:'Optimize failed',message:e&&e.message?e.message:'Could not optimize the media library.'});
+ }
 }
 
 /* ============ SEO TAB ============ */
@@ -2092,7 +2183,7 @@ function openLead(i){var l=leads()[i];if(!l)return;l.isnew=false;
 /* ===== standalone image library ===== */
 function showLibrary(){applyCmsView('library');}
 function renderLibrary(){var el=document.getElementById('library');var imgs=STATE.site.images||[];var cats=[];imgs.forEach(function(im){if(im.cat&&cats.indexOf(im.cat)<0)cats.push(im.cat)});
- var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · auto-converted to WebP. Upload once, then add SEO per section when you use an image.</p></div><div><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
+ var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · resized to max '+IMG_MAX_EDGE+'px and WebP-compressed. Upload once, then add SEO per section when you use an image.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="tbtn2" onclick="optimizeMediaLibrary()" '+(imgs.length?'':'disabled')+'>Optimize media</button><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
  h+='<div class="dash-actions" style="margin-bottom:16px"><select onchange="IMGFILTER=this.value;renderLibrary()" style="padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--card);max-width:260px"><option value="">All categories ('+imgs.length+')</option>'+cats.map(function(c){return '<option'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>';
  var shown=imgs.map(function(im,i){return {im:im,i:i}}).filter(function(x){return !IMGFILTER||x.im.cat===IMGFILTER});
  h+=shown.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'+shown.map(function(o){var im=o.im;return '<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden"><img src="'+im.data+'" style="width:100%;height:100px;object-fit:cover;display:block"><div style="padding:5px 7px;font-size:.68rem;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div><button class="rm" style="margin:4px 7px 6px" onclick="imgRmAsk('+o.i+')">Remove</button></div>';}).join('')+'</div>':'<div class="honest">No images yet. Click <b>+ Upload</b> to add some.</div>';
@@ -2461,7 +2552,7 @@ function addNavPreset(id){
   selectMegaTab(STATE.site.menu.length-1);
   save();
 }
-function featOf(m){if(!m.featured)m.featured={img:'',title:'Book a free survey',text:'No obligation, no pushy sales — just honest advice.',cta:'Get a quote',ctaPage:'',bg:'dark'};if(!m.featured.bg)m.featured.bg='dark';return m.featured;}
+function featOf(m){if(!m.featured)m.featured={img:'',imgLibId:'',title:'Book a free survey',text:'No obligation, no pushy sales — just honest advice.',cta:'Get a quote',ctaPage:'',bg:'dark'};if(!m.featured.bg)m.featured.bg='dark';if(m.featured.imgLibId==null)m.featured.imgLibId='';return m.featured;}
 function megaOn(m){return m.megaEnabled===true || (m.megaEnabled!==false && Array.isArray(m.cols) && m.cols.length > 0);}
 function setMenuIcon(mi,ci,ii,v){STATE.site.menu[mi].cols[ci].items[ii].icon=v;renderMega();save();}
 function setMenuPage(mi,ci,ii,v){var it=STATE.site.menu[mi].cols[ci].items[ii];it.page=v;it.href=v;renderMega();save();}
@@ -2529,10 +2620,11 @@ function confirmRemoveMenuItem(){
     }
   });
 }
-function setFeatImg(id){var im=(STATE.site.images||[]).filter(function(x){return x.id===id})[0];featOf(STATE.site.menu[MEGA_PI]).img=im?im.data:'';renderMega();save();}
-function clearFeatImg(){featOf(STATE.site.menu[MEGA_PI]).img='';renderMega();save();}
+function setFeatImg(id){var im=findLibImg(id);var f=featOf(STATE.site.menu[MEGA_PI]);if(im){f.imgLibId=im.id;f.img='';}else{f.imgLibId='';f.img='';}renderMega();save();}
+function clearFeatImg(){var f=featOf(STATE.site.menu[MEGA_PI]);f.img='';f.imgLibId='';renderMega();save();}
 function menuFeatImgs(feat){var imgs=STATE.site.images||[];if(!imgs.length)return '<div class="hint" style="font-size:.8rem">No images yet — add some in the <b>Media library</b>, then pick one here.</div>';
- return '<div class="iconpick" style="grid-template-columns:repeat(6,1fr)">'+imgs.map(function(im){return '<button class="'+(feat.img===im.data?'on':'')+'" style="aspect-ratio:4/3;overflow:hidden;padding:0" onclick="setFeatImg(\''+im.id+'\')"><img src="'+im.data+'" style="width:100%;height:100%;object-fit:cover"></button>'}).join('')+'</div>'+(feat.img?'<button class="rm" style="margin-top:6px" onclick="clearFeatImg()">remove image</button>':'');
+ var cur=featImgSrc(feat);
+ return '<div class="iconpick" style="grid-template-columns:repeat(6,1fr)">'+imgs.map(function(im){return '<button class="'+(cur===im.data||feat.imgLibId===im.id?'on':'')+'" style="aspect-ratio:4/3;overflow:hidden;padding:0" onclick="setFeatImg(\''+im.id+'\')"><img src="'+im.data+'" style="width:100%;height:100%;object-fit:cover"></button>'}).join('')+'</div>'+(cur?'<button class="rm" style="margin-top:6px" onclick="clearFeatImg()">remove image</button>':'');
 }
 function renderMega(){var el=document.getElementById('megaedit');if(!el)return;var site=STATE&&STATE.site;var M=(site&&site.menu)||[];
  if(!M.length){el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1></div></div><div class="honest">No menu items yet. <button class="tbtn2" onclick="STATE.site.menu=[{label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]}];selectMegaTab(0);save()">Add one</button></div></div>';return;}
@@ -2542,8 +2634,9 @@ function renderMega(){var el=document.getElementById('megaedit');if(!el)return;v
  if(mega){
    var cols=(sel.cols||[]).map(function(c){return '<div class="mm-col"><div class="mm-ey">'+esc(c.ey)+'</div>'+(c.items||[]).map(function(it){return '<div class="mm-item"><span class="ic">'+icon(it.icon||'solar',18)+'</span><div><b>'+esc(it.label)+'</b>'+(it.desc?'<span class="mm-d">'+esc(it.desc)+'</span>':'')+'</div></div>';}).join('')+'</div>';}).join('');
    var _tex=feat.bg==='light'?'/assets/heliaxis-card-fill-light.svg':'/assets/heliaxis-card-fill-dark.svg';
-   var fbg=feat.img?' style="background-image:linear-gradient(rgba(20,18,14,.5),rgba(20,18,14,.82)),url('+feat.img+');background-size:cover;background-position:center"':' style="background-image:url('+_tex+');background-size:cover;background-position:top right;background-repeat:no-repeat"';
-   var featured='<div class="mm-featured'+(feat.bg==='light'&&!feat.img?' light':'')+'"'+fbg+'>'+(feat.img?'':'<svg class="mm-spark" viewBox="0 0 24 24" fill="#F8BC1E" width="32" height="32">'+[0,90,180,270].map(function(a){return '<g transform="rotate('+a+' 12 12)">'+RAY+'</g>'}).join('')+'</svg>')+'<div class="mm-ft-t">'+esc(feat.title)+'</div><p>'+esc(feat.text)+'</p><span class="mm-ft-cta">'+esc(feat.cta)+' →</span></div>';
+   var _featSrc=featImgSrc(feat);
+   var fbg=_featSrc?' style="background-image:linear-gradient(rgba(20,18,14,.5),rgba(20,18,14,.82)),url('+_featSrc+');background-size:cover;background-position:center"':' style="background-image:url('+_tex+');background-size:cover;background-position:top right;background-repeat:no-repeat"';
+   var featured='<div class="mm-featured'+(feat.bg==='light'&&!_featSrc?' light':'')+'"'+fbg+'>'+(_featSrc?'':'<svg class="mm-spark" viewBox="0 0 24 24" fill="#F8BC1E" width="32" height="32">'+[0,90,180,270].map(function(a){return '<g transform="rotate('+a+' 12 12)">'+RAY+'</g>'}).join('')+'</svg>')+'<div class="mm-ft-t">'+esc(feat.title)+'</div><p>'+esc(feat.text)+'</p><span class="mm-ft-cta">'+esc(feat.cta)+' →</span></div>';
    panel='<div class="mm-panel" style="grid-template-columns:repeat('+((sel.cols||[]).length)+',1fr) 1.15fr">'+cols+featured+'</div>';
  } else {
    panel='<div style="padding:22px 24px;background:var(--card);font-family:var(--mono);font-size:.75rem;color:var(--muted)">Direct link → '+(sel.href||sel.page?esc(pageName(sel.href||sel.page)):'<span style="color:#b4462f">no page set</span>')+' · no mega panel</div>';
@@ -2747,6 +2840,7 @@ w.logoAdd = logoAdd;
 w.imgRm = imgRm;
 w.imgRmAsk = imgRmAsk;
 w.imgUpload = imgUpload;
+w.optimizeMediaLibrary = optimizeMediaLibrary;
 w.closeImgMetaModal = closeImgMetaModal;
 w.confirmImgMeta = confirmImgMeta;
 w.imgMetaSetLoading = imgMetaSetLoading;
