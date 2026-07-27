@@ -96,6 +96,9 @@ export default function Studio({
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMsg, setSaveMsg] = useState('');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [captionOverride, setCaptionOverride] = useState<string | null>(null);
+  const [capBusy, setCapBusy] = useState(false);
+  const [capErr, setCapErr] = useState('');
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -232,7 +235,32 @@ export default function Studio({
   }
 
   function setTpl(k: TemplateKey) {
+    setCaptionOverride(null);
+    setCapErr('');
     setS((s) => ({ ...s, tpl: k, data: { ...TEMPLATES[k].defaults } }));
+  }
+
+  async function genCaption() {
+    setCapErr('');
+    setCapBusy(true);
+    try {
+      const t = TEMPLATES[S.tpl];
+      const res = await fetch('/api/caption', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tplName: t.name, tplDesc: t.desc, data: S.data, tone: genTone }),
+      });
+      const json = await res.json();
+      setCapBusy(false);
+      if (!res.ok || json.error) {
+        setCapErr(json.error || 'Could not generate caption.');
+        return;
+      }
+      setCaptionOverride(json.caption || '');
+    } catch {
+      setCapBusy(false);
+      setCapErr('Network error — please try again.');
+    }
   }
   function setField(k: string, v: string) {
     setS((s) => ({ ...s, data: { ...s.data, [k]: v } }));
@@ -310,6 +338,8 @@ export default function Studio({
     setPostSource('manual');
     imgsRef.current.photo = null;
     setSaveState('idle');
+    setCaptionOverride(null);
+    setCapErr('');
     setS({
       tpl: 'statement',
       size: 'square',
@@ -359,6 +389,8 @@ export default function Studio({
       skipSave.current = false;
       setPostId(newId());
       setPostSource('ai');
+      setCaptionOverride(null);
+      setCapErr('');
       setS(newState);
       setGenOpen(false);
       setGenTopic('');
@@ -374,6 +406,8 @@ export default function Studio({
     setPostId(row.id);
     setPostSource((row.source as 'manual' | 'ai') || 'manual');
     setSaveState('saved');
+    setCaptionOverride(null);
+    setCapErr('');
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
@@ -479,7 +513,7 @@ export default function Studio({
   }
 
   const tpl = TEMPLATES[S.tpl];
-  const caption = tpl.caption(S.data);
+  const caption = captionOverride ?? tpl.caption(S.data);
 
   return (
     <div className={styles.app}>
@@ -690,10 +724,16 @@ export default function Studio({
           );
         })}
 
-        <div className={styles.ph}>
-          <Spark size={11} /> Suggested caption
+        <div className={`${styles.ph} ${styles.phbetween}`}>
+          <span className={styles.phlabel}>
+            <Spark size={11} /> Suggested caption
+          </span>
+          <button className={styles.phbtn} onClick={genCaption} disabled={capBusy}>
+            {capBusy ? 'Writing…' : '✦ Generate'}
+          </button>
         </div>
         <div className={styles.cap}>{caption}</div>
+        {capErr && <div className={styles.saveerr}>{capErr}</div>}
         <div className={styles.tags}>
           {tpl.tags.map((t) => (
             <span className={styles.tagC} key={t}>
@@ -703,7 +743,11 @@ export default function Studio({
         </div>
         <button
           className={styles.mini}
-          onClick={() => navigator.clipboard?.writeText(caption + '\n\n' + tpl.tags.join(' '))}
+          onClick={() =>
+            navigator.clipboard?.writeText(
+              captionOverride ? caption : caption + '\n\n' + tpl.tags.join(' ')
+            )
+          }
         >
           Copy caption
         </button>
