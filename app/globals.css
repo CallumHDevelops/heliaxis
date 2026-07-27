@@ -1,0 +1,52 @@
+:root {
+  --ink: #211f18;
+  --ink-2: #2c2820;
+  --solar: #f8bc1e;
+  --amber: #e39a0c;
+  --amber-2: #c77f04;
+  --paper: #f7f2e7;
+  --paper-2: #efe8d8;
+  --card: #fffdf8;
+  --muted: #6e6a5e;
+  --muted-d: #a69f8e;
+  --ok: #3f7d4e;
+  --line: rgba(33, 31, 24, 0.14);
+  --line-d: rgba(247, 242, 231, 0.16);
+
+  --display: var(--font-ezra), system-ui, sans-serif;
+  --body: var(--font-body), system-ui, -apple-system, sans-serif;
+  --mono: var(--font-mono), 'SFMono-Regular', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--body);
+  background: var(--paper-2);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

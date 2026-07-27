@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Heliaxis Post Studio
 
-## Getting Started
+An on-brand social post generator for Heliaxis. Next.js (App Router) + Supabase auth + a server-side Claude proxy. Built to hand to a marketing agency: they log in, generate posts, download PNGs, and shared history stops anyone posting the same thing twice.
 
-First, run the development server:
+## What's inside
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Login / Register** — Supabase email + password. Protected routes via `middleware.ts`.
+- **The Studio** — the canvas post tool: 8 templates, 4 sizes, 3 themes, cross-hatch toggle, photo backgrounds, click-to-edit, live caption + hashtags, PNG export.
+- **Generate with Claude** — calls `/api/generate`, a **server** route that holds your Anthropic key. The key is never sent to the browser.
+- **Shared history** — every generated/saved post is stored in Supabase and shown to all users, with Claude told to avoid repeating recent posts.
+
+## Prerequisites
+
+- Node 18.17+
+- A Supabase project
+- An Anthropic API key (console.anthropic.com)
+
+## 1. Fonts and logos (required)
+
+- Put the Ezra `.otf` files in `/fonts`:
+  `Ezra_Black.otf`, `Ezra_ExtraBold.otf`, `Ezra_Bold.otf`, `Ezra_Medium.otf`
+  (see `fonts/README.txt`). Without these the build will fail — Ezra is self-hosted.
+- The logos are already in `/public` (`heliaxis-logo.png`, `heliaxis-logo-light.png`).
+
+## 2. Supabase
+
+1. Create a project at supabase.com.
+2. SQL editor → paste and run `supabase-setup.sql` (creates the `posts` table + policies).
+3. Authentication → Providers → keep **Email** enabled.
+4. Authentication → URL Configuration → add your site URL and
+   `https://YOUR-DOMAIN/auth/callback` as a redirect URL.
+5. Project Settings → API → copy the **Project URL** and **anon public** key.
+
+## 3. Environment variables
+
+Copy `.env.example` to `.env.local` and fill in:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+ANTHROPIC_API_KEY=sk-ant-...        # server-side only, never NEXT_PUBLIC
+ANTHROPIC_MODEL=claude-sonnet-5
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 4. Run locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+# http://localhost:3000  → redirects to /login
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 5. Deploy to Vercel
 
-## Learn More
+1. Push this repo to GitHub.
+2. Import it in Vercel.
+3. Add the four environment variables (Project → Settings → Environment Variables).
+   **`ANTHROPIC_API_KEY` must NOT be prefixed with `NEXT_PUBLIC`** — that's what keeps it server-side.
+4. Deploy. Then point your CNAME/subdomain at the Vercel project (Project → Settings → Domains).
+5. Add the final domain to Supabase's redirect URLs (step 2.4).
 
-To learn more about Next.js, take a look at the following resources:
+## Handing it to your agency
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Create their accounts (Authentication → Users → Invite), then in
+  Authentication → Providers turn **off** public sign-ups so `/register` can't
+  create new accounts.
+- They sign in, generate, download. History is shared across everyone.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Security notes
 
-## Deploy on Vercel
+- The Anthropic key lives only in Vercel's server environment. The browser never sees it.
+- `/api/generate` refuses requests from anyone who isn't signed in.
+- Row Level Security is on; only authenticated users can read/write history.
+- If you want per-user (not shared) history, add an `org_id`/`created_by` filter
+  to the select policy in `supabase-setup.sql`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Extending
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- More templates: add to `TEMPLATES` in `lib/postEngine.ts` (add render handling if the layout is new).
+- Batch mode, scheduled posts, direct publishing: all natural next steps — the engine and history table are ready for them.
