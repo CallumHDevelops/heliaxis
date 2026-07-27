@@ -116,6 +116,11 @@ export default function Studio({
   const [pickLabel, setPickLabel] = useState('');
   const [library, setLibrary] = useState<{ id: string; icon: string; label: string }[]>([]);
   const [libMsg, setLibMsg] = useState('');
+  const [ideasOpen, setIdeasOpen] = useState(false);
+  const [ideas, setIdeas] = useState<{ title: string; brief: string }[]>([]);
+  const [ideasBusy, setIdeasBusy] = useState(false);
+  const [ideasErr, setIdeasErr] = useState('');
+  const [savedIdeas, setSavedIdeas] = useState<{ id: string; title: string; brief: string }[]>([]);
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -322,6 +327,76 @@ export default function Studio({
     await supabase.from('badge_library').delete().eq('id', id);
     loadLibrary();
   }
+  async function updateLibrary(id: string, label: string) {
+    const { error } = await supabase
+      .from('badge_library')
+      .update({ label: label.trim() })
+      .eq('id', id);
+    if (error) {
+      setLibMsg(error.message);
+      return;
+    }
+    loadLibrary();
+  }
+
+  // ---- post ideas ----
+  function openIdeas() {
+    setIdeasErr('');
+    setIdeasOpen(true);
+    loadSavedIdeas();
+    genIdeas();
+  }
+  async function genIdeas() {
+    setIdeasErr('');
+    setIdeasBusy(true);
+    try {
+      const recent = history.slice(0, 25).map((h) => h.headline);
+      const res = await fetch('/api/ideas', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ recent }),
+      });
+      const json = await res.json();
+      setIdeasBusy(false);
+      if (!res.ok || json.error) {
+        setIdeasErr(json.error || 'Could not get ideas.');
+        return;
+      }
+      setIdeas(Array.isArray(json.ideas) ? json.ideas : []);
+    } catch {
+      setIdeasBusy(false);
+      setIdeasErr('Network error — please try again.');
+    }
+  }
+  async function loadSavedIdeas() {
+    const { data } = await supabase
+      .from('saved_ideas')
+      .select('id, title, brief')
+      .order('created_at', { ascending: false });
+    if (data) setSavedIdeas(data as { id: string; title: string; brief: string }[]);
+  }
+  async function saveIdea(idea: { title: string; brief: string }) {
+    setIdeasErr('');
+    const { error } = await supabase
+      .from('saved_ideas')
+      .insert({ title: idea.title, brief: idea.brief });
+    if (error) {
+      setIdeasErr(error.message);
+      return;
+    }
+    loadSavedIdeas();
+  }
+  async function deleteSavedIdea(id: string) {
+    await supabase.from('saved_ideas').delete().eq('id', id);
+    loadSavedIdeas();
+  }
+  function selectIdea(idea: { title: string; brief: string }) {
+    const topic = idea.brief ? `${idea.title} — ${idea.brief}` : idea.title;
+    setGenTopic(topic);
+    setIdeasOpen(false);
+    setGenOpen(true);
+    runGenerate(topic);
+  }
 
   function loadPhoto(file?: File) {
     if (!file) return;
@@ -407,9 +482,10 @@ export default function Studio({
     });
   }
 
-  async function runGenerate() {
+  async function runGenerate(topicArg?: string) {
+    const topic = (topicArg ?? genTopic).trim();
     setGenErr(false);
-    if (!genTopic.trim()) {
+    if (!topic) {
       setGenErr(true);
       setGenStatus('Add a topic or angle first.');
       return;
@@ -426,7 +502,7 @@ export default function Studio({
           tplName: t.name,
           tplDesc: t.desc,
           fields: t.fields,
-          topic: genTopic,
+          topic,
           tone: genTone,
           recent,
         }),
@@ -873,6 +949,9 @@ export default function Studio({
               Choose a template and describe the post. The AI writes on-brand copy, checks it
               against your shared history so you never repeat, and drops it onto the canvas.
             </p>
+            <button className={styles.mini} onClick={openIdeas}>
+              ✦ Not sure what to post? Get ideas
+            </button>
             <div className={styles.fld}>
               <label>Template</label>
               <select value={genTpl} onChange={(e) => setGenTpl(e.target.value as TemplateKey)}>
@@ -904,7 +983,7 @@ export default function Studio({
             <div className={styles.mrow}>
               <button
                 className={`${styles.btn} ${styles.solar}`}
-                onClick={runGenerate}
+                onClick={() => runGenerate()}
                 disabled={busy}
               >
                 {busy ? 'Generating…' : '✦ Generate post'}
@@ -969,6 +1048,81 @@ export default function Studio({
         </div>
       )}
 
+      {/* IDEAS MODAL */}
+      {ideasOpen && (
+        <div className={styles.modal} onClick={() => setIdeasOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setIdeasOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Post ideas
+            </h2>
+            <p className={styles.msub}>
+              A few angles you could post about. Select one to generate it, or save it for later.
+            </p>
+            {savedIdeas.length > 0 && (
+              <>
+                <div className={styles.libLabel}>Saved for later</div>
+                <div className={styles.ideaList}>
+                  {savedIdeas.map((i) => (
+                    <div className={styles.ideaCard} key={i.id}>
+                      <div className={styles.ideaText}>
+                        <div className={styles.ideaTitle}>{i.title}</div>
+                        {i.brief && <div className={styles.ideaBrief}>{i.brief}</div>}
+                      </div>
+                      <div className={styles.ideaActions}>
+                        <button
+                          className={`${styles.btn} ${styles.solar}`}
+                          onClick={() => selectIdea(i)}
+                        >
+                          Select
+                        </button>
+                        <button className={styles.btn} onClick={() => deleteSavedIdea(i.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className={styles.libLabel}>Fresh ideas</div>
+            {ideasErr && <div className={styles.saveerr}>{ideasErr}</div>}
+            <div className={styles.ideaList}>
+              {ideasBusy && <div className={styles.histempty}>Thinking of ideas…</div>}
+              {!ideasBusy && ideas.length === 0 && !ideasErr && (
+                <div className={styles.histempty}>No ideas yet.</div>
+              )}
+              {ideas.map((i, idx) => (
+                <div className={styles.ideaCard} key={idx}>
+                  <div className={styles.ideaText}>
+                    <div className={styles.ideaTitle}>{i.title}</div>
+                    {i.brief && <div className={styles.ideaBrief}>{i.brief}</div>}
+                  </div>
+                  <div className={styles.ideaActions}>
+                    <button
+                      className={`${styles.btn} ${styles.solar}`}
+                      onClick={() => selectIdea(i)}
+                    >
+                      Select
+                    </button>
+                    <button className={styles.btn} onClick={() => saveIdea(i)}>
+                      Save for later
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className={styles.mrow}>
+              <button className={styles.btn} onClick={genIdeas} disabled={ideasBusy}>
+                {ideasBusy ? 'Thinking…' : '✦ Get 5 more'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ICON BANK MODAL */}
       {iconOpen && (
         <div className={styles.modal} onClick={() => setIconOpen(false)}>
@@ -1018,7 +1172,18 @@ export default function Studio({
                         {l.label || prettifyIcon(l.icon)}
                       </button>
                       <button
-                        className={styles.libX}
+                        className={styles.libBtn}
+                        onClick={() => {
+                          const nl = window.prompt('Edit label', l.label);
+                          if (nl !== null) updateLibrary(l.id, nl);
+                        }}
+                        aria-label="Edit label"
+                        title="Edit label"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className={styles.libBtn}
                         onClick={() => deleteFromLibrary(l.id)}
                         aria-label="Remove from library"
                         title="Remove from library"

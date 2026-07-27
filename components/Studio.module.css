@@ -552,19 +552,68 @@
 .libItem .presetBtn {
   border-radius: 3px 0 0 3px;
 }
-.libX {
+.libBtn {
   border: 1px solid var(--line);
   border-left: 0;
   background: var(--card);
   cursor: pointer;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.85rem;
   line-height: 1;
   padding: 0 9px;
+}
+.libBtn:hover {
+  color: var(--ink);
+  border-color: var(--solar);
+}
+.libItem .libBtn:last-child {
   border-radius: 0 3px 3px 0;
 }
-.libX:hover {
-  color: #b4462f;
+
+/* post ideas */
+.ideaList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.ideaCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 11px 13px;
+  background: var(--card);
+}
+.ideaText {
+  min-width: 0;
+}
+.ideaTitle {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.ideaBrief {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.ideaActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ideaActions .btn {
+  color: var(--ink);
+  border-color: var(--line);
+  padding: 6px 11px;
+  font-size: 0.78rem;
+}
+.ideaActions .btn.solar {
+  color: var(--ink);
   border-color: var(--solar);
 }
 .iconGrid {

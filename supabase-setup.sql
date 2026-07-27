@@ -70,8 +70,34 @@ create policy "authenticated can read badge_library"
 create policy "authenticated can insert badge_library"
   on public.badge_library for insert to authenticated with check (true);
 
+create policy "authenticated can update badge_library"
+  on public.badge_library for update to authenticated using (true) with check (true);
+
 create policy "authenticated can delete badge_library"
   on public.badge_library for delete to authenticated using (true);
+
+-- ============================================================
+-- Saved post ideas — "save for later" from the Get Ideas generator.
+-- Shared across all users.
+-- ============================================================
+create table if not exists public.saved_ideas (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  title       text not null,
+  brief       text not null default ''
+);
+
+alter table public.saved_ideas enable row level security;
+
+create policy "authenticated can read saved_ideas"
+  on public.saved_ideas for select to authenticated using (true);
+
+create policy "authenticated can insert saved_ideas"
+  on public.saved_ideas for insert to authenticated with check (true);
+
+create policy "authenticated can delete saved_ideas"
+  on public.saved_ideas for delete to authenticated using (true);
 
 -- ============================================================
 -- Auth note: in Dashboard → Authentication → Providers, keep Email enabled.
