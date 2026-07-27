@@ -36,6 +36,13 @@ create policy "authenticated can insert posts"
   to authenticated
   with check (true);
 
+-- …update posts (needed for auto-save, which upserts a post by its id)…
+create policy "authenticated can update posts"
+  on public.posts for update
+  to authenticated
+  using (true)
+  with check (true);
+
 -- …and delete (used by "Clear all"). Tighten to (created_by = auth.uid())
 -- if you'd rather each user only clear their own.
 create policy "authenticated can delete posts"

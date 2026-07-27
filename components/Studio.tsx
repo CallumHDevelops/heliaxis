@@ -19,6 +19,14 @@ import {
 } from '@/lib/postEngine';
 import styles from './Studio.module.css';
 
+function newId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 interface HistoryRow {
   id: string;
   tpl: string;
@@ -82,6 +90,14 @@ export default function Studio({
   const [usersMsg, setUsersMsg] = useState('');
   const [usersBusy, setUsersBusy] = useState(false);
 
+  // per-post identity + auto-save
+  const [postId, setPostId] = useState<string>(() => newId());
+  const [postSource, setPostSource] = useState<'manual' | 'ai'>('manual');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveMsg, setSaveMsg] = useState('');
+  const firstRun = useRef(true);
+  const skipSave = useRef(false);
+
   const supabase = createClient();
 
   // resolve next/font family names + load logo images once
@@ -142,6 +158,47 @@ export default function Studio({
     Sref.current = S;
     draw();
   }, [S, draw]);
+
+  // auto-save the current post (upsert by id) shortly after any change
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    if (skipSave.current) {
+      skipSave.current = false;
+      return;
+    }
+    setSaveState('saving');
+    const h = setTimeout(() => {
+      autosave();
+    }, 1000);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [S]);
+
+  async function autosave() {
+    const { error } = await supabase.from('posts').upsert(
+      {
+        id: postId,
+        tpl: S.tpl,
+        size: S.size,
+        theme: S.theme,
+        hatch: S.hatch,
+        data: S.data,
+        headline: headlineOf(S.data),
+        source: postSource,
+      },
+      { onConflict: 'id' }
+    );
+    if (error) {
+      setSaveState('error');
+      setSaveMsg(error.message);
+      return;
+    }
+    setSaveState('saved');
+    loadHistory();
+  }
 
   async function loadHistory() {
     const { data } = await supabase
@@ -225,18 +282,19 @@ export default function Studio({
     return (data.headline || data.stat || data.quote || '').split('*').join('');
   }
 
-  async function saveToHistory(source: string) {
-    const row = {
-      tpl: S.tpl,
-      size: S.size,
-      theme: S.theme,
-      hatch: S.hatch,
-      data: S.data,
-      headline: headlineOf(S.data),
-      source,
-    };
-    const { error } = await supabase.from('posts').insert(row);
-    if (!error) loadHistory();
+  function newPost() {
+    skipSave.current = true;
+    setPostId(newId());
+    setPostSource('manual');
+    imgsRef.current.photo = null;
+    setSaveState('idle');
+    setS({
+      tpl: 'statement',
+      size: 'square',
+      theme: 'dark',
+      hatch: true,
+      data: { ...TEMPLATES.statement.defaults },
+    });
   }
 
   async function runGenerate() {
@@ -275,18 +333,11 @@ export default function Studio({
       for (const f of TEMPLATES[genTpl].fields) if (obj[f]) next[f] = obj[f];
       if (!next.footer) next.footer = 'heliaxis.co.uk · 01633 965205';
       const newState: PostState = { ...S, tpl: genTpl, data: next };
+      // start a fresh saved record for the generated post; autosave persists it
+      skipSave.current = false;
+      setPostId(newId());
+      setPostSource('ai');
       setS(newState);
-      // save generated post to shared history
-      await supabase.from('posts').insert({
-        tpl: genTpl,
-        size: S.size,
-        theme: S.theme,
-        hatch: S.hatch,
-        data: next,
-        headline: headlineOf(next),
-        source: 'ai',
-      });
-      loadHistory();
       setGenOpen(false);
       setGenTopic('');
     } catch (err) {
@@ -297,6 +348,10 @@ export default function Studio({
   }
 
   function loadHistoryRow(row: HistoryRow) {
+    skipSave.current = true;
+    setPostId(row.id);
+    setPostSource((row.source as 'manual' | 'ai') || 'manual');
+    setSaveState('saved');
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
@@ -417,6 +472,9 @@ export default function Studio({
           </button>
           <button className={styles.btn} onClick={() => setGenOpen(true)}>
             <Spark size={12} /> Generate
+          </button>
+          <button className={styles.btn} onClick={newPost}>
+            + New Post
           </button>
           <button className={`${styles.btn} ${styles.solar}`} onClick={download}>
             Download PNG
@@ -611,9 +669,12 @@ export default function Studio({
         >
           Copy caption
         </button>
-        <button className={styles.mini} onClick={() => saveToHistory('manual')}>
-          Save to history
-        </button>
+        <div className={styles.savestate} data-state={saveState}>
+          {saveState === 'saving' && 'Saving…'}
+          {saveState === 'saved' && '✓ Saved automatically'}
+          {saveState === 'error' && `Save failed — ${saveMsg}`}
+          {saveState === 'idle' && 'Autosaves as you edit'}
+        </div>
         <div className={styles.note}>
           <b>Before posting:</b> any savings, payback or grant figure must be one you can evidence.
           Add your assumptions and a date where it matters.

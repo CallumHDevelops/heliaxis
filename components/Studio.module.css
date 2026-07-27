@@ -448,6 +448,25 @@
   padding: 30px 0;
 }
 
+.savestate {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 12px;
+  text-align: center;
+}
+.savestate[data-state='saved'] {
+  color: var(--amber-2);
+}
+.savestate[data-state='error'] {
+  color: #b4462f;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
 /* account menu + admin */
 .profile {
   position: relative;
