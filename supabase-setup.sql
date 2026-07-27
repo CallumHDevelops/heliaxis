@@ -10,7 +10,7 @@
 create table if not exists public.posts (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz not null default now(),
-  created_by  uuid references auth.users (id) default auth.uid(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   tpl         text not null,
   size        text not null,
   theme       text not null,
