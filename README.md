@@ -38,9 +38,13 @@ Copy `.env.example` to `.env.local` and fill in:
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-ANTHROPIC_API_KEY=sk-ant-...        # server-side only, never NEXT_PUBLIC
-ANTHROPIC_MODEL=claude-sonnet-5
+OPENROUTER_API_KEY=sk-or-...        # server-side only, never NEXT_PUBLIC
+# optional: OPENAI_API_BASE_URL, OPENAI_MODEL (defaults to OpenRouter + gpt-4o-mini)
 ```
+
+The AI route is OpenAI-compatible and reuses the same env vars as the Heliaxis
+blog CMS (`OPENROUTER_API_KEY` / `OPENAI_API_BASE_URL` / `OPENAI_MODEL`). On the
+shared Vercel project these are already set, so nothing extra is needed there.
 
 ## 4. Run locally
 
@@ -54,8 +58,8 @@ npm run dev
 
 1. Push this repo to GitHub.
 2. Import it in Vercel.
-3. Add the four environment variables (Project → Settings → Environment Variables).
-   **`ANTHROPIC_API_KEY` must NOT be prefixed with `NEXT_PUBLIC`** — that's what keeps it server-side.
+3. Add the environment variables (Project → Settings → Environment Variables).
+   **`OPENROUTER_API_KEY` must NOT be prefixed with `NEXT_PUBLIC`** — that's what keeps it server-side.
 4. Deploy. Then point your CNAME/subdomain at the Vercel project (Project → Settings → Domains).
 5. Add the final domain to Supabase's redirect URLs (step 2.4).
 

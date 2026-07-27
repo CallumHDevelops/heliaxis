@@ -3,6 +3,20 @@ import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
+// AI provider config — OpenAI-compatible (OpenRouter now; swap via env later).
+// Mirrors the existing Heliaxis blog CMS setup so the same account/keys are reused.
+function aiConfig() {
+  const apiKey =
+    process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
+  const baseUrl = (
+    process.env.OPENAI_API_BASE_URL ||
+    process.env.AI_BASE_URL ||
+    'https://openrouter.ai/api/v1'
+  ).replace(/\/$/, '');
+  const model = process.env.OPENAI_MODEL || process.env.AI_MODEL || 'openai/gpt-4o-mini';
+  return { apiKey, baseUrl, model };
+}
+
 // House style + field rules, mirrored from the standalone tool.
 function buildPrompt(
   tplName: string,
@@ -45,9 +59,12 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key)
-    return NextResponse.json({ error: 'Server is missing ANTHROPIC_API_KEY' }, { status: 500 });
+  const { apiKey, baseUrl, model } = aiConfig();
+  if (!apiKey)
+    return NextResponse.json(
+      { error: 'Server is missing AI credentials (set OPENROUTER_API_KEY)' },
+      { status: 500 }
+    );
 
   let body: any;
   try {
@@ -61,27 +78,30 @@ export async function POST(req: Request) {
 
   const prompt = buildPrompt(tplName, tplDesc, fields, topic, tone || 'House style', recent || []);
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
+  const r = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
-      'content-type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://social.heliaxis.co.uk',
+      'X-Title': 'Heliaxis Post Studio',
     },
     body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+      model,
+      temperature: 0.7,
       max_tokens: 700,
+      response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     }),
   });
 
   if (!r.ok) {
     const detail = await r.text();
-    return NextResponse.json({ error: 'Anthropic API error', detail }, { status: 502 });
+    return NextResponse.json({ error: 'AI request failed', detail }, { status: 502 });
   }
 
   const data = await r.json();
-  const text: string = data?.content?.[0]?.text || '';
+  const text: string = data?.choices?.[0]?.message?.content || '';
   let obj: Record<string, string> | null = null;
   try {
     obj = JSON.parse(text.replace(/```json/gi, '').replace(/```/g, '').trim());
