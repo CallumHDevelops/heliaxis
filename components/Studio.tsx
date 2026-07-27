@@ -95,6 +95,7 @@ export default function Studio({
   const [postSource, setPostSource] = useState<'manual' | 'ai'>('manual');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMsg, setSaveMsg] = useState('');
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -204,6 +205,21 @@ export default function Studio({
     skipSave.current = false;
     setSaveState('saving');
     await autosave();
+  }
+
+  async function saveContinue() {
+    await saveNow();
+    setSaveModalOpen(false);
+  }
+  async function saveAndDownload() {
+    await saveNow();
+    setSaveModalOpen(false);
+    download();
+  }
+  async function saveAndNew() {
+    await saveNow();
+    setSaveModalOpen(false);
+    newPost();
   }
 
   async function loadHistory() {
@@ -495,7 +511,7 @@ export default function Studio({
           <button className={styles.btn} onClick={newPost}>
             + New Post
           </button>
-          <button className={styles.btn} onClick={saveNow} disabled={saveState === 'saving'}>
+          <button className={styles.btn} onClick={() => setSaveModalOpen(true)}>
             Save
           </button>
           <button className={`${styles.btn} ${styles.solar}`} onClick={download}>
@@ -805,6 +821,46 @@ export default function Studio({
             <div className={styles.mrow}>
               <button className={styles.btn} onClick={clearHistory}>
                 Clear all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SAVE MODAL */}
+      {saveModalOpen && (
+        <div className={styles.modal} onClick={() => setSaveModalOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setSaveModalOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Save this post
+            </h2>
+            <p className={styles.msub}>
+              Your work autosaves as you edit — choose what to do next.
+            </p>
+            <div className={styles.savechoices}>
+              <button
+                className={`${styles.btn} ${styles.solar}`}
+                onClick={saveContinue}
+                disabled={saveState === 'saving'}
+              >
+                Save &amp; continue editing
+              </button>
+              <button
+                className={styles.btn}
+                onClick={saveAndDownload}
+                disabled={saveState === 'saving'}
+              >
+                Save &amp; download PNG
+              </button>
+              <button
+                className={styles.btn}
+                onClick={saveAndNew}
+                disabled={saveState === 'saving'}
+              >
+                Save &amp; create new post
               </button>
             </div>
           </div>

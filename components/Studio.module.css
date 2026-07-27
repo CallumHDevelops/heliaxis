@@ -474,6 +474,28 @@
   border-color: #e8896f;
 }
 
+/* save modal choices */
+.savechoices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+.savechoices .btn {
+  color: var(--ink);
+  border-color: var(--line);
+  justify-content: center;
+  padding: 13px;
+  font-size: 0.9rem;
+}
+.savechoices .btn.solar {
+  color: var(--ink);
+  border-color: var(--solar);
+}
+.savechoices .btn:hover {
+  border-color: var(--solar);
+}
+
 /* post id + save error in the content panel */
 .postid {
   font-family: var(--mono);
