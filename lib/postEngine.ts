@@ -1,7 +1,14 @@
 // Heliaxis Post Studio — rendering engine.
 // Framework-agnostic: renderPost(canvas, state, images) paints a post.
 
+import { getIconPaths } from './icons';
+
 export const RAY = 'M11 9.6 L13 9.6 L13 0.8 L11 3 Z';
+
+export interface Badge {
+  icon: string; // icon id, e.g. "ic-shield"
+  label: string;
+}
 
 export const C = {
   ink: '#211F18',
@@ -227,6 +234,7 @@ export interface PostState {
   theme: ThemeKey;
   hatch: boolean;
   data: Record<string, string>;
+  badges?: Badge[];
 }
 
 export interface ClickZone {
@@ -438,6 +446,41 @@ export function renderPost(
       cx += ctx.measureText(ch).width + tracking;
     }
   }
+  function roundRectPath(x: number, y: number, w: number, h: number, r: number) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  // draw a 24x24 icon (by id) scaled into a box at (x,y)
+  function drawIcon(id: string, x: number, y: number, size: number, strokeCol: string, fillCol: string) {
+    const paths = getIconPaths(id);
+    if (!paths.length) return;
+    const sc = size / 24;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    ctx.lineWidth = 1.7;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const p of paths) {
+      const pth = new Path2D(p.d);
+      if (p.fill) {
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = fillCol;
+        ctx.fill(pth);
+        ctx.restore();
+      } else {
+        ctx.strokeStyle = strokeCol;
+        ctx.stroke(pth);
+      }
+    }
+    ctx.restore();
+  }
 
   // ---- background ----
   ctx.fillStyle = bg;
@@ -526,6 +569,41 @@ export function renderPost(
     const fy = H - pad + Math.round(6 * u);
     ctx.fillText(d.footer.toUpperCase(), pad, fy);
     zone('footer', pad - 10, fy - Math.round(30 * u), maxW, Math.round(48 * u));
+  }
+
+  // accreditations strip — a row of icon+label badges just above the footer
+  const badges = S.badges || [];
+  if (badges.length) {
+    const iconSz = Math.round(26 * u);
+    const padIn = Math.round(11 * u);
+    const gap = Math.round(9 * u);
+    const lblSz = Math.round(17 * u);
+    const pillH = Math.round(42 * u);
+    let bx = pad;
+    let by = H - pad - Math.round(54 * u); // pill vertical centre
+    for (const bd of badges) {
+      const label = (bd.label || '').toUpperCase();
+      setMono(lblSz, 600);
+      const lblW = label ? ctx.measureText(label).width : 0;
+      const pillW = padIn + iconSz + (label ? Math.round(7 * u) + lblW : 0) + padIn;
+      if (bx + pillW > W - pad && bx > pad) {
+        bx = pad;
+        by -= pillH + gap;
+      }
+      roundRectPath(bx, by - pillH / 2, pillW, pillH, Math.round(6 * u));
+      ctx.strokeStyle = sub;
+      ctx.lineWidth = Math.max(1, Math.round(1.3 * u));
+      ctx.stroke();
+      drawIcon(bd.icon, bx + padIn, by - iconSz / 2, iconSz, fg, accent);
+      if (label) {
+        setMono(lblSz, 600);
+        ctx.fillStyle = fg;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, bx + padIn + iconSz + Math.round(7 * u), by);
+        ctx.textBaseline = 'alphabetic';
+      }
+      bx += pillW + gap;
+    }
   }
 
   const top = pad + Math.round(120 * u);

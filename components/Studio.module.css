@@ -474,6 +474,103 @@
   border-color: #e8896f;
 }
 
+/* accreditation badges + icon bank */
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.badgeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--body);
+  font-size: 0.72rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 5px 4px 7px;
+  color: var(--ink);
+}
+.badgeIco {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.badgeX {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.badgeX:hover {
+  color: #b4462f;
+}
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.presetBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  padding: 7px 11px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.presetBtn:hover {
+  border-color: var(--solar);
+}
+.presetBtn .badgeIco {
+  width: 17px;
+  height: 17px;
+}
+.iconGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  max-height: 38vh;
+  overflow-y: auto;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px;
+  background: var(--paper-2);
+}
+.iconCell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--card);
+  cursor: pointer;
+}
+.iconCell svg {
+  width: 22px;
+  height: 22px;
+}
+.iconCell:hover {
+  border-color: var(--solar);
+}
+.iconCell.on {
+  border-color: var(--solar);
+  background: rgba(248, 188, 30, 0.18);
+}
+
 /* section header with an inline action (e.g. caption Generate) */
 .phbetween {
   justify-content: space-between;

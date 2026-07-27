@@ -16,8 +16,19 @@ import {
   type ThemeKey,
   type ClickZone,
   type RenderImages,
+  type Badge,
 } from '@/lib/postEngine';
+import { ICON_IDS, ICON_SPRITE } from '@/lib/iconSprite';
+import { prettifyIcon } from '@/lib/icons';
 import styles from './Studio.module.css';
+
+const BADGE_PRESETS: Badge[] = [
+  { icon: 'ic-shield', label: 'MCS Certified' },
+  { icon: 'ic-award', label: 'TrustMark' },
+  { icon: 'ic-check', label: 'RECC' },
+  { icon: 'ic-percent', label: '0% VAT' },
+  { icon: 'ic-leaf', label: 'Renewable' },
+];
 
 function newId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -66,6 +77,7 @@ export default function Studio({
     theme: 'dark',
     hatch: true,
     data: { ...TEMPLATES.statement.defaults },
+    badges: [],
   });
 
   const [genOpen, setGenOpen] = useState(false);
@@ -99,6 +111,9 @@ export default function Studio({
   const [captionOverride, setCaptionOverride] = useState<string | null>(null);
   const [capBusy, setCapBusy] = useState(false);
   const [capErr, setCapErr] = useState('');
+  const [iconOpen, setIconOpen] = useState(false);
+  const [pickIcon, setPickIcon] = useState('');
+  const [pickLabel, setPickLabel] = useState('');
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -189,7 +204,7 @@ export default function Studio({
         size: S.size,
         theme: S.theme,
         hatch: S.hatch,
-        data: S.data,
+        data: { ...S.data, __badges: JSON.stringify(S.badges || []) },
         headline: headlineOf(S.data),
         source: postSource,
       },
@@ -264,6 +279,19 @@ export default function Studio({
   }
   function setField(k: string, v: string) {
     setS((s) => ({ ...s, data: { ...s.data, [k]: v } }));
+  }
+
+  function addBadge(icon: string, label: string) {
+    if (!icon) return;
+    setS((s) => ({ ...s, badges: [...(s.badges || []), { icon, label: label.trim() }] }));
+  }
+  function removeBadge(i: number) {
+    setS((s) => ({ ...s, badges: (s.badges || []).filter((_, j) => j !== i) }));
+  }
+  function openIconBank() {
+    setPickIcon('');
+    setPickLabel('');
+    setIconOpen(true);
   }
 
   function loadPhoto(file?: File) {
@@ -346,6 +374,7 @@ export default function Studio({
       theme: 'dark',
       hatch: true,
       data: { ...TEMPLATES.statement.defaults },
+      badges: [],
     });
   }
 
@@ -408,12 +437,21 @@ export default function Studio({
     setSaveState('saved');
     setCaptionOverride(null);
     setCapErr('');
+    const raw = { ...row.data } as Record<string, string>;
+    let badges: Badge[] = [];
+    try {
+      badges = raw.__badges ? JSON.parse(raw.__badges) : [];
+    } catch {
+      badges = [];
+    }
+    delete raw.__badges;
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
       theme: (row.theme as ThemeKey) || 'dark',
       hatch: row.hatch !== false,
-      data: { ...row.data },
+      data: raw,
+      badges,
     });
     setHistOpen(false);
   }
@@ -517,6 +555,8 @@ export default function Studio({
 
   return (
     <div className={styles.app}>
+      {/* hidden icon sprite for <use> references */}
+      <div style={{ display: 'none' }} aria-hidden dangerouslySetInnerHTML={{ __html: ICON_SPRITE }} />
       <div className={styles.bar}>
         <div className={styles.lt}>
           <img src="/heliaxis-logo-light.png" alt="Heliaxis" />
@@ -684,6 +724,35 @@ export default function Studio({
         <button className={styles.mini} onClick={clearPhoto}>
           Remove photo
         </button>
+
+        <div className={styles.ph}>
+          <Spark size={11} /> Accreditations
+        </div>
+        {(S.badges || []).length > 0 && (
+          <div className={styles.badgeRow}>
+            {(S.badges || []).map((b, i) => (
+              <span className={styles.badgeChip} key={i}>
+                <svg className={styles.badgeIco} aria-hidden>
+                  <use href={`#${b.icon}`} />
+                </svg>
+                {b.label || prettifyIcon(b.icon)}
+                <button
+                  className={styles.badgeX}
+                  onClick={() => removeBadge(i)}
+                  aria-label="Remove badge"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <button className={styles.mini} onClick={openIconBank}>
+          + Add badge / icon
+        </button>
+        <div className={styles.hint}>
+          A row of small icon badges above the footer — e.g. MCS Certified, TrustMark, 0% VAT.
+        </div>
       </div>
 
       {/* CENTRE */}
@@ -865,6 +934,81 @@ export default function Studio({
             <div className={styles.mrow}>
               <button className={styles.btn} onClick={clearHistory}>
                 Clear all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ICON BANK MODAL */}
+      {iconOpen && (
+        <div className={styles.modal} onClick={() => setIconOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setIconOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Icon bank
+            </h2>
+            <p className={styles.msub}>
+              Pick an icon and label for the accreditations strip, or tap a quick preset.
+            </p>
+            <div className={styles.presets}>
+              {BADGE_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  className={styles.presetBtn}
+                  onClick={() => {
+                    addBadge(p.icon, p.label);
+                    setIconOpen(false);
+                  }}
+                >
+                  <svg className={styles.badgeIco} aria-hidden>
+                    <use href={`#${p.icon}`} />
+                  </svg>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className={styles.iconGrid}>
+              {ICON_IDS.map((id) => (
+                <button
+                  key={id}
+                  className={`${styles.iconCell} ${pickIcon === id ? styles.on : ''}`}
+                  title={prettifyIcon(id)}
+                  onClick={() => {
+                    setPickIcon(id);
+                    if (!pickLabel.trim()) setPickLabel(prettifyIcon(id));
+                  }}
+                >
+                  <svg aria-hidden>
+                    <use href={`#${id}`} />
+                  </svg>
+                </button>
+              ))}
+            </div>
+            <div className={styles.fld}>
+              <label>Label (optional)</label>
+              <input
+                type="text"
+                value={pickLabel}
+                onChange={(e) => setPickLabel(e.target.value)}
+                placeholder="e.g. MCS Certified"
+              />
+            </div>
+            <div className={styles.mrow}>
+              <button
+                className={`${styles.btn} ${styles.solar}`}
+                disabled={!pickIcon}
+                onClick={() => {
+                  addBadge(pickIcon, pickLabel);
+                  setIconOpen(false);
+                }}
+              >
+                Add to post
+              </button>
+              <button className={styles.btn} onClick={() => setIconOpen(false)}>
+                Cancel
               </button>
             </div>
           </div>
