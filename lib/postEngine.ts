@@ -506,11 +506,18 @@ export function renderPost(
 
   if (tpl === 'stat') {
     cy = eyebrow(d.eyebrow, top);
-    setFont(900, Math.round(200 * u));
+    // auto-fit the big number so long figures (e.g. "4,200 kWh") never overflow
+    let statSize = 200;
+    setFont(900, Math.round(statSize * u));
+    while (statSize > 64 && ctx.measureText(d.stat).width > maxW) {
+      statSize -= 6;
+      setFont(900, Math.round(statSize * u));
+    }
     ctx.fillStyle = accent;
-    ctx.fillText(d.stat, pad, cy + Math.round(150 * u));
-    zone('stat', pad - 10, cy, maxW, Math.round(180 * u));
-    cy = cy + Math.round(150 * u) + Math.round(60 * u);
+    const statBase = cy + Math.round(statSize * 0.75 * u);
+    ctx.fillText(d.stat, pad, statBase);
+    zone('stat', pad - 10, cy, maxW, Math.round(statSize * u));
+    cy = statBase + Math.round(60 * u);
     setFont(800, Math.round(64 * u));
     const sl = cy;
     cy = drawLines(d.statlabel, pad, cy, maxW, Math.round(70 * u), fg);

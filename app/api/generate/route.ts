@@ -40,13 +40,13 @@ BRAND VOICE: confident, plain-spoken, benefit-led, honest. Numbers over adjectiv
 TONE FOR THIS POST: ${tone}
 
 TEMPLATE: ${tplName} (${tplDesc}). Fill EXACTLY these fields: ${fieldList}.
-FIELD RULES: 'eyebrow' = 2-4 word ALL-CAPS kicker. 'headline' = short and punchy; wrap ONE or TWO key words in *asterisks* to accent them gold. 'sub' = one or two plain sentences. 'stat' = a short figure like £1,400 or 68%. 'footer' = always "heliaxis.co.uk · 01633 965205". Keep it tight — this is a graphic, not an article.
+FIELD RULES: 'eyebrow' = 2-4 word ALL-CAPS kicker. 'headline' = short and punchy; wrap ONE or TWO key words in *asterisks* to accent them gold. 'sub' = one or two plain sentences. 'stat' = ONE clean figure WITH its correct unit and nothing else — no square brackets, no words around it. Use the right unit: energy generated or used = kWh (never kV, and never kW for a total amount), system size = kWp or kW, money = £, proportions = %. Keep it short enough to sit on one line (e.g. £1,400, 68%, 4,200 kWh). 'statlabel' = a few words saying what the figure is (e.g. "generated a year."). On a stat post the 'sub' MUST give the context that makes the number meaningful — system size, property type and orientation/location (e.g. "From a 5.2 kWp array on a south-facing roof in Newport."). Never present a number without saying what produced it. 'footer' = always "heliaxis.co.uk · 01633 965205". Keep it tight — this is a graphic, not an article.
 
 TOPIC / ANGLE FROM THE USER:
 ${topic}
 
 ${avoid ? `AVOID REPEATING these recent posts — make this meaningfully different in angle and wording:\n${avoid}\n` : ''}
-COMPLIANCE: Do not invent specific savings, payback, percentages or prices. If the user supplied a figure, use it; otherwise keep claims general or use a clearly illustrative placeholder in [square brackets] the user must verify.
+COMPLIANCE: Never wrap numbers in square brackets or any placeholder punctuation — write every number as a real, plain figure. Do not invent precise savings, payback or prices. If the user gave a figure, use it exactly. If not, give a realistic, clearly illustrative example AND state the assumptions behind it in 'sub' (system size, orientation, tariff) so no figure ever appears without context. Every number must carry a correct unit and something a reader can sense-check.
 
 Respond with ONLY a JSON object mapping each required field to its string value. No markdown, no commentary, no code fences. Fields: ${fieldList}.`;
 }

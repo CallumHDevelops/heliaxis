@@ -31,7 +31,21 @@ interface HistoryRow {
   created_at: string;
 }
 
-export default function Studio({ userEmail }: { userEmail: string }) {
+interface AdminUser {
+  id: string;
+  email: string;
+  created_at: string;
+  last_sign_in_at: string | null;
+  confirmed: boolean;
+}
+
+export default function Studio({
+  userEmail,
+  isAdmin,
+}: {
+  userEmail: string;
+  isAdmin: boolean;
+}) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const zonesRef = useRef<ClickZone[]>([]);
@@ -55,6 +69,18 @@ export default function Studio({ userEmail }: { userEmail: string }) {
   const [genStatus, setGenStatus] = useState('');
   const [genErr, setGenErr] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // account menu + admin
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDraft, setEmailDraft] = useState(userEmail);
+  const [emailMsg, setEmailMsg] = useState('');
+  const [emailErr, setEmailErr] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersMsg, setUsersMsg] = useState('');
+  const [usersBusy, setUsersBusy] = useState(false);
 
   const supabase = createClient();
 
@@ -221,7 +247,7 @@ export default function Studio({ userEmail }: { userEmail: string }) {
       return;
     }
     setBusy(true);
-    setGenStatus('✦ Claude is writing your post…');
+    setGenStatus('✦ Writing your post…');
     const t = TEMPLATES[genTpl];
     const recent = history.slice(0, 25).map((h) => h.headline);
     try {
@@ -293,6 +319,88 @@ export default function Studio({ userEmail }: { userEmail: string }) {
     router.refresh();
   }
 
+  async function saveEmail() {
+    setEmailErr(false);
+    setEmailMsg('');
+    const email = emailDraft.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setEmailErr(true);
+      setEmailMsg('Enter a valid email address.');
+      return;
+    }
+    setEmailBusy(true);
+    try {
+      const res = await fetch('/api/account/email', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const json = await res.json();
+      setEmailBusy(false);
+      if (!res.ok || json.error) {
+        setEmailErr(true);
+        setEmailMsg(json.error || 'Could not update email.');
+        return;
+      }
+      setEmailMsg('Email updated.');
+      router.refresh();
+      setTimeout(() => setEmailOpen(false), 900);
+    } catch {
+      setEmailBusy(false);
+      setEmailErr(true);
+      setEmailMsg('Network error — please try again.');
+    }
+  }
+
+  async function loadUsers() {
+    setUsersBusy(true);
+    setUsersMsg('');
+    try {
+      const res = await fetch('/api/admin/users');
+      const json = await res.json();
+      setUsersBusy(false);
+      if (!res.ok || json.error) {
+        setUsersMsg(json.error || 'Could not load users.');
+        return;
+      }
+      setUsers(json.users || []);
+    } catch {
+      setUsersBusy(false);
+      setUsersMsg('Network error — please try again.');
+    }
+  }
+
+  function openAdmin() {
+    setMenuOpen(false);
+    setAdminOpen(true);
+    loadUsers();
+  }
+
+  async function deleteUser(id: string, email: string) {
+    if (!confirm(`Delete ${email}? This permanently removes their login and cannot be undone.`))
+      return;
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        setUsersMsg(json.error || 'Could not delete user.');
+        return;
+      }
+      setUsers((list) => list.filter((u) => u.id !== id));
+    } catch {
+      setUsersMsg('Network error — please try again.');
+    }
+  }
+
+  function fmtDate(iso: string | null) {
+    if (!iso) return 'never';
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: '2-digit',
+    });
+  }
+
   const tpl = TEMPLATES[S.tpl];
   const caption = tpl.caption(S.data);
 
@@ -304,7 +412,6 @@ export default function Studio({ userEmail }: { userEmail: string }) {
           <span className={styles.tag}>Post Studio</span>
         </div>
         <div className={styles.rt}>
-          <span className={styles.who}>{userEmail}</span>
           <button className={styles.btn} onClick={() => setHistOpen(true)}>
             History
           </button>
@@ -314,9 +421,50 @@ export default function Studio({ userEmail }: { userEmail: string }) {
           <button className={`${styles.btn} ${styles.solar}`} onClick={download}>
             Download PNG
           </button>
-          <button className={styles.btn} onClick={signOut}>
-            Sign out
-          </button>
+          <div className={styles.profile}>
+            <button
+              className={styles.avatar}
+              onClick={() => setMenuOpen((o) => !o)}
+              title={userEmail}
+              aria-label="Account menu"
+            >
+              {(userEmail[0] || '?').toUpperCase()}
+            </button>
+            {menuOpen && (
+              <>
+                <div className={styles.menuback} onClick={() => setMenuOpen(false)} />
+                <div className={styles.menu}>
+                  <div className={styles.menuhead}>
+                    <div className={styles.menuemail}>{userEmail}</div>
+                    <div className={styles.menurole}>{isAdmin ? 'Administrator' : 'Member'}</div>
+                  </div>
+                  <button
+                    className={styles.menuitem}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setEmailDraft(userEmail);
+                      setEmailMsg('');
+                      setEmailErr(false);
+                      setEmailOpen(true);
+                    }}
+                  >
+                    Edit email
+                  </button>
+                  {isAdmin && (
+                    <button className={styles.menuitem} onClick={openAdmin}>
+                      Manage users
+                    </button>
+                  )}
+                  <button
+                    className={`${styles.menuitem} ${styles.menusignout}`}
+                    onClick={signOut}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -480,10 +628,10 @@ export default function Studio({ userEmail }: { userEmail: string }) {
               ×
             </button>
             <h2 className={styles.mtitle}>
-              <Spark size={16} /> Generate a post with Claude
+              <Spark size={16} /> Generate a post with AI
             </h2>
             <p className={styles.msub}>
-              Choose a template and describe the post. Claude writes on-brand copy, checks it
+              Choose a template and describe the post. The AI writes on-brand copy, checks it
               against your shared history so you never repeat, and drops it onto the canvas.
             </p>
             <div className={styles.fld}>
@@ -576,6 +724,101 @@ export default function Studio({ userEmail }: { userEmail: string }) {
             <div className={styles.mrow}>
               <button className={styles.btn} onClick={clearHistory}>
                 Clear all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT EMAIL MODAL */}
+      {emailOpen && (
+        <div className={styles.modal} onClick={() => setEmailOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setEmailOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Your account
+            </h2>
+            <p className={styles.msub}>Update the email address you sign in with.</p>
+            <div className={styles.fld}>
+              <label>Email</label>
+              <input
+                type="email"
+                value={emailDraft}
+                onChange={(e) => setEmailDraft(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div className={`${styles.gstatus} ${emailErr ? styles.err : ''}`}>{emailMsg}</div>
+            <div className={styles.mrow}>
+              <button
+                className={`${styles.btn} ${styles.solar}`}
+                onClick={saveEmail}
+                disabled={emailBusy}
+              >
+                {emailBusy ? 'Saving…' : 'Save email'}
+              </button>
+              <button className={styles.btn} onClick={() => setEmailOpen(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE USERS MODAL (admin) */}
+      {adminOpen && isAdmin && (
+        <div className={styles.modal} onClick={() => setAdminOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setAdminOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Manage users
+            </h2>
+            <p className={styles.msub}>
+              Everyone with access to Post Studio. Deleting a user permanently removes their login.
+            </p>
+            {usersMsg && <div className={`${styles.gstatus} ${styles.err}`}>{usersMsg}</div>}
+            <div className={styles.userlist}>
+              {usersBusy && <div className={styles.histempty}>Loading users…</div>}
+              {!usersBusy && users.length === 0 && (
+                <div className={styles.histempty}>No users found.</div>
+              )}
+              {users.map((u) => {
+                const isSelf = u.email.toLowerCase() === userEmail.toLowerCase();
+                return (
+                  <div className={styles.urow} key={u.id}>
+                    <div className={styles.uinfo}>
+                      <div className={styles.uemail}>
+                        {u.email}
+                        {isSelf && <span className={styles.ubadge}>you</span>}
+                        {!u.confirmed && (
+                          <span className={`${styles.ubadge} ${styles.ubadgeMuted}`}>
+                            unconfirmed
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.umeta}>
+                        Joined {fmtDate(u.created_at)} · last in {fmtDate(u.last_sign_in_at)}
+                      </div>
+                    </div>
+                    <button
+                      className={styles.udel}
+                      disabled={isSelf}
+                      title={isSelf ? 'You cannot delete your own account' : 'Delete user'}
+                      onClick={() => deleteUser(u.id, u.email)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.mrow}>
+              <button className={styles.btn} onClick={loadUsers} disabled={usersBusy}>
+                Refresh
               </button>
             </div>
           </div>
