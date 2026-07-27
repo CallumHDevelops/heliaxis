@@ -335,6 +335,26 @@ export function renderPost(
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
+  // Average perceptual luminance (0=black … 1=white) of a region of the
+  // already-composited canvas, so text colour can adapt to what's behind it.
+  function avgLuminance(x: number, y: number, w: number, h: number) {
+    x = Math.max(0, Math.min(W - 1, x));
+    y = Math.max(0, Math.min(H - 1, y));
+    w = Math.max(1, Math.min(W - x, w));
+    h = Math.max(1, Math.min(H - y, h));
+    try {
+      const data = ctx.getImageData(x, y, w, h).data;
+      let sum = 0;
+      let n = 0;
+      for (let i = 0; i < data.length; i += 40) {
+        sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        n++;
+      }
+      return n ? sum / n / 255 : 0;
+    } catch {
+      return 0; // tainted canvas — assume dark, use light text
+    }
+  }
   function wrap(text: string, maxW: number) {
     const lines: string[] = [];
     text.split('\n').forEach((para) => {
@@ -445,10 +465,18 @@ export function renderPost(
     ctx.fillRect(0, 0, W, H);
     if (S.hatch) grid('rgba(247,242,231,.06)', Math.round(W / 17), 0.72);
     glow(W * 0.82, H * 0.12, W * 0.55, '248,188,30', 0.14);
-    fg = C.paper;
-    sub = C.mutedD;
-    accent = C.solar;
-    eyeCol = C.solar;
+    // pick readable colours from the actual composited background where text sits
+    const lum = avgLuminance(
+      Math.round(W * 0.08),
+      Math.round(H * 0.14),
+      Math.round(W * 0.7),
+      Math.round(H * 0.62)
+    );
+    const lightText = lum < 0.58;
+    fg = lightText ? C.paper : C.ink;
+    sub = lightText ? 'rgba(247,242,231,0.92)' : 'rgba(33,31,24,0.82)';
+    accent = lightText ? C.solar : C.amber2;
+    eyeCol = accent;
   } else {
     if (!isGold) {
       const gr = ctx.createLinearGradient(0, 0, W, H);
@@ -483,6 +511,13 @@ export function renderPost(
     ctx.drawImage(lg, pad, pad, lw, lh2);
   }
   sparkPath(W - pad - Math.round(20 * u), pad + Math.round(22 * u), Math.round(40 * u), accent);
+
+  // over a photo, drop a soft shadow behind all text for guaranteed legibility
+  if (imgs.photo) {
+    ctx.shadowColor = fg === C.paper ? 'rgba(0,0,0,0.55)' : 'rgba(247,242,231,0.6)';
+    ctx.shadowBlur = Math.round(12 * u);
+    ctx.shadowOffsetY = Math.round(2 * u);
+  }
 
   // footer
   if (d.footer) {
