@@ -200,6 +200,12 @@ export default function Studio({
     loadHistory();
   }
 
+  async function saveNow() {
+    skipSave.current = false;
+    setSaveState('saving');
+    await autosave();
+  }
+
   async function loadHistory() {
     const { data } = await supabase
       .from('posts')
@@ -467,6 +473,19 @@ export default function Studio({
           <span className={styles.tag}>Post Studio</span>
         </div>
         <div className={styles.rt}>
+          <span
+            className={styles.savebadge}
+            data-state={saveState}
+            title={saveState === 'error' ? saveMsg : undefined}
+          >
+            {saveState === 'saving'
+              ? 'Saving…'
+              : saveState === 'saved'
+                ? '✓ Saved'
+                : saveState === 'error'
+                  ? 'Save failed'
+                  : 'Autosave on'}
+          </span>
           <button className={styles.btn} onClick={() => setHistOpen(true)}>
             History
           </button>
@@ -475,6 +494,9 @@ export default function Studio({
           </button>
           <button className={styles.btn} onClick={newPost}>
             + New Post
+          </button>
+          <button className={styles.btn} onClick={saveNow} disabled={saveState === 'saving'}>
+            Save
           </button>
           <button className={`${styles.btn} ${styles.solar}`} onClick={download}>
             Download PNG
@@ -669,12 +691,10 @@ export default function Studio({
         >
           Copy caption
         </button>
-        <div className={styles.savestate} data-state={saveState}>
-          {saveState === 'saving' && 'Saving…'}
-          {saveState === 'saved' && '✓ Saved automatically'}
-          {saveState === 'error' && `Save failed — ${saveMsg}`}
-          {saveState === 'idle' && 'Autosaves as you edit'}
+        <div className={styles.postid} title={`Full post ID: ${postId}`}>
+          POST ID · <b>{postId.slice(0, 8)}</b>
         </div>
+        {saveState === 'error' && <div className={styles.saveerr}>Save failed — {saveMsg}</div>}
         <div className={styles.note}>
           <b>Before posting:</b> any savings, payback or grant figure must be one you can evidence.
           Add your assumptions and a date where it matters.
@@ -773,7 +793,7 @@ export default function Studio({
                       {TEMPLATES[row.tpl as TemplateKey]?.name} · {row.theme} ·{' '}
                       {dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{' '}
                       {dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                      {row.source === 'ai' ? ' · ✦ generated' : ''}
+                      {row.source === 'ai' ? ' · ✦ generated' : ''} · ID {row.id.slice(0, 8)}
                     </div>
                     <div className={styles.hd}>
                       {row.data?.sub || row.data?.statlabel || row.data?.quote || ''}
