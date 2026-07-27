@@ -114,6 +114,8 @@ export default function Studio({
   const [iconOpen, setIconOpen] = useState(false);
   const [pickIcon, setPickIcon] = useState('');
   const [pickLabel, setPickLabel] = useState('');
+  const [library, setLibrary] = useState<{ id: string; icon: string; label: string }[]>([]);
+  const [libMsg, setLibMsg] = useState('');
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -163,6 +165,7 @@ export default function Studio({
       document.fonts.ready.then(draw);
     }
     loadHistory();
+    loadLibrary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -291,7 +294,33 @@ export default function Studio({
   function openIconBank() {
     setPickIcon('');
     setPickLabel('');
+    setLibMsg('');
+    loadLibrary();
     setIconOpen(true);
+  }
+
+  async function loadLibrary() {
+    const { data } = await supabase
+      .from('badge_library')
+      .select('id, icon, label')
+      .order('created_at', { ascending: true });
+    if (data) setLibrary(data as { id: string; icon: string; label: string }[]);
+  }
+  async function saveToLibrary() {
+    if (!pickIcon) return;
+    setLibMsg('');
+    const { error } = await supabase
+      .from('badge_library')
+      .insert({ icon: pickIcon, label: pickLabel.trim() });
+    if (error) {
+      setLibMsg(error.message);
+      return;
+    }
+    loadLibrary();
+  }
+  async function deleteFromLibrary(id: string) {
+    await supabase.from('badge_library').delete().eq('id', id);
+    loadLibrary();
   }
 
   function loadPhoto(file?: File) {
@@ -970,6 +999,37 @@ export default function Studio({
                 </button>
               ))}
             </div>
+            {library.length > 0 && (
+              <>
+                <div className={styles.libLabel}>Your library</div>
+                <div className={styles.presets}>
+                  {library.map((l) => (
+                    <span className={styles.libItem} key={l.id}>
+                      <button
+                        className={styles.presetBtn}
+                        onClick={() => {
+                          addBadge(l.icon, l.label);
+                          setIconOpen(false);
+                        }}
+                      >
+                        <svg className={styles.badgeIco} aria-hidden>
+                          <use href={`#${l.icon}`} />
+                        </svg>
+                        {l.label || prettifyIcon(l.icon)}
+                      </button>
+                      <button
+                        className={styles.libX}
+                        onClick={() => deleteFromLibrary(l.id)}
+                        aria-label="Remove from library"
+                        title="Remove from library"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
             <div className={styles.iconGrid}>
               {ICON_IDS.map((id) => (
                 <button
@@ -996,6 +1056,7 @@ export default function Studio({
                 placeholder="e.g. MCS Certified"
               />
             </div>
+            {libMsg && <div className={styles.saveerr}>{libMsg}</div>}
             <div className={styles.mrow}>
               <button
                 className={`${styles.btn} ${styles.solar}`}
@@ -1006,6 +1067,9 @@ export default function Studio({
                 }}
               >
                 Add to post
+              </button>
+              <button className={styles.btn} disabled={!pickIcon} onClick={saveToLibrary}>
+                Save to Library
               </button>
               <button className={styles.btn} onClick={() => setIconOpen(false)}>
                 Cancel

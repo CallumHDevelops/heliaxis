@@ -537,6 +537,36 @@
   width: 17px;
   height: 17px;
 }
+.libLabel {
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber-2);
+  margin: 2px 0 8px;
+}
+.libItem {
+  display: inline-flex;
+  align-items: stretch;
+}
+.libItem .presetBtn {
+  border-radius: 3px 0 0 3px;
+}
+.libX {
+  border: 1px solid var(--line);
+  border-left: 0;
+  background: var(--card);
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 9px;
+  border-radius: 0 3px 3px 0;
+}
+.libX:hover {
+  color: #b4462f;
+  border-color: var(--solar);
+}
 .iconGrid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);

@@ -51,6 +51,29 @@ create policy "authenticated can delete posts"
   using (true);
 
 -- ============================================================
+-- Saved badge library — custom accreditation badges (icon + label) that
+-- your team saves and reuses (e.g. SSIP, NAPIT). Shared across all users.
+-- ============================================================
+create table if not exists public.badge_library (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  icon        text not null,
+  label       text not null default ''
+);
+
+alter table public.badge_library enable row level security;
+
+create policy "authenticated can read badge_library"
+  on public.badge_library for select to authenticated using (true);
+
+create policy "authenticated can insert badge_library"
+  on public.badge_library for insert to authenticated with check (true);
+
+create policy "authenticated can delete badge_library"
+  on public.badge_library for delete to authenticated using (true);
+
+-- ============================================================
 -- Auth note: in Dashboard → Authentication → Providers, keep Email enabled.
 -- For an invite-only agency tool, turn OFF "Allow new users to sign up"
 -- once you've created the accounts you need, and invite users instead
