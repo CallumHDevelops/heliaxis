@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" preserveAspectRatio="xMidYMid slice" width="600" height="400">
+  <defs>
+    <pattern id="gridD" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M30 0H0V30" fill="none" stroke="#F7F2E7" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="glowD" cx="0.88" cy="-0.08" r="0.65">
+      <stop offset="0" stop-color="#F8BC1E" stop-opacity="0.20"/>
+      <stop offset="0.55" stop-color="#F8BC1E" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fadeD" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="0.82" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="mD"><rect width="600" height="400" fill="url(#fadeD)"/></mask>
+  </defs>
+  <rect width="600" height="400" fill="#211F18"/>
+  <rect width="600" height="400" fill="url(#glowD)"/>
+  <rect width="600" height="400" fill="url(#gridD)" mask="url(#mD)"/>
+</svg>

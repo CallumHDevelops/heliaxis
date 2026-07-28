@@ -1,0 +1,364 @@
+/* Click heatmap — compact solid dock (Clicks + Search) */
+
+html:has(.admin-shell--flush),
+body:has(.admin-shell--flush) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.hm {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #211f18;
+}
+
+.hm__dock {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  z-index: 20;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(232px, calc(100% - 24px));
+  pointer-events: none;
+  touch-action: none;
+}
+
+.hm__dock.is-moved {
+  top: 0;
+  right: auto;
+  transform: none;
+}
+
+.hm__dock.is-dragging {
+  z-index: 40;
+  opacity: 0.96;
+}
+
+.hm__dock > * {
+  pointer-events: auto;
+}
+
+.hm__drag {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(33, 31, 24, 0.1);
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.hm__drag:active,
+.hm__dock.is-dragging .hm__drag {
+  cursor: grabbing;
+  background: #f7f6f2;
+}
+
+.hm__drag-dots {
+  display: block;
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: #c4c0b4;
+}
+
+.hm__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(33, 31, 24, 0.12);
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.hm__card--search {
+  position: relative;
+}
+
+.hm__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hm__chip-label {
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #8a8678;
+}
+
+.hm__current {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.hm__current b {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #211f18;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hm__current span {
+  font-size: 0.66rem;
+  color: #8a8678;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hm__search {
+  position: relative;
+}
+
+.hm__chip-input,
+.hm__chip-select {
+  font: 600 0.8rem/1.2 system-ui, sans-serif;
+  color: #211f18;
+  background: #f7f6f2;
+  border: 1px solid rgba(33, 31, 24, 0.1);
+  border-radius: 5px;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.hm__chip-input:focus,
+.hm__chip-select:focus {
+  outline: none;
+  border-color: #f8bc1e;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(248, 188, 30, 0.35);
+}
+
+.hm__chip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hm__chip-select--range {
+  flex: 1;
+}
+
+.hm__count {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: #f8bc1e;
+  color: #211f18;
+  white-space: nowrap;
+  min-width: 2.4rem;
+  text-align: center;
+}
+
+.hm__count.is-muted {
+  background: #eeebe3;
+  color: #8a8678;
+}
+
+.hm__mini {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.hm__mini--inline {
+  flex-direction: row;
+}
+
+.hm__mini-btn {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid rgba(33, 31, 24, 0.1);
+  background: #f7f6f2;
+  color: #211f18;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hm__mini-btn:hover {
+  background: #f8bc1e;
+  border-color: #f8bc1e;
+}
+
+/* Floating results — doesn’t stretch the dock */
+.hm__results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 188px;
+  overflow: auto;
+  border: 1px solid rgba(33, 31, 24, 0.12);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.hm__results-empty {
+  padding: 8px;
+  font-size: 0.74rem;
+  color: #8a8678;
+}
+
+.hm__result {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: stretch;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  padding: 6px 7px;
+  cursor: pointer;
+  color: #211f18;
+}
+
+.hm__result:hover,
+.hm__result.is-on {
+  background: rgba(248, 188, 30, 0.2);
+}
+
+.hm__result-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hm__result-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.hm__result-main em {
+  flex-shrink: 0;
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 750;
+  color: #6e6a5e;
+}
+
+.hm__result-path {
+  font-size: 0.64rem;
+  color: #8a8678;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hm__toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 21;
+  max-width: 90%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #b4462f;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.hm__stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-x: hidden;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hm__empty {
+  position: sticky;
+  top: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: fit-content;
+  max-width: calc(100% - 28px);
+  margin: 16px auto 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid rgba(33, 31, 24, 0.12);
+  font-size: 0.82rem;
+  color: #6e6a5e;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.hm__empty strong {
+  color: #211f18;
+  font-size: 0.88rem;
+}
+
+.hm__frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: #fff;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+@media (max-width: 720px) {
+  .hm__dock {
+    right: 8px;
+    width: min(210px, calc(100% - 16px));
+  }
+}

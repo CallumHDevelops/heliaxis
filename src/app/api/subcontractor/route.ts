@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getResendApiKey } from '@/lib/resend';
 
 export async function POST(request: NextRequest) {
   try {
+    const resendKey = getResendApiKey();
     // Check if environment variables are set
-    console.log('🔑 Resend API Key exists:', !!process.env.RESEND_API_KEY);
+    console.log('🔑 Resend API Key exists:', !!resendKey);
     console.log('📧 Admin Email:', process.env.ADMIN_EMAIL || 'NOT SET');
     
     const formData = await request.formData();
@@ -248,11 +250,11 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Authorization': `Bearer ${resendKey}`,
       },
       body: JSON.stringify({
-        from: 'Subcontractor Portal <onboarding@resend.dev>',
-        to: [process.env.ADMIN_EMAIL || 'your-email@example.com'],
+        from: 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
+        to: [process.env.ADMIN_EMAIL || 'hello@heliaxis.co.uk'],
         subject: `🔔 New Subcontractor Onboarding: ${data.companyName}`,
         html: adminEmailHtml,
         reply_to: data.email,
@@ -279,10 +281,10 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Authorization': `Bearer ${resendKey}`,
         },
         body: JSON.stringify({
-          from: 'Subcontractor Portal <onboarding@resend.dev>',
+          from: 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
           to: [data.email],
           subject: '✅ Confirmation: Your Subcontractor Onboarding Submission',
           html: userReceiptHtml,
@@ -309,7 +311,7 @@ export async function POST(request: NextRequest) {
       adminEmailId: adminEmail.id,
       userEmailId: userEmail?.id,
       debug: {
-        apiKeyExists: !!process.env.RESEND_API_KEY,
+        apiKeyExists: !!resendKey,
         adminEmail: process.env.ADMIN_EMAIL,
         userEmail: data.email,
         receiptRequested: data.sendEmailReceipt,
