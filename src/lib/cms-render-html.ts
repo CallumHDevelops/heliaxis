@@ -273,8 +273,9 @@ function renderBlock(b: LooseBlock): string {
     const cols = Array.isArray(p.cols)
       ? (p.cols as Array<{ title?: string; links?: Array<{ label?: string; href?: string }> }>)
       : [];
-    const brand = p.logoImg
-      ? `<img class="pv-footer-logo" src="${esc(p.logoImg)}" alt="${esc(p.brandText || 'Heliaxis')}">`
+    const logoSrc = imgSrc(p.logoImg);
+    const brand = logoSrc
+      ? `<img class="pv-footer-logo" src="${esc(logoSrc)}" alt="${esc(p.brandText || 'Heliaxis')}">`
       : `<p class="pv-footer-word">${esc(p.brandText || 'Heliaxis')}</p>`;
     const colHtml = cols
       .map((col) => {
