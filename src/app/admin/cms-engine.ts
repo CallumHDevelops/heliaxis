@@ -26,7 +26,7 @@ window.storage = {
   },
   async set(key, value){
     const str = String(value);
-    const tooLargeHint = 'Save failed — media library too large. Use Optimize media or upload fewer/smaller images.';
+    const tooLargeHint = 'Save failed — content is too large. Try uploading fewer or smaller images.';
     let r;
     try {
       r = await fetch('/api/cms', {
@@ -248,6 +248,7 @@ async function saveNow(){
   setSaved('Saving to Supabase…');
   try{
     if(!window.storage)throw new Error('Storage unavailable');
+    await ensureMediaOptimized({silent:true,skipSave:true});
     await window.storage.set('heliaxis-cms-v1',JSON.stringify(STATE),false);
     setSaved('Saved to Supabase');
     DIRTY=false;
@@ -264,6 +265,10 @@ async function boot(){
   if(!Array.isArray(STATE.site.menu))STATE.site.menu=defaultSite().menu;
   if(!Array.isArray(STATE.site.logos))STATE.site.logos=defaultSite().logos;
   if(!Array.isArray(STATE.site.images))STATE.site.images=[];
+  try{
+    var mediaFix=await ensureMediaOptimized({silent:true,skipSave:true});
+    if((mediaFix.migrated||0)+(mediaFix.remapped||0)>0)await saveNow();
+  }catch(e){console.warn('Media auto-optimize on load:',e);}
   if(ensureUniquePageTitles())save();
   if(repairLegacyUntitledSlugs())save();
   if(ensureUniquePageSlugs())save();
@@ -1192,13 +1197,13 @@ function imagePicker(cur,path){const imgs=STATE.site.images||[];const src=imgSrc
   }).join('')+'</div>';
  }else{h+='<div class="hint">No images yet — upload one above.</div>';}
  h+=sectionImgMeta(cur,path)+'</div>';return h;}
-function pickImg(path,imgId){const im=findLibImg(imgId);if(!im)return;const cur=getAtPath(path);const same=(cur&&cur.libId===imgId)||imgSrc(cur)===im.data;const existing=same?imgResolve(cur):{...imgMetaEmpty(),src:im.data,libId:imgId};openPlacementImgMeta(path,im.data,im.name,existing,imgId);}
+function pickImg(path,imgId){const im=findLibImg(imgId);if(!im)return;const cur=getAtPath(path);const prev=imgResolve(cur);const same=(cur&&cur.libId===imgId)||prev.src===im.data;
+ upd(path,{libId:imgId,src:'',alt:prev.alt||suggestAltFromName(im.name),title:prev.title,desc:prev.desc,caption:prev.caption,keywords:prev.keywords,loading:prev.loading||'lazy',decorative:prev.decorative,focusX:same?prev.focusX:50,focusY:same?prev.focusY:50,zoom:same?prev.zoom:1});}
 function editPlacementImgMeta(path){const cur=getAtPath(path);const m=imgResolve(cur);if(!m.src){openNoticeModal({title:'Pick an image first',message:'Choose an image for this section before editing SEO metadata.'});return;}const libId=(cur&&typeof cur==='object'&&cur.libId)||m.libId||(findLibImgByData(m.src)||{}).id||'';openPlacementImgMeta(path,m.src,'',Object.assign({},m,{libId:libId}),libId);}
 function openPlacementImgMeta(path,src,name,existing,libId){const ex=imgResolve(existing);ex.src=src;window._imgMetaPlacementPath=path;window._imgMetaLibId=libId||ex.libId||(findLibImgByData(src)||{}).id||'';showImgMetaModal({data:src,name:name||'',libId:window._imgMetaLibId,alt:ex.alt,title:ex.title,desc:ex.desc,caption:ex.caption,keywords:ex.keywords,loading:ex.loading,decorative:ex.decorative,focusX:ex.focusX,focusY:ex.focusY},{placement:true,suggestedAlt:ex.alt||suggestAltFromName(name)});}
 function renderImages(){const el=document.getElementById('panel-images');const imgs=STATE.site.images||[];const cats=[...new Set(imgs.map(im=>im.cat).filter(Boolean))];
- let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once, then reuse them in any section. Photos are auto-resized (max '+IMG_MAX_EDGE+'px), WebP-compressed, and stored in Supabase Storage. <b>SEO metadata</b> is added when you pick an image in the <b>Sections</b> tab.</div>';
+ let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once — they are automatically resized, compressed, and stored in Supabase Storage. Reuse them in any section; add SEO per section from the <b>Sections</b> tab.</div>';
  h+='<div class="fld"><label>Upload image(s)</label><input type="file" accept="image/*" multiple id="imgup" onchange="imgUpload(this)"></div>';
- if(imgs.length)h+='<button type="button" class="miniadd" onclick="optimizeMediaLibrary()" style="margin-bottom:12px">Optimize media library</button><div class="hint" style="margin-top:-8px">Migrate old inline/base64 images to Supabase Storage and remove duplicate section copies — use this if Save/Publish is failing.</div>';
  h+='<div class="fld"><label>Filter by category</label><select onchange="IMGFILTER=this.value;renderImages()"><option value="">All ('+imgs.length+')</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>';
  const shown=imgs.map((im,i)=>({im,i})).filter(x=>!IMGFILTER||x.im.cat===IMGFILTER);
  h+=shown.length?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+shown.map(({im,i})=>'<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden;position:relative"><img src="'+im.data+'" style="width:100%;height:68px;object-fit:cover;display:block"><button class="rm" style="position:absolute;top:2px;right:4px;background:rgba(0,0,0,.55);color:#fff;border-radius:2px;padding:1px 5px" onclick="imgRmAsk('+i+')" title="Remove from library">×</button><div style="font-size:.68rem;padding:5px 7px;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div></div>').join('')+'</div>':'<div class="hint">No images yet — upload one above.</div>';
@@ -1259,8 +1264,11 @@ async function imgUpload(inp,pickPath){
   openNoticeModal({title:'Some uploads failed',message:'Could not upload '+failures.length+' image'+(failures.length===1?'':'s')+'. Check your connection and try again.'});
  }
 }
-function finishImgUpload(uploaded,pickPath){renderImages();if(MODE==='library')renderLibrary();save();
- if(pickPath&&uploaded.length===1){const u=uploaded[0];openPlacementImgMeta(pickPath,u.data,u.baseName,{...imgMetaEmpty(),src:u.data,libId:u.id},u.id);}
+function finishImgUpload(uploaded,pickPath){renderImages();if(MODE==='library')renderLibrary();
+ if(pickPath&&uploaded.length===1){
+  const u=uploaded[0];
+  upd(pickPath,{libId:u.id,src:'',alt:suggestAltFromName(u.baseName),title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1});
+ }else{save();}
  if(MODE==='edit'){renderBuild();renderPreview();}}
 function showImgMetaModal(im,opts){opts=opts||{};const suggestedAlt=opts.suggestedAlt||suggestAltFromName(im.name);
  const isPlacement=!!opts.placement;const m=imgResolve(im);m.data=im.data||m.src;m.name=im.name||'';
@@ -1373,38 +1381,43 @@ function dedupePlacementsToLibIds(dataToId){
  });
  return count;
 }
-async function optimizeMediaLibrary(){
+var _mediaOptimizeRunning=false;
+async function ensureMediaOptimized(opts){
+ opts=opts||{};
+ var silent=opts.silent!==false;
  var imgs=STATE.site.images||[];
- if(!imgs.length){openNoticeModal({title:'Nothing to optimize',message:'Upload some images first.'});return;}
- setSaved('Optimizing media…');
  var migrated=0;
+ if(_mediaOptimizeRunning)return {migrated:0,remapped:0};
+ _mediaOptimizeRunning=true;
  try{
-  // Capture data→id before migration so placements with old base64 still match.
   var beforeMap={};
   imgs.forEach(function(im){if(im&&im.id&&im.data)beforeMap[im.data]=im.id;});
   for(var i=0;i<imgs.length;i++){
    var im=imgs[i];
    if(!im||!im.data)continue;
    if(/^data:image\//i.test(String(im.data))){
+    if(!silent)setSaved('Compressing & uploading media…');
     var fileName=(im.name||('image-'+(i+1)+'.webp')).replace(/\.[^.]+$/,'.webp');
     var next=await toWebpPromise(im.data);
     var upFile=dataUrlToFile(next,fileName);
+    var oldData=im.data;
     im.data=await uploadCmsMediaFile(upFile,fileName);
+    if(oldData&&beforeMap[oldData]===im.id)delete beforeMap[oldData];
+    beforeMap[im.data]=im.id;
     migrated++;
    }
   }
   var remapped=dedupePlacementsToLibIds(beforeMap);
-  // Also strip any leftover src that still matches current library values.
   remapped+=dedupePlacementsToLibIds();
-  await save();
-  renderImages();
-  if(MODE==='library')renderLibrary();
-  if(MODE==='edit'){renderBuild();renderPreview();}
-  if(MODE==='mega')renderMega();
-  openNoticeModal({title:'Media optimized',message:'Migrated '+migrated+' image'+(migrated===1?'':'s')+' to Supabase Storage and linked '+remapped+' placement'+(remapped===1?'':'s')+' by library ID. Try Publish again.'});
- }catch(e){
-  setSaved(e&&e.message?e.message:'Optimize failed');
-  openNoticeModal({title:'Optimize failed',message:e&&e.message?e.message:'Could not optimize the media library.'});
+  if(migrated||remapped){
+   if(MODE==='library')renderLibrary();
+   if(MODE==='edit'){renderBuild();renderPreview();}
+   if(MODE==='mega')renderMega();
+   renderImages();
+  }
+  return {migrated:migrated,remapped:remapped};
+ }finally{
+  _mediaOptimizeRunning=false;
  }
 }
 
@@ -1655,7 +1668,7 @@ async function doPublish(){
       try{em=(await r.json()).error||em;}catch(e){}
       if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');
       if(r.status===413||/payload|too large|entity|FUNCTION_PAYLOAD_TOO_LARGE/i.test(String(em))){
-        throw new Error('Publish payload too large. Open Images or Media library and run Optimize media, then publish again.');
+        throw new Error('Publish payload too large. Try uploading fewer or smaller images, then publish again.');
       }
       throw new Error(em);
     }
@@ -2249,7 +2262,7 @@ function openLead(i){var l=leads()[i];if(!l)return;l.isnew=false;
 /* ===== standalone image library ===== */
 function showLibrary(){applyCmsView('library');}
 function renderLibrary(){var el=document.getElementById('library');var imgs=STATE.site.images||[];var cats=[];imgs.forEach(function(im){if(im.cat&&cats.indexOf(im.cat)<0)cats.push(im.cat)});
- var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · resized to max '+IMG_MAX_EDGE+'px, WebP-compressed, and hosted in Supabase Storage. Upload once, then add SEO per section when you use an image.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="tbtn2" onclick="optimizeMediaLibrary()" '+(imgs.length?'':'disabled')+'>Optimize media</button><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
+ var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · auto-resized, WebP-compressed, and hosted in Supabase Storage when you upload.</p></div><div><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
  h+='<div class="dash-actions" style="margin-bottom:16px"><select onchange="IMGFILTER=this.value;renderLibrary()" style="padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--card);max-width:260px"><option value="">All categories ('+imgs.length+')</option>'+cats.map(function(c){return '<option'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>';
  var shown=imgs.map(function(im,i){return {im:im,i:i}}).filter(function(x){return !IMGFILTER||x.im.cat===IMGFILTER});
  h+=shown.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'+shown.map(function(o){var im=o.im;return '<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden"><img src="'+im.data+'" style="width:100%;height:100px;object-fit:cover;display:block"><div style="padding:5px 7px;font-size:.68rem;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div><button class="rm" style="margin:4px 7px 6px" onclick="imgRmAsk('+o.i+')">Remove</button></div>';}).join('')+'</div>':'<div class="honest">No images yet. Click <b>+ Upload</b> to add some.</div>';
@@ -2906,7 +2919,6 @@ w.logoAdd = logoAdd;
 w.imgRm = imgRm;
 w.imgRmAsk = imgRmAsk;
 w.imgUpload = imgUpload;
-w.optimizeMediaLibrary = optimizeMediaLibrary;
 w.closeImgMetaModal = closeImgMetaModal;
 w.confirmImgMeta = confirmImgMeta;
 w.imgMetaSetLoading = imgMetaSetLoading;
