@@ -26,7 +26,7 @@ window.storage = {
   },
   async set(key, value){
     const str = String(value);
-    const tooLargeHint = 'Save failed — media library too large. Use Optimize media or upload fewer/smaller images.';
+    const tooLargeHint = 'Save failed — content is too large. Try uploading fewer or smaller images.';
     let r;
     try {
       r = await fetch('/api/cms', {
@@ -248,6 +248,7 @@ async function saveNow(){
   setSaved('Saving to Supabase…');
   try{
     if(!window.storage)throw new Error('Storage unavailable');
+    await ensureMediaOptimized({silent:true,skipSave:true});
     await window.storage.set('heliaxis-cms-v1',JSON.stringify(STATE),false);
     setSaved('Saved to Supabase');
     DIRTY=false;
@@ -264,6 +265,10 @@ async function boot(){
   if(!Array.isArray(STATE.site.menu))STATE.site.menu=defaultSite().menu;
   if(!Array.isArray(STATE.site.logos))STATE.site.logos=defaultSite().logos;
   if(!Array.isArray(STATE.site.images))STATE.site.images=[];
+  try{
+    var mediaFix=await ensureMediaOptimized({silent:true,skipSave:true});
+    if((mediaFix.migrated||0)+(mediaFix.remapped||0)>0)await saveNow();
+  }catch(e){console.warn('Media auto-optimize on load:',e);}
   if(ensureUniquePageTitles())save();
   if(repairLegacyUntitledSlugs())save();
   if(ensureUniquePageSlugs())save();
@@ -514,7 +519,8 @@ function renderBlock(b,edit){
    return '<div class="pv-cta"><div class="pv-cta-glow"></div><div class="z"><h2>'+accentText(p.headline)+'</h2><p'+ce(id+'.sub',edit)+'>'+esc(p.sub)+'</p>'+row+'</div></div>';}
  if(t==='footer'){
    var brand='';
-   if(p.logoImg)brand='<img class="pv-footer-logo" src="'+esc(p.logoImg)+'" alt="'+esc(p.brandText||'Heliaxis')+'">';
+   var logoSrc=imgSrc(p.logoImg);
+   if(logoSrc)brand='<img class="pv-footer-logo" src="'+esc(logoSrc)+'" alt="'+esc(p.brandText||'Heliaxis')+'">';
    else brand='<p class="pv-footer-word"'+ce(id+'.brandText',edit)+'>'+esc(p.brandText||'Heliaxis')+'</p>';
    var cols=(Array.isArray(p.cols)?p.cols:[]).map(function(c,i){return renderFooterCol(c,i,id,edit);}).join('');
    var siteHref=p.siteHref||'https://heliaxis.co.uk';
@@ -677,13 +683,13 @@ function filterIcons(inp,id){const q=inp.value.toLowerCase();document.getElement
 function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='';
  if(bt==='hero'){h+=txt('Blog tags',p.tags||'',id+'.tags')+'<div class="hint">Comma or | separated — shown at the top of the hero (blog posts).</div>'+txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Headline',p.headline,id+'.headline')+area('Subheadline',p.sub,id+'.sub')+'<div class="hint">Leave subheadline empty to remove the gap under the title.</div>';
    h+=chk('Wider text',!!p.textWide,id+'.textWide')+'<div class="hint">Wider text hides the right spark/logo and lets the headline span the full width — ideal for blog heroes.</div>';
-   h+=imagePicker(p.markImg||'',id+'.markImg')+'<div class="hint">Optional custom image for the right mark. Leave empty for the default gold spark. Hidden when <b>Wider text</b> or <b>Hide right logo</b> is on.</div>';
+   h+=imagePicker(p.markImg||'',id+'.markImg','Right mark / logo',true)+'<div class="hint">Optional custom image for the right mark. Leave empty for the default gold spark. Hidden when <b>Wider text</b> or <b>Hide right logo</b> is on.</div>';
    h+=chk('Hide right logo / mark',!!p.hideMark,id+'.hideMark')+chk('Hide sun glow',!!p.hideSun,id+'.hideSun')+chk('Hide rating row',!!p.hideRating,id+'.hideRating')+chk('Hide microtrust line',!!p.hideMicrotrust,id+'.hideMicrotrust');
    h+=chk('Disable primary button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Primary button is hidden.</div>':txt('Primary button',p.ctaLabel,id+'.ctaLabel')+routeFld('Primary button link',p.ctaHref||'#quote',id+'.ctaHref')+chk('Pulse animation on button',p.ctaPulse,id+'.ctaPulse'));
    h+=chk('Disable secondary button',!!p.cta2Disabled,id+'.cta2Disabled')+(p.cta2Disabled?'<div class="hint">Secondary button is hidden.</div>':txt('Secondary button',p.cta2,id+'.cta2')+routeFld('Secondary button link',p.cta2Href||'',id+'.cta2Href'));
    h+=txt('Microtrust bar',p.microtrust!=null?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees',id+'.microtrust')+txt('Rating value',p.ratingValue||'4.9',id+'.ratingValue')+txt('Installs count',p.ratingInstalls||'1200',id+'.ratingInstalls');}
  else if(bt==='stats'){h+='<div class="hint">Stat tiles</div>';p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Tile '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Number',s.n,id+'.items.'+i+'.n')+txt('Label',s.k,id+'.items.'+i+'.k')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{n:\'0\',k:\'Label\'})">+ Add tile</button>';}
- else if(bt==='footer'){h+=imagePicker(p.logoImg||'',id+'.logoImg')+'<div class="hint">Footer logo — leave empty to show the brand name as text.</div>'+txt('Brand name (fallback)',p.brandText||'Heliaxis',id+'.brandText')+area('About text',p.about,id+'.about');
+ else if(bt==='footer'){h+=imagePicker(p.logoImg||'',id+'.logoImg','Footer logo',true)+'<div class="hint">Leave empty to show the brand name as text.</div>'+txt('Brand name (fallback)',p.brandText||'Heliaxis',id+'.brandText')+area('About text',p.about,id+'.about');
    (p.cols||[]).forEach(function(col,ci){
     h+='<div class="sub"><div class="sh"><b>Column '+(ci+1)+'</b>'+(ci>0?'<button class="rm" onclick="rmFooterCol(\''+id+'\','+ci+')">remove col</button>':'')+'</div>'+txt('Heading',col.title,id+'.cols.'+ci+'.title');
     (col.links||[]).forEach(function(lk,li){
@@ -708,7 +714,8 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
    if(gfi!==i)h+='<button type="button" class="miniadd" style="margin-bottom:8px" onclick="setGalleryFeatured(\''+id+'\','+i+')">Make large featured frame</button>';
    else h+='<div class="hint" style="color:var(--ok);margin-bottom:8px">✓ Large featured frame</div>';
    h+=imagePicker(it.img,id+'.items.'+i+'.img')+'<div class="hint" style="font-size:.76rem;margin:-4px 0 8px">With an image: drag to pan, scroll to zoom in preview.</div>'+txt('Location label',it.loc,id+'.items.'+i+'.loc')+'</div>';});
-   h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{img:\'\',loc:\'Town · 4.0 kWp\',featured:false})">+ Add frame</button>';}
+   h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{img:\'\',loc:\'Town · 4.0 kWp\',featured:false})">+ Add frame</button>';
+   h+='<button type="button" class="miniadd" onclick="openGalleryImgPicker(\''+id+'\')">+ Add frames from library</button>';}
  else if(bt==='funding'){h+=txt('Eyebrow',p.eyebrow||'Funding & finance',id+'.eyebrow')+accentArea('Title',p.title||'Solar within reach, whatever your budget',id+'.title')+area('Subtext (leave empty to hide)',p.sub!=null?p.sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.',id+'.sub')+'<div class="hint">Dark band with funding cards and an urgency CTA. Click text in the preview to edit.</div>';
    p.items.forEach(function(it,i){h+='<div class="sub"><div class="sh"><b>Card '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+accentArea('Title',it.title,id+'.items.'+i+'.title')+area('Text',it.text,id+'.items.'+i+'.text')+'</div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'New option\',text:\'Description.\'})">+ Add card</button>'+accentHint();
@@ -1179,35 +1186,373 @@ function sectionImgMeta(cur,path){
  const tags=[];if(m.alt)tags.push('Alt');if(m.title)tags.push('Title');if(m.caption)tags.push('Caption');if(m.desc)tags.push('Meta desc');if(m.keywords)tags.push('Keywords');
  return '<div class="imgseo-card" onclick="editPlacementImgMeta(\''+path+'\')" title="Edit SEO for this section"><img src="'+m.src+'"><div class="imgseo-card-body"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="imgseo-pill">'+SPARK+' Section SEO</span>'+(tags.length?'<span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">'+tags.join(' · ')+'</span>':'')+'</div><div class="imgseo-card-row"><b>Alt</b> '+(m.alt?esc(m.alt):'<span style="opacity:.55">Not set</span>')+'</div>'+(m.title?'<div class="imgseo-card-row"><b>Title</b> '+esc(m.title)+'</div>':'')+(m.caption?'<div class="imgseo-card-row"><b>Caption</b> '+esc(m.caption)+'</div>':'')+'<div class="imgseo-card-hint">Drag image in preview to reposition · click here for SEO</div></div></div>';
 }
-function imagePicker(cur,path){const imgs=STATE.site.images||[];const src=imgSrc(cur);const curLib=(cur&&typeof cur==='object'&&cur.libId)||'';
- let h='<div class="fld"><label>Image</label><label class="miniadd" style="display:inline-block;cursor:pointer;margin-bottom:6px">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this,\''+path+'\')"></label>';
- if(imgs.length){
-  h+='<div class="img-lib-pick">'+imgs.map(function(im,i){
-   return '<div class="img-lib-thumb'+(src===im.data||curLib===im.id?' is-on':'')+'">'+
-    '<button type="button" class="img-lib-pick-btn" onclick="pickImg(\''+path+'\',\''+im.id+'\')" title="'+esc(im.name||im.cat||'Image')+'">'+
-     '<img src="'+im.data+'" alt="">'+
-    '</button>'+
-    '<button type="button" class="img-lib-rm" title="Remove from library" aria-label="Remove from library" onclick="event.stopPropagation();imgRmAsk('+i+')">×</button>'+
-   '</div>';
-  }).join('')+'</div>';
- }else{h+='<div class="hint">No images yet — upload one above.</div>';}
- h+=sectionImgMeta(cur,path)+'</div>';return h;}
-function pickImg(path,imgId){const im=findLibImg(imgId);if(!im)return;const cur=getAtPath(path);const same=(cur&&cur.libId===imgId)||imgSrc(cur)===im.data;const existing=same?imgResolve(cur):{...imgMetaEmpty(),src:im.data,libId:imgId};openPlacementImgMeta(path,im.data,im.name,existing,imgId);}
+var IMG_SEL={};
+var _imgLibMulti=false;
+var _imgLibGalleryBlock=null;
+function imgSelIds(){return Object.keys(IMG_SEL).filter(function(id){return IMG_SEL[id];});}
+function imgSelCount(){return imgSelIds().length;}
+function imgSelIsOn(id){return !!IMG_SEL[id];}
+function imgSelToggle(id){
+ if(!id)return;
+ if(IMG_SEL[id])delete IMG_SEL[id];else IMG_SEL[id]=true;
+ if(window._imgLibPickPath||_imgLibMulti)renderImgLibModalGrid();
+ else{renderImages();if(MODE==='library')renderLibrary();}
+}
+function imgSelSelectAll(ids){
+ (ids||[]).forEach(function(id){if(id)IMG_SEL[id]=true;});
+ if(window._imgLibPickPath||_imgLibMulti)renderImgLibModalGrid();
+ else{renderImages();if(MODE==='library')renderLibrary();}
+}
+function imgSelClear(){
+ IMG_SEL={};
+ if(window._imgLibPickPath||_imgLibMulti)renderImgLibModalGrid();
+ else{renderImages();if(MODE==='library')renderLibrary();}
+}
+function imgSelPrune(){
+ imgSelIds().forEach(function(id){
+  if(!(STATE.site.images||[]).some(function(im){return im.id===id;}))delete IMG_SEL[id];
+ });
+}
+function imgSelToolbarHtml(shownIds,opts){
+ opts=opts||{};
+ var n=imgSelCount();
+ var allOn=shownIds.length>0&&shownIds.every(function(id){return IMG_SEL[id];});
+ var h='<div class="img-sel-toolbar">';
+ h+='<div class="img-sel-toolbar-row">';
+ h+="<button type='button' class='miniadd' onclick='"+(allOn?"imgSelClear()":"imgSelSelectAll("+JSON.stringify(shownIds)+")")+"'>"+(allOn?"Deselect all":"Select all")+"</button>";
+ h+='<button type="button" class="miniadd"'+(n?'':' disabled style="opacity:.45"')+' onclick="imgSelClear()">Clear</button>';
+ if(!opts.hideCat){
+  h+='<span class="img-sel-divider"></span>';
+  h+='<input class="img-sel-cat" id="img-sel-cat" type="text" placeholder="Category label" onkeydown="if(event.key===\'Enter\')imgBulkSetCategory(this.value)">';
+  h+='<button type="button" class="miniadd"'+(n?'':' disabled style="opacity:.45"')+' onclick="imgBulkSetCategory(document.getElementById(\'img-sel-cat\').value)">Set category</button>';
+ }
+ h+='<button type="button" class="miniadd img-sel-del"'+(n?'':' disabled style="opacity:.45"')+' onclick="imgBulkDeleteAsk()">Delete selected'+(n?' ('+n+')':'')+'</button>';
+ h+='</div>';
+ if(n)h+='<div class="img-sel-status">'+n+' image'+(n===1?'':'s')+' selected</div>';
+ h+='</div>';
+ return h;
+}
+function imgLibraryCardHtml(im,i,layout){
+ layout=layout||'panel';
+ var on=imgSelIsOn(im.id);
+ var cardCls='img-lib-card'+(on?' is-selected':'')+(layout==='library'?' img-lib-card-wide':'');
+ var h='<div class="'+cardCls+'" onclick="imgSelToggle(\''+im.id+'\')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();imgSelToggle(\''+im.id+'\')}">';
+ h+='<label class="img-lib-check" onclick="event.stopPropagation()"><input type="checkbox"'+(on?' checked':'')+' onchange="imgSelToggle(\''+im.id+'\')"><span aria-hidden="true"></span></label>';
+ h+='<img src="'+im.data+'" alt="" loading="lazy">';
+ h+='<button type="button" class="img-lib-card-rm" title="Remove from library" aria-label="Remove from library" onclick="event.stopPropagation();imgRmAsk('+i+')">×</button>';
+ h+='<div class="img-lib-card-name">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div>';
+ h+='</div>';
+ return h;
+}
+function imgBulkSetCategory(cat){
+ var ids=imgSelIds();
+ if(!ids.length)return;
+ cat=String(cat||'').trim();
+ (STATE.site.images||[]).forEach(function(im){if(ids.indexOf(im.id)>=0)im.cat=cat;});
+ save();renderImages();if(MODE==='library')renderLibrary();if(window._imgLibPickPath||_imgLibMulti)renderImgLibModalGrid();
+}
+function imgBulkDeleteAsk(){
+ var ids=imgSelIds().slice();
+ var n=ids.length;
+ if(!n)return;
+ openConfirmModal({
+  title:'Remove '+n+' image'+(n===1?'':'s')+'?',
+  message:'Sections using these images will clear them. This cannot be undone.',
+  label:'Selection',
+  targetHtml:'<div class="modal-confirm-target"><span class="nm">'+n+' library image'+(n===1?'':'s')+'</span><span class="ty">bulk delete</span></div>',
+  confirmLabel:'Remove '+(n===1?'image':n+' images'),
+  action:function(){imgRmMany(ids);}
+ });
+}
+function imgRmMany(idList){
+ if(!idList||!idList.length)return;
+ var set=new Set(idList);
+ var imgs=STATE.site.images||[];
+ var removed=imgs.filter(function(im){return set.has(im.id);});
+ if(!removed.length)return;
+ removed.forEach(function(im){
+  var data=im.data;
+  var libId=im.id;
+  (STATE.pages||[]).forEach(function(pg){
+   (pg.blocks||[]).forEach(function(bl){scrubImgData(bl.p,data,libId);});
+  });
+  (STATE.site.menu||[]).forEach(function(m){
+   if(!m.featured)return;
+   if(m.featured.imgLibId===libId||(data&&m.featured.img===data)){m.featured.img='';m.featured.imgLibId='';}
+  });
+ });
+ STATE.site.images=imgs.filter(function(im){return !set.has(im.id);});
+ IMG_SEL={};
+ renderImages();
+ if(window._imgLibPickPath||_imgLibMulti)renderImgLibModalGrid();
+ if(MODE==='library')renderLibrary();
+ if(MODE==='edit'){renderBuild();renderPreview();}
+ save();
+}
+var _imgLibFilter='';
+function imagePicker(cur,path,lbl,noMeta){
+ const src=imgSrc(cur);
+ const pathEsc=String(path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+ let h='<div class="fld img-pick-compact"><label>'+(lbl||'Image')+'</label><div class="img-pick-row">';
+ h+='<div class="img-pick-preview'+(src?'':' is-empty')+'">';
+ if(src)h+='<img src="'+src+'" alt="">';
+ else h+='<span class="img-pick-ph">No image</span>';
+ h+='</div><div class="img-pick-actions">';
+ h+='<button type="button" class="miniadd" onclick="openImgLibModal(\''+pathEsc+'\')">Choose</button>';
+ h+='<label class="miniadd img-pick-upload">Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this,\''+pathEsc+'\')"></label>';
+ if(src)h+='<button type="button" class="miniadd img-pick-clear" onclick="clearImgPick(\''+pathEsc+'\')">Clear</button>';
+ h+='</div></div>';
+ if(!noMeta)h+=sectionImgMeta(cur,path);
+ h+='</div>';
+ return h;
+}
+function imgLibModalShell(path,multiMode){
+ var pathEsc=String(path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+ var isGallery=!!_imgLibGalleryBlock;
+ var title=isGallery?'Add gallery frames':(multiMode?'Choose images':'Choose image');
+ var lede=isGallery?'Select one or more images — each becomes a gallery frame.':(multiMode?'Select multiple images, then confirm.':'Pick from your site library. Uploads are stored once and reused everywhere.');
+ var h='<button class="close" onclick="closeImgLibModal()">×</button>'
+  +'<h2>'+title+'</h2>'
+  +'<p class="imglib-lede">'+lede+'</p>'
+  +'<div class="imglib-toolbar">'
+  +'<input id="imglib-search" type="search" placeholder="Search by name…" value="'+esc(_imgLibFilter)+'" oninput="filterImgLibModal(this.value)">';
+ if(path&&!/\.(logoImg|markImg)$/.test(String(path))&&!isGallery){
+  h+='<label class="imglib-multi-toggle"><input type="checkbox"'+(multiMode?' checked':'')+' onchange="toggleImgLibMulti(this.checked)"><span>Multi-select</span></label>';
+ }
+ if(path||isGallery){
+  h+='<label class="miniadd imglib-upload">Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this,\''+pathEsc+'\')"></label>';
+ }else{
+  h+='<label class="miniadd imglib-upload">Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label>';
+ }
+ h+='</div>'
+  +'<div id="imglib-sel-toolbar"></div>'
+  +'<div class="img-lib-pick imglib-grid" id="imglib-grid"></div>'
+  +'<div class="imglib-foot"><span id="imglib-count"></span><div class="imglib-foot-actions">';
+ if(isGallery){
+  h+='<button type="button" class="tbtn solar modal-btn-primary"'+(imgSelCount()?'':' disabled style="opacity:.45"')+' onclick="applyGalleryImgPick()">Add frames'+(imgSelCount()?' ('+imgSelCount()+')':'')+'</button>';
+ }else if(multiMode&&path){
+  h+='<button type="button" class="tbtn solar modal-btn-primary"'+(imgSelCount()?'':' disabled style="opacity:.45"')+' onclick="applyImgLibMultiPick()">Use selected'+(imgSelCount()?' ('+imgSelCount()+')':'')+'</button>';
+ }
+ h+='<button type="button" class="tbtn modal-btn-ghost" onclick="closeImgLibModal()">Cancel</button></div></div>';
+ return h;
+}
+function toggleImgLibMulti(on){
+ _imgLibMulti=!!on;
+ if(!_imgLibMulti)IMG_SEL={};
+ var path=window._imgLibPickPath;
+ var box=document.getElementById('modalbox');
+ if(box)box.innerHTML=imgLibModalShell(path,_imgLibMulti);
+ renderImgLibModalGrid();
+}
+function openImgLibModal(path){
+ window._imgLibPickPath=path;
+ window._imgLibGalleryBlock=null;
+ _imgLibMulti=false;
+ _imgLibFilter='';
+ IMG_SEL={};
+ var box=document.getElementById('modalbox');
+ box.className='modalbox imglib-box';
+ box.innerHTML=imgLibModalShell(path,false);
+ document.getElementById('modal').classList.add('show');
+ renderImgLibModalGrid();
+}
+function openGalleryImgPicker(blockId){
+ window._imgLibPickPath=null;
+ window._imgLibGalleryBlock=blockId;
+ _imgLibMulti=true;
+ _imgLibFilter='';
+ IMG_SEL={};
+ var box=document.getElementById('modalbox');
+ box.className='modalbox imglib-box';
+ box.innerHTML=imgLibModalShell(null,true);
+ document.getElementById('modal').classList.add('show');
+ renderImgLibModalGrid();
+}
+function applyGalleryImgPick(){
+ var blockId=_imgLibGalleryBlock;
+ var bl=blockId?findBlock(blockId):null;
+ var ids=imgSelIds();
+ if(!bl||bl.t!=='gallery'||!ids.length)return;
+ ids.forEach(function(id){
+  var im=findLibImg(id);
+  if(!im)return;
+  (bl.p.items=bl.p.items||[]).push({
+   img:{libId:id,src:'',alt:suggestAltFromName(im.name),title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1},
+   loc:'Location · kWp',
+   featured:false
+  });
+ });
+ closeImgLibModal();
+ save();renderBuild();renderPreview();
+}
+function applyImgLibMultiPick(){
+ var path=window._imgLibPickPath;
+ var ids=imgSelIds();
+ if(!path||!ids.length)return;
+ if(/\.items\.\d+\.img$/.test(String(path))){
+  pickImg(path,ids[0]);
+  return;
+ }
+ ids.forEach(function(id,i){
+  if(i===0)pickImg(path,id);
+ });
+ if(ids.length>1){
+  openNoticeModal({title:'Multiple images',message:'This field only supports one image — the first selected image was applied.'});
+ }
+}
+function closeImgLibModal(){
+ window._imgLibPickPath=null;
+ window._imgLibGalleryBlock=null;
+ _imgLibMulti=false;
+ _imgLibFilter='';
+ IMG_SEL={};
+ var box=document.getElementById('modalbox');
+ if(box)box.className='modalbox';
+ closeModal();
+}
+function filterImgLibModal(q){
+ _imgLibFilter=String(q||'').toLowerCase();
+ renderImgLibModalGrid();
+}
+function renderImgLibModalGrid(){
+ var grid=document.getElementById('imglib-grid');
+ var countEl=document.getElementById('imglib-count');
+ var toolbarEl=document.getElementById('imglib-sel-toolbar');
+ if(!grid)return;
+ imgSelPrune();
+ var path=window._imgLibPickPath;
+ var cur=path?getAtPath(path):null;
+ var src=imgSrc(cur);
+ var curLib=(cur&&typeof cur==='object'&&cur.libId)||'';
+ var all=STATE.site.images||[];
+ var imgs=all.filter(function(im){
+  if(!_imgLibFilter)return true;
+  var n=((im.name||'')+' '+(im.cat||'')).toLowerCase();
+  return n.indexOf(_imgLibFilter)>=0;
+ });
+ var shownIds=imgs.map(function(im){return im.id;});
+ if(toolbarEl)toolbarEl.innerHTML=(_imgLibMulti||_imgLibGalleryBlock)?imgSelToolbarHtml(shownIds,{hideCat:true}):'';
+ if(countEl)countEl.textContent=imgs.length+' image'+(imgs.length===1?'':'s');
+ var footBtn=document.querySelector('.imglib-foot .tbtn.solar');
+ if(footBtn){
+  var n=imgSelCount();
+  if(_imgLibGalleryBlock){
+   footBtn.textContent='Add frames'+(n?' ('+n+')':'');
+   footBtn.disabled=!n;
+   footBtn.style.opacity=n?'':'0.45';
+  }else if(_imgLibMulti&&path){
+   footBtn.textContent='Use selected'+(n?' ('+n+')':'');
+   footBtn.disabled=!n;
+   footBtn.style.opacity=n?'':'0.45';
+  }
+ }
+ if(!imgs.length){
+  grid.innerHTML='<div class="imglib-empty">'+(all.length?'No images match your search.':'No images yet — upload one above.')+'</div>';
+  return;
+ }
+ var pathEsc=String(path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+ var multi=_imgLibMulti||!!_imgLibGalleryBlock;
+ grid.innerHTML=imgs.map(function(im){
+  var i=all.indexOf(im);
+  var on=multi?(imgSelIsOn(im.id)):(src===im.data||curLib===im.id);
+  if(multi){
+   return '<div class="img-lib-thumb'+(on?' is-on':'')+' img-lib-thumb-multi" onclick="imgSelToggle(\''+im.id+'\')" role="button" tabindex="0">'
+    +'<label class="img-lib-check" onclick="event.stopPropagation()"><input type="checkbox"'+(on?' checked':'')+' onchange="imgSelToggle(\''+im.id+'\')"><span aria-hidden="true"></span></label>'
+    +'<img src="'+im.data+'" alt="" title="'+esc(im.name||im.cat||'Image')+'">'
+    +'<button type="button" class="img-lib-rm" title="Remove from library" aria-label="Remove from library" onclick="event.stopPropagation();imgRmAsk('+i+')">×</button>'
+    +'</div>';
+  }
+  return '<div class="img-lib-thumb'+(on?' is-on':'')+'">'
+   +'<button type="button" class="img-lib-pick-btn" onclick="pickImg(\''+pathEsc+'\',\''+im.id+'\')" title="'+esc(im.name||im.cat||'Image')+'">'
+   +'<img src="'+im.data+'" alt="">'
+   +'</button>'
+   +'<button type="button" class="img-lib-rm" title="Remove from library" aria-label="Remove from library" onclick="event.stopPropagation();imgRmAsk('+i+')">×</button>'
+   +'</div>';
+ }).join('');
+}
+function clearImgPick(path){
+ var simple=/\.(logoImg|markImg)$/.test(String(path||''));
+ upd(path,simple?'':imgMetaEmpty());
+ if(window._imgLibPickPath===path)renderImgLibModalGrid();
+}
+function pickImg(path,imgId){const im=findLibImg(imgId);if(!im)return;const cur=getAtPath(path);const prev=imgResolve(cur);const same=(cur&&cur.libId===imgId)||prev.src===im.data;
+ if(/\.(logoImg|markImg)$/.test(String(path||''))){upd(path,im.data);if(window._imgLibPickPath===path)closeImgLibModal();return;}
+ upd(path,{libId:imgId,src:'',alt:prev.alt||suggestAltFromName(im.name),title:prev.title,desc:prev.desc,caption:prev.caption,keywords:prev.keywords,loading:prev.loading||'lazy',decorative:prev.decorative,focusX:same?prev.focusX:50,focusY:same?prev.focusY:50,zoom:same?prev.zoom:1});
+ if(window._imgLibPickPath===path)closeImgLibModal();}
 function editPlacementImgMeta(path){const cur=getAtPath(path);const m=imgResolve(cur);if(!m.src){openNoticeModal({title:'Pick an image first',message:'Choose an image for this section before editing SEO metadata.'});return;}const libId=(cur&&typeof cur==='object'&&cur.libId)||m.libId||(findLibImgByData(m.src)||{}).id||'';openPlacementImgMeta(path,m.src,'',Object.assign({},m,{libId:libId}),libId);}
 function openPlacementImgMeta(path,src,name,existing,libId){const ex=imgResolve(existing);ex.src=src;window._imgMetaPlacementPath=path;window._imgMetaLibId=libId||ex.libId||(findLibImgByData(src)||{}).id||'';showImgMetaModal({data:src,name:name||'',libId:window._imgMetaLibId,alt:ex.alt,title:ex.title,desc:ex.desc,caption:ex.caption,keywords:ex.keywords,loading:ex.loading,decorative:ex.decorative,focusX:ex.focusX,focusY:ex.focusY},{placement:true,suggestedAlt:ex.alt||suggestAltFromName(name)});}
 function renderImages(){const el=document.getElementById('panel-images');const imgs=STATE.site.images||[];const cats=[...new Set(imgs.map(im=>im.cat).filter(Boolean))];
- let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once, then reuse them in any section. Photos are auto-resized (max '+IMG_MAX_EDGE+'px) and WebP-compressed. <b>SEO metadata</b> is added when you pick an image in the <b>Sections</b> tab.</div>';
+ imgSelPrune();
+ let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once — they are automatically resized, compressed, and stored in Supabase Storage. Click images to select multiple for bulk actions.</div>';
  h+='<div class="fld"><label>Upload image(s)</label><input type="file" accept="image/*" multiple id="imgup" onchange="imgUpload(this)"></div>';
- if(imgs.length)h+='<button type="button" class="miniadd" onclick="optimizeMediaLibrary()" style="margin-bottom:12px">Optimize media library</button><div class="hint" style="margin-top:-8px">Recompress oversized photos and remove duplicate base64 copies from sections — use this if Save is failing.</div>';
  h+='<div class="fld"><label>Filter by category</label><select onchange="IMGFILTER=this.value;renderImages()"><option value="">All ('+imgs.length+')</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>';
  const shown=imgs.map((im,i)=>({im,i})).filter(x=>!IMGFILTER||x.im.cat===IMGFILTER);
- h+=shown.length?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+shown.map(({im,i})=>'<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden;position:relative"><img src="'+im.data+'" style="width:100%;height:68px;object-fit:cover;display:block"><button class="rm" style="position:absolute;top:2px;right:4px;background:rgba(0,0,0,.55);color:#fff;border-radius:2px;padding:1px 5px" onclick="imgRmAsk('+i+')" title="Remove from library">×</button><div style="font-size:.68rem;padding:5px 7px;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div></div>').join('')+'</div>':'<div class="hint">No images yet — upload one above.</div>';
+ if(shown.length)h+=imgSelToolbarHtml(shown.map(x=>x.im.id));
+ h+=shown.length?'<div class="img-lib-grid-panel">'+shown.map(({im,i})=>imgLibraryCardHtml(im,i,'panel')).join('')+'</div>':'<div class="hint">No images yet — upload one above.</div>';
  el.innerHTML=h;}
 function toWebp(dataURL,cb){try{const img=new Image();img.onload=()=>{try{var w=img.naturalWidth||img.width||1;var h=img.naturalHeight||img.height||1;var scale=1;if(w>IMG_MAX_EDGE||h>IMG_MAX_EDGE)scale=IMG_MAX_EDGE/Math.max(w,h);var cw=Math.max(1,Math.round(w*scale));var ch=Math.max(1,Math.round(h*scale));const c=document.createElement('canvas');c.width=cw;c.height=ch;c.getContext('2d').drawImage(img,0,0,cw,ch);cb(c.toDataURL('image/webp',IMG_WEBP_QUALITY));}catch(e){cb(dataURL)}};img.onerror=()=>cb(dataURL);img.src=dataURL;}catch(e){cb(dataURL)}}
 function toWebpPromise(dataURL){return new Promise(function(resolve){toWebp(dataURL,resolve);});}
-function imgUpload(inp,pickPath){const files=[...inp.files];if(!files.length)return;inp.value='';let pending=files.length;const uploaded=[];files.forEach(f=>{const r=new FileReader();r.onload=()=>{toWebp(r.result,webp=>{const name=f.name.replace(/\.[^.]+$/,'.webp');const baseName=f.name.replace(/\.[^.]+$/,'');const id=uid();(STATE.site.images=STATE.site.images||[]).push({id,name,data:webp,cat:''});uploaded.push({id,name,baseName,data:webp});pending--;if(pending===0)finishImgUpload(uploaded,pickPath);});};r.readAsDataURL(f);});}
-function finishImgUpload(uploaded,pickPath){renderImages();if(MODE==='library')renderLibrary();save();
- if(pickPath&&uploaded.length===1){const u=uploaded[0];openPlacementImgMeta(pickPath,u.data,u.baseName,{...imgMetaEmpty(),src:u.data,libId:u.id},u.id);}
+async function uploadCmsMediaFile(file,name){
+ const f=file instanceof File?file:new File([file],name||'image.webp',{type:'image/webp'});
+ const fd=new FormData();
+ fd.append('file',f,f.name||name||'image.webp');
+ const r=await fetch('/api/cms/media',{method:'POST',credentials:'same-origin',body:fd});
+ var d=null;try{d=await r.json();}catch(e){}
+ if(!r.ok)throw new Error((d&&d.error)||'Image upload failed');
+ if(!d||!d.url)throw new Error('Image upload returned no URL');
+ return String(d.url);
+}
+function dataUrlToFile(dataURL,name){
+ var m=String(dataURL||'').match(/^data:([^;]+);base64,(.+)$/);
+ if(!m)throw new Error('Invalid image data');
+ var mime=m[1]||'image/webp';
+ var b64=m[2]||'';
+ var bin=atob(b64);
+ var len=bin.length;
+ var arr=new Uint8Array(len);
+ for(var i=0;i<len;i++)arr[i]=bin.charCodeAt(i);
+ return new File([arr],name||'image.webp',{type:mime});
+}
+async function imgUpload(inp,pickPath){
+ const files=[...inp.files];
+ if(!files.length)return;
+ inp.value='';
+ const uploaded=[];
+ const failures=[];
+ setSaved('Uploading media…');
+ for(var i=0;i<files.length;i++){
+  const f=files[i];
+  try{
+   const dataURL=await new Promise(function(resolve,reject){
+    const r=new FileReader();
+    r.onload=function(){resolve(r.result);};
+    r.onerror=function(){reject(new Error('Could not read file'));};
+    r.readAsDataURL(f);
+   });
+   const webp=await toWebpPromise(dataURL);
+   const name=f.name.replace(/\.[^.]+$/,'.webp');
+   const baseName=f.name.replace(/\.[^.]+$/,'');
+   const upFile=dataUrlToFile(webp,name);
+   const url=await uploadCmsMediaFile(upFile,name);
+   const id=uid();
+   (STATE.site.images=STATE.site.images||[]).push({id,name,data:url,cat:''});
+   uploaded.push({id,name,baseName,data:url});
+  }catch(e){
+   failures.push((f&&f.name)||('file '+(i+1)));
+  }
+ }
+ if(uploaded.length)finishImgUpload(uploaded,pickPath);
+ if(failures.length){
+  openNoticeModal({title:'Some uploads failed',message:'Could not upload '+failures.length+' image'+(failures.length===1?'':'s')+'. Check your connection and try again.'});
+ }
+}
+function finishImgUpload(uploaded,pickPath){renderImages();if(MODE==='library')renderLibrary();
+ if(pickPath&&uploaded.length===1){
+  const u=uploaded[0];
+  if(/\.(logoImg|markImg)$/.test(String(pickPath||'')))upd(pickPath,u.data);
+  else upd(pickPath,{libId:u.id,src:'',alt:suggestAltFromName(u.baseName),title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1});
+  if(window._imgLibPickPath===pickPath)closeImgLibModal();
+ }else{save();if(window._imgLibPickPath)renderImgLibModalGrid();}
  if(MODE==='edit'){renderBuild();renderPreview();}}
 function showImgMetaModal(im,opts){opts=opts||{};const suggestedAlt=opts.suggestedAlt||suggestAltFromName(im.name);
  const isPlacement=!!opts.placement;const m=imgResolve(im);m.data=im.data||m.src;m.name=im.name||'';
@@ -1276,6 +1621,7 @@ function imgRm(i){
  if(!im)return;
  var data=im.data;
  var libId=im.id;
+ if(IMG_SEL[libId])delete IMG_SEL[libId];
  imgs.splice(i,1);
  (STATE.pages||[]).forEach(function(pg){
   (pg.blocks||[]).forEach(function(bl){scrubImgData(bl.p,data,libId);});
@@ -1285,6 +1631,7 @@ function imgRm(i){
   if(m.featured.imgLibId===libId||(data&&m.featured.img===data)){m.featured.img='';m.featured.imgLibId='';}
  });
  renderImages();
+ if(window._imgLibPickPath)renderImgLibModalGrid();
  if(MODE==='library')renderLibrary();
  if(MODE==='edit'){renderBuild();renderPreview();}
  save();
@@ -1320,33 +1667,43 @@ function dedupePlacementsToLibIds(dataToId){
  });
  return count;
 }
-async function optimizeMediaLibrary(){
+var _mediaOptimizeRunning=false;
+async function ensureMediaOptimized(opts){
+ opts=opts||{};
+ var silent=opts.silent!==false;
  var imgs=STATE.site.images||[];
- if(!imgs.length){openNoticeModal({title:'Nothing to optimize',message:'Upload some images first.'});return;}
- setSaved('Optimizing media…');
- var compressed=0;
+ var migrated=0;
+ if(_mediaOptimizeRunning)return {migrated:0,remapped:0};
+ _mediaOptimizeRunning=true;
  try{
-  // Capture data→id before recompress so placements with old base64 still match.
   var beforeMap={};
   imgs.forEach(function(im){if(im&&im.id&&im.data)beforeMap[im.data]=im.id;});
   for(var i=0;i<imgs.length;i++){
    var im=imgs[i];
    if(!im||!im.data)continue;
-   var next=await toWebpPromise(im.data);
-   if(next&&next!==im.data){im.data=next;compressed++;}
+   if(/^data:image\//i.test(String(im.data))){
+    if(!silent)setSaved('Compressing & uploading media…');
+    var fileName=(im.name||('image-'+(i+1)+'.webp')).replace(/\.[^.]+$/,'.webp');
+    var next=await toWebpPromise(im.data);
+    var upFile=dataUrlToFile(next,fileName);
+    var oldData=im.data;
+    im.data=await uploadCmsMediaFile(upFile,fileName);
+    if(oldData&&beforeMap[oldData]===im.id)delete beforeMap[oldData];
+    beforeMap[im.data]=im.id;
+    migrated++;
+   }
   }
   var remapped=dedupePlacementsToLibIds(beforeMap);
-  // Also strip any leftover src that still matches the new library bytes.
   remapped+=dedupePlacementsToLibIds();
-  await save();
-  renderImages();
-  if(MODE==='library')renderLibrary();
-  if(MODE==='edit'){renderBuild();renderPreview();}
-  if(MODE==='mega')renderMega();
-  openNoticeModal({title:'Media optimized',message:'Recompressed '+compressed+' image'+(compressed===1?'':'s')+' and linked '+remapped+' placement'+(remapped===1?'':'s')+' by library ID. Try Save / Publish again.'});
- }catch(e){
-  setSaved(e&&e.message?e.message:'Optimize failed');
-  openNoticeModal({title:'Optimize failed',message:e&&e.message?e.message:'Could not optimize the media library.'});
+  if(migrated||remapped){
+   if(MODE==='library')renderLibrary();
+   if(MODE==='edit'){renderBuild();renderPreview();}
+   if(MODE==='mega')renderMega();
+   renderImages();
+  }
+  return {migrated:migrated,remapped:remapped};
+ }finally{
+  _mediaOptimizeRunning=false;
  }
 }
 
@@ -1592,7 +1949,15 @@ async function doPublish(){
     // Send live STATE (incl. site.menu) so publish does not re-read a stale draft.
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
       body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages}})});
-    if(!r.ok){var em='Publish failed';try{em=(await r.json()).error||em;}catch(e){}if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');throw new Error(em);}
+    if(!r.ok){
+      var em='Publish failed';
+      try{em=(await r.json()).error||em;}catch(e){}
+      if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');
+      if(r.status===413||/payload|too large|entity|FUNCTION_PAYLOAD_TOO_LARGE/i.test(String(em))){
+        throw new Error('Publish payload too large. Try uploading fewer or smaller images, then publish again.');
+      }
+      throw new Error(em);
+    }
     var liveUrl=(MODE==='mega'||MODE==='library'||MODE==='logos')
       ? (siteOrigin()+'/')
       : publicPageUrl(page()?(isCmsBlogPage(page())?toPublicBlogSlug(page().slug):page().slug):'/');
@@ -1613,6 +1978,15 @@ function closeModal(){
   var m=document.getElementById('modal');
   if(m)m.classList.remove('show');
   window._confirmAction=null;
+  // Do not clear IMG_SEL here — confirm dialogs (bulk delete) run after closeModal
+  // and need the selection (or a captured id list) to still exist.
+  if(window._imgLibPickPath||window._imgLibGalleryBlock||_imgLibMulti){
+    window._imgLibPickPath=null;
+    window._imgLibGalleryBlock=null;
+    _imgLibMulti=false;
+    _imgLibFilter='';
+    IMG_SEL={};
+  }
 }
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 document.addEventListener('keydown',function(e){if(MODE!=='dash')return;if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes((document.activeElement&&document.activeElement.tagName)||'')){e.preventDefault();var el=document.getElementById('dash-page-search');if(el)el.focus();}});
@@ -2183,10 +2557,12 @@ function openLead(i){var l=leads()[i];if(!l)return;l.isnew=false;
 /* ===== standalone image library ===== */
 function showLibrary(){applyCmsView('library');}
 function renderLibrary(){var el=document.getElementById('library');var imgs=STATE.site.images||[];var cats=[];imgs.forEach(function(im){if(im.cat&&cats.indexOf(im.cat)<0)cats.push(im.cat)});
- var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · resized to max '+IMG_MAX_EDGE+'px and WebP-compressed. Upload once, then add SEO per section when you use an image.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="tbtn2" onclick="optimizeMediaLibrary()" '+(imgs.length?'':'disabled')+'>Optimize media</button><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
+ imgSelPrune();
+ var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · click to select multiple for bulk delete or category.</p></div><div><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
  h+='<div class="dash-actions" style="margin-bottom:16px"><select onchange="IMGFILTER=this.value;renderLibrary()" style="padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--card);max-width:260px"><option value="">All categories ('+imgs.length+')</option>'+cats.map(function(c){return '<option'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>';
  var shown=imgs.map(function(im,i){return {im:im,i:i}}).filter(function(x){return !IMGFILTER||x.im.cat===IMGFILTER});
- h+=shown.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'+shown.map(function(o){var im=o.im;return '<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden"><img src="'+im.data+'" style="width:100%;height:100px;object-fit:cover;display:block"><div style="padding:5px 7px;font-size:.68rem;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div><button class="rm" style="margin:4px 7px 6px" onclick="imgRmAsk('+o.i+')">Remove</button></div>';}).join('')+'</div>':'<div class="honest">No images yet. Click <b>+ Upload</b> to add some.</div>';
+ if(shown.length)h+=imgSelToolbarHtml(shown.map(function(o){return o.im.id;}));
+ h+=shown.length?'<div class="img-lib-grid-library">'+shown.map(function(o){return imgLibraryCardHtml(o.im,o.i,'library');}).join('')+'</div>':'<div class="honest">No images yet. Click <b>+ Upload</b> to add some.</div>';
  h+='</div>';el.innerHTML=h;
 }
 /* ===== analytics + SEO ===== */
@@ -2796,6 +3172,19 @@ w.updArr2 = updArr2;
 w.nestArr = nestArr;
 w.filterIcons = filterIcons;
 w.pickImg = pickImg;
+w.openImgLibModal = openImgLibModal;
+w.openGalleryImgPicker = openGalleryImgPicker;
+w.closeImgLibModal = closeImgLibModal;
+w.filterImgLibModal = filterImgLibModal;
+w.toggleImgLibMulti = toggleImgLibMulti;
+w.applyGalleryImgPick = applyGalleryImgPick;
+w.applyImgLibMultiPick = applyImgLibMultiPick;
+w.clearImgPick = clearImgPick;
+w.imgSelToggle = imgSelToggle;
+w.imgSelSelectAll = imgSelSelectAll;
+w.imgSelClear = imgSelClear;
+w.imgBulkSetCategory = imgBulkSetCategory;
+w.imgBulkDeleteAsk = imgBulkDeleteAsk;
 w.editPlacementImgMeta = editPlacementImgMeta;
 w.pvOver = pvOver;
 w.pvLeave = pvLeave;
@@ -2840,7 +3229,6 @@ w.logoAdd = logoAdd;
 w.imgRm = imgRm;
 w.imgRmAsk = imgRmAsk;
 w.imgUpload = imgUpload;
-w.optimizeMediaLibrary = optimizeMediaLibrary;
 w.closeImgMetaModal = closeImgMetaModal;
 w.confirmImgMeta = confirmImgMeta;
 w.imgMetaSetLoading = imgMetaSetLoading;
