@@ -1196,16 +1196,69 @@ function pickImg(path,imgId){const im=findLibImg(imgId);if(!im)return;const cur=
 function editPlacementImgMeta(path){const cur=getAtPath(path);const m=imgResolve(cur);if(!m.src){openNoticeModal({title:'Pick an image first',message:'Choose an image for this section before editing SEO metadata.'});return;}const libId=(cur&&typeof cur==='object'&&cur.libId)||m.libId||(findLibImgByData(m.src)||{}).id||'';openPlacementImgMeta(path,m.src,'',Object.assign({},m,{libId:libId}),libId);}
 function openPlacementImgMeta(path,src,name,existing,libId){const ex=imgResolve(existing);ex.src=src;window._imgMetaPlacementPath=path;window._imgMetaLibId=libId||ex.libId||(findLibImgByData(src)||{}).id||'';showImgMetaModal({data:src,name:name||'',libId:window._imgMetaLibId,alt:ex.alt,title:ex.title,desc:ex.desc,caption:ex.caption,keywords:ex.keywords,loading:ex.loading,decorative:ex.decorative,focusX:ex.focusX,focusY:ex.focusY},{placement:true,suggestedAlt:ex.alt||suggestAltFromName(name)});}
 function renderImages(){const el=document.getElementById('panel-images');const imgs=STATE.site.images||[];const cats=[...new Set(imgs.map(im=>im.cat).filter(Boolean))];
- let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once, then reuse them in any section. Photos are auto-resized (max '+IMG_MAX_EDGE+'px) and WebP-compressed. <b>SEO metadata</b> is added when you pick an image in the <b>Sections</b> tab.</div>';
+ let h='<div class="ph">'+SPARK+'Image library</div><div class="hint">Upload images here once, then reuse them in any section. Photos are auto-resized (max '+IMG_MAX_EDGE+'px), WebP-compressed, and stored in Supabase Storage. <b>SEO metadata</b> is added when you pick an image in the <b>Sections</b> tab.</div>';
  h+='<div class="fld"><label>Upload image(s)</label><input type="file" accept="image/*" multiple id="imgup" onchange="imgUpload(this)"></div>';
- if(imgs.length)h+='<button type="button" class="miniadd" onclick="optimizeMediaLibrary()" style="margin-bottom:12px">Optimize media library</button><div class="hint" style="margin-top:-8px">Recompress oversized photos and remove duplicate base64 copies from sections — use this if Save is failing.</div>';
+ if(imgs.length)h+='<button type="button" class="miniadd" onclick="optimizeMediaLibrary()" style="margin-bottom:12px">Optimize media library</button><div class="hint" style="margin-top:-8px">Migrate old inline/base64 images to Supabase Storage and remove duplicate section copies — use this if Save/Publish is failing.</div>';
  h+='<div class="fld"><label>Filter by category</label><select onchange="IMGFILTER=this.value;renderImages()"><option value="">All ('+imgs.length+')</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>';
  const shown=imgs.map((im,i)=>({im,i})).filter(x=>!IMGFILTER||x.im.cat===IMGFILTER);
  h+=shown.length?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+shown.map(({im,i})=>'<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden;position:relative"><img src="'+im.data+'" style="width:100%;height:68px;object-fit:cover;display:block"><button class="rm" style="position:absolute;top:2px;right:4px;background:rgba(0,0,0,.55);color:#fff;border-radius:2px;padding:1px 5px" onclick="imgRmAsk('+i+')" title="Remove from library">×</button><div style="font-size:.68rem;padding:5px 7px;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div></div>').join('')+'</div>':'<div class="hint">No images yet — upload one above.</div>';
  el.innerHTML=h;}
 function toWebp(dataURL,cb){try{const img=new Image();img.onload=()=>{try{var w=img.naturalWidth||img.width||1;var h=img.naturalHeight||img.height||1;var scale=1;if(w>IMG_MAX_EDGE||h>IMG_MAX_EDGE)scale=IMG_MAX_EDGE/Math.max(w,h);var cw=Math.max(1,Math.round(w*scale));var ch=Math.max(1,Math.round(h*scale));const c=document.createElement('canvas');c.width=cw;c.height=ch;c.getContext('2d').drawImage(img,0,0,cw,ch);cb(c.toDataURL('image/webp',IMG_WEBP_QUALITY));}catch(e){cb(dataURL)}};img.onerror=()=>cb(dataURL);img.src=dataURL;}catch(e){cb(dataURL)}}
 function toWebpPromise(dataURL){return new Promise(function(resolve){toWebp(dataURL,resolve);});}
-function imgUpload(inp,pickPath){const files=[...inp.files];if(!files.length)return;inp.value='';let pending=files.length;const uploaded=[];files.forEach(f=>{const r=new FileReader();r.onload=()=>{toWebp(r.result,webp=>{const name=f.name.replace(/\.[^.]+$/,'.webp');const baseName=f.name.replace(/\.[^.]+$/,'');const id=uid();(STATE.site.images=STATE.site.images||[]).push({id,name,data:webp,cat:''});uploaded.push({id,name,baseName,data:webp});pending--;if(pending===0)finishImgUpload(uploaded,pickPath);});};r.readAsDataURL(f);});}
+async function uploadCmsMediaFile(file,name){
+ const f=file instanceof File?file:new File([file],name||'image.webp',{type:'image/webp'});
+ const fd=new FormData();
+ fd.append('file',f,f.name||name||'image.webp');
+ const r=await fetch('/api/cms/media',{method:'POST',credentials:'same-origin',body:fd});
+ var d=null;try{d=await r.json();}catch(e){}
+ if(!r.ok)throw new Error((d&&d.error)||'Image upload failed');
+ if(!d||!d.url)throw new Error('Image upload returned no URL');
+ return String(d.url);
+}
+function dataUrlToFile(dataURL,name){
+ var m=String(dataURL||'').match(/^data:([^;]+);base64,(.+)$/);
+ if(!m)throw new Error('Invalid image data');
+ var mime=m[1]||'image/webp';
+ var b64=m[2]||'';
+ var bin=atob(b64);
+ var len=bin.length;
+ var arr=new Uint8Array(len);
+ for(var i=0;i<len;i++)arr[i]=bin.charCodeAt(i);
+ return new File([arr],name||'image.webp',{type:mime});
+}
+async function imgUpload(inp,pickPath){
+ const files=[...inp.files];
+ if(!files.length)return;
+ inp.value='';
+ const uploaded=[];
+ const failures=[];
+ setSaved('Uploading media…');
+ for(var i=0;i<files.length;i++){
+  const f=files[i];
+  try{
+   const dataURL=await new Promise(function(resolve,reject){
+    const r=new FileReader();
+    r.onload=function(){resolve(r.result);};
+    r.onerror=function(){reject(new Error('Could not read file'));};
+    r.readAsDataURL(f);
+   });
+   const webp=await toWebpPromise(dataURL);
+   const name=f.name.replace(/\.[^.]+$/,'.webp');
+   const baseName=f.name.replace(/\.[^.]+$/,'');
+   const upFile=dataUrlToFile(webp,name);
+   const url=await uploadCmsMediaFile(upFile,name);
+   const id=uid();
+   (STATE.site.images=STATE.site.images||[]).push({id,name,data:url,cat:''});
+   uploaded.push({id,name,baseName,data:url});
+  }catch(e){
+   failures.push((f&&f.name)||('file '+(i+1)));
+  }
+ }
+ if(uploaded.length)finishImgUpload(uploaded,pickPath);
+ if(failures.length){
+  openNoticeModal({title:'Some uploads failed',message:'Could not upload '+failures.length+' image'+(failures.length===1?'':'s')+'. Check your connection and try again.'});
+ }
+}
 function finishImgUpload(uploaded,pickPath){renderImages();if(MODE==='library')renderLibrary();save();
  if(pickPath&&uploaded.length===1){const u=uploaded[0];openPlacementImgMeta(pickPath,u.data,u.baseName,{...imgMetaEmpty(),src:u.data,libId:u.id},u.id);}
  if(MODE==='edit'){renderBuild();renderPreview();}}
@@ -1324,26 +1377,31 @@ async function optimizeMediaLibrary(){
  var imgs=STATE.site.images||[];
  if(!imgs.length){openNoticeModal({title:'Nothing to optimize',message:'Upload some images first.'});return;}
  setSaved('Optimizing media…');
- var compressed=0;
+ var migrated=0;
  try{
-  // Capture data→id before recompress so placements with old base64 still match.
+  // Capture data→id before migration so placements with old base64 still match.
   var beforeMap={};
   imgs.forEach(function(im){if(im&&im.id&&im.data)beforeMap[im.data]=im.id;});
   for(var i=0;i<imgs.length;i++){
    var im=imgs[i];
    if(!im||!im.data)continue;
-   var next=await toWebpPromise(im.data);
-   if(next&&next!==im.data){im.data=next;compressed++;}
+   if(/^data:image\//i.test(String(im.data))){
+    var fileName=(im.name||('image-'+(i+1)+'.webp')).replace(/\.[^.]+$/,'.webp');
+    var next=await toWebpPromise(im.data);
+    var upFile=dataUrlToFile(next,fileName);
+    im.data=await uploadCmsMediaFile(upFile,fileName);
+    migrated++;
+   }
   }
   var remapped=dedupePlacementsToLibIds(beforeMap);
-  // Also strip any leftover src that still matches the new library bytes.
+  // Also strip any leftover src that still matches current library values.
   remapped+=dedupePlacementsToLibIds();
   await save();
   renderImages();
   if(MODE==='library')renderLibrary();
   if(MODE==='edit'){renderBuild();renderPreview();}
   if(MODE==='mega')renderMega();
-  openNoticeModal({title:'Media optimized',message:'Recompressed '+compressed+' image'+(compressed===1?'':'s')+' and linked '+remapped+' placement'+(remapped===1?'':'s')+' by library ID. Try Save / Publish again.'});
+  openNoticeModal({title:'Media optimized',message:'Migrated '+migrated+' image'+(migrated===1?'':'s')+' to Supabase Storage and linked '+remapped+' placement'+(remapped===1?'':'s')+' by library ID. Try Publish again.'});
  }catch(e){
   setSaved(e&&e.message?e.message:'Optimize failed');
   openNoticeModal({title:'Optimize failed',message:e&&e.message?e.message:'Could not optimize the media library.'});
@@ -1592,7 +1650,15 @@ async function doPublish(){
     // Send live STATE (incl. site.menu) so publish does not re-read a stale draft.
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
       body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages}})});
-    if(!r.ok){var em='Publish failed';try{em=(await r.json()).error||em;}catch(e){}if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');throw new Error(em);}
+    if(!r.ok){
+      var em='Publish failed';
+      try{em=(await r.json()).error||em;}catch(e){}
+      if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');
+      if(r.status===413||/payload|too large|entity|FUNCTION_PAYLOAD_TOO_LARGE/i.test(String(em))){
+        throw new Error('Publish payload too large. Open Images or Media library and run Optimize media, then publish again.');
+      }
+      throw new Error(em);
+    }
     var liveUrl=(MODE==='mega'||MODE==='library'||MODE==='logos')
       ? (siteOrigin()+'/')
       : publicPageUrl(page()?(isCmsBlogPage(page())?toPublicBlogSlug(page().slug):page().slug):'/');
@@ -2183,7 +2249,7 @@ function openLead(i){var l=leads()[i];if(!l)return;l.isnew=false;
 /* ===== standalone image library ===== */
 function showLibrary(){applyCmsView('library');}
 function renderLibrary(){var el=document.getElementById('library');var imgs=STATE.site.images||[];var cats=[];imgs.forEach(function(im){if(im.cat&&cats.indexOf(im.cat)<0)cats.push(im.cat)});
- var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · resized to max '+IMG_MAX_EDGE+'px and WebP-compressed. Upload once, then add SEO per section when you use an image.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="tbtn2" onclick="optimizeMediaLibrary()" '+(imgs.length?'':'disabled')+'>Optimize media</button><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
+ var h='<div class="adm-wrap"><div class="adm-h"><div><h1>Media library</h1><p>'+imgs.length+' items · resized to max '+IMG_MAX_EDGE+'px, WebP-compressed, and hosted in Supabase Storage. Upload once, then add SEO per section when you use an image.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="tbtn2" onclick="optimizeMediaLibrary()" '+(imgs.length?'':'disabled')+'>Optimize media</button><label class="tbtn2" style="cursor:pointer">+ Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label></div></div>';
  h+='<div class="dash-actions" style="margin-bottom:16px"><select onchange="IMGFILTER=this.value;renderLibrary()" style="padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--card);max-width:260px"><option value="">All categories ('+imgs.length+')</option>'+cats.map(function(c){return '<option'+(IMGFILTER===c?' selected':'')+'>'+esc(c)+'</option>'}).join('')+'</select></div>';
  var shown=imgs.map(function(im,i){return {im:im,i:i}}).filter(function(x){return !IMGFILTER||x.im.cat===IMGFILTER});
  h+=shown.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'+shown.map(function(o){var im=o.im;return '<div style="border:1px solid var(--line);border-radius:3px;overflow:hidden"><img src="'+im.data+'" style="width:100%;height:100px;object-fit:cover;display:block"><div style="padding:5px 7px;font-size:.68rem;color:var(--muted);border-top:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(im.name?esc(im.name):'Image')+(im.cat?' · '+esc(im.cat):'')+'</div><button class="rm" style="margin:4px 7px 6px" onclick="imgRmAsk('+o.i+')">Remove</button></div>';}).join('')+'</div>':'<div class="honest">No images yet. Click <b>+ Upload</b> to add some.</div>';
