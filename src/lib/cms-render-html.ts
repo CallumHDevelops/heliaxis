@@ -204,14 +204,30 @@ function renderBlock(b: LooseBlock): string {
       !p.hideMicrotrust && mt.trim()
         ? `<p class="microtrust">${esc(mt)}</p>`
         : '';
-    const rtVal = String(p.ratingValue || '4.9');
-    const rtInst = String(p.ratingInstalls || '1200');
+    const rtVal =
+      p.ratingValue != null && String(p.ratingValue).trim() !== ''
+        ? String(p.ratingValue)
+        : '4.9';
+    const rtStars = Math.max(1, Math.min(5, Number(p.ratingStars) || 5));
+    const rtPlat =
+      p.ratingPlatform != null ? String(p.ratingPlatform) : 'Google & Trustpilot';
+    const rtInst =
+      p.ratingInstalls != null && String(p.ratingInstalls).trim() !== ''
+        ? String(p.ratingInstalls)
+        : '1200';
+    const rtSuf =
+      p.ratingInstallsSuffix != null ? String(p.ratingInstallsSuffix) : '+';
+    const rtLab =
+      p.ratingInstallsLabel != null
+        ? String(p.ratingInstallsLabel)
+        : 'installs across South Wales';
     const rthtml = !p.hideRating
-      ? `<div class="rating"><div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">★★★★★</span><span>Google &amp; Trustpilot</span></div><div class="r"><span class="big"><span>${esc(rtInst)}</span>+</span><span>installs across South Wales</span></div></div>`
+      ? `<div class="rating"><div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">${esc('★'.repeat(rtStars))}</span><span>${esc(rtPlat)}</span></div><div class="r"><span class="big"><span>${esc(rtInst)}</span><span>${esc(rtSuf)}</span></span><span>${esc(rtLab)}</span></div></div>`
       : '';
-    const eyebrowHtml = p.eyebrow
-      ? `<span class="eyebrow on-dark">${SPARK.replace('<svg ', '<svg class="spark-ico" ')}${esc(p.eyebrow)}</span>`
-      : '';
+    const eyebrowHtml =
+      !p.hideEyebrow && p.eyebrow && String(p.eyebrow).trim()
+        ? `<span class="eyebrow on-dark">${p.hideEyebrowSpark ? '' : SPARK.replace('<svg ', '<svg class="spark-ico" ')}<span class="eyebrow-txt">${esc(p.eyebrow)}</span></span>`
+        : '';
     let markHtml = '';
     if (!hideMark) {
       if (p.markImg) {
@@ -285,10 +301,29 @@ function renderBlock(b: LooseBlock): string {
         return `<div><h4>${esc(col.title || '')}</h4>${links}</div>`;
       })
       .join('');
+    let badgesHtml = '';
+    if (!p.hideBadges) {
+      const badges = Array.isArray(p.badges) ? (p.badges as Array<{ name?: string; libId?: string; src?: string }>) : [];
+      const badgeItems = badges
+        .map((b) => {
+          const src = imgSrc(b);
+          const nm = b?.name || 'Accreditation';
+          if (!src) return b?.name ? `<span class="pv-footer-badge is-text">${esc(nm)}</span>` : '';
+          return `<span class="pv-footer-badge"><img src="${esc(src)}" alt="${esc(nm)}"></span>`;
+        })
+        .filter(Boolean)
+        .join('');
+      if (badgeItems) {
+        const blab = p.badgesLabel != null ? String(p.badgesLabel) : 'Accreditations';
+        badgesHtml =
+          `<div class="pv-footer-badges">${blab ? `<div class="pv-footer-badges-label">${esc(blab)}</div>` : ''}` +
+          `<div class="pv-footer-badges-row">${badgeItems}</div></div>`;
+      }
+    }
     const siteHref = String(p.siteHref || 'https://heliaxis.co.uk');
     return (
       `<footer class="pv-footer"><div class="wrap"><div class="cols"><div class="pv-footer-brand">${brand}` +
-      `<p class="pv-footer-about">${esc(p.about)}</p></div>${colHtml}</div>` +
+      `<p class="pv-footer-about">${esc(p.about)}</p>${badgesHtml}</div>${colHtml}</div>` +
       `<div class="base"><span>${esc(p.copyright)}</span><a href="${esc(siteHref)}" class="pv-footer-url">${esc(p.siteUrl || 'heliaxis.co.uk')}</a></div></div></footer>`
     );
   }
@@ -500,7 +535,7 @@ function renderBlock(b: LooseBlock): string {
       .join('');
     let body =
       items.length > 3
-        ? `<div class="pv-tmarquee"><div class="trk" style="animation-duration:${Number(p.speed) || 36}s">${cards}${cards}</div></div>`
+        ? `<div class="pv-tmarquee"><div class="trk" style="animation-duration:${Number(p.speed) || 36}s"><div class="pv-tset">${cards}</div><div class="pv-tset" aria-hidden="true">${cards}</div></div></div>`
         : `<div class="tgrid">${cards}</div>`;
     const fnHtml = fn ? `<p class="pv-testi-note">${esc(fn)}</p>` : '';
     return (
