@@ -249,7 +249,7 @@ function renderBlock(b: LooseBlock): string {
     const tx =
       `<div>${eyebrow(p.eyebrow)}` +
       `<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px">${accentText(p.title)}</h2>` +
-      `<p style="color:var(--muted);margin-top:12px;line-height:1.6">${esc(p.text)}</p>` +
+      `<p style="color:var(--muted);margin-top:12px;line-height:1.6">${esc(p.text).replace(/\n/g, '<br>')}</p>` +
       (ctaBtn ? `<div class="pv-btnrow">${ctaBtn}</div>` : '') +
       '</div>';
     return `<div class="pv-media is-blog" style="display:grid;grid-template-columns:${cols};gap:34px;align-items:center">${p.side === 'left' ? im + tx : tx + im}</div>`;
@@ -381,7 +381,7 @@ function renderBlock(b: LooseBlock): string {
     const pts = points
       .map(
         (pt) =>
-          `<div class="pv-pt"><span class="ic">${QUOTE_CHECK_SVG}</span><div><b>${esc(pt.title)}</b><span>${esc(pt.text)}</span></div></div>`,
+          `<div class="pv-pt"><span class="ic">${QUOTE_CHECK_SVG}</span><div><b>${esc(pt.title)}</b><span>${esc(pt.text).replace(/\n/g, '<br>')}</span></div></div>`,
       )
       .join('');
     let callBox = '';
@@ -591,7 +591,7 @@ function renderBlock(b: LooseBlock): string {
     const cards = items
       .map(
         (it) =>
-          `<div class="fcard"><h3>${accentText(it.title)}</h3><p>${esc(it.text)}</p></div>`,
+          `<div class="fcard"><h3>${accentText(it.title)}</h3><p>${esc(it.text).replace(/\n/g, '<br>')}</p></div>`,
       )
       .join('');
     const subHtml = fsub ? `<p>${esc(fsub)}</p>` : '';
@@ -602,6 +602,38 @@ function renderBlock(b: LooseBlock): string {
     return (
       `<div class="pv-funding"><div class="pv-funding-glow"></div><div class="wrap"><div class="shead">${eyebrow(feb, true)}<h2>${accentText(ftl)}</h2>${subHtml}</div><div class="fgrid" style="grid-template-columns:repeat(${cols},1fr)">${cards}</div>${ctaHtml}</div></div>`
     );
+  }
+
+  if (t === 'clientbanner') {
+    const cs = Array.isArray(p.clients) ? (p.clients as Array<{ name?: string; img?: unknown }>) : [];
+    if (!cs.length) return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"></div></div></div>`;
+    const chip = (c: { name?: string; img?: unknown }) => {
+      const src = imgSrc(c.img);
+      return `<span class="pv-brand">${src ? `<img src="${esc(src)}" alt="${esc(c.name)}">` : esc(c.name)}</span>`;
+    };
+    let cset = cs.map(chip).join('');
+    let cn = cs.length;
+    while (cn < 10) {
+      cset += cs.map(chip).join('');
+      cn += cs.length;
+    }
+    return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"><div class="pv-bset">${cset}</div><div class="pv-bset" aria-hidden="true">${cset}</div></div></div></div>`;
+  }
+
+  if (t === 'accbanner') {
+    const is = Array.isArray(p.items) ? (p.items as Array<{ name?: string; img?: unknown }>) : [];
+    if (!is.length) return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"></div></div></div>`;
+    const chip = (c: { name?: string; img?: unknown }) => {
+      const src = imgSrc(c.img);
+      return `<span class="pv-brand">${src ? `<img src="${esc(src)}" alt="${esc(c.name)}" style="height:40px;width:auto;object-fit:contain">` : esc(c.name)}</span>`;
+    };
+    let iset = is.map(chip).join('');
+    let inum = is.length;
+    while (inum < 10) {
+      iset += is.map(chip).join('');
+      inum += is.length;
+    }
+    return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"><div class="pv-bset">${iset}</div><div class="pv-bset" aria-hidden="true">${iset}</div></div></div></div>`;
   }
 
   return '';
