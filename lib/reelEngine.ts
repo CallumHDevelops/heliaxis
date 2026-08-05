@@ -1,4 +1,4 @@
-// Heliaxis Reel engine — animated, on-brand scene rendering for 9:16 reels.
+// Heliaxis Reel engine — animated, on-brand scene rendering (size-aware).
 import { C, RAY } from './postEngine';
 
 export type ReelTheme = 'dark' | 'light' | 'gold';
@@ -7,6 +7,9 @@ export type ReelAnim = 'up' | 'fade' | 'left';
 export interface Scene {
   id: string;
   bg: string | null; // image data URL, or null for a branded gradient
+  videoUrl?: string | null; // in-memory blob URL for a video clip (takes priority over bg)
+  videoName?: string; // display label (video isn't persisted)
+  videoStart?: number; // trim in-point (seconds)
   theme: ReelTheme;
   eyebrow: string;
   headline: string; // supports *word* -> gold
@@ -21,8 +24,22 @@ export interface ReelFonts {
   mono: string;
 }
 
-export const REEL_W = 1080;
-export const REEL_H = 1920;
+// drawable media resolved by the host (image or video frame)
+export interface SceneMedia {
+  src: CanvasImageSource;
+  w: number;
+  h: number;
+  kenBurns: boolean;
+}
+
+export const REEL_SIZES = {
+  '9:16': { w: 1080, h: 1920, label: 'Reel 9:16' },
+  '1:1': { w: 1080, h: 1080, label: 'Square 1:1' },
+  '4:5': { w: 1080, h: 1350, label: 'Portrait 4:5' },
+  '16:9': { w: 1920, h: 1080, label: 'Landscape 16:9' },
+} as const;
+export type ReelSizeKey = keyof typeof REEL_SIZES;
+
 export const TRANS = 0.45; // cross-fade duration (s)
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -33,6 +50,21 @@ const ease = (t: number) => {
 
 export function totalDuration(scenes: Scene[]) {
   return scenes.reduce((a, s) => a + Math.max(0.2, s.seconds), 0);
+}
+
+export function sceneIndexAt(scenes: Scene[], t: number): { i: number; lt: number } {
+  const durs = scenes.map((s) => Math.max(0.2, s.seconds));
+  let start = 0;
+  let i = 0;
+  for (; i < scenes.length; i++) {
+    if (t < start + durs[i]) break;
+    start += durs[i];
+  }
+  if (i >= scenes.length) {
+    i = Math.max(0, scenes.length - 1);
+    start = totalDuration(scenes) - (durs[i] || 0);
+  }
+  return { i, lt: t - start };
 }
 
 function drawSpark(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, fill: string) {
@@ -53,7 +85,6 @@ function drawSpark(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: 
   ctx.restore();
 }
 
-// wrap into lines of coloured words, honouring *accent* segments
 function wrapRich(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -128,12 +159,11 @@ function wrapPlain(ctx: CanvasRenderingContext2D, text: string, maxW: number): s
   return out;
 }
 
-// offset for an element's entrance, based on the scene's anim style
 function entrOffset(anim: ReelAnim, e: number): [number, number] {
   const k = (1 - e) * 46;
   if (anim === 'fade') return [0, 0];
   if (anim === 'left') return [k, 0];
-  return [0, k]; // up
+  return [0, k];
 }
 
 export function drawSceneFrame(
@@ -141,11 +171,11 @@ export function drawSceneFrame(
   scene: Scene,
   lt: number,
   fam: ReelFonts,
-  img: HTMLImageElement | null,
-  alpha: number
+  media: SceneMedia | null,
+  alpha: number,
+  W: number,
+  H: number
 ) {
-  const W = REEL_W;
-  const H = REEL_H;
   const dur = Math.max(0.2, scene.seconds);
   const isDark = scene.theme === 'dark';
   const isGold = scene.theme === 'gold';
@@ -153,18 +183,17 @@ export function drawSceneFrame(
   let fg = isGold ? C.ink : isDark ? C.paper : C.ink;
   let subCol = isGold ? 'rgba(33,31,24,.72)' : isDark ? C.mutedD : C.muted;
   let accent = isGold ? C.ink : C.solar;
-  const eyeCol = accent;
+  const hasMedia = !!(media && media.w && media.h);
 
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  // background
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  if (img && img.complete && img.naturalWidth) {
+  if (hasMedia && media) {
     const p = clamp01(lt / dur);
-    const scale = 1.06 + 0.14 * p; // Ken Burns zoom
-    const ir = img.naturalWidth / img.naturalHeight;
+    const scale = media.kenBurns ? 1.06 + 0.14 * p : 1.0;
+    const ir = media.w / media.h;
     const cr = W / H;
     let dw: number;
     let dh: number;
@@ -175,9 +204,13 @@ export function drawSceneFrame(
       dw = W * scale;
       dh = dw / ir;
     }
-    const dx = (W - dw) / 2 - (dw - W) * 0.12 * p;
+    const dx = (W - dw) / 2 - (media.kenBurns ? (dw - W) * 0.12 * p : 0);
     const dy = (H - dh) / 2;
-    ctx.drawImage(img, dx, dy, dw, dh);
+    try {
+      ctx.drawImage(media.src, dx, dy, dw, dh);
+    } catch {
+      /* frame not ready */
+    }
     const og = ctx.createLinearGradient(0, 0, 0, H);
     og.addColorStop(0, 'rgba(20,18,14,.5)');
     og.addColorStop(1, 'rgba(20,18,14,.92)');
@@ -204,23 +237,21 @@ export function drawSceneFrame(
     ctx.fillRect(0, 0, W, H);
   }
 
-  const pad = Math.round(W * 0.09);
+  const pad = Math.round(Math.min(W, H) * 0.09);
   drawSpark(ctx, W - pad - 12, pad + 22, 44, accent);
 
-  // text block, lower third-ish
   const x = pad;
-  let cy = H * 0.46;
+  let cy = H * (W >= H ? 0.4 : 0.46); // landscape: text a touch higher
 
   if (scene.eyebrow) {
-    const e = ease((lt - 0.0) / 0.5);
+    const e = ease(lt / 0.5);
     const [ox, oy] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
     ctx.font = `600 30px ${fam.mono}, monospace`;
-    ctx.fillStyle = eyeCol;
+    ctx.fillStyle = accent;
     ctx.fillText(scene.eyebrow.toUpperCase(), x + ox, cy + oy);
     cy += 70;
   }
-
   if (scene.headline) {
     const e = ease((lt - 0.12) / 0.55);
     const [ox, oy] = entrOffset(scene.anim, e);
@@ -229,7 +260,6 @@ export function drawSceneFrame(
     const lines = wrapRich(ctx, scene.headline, W - pad * 2, fg, accent);
     cy = fillRich(ctx, lines, x + ox, cy + 96 + oy, 112);
   }
-
   if (scene.sub) {
     const e = ease((lt - 0.28) / 0.55);
     const [ox, oy] = entrOffset(scene.anim, e);
@@ -243,7 +273,6 @@ export function drawSceneFrame(
     }
   }
 
-  // footer
   ctx.globalAlpha = alpha;
   ctx.font = `500 24px ${fam.mono}, monospace`;
   ctx.fillStyle = subCol;
@@ -252,35 +281,25 @@ export function drawSceneFrame(
   ctx.restore();
 }
 
-// Render the whole reel at absolute time t (seconds). imgFor resolves a scene's image.
 export function renderReel(
   ctx: CanvasRenderingContext2D,
   scenes: Scene[],
   t: number,
-  imgFor: (s: Scene) => HTMLImageElement | null,
-  fam: ReelFonts
+  mediaFor: (s: Scene) => SceneMedia | null,
+  fam: ReelFonts,
+  W: number,
+  H: number
 ) {
   ctx.fillStyle = C.ink;
-  ctx.fillRect(0, 0, REEL_W, REEL_H);
+  ctx.fillRect(0, 0, W, H);
   if (!scenes.length) return;
 
+  const { i, lt } = sceneIndexAt(scenes, t);
   const durs = scenes.map((s) => Math.max(0.2, s.seconds));
-  let start = 0;
-  let i = 0;
-  for (; i < scenes.length; i++) {
-    if (t < start + durs[i]) break;
-    start += durs[i];
-  }
-  if (i >= scenes.length) {
-    i = scenes.length - 1;
-    start = totalDuration(scenes) - durs[i];
-  }
-  const lt = t - start;
-
   if (lt < TRANS && i > 0) {
-    drawSceneFrame(ctx, scenes[i - 1], durs[i - 1], fam, imgFor(scenes[i - 1]), 1);
-    drawSceneFrame(ctx, scenes[i], lt, fam, imgFor(scenes[i]), ease(lt / TRANS));
+    drawSceneFrame(ctx, scenes[i - 1], durs[i - 1], fam, mediaFor(scenes[i - 1]), 1, W, H);
+    drawSceneFrame(ctx, scenes[i], lt, fam, mediaFor(scenes[i]), ease(lt / TRANS), W, H);
   } else {
-    drawSceneFrame(ctx, scenes[i], lt, fam, imgFor(scenes[i]), 1);
+    drawSceneFrame(ctx, scenes[i], lt, fam, mediaFor(scenes[i]), 1, W, H);
   }
 }

@@ -310,6 +310,53 @@
   line-height: 1.45;
   margin-top: 6px;
 }
+.videoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 7px 10px;
+  background: var(--card);
+  font-size: 0.76rem;
+  color: var(--ink);
+}
+.videoRow span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.videoRow button {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: #b4462f;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.uploadDark {
+  display: block;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  border: 1px solid var(--ink);
+  background: none;
+  color: var(--ink);
+  padding: 9px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.uploadDark:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+.uploadDark input {
+  display: none;
+}
 .note {
   background: rgba(248, 188, 30, 0.13);
   border-left: 3px solid var(--solar);

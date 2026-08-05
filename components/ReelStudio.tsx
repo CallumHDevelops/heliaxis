@@ -1,15 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Spark } from './Spark';
 import {
-  REEL_W,
-  REEL_H,
+  REEL_SIZES,
   renderReel,
+  sceneIndexAt,
   totalDuration,
+  type ReelSizeKey,
   type Scene,
+  type SceneMedia,
   type ReelTheme,
   type ReelAnim,
 } from '@/lib/reelEngine';
@@ -23,6 +25,9 @@ const uid = () =>
 const newScene = (): Scene => ({
   id: uid(),
   bg: null,
+  videoUrl: null,
+  videoName: '',
+  videoStart: 0,
   theme: 'dark',
   eyebrow: 'MCS-CERTIFIED · SOUTH WALES',
   headline: 'Energy that revolves around *you.*',
@@ -37,23 +42,28 @@ const ANIMS: { k: ReelAnim; label: string }[] = [
   { k: 'fade', label: 'Fade' },
   { k: 'left', label: 'Slide in' },
 ];
+const SIZE_KEYS = Object.keys(REEL_SIZES) as ReelSizeKey[];
 
 export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const supabase = createClient();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const famRef = useRef({ display: 'sans-serif', body: 'sans-serif', mono: 'monospace' });
   const imgCache = useRef<Record<string, HTMLImageElement>>({});
+  const videoCache = useRef<Record<string, HTMLVideoElement>>({});
 
   const [scenes, setScenes] = useState<Scene[]>([newScene()]);
   const [sel, setSel] = useState(0);
+  const [size, setSize] = useState<ReelSizeKey>('9:16');
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [images, setImages] = useState<{ id: string; name: string; data_url: string }[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioName, setAudioName] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [, force] = useState(0); // re-render when video metadata loads
 
   const scenesRef = useRef(scenes);
+  const sizeRef = useRef(size);
   const playheadRef = useRef(0);
   const playingRef = useRef(false);
   const startRef = useRef(0);
@@ -62,34 +72,107 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   useEffect(() => {
     scenesRef.current = scenes;
   }, [scenes]);
+  useEffect(() => {
+    sizeRef.current = size;
+    drawAt(playheadRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size]);
 
-  const imgFor = useCallback((s: Scene) => {
-    if (!s.bg) return null;
-    let im = imgCache.current[s.bg];
+  function imgFor(url: string) {
+    let im = imgCache.current[url];
     if (!im) {
       im = new Image();
       im.onload = () => drawAt(playheadRef.current);
-      im.src = s.bg;
-      imgCache.current[s.bg] = im;
+      im.src = url;
+      imgCache.current[url] = im;
     }
     return im;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
+  function videoFor(url: string) {
+    let v = videoCache.current[url];
+    if (!v) {
+      v = document.createElement('video');
+      v.src = url;
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      v.onloadeddata = () => {
+        force((n) => n + 1);
+        drawAt(playheadRef.current);
+      };
+      videoCache.current[url] = v;
+    }
+    return v;
+  }
+  function mediaFor(s: Scene): SceneMedia | null {
+    if (s.videoUrl) {
+      const v = videoFor(s.videoUrl);
+      if (v.videoWidth && v.videoHeight)
+        return { src: v, w: v.videoWidth, h: v.videoHeight, kenBurns: false };
+      return null;
+    }
+    if (s.bg) {
+      const im = imgFor(s.bg);
+      if (im.complete && im.naturalWidth)
+        return { src: im, w: im.naturalWidth, h: im.naturalHeight, kenBurns: true };
+      return null;
+    }
+    return null;
+  }
 
-  const drawAt = useCallback(
-    (t: number) => {
-      const c = canvasRef.current;
-      if (!c) return;
-      const ctx = c.getContext('2d');
-      if (!ctx) return;
-      if (c.width !== REEL_W) {
-        c.width = REEL_W;
-        c.height = REEL_H;
+  function drawAt(t: number) {
+    const c = canvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    const dim = REEL_SIZES[sizeRef.current];
+    if (c.width !== dim.w || c.height !== dim.h) {
+      c.width = dim.w;
+      c.height = dim.h;
+    }
+    renderReel(ctx, scenesRef.current, t, mediaFor, famRef.current, dim.w, dim.h);
+  }
+
+  function syncVideos(t: number, isPlaying: boolean) {
+    const arr = scenesRef.current;
+    const { i, lt } = sceneIndexAt(arr, t);
+    const active = arr[i];
+    const activeUrl = active?.videoUrl || null;
+    for (const url in videoCache.current) {
+      if (url !== activeUrl) videoCache.current[url].pause();
+    }
+    if (activeUrl && active) {
+      const v = videoCache.current[activeUrl];
+      if (v) {
+        const target = (active.videoStart || 0) + Math.max(0, lt);
+        if (isPlaying) {
+          if (v.paused) {
+            try {
+              v.currentTime = target;
+            } catch {
+              /* not seekable yet */
+            }
+            v.play().catch(() => {});
+          } else if (Math.abs(v.currentTime - target) > 0.35) {
+            try {
+              v.currentTime = target;
+            } catch {
+              /* ignore */
+            }
+          }
+        } else {
+          if (!v.paused) v.pause();
+          if (Math.abs(v.currentTime - target) > 0.05) {
+            try {
+              v.currentTime = target;
+            } catch {
+              /* ignore */
+            }
+          }
+        }
       }
-      renderReel(ctx, scenesRef.current, t, imgFor, famRef.current);
-    },
-    [imgFor]
-  );
+    }
+  }
 
   // fonts + persisted draft + image library
   useEffect(() => {
@@ -102,8 +185,14 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     try {
       const saved = localStorage.getItem('heliaxis_reel');
       if (saved) {
-        const arr = JSON.parse(saved);
-        if (Array.isArray(arr) && arr.length) setScenes(arr);
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.scenes) && parsed.scenes.length) {
+          // videos are in-memory only — drop dead blob URLs on load
+          setScenes(
+            parsed.scenes.map((s: Scene) => ({ ...s, videoUrl: null, videoName: '', videoStart: 0 }))
+          );
+          if (parsed.size && REEL_SIZES[parsed.size as ReelSizeKey]) setSize(parsed.size);
+        }
       }
     } catch {
       /* ignore */
@@ -116,16 +205,17 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // persist + repaint on edits (when not actively playing)
   useEffect(() => {
     try {
-      localStorage.setItem('heliaxis_reel', JSON.stringify(scenes));
+      // don't persist blob video URLs (invalid after reload)
+      const persist = scenes.map((s) => ({ ...s, videoUrl: null, videoName: '', videoStart: 0 }));
+      localStorage.setItem('heliaxis_reel', JSON.stringify({ scenes: persist, size }));
     } catch {
       /* ignore */
     }
     if (!playingRef.current) drawAt(playheadRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenes]);
+  }, [scenes, size]);
 
   async function loadImages() {
     const { data } = await supabase
@@ -141,6 +231,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     const clamped = Math.max(0, Math.min(total, t));
     playheadRef.current = clamped;
     setPlayhead(clamped);
+    syncVideos(clamped, false);
     drawAt(clamped);
   }
 
@@ -156,10 +247,10 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     }
     playheadRef.current = t;
     setPlayhead(t);
+    syncVideos(t, true);
     drawAt(t);
     requestAnimationFrame(tick);
   }
-
   function play() {
     if (!scenes.length) return;
     let from = playheadRef.current;
@@ -177,6 +268,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     playingRef.current = false;
     setPlaying(false);
     if (audioElRef.current) audioElRef.current.pause();
+    for (const url in videoCache.current) videoCache.current[url].pause();
   }
 
   // ---- scene ops ----
@@ -195,11 +287,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     setSel((v) => Math.max(0, v - (i <= v ? 1 : 0)));
   }
   function duplicateScene(i: number) {
-    setScenes((s) => {
-      const copy = { ...s[i], id: uid() };
-      const next = [...s.slice(0, i + 1), copy, ...s.slice(i + 1)];
-      return next;
-    });
+    setScenes((s) => [...s.slice(0, i + 1), { ...s[i], id: uid() }, ...s.slice(i + 1)]);
   }
   function move(i: number, dir: -1 | 1) {
     setScenes((s) => {
@@ -221,6 +309,14 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     };
     r.readAsDataURL(file);
   }
+  function onSceneVideo(file?: File) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    patch(sel, { videoUrl: url, videoName: file.name, videoStart: 0, bg: null });
+  }
+  function removeVideo() {
+    patch(sel, { videoUrl: null, videoName: '', videoStart: 0 });
+  }
 
   function pickMime() {
     const cands = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
@@ -234,7 +330,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     setExporting(true);
     try {
       const canvas = canvasRef.current!;
-      drawAt(0);
+      setHead(0);
       const stream = canvas.captureStream(30);
       let ac: AudioContext | null = null;
       let aEl: HTMLAudioElement | null = null;
@@ -267,7 +363,9 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
         const t0 = performance.now();
         const loop = () => {
           const t = (performance.now() - t0) / 1000;
-          drawAt(Math.min(t, total));
+          const tt = Math.min(t, total);
+          syncVideos(tt, true);
+          drawAt(tt);
           if (t >= total) {
             resolve();
             return;
@@ -278,6 +376,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
       });
       rec.stop();
       if (aEl) aEl.pause();
+      for (const url in videoCache.current) videoCache.current[url].pause();
       await stopped;
       if (ac) ac.close();
       const blob = new Blob(chunks, { type: 'video/webm' });
@@ -294,6 +393,8 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   }
 
   const sc = scenes[sel] || scenes[0];
+  const selVideo = sc.videoUrl ? videoCache.current[sc.videoUrl] : null;
+  const selVideoDur = selVideo && selVideo.duration ? selVideo.duration : 30;
 
   return (
     <div className={styles.app}>
@@ -305,7 +406,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
         </div>
         <div className={styles.rt}>
           <label className={styles.upload}>
-            {audioName ? '♪ ' + audioName.slice(0, 18) : '♪ Add music'}
+            {audioName ? '♪ ' + audioName.slice(0, 16) : '♪ Add music'}
             <input type="file" accept="audio/*" onChange={(e) => onAudio(e.target.files?.[0])} />
           </label>
           <Link className={styles.btn} href="/studio">
@@ -321,8 +422,24 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
         </div>
       </div>
 
-      {/* LEFT — scene list */}
+      {/* LEFT — format + scene list */}
       <div className={styles.panel}>
+        <div className={styles.ph}>
+          <Spark size={11} /> Format
+        </div>
+        <div className={styles.seg} style={{ flexWrap: 'wrap', marginBottom: 16 }}>
+          {SIZE_KEYS.map((k) => (
+            <button
+              key={k}
+              className={size === k ? styles.segon : ''}
+              onClick={() => setSize(k)}
+              title={REEL_SIZES[k].label}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+
         <div className={styles.ph}>
           <Spark size={11} /> Scenes · {total.toFixed(1)}s
         </div>
@@ -337,7 +454,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
               <b>{s.headline.split('*').join('') || 'Untitled scene'}</b>
               <span>
                 {s.seconds}s · {s.theme}
-                {s.bg ? ' · photo' : ''}
+                {s.videoUrl ? ' · video' : s.bg ? ' · photo' : ''}
               </span>
             </div>
             <div className={styles.scops}>
@@ -414,28 +531,64 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
         </div>
 
         <div className={styles.fld}>
-          <label>Background</label>
-          <div className={styles.bgGrid}>
-            <button
-              className={`${styles.bgCell} ${!sc.bg ? styles.on : ''}`}
-              onClick={() => patch(sel, { bg: null })}
-              title="No photo (branded gradient)"
-            >
-              None
-            </button>
-            {images.map((im) => (
-              <button
-                key={im.id}
-                className={`${styles.bgCell} ${sc.bg === im.data_url ? styles.on : ''}`}
-                onClick={() => patch(sel, { bg: im.data_url })}
-                title={im.name}
-              >
-                <img src={im.data_url} alt={im.name} />
-              </button>
-            ))}
-          </div>
-          <div className={styles.hint}>Backgrounds come from your Image library (in the post studio).</div>
+          <label>Video clip {sc.videoUrl ? '(overrides background)' : ''}</label>
+          {sc.videoUrl ? (
+            <>
+              <div className={styles.videoRow}>
+                <span>🎬 {sc.videoName || 'clip'}</span>
+                <button onClick={removeVideo}>Remove</button>
+              </div>
+              <label style={{ marginTop: 8 }}>
+                Trim start — {(sc.videoStart || 0).toFixed(1)}s of {selVideoDur.toFixed(1)}s
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0.1, selVideoDur - 0.1)}
+                step={0.1}
+                value={sc.videoStart || 0}
+                onChange={(e) => patch(sel, { videoStart: Number(e.target.value) })}
+                style={{ width: '100%' }}
+              />
+              <div className={styles.hint}>Plays for the scene duration from this point.</div>
+            </>
+          ) : (
+            <label className={styles.uploadDark}>
+              Upload video clip
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => onSceneVideo(e.target.files?.[0])}
+              />
+            </label>
+          )}
         </div>
+
+        {!sc.videoUrl && (
+          <div className={styles.fld}>
+            <label>Background image</label>
+            <div className={styles.bgGrid}>
+              <button
+                className={`${styles.bgCell} ${!sc.bg ? styles.on : ''}`}
+                onClick={() => patch(sel, { bg: null })}
+                title="No photo (branded gradient)"
+              >
+                None
+              </button>
+              {images.map((im) => (
+                <button
+                  key={im.id}
+                  className={`${styles.bgCell} ${sc.bg === im.data_url ? styles.on : ''}`}
+                  onClick={() => patch(sel, { bg: im.data_url })}
+                  title={im.name}
+                >
+                  <img src={im.data_url} alt={im.name} />
+                </button>
+              ))}
+            </div>
+            <div className={styles.hint}>From your post Image library.</div>
+          </div>
+        )}
 
         <div className={styles.fld}>
           <label>Eyebrow</label>
@@ -478,8 +631,8 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
         </div>
 
         <div className={styles.note}>
-          <b>Export</b> plays the reel in real time to record it, so keep the tab focused. Output is
-          WebM (1080×1920). MP4 export is a planned upgrade.
+          <b>Export</b> records in real time — keep the tab focused. Output is WebM. Video clips are
+          in-memory only (re-add after a reload); MP4 + saved reels are planned.
         </div>
       </div>
     </div>
