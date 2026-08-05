@@ -140,6 +140,7 @@ export default function Studio({
   const [editImage, setEditImage] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [confirmState, setConfirmState] = useState<{ msg: string; onYes: () => void } | null>(null);
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -255,10 +256,12 @@ export default function Studio({
       return { ...s, brands: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] };
     });
   }
-  async function deleteBrandLogo(id: string) {
-    await supabase.from('brand_logos').delete().eq('id', id);
-    setS((s) => ({ ...s, brands: (s.brands || []).filter((x) => x !== id) }));
-    loadBrandLogos();
+  function deleteBrandLogo(id: string, name: string) {
+    askConfirm(`Delete "${name || 'this logo'}" from the library? This can't be undone.`, () => {
+      setBrandLogos((list) => list.filter((b) => b.id !== id));
+      setS((s) => ({ ...s, brands: (s.brands || []).filter((x) => x !== id) }));
+      supabase.from('brand_logos').delete().eq('id', id);
+    });
   }
   function openBrand() {
     setBrandMsg('');
@@ -311,26 +314,55 @@ export default function Studio({
     };
     im.src = dataUrl;
   }
-  function onImageFile(file?: File) {
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = async () => {
-      const dataUrl = r.result as string;
-      selectImageUrl(dataUrl); // apply straight away
-      const name = file.name.replace(/\.[^.]+$/, '');
-      const { error } = await supabase.from('image_library').insert({ name, data_url: dataUrl });
+  function readFileAsDataURL(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = () => reject(new Error('read failed'));
+      r.readAsDataURL(file);
+    });
+  }
+  async function onImageFiles(files?: FileList | null) {
+    if (!files || !files.length) return;
+    setImageMsg('');
+    const seen = new Set(imageLibrary.map((i) => (i.name || '').trim().toLowerCase()));
+    const arr = Array.from(files);
+    const toInsert: { name: string; data_url: string }[] = [];
+    const skipped: string[] = [];
+    for (const file of arr) {
+      const name = file.name.replace(/\.[^.]+$/, '').trim();
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        skipped.push(name);
+        continue;
+      }
+      seen.add(key);
+      try {
+        toInsert.push({ name, data_url: await readFileAsDataURL(file) });
+      } catch {
+        skipped.push(name);
+      }
+    }
+    if (toInsert.length) {
+      if (arr.length === 1) selectImageUrl(toInsert[0].data_url); // single upload → apply now
+      const { error } = await supabase.from('image_library').insert(toInsert);
       if (error) {
         setImageMsg(error.message);
         return;
       }
-      setImageMsg('');
-      loadImages();
-    };
-    r.readAsDataURL(file);
-  }
-  async function deleteImage(id: string) {
-    await supabase.from('image_library').delete().eq('id', id);
+    }
+    if (skipped.length)
+      setImageMsg(`Skipped ${skipped.length} with a name already in the library: ${skipped.join(', ')}`);
     loadImages();
+  }
+  function askConfirm(msg: string, onYes: () => void) {
+    setConfirmState({ msg, onYes });
+  }
+  function deleteImage(id: string, name: string) {
+    askConfirm(`Delete "${name || 'this image'}" from the library? This can't be undone.`, () => {
+      setImageLibrary((list) => list.filter((i) => i.id !== id)); // instant, optimistic
+      supabase.from('image_library').delete().eq('id', id);
+    });
   }
 
   // auto-save the current post (upsert by id) shortly after any change
@@ -490,9 +522,11 @@ export default function Studio({
     }
     loadLibrary();
   }
-  async function deleteFromLibrary(id: string) {
-    await supabase.from('badge_library').delete().eq('id', id);
-    loadLibrary();
+  function deleteFromLibrary(id: string) {
+    askConfirm('Remove this badge from your library?', () => {
+      setLibrary((list) => list.filter((l) => l.id !== id));
+      supabase.from('badge_library').delete().eq('id', id);
+    });
   }
   async function updateLibrary(id: string, label: string) {
     const { error } = await supabase
@@ -553,9 +587,9 @@ export default function Studio({
     }
     loadSavedIdeas();
   }
-  async function deleteSavedIdea(id: string) {
-    await supabase.from('saved_ideas').delete().eq('id', id);
-    loadSavedIdeas();
+  function deleteSavedIdea(id: string) {
+    setSavedIdeas((list) => list.filter((i) => i.id !== id));
+    supabase.from('saved_ideas').delete().eq('id', id);
   }
   function selectIdea(idea: { title: string; brief: string }) {
     const topic = idea.brief ? `${idea.title} — ${idea.brief}` : idea.title;
@@ -1495,32 +1529,62 @@ export default function Studio({
                 </button>
               ))}
             </div>
-            <div className={styles.fld}>
-              <label>
-                Label {picked.length > 1 ? '(pick one to label; others use their name)' : '(optional)'}
-              </label>
-              <input
-                type="text"
-                value={pickLabel}
-                onChange={(e) => setPickLabel(e.target.value)}
-                placeholder="e.g. MCS Certified"
-                disabled={picked.length !== 1}
-              />
+            <div className={styles.stickyFooter}>
+              <div className={styles.fld}>
+                <label>
+                  Label{' '}
+                  {picked.length > 1 ? '(pick one to label; others use their name)' : '(optional)'}
+                </label>
+                <input
+                  type="text"
+                  value={pickLabel}
+                  onChange={(e) => setPickLabel(e.target.value)}
+                  placeholder="e.g. MCS Certified"
+                  disabled={picked.length !== 1}
+                />
+              </div>
+              {libMsg && <div className={styles.saveerr}>{libMsg}</div>}
+              <div className={styles.mrow}>
+                <button
+                  className={`${styles.btn} ${styles.solar}`}
+                  disabled={!picked.length}
+                  onClick={addPickedToPost}
+                >
+                  {picked.length > 1 ? `Add ${picked.length} to post` : 'Add to post'}
+                </button>
+                <button className={styles.btn} disabled={!picked.length} onClick={saveToLibrary}>
+                  Save to Library
+                </button>
+                <button className={`${styles.btn} ${styles.solar}`} onClick={() => setIconOpen(false)}>
+                  Done
+                </button>
+              </div>
             </div>
-            {libMsg && <div className={styles.saveerr}>{libMsg}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DIALOG */}
+      {confirmState && (
+        <div className={styles.modal} style={{ zIndex: 400 }} onClick={() => setConfirmState(null)}>
+          <div className={`${styles.modalbox} ${styles.confirmBox}`} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.mtitle}>Are you sure?</h2>
+            <p className={styles.msub}>{confirmState.msg}</p>
             <div className={styles.mrow}>
               <button
-                className={`${styles.btn} ${styles.solar}`}
-                disabled={!picked.length}
-                onClick={addPickedToPost}
+                className={styles.dangerBtn}
+                onClick={() => {
+                  confirmState.onYes();
+                  setConfirmState(null);
+                }}
               >
-                {picked.length > 1 ? `Add ${picked.length} to post` : 'Add to post'}
+                Delete
               </button>
-              <button className={styles.btn} disabled={!picked.length} onClick={saveToLibrary}>
-                Save to Library
-              </button>
-              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setIconOpen(false)}>
-                Done
+              <button
+                className={`${styles.btn} ${styles.solar}`}
+                onClick={() => setConfirmState(null)}
+              >
+                Cancel
               </button>
             </div>
           </div>
@@ -1556,7 +1620,7 @@ export default function Studio({
                   </button>
                   <button
                     className={styles.logoDel}
-                    onClick={() => deleteBrandLogo(l.id)}
+                    onClick={() => deleteBrandLogo(l.id, l.name)}
                     aria-label="Delete logo"
                     title="Delete from library"
                   >
@@ -1629,7 +1693,7 @@ export default function Studio({
                   </div>
                   <button
                     className={styles.logoDel}
-                    onClick={() => deleteImage(l.id)}
+                    onClick={() => deleteImage(l.id, l.name)}
                     aria-label="Delete image"
                     title="Delete from library"
                   >
@@ -1671,11 +1735,12 @@ export default function Studio({
             {imageMsg && <div className={styles.saveerr}>{imageMsg}</div>}
             <div className={styles.mrow}>
               <label className={styles.uploadBtn}>
-                Upload image
+                Upload image(s)
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => onImageFile(e.target.files?.[0])}
+                  multiple
+                  onChange={(e) => onImageFiles(e.target.files)}
                 />
               </label>
               <button className={styles.btn} onClick={() => setImageOpen(false)}>

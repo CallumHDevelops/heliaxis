@@ -815,11 +815,36 @@
   color: var(--ink);
   border-color: var(--solar);
 }
+.stickyFooter {
+  position: sticky;
+  bottom: 0;
+  background: var(--paper);
+  padding-top: 12px;
+  margin-top: 2px;
+}
+.confirmBox {
+  max-width: 400px;
+}
+.dangerBtn {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  border: 1px solid #b4462f;
+  background: none;
+  color: #b4462f;
+  padding: 8px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.dangerBtn:hover {
+  background: #b4462f;
+  color: var(--paper);
+}
 .iconGrid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 6px;
-  max-height: 38vh;
+  max-height: 30vh;
   overflow-y: auto;
   margin-bottom: 14px;
   border: 1px solid var(--line);

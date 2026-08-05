@@ -570,32 +570,38 @@ export function renderPost(
     zone('footer', pad - 10, fy - Math.round(30 * u), maxW, Math.round(48 * u));
   }
 
-  // brand / "trusted installers of" logos — bottom-right, on a light backing
+  // brand / "trusted installers of" logos — bottom-right, EACH in its own card
   const brandImgs = (imgs.brands || []).filter((im) => im && im.complete && im.naturalWidth);
+  let brandLeft = W - pad;
+  let brandTop = Infinity;
+  let brandBottom = -Infinity;
   if (brandImgs.length) {
     const logoH = Math.round((S.size === 'landscape' ? 22 : 34) * u);
-    const gapX = Math.round(14 * u);
-    const dims = brandImgs.map((im) => ({
-      im,
-      w: logoH * (im.naturalWidth / Math.max(1, im.naturalHeight)),
-    }));
-    const rowW = dims.reduce((a, dd) => a + dd.w, 0) + gapX * Math.max(0, dims.length - 1);
+    const padB = Math.round(8 * u);
+    const cardGap = Math.round((S.size === 'landscape' ? 8 : 12) * u);
+    const cards = brandImgs.map((im) => {
+      const w = logoH * (im.naturalWidth / Math.max(1, im.naturalHeight));
+      return { im, w, cardW: w + padB * 2 };
+    });
+    const totalW = cards.reduce((a, c) => a + c.cardW, 0) + cardGap * Math.max(0, cards.length - 1);
     const rightX = W - pad;
     const rowBottom = H - pad + Math.round(2 * u);
     const rowTop = rowBottom - logoH;
-    const padB = Math.round(8 * u);
-    roundRectPath(rightX - rowW - padB, rowTop - padB, rowW + padB * 2, logoH + padB * 2, Math.round(7 * u));
-    ctx.fillStyle = 'rgba(247,242,231,0.94)';
-    ctx.fill();
+    brandTop = rowTop - padB;
+    brandBottom = rowBottom + padB;
+    brandLeft = rightX - totalW;
     setMono(Math.round(13 * u), 600);
     ctx.fillStyle = sub;
     ctx.textAlign = 'right';
-    ctx.fillText('TRUSTED INSTALLERS OF', rightX, rowTop - padB - Math.round(12 * u));
+    ctx.fillText('TRUSTED INSTALLERS OF', rightX, brandTop - Math.round(10 * u));
     ctx.textAlign = 'left';
-    let bxr = rightX - rowW;
-    for (const dd of dims) {
-      ctx.drawImage(dd.im, bxr, rowTop, dd.w, logoH);
-      bxr += dd.w + gapX;
+    let x = brandLeft;
+    for (const c of cards) {
+      roundRectPath(x, rowTop - padB, c.cardW, logoH + padB * 2, Math.round(7 * u));
+      ctx.fillStyle = 'rgba(247,242,231,0.94)';
+      ctx.fill();
+      ctx.drawImage(c.im, x + padB, rowTop, c.w, logoH);
+      x += c.cardW + cardGap;
     }
   }
 
@@ -758,23 +764,28 @@ export function renderPost(
       }
     };
 
+    const hasBrands = brandImgs.length > 0;
     if (land) {
-      // landscape is short & wide — sit the badges on the footer row, bottom-right
+      // landscape is short & wide — badges on the footer row, right-aligned,
+      // ending clear of any brand logos to their right
       const items = badges.map((bd) => {
         const label = (bd.label || '').toUpperCase();
         return { bd, label, w: widthOf(label) };
       });
       const totalW = items.reduce((a, it) => a + it.w, 0) + gap * Math.max(0, items.length - 1);
-      let bx = W - pad - totalW;
+      const rightEnd = hasBrands ? brandLeft - gap : W - pad;
+      let bx = Math.max(pad, rightEnd - totalW);
       const by = H - pad - Math.round(4 * u);
       for (const it of items) {
         drawPill(bx, by, it.w, it.bd, it.label);
         bx += it.w + gap;
       }
     } else {
-      // stacked just above the footer; extra rows wrap upward
+      // stacked just above the footer; if logos are present, sit entirely
+      // above them so the two never overlap
       let bx = pad;
       let by = H - pad - Math.round(56 * u);
+      if (hasBrands) by = Math.min(by, brandTop - pillH / 2 - Math.round(12 * u));
       for (const bd of badges) {
         const label = (bd.label || '').toUpperCase();
         const w = widthOf(label);
