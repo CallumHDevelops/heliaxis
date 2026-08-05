@@ -433,6 +433,14 @@
   text-transform: uppercase;
   margin-top: 2px;
 }
+.hby {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: var(--amber-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
 .hd {
   font-size: 0.8rem;
   color: var(--muted);

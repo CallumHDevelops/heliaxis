@@ -78,6 +78,7 @@ export default function Studio({
     hatch: true,
     data: { ...TEMPLATES.statement.defaults },
     badges: [],
+    photoShade: 0.62,
   });
 
   const [genOpen, setGenOpen] = useState(false);
@@ -105,6 +106,9 @@ export default function Studio({
   // per-post identity + auto-save
   const [postId, setPostId] = useState<string>(() => newId());
   const [postSource, setPostSource] = useState<'manual' | 'ai'>('manual');
+  const [postAuthor, setPostAuthor] = useState<string>(userEmail);
+  const [downloads, setDownloads] = useState(0);
+  const [hasPhoto, setHasPhoto] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMsg, setSaveMsg] = useState('');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -112,7 +116,7 @@ export default function Studio({
   const [capBusy, setCapBusy] = useState(false);
   const [capErr, setCapErr] = useState('');
   const [iconOpen, setIconOpen] = useState(false);
-  const [pickIcon, setPickIcon] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
   const [pickLabel, setPickLabel] = useState('');
   const [library, setLibrary] = useState<{ id: string; icon: string; label: string }[]>([]);
   const [libMsg, setLibMsg] = useState('');
@@ -204,6 +208,15 @@ export default function Studio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [S]);
 
+  function postRowData(dls: number) {
+    return {
+      ...S.data,
+      __badges: JSON.stringify(S.badges || []),
+      __author: postAuthor || userEmail,
+      __downloads: dls,
+    };
+  }
+
   async function autosave() {
     const { error } = await supabase.from('posts').upsert(
       {
@@ -212,7 +225,7 @@ export default function Studio({
         size: S.size,
         theme: S.theme,
         hatch: S.hatch,
-        data: { ...S.data, __badges: JSON.stringify(S.badges || []) },
+        data: postRowData(downloads),
         headline: headlineOf(S.data),
         source: postSource,
       },
@@ -297,11 +310,21 @@ export default function Studio({
     setS((s) => ({ ...s, badges: (s.badges || []).filter((_, j) => j !== i) }));
   }
   function openIconBank() {
-    setPickIcon('');
+    setPicked([]);
     setPickLabel('');
     setLibMsg('');
     loadLibrary();
     setIconOpen(true);
+  }
+  function togglePick(id: string) {
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  }
+  function labelFor(id: string) {
+    return picked.length === 1 ? pickLabel.trim() || prettifyIcon(id) : prettifyIcon(id);
+  }
+  function addPickedToPost() {
+    picked.forEach((id) => addBadge(id, labelFor(id)));
+    setIconOpen(false);
   }
 
   async function loadLibrary() {
@@ -312,11 +335,10 @@ export default function Studio({
     if (data) setLibrary(data as { id: string; icon: string; label: string }[]);
   }
   async function saveToLibrary() {
-    if (!pickIcon) return;
+    if (!picked.length) return;
     setLibMsg('');
-    const { error } = await supabase
-      .from('badge_library')
-      .insert({ icon: pickIcon, label: pickLabel.trim() });
+    const rows = picked.map((id) => ({ icon: id, label: labelFor(id) }));
+    const { error } = await supabase.from('badge_library').insert(rows);
     if (error) {
       setLibMsg(error.message);
       return;
@@ -405,6 +427,7 @@ export default function Studio({
       const im = new Image();
       im.onload = () => {
         imgsRef.current.photo = im;
+        setHasPhoto(true);
         draw();
       };
       im.src = r.result as string;
@@ -413,6 +436,7 @@ export default function Studio({
   }
   function clearPhoto() {
     imgsRef.current.photo = null;
+    setHasPhoto(false);
     draw();
   }
 
@@ -448,7 +472,7 @@ export default function Studio({
     cv.style.cursor = hit ? 'pointer' : 'default';
   }
 
-  function download() {
+  async function download() {
     const cv = canvasRef.current!;
     cv.toBlob((b) => {
       if (!b) return;
@@ -458,6 +482,24 @@ export default function Studio({
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     }, 'image/png');
+    // track download count on the post
+    const next = downloads + 1;
+    setDownloads(next);
+    skipSave.current = false;
+    await supabase.from('posts').upsert(
+      {
+        id: postId,
+        tpl: S.tpl,
+        size: S.size,
+        theme: S.theme,
+        hatch: S.hatch,
+        data: postRowData(next),
+        headline: headlineOf(S.data),
+        source: postSource,
+      },
+      { onConflict: 'id' }
+    );
+    loadHistory();
   }
 
   function headlineOf(data: Record<string, string>) {
@@ -468,7 +510,10 @@ export default function Studio({
     skipSave.current = true;
     setPostId(newId());
     setPostSource('manual');
+    setPostAuthor(userEmail);
+    setDownloads(0);
     imgsRef.current.photo = null;
+    setHasPhoto(false);
     setSaveState('idle');
     setCaptionOverride(null);
     setCapErr('');
@@ -479,6 +524,7 @@ export default function Studio({
       hatch: true,
       data: { ...TEMPLATES.statement.defaults },
       badges: [],
+      photoShade: 0.62,
     });
   }
 
@@ -523,6 +569,8 @@ export default function Studio({
       skipSave.current = false;
       setPostId(newId());
       setPostSource('ai');
+      setPostAuthor(userEmail);
+      setDownloads(0);
       setCaptionOverride(null);
       setCapErr('');
       setS(newState);
@@ -549,7 +597,13 @@ export default function Studio({
     } catch {
       badges = [];
     }
+    setPostAuthor(raw.__author || '');
+    setDownloads(Number(raw.__downloads) || 0);
+    imgsRef.current.photo = null;
+    setHasPhoto(false);
     delete raw.__badges;
+    delete raw.__author;
+    delete raw.__downloads;
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
@@ -557,6 +611,7 @@ export default function Studio({
       hatch: row.hatch !== false,
       data: raw,
       badges,
+      photoShade: 0.62,
     });
     setHistOpen(false);
   }
@@ -829,6 +884,21 @@ export default function Studio({
         <button className={styles.mini} onClick={clearPhoto}>
           Remove photo
         </button>
+        {hasPhoto && (
+          <div className={styles.fld} style={{ marginTop: 12 }}>
+            <label>Image darkening — lower is brighter</label>
+            <input
+              type="range"
+              min={0}
+              max={90}
+              value={Math.round((S.photoShade ?? 0.62) * 100)}
+              onChange={(e) =>
+                setS((s) => ({ ...s, photoShade: Number(e.target.value) / 100 }))
+              }
+              style={{ width: '100%' }}
+            />
+          </div>
+        )}
 
         <div className={styles.ph}>
           <Spark size={11} /> Accreditations
@@ -1017,6 +1087,8 @@ export default function Studio({
               )}
               {history.map((row) => {
                 const dt = new Date(row.created_at);
+                const author = (row.data as Record<string, string>)?.__author || '';
+                const dls = Number((row.data as Record<string, string>)?.__downloads) || 0;
                 return (
                   <div
                     className={styles.hitem}
@@ -1030,8 +1102,10 @@ export default function Studio({
                       {TEMPLATES[row.tpl as TemplateKey]?.name} · {row.theme} ·{' '}
                       {dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{' '}
                       {dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                      {row.source === 'ai' ? ' · ✦ generated' : ''} · ID {row.id.slice(0, 8)}
+                      {row.source === 'ai' ? ' · ✦ generated' : ''} · {dls} download
+                      {dls === 1 ? '' : 's'}
                     </div>
+                    {author && <div className={styles.hby}>by {author}</div>}
                     <div className={styles.hd}>
                       {row.data?.sub || row.data?.statlabel || row.data?.quote || ''}
                     </div>
@@ -1134,7 +1208,7 @@ export default function Studio({
               <Spark size={16} /> Icon bank
             </h2>
             <p className={styles.msub}>
-              Pick an icon and label for the accreditations strip, or tap a quick preset.
+              Tap a preset, or select one or more icons and add them to the accreditations strip.
             </p>
             <div className={styles.presets}>
               {BADGE_PRESETS.map((p) => (
@@ -1199,12 +1273,9 @@ export default function Studio({
               {ICON_IDS.map((id) => (
                 <button
                   key={id}
-                  className={`${styles.iconCell} ${pickIcon === id ? styles.on : ''}`}
+                  className={`${styles.iconCell} ${picked.includes(id) ? styles.on : ''}`}
                   title={prettifyIcon(id)}
-                  onClick={() => {
-                    setPickIcon(id);
-                    if (!pickLabel.trim()) setPickLabel(prettifyIcon(id));
-                  }}
+                  onClick={() => togglePick(id)}
                 >
                   <svg aria-hidden>
                     <use href={`#${id}`} />
@@ -1213,27 +1284,27 @@ export default function Studio({
               ))}
             </div>
             <div className={styles.fld}>
-              <label>Label (optional)</label>
+              <label>
+                Label {picked.length > 1 ? '(pick one to label; others use their name)' : '(optional)'}
+              </label>
               <input
                 type="text"
                 value={pickLabel}
                 onChange={(e) => setPickLabel(e.target.value)}
                 placeholder="e.g. MCS Certified"
+                disabled={picked.length !== 1}
               />
             </div>
             {libMsg && <div className={styles.saveerr}>{libMsg}</div>}
             <div className={styles.mrow}>
               <button
                 className={`${styles.btn} ${styles.solar}`}
-                disabled={!pickIcon}
-                onClick={() => {
-                  addBadge(pickIcon, pickLabel);
-                  setIconOpen(false);
-                }}
+                disabled={!picked.length}
+                onClick={addPickedToPost}
               >
-                Add to post
+                {picked.length > 1 ? `Add ${picked.length} to post` : 'Add to post'}
               </button>
-              <button className={styles.btn} disabled={!pickIcon} onClick={saveToLibrary}>
+              <button className={styles.btn} disabled={!picked.length} onClick={saveToLibrary}>
                 Save to Library
               </button>
               <button className={styles.btn} onClick={() => setIconOpen(false)}>

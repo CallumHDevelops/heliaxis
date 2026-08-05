@@ -235,6 +235,7 @@ export interface PostState {
   hatch: boolean;
   data: Record<string, string>;
   badges?: Badge[];
+  photoShade?: number; // 0..~0.9 dark overlay strength on photo backgrounds
 }
 
 export interface ClickZone {
@@ -501,9 +502,10 @@ export function renderPost(
       dy = (H - dh) / 2;
     }
     ctx.drawImage(imgs.photo, dx, dy, dw, dh);
+    const shade = typeof S.photoShade === 'number' ? S.photoShade : 0.62;
     const og = ctx.createLinearGradient(0, 0, 0, H);
-    og.addColorStop(0, 'rgba(20,18,14,.62)');
-    og.addColorStop(1, 'rgba(20,18,14,.90)');
+    og.addColorStop(0, `rgba(20,18,14,${shade})`);
+    og.addColorStop(1, `rgba(20,18,14,${Math.min(0.98, shade + 0.28)})`);
     ctx.fillStyle = og;
     ctx.fillRect(0, 0, W, H);
     if (S.hatch) grid('rgba(247,242,231,.06)', Math.round(W / 17), 0.72);
@@ -571,42 +573,8 @@ export function renderPost(
     zone('footer', pad - 10, fy - Math.round(30 * u), maxW, Math.round(48 * u));
   }
 
-  // accreditations strip — a row of icon+label badges just above the footer
-  const badges = S.badges || [];
-  if (badges.length) {
-    const iconSz = Math.round(26 * u);
-    const padIn = Math.round(11 * u);
-    const gap = Math.round(9 * u);
-    const lblSz = Math.round(17 * u);
-    const pillH = Math.round(42 * u);
-    let bx = pad;
-    let by = H - pad - Math.round(54 * u); // pill vertical centre
-    for (const bd of badges) {
-      const label = (bd.label || '').toUpperCase();
-      setMono(lblSz, 600);
-      const lblW = label ? ctx.measureText(label).width : 0;
-      const pillW = padIn + iconSz + (label ? Math.round(7 * u) + lblW : 0) + padIn;
-      if (bx + pillW > W - pad && bx > pad) {
-        bx = pad;
-        by -= pillH + gap;
-      }
-      roundRectPath(bx, by - pillH / 2, pillW, pillH, Math.round(6 * u));
-      ctx.strokeStyle = sub;
-      ctx.lineWidth = Math.max(1, Math.round(1.3 * u));
-      ctx.stroke();
-      drawIcon(bd.icon, bx + padIn, by - iconSz / 2, iconSz, fg, accent);
-      if (label) {
-        setMono(lblSz, 600);
-        ctx.fillStyle = fg;
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, bx + padIn + iconSz + Math.round(7 * u), by);
-        ctx.textBaseline = 'alphabetic';
-      }
-      bx += pillW + gap;
-    }
-  }
 
-  const top = pad + Math.round(120 * u);
+  const top = pad + Math.round((S.size === 'landscape' ? 64 : 120) * u);
   let cy = top;
   const eyebrow = (txt: string, y: number) => {
     if (!txt) return y;
@@ -702,10 +670,12 @@ export function renderPost(
     cy = drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent);
     zone('headline', pad - 10, hStart - Math.round(hsz * u), maxW, cy - hStart + Math.round(hsz * 0.4 * u));
     if (d.sub) {
-      setBody(Math.round(36 * u), 400);
-      cy += Math.round(26 * u);
+      const subSz = S.size === 'landscape' ? 30 : 36;
+      const subLh = S.size === 'landscape' ? 42 : 50;
+      setBody(Math.round(subSz * u), 400);
+      cy += Math.round((S.size === 'landscape' ? 16 : 26) * u);
       const ss = cy;
-      cy = drawLines(d.sub, pad, cy, maxW * 0.95, Math.round(50 * u), sub);
+      cy = drawLines(d.sub, pad, cy, maxW * 0.95, Math.round(subLh * u), sub);
       zone('sub', pad - 10, ss - Math.round(34 * u), maxW, cy - ss + Math.round(10 * u));
     }
     if (d.badge) {
@@ -729,6 +699,45 @@ export function renderPost(
       ctx.fillStyle = isGold ? C.paper : C.ink;
       ctx.fillText(d.cta + '  \u2192', pad + Math.round(28 * u), cy);
       zone('cta', pad - 10, cy - Math.round(42 * u), cw + 20, Math.round(72 * u));
+    }
+  }
+
+  // accreditations strip — flows just under the content, size-aware, wraps.
+  const badges = S.badges || [];
+  if (badges.length) {
+    const land = S.size === 'landscape';
+    const iconSz = Math.round((land ? 24 : 32) * u);
+    const padIn = Math.round((land ? 9 : 12) * u);
+    const gap = Math.round((land ? 7 : 10) * u);
+    const lblSz = Math.round((land ? 16 : 20) * u);
+    const pillH = Math.round((land ? 38 : 50) * u);
+    const footerGuard = H - pad - Math.round(46 * u); // keep clear of the footer
+    let by = cy + Math.round((land ? 22 : 40) * u) + pillH / 2;
+    const maxBy = footerGuard - pillH / 2;
+    if (by > maxBy) by = maxBy;
+    let bx = pad;
+    for (const bd of badges) {
+      const label = (bd.label || '').toUpperCase();
+      setMono(lblSz, 600);
+      const lblW = label ? ctx.measureText(label).width : 0;
+      const pillW = padIn + iconSz + (label ? Math.round(8 * u) + lblW : 0) + padIn;
+      if (bx + pillW > W - pad && bx > pad) {
+        bx = pad;
+        by += pillH + gap;
+      }
+      roundRectPath(bx, by - pillH / 2, pillW, pillH, Math.round(7 * u));
+      ctx.strokeStyle = sub;
+      ctx.lineWidth = Math.max(1, Math.round(1.4 * u));
+      ctx.stroke();
+      drawIcon(bd.icon, bx + padIn, by - iconSz / 2, iconSz, fg, accent);
+      if (label) {
+        setMono(lblSz, 600);
+        ctx.fillStyle = fg;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, bx + padIn + iconSz + Math.round(8 * u), by);
+        ctx.textBaseline = 'alphabetic';
+      }
+      bx += pillW + gap;
     }
   }
 
