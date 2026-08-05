@@ -130,7 +130,13 @@ export default function Studio({
     []
   );
   const [brandMsg, setBrandMsg] = useState('');
+  const [brandOpen, setBrandOpen] = useState(false);
   const brandCache = useRef<Record<string, HTMLImageElement>>({});
+  const [imageOpen, setImageOpen] = useState(false);
+  const [imageLibrary, setImageLibrary] = useState<{ id: string; name: string; data_url: string }[]>(
+    []
+  );
+  const [imageMsg, setImageMsg] = useState('');
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -182,6 +188,7 @@ export default function Studio({
     loadHistory();
     loadLibrary();
     loadBrandLogos();
+    loadImages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -249,6 +256,56 @@ export default function Studio({
     await supabase.from('brand_logos').delete().eq('id', id);
     setS((s) => ({ ...s, brands: (s.brands || []).filter((x) => x !== id) }));
     loadBrandLogos();
+  }
+  function openBrand() {
+    setBrandMsg('');
+    setMenuOpen(false);
+    loadBrandLogos();
+    setBrandOpen(true);
+  }
+
+  // ---- image / photo library ----
+  async function loadImages() {
+    const { data } = await supabase
+      .from('image_library')
+      .select('id, name, data_url')
+      .order('created_at', { ascending: false });
+    if (data) setImageLibrary(data as { id: string; name: string; data_url: string }[]);
+  }
+  function openImages() {
+    setImageMsg('');
+    loadImages();
+    setImageOpen(true);
+  }
+  function selectImageUrl(dataUrl: string) {
+    const im = new Image();
+    im.onload = () => {
+      imgsRef.current.photo = im;
+      setHasPhoto(true);
+      draw();
+    };
+    im.src = dataUrl;
+  }
+  function onImageFile(file?: File) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      const dataUrl = r.result as string;
+      selectImageUrl(dataUrl); // apply straight away
+      const name = file.name.replace(/\.[^.]+$/, '');
+      const { error } = await supabase.from('image_library').insert({ name, data_url: dataUrl });
+      if (error) {
+        setImageMsg(error.message);
+        return;
+      }
+      setImageMsg('');
+      loadImages();
+    };
+    r.readAsDataURL(file);
+  }
+  async function deleteImage(id: string) {
+    await supabase.from('image_library').delete().eq('id', id);
+    loadImages();
   }
 
   // auto-save the current post (upsert by id) shortly after any change
@@ -386,7 +443,8 @@ export default function Studio({
   }
   function addPickedToPost() {
     picked.forEach((id) => addBadge(id, labelFor(id)));
-    setIconOpen(false);
+    setPicked([]);
+    setPickLabel('');
   }
 
   async function loadLibrary() {
@@ -851,6 +909,18 @@ export default function Studio({
                   >
                     Edit email
                   </button>
+                  <button className={styles.menuitem} onClick={openBrand}>
+                    Manufacturer logos
+                  </button>
+                  <button
+                    className={styles.menuitem}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      openImages();
+                    }}
+                  >
+                    Image library
+                  </button>
                   {isAdmin && (
                     <button className={styles.menuitem} onClick={openAdmin}>
                       Manage users
@@ -940,14 +1010,9 @@ export default function Studio({
         <div className={styles.ph}>
           <Spark size={11} /> Photo background
         </div>
-        <div className={styles.fld}>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => loadPhoto(e.target.files?.[0])}
-            style={{ fontSize: '.75rem' }}
-          />
-        </div>
+        <button className={styles.mini} onClick={openImages}>
+          Select Photo / Image
+        </button>
         <div className={styles.hint}>
           Optional. A real install photo lifts engagement far more than a graphic. The overlay and
           faint grid keep text readable and on-brand.
@@ -1003,41 +1068,35 @@ export default function Studio({
         <div className={styles.ph}>
           <Spark size={11} /> Trusted installers
         </div>
-        {brandLogos.length > 0 && (
+        {(S.brands || []).length > 0 && (
           <div className={styles.brandGrid}>
-            {brandLogos.map((l) => (
-              <span
-                className={`${styles.brandChip} ${(S.brands || []).includes(l.id) ? styles.on : ''}`}
-                key={l.id}
-              >
-                <button className={styles.brandPick} onClick={() => toggleBrand(l.id)} title={l.name}>
-                  <img src={l.data_url} alt={l.name} />
-                  <span>{l.name || 'Logo'}</span>
-                </button>
-                <button
-                  className={styles.brandX}
-                  onClick={() => deleteBrandLogo(l.id)}
-                  aria-label="Delete logo"
-                  title="Delete from library"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
+            {(S.brands || []).map((id) => {
+              const l = brandLogos.find((b) => b.id === id);
+              if (!l) return null;
+              return (
+                <span className={`${styles.brandChip} ${styles.on}`} key={id}>
+                  <span className={styles.brandPick}>
+                    <img src={l.data_url} alt={l.name} />
+                    <span>{l.name || 'Logo'}</span>
+                  </span>
+                  <button
+                    className={styles.brandX}
+                    onClick={() => toggleBrand(id)}
+                    aria-label="Remove from post"
+                    title="Remove from post"
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
           </div>
         )}
-        <div className={styles.fld}>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => onBrandFile(e.target.files?.[0])}
-            style={{ fontSize: '.75rem' }}
-          />
-        </div>
-        {brandMsg && <div className={styles.saveerr}>{brandMsg}</div>}
+        <button className={styles.mini} onClick={openBrand}>
+          Select Manufacturer logo
+        </button>
         <div className={styles.hint}>
-          Upload installer/partner logos, then tap to place selected ones bottom-right under
-          &ldquo;Trusted installers of&rdquo;.
+          Selected logos show bottom-right under &ldquo;Trusted installers of&rdquo;.
         </div>
       </div>
 
@@ -1319,17 +1378,37 @@ export default function Studio({
               <Spark size={16} /> Icon bank
             </h2>
             <p className={styles.msub}>
-              Tap a preset, or select one or more icons and add them to the accreditations strip.
+              Add as many as you like — presets and library add instantly, or multi-select icons
+              from the grid. The panel stays open; hit Done when finished.
             </p>
+            {(S.badges || []).length > 0 && (
+              <>
+                <div className={styles.libLabel}>On this post</div>
+                <div className={styles.badgeRow}>
+                  {(S.badges || []).map((b, i) => (
+                    <span className={styles.badgeChip} key={i}>
+                      <svg className={styles.badgeIco} aria-hidden>
+                        <use href={`#${b.icon}`} />
+                      </svg>
+                      {b.label || prettifyIcon(b.icon)}
+                      <button
+                        className={styles.badgeX}
+                        onClick={() => removeBadge(i)}
+                        aria-label="Remove badge"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
             <div className={styles.presets}>
               {BADGE_PRESETS.map((p) => (
                 <button
                   key={p.label}
                   className={styles.presetBtn}
-                  onClick={() => {
-                    addBadge(p.icon, p.label);
-                    setIconOpen(false);
-                  }}
+                  onClick={() => addBadge(p.icon, p.label)}
                 >
                   <svg className={styles.badgeIco} aria-hidden>
                     <use href={`#${p.icon}`} />
@@ -1346,10 +1425,7 @@ export default function Studio({
                     <span className={styles.libItem} key={l.id}>
                       <button
                         className={styles.presetBtn}
-                        onClick={() => {
-                          addBadge(l.icon, l.label);
-                          setIconOpen(false);
-                        }}
+                        onClick={() => addBadge(l.icon, l.label)}
                       >
                         <svg className={styles.badgeIco} aria-hidden>
                           <use href={`#${l.icon}`} />
@@ -1418,8 +1494,115 @@ export default function Studio({
               <button className={styles.btn} disabled={!picked.length} onClick={saveToLibrary}>
                 Save to Library
               </button>
-              <button className={styles.btn} onClick={() => setIconOpen(false)}>
-                Cancel
+              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setIconOpen(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BRAND / MANUFACTURER LOGO MODAL */}
+      {brandOpen && (
+        <div className={styles.modal} onClick={() => setBrandOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setBrandOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Manufacturer logos
+            </h2>
+            <p className={styles.msub}>
+              Upload installer/partner logos, then tap to place selected ones on the post
+              (bottom-right, under &ldquo;Trusted installers of&rdquo;). Shared across the team.
+            </p>
+            <div className={styles.logoGrid}>
+              {brandLogos.length === 0 && (
+                <div className={styles.histempty}>No logos yet — upload one below.</div>
+              )}
+              {brandLogos.map((l) => (
+                <div
+                  className={`${styles.logoCell} ${(S.brands || []).includes(l.id) ? styles.on : ''}`}
+                  key={l.id}
+                >
+                  <button className={styles.logoPick} onClick={() => toggleBrand(l.id)} title={l.name}>
+                    <img src={l.data_url} alt={l.name} />
+                    <span>{l.name || 'Logo'}</span>
+                  </button>
+                  <button
+                    className={styles.logoDel}
+                    onClick={() => deleteBrandLogo(l.id)}
+                    aria-label="Delete logo"
+                    title="Delete from library"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            {brandMsg && <div className={styles.saveerr}>{brandMsg}</div>}
+            <div className={styles.fld}>
+              <label>Upload a logo (transparent PNG or SVG works best)</label>
+              <input type="file" accept="image/*" onChange={(e) => onBrandFile(e.target.files?.[0])} />
+            </div>
+            <div className={styles.mrow}>
+              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setBrandOpen(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IMAGE LIBRARY MODAL */}
+      {imageOpen && (
+        <div className={styles.modal} onClick={() => setImageOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setImageOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Image library
+            </h2>
+            <p className={styles.msub}>
+              Pick a background image, or upload a new one (applied instantly and saved to the shared
+              library).
+            </p>
+            <div className={styles.logoGrid}>
+              {imageLibrary.length === 0 && (
+                <div className={styles.histempty}>No images yet — upload one below.</div>
+              )}
+              {imageLibrary.map((l) => (
+                <div className={styles.logoCell} key={l.id}>
+                  <button
+                    className={styles.imgPick}
+                    onClick={() => {
+                      selectImageUrl(l.data_url);
+                      setImageOpen(false);
+                    }}
+                    title={l.name}
+                  >
+                    <img src={l.data_url} alt={l.name} />
+                  </button>
+                  <button
+                    className={styles.logoDel}
+                    onClick={() => deleteImage(l.id)}
+                    aria-label="Delete image"
+                    title="Delete from library"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            {imageMsg && <div className={styles.saveerr}>{imageMsg}</div>}
+            <div className={styles.fld}>
+              <label>Upload an image</label>
+              <input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0])} />
+            </div>
+            <div className={styles.mrow}>
+              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setImageOpen(false)}>
+                Done
               </button>
             </div>
           </div>

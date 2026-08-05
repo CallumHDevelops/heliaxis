@@ -482,6 +482,81 @@
   border-color: #e8896f;
 }
 
+/* logo / image library grids (modals) */
+.logoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+.logoCell {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.logoCell.on {
+  border-color: var(--solar);
+  box-shadow: inset 0 0 0 2px var(--solar);
+}
+.logoPick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: var(--card);
+  cursor: pointer;
+  padding: 12px 8px;
+  color: var(--ink);
+  font-size: 0.72rem;
+}
+.logoPick img {
+  height: 34px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.logoPick span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.imgPick {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: var(--card);
+  cursor: pointer;
+  padding: 0;
+  aspect-ratio: 1;
+}
+.imgPick img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.logoDel {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(20, 18, 14, 0.6);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 2px 6px;
+}
+.logoDel:hover {
+  background: #b4462f;
+}
+
 /* brand logos (trusted installers) */
 .brandGrid {
   display: flex;

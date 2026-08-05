@@ -123,6 +123,29 @@ create policy "authenticated can delete brand_logos"
   on public.brand_logos for delete to authenticated using (true);
 
 -- ============================================================
+-- Image library — background photos/images (stored as data URLs), shared,
+-- for the "Select photo / image" picker.
+-- ============================================================
+create table if not exists public.image_library (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  name        text not null default '',
+  data_url    text not null
+);
+
+alter table public.image_library enable row level security;
+
+create policy "authenticated can read image_library"
+  on public.image_library for select to authenticated using (true);
+
+create policy "authenticated can insert image_library"
+  on public.image_library for insert to authenticated with check (true);
+
+create policy "authenticated can delete image_library"
+  on public.image_library for delete to authenticated using (true);
+
+-- ============================================================
 -- Auth note: in Dashboard → Authentication → Providers, keep Email enabled.
 -- For an invite-only agency tool, turn OFF "Allow new users to sign up"
 -- once you've created the accounts you need, and invite users instead
