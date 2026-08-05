@@ -976,6 +976,9 @@ export default function Studio({
                   ? 'Save failed'
                   : 'Autosave on'}
           </span>
+          <a className={styles.btn} href="/reel">
+            Reels
+          </a>
           <button className={styles.btn} onClick={() => setHistOpen(true)}>
             History
           </button>

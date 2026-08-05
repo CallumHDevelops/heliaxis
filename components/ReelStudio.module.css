@@ -1,0 +1,331 @@
+.app {
+  display: grid;
+  grid-template-columns: 300px 1fr 320px;
+  height: 100vh;
+  overflow: hidden;
+}
+.bar {
+  grid-column: 1 / -1;
+  background: var(--ink);
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  height: 54px;
+}
+.lt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lt img {
+  height: 22px;
+}
+.tag {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-d);
+}
+.rt {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.btn {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  border: 1px solid var(--line-d);
+  background: none;
+  color: var(--paper);
+  padding: 8px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:hover {
+  border-color: var(--solar);
+}
+.btn.solar {
+  background: var(--solar);
+  color: var(--ink);
+  border-color: var(--solar);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.upload {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--paper);
+  border: 1px solid var(--line-d);
+  border-radius: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.upload:hover {
+  border-color: var(--solar);
+}
+.upload input {
+  display: none;
+}
+
+.panel {
+  background: var(--paper);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 16px;
+}
+.panel.right {
+  border-right: 0;
+  border-left: 1px solid var(--line);
+}
+.ph {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.scene {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 9px 10px;
+  margin-bottom: 7px;
+  background: var(--card);
+  cursor: pointer;
+}
+.scene.on {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.scnum {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  width: 16px;
+  flex-shrink: 0;
+}
+.scbody {
+  flex: 1;
+  min-width: 0;
+}
+.scbody b {
+  display: block;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scbody span {
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.scops {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.scops button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+.scops button:hover {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+.scdel:hover {
+  color: #b4462f !important;
+}
+.mini {
+  width: 100%;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  border: 1px solid var(--ink);
+  background: none;
+  color: var(--ink);
+  padding: 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+.mini:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.stage {
+  background: var(--paper-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow: hidden;
+  gap: 14px;
+}
+.canvaswrap {
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px -26px rgba(33, 31, 24, 0.6);
+  background: #211f18;
+  max-height: calc(100vh - 150px);
+  display: flex;
+}
+.canvaswrap canvas {
+  display: block;
+  max-height: calc(100vh - 150px);
+  max-width: 100%;
+  height: auto;
+  width: auto;
+}
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 520px;
+}
+.transport .btn {
+  color: var(--ink);
+  border-color: var(--solar);
+}
+.scrub {
+  flex: 1;
+}
+.time {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.fld {
+  margin-bottom: 12px;
+}
+.fld label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.fld input[type='text'],
+.fld input:not([type]),
+.fld textarea {
+  width: 100%;
+  font-family: var(--body);
+  font-size: 0.86rem;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+}
+.fld textarea {
+  resize: vertical;
+  min-height: 54px;
+  line-height: 1.45;
+}
+.seg {
+  display: flex;
+  gap: 5px;
+}
+.seg button {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 8px 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.seg button.segon {
+  background: var(--ink);
+  color: var(--solar);
+  border-color: var(--ink);
+}
+.bgGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+.bgCell {
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  cursor: pointer;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.52rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  padding: 0;
+}
+.bgCell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bgCell.on {
+  border-color: var(--solar);
+  box-shadow: inset 0 0 0 2px var(--solar);
+}
+.hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+.note {
+  background: rgba(248, 188, 30, 0.13);
+  border-left: 3px solid var(--solar);
+  border-radius: 2px;
+  padding: 9px 11px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 12px;
+}
+.note b {
+  color: var(--ink);
+}
+
+@media (max-width: 1100px) {
+  .app {
+    grid-template-columns: 260px 1fr 300px;
+  }
+}
