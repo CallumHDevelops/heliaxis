@@ -236,6 +236,7 @@ export interface PostState {
   data: Record<string, string>;
   badges?: Badge[];
   photoShade?: number; // 0..~0.9 dark overlay strength on photo backgrounds
+  brands?: string[]; // brand-logo ids shown bottom-right ("Trusted installers of")
 }
 
 export interface ClickZone {
@@ -251,6 +252,7 @@ export interface RenderImages {
   dark?: HTMLImageElement | null;
   black?: HTMLImageElement | null;
   photo?: HTMLImageElement | null;
+  brands?: HTMLImageElement[];
 }
 
 export interface Fonts {
@@ -571,6 +573,35 @@ export function renderPost(
     const fy = H - pad + Math.round(6 * u);
     ctx.fillText(d.footer.toUpperCase(), pad, fy);
     zone('footer', pad - 10, fy - Math.round(30 * u), maxW, Math.round(48 * u));
+  }
+
+  // brand / "trusted installers of" logos — bottom-right, on a light backing
+  const brandImgs = (imgs.brands || []).filter((im) => im && im.complete && im.naturalWidth);
+  if (brandImgs.length) {
+    const logoH = Math.round((S.size === 'landscape' ? 32 : 48) * u);
+    const gapX = Math.round(16 * u);
+    const dims = brandImgs.map((im) => ({
+      im,
+      w: logoH * (im.naturalWidth / Math.max(1, im.naturalHeight)),
+    }));
+    const rowW = dims.reduce((a, dd) => a + dd.w, 0) + gapX * Math.max(0, dims.length - 1);
+    const rightX = W - pad;
+    const rowBottom = H - pad + Math.round(2 * u);
+    const rowTop = rowBottom - logoH;
+    const padB = Math.round(10 * u);
+    roundRectPath(rightX - rowW - padB, rowTop - padB, rowW + padB * 2, logoH + padB * 2, Math.round(8 * u));
+    ctx.fillStyle = 'rgba(247,242,231,0.94)';
+    ctx.fill();
+    setMono(Math.round(15 * u), 600);
+    ctx.fillStyle = sub;
+    ctx.textAlign = 'right';
+    ctx.fillText('TRUSTED INSTALLERS OF', rightX, rowTop - padB - Math.round(12 * u));
+    ctx.textAlign = 'left';
+    let bxr = rightX - rowW;
+    for (const dd of dims) {
+      ctx.drawImage(dd.im, bxr, rowTop, dd.w, logoH);
+      bxr += dd.w + gapX;
+    }
   }
 
 

@@ -79,6 +79,7 @@ export default function Studio({
     data: { ...TEMPLATES.statement.defaults },
     badges: [],
     photoShade: 0.62,
+    brands: [],
   });
 
   const [genOpen, setGenOpen] = useState(false);
@@ -125,6 +126,11 @@ export default function Studio({
   const [ideasBusy, setIdeasBusy] = useState(false);
   const [ideasErr, setIdeasErr] = useState('');
   const [savedIdeas, setSavedIdeas] = useState<{ id: string; title: string; brief: string }[]>([]);
+  const [brandLogos, setBrandLogos] = useState<{ id: string; name: string; data_url: string }[]>(
+    []
+  );
+  const [brandMsg, setBrandMsg] = useState('');
+  const brandCache = useRef<Record<string, HTMLImageElement>>({});
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -175,6 +181,7 @@ export default function Studio({
     }
     loadHistory();
     loadLibrary();
+    loadBrandLogos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -189,6 +196,60 @@ export default function Studio({
     Sref.current = S;
     draw();
   }, [S, draw]);
+
+  // resolve selected brand logos to <img> elements and repaint when ready
+  useEffect(() => {
+    const ids = S.brands || [];
+    ids.forEach((id) => {
+      if (!brandCache.current[id]) {
+        const logo = brandLogos.find((b) => b.id === id);
+        if (logo) {
+          const im = new Image();
+          im.onload = () => draw();
+          im.src = logo.data_url;
+          brandCache.current[id] = im;
+        }
+      }
+    });
+    imgsRef.current.brands = ids.map((id) => brandCache.current[id]).filter(Boolean);
+    draw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [S.brands, brandLogos]);
+
+  async function loadBrandLogos() {
+    const { data } = await supabase
+      .from('brand_logos')
+      .select('id, name, data_url')
+      .order('created_at', { ascending: true });
+    if (data) setBrandLogos(data as { id: string; name: string; data_url: string }[]);
+  }
+  function onBrandFile(file?: File) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      const dataUrl = r.result as string;
+      const name = file.name.replace(/\.[^.]+$/, '');
+      const { error } = await supabase.from('brand_logos').insert({ name, data_url: dataUrl });
+      if (error) {
+        setBrandMsg(error.message);
+        return;
+      }
+      setBrandMsg('');
+      loadBrandLogos();
+    };
+    r.readAsDataURL(file);
+  }
+  function toggleBrand(id: string) {
+    setS((s) => {
+      const cur = s.brands || [];
+      return { ...s, brands: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] };
+    });
+  }
+  async function deleteBrandLogo(id: string) {
+    await supabase.from('brand_logos').delete().eq('id', id);
+    setS((s) => ({ ...s, brands: (s.brands || []).filter((x) => x !== id) }));
+    loadBrandLogos();
+  }
 
   // auto-save the current post (upsert by id) shortly after any change
   useEffect(() => {
@@ -212,6 +273,7 @@ export default function Studio({
     return {
       ...S.data,
       __badges: JSON.stringify(S.badges || []),
+      __brands: JSON.stringify(S.brands || []),
       __author: postAuthor || userEmail,
       __downloads: dls,
     };
@@ -525,6 +587,7 @@ export default function Studio({
       data: { ...TEMPLATES.statement.defaults },
       badges: [],
       photoShade: 0.62,
+      brands: [],
     });
   }
 
@@ -597,11 +660,18 @@ export default function Studio({
     } catch {
       badges = [];
     }
+    let brands: string[] = [];
+    try {
+      brands = raw.__brands ? JSON.parse(raw.__brands) : [];
+    } catch {
+      brands = [];
+    }
     setPostAuthor(raw.__author || '');
     setDownloads(Number(raw.__downloads) || 0);
     imgsRef.current.photo = null;
     setHasPhoto(false);
     delete raw.__badges;
+    delete raw.__brands;
     delete raw.__author;
     delete raw.__downloads;
     setS({
@@ -612,6 +682,7 @@ export default function Studio({
       data: raw,
       badges,
       photoShade: 0.62,
+      brands,
     });
     setHistOpen(false);
   }
@@ -926,7 +997,47 @@ export default function Studio({
           + Add badge / icon
         </button>
         <div className={styles.hint}>
-          A row of small icon badges above the footer — e.g. MCS Certified, TrustMark, 0% VAT.
+          A row of small icon badges under the content — e.g. MCS Certified, TrustMark, 0% VAT.
+        </div>
+
+        <div className={styles.ph}>
+          <Spark size={11} /> Trusted installers
+        </div>
+        {brandLogos.length > 0 && (
+          <div className={styles.brandGrid}>
+            {brandLogos.map((l) => (
+              <span
+                className={`${styles.brandChip} ${(S.brands || []).includes(l.id) ? styles.on : ''}`}
+                key={l.id}
+              >
+                <button className={styles.brandPick} onClick={() => toggleBrand(l.id)} title={l.name}>
+                  <img src={l.data_url} alt={l.name} />
+                  <span>{l.name || 'Logo'}</span>
+                </button>
+                <button
+                  className={styles.brandX}
+                  onClick={() => deleteBrandLogo(l.id)}
+                  aria-label="Delete logo"
+                  title="Delete from library"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className={styles.fld}>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => onBrandFile(e.target.files?.[0])}
+            style={{ fontSize: '.75rem' }}
+          />
+        </div>
+        {brandMsg && <div className={styles.saveerr}>{brandMsg}</div>}
+        <div className={styles.hint}>
+          Upload installer/partner logos, then tap to place selected ones bottom-right under
+          &ldquo;Trusted installers of&rdquo;.
         </div>
       </div>
 
