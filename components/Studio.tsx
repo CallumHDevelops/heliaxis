@@ -141,6 +141,7 @@ export default function Studio({
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [confirmState, setConfirmState] = useState<{ msg: string; onYes: () => void } | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -804,6 +805,57 @@ export default function Studio({
     setHistOpen(false);
   }
 
+  // render a history row to an image for the hover preview (no stored photo)
+  function renderRowToDataURL(row: HistoryRow): string | null {
+    try {
+      const data = { ...row.data } as Record<string, string>;
+      let badges: Badge[] = [];
+      let brands: string[] = [];
+      try {
+        badges = data.__badges ? JSON.parse(data.__badges) : [];
+      } catch {
+        badges = [];
+      }
+      try {
+        brands = data.__brands ? JSON.parse(data.__brands) : [];
+      } catch {
+        brands = [];
+      }
+      delete data.__badges;
+      delete data.__brands;
+      delete data.__author;
+      delete data.__downloads;
+      const state: PostState = {
+        tpl: row.tpl as TemplateKey,
+        size: (row.size as SizeKey) || 'square',
+        theme: (row.theme as ThemeKey) || 'dark',
+        hatch: row.hatch !== false,
+        data,
+        badges,
+        brands,
+        photoShade: 0.62,
+      };
+      const brandImgs: HTMLImageElement[] = [];
+      for (const id of brands) {
+        let im = brandCache.current[id];
+        if (!im) {
+          const logo = brandLogos.find((b) => b.id === id);
+          if (logo) {
+            im = new Image();
+            im.src = logo.data_url;
+            brandCache.current[id] = im;
+          }
+        }
+        if (im) brandImgs.push(im);
+      }
+      const off = document.createElement('canvas');
+      renderPost(off, state, { ...imgsRef.current, photo: null, brands: brandImgs }, famRef.current);
+      return off.toDataURL('image/png');
+    } catch {
+      return null;
+    }
+  }
+
   async function clearHistory() {
     if (!confirm('Clear all saved post history? This cannot be undone.')) return;
     await supabase.from('posts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -1323,6 +1375,8 @@ export default function Studio({
                     className={styles.hitem}
                     key={row.id}
                     onClick={() => loadHistoryRow(row)}
+                    onMouseEnter={() => setPreviewUrl(renderRowToDataURL(row))}
+                    onMouseLeave={() => setPreviewUrl(null)}
                   >
                     <div className={styles.ht}>
                       {row.headline || TEMPLATES[row.tpl as TemplateKey]?.name || 'Post'}
@@ -1561,6 +1615,13 @@ export default function Studio({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* HISTORY HOVER PREVIEW */}
+      {histOpen && previewUrl && (
+        <div className={styles.previewFloat}>
+          <img src={previewUrl} alt="Post preview" />
         </div>
       )}
 

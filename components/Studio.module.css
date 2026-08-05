@@ -455,6 +455,32 @@
   text-align: center;
   padding: 30px 0;
 }
+.previewFloat {
+  position: fixed;
+  top: 50%;
+  right: 3vw;
+  transform: translateY(-50%);
+  z-index: 260;
+  pointer-events: none;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 24px 60px -20px rgba(20, 18, 14, 0.7);
+}
+.previewFloat img {
+  display: block;
+  max-width: 340px;
+  max-height: 72vh;
+  width: auto;
+  height: auto;
+  border-radius: 3px;
+}
+@media (max-width: 900px) {
+  .previewFloat {
+    display: none;
+  }
+}
 
 /* top-bar save badge */
 .savebadge {
