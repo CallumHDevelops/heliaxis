@@ -733,29 +733,22 @@ export function renderPost(
     }
   }
 
-  // accreditations strip — flows just under the content, size-aware, wraps.
+  // accreditations strip
   const badges = S.badges || [];
   if (badges.length) {
     const land = S.size === 'landscape';
-    const iconSz = Math.round((land ? 24 : 32) * u);
+    const iconSz = Math.round((land ? 22 : 32) * u);
     const padIn = Math.round((land ? 9 : 12) * u);
     const gap = Math.round((land ? 7 : 10) * u);
-    const lblSz = Math.round((land ? 16 : 20) * u);
-    const pillH = Math.round((land ? 38 : 50) * u);
-    const footerGuard = H - pad - Math.round(46 * u); // keep clear of the footer
-    let by = cy + Math.round((land ? 22 : 40) * u) + pillH / 2;
-    const maxBy = footerGuard - pillH / 2;
-    if (by > maxBy) by = maxBy;
-    let bx = pad;
-    for (const bd of badges) {
-      const label = (bd.label || '').toUpperCase();
+    const lblSz = Math.round((land ? 15 : 20) * u);
+    const pillH = Math.round((land ? 34 : 50) * u);
+
+    const widthOf = (label: string) => {
       setMono(lblSz, 600);
       const lblW = label ? ctx.measureText(label).width : 0;
-      const pillW = padIn + iconSz + (label ? Math.round(8 * u) + lblW : 0) + padIn;
-      if (bx + pillW > W - pad && bx > pad) {
-        bx = pad;
-        by += pillH + gap;
-      }
+      return padIn + iconSz + (label ? Math.round(8 * u) + lblW : 0) + padIn;
+    };
+    const drawPill = (bx: number, by: number, pillW: number, bd: Badge, label: string) => {
       roundRectPath(bx, by - pillH / 2, pillW, pillH, Math.round(7 * u));
       ctx.strokeStyle = sub;
       ctx.lineWidth = Math.max(1, Math.round(1.4 * u));
@@ -768,7 +761,35 @@ export function renderPost(
         ctx.fillText(label, bx + padIn + iconSz + Math.round(8 * u), by);
         ctx.textBaseline = 'alphabetic';
       }
-      bx += pillW + gap;
+    };
+
+    if (land) {
+      // landscape is short & wide — sit the badges on the footer row, bottom-right
+      const items = badges.map((bd) => {
+        const label = (bd.label || '').toUpperCase();
+        return { bd, label, w: widthOf(label) };
+      });
+      const totalW = items.reduce((a, it) => a + it.w, 0) + gap * Math.max(0, items.length - 1);
+      let bx = W - pad - totalW;
+      const by = H - pad - Math.round(4 * u);
+      for (const it of items) {
+        drawPill(bx, by, it.w, it.bd, it.label);
+        bx += it.w + gap;
+      }
+    } else {
+      // stacked just above the footer; extra rows wrap upward
+      let bx = pad;
+      let by = H - pad - Math.round(56 * u);
+      for (const bd of badges) {
+        const label = (bd.label || '').toUpperCase();
+        const w = widthOf(label);
+        if (bx + w > W - pad && bx > pad) {
+          bx = pad;
+          by -= pillH + gap;
+        }
+        drawPill(bx, by, w, bd, label);
+        bx += w + gap;
+      }
     }
   }
 
