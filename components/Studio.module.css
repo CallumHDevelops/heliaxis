@@ -482,6 +482,66 @@
   border-color: #e8896f;
 }
 
+/* upload button (wraps a hidden file input) */
+.uploadBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  background: var(--solar);
+  color: var(--ink);
+  border: 1px solid var(--solar);
+  padding: 9px 16px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.uploadBtn:hover {
+  background: var(--amber);
+}
+.uploadBtn input {
+  display: none;
+}
+
+/* image meta + details editor */
+.imgMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 5px 7px;
+  background: var(--card);
+}
+.imgName {
+  font-family: var(--body);
+  font-size: 0.68rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.imgInfo {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--amber-2);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.imgInfo:hover {
+  color: var(--ink);
+}
+.detailEditor {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 12px 14px;
+  background: var(--paper-2);
+  margin-bottom: 14px;
+}
+
 /* logo / image library grids (modals) */
 .logoGrid {
   display: grid;

@@ -133,10 +133,13 @@ export default function Studio({
   const [brandOpen, setBrandOpen] = useState(false);
   const brandCache = useRef<Record<string, HTMLImageElement>>({});
   const [imageOpen, setImageOpen] = useState(false);
-  const [imageLibrary, setImageLibrary] = useState<{ id: string; name: string; data_url: string }[]>(
-    []
-  );
+  const [imageLibrary, setImageLibrary] = useState<
+    { id: string; name: string; description: string; data_url: string }[]
+  >([]);
   const [imageMsg, setImageMsg] = useState('');
+  const [editImage, setEditImage] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -268,14 +271,36 @@ export default function Studio({
   async function loadImages() {
     const { data } = await supabase
       .from('image_library')
-      .select('id, name, data_url')
+      .select('id, name, description, data_url')
       .order('created_at', { ascending: false });
-    if (data) setImageLibrary(data as { id: string; name: string; data_url: string }[]);
+    if (data)
+      setImageLibrary(
+        data as { id: string; name: string; description: string; data_url: string }[]
+      );
   }
   function openImages() {
     setImageMsg('');
+    setEditImage(null);
     loadImages();
     setImageOpen(true);
+  }
+  function startEditImage(l: { id: string; name: string; description: string }) {
+    setEditImage(l.id);
+    setEditName(l.name || '');
+    setEditDesc(l.description || '');
+  }
+  async function saveImageDetails() {
+    if (!editImage) return;
+    const { error } = await supabase
+      .from('image_library')
+      .update({ name: editName.trim(), description: editDesc.trim() })
+      .eq('id', editImage);
+    if (error) {
+      setImageMsg(error.message);
+      return;
+    }
+    setEditImage(null);
+    loadImages();
   }
   function selectImageUrl(dataUrl: string) {
     const im = new Image();
@@ -1541,12 +1566,17 @@ export default function Studio({
               ))}
             </div>
             {brandMsg && <div className={styles.saveerr}>{brandMsg}</div>}
-            <div className={styles.fld}>
-              <label>Upload a logo (transparent PNG or SVG works best)</label>
-              <input type="file" accept="image/*" onChange={(e) => onBrandFile(e.target.files?.[0])} />
-            </div>
+            <div className={styles.hint}>Transparent PNG or SVG works best.</div>
             <div className={styles.mrow}>
-              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setBrandOpen(false)}>
+              <label className={styles.uploadBtn}>
+                Upload logo
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => onBrandFile(e.target.files?.[0])}
+                />
+              </label>
+              <button className={styles.btn} onClick={() => setBrandOpen(false)}>
                 Done
               </button>
             </div>
@@ -1580,10 +1610,23 @@ export default function Studio({
                       selectImageUrl(l.data_url);
                       setImageOpen(false);
                     }}
-                    title={l.name}
+                    title={l.description || l.name || 'Use as background'}
                   >
                     <img src={l.data_url} alt={l.name} />
                   </button>
+                  <div className={styles.imgMeta}>
+                    <span className={styles.imgName} title={l.name}>
+                      {l.name || 'Untitled'}
+                    </span>
+                    <button
+                      className={styles.imgInfo}
+                      onClick={() => startEditImage(l)}
+                      title="Edit details"
+                      aria-label="Edit details"
+                    >
+                      ⓘ
+                    </button>
+                  </div>
                   <button
                     className={styles.logoDel}
                     onClick={() => deleteImage(l.id)}
@@ -1595,13 +1638,47 @@ export default function Studio({
                 </div>
               ))}
             </div>
+            {editImage && (
+              <div className={styles.detailEditor}>
+                <div className={styles.libLabel}>Image details</div>
+                <div className={styles.fld}>
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="e.g. Penarth 6.4 kWp install"
+                  />
+                </div>
+                <div className={styles.fld}>
+                  <label>Notes for the team</label>
+                  <textarea
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    placeholder="Location, system size, what's notable, usage rights…"
+                  />
+                </div>
+                <div className={styles.mrow}>
+                  <button className={`${styles.btn} ${styles.solar}`} onClick={saveImageDetails}>
+                    Save details
+                  </button>
+                  <button className={styles.btn} onClick={() => setEditImage(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
             {imageMsg && <div className={styles.saveerr}>{imageMsg}</div>}
-            <div className={styles.fld}>
-              <label>Upload an image</label>
-              <input type="file" accept="image/*" onChange={(e) => onImageFile(e.target.files?.[0])} />
-            </div>
             <div className={styles.mrow}>
-              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setImageOpen(false)}>
+              <label className={styles.uploadBtn}>
+                Upload image
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => onImageFile(e.target.files?.[0])}
+                />
+              </label>
+              <button className={styles.btn} onClick={() => setImageOpen(false)}>
                 Done
               </button>
             </div>

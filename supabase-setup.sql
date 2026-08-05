@@ -131,8 +131,11 @@ create table if not exists public.image_library (
   created_at  timestamptz not null default now(),
   created_by  uuid references auth.users (id) on delete set null default auth.uid(),
   name        text not null default '',
+  description text not null default '',
   data_url    text not null
 );
+-- if the table already existed without it:
+alter table public.image_library add column if not exists description text not null default '';
 
 alter table public.image_library enable row level security;
 
@@ -141,6 +144,9 @@ create policy "authenticated can read image_library"
 
 create policy "authenticated can insert image_library"
   on public.image_library for insert to authenticated with check (true);
+
+create policy "authenticated can update image_library"
+  on public.image_library for update to authenticated using (true) with check (true);
 
 create policy "authenticated can delete image_library"
   on public.image_library for delete to authenticated using (true);
