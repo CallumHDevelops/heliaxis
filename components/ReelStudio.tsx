@@ -43,6 +43,16 @@ const ANIMS: { k: ReelAnim; label: string }[] = [
   { k: 'left', label: 'Slide in' },
 ];
 const SIZE_KEYS = Object.keys(REEL_SIZES) as ReelSizeKey[];
+const REEL_TYPES = [
+  'Myth-buster',
+  'FAQ / Q&A',
+  'Grant / funding',
+  'Customer proof / stat',
+  'Quick tip',
+  'Announcement / news',
+  'Explainer',
+];
+const PLATFORMS = ['Instagram', 'TikTok', 'Facebook', 'LinkedIn'];
 
 export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const supabase = createClient();
@@ -61,6 +71,14 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const [audioName, setAudioName] = useState('');
   const [exporting, setExporting] = useState(false);
   const [, force] = useState(0); // re-render when video metadata loads
+  const [genOpen, setGenOpen] = useState(false);
+  const [genType, setGenType] = useState('Myth-buster');
+  const [genPlatform, setGenPlatform] = useState('Instagram');
+  const [genContext, setGenContext] = useState('');
+  const [genUrl, setGenUrl] = useState('');
+  const [genBusy, setGenBusy] = useState(false);
+  const [genErr, setGenErr] = useState('');
+  const [genCaption, setGenCaption] = useState('');
 
   const scenesRef = useRef(scenes);
   const sizeRef = useRef(size);
@@ -318,6 +336,56 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     patch(sel, { videoUrl: null, videoName: '', videoStart: 0 });
   }
 
+  async function runGenerateReel() {
+    setGenErr('');
+    setGenBusy(true);
+    try {
+      const res = await fetch('/api/reel', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: genType,
+          platform: genPlatform,
+          context: genContext,
+          referenceUrl: genUrl,
+        }),
+      });
+      const j = await res.json();
+      setGenBusy(false);
+      if (!res.ok || j.error) {
+        setGenErr(j.error || 'Generation failed. Try again.');
+        return;
+      }
+      const mapped: Scene[] = (j.scenes || []).map((s: any) => ({
+        id: uid(),
+        bg: null,
+        videoUrl: null,
+        videoName: '',
+        videoStart: 0,
+        theme: s.theme,
+        eyebrow: s.eyebrow,
+        headline: s.headline,
+        sub: s.sub,
+        seconds: s.seconds,
+        anim: s.anim,
+      }));
+      if (mapped.length) {
+        stop();
+        setScenes(mapped);
+        setSel(0);
+        playheadRef.current = 0;
+        setPlayhead(0);
+      }
+      setGenCaption(
+        ((j.caption || '') + (j.hashtags ? '\n\n' + j.hashtags : '')).trim()
+      );
+      setGenOpen(false);
+    } catch {
+      setGenBusy(false);
+      setGenErr('Network error — please try again.');
+    }
+  }
+
   function pickMime() {
     const cands = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
     for (const c of cands) if (MediaRecorder.isTypeSupported(c)) return c;
@@ -405,6 +473,18 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
           <span className={styles.tag}>Reel Studio · beta</span>
         </div>
         <div className={styles.rt}>
+          {genCaption && (
+            <button
+              className={styles.btn}
+              onClick={() => navigator.clipboard?.writeText(genCaption)}
+              title="Copy the generated caption + hashtags"
+            >
+              Copy caption
+            </button>
+          )}
+          <button className={`${styles.btn} ${styles.solar}`} onClick={() => setGenOpen(true)}>
+            <Spark size={12} /> Generate
+          </button>
           <label className={styles.upload}>
             {audioName ? '♪ ' + audioName.slice(0, 16) : '♪ Add music'}
             <input type="file" accept="audio/*" onChange={(e) => onAudio(e.target.files?.[0])} />
@@ -635,6 +715,71 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
           in-memory only (re-add after a reload); MP4 + saved reels are planned.
         </div>
       </div>
+
+      {/* GENERATE MODAL */}
+      {genOpen && (
+        <div className={styles.modal} onClick={() => setGenOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setGenOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Generate a reel
+            </h2>
+            <p className={styles.msub}>
+              The AI scripts a full multi-scene reel — tuned for the platform&rsquo;s audience and
+              attention span. It replaces the current scenes; you then add backgrounds/clips.
+            </p>
+            <div className={styles.fld}>
+              <label>Type</label>
+              <select value={genType} onChange={(e) => setGenType(e.target.value)}>
+                {REEL_TYPES.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.fld}>
+              <label>Platform (sets tone: B2C vs B2B, and length)</label>
+              <select value={genPlatform} onChange={(e) => setGenPlatform(e.target.value)}>
+                {PLATFORMS.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.fld}>
+              <label>Context / angle (optional)</label>
+              <textarea
+                value={genContext}
+                onChange={(e) => setGenContext(e.target.value)}
+                placeholder="e.g. Bust the myth that solar doesn't work in Welsh winters. Or: promote our battery install offer."
+              />
+            </div>
+            {genType.startsWith('Grant') && (
+              <div className={styles.fld}>
+                <label>Grant / reference URL — the AI reads it for real details</label>
+                <input
+                  value={genUrl}
+                  onChange={(e) => setGenUrl(e.target.value)}
+                  placeholder="https://…"
+                />
+              </div>
+            )}
+            {genErr && <div className={styles.gstatus}>{genErr}</div>}
+            <div className={styles.mrow}>
+              <button
+                className={`${styles.btn} ${styles.solar}`}
+                onClick={runGenerateReel}
+                disabled={genBusy}
+              >
+                {genBusy ? 'Scripting…' : '✦ Generate reel'}
+              </button>
+              <button className={styles.btn} onClick={() => setGenOpen(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
