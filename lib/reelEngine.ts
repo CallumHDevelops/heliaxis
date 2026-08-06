@@ -1,5 +1,11 @@
 // Heliaxis Reel engine — animated, on-brand, size-aware scene rendering.
 import { C, RAY } from './postEngine';
+import { getIconPaths } from './icons';
+
+export interface ReelBadge {
+  icon: string;
+  label: string;
+}
 
 export type ReelTheme = 'dark' | 'light' | 'gold';
 export type ReelAnim = 'up' | 'fade' | 'left';
@@ -16,6 +22,7 @@ export interface Scene {
   headline: string; // supports *word* -> gold
   sub: string;
   cta?: string; // optional CTA button label
+  badges?: ReelBadge[]; // accreditation pills
   seconds: number;
   anim: ReelAnim;
   transition?: ReelTransition; // how this scene enters
@@ -124,6 +131,40 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+function drawIconAt(
+  ctx: CanvasRenderingContext2D,
+  id: string,
+  x: number,
+  y: number,
+  size: number,
+  strokeCol: string,
+  fillCol: string
+) {
+  const paths = getIconPaths(id);
+  if (!paths.length) return;
+  const sc = size / 24;
+  const a0 = ctx.globalAlpha;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  ctx.lineWidth = 1.7;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (const p of paths) {
+    const pth = new Path2D(p.d);
+    if (p.fill) {
+      ctx.globalAlpha = a0 * 0.3;
+      ctx.fillStyle = fillCol;
+      ctx.fill(pth);
+      ctx.globalAlpha = a0;
+    } else {
+      ctx.strokeStyle = strokeCol;
+      ctx.stroke(pth);
+    }
+  }
+  ctx.restore();
 }
 
 function wrapRich(
@@ -291,7 +332,6 @@ export function drawSceneFrame(
   const pad = Math.round(Math.min(W, H) * 0.09);
   drawSpark(ctx, W - pad - 12, pad + 22, 44, accent);
 
-  const x = pad;
   const subBright = hasMedia || isDark
     ? 'rgba(247,242,231,0.87)'
     : isGold
@@ -314,60 +354,59 @@ export function drawSceneFrame(
   const ctaH = scene.cta ? Math.round(90 * u) : 0;
 
   const footerY = H - pad; // footer baseline
-  const safeBottom = footerY - Math.round(52 * u);
   const topLimit = pad + Math.round(110 * u);
-  const available = safeBottom - topLimit;
+
+  // FIXED ANCHORS so the headline + sub sit in the same place every scene,
+  // regardless of whether there's an eyebrow (the eyebrow floats above).
+  const hAnchorBottom = Math.round(H * 0.56); // headline's last line sits on this
+  const sAnchorTop = hAnchorBottom + gapHeadSub; // sub always starts here
 
   // sub lines (fixed size)
   ctx.font = `500 ${subSize}px ${fam.body}, sans-serif`;
   const subLines = scene.sub ? wrapPlain(ctx, scene.sub, (W - pad * 2) * 0.94) : [];
   const subH = subLines.length * subLH;
 
-  // auto-fit the headline: shrink until it fits (<= 4 lines) within the safe area
+  // auto-fit the headline so it fits the zone above its anchor (grows upward)
+  const eyebrowReserve = scene.eyebrow ? eyebrowBlockH + gapEyeHead : 0;
+  const availForHead = hAnchorBottom - topLimit - eyebrowReserve;
   let hSize = Math.round(100 * u);
   const minH = Math.round(50 * u);
   let hLines: { t: string; c: string }[][] = [];
   let hLH = Math.round(hSize * 1.08);
-  const blockHeightFor = (headH: number) =>
-    eyebrowBlockH +
-    (scene.eyebrow ? gapEyeHead : 0) +
-    headH +
-    (subLines.length ? gapHeadSub + subH : 0) +
-    (scene.cta ? gapSubCta + ctaH : 0);
   while (hSize >= minH) {
     ctx.font = `900 ${hSize}px ${fam.display}, sans-serif`;
     hLines = wrapRich(ctx, scene.headline, W - pad * 2, fg, accent);
     hLH = Math.round(hSize * 1.08);
-    const headH = hLines.length * hLH;
-    if (hLines.length <= 4 && blockHeightFor(headH) <= available) break;
+    if (hLines.length <= 4 && hLines.length * hLH <= availForHead) break;
     hSize -= 4;
   }
   const headH = hLines.length * hLH;
-  const blockH = blockHeightFor(headH);
-  let cy = Math.max(topLimit, safeBottom - blockH); // bottom-anchored, clamped
+  const headTop = hAnchorBottom - headH;
 
   ctx.textBaseline = 'top';
 
+  // eyebrow (floats above the headline; doesn't move headline/sub)
   if (scene.eyebrow) {
+    const eyeTop = headTop - gapEyeHead - eyebrowBlockH;
     const e = settled ? 1 : ease(lt / 0.5);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
     ctx.font = `600 ${eyebrowSize}px ${fam.mono}, monospace`;
     ctx.fillStyle = accent;
-    ctx.fillText(scene.eyebrow.toUpperCase(), x + ex, cy + ey);
-    ctx.fillRect(x + ex, cy + eyebrowSize + ruleGap + ey, Math.round(60 * u), ruleH);
-    pushZone('eyebrow', cy, eyebrowSize + 12);
-    cy += eyebrowBlockH + gapEyeHead;
+    ctx.fillText(scene.eyebrow.toUpperCase(), pad + ex, eyeTop + ey);
+    ctx.fillRect(pad + ex, eyeTop + eyebrowSize + ruleGap + ey, Math.round(60 * u), ruleH);
+    pushZone('eyebrow', eyeTop, eyebrowSize + 12);
   }
+  // headline (bottom fixed at hAnchorBottom)
   {
     const e = settled ? 1 : ease((lt - 0.12) / 0.55);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
     ctx.font = `900 ${hSize}px ${fam.display}, sans-serif`;
     const space = ctx.measureText(' ').width;
-    let yy = cy + ey;
+    let yy = headTop + ey;
     for (const line of hLines) {
-      let lx = x + ex;
+      let lx = pad + ex;
       for (const wd of line) {
         ctx.fillStyle = wd.c;
         ctx.fillText(wd.t, lx, yy);
@@ -375,26 +414,27 @@ export function drawSceneFrame(
       }
       yy += hLH;
     }
-    pushZone('headline', cy, headH + 12);
-    cy += headH;
+    pushZone('headline', headTop, headH + 12);
   }
+  // sub (top fixed at sAnchorTop)
+  let subBottom = sAnchorTop;
   if (subLines.length) {
-    cy += gapHeadSub;
     const e = settled ? 1 : ease((lt - 0.28) / 0.55);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
     ctx.font = `500 ${subSize}px ${fam.body}, sans-serif`;
     ctx.fillStyle = subBright;
-    let yy = cy + ey;
+    let yy = sAnchorTop + ey;
     for (const l of subLines) {
-      ctx.fillText(l, x + ex, yy);
+      ctx.fillText(l, pad + ex, yy);
       yy += subLH;
     }
-    pushZone('sub', cy, subH + 12);
-    cy += subH;
+    subBottom = sAnchorTop + subH;
+    pushZone('sub', sAnchorTop, subH + 12);
   }
+  // cta (below the sub)
   if (scene.cta) {
-    cy += gapSubCta;
+    const cyc = (subLines.length ? subBottom : sAnchorTop) + gapSubCta;
     const e = settled ? 1 : ease((lt - 0.42) / 0.5);
     ctx.globalAlpha = alpha * e;
     ctx.textBaseline = 'alphabetic';
@@ -402,15 +442,48 @@ export function drawSceneFrame(
     const label = scene.cta + '  →';
     const bw = ctx.measureText(label).width + Math.round(64 * u);
     ctx.fillStyle = accent;
-    roundRect(ctx, x, cy, bw, ctaH, Math.round(12 * u));
+    roundRect(ctx, pad, cyc, bw, ctaH, Math.round(12 * u));
     ctx.fill();
     ctx.fillStyle = isGold ? C.paper : C.ink;
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, x + Math.round(32 * u), cy + ctaH / 2);
+    ctx.fillText(label, pad + Math.round(32 * u), cyc + ctaH / 2);
     ctx.textBaseline = 'top';
-    if (zones) zones.push({ f: 'cta', x: x + ox, y: cy, w: bw, h: ctaH });
+    if (zones) zones.push({ f: 'cta', x: pad + ox, y: cyc, w: bw, h: ctaH });
   }
   ctx.textBaseline = 'alphabetic';
+
+  // accreditation badges — small pill row just above the footer
+  const badges = scene.badges || [];
+  if (badges.length) {
+    const e = settled ? 1 : ease((lt - 0.32) / 0.5);
+    ctx.globalAlpha = alpha * e;
+    const bIcon = Math.round(24 * u);
+    const bPad = Math.round(10 * u);
+    const bGap = Math.round(8 * u);
+    const bLbl = Math.round(16 * u);
+    const bH = Math.round(42 * u);
+    const by = footerY - Math.round(52 * u);
+    let bx = pad;
+    for (const bd of badges) {
+      const label = (bd.label || '').toUpperCase();
+      ctx.font = `600 ${bLbl}px ${fam.mono}, monospace`;
+      const lblW = label ? ctx.measureText(label).width : 0;
+      const pw = bPad + bIcon + (label ? Math.round(7 * u) + lblW : 0) + bPad;
+      roundRect(ctx, bx, by - bH / 2, pw, bH, Math.round(6 * u));
+      ctx.strokeStyle = subCol;
+      ctx.lineWidth = Math.max(1, Math.round(1.3 * u));
+      ctx.stroke();
+      drawIconAt(ctx, bd.icon, bx + bPad, by - bIcon / 2, bIcon, fg, accent);
+      if (label) {
+        ctx.font = `600 ${bLbl}px ${fam.mono}, monospace`;
+        ctx.fillStyle = fg;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, bx + bPad + bIcon + Math.round(7 * u), by);
+        ctx.textBaseline = 'alphabetic';
+      }
+      bx += pw + bGap;
+    }
+  }
 
   ctx.globalAlpha = alpha;
   ctx.font = `500 ${Math.round(24 * u)}px ${fam.mono}, monospace`;

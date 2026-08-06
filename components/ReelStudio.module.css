@@ -431,6 +431,12 @@
 .chip:hover {
   border-color: var(--solar);
 }
+.badgeIco {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
 .chipMain {
   border: 0;
   background: none;

@@ -18,7 +18,16 @@ import {
   type ReelTransition,
   type ReelZone,
 } from '@/lib/reelEngine';
+import { ICON_SPRITE } from '@/lib/iconSprite';
+import { prettifyIcon } from '@/lib/icons';
 import styles from './ReelStudio.module.css';
+
+const REEL_BADGE_PRESETS = [
+  { icon: 'ic-shield', label: 'MCS Certified' },
+  { icon: 'ic-award', label: 'TrustMark' },
+  { icon: 'ic-check', label: 'RECC' },
+  { icon: 'ic-percent', label: '0% VAT' },
+];
 
 const uid = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -106,6 +115,9 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const [reelId, setReelId] = useState<string | null>(null);
   const [reelName, setReelName] = useState('Untitled reel');
   const [saveMsg, setSaveMsg] = useState('');
+  const [badgeLibrary, setBadgeLibrary] = useState<{ id: string; icon: string; label: string }[]>(
+    []
+  );
 
   const zonesRef = useRef<ReelZone[]>([]);
   const scenesRef = useRef(scenes);
@@ -296,9 +308,24 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     loadImages();
     loadCtas();
     loadReels();
+    loadBadges();
     drawAt(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadBadges() {
+    const { data } = await supabase
+      .from('badge_library')
+      .select('id, icon, label')
+      .order('created_at', { ascending: true });
+    if (data) setBadgeLibrary(data as { id: string; icon: string; label: string }[]);
+  }
+  function addBadgeToScene(icon: string, label: string) {
+    patch(sel, { badges: [...(sc.badges || []), { icon, label }] });
+  }
+  function removeBadgeFromScene(i: number) {
+    patch(sel, { badges: (sc.badges || []).filter((_, k) => k !== i) });
+  }
 
   useEffect(() => {
     try {
@@ -694,6 +721,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
 
   return (
     <div className={styles.app}>
+      <div style={{ display: 'none' }} aria-hidden dangerouslySetInnerHTML={{ __html: ICON_SPRITE }} />
       {audioUrl && <audio ref={audioElRef} src={audioUrl} preload="auto" />}
       <div className={styles.bar}>
         <div className={styles.lt}>
@@ -974,6 +1002,54 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
                 ✕ no button
               </button>
             ) : null}
+          </div>
+        </div>
+
+        <div className={styles.fld}>
+          <label>Accreditations (optional)</label>
+          {(sc.badges || []).length > 0 && (
+            <div className={styles.chips} style={{ marginBottom: 6 }}>
+              {(sc.badges || []).map((b, i) => (
+                <span key={i} className={styles.chip}>
+                  <svg className={styles.badgeIco} aria-hidden>
+                    <use href={`#${b.icon}`} />
+                  </svg>
+                  {b.label || prettifyIcon(b.icon)}
+                  <button className={styles.chipX} onClick={() => removeBadgeFromScene(i)}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className={styles.chips}>
+            {REEL_BADGE_PRESETS.map((p) => (
+              <button
+                key={p.label}
+                className={styles.chip}
+                onClick={() => addBadgeToScene(p.icon, p.label)}
+              >
+                <svg className={styles.badgeIco} aria-hidden>
+                  <use href={`#${p.icon}`} />
+                </svg>
+                {p.label}
+              </button>
+            ))}
+            {badgeLibrary.map((l) => (
+              <button
+                key={l.id}
+                className={styles.chip}
+                onClick={() => addBadgeToScene(l.icon, l.label)}
+              >
+                <svg className={styles.badgeIco} aria-hidden>
+                  <use href={`#${l.icon}`} />
+                </svg>
+                {l.label || prettifyIcon(l.icon)}
+              </button>
+            ))}
+          </div>
+          <div className={styles.hint}>
+            Small pills above the footer. Build more in the post studio&rsquo;s Icon bank.
           </div>
         </div>
 
