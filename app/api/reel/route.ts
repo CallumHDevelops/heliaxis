@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { BRAND, VOICE, COMPLIANCE, audienceFor } from '@/lib/prompt';
 
 export const runtime = 'nodejs';
 
@@ -107,26 +108,37 @@ export async function POST(req: Request) {
   const referenceUrl = String(body?.referenceUrl || '').trim();
 
   const grantText = referenceUrl ? await fetchUrlText(referenceUrl) : '';
-  const { audience, length } = platformGuidance(platform);
+  const audience = audienceFor(platform);
+  const { length } = platformGuidance(platform);
 
-  const prompt = `You are a short-form vertical video (Reel) scriptwriter for Heliaxis, an MCS-certified renewable energy installer in South Wales (solar PV, battery storage, infrared/alternative heating, LED lighting, EV charging).
+  const prompt = `You are Heliaxis's short-form video (Reel) scriptwriter and social strategist.
 
-BRAND VOICE: confident, plain-spoken, benefit-led, honest. UK English. No hype ("revolutionary", "leading").
+${BRAND}
 
-FORMAT: a Reel made of short text scenes over background footage/photos. Each scene shows a few words on screen for ~2-3 seconds. On-screen text MUST be short enough to read instantly.
+${VOICE}
 
-TYPE: ${type}
-PLATFORM: ${platform} — ${audience}
-USER CONTEXT: ${context || '(none provided)'}
-${grantText ? `SOURCE MATERIAL (extracted from ${referenceUrl}) — use only facts supported here:\n${grantText}\n` : referenceUrl ? `(Could not read ${referenceUrl}; do not invent its details.)\n` : ''}
-ATTENTION & LENGTH: Optimise for ${platform}. ${length} Use 4-6 scenes. Scene 1 MUST be a strong hook (a question, a myth, or a bold fact) that lands in ~2 seconds. The final scene is a clear, low-pressure call to action (free survey · 01633 965205 · heliaxis.co.uk).
+FORMAT: a vertical Reel = a sequence of short TEXT scenes over background footage/photos. Each scene shows only a few words for ~2-3 seconds, so on-screen text must be readable in a glance (headlines ideally ≤ 6 words).
 
-PER-SCENE FIELDS: 'eyebrow' = optional 2-4 word ALL-CAPS kicker. 'headline' = the main on-screen line, short and punchy; wrap ONE key word in *asterisks* for a gold accent. 'sub' = optional one short supporting line. 'seconds' = 2-4 (hook can be 2, CTA ~3). 'theme' = 'dark' | 'light' | 'gold' (mostly 'dark'). 'anim' = 'up' | 'fade' | 'left'.
+BRIEF:
+- TYPE: ${type}
+- PLATFORM: ${platform} — ${audience}
+- USER CONTEXT: ${context || '(none provided — choose a strong, specific angle yourself)'}
+${grantText ? `- SOURCE MATERIAL (extracted from ${referenceUrl}) — use ONLY facts supported by this text:\n${grantText}\n` : referenceUrl ? `- (Could not read ${referenceUrl}; do not invent its details.)\n` : ''}
+RETENTION & STRUCTURE (this is what makes reels work):
+- SCENE 1 IS EVERYTHING: hook in the first ~2 seconds. Use one of: a myth to bust, a sharp question, a surprising/concrete fact, or a relatable pain point. No slow intros, no logos-first.
+- Then deliver ONE clear idea, building scene to scene — each scene earns the next. Create a small "open loop" early and pay it off.
+- FINAL SCENE = a clear, low-pressure call to action (free survey · 01633 965205 · heliaxis.co.uk).
+- ${length} Use 4-6 scenes. Vary rhythm: a punchy hook scene can be 2s; the payoff/CTA ~3s.
+- Every on-screen line must be instantly readable — cut adjectives, keep it concrete.
 
-COMPLIANCE: never invent specific savings, payback, grant amounts, deadlines or prices. If a figure isn't in the provided source/context, keep the claim general.
+PER-SCENE FIELDS: 'eyebrow' = optional 2-4 word ALL-CAPS kicker. 'headline' = the main on-screen line, short and punchy; wrap ONE key word in *asterisks* for a gold accent. 'sub' = optional one short supporting line. 'seconds' = 2-4. 'theme' = 'dark' | 'light' | 'gold' (mostly 'dark'; use 'gold' sparingly for emphasis). 'anim' = 'up' | 'fade' | 'left'.
+
+${COMPLIANCE}
+
+Also write a platform-appropriate CAPTION (hook first line, a little value, then a soft CTA) and 4-6 relevant HASHTAGS.
 
 Return ONLY JSON of this exact shape (no markdown):
-{"recommendedSeconds": number, "scenes":[{"eyebrow":"","headline":"","sub":"","seconds":3,"theme":"dark","anim":"up"}], "caption":"an engaging caption with a hook and CTA", "hashtags":"#.. #.."}`;
+{"recommendedSeconds": number, "scenes":[{"eyebrow":"","headline":"","sub":"","seconds":3,"theme":"dark","anim":"up"}], "caption":"", "hashtags":"#.. #.."}`;
 
   const r = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { BRAND, VOICE, COMPLIANCE } from '@/lib/prompt';
 
 export const runtime = 'nodejs';
 
@@ -44,26 +45,28 @@ export async function POST(req: Request) {
     .map(([k, v]) => `${k}: ${String(v).split('*').join('')}`)
     .join('\n');
 
-  const prompt = `You are writing the SOCIAL MEDIA CAPTION that sits beneath a Heliaxis post graphic.
+  const prompt = `You are Heliaxis's social copywriter, writing the CAPTION that sits beneath a post graphic.
 
-Heliaxis is an MCS-certified renewable energy installer in South Wales (solar PV, battery storage, infrared/alternative heating, LED lighting, EV charging).
-BRAND VOICE: confident, plain-spoken, benefit-led, honest. Numbers over adjectives. UK English. Never hype ("revolutionary", "leading", "cutting-edge"). We survey before we quote and show our assumptions.
+${BRAND}
+
+${VOICE}
 
 TONE: ${tone || 'House style'}
 TEMPLATE: ${tplName || 'Post'} (${tplDesc || ''}).
 
-The GRAPHIC ALREADY SHOWS this text — do NOT just repeat it in the caption:
+The GRAPHIC ALREADY SHOWS this text — do NOT restate these same sentences in the caption:
 ${onGraphic}
 
-Write a caption that COMPLEMENTS the graphic, it must NOT restate the same sentences:
-- Open with a short scroll-stopping hook (a question, a myth, or a concrete fact) — a different angle from the headline.
-- Add 1-2 short paragraphs of context or value that go BEYOND what's on the image (why it matters, what to check, a practical takeaway).
-- End with a clear, low-pressure call to action (free no-obligation survey · 01633 965205 · heliaxis.co.uk).
-- Then a final line of 4-6 relevant hashtags.
+Write a caption that COMPLEMENTS the graphic (adds to it, never repeats it):
+- Line 1 is a scroll-stopping hook — a different angle from the headline (a question, a myth, or a concrete fact). It must work even if the image isn't seen.
+- Then 1-2 short paragraphs of genuine value the image doesn't cover: why it matters, what to check, a practical takeaway.
+- End with a clear, low-pressure CTA (free no-obligation survey · 01633 965205 · heliaxis.co.uk).
+- Final line: 4-6 relevant, non-spammy hashtags.
+- Keep it tight and skimmable — short paragraphs, line breaks, no walls of text, no emoji-stuffing.
 
-COMPLIANCE: never invent specific savings, payback or prices. Keep claims honest and general unless a figure is already given. UK English. Keep it tight and readable — a few short paragraphs, not an essay.
+${COMPLIANCE}
 
-Return ONLY the caption text (with the hashtags line). No preamble, no quotes, no markdown.`;
+Return ONLY the caption text (ending with the hashtags line). No preamble, no quotes, no markdown.`;
 
   const r = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',

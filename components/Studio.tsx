@@ -91,6 +91,8 @@ export default function Studio({
   const [genStatus, setGenStatus] = useState('');
   const [genErr, setGenErr] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [genSuggest, setGenSuggest] = useState<string[]>([]);
+  const [genSuggestBusy, setGenSuggestBusy] = useState(false);
 
   // account menu + admin
   const [menuOpen, setMenuOpen] = useState(false);
@@ -709,6 +711,26 @@ export default function Studio({
     });
   }
 
+  async function suggestPostTopics() {
+    setGenSuggestBusy(true);
+    try {
+      const res = await fetch('/api/suggest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: `${TEMPLATES[genTpl].name} post`,
+          platform: 'Instagram',
+          context: genTopic,
+        }),
+      });
+      const j = await res.json();
+      setGenSuggestBusy(false);
+      if (res.ok && !j.error) setGenSuggest(j.suggestions || []);
+    } catch {
+      setGenSuggestBusy(false);
+    }
+  }
+
   async function runGenerate(topicArg?: string) {
     const topic = (topicArg ?? genTopic).trim();
     setGenErr(false);
@@ -1323,6 +1345,23 @@ export default function Studio({
                 onChange={(e) => setGenTopic(e.target.value)}
                 placeholder="e.g. New battery install in Penarth, customer cut evening grid use by 70%. Or: explain why cheaper quotes often skip MCS certification."
               />
+              <button
+                className={styles.phbtn}
+                style={{ marginTop: 6 }}
+                onClick={suggestPostTopics}
+                disabled={genSuggestBusy}
+              >
+                {genSuggestBusy ? 'Thinking…' : '✦ Suggest angles'}
+              </button>
+              {genSuggest.length > 0 && (
+                <div className={styles.sugRow}>
+                  {genSuggest.map((s, i) => (
+                    <button key={i} className={styles.sugChip} onClick={() => setGenTopic(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className={styles.fld}>
               <label>Tone</label>

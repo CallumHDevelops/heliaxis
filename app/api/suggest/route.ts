@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { BRAND, VOICE } from '@/lib/prompt';
+import { BRAND, VOICE, audienceFor } from '@/lib/prompt';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +16,7 @@ function aiConfig() {
   return { apiKey, baseUrl, model };
 }
 
+// Quick "auto-suggest": short, specific angles to drop into a topic/context field.
 export async function POST(req: Request) {
   const supabase = await createClient();
   const {
@@ -34,28 +35,23 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    /* optional body */
+    /* optional */
   }
-  const recent: string[] = Array.isArray(body?.recent) ? body.recent : [];
-  const avoid = recent
-    .filter(Boolean)
-    .slice(0, 25)
-    .map((h) => '- ' + String(h).slice(0, 90))
-    .join('\n');
+  const type = String(body?.type || 'post');
+  const platform = String(body?.platform || 'Instagram');
+  const context = String(body?.context || '').slice(0, 600);
 
-  const prompt = `You are Heliaxis's social media strategist, proposing what to post next.
+  const prompt = `You are Heliaxis's social strategist. Suggest 6 SHORT, specific angles the team could turn into a "${type}".
 
 ${BRAND}
 
 ${VOICE}
 
-Suggest 5 DISTINCT, specific post ideas the team could make next. Deliberately spread across different angles — e.g. myth-busting, a customer proof point, a seasonal/timely tip, funding/grant news, buyer advice ("what to check in a quote"), a local case study, a quick explainer, a behind-the-scenes. No two ideas should feel similar.
-Each idea must be concrete and act-on-able (a real angle, not a vague theme), grounded in what Heliaxis actually does, and relevant to South Wales homeowners or local businesses.
+AUDIENCE (${platform}): ${audienceFor(platform)}
+${context ? `STEER FROM THE USER: ${context}\n` : ''}
+Each suggestion is one concrete, click-ready angle of 4-10 words — a hook or topic someone could pick and run with (not a vague theme). Make them genuinely different from each other and grounded in what Heliaxis does.
 
-${avoid ? `AVOID repeating these recent posts — make the ideas genuinely fresh:\n${avoid}\n` : ''}
-Return ONLY a JSON object of this exact shape (no markdown, no commentary):
-{"ideas":[{"title":"short punchy title, max ~8 words","brief":"one clear sentence on the angle and what the post would say"}]}
-Exactly 5 ideas.`;
+Return ONLY JSON: {"suggestions":["...","..."]} with exactly 6 items.`;
 
   const r = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -63,12 +59,12 @@ Exactly 5 ideas.`;
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://social.heliaxis.co.uk',
-      'X-Title': 'Heliaxis Post Studio',
+      'X-Title': 'Heliaxis Auto-suggest',
     },
     body: JSON.stringify({
       model,
-      temperature: 0.95,
-      max_tokens: 700,
+      temperature: 1.0,
+      max_tokens: 400,
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -78,21 +74,18 @@ Exactly 5 ideas.`;
     const detail = await r.text();
     return NextResponse.json({ error: 'AI request failed', detail }, { status: 502 });
   }
-
   const json = await r.json();
   const text: string = json?.choices?.[0]?.message?.content || '';
-  let ideas: { title: string; brief: string }[] = [];
+  let suggestions: string[] = [];
   try {
     const parsed = JSON.parse(text.replace(/```json/gi, '').replace(/```/g, '').trim());
-    ideas = Array.isArray(parsed?.ideas) ? parsed.ideas : [];
+    suggestions = (Array.isArray(parsed?.suggestions) ? parsed.suggestions : [])
+      .map((s: any) => String(s).trim())
+      .filter(Boolean)
+      .slice(0, 6);
   } catch {
-    return NextResponse.json({ error: 'Could not parse ideas', raw: text }, { status: 502 });
+    return NextResponse.json({ error: 'Could not parse suggestions' }, { status: 502 });
   }
 
-  ideas = ideas
-    .filter((i) => i && i.title)
-    .map((i) => ({ title: String(i.title), brief: String(i.brief || '') }))
-    .slice(0, 5);
-
-  return NextResponse.json({ ideas });
+  return NextResponse.json({ suggestions });
 }

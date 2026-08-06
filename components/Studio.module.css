@@ -929,6 +929,29 @@
   cursor: default;
 }
 
+/* auto-suggest chips */
+.sugRow {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+.sugChip {
+  text-align: left;
+  font-family: var(--body);
+  font-size: 0.78rem;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 7px 10px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.sugChip:hover {
+  border-color: var(--solar);
+}
+
 /* save modal choices */
 .savechoices {
   display: flex;

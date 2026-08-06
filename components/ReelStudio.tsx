@@ -96,6 +96,8 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const [genBusy, setGenBusy] = useState(false);
   const [genErr, setGenErr] = useState('');
   const [genCaption, setGenCaption] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestBusy, setSuggestBusy] = useState(false);
   const [ctaLibrary, setCtaLibrary] = useState<{ id: string; label: string }[]>([]);
   const [reels, setReels] = useState<
     { id: string; name: string; size: string; updated_at: string }[]
@@ -544,6 +546,22 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   }
   function removeVideo() {
     patch(sel, { videoUrl: null, videoName: '', videoStart: 0 });
+  }
+
+  async function suggestAngles() {
+    setSuggestBusy(true);
+    try {
+      const res = await fetch('/api/suggest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: genType, platform: genPlatform, context: genContext }),
+      });
+      const j = await res.json();
+      setSuggestBusy(false);
+      if (res.ok && !j.error) setSuggestions(j.suggestions || []);
+    } catch {
+      setSuggestBusy(false);
+    }
   }
 
   async function runGenerateReel() {
@@ -1043,6 +1061,23 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
                 onChange={(e) => setGenContext(e.target.value)}
                 placeholder="e.g. Bust the myth that solar doesn't work in Welsh winters. Or: promote our battery install offer."
               />
+              <button
+                className={styles.miniInline}
+                onClick={suggestAngles}
+                disabled={suggestBusy}
+                style={{ marginTop: 6 }}
+              >
+                {suggestBusy ? 'Thinking…' : '✦ Suggest angles'}
+              </button>
+              {suggestions.length > 0 && (
+                <div className={styles.chips}>
+                  {suggestions.map((s, i) => (
+                    <button key={i} className={styles.chip} onClick={() => setGenContext(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {genType.startsWith('Grant') && (
               <div className={styles.fld}>

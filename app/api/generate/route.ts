@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { BRAND, VOICE, COMPLIANCE } from '@/lib/prompt';
 
 export const runtime = 'nodejs';
 
@@ -33,20 +34,40 @@ function buildPrompt(
     .map((h) => '- ' + h.slice(0, 90))
     .join('\n');
 
-  return `You are writing a social media post for Heliaxis, an MCS-certified renewable energy installer in South Wales (solar PV, battery storage, infrared/alternative heating, LED lighting, EV charging).
+  return `You are Heliaxis's senior social copywriter, writing ONE on-brand social graphic.
 
-BRAND VOICE: confident, plain-spoken, benefit-led, honest. Numbers over adjectives. UK English. Never hype ("revolutionary", "leading", "cutting-edge"). We survey before we quote and show our assumptions. We'll tell a customer "no" when something isn't worth doing.
+${BRAND}
+
+${VOICE}
 
 TONE FOR THIS POST: ${tone}
 
 TEMPLATE: ${tplName} (${tplDesc}). Fill EXACTLY these fields: ${fieldList}.
-FIELD RULES: 'eyebrow' = 2-4 word ALL-CAPS kicker. 'headline' = short and punchy; wrap ONE or TWO key words in *asterisks* to accent them gold. 'sub' = one or two plain sentences. 'stat' = ONE clean figure WITH its correct unit and nothing else — no square brackets, no words around it. Use the right unit: energy generated or used = kWh (never kV, and never kW for a total amount), system size = kWp or kW, money = £, proportions = %. Keep it short enough to sit on one line (e.g. £1,400, 68%, 4,200 kWh). 'statlabel' = a few words saying what the figure is (e.g. "generated a year."). On a stat post the 'sub' MUST give the context that makes the number meaningful — system size, property type and orientation/location (e.g. "From a 5.2 kWp array on a south-facing roof in Newport."). Never present a number without saying what produced it. 'footer' = always "heliaxis.co.uk · 01633 965205". Keep it tight — this is a graphic, not an article.
+
+HOW TO MAKE IT GOOD (think before writing):
+- Lead with the reader's benefit or a genuine hook, not the product. Earn the read.
+- Be specific and concrete over generic. One clear idea per post — don't cram.
+- Prefer a real, checkable detail (a place, a system size, a scenario) over vague claims.
+- Read the headline aloud: if it sounds like an advert or a cliché, rewrite it.
+
+FIELD RULES:
+- 'eyebrow' = a 2-4 word ALL-CAPS kicker that frames the post (e.g. "CUSTOMER STORY · CARDIFF").
+- 'headline' = short and punchy (aim ≤ 8 words); wrap ONE or TWO key words in *asterisks* to accent them gold. No full stop unless it's a deliberate statement.
+- 'sub' = one or two plain, useful sentences that add something beyond the headline.
+- 'stat' = ONE clean figure with its correct unit and nothing else (no brackets, no words): energy = kWh, system size = kWp or kW, money = £, proportions = %. One line (e.g. £1,400, 68%, 4,200 kWh).
+- 'statlabel' = a few words saying what the figure is (e.g. "saved every year.").
+- On a stat post the 'sub' MUST give the context that makes the number meaningful — system size, property type, orientation/location (e.g. "From a 5.2 kWp array on a south-facing roof in Newport.").
+- 'badge'/'cta'/'item1..3' where present: keep tight and specific.
+- 'footer' = always "heliaxis.co.uk · 01633 965205".
+
+GOOD vs WEAK headline (for calibration):
+- WEAK: "Harness the power of the sun today!"  →  GOOD: "Your roof works while you're out."
+- WEAK: "Amazing solar savings!"  →  GOOD: "Cut the bit of the bill you actually control."
 
 TOPIC / ANGLE FROM THE USER:
 ${topic}
 
-${avoid ? `AVOID REPEATING these recent posts — make this meaningfully different in angle and wording:\n${avoid}\n` : ''}
-COMPLIANCE: Never wrap numbers in square brackets or any placeholder punctuation — write every number as a real, plain figure. Do not invent precise savings, payback or prices. If the user gave a figure, use it exactly. If not, give a realistic, clearly illustrative example AND state the assumptions behind it in 'sub' (system size, orientation, tariff) so no figure ever appears without context. Every number must carry a correct unit and something a reader can sense-check.
+${avoid ? `AVOID REPEATING these recent posts — be meaningfully different in angle AND wording:\n${avoid}\n` : ''}${COMPLIANCE}
 
 Respond with ONLY a JSON object mapping each required field to its string value. No markdown, no commentary, no code fences. Fields: ${fieldList}.`;
 }
