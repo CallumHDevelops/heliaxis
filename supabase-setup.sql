@@ -152,6 +152,46 @@ create policy "authenticated can delete image_library"
   on public.image_library for delete to authenticated using (true);
 
 -- ============================================================
+-- Saved reels — the reel builder's scenes + format (shared). Videos are
+-- in-memory only and are NOT stored; background images/text/CTA are.
+-- ============================================================
+create table if not exists public.reels (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  name        text not null default 'Untitled reel',
+  size        text not null default '9:16',
+  scenes      jsonb not null default '[]'::jsonb
+);
+alter table public.reels enable row level security;
+create policy "authenticated can read reels"
+  on public.reels for select to authenticated using (true);
+create policy "authenticated can insert reels"
+  on public.reels for insert to authenticated with check (true);
+create policy "authenticated can update reels"
+  on public.reels for update to authenticated using (true) with check (true);
+create policy "authenticated can delete reels"
+  on public.reels for delete to authenticated using (true);
+
+-- ============================================================
+-- CTA button library — reusable call-to-action labels (shared).
+-- ============================================================
+create table if not exists public.cta_library (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  created_by  uuid references auth.users (id) on delete set null default auth.uid(),
+  label       text not null
+);
+alter table public.cta_library enable row level security;
+create policy "authenticated can read cta_library"
+  on public.cta_library for select to authenticated using (true);
+create policy "authenticated can insert cta_library"
+  on public.cta_library for insert to authenticated with check (true);
+create policy "authenticated can delete cta_library"
+  on public.cta_library for delete to authenticated using (true);
+
+-- ============================================================
 -- Auth note: in Dashboard → Authentication → Providers, keep Email enabled.
 -- For an invite-only agency tool, turn OFF "Allow new users to sign up"
 -- once you've created the accounts you need, and invite users instead

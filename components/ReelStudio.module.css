@@ -371,6 +371,143 @@
   color: var(--ink);
 }
 
+.nameInput {
+  width: 100%;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+.ctaRow {
+  display: flex;
+  gap: 6px;
+}
+.ctaRow input {
+  flex: 1;
+}
+.miniInline {
+  border: 1px solid var(--ink);
+  background: none;
+  color: var(--ink);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.74rem;
+  padding: 0 12px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.miniInline:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+.miniInline:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--body);
+  font-size: 0.68rem;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.chip:hover {
+  border-color: var(--solar);
+}
+.chipMain {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.68rem;
+  padding: 0;
+}
+.chipX {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 0 0 5px;
+}
+.chipX:hover {
+  color: #b4462f;
+}
+.reelList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 52vh;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+.reelRow {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  overflow: hidden;
+}
+.reelPick {
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 10px 12px;
+}
+.reelPick b {
+  display: block;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.reelPick span {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.reelPick:hover {
+  background: var(--paper-2);
+}
+.reelDel {
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 1rem;
+  padding: 0 12px;
+}
+.reelDel:hover {
+  color: #b4462f;
+}
+.empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 24px 0;
+}
 .fld select {
   width: 100%;
   font-family: var(--body);

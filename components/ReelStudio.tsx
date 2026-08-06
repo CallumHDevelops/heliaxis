@@ -8,12 +8,15 @@ import {
   REEL_SIZES,
   renderReel,
   sceneIndexAt,
+  sceneStart,
   totalDuration,
   type ReelSizeKey,
   type Scene,
   type SceneMedia,
   type ReelTheme,
   type ReelAnim,
+  type ReelTransition,
+  type ReelZone,
 } from '@/lib/reelEngine';
 import styles from './ReelStudio.module.css';
 
@@ -53,6 +56,11 @@ const REEL_TYPES = [
   'Explainer',
 ];
 const PLATFORMS = ['Instagram', 'TikTok', 'Facebook', 'LinkedIn'];
+const CTA_PRESETS = ['Get a free survey', 'Book your survey', 'Message us today', 'Try our estimator', 'Learn more'];
+const TRANSITIONS: { k: ReelTransition; label: string }[] = [
+  { k: 'fade', label: 'Cross-fade' },
+  { k: 'slide', label: 'Slide' },
+];
 
 export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const supabase = createClient();
@@ -79,7 +87,16 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const [genBusy, setGenBusy] = useState(false);
   const [genErr, setGenErr] = useState('');
   const [genCaption, setGenCaption] = useState('');
+  const [ctaLibrary, setCtaLibrary] = useState<{ id: string; label: string }[]>([]);
+  const [reels, setReels] = useState<
+    { id: string; name: string; size: string; updated_at: string }[]
+  >([]);
+  const [reelsOpen, setReelsOpen] = useState(false);
+  const [reelId, setReelId] = useState<string | null>(null);
+  const [reelName, setReelName] = useState('Untitled reel');
+  const [saveMsg, setSaveMsg] = useState('');
 
+  const zonesRef = useRef<ReelZone[]>([]);
   const scenesRef = useRef(scenes);
   const sizeRef = useRef(size);
   const playheadRef = useRef(0);
@@ -148,7 +165,45 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
       c.width = dim.w;
       c.height = dim.h;
     }
-    renderReel(ctx, scenesRef.current, t, mediaFor, famRef.current, dim.w, dim.h);
+    zonesRef.current = renderReel(ctx, scenesRef.current, t, mediaFor, famRef.current, dim.w, dim.h);
+  }
+
+  function selectScene(i: number) {
+    setSel(i);
+    stop();
+    setHead(sceneStart(scenesRef.current, i) + 0.001);
+  }
+
+  function onCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const r = cv.getBoundingClientRect();
+    const mx = ((e.clientX - r.left) * cv.width) / r.width;
+    const my = ((e.clientY - r.top) * cv.height) / r.height;
+    const { i } = sceneIndexAt(scenesRef.current, playheadRef.current);
+    if (i !== sel) setSel(i);
+    for (let k = zonesRef.current.length - 1; k >= 0; k--) {
+      const z = zonesRef.current[k];
+      if (mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h) {
+        const el = document.querySelector<HTMLElement>(`[data-rfield="${z.f}"]`);
+        if (el) {
+          el.focus();
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+        return;
+      }
+    }
+  }
+  function onCanvasMove(e: React.MouseEvent<HTMLCanvasElement>) {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const r = cv.getBoundingClientRect();
+    const mx = ((e.clientX - r.left) * cv.width) / r.width;
+    const my = ((e.clientY - r.top) * cv.height) / r.height;
+    const hit = zonesRef.current.some(
+      (z) => mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h
+    );
+    cv.style.cursor = hit ? 'pointer' : 'default';
   }
 
   function syncVideos(t: number, isPlaying: boolean) {
@@ -219,6 +274,8 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
       document.fonts.ready.then(() => drawAt(playheadRef.current));
     }
     loadImages();
+    loadCtas();
+    loadReels();
     drawAt(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -241,6 +298,94 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
       .select('id, name, data_url')
       .order('created_at', { ascending: false });
     if (data) setImages(data as { id: string; name: string; data_url: string }[]);
+  }
+  async function loadCtas() {
+    const { data } = await supabase
+      .from('cta_library')
+      .select('id, label')
+      .order('created_at', { ascending: true });
+    if (data) setCtaLibrary(data as { id: string; label: string }[]);
+  }
+  async function saveCta() {
+    const label = (sc?.cta || '').trim();
+    if (!label) return;
+    if (ctaLibrary.some((c) => c.label.toLowerCase() === label.toLowerCase())) return;
+    const { error } = await supabase.from('cta_library').insert({ label });
+    if (!error) loadCtas();
+  }
+  function deleteCta(id: string) {
+    setCtaLibrary((l) => l.filter((c) => c.id !== id));
+    supabase.from('cta_library').delete().eq('id', id);
+  }
+
+  async function loadReels() {
+    const { data } = await supabase
+      .from('reels')
+      .select('id, name, size, updated_at')
+      .order('updated_at', { ascending: false });
+    if (data) setReels(data as { id: string; name: string; size: string; updated_at: string }[]);
+  }
+  function scenesForSave() {
+    // strip in-memory video blobs; keep text/bg/cta/etc.
+    return scenesRef.current.map((s) => ({ ...s, videoUrl: null, videoName: '', videoStart: 0 }));
+  }
+  async function saveReel() {
+    setSaveMsg('');
+    const payload = { name: reelName.trim() || 'Untitled reel', size, scenes: scenesForSave() };
+    if (reelId) {
+      const { error } = await supabase
+        .from('reels')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', reelId);
+      if (error) {
+        setSaveMsg(error.message);
+        return;
+      }
+    } else {
+      const { data, error } = await supabase.from('reels').insert(payload).select('id').single();
+      if (error) {
+        setSaveMsg(error.message);
+        return;
+      }
+      if (data) setReelId(data.id as string);
+    }
+    setSaveMsg('Saved ✓');
+    loadReels();
+    setTimeout(() => setSaveMsg(''), 1500);
+  }
+  async function loadReel(id: string) {
+    const { data } = await supabase
+      .from('reels')
+      .select('id, name, size, scenes')
+      .eq('id', id)
+      .single();
+    if (data) {
+      stop();
+      const arr = (data.scenes as Scene[]) || [];
+      setScenes(arr.length ? arr : [newScene()]);
+      if (data.size && REEL_SIZES[data.size as ReelSizeKey]) setSize(data.size as ReelSizeKey);
+      setReelId(data.id as string);
+      setReelName((data.name as string) || 'Untitled reel');
+      setSel(0);
+      playheadRef.current = 0;
+      setPlayhead(0);
+      setReelsOpen(false);
+    }
+  }
+  function deleteReel(id: string) {
+    setReels((r) => r.filter((x) => x.id !== id));
+    if (reelId === id) setReelId(null);
+    supabase.from('reels').delete().eq('id', id);
+  }
+  function newReel() {
+    stop();
+    setScenes([newScene()]);
+    setReelId(null);
+    setReelName('Untitled reel');
+    setSel(0);
+    playheadRef.current = 0;
+    setPlayhead(0);
+    setReelsOpen(false);
   }
 
   const total = totalDuration(scenes);
@@ -265,6 +410,8 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     }
     playheadRef.current = t;
     setPlayhead(t);
+    const { i } = sceneIndexAt(scenesRef.current, t);
+    setSel((v) => (v === i ? v : i));
     syncVideos(t, true);
     drawAt(t);
     requestAnimationFrame(tick);
@@ -489,6 +636,18 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
             {audioName ? '♪ ' + audioName.slice(0, 16) : '♪ Add music'}
             <input type="file" accept="audio/*" onChange={(e) => onAudio(e.target.files?.[0])} />
           </label>
+          <button
+            className={styles.btn}
+            onClick={() => {
+              loadReels();
+              setReelsOpen(true);
+            }}
+          >
+            Reels
+          </button>
+          <button className={styles.btn} onClick={saveReel}>
+            {saveMsg || 'Save'}
+          </button>
           <Link className={styles.btn} href="/studio">
             Back to posts
           </Link>
@@ -504,6 +663,12 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
 
       {/* LEFT — format + scene list */}
       <div className={styles.panel}>
+        <input
+          className={styles.nameInput}
+          value={reelName}
+          onChange={(e) => setReelName(e.target.value)}
+          placeholder="Reel name"
+        />
         <div className={styles.ph}>
           <Spark size={11} /> Format
         </div>
@@ -527,7 +692,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
           <div
             key={s.id}
             className={`${styles.scene} ${i === sel ? styles.on : ''}`}
-            onClick={() => setSel(i)}
+            onClick={() => selectScene(i)}
           >
             <div className={styles.scnum}>{i + 1}</div>
             <div className={styles.scbody}>
@@ -565,7 +730,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
       {/* CENTRE — preview */}
       <div className={styles.stage}>
         <div className={styles.canvaswrap}>
-          <canvas ref={canvasRef} />
+          <canvas ref={canvasRef} onClick={onCanvasClick} onMouseMove={onCanvasMove} />
         </div>
         <div className={styles.transport}>
           <button className={`${styles.btn} ${styles.solar}`} onClick={playing ? stop : play}>
@@ -672,15 +837,64 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
 
         <div className={styles.fld}>
           <label>Eyebrow</label>
-          <input value={sc.eyebrow} onChange={(e) => patch(sel, { eyebrow: e.target.value })} />
+          <input
+            data-rfield="eyebrow"
+            value={sc.eyebrow}
+            onChange={(e) => patch(sel, { eyebrow: e.target.value })}
+          />
         </div>
         <div className={styles.fld}>
           <label>Headline — *word* for gold</label>
-          <textarea value={sc.headline} onChange={(e) => patch(sel, { headline: e.target.value })} />
+          <textarea
+            data-rfield="headline"
+            value={sc.headline}
+            onChange={(e) => patch(sel, { headline: e.target.value })}
+          />
         </div>
         <div className={styles.fld}>
           <label>Sub</label>
-          <textarea value={sc.sub} onChange={(e) => patch(sel, { sub: e.target.value })} />
+          <textarea
+            data-rfield="sub"
+            value={sc.sub}
+            onChange={(e) => patch(sel, { sub: e.target.value })}
+          />
+        </div>
+
+        <div className={styles.fld}>
+          <label>CTA button (optional)</label>
+          <div className={styles.ctaRow}>
+            <input
+              data-rfield="cta"
+              value={sc.cta || ''}
+              onChange={(e) => patch(sel, { cta: e.target.value })}
+              placeholder="e.g. Get a free survey"
+            />
+            <button className={styles.miniInline} onClick={saveCta} disabled={!(sc.cta || '').trim()}>
+              Save
+            </button>
+          </div>
+          <div className={styles.chips}>
+            {CTA_PRESETS.map((c) => (
+              <button key={c} className={styles.chip} onClick={() => patch(sel, { cta: c })}>
+                {c}
+              </button>
+            ))}
+            {ctaLibrary.map((c) => (
+              <span key={c.id} className={styles.chip}>
+                <button className={styles.chipMain} onClick={() => patch(sel, { cta: c.label })}>
+                  {c.label}
+                </button>
+                <button className={styles.chipX} onClick={() => deleteCta(c.id)} aria-label="Delete">
+                  ×
+                </button>
+              </span>
+            ))}
+            {sc.cta ? (
+              <button className={styles.chip} onClick={() => patch(sel, { cta: '' })}>
+                ✕ no button
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className={styles.fld}>
@@ -705,6 +919,20 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
                 onClick={() => patch(sel, { anim: a.k })}
               >
                 {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className={styles.fld}>
+          <label>Transition into this scene</label>
+          <div className={styles.seg}>
+            {TRANSITIONS.map((t) => (
+              <button
+                key={t.k}
+                className={(sc.transition || 'fade') === t.k ? styles.segon : ''}
+                onClick={() => patch(sel, { transition: t.k })}
+              >
+                {t.label}
               </button>
             ))}
           </div>
@@ -775,6 +1003,48 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
               </button>
               <button className={styles.btn} onClick={() => setGenOpen(false)}>
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REELS MODAL */}
+      {reelsOpen && (
+        <div className={styles.modal} onClick={() => setReelsOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setReelsOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Saved reels
+            </h2>
+            <p className={styles.msub}>
+              Reels save their scenes, format, text and CTAs (shared across the team). Uploaded video
+              clips and music aren&rsquo;t stored — re-add them after loading.
+            </p>
+            <div className={styles.reelList}>
+              {reels.length === 0 && <div className={styles.empty}>No saved reels yet.</div>}
+              {reels.map((r) => (
+                <div className={styles.reelRow} key={r.id}>
+                  <button className={styles.reelPick} onClick={() => loadReel(r.id)}>
+                    <b>{r.name}</b>
+                    <span>
+                      {r.size} · {new Date(r.updated_at).toLocaleDateString('en-GB')}
+                    </span>
+                  </button>
+                  <button className={styles.reelDel} onClick={() => deleteReel(r.id)}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className={styles.mrow}>
+              <button className={`${styles.btn} ${styles.solar}`} onClick={newReel}>
+                + New reel
+              </button>
+              <button className={styles.btn} onClick={() => setReelsOpen(false)}>
+                Close
               </button>
             </div>
           </div>
