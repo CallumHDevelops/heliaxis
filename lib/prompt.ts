@@ -2,8 +2,14 @@
 
 export const BRAND = `COMPANY: Heliaxis — an MCS-certified renewable energy installer based in Newport, South Wales, covering Cardiff, Newport and the surrounding valleys and coast.
 SERVICES: solar PV, battery storage, infrared & alternative heating, LED lighting, EV charging.
-WHAT SETS US APART: we survey before we quote and show the assumptions behind every figure; we give an honest "no" when something isn't worth doing; MCS-certified installs (so customers can access SEG export payments and eligible grants); a local, accountable team you can actually reach.
-CONTACT: heliaxis.co.uk · 01633 965205.`;
+WHAT SETS US APART: we survey before we quote and show the assumptions behind every figure; we give an honest "no" when something isn't worth doing; we are an MCS-certified installer, so the work is done to a recognised standard; a local, accountable team you can actually reach.
+CONTACT: heliaxis.co.uk · 01633 965205.
+
+MCS — GET THIS RIGHT (accuracy matters):
+- MCS (Microgeneration Certification Scheme) certifies INSTALLERS and PRODUCTS to a recognised quality standard. It is NOT a certificate awarded to an individual "install", and a homeowner does not become "certified".
+- Heliaxis is an MCS-certified installer; our installations are carried out to MCS standards.
+- Because the work is done by an MCS-certified installer, the customer can access the Smart Export Guarantee (SEG — payment for exported energy) and many grant schemes (most require an MCS-certified installer).
+- So MCS = quality assurance + eligibility for SEG and grants. Say "MCS-certified installer" or "installed to MCS standards" — never "certified install(s)".`;
 
 export const VOICE = `BRAND VOICE: confident, plain-spoken, benefit-led and honest. UK English spelling and idiom (colour, optimise, £, "whilst" sparingly). Numbers over adjectives. Short, active sentences. Write like a knowledgeable local installer who respects the reader's intelligence — never salesy.
 BANNED (do not use): hype and filler such as "revolutionary", "leading", "cutting-edge", "game-changing", "unlock", "supercharge", "seamless", "elevate", "harness the power of the sun", exclamation-stuffing and emoji-stuffing. Avoid clichés and vague superlatives.`;

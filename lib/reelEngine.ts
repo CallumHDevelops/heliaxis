@@ -287,73 +287,135 @@ export function drawSceneFrame(
     grid(ctx, W, H, 'rgba(33,31,24,.07)', Math.round(W / 17));
   }
 
+  const u = Math.min(W, H) / 1080;
   const pad = Math.round(Math.min(W, H) * 0.09);
   drawSpark(ctx, W - pad - 12, pad + 22, 44, accent);
 
   const x = pad;
-  let cy = H * (W >= H ? 0.36 : 0.44);
+  const subBright = hasMedia || isDark
+    ? 'rgba(247,242,231,0.87)'
+    : isGold
+      ? 'rgba(33,31,24,0.82)'
+      : 'rgba(33,31,24,0.78)';
   const pushZone = (f: string, zy: number, zh: number) => {
     if (zones) zones.push({ f, x: pad - 14 + ox, y: zy, w: W - pad * 2 + 28, h: zh });
   };
+
+  const eyebrowSize = Math.round(30 * u);
+  const subSize = Math.round(40 * u);
+  const subLH = Math.round(subSize * 1.38);
+  const gapEyeHead = Math.round(50 * u);
+  const gapHeadSub = Math.round(36 * u);
+  const gapSubCta = Math.round(38 * u);
+  const ruleGap = Math.round(18 * u);
+  const ruleH = Math.round(4 * u);
+  const eyebrowBlockH = scene.eyebrow ? eyebrowSize + ruleGap + ruleH : 0;
+  const ctaFont = Math.round(42 * u);
+  const ctaH = scene.cta ? Math.round(90 * u) : 0;
+
+  const footerY = H - pad; // footer baseline
+  const safeBottom = footerY - Math.round(52 * u);
+  const topLimit = pad + Math.round(110 * u);
+  const available = safeBottom - topLimit;
+
+  // sub lines (fixed size)
+  ctx.font = `500 ${subSize}px ${fam.body}, sans-serif`;
+  const subLines = scene.sub ? wrapPlain(ctx, scene.sub, (W - pad * 2) * 0.94) : [];
+  const subH = subLines.length * subLH;
+
+  // auto-fit the headline: shrink until it fits (<= 4 lines) within the safe area
+  let hSize = Math.round(100 * u);
+  const minH = Math.round(50 * u);
+  let hLines: { t: string; c: string }[][] = [];
+  let hLH = Math.round(hSize * 1.08);
+  const blockHeightFor = (headH: number) =>
+    eyebrowBlockH +
+    (scene.eyebrow ? gapEyeHead : 0) +
+    headH +
+    (subLines.length ? gapHeadSub + subH : 0) +
+    (scene.cta ? gapSubCta + ctaH : 0);
+  while (hSize >= minH) {
+    ctx.font = `900 ${hSize}px ${fam.display}, sans-serif`;
+    hLines = wrapRich(ctx, scene.headline, W - pad * 2, fg, accent);
+    hLH = Math.round(hSize * 1.08);
+    const headH = hLines.length * hLH;
+    if (hLines.length <= 4 && blockHeightFor(headH) <= available) break;
+    hSize -= 4;
+  }
+  const headH = hLines.length * hLH;
+  const blockH = blockHeightFor(headH);
+  let cy = Math.max(topLimit, safeBottom - blockH); // bottom-anchored, clamped
+
+  ctx.textBaseline = 'top';
 
   if (scene.eyebrow) {
     const e = settled ? 1 : ease(lt / 0.5);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
-    ctx.font = `600 30px ${fam.mono}, monospace`;
+    ctx.font = `600 ${eyebrowSize}px ${fam.mono}, monospace`;
     ctx.fillStyle = accent;
     ctx.fillText(scene.eyebrow.toUpperCase(), x + ex, cy + ey);
-    pushZone('eyebrow', cy - 30, 52);
-    cy += 70;
+    ctx.fillRect(x + ex, cy + eyebrowSize + ruleGap + ey, Math.round(60 * u), ruleH);
+    pushZone('eyebrow', cy, eyebrowSize + 12);
+    cy += eyebrowBlockH + gapEyeHead;
   }
-  if (scene.headline) {
+  {
     const e = settled ? 1 : ease((lt - 0.12) / 0.55);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
-    ctx.font = `900 98px ${fam.display}, sans-serif`;
-    const lines = wrapRich(ctx, scene.headline, W - pad * 2, fg, accent);
-    const hStart = cy + 96;
-    cy = fillRich(ctx, lines, x + ex, hStart + ey, 112);
-    pushZone('headline', hStart - 90, cy - hStart + 40);
+    ctx.font = `900 ${hSize}px ${fam.display}, sans-serif`;
+    const space = ctx.measureText(' ').width;
+    let yy = cy + ey;
+    for (const line of hLines) {
+      let lx = x + ex;
+      for (const wd of line) {
+        ctx.fillStyle = wd.c;
+        ctx.fillText(wd.t, lx, yy);
+        lx += ctx.measureText(wd.t).width + space;
+      }
+      yy += hLH;
+    }
+    pushZone('headline', cy, headH + 12);
+    cy += headH;
   }
-  if (scene.sub) {
+  if (subLines.length) {
+    cy += gapHeadSub;
     const e = settled ? 1 : ease((lt - 0.28) / 0.55);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
-    ctx.font = `400 42px ${fam.body}, sans-serif`;
-    ctx.fillStyle = subCol;
-    let yy = cy + 60;
-    const sStart = yy;
-    for (const l of wrapPlain(ctx, scene.sub, (W - pad * 2) * 0.96)) {
-      ctx.fillText(l, x + ex, yy + ey);
-      yy += 58;
+    ctx.font = `500 ${subSize}px ${fam.body}, sans-serif`;
+    ctx.fillStyle = subBright;
+    let yy = cy + ey;
+    for (const l of subLines) {
+      ctx.fillText(l, x + ex, yy);
+      yy += subLH;
     }
-    pushZone('sub', sStart - 40, yy - sStart + 20);
-    cy = yy;
+    pushZone('sub', cy, subH + 12);
+    cy += subH;
   }
   if (scene.cta) {
+    cy += gapSubCta;
     const e = settled ? 1 : ease((lt - 0.42) / 0.5);
     ctx.globalAlpha = alpha * e;
-    ctx.font = `700 42px ${fam.display}, sans-serif`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = `700 ${ctaFont}px ${fam.display}, sans-serif`;
     const label = scene.cta + '  →';
-    const tw = ctx.measureText(label).width;
-    const bw = tw + 64;
-    const bh = 88;
-    const byp = cy + 44 + (1 - e) * 18;
+    const bw = ctx.measureText(label).width + Math.round(64 * u);
     ctx.fillStyle = accent;
-    roundRect(ctx, x, byp, bw, bh, 12);
+    roundRect(ctx, x, cy, bw, ctaH, Math.round(12 * u));
     ctx.fill();
     ctx.fillStyle = isGold ? C.paper : C.ink;
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, x + 32, byp + bh / 2);
-    ctx.textBaseline = 'alphabetic';
-    if (zones) zones.push({ f: 'cta', x: x + ox, y: byp, w: bw, h: bh });
+    ctx.fillText(label, x + Math.round(32 * u), cy + ctaH / 2);
+    ctx.textBaseline = 'top';
+    if (zones) zones.push({ f: 'cta', x: x + ox, y: cy, w: bw, h: ctaH });
   }
+  ctx.textBaseline = 'alphabetic';
 
   ctx.globalAlpha = alpha;
-  ctx.font = `500 24px ${fam.mono}, monospace`;
+  ctx.font = `500 ${Math.round(24 * u)}px ${fam.mono}, monospace`;
   ctx.fillStyle = subCol;
-  ctx.fillText('HELIAXIS.CO.UK · 01633 965205', pad, H - pad);
+  ctx.fillText('HELIAXIS.CO.UK · 01633 965205', pad, footerY);
 
   ctx.restore();
 }
