@@ -217,7 +217,8 @@ export function drawSceneFrame(
   W: number,
   H: number,
   offsetX = 0,
-  zones?: ReelZone[]
+  zones?: ReelZone[],
+  settled = false
 ) {
   const dur = Math.max(0.2, scene.seconds);
   const isDark = scene.theme === 'dark';
@@ -296,7 +297,7 @@ export function drawSceneFrame(
   };
 
   if (scene.eyebrow) {
-    const e = ease(lt / 0.5);
+    const e = settled ? 1 : ease(lt / 0.5);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
     ctx.font = `600 30px ${fam.mono}, monospace`;
@@ -306,7 +307,7 @@ export function drawSceneFrame(
     cy += 70;
   }
   if (scene.headline) {
-    const e = ease((lt - 0.12) / 0.55);
+    const e = settled ? 1 : ease((lt - 0.12) / 0.55);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
     ctx.font = `900 98px ${fam.display}, sans-serif`;
@@ -316,7 +317,7 @@ export function drawSceneFrame(
     pushZone('headline', hStart - 90, cy - hStart + 40);
   }
   if (scene.sub) {
-    const e = ease((lt - 0.28) / 0.55);
+    const e = settled ? 1 : ease((lt - 0.28) / 0.55);
     const [ex, ey] = entrOffset(scene.anim, e);
     ctx.globalAlpha = alpha * e;
     ctx.font = `400 42px ${fam.body}, sans-serif`;
@@ -331,7 +332,7 @@ export function drawSceneFrame(
     cy = yy;
   }
   if (scene.cta) {
-    const e = ease((lt - 0.42) / 0.5);
+    const e = settled ? 1 : ease((lt - 0.42) / 0.5);
     ctx.globalAlpha = alpha * e;
     ctx.font = `700 42px ${fam.display}, sans-serif`;
     const label = scene.cta + '  →';
@@ -364,7 +365,8 @@ export function renderReel(
   mediaFor: (s: Scene) => SceneMedia | null,
   fam: ReelFonts,
   W: number,
-  H: number
+  H: number,
+  settled = false
 ): ReelZone[] {
   ctx.fillStyle = C.ink;
   ctx.fillRect(0, 0, W, H);
@@ -374,6 +376,12 @@ export function renderReel(
   const { i, lt } = sceneIndexAt(scenes, t);
   const durs = scenes.map((s) => Math.max(0.2, s.seconds));
   const incoming = scenes[i];
+
+  if (settled) {
+    // editing/scrubbing — show the fully composed scene (no entrance/transition)
+    drawSceneFrame(ctx, incoming, lt, fam, mediaFor(incoming), 1, W, H, 0, zones, true);
+    return zones;
+  }
 
   if (lt < TRANS && i > 0) {
     const p = ease(lt / TRANS);

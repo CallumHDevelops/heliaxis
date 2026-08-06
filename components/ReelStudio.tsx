@@ -77,6 +77,15 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   const [images, setImages] = useState<{ id: string; name: string; data_url: string }[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioName, setAudioName] = useState('');
+  const [audioAttribution, setAudioAttribution] = useState('');
+  const [musicOpen, setMusicOpen] = useState(false);
+  const [musicQ, setMusicQ] = useState('');
+  const [musicResults, setMusicResults] = useState<
+    { id: string; name: string; artist: string; duration: number; audio: string; license: string }[]
+  >([]);
+  const [musicBusy, setMusicBusy] = useState(false);
+  const [musicErr, setMusicErr] = useState('');
+  const previewRef = useRef<HTMLAudioElement | null>(null);
   const [exporting, setExporting] = useState(false);
   const [, force] = useState(0); // re-render when video metadata loads
   const [genOpen, setGenOpen] = useState(false);
@@ -155,7 +164,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     return null;
   }
 
-  function drawAt(t: number) {
+  function drawAt(t: number, animate = false) {
     const c = canvasRef.current;
     if (!c) return;
     const ctx = c.getContext('2d');
@@ -165,7 +174,16 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
       c.width = dim.w;
       c.height = dim.h;
     }
-    zonesRef.current = renderReel(ctx, scenesRef.current, t, mediaFor, famRef.current, dim.w, dim.h);
+    zonesRef.current = renderReel(
+      ctx,
+      scenesRef.current,
+      t,
+      mediaFor,
+      famRef.current,
+      dim.w,
+      dim.h,
+      !animate // settled when not animating (editing/scrubbing) so text/CTA show fully
+    );
   }
 
   function selectScene(i: number) {
@@ -413,7 +431,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     const { i } = sceneIndexAt(scenesRef.current, t);
     setSel((v) => (v === i ? v : i));
     syncVideos(t, true);
-    drawAt(t);
+    drawAt(t, true);
     requestAnimationFrame(tick);
   }
   function play() {
@@ -471,8 +489,53 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     r.onload = () => {
       setAudioUrl(r.result as string);
       setAudioName(file.name);
+      setAudioAttribution('');
     };
     r.readAsDataURL(file);
+  }
+  async function searchMusic() {
+    setMusicBusy(true);
+    setMusicErr('');
+    try {
+      const res = await fetch('/api/music?q=' + encodeURIComponent(musicQ));
+      const j = await res.json();
+      setMusicBusy(false);
+      if (!res.ok || j.error) {
+        setMusicErr(j.error || 'Search failed.');
+        return;
+      }
+      setMusicResults(j.tracks || []);
+    } catch {
+      setMusicBusy(false);
+      setMusicErr('Network error — please try again.');
+    }
+  }
+  function previewTrack(audio: string) {
+    if (!previewRef.current) previewRef.current = new Audio();
+    const a = previewRef.current;
+    a.src = audio;
+    a.currentTime = 0;
+    a.play().catch(() => {});
+  }
+  function stopPreview() {
+    if (previewRef.current) previewRef.current.pause();
+  }
+  async function useTrack(t: { name: string; artist: string; audio: string; license: string }) {
+    setMusicErr('');
+    try {
+      const res = await fetch('/api/music?audio=' + encodeURIComponent(t.audio));
+      if (!res.ok) throw new Error('load failed');
+      const blob = await res.blob();
+      setAudioUrl(URL.createObjectURL(blob));
+      setAudioName(`${t.name} — ${t.artist}`);
+      setAudioAttribution(
+        `Music: “${t.name}” by ${t.artist} (via Jamendo)${t.license ? ' · ' + t.license : ''}`
+      );
+      stopPreview();
+      setMusicOpen(false);
+    } catch {
+      setMusicErr('Could not load that track — try another.');
+    }
   }
   function onSceneVideo(file?: File) {
     if (!file) return;
@@ -580,7 +643,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
           const t = (performance.now() - t0) / 1000;
           const tt = Math.min(t, total);
           syncVideos(tt, true);
-          drawAt(tt);
+          drawAt(tt, true);
           if (t >= total) {
             resolve();
             return;
@@ -632,10 +695,9 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
           <button className={`${styles.btn} ${styles.solar}`} onClick={() => setGenOpen(true)}>
             <Spark size={12} /> Generate
           </button>
-          <label className={styles.upload}>
-            {audioName ? '♪ ' + audioName.slice(0, 16) : '♪ Add music'}
-            <input type="file" accept="audio/*" onChange={(e) => onAudio(e.target.files?.[0])} />
-          </label>
+          <button className={styles.upload} onClick={() => setMusicOpen(true)}>
+            {audioName ? '♪ ' + audioName.slice(0, 16) : '♪ Music'}
+          </button>
           <button
             className={styles.btn}
             onClick={() => {
@@ -1003,6 +1065,90 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
               </button>
               <button className={styles.btn} onClick={() => setGenOpen(false)}>
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MUSIC MODAL */}
+      {musicOpen && (
+        <div
+          className={styles.modal}
+          onClick={() => {
+            stopPreview();
+            setMusicOpen(false);
+          }}
+        >
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button
+              className={styles.mclose}
+              onClick={() => {
+                stopPreview();
+                setMusicOpen(false);
+              }}
+            >
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> Music
+            </h2>
+            <p className={styles.msub}>
+              Search royalty-free tracks (via Jamendo). Preview, then use — remember to credit the
+              artist in your caption. Or upload your own file below.
+            </p>
+            <div className={styles.ctaRow}>
+              <input
+                value={musicQ}
+                onChange={(e) => setMusicQ(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchMusic()}
+                placeholder="e.g. upbeat corporate, calm acoustic"
+              />
+              <button className={styles.miniInline} onClick={searchMusic} disabled={musicBusy}>
+                {musicBusy ? '…' : 'Search'}
+              </button>
+            </div>
+            {musicErr && <div className={styles.gstatus}>{musicErr}</div>}
+            <div className={styles.reelList} style={{ marginTop: 12 }}>
+              {musicResults.map((t) => (
+                <div className={styles.reelRow} key={t.id}>
+                  <button className={styles.reelPick} onClick={() => useTrack(t)}>
+                    <b>{t.name}</b>
+                    <span>
+                      {t.artist} · {Math.round(t.duration)}s
+                    </span>
+                  </button>
+                  <button
+                    className={styles.reelDel}
+                    onClick={() => previewTrack(t.audio)}
+                    title="Preview"
+                  >
+                    ▶
+                  </button>
+                </div>
+              ))}
+              {!musicBusy && musicResults.length === 0 && (
+                <div className={styles.empty}>Search for a mood or genre to start.</div>
+              )}
+            </div>
+            {audioAttribution && <div className={styles.hint}>{audioAttribution}</div>}
+            <div className={styles.mrow}>
+              <label className={styles.uploadDark} style={{ flex: 1 }}>
+                Upload your own file
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => onAudio(e.target.files?.[0])}
+                />
+              </label>
+              <button
+                className={`${styles.btn} ${styles.solar}`}
+                onClick={() => {
+                  stopPreview();
+                  setMusicOpen(false);
+                }}
+              >
+                Done
               </button>
             </div>
           </div>
