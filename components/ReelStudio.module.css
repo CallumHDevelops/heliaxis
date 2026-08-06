@@ -67,6 +67,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--paper);
+  background: none;
   border: 1px solid var(--line-d);
   border-radius: 2px;
   padding: 8px 12px;
