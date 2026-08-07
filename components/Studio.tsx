@@ -483,7 +483,13 @@ export default function Studio({
 
   function addBadge(icon: string, label: string) {
     if (!icon) return;
-    setS((s) => ({ ...s, badges: [...(s.badges || []), { icon, label: label.trim() }] }));
+    const clean = label.trim();
+    setS((s) => {
+      const existing = s.badges || [];
+      if (existing.some((b) => b.icon === icon && b.label.toLowerCase() === clean.toLowerCase()))
+        return s; // no duplicates
+      return { ...s, badges: [...existing, { icon, label: clean }] };
+    });
   }
   function removeBadge(i: number) {
     setS((s) => ({ ...s, badges: (s.badges || []).filter((_, j) => j !== i) }));

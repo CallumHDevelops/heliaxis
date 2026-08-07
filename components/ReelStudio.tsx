@@ -321,7 +321,10 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
     if (data) setBadgeLibrary(data as { id: string; icon: string; label: string }[]);
   }
   function addBadgeToScene(icon: string, label: string) {
-    patch(sel, { badges: [...(sc.badges || []), { icon, label }] });
+    const existing = sc.badges || [];
+    if (existing.some((b) => b.icon === icon && b.label.toLowerCase() === label.toLowerCase()))
+      return; // already on this scene
+    patch(sel, { badges: [...existing, { icon, label }] });
   }
   function removeBadgeFromScene(i: number) {
     patch(sel, { badges: (sc.badges || []).filter((_, k) => k !== i) });
