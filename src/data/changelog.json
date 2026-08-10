@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.4.3",
+    "date": "2026-07-07",
+    "type": "feature",
+    "title": "Image blocks: choose Fill or Fit",
+    "detail": "Media blocks now have a Fill (crop to frame) / Fit (show the whole image) toggle — ideal for logos and award badges that shouldn't be cropped."
+  },
+  {
     "version": "0.4.2",
     "date": "2026-07-07",
     "type": "fix",

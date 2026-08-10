@@ -536,7 +536,7 @@ function renderBlock(b,edit){
      return '<div class="qa2'+(edit&&i===0?' open':'')+'"><button type="button" class="q"><span class="ix">Q/'+num+'</span><span'+ce(id+'.items.'+i+'.q',edit)+'>'+esc(q.q)+'</span><span class="tog"></span></button><div class="a"'+(edit&&i===0?' style="max-height:none"':'')+'><p'+ce(id+'.items.'+i+'.a',edit)+'>'+esc(q.a)+'</p></div></div>';
    }).join('');
    return '<div class="pv-faq'+(edit?' is-edit':'')+'" id="'+esc(anchor)+'"><div class="wrap"><div class="shead center">'+eyebrow(feb,id+'.eyebrow',edit)+'<h2>'+accentText(ftl)+'</h2></div><div class="faq">'+qa+'</div></div></div>';}
-if(t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img'):'<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
+if(t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img',p.fit):'<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
    const ctaBtn=p.ctaDisabled?'':btn(p.cta,'solar',false,null,id+'.cta',edit,p.ctaHref||'#quote');
    const cols=p.textWide?(p.side==='left'?'0.75fr 1.25fr':'1.25fr 0.75fr'):'1fr 1fr';
    const tx='<div>'+eyebrow(p.eyebrow,id+'.eyebrow',edit)+'<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px">'+accentText(p.title)+'</h2><p style="color:var(--muted);margin-top:12px;line-height:1.6"'+ce(id+'.text',edit)+'>'+esc(p.text)+'</p>'+(ctaBtn?'<div class="pv-btnrow">'+ctaBtn+'</div>':'')+'</div>';
@@ -751,7 +751,7 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
      h+=chk('Interest field',p.fInterest!==false,id+'.fInterest')+(p.fInterest===false?'':txt('Interest label',p.interestLabel||'What are you interested in? (optional)',id+'.interestLabel')+txt('Interest placeholder',p.interestPh||'Solar, battery, heat pump, EV…',id+'.interestPh'));
      h+=txt('Submit button',p.btn||'Get my free quote',id+'.btn')+chk('Pulse button',p.pulse,id+'.pulse')+area('Trust footnote',p.footnote!=null?p.footnote:'No obligation and no pushy sales — we\'ll simply arrange a free survey.',id+'.footnote')+area('Legal note (optional)',p.legalNote||'',id+'.legalNote');
    }
- } else if(bt==='media'){h+=imagePicker(p.img,id+'.img')+'<div class="fld"><label>Image side</label><div class="seg"><button class="'+(p.side==='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'left\')">Left</button><button class="'+(p.side!=='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'right\')">Right</button></div></div>'+txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title')+'<div class="fld"><label>Text</label><textarea rows="5" oninput="updT(\''+id+'.text\',this.value)">'+esc(p.text)+'</textarea></div>'+chk('Wider text',!!p.textWide,id+'.textWide')+chk('Disable button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Button is hidden on the page.</div>':txt('Button',p.cta,id+'.cta')+routeFld('Button link / route',p.ctaHref||'#quote',id+'.ctaHref'));}
+ } else if(bt==='media'){h+=imagePicker(p.img,id+'.img')+'<div class="fld"><label>Image side</label><div class="seg"><button class="'+(p.side==='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'left\')">Left</button><button class="'+(p.side!=='left'?'on':'')+'" onclick="upd(\''+id+'.side\',\'right\')">Right</button></div></div>'+'<div class="fld"><label>Image fit</label><div class="seg"><button class="'+(p.fit!=='contain'?'on':'')+'" onclick="upd(\''+id+'.fit\',\'cover\')">Fill (crop)</button><button class="'+(p.fit==='contain'?'on':'')+'" onclick="upd(\''+id+'.fit\',\'contain\')">Fit (whole)</button></div></div>'+txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title')+'<div class="fld"><label>Text</label><textarea rows="5" oninput="updT(\''+id+'.text\',this.value)">'+esc(p.text)+'</textarea></div>'+chk('Wider text',!!p.textWide,id+'.textWide')+chk('Disable button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Button is hidden on the page.</div>':txt('Button',p.cta,id+'.cta')+routeFld('Button link / route',p.ctaHref||'#quote',id+'.ctaHref'));}
 else if(bt==='pricing'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.plans.forEach((pl,i)=>{h+='<div class="sub"><div class="sh"><b>Plan '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'plans\','+i+')">remove</button></div>'+txt('Name',pl.name,id+'.plans.'+i+'.name')+'<div class="row2">'+txt('Price',pl.price,id+'.plans.'+i+'.price')+txt('Per',pl.per,id+'.plans.'+i+'.per')+'</div>'+bulletsEd(id,'plans.'+i+'.feats',pl.feats)+txt('Button',pl.cta,id+'.plans.'+i+'.cta')+routeFld('Button link',pl.ctaHref||'#quote',id+'.plans.'+i+'.ctaHref')+chk('Highlight this plan',pl.hl,id+'.plans.'+i+'.hl')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'plans\',{name:\'Plan\',price:\'£0\',per:\'\',feats:[\'Feature\'],cta:\'Choose\',ctaHref:\'#quote\',hl:false})">+ Add plan</button>';}
  else if(bt==='steps'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Step '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Title',s.title,id+'.items.'+i+'.title')+area('Text',s.text,id+'.items.'+i+'.text')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'Step\',text:\'Detail.\'})">+ Add step</button>'+accentHint();}
  else if(bt==='casestudy'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((cs,i)=>{h+='<div class="sub"><div class="sh"><b>Card '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(cs.img,id+'.items.'+i+'.img')+txt('Location',cs.loc,id+'.items.'+i+'.loc')+txt('Title',cs.title,id+'.items.'+i+'.title')+'<div class="row2">'+txt('Stat',cs.stat,id+'.items.'+i+'.stat')+txt('Stat label',cs.statlabel,id+'.items.'+i+'.statlabel')+'</div></div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{img:\'\',loc:\'Town\',title:\'Project\',stat:\'0\',statlabel:\'Label\'})">+ Add card</button>'+accentHint();}
@@ -1011,7 +1011,8 @@ function featImgSrc(feat){
  return feat.img||'';
 }
 function pvImgClick(ev,path){ev.stopPropagation();const blockId=path.split('.')[0];if(blockId)selectBlock(blockId);editPlacementImgMeta(path);}
-function mediaImgCss(fx,fy,zoom){
+function mediaImgCss(fx,fy,zoom,fit){
+ if(fit==='contain')return 'object-fit:contain;object-position:center';
  fx=clampFocus(fx);fy=clampFocus(fy);
  // Always apply a small bleed scale so there is room to pan even at 100%
  var z=clampZoom(zoom)*1.2;
@@ -1059,12 +1060,12 @@ function imgTag(val,style,edit,path){
  return out;
 }
 /** Fixed 4:3 crop frame for Image + text — cover-fit with drag + zoom in edit mode. */
-function mediaFrameHtml(val,edit,path){
+function mediaFrameHtml(val,edit,path,fit){
  const m=imgResolve(val);
  if(!m.src)return '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
  const fx=clampFocus(m.focusX);const fy=clampFocus(m.focusY);const zoom=clampZoom(m.zoom);
  const alt=m.decorative?'':m.alt;
- const img='<img class="pv-media-frame-img" src="'+m.src+'" alt="'+esc(alt)+'"'+(m.decorative?' aria-hidden="true"':'')+(m.title?' title="'+esc(m.title)+'"':'')+' loading="'+esc(m.loading||'lazy')+'" decoding="async" style="'+mediaImgCss(fx,fy,zoom)+'">';
+ const img='<img class="pv-media-frame-img" src="'+m.src+'" alt="'+esc(alt)+'"'+(m.decorative?' aria-hidden="true"':'')+(m.title?' title="'+esc(m.title)+'"':'')+' loading="'+esc(m.loading||'lazy')+'" decoding="async" style="'+mediaImgCss(fx,fy,zoom,fit)+'">';
  const cap=m.caption?'<figcaption class="pv-media-frame-cap">'+esc(m.caption)+'</figcaption>':'';
  if(edit&&path){
   const zoomPct=Math.round(zoom*100);

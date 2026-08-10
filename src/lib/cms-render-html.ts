@@ -116,7 +116,7 @@ function clampZoom(n: unknown): number {
   return Math.max(1, Math.min(3, Math.round(v * 100) / 100));
 }
 
-function mediaFrameHtml(val: unknown): string {
+function mediaFrameHtml(val: unknown, fit?: unknown): string {
   const src = imgSrc(val);
   if (!src) {
     return '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
@@ -145,7 +145,9 @@ function mediaFrameHtml(val: unknown): string {
   const tx = ((50 - focusX) / 50) * maxShift;
   const ty = ((50 - focusY) / 50) * maxShift;
   const imgStyle =
-    `object-fit:cover;object-position:50% 50%;transform:translate(${tx}%,${ty}%) scale(${z});transform-origin:center center`;
+    fit === 'contain'
+      ? 'object-fit:contain;object-position:center'
+      : `object-fit:cover;object-position:50% 50%;transform:translate(${tx}%,${ty}%) scale(${z});transform-origin:center center`;
   const img =
     `<img class="pv-media-frame-img" src="${esc(src)}" alt="${esc(decorative ? '' : alt)}"` +
     (decorative ? ' aria-hidden="true"' : '') +
@@ -236,7 +238,7 @@ function renderBlock(b: LooseBlock): string {
 
   if (t === 'media') {
     const im = p.img
-      ? mediaFrameHtml(p.img)
+      ? mediaFrameHtml(p.img, p.fit)
       : '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
     const ctaBtn = p.ctaDisabled ? '' : btn(p.cta, 'solar', false, p.ctaHref || '#quote');
     const cols = p.textWide
