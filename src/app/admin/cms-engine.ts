@@ -763,7 +763,7 @@ else if(bt==='pricing'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Ti
  else if(bt==='steps'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Step '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Title',s.title,id+'.items.'+i+'.title')+area('Text',s.text,id+'.items.'+i+'.text')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'Step\',text:\'Detail.\'})">+ Add step</button>'+accentHint();}
  else if(bt==='casestudy'){h+=txt('Eyebrow',p.eyebrow,id+'.eyebrow')+accentArea('Title',p.title,id+'.title');p.items.forEach((cs,i)=>{h+='<div class="sub"><div class="sh"><b>Card '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(cs.img,id+'.items.'+i+'.img')+txt('Location',cs.loc,id+'.items.'+i+'.loc')+txt('Title',cs.title,id+'.items.'+i+'.title')+'<div class="row2">'+txt('Stat',cs.stat,id+'.items.'+i+'.stat')+txt('Stat label',cs.statlabel,id+'.items.'+i+'.statlabel')+'</div></div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{img:\'\',loc:\'Town\',title:\'Project\',stat:\'0\',statlabel:\'Label\'})">+ Add card</button>'+accentHint();}
  else if(bt==='clientbanner'){h+=accentArea('Heading',p.heading,id+'.heading')+chk('Dark theme',!!p.dark,id+'.dark');p.clients.forEach((c,i)=>{h+='<div style="display:flex;gap:5px;margin-bottom:5px"><input value="'+esc(c.name)+'" oninput="updArr2(\''+id+'\',\'clients\','+i+',\'name\',this.value)"><button class="rm" onclick="rmItem(\''+id+'\',\'clients\','+i+')">×</button></div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'clients\',{name:\'Client name\',img:\'\'})">+ Add client</button>';}
-  else if(bt==='accbanner'){h+=accentArea('Heading',p.heading,id+'.heading')+chk('Dark theme',!!p.dark,id+'.dark');p.items.forEach((c,i)=>{h+='<div class="sub"><div class="sh"><b>Accreditation '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(c.img,id+'.items.'+i+'.img')+txt('Name (alt text)',c.name,id+'.items.'+i+'.name')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{name:\'Accreditation\',img:\'\'})">+ Add accreditation</button>';}
+  else if(bt==='accbanner'){h+=accentArea('Heading',p.heading,id+'.heading')+chk('Dark theme',!!p.dark,id+'.dark');p.items.forEach((c,i)=>{h+='<div class="sub"><div class="sh"><b>Accreditation '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(c.img,id+'.items.'+i+'.img')+txt('Name (alt text)',c.name,id+'.items.'+i+'.name')+'</div>';});h+='<button class="miniadd" onclick="openGalleryImgPicker(\''+id+'\')">+ Add accreditations from library</button>'+'<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{name:\'Accreditation\',img:\'\'})">+ Add blank</button>';}
   else if(bt==='trustbar'){h+=txt('Logos',p.logos||'',id+'.logos')+'<div class="hint">Comma separated list of text logos (e.g. MCS, RECC, NICEIC).</div>'+txt('Rating text',p.rating||'',id+'.rating');}
  h+=spacingEd(id,p);
  return h;
@@ -1381,15 +1381,17 @@ function applyGalleryImgPick(){
  var blockId=_imgLibGalleryBlock;
  var bl=blockId?findBlock(blockId):null;
  var ids=imgSelIds();
- if(!bl||bl.t!=='gallery'||!ids.length)return;
+ if(!bl||!ids.length||(bl.t!=='gallery'&&bl.t!=='accbanner'))return;
  ids.forEach(function(id){
   var im=findLibImg(id);
   if(!im)return;
-  (bl.p.items=bl.p.items||[]).push({
-   img:{libId:id,src:'',alt:suggestAltFromName(im.name),title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1},
-   loc:'Location · kWp',
-   featured:false
-  });
+  var imgObj={libId:id,src:'',alt:suggestAltFromName(im.name),title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1};
+  bl.p.items=bl.p.items||[];
+  if(bl.t==='accbanner'){
+   bl.p.items.push({img:imgObj,name:im.name||'Accreditation'});
+  }else{
+   bl.p.items.push({img:imgObj,loc:'Location · kWp',featured:false});
+  }
  });
  closeImgLibModal();
  save();renderBuild();renderPreview();
@@ -1446,7 +1448,9 @@ function renderImgLibModalGrid(){
  if(footBtn){
   var n=imgSelCount();
   if(_imgLibGalleryBlock){
-   footBtn.textContent='Add frames'+(n?' ('+n+')':'');
+   var _tgtBl=findBlock(_imgLibGalleryBlock);
+   var _addLbl=(_tgtBl&&_tgtBl.t==='accbanner')?'Add accreditations':'Add frames';
+   footBtn.textContent=_addLbl+(n?' ('+n+')':'');
    footBtn.disabled=!n;
    footBtn.style.opacity=n?'':'0.45';
   }else if(_imgLibMulti&&path){
