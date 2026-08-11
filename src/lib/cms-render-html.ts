@@ -116,7 +116,7 @@ function clampZoom(n: unknown): number {
   return Math.max(1, Math.min(3, Math.round(v * 100) / 100));
 }
 
-function mediaFrameHtml(val: unknown): string {
+function mediaFrameHtml(val: unknown, fit?: unknown): string {
   const src = imgSrc(val);
   if (!src) {
     return '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
@@ -145,7 +145,9 @@ function mediaFrameHtml(val: unknown): string {
   const tx = ((50 - focusX) / 50) * maxShift;
   const ty = ((50 - focusY) / 50) * maxShift;
   const imgStyle =
-    `object-fit:cover;object-position:50% 50%;transform:translate(${tx}%,${ty}%) scale(${z});transform-origin:center center`;
+    fit === 'contain'
+      ? 'object-fit:contain;object-position:center'
+      : `object-fit:cover;object-position:50% 50%;transform:translate(${tx}%,${ty}%) scale(${z});transform-origin:center center`;
   const img =
     `<img class="pv-media-frame-img" src="${esc(src)}" alt="${esc(decorative ? '' : alt)}"` +
     (decorative ? ' aria-hidden="true"' : '') +
@@ -204,30 +206,14 @@ function renderBlock(b: LooseBlock): string {
       !p.hideMicrotrust && mt.trim()
         ? `<p class="microtrust">${esc(mt)}</p>`
         : '';
-    const rtVal =
-      p.ratingValue != null && String(p.ratingValue).trim() !== ''
-        ? String(p.ratingValue)
-        : '4.9';
-    const rtStars = Math.max(1, Math.min(5, Number(p.ratingStars) || 5));
-    const rtPlat =
-      p.ratingPlatform != null ? String(p.ratingPlatform) : 'Google & Trustpilot';
-    const rtInst =
-      p.ratingInstalls != null && String(p.ratingInstalls).trim() !== ''
-        ? String(p.ratingInstalls)
-        : '1200';
-    const rtSuf =
-      p.ratingInstallsSuffix != null ? String(p.ratingInstallsSuffix) : '+';
-    const rtLab =
-      p.ratingInstallsLabel != null
-        ? String(p.ratingInstallsLabel)
-        : 'installs across South Wales';
+    const rtVal = String(p.ratingValue || '4.9');
+    const rtInst = String(p.ratingInstalls || '1200');
     const rthtml = !p.hideRating
-      ? `<div class="rating"><div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">${esc('★'.repeat(rtStars))}</span><span>${esc(rtPlat)}</span></div><div class="r"><span class="big"><span>${esc(rtInst)}</span><span>${esc(rtSuf)}</span></span><span>${esc(rtLab)}</span></div></div>`
+      ? `<div class="rating"><div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">★★★★★</span><span>Google &amp; Trustpilot</span></div><div class="r"><span class="big"><span>${esc(rtInst)}</span>+</span><span>installs across South Wales</span></div></div>`
       : '';
-    const eyebrowHtml =
-      !p.hideEyebrow && p.eyebrow && String(p.eyebrow).trim()
-        ? `<span class="eyebrow on-dark">${p.hideEyebrowSpark ? '' : SPARK.replace('<svg ', '<svg class="spark-ico" ')}<span class="eyebrow-txt">${esc(p.eyebrow)}</span></span>`
-        : '';
+    const eyebrowHtml = p.eyebrow
+      ? `<span class="eyebrow on-dark">${SPARK.replace('<svg ', '<svg class="spark-ico" ')}${esc(p.eyebrow)}</span>`
+      : '';
     let markHtml = '';
     if (!hideMark) {
       if (p.markImg) {
@@ -252,7 +238,7 @@ function renderBlock(b: LooseBlock): string {
 
   if (t === 'media') {
     const im = p.img
-      ? mediaFrameHtml(p.img)
+      ? mediaFrameHtml(p.img, p.fit)
       : '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
     const ctaBtn = p.ctaDisabled ? '' : btn(p.cta, 'solar', false, p.ctaHref || '#quote');
     const cols = p.textWide
@@ -263,7 +249,7 @@ function renderBlock(b: LooseBlock): string {
     const tx =
       `<div>${eyebrow(p.eyebrow)}` +
       `<h2 style="font-size:clamp(1.5rem,2.6vw,2.1rem);font-weight:700;margin-top:10px">${accentText(p.title)}</h2>` +
-      `<p style="color:var(--muted);margin-top:12px;line-height:1.6">${esc(p.text).replace(/\n/g, '<br>')}</p>` +
+      `<p style="color:var(--muted);margin-top:12px;line-height:1.6">${esc(p.text)}</p>` +
       (ctaBtn ? `<div class="pv-btnrow">${ctaBtn}</div>` : '') +
       '</div>';
     return `<div class="pv-media is-blog" style="display:grid;grid-template-columns:${cols};gap:34px;align-items:center">${p.side === 'left' ? im + tx : tx + im}</div>`;
@@ -301,29 +287,10 @@ function renderBlock(b: LooseBlock): string {
         return `<div><h4>${esc(col.title || '')}</h4>${links}</div>`;
       })
       .join('');
-    let badgesHtml = '';
-    if (!p.hideBadges) {
-      const badges = Array.isArray(p.badges) ? (p.badges as Array<{ name?: string; libId?: string; src?: string }>) : [];
-      const badgeItems = badges
-        .map((b) => {
-          const src = imgSrc(b);
-          const nm = b?.name || 'Accreditation';
-          if (!src) return b?.name ? `<span class="pv-footer-badge is-text">${esc(nm)}</span>` : '';
-          return `<span class="pv-footer-badge"><img src="${esc(src)}" alt="${esc(nm)}"></span>`;
-        })
-        .filter(Boolean)
-        .join('');
-      if (badgeItems) {
-        const blab = p.badgesLabel != null ? String(p.badgesLabel) : 'Accreditations';
-        badgesHtml =
-          `<div class="pv-footer-badges">${blab ? `<div class="pv-footer-badges-label">${esc(blab)}</div>` : ''}` +
-          `<div class="pv-footer-badges-row">${badgeItems}</div></div>`;
-      }
-    }
     const siteHref = String(p.siteHref || 'https://heliaxis.co.uk');
     return (
       `<footer class="pv-footer"><div class="wrap"><div class="cols"><div class="pv-footer-brand">${brand}` +
-      `<p class="pv-footer-about">${esc(p.about)}</p>${badgesHtml}</div>${colHtml}</div>` +
+      `<p class="pv-footer-about">${esc(p.about)}</p></div>${colHtml}</div>` +
       `<div class="base"><span>${esc(p.copyright)}</span><a href="${esc(siteHref)}" class="pv-footer-url">${esc(p.siteUrl || 'heliaxis.co.uk')}</a></div></div></footer>`
     );
   }
@@ -414,7 +381,7 @@ function renderBlock(b: LooseBlock): string {
     const pts = points
       .map(
         (pt) =>
-          `<div class="pv-pt"><span class="ic">${QUOTE_CHECK_SVG}</span><div><b>${esc(pt.title)}</b><span>${esc(pt.text).replace(/\n/g, '<br>')}</span></div></div>`,
+          `<div class="pv-pt"><span class="ic">${QUOTE_CHECK_SVG}</span><div><b>${esc(pt.title)}</b><span>${esc(pt.text)}</span></div></div>`,
       )
       .join('');
     let callBox = '';
@@ -535,7 +502,7 @@ function renderBlock(b: LooseBlock): string {
       .join('');
     let body =
       items.length > 3
-        ? `<div class="pv-tmarquee"><div class="trk" style="animation-duration:${Number(p.speed) || 36}s"><div class="pv-tset">${cards}</div><div class="pv-tset" aria-hidden="true">${cards}</div></div></div>`
+        ? `<div class="pv-tmarquee"><div class="trk" style="animation-duration:${Number(p.speed) || 36}s">${cards}${cards}</div></div>`
         : `<div class="tgrid">${cards}</div>`;
     const fnHtml = fn ? `<p class="pv-testi-note">${esc(fn)}</p>` : '';
     return (
@@ -624,7 +591,7 @@ function renderBlock(b: LooseBlock): string {
     const cards = items
       .map(
         (it) =>
-          `<div class="fcard"><h3>${accentText(it.title)}</h3><p>${esc(it.text).replace(/\n/g, '<br>')}</p></div>`,
+          `<div class="fcard"><h3>${accentText(it.title)}</h3><p>${esc(it.text)}</p></div>`,
       )
       .join('');
     const subHtml = fsub ? `<p>${esc(fsub)}</p>` : '';
@@ -635,38 +602,6 @@ function renderBlock(b: LooseBlock): string {
     return (
       `<div class="pv-funding"><div class="pv-funding-glow"></div><div class="wrap"><div class="shead">${eyebrow(feb, true)}<h2>${accentText(ftl)}</h2>${subHtml}</div><div class="fgrid" style="grid-template-columns:repeat(${cols},1fr)">${cards}</div>${ctaHtml}</div></div>`
     );
-  }
-
-  if (t === 'clientbanner') {
-    const cs = Array.isArray(p.clients) ? (p.clients as Array<{ name?: string; img?: unknown }>) : [];
-    if (!cs.length) return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"></div></div></div>`;
-    const chip = (c: { name?: string; img?: unknown }) => {
-      const src = imgSrc(c.img);
-      return `<span class="pv-brand">${src ? `<img src="${esc(src)}" alt="${esc(c.name)}">` : esc(c.name)}</span>`;
-    };
-    let cset = cs.map(chip).join('');
-    let cn = cs.length;
-    while (cn < 10) {
-      cset += cs.map(chip).join('');
-      cn += cs.length;
-    }
-    return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"><div class="pv-bset">${cset}</div><div class="pv-bset" aria-hidden="true">${cset}</div></div></div></div>`;
-  }
-
-  if (t === 'accbanner') {
-    const is = Array.isArray(p.items) ? (p.items as Array<{ name?: string; img?: unknown }>) : [];
-    if (!is.length) return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"></div></div></div>`;
-    const chip = (c: { name?: string; img?: unknown }) => {
-      const src = imgSrc(c.img);
-      return `<span class="pv-brand">${src ? `<img src="${esc(src)}" alt="${esc(c.name)}" style="height:40px;width:auto;object-fit:contain">` : esc(c.name)}</span>`;
-    };
-    let iset = is.map(chip).join('');
-    let inum = is.length;
-    while (inum < 10) {
-      iset += is.map(chip).join('');
-      inum += is.length;
-    }
-    return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"><div class="pv-bset">${iset}</div><div class="pv-bset" aria-hidden="true">${iset}</div></div></div></div>`;
   }
 
   return '';
