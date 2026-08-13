@@ -1,7 +1,9 @@
 /* Header.module.css — Heliaxis mega menu.
    Brand CSS variables (--ink, --solar, etc.) come from the .site scope in site.css. */
 
-.header { position: sticky; top: 0; z-index: 60; }
+.header { position: sticky; top: 0; z-index: 60; transition: box-shadow 0.25s ease; }
+/* Elevate once scrolled so the sticky bar reads as floating over the content. */
+.header.scrolled { box-shadow: 0 10px 30px -18px rgba(33, 31, 24, 0.55); }
 
 /* utility top bar */
 .topbar {
