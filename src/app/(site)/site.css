@@ -30,3 +30,15 @@
   line-height: 1.02;
   margin: 0;
 }
+
+/* CMS prose: honour author line breaks. Editors write body copy with Enter /
+   textarea newlines; default white-space collapses those, so paragraphs render
+   as one run-on block. `pre-line` keeps the line breaks while still wrapping and
+   collapsing runs of spaces. Scoped to CMS page bodies so hand-built React
+   sections are unaffected. Higher specificity (.site …) beats the published CSS
+   snapshot regardless of cascade order, so it also fixes already-published pages
+   where the newlines are already stored. */
+.site .pv-page p,
+.site .pv-page .lead,
+.site .pv-page blockquote,
+.site .pv-pt span { white-space: pre-line; }

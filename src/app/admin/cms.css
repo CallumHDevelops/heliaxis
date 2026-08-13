@@ -562,6 +562,9 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-quote .pv-pt .ic svg{width:22px;height:22px;stroke-width:1.7}
 .pv-quote .pv-pt b{font-family:var(--display);font-size:1.02rem;display:block}
 .pv-quote .pv-pt span{color:var(--muted);font-size:.92rem}
+/* WYSIWYG parity: honour author line breaks in body copy while editing, matching
+   the live site rule in site.css. Scoped to the preview so editor chrome is untouched. */
+#preview p,#preview .lead,#preview blockquote,#preview .pv-pt span{white-space:pre-line}
 .pv-quote .pv-callnow{margin-top:24px;padding:18px 20px;border:1px solid var(--line);border-radius:3px;background:var(--card);display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .pv-quote .pv-call-lbl{font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .pv-quote .pv-callnow .tel{font-family:var(--display);font-weight:900;font-size:1.4rem;color:var(--ink);text-decoration:none}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { MenuTop } from '@/lib/menu-types';
 import styles from './Header.module.css';
@@ -137,7 +137,22 @@ export default function Header({ menu }: { menu?: MenuTop[] }) {
   const [open, setOpen] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileExpand, setMobileExpand] = useState<number | null>(null);
+  const [scrolled, setScrolled] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sentinel = useRef<HTMLDivElement | null>(null);
+
+  // Elevate the sticky header once the page scrolls past the very top. A zero-height
+  // sentinel + IntersectionObserver avoids attaching a scroll listener (no jank).
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      ([entry]) => setScrolled(!entry.isIntersecting),
+      { rootMargin: '0px', threshold: 0 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const show = (i: number) => {
     if (timer.current) clearTimeout(timer.current);
@@ -154,7 +169,10 @@ export default function Header({ menu }: { menu?: MenuTop[] }) {
   );
 
   return (
-    <header className={styles.header}>
+    <>
+      {/* scroll sentinel: sits at the very top so the header knows when it's stuck */}
+      <div ref={sentinel} aria-hidden style={{ position: 'absolute', top: 0, height: 1, width: 1 }} />
+      <header className={`${styles.header}${scrolled ? ` ${styles.scrolled}` : ''}`}>
       {/* utility top bar */}
       <div className={styles.topbar}>
         <div className={styles.wrap}>
@@ -308,6 +326,7 @@ export default function Header({ menu }: { menu?: MenuTop[] }) {
           </Link>
         </div>
       )}
-    </header>
+      </header>
+    </>
   );
 }
