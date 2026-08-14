@@ -1152,11 +1152,73 @@
   cursor: default;
 }
 
-@media (max-width: 1100px) {
+/* ---- tablet / mobile: stack the columns, canvas on top ---- */
+@media (max-width: 1024px) {
   .app {
-    grid-template-columns: 300px 1fr;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .bar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 52px;
+    padding: 8px 12px;
+    gap: 6px 8px;
+    position: sticky;
+    top: 0;
+    z-index: 60;
+  }
+  .rt {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .btn {
+    font-size: 0.78rem;
+    padding: 7px 10px;
+  }
+  .stage {
+    order: 1;
+    padding: 14px;
+    min-height: 0;
+  }
+  .panel {
+    order: 2;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    overflow: visible;
   }
   .panel.right {
+    order: 3;
+    display: block;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .canvaswrap,
+  .canvaswrap canvas {
+    max-height: 60vh;
+  }
+  .previewFloat {
     display: none;
+  }
+}
+@media (max-width: 560px) {
+  .modalbox {
+    padding: 22px 18px;
+  }
+  .iconGrid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .logoGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .tgrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .mrow {
+    flex-wrap: wrap;
   }
 }
