@@ -31,3 +31,18 @@ export type MenuTop = {
   cols?: MenuCol[];
   featured?: MenuFeatured;
 };
+
+export type SiteTopbar = {
+  /** Show/hide the whole top bar. */
+  show: boolean;
+  /** Left-hand accreditations line. */
+  accreditationText: string;
+  /** Rating value shown after the stars, e.g. "4.9". */
+  ratingValue: string;
+  /** Opening hours, e.g. "Mon–Sat 8am–6pm". */
+  hoursText: string;
+  /** Phone number as displayed, e.g. "01633 965205". */
+  phone: string;
+  /** Phone link, e.g. "tel:01633965205". */
+  phoneHref: string;
+};

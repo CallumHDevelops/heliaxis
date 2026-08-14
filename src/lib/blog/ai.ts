@@ -4,7 +4,7 @@ import { cmsArticleAiSchema, type CmsArticleAi } from './cms-article-template';
 export const generatedPostSchema = cmsArticleAiSchema;
 export type GeneratedPost = CmsArticleAi;
 
-function aiConfig() {
+export function aiConfig() {
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
   const baseUrl = (
     process.env.OPENAI_API_BASE_URL ||
