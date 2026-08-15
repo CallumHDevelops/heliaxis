@@ -2105,7 +2105,11 @@ function toPublicBlogSlug(raw){
   rest=(rest||'article').replace(/^-+/,'')||'article';
   return normSlug('/blog/'+rest);
 }
-function pageSlugTaken(slug,exceptIdx){var k=normSlug(slug);if(!k)return false;if(k==='/blog'||k==='/admin'||k.indexOf('/admin/')===0)return true;for(var i=0;i<STATE.pages.length;i++){if(i===exceptIdx)continue;if(normSlug(STATE.pages[i].slug)===k)return true;}return false;}
+/* Real filesystem routes that a CMS slug must NOT claim — otherwise Next resolves
+   the static route ahead of the [...slug] catch-all and the CMS page is silently
+   shadowed. Keep in sync with src/app/(site)/* and the top-level auth pages. */
+var RESERVED_SLUGS=['/commercial-funding','/solar-estimator','/roof-designer','/warehousing','/updates','/newport-net-zero-grant','/preview','/login','/register','/pending','/branding','/subcontractor-form'];
+function pageSlugTaken(slug,exceptIdx){var k=normSlug(slug);if(!k)return false;if(k==='/blog'||k==='/admin'||k.indexOf('/admin/')===0)return true;if(RESERVED_SLUGS.indexOf(k)!==-1)return true;for(var i=0;i<STATE.pages.length;i++){if(i===exceptIdx)continue;if(normSlug(STATE.pages[i].slug)===k)return true;}return false;}
 function uniquePageSlug(base,exceptIdx){base=normSlug(base);if(base==='/')return '/';if(!pageSlugTaken(base,exceptIdx))return base;var n=2;while(pageSlugTaken(base+'-'+n,exceptIdx))n++;return base+'-'+n;}
 function ensureUniquePageSlugs(){var changed=false;for(var i=0;i<STATE.pages.length;i++){var pg=STATE.pages[i];var cur=normSlug(pg.slug);if(cur==='/'&&!pageSlugTaken('/',i)){if(pg.slug!=='/'){pg.slug='/';pg.seo=pg.seo||{};pg.seo.slug='/';changed=true;}continue;}if(cur==='/'&&pageSlugTaken('/',i)){var next=uniquePageSlug(titleToSlug(pg.name||'page'),i);if(next==='/')next=uniquePageSlug('/page',i);pg.slug=next;pg.seo=pg.seo||{};pg.seo.slug=next;changed=true;continue;}if(!pageSlugTaken(cur,i)){if(pg.slug!==cur){pg.slug=cur;pg.seo=pg.seo||{};pg.seo.slug=cur;changed=true;}continue;}var fixed=uniquePageSlug(cur,i);pg.slug=fixed;pg.seo=pg.seo||{};pg.seo.slug=fixed;changed=true;}return changed;}
 /** Repair AI-blog paths mangled to `/blog-foo` or `/blog/-foo`. */

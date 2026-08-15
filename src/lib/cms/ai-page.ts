@@ -135,6 +135,38 @@ export function normalizeBlocks(rawBlocks: unknown): CmsBlock[] {
   return out;
 }
 
+/** Best-effort repair for a JSON object truncated by the model's output cap:
+ *  close an open string, drop a dangling comma / valueless key, and balance the
+ *  open braces/brackets. The result parses to the sections that DID complete
+ *  (normalizeBlocks then keeps only the valid ones) instead of failing outright. */
+function repairTruncatedJson(s: string): string {
+  const start = s.indexOf('{');
+  const body = start > 0 ? s.slice(start) : s;
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') stack.pop();
+  }
+  let out = body;
+  if (esc) out = out.slice(0, -1); // dangling escape char
+  if (inStr) out += '"'; // close an open string
+  out = out.replace(/,\s*$/, ''); // trailing comma
+  out = out.replace(/:\s*$/, ':null'); // key with no value yet
+  out = out.replace(/,\s*$/, '');
+  for (let i = stack.length - 1; i >= 0; i--) out += stack[i];
+  return out;
+}
+
 function extractJson(text: string): unknown {
   const trimmed = String(text || '').trim();
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -142,10 +174,22 @@ function extractJson(text: string): unknown {
   try {
     return JSON.parse(raw);
   } catch {
-    // Strong models sometimes wrap JSON in prose — pull out the first {...} object.
-    const start = raw.indexOf('{');
-    const end = raw.lastIndexOf('}');
-    if (start !== -1 && end > start) return JSON.parse(raw.slice(start, end + 1));
+    /* fall through */
+  }
+  // Strong models sometimes wrap JSON in prose — pull out the first {...} object.
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try {
+      return JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      /* fall through */
+    }
+  }
+  // Last resort: repair a truncated (over-cap) completion.
+  try {
+    return JSON.parse(repairTruncatedJson(raw));
+  } catch {
     throw new Error('AI returned unparseable JSON');
   }
 }
@@ -289,7 +333,7 @@ export async function generatePage(
   const { apiKey, baseUrl } = aiConfig();
   if (!apiKey) throw new Error('AI is not configured. Set OPENROUTER_API_KEY (or AI_API_KEY).');
 
-  const topic = String(prompt || '').trim();
+  const topic = String(prompt || '').trim().slice(0, 4000);
   const ctx = String(context || '').trim().slice(0, 2000);
   const research = await researchTopic(topic);
 
