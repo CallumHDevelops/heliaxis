@@ -1,7 +1,7 @@
 import 'server-only';
 import { unstable_noStore as noStore } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { MenuCol, MenuFeatured, MenuTop } from '@/lib/menu-types';
+import type { MenuCol, MenuFeatured, MenuTop, SiteTopbar } from '@/lib/menu-types';
 
 // Published snapshot is preferred; draft is a fallback so a fresh install still
 // shows the menu after Save (before the first Publish).
@@ -95,6 +95,60 @@ export async function getPublishedMenu(): Promise<MenuTop[] | null> {
       if (mapped?.length) return mapped;
     }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+function topbarFromKvValue(raw: unknown): SiteTopbar | null {
+  if (raw == null) return null;
+  try {
+    const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const tb = (state as { site?: { topbar?: unknown } })?.site?.topbar as
+      | Partial<SiteTopbar>
+      | undefined;
+    if (!tb || typeof tb !== 'object') return null;
+    return {
+      show: tb.show !== false,
+      accreditationText: String(tb.accreditationText ?? ''),
+      ratingValue: String(tb.ratingValue ?? ''),
+      hoursText: String(tb.hoursText ?? ''),
+      phone: String(tb.phone ?? ''),
+      phoneHref: String(tb.phoneHref ?? ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load the header top-bar settings for the public Header from Supabase.
+ * Prefers the published CMS doc; falls back to the draft if nothing is published
+ * yet. Returns null when no topbar has been authored (Header then uses its
+ * built-in defaults).
+ */
+export async function getPublishedTopbar(): Promise<SiteTopbar | null> {
+  noStore();
+  try {
+    const admin = createAdminClient();
+    // Once a published CMS doc exists, trust ONLY it — never let unpublished draft
+    // edits reach the public Header (the top-bar editor saves draft-only until
+    // Publish). On a doc that predates this feature the topbar is absent → null →
+    // Header falls back to DEFAULT_TOPBAR until the first re-publish writes it.
+    const { data: pub } = await admin
+      .from('cms_kv')
+      .select('value')
+      .eq('key', PUBLISHED_KEY)
+      .maybeSingle();
+    if (pub?.value != null) return topbarFromKvValue(pub.value);
+    // No published doc at all (fresh install, pre-first-publish-ever): the draft is
+    // the only source, mirroring getPublishedMenu's fallback.
+    const { data: draft } = await admin
+      .from('cms_kv')
+      .select('value')
+      .eq('key', DRAFT_KEY)
+      .maybeSingle();
+    return topbarFromKvValue(draft?.value);
   } catch {
     return null;
   }

@@ -226,10 +226,38 @@ function renderBlock(b: LooseBlock): string {
       }
     }
     const sunHtml = wide || p.hideSun ? '' : '<div class="sun"></div>';
-    const heroCls = `hero${wide ? ' wide' : ''}${hideMark ? ' no-mark' : ''}`;
+    const bgSrc = imgSrc(p.bgImg);
+    let bgHtml = '';
+    if (bgSrc) {
+      let bfx = 50;
+      let bfy = 50;
+      let bz = 1;
+      if (typeof p.bgImg === 'object' && p.bgImg) {
+        const bm = p.bgImg as Record<string, unknown>;
+        bfx = clampFocus(bm.focusX);
+        bfy = clampFocus(bm.focusY);
+        bz = clampZoom(bm.zoom);
+      }
+      const z = bz * 1.2;
+      const maxShift = ((1 - 1 / z) / 2) * 100;
+      const tx = ((50 - bfx) / 50) * maxShift;
+      const ty = ((50 - bfy) / 50) * maxShift;
+      const bgStyle = `object-fit:cover;object-position:50% 50%;transform:translate(${tx}%,${ty}%) scale(${z});transform-origin:center center`;
+      let ov = 62;
+      // Match the client guard (cms-engine.ts): a literal null must fall through
+      // to the 62 default, not become Number(null)===0 → a near-transparent scrim.
+      if (p.bgOverlay != null && Number.isFinite(Number(p.bgOverlay))) {
+        ov = Math.max(0, Math.min(100, Number(p.bgOverlay)));
+      }
+      const scrimOp = (0.4 + 0.6 * (ov / 100)).toFixed(3);
+      bgHtml =
+        `<div class="hero-bg"><img class="hero-bg-img" src="${esc(bgSrc)}" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="async" style="${bgStyle}">` +
+        `<div class="hero-bg-scrim" style="opacity:${scrimOp}"></div><div class="hero-bg-hatch" aria-hidden="true"></div></div>`;
+    }
+    const heroCls = `hero${wide ? ' wide' : ''}${hideMark ? ' no-mark' : ''}${bgSrc ? ' has-bg' : ''}`;
     const wrapCls = `wrap${hideMark ? ' is-single' : ''}`;
     return (
-      `<section class="${heroCls}" id="top"><div class="glow"></div>${sunHtml}<div class="${wrapCls}"><div class="hero-copy">` +
+      `<section class="${heroCls}" id="top">${bgHtml}<div class="glow"></div>${sunHtml}<div class="${wrapCls}"><div class="hero-copy">` +
       heroTags(p.tags) +
       eyebrowHtml +
       `<h1>${accentText(p.headline)}</h1>${sub}${btnrow}${mthtml}${rthtml}</div>${markHtml}</div></section>`
@@ -634,6 +662,121 @@ function renderBlock(b: LooseBlock): string {
       inum += is.length;
     }
     return `<div class="pv-banner${p.dark ? ' dk' : ''}"><div class="bh">${accentText(p.heading)}</div><div class="pv-bmarq"><div class="trk"><div class="pv-bset">${iset}</div><div class="pv-bset" aria-hidden="true">${iset}</div></div></div></div>`;
+  }
+
+  if (t === 'grid') {
+    const items = Array.isArray(p.items)
+      ? (p.items as Array<{ icon?: string; title?: string; desc?: string }>)
+      : [];
+    const cols = Number(p.cols) || 3;
+    const anchor =
+      p.anchor && String(p.anchor).trim()
+        ? ` id="${esc(String(p.anchor).trim().replace(/[^a-zA-Z0-9_-]/g, ''))}"`
+        : '';
+    // Known limitation: this server path is only the scheduled-publish FALLBACK
+    // (used when no client-rendered HTML exists). It renders a generic icon stub
+    // rather than the per-item duotone glyph — the client engine owns the full icon
+    // set, and the mainstream publish path serves the client-rendered HTML with the
+    // real icons, so live pages are unaffected.
+    const card = (it: { icon?: string; title?: string; desc?: string }) =>
+      `<div class="pv-card"><span class="ic">${iconStub(22)}</span><h3>${accentText(it.title)}</h3><p>${esc(it.desc)}</p></div>`;
+    let inner = '';
+    if (p.fill === 'balance') {
+      inner =
+        '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px">' +
+        items
+          .map(
+            (it) =>
+              `<div class="pv-card" style="flex:0 1 calc(${100 / cols}% - 14px);min-width:220px"><span class="ic">${iconStub(22)}</span><h3>${accentText(it.title)}</h3><p>${esc(it.desc)}</p></div>`,
+          )
+          .join('') +
+        '</div>';
+    } else {
+      let extra = '';
+      const rem = items.length % cols;
+      if (rem !== 0 && p.fill === 'contact') {
+        const gap = cols - rem;
+        extra =
+          `<div class="pv-card pv-contact" style="grid-column:span ${gap}"><h3>${accentText(p.contactHeading || 'Get in touch')}</h3><p>${esc(p.contactText || "Not sure which option fits? Tell us your setup and we'll point you the right way.")}</p>${btn(p.contactBtn || 'Contact us', 'solar', false, p.contactHref || '#quote')}</div>`;
+      }
+      inner =
+        `<div class="pv-grid" style="grid-template-columns:repeat(${cols},1fr)">` +
+        items.map(card).join('') +
+        extra +
+        '</div>';
+    }
+    return `<div class="pv-sec"${anchor}><div class="shead${p.centerHeader ? ' center' : ''}">${eyebrow(p.eyebrow)}<h2>${accentText(p.title)}</h2></div>${inner}</div>`;
+  }
+
+  if (t === 'steps') {
+    const items = Array.isArray(p.items)
+      ? (p.items as Array<{ title?: string; text?: string }>)
+      : [];
+    return (
+      `<div class="pv-sec"><div class="shead">${eyebrow(p.eyebrow || 'How it works')}<h2>${accentText(p.title)}</h2></div>` +
+      `<div class="pv-steps" style="grid-template-columns:repeat(${items.length || 1},1fr)">` +
+      items
+        .map(
+          (s, i) =>
+            `<div class="pv-pstep"><div class="n">0${i + 1}</div><h4>${accentText(s.title)}</h4><p>${esc(s.text).replace(/\n/g, '<br>')}</p></div>`,
+        )
+        .join('') +
+      '</div></div>'
+    );
+  }
+
+  if (t === 'pricing') {
+    const plans = Array.isArray(p.plans)
+      ? (p.plans as Array<{ name?: string; price?: string; per?: string; feats?: unknown; cta?: string; ctaHref?: string; hl?: boolean }>)
+      : [];
+    return (
+      `<div class="pv-sec"><div class="shead center">${eyebrow(p.eyebrow || 'Options')}<h2>${accentText(p.title)}</h2></div>` +
+      `<div style="display:grid;grid-template-columns:repeat(${plans.length || 1},1fr);gap:14px">` +
+      plans
+        .map((pl) => {
+          const feats = Array.isArray(pl.feats) ? (pl.feats as unknown[]) : [];
+          return (
+            `<div class="pv-card${pl.hl ? ' pv-plan-hl' : ''}"><div style="font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-2)">${esc(pl.name)}</div>` +
+            `<div style="font-family:var(--display);font-weight:900;font-size:1.9rem;margin:6px 0">${esc(pl.price)}</div>` +
+            `<div style="color:var(--muted);font-size:.8rem;margin-bottom:12px">${esc(pl.per)}</div>` +
+            feats
+              .map(
+                (f) =>
+                  `<div style="display:flex;gap:8px;padding:5px 0;font-size:.87rem;border-top:1px solid var(--line)"><span style="color:var(--ok)">✓</span><span>${esc(f)}</span></div>`,
+              )
+              .join('') +
+            `<div style="margin-top:14px">${btn(pl.cta, pl.hl ? 'solar' : 'dark ghost', false, pl.ctaHref || '#quote')}</div></div>`
+          );
+        })
+        .join('') +
+      '</div></div>'
+    );
+  }
+
+  if (t === 'casestudy') {
+    const items = Array.isArray(p.items)
+      ? (p.items as Array<{ img?: unknown; loc?: string; title?: string; stat?: string; statlabel?: string }>)
+      : [];
+    return (
+      `<div class="pv-sec"><div class="shead">${eyebrow(p.eyebrow || 'Our work')}<h2>${accentText(p.title)}</h2></div>` +
+      `<div style="display:grid;grid-template-columns:repeat(${Math.min(items.length || 1, 3)},1fr);gap:14px">` +
+      items
+        .map((cs) => {
+          const src = imgSrc(cs.img);
+          const media = src
+            ? `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" style="width:100%;height:150px;object-fit:cover;display:block">`
+            : '<div style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b)"></div>';
+          return (
+            `<div class="pv-card" style="padding:0;overflow:hidden">${media}<div style="padding:18px">` +
+            `<div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)">${esc(cs.loc)}</div>` +
+            `<h3 style="font-size:1.02rem;font-weight:600;margin-top:4px">${accentText(cs.title)}</h3>` +
+            `<div style="font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:10px">${esc(cs.stat)}</div>` +
+            `<div style="font-size:.76rem;color:var(--muted)">${esc(cs.statlabel)}</div></div></div>`
+          );
+        })
+        .join('') +
+      '</div></div>'
+    );
   }
 
   return '';

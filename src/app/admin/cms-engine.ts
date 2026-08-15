@@ -152,6 +152,7 @@ let STATE, SEL=null, VIEW='desk';
 function uid(){return Math.random().toString(36).slice(2,8)}
 function defaultSite(){return {
   images:[],
+  topbar:{show:true,accreditationText:'MCS · RECC · NICEIC · TrustMark certified installer',ratingValue:'4.9',hoursText:'Mon–Sat 8am–6pm',phone:'01633 965205',phoneHref:'tel:01633965205'},
   logos:[
     {id:uid(),name:'GivEnergy',img:'',bnr:true},{id:uid(),name:'SolarEdge',img:'',bnr:true},
     {id:uid(),name:'Tesla Powerwall',img:'',bnr:true},{id:uid(),name:'JA Solar',img:'',bnr:true},
@@ -265,6 +266,7 @@ async function boot(){
   if(!Array.isArray(STATE.site.menu))STATE.site.menu=defaultSite().menu;
   if(!Array.isArray(STATE.site.logos))STATE.site.logos=defaultSite().logos;
   if(!Array.isArray(STATE.site.images))STATE.site.images=[];
+  if(!STATE.site.topbar||typeof STATE.site.topbar!=='object')STATE.site.topbar=defaultSite().topbar;
   try{
     var mediaFix=await ensureMediaOptimized({silent:true,skipSave:true});
     if((mediaFix.migrated||0)+(mediaFix.remapped||0)>0)await saveNow();
@@ -456,9 +458,18 @@ function renderBlock(b,edit){
      else markHtml='<div class="hero-mark">'+HERO_MARK_SPARK+'</div>';
    }
    var sunHtml=(wide||p.hideSun)?'':'<div class="sun"></div>';
-   var heroCls='hero'+(wide?' wide':'')+(hideMark?' no-mark':'');
+   var bgSrc=imgSrc(p.bgImg);
+   var bgHtml='';
+   if(bgSrc){
+     var _bm=imgResolve(p.bgImg);
+     var _bgCss=mediaImgCss(_bm.focusX,_bm.focusY,_bm.zoom);
+     var _ov=(p.bgOverlay!=null&&isFinite(Number(p.bgOverlay)))?Math.max(0,Math.min(100,Number(p.bgOverlay))):62;
+     var _sc=(0.4+0.6*(_ov/100)).toFixed(3);
+     bgHtml='<div class="hero-bg"><img class="hero-bg-img" src="'+esc(bgSrc)+'" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="async" style="'+_bgCss+'"><div class="hero-bg-scrim" style="opacity:'+_sc+'"></div><div class="hero-bg-hatch" aria-hidden="true"></div></div>';
+   }
+   var heroCls='hero'+(wide?' wide':'')+(hideMark?' no-mark':'')+(bgSrc?' has-bg':'');
    var wrapCls='wrap'+(hideMark?' is-single':'');
-   return '<section class="'+heroCls+'" id="top"><div class="glow"></div>'+sunHtml+'<div class="'+wrapCls+'"><div class="hero-copy">'+heroTags(p.tags)+eyebrowHtml+'<h1>'+accentText(p.headline)+'</h1>'+sub+btnrow+mthtml+rthtml+'</div>'+markHtml+'</div></section>';
+   return '<section class="'+heroCls+'" id="top">'+bgHtml+'<div class="glow"></div>'+sunHtml+'<div class="'+wrapCls+'"><div class="hero-copy">'+heroTags(p.tags)+eyebrowHtml+'<h1>'+accentText(p.headline)+'</h1>'+sub+btnrow+mthtml+rthtml+'</div>'+markHtml+'</div></section>';
  }
  if(t==='stats')return '<div class="pv-stats" style="grid-template-columns:repeat('+(p.items.length)+',1fr)">'+p.items.map((s,i)=>'<div class="pv-stat"><div class="n"'+ce(id+'.items.'+i+'.n',edit)+'>'+esc(s.n)+'</div><div class="k"'+ce(id+'.items.'+i+'.k',edit)+'>'+esc(s.k)+'</div></div>').join('')+'</div>';
  if(t==='grid'){const gc=(it,i)=>'<div class="pv-card"><span class="ic">'+icon(it.icon)+'</span><h3>'+accentText(it.title)+'</h3><p'+ce(id+'.items.'+i+'.desc',edit)+'>'+esc(it.desc)+'</p></div>';
@@ -692,6 +703,15 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
    h+=chk('Wider text',!!p.textWide,id+'.textWide')+'<div class="hint">Wider text hides the right spark/logo and lets the headline span the full width — ideal for blog heroes.</div>';
    h+=imagePicker(p.markImg||'',id+'.markImg','Right mark / logo',true)+'<div class="hint">Optional custom image for the right mark. Leave empty for the default gold spark. Hidden when <b>Wider text</b> or <b>Hide right logo</b> is on.</div>';
    h+=chk('Hide right logo / mark',!!p.hideMark,id+'.hideMark')+chk('Hide sun glow',!!p.hideSun,id+'.hideSun')+chk('Hide rating row',!!p.hideRating,id+'.hideRating')+chk('Hide microtrust line',!!p.hideMicrotrust,id+'.hideMicrotrust');
+   var _bgOv=(p.bgOverlay!=null?p.bgOverlay:62);
+   h+='<div class="sub"><div class="sh"><b>Case-study background</b></div>'+imagePicker(p.bgImg||'',id+'.bgImg','Background image',true)+'<div class="hint">Puts a photo behind the dark hero with a gradient + cross-hatch overlay. Leave empty for the standard dark hero.</div>';
+   if(imgSrc(p.bgImg)){var _bgm=imgResolve(p.bgImg);
+     h+='<div class="fld"><label>Overlay darkness — <span id="heroOvLbl">'+esc(String(_bgOv))+'</span>%</label><input type="range" min="0" max="100" step="1" value="'+esc(String(_bgOv))+'" oninput="heroBgOverlay(\''+id+'.bgOverlay\',this.value)"></div>';
+     h+='<div class="fld"><label>Focus X — <span id="heroFxLbl">'+Math.round(_bgm.focusX)+'</span>%</label><input type="range" min="0" max="100" step="1" value="'+Math.round(_bgm.focusX)+'" oninput="heroBgFocus(\''+id+'.bgImg\',\'focusX\',this.value)"></div>';
+     h+='<div class="fld"><label>Focus Y — <span id="heroFyLbl">'+Math.round(_bgm.focusY)+'</span>%</label><input type="range" min="0" max="100" step="1" value="'+Math.round(_bgm.focusY)+'" oninput="heroBgFocus(\''+id+'.bgImg\',\'focusY\',this.value)"></div>';
+     h+='<div class="fld"><label>Zoom — <span id="heroZmLbl">'+Math.round(_bgm.zoom*100)+'</span>%</label><input type="range" min="100" max="300" step="5" value="'+Math.round(_bgm.zoom*100)+'" oninput="heroBgFocus(\''+id+'.bgImg\',\'zoom\',this.value/100)"></div>';
+   }
+   h+='</div>';
    h+=chk('Disable primary button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Primary button is hidden.</div>':txt('Primary button',p.ctaLabel,id+'.ctaLabel')+routeFld('Primary button link',p.ctaHref||'#quote',id+'.ctaHref')+chk('Pulse animation on button',p.ctaPulse,id+'.ctaPulse'));
    h+=chk('Disable secondary button',!!p.cta2Disabled,id+'.cta2Disabled')+(p.cta2Disabled?'<div class="hint">Secondary button is hidden.</div>':txt('Secondary button',p.cta2,id+'.cta2')+routeFld('Secondary button link',p.cta2Href||'',id+'.cta2Href'));
    h+=txt('Microtrust bar',p.microtrust!=null?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees',id+'.microtrust')+txt('Rating value',p.ratingValue||'4.9',id+'.ratingValue')+txt('Installs count',p.ratingInstalls||'1200',id+'.ratingInstalls');}
@@ -791,7 +811,7 @@ function addFooterLink(id,ci){var p=findBlock(id).p;if(!p.cols||!p.cols[ci])retu
 function rmFooterCol(id,ci){var p=findBlock(id).p;if(!p.cols)return;p.cols.splice(ci,1);renderPreview();renderBuild();save();}
 function selectBlock(id){if(SEL===id)return;SEL=id;tplHide();renderPreview();renderBuild();}
 function blockDefs(){const defs={
-  hero:{eyebrow:'Eyebrow',headline:'Your headline here',sub:'Supporting sentence.',dark:true,ctaLabel:'Get a quote',ctaHref:'#quote',ctaPulse:false,cta2:'',cta2Href:'',ctaDisabled:false,cta2Disabled:false,textWide:false,tags:'',hideMark:false,hideSun:false,hideRating:false,hideMicrotrust:false,markImg:'',ratingValue:'4.9',ratingInstalls:'1200',microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees'},
+  hero:{eyebrow:'Eyebrow',headline:'Your headline here',sub:'Supporting sentence.',dark:true,ctaLabel:'Get a quote',ctaHref:'#quote',ctaPulse:false,cta2:'',cta2Href:'',ctaDisabled:false,cta2Disabled:false,textWide:false,tags:'',hideMark:false,hideSun:false,hideRating:false,hideMicrotrust:false,markImg:'',bgImg:'',bgOverlay:62,ratingValue:'4.9',ratingInstalls:'1200',microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees'},
   stats:{items:[{n:'100+',k:'Installs'},{n:'£1,200',k:'Saved / yr'},{n:'4.9★',k:'Rating'}]},
   grid:{eyebrow:'Section',title:'Section title',anchor:'',cols:3,fill:'none',contactHeading:'Get in touch',contactText:'Not sure which option fits? Tell us your setup and we\'ll point you the right way.',contactBtn:'Contact us',contactHref:'#quote',items:[{icon:'solar',title:'Item one',desc:'Description.'},{icon:'battery',title:'Item two',desc:'Description.'},{icon:'ev',title:'Item three',desc:'Description.'}]},
   footer:footerDefaults(),
@@ -967,6 +987,14 @@ function confirmNewPage(){
   syncCmsUrl(false);
 }
 
+/* ============ AI PAGE BUILDER ============ */
+function aiPageContext(){var pg=page();if(!pg)return '';var seq=(pg.blocks||[]).map(function(b){return blockDisplayName(b.t);}).join(', ');var hero=(pg.blocks||[]).find(function(b){return blockTypeKey(b.t)==='hero';});var head=hero&&hero.p?String(hero.p.headline||''):'';return ('Page name: '+(pg.name||'Untitled')+'. Existing sections: '+(seq||'none')+'.'+(head?(' Current headline: '+head):'')).slice(0,2000);}
+function openAiBuilder(){window._aiState={loading:false,error:'',blocks:null,prompt:'',target:'append'};var box=document.getElementById('modalbox');if(box)box.className='modalbox';renderAiBuilder();var m=document.getElementById('modal');if(m)m.classList.add('show');var inp=document.getElementById('ai-prompt');if(inp)inp.focus();}
+function aiTargetChange(){var sel=document.querySelector('input[name="ai-target"]:checked');var t=sel?sel.value:'append';if(window._aiState)window._aiState.target=t;var wrap=document.getElementById('ai-new-name-wrap');if(wrap)wrap.style.display=(t==='new')?'':'none';}
+function aiBlockPreview(b){return '<div style="border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--paper)"><div style="font-family:var(--mono);font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 9px;border-bottom:1px solid var(--line);background:var(--paper-2)">'+esc(blockDisplayName(b.t))+'</div><div style="height:150px;overflow:hidden;pointer-events:none"><div style="width:1160px;transform:scale(.2);transform-origin:top left">'+renderBlock({t:b.t,p:b.p},false)+'</div></div></div>';}
+function renderAiBuilder(){var box=document.getElementById('modalbox');if(!box)return;var st=window._aiState||{};var tgt=st.target||'append';var h='<button class="close" onclick="closeModal()">×</button>';h+='<h2>AI page builder</h2>';h+='<p>Describe the page you want — a case study, a service page, an FAQ — and the assistant drafts editable sections you can drop in.</p>';h+='<div class="fld"><label for="ai-prompt">What should this page cover?</label><textarea id="ai-prompt" rows="4" placeholder="e.g. A case study about a 55 kWp warehouse rooftop install in Newport that cut the client&#39;s grid use by 42%. Cover the challenge, what we installed, the results, and a call to action.">'+esc(st.prompt||'')+'</textarea></div>';h+='<div class="fld"><label>Where should it go?</label><label class="chk"><input type="radio" name="ai-target" value="append"'+(tgt!=='new'?' checked':'')+' onchange="aiTargetChange()"> Add to the current page</label><label class="chk"><input type="radio" name="ai-target" value="new"'+(tgt==='new'?' checked':'')+' onchange="aiTargetChange()"> Create a new page</label></div>';h+='<div class="fld" id="ai-new-name-wrap" style="display:'+(tgt==='new'?'':'none')+'"><label for="ai-new-name">New page title</label><input id="ai-new-name" type="text" placeholder="e.g. Warehouse Case Study — Newport"></div>';if(st.error)h+='<div class="modal-err" role="alert">'+esc(st.error)+'</div>';if(st.blocks&&st.blocks.length){h+='<div class="hint">Proposed sections ('+st.blocks.length+') — preview below, then insert.</div>';h+='<div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:10px;margin:8px 0">'+st.blocks.map(aiBlockPreview).join('')+'</div>';}h+='<div class="modal-actions">';h+='<button type="button" class="tbtn modal-btn-ghost" onclick="closeModal()">Cancel</button>';if(st.blocks&&st.blocks.length){h+='<button type="button" class="tbtn tbtn-quiet" onclick="aiGenerate()"'+(st.loading?' disabled':'')+'>'+(st.loading?'Generating…':'Regenerate')+'</button>';h+='<button type="button" class="tbtn solar modal-btn-primary" onclick="aiInsert()">Insert '+st.blocks.length+' section'+(st.blocks.length>1?'s':'')+'</button>';}else{h+='<button type="button" class="tbtn solar modal-btn-primary" onclick="aiGenerate()"'+(st.loading?' disabled':'')+'>'+(st.loading?'Generating…':'Generate')+'</button>';}h+='</div>';box.innerHTML=h;}
+async function aiGenerate(){var st=window._aiState||(window._aiState={});var inp=document.getElementById('ai-prompt');var prompt=(inp&&inp.value||'').trim();if(prompt.length<8){st.error='Describe the page in a sentence or two first.';renderAiBuilder();return;}var sel=document.querySelector('input[name="ai-target"]:checked');st.target=sel?sel.value:'append';st.prompt=prompt;st.loading=true;st.error='';st.blocks=null;renderAiBuilder();try{var r=await fetch('/api/cms/ai-page',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,context:aiPageContext()})});var d=null;try{d=await r.json();}catch(e){}st.loading=false;if(!r.ok){st.error=(d&&d.error)||('Generation failed ('+r.status+')');renderAiBuilder();return;}st.blocks=(d&&Array.isArray(d.blocks))?d.blocks:[];if(!st.blocks.length)st.error='The AI did not return any usable sections. Try rephrasing your description.';renderAiBuilder();}catch(e){st.loading=false;st.error='Network error — please try again.';renderAiBuilder();}}
+function aiInsert(){var st=window._aiState;if(!st||!st.blocks||!st.blocks.length)return;var sel=document.querySelector('input[name="ai-target"]:checked');var target=sel?sel.value:'append';var blocks=st.blocks.map(function(b){return {id:uid(),t:b.t,p:JSON.parse(JSON.stringify(b.p))};});if(target==='new'){var nameInp=document.getElementById('ai-new-name');var name=uniquePageTitle((nameInp&&nameInp.value.trim())||st.prompt.slice(0,40)||'AI page');var slug=uniquePageSlug(titleToSlug(name));STATE.pages.push({id:uid(),_draft:1,name:name,slug:slug,type:'page',seo:{slug:slug},blocks:blocks});STATE.current=STATE.pages.length-1;}else{if(!page()){closeModal();return;}page().blocks=page().blocks.concat(blocks);}SEL=blocks.length?blocks[blocks.length-1].id:null;closeModal();MODE='edit';setMode();renderAll();tab('build');save();syncCmsUrl(false);}
 /* ============ MENU TAB ============ */
 function renderMenu(){const el=document.getElementById('panel-menu');let h='<div class="ph">'+SPARK+'Mega menu editor</div><div class="hint">Edit the top-level items and their columns. This drives the site nav &amp; mega panel.</div>'+megaPreview();
  STATE.site.menu.forEach((m,mi)=>{h+='<div class="sub"><div class="sh"><b>Top item '+(mi+1)+'</b><button class="rm" onclick="menuRm('+mi+')">remove</button></div><div class="fld"><input value="'+esc(m.label)+'" oninput="menuLabel('+mi+',this.value)"></div>';
@@ -1056,6 +1084,8 @@ function writeMediaImgMeta(path, partial, opts){
  if(!opts.silent)renderBuild();
  return next;
 }
+function heroBgOverlay(path,val){updT(path,val);var el=document.getElementById('heroOvLbl');if(el)el.textContent=Math.round(Number(val))+'';}
+function heroBgFocus(path,key,val){var partial={};if(key==='zoom')partial.zoom=Number(val);else partial[key]=Number(val);writeMediaImgMeta(path,partial,{silent:true});renderPreview();var m=imgResolve(getAtPath(path));var el;if(key==='focusX'){el=document.getElementById('heroFxLbl');if(el)el.textContent=Math.round(m.focusX)+'';}else if(key==='focusY'){el=document.getElementById('heroFyLbl');if(el)el.textContent=Math.round(m.focusY)+'';}else{el=document.getElementById('heroZmLbl');if(el)el.textContent=Math.round(m.zoom*100)+'';}}
 function imgTag(val,style,edit,path){
  const m=imgResolve(val);if(!m.src)return '';
  const alt=m.decorative?'':m.alt;
@@ -2272,6 +2302,8 @@ function ensureHeroCustomize(){
       if(p.hideRating==null){p.hideRating=false;changed=true;}
       if(p.hideMicrotrust==null){p.hideMicrotrust=false;changed=true;}
       if(p.markImg==null){p.markImg='';changed=true;}
+      if(p.bgImg==null){p.bgImg='';changed=true;}
+      if(p.bgOverlay==null){p.bgOverlay=62;changed=true;}
       if(p.ratingValue==null){p.ratingValue='4.9';changed=true;}
       if(p.ratingInstalls==null){p.ratingInstalls='1200';changed=true;}
       if(p.textWide==null){p.textWide=false;changed=true;}
@@ -3021,8 +3053,25 @@ function menuFeatImgs(feat){var imgs=STATE.site.images||[];if(!imgs.length)retur
  var cur=featImgSrc(feat);
  return '<div class="iconpick" style="grid-template-columns:repeat(6,1fr)">'+imgs.map(function(im){return '<button class="'+(cur===im.data||feat.imgLibId===im.id?'on':'')+'" style="aspect-ratio:4/3;overflow:hidden;padding:0" onclick="setFeatImg(\''+im.id+'\')"><img src="'+im.data+'" style="width:100%;height:100%;object-fit:cover"></button>'}).join('')+'</div>'+(cur?'<button class="rm" style="margin-top:6px" onclick="clearFeatImg()">remove image</button>':'');
 }
+/* ===== header top-bar (utility strip) settings — edited on the mega page ===== */
+function ensureTopbar(){if(!STATE.site.topbar||typeof STATE.site.topbar!=='object')STATE.site.topbar={show:true,accreditationText:'',ratingValue:'',hoursText:'',phone:'',phoneHref:''};return STATE.site.topbar;}
+function setTopbar(k,v){var tb=ensureTopbar();tb[k]=v;renderMega();save();}
+function setTopbarPhone(v){var tb=ensureTopbar();tb.phone=v;var digits=String(v||'').replace(/[^0-9+]/g,'');if(digits)tb.phoneHref='tel:'+digits;renderMega();save();}
+function topbarCard(){
+  var tb=(STATE.site&&STATE.site.topbar)||{};
+  var on=tb.show!==false;
+  return '<div class="panelcard"><h3 style="display:flex;justify-content:space-between;align-items:center">Top bar (thin strip above the logo)'
+    +'<label class="chk" style="margin:0"><input type="checkbox" '+(on?'checked':'')+' onchange="setTopbar(\'show\',this.checked)"> Show</label></h3>'
+    +'<div class="hint" style="font-size:.78rem;margin-bottom:8px">The dark utility strip at the very top of every page. Use the top <b>Publish</b> button to apply.</div>'
+    +'<div class="fld"><label>Accreditations (left text)</label><input value="'+esc(tb.accreditationText||'')+'" onchange="setTopbar(\'accreditationText\',this.value)"></div>'
+    +'<div class="row2"><div class="fld"><label>Rating value</label><input value="'+esc(tb.ratingValue||'')+'" placeholder="4.9" onchange="setTopbar(\'ratingValue\',this.value)"></div>'
+    +'<div class="fld"><label>Opening hours</label><input value="'+esc(tb.hoursText||'')+'" placeholder="Mon–Sat 8am–6pm" onchange="setTopbar(\'hoursText\',this.value)"></div></div>'
+    +'<div class="row2"><div class="fld"><label>Phone (shown)</label><input value="'+esc(tb.phone||'')+'" placeholder="01633 965205" onchange="setTopbarPhone(this.value)"></div>'
+    +'<div class="fld"><label>Phone link (tel:)</label><input value="'+esc(tb.phoneHref||'')+'" placeholder="tel:01633965205" onchange="setTopbar(\'phoneHref\',this.value)"></div></div>'
+    +'<div class="hint" style="font-size:.72rem">Preview: ★★★★★ '+esc(tb.ratingValue||'')+' rated · '+esc(tb.hoursText||'')+' · '+esc(tb.phone||'')+'</div></div>';
+}
 function renderMega(){var el=document.getElementById('megaedit');if(!el)return;var site=STATE&&STATE.site;var M=(site&&site.menu)||[];
- if(!M.length){el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1></div></div><div class="honest">No menu items yet. <button class="tbtn2" onclick="STATE.site.menu=[{label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]}];selectMegaTab(0);save()">Add one</button></div></div>';return;}
+ if(!M.length){el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1></div></div><div class="honest">No menu items yet. <button class="tbtn2" onclick="STATE.site.menu=[{label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]}];selectMegaTab(0);save()">Add one</button></div>'+topbarCard()+'</div>';return;}
  if(MEGA_PI>=M.length)MEGA_PI=0;var sel=M[MEGA_PI];var mega=megaOn(sel);var feat=featOf(sel);
  var nav=M.map(function(t,i){return '<button class="mm-nav'+(i===MEGA_PI?' on':'')+'" draggable="true" ondragstart="mDragStart(\'top\','+i+',0,'+i+')" ondragover="mDragOver(event)" ondrop="mDrop(\'top\',0,0,'+i+')" ondragend="mDragEnd()" onclick="selectMegaTab('+i+')" title="Drag to reorder">'+esc(t.label)+(megaOn(t)?'':' ↗')+'</button>';}).join('');
  var panel;
@@ -3076,7 +3125,7 @@ function renderMega(){var el=document.getElementById('megaedit');if(!el)return;v
    +'<button class="dact" onclick="addNavPreset(\'contact\')"><b>+ Contact</b><span>links to /#quote</span></button>'
    +'<button class="dact" onclick="STATE.site.menu.push({label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]});selectMegaTab(STATE.site.menu.length-1);save()"><b>+ Add top-level item</b><span>new nav entry / mega panel</span></button></div>';
 
- el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1><p>This is the top navigation on the live site (the Solar &amp; Battery / Business / Funding / Estimator bar). Add a direct link like <b>Estimator</b> below, or enable a mega panel. Then use the top <b>Publish</b> button to update the header.</p></div></div>'+preview+ed+'</div>';
+ el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1><p>This is the top navigation on the live site (the Solar &amp; Battery / Business / Funding / Estimator bar). Add a direct link like <b>Estimator</b> below, or enable a mega panel. Then use the top <b>Publish</b> button to update the header.</p></div></div>'+topbarCard()+preview+ed+'</div>';
 }
 
 boot();
@@ -3157,6 +3206,11 @@ w.pagePickerSearch = pagePickerSearch;
 w.pagePickerPick = pagePickerPick;
 w.addPage = addPage;
 w.confirmNewPage = confirmNewPage;
+/* ai-builder */
+w.openAiBuilder = openAiBuilder;
+w.aiGenerate = aiGenerate;
+w.aiInsert = aiInsert;
+w.aiTargetChange = aiTargetChange;
 w.newPageNameInput = newPageNameInput;
 w.newPageSlugInput = newPageSlugInput;
 w.saveAsTemplate = saveAsTemplate;
@@ -3187,6 +3241,9 @@ w.setGalleryFeatured = setGalleryFeatured;
 w.moveGalItem = moveGalItem;
 w.upd = upd;
 w.updT = updT;
+/* hero-bg */
+w.heroBgOverlay = heroBgOverlay;
+w.heroBgFocus = heroBgFocus;
 w.updArr2 = updArr2;
 w.nestArr = nestArr;
 w.filterIcons = filterIcons;
@@ -3330,4 +3387,7 @@ w.selectMenuPreviewTab = selectMenuPreviewTab;
 Object.defineProperty(w, 'MEGA_PI', { get: function(){ return MEGA_PI; }, set: function(v){ MEGA_PI = Number(v); }, configurable: true });
 Object.defineProperty(w, 'MENU_PI', { get: function(){ return MENU_PI; }, set: function(v){ MENU_PI = Number(v); }, configurable: true });
 w.IMGFILTER = typeof IMGFILTER !== 'undefined' ? IMGFILTER : undefined;
+/* topbar */
+w.setTopbar = setTopbar;
+w.setTopbarPhone = setTopbarPhone;
 }

@@ -57,6 +57,7 @@ const CMS_HTML = `
         <div class="toolbar-more-menu" id="toolbarMore" role="menu">
           <button type="button" role="menuitem" onclick="addPage();closeToolbarMore()">New page</button>
           <button type="button" role="menuitem" onclick="saveAsTemplate();closeToolbarMore()">Save as template</button>
+          <button type="button" role="menuitem" onclick="openAiBuilder();closeToolbarMore()">AI page builder</button>
           <div class="menu-divider" role="separator"></div>
           <button type="button" role="menuitem" onclick="exportJSON();closeToolbarMore()">Export data</button>
           <button type="button" role="menuitem" onclick="exportHTML();closeToolbarMore()">Export HTML</button>

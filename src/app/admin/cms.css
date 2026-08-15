@@ -739,6 +739,13 @@ button.pv-seg{font:inherit}
 .hero.wide .sun,.hero.no-mark .sun{display:none}
 .hero .hero-copy{min-width:0}
 .hero-mark img{display:block;max-width:min(52%,230px);height:auto;margin:0 auto;filter:drop-shadow(0 16px 34px rgba(248,188,30,.22))}
+/* case-study hero: background image + gradient scrim + cross-hatch */
+.hero.has-bg{background:var(--ink)}
+.hero.has-bg::before{display:none}
+.hero .hero-bg{position:absolute;inset:0;overflow:hidden}
+.hero .hero-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.hero .hero-bg-scrim{position:absolute;inset:0;background:linear-gradient(90deg,rgba(33,31,24,.94),rgba(33,31,24,.72) 42%,rgba(33,31,24,.40) 100%),linear-gradient(0deg,rgba(33,31,24,.85),rgba(33,31,24,0) 60%)}
+.hero .hero-bg-hatch{position:absolute;inset:0;background-image:linear-gradient(rgba(247,242,231,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(247,242,231,.05) 1px,transparent 1px);background-size:64px 64px;-webkit-mask-image:linear-gradient(150deg,#000,transparent 70%);mask-image:linear-gradient(150deg,#000,transparent 70%);pointer-events:none}
 @media(max-width:960px){
   .hero .wrap{grid-template-columns:1fr}
   .hero .hero-mark{display:none}

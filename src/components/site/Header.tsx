@@ -2,8 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { MenuTop } from '@/lib/menu-types';
+import type { MenuTop, SiteTopbar } from '@/lib/menu-types';
 import styles from './Header.module.css';
+
+/* Top-bar fallback — the current hardcoded values, used until the CMS publishes
+   a `site.topbar` (see src/lib/cms.ts getPublishedTopbar). */
+const DEFAULT_TOPBAR: SiteTopbar = {
+  show: true,
+  accreditationText: 'MCS · RECC · NICEIC · TrustMark certified installer',
+  ratingValue: '4.9',
+  hoursText: 'Mon–Sat 8am–6pm',
+  phone: '01633 965205',
+  phoneHref: 'tel:01633965205',
+};
 
 /* Monopitch spark */
 export function Spark({ size = 13 }: { size?: number }) {
@@ -117,7 +128,8 @@ const DEFAULT_MENU: MenuTop[] = [
   { label: 'Contact', href: '/#quote' },
 ];
 
-export default function Header({ menu }: { menu?: MenuTop[] }) {
+export default function Header({ menu, topbar }: { menu?: MenuTop[]; topbar?: SiteTopbar }) {
+  const tb = topbar ?? DEFAULT_TOPBAR;
   const fromCms = Boolean(menu && menu.length);
   const rawMenu = fromCms ? menu! : DEFAULT_MENU;
   const MENU = rawMenu.map((t) => {
@@ -173,16 +185,18 @@ export default function Header({ menu }: { menu?: MenuTop[] }) {
       {/* scroll sentinel: sits at the very top so the header knows when it's stuck */}
       <div ref={sentinel} aria-hidden style={{ position: 'absolute', top: 0, height: 1, width: 1 }} />
       <header className={`${styles.header}${scrolled ? ` ${styles.scrolled}` : ''}`}>
-      {/* utility top bar */}
-      <div className={styles.topbar}>
-        <div className={styles.wrap}>
-          <span className={styles.tl}>MCS · RECC · NICEIC · TrustMark certified installer</span>
-          <span className={styles.tr}>
-            <span className={styles.stars}>★★★★★</span> 4.9 rated · Mon–Sat 8am–6pm ·{' '}
-            <a href="tel:01633965205">01633 965205</a>
-          </span>
+      {/* utility top bar — content from CMS (src/lib/cms.ts getPublishedTopbar) */}
+      {tb.show && (
+        <div className={styles.topbar}>
+          <div className={styles.wrap}>
+            <span className={styles.tl}>{tb.accreditationText}</span>
+            <span className={styles.tr}>
+              <span className={styles.stars}>★★★★★</span> {tb.ratingValue} rated · {tb.hoursText} ·{' '}
+              <a href={tb.phoneHref}>{tb.phone}</a>
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* nav + mega */}
       <div className={styles.navbar}>
@@ -216,9 +230,9 @@ export default function Header({ menu }: { menu?: MenuTop[] }) {
           </nav>
 
           <div className={styles.headcta}>
-            <a className={styles.headtel} href="tel:01633965205">
+            <a className={styles.headtel} href={tb.phoneHref}>
               <Icon name="phone" size={16} />
-              01633 965205
+              {tb.phone}
             </a>
             <Link className={styles.qbtn} href="/#quote">
               Free quote
