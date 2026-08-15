@@ -3071,7 +3071,7 @@ function topbarCard(){
     +'<div class="hint" style="font-size:.72rem">Preview: ★★★★★ '+esc(tb.ratingValue||'')+' rated · '+esc(tb.hoursText||'')+' · '+esc(tb.phone||'')+'</div></div>';
 }
 function renderMega(){var el=document.getElementById('megaedit');if(!el)return;var site=STATE&&STATE.site;var M=(site&&site.menu)||[];
- if(!M.length){el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1></div></div><div class="honest">No menu items yet. <button class="tbtn2" onclick="STATE.site.menu=[{label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]}];selectMegaTab(0);save()">Add one</button></div></div>';return;}
+ if(!M.length){el.innerHTML='<div class="adm-wrap"><div class="adm-h"><div><h1>Mega menu</h1></div></div><div class="honest">No menu items yet. <button class="tbtn2" onclick="STATE.site.menu=[{label:\'New item\',megaEnabled:true,page:\'\',cols:[{ey:\'Column\',items:[{icon:\'solar\',label:\'Item\',page:\'\'}]}]}];selectMegaTab(0);save()">Add one</button></div>'+topbarCard()+'</div>';return;}
  if(MEGA_PI>=M.length)MEGA_PI=0;var sel=M[MEGA_PI];var mega=megaOn(sel);var feat=featOf(sel);
  var nav=M.map(function(t,i){return '<button class="mm-nav'+(i===MEGA_PI?' on':'')+'" draggable="true" ondragstart="mDragStart(\'top\','+i+',0,'+i+')" ondragover="mDragOver(event)" ondrop="mDrop(\'top\',0,0,'+i+')" ondragend="mDragEnd()" onclick="selectMegaTab('+i+')" title="Drag to reorder">'+esc(t.label)+(megaOn(t)?'':' ↗')+'</button>';}).join('');
  var panel;

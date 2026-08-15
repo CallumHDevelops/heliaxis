@@ -131,12 +131,24 @@ export async function getPublishedTopbar(): Promise<SiteTopbar | null> {
   noStore();
   try {
     const admin = createAdminClient();
-    for (const key of [PUBLISHED_KEY, DRAFT_KEY]) {
-      const { data } = await admin.from('cms_kv').select('value').eq('key', key).maybeSingle();
-      const tb = topbarFromKvValue(data?.value);
-      if (tb) return tb;
-    }
-    return null;
+    // Once a published CMS doc exists, trust ONLY it — never let unpublished draft
+    // edits reach the public Header (the top-bar editor saves draft-only until
+    // Publish). On a doc that predates this feature the topbar is absent → null →
+    // Header falls back to DEFAULT_TOPBAR until the first re-publish writes it.
+    const { data: pub } = await admin
+      .from('cms_kv')
+      .select('value')
+      .eq('key', PUBLISHED_KEY)
+      .maybeSingle();
+    if (pub?.value != null) return topbarFromKvValue(pub.value);
+    // No published doc at all (fresh install, pre-first-publish-ever): the draft is
+    // the only source, mirroring getPublishedMenu's fallback.
+    const { data: draft } = await admin
+      .from('cms_kv')
+      .select('value')
+      .eq('key', DRAFT_KEY)
+      .maybeSingle();
+    return topbarFromKvValue(draft?.value);
   } catch {
     return null;
   }

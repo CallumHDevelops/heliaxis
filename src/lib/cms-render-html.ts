@@ -244,8 +244,11 @@ function renderBlock(b: LooseBlock): string {
       const ty = ((50 - bfy) / 50) * maxShift;
       const bgStyle = `object-fit:cover;object-position:50% 50%;transform:translate(${tx}%,${ty}%) scale(${z});transform-origin:center center`;
       let ov = 62;
-      const rawOv = Number(p.bgOverlay);
-      if (Number.isFinite(rawOv)) ov = Math.max(0, Math.min(100, rawOv));
+      // Match the client guard (cms-engine.ts): a literal null must fall through
+      // to the 62 default, not become Number(null)===0 → a near-transparent scrim.
+      if (p.bgOverlay != null && Number.isFinite(Number(p.bgOverlay))) {
+        ov = Math.max(0, Math.min(100, Number(p.bgOverlay)));
+      }
       const scrimOp = (0.4 + 0.6 * (ov / 100)).toFixed(3);
       bgHtml =
         `<div class="hero-bg"><img class="hero-bg-img" src="${esc(bgSrc)}" alt="" aria-hidden="true" loading="eager" fetchpriority="high" decoding="async" style="${bgStyle}">` +
@@ -670,6 +673,11 @@ function renderBlock(b: LooseBlock): string {
       p.anchor && String(p.anchor).trim()
         ? ` id="${esc(String(p.anchor).trim().replace(/[^a-zA-Z0-9_-]/g, ''))}"`
         : '';
+    // Known limitation: this server path is only the scheduled-publish FALLBACK
+    // (used when no client-rendered HTML exists). It renders a generic icon stub
+    // rather than the per-item duotone glyph — the client engine owns the full icon
+    // set, and the mainstream publish path serves the client-rendered HTML with the
+    // real icons, so live pages are unaffected.
     const card = (it: { icon?: string; title?: string; desc?: string }) =>
       `<div class="pv-card"><span class="ic">${iconStub(22)}</span><h3>${accentText(it.title)}</h3><p>${esc(it.desc)}</p></div>`;
     let inner = '';

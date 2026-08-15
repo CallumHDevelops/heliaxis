@@ -60,6 +60,15 @@ function sanitizeRich(html: unknown): string {
     const t = tag.toLowerCase();
     return ALLOWED_TAGS.has(t) ? '</' + t + '>' : '';
   });
+  // Kill any unterminated tag fragment at EOF. The passes above only match tags
+  // that carry their own '>', so an unclosed '<img src=x onerror=...' or
+  // '<a href="javascript:...' survives untouched — and the surrounding wrapper
+  // markup ('<div class="pv-rich">…</div>') would supply the closing '>' at render
+  // time, reviving it as a live element (classic unclosed-tag XSS absorption).
+  s = s.replace(/<[^>]*$/, '');
+  // Escape any remaining stray '<' that does not begin a well-formed allowed tag
+  // (all kept tags are already bare <tag>/</tag>/<a href="…"> forms by now).
+  s = s.replace(/<(?!\/?(?:p|strong|em|a|br|ul|ol|li|h3|h4|blockquote)\b)/gi, '&lt;');
   return s.trim() || '<p></p>';
 }
 
