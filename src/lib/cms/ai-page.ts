@@ -135,23 +135,174 @@ export function normalizeBlocks(rawBlocks: unknown): CmsBlock[] {
   return out;
 }
 
+/** Best-effort repair for a JSON object truncated by the model's output cap:
+ *  close an open string, drop a dangling comma / valueless key, and balance the
+ *  open braces/brackets. The result parses to the sections that DID complete
+ *  (normalizeBlocks then keeps only the valid ones) instead of failing outright. */
+function repairTruncatedJson(s: string): string {
+  const start = s.indexOf('{');
+  const body = start > 0 ? s.slice(start) : s;
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') stack.pop();
+  }
+  let out = body;
+  if (esc) out = out.slice(0, -1); // dangling escape char
+  if (inStr) out += '"'; // close an open string
+  out = out.replace(/,\s*$/, ''); // trailing comma
+  out = out.replace(/:\s*$/, ':null'); // key with no value yet
+  out = out.replace(/,\s*$/, '');
+  for (let i = stack.length - 1; i >= 0; i--) out += stack[i];
+  return out;
+}
+
 function extractJson(text: string): unknown {
   const trimmed = String(text || '').trim();
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const rawText = fence ? fence[1].trim() : trimmed;
-  return JSON.parse(rawText);
+  const raw = (fence ? fence[1] : trimmed).trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    /* fall through */
+  }
+  // Strong models sometimes wrap JSON in prose — pull out the first {...} object.
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try {
+      return JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      /* fall through */
+    }
+  }
+  // Last resort: repair a truncated (over-cap) completion.
+  try {
+    return JSON.parse(repairTruncatedJson(raw));
+  } catch {
+    throw new Error('AI returned unparseable JSON');
+  }
 }
 
-const SYSTEM = `You are a page-layout assistant for the Heliaxis CMS (Heliaxis is an MCS-certified solar, battery and energy installer in South Wales, UK). The user describes a page. You return the sections ("blocks") that build it, in reading order.
+export type PageSeo = { title: string; description: string; slug: string };
 
-Write practical, trustworthy British English. No hype. Never invent statistics, prices, certifications, grants, phone numbers, emails or customer data — if a figure is unknown, keep copy qualitative.
+function stripTags(s: unknown): string {
+  return String(s ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
 
-Return ONLY valid JSON of this exact shape (no prose, no markdown):
-{ "blocks": [ { "t": <type>, "p": { ...fields } }, ... ] }
+function normalizeSlug(slug: string): string {
+  return String(slug || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+/, '')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
-Rules:
-- 3 to 8 blocks. A good page usually opens with a hero and ends with a cta.
-- Use ONLY these block types and fields. Any other type or field is discarded.
+function sanitizeSeo(raw: unknown, fallbackTitle: string): PageSeo {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const title = (stripTags(o.title) || stripTags(fallbackTitle) || 'New page').slice(0, 70);
+  const description = stripTags(o.description ?? o.desc).slice(0, 180);
+  const slug = (normalizeSlug(String(o.slug ?? title)) || 'page').slice(0, 80);
+  return { title, description, slug };
+}
+
+/** Writing model. Long-form pages default to a strong model; override with
+ *  AI_PAGE_MODEL (falls back to the shared AI_MODEL, else a sensible strong default). */
+function pageModel(): string {
+  return (
+    process.env.AI_PAGE_MODEL ||
+    process.env.AI_MODEL ||
+    process.env.OPENAI_MODEL ||
+    'anthropic/claude-3.5-sonnet'
+  );
+}
+
+/** Best-effort live web research via Tavily (TAVILY_API_KEY). Reads the current
+ *  top-ranking pages for the topic so the writer can beat them. Returns '' when no
+ *  key is set or the call fails — the writer then proceeds on model knowledge.
+ *  We only call Tavily's own API (no arbitrary URL fetching), so there is no SSRF
+ *  surface; the returned text is treated as untrusted and only used as context. */
+async function researchTopic(brief: string): Promise<string> {
+  const key = process.env.TAVILY_API_KEY;
+  if (!key) return '';
+  const query =
+    brief
+      .replace(
+        /^\s*(?:i\s+(?:want|need|would\s+like)\s+to\s+)?(?:please\s+)?(?:write|create|build|make|generate|draft)\s+(?:me\s+)?(?:a\s+|an\s+|the\s+)?(?:new\s+)?(?:web\s*)?page\s+(?:about|on|for|covering)\s+/i,
+        '',
+      )
+      .trim()
+      .slice(0, 380) || brief.slice(0, 380);
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        query,
+        search_depth: 'advanced',
+        max_results: 5,
+        include_answer: true,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return '';
+    const data = (await res.json()) as {
+      answer?: string;
+      results?: Array<{ title?: string; url?: string; content?: string }>;
+    };
+    const parts: string[] = [];
+    if (data.answer) parts.push('Synthesised answer from current search results:\n' + String(data.answer).slice(0, 800));
+    (data.results || []).slice(0, 5).forEach((r, i) => {
+      const title = String(r.title || '').replace(/\s+/g, ' ').slice(0, 140);
+      const url = String(r.url || '');
+      const content = String(r.content || '').replace(/\s+/g, ' ').slice(0, 700);
+      if (title || content) parts.push(`[${i + 1}] ${title} — ${url}\n${content}`);
+    });
+    return parts.join('\n\n').slice(0, 6500);
+  } catch {
+    return '';
+  }
+}
+
+const SYSTEM = `You are a senior SEO & GEO/AEO content strategist and copywriter for Heliaxis, an MCS-certified solar, battery, heat-pump and EV-charging installer in South Wales, UK. You produce a COMPLETE, genuinely useful web page as CMS sections ("blocks") in reading order.
+
+GOAL: write a page that OUTRANKS and OUT-HELPS the competitor pages provided in the research. Cover everything they cover, then go further — more specific, better organised, more trustworthy.
+
+Write plain, authoritative British English. No hype, no filler, no purple prose. Never invent statistics, prices, percentages, certifications, grants, phone numbers, emails, dates or customer names — if a figure is not established, keep the claim qualitative. Use the research ONLY for topic coverage and structure, never to copy wording or lift unverified numbers.
+
+Return ONLY valid JSON of this exact shape (no prose, no markdown, no code fences):
+{ "seo": { "title": "...", "description": "...", "slug": "kebab-slug" }, "blocks": [ { "t": <type>, "p": { ...fields } }, ... ] }
+
+SEO (for Google indexing):
+- Put the primary keyword/topic naturally in seo.title, the hero headline, the first intro paragraph and the slug.
+- seo.title ~50–60 chars; seo.description 120–160 chars with a clear benefit + the topic; slug = short kebab-case, no leading slash.
+- Give each section a distinct title that targets a relevant sub-topic (clear heading hierarchy).
+
+GEO / AEO (for AI answer engines — Google AI Overviews, ChatGPT, Perplexity):
+- Open the page's first text section with a DIRECT 1–2 sentence answer to the reader's core question, then expand.
+- Include a strong faq block: 5–8 real "People Also Ask"-style questions with concrete, self-contained answers.
+- Make claims specific, quotable and citeable; prefer concrete facts and practical takeaways over vague statements.
+
+DEPTH (this is the main requirement — earlier output was far too thin):
+- Produce 7 to 12 blocks: hero → a rich/media intro that leads with the direct answer → 1–2 substantive body sections (a benefits grid, a steps/process, and/or long-form rich text) → faq → a closing cta. Add funding, stats, testi, split or pricing ONLY where they genuinely fit the topic.
+- rich blocks must contain 2–4 substantial paragraphs of real, specific information — not one short paragraph.
+- Every section must add distinct value; never repeat the same point across sections.
+
+RULES:
+- Use ONLY the block types and fields below. Any other type or field is discarded.
 - Do NOT set image fields (img) — leave images out; the user adds photos afterwards. Do NOT invent ids.
 
 BLOCK TYPES:
@@ -172,16 +323,26 @@ rich  { html }  // long-form prose. Allowed HTML only: <p> <strong> <em> <a> <br
 
 Hrefs: use "#quote" for quote CTAs, "/commercial-funding" for business/funding, or a real internal path. Keep the JSON compact and valid.`;
 
-/** Provider-agnostic: reuses aiConfig() from src/lib/blog/ai.ts (OpenRouter now; swap via AI_BASE_URL/AI_API_KEY/AI_MODEL). */
-export async function generatePageBlocks(prompt: string, context?: string): Promise<CmsBlock[]> {
-  const { apiKey, baseUrl, model } = aiConfig();
+/** Research-driven, SEO/GEO-optimised page generator. Reuses the OpenRouter config
+ *  from src/lib/blog/ai.ts; writing model via pageModel(); optional live web research
+ *  via researchTopic(). Returns validated blocks + SEO metadata. */
+export async function generatePage(
+  prompt: string,
+  context?: string,
+): Promise<{ blocks: CmsBlock[]; seo: PageSeo }> {
+  const { apiKey, baseUrl } = aiConfig();
   if (!apiKey) throw new Error('AI is not configured. Set OPENROUTER_API_KEY (or AI_API_KEY).');
 
-  const topic = String(prompt || '').trim();
+  const topic = String(prompt || '').trim().slice(0, 4000);
   const ctx = String(context || '').trim().slice(0, 2000);
+  const research = await researchTopic(topic);
+
   const userMessage =
-    (ctx ? `Current page context (match its tone; avoid duplicating sections that already exist):\n${ctx}\n\n` : '') +
-    `Build the page for this brief. Return ONLY the JSON object described in the system message:\n\n${topic}`;
+    (ctx ? `Current page context (match its tone; do not duplicate sections that already exist):\n${ctx}\n\n` : '') +
+    (research
+      ? `RESEARCH — current top-ranking pages for this topic (use for coverage & structure only; never copy wording or unverified numbers):\n${research}\n\n`
+      : `No live research was available — write from your own expertise.\n\n`) +
+    `Write the most comprehensive, better-structured and more helpful page than the sources above, for this brief. Return ONLY the JSON object described in the system message:\n\n${topic}`;
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -192,9 +353,9 @@ export async function generatePageBlocks(prompt: string, context?: string): Prom
       'X-Title': 'Heliaxis CMS Page Builder',
     },
     body: JSON.stringify({
-      model,
+      model: pageModel(),
       temperature: 0.6,
-      response_format: { type: 'json_object' },
+      max_tokens: 8000,
       messages: [
         { role: 'system', content: SYSTEM },
         { role: 'user', content: userMessage },
@@ -211,7 +372,16 @@ export async function generatePageBlocks(prompt: string, context?: string): Prom
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('AI returned an empty response');
 
-  const parsed = extractJson(content) as { blocks?: unknown } | unknown[];
+  const parsed = extractJson(content) as { blocks?: unknown; seo?: unknown } | unknown[];
   const rawBlocks = Array.isArray(parsed) ? parsed : (parsed as { blocks?: unknown }).blocks;
-  return normalizeBlocks(rawBlocks);
+  const blocks = normalizeBlocks(rawBlocks);
+  const heroBlock = blocks.find((b) => b.t === 'hero');
+  const fallbackTitle = heroBlock ? String((heroBlock.p as Record<string, unknown>).headline || topic) : topic;
+  const seo = sanitizeSeo(Array.isArray(parsed) ? undefined : (parsed as { seo?: unknown }).seo, fallbackTitle);
+  return { blocks, seo };
+}
+
+/** @deprecated use generatePage — kept so existing imports keep working. */
+export async function generatePageBlocks(prompt: string, context?: string): Promise<CmsBlock[]> {
+  return (await generatePage(prompt, context)).blocks;
 }
