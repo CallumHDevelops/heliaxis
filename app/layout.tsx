@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
+import PWARegister from '@/components/PWARegister';
 import './globals.css';
 
 // Self-hosted Ezra. Drop the .otf files into /fonts (see fonts/README.txt).
@@ -31,20 +32,31 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'Heliaxis · Post Studio',
-  description: 'On-brand social post generator for Heliaxis.',
+  description: 'On-brand social posts & reels for Heliaxis.',
   robots: { index: false, follow: false },
+  applicationName: 'Post Studio',
+  appleWebApp: {
+    capable: true,
+    title: 'Post Studio',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#211F18',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-GB" className={`${ezra.variable} ${hanken.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <PWARegister />
+      </body>
     </html>
   );
 }
