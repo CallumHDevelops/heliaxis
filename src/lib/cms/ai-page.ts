@@ -296,10 +296,12 @@ GEO / AEO (for AI answer engines — Google AI Overviews, ChatGPT, Perplexity):
 - Include a strong faq block: 5–8 real "People Also Ask"-style questions with concrete, self-contained answers.
 - Make claims specific, quotable and citeable; prefer concrete facts and practical takeaways over vague statements.
 
-DEPTH (this is the main requirement — earlier output was far too thin):
-- Produce 7 to 12 blocks: hero → a rich/media intro that leads with the direct answer → 1–2 substantive body sections (a benefits grid, a steps/process, and/or long-form rich text) → faq → a closing cta. Add funding, stats, testi, split or pricing ONLY where they genuinely fit the topic.
-- rich blocks must contain 2–4 substantial paragraphs of real, specific information — not one short paragraph.
-- Every section must add distinct value; never repeat the same point across sections.
+STRUCTURE — use the RIGHT block for each idea. This is critical: do NOT output a wall of "rich" text sections.
+- Produce 8 to 12 blocks with VARIED types. A strong page looks like:
+  hero → media (intro that leads with the direct answer) → grid (key benefits/features) → steps (how it works / the process) → [optional: stats, split for home-vs-business, funding, casestudy, testi] → faq → cta.
+- You MUST include a grid OR a steps block, and you MUST include an faq block (5–8 questions).
+- Use AT MOST 2 "rich" blocks in the entire page, and NEVER place two rich blocks back-to-back. Turn list-like, step-like, comparison or benefit content into grid / steps / split / stats / funding blocks — these read far better than prose. Reach for "rich" only for genuine long-form explanation that no structured block fits.
+- Each rich block = 2–3 substantial paragraphs. Every section must add DISTINCT value; never repeat a point across sections.
 
 RULES:
 - Use ONLY the block types and fields below. Any other type or field is discarded.
@@ -322,6 +324,25 @@ cta   { headline, sub, btn, btnHref }  // closing call-to-action band.
 rich  { html }  // long-form prose. Allowed HTML only: <p> <strong> <em> <a> <br> <ul> <ol> <li> <h3> <h4> <blockquote>. No inline styles, images or scripts.
 
 Hrefs: use "#quote" for quote CTAs, "/commercial-funding" for business/funding, or a real internal path. Keep the JSON compact and valid.`;
+
+/** Safety net for the model over-using rich blocks: fold any back-to-back rich
+ *  blocks into one so the page never renders as a wall of prose sections. Lossless
+ *  (their HTML is concatenated) and order-preserving. */
+function mergeAdjacentRich(blocks: CmsBlock[]): CmsBlock[] {
+  const out: CmsBlock[] = [];
+  for (const b of blocks) {
+    const prev = out[out.length - 1];
+    if (b.t === 'rich' && prev && prev.t === 'rich') {
+      const pp = prev.p as Record<string, unknown>;
+      const a = String(pp.html || '');
+      const c = String((b.p as Record<string, unknown>).html || '');
+      pp.html = a && c ? a + '\n' + c : a || c;
+    } else {
+      out.push(b);
+    }
+  }
+  return out;
+}
 
 /** Research-driven, SEO/GEO-optimised page generator. Reuses the OpenRouter config
  *  from src/lib/blog/ai.ts; writing model via pageModel(); optional live web research
@@ -374,7 +395,7 @@ export async function generatePage(
 
   const parsed = extractJson(content) as { blocks?: unknown; seo?: unknown } | unknown[];
   const rawBlocks = Array.isArray(parsed) ? parsed : (parsed as { blocks?: unknown }).blocks;
-  const blocks = normalizeBlocks(rawBlocks);
+  const blocks = mergeAdjacentRich(normalizeBlocks(rawBlocks));
   const heroBlock = blocks.find((b) => b.t === 'hero');
   const fallbackTitle = heroBlock ? String((heroBlock.p as Record<string, unknown>).headline || topic) : topic;
   const seo = sanitizeSeo(Array.isArray(parsed) ? undefined : (parsed as { seo?: unknown }).seo, fallbackTitle);
