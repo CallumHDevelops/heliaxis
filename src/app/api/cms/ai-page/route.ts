@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requireApproved } from '@/lib/auth';
-import { generatePageBlocks, isAiConfigured } from '@/lib/cms/ai-page';
+import { generatePage, isAiConfigured } from '@/lib/cms/ai-page';
 
 export const dynamic = 'force-dynamic';
+// Research + a strong writing model can take well over the default limit. Vercel
+// caps this at the plan maximum (60s Hobby, up to 300s Pro/Fluid).
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const session = await requireApproved();
@@ -31,14 +34,14 @@ export async function POST(req: Request) {
   const context = typeof body.context === 'string' ? body.context.slice(0, 2000) : '';
 
   try {
-    const blocks = await generatePageBlocks(prompt, context);
+    const { blocks, seo } = await generatePage(prompt, context);
     if (!blocks.length) {
       return NextResponse.json(
         { error: 'The AI did not return any usable sections. Try rephrasing your description.' },
         { status: 422 },
       );
     }
-    return NextResponse.json({ blocks });
+    return NextResponse.json({ blocks, seo });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Generation failed';
     return NextResponse.json({ error: message }, { status: 500 });
