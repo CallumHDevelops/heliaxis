@@ -696,14 +696,26 @@ export function renderPost(
   } else {
     // statement / offer / question / tool / announce
     cy = eyebrow(d.eyebrow, top);
-    const hsz = S.size === 'landscape' ? 62 : 82;
+    // auto-fit headline: bigger for short copy, smaller for long (esp. tall story)
+    const clean = d.headline.split('*').join('');
+    const maxHsz = S.size === 'landscape' ? 72 : S.size === 'story' ? 132 : 100;
+    const minHsz = 44;
+    const targetLines = S.size === 'landscape' ? 3 : S.size === 'story' ? 5 : 3;
+    let hsz = maxHsz;
+    while (hsz > minHsz) {
+      setFont(900, Math.round(hsz * u));
+      const lines = wrap(clean, maxW);
+      const maxLineW = lines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+      if (lines.length <= targetLines && maxLineW <= maxW) break;
+      hsz -= 4;
+    }
     setFont(900, Math.round(hsz * u));
     const hStart = cy + Math.round(40 * u);
     cy = drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent);
     zone('headline', pad - 10, hStart - Math.round(hsz * u), maxW, cy - hStart + Math.round(hsz * 0.4 * u));
     if (d.sub) {
-      const subSz = S.size === 'landscape' ? 30 : 36;
-      const subLh = S.size === 'landscape' ? 42 : 50;
+      const subSz = S.size === 'landscape' ? 30 : S.size === 'story' ? 44 : 36;
+      const subLh = S.size === 'landscape' ? 42 : S.size === 'story' ? 60 : 50;
       setBody(Math.round(subSz * u), 400);
       cy += Math.round((S.size === 'landscape' ? 16 : 26) * u);
       const ss = cy;

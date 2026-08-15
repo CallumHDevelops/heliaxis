@@ -91,6 +91,7 @@ export default function Studio({
   const [genStatus, setGenStatus] = useState('');
   const [genErr, setGenErr] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'design' | 'content'>('design');
   const [genSuggest, setGenSuggest] = useState<string[]>([]);
   const [genSuggestBusy, setGenSuggestBusy] = useState(false);
 
@@ -982,7 +983,7 @@ export default function Studio({
   const caption = captionOverride ?? tpl.caption(S.data);
 
   return (
-    <div className={styles.app}>
+    <div className={styles.app} data-mtab={mobileTab}>
       {/* hidden icon sprite for <use> references */}
       <div style={{ display: 'none' }} aria-hidden dangerouslySetInnerHTML={{ __html: ICON_SPRITE }} />
       <div className={styles.bar}>
@@ -1086,6 +1087,17 @@ export default function Studio({
         <div className={styles.ph}>
           <Spark size={11} /> Template
         </div>
+        <select
+          className={styles.tplSelect}
+          value={S.tpl}
+          onChange={(e) => setTpl(e.target.value as TemplateKey)}
+        >
+          {(Object.keys(TEMPLATES) as TemplateKey[]).map((k) => (
+            <option key={k} value={k}>
+              {TEMPLATES[k].name} — {TEMPLATES[k].desc}
+            </option>
+          ))}
+        </select>
         <div className={styles.tgrid}>
           {(Object.keys(TEMPLATES) as TemplateKey[]).map((k) => (
             <button
@@ -1994,6 +2006,39 @@ export default function Studio({
           </div>
         </div>
       )}
+
+      {/* mobile bottom bar */}
+      <div className={styles.mobileBar}>
+        <button
+          className={`${styles.mbBtn} ${mobileTab === 'design' ? styles.mbOn : ''}`}
+          onClick={() => setMobileTab('design')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M4 6h16M4 12h16M4 18h10" />
+          </svg>
+          Design
+        </button>
+        <button
+          className={`${styles.mbBtn} ${mobileTab === 'content' ? styles.mbOn : ''}`}
+          onClick={() => setMobileTab('content')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M5 4h14v16H5z" />
+            <path d="M8 9h8M8 13h5" />
+          </svg>
+          Content
+        </button>
+        <button className={styles.mbBtn} onClick={() => setGenOpen(true)}>
+          <Spark size={16} />
+          Generate
+        </button>
+        <button className={styles.mbBtn} onClick={download}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M12 4v11M8 11l4 4 4-4M5 20h14" />
+          </svg>
+          Download
+        </button>
+      </div>
     </div>
   );
 }

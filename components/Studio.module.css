@@ -1152,7 +1152,23 @@
   cursor: default;
 }
 
-/* ---- tablet / mobile: stack the columns, canvas on top ---- */
+/* mobile-only helpers (hidden on desktop) */
+.tplSelect {
+  display: none;
+  width: 100%;
+  font-family: var(--body);
+  font-size: 0.86rem;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+}
+.mobileBar {
+  display: none;
+}
+
+/* ---- tablet / mobile: stack, canvas on top, tabbed panels + bottom bar ---- */
 @media (max-width: 1024px) {
   .app {
     display: flex;
@@ -1160,6 +1176,7 @@
     height: auto;
     min-height: 100vh;
     overflow: visible;
+    padding-bottom: 64px; /* room for the fixed bottom bar */
   }
   .bar {
     flex-wrap: wrap;
@@ -1182,8 +1199,11 @@
   }
   .stage {
     order: 1;
-    padding: 14px;
+    padding: 12px;
     min-height: 0;
+    position: sticky;
+    top: 52px;
+    z-index: 40;
   }
   .panel {
     order: 2;
@@ -1197,12 +1217,58 @@
     border-left: 0;
     border-top: 1px solid var(--line);
   }
+  /* show only the tab's panel */
+  .app[data-mtab='design'] .panel.right {
+    display: none;
+  }
+  .app[data-mtab='content'] .panel:not(.right) {
+    display: none;
+  }
   .canvaswrap,
   .canvaswrap canvas {
-    max-height: 60vh;
+    max-height: 42vh;
+  }
+  .tplSelect {
+    display: block;
+  }
+  .tgrid {
+    display: none;
   }
   .previewFloat {
     display: none;
+  }
+  .mobileBar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    background: var(--ink);
+    border-top: 1px solid var(--line-d);
+    padding: 4px 4px;
+  }
+  .mbBtn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    border: 0;
+    color: var(--muted-d);
+    font-family: var(--mono);
+    font-size: 0.52rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 6px 2px;
+    cursor: pointer;
+  }
+  .mbBtn svg {
+    stroke: currentColor;
+  }
+  .mbOn {
+    color: var(--solar);
   }
 }
 @media (max-width: 560px) {
