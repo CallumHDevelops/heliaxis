@@ -432,7 +432,7 @@ function heroTags(tags){
   if(!list.length)return '';
   return '<div class="pv-hero-tags">'+list.map(function(t){return '<span class="pv-hero-tag">'+esc(t)+'</span>'}).join('<span class="pv-hero-tag-sep" aria-hidden="true">|</span>')+'</div>';
 }
-const BLOCKNAMES={hero:'Hero',trustbar:'Trust bar',estband:'Estimator band',stats:'Stat bar',grid:'Grid section',split:'Home / Business',media:'Image + text',pricing:'Pricing plans',funding:'Funding & finance',steps:'Process steps',casestudy:'Case-study cards',gallery:'Install gallery',clientbanner:'Client banner',accbanner:'Accreditation banner',testi:'Testimonials',banner:'Brand banner',form:'Quote form',cta:'CTA band',footer:'Site footer',faq:'FAQ',rich:'Rich text'};
+const BLOCKNAMES={hero:'Hero',trustbar:'Trust bar',estband:'Estimator band',stats:'Stat bar',grid:'Grid section',split:'Home / Business',media:'Image + text',pricing:'Pricing plans',funding:'Funding & finance',steps:'Process steps',explorer:'Feature explorer',casestudy:'Case-study cards',gallery:'Install gallery',clientbanner:'Client banner',accbanner:'Accreditation banner',testi:'Testimonials',banner:'Brand banner',form:'Quote form',cta:'CTA band',footer:'Site footer',faq:'FAQ',rich:'Rich text'};
 function blockTypeKey(t){return String(t||'').trim().toLowerCase();}
 function blockDisplayName(t){var k=blockTypeKey(t);return BLOCKNAMES[k]||k||'Section';}
 function renderBlock(b,edit){
@@ -520,6 +520,30 @@ function renderBlock(b,edit){
      ctaHtml='<a class="pv-urgency" href="'+esc(p.ctaHref||'/commercial-funding')+'"'+(edit?' onclick="event.preventDefault()"':'')+'><span class="dot"></span><span'+ce(id+'.cta',edit)+'>'+esc(p.cta)+'</span></a>';
    }
    return '<div class="pv-funding"><div class="pv-funding-glow"></div><div class="wrap"><div class="shead">'+eyebrow(feb,id+'.eyebrow',edit,true)+'<h2>'+accentText(ftl)+'</h2>'+subHtml+'</div><div class="fgrid" style="grid-template-columns:repeat('+cols+',1fr)">'+cards+'</div>'+ctaHtml+'</div></div>';}
+ if(t==='explorer'){
+   var xeb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Mounting systems';
+   var xtl=(p.title!=null&&String(p.title).trim()!=='')?p.title:'One roof, every way to mount it';
+   var xsub=p.sub===''?null:(p.sub!=null&&String(p.sub).trim()!==''?p.sub:'Pick a system to see how we install it — and the photo updates with it.');
+   var xitems=(Array.isArray(p.items)?p.items:[]).slice(0,8);
+   if(!xitems.length)xitems=[{title:'Option',text:'Description.',img:'',cta:'',ctaHref:''}];
+   var gid='pvfx-'+id;
+   var radios=xitems.map(function(it,i){return '<input class="pv-fx-radio" type="radio" name="'+gid+'" id="'+gid+'-'+(i+1)+'"'+(i===0?' checked':'')+'>';}).join('');
+   var shots=xitems.map(function(it,i){
+     var num=String(i+1).padStart(2,'0');
+     var im=it.img?imgTag(it.img,'position:absolute;inset:0;width:100%;height:100%;object-fit:cover',edit,id+'.items.'+i+'.img'):'<div class="pv-fx-empty" aria-hidden="true">IMAGE</div>';
+     return '<figure class="pv-fx-shot">'+im+'<span class="pv-fx-tag">'+num+' / '+esc(it.title||'')+'</span></figure>';
+   }).join('');
+   var rows=xitems.map(function(it,i){
+     var num=String(i+1).padStart(2,'0');
+     var cta=(it.cta&&String(it.cta).trim())?'<a class="pv-btn solar pv-fx-cta" href="'+esc(it.ctaHref||'#quote')+'"'+(edit?' onclick="event.preventDefault()"':'')+'><span'+ce(id+'.items.'+i+'.cta',edit)+'>'+esc(it.cta)+'</span></a>':'';
+     return '<label class="pv-fx-item" for="'+gid+'-'+(i+1)+'">'
+       +'<span class="pv-fx-no">'+num+'</span>'
+       +'<span class="pv-fx-copy"><span class="pv-fx-title"'+ce(id+'.items.'+i+'.title',edit)+'>'+accentText(it.title||'')+'</span>'
+       +'<span class="pv-fx-desc"><span class="pv-fx-desc-in"><span class="pv-fx-desc-tx"'+ce(id+'.items.'+i+'.text',edit,1)+'>'+esc(it.text||'').replace(/\n/g,'<br>')+'</span>'+cta+'</span></span></span>'
+       +'<span class="pv-fx-chev" aria-hidden="true"></span></label>';
+   }).join('');
+   var xsubHtml=xsub?('<p'+ce(id+'.sub',edit)+'>'+esc(xsub)+'</p>'):'';
+   return '<section class="pv-fx'+(edit?' is-edit':'')+'"><div class="pv-fx-glow"></div><div class="wrap"><div class="shead">'+eyebrow(xeb,id+'.eyebrow',edit,true)+'<h2>'+accentText(xtl)+'</h2>'+xsubHtml+'</div>'+radios+'<div class="pv-fx-inner"><div class="pv-fx-stage">'+shots+'</div><div class="pv-fx-list">'+rows+'</div></div></div></section>';}
  if(t==='banner'){const ls=STATE.site.logos.filter(l=>l.bnr);const chip=l=>'<span class="pv-brand">'+(l.img?'<img src="'+l.img+'">':esc(l.name))+'</span>';
    return '<div class="pv-banner"><div class="bh">'+accentText(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+ls.map(chip).join('')+ls.map(chip).join('')+'</div></div></div>';}
  if(t==='cta'){
@@ -747,6 +771,10 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
    p.items.forEach(function(it,i){h+='<div class="sub"><div class="sh"><b>Card '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+accentArea('Title',it.title,id+'.items.'+i+'.title')+area('Text',it.text,id+'.items.'+i+'.text')+'</div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'New option\',text:\'Description.\'})">+ Add card</button>'+accentHint();
    h+=chk('Hide urgency button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Urgency button is hidden on the page.</div>':txt('Urgency button',p.cta||'0% VAT ends March 2027 — see all funding routes →',id+'.cta')+routeFld('Button link',p.ctaHref||'/commercial-funding',id+'.ctaHref'));}
+ else if(bt==='explorer'){h+=txt('Eyebrow',p.eyebrow||'Mounting systems',id+'.eyebrow')+accentArea('Title',p.title||'One roof, every way to mount it',id+'.title')+area('Subtext (leave empty to hide)',p.sub!=null?p.sub:'Pick a system to see how we install it — and the photo updates with it.',id+'.sub')+'<div class="hint">Dark cinematic explorer — click a row on the page to expand it and cross-fade its photo. No JS. Up to 8 options.</div>';
+   p.items.forEach(function(it,i){h+='<div class="sub"><div class="sh"><b>Option '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(it.img,id+'.items.'+i+'.img','Photo for this option',true)+'<div class="hint" style="font-size:.76rem;margin:-4px 0 8px">Left “film still” for this option. Leave blank for a placeholder plate.</div>'+accentArea('Title',it.title,id+'.items.'+i+'.title')+area('Description',it.text,id+'.items.'+i+'.text')+txt('Button (leave empty to hide)',it.cta||'',id+'.items.'+i+'.cta')+(it.cta&&String(it.cta).trim()?routeFld('Button link',it.ctaHref||'#quote',id+'.items.'+i+'.ctaHref'):'')+'</div>';});
+   h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'New option\',text:\'Description.\',img:\'\',cta:\'\',ctaHref:\'#quote\'})">+ Add option</button>'+accentHint();
+   if(p.items.length>8)h+='<div class="hint" style="color:var(--amber-2)">Only the first 8 options render on the page.</div>';}
  else if(bt==='testi'){h+=txt('Eyebrow',p.eyebrow||'Real customers',id+'.eyebrow')+accentArea('Title',p.title||'Trusted across South Wales',id+'.title')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',id+'.footnote')+'<div class="hint">Add testimonials. <b>More than 3 turns it into an auto-scrolling slider.</b></div>';
    h+='<div class="fld"><label>Slider speed — '+(p.speed||36)+'s per loop (lower = faster)</label><input type="range" min="12" max="80" value="'+(p.speed||36)+'" oninput="updT(\''+id+'.speed\',+this.value)"></div>';
    p.items.forEach((tt,i)=>{h+='<div class="sub"><div class="sh"><b>#'+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+area('Quote',tt.quote,id+'.items.'+i+'.quote')+'<div class="row2">'+txt('Name',tt.name,id+'.items.'+i+'.name')+txt('Location',tt.loc,id+'.items.'+i+'.loc')+'</div><div class="fld"><label>Stars — '+(tt.stars||5)+'</label><div class="seg">'+[1,2,3,4,5].map(s=>'<button class="'+((tt.stars||5)===s?'on':'')+'" onclick="upd(\''+id+'.items.'+i+'.stars\','+s+')">'+s+'★</button>').join('')+'</div></div></div>';});
@@ -2387,7 +2415,13 @@ window.EXTRA_DEFAULTS={
  gallery:{eyebrow:'Recent work',title:'Installs across South Wales',sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',featuredLabel:'Featured install',footnote:'Placeholder frames — swap in your real drone & install photography.',featuredIndex:0,items:[{img:'',loc:'Cardiff · 6.4 kWp + 10kWh battery',featured:true},{img:'',loc:'Swansea · 4.0 kWp',featured:false},{img:'',loc:'Newport · Commercial 55 kWp',featured:false},{img:'',loc:'Bridgend · 5.3 kWp + EV',featured:false},{img:'',loc:'Vale of Glamorgan · Heat pump',featured:false}]},
  funding:{eyebrow:'Funding & finance',title:'Solar within reach, whatever your budget',sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.',items:[{title:'0% VAT on home solar',text:'Residential installs carry 0% VAT until 31 March 2027 — a saving worth locking in.'},{title:'Finance & PPA options',text:'Spread the cost, or let a funder cover it entirely with Solar-as-a-Service for businesses.'},{title:'Welsh & local grants',text:'From the Nest scheme to Newport\'s SME decarbonisation grant — we\'ll help you find and time it.'}],cta:'0% VAT ends March 2027 — see all funding routes →',ctaHref:'/commercial-funding',ctaDisabled:false},
  clientbanner:{heading:'Trusted by businesses across South Wales',clients:[{name:'Morgan Ltd',img:''},{name:'Valley Foods',img:''},{name:'Cambrian Care',img:''},{name:'Severn Logistics',img:''},{name:'Tafwyl Retail',img:''}]},
- accbanner:{heading:'Our Accreditations',items:[{name:'MCS',img:''},{name:'RECC',img:''}]}
+ accbanner:{heading:'Our Accreditations',items:[{name:'MCS',img:''},{name:'RECC',img:''}]},
+ explorer:{eyebrow:'Mounting systems',title:'One roof, every way to mount it',sub:'Pick a system to see how we install it — and the photo updates with it.',items:[
+   {title:'In-roof',text:'Panels sit flush within the roof plane for a low-profile, weather-integrated finish.',img:'',cta:'Book a survey',ctaHref:'#quote'},
+   {title:'On-roof',text:'Rail-mounted above existing tiles — the fastest, most cost-effective retrofit.',img:'',cta:'Book a survey',ctaHref:'#quote'},
+   {title:'Flat roof',text:'Ballasted A-frames angled for yield with no roof penetrations.',img:'',cta:'Book a survey',ctaHref:'#quote'},
+   {title:'Ground-mount',text:'Framed arrays for sites with spare land — ideal for farms and larger demand.',img:'',cta:'Book a survey',ctaHref:'#quote'}
+ ]}
 };
 function altLanding(c,tpl){const[name,headline,sub,benefits,cta]=c;const U=()=>uid();
  const hero={id:U(),t:'hero',p:{eyebrow:'MCS-certified · South Wales',headline,sub,dark:true,ctaLabel:cta,ctaPulse:true,cta2:''}};

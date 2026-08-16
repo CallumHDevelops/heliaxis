@@ -779,6 +779,42 @@ function renderBlock(b: LooseBlock): string {
     );
   }
 
+  if (t === 'explorer') {
+    const items = (Array.isArray(p.items)
+      ? (p.items as Array<{ title?: string; text?: string; img?: unknown; cta?: string; ctaHref?: string }>)
+      : []).slice(0, 8);
+    const list = items.length ? items : [{ title: 'Option', text: 'Description.' }];
+    const xeb = p.eyebrow != null && String(p.eyebrow).trim() !== '' ? String(p.eyebrow) : 'Mounting systems';
+    const xtl = p.title != null && String(p.title).trim() !== '' ? String(p.title) : 'One roof, every way to mount it';
+    const xsub = p.sub === '' ? null
+      : p.sub != null && String(p.sub).trim() !== '' ? String(p.sub)
+      : 'Pick a system to see how we install it — and the photo updates with it.';
+    const gid = `pvfx-${esc(String((b as { id?: unknown }).id || 'x'))}`;
+    const radios = list.map((_it, i) =>
+      `<input class="pv-fx-radio" type="radio" name="${gid}" id="${gid}-${i + 1}"${i === 0 ? ' checked' : ''}>`).join('');
+    const shots = list.map((it, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const src = imgSrc(it.img);
+      const im = src
+        ? `<img src="${esc(src)}" alt="${esc(it.title || '')}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`
+        : '<div class="pv-fx-empty" aria-hidden="true">IMAGE</div>';
+      return `<figure class="pv-fx-shot">${im}<span class="pv-fx-tag">${num} / ${esc(it.title || '')}</span></figure>`;
+    }).join('');
+    const rows = list.map((it, i) => {
+      const num = String(i + 1).padStart(2, '0');
+      const cta = it.cta && String(it.cta).trim()
+        ? `<a class="pv-btn solar pv-fx-cta" href="${esc(it.ctaHref || '#quote')}"><span>${esc(it.cta)}</span></a>`
+        : '';
+      return `<label class="pv-fx-item" for="${gid}-${i + 1}">`
+        + `<span class="pv-fx-no">${num}</span>`
+        + `<span class="pv-fx-copy"><span class="pv-fx-title">${accentText(it.title || '')}</span>`
+        + `<span class="pv-fx-desc"><span class="pv-fx-desc-in"><span class="pv-fx-desc-tx">${esc(it.text || '').replace(/\n/g, '<br>')}</span>${cta}</span></span></span>`
+        + `<span class="pv-fx-chev" aria-hidden="true"></span></label>`;
+    }).join('');
+    const xsubHtml = xsub ? `<p>${esc(xsub)}</p>` : '';
+    return `<section class="pv-fx"><div class="pv-fx-glow"></div><div class="wrap"><div class="shead">${eyebrow(xeb, true)}<h2>${accentText(xtl)}</h2>${xsubHtml}</div>${radios}<div class="pv-fx-inner"><div class="pv-fx-stage">${shots}</div><div class="pv-fx-list">${rows}</div></div></div></section>`;
+  }
+
   return '';
 }
 
