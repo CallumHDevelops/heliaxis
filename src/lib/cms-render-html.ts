@@ -719,7 +719,7 @@ function renderBlock(b: LooseBlock): string {
       items
         .map(
           (s, i) =>
-            `<div class="pv-pstep"><div class="n">0${i + 1}</div><h4>${accentText(s.title)}</h4><p>${esc(s.text).replace(/\n/g, '<br>')}</p></div>`,
+            `<div class="pv-pstep"><div class="n">${String(i + 1).padStart(2, '0')}</div><h4>${accentText(s.title)}</h4><p>${esc(s.text).replace(/\n/g, '<br>')}</p></div>`,
         )
         .join('') +
       '</div></div>'
