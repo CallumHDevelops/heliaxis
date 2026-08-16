@@ -309,7 +309,7 @@ STRUCTURE — use the RIGHT block for each idea. This is critical: do NOT output
 - You MUST include a grid OR a steps block, and you MUST include an faq block (5–8 questions).
 - Use AT MOST 2 "rich" blocks in the entire page, and NEVER place two rich blocks back-to-back. Turn list-like, step-like, comparison or benefit content into grid / steps / split / stats / funding blocks — these read far better than prose. Reach for "rich" only for genuine long-form explanation that no structured block fits.
 - Each rich block = 2–3 substantial paragraphs. Every section must add DISTINCT value; never repeat a point across sections.
-- Keep sections scannable: steps = 3–6 steps (NEVER more than 6), grid = 3 or 4 cards, funding = 3 cards. Card titles are short; card text is 1–2 tight sentences, not a paragraph.
+- Keep sections scannable: steps = 3–8 steps (up to ~10 only for a genuinely detailed end-to-end process), grid = 3 or 4 cards, funding = 3 cards. Card titles are short; card text is 1–2 tight sentences, not a paragraph.
 
 RULES:
 - Use ONLY the block types and fields below. Any other type or field is discarded.
@@ -321,7 +321,7 @@ stats { items:[{ n:"55 kWp", k:"System size" }] }  // 2-4 short stat items.
 grid  { eyebrow, title, cols:3, items:[{ icon, title, desc }] }  // feature cards. icon from: solar,battery,heatpump,ev,home,building,shield,coin,grant,warehouse,monitor,clock,bolt,sun,leaf,pound,chart,check,star,map,wrench,users,award,factory,plug,target.
 split { lIcon:"home", lt, ld, lb:[".."], lc, rIcon:"building", rt, rd, rb:[".."], rc }  // two side-by-side cards (home vs business), lb/rb are bullet arrays.
 media { eyebrow, title, text, side:"right", cta, ctaHref }  // one image-and-text row (image left blank).
-steps { eyebrow, title, items:[{ title, text }] }  // numbered process, 3-5 steps.
+steps { eyebrow, title, items:[{ title, text }] }  // numbered process, 3-8 steps (up to ~10 for a detailed end-to-end process).
 funding { eyebrow, title, sub, items:[{ title, text }], cta, ctaHref }  // finance/grant cards.
 explorer { eyebrow, title, sub, items:[{ title, text, cta, ctaHref }] }  // dark interactive "feature explorer": 3-6 options a visitor clicks to expand; leave images out.
 faq   { eyebrow, title, items:[{ q, a }] }  // Q&A accordion.
