@@ -714,7 +714,7 @@ function renderBlock(b: LooseBlock): string {
       : [];
     return (
       `<div class="pv-sec"><div class="shead">${eyebrow(p.eyebrow || 'How it works')}<h2>${accentText(p.title)}</h2></div>` +
-      `<div class="pv-steps" style="grid-template-columns:repeat(${items.length || 1},1fr)">` +
+      `<div class="pv-steps" style="grid-template-columns:repeat(${Math.min(items.length || 1, 4)},1fr)">` +
       items
         .map(
           (s, i) =>

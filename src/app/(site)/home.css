@@ -135,6 +135,8 @@
 .fcard{background:rgba(247,242,231,.04);border:1px solid var(--line-d);border-radius:3px;padding:24px}
 .fcard h3{font-size:1.15rem;font-weight:700;color:var(--paper)}
 .fcard p{margin-top:8px;color:var(--muted-d);font-size:.92rem}
+.fcard{transition:border-color .18s ease,background .18s ease}
+.fcard:hover{border-color:var(--solar);background:rgba(248,188,30,.06)}
 .urgency{display:inline-flex;align-items:center;gap:8px;margin-top:22px;font-family:var(--mono);font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);background:var(--solar);padding:9px 14px;border-radius:2px}
 .urgency .dot{width:8px;height:8px;border-radius:50%;background:var(--ink);animation:blink 1.4s infinite}
 @keyframes blink{50%{opacity:.3}}

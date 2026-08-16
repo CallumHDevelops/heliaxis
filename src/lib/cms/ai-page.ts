@@ -283,6 +283,11 @@ GOAL: write a page that OUTRANKS and OUT-HELPS the competitor pages provided in 
 
 Write plain, authoritative British English. No hype, no filler, no purple prose. Never invent statistics, prices, percentages, certifications, grants, phone numbers, emails, dates or customer names — if a figure is not established, keep the claim qualitative. Use the research ONLY for topic coverage and structure, never to copy wording or lift unverified numbers.
 
+WRITE FOR THE READER (audience-first — this matters most; earlier drafts were too generic and textbook):
+- Work out WHO the page is for from the brief (e.g. business owners / facilities managers, or homeowners) and write to their actual priorities: cost, payback drivers, disruption, reliability, warranties, and the practical next step.
+- Lead with the reader's outcome and concrete specifics, NOT a dictionary definition. NEVER open a section with "X refers to…", "X is the installation of…", "X is a system that…", or "Understanding X". Assume they already know what solar is — tell them what it means for THEIR site and why it's worth their time.
+- Be concrete and differentiated: name real options/methods and real next steps rather than explaining the concept in the abstract. Good example of the register to hit: "Commercial solar designed around your half-hourly demand, not your roof area — in-roof, on-roof, flat-roof, ground-mount or carport, MCS-certified and built to last." Prefer specific nouns and outcomes over encyclopaedic filler.
+
 Return ONLY valid JSON of this exact shape (no prose, no markdown, no code fences):
 { "seo": { "title": "...", "description": "...", "slug": "kebab-slug" }, "blocks": [ { "t": <type>, "p": { ...fields } }, ... ] }
 
@@ -302,6 +307,7 @@ STRUCTURE — use the RIGHT block for each idea. This is critical: do NOT output
 - You MUST include a grid OR a steps block, and you MUST include an faq block (5–8 questions).
 - Use AT MOST 2 "rich" blocks in the entire page, and NEVER place two rich blocks back-to-back. Turn list-like, step-like, comparison or benefit content into grid / steps / split / stats / funding blocks — these read far better than prose. Reach for "rich" only for genuine long-form explanation that no structured block fits.
 - Each rich block = 2–3 substantial paragraphs. Every section must add DISTINCT value; never repeat a point across sections.
+- Keep sections scannable: steps = 3–6 steps (NEVER more than 6), grid = 3 or 4 cards, funding = 3 cards. Card titles are short; card text is 1–2 tight sentences, not a paragraph.
 
 RULES:
 - Use ONLY the block types and fields below. Any other type or field is discarded.

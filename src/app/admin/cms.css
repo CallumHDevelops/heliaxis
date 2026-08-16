@@ -445,6 +445,10 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-pstep .n{font-family:var(--mono);font-weight:600;font-size:.9rem;color:var(--ink);background:var(--solar);padding:5px 10px;border-radius:2px;display:inline-block;margin-bottom:14px;line-height:1}
 .pv-pstep h4{font-size:1.05rem;font-weight:700;margin:0}
 .pv-pstep p{margin-top:6px;color:var(--muted);font-size:.9rem}
+/* Steps never exceed 4 across (render caps the inline count); collapse on smaller
+   screens — !important because the inline grid-template-columns would otherwise win. */
+@media(max-width:900px){.pv-steps{grid-template-columns:repeat(2,1fr)!important}}
+@media(max-width:560px){.pv-steps{grid-template-columns:1fr!important}}
 .pv-testi{padding:76px 0;background:var(--paper);box-sizing:border-box;width:100%}
 .pv-testi .wrap{max-width:var(--pv-max,1160px);margin:0 auto;padding:0 var(--pv-gutter,24px);box-sizing:border-box;width:100%}
 .pv-testi .shead{max-width:680px;margin:0 auto 34px;text-align:center}
@@ -500,6 +504,8 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-funding .fcard h3{font-size:1.15rem;font-weight:700;color:var(--paper);margin:0}
 .pv-funding .fcard p{margin-top:8px;color:var(--muted-d);font-size:.92rem}
 .pv-funding h2 .y,.pv-funding .fcard h3 .y{color:var(--solar)}
+.pv-funding .fcard{transition:border-color .18s ease,background .18s ease}
+.pv-funding .fcard:hover{border-color:var(--solar);background:rgba(248,188,30,.06)}
 .pv-urgency{display:inline-flex;align-items:center;gap:8px;margin-top:22px;font-family:var(--mono);font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);background:var(--solar);padding:9px 14px;border-radius:2px;text-decoration:none}
 .pv-urgency .dot{width:8px;height:8px;border-radius:50%;background:var(--ink);animation:pvblink 1.4s infinite;flex-shrink:0}
 @keyframes pvblink{50%{opacity:.3}}
