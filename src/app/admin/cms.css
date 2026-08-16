@@ -582,7 +582,7 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-fx-radio:nth-of-type(5):checked~.pv-fx-inner .pv-fx-item:nth-of-type(5) .pv-fx-desc,
 .pv-fx-radio:nth-of-type(6):checked~.pv-fx-inner .pv-fx-item:nth-of-type(6) .pv-fx-desc,
 .pv-fx-radio:nth-of-type(7):checked~.pv-fx-inner .pv-fx-item:nth-of-type(7) .pv-fx-desc,
-.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-item:nth-of-type(8) .pv-fx-desc{max-height:360px;opacity:1}
+.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-item:nth-of-type(8) .pv-fx-desc{max-height:640px;opacity:1}
 .pv-fx-radio:nth-of-type(1):checked~.pv-fx-inner .pv-fx-item:nth-of-type(1) .pv-fx-chev::after,
 .pv-fx-radio:nth-of-type(2):checked~.pv-fx-inner .pv-fx-item:nth-of-type(2) .pv-fx-chev::after,
 .pv-fx-radio:nth-of-type(3):checked~.pv-fx-inner .pv-fx-item:nth-of-type(3) .pv-fx-chev::after,
@@ -600,8 +600,9 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-fx-radio:nth-of-type(7):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(7),
 .pv-fx-radio:nth-of-type(8):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(8){outline:2px solid var(--solar);outline-offset:2px}
 .pv-fx.is-edit .pv-fx-desc{max-height:none;opacity:1;overflow:visible}
+.pv-fx.is-edit .pv-fx-shot{pointer-events:auto}
 @media(prefers-reduced-motion:reduce){.pv-fx-shot,.pv-fx-desc,.pv-fx-item::before,.pv-fx-chev::after{transition:none}}
-@media(max-width:820px){.pv-fx-inner{grid-template-columns:1fr!important}.pv-fx-stage{min-height:300px}}
+@media(max-width:820px){.pv-fx-inner{grid-template-columns:1fr!important}.pv-fx-stage{min-height:280px;max-height:72vh;position:sticky;top:12px}}
 @media(max-width:560px){.pv-fx{padding:56px 0}.pv-fx-item{padding:14px}.pv-fx-stage{min-height:240px}}
 .pv-urgency{display:inline-flex;align-items:center;gap:8px;margin-top:22px;font-family:var(--mono);font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);background:var(--solar);padding:9px 14px;border-radius:2px;text-decoration:none}
 .pv-urgency .dot{width:8px;height:8px;border-radius:50%;background:var(--ink);animation:pvblink 1.4s infinite;flex-shrink:0}
