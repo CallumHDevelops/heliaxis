@@ -506,6 +506,104 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-funding h2 .y,.pv-funding .fcard h3 .y{color:var(--solar)}
 .pv-funding .fcard{transition:border-color .18s ease,background .18s ease}
 .pv-funding .fcard:hover{border-color:var(--solar);background:rgba(248,188,30,.06)}
+/* ===== Feature explorer (pv-fx) — dark cinematic, JS-free radio engine ===== */
+.pv-fx{background:var(--ink);color:var(--paper);position:relative;overflow:hidden;padding:76px 0;box-sizing:border-box;width:100%}
+.pv-fx::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(247,242,231,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(247,242,231,.05) 1px,transparent 1px);background-size:64px 64px;-webkit-mask-image:linear-gradient(150deg,#000,transparent 82%);mask-image:linear-gradient(150deg,#000,transparent 82%);pointer-events:none;z-index:0}
+.pv-fx-glow{position:absolute;inset:0;background:radial-gradient(55% 100% at 8% 0,rgba(248,188,30,.16),transparent 55%);z-index:1;pointer-events:none}
+.pv-fx .wrap{max-width:var(--pv-max,1160px);margin:0 auto;padding:0 var(--pv-gutter,24px);position:relative;z-index:2;box-sizing:border-box;width:100%}
+.pv-fx .shead{max-width:680px;margin-bottom:34px}
+.pv-fx h2{font-size:clamp(1.8rem,3.6vw,2.6rem);font-weight:800;margin-top:12px;color:var(--paper)}
+.pv-fx h2 .y{color:var(--solar)}
+.pv-fx .shead p{margin-top:14px;color:var(--muted-d);font-size:1.06rem}
+.pv-fx .pv-eyebrow.on-dark{color:var(--solar)}
+.pv-fx-radio{position:absolute;width:1px;height:1px;opacity:0;margin:0;pointer-events:none}
+.pv-fx-inner{display:grid;grid-template-columns:1.15fr .85fr;gap:28px;align-items:start;position:relative;z-index:2}
+.pv-fx-stage{position:relative;min-height:420px;border-radius:4px;overflow:hidden;border:1px solid rgba(248,188,30,.35);background:linear-gradient(135deg,#26324c,#171d2b);box-shadow:0 0 0 1px rgba(248,188,30,.08),0 40px 90px -46px rgba(0,0,0,.85),inset 0 0 60px -22px rgba(248,188,30,.14)}
+.pv-fx-stage::before,.pv-fx-stage::after{content:"";position:absolute;width:22px;height:22px;z-index:4;opacity:.7;pointer-events:none}
+.pv-fx-stage::before{top:10px;left:10px;border-top:1.5px solid var(--solar);border-left:1.5px solid var(--solar)}
+.pv-fx-stage::after{bottom:10px;right:10px;border-bottom:1.5px solid var(--solar);border-right:1.5px solid var(--solar)}
+.pv-fx-shot{position:absolute;inset:0;margin:0;opacity:0;transform:scale(1.03);transition:opacity .5s ease,transform .6s ease;pointer-events:none}
+.pv-fx-shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.pv-fx-empty{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;color:var(--muted-d);background:linear-gradient(135deg,#26324c,#171d2b)}
+.pv-fx-tag{position:absolute;left:14px;bottom:14px;z-index:3;font-family:var(--mono);font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--paper);background:rgba(20,18,14,.7);border:1px solid rgba(248,188,30,.3);padding:6px 10px;border-radius:2px}
+.pv-fx-list{display:flex;flex-direction:column;gap:10px}
+.pv-fx-item{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;padding:16px 18px;border:1px solid var(--line-d);border-radius:3px;background:rgba(247,242,231,.04);cursor:pointer;transition:border-color .18s,background .18s}
+.pv-fx-item:hover{border-color:rgba(248,188,30,.55);background:rgba(248,188,30,.05)}
+.pv-fx-item::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;background:var(--solar);transform:scaleY(0);transform-origin:top;transition:transform .25s ease}
+.pv-fx-no{font-family:var(--mono);font-size:.74rem;font-weight:600;color:var(--muted-d);line-height:1.7;transition:color .18s}
+.pv-fx-copy{min-width:0}
+.pv-fx-title{font-family:var(--display);font-weight:700;font-size:1.12rem;color:var(--paper);display:block}
+.pv-fx-title .y{color:var(--solar)}
+.pv-fx-desc{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s ease,opacity .3s ease}
+.pv-fx-desc-in{display:block;padding-top:10px}
+.pv-fx-desc-tx{display:block;color:var(--muted-d);font-size:.92rem;line-height:1.6}
+.pv-fx-cta{margin-top:14px}
+.pv-fx-chev{position:relative;width:18px;height:18px;margin-top:3px;flex:none}
+.pv-fx-chev::before,.pv-fx-chev::after{content:"";position:absolute;background:var(--muted-d);transition:transform .3s}
+.pv-fx-chev::before{left:0;right:0;top:8px;height:1.5px}
+.pv-fx-chev::after{top:1px;bottom:1px;left:8px;width:1.5px}
+/* THE ENGINE: radios are the only <input> siblings, so :nth-of-type(n)=radio n; ~ reaches .pv-fx-inner; descendants hit item/shot n */
+.pv-fx-radio:nth-of-type(1):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(1),
+.pv-fx-radio:nth-of-type(2):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(2),
+.pv-fx-radio:nth-of-type(3):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(3),
+.pv-fx-radio:nth-of-type(4):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(4),
+.pv-fx-radio:nth-of-type(5):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(5),
+.pv-fx-radio:nth-of-type(6):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(6),
+.pv-fx-radio:nth-of-type(7):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(7),
+.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-shot:nth-of-type(8){opacity:1;transform:scale(1);z-index:2}
+.pv-fx-radio:nth-of-type(1):checked~.pv-fx-inner .pv-fx-item:nth-of-type(1),
+.pv-fx-radio:nth-of-type(2):checked~.pv-fx-inner .pv-fx-item:nth-of-type(2),
+.pv-fx-radio:nth-of-type(3):checked~.pv-fx-inner .pv-fx-item:nth-of-type(3),
+.pv-fx-radio:nth-of-type(4):checked~.pv-fx-inner .pv-fx-item:nth-of-type(4),
+.pv-fx-radio:nth-of-type(5):checked~.pv-fx-inner .pv-fx-item:nth-of-type(5),
+.pv-fx-radio:nth-of-type(6):checked~.pv-fx-inner .pv-fx-item:nth-of-type(6),
+.pv-fx-radio:nth-of-type(7):checked~.pv-fx-inner .pv-fx-item:nth-of-type(7),
+.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-item:nth-of-type(8){border-color:rgba(248,188,30,.6);background:rgba(248,188,30,.07)}
+.pv-fx-radio:nth-of-type(1):checked~.pv-fx-inner .pv-fx-item:nth-of-type(1)::before,
+.pv-fx-radio:nth-of-type(2):checked~.pv-fx-inner .pv-fx-item:nth-of-type(2)::before,
+.pv-fx-radio:nth-of-type(3):checked~.pv-fx-inner .pv-fx-item:nth-of-type(3)::before,
+.pv-fx-radio:nth-of-type(4):checked~.pv-fx-inner .pv-fx-item:nth-of-type(4)::before,
+.pv-fx-radio:nth-of-type(5):checked~.pv-fx-inner .pv-fx-item:nth-of-type(5)::before,
+.pv-fx-radio:nth-of-type(6):checked~.pv-fx-inner .pv-fx-item:nth-of-type(6)::before,
+.pv-fx-radio:nth-of-type(7):checked~.pv-fx-inner .pv-fx-item:nth-of-type(7)::before,
+.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-item:nth-of-type(8)::before{transform:scaleY(1)}
+.pv-fx-radio:nth-of-type(1):checked~.pv-fx-inner .pv-fx-item:nth-of-type(1) .pv-fx-no,
+.pv-fx-radio:nth-of-type(2):checked~.pv-fx-inner .pv-fx-item:nth-of-type(2) .pv-fx-no,
+.pv-fx-radio:nth-of-type(3):checked~.pv-fx-inner .pv-fx-item:nth-of-type(3) .pv-fx-no,
+.pv-fx-radio:nth-of-type(4):checked~.pv-fx-inner .pv-fx-item:nth-of-type(4) .pv-fx-no,
+.pv-fx-radio:nth-of-type(5):checked~.pv-fx-inner .pv-fx-item:nth-of-type(5) .pv-fx-no,
+.pv-fx-radio:nth-of-type(6):checked~.pv-fx-inner .pv-fx-item:nth-of-type(6) .pv-fx-no,
+.pv-fx-radio:nth-of-type(7):checked~.pv-fx-inner .pv-fx-item:nth-of-type(7) .pv-fx-no,
+.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-item:nth-of-type(8) .pv-fx-no{color:var(--solar)}
+.pv-fx-radio:nth-of-type(1):checked~.pv-fx-inner .pv-fx-item:nth-of-type(1) .pv-fx-desc,
+.pv-fx-radio:nth-of-type(2):checked~.pv-fx-inner .pv-fx-item:nth-of-type(2) .pv-fx-desc,
+.pv-fx-radio:nth-of-type(3):checked~.pv-fx-inner .pv-fx-item:nth-of-type(3) .pv-fx-desc,
+.pv-fx-radio:nth-of-type(4):checked~.pv-fx-inner .pv-fx-item:nth-of-type(4) .pv-fx-desc,
+.pv-fx-radio:nth-of-type(5):checked~.pv-fx-inner .pv-fx-item:nth-of-type(5) .pv-fx-desc,
+.pv-fx-radio:nth-of-type(6):checked~.pv-fx-inner .pv-fx-item:nth-of-type(6) .pv-fx-desc,
+.pv-fx-radio:nth-of-type(7):checked~.pv-fx-inner .pv-fx-item:nth-of-type(7) .pv-fx-desc,
+.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-item:nth-of-type(8) .pv-fx-desc{max-height:640px;opacity:1}
+.pv-fx-radio:nth-of-type(1):checked~.pv-fx-inner .pv-fx-item:nth-of-type(1) .pv-fx-chev::after,
+.pv-fx-radio:nth-of-type(2):checked~.pv-fx-inner .pv-fx-item:nth-of-type(2) .pv-fx-chev::after,
+.pv-fx-radio:nth-of-type(3):checked~.pv-fx-inner .pv-fx-item:nth-of-type(3) .pv-fx-chev::after,
+.pv-fx-radio:nth-of-type(4):checked~.pv-fx-inner .pv-fx-item:nth-of-type(4) .pv-fx-chev::after,
+.pv-fx-radio:nth-of-type(5):checked~.pv-fx-inner .pv-fx-item:nth-of-type(5) .pv-fx-chev::after,
+.pv-fx-radio:nth-of-type(6):checked~.pv-fx-inner .pv-fx-item:nth-of-type(6) .pv-fx-chev::after,
+.pv-fx-radio:nth-of-type(7):checked~.pv-fx-inner .pv-fx-item:nth-of-type(7) .pv-fx-chev::after,
+.pv-fx-radio:nth-of-type(8):checked~.pv-fx-inner .pv-fx-item:nth-of-type(8) .pv-fx-chev::after{transform:scaleY(0)}
+.pv-fx-radio:nth-of-type(1):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(1),
+.pv-fx-radio:nth-of-type(2):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(2),
+.pv-fx-radio:nth-of-type(3):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(3),
+.pv-fx-radio:nth-of-type(4):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(4),
+.pv-fx-radio:nth-of-type(5):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(5),
+.pv-fx-radio:nth-of-type(6):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(6),
+.pv-fx-radio:nth-of-type(7):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(7),
+.pv-fx-radio:nth-of-type(8):focus-visible~.pv-fx-inner .pv-fx-item:nth-of-type(8){outline:2px solid var(--solar);outline-offset:2px}
+.pv-fx.is-edit .pv-fx-desc{max-height:none;opacity:1;overflow:visible}
+.pv-fx.is-edit .pv-fx-shot{pointer-events:auto}
+@media(prefers-reduced-motion:reduce){.pv-fx-shot,.pv-fx-desc,.pv-fx-item::before,.pv-fx-chev::after{transition:none}}
+@media(max-width:820px){.pv-fx-inner{grid-template-columns:1fr!important}.pv-fx-stage{min-height:280px;max-height:72vh;position:sticky;top:12px}}
+@media(max-width:560px){.pv-fx{padding:56px 0}.pv-fx-item{padding:14px}.pv-fx-stage{min-height:240px}}
 .pv-urgency{display:inline-flex;align-items:center;gap:8px;margin-top:22px;font-family:var(--mono);font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);background:var(--solar);padding:9px 14px;border-radius:2px;text-decoration:none}
 .pv-urgency .dot{width:8px;height:8px;border-radius:50%;background:var(--ink);animation:pvblink 1.4s infinite;flex-shrink:0}
 @keyframes pvblink{50%{opacity:.3}}

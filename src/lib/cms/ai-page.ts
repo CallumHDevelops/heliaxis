@@ -24,6 +24,7 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
   media: { img: '', side: 'right', eyebrow: 'Why choose us', title: 'A section title', text: 'Describe the benefit here.', cta: 'Learn more', ctaHref: '#quote', ctaDisabled: false, textWide: false, fit: 'cover' },
   steps: { eyebrow: 'How it works', title: 'From enquiry to switch-on', items: [{ title: 'Step', text: 'Detail.' }] },
   funding: { eyebrow: 'Funding & finance', title: 'Solar within reach, whatever your budget', sub: '', items: [{ title: 'Option', text: 'Detail.' }], cta: '', ctaHref: '/commercial-funding', ctaDisabled: false },
+  explorer: { eyebrow: 'Mounting systems', title: 'One roof, every way to mount it', sub: '', items: [{ title: 'Option', text: 'Detail.', img: '', cta: '', ctaHref: '#quote' }] },
   faq: { eyebrow: 'Good to know', title: 'Your questions, answered', anchor: 'faq', items: [{ q: 'A question?', a: 'An answer.' }] },
   cta: { headline: 'Ready to start?', sub: 'Book a free survey today.', btn: 'Get my free quote', btnHref: '#quote', pulse: true, ctaDisabled: false, btn2: '', btn2Href: '', cta2Disabled: false },
   rich: { html: '<p>Write anything here…</p>' },
@@ -114,6 +115,7 @@ function normalizeBlock(raw: unknown): CmsBlock | null {
   if (t === 'rich') p.html = sanitizeRich(p.html);
   if (t === 'testi') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.stars = clampInt(it.stars, 1, 5, 5); });
   if (t === 'casestudy') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.img = ''; });
+  if (t === 'explorer') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.img = ''; });
   if (t === 'gallery') {
     const items = p.items as Array<Record<string, unknown>>;
     items.forEach((it) => { it.img = ''; it.featured = false; });
@@ -321,6 +323,7 @@ split { lIcon:"home", lt, ld, lb:[".."], lc, rIcon:"building", rt, rd, rb:[".."]
 media { eyebrow, title, text, side:"right", cta, ctaHref }  // one image-and-text row (image left blank).
 steps { eyebrow, title, items:[{ title, text }] }  // numbered process, 3-5 steps.
 funding { eyebrow, title, sub, items:[{ title, text }], cta, ctaHref }  // finance/grant cards.
+explorer { eyebrow, title, sub, items:[{ title, text, cta, ctaHref }] }  // dark interactive "feature explorer": 3-6 options a visitor clicks to expand; leave images out.
 faq   { eyebrow, title, items:[{ q, a }] }  // Q&A accordion.
 testi { eyebrow, title, items:[{ stars:5, quote, name, loc }] }  // testimonials. Mark quotes as illustrative in footnote if invented.
 pricing { eyebrow, title, plans:[{ name, price, per, feats:[".."], cta, ctaHref, hl:false }] }  // set hl:true on one recommended plan.
