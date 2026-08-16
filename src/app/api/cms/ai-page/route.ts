@@ -34,14 +34,14 @@ export async function POST(req: Request) {
   const context = typeof body.context === 'string' ? body.context.slice(0, 2000) : '';
 
   try {
-    const { blocks, seo } = await generatePage(prompt, context);
+    const { blocks, seo, debug } = await generatePage(prompt, context);
     if (!blocks.length) {
       return NextResponse.json(
-        { error: 'The AI did not return any usable sections. Try rephrasing your description.' },
+        { error: 'The AI did not return any usable sections. Try rephrasing your description.', debug },
         { status: 422 },
       );
     }
-    return NextResponse.json({ blocks, seo });
+    return NextResponse.json({ blocks, seo, debug });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Generation failed';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -223,12 +223,11 @@ function sanitizeSeo(raw: unknown, fallbackTitle: string): PageSeo {
 /** Writing model. Long-form pages default to a strong model; override with
  *  AI_PAGE_MODEL (falls back to the shared AI_MODEL, else a sensible strong default). */
 function pageModel(): string {
-  return (
-    process.env.AI_PAGE_MODEL ||
-    process.env.AI_MODEL ||
-    process.env.OPENAI_MODEL ||
-    'anthropic/claude-3.5-sonnet'
-  );
+  // Deep page writing needs a STRONG model. Use AI_PAGE_MODEL if set, otherwise a
+  // strong default. Deliberately does NOT inherit AI_MODEL / OPENAI_MODEL — those may
+  // point at a cheap model configured for the blog generator (openai/gpt-4o-mini),
+  // which produced thin, generic 2-section pages.
+  return process.env.AI_PAGE_MODEL || 'anthropic/claude-3.5-sonnet';
 }
 
 /** Best-effort live web research via Tavily (TAVILY_API_KEY). Reads the current
@@ -359,7 +358,7 @@ function mergeAdjacentRich(blocks: CmsBlock[]): CmsBlock[] {
 export async function generatePage(
   prompt: string,
   context?: string,
-): Promise<{ blocks: CmsBlock[]; seo: PageSeo }> {
+): Promise<{ blocks: CmsBlock[]; seo: PageSeo; debug: { model: string; rawCount: number; keptCount: number } }> {
   const { apiKey, baseUrl } = aiConfig();
   if (!apiKey) throw new Error('AI is not configured. Set OPENROUTER_API_KEY (or AI_API_KEY).');
 
@@ -404,11 +403,12 @@ export async function generatePage(
 
   const parsed = extractJson(content) as { blocks?: unknown; seo?: unknown } | unknown[];
   const rawBlocks = Array.isArray(parsed) ? parsed : (parsed as { blocks?: unknown }).blocks;
+  const rawCount = Array.isArray(rawBlocks) ? rawBlocks.length : 0;
   const blocks = mergeAdjacentRich(normalizeBlocks(rawBlocks));
   const heroBlock = blocks.find((b) => b.t === 'hero');
   const fallbackTitle = heroBlock ? String((heroBlock.p as Record<string, unknown>).headline || topic) : topic;
   const seo = sanitizeSeo(Array.isArray(parsed) ? undefined : (parsed as { seo?: unknown }).seo, fallbackTitle);
-  return { blocks, seo };
+  return { blocks, seo, debug: { model: pageModel(), rawCount, keptCount: blocks.length } };
 }
 
 /** @deprecated use generatePage — kept so existing imports keep working. */
