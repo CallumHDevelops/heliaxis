@@ -227,7 +227,7 @@ function pageModel(): string {
   // strong default. Deliberately does NOT inherit AI_MODEL / OPENAI_MODEL — those may
   // point at a cheap model configured for the blog generator (openai/gpt-4o-mini),
   // which produced thin, generic 2-section pages.
-  return process.env.AI_PAGE_MODEL || 'anthropic/claude-3.5-sonnet';
+  return process.env.AI_PAGE_MODEL || 'openai/gpt-4o';
 }
 
 /** Best-effort live web research via Tavily (TAVILY_API_KEY). Reads the current
@@ -373,33 +373,55 @@ export async function generatePage(
       : `No live research was available — write from your own expertise.\n\n`) +
     `Write the most comprehensive, better-structured and more helpful page than the sources above, for this brief. Return ONLY the JSON object described in the system message:\n\n${topic}`;
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk',
-      'X-Title': 'Heliaxis CMS Page Builder',
-    },
-    body: JSON.stringify({
-      model: pageModel(),
-      temperature: 0.6,
-      max_tokens: 8000,
-      messages: [
-        { role: 'system', content: SYSTEM },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-  });
+  // Try the configured/strong model first, then fall back to widely-available models
+  // if it is unavailable (e.g. a retired/renamed OpenRouter slug → 404 "no endpoints").
+  const primary = pageModel();
+  const candidates = [primary];
+  if (!candidates.includes('openai/gpt-4o')) candidates.push('openai/gpt-4o');
+  if (!candidates.includes('openai/gpt-4o-mini')) candidates.push('openai/gpt-4o-mini');
 
-  if (!res.ok) {
+  let content: string | undefined;
+  let usedModel = primary;
+  let lastErr = '';
+  for (const model of candidates) {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk',
+        'X-Title': 'Heliaxis CMS Page Builder',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.6,
+        max_tokens: 8000,
+        messages: [
+          { role: 'system', content: SYSTEM },
+          { role: 'user', content: userMessage },
+        ],
+      }),
+    });
+
+    if (res.ok) {
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      content = data.choices?.[0]?.message?.content;
+      usedModel = model;
+      if (content) break;
+      lastErr = 'empty response';
+      continue;
+    }
+
     const errText = await res.text().catch(() => '');
-    throw new Error(`AI request failed (${res.status}): ${errText.slice(0, 200)}`);
+    lastErr = `${res.status}: ${errText.slice(0, 200)}`;
+    // Only fall through to the next candidate when the model itself is unavailable;
+    // for auth/rate-limit/other errors, fail fast with the real message.
+    const modelUnavailable =
+      res.status === 404 || /no endpoints|not a valid model|model_not_found|does not exist/i.test(errText);
+    if (!modelUnavailable) throw new Error(`AI request failed (${lastErr})`);
   }
 
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('AI returned an empty response');
+  if (!content) throw new Error(`AI request failed (${lastErr || 'no usable model'})`);
 
   const parsed = extractJson(content) as { blocks?: unknown; seo?: unknown } | unknown[];
   const rawBlocks = Array.isArray(parsed) ? parsed : (parsed as { blocks?: unknown }).blocks;
@@ -408,7 +430,7 @@ export async function generatePage(
   const heroBlock = blocks.find((b) => b.t === 'hero');
   const fallbackTitle = heroBlock ? String((heroBlock.p as Record<string, unknown>).headline || topic) : topic;
   const seo = sanitizeSeo(Array.isArray(parsed) ? undefined : (parsed as { seo?: unknown }).seo, fallbackTitle);
-  return { blocks, seo, debug: { model: pageModel(), rawCount, keptCount: blocks.length } };
+  return { blocks, seo, debug: { model: usedModel, rawCount, keptCount: blocks.length } };
 }
 
 /** @deprecated use generatePage — kept so existing imports keep working. */
