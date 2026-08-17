@@ -117,9 +117,6 @@ function readBlock(raw: unknown): { t: string; p: Record<string, unknown> } | nu
     if (o[k] != null && o[k] !== '') { t = String(o[k]).trim().toLowerCase(); break; }
   }
   let p: unknown;
-  for (const k of ['p', 'props', 'content', 'data', 'fields', 'attributes']) {
-    if (o[k] && typeof o[k] === 'object') { p = o[k]; break; }
-  }
   // Object-keyed shape: { "hero": { ...fields } }
   if (!ALLOWED.has(t)) {
     const typeKey = Object.keys(o).find(
@@ -128,11 +125,30 @@ function readBlock(raw: unknown): { t: string; p: Record<string, unknown> } | nu
     if (typeKey) { t = typeKey.trim().toLowerCase(); p = o[typeKey]; }
   }
   if (!ALLOWED.has(t)) return null;
-  // Flattened fields with no nested props object: { t:'hero', headline:'…' }
   if (!p || typeof p !== 'object') {
-    const clone: Record<string, unknown> = { ...o };
-    for (const k of TYPE_KEYS) delete clone[k];
-    p = clone;
+    // Explicit props wrapper.
+    for (const k of ['p', 'props']) {
+      if (o[k] && typeof o[k] === 'object') { p = o[k]; break; }
+    }
+    // A generic container (content/data/fields/attributes) only counts as the props
+    // wrapper if it actually carries this type's fields — otherwise it's an incidental
+    // field on a flattened block and must not hijack the real siblings.
+    if (!p || typeof p !== 'object') {
+      const defKeys = Object.keys(DEFAULTS[t] || {});
+      for (const k of ['content', 'data', 'fields', 'attributes']) {
+        const v = o[k];
+        if (v && typeof v === 'object' && Object.keys(v as object).some((kk) => defKeys.includes(kk))) {
+          p = v;
+          break;
+        }
+      }
+    }
+    // Flattened fields: { t:'hero', headline:'…' }
+    if (!p || typeof p !== 'object') {
+      const clone: Record<string, unknown> = { ...o };
+      for (const k of TYPE_KEYS) delete clone[k];
+      p = clone;
+    }
   }
   return { t, p: p as Record<string, unknown> };
 }
