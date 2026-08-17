@@ -380,11 +380,11 @@ export async function generatePage(
   if (!candidates.includes('openai/gpt-4o')) candidates.push('openai/gpt-4o');
   if (!candidates.includes('openai/gpt-4o-mini')) candidates.push('openai/gpt-4o-mini');
 
-  let content: string | undefined;
-  let usedModel = primary;
-  let lastErr = '';
-  for (const model of candidates) {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+  const MAX_TOKENS = 6000;
+  const CREDITS_MSG =
+    'AI credits are low on OpenRouter — top up at https://openrouter.ai/settings/credits, then try again.';
+  const callChat = (model: string, maxTokens: number) =>
+    fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -395,13 +395,28 @@ export async function generatePage(
       body: JSON.stringify({
         model,
         temperature: 0.6,
-        max_tokens: 8000,
+        max_tokens: maxTokens,
         messages: [
           { role: 'system', content: SYSTEM },
           { role: 'user', content: userMessage },
         ],
       }),
     });
+
+  let content: string | undefined;
+  let usedModel = primary;
+  let lastErr = '';
+  for (const model of candidates) {
+    let res = await callChat(model, MAX_TOKENS);
+
+    // Low balance: OpenRouter (402) reports the max output tokens we can afford. If
+    // that's enough for a usable page, retry within budget rather than failing.
+    if (res.status === 402) {
+      const errText = await res.text().catch(() => '');
+      const afford = parseInt((errText.match(/afford\s+(\d+)/i) || [])[1] || '0', 10);
+      if (afford >= 900) res = await callChat(model, Math.max(900, afford - 96));
+      else throw new Error(CREDITS_MSG);
+    }
 
     if (res.ok) {
       const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
@@ -414,6 +429,7 @@ export async function generatePage(
 
     const errText = await res.text().catch(() => '');
     lastErr = `${res.status}: ${errText.slice(0, 200)}`;
+    if (res.status === 402) throw new Error(CREDITS_MSG);
     // Only fall through to the next candidate when the model itself is unavailable;
     // for auth/rate-limit/other errors, fail fast with the real message.
     const modelUnavailable =
