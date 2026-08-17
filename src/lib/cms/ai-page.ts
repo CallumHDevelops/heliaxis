@@ -103,12 +103,61 @@ function clampInt(v: unknown, min: number, max: number, fallback: number): numbe
   return Math.max(min, Math.min(max, n));
 }
 
-function normalizeBlock(raw: unknown): CmsBlock | null {
+const TYPE_KEYS = ['t', 'type', 'blockType', 'block'];
+
+/** Locate the block type + props tolerantly — strong models emit varied shapes:
+ *  {t,p}, {type,props}, flattened {t,...fields}, or object-keyed {hero:{...}}. Only
+ *  HOW we find type/props is relaxed; the field-level whitelist (mergeObj against
+ *  DEFAULTS) and the per-type hardening below are unchanged, so nothing unsafe leaks. */
+function readBlock(raw: unknown): { t: string; p: Record<string, unknown> } | null {
   if (!raw || typeof raw !== 'object') return null;
-  const t = String((raw as Record<string, unknown>).t || '').trim().toLowerCase();
+  const o = raw as Record<string, unknown>;
+  let t = '';
+  for (const k of TYPE_KEYS) {
+    if (o[k] != null && o[k] !== '') { t = String(o[k]).trim().toLowerCase(); break; }
+  }
+  let p: unknown;
+  // Object-keyed shape: { "hero": { ...fields } }
+  if (!ALLOWED.has(t)) {
+    const typeKey = Object.keys(o).find(
+      (k) => ALLOWED.has(k.trim().toLowerCase()) && o[k] && typeof o[k] === 'object',
+    );
+    if (typeKey) { t = typeKey.trim().toLowerCase(); p = o[typeKey]; }
+  }
   if (!ALLOWED.has(t)) return null;
-  const rawP = (raw as Record<string, unknown>).p;
-  const p = mergeObj(DEFAULTS[t], (rawP && typeof rawP === 'object') ? rawP as Record<string, unknown> : {});
+  if (!p || typeof p !== 'object') {
+    // Explicit props wrapper.
+    for (const k of ['p', 'props']) {
+      if (o[k] && typeof o[k] === 'object') { p = o[k]; break; }
+    }
+    // A generic container (content/data/fields/attributes) only counts as the props
+    // wrapper if it actually carries this type's fields — otherwise it's an incidental
+    // field on a flattened block and must not hijack the real siblings.
+    if (!p || typeof p !== 'object') {
+      const defKeys = Object.keys(DEFAULTS[t] || {});
+      for (const k of ['content', 'data', 'fields', 'attributes']) {
+        const v = o[k];
+        if (v && typeof v === 'object' && Object.keys(v as object).some((kk) => defKeys.includes(kk))) {
+          p = v;
+          break;
+        }
+      }
+    }
+    // Flattened fields: { t:'hero', headline:'…' }
+    if (!p || typeof p !== 'object') {
+      const clone: Record<string, unknown> = { ...o };
+      for (const k of TYPE_KEYS) delete clone[k];
+      p = clone;
+    }
+  }
+  return { t, p: p as Record<string, unknown> };
+}
+
+function normalizeBlock(raw: unknown): CmsBlock | null {
+  const rb = readBlock(raw);
+  if (!rb) return null;
+  const t = rb.t;
+  const p = mergeObj(DEFAULTS[t], rb.p);
   // Per-type hardening — the model never supplies real assets or out-of-range values.
   if (t === 'grid') p.cols = clampInt(p.cols, 1, 4, 3);
   if (t === 'media') p.img = '';
@@ -358,7 +407,11 @@ function mergeAdjacentRich(blocks: CmsBlock[]): CmsBlock[] {
 export async function generatePage(
   prompt: string,
   context?: string,
-): Promise<{ blocks: CmsBlock[]; seo: PageSeo; debug: { model: string; rawCount: number; keptCount: number } }> {
+): Promise<{
+  blocks: CmsBlock[];
+  seo: PageSeo;
+  debug: { model: string; rawCount: number; keptCount: number; firstKeys: string[] };
+}> {
   const { apiKey, baseUrl } = aiConfig();
   if (!apiKey) throw new Error('AI is not configured. Set OPENROUTER_API_KEY (or AI_API_KEY).');
 
@@ -441,12 +494,15 @@ export async function generatePage(
 
   const parsed = extractJson(content) as { blocks?: unknown; seo?: unknown } | unknown[];
   const rawBlocks = Array.isArray(parsed) ? parsed : (parsed as { blocks?: unknown }).blocks;
-  const rawCount = Array.isArray(rawBlocks) ? rawBlocks.length : 0;
+  const rawArr = Array.isArray(rawBlocks) ? rawBlocks : [];
+  const rawCount = rawArr.length;
+  const firstKeys =
+    rawArr[0] && typeof rawArr[0] === 'object' ? Object.keys(rawArr[0] as object).slice(0, 8) : [];
   const blocks = mergeAdjacentRich(normalizeBlocks(rawBlocks));
   const heroBlock = blocks.find((b) => b.t === 'hero');
   const fallbackTitle = heroBlock ? String((heroBlock.p as Record<string, unknown>).headline || topic) : topic;
   const seo = sanitizeSeo(Array.isArray(parsed) ? undefined : (parsed as { seo?: unknown }).seo, fallbackTitle);
-  return { blocks, seo, debug: { model: usedModel, rawCount, keptCount: blocks.length } };
+  return { blocks, seo, debug: { model: usedModel, rawCount, keptCount: blocks.length, firstKeys } };
 }
 
 /** @deprecated use generatePage — kept so existing imports keep working. */
