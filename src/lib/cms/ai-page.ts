@@ -348,16 +348,18 @@ SEO (for Google indexing):
 
 GEO / AEO (for AI answer engines — Google AI Overviews, ChatGPT, Perplexity):
 - Open the page's first text section with a DIRECT 1–2 sentence answer to the reader's core question, then expand.
-- Include a strong faq block: 5–8 real "People Also Ask"-style questions with concrete, self-contained answers.
+- Include a strong faq block: 5–8 real "People Also Ask"-style questions SPECIFIC to this page's exact topic and audience. Every answer must DIRECTLY and FULLY answer its own question in 2–3 self-contained sentences — never a vague one-liner, and never answer a different question than the one asked (e.g. a care-home page's planning question must answer planning for care homes, not generic "commercial solar").
 - Make claims specific, quotable and citeable; prefer concrete facts and practical takeaways over vague statements.
 
 STRUCTURE — use the RIGHT block for each idea. This is critical: do NOT output a wall of "rich" text sections.
 - Produce 8 to 12 blocks with VARIED types. A strong page looks like:
-  hero → media (intro that leads with the direct answer) → grid (key benefits/features) → steps (how it works / the process) → [optional: stats, split for home-vs-business, funding, casestudy, testi] → faq → cta.
+  hero → media (intro that leads with the direct answer) → grid (key benefits/features) → steps (how it works / the process) → [optional: stats, split, funding, casestudy, testi] → faq → cta.
 - You MUST include a grid OR a steps block, and you MUST include an faq block (5–8 questions).
+- NEVER place two dark-background sections back-to-back. The hero, funding and explorer blocks all render on a dark band — always separate them with a light section (media, grid, steps, split, faq or stats). e.g. hero → light section(s) → … → funding → light section → cta.
 - Use AT MOST 2 "rich" blocks in the entire page, and NEVER place two rich blocks back-to-back. Turn list-like, step-like, comparison or benefit content into grid / steps / split / stats / funding blocks — these read far better than prose. Reach for "rich" only for genuine long-form explanation that no structured block fits.
 - Each rich block = 2–3 substantial paragraphs. Every section must add DISTINCT value; never repeat a point across sections.
 - Keep sections scannable: steps = 3–8 steps (up to ~10 only for a genuinely detailed end-to-end process), grid = 3 or 4 cards, funding = 3 cards. Card titles are short; card text is 1–2 tight sentences, not a paragraph.
+- BALANCE cards that sit side-by-side in a row (grid items, funding items, split bullets): give them a similar text LENGTH — within ~15 characters of each other — so no card is visibly taller than its neighbours. Trim or pad wording to even them up.
 
 RULES:
 - Use ONLY the block types and fields below. Any other type or field is discarded.
@@ -367,7 +369,7 @@ BLOCK TYPES:
 hero  { eyebrow, headline, sub, ctaLabel, ctaHref, tags, dark:true }  // page banner. headline = the page's main H1.
 stats { items:[{ n:"55 kWp", k:"System size" }] }  // 2-4 short stat items.
 grid  { eyebrow, title, cols:3, items:[{ icon, title, desc }] }  // feature cards. icon from: solar,battery,heatpump,ev,home,building,shield,coin,grant,warehouse,monitor,clock,bolt,sun,leaf,pound,chart,check,star,map,wrench,users,award,factory,plug,target.
-split { lIcon:"home", lt, ld, lb:[".."], lc, rIcon:"building", rt, rd, rb:[".."], rc }  // two side-by-side cards (home vs business), lb/rb are bullet arrays.
+split { lIcon:"home", lt, ld, lb:[".."], lc, rIcon:"building", rt, rd, rb:[".."], rc }  // two side-by-side cards, lb/rb are bullet arrays. Tailor BOTH sides to THIS page's audience and pick fitting icons/titles — do NOT default to generic "home vs business" unless the page genuinely serves both. Only use this block when a real two-way comparison helps the reader.
 media { eyebrow, title, text, side:"right", cta, ctaHref }  // one image-and-text row (image left blank).
 steps { eyebrow, title, items:[{ title, text }] }  // numbered process, 3-8 steps (up to ~10 for a detailed end-to-end process).
 funding { eyebrow, title, sub, items:[{ title, text }], cta, ctaHref }  // finance/grant cards.
