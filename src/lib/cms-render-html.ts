@@ -117,7 +117,20 @@ function clampZoom(n: unknown): number {
   return Math.max(1, Math.min(3, Math.round(v * 100) / 100));
 }
 
-function mediaFrameHtml(val: unknown, fit?: unknown): string {
+function mediaGradHtml(p: Record<string, unknown>): string {
+  if (!p || !p.imgGradient) return '';
+  const dirRaw = String(p.imgGradientDir || 'bottom');
+  const dir = dirRaw === 'top' || dirRaw === 'left' || dirRaw === 'right' ? dirRaw : 'bottom';
+  const tone = p.imgGradientTone === 'gold' ? 'gold' : 'ink';
+  let s = 60;
+  if (p.imgGradientStrength != null && Number.isFinite(Number(p.imgGradientStrength))) {
+    s = Math.max(0, Math.min(100, Number(p.imgGradientStrength)));
+  }
+  const op = (0.18 + 0.72 * (s / 100)).toFixed(3);
+  return `<div class="pv-media-frame-grad pv-mgrad-${dir} pv-mgrad-${tone}" style="opacity:${op}" aria-hidden="true"></div>`;
+}
+
+function mediaFrameHtml(val: unknown, fit?: unknown, grad?: string): string {
   const src = imgSrc(val);
   if (!src) {
     return '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
@@ -157,7 +170,7 @@ function mediaFrameHtml(val: unknown, fit?: unknown): string {
   const cap = caption
     ? `<figcaption class="pv-media-frame-cap">${esc(caption)}</figcaption>`
     : '';
-  return `<div class="pv-media-frame">${img}${cap}</div>`;
+  return `<div class="pv-media-frame">${img}${grad || ''}${cap}</div>`;
 }
 
 const QUOTE_CHECK_SVG =
@@ -267,7 +280,7 @@ function renderBlock(b: LooseBlock): string {
 
   if (t === 'media') {
     const im = p.img
-      ? mediaFrameHtml(p.img, p.fit)
+      ? mediaFrameHtml(p.img, p.fit, mediaGradHtml(p))
       : '<div class="pv-media-frame is-empty" aria-hidden="true">IMAGE</div>';
     const ctaBtn = p.ctaDisabled ? '' : btn(p.cta, 'solar', false, p.ctaHref || '#quote');
     const cols = p.textWide
