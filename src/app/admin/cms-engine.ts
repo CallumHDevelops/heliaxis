@@ -663,7 +663,7 @@ function renderPreview(){
  if(typeof window.initPvFaq==='function')window.initPvFaq(pv);
 }
 /* Inline edit: write contenteditable text back to the block model by data-ep path. */
-function epSet(el){const ep=el.getAttribute('data-ep');if(!ep)return;const parts=ep.split('.');const bl=findBlock(parts[0]);if(!bl)return;let o=bl.p;for(let i=1;i<parts.length-1;i++){o=o[parts[i]];if(o==null)return;}var _v;if(el.getAttribute('data-html')==='1'){_v=el.innerHTML;}else{_v=(el.innerText!=null?el.innerText:el.textContent)||'';_v=_v.replace(/\r\n?/g,'\n').replace(/ /g,' ').replace(/\n+$/,'');}o[parts[parts.length-1]]=_v;}
+function epSet(el){const ep=el.getAttribute('data-ep');if(!ep)return;const parts=ep.split('.');const bl=findBlock(parts[0]);if(!bl)return;let o=bl.p;for(let i=1;i<parts.length-1;i++){o=o[parts[i]];if(o==null)return;}var _v;if(el.getAttribute('data-html')==='1'){_v=el.innerHTML;}else{var _html=el.innerHTML||'';if(/class="y"/i.test(_html)){/* accent heading: rebuild **gold** from <span class="y"> so inline edits keep the accent */_v=_html.replace(/<span[^>]*class="y"[^>]*>([\s\S]*?)<\/span>/gi,'**$1**').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/gi,' ').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&quot;/gi,'"').replace(/&#0?39;|&#x27;/gi,"'").replace(/&amp;/gi,'&');}else{_v=(el.innerText!=null?el.innerText:el.textContent)||'';}_v=_v.replace(/\r\n?/g,'\n').replace(/ /g,' ').replace(/\n+$/,'');}o[parts[parts.length-1]]=_v;}
 function epInput(el){epSet(el);debSave();}
 function epBlur(el){epSet(el);renderBuild();save();}
 function epKey(e,allowEnter){if(allowEnter)return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}
