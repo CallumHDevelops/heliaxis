@@ -583,6 +583,9 @@
   border-radius: 4px;
   background: var(--paper-2);
   overflow: hidden;
+  /* skip rendering off-screen cells so scrolling a big library stays smooth */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
 }
 .logoCell.on {
   border-color: var(--solar);

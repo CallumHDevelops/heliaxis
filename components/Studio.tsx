@@ -1230,7 +1230,7 @@ export default function Studio({
               return (
                 <span className={`${styles.brandChip} ${styles.on}`} key={id}>
                   <span className={styles.brandPick}>
-                    <img src={l.data_url} alt={l.name} />
+                    <img src={l.data_url} alt={l.name} loading="lazy" decoding="async" />
                     <span>{l.name || 'Logo'}</span>
                   </span>
                   <button
@@ -1736,7 +1736,7 @@ export default function Studio({
                   key={l.id}
                 >
                   <button className={styles.logoPick} onClick={() => toggleBrand(l.id)} title={l.name}>
-                    <img src={l.data_url} alt={l.name} />
+                    <img src={l.data_url} alt={l.name} loading="lazy" decoding="async" />
                     <span>{l.name || 'Logo'}</span>
                   </button>
                   <button
@@ -1797,7 +1797,7 @@ export default function Studio({
                     }}
                     title={l.description || l.name || 'Use as background'}
                   >
-                    <img src={l.data_url} alt={l.name} />
+                    <img src={l.data_url} alt={l.name} loading="lazy" decoding="async" />
                   </button>
                   <div className={styles.imgMeta}>
                     <span className={styles.imgName} title={l.name}>

@@ -590,6 +590,11 @@ export function renderPost(
     brandTop = rowTop - padB;
     brandBottom = rowBottom + padB;
     brandLeft = rightX - totalW;
+    // no legibility shadow on the logo cards (that was the "glow")
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
     setMono(Math.round(13 * u), 600);
     ctx.fillStyle = sub;
     ctx.textAlign = 'right';
@@ -603,10 +608,16 @@ export function renderPost(
       ctx.drawImage(c.im, x + padB, rowTop, c.w, logoH);
       x += c.cardW + cardGap;
     }
+    ctx.restore();
   }
 
 
-  const top = pad + Math.round((S.size === 'landscape' ? 64 : 120) * u);
+  const top =
+    pad +
+    Math.round(
+      (S.size === 'landscape' ? 64 : S.size === 'portrait' ? 200 : S.size === 'story' ? 260 : 120) *
+        u
+    );
   let cy = top;
   const eyebrow = (txt: string, y: number) => {
     if (!txt) return y;
@@ -714,12 +725,23 @@ export function renderPost(
     cy = drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent);
     zone('headline', pad - 10, hStart - Math.round(hsz * u), maxW, cy - hStart + Math.round(hsz * 0.4 * u));
     if (d.sub) {
-      const subSz = S.size === 'landscape' ? 30 : S.size === 'story' ? 44 : 36;
-      const subLh = S.size === 'landscape' ? 42 : S.size === 'story' ? 60 : 50;
-      setBody(Math.round(subSz * u), 400);
+      let subSz = S.size === 'landscape' ? 30 : S.size === 'story' ? 44 : 36;
+      let subLh = S.size === 'landscape' ? 42 : S.size === 'story' ? 60 : 50;
       cy += Math.round((S.size === 'landscape' ? 16 : 26) * u);
       const ss = cy;
-      cy = drawLines(d.sub, pad, cy, maxW * 0.95, Math.round(subLh * u), sub);
+      const subMaxW = maxW * 0.95;
+      // reserve room for the footer (and badges if present) so the sub never overlaps them
+      const badgeReserve = S.badges && S.badges.length ? (S.size === 'landscape' ? 54 : 62) : 18;
+      const subBottomLimit = H - pad - Math.round((30 + badgeReserve) * u);
+      setBody(Math.round(subSz * u), 400);
+      let subLines = wrap(d.sub, subMaxW);
+      while (subSz > 22 && ss + subLines.length * Math.round(subLh * u) > subBottomLimit) {
+        subSz -= 2;
+        subLh = Math.round(subSz * 1.4);
+        setBody(Math.round(subSz * u), 400);
+        subLines = wrap(d.sub, subMaxW);
+      }
+      cy = drawLines(d.sub, pad, cy, subMaxW, Math.round(subLh * u), sub);
       zone('sub', pad - 10, ss - Math.round(34 * u), maxW, cy - ss + Math.round(10 * u));
     }
     if (d.badge) {

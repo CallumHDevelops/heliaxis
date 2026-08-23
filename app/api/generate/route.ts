@@ -50,6 +50,10 @@ HOW TO MAKE IT GOOD (think before writing):
 - Prefer a real, checkable detail (a place, a system size, a scenario) over vague claims.
 - Read the headline aloud: if it sounds like an advert or a cliché, rewrite it.
 
+ANSWERING A QUESTION OR BUSTING A MYTH (Q&A / myth templates): the 'sub' must be a CONFIDENT, warm, helpful answer — NOT a wishy-washy "it depends". Lead with a clear, positive answer, then the reason in plain terms, then a light reassurance that you assess each home individually.
+- Weak: "It depends on your energy usage patterns."
+- Good: "Absolutely. A battery stores the solar you don't use during the day so you can use it at night — we work out whether it pays for your home before you commit."
+
 FIELD RULES:
 - 'eyebrow' = a 2-4 word ALL-CAPS kicker that frames the post (e.g. "CUSTOMER STORY · CARDIFF").
 - 'headline' = short and punchy (aim ≤ 8 words); wrap ONE or TWO key words in *asterisks* to accent them gold. No full stop unless it's a deliberate statement.
