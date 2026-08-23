@@ -542,6 +542,9 @@ export function renderPost(
   }
 
   const pad = Math.round(W * 0.085);
+  // landscape is short & wide — a full 8.5% top+bottom pad eats most of the
+  // 628px height, so use a tighter vertical pad there to free up real estate
+  const padY = S.size === 'landscape' ? Math.round(W * 0.05) : pad;
   const maxW = W - pad * 2;
   const u = W / 1080;
 
@@ -550,9 +553,9 @@ export function renderPost(
   if (lg && lg.complete && lg.naturalWidth) {
     const lh2 = Math.round(46 * u);
     const lw = lh2 * (lg.naturalWidth / lg.naturalHeight);
-    ctx.drawImage(lg, pad, pad, lw, lh2);
+    ctx.drawImage(lg, pad, padY, lw, lh2);
   }
-  sparkPath(W - pad - Math.round(20 * u), pad + Math.round(22 * u), Math.round(40 * u), accent);
+  sparkPath(W - pad - Math.round(20 * u), padY + Math.round(22 * u), Math.round(40 * u), accent);
 
   // over a photo, drop a soft shadow behind all text for guaranteed legibility
   if (imgs.photo) {
@@ -565,7 +568,7 @@ export function renderPost(
   if (d.footer) {
     setMono(Math.round(19 * u), 500);
     ctx.fillStyle = sub;
-    const fy = H - pad + Math.round(6 * u);
+    const fy = H - padY + Math.round(6 * u);
     ctx.fillText(d.footer.toUpperCase(), pad, fy);
     zone('footer', pad - 10, fy - Math.round(30 * u), maxW, Math.round(48 * u));
   }
@@ -585,7 +588,7 @@ export function renderPost(
     });
     const totalW = cards.reduce((a, c) => a + c.cardW, 0) + cardGap * Math.max(0, cards.length - 1);
     const rightX = W - pad;
-    const rowBottom = H - pad + Math.round(2 * u);
+    const rowBottom = H - padY + Math.round(2 * u);
     const rowTop = rowBottom - logoH;
     brandTop = rowTop - padB;
     brandBottom = rowBottom + padB;
@@ -613,9 +616,9 @@ export function renderPost(
 
 
   const top =
-    pad +
+    padY +
     Math.round(
-      (S.size === 'landscape' ? 64 : S.size === 'portrait' ? 200 : S.size === 'story' ? 260 : 120) *
+      (S.size === 'landscape' ? 96 : S.size === 'portrait' ? 200 : S.size === 'story' ? 260 : 120) *
         u
     );
   let cy = top;
@@ -632,11 +635,11 @@ export function renderPost(
     // Landscape is short & wide — stacking the big number + label + sub never
     // fits. Lay it out side-by-side: number on the left, label + sub on the
     // right, each vertically centred in the space between eyebrow and footer.
-    const ey = pad + Math.round(64 * u);
+    const ey = padY + Math.round(70 * u);
     if (d.eyebrow) eyebrow(d.eyebrow, ey);
-    const bandTop = ey + Math.round(18 * u);
-    const footerReserve = (d.footer ? 44 : 10) + (brandImgs.length ? 34 : 0);
-    const bandBottom = H - pad - Math.round(footerReserve * u);
+    const bandTop = ey + Math.round(14 * u);
+    const footerReserve = (d.footer ? 48 : 12) + (brandImgs.length ? 34 : 0);
+    const bandBottom = H - padY - Math.round(footerReserve * u);
     const bandH = Math.max(1, bandBottom - bandTop);
 
     const colGap = Math.round(40 * u);
@@ -822,42 +825,96 @@ export function renderPost(
   } else {
     // statement / offer / question / tool / announce
     cy = eyebrow(d.eyebrow, top);
-    // auto-fit headline: bigger for short copy, smaller for long (esp. tall story)
     const clean = d.headline.split('*').join('');
-    const maxHsz = S.size === 'landscape' ? 72 : S.size === 'story' ? 132 : 100;
-    const minHsz = 44;
-    const targetLines = S.size === 'landscape' ? 3 : S.size === 'story' ? 5 : 3;
-    let hsz = maxHsz;
-    while (hsz > minHsz) {
-      setFont(900, Math.round(hsz * u));
-      const lines = wrap(clean, maxW);
-      const maxLineW = lines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
-      if (lines.length <= targetLines && maxLineW <= maxW) break;
-      hsz -= 4;
-    }
-    setFont(900, Math.round(hsz * u));
-    const hStart = cy + Math.round(40 * u);
-    cy = drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent);
-    zone('headline', pad - 10, hStart - Math.round(hsz * u), maxW, cy - hStart + Math.round(hsz * 0.4 * u));
-    if (d.sub) {
-      let subSz = S.size === 'landscape' ? 30 : S.size === 'story' ? 44 : 36;
-      let subLh = S.size === 'landscape' ? 42 : S.size === 'story' ? 60 : 50;
-      cy += Math.round((S.size === 'landscape' ? 16 : 26) * u);
-      const ss = cy;
-      const subMaxW = maxW * 0.95;
-      // reserve room for the footer (and badges if present) so the sub never overlaps them
-      const badgeReserve = S.badges && S.badges.length ? (S.size === 'landscape' ? 54 : 62) : 18;
-      const subBottomLimit = H - pad - Math.round((30 + badgeReserve) * u);
-      setBody(Math.round(subSz * u), 400);
-      let subLines = wrap(d.sub, subMaxW);
-      while (subSz > 22 && ss + subLines.length * Math.round(subLh * u) > subBottomLimit) {
-        subSz -= 2;
-        subLh = Math.round(subSz * 1.4);
-        setBody(Math.round(subSz * u), 400);
-        subLines = wrap(d.sub, subMaxW);
+
+    if (S.size === 'landscape') {
+      // Landscape is short & wide — fit the headline AND the sub TOGETHER into
+      // the band above the footer, shrinking both until the whole block fits.
+      const extraReserve =
+        (d.badge ? 66 : 0) + (d.cta ? 76 : 0) + (S.badges && S.badges.length ? 46 : 0);
+      const bandBottom = H - padY - Math.round((46 + extraReserve) * u);
+      const hTop = cy + Math.round(26 * u);
+      let hsz = 60;
+      let subSz = 26;
+      let hLines: string[] = [];
+      let hLH = 0;
+      let hBlockH = 0;
+      let subLines: string[] = [];
+      let subLH = 0;
+      let subBlockH = 0;
+      const subGap = Math.round(16 * u);
+      const fit = () => {
+        setFont(900, Math.round(hsz * u));
+        hLines = wrap(clean, maxW);
+        hLH = Math.round(hsz * 1.1 * u);
+        hBlockH = hLines.length * hLH;
+        subLines = [];
+        subLH = 0;
+        subBlockH = 0;
+        if (d.sub) {
+          setBody(Math.round(subSz * u), 400);
+          subLines = wrap(d.sub, maxW * 0.95);
+          subLH = Math.round(subSz * 1.34 * u);
+          subBlockH = subGap + subLines.length * subLH;
+        }
+        return hBlockH + subBlockH;
+      };
+      let total = fit();
+      while ((hsz > 38 || subSz > 19) && hTop + total > bandBottom) {
+        if (hsz > 38) hsz -= 3;
+        if (subSz > 19) subSz -= 1;
+        total = fit();
       }
-      cy = drawLines(d.sub, pad, cy, subMaxW, Math.round(subLh * u), sub);
-      zone('sub', pad - 10, ss - Math.round(34 * u), maxW, cy - ss + Math.round(10 * u));
+      setFont(900, Math.round(hsz * u));
+      drawRich(d.headline, pad, hTop + Math.round(hsz * 0.8 * u), maxW, hLH, fg, accent);
+      zone('headline', pad - 10, hTop, maxW, hBlockH);
+      cy = hTop + hBlockH;
+      if (d.sub) {
+        cy += subGap;
+        setBody(Math.round(subSz * u), 400);
+        const ss = cy;
+        drawLines(d.sub, pad, cy + Math.round(subSz * 0.8 * u), maxW * 0.95, subLH, sub);
+        zone('sub', pad - 10, ss, maxW, subLines.length * subLH);
+        cy = ss + subLines.length * subLH;
+      }
+    } else {
+      // square / portrait / story
+      // auto-fit headline: bigger for short copy, smaller for long (esp. tall story)
+      const maxHsz = S.size === 'story' ? 132 : 100;
+      const minHsz = 44;
+      const targetLines = S.size === 'story' ? 5 : 3;
+      let hsz = maxHsz;
+      while (hsz > minHsz) {
+        setFont(900, Math.round(hsz * u));
+        const lines = wrap(clean, maxW);
+        const maxLineW = lines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+        if (lines.length <= targetLines && maxLineW <= maxW) break;
+        hsz -= 4;
+      }
+      setFont(900, Math.round(hsz * u));
+      const hStart = cy + Math.round(40 * u);
+      cy = drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent);
+      zone('headline', pad - 10, hStart - Math.round(hsz * u), maxW, cy - hStart + Math.round(hsz * 0.4 * u));
+      if (d.sub) {
+        let subSz = S.size === 'story' ? 44 : 36;
+        let subLh = S.size === 'story' ? 60 : 50;
+        cy += Math.round(26 * u);
+        const ss = cy;
+        const subMaxW = maxW * 0.95;
+        // reserve room for the footer (and badges if present) so the sub never overlaps them
+        const badgeReserve = S.badges && S.badges.length ? 62 : 18;
+        const subBottomLimit = H - padY - Math.round((30 + badgeReserve) * u);
+        setBody(Math.round(subSz * u), 400);
+        let subLines = wrap(d.sub, subMaxW);
+        while (subSz > 22 && ss + subLines.length * Math.round(subLh * u) > subBottomLimit) {
+          subSz -= 2;
+          subLh = Math.round(subSz * 1.4);
+          setBody(Math.round(subSz * u), 400);
+          subLines = wrap(d.sub, subMaxW);
+        }
+        cy = drawLines(d.sub, pad, cy, subMaxW, Math.round(subLh * u), sub);
+        zone('sub', pad - 10, ss - Math.round(34 * u), maxW, cy - ss + Math.round(10 * u));
+      }
     }
     if (d.badge) {
       cy += Math.round(34 * u);
@@ -924,7 +981,7 @@ export function renderPost(
       const totalW = items.reduce((a, it) => a + it.w, 0) + gap * Math.max(0, items.length - 1);
       const rightEnd = hasBrands ? brandLeft - gap : W - pad;
       let bx = Math.max(pad, rightEnd - totalW);
-      const by = H - pad - Math.round(4 * u);
+      const by = H - padY - Math.round(4 * u);
       for (const it of items) {
         drawPill(bx, by, it.w, it.bd, it.label);
         bx += it.w + gap;
@@ -933,7 +990,7 @@ export function renderPost(
       // stacked just above the footer; if logos are present, sit entirely
       // above them so the two never overlap
       let bx = pad;
-      let by = H - pad - Math.round(56 * u);
+      let by = H - padY - Math.round(56 * u);
       if (hasBrands) by = Math.min(by, brandTop - pillH / 2 - Math.round(12 * u));
       for (const bd of badges) {
         const label = (bd.label || '').toUpperCase();
