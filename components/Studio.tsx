@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Spark } from './Spark';
+import ProjectsModal from './ProjectsModal';
 import {
   TEMPLATES,
   SIZES,
@@ -119,6 +120,7 @@ export default function Studio({
   const [captionOverride, setCaptionOverride] = useState<string | null>(null);
   const [capBusy, setCapBusy] = useState(false);
   const [capErr, setCapErr] = useState('');
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [pickLabel, setPickLabel] = useState('');
@@ -1064,6 +1066,15 @@ export default function Studio({
                   >
                     Image library
                   </button>
+                  <button
+                    className={styles.menuitem}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setProjectsOpen(true);
+                    }}
+                  >
+                    Projects
+                  </button>
                   {isAdmin && (
                     <button className={styles.menuitem} onClick={openAdmin}>
                       Manage users
@@ -2006,6 +2017,8 @@ export default function Studio({
           </div>
         </div>
       )}
+
+      {projectsOpen && <ProjectsModal onClose={() => setProjectsOpen(false)} />}
 
       {/* mobile bottom bar */}
       <div className={styles.mobileBar}>

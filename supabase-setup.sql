@@ -198,3 +198,45 @@ create policy "authenticated can delete cta_library"
 -- (Authentication → Users → Invite). That stops the public /register route
 -- creating accounts.
 -- ============================================================
+
+-- ============================================================
+-- Projects — real installs the team can showcase (shared). Photos live in
+-- project_images. OpenSolar imports prefill the fields.
+-- ============================================================
+create table if not exists public.projects (
+  id                 uuid primary key default gen_random_uuid(),
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(),
+  created_by         uuid references auth.users (id) on delete set null default auth.uid(),
+  name               text not null default '',
+  location           text not null default '',
+  panel_manufacturer text not null default '',
+  panel_model        text not null default '',
+  panel_wattage      text not null default '',
+  panel_count        text not null default '',
+  system_size        text not null default '',
+  annual_generation  text not null default '',
+  inverter_brand     text not null default '',
+  inverter_model     text not null default '',
+  battery_brand      text not null default '',
+  battery_total      text not null default '',
+  annual_savings     text not null default '',
+  notes              text not null default ''
+);
+alter table public.projects enable row level security;
+create policy "authenticated can read projects"   on public.projects for select to authenticated using (true);
+create policy "authenticated can insert projects"  on public.projects for insert to authenticated with check (true);
+create policy "authenticated can update projects"  on public.projects for update to authenticated using (true) with check (true);
+create policy "authenticated can delete projects"  on public.projects for delete to authenticated using (true);
+
+create table if not exists public.project_images (
+  id          uuid primary key default gen_random_uuid(),
+  created_at  timestamptz not null default now(),
+  project_id  uuid references public.projects (id) on delete cascade,
+  name        text not null default '',
+  data_url    text not null
+);
+alter table public.project_images enable row level security;
+create policy "authenticated can read project_images"   on public.project_images for select to authenticated using (true);
+create policy "authenticated can insert project_images"  on public.project_images for insert to authenticated with check (true);
+create policy "authenticated can delete project_images"  on public.project_images for delete to authenticated using (true);

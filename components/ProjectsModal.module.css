@@ -1,0 +1,244 @@
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 14, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 220;
+  padding: 24px;
+}
+.box {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 5px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 26px 28px;
+  position: relative;
+}
+.close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: 0;
+  font-size: 1.4rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.35rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title svg {
+  fill: var(--amber-2);
+}
+.sub {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin: 8px 0 18px;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.row {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  cursor: pointer;
+  padding: 11px 13px;
+}
+.row:hover {
+  border-color: var(--solar);
+}
+.row b {
+  display: block;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.row span {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 24px 0;
+}
+.imp {
+  display: block;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  background: rgba(248, 188, 30, 0.14);
+  border: 1px dashed var(--solar);
+  color: var(--ink);
+  padding: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  margin: 6px 0 16px;
+}
+.imp input {
+  display: none;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.fld {
+  margin-bottom: 11px;
+}
+.fld label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.fld input,
+.fld textarea {
+  width: 100%;
+  font-family: var(--body);
+  font-size: 0.86rem;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+}
+.fld textarea {
+  resize: vertical;
+  min-height: 54px;
+  line-height: 1.45;
+}
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.photo {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(20, 18, 14, 0.6);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 2px 6px;
+}
+.photo button:hover {
+  background: #b4462f;
+}
+.upload {
+  display: inline-block;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  padding: 8px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.upload:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+.upload input {
+  display: none;
+}
+.note {
+  font-size: 0.82rem;
+  color: var(--amber-2);
+  margin: 10px 0 0;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.btn {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  padding: 9px 16px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.btn:hover {
+  border-color: var(--solar);
+}
+.btn.solar {
+  background: var(--solar);
+  border-color: var(--solar);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.danger {
+  margin-left: auto;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.84rem;
+  border: 1px solid #b4462f;
+  background: none;
+  color: #b4462f;
+  padding: 9px 16px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.danger:hover {
+  background: #b4462f;
+  color: var(--paper);
+}
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .photoGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
