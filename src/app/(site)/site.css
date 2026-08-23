@@ -24,6 +24,11 @@
   color: var(--ink);
   font-family: var(--body);
 }
+/* Sticky footer for CMS-rendered pages — pin the footer to the bottom on short pages */
+.site:has(> .pv-live){display:flex;flex-direction:column;min-height:100vh}
+.site > .pv-live{flex:1 0 auto;display:flex;flex-direction:column}
+.pv-live > .pv-page{flex:1 0 auto;display:flex;flex-direction:column}
+.pv-live > .pv-page > div:has(> .pv-footer){margin-top:auto}
 .site h1, .site h2, .site h3, .site h4 {
   font-family: var(--display);
   letter-spacing: -.015em;
