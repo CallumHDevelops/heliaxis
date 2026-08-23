@@ -411,8 +411,10 @@ function btn(label,cls,pulse,ic,ep,edit,href,noArrow){
  var inner=(ic?icon(ic,16):'')+'<span'+ce(ep,edit)+'>'+esc(label)+'</span>'+(noArrow?'':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>');
  var clsFull='pv-btn '+cls+(pulse?' pulse':'');
  if(href){
-  // In edit mode, never navigate — editors type links in the sidebar.
-  return '<a class="'+clsFull+'" href="'+esc(href)+'"'+(edit?' onclick="event.preventDefault()"':'')+'>'+inner+'</a>';
+  // In edit mode, never navigate; right-click opens an inline link editor.
+  var atts=edit?' onclick="event.preventDefault()"':'';
+  if(edit&&ep){var _hp=/Label$/.test(ep)?ep.replace(/Label$/,'Href'):(/Btn$/.test(ep)?ep.replace(/Btn$/,'Href'):ep+'Href');atts+=' oncontextmenu="pvLinkCtx(event,\''+_hp+'\')" title="Right-click to edit this button\'s link"';}
+  return '<a class="'+clsFull+'" href="'+esc(href)+'"'+atts+'>'+inner+'</a>';
  }
  return '<span class="'+clsFull+'">'+inner+'</span>';
 }
@@ -1078,6 +1080,27 @@ function featImgSrc(feat){
 function pvImgClick(ev,path){ev.stopPropagation();const blockId=path.split('.')[0];if(blockId)selectBlock(blockId);editPlacementImgMeta(path);}
 function pvImgPick(ev,path){if(ev){ev.stopPropagation();if(ev.preventDefault)ev.preventDefault();}var b=String(path||'').split('.')[0];if(b)selectBlock(b);openImgLibModal(path);}
 function pvReplaceFromMeta(){var path=window._imgMetaPlacementPath;closeImgMetaModal();if(path)openImgLibModal(path);}
+/* Right-click a button in the preview → inline link editor (no sidebar needed). */
+function pvLinkCtx(ev,hrefPath){
+ if(ev){ev.preventDefault();ev.stopPropagation();}
+ pvLinkClose();
+ var bId=String(hrefPath||'').split('.')[0];if(bId)selectBlock(bId);
+ window._pvLinkPath=hrefPath;
+ var cur=getAtPath(hrefPath);cur=(cur==null?'':String(cur));
+ var pop=document.createElement('div');pop.className='pvlink-pop';pop.id='pvlinkpop';
+ var vx=ev?ev.clientX:120,vy=ev?ev.clientY:120;
+ pop.style.left=Math.max(8,Math.min(vx,window.innerWidth-292))+'px';
+ pop.style.top=Math.max(8,Math.min(vy,window.innerHeight-210))+'px';
+ pop.innerHTML='<div class="pvlink-lbl">Button link</div>'
+  +'<input class="pvlink-input" id="pvlinkinput" value="'+esc(cur)+'" placeholder="#quote · /commercial-funding · https://…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pvLinkSave()}else if(event.key===\'Escape\')pvLinkClose()">'
+  +'<div class="pvlink-presets"><button type="button" onclick="pvLinkPreset(\'#quote\')">Get a quote</button><button type="button" onclick="pvLinkPreset(\'/commercial-funding\')">Funding</button><button type="button" onclick="pvLinkPreset(\'/contact\')">Contact</button><button type="button" onclick="pvLinkPreset(\'/blog\')">Blog</button></div>'
+  +'<div class="pvlink-actions"><button type="button" class="pvlink-save" onclick="pvLinkSave()">Save link</button><button type="button" class="pvlink-cancel" onclick="pvLinkClose()">Cancel</button></div>';
+ document.body.appendChild(pop);
+ setTimeout(function(){var inp=document.getElementById('pvlinkinput');if(inp){inp.focus();inp.select();}window._pvLinkAway=function(e){var p=document.getElementById('pvlinkpop');if(p&&!p.contains(e.target))pvLinkClose();};document.addEventListener('mousedown',window._pvLinkAway);},0);
+}
+function pvLinkPreset(v){var inp=document.getElementById('pvlinkinput');if(inp)inp.value=v;pvLinkSave();}
+function pvLinkSave(){var inp=document.getElementById('pvlinkinput');var path=window._pvLinkPath;if(inp&&path)upd(path,inp.value.trim());pvLinkClose();}
+function pvLinkClose(){var p=document.getElementById('pvlinkpop');if(p)p.parentNode.removeChild(p);if(window._pvLinkAway){document.removeEventListener('mousedown',window._pvLinkAway);window._pvLinkAway=null;}window._pvLinkPath=null;}
 function mediaImgCss(fx,fy,zoom,fit){
  if(fit==='contain')return 'object-fit:contain;object-position:center';
  fx=clampFocus(fx);fy=clampFocus(fy);
@@ -3323,6 +3346,10 @@ w.pvDropEnd = pvDropEnd;
 w.pvImgClick = pvImgClick;
 w.pvImgPick = pvImgPick;
 w.pvReplaceFromMeta = pvReplaceFromMeta;
+w.pvLinkCtx = pvLinkCtx;
+w.pvLinkPreset = pvLinkPreset;
+w.pvLinkSave = pvLinkSave;
+w.pvLinkClose = pvLinkClose;
 w.pvGalImgClick = pvGalImgClick;
 w.pvGalImgFile = pvGalImgFile;
 w.mediaFocusStart = mediaFocusStart;
