@@ -337,6 +337,7 @@ WRITE FOR THE READER (audience-first — this matters most; earlier drafts were 
 - Work out WHO the page is for from the brief (e.g. business owners / facilities managers, or homeowners) and write to their actual priorities: cost, payback drivers, disruption, reliability, warranties, and the practical next step.
 - Lead with the reader's outcome and concrete specifics, NOT a dictionary definition. NEVER open a section with "X refers to…", "X is the installation of…", "X is a system that…", or "Understanding X". Assume they already know what solar is — tell them what it means for THEIR site and why it's worth their time.
 - Be concrete and differentiated: name real options/methods and real next steps rather than explaining the concept in the abstract. Good example of the register to hit: "Commercial solar designed around your half-hourly demand, not your roof area — in-roof, on-roof, flat-roof, ground-mount or carport, MCS-certified and built to last." Prefer specific nouns and outcomes over encyclopaedic filler.
+- STAY STRICTLY ON TOPIC AND ON AUDIENCE: every section must serve the EXACT topic and audience of the brief. Do NOT drift into adjacent-but-different subjects or audiences — e.g. a COMMERCIAL page must never introduce residential "owner-occupier vs tenant" or homeowner content, and a finance page must not wander off finance, unless the brief explicitly asks. If a section (especially a two-way split) cannot be made genuinely relevant to THIS audience, omit it rather than forcing a generic or off-topic one.
 
 Return ONLY valid JSON of this exact shape (no prose, no markdown, no code fences):
 { "seo": { "title": "...", "description": "...", "slug": "kebab-slug" }, "blocks": [ { "t": <type>, "p": { ...fields } }, ... ] }
@@ -364,6 +365,7 @@ STRUCTURE — use the RIGHT block for each idea. This is critical: do NOT output
 RULES:
 - Use ONLY the block types and fields below. Any other type or field is discarded.
 - Do NOT set image fields (img) — leave images out; the user adds photos afterwards. Do NOT invent ids.
+- BUTTON LABELS: every button/CTA label (hero ctaLabel, cta, funding cta, split card buttons lc/rc, media cta, etc.) MUST be a short action phrase of 2–5 words (e.g. "Book a survey", "See funding options", "Talk to us") — NEVER a full sentence or a claim. Put any explanation in the surrounding text, never on the button.
 
 BLOCK TYPES:
 hero  { eyebrow, headline, sub, ctaLabel, ctaHref, tags, dark:true }  // page banner. headline = the page's main H1.
