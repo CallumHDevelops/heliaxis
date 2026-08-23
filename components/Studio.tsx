@@ -21,7 +21,8 @@ import {
 } from '@/lib/postEngine';
 import { ICON_IDS, ICON_SPRITE } from '@/lib/iconSprite';
 import { prettifyIcon } from '@/lib/icons';
-import { APP_VERSION, WHATS_NEW, GUIDE_STEPS } from '@/lib/updates';
+import { APP_VERSION, WHATS_NEW, TOUR_STEPS, type TourStep } from '@/lib/updates';
+import GuideTour from './GuideTour';
 import styles from './Studio.module.css';
 
 const SEEN_KEY = 'heliaxis_studio_seen_version';
@@ -132,7 +133,7 @@ export default function Studio({
   const [capBusy, setCapBusy] = useState(false);
   const [capErr, setCapErr] = useState('');
   const [projectsOpen, setProjectsOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [newPostOpen, setNewPostOpen] = useState(false);
   const [npTpl, setNpTpl] = useState<TemplateKey>('statement');
@@ -235,6 +236,21 @@ export default function Studio({
       /* ignore */
     }
     setWhatsNewOpen(false);
+  }
+  function startTour() {
+    // close anything that would sit over the tour
+    setWhatsNewOpen(false);
+    setMenuOpen(false);
+    setGenOpen(false);
+    setHistOpen(false);
+    setNewPostOpen(false);
+    setTourOpen(true);
+  }
+  // called as the tour advances — reveal the right panel on mobile so the
+  // target actually exists, and close the account menu between steps
+  function handleTourStep(step: TourStep) {
+    if (step.mobileTab) setMobileTab(step.mobileTab);
+    if (step.target !== '[data-tour="account"]') setMenuOpen(false);
   }
 
   const draw = useCallback(() => {
@@ -1195,19 +1211,19 @@ export default function Studio({
           </a>
           <button
             className={styles.btn}
-            onClick={() => setGuideOpen(true)}
-            title="How it works"
-            aria-label="How it works"
+            onClick={startTour}
+            title="Take the interactive tour"
+            aria-label="Take the interactive tour"
           >
             ? Guide
           </button>
-          <button className={styles.btn} onClick={() => setHistOpen(true)}>
+          <button className={styles.btn} data-tour="history" onClick={() => setHistOpen(true)}>
             History
           </button>
-          <button className={styles.btn} onClick={() => setGenOpen(true)}>
+          <button className={styles.btn} data-tour="generate" onClick={() => setGenOpen(true)}>
             <Spark size={12} /> Generate
           </button>
-          <button className={styles.btn} onClick={openNewPost}>
+          <button className={styles.btn} data-tour="new-post" onClick={openNewPost}>
             + New Post
           </button>
           <button className={styles.btn} onClick={() => setSaveModalOpen(true)}>
@@ -1219,6 +1235,7 @@ export default function Studio({
           <div className={styles.profile}>
             <button
               className={styles.avatar}
+              data-tour="account"
               onClick={() => setMenuOpen((o) => !o)}
               title={userEmail}
               aria-label="Account menu"
@@ -1291,6 +1308,7 @@ export default function Studio({
         </div>
         <select
           className={styles.tplSelect}
+          data-tour="template"
           value={S.tpl}
           onChange={(e) => setTpl(e.target.value as TemplateKey)}
         >
@@ -1304,7 +1322,7 @@ export default function Studio({
         <div className={styles.ph}>
           <Spark size={11} /> Size
         </div>
-        <div className={`${styles.seg} ${styles.sizes}`}>
+        <div className={`${styles.seg} ${styles.sizes}`} data-tour="size">
           {(Object.keys(SIZES) as SizeKey[]).map((k) => (
             <button
               key={k}
@@ -1321,7 +1339,7 @@ export default function Studio({
         <div className={styles.ph}>
           <Spark size={11} /> Theme
         </div>
-        <div className={styles.seg}>
+        <div className={styles.seg} data-tour="theme">
           {(Object.keys(THEMES) as ThemeKey[]).map((k) => (
             <button
               key={k}
@@ -1359,7 +1377,7 @@ export default function Studio({
             Change photo — {postProject.name}
           </button>
         )}
-        <button className={styles.mini} onClick={openImages}>
+        <button className={styles.mini} data-tour="photo" onClick={openImages}>
           {postProject ? 'Or choose from library' : 'Select Photo / Image'}
         </button>
         <div className={styles.hint}>
@@ -1408,7 +1426,7 @@ export default function Studio({
             ))}
           </div>
         )}
-        <button className={styles.mini} onClick={openIconBank}>
+        <button className={styles.mini} data-tour="badges" onClick={openIconBank}>
           + Add badge / icon
         </button>
         <div className={styles.hint}>Small badges under the content — MCS, TrustMark, 0% VAT.</div>
@@ -1448,7 +1466,7 @@ export default function Studio({
 
       {/* CENTRE */}
       <div className={styles.stage}>
-        <div className={styles.canvaswrap}>
+        <div className={styles.canvaswrap} data-tour="canvas">
           <canvas ref={canvasRef} onClick={onCanvasClick} onMouseMove={onCanvasMove} />
         </div>
         <div className={styles.stagemeta}>
@@ -1457,7 +1475,7 @@ export default function Studio({
       </div>
 
       {/* RIGHT */}
-      <div className={`${styles.panel} ${styles.right}`}>
+      <div className={`${styles.panel} ${styles.right}`} data-tour="content">
         <div className={styles.ph}>
           <Spark size={11} /> Content
         </div>
@@ -1484,7 +1502,7 @@ export default function Studio({
           );
         })}
 
-        <div className={`${styles.ph} ${styles.phbetween}`}>
+        <div className={`${styles.ph} ${styles.phbetween}`} data-tour="caption">
           <span className={styles.phlabel}>
             <Spark size={11} /> Suggested caption
           </span>
@@ -2323,44 +2341,13 @@ export default function Studio({
         </div>
       )}
 
-      {/* GUIDE MODAL */}
-      {guideOpen && (
-        <div className={styles.modal} onClick={() => setGuideOpen(false)}>
-          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
-            <button className={styles.mclose} onClick={() => setGuideOpen(false)}>
-              ×
-            </button>
-            <h2 className={styles.mtitle}>
-              <Spark size={16} /> How Post Studio works
-            </h2>
-            <p className={styles.msub}>
-              A quick tour of everything, start to finish. You can reopen this any time from the
-              &ldquo;? Guide&rdquo; button.
-            </p>
-            <div className={styles.guideList}>
-              {GUIDE_STEPS.map((s) => (
-                <div className={styles.guideStep} key={s.title}>
-                  <div className={styles.guideTitle}>{s.title}</div>
-                  <div className={styles.guideBody}>{s.body}</div>
-                </div>
-              ))}
-            </div>
-            <div className={styles.mrow}>
-              <button
-                className={styles.btn}
-                onClick={() => {
-                  setGuideOpen(false);
-                  setWhatsNewOpen(true);
-                }}
-              >
-                ✦ What&rsquo;s new
-              </button>
-              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setGuideOpen(false)}>
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* INTERACTIVE GUIDE / TOUR */}
+      {tourOpen && (
+        <GuideTour
+          steps={TOUR_STEPS}
+          onClose={() => setTourOpen(false)}
+          onStep={handleTourStep}
+        />
       )}
 
       {/* WHAT'S NEW MODAL */}
@@ -2394,10 +2381,10 @@ export default function Studio({
                 className={styles.btn}
                 onClick={() => {
                   dismissWhatsNew();
-                  setGuideOpen(true);
+                  startTour();
                 }}
               >
-                ? Full guide
+                ? Take the tour
               </button>
               <button className={`${styles.btn} ${styles.solar}`} onClick={dismissWhatsNew}>
                 Got it
