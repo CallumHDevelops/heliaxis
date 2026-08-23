@@ -81,6 +81,7 @@ export default function ProjectsModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [msg, setMsg] = useState('');
+  const [upload, setUpload] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     loadList();
@@ -131,9 +132,8 @@ export default function ProjectsModal({ onClose }: { onClose: () => void }) {
       setMsg(error.message);
       return;
     }
-    setMsg('Saved ✓');
-    setTimeout(() => setMsg(''), 1400);
     loadList();
+    onClose();
   }
   async function del() {
     if (!editing) return;
@@ -145,7 +145,15 @@ export default function ProjectsModal({ onClose }: { onClose: () => void }) {
   function onImages(files?: FileList | null) {
     if (!files || !editing) return;
     const pid = editing.id;
-    Array.from(files).forEach((file) => {
+    const arr = Array.from(files);
+    setUpload({ done: 0, total: arr.length });
+    let done = 0;
+    const finishOne = () => {
+      done += 1;
+      setUpload({ done, total: arr.length });
+      if (done >= arr.length) setTimeout(() => setUpload(null), 800);
+    };
+    arr.forEach((file) => {
       const r = new FileReader();
       r.onload = async () => {
         const { data, error } = await supabase
@@ -159,7 +167,9 @@ export default function ProjectsModal({ onClose }: { onClose: () => void }) {
           .single();
         if (!error && data)
           setImages((im) => [...im, data as { id: string; name: string; data_url: string }]);
+        finishOne();
       };
+      r.onerror = finishOne;
       r.readAsDataURL(file);
     });
   }
@@ -294,6 +304,16 @@ export default function ProjectsModal({ onClose }: { onClose: () => void }) {
                   onChange={(e) => onImages(e.target.files)}
                 />
               </label>
+              {upload && (
+                <div className={styles.progress}>
+                  <div className={styles.progressBar}>
+                    <span style={{ width: `${(upload.done / upload.total) * 100}%` }} />
+                  </div>
+                  <div className={styles.progressText}>
+                    Uploading {upload.done}/{upload.total}
+                  </div>
+                </div>
+              )}
             </div>
 
             {msg && <div className={styles.note}>{msg}</div>}

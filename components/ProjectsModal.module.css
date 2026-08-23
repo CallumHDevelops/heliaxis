@@ -190,6 +190,29 @@
   color: var(--amber-2);
   margin: 10px 0 0;
 }
+.progress {
+  margin-top: 8px;
+}
+.progressBar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.progressBar span {
+  display: block;
+  height: 100%;
+  background: var(--solar);
+  transition: width 0.2s ease;
+}
+.progressText {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-top: 4px;
+}
 .actions {
   display: flex;
   gap: 10px;

@@ -121,6 +121,13 @@ export default function Studio({
   const [capBusy, setCapBusy] = useState(false);
   const [capErr, setCapErr] = useState('');
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [newPostOpen, setNewPostOpen] = useState(false);
+  const [npTpl, setNpTpl] = useState<TemplateKey>('statement');
+  const [npMode, setNpMode] = useState<'choose' | 'project'>('choose');
+  const [npProjects, setNpProjects] = useState<
+    Record<string, string>[]
+  >([]);
+  const [npBusy, setNpBusy] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [pickLabel, setPickLabel] = useState('');
@@ -720,6 +727,115 @@ export default function Studio({
     });
   }
 
+  // ---- New Post modal (template + Custom / Smart / from project) ----
+  function openNewPost() {
+    setNpMode('choose');
+    setNewPostOpen(true);
+    loadNpProjects();
+  }
+  async function loadNpProjects() {
+    const { data } = await supabase
+      .from('projects')
+      .select('*')
+      .order('updated_at', { ascending: false });
+    if (data) setNpProjects(data as Record<string, string>[]);
+  }
+  function startPost(tpl: TemplateKey, source: 'manual' | 'ai', data?: Record<string, string>) {
+    skipSave.current = source === 'manual';
+    setPostId(newId());
+    setPostSource(source);
+    setPostAuthor(userEmail);
+    setDownloads(0);
+    imgsRef.current.photo = null;
+    setHasPhoto(false);
+    setSaveState('idle');
+    setCaptionOverride(null);
+    setCapErr('');
+    setS({
+      tpl,
+      size: 'square',
+      theme: 'dark',
+      hatch: true,
+      data: data || { ...TEMPLATES[tpl].defaults },
+      badges: [],
+      photoShade: 0.62,
+      brands: [],
+    });
+  }
+  function npCustom() {
+    startPost(npTpl, 'manual');
+    setNewPostOpen(false);
+  }
+  function npSmart() {
+    startPost(npTpl, 'manual');
+    setNewPostOpen(false);
+    setGenTpl(npTpl);
+    setGenOpen(true);
+  }
+  function buildProjectTopic(p: Record<string, string>) {
+    const bits: string[] = [];
+    if (p.location) bits.push(`in ${p.location}`);
+    if (p.system_size) bits.push(`a ${p.system_size} system`);
+    const panel = [
+      p.panel_count ? `${p.panel_count} ×` : '',
+      p.panel_wattage,
+      p.panel_manufacturer,
+      p.panel_model ? `(${p.panel_model})` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (panel) bits.push(`${panel} panels`);
+    if (p.inverter_brand)
+      bits.push(`${p.inverter_brand}${p.inverter_model ? ' ' + p.inverter_model : ''} inverter`);
+    if (p.battery_brand)
+      bits.push(`${p.battery_total ? p.battery_total + ' of ' : ''}${p.battery_brand} battery storage`);
+    if (p.annual_generation) bits.push(`generating around ${p.annual_generation} a year`);
+    if (p.annual_savings) bits.push(`saving about ${p.annual_savings} a year`);
+    return `A REAL, completed Heliaxis installation: ${bits.join(', ')}.${
+      p.notes ? ' Notes: ' + p.notes + '.' : ''
+    } Write a ${TEMPLATES[npTpl].name} post celebrating this specific real install. These figures are verified — use them exactly and do not invent any others.`;
+  }
+  async function npFromProject(p: Record<string, string>) {
+    setNpBusy(true);
+    try {
+      const { data: imgs } = await supabase
+        .from('project_images')
+        .select('data_url')
+        .eq('project_id', p.id)
+        .limit(1);
+      const t = TEMPLATES[npTpl];
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          tplName: t.name,
+          tplDesc: t.desc,
+          fields: t.fields,
+          topic: buildProjectTopic(p),
+          tone: 'Confident & plain-spoken (house style)',
+          recent: history.slice(0, 25).map((h) => h.headline),
+        }),
+      });
+      const json = await res.json();
+      setNpBusy(false);
+      if (!res.ok || json.error) {
+        alert(json.error || 'Generation failed — try again.');
+        return;
+      }
+      const next: Record<string, string> = { ...TEMPLATES[npTpl].defaults };
+      for (const f of t.fields) if (json.fields?.[f]) next[f] = json.fields[f];
+      if (!next.footer) next.footer = 'heliaxis.co.uk · 01633 965205';
+      startPost(npTpl, 'ai', next);
+      const url = imgs && imgs[0] ? (imgs[0] as { data_url: string }).data_url : null;
+      if (url) selectImageUrl(url);
+      setNewPostOpen(false);
+      setNpMode('choose');
+    } catch {
+      setNpBusy(false);
+      alert('Network error — please try again.');
+    }
+  }
+
   async function suggestPostTopics() {
     setGenSuggestBusy(true);
     try {
@@ -1016,7 +1132,7 @@ export default function Studio({
           <button className={styles.btn} onClick={() => setGenOpen(true)}>
             <Spark size={12} /> Generate
           </button>
-          <button className={styles.btn} onClick={newPost}>
+          <button className={styles.btn} onClick={openNewPost}>
             + New Post
           </button>
           <button className={styles.btn} onClick={() => setSaveModalOpen(true)}>
@@ -1109,18 +1225,6 @@ export default function Studio({
             </option>
           ))}
         </select>
-        <div className={styles.tgrid}>
-          {(Object.keys(TEMPLATES) as TemplateKey[]).map((k) => (
-            <button
-              key={k}
-              className={`${styles.tpl} ${k === S.tpl ? styles.on : ''}`}
-              onClick={() => setTpl(k)}
-            >
-              <b>{TEMPLATES[k].name}</b>
-              <span>{TEMPLATES[k].desc}</span>
-            </button>
-          ))}
-        </div>
 
         <div className={styles.ph}>
           <Spark size={11} /> Size
@@ -2014,6 +2118,84 @@ export default function Studio({
                 Refresh
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW POST MODAL */}
+      {newPostOpen && (
+        <div className={styles.modal} onClick={() => setNewPostOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setNewPostOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> New post
+            </h2>
+            <p className={styles.msub}>Pick a template, then choose how to start.</p>
+            <div className={styles.fld}>
+              <label>Template</label>
+              <select value={npTpl} onChange={(e) => setNpTpl(e.target.value as TemplateKey)}>
+                {(Object.keys(TEMPLATES) as TemplateKey[]).map((k) => (
+                  <option key={k} value={k}>
+                    {TEMPLATES[k].name} — {TEMPLATES[k].desc}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {npMode === 'choose' ? (
+              <div className={styles.npChoices}>
+                <button className={styles.npCard} onClick={npCustom}>
+                  <span className={styles.npIco}>✎</span>
+                  <b>Custom</b>
+                  <i>Start blank and write it yourself.</i>
+                </button>
+                <button className={styles.npCard} onClick={npSmart}>
+                  <span className={`${styles.npIco} ${styles.npAi}`}>
+                    <Spark size={18} /> AI
+                  </span>
+                  <b>Smart Post</b>
+                  <i>The AI writes it from a topic you give.</i>
+                </button>
+                <button className={styles.npCard} onClick={() => setNpMode('project')}>
+                  <span className={styles.npIco}>▦</span>
+                  <b>Create from project</b>
+                  <i>Turn a real install into a post.</i>
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className={styles.libLabel}>Choose a project</div>
+                {npBusy && (
+                  <div className={styles.gstatus}>✦ Writing your post from the project…</div>
+                )}
+                <div className={styles.histlist}>
+                  {npProjects.length === 0 && (
+                    <div className={styles.histempty}>
+                      No projects yet — add one from the profile menu (Projects).
+                    </div>
+                  )}
+                  {npProjects.map((p) => (
+                    <div
+                      className={styles.hitem}
+                      key={p.id}
+                      onClick={() => !npBusy && npFromProject(p)}
+                    >
+                      <div className={styles.ht}>{p.name || p.location || 'Project'}</div>
+                      <div className={styles.hm}>
+                        {[p.location, p.system_size].filter(Boolean).join(' · ') || 'No details'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className={styles.mrow}>
+                  <button className={styles.btn} onClick={() => setNpMode('choose')} disabled={npBusy}>
+                    Back
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
