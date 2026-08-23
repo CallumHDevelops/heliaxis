@@ -702,7 +702,7 @@ function renderBuild(){
    '<div class="blkrow'+(SEL===bl.id?' sel':'')+'" draggable="true" data-i="'+i+'" onmouseenter="blockRowPrev(\''+bl.id+'\',this)" onmouseleave="blockRowLeave(event)" ondragstart="dstart(event,'+i+')" ondragover="dover(event,'+i+',this)" ondragleave="dleave(this)" ondrop="ddrop(event,'+i+')" ondragend="dend()" onclick="selectBlock(\''+bl.id+'\')">'+
    '<span class="gr">⋮⋮</span><span class="nm">'+blockDisplayName(bl.t)+'</span><span class="ty">'+blockTypeKey(bl.t)+'</span><button class="x" onclick="event.stopPropagation();confirmDelBlock(\''+bl.id+'\')">×</button></div>').join('')+'</div>';
  h+='<div class="addwrap"><button class="addbtn" onclick="document.getElementById(\'addmenu\').classList.toggle(\'hide\')">+ Add section</button>'+
-   '<div class="addmenu hide" id="addmenu">'+Object.keys(BLOCKNAMES).map(t=>'<button draggable="true" ondragstart="dstartNew(event,\''+t+'\')" ondragend="dend()" onmouseenter="sectionPrev(\''+t+'\',this)" onmouseleave="blockRowLeave(event)" onclick="addBlock(\''+t+'\')" title="Click to add, or drag onto the layout">'+BLOCKNAMES[t]+'</button>').join('')+'</div></div>';
+   '<div class="addmenu hide" id="addmenu">'+Object.keys(BLOCKNAMES).map(t=>'<button draggable="true" ondragstart="dstartNew(event,\''+t+'\')" ondragend="dend()" onmouseenter="sectionPrev(\''+t+'\',this)" onmouseleave="blockRowLeave(event)" onclick="addBlock(\''+t+'\')" title="Click to add, or drag onto the layout">'+BLOCKNAMES[t]+'</button>').join('')+'<button onclick="addContactForm()" title="Add a full contact form section">Contact form</button></div></div>';
  // inspector
  if(SEL){const bl=b.find(x=>x.id===SEL);if(bl)h+='<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"><div class="ph">'+SPARK+'Edit: '+blockDisplayName(bl.t)+'</div>'+inspector(bl)+'</div>';}
  el.innerHTML=h;
@@ -858,6 +858,7 @@ function blockDefs(){const defs={
 };
  Object.assign(defs,window.EXTRA_DEFAULTS||{});return defs;}
 function makeBlock(t){const defs=blockDefs();return {id:uid(),t,p:JSON.parse(JSON.stringify(defs[t]))};}
+function addContactForm(){var bl=makeBlock('form');bl.p.variant='contact';bl.p.fName=true;bl.p.fEmail=true;bl.p.fPhone=true;bl.p.fPost=true;bl.p.fMsg=true;bl.p.heading=bl.p.heading||'Get in touch';bl.p.sub='Tell us about your property and goals — we\'ll be in touch shortly.';page().blocks.push(bl);SEL=bl.id;var am=document.getElementById('addmenu');if(am)am.classList.add('hide');renderPreview();renderBuild();save();}
 function addBlock(t){const bl=makeBlock(t);page().blocks.push(bl);SEL=bl.id;
  const am=document.getElementById('addmenu');if(am)am.classList.add('hide');renderPreview();renderBuild();save();}
 function addBlockAt(t,idx){const b=page().blocks;if(idx==null||idx<0||idx>b.length)idx=b.length;const bl=makeBlock(t);b.splice(idx,0,bl);SEL=bl.id;
@@ -3276,6 +3277,7 @@ w.tab = tab;
 w.setView = setView;
 w.selectBlock = selectBlock;
 w.addBlock = addBlock;
+w.addContactForm = addContactForm;
 w.delBlock = delBlock;
 w.confirmDelBlock = confirmDelBlock;
 w.doDelBlock = doDelBlock;
