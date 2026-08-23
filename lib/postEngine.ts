@@ -628,30 +628,145 @@ export function renderPost(
     return y + Math.round(66 * u);
   };
 
-  if (tpl === 'stat') {
-    cy = eyebrow(d.eyebrow, top);
+  if (tpl === 'stat' && S.size === 'landscape') {
+    // Landscape is short & wide — stacking the big number + label + sub never
+    // fits. Lay it out side-by-side: number on the left, label + sub on the
+    // right, each vertically centred in the space between eyebrow and footer.
+    const ey = pad + Math.round(64 * u);
+    if (d.eyebrow) eyebrow(d.eyebrow, ey);
+    const bandTop = ey + Math.round(18 * u);
+    const footerReserve = (d.footer ? 44 : 10) + (brandImgs.length ? 34 : 0);
+    const bandBottom = H - pad - Math.round(footerReserve * u);
+    const bandH = Math.max(1, bandBottom - bandTop);
+
+    const colGap = Math.round(40 * u);
+    const leftW = Math.round(maxW * 0.46);
+    const rightX = pad + leftW + colGap;
+    const rightW = W - pad - rightX;
+
+    // fit the number into the left column (and the band height)
+    let statSize = 150;
+    setFont(900, Math.round(statSize * u));
+    while (
+      statSize > 46 &&
+      (ctx.measureText(d.stat).width > leftW || statSize * u > bandH * 0.82)
+    ) {
+      statSize -= 4;
+      setFont(900, Math.round(statSize * u));
+    }
+    const numH = Math.round(statSize * u);
+
+    // fit label + sub into the right column
+    let labelSz = 42;
+    let labelLH = Math.round(labelSz * 1.08 * u);
+    setFont(800, Math.round(labelSz * u));
+    let labelLines = wrap(d.statlabel, rightW);
+    let subSz = 25;
+    let subLines: string[] = [];
+    let subLH = Math.round(subSz * 1.32 * u);
+    const measureRight = () => {
+      setFont(800, Math.round(labelSz * u));
+      labelLH = Math.round(labelSz * 1.08 * u);
+      labelLines = wrap(d.statlabel, rightW);
+      let h = labelLines.length * labelLH;
+      if (d.sub) {
+        setBody(Math.round(subSz * u), 400);
+        subLH = Math.round(subSz * 1.32 * u);
+        subLines = wrap(d.sub, rightW);
+        h += Math.round(14 * u) + subLines.length * subLH;
+      }
+      return h;
+    };
+    let rightH = measureRight();
+    while ((labelSz > 26 || subSz > 18) && rightH > bandH) {
+      if (labelSz > 26) labelSz -= 2;
+      if (subSz > 18) subSz -= 1;
+      rightH = measureRight();
+    }
+
+    // left: number, vertically centred
+    const numTop = bandTop + Math.max(0, (bandH - numH) / 2);
+    setFont(900, Math.round(statSize * u));
+    ctx.fillStyle = accent;
+    ctx.fillText(d.stat, pad, numTop + Math.round(statSize * 0.74 * u));
+    zone('stat', pad - 10, numTop, leftW, numH);
+
+    // right: label + sub, vertically centred
+    let ry = bandTop + Math.max(0, (bandH - rightH) / 2);
+    setFont(800, Math.round(labelSz * u));
+    const rls = ry + Math.round(labelSz * 0.82 * u);
+    let ny = drawLines(d.statlabel, rightX, rls, rightW, labelLH, fg);
+    zone('statlabel', rightX - 10, ry, rightW, ny - rls + labelLH);
+    ry = ny + Math.round(6 * u);
+    if (d.sub) {
+      setBody(Math.round(subSz * u), 400);
+      const ss = ry + Math.round(subSz * 0.8 * u);
+      const se = drawLines(d.sub, rightX, ss, rightW, subLH, sub);
+      zone('sub', rightX - 10, ry, rightW, se - ss + subLH);
+    }
+  } else if (tpl === 'stat') {
+    // Square / portrait / story — measure the whole block, then vertically
+    // centre it between the header and the footer so it never crowds the top.
     // auto-fit the big number so long figures (e.g. "4,200 kWh") never overflow
-    let statSize = 200;
+    let statSize = S.size === 'story' ? 220 : 200;
     setFont(900, Math.round(statSize * u));
     while (statSize > 64 && ctx.measureText(d.stat).width > maxW) {
       statSize -= 6;
       setFont(900, Math.round(statSize * u));
     }
-    ctx.fillStyle = accent;
-    const statBase = cy + Math.round(statSize * 0.75 * u);
-    ctx.fillText(d.stat, pad, statBase);
-    zone('stat', pad - 10, cy, maxW, Math.round(statSize * u));
-    cy = statBase + Math.round(60 * u);
-    setFont(800, Math.round(64 * u));
-    const sl = cy;
-    cy = drawLines(d.statlabel, pad, cy, maxW, Math.round(70 * u), fg);
-    zone('statlabel', pad - 10, sl - Math.round(60 * u), maxW, cy - sl + Math.round(20 * u));
+    const numLineH = Math.round(statSize * u);
+    // clear gap below the number's descenders (the comma) before the label
+    const gapNumLabel = Math.round((statSize * 0.18 + 26) * u);
+
+    const labelSize = S.size === 'story' ? 74 : 64;
+    const labelLH = Math.round(labelSize * 1.1 * u);
+    setFont(800, Math.round(labelSize * u));
+    const labelLines = wrap(d.statlabel, maxW);
+    const labelH = labelLines.length * labelLH;
+
+    const subSize = S.size === 'story' ? 40 : 34;
+    const subLH = Math.round(subSize * 1.35 * u);
+    let subLines: string[] = [];
+    let subH = 0;
     if (d.sub) {
-      setBody(Math.round(34 * u), 400);
-      cy += Math.round(24 * u);
-      const ss = cy;
-      cy = drawLines(d.sub, pad, cy, maxW * 0.92, Math.round(46 * u), sub);
-      zone('sub', pad - 10, ss - Math.round(30 * u), maxW, cy - ss + Math.round(10 * u));
+      setBody(Math.round(subSize * u), 400);
+      subLines = wrap(d.sub, maxW * 0.92);
+      subH = Math.round(22 * u) + subLines.length * subLH;
+    }
+
+    const eyeH = d.eyebrow ? Math.round(62 * u) : 0;
+    const blockH = eyeH + numLineH + gapNumLabel + labelH + subH;
+
+    const bandTop = pad + Math.round(70 * u);
+    const badgeReserve = S.badges && S.badges.length ? 74 : 0;
+    const footerReserve = (d.footer ? 48 : 8) + badgeReserve;
+    const bandBottom = H - pad - Math.round(footerReserve * u);
+    let yy = bandTop + Math.max(0, (bandBottom - bandTop - blockH) / 2);
+
+    if (d.eyebrow) {
+      eyebrow(d.eyebrow, yy + Math.round(22 * u));
+      yy += eyeH;
+    }
+    // number
+    setFont(900, Math.round(statSize * u));
+    ctx.fillStyle = accent;
+    ctx.fillText(d.stat, pad, yy + Math.round(statSize * 0.74 * u));
+    zone('stat', pad - 10, yy, maxW, numLineH);
+    yy += numLineH + gapNumLabel;
+    // label
+    const labelTop = yy;
+    setFont(800, Math.round(labelSize * u));
+    const ls = labelTop + Math.round(labelSize * 0.8 * u);
+    drawLines(d.statlabel, pad, ls, maxW, labelLH, fg);
+    zone('statlabel', pad - 10, labelTop, maxW, labelH);
+    yy = labelTop + labelH;
+    // sub
+    if (d.sub) {
+      yy += Math.round(22 * u);
+      setBody(Math.round(subSize * u), 400);
+      const ss = yy + Math.round(subSize * 0.8 * u);
+      drawLines(d.sub, pad, ss, maxW * 0.92, subLH, sub);
+      zone('sub', pad - 10, yy, maxW, subLines.length * subLH);
     }
   } else if (tpl === 'quote') {
     ctx.fillStyle = accent;

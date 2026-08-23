@@ -21,7 +21,10 @@ import {
 } from '@/lib/postEngine';
 import { ICON_IDS, ICON_SPRITE } from '@/lib/iconSprite';
 import { prettifyIcon } from '@/lib/icons';
+import { APP_VERSION, WHATS_NEW, GUIDE_STEPS } from '@/lib/updates';
 import styles from './Studio.module.css';
+
+const SEEN_KEY = 'heliaxis_studio_seen_version';
 
 const BADGE_PRESETS: Badge[] = [
   { icon: 'ic-shield', label: 'MCS Certified' },
@@ -114,6 +117,14 @@ export default function Studio({
   const [postAuthor, setPostAuthor] = useState<string>(userEmail);
   const [downloads, setDownloads] = useState(0);
   const [hasPhoto, setHasPhoto] = useState(false);
+  // when a post was created from a project, remember it so we can offer
+  // "Change photo" scoped to that project and tag it in history
+  const [postProject, setPostProject] = useState<{ id: string; name: string } | null>(null);
+  const [projPhotoOpen, setProjPhotoOpen] = useState(false);
+  const [projPhotos, setProjPhotos] = useState<{ id: string; name: string; data_url: string }[]>(
+    []
+  );
+  const [projPhotosBusy, setProjPhotosBusy] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMsg, setSaveMsg] = useState('');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -121,6 +132,8 @@ export default function Studio({
   const [capBusy, setCapBusy] = useState(false);
   const [capErr, setCapErr] = useState('');
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [newPostOpen, setNewPostOpen] = useState(false);
   const [npTpl, setNpTpl] = useState<TemplateKey>('statement');
   const [npMode, setNpMode] = useState<'choose' | 'project'>('choose');
@@ -206,8 +219,23 @@ export default function Studio({
     loadLibrary();
     loadBrandLogos();
     loadImages();
+    // show "what's new" once per release
+    try {
+      if (localStorage.getItem(SEEN_KEY) !== APP_VERSION) setWhatsNewOpen(true);
+    } catch {
+      /* private mode / no storage — skip */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function dismissWhatsNew() {
+    try {
+      localStorage.setItem(SEEN_KEY, APP_VERSION);
+    } catch {
+      /* ignore */
+    }
+    setWhatsNewOpen(false);
+  }
 
   const draw = useCallback(() => {
     if (!canvasRef.current) return;
@@ -403,6 +431,8 @@ export default function Studio({
       __brands: JSON.stringify(S.brands || []),
       __author: postAuthor || userEmail,
       __downloads: dls,
+      __project: postProject?.name || '',
+      __projectId: postProject?.id || '',
     };
   }
 
@@ -447,7 +477,21 @@ export default function Studio({
   async function saveAndNew() {
     await saveNow();
     setSaveModalOpen(false);
-    newPost();
+    openNewPost();
+  }
+
+  // photos from the project this post was created from
+  async function openProjectPhotos() {
+    if (!postProject) return;
+    setProjPhotoOpen(true);
+    setProjPhotosBusy(true);
+    const { data } = await supabase
+      .from('project_images')
+      .select('id, name, data_url')
+      .eq('project_id', postProject.id)
+      .order('created_at', { ascending: true });
+    setProjPhotos((data as { id: string; name: string; data_url: string }[]) || []);
+    setProjPhotosBusy(false);
   }
 
   async function loadHistory() {
@@ -465,26 +509,31 @@ export default function Studio({
     setS((s) => ({ ...s, tpl: k, data: { ...TEMPLATES[k].defaults } }));
   }
 
+  async function makeCaption(
+    tplKey: TemplateKey,
+    data: Record<string, string>,
+    tone: string
+  ): Promise<string> {
+    const t = TEMPLATES[tplKey];
+    const res = await fetch('/api/caption', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tplName: t.name, tplDesc: t.desc, data, tone }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.error || 'Could not generate caption.');
+    return json.caption || '';
+  }
   async function genCaption() {
     setCapErr('');
     setCapBusy(true);
     try {
-      const t = TEMPLATES[S.tpl];
-      const res = await fetch('/api/caption', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ tplName: t.name, tplDesc: t.desc, data: S.data, tone: genTone }),
-      });
-      const json = await res.json();
+      const caption = await makeCaption(S.tpl, S.data, genTone);
+      setCaptionOverride(caption);
+    } catch (e) {
+      setCapErr((e as Error).message || 'Network error — please try again.');
+    } finally {
       setCapBusy(false);
-      if (!res.ok || json.error) {
-        setCapErr(json.error || 'Could not generate caption.');
-        return;
-      }
-      setCaptionOverride(json.caption || '');
-    } catch {
-      setCapBusy(false);
-      setCapErr('Network error — please try again.');
     }
   }
   function setField(k: string, v: string) {
@@ -710,6 +759,7 @@ export default function Studio({
     setPostSource('manual');
     setPostAuthor(userEmail);
     setDownloads(0);
+    setPostProject(null);
     imgsRef.current.photo = null;
     setHasPhoto(false);
     setSaveState('idle');
@@ -746,6 +796,7 @@ export default function Studio({
     setPostSource(source);
     setPostAuthor(userEmail);
     setDownloads(0);
+    setPostProject(null);
     imgsRef.current.photo = null;
     setHasPhoto(false);
     setSaveState('idle');
@@ -826,10 +877,21 @@ export default function Studio({
       for (const f of t.fields) if (json.fields?.[f]) next[f] = json.fields[f];
       if (!next.footer) next.footer = 'heliaxis.co.uk · 01633 965205';
       startPost(npTpl, 'ai', next);
+      setPostProject({ id: p.id, name: p.name || p.location || 'Project' });
       const url = imgs && imgs[0] ? (imgs[0] as { data_url: string }).data_url : null;
       if (url) selectImageUrl(url);
       setNewPostOpen(false);
       setNpMode('choose');
+      // write a distinct caption (not a copy of the on-image text)
+      setCapBusy(true);
+      try {
+        const caption = await makeCaption(npTpl, next, 'Confident & plain-spoken (house style)');
+        setCaptionOverride(caption);
+      } catch {
+        /* leave the default caption if the AI caption fails */
+      } finally {
+        setCapBusy(false);
+      }
     } catch {
       setNpBusy(false);
       alert('Network error — please try again.');
@@ -933,12 +995,15 @@ export default function Studio({
     }
     setPostAuthor(raw.__author || '');
     setDownloads(Number(raw.__downloads) || 0);
+    setPostProject(raw.__projectId ? { id: raw.__projectId, name: raw.__project || 'Project' } : null);
     imgsRef.current.photo = null;
     setHasPhoto(false);
     delete raw.__badges;
     delete raw.__brands;
     delete raw.__author;
     delete raw.__downloads;
+    delete raw.__project;
+    delete raw.__projectId;
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
@@ -972,6 +1037,8 @@ export default function Studio({
       delete data.__brands;
       delete data.__author;
       delete data.__downloads;
+      delete data.__project;
+      delete data.__projectId;
       const state: PostState = {
         tpl: row.tpl as TemplateKey,
         size: (row.size as SizeKey) || 'square',
@@ -1126,6 +1193,14 @@ export default function Studio({
           <a className={styles.btn} href="/reel">
             Reels
           </a>
+          <button
+            className={styles.btn}
+            onClick={() => setGuideOpen(true)}
+            title="How it works"
+            aria-label="How it works"
+          >
+            ? Guide
+          </button>
           <button className={styles.btn} onClick={() => setHistOpen(true)}>
             History
           </button>
@@ -1279,12 +1354,18 @@ export default function Studio({
         <div className={styles.ph}>
           <Spark size={11} /> Photo background
         </div>
+        {postProject && (
+          <button className={`${styles.mini} ${styles.solar}`} onClick={openProjectPhotos}>
+            Change photo — {postProject.name}
+          </button>
+        )}
         <button className={styles.mini} onClick={openImages}>
-          Select Photo / Image
+          {postProject ? 'Or choose from library' : 'Select Photo / Image'}
         </button>
         <div className={styles.hint}>
-          Optional. A real install photo lifts engagement far more than a graphic. The overlay and
-          faint grid keep text readable and on-brand.
+          {postProject
+            ? 'This post was built from a project — pick any photo from that install, or use the shared library.'
+            : 'Optional. A real install photo lifts engagement far more than a graphic. The overlay and faint grid keep text readable and on-brand.'}
         </div>
         <button className={styles.mini} onClick={clearPhoto}>
           Remove photo
@@ -1330,9 +1411,7 @@ export default function Studio({
         <button className={styles.mini} onClick={openIconBank}>
           + Add badge / icon
         </button>
-        <div className={styles.hint}>
-          A row of small icon badges under the content — e.g. MCS Certified, TrustMark, 0% VAT.
-        </div>
+        <div className={styles.hint}>Small badges under the content — MCS, TrustMark, 0% VAT.</div>
 
         <div className={styles.ph}>
           <Spark size={11} /> Trusted installers
@@ -1364,9 +1443,7 @@ export default function Studio({
         <button className={styles.mini} onClick={openBrand}>
           Select Manufacturer logo
         </button>
-        <div className={styles.hint}>
-          Selected logos show bottom-right under &ldquo;Trusted installers of&rdquo;.
-        </div>
+        <div className={styles.hint}>Shown bottom-right under &ldquo;Trusted installers of&rdquo;.</div>
       </div>
 
       {/* CENTRE */}
@@ -1545,6 +1622,7 @@ export default function Studio({
                 const dt = new Date(row.created_at);
                 const author = (row.data as Record<string, string>)?.__author || '';
                 const dls = Number((row.data as Record<string, string>)?.__downloads) || 0;
+                const project = (row.data as Record<string, string>)?.__project || '';
                 return (
                   <div
                     className={styles.hitem}
@@ -1556,6 +1634,7 @@ export default function Studio({
                     <div className={styles.ht}>
                       {row.headline || TEMPLATES[row.tpl as TemplateKey]?.name || 'Post'}
                     </div>
+                    {project && <div className={styles.htag}>▦ Project: {project}</div>}
                     <div className={styles.hm}>
                       {TEMPLATES[row.tpl as TemplateKey]?.name} · {row.theme} ·{' '}
                       {dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{' '}
@@ -2196,6 +2275,134 @@ export default function Studio({
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* PROJECT PHOTO PICKER (for posts created from a project) */}
+      {projPhotoOpen && (
+        <div className={styles.modal} onClick={() => setProjPhotoOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setProjPhotoOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> {postProject?.name || 'Project'} — photos
+            </h2>
+            <p className={styles.msub}>
+              Choose a photo from this install to use as the background.
+            </p>
+            <div className={styles.logoGrid}>
+              {projPhotosBusy && <div className={styles.histempty}>Loading photos…</div>}
+              {!projPhotosBusy && projPhotos.length === 0 && (
+                <div className={styles.histempty}>
+                  No photos on this project yet — add some in Projects.
+                </div>
+              )}
+              {projPhotos.map((im) => (
+                <div className={styles.logoCell} key={im.id}>
+                  <button
+                    className={styles.imgPick}
+                    onClick={() => {
+                      selectImageUrl(im.data_url);
+                      setProjPhotoOpen(false);
+                    }}
+                    title={im.name || 'Use as background'}
+                  >
+                    <img src={im.data_url} alt={im.name} loading="lazy" decoding="async" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className={styles.mrow}>
+              <button className={styles.btn} onClick={() => setProjPhotoOpen(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GUIDE MODAL */}
+      {guideOpen && (
+        <div className={styles.modal} onClick={() => setGuideOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setGuideOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> How Post Studio works
+            </h2>
+            <p className={styles.msub}>
+              A quick tour of everything, start to finish. You can reopen this any time from the
+              &ldquo;? Guide&rdquo; button.
+            </p>
+            <div className={styles.guideList}>
+              {GUIDE_STEPS.map((s) => (
+                <div className={styles.guideStep} key={s.title}>
+                  <div className={styles.guideTitle}>{s.title}</div>
+                  <div className={styles.guideBody}>{s.body}</div>
+                </div>
+              ))}
+            </div>
+            <div className={styles.mrow}>
+              <button
+                className={styles.btn}
+                onClick={() => {
+                  setGuideOpen(false);
+                  setWhatsNewOpen(true);
+                }}
+              >
+                ✦ What&rsquo;s new
+              </button>
+              <button className={`${styles.btn} ${styles.solar}`} onClick={() => setGuideOpen(false)}>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WHAT'S NEW MODAL */}
+      {whatsNewOpen && (
+        <div className={styles.modal} onClick={dismissWhatsNew}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={dismissWhatsNew}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> What&rsquo;s new
+            </h2>
+            <p className={styles.msub}>Here&rsquo;s what&rsquo;s changed since you were last in.</p>
+            <div className={styles.guideList}>
+              {WHATS_NEW.map((u) => (
+                <div className={styles.updateEntry} key={u.version}>
+                  <div className={styles.updateHead}>
+                    <span className={styles.updateTitle}>{u.title}</span>
+                    <span className={styles.updateDate}>{u.date}</span>
+                  </div>
+                  <ul className={styles.updateItems}>
+                    {u.items.map((it, i) => (
+                      <li key={i}>{it}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className={styles.mrow}>
+              <button
+                className={styles.btn}
+                onClick={() => {
+                  dismissWhatsNew();
+                  setGuideOpen(true);
+                }}
+              >
+                ? Full guide
+              </button>
+              <button className={`${styles.btn} ${styles.solar}`} onClick={dismissWhatsNew}>
+                Got it
+              </button>
+            </div>
           </div>
         </div>
       )}
