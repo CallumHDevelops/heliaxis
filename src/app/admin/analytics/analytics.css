@@ -64,6 +64,31 @@ body:has(.admin-shell--flush) {
   white-space: pre-wrap;
 }
 
+.ua-full {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+.ua-full__open {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 5;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(33, 31, 24, 0.82);
+  color: #f8bc1e;
+  text-decoration: none;
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.5);
+}
+.ua-full__open:hover {
+  background: #211f18;
+}
 .ua-full__frame {
   display: block;
   flex: 1 1 auto;

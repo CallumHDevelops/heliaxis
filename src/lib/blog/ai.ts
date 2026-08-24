@@ -85,10 +85,18 @@ Split cards:
 - Buttons: short CTA labels (no arrows — the UI adds them).`;
 
 function extractJson(text: string): unknown {
-  const trimmed = text.trim();
+  const trimmed = String(text || '').trim();
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = fence ? fence[1].trim() : trimmed;
-  return JSON.parse(raw);
+  const raw = (fence ? fence[1] : trimmed).trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    /* fall through */
+  }
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start !== -1 && end > start) return JSON.parse(raw.slice(start, end + 1));
+  throw new Error('AI returned unparseable JSON');
 }
 
 function normalizeSlug(slug: string): string {
@@ -101,50 +109,100 @@ function normalizeSlug(slug: string): string {
     .replace(/^-|-$/g, '');
 }
 
-/** Provider-agnostic: OpenRouter now; Claude/OpenAI later via AI_BASE_URL + AI_API_KEY + AI_MODEL. */
+/** Writing model for blog articles. Strong by default; override with AI_BLOG_MODEL.
+ *  Deliberately does NOT inherit AI_MODEL/OPENAI_MODEL (may be a cheap model set for
+ *  something else). */
+function blogModel(): string {
+  return process.env.AI_BLOG_MODEL || 'openai/gpt-4o';
+}
+
+/** All template fields defaulted — used to backfill a slightly-incomplete AI draft so
+ *  a near-miss response still yields an editable draft instead of hard-failing. */
+function blogDraftDefaults(): Record<string, unknown> {
+  return {
+    title: 'Untitled article', slug: 'untitled-article', seoTitle: '', seoDescription: '',
+    tags: '', headline: '', sub: '', introEyebrow: 'INTRODUCTION', introTitle: '', introText: '',
+    bodyHtml1: '<p></p>', ctaHeadline: 'Ready to start?', ctaSub: 'Book a free survey today.',
+    ctaBtn: 'Get my free quote', bodyHtml2: '<p></p>', homeTitle: 'For your home', homeDesc: '',
+    homeBullets: ['', ''], homeBtn: 'Get my home quote', businessTitle: 'For your business',
+    businessDesc: '', businessBullets: ['', ''], businessBtn: 'Explore business funding', imageQuery: '',
+  };
+}
+
+/** Provider-agnostic (OpenRouter). Strong model with an availability fallback chain,
+ *  low-credit (402) adaptive retry, and shape-tolerant parsing — mirrors the page builder. */
 export async function generateBlogPost(prompt: string): Promise<GeneratedPost> {
-  const { apiKey, baseUrl, model } = aiConfig();
+  const { apiKey, baseUrl } = aiConfig();
   if (!apiKey) throw new Error('AI is not configured. Set OPENROUTER_API_KEY (or AI_API_KEY).');
 
-  const topic = String(prompt || '').trim();
+  const topic = String(prompt || '').trim().slice(0, 4000);
   const userMessage =
     `Write the blog article JSON for this topic (follow it exactly — do not substitute a solar/energy article):\n\n${topic}`;
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk',
-      'X-Title': 'Heliaxis Blog CMS',
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: SYSTEM },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-  });
+  const primary = blogModel();
+  const candidates = [primary];
+  if (!candidates.includes('openai/gpt-4o')) candidates.push('openai/gpt-4o');
+  if (!candidates.includes('openai/gpt-4o-mini')) candidates.push('openai/gpt-4o-mini');
+  const CREDITS_MSG =
+    'AI credits are low on OpenRouter — top up at https://openrouter.ai/settings/credits, then try again.';
+  const callChat = (model: string, maxTokens: number) =>
+    fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk',
+        'X-Title': 'Heliaxis Blog CMS',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.7,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'system', content: SYSTEM },
+          { role: 'user', content: userMessage },
+        ],
+      }),
+    });
 
-  if (!res.ok) {
+  let content: string | undefined;
+  let lastErr = '';
+  for (const model of candidates) {
+    let res = await callChat(model, 6000);
+    if (res.status === 402) {
+      const errText = await res.text().catch(() => '');
+      const afford = parseInt((errText.match(/afford\s+(\d+)/i) || [])[1] || '0', 10);
+      if (afford >= 900) res = await callChat(model, Math.max(900, afford - 96));
+      else throw new Error(CREDITS_MSG);
+    }
+    if (res.ok) {
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      content = data.choices?.[0]?.message?.content;
+      if (content) break;
+      lastErr = 'empty response';
+      continue;
+    }
     const errText = await res.text().catch(() => '');
-    throw new Error(`AI request failed (${res.status}): ${errText.slice(0, 200)}`);
+    lastErr = `${res.status}: ${errText.slice(0, 200)}`;
+    if (res.status === 402) throw new Error(CREDITS_MSG);
+    const modelUnavailable =
+      res.status === 404 || /no endpoints|not a valid model|model_not_found|does not exist/i.test(errText);
+    if (!modelUnavailable) throw new Error(`AI request failed (${lastErr})`);
   }
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('AI returned an empty response');
+  if (!content) throw new Error(`AI request failed (${lastErr || 'no usable model'})`);
 
   const parsed = extractJson(content) as Record<string, unknown>;
   if (parsed && typeof parsed.slug === 'string') {
     parsed.slug = normalizeSlug(parsed.slug);
   }
-  return generatedPostSchema.parse(parsed);
+  // Shape-tolerant: try as-is, then backfill missing fields with defaults so a
+  // near-miss response still produces an editable draft rather than throwing.
+  const safe = generatedPostSchema.safeParse(parsed);
+  if (safe.success) return safe.data;
+  return generatedPostSchema.parse({
+    ...blogDraftDefaults(),
+    ...(parsed && typeof parsed === 'object' ? parsed : {}),
+  });
 }
 
 /** @deprecated free-form body blocks removed — kept for type compatibility. */
