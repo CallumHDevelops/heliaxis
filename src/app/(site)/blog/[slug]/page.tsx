@@ -83,9 +83,10 @@ export default async function BlogPostPage({ params }: Props) {
         />
         {cms.css ? <style dangerouslySetInnerHTML={{ __html: cms.css }} /> : null}
         <div
-          className={cms.theme === 'dark' ? 'dk' : ''}
+          className={`blog-live-body${cms.theme === 'dark' ? ' dk' : ''}`}
           dangerouslySetInnerHTML={{ __html: cms.html }}
         />
+        <SiteFooter />
         <CmsFormRuntime />
       </>
     );

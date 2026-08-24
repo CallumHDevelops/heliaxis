@@ -1105,7 +1105,7 @@ function mediaImgCss(fx,fy,zoom,fit){
  if(fit==='contain')return 'object-fit:contain;object-position:center';
  fx=clampFocus(fx);fy=clampFocus(fy);
  // Always apply a small bleed scale so there is room to pan even at 100%
- var z=clampZoom(zoom)*1.2;
+ var z=clampZoom(zoom)*1.4;
  var maxShift=((1-1/z)/2)*100;
  var tx=((50-fx)/50)*maxShift;
  var ty=((50-fy)/50)*maxShift;
@@ -1114,7 +1114,7 @@ function mediaImgCss(fx,fy,zoom,fit){
 function applyMediaImgStyle(img,fx,fy,zoom){
  if(!img)return;
  fx=clampFocus(fx);fy=clampFocus(fy);
- var z=clampZoom(zoom)*1.2;
+ var z=clampZoom(zoom)*1.4;
  var maxShift=((1-1/z)/2)*100;
  var tx=((50-fx)/50)*maxShift;
  var ty=((50-fy)/50)*maxShift;
