@@ -2394,7 +2394,12 @@ export default function Studio({
         </div>
       )}
 
-      {projectsOpen && <ProjectsModal onClose={() => setProjectsOpen(false)} />}
+      {projectsOpen && (
+        <ProjectsModal
+          onClose={() => setProjectsOpen(false)}
+          onOpenPost={(row) => loadHistoryRow(row as HistoryRow)}
+        />
+      )}
 
       {/* mobile bottom bar */}
       <div className={styles.mobileBar}>
