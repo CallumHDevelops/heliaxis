@@ -717,12 +717,15 @@ export function renderPost(
       statSize -= 6;
       setFont(900, Math.round(statSize * u));
     }
-    const numLineH = Math.round(statSize * u);
-    // clear gap below the number's descenders (the comma) before the label
-    const gapNumLabel = Math.round((statSize * 0.18 + 26) * u);
+    // number glyph metrics (cap height above baseline, descender below — the
+    // comma in figures like "£1,264" drops below the baseline)
+    const capNum = statSize * 0.72 * u;
+    const descNum = statSize * 0.17 * u;
+    const numVisual = capNum + descNum;
 
     const labelSize = S.size === 'story' ? 74 : 64;
     const labelLH = Math.round(labelSize * 1.1 * u);
+    const capLabel = labelSize * 0.75 * u;
     setFont(800, Math.round(labelSize * u));
     const labelLines = wrap(d.statlabel, maxW);
     const labelH = labelLines.length * labelLH;
@@ -734,41 +737,49 @@ export function renderPost(
     if (d.sub) {
       setBody(Math.round(subSize * u), 400);
       subLines = wrap(d.sub, maxW * 0.92);
-      subH = Math.round(22 * u) + subLines.length * subLH;
+      subH = Math.round(24 * u) + subLines.length * subLH;
     }
 
-    const eyeH = d.eyebrow ? Math.round(62 * u) : 0;
-    const blockH = eyeH + numLineH + gapNumLabel + labelH + subH;
+    // the number is centred between the eyebrow and the label: identical gap
+    // G above (to the eyebrow's baseline) and below (to the label's cap-top)
+    const G = Math.round((S.size === 'story' ? 66 : 56) * u);
+    const eyeCap = d.eyebrow ? Math.round(21 * u) : 0;
+    const eyeDesc = d.eyebrow ? Math.round(4 * u) : 0;
+    const eyeToNumTop = d.eyebrow ? eyeDesc + G : 0; // eyebrow baseline → number cap-top
+
+    const blockH = eyeCap + eyeToNumTop + numVisual + G + labelH + subH;
 
     const bandTop = pad + Math.round(70 * u);
     const badgeReserve = S.badges && S.badges.length ? 74 : 0;
     const footerReserve = (d.footer ? 48 : 8) + badgeReserve;
-    const bandBottom = H - pad - Math.round(footerReserve * u);
+    const bandBottom = H - padY - Math.round(footerReserve * u);
     let yy = bandTop + Math.max(0, (bandBottom - bandTop - blockH) / 2);
 
+    // eyebrow — leave yy at its baseline
     if (d.eyebrow) {
-      eyebrow(d.eyebrow, yy + Math.round(22 * u));
-      yy += eyeH;
+      const eyeBaseline = yy + eyeCap;
+      eyebrow(d.eyebrow, eyeBaseline);
+      yy = eyeBaseline;
     }
-    // number
+    // number — cap-top a gap G below the eyebrow baseline
+    const numTop = yy + eyeToNumTop;
+    const numBaseline = numTop + capNum;
     setFont(900, Math.round(statSize * u));
     ctx.fillStyle = accent;
-    ctx.fillText(d.stat, pad, yy + Math.round(statSize * 0.74 * u));
-    zone('stat', pad - 10, yy, maxW, numLineH);
-    yy += numLineH + gapNumLabel;
-    // label
-    const labelTop = yy;
+    ctx.fillText(d.stat, pad, numBaseline);
+    zone('stat', pad - 10, numTop, maxW, numVisual);
+    // label — cap-top the same gap G below the number's descender
+    const numBottom = numBaseline + descNum;
+    const labelTop = numBottom + G;
     setFont(800, Math.round(labelSize * u));
-    const ls = labelTop + Math.round(labelSize * 0.8 * u);
-    drawLines(d.statlabel, pad, ls, maxW, labelLH, fg);
+    drawLines(d.statlabel, pad, labelTop + capLabel, maxW, labelLH, fg);
     zone('statlabel', pad - 10, labelTop, maxW, labelH);
     yy = labelTop + labelH;
     // sub
     if (d.sub) {
-      yy += Math.round(22 * u);
+      yy += Math.round(24 * u);
       setBody(Math.round(subSize * u), 400);
-      const ss = yy + Math.round(subSize * 0.8 * u);
-      drawLines(d.sub, pad, ss, maxW * 0.92, subLH, sub);
+      drawLines(d.sub, pad, yy + Math.round(subSize * 0.8 * u), maxW * 0.92, subLH, sub);
       zone('sub', pad - 10, yy, maxW, subLines.length * subLH);
     }
   } else if (tpl === 'quote') {
