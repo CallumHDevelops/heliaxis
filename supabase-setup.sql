@@ -226,6 +226,10 @@ create table if not exists public.projects (
   annual_savings     text not null default '',
   notes              text not null default ''
 );
+-- Telegram ingest groups a burst of messages from one chat into one project
+alter table public.projects add column if not exists tg_chat_id text;
+create index if not exists projects_tg_chat_idx on public.projects (tg_chat_id);
+
 alter table public.projects enable row level security;
 create policy "authenticated can read projects"   on public.projects for select to authenticated using (true);
 create policy "authenticated can insert projects"  on public.projects for insert to authenticated with check (true);

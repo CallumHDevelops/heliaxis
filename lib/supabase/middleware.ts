@@ -1,7 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/auth'];
+// /api/telegram is a machine-to-machine webhook (secured by its own secret
+// token + sender allowlist), so it must not be bounced to /login
+const PUBLIC_PATHS = ['/login', '/register', '/auth', '/api/telegram'];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
