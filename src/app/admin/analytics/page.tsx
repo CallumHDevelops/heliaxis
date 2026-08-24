@@ -24,14 +24,19 @@ export default async function AdminAnalyticsPage() {
           <ApiSetupCard hasWebsiteId={umami.configured} />
         </div>
       ) : (
-        <iframe
-          className="ua-full__frame"
-          src={shareUrl}
-          title="Umami analytics"
-          loading="eager"
-          referrerPolicy="no-referrer-when-downgrade"
-          allow="clipboard-write"
-        />
+        <div className="ua-full">
+          <a className="ua-full__open" href={shareUrl} target="_blank" rel="noopener noreferrer">
+            Open in Umami ↗
+          </a>
+          <iframe
+            className="ua-full__frame"
+            src={shareUrl}
+            title="Umami analytics"
+            loading="eager"
+            referrerPolicy="no-referrer-when-downgrade"
+            allow="clipboard-write"
+          />
+        </div>
       )}
     </AdminShell>
   );

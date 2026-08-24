@@ -65,8 +65,10 @@ export async function POST(req: Request) {
   try {
     if (body.placeholder) {
       ai = placeholderCmsArticleAi();
+      // Unique slug base so repeated placeholders never collide into /blog/…-2-2.
+      const stamp = Date.now().toString(36).slice(-4);
       ai.title = 'Untitled article';
-      ai.slug = 'untitled-article';
+      ai.slug = `untitled-article-${stamp}`;
       ai.seoTitle = 'Untitled article — Heliaxis';
     } else {
       const raw = body.draft as Record<string, unknown>;
