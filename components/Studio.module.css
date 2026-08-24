@@ -267,6 +267,27 @@
   height: auto;
   width: auto;
 }
+.canvasEdit {
+  position: absolute;
+  z-index: 6;
+  margin: 0;
+  padding: 3px 6px;
+  border: 2px solid var(--solar);
+  border-radius: 4px;
+  background: rgba(247, 242, 231, 0.98);
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.12;
+  resize: none;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(20, 18, 14, 0.35);
+}
+.canvasEdit:focus {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(248, 188, 30, 0.35),
+    0 6px 20px rgba(20, 18, 14, 0.35);
+}
 .stagemeta {
   margin-top: 14px;
   font-family: var(--mono);

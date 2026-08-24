@@ -37,6 +37,8 @@ export const THEMES: Record<ThemeKey, string> = { dark: 'Dark', light: 'Light', 
 export type TemplateKey =
   | 'statement'
   | 'stat'
+  | 'projectcomplete'
+  | 'contractaward'
   | 'offer'
   | 'quote'
   | 'question'
@@ -90,6 +92,42 @@ export const TEMPLATES: Record<TemplateKey, Template> = {
       d.sub +
       '\n\nEvery figure we publish is one we can evidence — and we show the assumptions behind it so you can check them.\n\nWant to know what your roof could do? Free survey, no obligation.\n\n📞 01633 965205',
     tags: ['#SolarSavings', '#EnergyBills', '#SolarPV', '#SouthWales', '#CaseStudy'],
+  },
+  projectcomplete: {
+    name: 'Project complete',
+    desc: 'Showcase a finished install',
+    fields: ['eyebrow', 'headline', 'sub', 'badge', 'footer'],
+    defaults: {
+      eyebrow: 'PROJECT COMPLETE · SOUTH WALES',
+      headline: 'Another install *switched on.*',
+      sub: '6.4 kWp of solar and a 10 kWh battery — designed, installed and commissioned by our own MCS-certified team.',
+      badge: 'HANDED OVER',
+      footer: 'heliaxis.co.uk · 01633 965205',
+    },
+    caption: (d) =>
+      d.headline.split('*').join('') +
+      '\n\n' +
+      d.sub +
+      '\n\nAnother happy home powered by its own roof. Every install is surveyed, designed and commissioned in-house — no subcontracted shortcuts.\n\nThinking about yours? Free, no-obligation survey.\n\n📞 01633 965205\n🔗 heliaxis.co.uk',
+    tags: ['#SolarInstall', '#ProjectComplete', '#SolarPV', '#SouthWales', '#BatteryStorage'],
+  },
+  contractaward: {
+    name: 'Contract award',
+    desc: 'Announce a commercial win',
+    fields: ['eyebrow', 'headline', 'sub', 'badge', 'footer'],
+    defaults: {
+      eyebrow: 'CONTRACT AWARD',
+      headline: 'Proud to be *appointed.*',
+      sub: 'Heliaxis has been selected to deliver a commercial solar installation for a leading local business. Work begins this spring.',
+      badge: 'NEW CONTRACT',
+      footer: 'heliaxis.co.uk · 01633 965205',
+    },
+    caption: (d) =>
+      d.headline.split('*').join('') +
+      '\n\n' +
+      d.sub +
+      '\n\nWe’re grateful for the trust — and excited to get building. Commercial solar, battery and EV projects delivered end to end.\n\nExploring renewables for your business? Let’s talk.\n\n📞 01633 965205\n🔗 heliaxis.co.uk',
+    tags: ['#ContractAward', '#CommercialSolar', '#NetZero', '#SouthWales', '#Renewables'],
   },
   offer: {
     name: 'Offer',

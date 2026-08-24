@@ -2,7 +2,7 @@
 // Bump APP_VERSION whenever you add a WHATS_NEW entry: on next sign-in every
 // user sees the update once (tracked in localStorage), then it stops showing.
 
-export const APP_VERSION = '2025.08.23';
+export const APP_VERSION = '2025.08.24';
 
 export interface UpdateEntry {
   version: string;
@@ -13,6 +13,18 @@ export interface UpdateEntry {
 
 // Newest first. The topmost entry's version should match APP_VERSION.
 export const WHATS_NEW: UpdateEntry[] = [
+  {
+    version: '2025.08.24',
+    date: '24 August 2025',
+    title: 'Edit on the post, new templates & tidier projects',
+    items: [
+      'Edit text right on the post — click any text on the canvas and type, no need to use the right-hand panel.',
+      'Two new templates: Project Complete (showcase a finished install) and Contract Award (announce a commercial win).',
+      'Projects now show how many posts each has, list those posts (click to reopen one), and keep details read-only with an Edit button so nothing is changed by accident.',
+      'A guided, interactive tour (the ? Guide button) that spotlights each control.',
+      'Layout fixes: landscape text no longer runs into the footer, the stat number is centred, and story posts have more breathing room.',
+    ],
+  },
   {
     version: '2025.08.23',
     date: '23 August 2025',
@@ -88,8 +100,8 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     target: '[data-tour="canvas"]',
-    title: 'Your live preview',
-    body: 'This is the finished post. Click any text directly on the canvas to jump to its field — and wrap *a word* in asterisks to make it gold.',
+    title: 'Your live preview — edit on the post',
+    body: 'This is the finished post. Click any text directly on the canvas to edit it right there; press Escape or click away when done. Wrap *a word* in asterisks to make it gold.',
     placement: 'left',
   },
   {

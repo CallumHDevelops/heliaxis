@@ -168,6 +168,19 @@ export default function Studio({
   const [editDesc, setEditDesc] = useState('');
   const [confirmState, setConfirmState] = useState<{ msg: string; onYes: () => void } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // inline "edit text on the post" overlay
+  const [edit, setEdit] = useState<{
+    f: string;
+    multiline: boolean;
+    display: boolean;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    fontPx: number;
+  } | null>(null);
+  const [editVal, setEditVal] = useState('');
+  const editRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -264,6 +277,23 @@ export default function Studio({
     Sref.current = S;
     draw();
   }, [S, draw]);
+
+  // focus the inline editor when it opens; close it if the window resizes
+  // (its position is pixel-based and would drift)
+  useEffect(() => {
+    if (!edit) return;
+    const t = setTimeout(() => {
+      editRef.current?.focus();
+      const el = editRef.current;
+      if (el && 'select' in el) el.select();
+    }, 10);
+    const onResize = () => setEdit(null);
+    window.addEventListener('resize', onResize);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [edit]);
 
   // resolve selected brand logos to <img> elements and repaint when ready
   useEffect(() => {
@@ -703,26 +733,46 @@ export default function Studio({
     draw();
   }
 
+  const MULTILINE_FIELDS = new Set([
+    'sub',
+    'headline',
+    'quote',
+    'item1',
+    'item2',
+    'item3',
+    'statlabel',
+  ]);
+  const DISPLAY_FIELDS = new Set(['headline', 'stat', 'statlabel', 'quote']);
+
   function onCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
     const cv = canvasRef.current!;
     const r = cv.getBoundingClientRect();
+    const scale = r.width / cv.width;
     const mx = ((e.clientX - r.left) * cv.width) / r.width;
     const my = ((e.clientY - r.top) * cv.height) / r.height;
     for (let i = zonesRef.current.length - 1; i >= 0; i--) {
       const z = zonesRef.current[i];
       if (mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h) {
-        const el = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-          `[data-field="${z.f}"]`
-        );
-        if (el) {
-          el.focus();
-          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          el.style.boxShadow = '0 0 0 2px var(--solar)';
-          setTimeout(() => (el.style.boxShadow = ''), 1200);
-        }
+        // edit this field inline, right on the post
+        if (!(z.f in S.data)) return;
+        const multiline = MULTILINE_FIELDS.has(z.f);
+        const dh = z.h * scale;
+        const fontPx = Math.max(13, Math.min(38, Math.round((multiline ? dh * 0.26 : dh * 0.44))));
+        setEditVal(S.data[z.f] || '');
+        setEdit({
+          f: z.f,
+          multiline,
+          display: DISPLAY_FIELDS.has(z.f),
+          left: z.x * scale,
+          top: z.y * scale,
+          width: Math.max(80, z.w * scale),
+          height: Math.max(fontPx * 1.6, dh),
+          fontPx,
+        });
         return;
       }
     }
+    setEdit(null);
   }
   function onCanvasMove(e: React.MouseEvent<HTMLCanvasElement>) {
     const cv = canvasRef.current!;
@@ -1468,6 +1518,58 @@ export default function Studio({
       <div className={styles.stage}>
         <div className={styles.canvaswrap} data-tour="canvas">
           <canvas ref={canvasRef} onClick={onCanvasClick} onMouseMove={onCanvasMove} />
+          {edit &&
+            (edit.multiline ? (
+              <textarea
+                ref={editRef as React.RefObject<HTMLTextAreaElement>}
+                className={styles.canvasEdit}
+                style={{
+                  left: edit.left,
+                  top: edit.top,
+                  width: edit.width,
+                  height: edit.height,
+                  fontSize: edit.fontPx,
+                  fontFamily: edit.display ? 'var(--font-ezra), sans-serif' : 'var(--font-body), sans-serif',
+                }}
+                value={editVal}
+                onChange={(e) => {
+                  setEditVal(e.target.value);
+                  setField(edit.f, e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setEdit(null);
+                  }
+                }}
+                onBlur={() => setEdit(null)}
+              />
+            ) : (
+              <input
+                ref={editRef as React.RefObject<HTMLInputElement>}
+                className={styles.canvasEdit}
+                style={{
+                  left: edit.left,
+                  top: edit.top,
+                  width: edit.width,
+                  height: edit.height,
+                  fontSize: edit.fontPx,
+                  fontFamily: edit.display ? 'var(--font-ezra), sans-serif' : 'var(--font-body), sans-serif',
+                }}
+                value={editVal}
+                onChange={(e) => {
+                  setEditVal(e.target.value);
+                  setField(edit.f, e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' || e.key === 'Enter') {
+                    e.preventDefault();
+                    setEdit(null);
+                  }
+                }}
+                onBlur={() => setEdit(null)}
+              />
+            ))}
         </div>
         <div className={styles.stagemeta}>
           {SIZES[S.size].note} · {tpl.name} · {THEMES[S.theme]}
