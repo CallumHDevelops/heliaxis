@@ -1393,6 +1393,8 @@ function imgRmMany(idList){
  save();
 }
 var _imgLibFilter='';
+var _imgLibTags=[];
+var _imgLibTagEdit='';
 function imagePicker(cur,path,lbl,noMeta){
  const src=imgSrc(cur);
  const pathEsc=String(path||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
@@ -1428,8 +1430,10 @@ function imgLibModalShell(path,multiMode){
   h+='<label class="miniadd imglib-upload">Upload<input type="file" accept="image/*" multiple style="display:none" onchange="imgUpload(this)"></label>';
  }
  h+='</div>'
+  +'<div id="imglib-tagbar" class="imglib-tagbar"></div>'
   +'<div id="imglib-sel-toolbar"></div>'
   +'<div class="img-lib-pick imglib-grid" id="imglib-grid"></div>'
+  +'<div id="imglib-tag-editor" class="imglib-tag-editor" hidden></div>'
   +'<div class="imglib-foot"><span id="imglib-count"></span><div class="imglib-foot-actions">';
  if(isGallery){
   h+='<button type="button" class="tbtn solar modal-btn-primary"'+(imgSelCount()?'':' disabled style="opacity:.45"')+' onclick="applyGalleryImgPick()">Add frames'+(imgSelCount()?' ('+imgSelCount()+')':'')+'</button>';
@@ -1452,6 +1456,8 @@ function openImgLibModal(path){
  window._imgLibGalleryBlock=null;
  _imgLibMulti=false;
  _imgLibFilter='';
+ _imgLibTags=[];
+ _imgLibTagEdit='';
  IMG_SEL={};
  var box=document.getElementById('modalbox');
  box.className='modalbox imglib-box';
@@ -1464,6 +1470,8 @@ function openGalleryImgPicker(blockId){
  window._imgLibGalleryBlock=blockId;
  _imgLibMulti=true;
  _imgLibFilter='';
+ _imgLibTags=[];
+ _imgLibTagEdit='';
  IMG_SEL={};
  var box=document.getElementById('modalbox');
  box.className='modalbox imglib-box';
@@ -1510,6 +1518,8 @@ function closeImgLibModal(){
  window._imgLibGalleryBlock=null;
  _imgLibMulti=false;
  _imgLibFilter='';
+ _imgLibTags=[];
+ _imgLibTagEdit='';
  IMG_SEL={};
  var box=document.getElementById('modalbox');
  if(box)box.className='modalbox';
@@ -1525,15 +1535,22 @@ function renderImgLibModalGrid(){
  var toolbarEl=document.getElementById('imglib-sel-toolbar');
  if(!grid)return;
  imgSelPrune();
+ renderImgLibTagBar();
  var path=window._imgLibPickPath;
  var cur=path?getAtPath(path):null;
  var src=imgSrc(cur);
  var curLib=(cur&&typeof cur==='object'&&cur.libId)||'';
  var all=STATE.site.images||[];
  var imgs=all.filter(function(im){
-  if(!_imgLibFilter)return true;
-  var n=((im.name||'')+' '+(im.cat||'')).toLowerCase();
-  return n.indexOf(_imgLibFilter)>=0;
+  if(_imgLibFilter){
+   var n=((im.name||'')+' '+(im.cat||'')+' '+((im.tags||[]).join(' '))).toLowerCase();
+   if(n.indexOf(_imgLibFilter)<0)return false;
+  }
+  if(_imgLibTags.length){
+   var t=(im.tags||[]).map(function(x){return String(x).toLowerCase();});
+   if(!_imgLibTags.some(function(sel){return t.indexOf(sel)>=0;}))return false;
+  }
+  return true;
  });
  var shownIds=imgs.map(function(im){return im.id;});
  if(toolbarEl)toolbarEl.innerHTML=(_imgLibMulti||_imgLibGalleryBlock)?imgSelToolbarHtml(shownIds,{hideCat:true}):'';
@@ -1566,6 +1583,7 @@ function renderImgLibModalGrid(){
    return '<div class="img-lib-thumb'+(on?' is-on':'')+' img-lib-thumb-multi" onclick="imgSelToggle(\''+im.id+'\')" role="button" tabindex="0">'
     +'<label class="img-lib-check" onclick="event.stopPropagation()"><input type="checkbox"'+(on?' checked':'')+' onchange="imgSelToggle(\''+im.id+'\')"><span aria-hidden="true"></span></label>'
     +'<img src="'+im.data+'" alt="" title="'+esc(im.name||im.cat||'Image')+'">'
+    +imgLibThumbTagBtn(im)
     +'<button type="button" class="img-lib-rm" title="Remove from library" aria-label="Remove from library" onclick="event.stopPropagation();imgRmAsk('+i+')">×</button>'
     +'</div>';
   }
@@ -1573,9 +1591,119 @@ function renderImgLibModalGrid(){
    +'<button type="button" class="img-lib-pick-btn" onclick="pickImg(\''+pathEsc+'\',\''+im.id+'\')" title="'+esc(im.name||im.cat||'Image')+'">'
    +'<img src="'+im.data+'" alt="">'
    +'</button>'
+   +imgLibThumbTagBtn(im)
    +'<button type="button" class="img-lib-rm" title="Remove from library" aria-label="Remove from library" onclick="event.stopPropagation();imgRmAsk('+i+')">×</button>'
    +'</div>';
  }).join('');
+}
+function allImgTags(){
+ var map={};
+ (STATE.site.images||[]).forEach(function(im){
+  (im.tags||[]).forEach(function(t){
+   t=String(t||'').trim().toLowerCase();
+   if(!t)return;
+   map[t]=(map[t]||0)+1;
+  });
+ });
+ return Object.keys(map).sort().map(function(t){return {tag:t,count:map[t]};});
+}
+function imgLibTagBarHtml(){
+ var tags=allImgTags();
+ if(!tags.length)return '';
+ var h='<div class="imglib-tagbar-inner">';
+ h+='<button type="button" class="imglib-tag'+(_imgLibTags.length?'':' is-on')+'" onclick="clearImgLibTagFilter()">All</button>';
+ tags.forEach(function(o){
+  var on=_imgLibTags.indexOf(o.tag)>=0;
+  var tEsc=String(o.tag).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  h+='<button type="button" class="imglib-tag'+(on?' is-on':'')+'" onclick="filterImgLibTag(\''+tEsc+'\')">'+esc(o.tag)+'<span class="imglib-tag-n">'+o.count+'</span></button>';
+ });
+ h+='</div>';
+ return h;
+}
+function renderImgLibTagBar(){
+ var bar=document.getElementById('imglib-tagbar');
+ if(!bar)return;
+ bar.innerHTML=imgLibTagBarHtml();
+}
+function filterImgLibTag(tag){
+ tag=String(tag||'').trim().toLowerCase();
+ if(!tag)return;
+ var i=_imgLibTags.indexOf(tag);
+ if(i>=0)_imgLibTags.splice(i,1);else _imgLibTags.push(tag);
+ renderImgLibTagBar();
+ renderImgLibModalGrid();
+}
+function clearImgLibTagFilter(){
+ _imgLibTags=[];
+ renderImgLibTagBar();
+ renderImgLibModalGrid();
+}
+function imgLibThumbTagBtn(im){
+ var n=(im.tags||[]).length;
+ var idEsc=String(im.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+ return '<button type="button" class="img-lib-tagbtn'+(n?' has-tags':'')+'" title="'+(n?'Edit tags ('+n+')':'Add tags')+'" aria-label="Edit tags" onclick="event.stopPropagation();openImgTagEdit(\''+idEsc+'\')">#'+(n?'<span class="img-lib-tagbtn-n">'+n+'</span>':'')+'</button>';
+}
+function imgLibTagEditorHtml(id){
+ var im=findLibImg(id);
+ if(!im)return '';
+ var tags=(im.tags||[]);
+ var idEsc=String(id).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+ var h='<div class="imglib-tagedit-backdrop" onclick="closeImgTagEdit()"></div>';
+ h+='<div class="imglib-tagedit-card" role="dialog" aria-label="Edit image tags">';
+ h+='<div class="imglib-tagedit-head"><img src="'+im.data+'" alt=""><div class="imglib-tagedit-nm">'+(im.name?esc(im.name):'Image')+'</div>';
+ h+='<button type="button" class="imglib-tagedit-x" aria-label="Close" onclick="closeImgTagEdit()">×</button></div>';
+ h+='<div class="imglib-tagedit-chips">';
+ if(tags.length){
+  tags.forEach(function(t){
+   var tEsc=String(t).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+   h+='<span class="imglib-tagedit-chip">'+esc(t)+'<button type="button" aria-label="Remove tag" onclick="imgTagRemove(\''+idEsc+'\',\''+tEsc+'\')">×</button></span>';
+  });
+ }else{
+  h+='<span class="imglib-tagedit-empty">No tags yet</span>';
+ }
+ h+='</div>';
+ h+='<div class="imglib-tagedit-add"><input id="imglib-tag-input" type="text" placeholder="Add a tag…" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();imgTagAdd(\''+idEsc+'\',this.value);this.value=\'\';}">';
+ h+='<button type="button" class="miniadd" onclick="var el=document.getElementById(\'imglib-tag-input\');imgTagAdd(\''+idEsc+'\',el.value);el.value=\'\';el.focus();">Add</button></div>';
+ h+='</div>';
+ return h;
+}
+function openImgTagEdit(id){
+ var host=document.getElementById('imglib-tag-editor');
+ if(!host)return;
+ _imgLibTagEdit=id;
+ host.innerHTML=imgLibTagEditorHtml(id);
+ host.hidden=false;
+ var inp=document.getElementById('imglib-tag-input');
+ if(inp)try{inp.focus();}catch(e){}
+}
+function closeImgTagEdit(){
+ _imgLibTagEdit='';
+ var host=document.getElementById('imglib-tag-editor');
+ if(host){host.hidden=true;host.innerHTML='';}
+}
+function imgTagAdd(id,val){
+ var im=findLibImg(id);
+ if(!im)return;
+ String(val||'').split(/[,|]/).forEach(function(part){
+  var t=part.trim().toLowerCase();
+  if(!t)return;
+  im.tags=im.tags||[];
+  if(im.tags.indexOf(t)<0)im.tags.push(t);
+ });
+ save();
+ openImgTagEdit(id);
+ renderImgLibTagBar();
+ renderImgLibModalGrid();
+}
+function imgTagRemove(id,tag){
+ var im=findLibImg(id);
+ if(!im)return;
+ tag=String(tag||'').toLowerCase();
+ im.tags=(im.tags||[]).filter(function(t){return String(t).toLowerCase()!==tag;});
+ save();
+ openImgTagEdit(id);
+ renderImgLibTagBar();
+ renderImgLibModalGrid();
 }
 function clearImgPick(path){
  var simple=/\.(logoImg|markImg)$/.test(String(path||''));
@@ -2094,6 +2222,8 @@ function closeModal(){
     window._imgLibGalleryBlock=null;
     _imgLibMulti=false;
     _imgLibFilter='';
+    _imgLibTags=[];
+    _imgLibTagEdit='';
     IMG_SEL={};
   }
 }
@@ -3329,6 +3459,12 @@ w.openImgLibModal = openImgLibModal;
 w.openGalleryImgPicker = openGalleryImgPicker;
 w.closeImgLibModal = closeImgLibModal;
 w.filterImgLibModal = filterImgLibModal;
+w.filterImgLibTag = filterImgLibTag;
+w.clearImgLibTagFilter = clearImgLibTagFilter;
+w.openImgTagEdit = openImgTagEdit;
+w.closeImgTagEdit = closeImgTagEdit;
+w.imgTagAdd = imgTagAdd;
+w.imgTagRemove = imgTagRemove;
 w.toggleImgLibMulti = toggleImgLibMulti;
 w.applyGalleryImgPick = applyGalleryImgPick;
 w.applyImgLibMultiPick = applyImgLibMultiPick;
