@@ -892,7 +892,8 @@ export function renderPost(
         hsz -= 4;
       }
       setFont(900, Math.round(hsz * u));
-      const hStart = cy + Math.round(40 * u);
+      // more breathing room under the eyebrow on the tall story format
+      const hStart = cy + Math.round((S.size === 'story' ? 92 : 40) * u);
       cy = drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent);
       zone('headline', pad - 10, hStart - Math.round(hsz * u), maxW, cy - hStart + Math.round(hsz * 0.4 * u));
       if (d.sub) {
