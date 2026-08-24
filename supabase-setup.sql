@@ -17,8 +17,11 @@ create table if not exists public.posts (
   hatch       boolean not null default true,
   data        jsonb not null,
   headline    text,
-  source      text not null default 'manual'  -- 'manual' | 'ai'
+  source      text not null default 'manual',  -- 'manual' | 'ai'
+  photo       text                             -- data-URL of the background photo, if any
 );
+-- if the posts table already exists from an earlier setup, add the column:
+alter table public.posts add column if not exists photo text;
 
 create index if not exists posts_created_at_idx on public.posts (created_at desc);
 

@@ -118,6 +118,9 @@ export default function Studio({
   const [postAuthor, setPostAuthor] = useState<string>(userEmail);
   const [downloads, setDownloads] = useState(0);
   const [hasPhoto, setHasPhoto] = useState(false);
+  // data-URL of the current background photo, persisted with the post so it
+  // comes back when the post is reloaded from history
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   // when a post was created from a project, remember it so we can offer
   // "Change photo" scoped to that project and tag it in history
   const [postProject, setPostProject] = useState<{ id: string; name: string } | null>(null);
@@ -400,6 +403,7 @@ export default function Studio({
       draw();
     };
     im.src = dataUrl;
+    setPhotoUrl(dataUrl);
   }
   function readFileAsDataURL(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -468,7 +472,7 @@ export default function Studio({
     }, 1000);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [S]);
+  }, [S, photoUrl]);
 
   function postRowData(dls: number) {
     return {
@@ -482,20 +486,30 @@ export default function Studio({
     };
   }
 
+  // upsert a post row; if the DB doesn't have the `photo` column yet, retry
+  // without it so saving never breaks before the migration is run
+  async function upsertPost(row: Record<string, unknown>) {
+    let { error } = await supabase.from('posts').upsert(row, { onConflict: 'id' });
+    if (error && /photo/i.test(error.message) && 'photo' in row) {
+      const { photo: _p, ...rest } = row;
+      void _p;
+      ({ error } = await supabase.from('posts').upsert(rest, { onConflict: 'id' }));
+    }
+    return error;
+  }
+
   async function autosave() {
-    const { error } = await supabase.from('posts').upsert(
-      {
-        id: postId,
-        tpl: S.tpl,
-        size: S.size,
-        theme: S.theme,
-        hatch: S.hatch,
-        data: postRowData(downloads),
-        headline: headlineOf(S.data),
-        source: postSource,
-      },
-      { onConflict: 'id' }
-    );
+    const error = await upsertPost({
+      id: postId,
+      tpl: S.tpl,
+      size: S.size,
+      theme: S.theme,
+      hatch: S.hatch,
+      data: postRowData(downloads),
+      headline: headlineOf(S.data),
+      source: postSource,
+      photo: photoUrl,
+    });
     if (error) {
       setSaveState('error');
       setSaveMsg(error.message);
@@ -541,9 +555,10 @@ export default function Studio({
   }
 
   async function loadHistory() {
+    // don't pull the (large) photo data-URL for every row — fetched on open
     const { data } = await supabase
       .from('posts')
-      .select('*')
+      .select('id, tpl, size, theme, hatch, data, headline, source, created_at')
       .order('created_at', { ascending: false })
       .limit(120);
     if (data) setHistory(data as HistoryRow[]);
@@ -724,12 +739,14 @@ export default function Studio({
         draw();
       };
       im.src = r.result as string;
+      setPhotoUrl(r.result as string);
     };
     r.readAsDataURL(file);
   }
   function clearPhoto() {
     imgsRef.current.photo = null;
     setHasPhoto(false);
+    setPhotoUrl(null);
     draw();
   }
 
@@ -799,19 +816,17 @@ export default function Studio({
     const next = downloads + 1;
     setDownloads(next);
     skipSave.current = false;
-    await supabase.from('posts').upsert(
-      {
-        id: postId,
-        tpl: S.tpl,
-        size: S.size,
-        theme: S.theme,
-        hatch: S.hatch,
-        data: postRowData(next),
-        headline: headlineOf(S.data),
-        source: postSource,
-      },
-      { onConflict: 'id' }
-    );
+    await upsertPost({
+      id: postId,
+      tpl: S.tpl,
+      size: S.size,
+      theme: S.theme,
+      hatch: S.hatch,
+      data: postRowData(next),
+      headline: headlineOf(S.data),
+      source: postSource,
+      photo: photoUrl,
+    });
     loadHistory();
   }
 
@@ -828,6 +843,7 @@ export default function Studio({
     setPostProject(null);
     imgsRef.current.photo = null;
     setHasPhoto(false);
+    setPhotoUrl(null);
     setSaveState('idle');
     setCaptionOverride(null);
     setCapErr('');
@@ -865,6 +881,7 @@ export default function Studio({
     setPostProject(null);
     imgsRef.current.photo = null;
     setHasPhoto(false);
+    setPhotoUrl(null);
     setSaveState('idle');
     setCaptionOverride(null);
     setCapErr('');
@@ -1064,6 +1081,20 @@ export default function Studio({
     setPostProject(raw.__projectId ? { id: raw.__projectId, name: raw.__project || 'Project' } : null);
     imgsRef.current.photo = null;
     setHasPhoto(false);
+    setPhotoUrl(null);
+    // restore the saved background photo (fetched lazily, not in the list query)
+    supabase
+      .from('posts')
+      .select('photo')
+      .eq('id', row.id)
+      .single()
+      .then(({ data }) => {
+        const url = (data as { photo?: string } | null)?.photo;
+        if (url) {
+          skipSave.current = true;
+          selectImageUrl(url);
+        }
+      });
     delete raw.__badges;
     delete raw.__brands;
     delete raw.__author;
