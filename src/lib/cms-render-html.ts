@@ -154,7 +154,7 @@ function mediaFrameHtml(val: unknown, fit?: unknown, grad?: string): string {
     focusY = clampFocus(m.focusY);
     zoom = clampZoom(m.zoom);
   }
-  const z = clampZoom(zoom) * 1.2;
+  const z = clampZoom(zoom) * 1.4;
   const maxShift = ((1 - 1 / z) / 2) * 100;
   const tx = ((50 - focusX) / 50) * maxShift;
   const ty = ((50 - focusY) / 50) * maxShift;
@@ -252,7 +252,7 @@ function renderBlock(b: LooseBlock): string {
         bfy = clampFocus(bm.focusY);
         bz = clampZoom(bm.zoom);
       }
-      const z = bz * 1.2;
+      const z = bz * 1.4;
       const maxShift = ((1 - 1 / z) / 2) * 100;
       const tx = ((50 - bfx) / 50) * maxShift;
       const ty = ((50 - bfy) / 50) * maxShift;
