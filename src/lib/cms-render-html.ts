@@ -726,6 +726,11 @@ function renderBlock(b: LooseBlock): string {
     const items = Array.isArray(p.items)
       ? (p.items as Array<{ title?: string; text?: string }>)
       : [];
+    const sn = items.length;
+    const sfill =
+      sn > 4 && sn % 4 !== 0
+        ? `<div class="pv-pstep-fill${sn % 2 === 0 ? ' is-teven' : ''}" style="grid-column:span ${(4 - (sn % 4)) % 4}" aria-hidden="true"><span class="pv-pstep-fill-box"></span></div>`
+        : '';
     return (
       `<div class="pv-sec"><div class="shead">${eyebrow(p.eyebrow || 'How it works')}<h2>${accentText(p.title)}</h2></div>` +
       `<div class="pv-steps" style="grid-template-columns:repeat(${Math.min(items.length || 1, 4)},1fr)">` +
@@ -735,6 +740,7 @@ function renderBlock(b: LooseBlock): string {
             `<div class="pv-pstep"><div class="n">${String(i + 1).padStart(2, '0')}</div><h4>${accentText(s.title)}</h4><p>${esc(s.text).replace(/\n/g, '<br>')}</p></div>`,
         )
         .join('') +
+      sfill +
       '</div></div>'
     );
   }
