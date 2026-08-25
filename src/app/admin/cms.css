@@ -206,7 +206,7 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .img-lib-pick-btn img{width:100%;height:100%;object-fit:cover;display:block}
 .img-lib-rm{position:absolute;top:3px;right:3px;z-index:2;width:22px;height:22px;padding:0;border:0;border-radius:2px;background:rgba(33,31,24,.72);color:#fff;font-size:14px;line-height:1;font-weight:700;cursor:pointer}
 .img-lib-rm:hover{background:#b4462f}
-.modalbox.imglib-box{max-width:min(1280px,96vw);padding:0;display:flex;flex-direction:column;max-height:min(88vh,760px);overflow:hidden;position:relative}
+.modalbox.imglib-box{max-width:min(1280px,96vw);width:min(1280px,96vw);padding:0;display:flex;flex-direction:column;max-height:min(88vh,760px);overflow:hidden;position:relative}
 .modalbox.imglib-box h2{padding:32px 64px 0;margin:0;text-align:center;font-size:1.4rem}
 .modalbox.imglib-box .imglib-lede{padding:8px 24px 0;margin:0;font-size:.88rem;color:var(--muted);line-height:1.5;text-align:center}
 .modalbox.imglib-box .close{position:absolute;top:16px;right:16px;margin:0;background:var(--paper-2);border-radius:50%;width:32px;height:32px;display:grid;place-items:center;transition:background .2s, color .2s;color:var(--muted)}
@@ -489,10 +489,13 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-pstep .n{font-family:var(--mono);font-weight:600;font-size:.9rem;color:var(--ink);background:var(--solar);padding:5px 10px;border-radius:2px;display:inline-block;margin-bottom:14px;line-height:1}
 .pv-pstep h4{font-size:1.05rem;font-weight:700;margin:0}
 .pv-pstep p{margin-top:6px;color:var(--muted);font-size:.9rem}
+.pv-pstep-fill{border-top:2px solid var(--line);padding-top:16px;display:flex;min-height:0}
+.pv-pstep-fill-box{flex:1;min-height:76px;border-radius:4px;border:1px solid var(--line);background:repeating-linear-gradient(135deg,rgba(33,31,24,.05) 0 1px,transparent 1px 10px),var(--paper-2);position:relative}
+.pv-pstep-fill-box::after{content:"✦";position:absolute;inset:0;display:grid;place-items:center;color:var(--amber);opacity:.4;font-size:1.05rem}
 /* Steps never exceed 4 across (render caps the inline count); collapse on smaller
    screens — !important because the inline grid-template-columns would otherwise win. */
-@media(max-width:900px){.pv-steps{grid-template-columns:repeat(2,1fr)!important}}
-@media(max-width:560px){.pv-steps{grid-template-columns:1fr!important}}
+@media(max-width:900px){.pv-steps{grid-template-columns:repeat(2,1fr)!important}.pv-pstep-fill{grid-column:span 1!important}.pv-pstep-fill.is-teven{display:none!important}}
+@media(max-width:560px){.pv-steps{grid-template-columns:1fr!important}.pv-pstep-fill{display:none!important}}
 .pv-testi{padding:76px 0;background:var(--paper);box-sizing:border-box;width:100%}
 .pv-testi .wrap{max-width:var(--pv-max,1160px);margin:0 auto;padding:0 var(--pv-gutter,24px);box-sizing:border-box;width:100%}
 .pv-testi .shead{max-width:680px;margin:0 auto 34px;text-align:center}
