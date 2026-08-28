@@ -1317,6 +1317,94 @@
   cursor: default;
 }
 
+.brandLogoRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.brandLogoBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 7;
+  border: 1px dashed var(--line-d, #444);
+  border-radius: 4px;
+  background: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: center;
+}
+.brandLogoBox.brandLogoLight {
+  background: var(--paper);
+  border-color: var(--line);
+}
+.brandLogoBox span {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-d);
+  line-height: 1.5;
+}
+.brandLogoBox.brandLogoLight span {
+  color: var(--muted);
+}
+.brandLogoBox img {
+  max-width: 82%;
+  max-height: 74%;
+  object-fit: contain;
+}
+.brandLogoBox input {
+  display: none;
+}
+.brandColors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.brandColor label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.brandColorRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.brandColorRow input[type='color'] {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.brandColorRow input[type='text'] {
+  width: 100%;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  padding: 7px 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink);
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .tplSelect {
   display: block;
   width: 100%;

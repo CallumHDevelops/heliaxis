@@ -22,6 +22,15 @@ import {
 import { ICON_IDS, ICON_SPRITE } from '@/lib/iconSprite';
 import { prettifyIcon } from '@/lib/icons';
 import { APP_VERSION, WHATS_NEW, TOUR_STEPS, type TourStep } from '@/lib/updates';
+import type { Brand } from '@/lib/postEngine';
+import {
+  type BrandKit,
+  BLANK_BRAND,
+  HELIAXIS_DEFAULTS,
+  HEADING_FONTS,
+  BODY_FONTS,
+  extractAccent,
+} from '@/lib/brandKit';
 import GuideTour from './GuideTour';
 import styles from './Studio.module.css';
 
@@ -75,6 +84,7 @@ export default function Studio({
   const zonesRef = useRef<ClickZone[]>([]);
   const imgsRef = useRef<RenderImages>({});
   const famRef = useRef({ display: 'sans-serif', body: 'sans-serif', mono: 'monospace' });
+  const brandRef = useRef<Brand | undefined>(undefined);
 
   const [S, setS] = useState<PostState>({
     tpl: 'statement',
@@ -136,6 +146,11 @@ export default function Studio({
   const [capBusy, setCapBusy] = useState(false);
   const [capErr, setCapErr] = useState('');
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [myBrandOpen, setMyBrandOpen] = useState(false);
+  const [brand, setBrand] = useState<BrandKit>(BLANK_BRAND);
+  const [bkDraft, setBkDraft] = useState<BrandKit>(BLANK_BRAND);
+  const [brandBusy, setBrandBusy] = useState(false);
+  const [brandMsg2, setBrandMsg2] = useState('');
   const [tourOpen, setTourOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [newPostOpen, setNewPostOpen] = useState(false);
@@ -246,6 +261,7 @@ export default function Studio({
     loadLibrary();
     loadBrandLogos();
     loadImages();
+    loadBrandKit();
     // show "what's new" once per release
     try {
       if (localStorage.getItem(SEEN_KEY) !== APP_VERSION) setWhatsNewOpen(true);
@@ -281,7 +297,13 @@ export default function Studio({
 
   const draw = useCallback(() => {
     if (!canvasRef.current) return;
-    zonesRef.current = renderPost(canvasRef.current, Sref.current, imgsRef.current, famRef.current);
+    zonesRef.current = renderPost(
+      canvasRef.current,
+      Sref.current,
+      imgsRef.current,
+      famRef.current,
+      brandRef.current
+    );
   }, []);
 
   // keep a ref of latest state for the draw callback
@@ -458,6 +480,118 @@ export default function Studio({
   }
   function askConfirm(msg: string, onYes: () => void) {
     setConfirmState({ msg, onYes });
+  }
+
+  // ---- My Brand kit (logo, colours, fonts) ----
+  function applyBrand(kit: BrandKit) {
+    const customColours =
+      kit.color_accent !== HELIAXIS_DEFAULTS.color_accent ||
+      kit.color_ink !== HELIAXIS_DEFAULTS.color_ink ||
+      kit.color_paper !== HELIAXIS_DEFAULTS.color_paper;
+    brandRef.current = customColours
+      ? { accent: kit.color_accent, ink: kit.color_ink, paper: kit.color_paper }
+      : undefined;
+    // fonts (fall back to the built-in Heliaxis/Hanken faces)
+    const cs = getComputedStyle(document.documentElement);
+    famRef.current = {
+      display: kit.font_heading || cs.getPropertyValue('--font-ezra').trim() || 'sans-serif',
+      body: kit.font_body || cs.getPropertyValue('--font-body').trim() || 'sans-serif',
+      mono: cs.getPropertyValue('--font-mono').trim() || 'monospace',
+    };
+    // logos (fall back to the Heliaxis marks)
+    const lightSrc = kit.logo_light || '/heliaxis-logo-light.png';
+    const darkSrc = kit.logo_dark || '/heliaxis-logo.png';
+    const li = new Image();
+    li.onload = () => draw();
+    li.src = lightSrc;
+    imgsRef.current.light = li;
+    const dk = new Image();
+    dk.onload = () => {
+      try {
+        const t = document.createElement('canvas');
+        t.width = dk.naturalWidth;
+        t.height = dk.naturalHeight;
+        const tc = t.getContext('2d')!;
+        tc.drawImage(dk, 0, 0);
+        const id = tc.getImageData(0, 0, t.width, t.height);
+        const p = id.data;
+        for (let i = 0; i < p.length; i += 4) {
+          if (p[i + 3] > 10) {
+            p[i] = 0;
+            p[i + 1] = 0;
+            p[i + 2] = 0;
+          }
+        }
+        tc.putImageData(id, 0, 0);
+        const bl = new Image();
+        bl.onload = () => draw();
+        bl.src = t.toDataURL();
+        imgsRef.current.black = bl;
+      } catch {
+        /* tainted canvas — skip the black variant */
+      }
+      draw();
+    };
+    dk.src = darkSrc;
+    imgsRef.current.dark = dk;
+    if (document.fonts?.ready) document.fonts.ready.then(draw);
+    draw();
+  }
+  async function loadBrandKit() {
+    const { data } = await supabase.from('brand_kit').select('*').eq('id', 'default').maybeSingle();
+    if (data) {
+      const kit = data as BrandKit;
+      setBrand(kit);
+      applyBrand(kit);
+    }
+  }
+  function openMyBrand() {
+    setMenuOpen(false);
+    setBrandMsg2('');
+    setBkDraft({ ...brand });
+    setMyBrandOpen(true);
+  }
+  function onBrandLogoFile(which: 'logo_light' | 'logo_dark', file?: File) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      const dataUrl = r.result as string;
+      setBkDraft((d) => ({ ...d, [which]: dataUrl }));
+      // auto-suggest the accent from the first logo uploaded
+      try {
+        const accent = await extractAccent(dataUrl);
+        setBkDraft((d) => ({ ...d, color_accent: accent }));
+        setBrandMsg2('Accent colour picked from your logo — adjust it below if needed.');
+      } catch {
+        /* ignore */
+      }
+    };
+    r.readAsDataURL(file);
+  }
+  async function reExtractAccent() {
+    const src = bkDraft.logo_dark || bkDraft.logo_light;
+    if (!src) return;
+    const accent = await extractAccent(src);
+    setBkDraft((d) => ({ ...d, color_accent: accent }));
+  }
+  async function saveBrand() {
+    setBrandBusy(true);
+    setBrandMsg2('');
+    const { error } = await supabase
+      .from('brand_kit')
+      .upsert({ id: 'default', ...bkDraft, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    setBrandBusy(false);
+    if (error) {
+      setBrandMsg2(error.message);
+      return;
+    }
+    setBrand(bkDraft);
+    applyBrand(bkDraft);
+    setMyBrandOpen(false);
+  }
+  function resetBrandToDefault() {
+    setBkDraft({ ...BLANK_BRAND });
+    setBrandMsg2('Reset to the Heliaxis defaults — press Save to apply.');
   }
   function deleteImage(id: string, name: string) {
     askConfirm(`Delete "${name || 'this image'}" from the library? This can't be undone.`, () => {
@@ -1248,7 +1382,13 @@ export default function Studio({
         if (im) brandImgs.push(im);
       }
       const off = document.createElement('canvas');
-      renderPost(off, state, { ...imgsRef.current, photo: null, brands: brandImgs }, famRef.current);
+      renderPost(
+        off,
+        state,
+        { ...imgsRef.current, photo: null, brands: brandImgs },
+        famRef.current,
+        brandRef.current
+      );
       return off.toDataURL('image/png');
     } catch {
       return null;
@@ -1430,6 +1570,9 @@ export default function Studio({
                     }}
                   >
                     Edit email
+                  </button>
+                  <button className={styles.menuitem} onClick={openMyBrand}>
+                    My Brand
                   </button>
                   <button className={styles.menuitem} onClick={openBrand}>
                     Manufacturer logos
@@ -2629,6 +2772,131 @@ export default function Studio({
               </button>
               <button className={`${styles.btn} ${styles.solar}`} onClick={dismissWhatsNew}>
                 Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MY BRAND MODAL */}
+      {myBrandOpen && (
+        <div className={styles.modal} onClick={() => setMyBrandOpen(false)}>
+          <div className={styles.modalbox} onClick={(e) => e.stopPropagation()}>
+            <button className={styles.mclose} onClick={() => setMyBrandOpen(false)}>
+              ×
+            </button>
+            <h2 className={styles.mtitle}>
+              <Spark size={16} /> My Brand
+            </h2>
+            <p className={styles.msub}>
+              Your logo, colours and fonts — applied to every post. Upload a logo and the accent
+              colour is picked from it automatically.
+            </p>
+
+            <div className={styles.libLabel}>Logos</div>
+            <div className={styles.brandLogoRow}>
+              <label className={styles.brandLogoBox}>
+                {bkDraft.logo_light ? (
+                  <img src={bkDraft.logo_light} alt="Logo for dark posts" />
+                ) : (
+                  <span>Upload logo<br />(for dark posts)</span>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => onBrandLogoFile('logo_light', e.target.files?.[0])}
+                />
+              </label>
+              <label className={`${styles.brandLogoBox} ${styles.brandLogoLight}`}>
+                {bkDraft.logo_dark ? (
+                  <img src={bkDraft.logo_dark} alt="Logo for light posts" />
+                ) : (
+                  <span>Upload logo<br />(for light posts)</span>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => onBrandLogoFile('logo_dark', e.target.files?.[0])}
+                />
+              </label>
+            </div>
+            <div className={styles.hint}>
+              A light (usually white) logo shows on dark/photo posts; a dark logo shows on light
+              posts. Transparent PNG or SVG works best.
+            </div>
+
+            <div className={styles.libLabel}>Colours</div>
+            <div className={styles.brandColors}>
+              {(
+                [
+                  ['color_accent', 'Accent'],
+                  ['color_ink', 'Dark'],
+                  ['color_paper', 'Light'],
+                ] as [keyof BrandKit, string][]
+              ).map(([k, label]) => (
+                <div className={styles.brandColor} key={k}>
+                  <label>{label}</label>
+                  <div className={styles.brandColorRow}>
+                    <input
+                      type="color"
+                      value={(bkDraft[k] as string) || '#000000'}
+                      onChange={(e) => setBkDraft((d) => ({ ...d, [k]: e.target.value }))}
+                    />
+                    <input
+                      type="text"
+                      value={bkDraft[k] as string}
+                      onChange={(e) => setBkDraft((d) => ({ ...d, [k]: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {(bkDraft.logo_light || bkDraft.logo_dark) && (
+              <button className={styles.mini} onClick={reExtractAccent}>
+                ✦ Re-pick accent from logo
+              </button>
+            )}
+
+            <div className={styles.libLabel}>Fonts</div>
+            <div className={styles.grid2}>
+              <div className={styles.fld}>
+                <label>Headings</label>
+                <select
+                  value={bkDraft.font_heading}
+                  onChange={(e) => setBkDraft((d) => ({ ...d, font_heading: e.target.value }))}
+                >
+                  {HEADING_FONTS.map((f) => (
+                    <option key={f.label} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.fld}>
+                <label>Body text</label>
+                <select
+                  value={bkDraft.font_body}
+                  onChange={(e) => setBkDraft((d) => ({ ...d, font_body: e.target.value }))}
+                >
+                  {BODY_FONTS.map((f) => (
+                    <option key={f.label} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {brandMsg2 && <div className={styles.note}>{brandMsg2}</div>}
+            <div className={styles.mrow}>
+              <button className={`${styles.btn} ${styles.solar}`} onClick={saveBrand} disabled={brandBusy}>
+                {brandBusy ? 'Saving…' : 'Save brand'}
+              </button>
+              <button className={styles.btn} onClick={resetBrandToDefault}>
+                Reset to Heliaxis
+              </button>
+              <button className={styles.btn} onClick={() => setMyBrandOpen(false)}>
+                Close
               </button>
             </div>
           </div>

@@ -53,6 +53,16 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-GB" className={`${ezra.variable} ${hanken.variable} ${mono.variable}`}>
+      <head>
+        {/* Curated brand fonts for the "My Brand" kit (canvas uses the literal
+            family names). Fails gracefully to system fonts if offline. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Montserrat:wght@700;800;900&family=Playfair+Display:wght@700;800;900&family=Oswald:wght@600;700&family=Bebas+Neue&family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&family=Lato:wght@400;700&family=Work+Sans:wght@400;500;600&display=swap"
+        />
+      </head>
       <body>
         {children}
         <PWARegister />

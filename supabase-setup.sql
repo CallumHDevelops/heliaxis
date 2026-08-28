@@ -247,3 +247,23 @@ alter table public.project_images enable row level security;
 create policy "authenticated can read project_images"   on public.project_images for select to authenticated using (true);
 create policy "authenticated can insert project_images"  on public.project_images for insert to authenticated with check (true);
 create policy "authenticated can delete project_images"  on public.project_images for delete to authenticated using (true);
+
+-- ============================================================
+-- My Brand — a single shared brand kit (logo, colours, fonts) that overrides
+-- the built-in Heliaxis branding on posts. One row, id = 'default'.
+-- ============================================================
+create table if not exists public.brand_kit (
+  id           text primary key default 'default',
+  updated_at   timestamptz not null default now(),
+  logo_light   text not null default '',
+  logo_dark    text not null default '',
+  color_accent text not null default '#F8BC1E',
+  color_ink    text not null default '#211F18',
+  color_paper  text not null default '#F7F2E7',
+  font_heading text not null default '',
+  font_body    text not null default ''
+);
+alter table public.brand_kit enable row level security;
+create policy "authenticated can read brand_kit"   on public.brand_kit for select to authenticated using (true);
+create policy "authenticated can insert brand_kit"  on public.brand_kit for insert to authenticated with check (true);
+create policy "authenticated can update brand_kit"  on public.brand_kit for update to authenticated using (true) with check (true);

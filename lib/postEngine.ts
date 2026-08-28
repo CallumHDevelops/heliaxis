@@ -302,12 +302,42 @@ export interface Fonts {
   mono: string;
 }
 
+// Optional per-workspace brand overrides (from the "My Brand" kit). When a
+// field is absent the Heliaxis defaults are used, so posts render unchanged.
+export interface Brand {
+  accent?: string; // main highlight colour (replaces the Heliaxis gold)
+  ink?: string; // dark colour
+  paper?: string; // light colour
+  // logos + fonts are applied by the caller (imgs / fam), not needed here
+}
+
+function hexToRgb(hex: string): string {
+  let h = hex.replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  const n = parseInt(h, 16);
+  if (Number.isNaN(n) || h.length !== 6) return '248,188,30';
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+function shade(hex: string, amt: number): string {
+  // amt < 0 darkens, > 0 lightens
+  let h = hex.replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  const n = parseInt(h, 16);
+  if (Number.isNaN(n) || h.length !== 6) return hex;
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  const r = clamp(((n >> 16) & 255) * (1 + amt));
+  const g = clamp(((n >> 8) & 255) * (1 + amt));
+  const b = clamp((n & 255) * (1 + amt));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
 // Returns the click zones so the UI can map canvas clicks to fields.
 export function renderPost(
   canvas: HTMLCanvasElement,
   S: PostState,
   imgs: RenderImages,
-  fam: Fonts
+  fam: Fonts,
+  brand?: Brand
 ): ClickZone[] {
   const ctx = canvas.getContext('2d')!;
   const sz = SIZES[S.size];
@@ -342,11 +372,17 @@ export function renderPost(
   const tpl = S.tpl;
   const isDark = S.theme === 'dark';
   const isGold = S.theme === 'gold';
-  let bg = isGold ? C.solar : isDark ? C.ink : C.paper;
-  let fg = isGold ? C.ink : isDark ? C.paper : C.ink;
+  // effective brand colours (fall back to Heliaxis defaults)
+  const solar = brand?.accent || C.solar;
+  const inkC = brand?.ink || C.ink;
+  const paperC = brand?.paper || C.paper;
+  const amber2 = brand?.accent ? shade(solar, -0.22) : C.amber2;
+  const accentRGB = brand?.accent ? hexToRgb(solar) : '248,188,30';
+  let bg = isGold ? solar : isDark ? inkC : paperC;
+  let fg = isGold ? inkC : isDark ? paperC : inkC;
   let sub = isGold ? 'rgba(33,31,24,.72)' : isDark ? C.mutedD : C.muted;
-  let accent = isGold ? C.ink : C.solar;
-  let eyeCol = isGold ? 'rgba(33,31,24,.78)' : isDark ? C.solar : C.amber2;
+  let accent = isGold ? inkC : solar;
+  let eyeCol = isGold ? 'rgba(33,31,24,.78)' : isDark ? solar : amber2;
 
   const setFont = (weight: string | number, size: number) =>
     (ctx.font = weight + ' ' + size + 'px ' + fam.display + ', sans-serif');
@@ -566,7 +602,7 @@ export function renderPost(
     ctx.fillStyle = og;
     ctx.fillRect(0, 0, W, H);
     if (S.hatch) grid('rgba(247,242,231,.06)', Math.round(W / 17), 0.72);
-    glow(W * 0.82, H * 0.12, W * 0.55, '248,188,30', 0.14);
+    glow(W * 0.82, H * 0.12, W * 0.55, accentRGB, 0.14);
     // pick readable colours from the actual composited background where text sits
     const lum = avgLuminance(
       Math.round(W * 0.08),
@@ -577,17 +613,17 @@ export function renderPost(
     const lightText = lum < 0.58;
     fg = lightText ? C.paper : C.ink;
     sub = lightText ? 'rgba(247,242,231,0.92)' : 'rgba(33,31,24,0.82)';
-    accent = lightText ? C.solar : C.amber2;
+    accent = lightText ? solar : amber2;
     eyeCol = accent;
   } else {
     if (!isGold) {
       const gr = ctx.createLinearGradient(0, 0, W, H);
       if (isDark) {
-        gr.addColorStop(0, C.ink);
-        gr.addColorStop(1, C.ink2);
+        gr.addColorStop(0, inkC);
+        gr.addColorStop(1, brand?.ink ? shade(inkC, 0.08) : C.ink2);
       } else {
-        gr.addColorStop(0, C.paper);
-        gr.addColorStop(1, C.paper2);
+        gr.addColorStop(0, paperC);
+        gr.addColorStop(1, brand?.paper ? shade(paperC, -0.05) : C.paper2);
       }
       ctx.fillStyle = gr;
       ctx.fillRect(0, 0, W, H);
@@ -598,7 +634,7 @@ export function renderPost(
         Math.round(W / 17),
         0.82
       );
-    if (!isGold) glow(W * 0.82, H * 0.12, W * 0.62, '248,188,30', isDark ? 0.26 : 0.1);
+    if (!isGold) glow(W * 0.82, H * 0.12, W * 0.62, accentRGB, isDark ? 0.26 : 0.1);
   }
 
   const pad = Math.round(W * 0.085);
