@@ -184,6 +184,16 @@ export default function Studio({
   } | null>(null);
   const [editVal, setEditVal] = useState('');
   const editRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+  // drag-to-move state (which field is being dragged and from where)
+  const dragRef = useRef<{
+    f: string;
+    z: ClickZone;
+    startX: number;
+    startY: number;
+    baseDx: number;
+    baseDy: number;
+    moved: boolean;
+  } | null>(null);
   const firstRun = useRef(true);
   const skipSave = useRef(false);
 
@@ -483,6 +493,7 @@ export default function Studio({
       __downloads: dls,
       __project: postProject?.name || '',
       __projectId: postProject?.id || '',
+      __offsets: JSON.stringify(S.offsets || {}),
     };
   }
 
@@ -761,45 +772,106 @@ export default function Studio({
   ]);
   const DISPLAY_FIELDS = new Set(['headline', 'stat', 'statlabel', 'quote']);
 
-  function onCanvasClick(e: React.MouseEvent<HTMLCanvasElement>) {
+  function canvasPoint(e: React.PointerEvent<HTMLCanvasElement>) {
     const cv = canvasRef.current!;
     const r = cv.getBoundingClientRect();
-    const scale = r.width / cv.width;
-    const mx = ((e.clientX - r.left) * cv.width) / r.width;
-    const my = ((e.clientY - r.top) * cv.height) / r.height;
+    return {
+      cv,
+      scale: r.width / cv.width,
+      mx: ((e.clientX - r.left) * cv.width) / r.width,
+      my: ((e.clientY - r.top) * cv.height) / r.height,
+    };
+  }
+  function hitZone(mx: number, my: number): ClickZone | null {
     for (let i = zonesRef.current.length - 1; i >= 0; i--) {
       const z = zonesRef.current[i];
-      if (mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h) {
-        // edit this field inline, right on the post
-        if (!(z.f in S.data)) return;
-        const multiline = MULTILINE_FIELDS.has(z.f);
-        const dh = z.h * scale;
-        const fontPx = Math.max(13, Math.min(38, Math.round((multiline ? dh * 0.26 : dh * 0.44))));
-        setEditVal(S.data[z.f] || '');
-        setEdit({
-          f: z.f,
-          multiline,
-          display: DISPLAY_FIELDS.has(z.f),
-          left: z.x * scale,
-          top: z.y * scale,
-          width: Math.max(80, z.w * scale),
-          height: Math.max(fontPx * 1.6, dh),
-          fontPx,
-        });
-        return;
-      }
+      if (mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h) return z;
     }
-    setEdit(null);
+    return null;
   }
-  function onCanvasMove(e: React.MouseEvent<HTMLCanvasElement>) {
+  // open the inline text editor over a field's zone
+  function openInlineEdit(z: ClickZone, scale: number) {
+    if (!(z.f in S.data)) return;
+    const multiline = MULTILINE_FIELDS.has(z.f);
+    const dh = z.h * scale;
+    const fontPx = Math.max(13, Math.min(38, Math.round(multiline ? dh * 0.26 : dh * 0.44)));
+    setEditVal(S.data[z.f] || '');
+    setEdit({
+      f: z.f,
+      multiline,
+      display: DISPLAY_FIELDS.has(z.f),
+      left: z.x * scale,
+      top: z.y * scale,
+      width: Math.max(80, z.w * scale),
+      height: Math.max(fontPx * 1.6, dh),
+      fontPx,
+    });
+  }
+
+  function onCanvasPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (edit) return; // let the open editor keep focus
+    const { cv, mx, my } = canvasPoint(e);
+    const z = hitZone(mx, my);
+    if (!z || !(z.f in S.data)) {
+      dragRef.current = null;
+      return;
+    }
+    const cur = S.offsets?.[z.f] || { dx: 0, dy: 0 };
+    dragRef.current = { f: z.f, z, startX: mx, startY: my, baseDx: cur.dx, baseDy: cur.dy, moved: false };
+    try {
+      cv.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    cv.style.cursor = 'grabbing';
+  }
+  function onCanvasPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    const { cv, mx, my } = canvasPoint(e);
+    const drag = dragRef.current;
+    if (!drag) {
+      cv.style.cursor = hitZone(mx, my) ? 'grab' : 'default';
+      return;
+    }
+    const ddx = mx - drag.startX;
+    const ddy = my - drag.startY;
+    if (!drag.moved && Math.hypot(ddx, ddy) < 4) return; // ignore micro-moves
+    drag.moved = true;
+    const f = drag.f;
+    setS((s) => ({
+      ...s,
+      offsets: { ...(s.offsets || {}), [f]: { dx: Math.round(drag.baseDx + ddx), dy: Math.round(drag.baseDy + ddy) } },
+    }));
+  }
+  function onCanvasPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    const { cv, scale } = canvasPoint(e);
+    const drag = dragRef.current;
+    dragRef.current = null;
+    try {
+      cv.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    cv.style.cursor = 'grab';
+    if (drag && !drag.moved) openInlineEdit(drag.z, scale); // a click, not a drag → edit
+  }
+  function onCanvasDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    // double-click a moved field to snap it back to its auto position
     const cv = canvasRef.current!;
     const r = cv.getBoundingClientRect();
     const mx = ((e.clientX - r.left) * cv.width) / r.width;
     const my = ((e.clientY - r.top) * cv.height) / r.height;
-    const hit = zonesRef.current.some(
-      (z) => mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h
-    );
-    cv.style.cursor = hit ? 'pointer' : 'default';
+    const z = hitZone(mx, my);
+    if (z && S.offsets?.[z.f]) {
+      setEdit(null);
+      setS((s) => {
+        const next = { ...(s.offsets || {}) };
+        delete next[z.f];
+        return { ...s, offsets: next };
+      });
+    }
+  }
+  function resetOffsets() {
+    setS((s) => ({ ...s, offsets: {} }));
   }
 
   async function download() {
@@ -1076,6 +1148,12 @@ export default function Studio({
     } catch {
       brands = [];
     }
+    let offsets: Record<string, { dx: number; dy: number }> = {};
+    try {
+      offsets = raw.__offsets ? JSON.parse(raw.__offsets) : {};
+    } catch {
+      offsets = {};
+    }
     setPostAuthor(raw.__author || '');
     setDownloads(Number(raw.__downloads) || 0);
     setPostProject(raw.__projectId ? { id: raw.__projectId, name: raw.__project || 'Project' } : null);
@@ -1101,6 +1179,7 @@ export default function Studio({
     delete raw.__downloads;
     delete raw.__project;
     delete raw.__projectId;
+    delete raw.__offsets;
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
@@ -1110,6 +1189,7 @@ export default function Studio({
       badges,
       photoShade: 0.62,
       brands,
+      offsets,
     });
     setHistOpen(false);
   }
@@ -1130,12 +1210,19 @@ export default function Studio({
       } catch {
         brands = [];
       }
+      let offsets: Record<string, { dx: number; dy: number }> = {};
+      try {
+        offsets = data.__offsets ? JSON.parse(data.__offsets) : {};
+      } catch {
+        offsets = {};
+      }
       delete data.__badges;
       delete data.__brands;
       delete data.__author;
       delete data.__downloads;
       delete data.__project;
       delete data.__projectId;
+      delete data.__offsets;
       const state: PostState = {
         tpl: row.tpl as TemplateKey,
         size: (row.size as SizeKey) || 'square',
@@ -1145,6 +1232,7 @@ export default function Studio({
         badges,
         brands,
         photoShade: 0.62,
+        offsets,
       };
       const brandImgs: HTMLImageElement[] = [];
       for (const id of brands) {
@@ -1451,6 +1539,19 @@ export default function Studio({
         </div>
 
         <div className={styles.ph}>
+          <Spark size={11} /> Layout
+        </div>
+        <div className={styles.hint}>
+          Drag any text on the post to reposition it. Click to edit, double-click a moved item to
+          snap it back.
+        </div>
+        {S.offsets && Object.keys(S.offsets).length > 0 && (
+          <button className={styles.mini} onClick={resetOffsets}>
+            Reset moved text ({Object.keys(S.offsets).length})
+          </button>
+        )}
+
+        <div className={styles.ph}>
           <Spark size={11} /> Photo background
         </div>
         {postProject && (
@@ -1548,7 +1649,14 @@ export default function Studio({
       {/* CENTRE */}
       <div className={styles.stage}>
         <div className={styles.canvaswrap} data-tour="canvas">
-          <canvas ref={canvasRef} onClick={onCanvasClick} onMouseMove={onCanvasMove} />
+          <canvas
+            ref={canvasRef}
+            onPointerDown={onCanvasPointerDown}
+            onPointerMove={onCanvasPointerMove}
+            onPointerUp={onCanvasPointerUp}
+            onDoubleClick={onCanvasDoubleClick}
+            style={{ touchAction: 'none' }}
+          />
           {edit &&
             (edit.multiline ? (
               <textarea

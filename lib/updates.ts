@@ -2,7 +2,7 @@
 // Bump APP_VERSION whenever you add a WHATS_NEW entry: on next sign-in every
 // user sees the update once (tracked in localStorage), then it stops showing.
 
-export const APP_VERSION = '2025.08.24';
+export const APP_VERSION = '2025.08.25';
 
 export interface UpdateEntry {
   version: string;
@@ -13,6 +13,17 @@ export interface UpdateEntry {
 
 // Newest first. The topmost entry's version should match APP_VERSION.
 export const WHATS_NEW: UpdateEntry[] = [
+  {
+    version: '2025.08.25',
+    date: '25 August 2025',
+    title: 'Move text anywhere on the post',
+    items: [
+      'Drag any text on the canvas to reposition it — the post keeps its on-brand look, you just fine-tune where things sit.',
+      'Click to edit, drag to move, and double-click a moved item to snap it back to its automatic position.',
+      'Positions are saved with the post and come back when you reopen it.',
+      'Saved posts also keep their background photo now, and you can send projects straight in via a Telegram bot.',
+    ],
+  },
   {
     version: '2025.08.24',
     date: '24 August 2025',
@@ -100,8 +111,8 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     target: '[data-tour="canvas"]',
-    title: 'Your live preview — edit on the post',
-    body: 'This is the finished post. Click any text directly on the canvas to edit it right there; press Escape or click away when done. Wrap *a word* in asterisks to make it gold.',
+    title: 'Your live preview — edit & move on the post',
+    body: 'Click any text on the canvas to edit it right there. Drag it to reposition it, and double-click a moved item to snap it back to its auto position. Wrap *a word* in asterisks to make it gold.',
     placement: 'left',
   },
   {

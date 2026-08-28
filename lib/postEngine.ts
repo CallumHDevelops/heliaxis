@@ -275,6 +275,9 @@ export interface PostState {
   badges?: Badge[];
   photoShade?: number; // 0..~0.9 dark overlay strength on photo backgrounds
   brands?: string[]; // brand-logo ids shown bottom-right ("Trusted installers of")
+  // per-field manual position nudges (canvas px) from drag-to-move; the field
+  // keeps its auto-computed position plus this offset
+  offsets?: Record<string, { dx: number; dy: number }>;
 }
 
 export interface ClickZone {
@@ -313,8 +316,27 @@ export function renderPost(
   canvas.width = W;
   canvas.height = H;
   const zones: ClickZone[] = [];
-  const zone = (f: string, x: number, y: number, w: number, hh: number) =>
-    zones.push({ f, x, y, w, h: hh });
+  // per-field manual drag offset
+  const ZERO = { dx: 0, dy: 0 };
+  const off = (f: string) => (S.offsets && S.offsets[f]) || ZERO;
+  // zones carry the field's offset so hit-testing follows the moved text
+  const zone = (f: string, x: number, y: number, w: number, hh: number) => {
+    const o = off(f);
+    zones.push({ f, x: x + o.dx, y: y + o.dy, w, h: hh });
+  };
+  // run a field's drawing translated by its manual offset (visual only — the
+  // layout cursor stays in un-offset space so other fields don't move)
+  const drawF = <T,>(f: string, fn: () => T): T => {
+    const o = off(f);
+    if (o.dx || o.dy) {
+      ctx.save();
+      ctx.translate(o.dx, o.dy);
+      const r = fn();
+      ctx.restore();
+      return r;
+    }
+    return fn();
+  };
 
   const d = S.data;
   const tpl = S.tpl;
@@ -607,7 +629,7 @@ export function renderPost(
     setMono(Math.round(19 * u), 500);
     ctx.fillStyle = sub;
     const fy = H - padY + Math.round(6 * u);
-    ctx.fillText(d.footer.toUpperCase(), pad, fy);
+    drawF('footer', () => ctx.fillText(d.footer.toUpperCase(), pad, fy));
     zone('footer', pad - 10, fy - Math.round(30 * u), maxW, Math.round(48 * u));
   }
 
@@ -663,8 +685,10 @@ export function renderPost(
   const eyebrow = (txt: string, y: number) => {
     if (!txt) return y;
     setMono(Math.round(21 * u), 600);
-    sparkPath(pad + Math.round(9 * u), y - Math.round(7 * u), Math.round(20 * u), eyeCol);
-    tracked(txt.toUpperCase(), pad + Math.round(30 * u), y, Math.round(3.4 * u), eyeCol);
+    drawF('eyebrow', () => {
+      sparkPath(pad + Math.round(9 * u), y - Math.round(7 * u), Math.round(20 * u), eyeCol);
+      tracked(txt.toUpperCase(), pad + Math.round(30 * u), y, Math.round(3.4 * u), eyeCol);
+    });
     zone('eyebrow', pad - 10, y - Math.round(34 * u), maxW, Math.round(52 * u));
     return y + Math.round(66 * u);
   };
@@ -729,20 +753,20 @@ export function renderPost(
     const numTop = bandTop + Math.max(0, (bandH - numH) / 2);
     setFont(900, Math.round(statSize * u));
     ctx.fillStyle = accent;
-    ctx.fillText(d.stat, pad, numTop + Math.round(statSize * 0.74 * u));
+    drawF('stat', () => ctx.fillText(d.stat, pad, numTop + Math.round(statSize * 0.74 * u)));
     zone('stat', pad - 10, numTop, leftW, numH);
 
     // right: label + sub, vertically centred
     let ry = bandTop + Math.max(0, (bandH - rightH) / 2);
     setFont(800, Math.round(labelSz * u));
     const rls = ry + Math.round(labelSz * 0.82 * u);
-    let ny = drawLines(d.statlabel, rightX, rls, rightW, labelLH, fg);
+    let ny = drawF('statlabel', () => drawLines(d.statlabel, rightX, rls, rightW, labelLH, fg));
     zone('statlabel', rightX - 10, ry, rightW, ny - rls + labelLH);
     ry = ny + Math.round(6 * u);
     if (d.sub) {
       setBody(Math.round(subSz * u), 400);
       const ss = ry + Math.round(subSz * 0.8 * u);
-      const se = drawLines(d.sub, rightX, ss, rightW, subLH, sub);
+      const se = drawF('sub', () => drawLines(d.sub, rightX, ss, rightW, subLH, sub));
       zone('sub', rightX - 10, ry, rightW, se - ss + subLH);
     }
   } else if (tpl === 'stat') {
@@ -804,65 +828,73 @@ export function renderPost(
     const numBaseline = numTop + capNum;
     setFont(900, Math.round(statSize * u));
     ctx.fillStyle = accent;
-    ctx.fillText(d.stat, pad, numBaseline);
+    drawF('stat', () => ctx.fillText(d.stat, pad, numBaseline));
     zone('stat', pad - 10, numTop, maxW, numVisual);
     // label — cap-top the same gap G below the number's descender
     const numBottom = numBaseline + descNum;
     const labelTop = numBottom + G;
     setFont(800, Math.round(labelSize * u));
-    drawLines(d.statlabel, pad, labelTop + capLabel, maxW, labelLH, fg);
+    drawF('statlabel', () => drawLines(d.statlabel, pad, labelTop + capLabel, maxW, labelLH, fg));
     zone('statlabel', pad - 10, labelTop, maxW, labelH);
     yy = labelTop + labelH;
     // sub
     if (d.sub) {
       yy += Math.round(24 * u);
       setBody(Math.round(subSize * u), 400);
-      drawLines(d.sub, pad, yy + Math.round(subSize * 0.8 * u), maxW * 0.92, subLH, sub);
+      drawF('sub', () =>
+        drawLines(d.sub, pad, yy + Math.round(subSize * 0.8 * u), maxW * 0.92, subLH, sub)
+      );
       zone('sub', pad - 10, yy, maxW, subLines.length * subLH);
     }
   } else if (tpl === 'quote') {
-    ctx.fillStyle = accent;
     setFont(900, Math.round(150 * u));
-    ctx.fillText('\u201C', pad, top + Math.round(90 * u));
+    const qMarkY = top + Math.round(90 * u);
     cy = top + Math.round(150 * u);
     setFont(800, Math.round(56 * u));
     const qs = cy;
-    cy = drawLines(d.quote, pad, cy, maxW, Math.round(70 * u), fg);
+    const qEnd = drawF('quote', () => {
+      ctx.fillStyle = accent;
+      setFont(900, Math.round(150 * u));
+      ctx.fillText('\u201C', pad, qMarkY);
+      setFont(800, Math.round(56 * u));
+      return drawLines(d.quote, pad, qs, maxW, Math.round(70 * u), fg);
+    });
+    cy = qEnd;
     zone('quote', pad - 10, qs - Math.round(56 * u), maxW, cy - qs + Math.round(20 * u));
     cy += Math.round(40 * u);
     const n = Math.max(1, Math.min(5, parseInt(d.stars || '5', 10)));
-    setBody(Math.round(34 * u), 600);
-    ctx.fillStyle = accent;
+    const starY = cy;
     let stars = '';
     for (let i = 0; i < n; i++) stars += '\u2605 ';
-    ctx.fillText(stars.trim(), pad, cy);
-    cy += Math.round(46 * u);
-    setMono(Math.round(24 * u), 500);
-    ctx.fillStyle = sub;
-    ctx.fillText((d.name + ' \u00b7 ' + d.location).toUpperCase(), pad, cy);
-    zone('name', pad - 10, cy - Math.round(28 * u), maxW, Math.round(44 * u));
+    const nameY = cy + Math.round(46 * u);
+    drawF('name', () => {
+      setBody(Math.round(34 * u), 600);
+      ctx.fillStyle = accent;
+      ctx.fillText(stars.trim(), pad, starY);
+      setMono(Math.round(24 * u), 500);
+      ctx.fillStyle = sub;
+      ctx.fillText((d.name + ' \u00b7 ' + d.location).toUpperCase(), pad, nameY);
+    });
+    cy = nameY;
+    zone('name', pad - 10, starY - Math.round(28 * u), maxW, Math.round(90 * u));
   } else if (tpl === 'list') {
     cy = eyebrow(d.eyebrow, top);
     setFont(900, Math.round(74 * u));
     const hs = cy + Math.round(34 * u);
-    cy = drawRich(d.headline, pad, hs, maxW, Math.round(84 * u), fg, accent);
+    cy = drawF('headline', () => drawRich(d.headline, pad, hs, maxW, Math.round(84 * u), fg, accent));
     zone('headline', pad - 10, hs - Math.round(74 * u), maxW, cy - hs + Math.round(30 * u));
     cy += Math.round(40 * u);
     const items = [d.item1, d.item2, d.item3];
     items.forEach((it, i) => {
       if (!it) return;
-      setMono(Math.round(30 * u), 600);
-      ctx.fillStyle = accent;
-      ctx.fillText('0' + (i + 1), pad, cy);
-      setBody(Math.round(34 * u), 500);
-      const ny = drawLines(
-        it,
-        pad + Math.round(74 * u),
-        cy,
-        maxW - Math.round(74 * u),
-        Math.round(44 * u),
-        fg
-      );
+      const iy = cy;
+      const ny = drawF('item' + (i + 1), () => {
+        setMono(Math.round(30 * u), 600);
+        ctx.fillStyle = accent;
+        ctx.fillText('0' + (i + 1), pad, iy);
+        setBody(Math.round(34 * u), 500);
+        return drawLines(it, pad + Math.round(74 * u), iy, maxW - Math.round(74 * u), Math.round(44 * u), fg);
+      });
       zone('item' + (i + 1), pad - 10, cy - Math.round(30 * u), maxW, ny - cy + Math.round(20 * u));
       ctx.strokeStyle = isDark ? 'rgba(247,242,231,.14)' : 'rgba(33,31,24,.12)';
       ctx.beginPath();
@@ -915,14 +947,18 @@ export function renderPost(
         total = fit();
       }
       setFont(900, Math.round(hsz * u));
-      drawRich(d.headline, pad, hTop + Math.round(hsz * 0.8 * u), maxW, hLH, fg, accent);
+      drawF('headline', () =>
+        drawRich(d.headline, pad, hTop + Math.round(hsz * 0.8 * u), maxW, hLH, fg, accent)
+      );
       zone('headline', pad - 10, hTop, maxW, hBlockH);
       cy = hTop + hBlockH;
       if (d.sub) {
         cy += subGap;
         setBody(Math.round(subSz * u), 400);
         const ss = cy;
-        drawLines(d.sub, pad, cy + Math.round(subSz * 0.8 * u), maxW * 0.95, subLH, sub);
+        drawF('sub', () =>
+          drawLines(d.sub, pad, ss + Math.round(subSz * 0.8 * u), maxW * 0.95, subLH, sub)
+        );
         zone('sub', pad - 10, ss, maxW, subLines.length * subLH);
         cy = ss + subLines.length * subLH;
       }
@@ -943,7 +979,9 @@ export function renderPost(
       setFont(900, Math.round(hsz * u));
       // more breathing room under the eyebrow on the tall story format
       const hStart = cy + Math.round((S.size === 'story' ? 92 : 40) * u);
-      cy = drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent);
+      cy = drawF('headline', () =>
+        drawRich(d.headline, pad, hStart, maxW, Math.round(hsz * 1.12 * u), fg, accent)
+      );
       zone('headline', pad - 10, hStart - Math.round(hsz * u), maxW, cy - hStart + Math.round(hsz * 0.4 * u));
       if (d.sub) {
         let subSz = S.size === 'story' ? 44 : 36;
@@ -962,7 +1000,8 @@ export function renderPost(
           setBody(Math.round(subSz * u), 400);
           subLines = wrap(d.sub, subMaxW);
         }
-        cy = drawLines(d.sub, pad, cy, subMaxW, Math.round(subLh * u), sub);
+        const subFinalLh = subLh;
+        cy = drawF('sub', () => drawLines(d.sub, pad, ss, subMaxW, Math.round(subFinalLh * u), sub));
         zone('sub', pad - 10, ss - Math.round(34 * u), maxW, cy - ss + Math.round(10 * u));
       }
     }
@@ -970,11 +1009,14 @@ export function renderPost(
       cy += Math.round(34 * u);
       setMono(Math.round(24 * u), 600);
       const bw = ctx.measureText(d.badge.toUpperCase()).width + Math.round(40 * u);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = Math.max(1, Math.round(2 * u));
-      ctx.strokeRect(pad, cy - Math.round(30 * u), bw, Math.round(52 * u));
-      ctx.fillStyle = accent;
-      ctx.fillText(d.badge.toUpperCase(), pad + Math.round(20 * u), cy + Math.round(2 * u));
+      const by = cy;
+      drawF('badge', () => {
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = Math.max(1, Math.round(2 * u));
+        ctx.strokeRect(pad, by - Math.round(30 * u), bw, Math.round(52 * u));
+        ctx.fillStyle = accent;
+        ctx.fillText(d.badge.toUpperCase(), pad + Math.round(20 * u), by + Math.round(2 * u));
+      });
       zone('badge', pad - 10, cy - Math.round(34 * u), maxW, Math.round(60 * u));
       cy += Math.round(60 * u);
     }
@@ -982,10 +1024,13 @@ export function renderPost(
       cy += Math.round(24 * u);
       setFont(700, Math.round(34 * u));
       const cw = ctx.measureText(d.cta + '  \u2192').width + Math.round(56 * u);
-      ctx.fillStyle = accent;
-      ctx.fillRect(pad, cy - Math.round(38 * u), cw, Math.round(64 * u));
-      ctx.fillStyle = isGold ? C.paper : C.ink;
-      ctx.fillText(d.cta + '  \u2192', pad + Math.round(28 * u), cy);
+      const cyc = cy;
+      drawF('cta', () => {
+        ctx.fillStyle = accent;
+        ctx.fillRect(pad, cyc - Math.round(38 * u), cw, Math.round(64 * u));
+        ctx.fillStyle = isGold ? C.paper : C.ink;
+        ctx.fillText(d.cta + '  \u2192', pad + Math.round(28 * u), cyc);
+      });
       zone('cta', pad - 10, cy - Math.round(42 * u), cw + 20, Math.round(72 * u));
     }
   }
