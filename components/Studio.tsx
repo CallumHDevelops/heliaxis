@@ -85,6 +85,7 @@ export default function Studio({
   const imgsRef = useRef<RenderImages>({});
   const famRef = useRef({ display: 'sans-serif', body: 'sans-serif', mono: 'monospace' });
   const brandRef = useRef<Brand | undefined>(undefined);
+  const hideFieldRef = useRef<string | undefined>(undefined); // field being edited (drawn hidden)
 
   const [S, setS] = useState<PostState>({
     tpl: 'statement',
@@ -190,15 +191,18 @@ export default function Studio({
   const [edit, setEdit] = useState<{
     f: string;
     multiline: boolean;
-    display: boolean;
     left: number;
     top: number;
     width: number;
     height: number;
     fontPx: number;
+    color: string;
+    fontFamily: string;
   } | null>(null);
   const [editVal, setEditVal] = useState('');
   const editRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+  // active alignment/snap guide lines shown while dragging (canvas coords)
+  const [snap, setSnap] = useState<{ v: number[]; h: number[]; W: number; H: number } | null>(null);
   // drag-to-move state (which field is being dragged and from where)
   const dragRef = useRef<{
     f: string;
@@ -302,7 +306,8 @@ export default function Studio({
       Sref.current,
       imgsRef.current,
       famRef.current,
-      brandRef.current
+      brandRef.current,
+      hideFieldRef.current
     );
   }, []);
 
@@ -312,6 +317,13 @@ export default function Studio({
     Sref.current = S;
     draw();
   }, [S, draw]);
+
+  // hide the field being edited on the canvas (so text isn't doubled behind
+  // the transparent editor) and repaint
+  useEffect(() => {
+    hideFieldRef.current = edit?.f;
+    draw();
+  }, [edit, draw]);
 
   // focus the inline editor when it opens; close it if the window resizes
   // (its position is pixel-based and would drift)
@@ -628,6 +640,7 @@ export default function Studio({
       __project: postProject?.name || '',
       __projectId: postProject?.id || '',
       __offsets: JSON.stringify(S.offsets || {}),
+      __scales: JSON.stringify(S.scales || {}),
     };
   }
 
@@ -905,6 +918,27 @@ export default function Studio({
     'statlabel',
   ]);
   const DISPLAY_FIELDS = new Set(['headline', 'stat', 'statlabel', 'quote']);
+  const MONO_FIELDS = new Set(['eyebrow', 'footer', 'name']);
+  const ACCENT_FIELDS = new Set(['stat', 'eyebrow', 'badge', 'cta']);
+
+  function fieldColor(f: string) {
+    const accent = S.theme === 'gold' ? '#211F18' : brandRef.current?.accent || '#F8BC1E';
+    const base = S.theme === 'dark' || hasPhoto ? '#F7F2E7' : '#211F18';
+    return ACCENT_FIELDS.has(f) ? accent : base;
+  }
+  function fieldFamily(f: string) {
+    if (MONO_FIELDS.has(f)) return 'var(--font-mono), monospace';
+    if (DISPLAY_FIELDS.has(f)) return brandRef.current ? 'inherit' : 'var(--font-ezra), sans-serif';
+    return 'var(--font-body), sans-serif';
+  }
+  function bumpScale(f: string, delta: number) {
+    const cur = Sref.current.scales?.[f] || 1;
+    const next = Math.max(0.4, Math.min(3, Math.round((cur + delta) * 100) / 100));
+    if (next === cur) return;
+    if (edit && edit.f === f)
+      setEdit((ed) => (ed ? { ...ed, fontPx: Math.max(11, Math.round((ed.fontPx * next) / cur)) } : ed));
+    setS((s) => ({ ...s, scales: { ...(s.scales || {}), [f]: next } }));
+  }
 
   function canvasPoint(e: React.PointerEvent<HTMLCanvasElement>) {
     const cv = canvasRef.current!;
@@ -923,22 +957,27 @@ export default function Studio({
     }
     return null;
   }
-  // open the inline text editor over a field's zone
+  // open the inline text editor over a field's zone (transparent, matching the
+  // on-canvas text size/colour/font)
   function openInlineEdit(z: ClickZone, scale: number) {
     if (!(z.f in S.data)) return;
     const multiline = MULTILINE_FIELDS.has(z.f);
-    const dh = z.h * scale;
-    const fontPx = Math.max(13, Math.min(38, Math.round(multiline ? dh * 0.26 : dh * 0.44)));
+    const fieldScale = S.scales?.[z.f] || 1;
+    // z.fontPx is the base (un-scaled) canvas font size; the visible size adds
+    // the field's scale, then convert to display px
+    const rendered = (z.fontPx || z.h / (multiline ? 3 : 1.2)) * fieldScale;
+    const fontPx = Math.max(11, Math.round(rendered * scale));
     setEditVal(S.data[z.f] || '');
     setEdit({
       f: z.f,
       multiline,
-      display: DISPLAY_FIELDS.has(z.f),
       left: z.x * scale,
       top: z.y * scale,
-      width: Math.max(80, z.w * scale),
-      height: Math.max(fontPx * 1.6, dh),
+      width: Math.max(90, z.w * scale + 8),
+      height: Math.max(fontPx * 1.5, z.h * scale),
       fontPx,
+      color: fieldColor(z.f),
+      fontFamily: fieldFamily(z.f),
     });
   }
 
@@ -960,7 +999,7 @@ export default function Studio({
     cv.style.cursor = 'grabbing';
   }
   function onCanvasPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
-    const { cv, mx, my } = canvasPoint(e);
+    const { cv, scale, mx, my } = canvasPoint(e);
     const drag = dragRef.current;
     if (!drag) {
       cv.style.cursor = hitZone(mx, my) ? 'grab' : 'default';
@@ -971,10 +1010,123 @@ export default function Studio({
     if (!drag.moved && Math.hypot(ddx, ddy) < 4) return; // ignore micro-moves
     drag.moved = true;
     const f = drag.f;
+    const baseLeft = drag.z.x - drag.baseDx;
+    const baseTop = drag.z.y - drag.baseDy;
+    const r = snapOffset(
+      f,
+      baseLeft,
+      baseTop,
+      drag.z.w,
+      drag.z.h,
+      drag.baseDx + ddx,
+      drag.baseDy + ddy,
+      cv.width,
+      cv.height,
+      scale
+    );
+    setSnap(r.v.length || r.h.length ? { v: r.v, h: r.h, W: cv.width, H: cv.height } : null);
     setS((s) => ({
       ...s,
-      offsets: { ...(s.offsets || {}), [f]: { dx: Math.round(drag.baseDx + ddx), dy: Math.round(drag.baseDy + ddy) } },
+      offsets: { ...(s.offsets || {}), [f]: { dx: Math.round(r.dx), dy: Math.round(r.dy) } },
     }));
+  }
+  // snap a proposed offset (dx,dy in canvas px) to canvas centre / margins /
+  // other fields' centres; returns the snapped offset and the guide lines hit
+  function snapOffset(
+    f: string,
+    baseLeft: number,
+    baseTop: number,
+    w: number,
+    h: number,
+    dx: number,
+    dy: number,
+    W: number,
+    H: number,
+    scale: number
+  ) {
+    const thr = 9 / scale;
+    const pad = Math.round(W * 0.085);
+    const left = baseLeft + dx;
+    const top = baseTop + dy;
+    const cx = left + w / 2;
+    const cyc = top + h / 2;
+    const xT: { t: number; a: number }[] = [
+      { t: W / 2, a: cx },
+      { t: pad, a: left },
+      { t: W - pad, a: left + w },
+    ];
+    const yT: { t: number; a: number }[] = [{ t: H / 2, a: cyc }];
+    zonesRef.current.forEach((z) => {
+      if (z.f === f) return;
+      xT.push({ t: z.x + z.w / 2, a: cx });
+      yT.push({ t: z.y + z.h / 2, a: cyc });
+    });
+    const v: number[] = [];
+    const hh: number[] = [];
+    let bx: { adj: number; t: number; d: number } | null = null;
+    for (const { t, a } of xT) {
+      const d = Math.abs(a - t);
+      if (d <= thr && (!bx || d < bx.d)) bx = { adj: t - a, t, d };
+    }
+    if (bx) {
+      dx += bx.adj;
+      v.push(bx.t);
+    }
+    let by: { adj: number; t: number; d: number } | null = null;
+    for (const { t, a } of yT) {
+      const d = Math.abs(a - t);
+      if (d <= thr && (!by || d < by.d)) by = { adj: t - a, t, d };
+    }
+    if (by) {
+      dy += by.adj;
+      hh.push(by.t);
+    }
+    return { dx, dy, v, h: hh };
+  }
+  // drag the field being edited via the toolbar's drag handle (window-level so
+  // it works outside the canvas element)
+  function startHandleDrag(e: React.PointerEvent<HTMLElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!edit) return;
+    const cv = canvasRef.current!;
+    const rect = cv.getBoundingClientRect();
+    const scale = rect.width / cv.width;
+    const f = edit.f;
+    const z = zonesRef.current.find((zz) => zz.f === f);
+    if (!z) return;
+    const base = S.offsets?.[f] || { dx: 0, dy: 0 };
+    const baseLeft = z.x - base.dx;
+    const baseTop = z.y - base.dy;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const move = (ev: PointerEvent) => {
+      const r = snapOffset(
+        f,
+        baseLeft,
+        baseTop,
+        z.w,
+        z.h,
+        base.dx + (ev.clientX - sx) / scale,
+        base.dy + (ev.clientY - sy) / scale,
+        cv.width,
+        cv.height,
+        scale
+      );
+      setSnap(r.v.length || r.h.length ? { v: r.v, h: r.h, W: cv.width, H: cv.height } : null);
+      setS((s) => ({
+        ...s,
+        offsets: { ...(s.offsets || {}), [f]: { dx: Math.round(r.dx), dy: Math.round(r.dy) } },
+      }));
+      setEdit((ed) => (ed ? { ...ed, left: (baseLeft + r.dx) * scale, top: (baseTop + r.dy) * scale } : ed));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setSnap(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   }
   function onCanvasPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
     const { cv, scale } = canvasPoint(e);
@@ -986,6 +1138,7 @@ export default function Studio({
       /* ignore */
     }
     cv.style.cursor = 'grab';
+    setSnap(null);
     if (drag && !drag.moved) openInlineEdit(drag.z, scale); // a click, not a drag → edit
   }
   function onCanvasDoubleClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -1288,6 +1441,12 @@ export default function Studio({
     } catch {
       offsets = {};
     }
+    let scales: Record<string, number> = {};
+    try {
+      scales = raw.__scales ? JSON.parse(raw.__scales) : {};
+    } catch {
+      scales = {};
+    }
     setPostAuthor(raw.__author || '');
     setDownloads(Number(raw.__downloads) || 0);
     setPostProject(raw.__projectId ? { id: raw.__projectId, name: raw.__project || 'Project' } : null);
@@ -1314,6 +1473,7 @@ export default function Studio({
     delete raw.__project;
     delete raw.__projectId;
     delete raw.__offsets;
+    delete raw.__scales;
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
@@ -1324,6 +1484,7 @@ export default function Studio({
       photoShade: 0.62,
       brands,
       offsets,
+      scales,
     });
     setHistOpen(false);
   }
@@ -1350,6 +1511,12 @@ export default function Studio({
       } catch {
         offsets = {};
       }
+      let scales: Record<string, number> = {};
+      try {
+        scales = data.__scales ? JSON.parse(data.__scales) : {};
+      } catch {
+        scales = {};
+      }
       delete data.__badges;
       delete data.__brands;
       delete data.__author;
@@ -1357,6 +1524,7 @@ export default function Studio({
       delete data.__project;
       delete data.__projectId;
       delete data.__offsets;
+      delete data.__scales;
       const state: PostState = {
         tpl: row.tpl as TemplateKey,
         size: (row.size as SizeKey) || 'square',
@@ -1367,6 +1535,7 @@ export default function Studio({
         brands,
         photoShade: 0.62,
         offsets,
+        scales,
       };
       const brandImgs: HTMLImageElement[] = [];
       for (const id of brands) {
@@ -1800,58 +1969,85 @@ export default function Studio({
             onDoubleClick={onCanvasDoubleClick}
             style={{ touchAction: 'none' }}
           />
-          {edit &&
-            (edit.multiline ? (
-              <textarea
-                ref={editRef as React.RefObject<HTMLTextAreaElement>}
-                className={styles.canvasEdit}
-                style={{
-                  left: edit.left,
-                  top: edit.top,
-                  width: edit.width,
-                  height: edit.height,
-                  fontSize: edit.fontPx,
-                  fontFamily: edit.display ? 'var(--font-ezra), sans-serif' : 'var(--font-body), sans-serif',
-                }}
-                value={editVal}
-                onChange={(e) => {
-                  setEditVal(e.target.value);
-                  setField(edit.f, e.target.value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    e.preventDefault();
-                    setEdit(null);
-                  }
-                }}
-                onBlur={() => setEdit(null)}
-              />
-            ) : (
-              <input
-                ref={editRef as React.RefObject<HTMLInputElement>}
-                className={styles.canvasEdit}
-                style={{
-                  left: edit.left,
-                  top: edit.top,
-                  width: edit.width,
-                  height: edit.height,
-                  fontSize: edit.fontPx,
-                  fontFamily: edit.display ? 'var(--font-ezra), sans-serif' : 'var(--font-body), sans-serif',
-                }}
-                value={editVal}
-                onChange={(e) => {
-                  setEditVal(e.target.value);
-                  setField(edit.f, e.target.value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape' || e.key === 'Enter') {
-                    e.preventDefault();
-                    setEdit(null);
-                  }
-                }}
-                onBlur={() => setEdit(null)}
-              />
-            ))}
+          {/* alignment / snap guides while dragging */}
+          {snap?.v.map((x, i) => (
+            <div key={'v' + i} className={styles.snapV} style={{ left: `${(x / snap.W) * 100}%` }} />
+          ))}
+          {snap?.h.map((y, i) => (
+            <div key={'h' + i} className={styles.snapH} style={{ top: `${(y / snap.H) * 100}%` }} />
+          ))}
+          {edit && (
+            <div className={styles.editWrap} style={{ left: edit.left, top: edit.top, width: edit.width }}>
+              <div className={styles.editBar}>
+                <button
+                  className={styles.editIco}
+                  title="Smaller"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => bumpScale(edit.f, -0.08)}
+                >
+                  A−
+                </button>
+                <button
+                  className={styles.editIco}
+                  title="Bigger"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => bumpScale(edit.f, 0.08)}
+                >
+                  A+
+                </button>
+                <span
+                  className={styles.editHandle}
+                  title="Drag to move"
+                  onPointerDown={startHandleDrag}
+                >
+                  ✥
+                </span>
+              </div>
+              {edit.multiline ? (
+                <textarea
+                  ref={editRef as React.RefObject<HTMLTextAreaElement>}
+                  className={styles.canvasEdit}
+                  style={{ height: edit.height, fontSize: edit.fontPx, fontFamily: edit.fontFamily, color: edit.color }}
+                  value={editVal}
+                  onChange={(e) => {
+                    setEditVal(e.target.value);
+                    setField(edit.f, e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setEdit(null);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (!e.currentTarget.closest(`.${styles.editWrap}`)?.contains(e.relatedTarget as Node))
+                      setEdit(null);
+                  }}
+                />
+              ) : (
+                <input
+                  ref={editRef as React.RefObject<HTMLInputElement>}
+                  className={styles.canvasEdit}
+                  style={{ height: edit.height, fontSize: edit.fontPx, fontFamily: edit.fontFamily, color: edit.color }}
+                  value={editVal}
+                  onChange={(e) => {
+                    setEditVal(e.target.value);
+                    setField(edit.f, e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' || e.key === 'Enter') {
+                      e.preventDefault();
+                      setEdit(null);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (!e.currentTarget.closest(`.${styles.editWrap}`)?.contains(e.relatedTarget as Node))
+                      setEdit(null);
+                  }}
+                />
+              )}
+            </div>
+          )}
         </div>
         <div className={styles.stagemeta}>
           {SIZES[S.size].note} · {tpl.name} · {THEMES[S.theme]}
