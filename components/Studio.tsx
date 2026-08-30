@@ -198,6 +198,7 @@ export default function Studio({
     fontPx: number;
     color: string;
     fontFamily: string;
+    align: 'left' | 'center' | 'right';
   } | null>(null);
   const [editVal, setEditVal] = useState('');
   const editRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
@@ -641,6 +642,7 @@ export default function Studio({
       __projectId: postProject?.id || '',
       __offsets: JSON.stringify(S.offsets || {}),
       __scales: JSON.stringify(S.scales || {}),
+      __aligns: JSON.stringify(S.aligns || {}),
     };
   }
 
@@ -931,6 +933,24 @@ export default function Studio({
     if (DISPLAY_FIELDS.has(f)) return brandRef.current ? 'inherit' : 'var(--font-ezra), sans-serif';
     return 'var(--font-body), sans-serif';
   }
+  function alignIcon(a: 'left' | 'center' | 'right') {
+    const rows = [20, 12, 20, 14];
+    return (
+      <svg width="15" height="12" viewBox="0 0 24 16" aria-hidden>
+        {rows.map((w, i) => {
+          const x = a === 'center' ? (24 - w) / 2 : a === 'right' ? 24 - w : 0;
+          return <rect key={i} x={x} y={i * 4 + 1} width={w} height={2} rx={1} fill="currentColor" />;
+        })}
+      </svg>
+    );
+  }
+  function cycleAlign(f: string) {
+    const order = ['left', 'center', 'right'] as const;
+    const cur = Sref.current.aligns?.[f] || 'left';
+    const next = order[(order.indexOf(cur) + 1) % 3];
+    if (edit && edit.f === f) setEdit((ed) => (ed ? { ...ed, align: next } : ed));
+    setS((s) => ({ ...s, aligns: { ...(s.aligns || {}), [f]: next } }));
+  }
   function bumpScale(f: string, delta: number) {
     const cur = Sref.current.scales?.[f] || 1;
     const next = Math.max(0.4, Math.min(3, Math.round((cur + delta) * 100) / 100));
@@ -978,6 +998,7 @@ export default function Studio({
       fontPx,
       color: fieldColor(z.f),
       fontFamily: fieldFamily(z.f),
+      align: S.aligns?.[z.f] || 'left',
     });
   }
 
@@ -1447,6 +1468,12 @@ export default function Studio({
     } catch {
       scales = {};
     }
+    let aligns: Record<string, 'left' | 'center' | 'right'> = {};
+    try {
+      aligns = raw.__aligns ? JSON.parse(raw.__aligns) : {};
+    } catch {
+      aligns = {};
+    }
     setPostAuthor(raw.__author || '');
     setDownloads(Number(raw.__downloads) || 0);
     setPostProject(raw.__projectId ? { id: raw.__projectId, name: raw.__project || 'Project' } : null);
@@ -1474,6 +1501,7 @@ export default function Studio({
     delete raw.__projectId;
     delete raw.__offsets;
     delete raw.__scales;
+    delete raw.__aligns;
     setS({
       tpl: row.tpl as TemplateKey,
       size: (row.size as SizeKey) || 'square',
@@ -1485,6 +1513,7 @@ export default function Studio({
       brands,
       offsets,
       scales,
+      aligns,
     });
     setHistOpen(false);
   }
@@ -1517,6 +1546,12 @@ export default function Studio({
       } catch {
         scales = {};
       }
+      let aligns: Record<string, 'left' | 'center' | 'right'> = {};
+      try {
+        aligns = data.__aligns ? JSON.parse(data.__aligns) : {};
+      } catch {
+        aligns = {};
+      }
       delete data.__badges;
       delete data.__brands;
       delete data.__author;
@@ -1525,6 +1560,7 @@ export default function Studio({
       delete data.__projectId;
       delete data.__offsets;
       delete data.__scales;
+      delete data.__aligns;
       const state: PostState = {
         tpl: row.tpl as TemplateKey,
         size: (row.size as SizeKey) || 'square',
@@ -1536,6 +1572,7 @@ export default function Studio({
         photoShade: 0.62,
         offsets,
         scales,
+        aligns,
       };
       const brandImgs: HTMLImageElement[] = [];
       for (const id of brands) {
@@ -1981,6 +2018,15 @@ export default function Studio({
               <div className={styles.editBar}>
                 <button
                   className={styles.editIco}
+                  title={`Align: ${edit.align} (click to change)`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => cycleAlign(edit.f)}
+                >
+                  {alignIcon(edit.align)}
+                </button>
+                <span className={styles.editSep} />
+                <button
+                  className={styles.editIco}
                   title="Smaller"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => bumpScale(edit.f, -0.08)}
@@ -2007,7 +2053,7 @@ export default function Studio({
                 <textarea
                   ref={editRef as React.RefObject<HTMLTextAreaElement>}
                   className={styles.canvasEdit}
-                  style={{ height: edit.height, fontSize: edit.fontPx, fontFamily: edit.fontFamily, color: edit.color }}
+                  style={{ height: edit.height, fontSize: edit.fontPx, fontFamily: edit.fontFamily, color: edit.color, textAlign: edit.align }}
                   value={editVal}
                   onChange={(e) => {
                     setEditVal(e.target.value);
@@ -2028,7 +2074,7 @@ export default function Studio({
                 <input
                   ref={editRef as React.RefObject<HTMLInputElement>}
                   className={styles.canvasEdit}
-                  style={{ height: edit.height, fontSize: edit.fontPx, fontFamily: edit.fontFamily, color: edit.color }}
+                  style={{ height: edit.height, fontSize: edit.fontPx, fontFamily: edit.fontFamily, color: edit.color, textAlign: edit.align }}
                   value={editVal}
                   onChange={(e) => {
                     setEditVal(e.target.value);

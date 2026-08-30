@@ -280,6 +280,8 @@ export interface PostState {
   offsets?: Record<string, { dx: number; dy: number }>;
   // per-field font-size multiplier from the A+/A- controls (1 = auto size)
   scales?: Record<string, number>;
+  // per-field text alignment (default 'left')
+  aligns?: Record<string, 'left' | 'center' | 'right'>;
 }
 
 export interface ClickZone {
@@ -354,6 +356,8 @@ export function renderPost(
   const ZERO = { dx: 0, dy: 0 };
   const off = (f: string) => (S.offsets && S.offsets[f]) || ZERO;
   const scaleOf = (f: string) => (S.scales && S.scales[f]) || 1;
+  const alignOf = (f: string) => (S.aligns && S.aligns[f]) || 'left';
+  let curAlign: 'left' | 'center' | 'right' = 'left'; // set per field by drawF
   const marginX = Math.round(W * 0.085); // default scale anchor x (left margin)
   // zones carry the field's offset + scale (anchored at the field's own
   // top-left, so text grows down-right), plus its rendered font size
@@ -371,6 +375,9 @@ export function renderPost(
     const o = off(f);
     const s = scaleOf(f);
     const hide = f === hideField;
+    const prevAlign = curAlign;
+    curAlign = alignOf(f);
+    let r: T;
     if (o.dx || o.dy || s !== 1 || hide) {
       ctx.save();
       if (o.dx || o.dy) ctx.translate(o.dx, o.dy);
@@ -380,11 +387,27 @@ export function renderPost(
         ctx.translate(-ax, -anchorY);
       }
       if (hide) ctx.globalAlpha = 0;
-      const r = fn();
+      r = fn();
       ctx.restore();
-      return r;
+    } else {
+      r = fn();
     }
-    return fn();
+    curAlign = prevAlign;
+    return r;
+  };
+  // draw a single line honouring the current field's alignment within [xL, xL+wMax]
+  const fillAligned = (text: string, xL: number, wMax: number, y: number) => {
+    if (curAlign === 'center') {
+      ctx.textAlign = 'center';
+      ctx.fillText(text, xL + wMax / 2, y);
+      ctx.textAlign = 'left';
+    } else if (curAlign === 'right') {
+      ctx.textAlign = 'right';
+      ctx.fillText(text, xL + wMax, y);
+      ctx.textAlign = 'left';
+    } else {
+      ctx.fillText(text, xL, y);
+    }
   };
 
   const d = S.data;
@@ -521,7 +544,9 @@ export function renderPost(
       let lineW = 0;
       const flush = () => {
         if (!line.length) return;
-        let cx = x;
+        // align the line within [x, x+maxW] per the current field's alignment
+        const factor = curAlign === 'center' ? 0.5 : curAlign === 'right' ? 1 : 0;
+        let cx = x + (maxW - lineW) * factor;
         line.forEach((wd) => {
           ctx.fillStyle = wd.c;
           ctx.fillText(wd.t, cx, yy);
@@ -684,7 +709,7 @@ export function renderPost(
     setMono(Math.round(19 * u), 500);
     ctx.fillStyle = sub;
     const fy = H - padY + Math.round(6 * u);
-    drawF('footer', () => ctx.fillText(d.footer.toUpperCase(), pad, fy), fy - Math.round(30 * u));
+    drawF('footer', () => fillAligned(d.footer.toUpperCase(), pad, maxW, fy), fy - Math.round(30 * u));
     zone('footer', pad - 10, fy - Math.round(30 * u), maxW, Math.round(48 * u));
   }
 
@@ -814,7 +839,7 @@ export function renderPost(
     ctx.fillStyle = accent;
     drawF(
       'stat',
-      () => ctx.fillText(d.stat, pad, numTop + Math.round(statSize * 0.74 * u)),
+      () => fillAligned(d.stat, pad, leftW, numTop + Math.round(statSize * 0.74 * u)),
       numTop
     );
     zone('stat', pad - 10, numTop, leftW, numH);
@@ -893,7 +918,7 @@ export function renderPost(
     const numBaseline = numTop + capNum;
     setFont(900, Math.round(statSize * u));
     ctx.fillStyle = accent;
-    drawF('stat', () => ctx.fillText(d.stat, pad, numBaseline), numTop);
+    drawF('stat', () => fillAligned(d.stat, pad, maxW, numBaseline), numTop);
     zone('stat', pad - 10, numTop, maxW, numVisual);
     // label — cap-top the same gap G below the number's descender
     const numBottom = numBaseline + descNum;

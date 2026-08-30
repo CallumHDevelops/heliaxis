@@ -319,6 +319,16 @@
 .editIco:hover {
   background: rgba(247, 242, 231, 0.16);
 }
+.editIco svg {
+  display: block;
+  fill: var(--paper);
+}
+.editSep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 1px;
+  background: rgba(247, 242, 231, 0.2);
+}
 .editHandle {
   display: flex;
   align-items: center;
