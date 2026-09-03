@@ -194,6 +194,8 @@ create table if not exists public.projects (
   site_contact         text,
   site_contact_phone   text,
   what3words           text,
+  site_lat             double precision,
+  site_lng             double precision,
   principal_contractor text,
   principal_designer   text,
   cdm_notifiable       boolean not null default false,
@@ -208,6 +210,9 @@ create table if not exists public.projects (
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );
+
+alter table public.projects add column if not exists site_lat double precision;
+alter table public.projects add column if not exists site_lng double precision;
 
 create index if not exists projects_status_idx  on public.projects (status);
 create index if not exists projects_created_idx on public.projects (created_at desc);

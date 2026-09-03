@@ -29,6 +29,8 @@ const projectSchema = z.object({
   site_contact: z.string().trim().optional(),
   site_contact_phone: z.string().trim().optional(),
   what3words: z.string().trim().optional(),
+  site_lat: z.number().min(-90).max(90).nullable(),
+  site_lng: z.number().min(-180).max(180).nullable(),
   principal_contractor: z.string().trim().optional(),
   principal_designer: z.string().trim().optional(),
   cdm_notifiable: z.boolean().default(false),
@@ -58,6 +60,8 @@ function parse(formData: FormData) {
     site_contact: str(formData, 'site_contact'),
     site_contact_phone: str(formData, 'site_contact_phone'),
     what3words: str(formData, 'what3words'),
+    site_lat: num(formData, 'site_lat'),
+    site_lng: num(formData, 'site_lng'),
     principal_contractor: str(formData, 'principal_contractor'),
     principal_designer: str(formData, 'principal_designer'),
     cdm_notifiable: formData.get('cdm_notifiable') === 'on',
@@ -75,6 +79,14 @@ function parse(formData: FormData) {
 function str(formData: FormData, key: string): string {
   const v = formData.get(key);
   return typeof v === 'string' ? v.trim() : '';
+}
+
+/** Hidden numeric inputs post as strings, and as '' when never populated. */
+function num(formData: FormData, key: string): number | null {
+  const raw = str(formData, key);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 /** Empty date strings must become null, not '' — Postgres rejects the latter. */

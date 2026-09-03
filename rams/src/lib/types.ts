@@ -84,6 +84,9 @@ export type Project = {
   site_contact: string | null;
   site_contact_phone: string | null;
   what3words: string | null;
+  /** Site coordinates, from the address lookup or the postcode centroid. */
+  site_lat: number | null;
+  site_lng: number | null;
   principal_contractor: string | null;
   principal_designer: string | null;
   cdm_notifiable: boolean;

@@ -20,7 +20,7 @@
   --color-danger: #a03232;
 
   --font-body: var(--font-hanken), system-ui, -apple-system, sans-serif;
-  --font-display: var(--font-hanken), system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-outfit), var(--font-hanken), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, 'SF Mono', monospace;
 
   --radius-xs: 2px;

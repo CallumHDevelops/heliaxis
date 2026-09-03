@@ -1,11 +1,20 @@
 import type { Metadata, Viewport } from 'next';
-import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
+import { Hanken_Grotesk, JetBrains_Mono, Outfit } from 'next/font/google';
 import './globals.css';
 
 const body = Hanken_Grotesk({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800', '900'],
   variable: '--font-hanken',
+  display: 'swap',
+});
+
+// Display face, matching heliaxis.co.uk. The brand spec specifies Ezra; swap
+// this for next/font/local once the Ezra family is added to src/fonts/.
+const display = Outfit({
+  subsets: ['latin'],
+  weight: ['500', '600', '700', '800', '900'],
+  variable: '--font-outfit',
   display: 'swap',
 });
 
@@ -35,7 +44,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-GB" className={`${body.variable} ${mono.variable}`}>
+    <html lang="en-GB" className={`${body.variable} ${display.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );

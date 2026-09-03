@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { Alert, Button, Card, Field, Input, LinkButton, Select, Textarea } from '@/components/ui';
+import { SiteLocationFields } from '@/components/location/SiteLocationFields';
 import { TECHNOLOGIES } from '@/lib/content/technologies';
 import type { Project } from '@/lib/types';
 import type { ProjectFormState } from './actions';
@@ -93,34 +94,12 @@ export function ProjectForm({
       </Section>
 
       <Section title="Site" eyebrow="P/03">
-        <Field label="Site address" className="sm:col-span-2">
-          <Textarea name="site_address" rows={3} defaultValue={project?.site_address ?? ''} />
-        </Field>
-        <Field label="Postcode">
-          <Input name="site_postcode" defaultValue={project?.site_postcode ?? ''} />
-        </Field>
-        <Field
-          label="what3words"
-          hint="Used on the report so an ambulance can find the working position."
-        >
-          <Input
-            name="what3words"
-            defaultValue={project?.what3words ?? ''}
-            placeholder="///filled.count.soap"
-          />
-        </Field>
+        <SiteLocationFields project={project} />
         <Field label="Site contact">
           <Input name="site_contact" defaultValue={project?.site_contact ?? ''} />
         </Field>
         <Field label="Site contact phone">
           <Input name="site_contact_phone" defaultValue={project?.site_contact_phone ?? ''} />
-        </Field>
-        <Field label="Nearest A&E" className="sm:col-span-2">
-          <Input
-            name="nearest_hospital"
-            defaultValue={project?.nearest_hospital ?? ''}
-            placeholder="Royal Gwent Hospital, Cardiff Rd, Newport NP20 2UB — 12 min"
-          />
         </Field>
         <Field label="Access notes" className="sm:col-span-2">
           <Textarea
