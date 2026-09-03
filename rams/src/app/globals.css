@@ -1,0 +1,285 @@
+@import 'tailwindcss';
+
+/* =========================================================================
+   Heliaxis brand tokens — "engineered warmth".
+   Warm charcoal + solar gold, sharp corners (radius <= 4px), hairline borders
+   in place of shadows, mono labels. Gold is an accent, never body text.
+   ========================================================================= */
+@theme {
+  --color-ink: #211f18;
+  --color-ink-2: #2c2820;
+  --color-solar: #f8bc1e;
+  --color-amber: #e39a0c;
+  --color-amber-2: #c77f04;
+  --color-paper: #f7f2e7;
+  --color-paper-2: #efe8d8;
+  --color-card: #fffdf8;
+  --color-muted: #6e6a5e;
+  --color-muted-d: #a69f8e;
+  --color-ok: #3f7d4e;
+  --color-danger: #a03232;
+
+  --font-body: var(--font-hanken), system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-hanken), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, 'SF Mono', monospace;
+
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+}
+
+:root {
+  --line: rgba(33, 31, 24, 0.14);
+  --line-strong: rgba(33, 31, 24, 0.26);
+  --line-d: rgba(247, 242, 231, 0.16);
+  color-scheme: light;
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+  margin: 0;
+}
+
+/* --- Utilities ---------------------------------------------------------- */
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-amber-2);
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  font-weight: 500;
+}
+
+.eyebrow-d {
+  color: var(--color-solar);
+}
+
+.hairline {
+  border: 1px solid var(--line);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.crosshatch {
+  position: relative;
+  overflow: hidden;
+}
+.crosshatch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(247, 242, 231, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(247, 242, 231, 0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+  -webkit-mask-image: linear-gradient(150deg, #000, transparent 80%);
+  mask-image: linear-gradient(150deg, #000, transparent 80%);
+}
+.crosshatch > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Button shine sweep — the one motion flourish carried over from the brand. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -130%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+.btn-shine:hover::after {
+  animation: shine 0.7s ease;
+}
+@keyframes shine {
+  to {
+    left: 150%;
+  }
+}
+
+/* Native controls, restyled to the brand rather than replaced. */
+.field {
+  width: 100%;
+  background: var(--color-card);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field:hover {
+  border-color: var(--line-strong);
+}
+.field:focus {
+  border-color: var(--color-amber-2);
+  box-shadow: 0 0 0 3px rgba(248, 188, 30, 0.22);
+}
+.field:disabled {
+  background: var(--color-paper-2);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+textarea.field {
+  min-height: 5rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+select.field {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%236E6A5E' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 11px;
+  padding-right: 1.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =========================================================================
+   Report / print. The report component is rendered at A4 width on screen and
+   printed straight to PDF from the browser, so one stylesheet serves both.
+   ========================================================================= */
+
+.report {
+  --report-fg: #211f18;
+  --report-muted: #55524a;
+  --report-line: #c9c3b4;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: var(--report-fg);
+}
+
+.report h1 {
+  font-size: 20pt;
+}
+.report h2 {
+  font-size: 12pt;
+}
+.report h3 {
+  font-size: 10.5pt;
+}
+
+/* Tailwind's reset strips list markers; the report needs them back. */
+.report ul {
+  list-style: disc outside;
+}
+.report ol {
+  list-style: decimal outside;
+}
+.report li {
+  margin-left: 0;
+}
+
+.report table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.report th,
+.report td {
+  border: 1px solid var(--report-line);
+  padding: 5px 7px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 9pt;
+}
+.report th {
+  background: #efe8d8;
+  font-weight: 700;
+  font-size: 8pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.report-page {
+  break-after: page;
+}
+.report-page:last-child {
+  break-after: auto;
+}
+.avoid-break {
+  break-inside: avoid;
+}
+
+@page {
+  size: A4;
+  margin: 14mm 12mm 16mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .report {
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+  .report thead {
+    display: table-header-group;
+  }
+  .report tr,
+  .report img {
+    break-inside: avoid;
+  }
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}

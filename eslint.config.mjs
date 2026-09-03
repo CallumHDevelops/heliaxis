@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The RAMS app is a self-contained project with its own lint config.
+    "rams/**",
   ]),
 ]);
 
