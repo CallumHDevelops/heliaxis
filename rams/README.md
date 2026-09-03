@@ -36,7 +36,8 @@ npm run dev
 ```
 
 Then follow [`SETUP.md`](SETUP.md) to create the Supabase project, run the
-schema and seed the first admin.
+schema and seed the first admin, and [`DEPLOY.md`](DEPLOY.md) to put it live on
+rams.heliaxis.co.uk.
 
 ```bash
 npm run build       # production build

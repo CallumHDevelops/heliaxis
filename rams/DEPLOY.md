@@ -1,112 +1,124 @@
 # Deploying RAMS to rams.heliaxis.co.uk
 
-RAMS follows the same pattern as **Post Studio** (`Social_Content_Creator`): one
-GitHub repository, a branch whose **root is the app**, served on its own
-subdomain from a Vercel *Preview* environment pinned to that branch.
+RAMS lives in its own repository, **CallumHDevelops/RAMS**, and is served from
+its own Vercel project on the **Production** environment.
 
-- Repository: `CallumHDevelops/heliaxis`
-- Branch: `claude/rams-repo-setup-f3dpf2`
-- Domain: `rams.heliaxis.co.uk`
-- Vercel project: the existing **heliaxis** project (no new project needed)
-
-`main` still holds the marketing site and is untouched. This branch is not
-intended to be merged into `main` — merging would overwrite the website, exactly
-as it would for `Social_Content_Creator`.
+Production custom domains are publicly accessible by default on every Vercel
+plan — Standard Protection only covers preview deployments and generated URLs.
+That matters here: share links go to clients and principal contractors who have
+no Vercel account, so the site the links point at must be reachable without
+signing in. Serving RAMS from a *preview* domain would put a Vercel login wall
+in front of it, and the Protection Exception that removes it is Enterprise-only
+or a paid Pro add-on. Production avoids that entirely, for free.
 
 ---
 
-## 1. Add the domain in Vercel
+## 1. Create the repository
 
-Vercel → the **heliaxis** project → **Settings → Domains → Add Domain**:
+On GitHub: **New repository** → `RAMS`, owner `CallumHDevelops`, **Private**,
+and **do not** add a README, .gitignore or licence — it must be empty.
 
-1. Domain: `rams.heliaxis.co.uk`
-2. **Connect to an environment** → **Preview**
-3. Branch: `claude/rams-repo-setup-f3dpf2`
-4. **Add Domain**
+## 2. Push the code
 
-## 2. Point the CNAME
+The app currently sits in `rams/` on the `claude/rams-repo-setup-f3dpf2` branch
+of the heliaxis repo. `scripts/split-into-own-repo.sh` extracts it with its
+history intact:
 
-In your DNS for `heliaxis.co.uk`, add the record Vercel shows you:
+```bash
+# from the root of a heliaxis checkout, on that branch
+bash rams/scripts/split-into-own-repo.sh git@github.com:CallumHDevelops/RAMS.git
+```
+
+It prints the path of a ready-to-push clone. Review it, then push.
+
+Afterwards `rams/` can be removed from the heliaxis branch — the history is
+preserved in the new repository.
+
+## 3. Create the Vercel project
+
+Vercel → **Add New → Project** → import `CallumHDevelops/RAMS`.
+
+- Framework preset: **Next.js** (detected automatically)
+- Root directory: leave as the repository root
+- Nothing else needs changing
+
+## 4. Environment variables
+
+Vercel → the RAMS project → **Settings → Environment Variables**. Add each for
+**all environments**. This is a separate project from the marketing site, so
+there is no risk of clashing with its variables of the same name.
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | The RAMS Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | The RAMS `anon` `public` key |
+| `SUPABASE_SERVICE_ROLE_KEY` | The RAMS `service_role` key — secret, server only |
+| `NEXT_PUBLIC_SITE_URL` | `https://rams.heliaxis.co.uk` |
+| `GETADDRESS_API_KEY` | getAddress.io key (optional — address autocomplete) |
+| `W3W_API_KEY` | what3words key (optional — auto three-word addresses) |
+
+`NEXT_PUBLIC_SITE_URL` is what share links are built from. Get it wrong and the
+links you send to clients point at the wrong host.
+
+The two optional keys can be added later; without them the address and
+what3words fields simply stay manual.
+
+## 5. Add the domain
+
+Vercel → the RAMS project → **Settings → Domains → Add Domain**:
+
+- Domain: `rams.heliaxis.co.uk`
+- **Connect to an environment → Production**
+
+Then add the DNS record Vercel shows you:
 
 ```
 Type    Name    Value
 CNAME   rams    cname.vercel-dns.com.
 ```
 
-## 3. Environment variables — the important bit
+No Deployment Protection changes are needed. Production domains are public by
+default, which is what share links require.
 
-The heliaxis Vercel project already holds the **marketing site's** Supabase
-variables under the same names. RAMS uses a **separate Supabase project**, so if
-you add its keys to "All Environments" you will overwrite the website's
-configuration, or RAMS will connect to the website's database.
+## 6. Set up the database
 
-Add each variable scoped to **Preview → this branch only**:
+Follow [`SETUP.md`](SETUP.md): create the Supabase project, run
+`supabase/schema.sql`, turn off email confirmation, then register at `/register`
+and run the one SQL statement that makes you the first admin.
 
-Vercel → **Settings → Environment Variables → Add**, and for every variable:
+## 7. Verify
 
-- Environment: **Preview**
-- Then choose **specific branch** and enter `claude/rams-repo-setup-f3dpf2`
+1. Open `https://rams.heliaxis.co.uk` — you should get the sign-in screen.
+2. Sign in, create a project and a RAMS, approve and issue it.
+3. Create a share link, then **open it in a private window while signed out of
+   both Vercel and RAMS**. You should see the document, not a login page.
 
-| Variable | Value |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | The **RAMS** Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | The RAMS `anon` `public` key |
-| `SUPABASE_SERVICE_ROLE_KEY` | The RAMS `service_role` key — secret |
-| `NEXT_PUBLIC_SITE_URL` | `https://rams.heliaxis.co.uk` |
-| `GETADDRESS_API_KEY` | Your getAddress.io key (optional) |
-| `W3W_API_KEY` | Your what3words key (optional) |
-
-`NEXT_PUBLIC_SITE_URL` is what share links are built from. Get it wrong and the
-links you send clients will point at the wrong host.
-
-## 4. Turn off Deployment Protection for this domain
-
-**Do not skip this.** Preview deployments are protected by default, which puts a
-Vercel login wall in front of the site. Staff could sign in; **clients and
-principal contractors could not open a share link** — which is the whole point
-of the feature.
-
-Vercel → **Settings → Deployment Protection → Protection Exceptions** → add
-`rams.heliaxis.co.uk`.
-
-Confirm it worked by opening a share link in a private window, signed out of
-Vercel. If you see a Vercel login screen, the exception is not applied.
-
-## 5. Deploying changes
-
-Every push to `claude/rams-repo-setup-f3dpf2` redeploys `rams.heliaxis.co.uk`.
-There is no separate release step.
+That last check is the one that matters — it is what your clients will do.
 
 ---
 
-## If you later want RAMS in its own repository
+## Deploying changes
 
-The branch root is the whole app, so extracting it is just a clone:
-
-```bash
-git clone --branch claude/rams-repo-setup-f3dpf2 --single-branch \
-  https://github.com/CallumHDevelops/heliaxis.git RAMS
-cd RAMS
-git checkout -b main
-git remote set-url origin git@github.com:CallumHDevelops/RAMS.git
-git push -u origin main
-```
-
-Then point `rams.heliaxis.co.uk` at that project's **Production** environment
-instead, and the Deployment Protection exception in step 4 becomes unnecessary.
-
----
+Every push to `main` in the RAMS repository deploys to production. Pushes to any
+other branch produce a preview deployment, which stays protected — that is the
+correct behaviour, and it does not affect the live domain.
 
 ## Troubleshooting
 
-**rams.heliaxis.co.uk shows the marketing website.** The domain is attached to
-Production, or to the wrong branch. It must be Preview + `claude/rams-repo-setup-f3dpf2`.
+**Everything redirects to `/login` and no account works.** The Supabase
+variables are missing or wrong. The app fails closed by design when Supabase is
+not configured, so it will never accidentally serve unprotected.
 
-**A Vercel login wall appears.** Step 4 is missing.
-
-**Everything redirects to /login and no account works.** The Supabase variables
-are missing for this branch, or they are the marketing site's. The app fails
-closed by design when Supabase is not configured.
+**A Vercel login wall appears on the live domain.** The domain is attached to
+Preview rather than Production, or Deployment Protection has been set to "All
+Deployments". Production must be public for share links to work.
 
 **Share links point at localhost or the wrong host.** `NEXT_PUBLIC_SITE_URL` is
-not set for this branch.
+not set in the Vercel environment.
+
+**Address autocomplete does nothing.** `GETADDRESS_API_KEY` is not set, or the
+plan's rate limit has been hit. The fields still accept typed input.
+
+**Certificate uploads fail.** The `certifications` and `project-files` storage
+buckets are created by `supabase/schema.sql`. If the Supabase project predates
+running it, run the script again — it is idempotent.
