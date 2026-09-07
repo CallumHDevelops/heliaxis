@@ -187,6 +187,8 @@ export default function Studio({
   const [editDesc, setEditDesc] = useState('');
   const [confirmState, setConfirmState] = useState<{ msg: string; onYes: () => void } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewTokenRef = useRef(0); // guards against stale async preview repaints
+  const previewPhotoCache = useRef<Record<string, string | null>>({}); // row id → photo data-URL
   // inline "edit text on the post" overlay
   const [edit, setEdit] = useState<{
     f: string;
@@ -1518,8 +1520,9 @@ export default function Studio({
     setHistOpen(false);
   }
 
-  // render a history row to an image for the hover preview (no stored photo)
-  function renderRowToDataURL(row: HistoryRow): string | null {
+  // render a history row to an image for the hover preview; pass the stored
+  // background photo (fetched lazily) so the preview matches the saved post
+  function renderRowToDataURL(row: HistoryRow, photoImg?: HTMLImageElement | null): string | null {
     try {
       const data = { ...row.data } as Record<string, string>;
       let badges: Badge[] = [];
@@ -1591,7 +1594,7 @@ export default function Studio({
       renderPost(
         off,
         state,
-        { ...imgsRef.current, photo: null, brands: brandImgs },
+        { ...imgsRef.current, photo: photoImg || null, brands: brandImgs },
         famRef.current,
         brandRef.current
       );
@@ -1599,6 +1602,39 @@ export default function Studio({
     } catch {
       return null;
     }
+  }
+
+  // show the hover preview: paint instantly without the photo, then fetch the
+  // saved photo and repaint so the preview matches the finished post
+  function showPreview(row: HistoryRow) {
+    const token = ++previewTokenRef.current;
+    setPreviewUrl(renderRowToDataURL(row));
+    const paintWithPhoto = (url: string) => {
+      const im = new Image();
+      im.onload = () => {
+        if (previewTokenRef.current === token) setPreviewUrl(renderRowToDataURL(row, im));
+      };
+      im.src = url;
+    };
+    const cached = previewPhotoCache.current[row.id];
+    if (cached !== undefined) {
+      if (cached) paintWithPhoto(cached);
+      return;
+    }
+    supabase
+      .from('posts')
+      .select('photo')
+      .eq('id', row.id)
+      .single()
+      .then(({ data }) => {
+        const url = (data as { photo?: string } | null)?.photo || null;
+        previewPhotoCache.current[row.id] = url;
+        if (url && previewTokenRef.current === token) paintWithPhoto(url);
+      });
+  }
+  function hidePreview() {
+    previewTokenRef.current++;
+    setPreviewUrl(null);
   }
 
   async function clearHistory() {
@@ -2272,8 +2308,8 @@ export default function Studio({
                     className={styles.hitem}
                     key={row.id}
                     onClick={() => loadHistoryRow(row)}
-                    onMouseEnter={() => setPreviewUrl(renderRowToDataURL(row))}
-                    onMouseLeave={() => setPreviewUrl(null)}
+                    onMouseEnter={() => showPreview(row)}
+                    onMouseLeave={hidePreview}
                   >
                     <div className={styles.ht}>
                       {row.headline || TEMPLATES[row.tpl as TemplateKey]?.name || 'Post'}
