@@ -1,17 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Spark } from '@/components/Spark';
 import styles from './auth.module.css';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
+  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -19,14 +16,19 @@ export default function LoginPage() {
     setErr('');
     setBusy(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        shouldCreateUser: true, // passwordless sign-in doubles as sign-up
+      },
+    });
     setBusy(false);
     if (error) {
       setErr(error.message);
       return;
     }
-    router.push('/studio');
-    router.refresh();
+    setSent(true);
   }
 
   return (
@@ -46,43 +48,58 @@ export default function LoginPage() {
       </div>
 
       <div className={styles.formside}>
-        <form className={styles.form} onSubmit={onSubmit}>
-          <span className={styles.eyebrow}>
-            <Spark size={12} /> Sign in
-          </span>
-          <h2>Welcome back.</h2>
-          <p className={styles.sub}>Sign in to create and manage posts.</p>
-
-          {err && <div className={`${styles.msg} ${styles.err}`}>{err}</div>}
-
-          <div className={styles.field}>
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
+        {sent ? (
+          <div className={styles.form}>
+            <span className={styles.eyebrow}>
+              <Spark size={12} /> Check your email
+            </span>
+            <h2>Link on its way.</h2>
+            <p className={styles.sub}>
+              We&rsquo;ve emailed a secure sign-in link to <b>{email}</b>. Open it on this device to
+              sign in — no password needed. It can take a minute; check spam if you don&rsquo;t see
+              it.
+            </p>
+            <button
+              className={styles.btn}
+              type="button"
+              onClick={() => {
+                setSent(false);
+                setErr('');
+              }}
+            >
+              Use a different email
+            </button>
           </div>
-          <div className={styles.field}>
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          <button className={styles.btn} disabled={busy}>
-            {busy ? 'Signing in…' : 'Sign in'}
-          </button>
+        ) : (
+          <form className={styles.form} onSubmit={onSubmit}>
+            <span className={styles.eyebrow}>
+              <Spark size={12} /> Sign in
+            </span>
+            <h2>Welcome back.</h2>
+            <p className={styles.sub}>
+              Enter your email and we&rsquo;ll send you a one-tap sign-in link. No password to
+              remember.
+            </p>
 
-          <div className={styles.alt}>
-            Need an account? <Link href="/register">Register</Link>
-          </div>
-        </form>
+            {err && <div className={`${styles.msg} ${styles.err}`}>{err}</div>}
+
+            <div className={styles.field}>
+              <label>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                autoFocus
+                placeholder="you@heliaxis.co.uk"
+              />
+            </div>
+            <button className={styles.btn} disabled={busy}>
+              {busy ? 'Sending link…' : 'Email me a sign-in link'}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
