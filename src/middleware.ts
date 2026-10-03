@@ -8,7 +8,19 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
 
-  // --- Subcontractor subdomain routing (unchanged) ---
+  // --- Subcontractor portal subdomain (subcontractor.heliaxis.co.uk) ---
+  // Serves only the token-gated /portal app; anything else lands on the portal home.
+  const isPortalDomain =
+    hostname.startsWith('subcontractor.heliaxis.co.uk') || hostname.startsWith('subcontractor.localhost');
+  if (isPortalDomain) {
+    if (pathname === '/portal' || pathname.startsWith('/portal/')) return NextResponse.next();
+    const url = request.nextUrl.clone();
+    url.pathname = '/portal';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
+  // --- Legacy subcontractor form subdomain (subcontract.heliaxis.co.uk, unchanged) ---
   const isSubcontractDomain =
     hostname.includes('subcontract.heliaxis.co.uk') ||
     hostname.includes('subcontract.localhost');
@@ -78,8 +90,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // The approvals dashboard is admin-only.
-    if (pathname.startsWith('/admin/approvals') && profile.role !== 'admin') {
+    // Approvals and subcontractor records (ID, bank, tax details) are admin-only.
+    if (
+      (pathname.startsWith('/admin/approvals') || pathname.startsWith('/admin/subcontractors')) &&
+      profile.role !== 'admin'
+    ) {
       const url = request.nextUrl.clone();
       url.pathname = '/admin';
       return NextResponse.redirect(url);

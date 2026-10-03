@@ -8,6 +8,7 @@ const BLOCKED_EXACT = new Set([
   '/register',
   '/pending',
   '/preview',
+  '/portal',
 ]);
 
 const BLOCKED_PREFIXES = [
@@ -17,6 +18,7 @@ const BLOCKED_PREFIXES = [
   '/pending/',
   '/preview/',
   '/api/',
+  '/portal/',
 ];
 
 /** Fixed marketing routes that always exist (even with 0 clicks). */
