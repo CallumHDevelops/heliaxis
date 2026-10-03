@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const DRAFT_KEY = 'heliaxis-cms-v1';
@@ -11,7 +11,7 @@ const RENDERED_KEY = 'heliaxis-cms-rendered';
 // Prefer the live `state` from the browser so mega-menu deletes aren't lost to a
 // stale draft read (overlapping saves).
 export async function POST(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }

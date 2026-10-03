@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { getPublishStyles } from '@/lib/cms-publish-styles';
 
 export async function GET() {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }

@@ -2114,7 +2114,7 @@ function openPublish(){
   document.getElementById('modal').classList.add('show');
 }
 function previewBackBarHtml(returnUrl){
-  var href=esc(returnUrl||'/admin');
+  var href=esc(returnUrl||'/admin/cms');
   var backLabel=returnUrl==='/admin/blog'?'← Back to articles':'← Back to editor';
   return '<div id="cms-preview-bar" style="position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:#211F18;color:#F7F2E7;font-family:system-ui,sans-serif;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.35)">'
     +'<span style="opacity:.85">Preview — not published</span>'
@@ -2249,11 +2249,11 @@ function cmsViewModeFromSlug(slug){
   return null;
 }
 function cmsPathForMode(mode){
-  if(mode==='library')return '/admin/library';
-  if(mode==='logos')return '/admin/logos';
-  if(mode==='mega')return '/admin/mega';
+  if(mode==='library')return '/admin/cms/library';
+  if(mode==='logos')return '/admin/cms/logos';
+  if(mode==='mega')return '/admin/cms/mega';
   if(mode==='edit'&&page())return cmsAdminPath(pageEditSlug(page()));
-  return '/admin';
+  return '/admin/cms';
 }
 function applyCmsView(mode,skipUrl){
   MODE=mode;
@@ -2515,7 +2515,7 @@ function syncPageSlugFromTitle(pg,idx){if(isHomePage(pg)){pg.slug='/';pg.seo=pg.
 function repairLegacyUntitledSlugs(){var changed=false;STATE.pages.forEach(function(pg,i){if(!pg.name||isHomePage(pg))return;if(!/^\/untitled-[a-z0-9]+$/i.test(pg.slug||''))return;syncPageSlugFromTitle(pg,i);changed=true;});return changed;}
 function pageNameInput(v){var pg=page();var cur=(pg.slug||'').replace(/\/$/,'')||'/';if(cur==='/'||cur==='')return;var slugInp=document.getElementById('seo-slug-input');if(!slugInp)return;var base=isCmsBlogPage(pg)?('/blog/'+(slugifyTitle(normTitle(v))||'article')):titleToSlug(normTitle(v));slugInp.value=uniquePageSlug(base,STATE.current);}
 function pageEditSlug(pg){var base=slugifyTitle(pg.name);if(!base)base=slugifyTitle((pg.slug||'/').replace(/^\//,''))||'page';return base;}
-function getSlugFromPath(){var parts=location.pathname.replace(/\/+$/,'').split('/');if(parts.length<3||parts[1]!=='admin')return null;var s=decodeURIComponent(parts[2]);if(!s||s==='enquiries'||s==='approvals'||s==='blog'||s==='analytics')return null;return s;}
+function getSlugFromPath(){var parts=location.pathname.replace(/\/+$/,'').split('/');if(parts.length<4||parts[1]!=='admin'||parts[2]!=='cms')return null;var s=decodeURIComponent(parts[3]);if(!s)return null;return s;}
 function findPageByEditSlug(slug){
   if(!slug)return -1;
   slug=decodeURIComponent(String(slug)).toLowerCase().replace(/^\/+/,'');
@@ -2526,7 +2526,7 @@ function findPageByEditSlug(slug){
     return urlSlug===slug;
   });
 }
-function cmsAdminPath(slug){return '/admin/'+encodeURIComponent(slug);}
+function cmsAdminPath(slug){return '/admin/cms/'+encodeURIComponent(slug);}
 function cmsDocTitle(){
   if(MODE==='edit'&&page())return page().name+' · Heliaxis CMS';
   if(MODE==='library')return 'Image library · Heliaxis CMS';
@@ -2706,11 +2706,11 @@ async function makeBlogArticle(){
   var r=await fetch('/api/blog/create-page',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({placeholder:true})});
   var d=await r.json().catch(function(){return {};});
   if(!r.ok)throw new Error(d.error||'Could not create blog article');
-  location.href=d.editPath||('/admin'+(d.slug||''));
+  location.href=d.editPath||('/admin/cms'+(d.slug||''));
  }catch(e){openNoticeModal({title:'Could not create article',message:(e&&e.message)||'Could not create blog article'});}
 }
 function renderDashboard(){var el=document.getElementById('dashboard');if(!el)return;
- var h='<div class="dash-wrap"><div class="dash-head"><h1>Dashboard</h1><p>Your whole site at a glance. Open a page to edit it, or create something new.</p></div>';
+ var h='<div class="dash-wrap"><div class="dash-head"><a href="/admin" style="display:inline-block;margin-bottom:.6rem;font-size:.85rem;font-weight:600;color:inherit;opacity:.7;text-decoration:none">← Main dashboard</a><h1>Website</h1><p>Your whole site at a glance. Open a page to edit it, or create something new.</p></div>';
  h+=dashStatsHtml();
  h+='<div class="dash-sec-h">'+SPARK+'Create</div><div class="dash-actions">'+
    '<button class="dact dact-icon" onclick="openNewPageChooser()"><span class="dact-ic">'+icon('home',22)+'</span><b>+ New page</b><span>Blank canvas or AI-built</span></button>'+

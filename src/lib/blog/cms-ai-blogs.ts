@@ -109,7 +109,7 @@ export async function listCmsAiBlogs(): Promise<CmsAiBlogListItem[]> {
         name: String(p.name || 'Untitled article'),
         slug,
         editSlug,
-        editPath: `/admin/${encodeURIComponent(editSlug)}`,
+        editPath: `/admin/cms/${encodeURIComponent(editSlug)}`,
         livePath: slug,
         live,
         status,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isTrackableAnalyticsPath, normalizeAnalyticsPath } from '@/lib/analytics-paths';
 import {
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
 /** Admin read — full page catalog or aggregated points for one URL. */
 export async function GET(req: NextRequest) {
-  const session = await requireApproved();
+  const session = await requirePortal('analytics');
   if (!session || session.profile.role !== 'admin') {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE });
   }

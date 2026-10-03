@@ -111,7 +111,7 @@ export function BlogAdminCreate({ aiReady }: Props) {
         tone: 'ok',
         text: `Created ${data.slug}. Opening editor…`,
       });
-      router.push(data.editPath || `/admin${data.slug}`);
+      router.push(data.editPath || `/admin/cms${data.slug}`);
     } catch (err) {
       setMsg({ tone: 'err', text: err instanceof Error ? err.message : 'Create failed' });
       setBusy('idle');

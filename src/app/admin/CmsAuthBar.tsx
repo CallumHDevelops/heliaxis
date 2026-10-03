@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { signOut } from '@/lib/auth-actions';
 import type { Profile } from '@/lib/auth';
+import { canAccess } from '@/lib/portals';
 
 function initials(email?: string | null) {
   if (!email) return '?';
@@ -57,23 +58,33 @@ export function CmsAuthBar({ profile }: { profile: Profile | null }) {
         </svg>
       </button>
       <div className="cms-user-dropdown" role="menu">
+        <Link href="/admin" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
+          Main dashboard
+        </Link>
         <Link href="/" className="cms-user-link" target="_blank" rel="noopener" role="menuitem" onClick={() => setOpen(false)}>
           View site
-        </Link>
-        <Link href="/admin/enquiries" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
-          Enquiries
         </Link>
         <Link href="/admin/blog" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
           Blog
         </Link>
-        {isAdmin && (
+        {canAccess(profile, 'enquiries') && (
+          <Link href="/admin/enquiries" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
+            Enquiries
+          </Link>
+        )}
+        {canAccess(profile, 'subcontractors') && (
+          <Link href="/admin/subcontractors" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
+            Subcontractors
+          </Link>
+        )}
+        {canAccess(profile, 'analytics') && (
           <Link href="/admin/analytics" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
             Analytics
           </Link>
         )}
         {isAdmin && (
-          <Link href="/admin/approvals" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
-            Approvals
+          <Link href="/admin/users" className="cms-user-link" role="menuitem" onClick={() => setOpen(false)}>
+            Users
           </Link>
         )}
         <div className="menu-divider" role="separator" />
