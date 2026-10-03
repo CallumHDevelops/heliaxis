@@ -8,10 +8,16 @@
   --amber: #c77f04;
   --ok: #3f7d4e;
   --bad: #a3322a;
+  --field: #fff;
+  --surface: #fff;
+  --disabled: #f4f1ea;
+  --fill: url(/assets/heliaxis-card-fill-light.svg);
+  /* We style dark mode ourselves, so browsers must not auto-darken (that hid the logo and headings). */
+  color-scheme: light dark;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--paper) url(/assets/heliaxis-card-fill-light.svg) top right / cover no-repeat;
+  background: var(--paper) var(--fill) top right / cover no-repeat;
   color: var(--ink);
   font-family: 'Hanken Grotesk', var(--font-outfit), system-ui, -apple-system, sans-serif;
 }
@@ -19,18 +25,19 @@
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 253, 248, 0.92);
+  padding: 0.9rem 1rem;
+  background: #211f18;
+  border-bottom: 3px solid var(--solar);
 }
 .pt-top-tag {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted);
-  border-left: 1px solid var(--line);
+  color: #e8e1cf;
+  border-left: 1px solid rgba(255, 253, 248, 0.25);
   padding-left: 0.9rem;
+  line-height: 1.3;
 }
 .pt-main { flex: 1; width: 100%; max-width: 960px; margin: 0 auto; padding: 1.25rem 1rem 3rem; box-sizing: border-box; }
 .pt-foot { text-align: center; font-size: 0.75rem; color: var(--muted); padding: 1rem; }
@@ -49,11 +56,12 @@
 .pt-muted { color: var(--muted); font-size: 0.9rem; margin: 0 0 1rem; }
 
 .pt-hero { margin-bottom: 1rem; }
-.pt-hero h1 { font-size: 1.6rem; margin: 0 0 0.5rem; line-height: 1.2; }
+.pt-hero h1 { font-size: 1.9rem; font-weight: 800; margin: 0.1rem 0 0.6rem; line-height: 1.15; color: var(--ink); letter-spacing: -0.01em; }
 .pt-kicker {
   font-family: ui-monospace, Menlo, monospace;
-  font-size: 0.78rem;
-  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--amber);
   margin: 0;
 }
 .pt-banner {
@@ -62,7 +70,8 @@
   font-size: 0.9rem;
   margin: 0.5rem 0 0.75rem;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
+  color: var(--ink);
 }
 .pt-banner.is-info { border-color: rgba(248, 188, 30, 0.6); background: rgba(248, 188, 30, 0.1); }
 .pt-banner.is-ok { border-color: rgba(63, 125, 78, 0.4); background: rgba(63, 125, 78, 0.08); }
@@ -102,7 +111,7 @@
   font-size: 0.8rem;
 }
 .pt-step.is-done .pt-step-n { background: var(--ok); color: #fff; }
-.pt-step.is-active:not(.is-done) .pt-step-n { background: var(--solar); color: var(--ink); }
+.pt-step.is-active:not(.is-done) .pt-step-n { background: var(--solar); color: #211f18; border-color: var(--solar); }
 
 fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-grid legend {
@@ -133,7 +142,7 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   font: inherit;
   font-size: 0.95rem;
   color: var(--ink);
-  background: #fff;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 2px;
 }
@@ -142,7 +151,7 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-field textarea:focus { outline: 2px solid var(--solar); outline-offset: 0; border-color: var(--ink); }
 .pt-field input:disabled,
 .pt-field select:disabled,
-.pt-field textarea:disabled { background: #f4f1ea; color: var(--muted); }
+.pt-field textarea:disabled { background: var(--disabled); color: var(--muted); }
 
 .pt-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; margin-top: 0.5rem; }
 .pt-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
@@ -152,7 +161,7 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   font: inherit;
   font-weight: 700;
   font-size: 0.95rem;
-  color: var(--ink);
+  color: #211f18;
   background: var(--solar);
   border: 0;
   border-radius: 2px;
@@ -181,7 +190,10 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   max-height: 60vh;
   overflow: auto;
   border: 1px solid var(--line);
+  /* The agreement always reads as a light paper document, in dark mode too. */
   background: #fffefb;
+  color: #211f18;
+  color-scheme: light;
   padding: 1.25rem;
   margin: 0.5rem 0 1rem;
 }
@@ -192,7 +204,7 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 
 
 .pt-cats { display: grid; gap: 0.75rem; margin-bottom: 1rem; }
-.pt-cat { border: 1px solid var(--line); border-radius: 3px; padding: 0.85rem; background: #fff; }
+.pt-cat { border: 1px solid var(--line); border-radius: 3px; padding: 0.85rem; background: var(--surface); }
 .pt-cat.is-needed { border-left: 3px solid var(--amber); }
 .pt-cat-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; }
 .pt-cat-head h3 { margin: 0 0 0.2rem; font-size: 0.98rem; }
@@ -228,7 +240,7 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   font-weight: 700;
   padding: 0.12rem 0.45rem;
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   color: var(--muted);
   margin-left: auto;
@@ -239,9 +251,34 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-x { background: none; border: 0; font-size: 1.2rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 0.2rem; }
 .pt-upload { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed var(--line); display: grid; gap: 0.8rem; }
 
+@media (prefers-color-scheme: dark) {
+  .pt-shell {
+    --ink: #f6f1e4;
+    --muted: #bdb5a1;
+    --line: rgba(255, 253, 248, 0.16);
+    --card: #26231c;
+    --paper: #171510;
+    --surface: #1f1c16;
+    --field: #14120e;
+    --disabled: #2a2720;
+    --amber: #f8bc1e;
+    --ok: #6fbf84;
+    --bad: #f08a80;
+    --fill: url(/assets/heliaxis-card-fill-dark.svg);
+  }
+  .pt-banner.is-info { background: rgba(248, 188, 30, 0.12); }
+  .pt-step.is-done .pt-step-n { color: #14120e; }
+  .pt-step-n { background: transparent; border: 1px solid var(--line); }
+  .pt-req { color: var(--solar); }
+  .pt-btn-ghost, .pt-link, .pt-doclist a, .pt-x { color: var(--ink); }
+}
+
 @media (max-width: 600px) {
   .pt-steps { grid-template-columns: 1fr; }
   .pt-card { padding: 1rem; }
+  .pt-hero h1 { font-size: 1.7rem; }
+  .pt-steps { gap: 0.4rem; }
+  .pt-step { padding: 0.6rem 0.7rem; }
   .pt-doc { padding: 0.8rem; max-height: 55vh; }
   .pt-grid { grid-template-columns: 1fr; }
 }
