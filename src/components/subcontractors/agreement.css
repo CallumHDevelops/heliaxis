@@ -125,6 +125,7 @@
 .agr-audit h2 { border-top: 0; padding-top: 0; }
 
 @media (max-width: 560px) {
+  .agr-cover h1 { font-size: 1.35rem; }
   .agr-clause { grid-template-columns: 1fr; gap: 0; }
   .agr-ul { margin-left: 0.6rem; }
   .agr-defs > div, .agr-meta > div { grid-template-columns: 1fr; gap: 0.1rem; }
