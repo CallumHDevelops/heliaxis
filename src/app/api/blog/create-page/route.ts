@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   buildCmsArticlePage,
@@ -49,7 +49,7 @@ function uniqueBlogSlug(pages: Array<Record<string, unknown>>, base: string): st
 }
 
 export async function POST(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session || session.profile.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: upErr.message }, { status: 500 });
   }
 
-  const editPath = `/admin${slug === '/' ? '' : slug}`;
+  const editPath = `/admin/cms${slug === '/' ? '' : slug}`;
   // Prefer title-based admin path (matches cms-engine pageEditSlug)
   const editSlug =
     String(page.name || '')
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || slug.replace(/^\//, '');
-  const adminEditPath = `/admin/${editSlug}`;
+  const adminEditPath = `/admin/cms/${encodeURIComponent(editSlug)}`;
   return NextResponse.json({
     ok: true,
     id: page.id,

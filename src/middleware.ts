@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
+import { canAccess, HUB_PATH, portalForPath } from '@/lib/portals';
 
 const AUTH_PATHS = ['/login', '/register', '/pending'];
 
@@ -78,11 +79,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, status')
-      .eq('id', user.id)
-      .single();
+    // select('*') so this keeps working before the `portals` column migration has run.
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
     if (!profile || profile.status !== 'approved') {
       const url = request.nextUrl.clone();
@@ -90,13 +88,17 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Approvals and subcontractor records (ID, bank, tax details) are admin-only.
-    if (
-      (pathname.startsWith('/admin/approvals') || pathname.startsWith('/admin/subcontractors')) &&
-      profile.role !== 'admin'
-    ) {
+    // Per-portal access: admins see everything; members only the portals ticked
+    // for them in /admin/users. No access → back to the dashboard with a notice.
+    const needed = portalForPath(pathname);
+    const allowed =
+      needed === null ||
+      (needed === 'admin' ? profile.role === 'admin' : canAccess(profile, needed));
+    if (!allowed) {
       const url = request.nextUrl.clone();
-      url.pathname = '/admin';
+      url.pathname = HUB_PATH;
+      url.search = '';
+      url.searchParams.set('denied', '1');
       return NextResponse.redirect(url);
     }
   }
@@ -110,7 +112,7 @@ export async function middleware(request: NextRequest) {
       .single();
     if (profile?.status === 'approved') {
       const url = request.nextUrl.clone();
-      url.pathname = '/admin';
+      url.pathname = HUB_PATH;
       return NextResponse.redirect(url);
     }
   }

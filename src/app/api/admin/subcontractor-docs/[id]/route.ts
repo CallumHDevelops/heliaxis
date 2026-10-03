@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getSessionProfile } from '@/lib/auth';
+import { canAccess } from '@/lib/portals';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { signedDocUrl } from '@/lib/subcontractors/server';
 
 /** Admin: open (or ?download=1) a subcontractor document via a 2-minute signed URL. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { user, profile } = await getSessionProfile();
-  if (!user || profile?.status !== 'approved' || profile.role !== 'admin') {
+  if (!user || !canAccess(profile, 'subcontractors')) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const { id } = await params;

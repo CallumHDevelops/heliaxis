@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { getSessionProfile } from '@/lib/auth';
+import { canAccess } from '@/lib/portals';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   agreementHash,
@@ -22,11 +23,11 @@ import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
-/** Subcontractor records hold ID, bank and tax details — admins only. */
+/** Subcontractor records hold ID, bank and tax details — only users given this portal. */
 async function requireAdmin() {
   const { user, profile } = await getSessionProfile();
-  if (!user || profile?.status !== 'approved' || profile.role !== 'admin') throw new Error('Not authorised');
-  return { email: user.email || profile.email || 'admin' };
+  if (!user || !canAccess(profile, 'subcontractors')) throw new Error('Not authorised');
+  return { email: user.email || profile?.email || 'admin' };
 }
 
 async function origin() {

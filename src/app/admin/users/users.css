@@ -1,0 +1,73 @@
+.us-page {
+  --ink: #211f18;
+  --muted: #6e6a5e;
+  --line: rgba(33, 31, 24, 0.14);
+  --card: #fffdf8;
+  --paper: #f7f2e7;
+  --solar: #f8bc1e;
+  --ok: #3f7d4e;
+  --bad: #a3322a;
+  color: var(--ink);
+}
+.us-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.us-head h1 { font-size: 1.5rem; font-weight: 800; margin: 0; }
+.us-head p { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0 0; max-width: 620px; }
+.us-head strong { color: var(--ink); }
+.us-search { padding: 0.5rem 0.6rem; font: inherit; font-size: 0.9rem; border: 1px solid var(--line); border-radius: 2px; background: #fff; min-width: 220px; }
+.us-banner { padding: 0.6rem 0.8rem; border-radius: 3px; font-size: 0.88rem; border: 1px solid var(--line); background: #fff; margin: 0 0 0.8rem; }
+.us-banner.is-warn { border-color: rgba(199, 127, 4, 0.5); background: rgba(199, 127, 4, 0.1); }
+.us-banner.is-err { border-color: rgba(163, 50, 42, 0.45); background: rgba(163, 50, 42, 0.08); }
+.us-note { font-size: 0.8rem; color: var(--muted); margin: 0 0 1rem; }
+.us-list { display: grid; gap: 0.7rem; }
+.us-empty { color: var(--muted); text-align: center; padding: 2rem; }
+.us-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) auto minmax(260px, 2fr) auto;
+  gap: 0.8rem 1.2rem;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.85rem 1rem;
+}
+.us-card.s-pending { border-left: 3px solid var(--solar); }
+.us-card.s-rejected { opacity: 0.6; }
+.us-who { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; font-size: 0.86rem; }
+.us-who strong { font-size: 0.95rem; }
+.us-who span { color: var(--muted); word-break: break-all; }
+.us-date { font-size: 0.74rem; }
+.us-you { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: var(--paper); color: var(--muted); padding: 0.1rem 0.35rem; border-radius: 2px; margin-left: 0.4rem; }
+.us-controls { display: flex; gap: 0.5rem; }
+.us-controls label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.72rem; font-weight: 600; color: var(--muted); }
+.us-controls select { padding: 0.4rem 0.5rem; font: inherit; font-size: 0.85rem; color: var(--ink); border: 1px solid var(--line); border-radius: 2px; background: #fff; }
+.us-portals { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; min-width: 0; }
+.us-portals legend { font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 0.3rem; padding: 0; }
+.us-portals legend em { font-weight: 400; }
+.us-portals label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+}
+.us-portals label.is-on { background: rgba(248, 188, 30, 0.22); border-color: var(--solar); }
+.us-portals:disabled label { cursor: default; }
+.us-portals input { margin: 0; accent-color: #211f18; }
+.us-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
+.us-btn { padding: 0.5rem 0.9rem; font: inherit; font-weight: 700; font-size: 0.85rem; color: var(--ink); background: var(--solar); border: 0; border-radius: 2px; cursor: pointer; white-space: nowrap; }
+.us-btn:disabled { opacity: 0.45; cursor: default; }
+.us-btn-ghost { padding: 0.45rem 0.8rem; font: inherit; font-size: 0.82rem; font-weight: 600; background: transparent; border: 1px solid var(--line); border-radius: 2px; cursor: pointer; }
+.us-btn-ghost.is-danger { color: var(--bad); }
+.us-ok { color: var(--ok); font-size: 0.78rem; }
+.us-err { color: var(--bad); font-size: 0.78rem; max-width: 220px; text-align: right; }
+
+@media (max-width: 900px) {
+  .us-card { grid-template-columns: 1fr; }
+  .us-actions { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; }
+  .us-err { text-align: left; }
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const DEFAULT_BUCKET = 'cms-media';
@@ -24,7 +24,7 @@ async function ensureBucket(bucket: string) {
 }
 
 export async function POST(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   try {

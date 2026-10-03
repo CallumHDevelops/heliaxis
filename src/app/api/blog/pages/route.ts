@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isCmsBlogPage, normalizeCmsSlug } from '@/lib/blog/cms-article-template';
 
@@ -39,7 +39,7 @@ function matchBlog(pg: LoosePage, id?: string, slug?: string): boolean {
 
 /** Delete an AI blog from CMS draft (+ published / rendered snapshots when present). */
 export async function DELETE(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session || session.profile.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { cancelCmsBlogSchedule, scheduleCmsBlog } from '@/lib/blog/cms-blog-schedule';
 
 export const dynamic = 'force-dynamic';
 
 /** Schedule an AI blog for automatic publish. HTML is optional — built from draft when omitted. */
 export async function POST(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session || session.profile.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
 /** Cancel a scheduled publish. */
 export async function DELETE(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session || session.profile.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

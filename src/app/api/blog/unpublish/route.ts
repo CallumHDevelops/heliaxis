@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { unpublishCmsBlog } from '@/lib/blog/cms-blog-schedule';
 
 export const dynamic = 'force-dynamic';
 
 /** Take a live AI blog offline (draft remains editable). */
 export async function POST(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session || session.profile.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { signOut } from '@/lib/auth-actions';
 import { brand } from '@/components/auth/authStyles';
+import { getSessionProfile } from '@/lib/auth';
+import { canAccess } from '@/lib/portals';
 
-type Tab = 'enquiries' | 'approvals' | 'blog' | 'analytics' | 'heatmap' | 'subcontractors';
+type Tab = 'dashboard' | 'enquiries' | 'approvals' | 'users' | 'blog' | 'analytics' | 'heatmap' | 'subcontractors';
 
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
@@ -24,21 +27,25 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
   );
 }
 
-export function AdminShell({
+export async function AdminShell({
   active,
-  isAdmin,
   children,
   wide,
   flush,
 }: {
   active: Tab;
-  isAdmin: boolean;
+  /** @deprecated nav now reads the signed-in profile itself. */
+  isAdmin?: boolean;
   children: ReactNode;
   /** Wider main column (e.g. analytics embed). */
   wide?: boolean;
   /** Edge-to-edge main (no max-width / side padding) — for full iframe pages. */
   flush?: boolean;
 }) {
+  // Nav shows only what this person can open (see /admin/users).
+  const { profile } = await getSessionProfile();
+  const can = (k: Parameters<typeof canAccess>[1]) => canAccess(profile, k);
+  const admin = profile?.role === 'admin';
   return (
     <div
       className={flush ? 'admin-shell admin-shell--flush' : 'admin-shell'}
@@ -72,7 +79,7 @@ export function AdminShell({
           zIndex: 2,
         }}
       >
-        <a href="/admin" style={{ display: 'flex', alignItems: 'center' }}>
+        <Link href="/admin" style={{ display: 'flex', alignItems: 'center' }}>
           <Image
             src="/assets/heliaxis-logo.png"
             alt="Heliaxis"
@@ -80,34 +87,20 @@ export function AdminShell({
             height={32}
             style={{ width: 140, height: 'auto' }}
           />
-        </a>
+        </Link>
         <nav style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
-          <NavLink href="/admin/enquiries" label="Enquiries" active={active === 'enquiries'} />
-          <NavLink href="/admin/blog" label="Blog" active={active === 'blog'} />
-          {isAdmin && (
-            <NavLink href="/admin/analytics" label="Analytics" active={active === 'analytics'} />
-          )}
-          {isAdmin && (
-            <NavLink href="/admin/analytics/heatmap" label="Heatmap" active={active === 'heatmap'} />
-          )}
-          {isAdmin && (
+          <NavLink href="/admin" label="Dashboard" active={active === 'dashboard'} />
+          {can('cms') && <NavLink href="/admin/cms" label="CMS" active={false} />}
+          {can('cms') && <NavLink href="/admin/blog" label="Blog" active={active === 'blog'} />}
+          {can('enquiries') && <NavLink href="/admin/enquiries" label="Enquiries" active={active === 'enquiries'} />}
+          {can('subcontractors') && (
             <NavLink href="/admin/subcontractors" label="Subcontractors" active={active === 'subcontractors'} />
           )}
-          {isAdmin && (
-            <NavLink href="/admin/approvals" label="Approvals" active={active === 'approvals'} />
+          {can('analytics') && <NavLink href="/admin/analytics" label="Analytics" active={active === 'analytics'} />}
+          {can('analytics') && (
+            <NavLink href="/admin/analytics/heatmap" label="Heatmap" active={active === 'heatmap'} />
           )}
-          <a
-            href="/admin"
-            style={{
-              padding: '.45rem .8rem',
-              fontSize: '.88rem',
-              fontWeight: 600,
-              textDecoration: 'none',
-              color: brand.muted,
-            }}
-          >
-            CMS
-          </a>
+          {admin && <NavLink href="/admin/users" label="Users" active={active === 'users' || active === 'approvals'} />}
           <form action={signOut} style={{ margin: 0 }}>
             <button
               type="submit"

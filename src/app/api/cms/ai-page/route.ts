@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { generatePage, isAiConfigured } from '@/lib/cms/ai-page';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session || session.profile.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

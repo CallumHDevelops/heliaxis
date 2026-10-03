@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireApproved } from '@/lib/auth';
+import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // Never cache CMS reads/writes — the editor must always see the latest saved doc.
@@ -8,7 +8,7 @@ const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' };
 
 // Load a CMS document by key (the page-builder calls this via window.storage.get).
 export async function GET(req: NextRequest) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const key = req.nextUrl.searchParams.get('key');
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
 // Save a CMS document (window.storage.set).
 export async function POST(req: NextRequest) {
-  const session = await requireApproved();
+  const session = await requirePortal('cms');
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const body = await req.json().catch(() => null);
