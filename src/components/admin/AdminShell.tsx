@@ -137,6 +137,10 @@ export async function AdminShell({
                 flexDirection: 'column',
               }
             : {
+                // width: 100% — auto margins on a flex item stop it stretching, which
+                // otherwise shrink-wraps the page to its content.
+                width: '100%',
+                boxSizing: 'border-box',
                 maxWidth: wide ? 1200 : 1000,
                 margin: '0 auto',
                 padding: '2rem 1.5rem',
