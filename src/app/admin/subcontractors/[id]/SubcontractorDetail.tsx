@@ -13,7 +13,7 @@ import {
   type EventRow,
   type SubcontractorRow,
 } from '@/lib/subcontractors/types';
-import { countersign, deleteDocument, reviewDocument, saveNotes, sendLink, setStatus, updateTerms } from '../actions';
+import { countersign, deleteDocument, reviewDocument, saveNotes, sendLink, setStatus, syncToRams, updateTerms } from '../actions';
 import { TermsForm } from '../TermsForm';
 import '../subcontractors.css';
 
@@ -64,12 +64,14 @@ export function SubcontractorDetail({
   documents,
   events,
   adminName,
+  rams,
 }: {
   sub: SubcontractorRow;
   agreement: AgreementSummary;
   documents: DocumentRow[];
   events: EventRow[];
   adminName: string;
+  rams: RamsInfo;
 }) {
   const router = useRouter();
   const d = sub.details || {};
@@ -231,6 +233,8 @@ export function SubcontractorDetail({
         </div>
 
         <aside className="sc-col-side">
+          <RamsPanel rams={rams} subId={sub.id} status={sub.status} />
+
           {/* ---------------- terms ---------------- */}
           <section className="sc-card">
             <div className="sc-row-between">
@@ -343,6 +347,76 @@ function ComplianceSummary({ comp }: { comp: ReturnType<typeof compliance> }) {
   );
 }
 
+type RamsInfo = {
+  configured: boolean;
+  appUrl: string;
+  ramsId: string | null;
+  syncedAt: string | null;
+  error: string | null;
+  /** False until supabase/rams-sync.sql has been run. */
+  setUp: boolean;
+};
+
+/** Copies of approved insurance, cards and qualifications go to the RAMS app. */
+function RamsPanel({ rams, subId, status }: { rams: RamsInfo; subId: string; status: SubcontractorRow['status'] }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  let body: React.ReactNode;
+  if (!rams.configured) body = <p className="sc-muted">RAMS isn&apos;t connected — add RAMS_SUPABASE_URL and RAMS_SUPABASE_SERVICE_ROLE_KEY in Vercel.</p>;
+  else if (!rams.setUp) body = <p className="sc-muted">Run <code>supabase/rams-sync.sql</code> in Supabase to switch syncing on.</p>;
+  else
+    body = (
+      <>
+        <dl className="sc-dl">
+          <dt>Status</dt>
+          <dd>
+            {rams.ramsId ? `Synced ${fmt(rams.syncedAt, true)}` : status === 'active' ? 'Not synced yet' : 'Sent once countersigned'}
+          </dd>
+        </dl>
+        {rams.error && <p className="sc-error">{rams.error}</p>}
+        <div className="sc-row">
+          <button
+            className="sc-btn-ghost"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setMsg(null);
+              const r = await syncToRams(subId);
+              setBusy(false);
+              setMsg(
+                r.ok
+                  ? { ok: true, text: `Synced — ${r.copied} new document${r.copied === 1 ? '' : 's'} copied.` }
+                  : { ok: false, text: r.error }
+              );
+              router.refresh();
+            }}
+          >
+            {busy ? 'Syncing…' : 'Sync to RAMS now'}
+          </button>
+          {rams.ramsId && (
+            <a className="sc-link-btn" href={`${rams.appUrl}/subcontractors/${rams.ramsId}`} target="_blank" rel="noreferrer">
+              Open in RAMS ↗
+            </a>
+          )}
+        </div>
+        {msg && <p className={msg.ok ? 'sc-muted' : 'sc-error'}>{msg.text}</p>}
+      </>
+    );
+
+  return (
+    <section className="sc-card">
+      <h2>RAMS</h2>
+      <p className="sc-muted">
+        Approved insurance, cards and qualifications are copied to RAMS so this firm can be named on a RAMS. Photo ID and
+        bank details stay here.
+      </p>
+      {body}
+    </section>
+  );
+}
+
 function DocRow({ doc, onChanged }: { doc: DocumentRow; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const ex = expiryState(doc.expires_on);
@@ -370,6 +444,9 @@ function DocRow({ doc, onChanged }: { doc: DocumentRow; onChanged: () => void })
         {doc.review_note && <span className="sc-sub is-bad">Rejected: {doc.review_note}</span>}
       </div>
       <div className="sc-doc-side">
+        {(doc as DocumentRow & { rams_row_id?: string | null }).rams_row_id && (
+          <span className="sc-pill is-ok" title="Copied into RAMS">In RAMS</span>
+        )}
         {doc.expires_on && (
           <span className={`sc-pill ${ex === 'expired' ? 'is-bad' : ex === 'expiring' ? 'is-warn' : ''}`}>
             {ex === 'expired' ? 'Expired' : 'Expires'} {fmt(doc.expires_on)}

@@ -473,7 +473,7 @@ function DocumentsStep({
     <div className="pt-card">
       <h2>Documents</h2>
       <p className="pt-muted">
-        PDFs or clear photos, up to 25 MB each. Come back to this page whenever something renews — the agreement asks you
+        PDFs or clear photos, up to 15 MB each. Come back to this page whenever something renews — the agreement asks you
         to send renewals at least 30 days before expiry (Clause 3A.2).
       </p>
 
@@ -538,7 +538,7 @@ function CategoryCard({
     // Some browsers (notably Windows) report HEIC photos with an empty type.
     const mime = file.type || (/\.hei[cf]$/i.test(file.name) ? 'image/heic' : '');
     if (!ALLOWED_MIME.includes(mime)) return setErr('Please upload a PDF or a photo (JPG, PNG, WebP, HEIC).');
-    if (file.size > MAX_FILE_BYTES) return setErr('Files must be under 25 MB.');
+    if (file.size > MAX_FILE_BYTES) return setErr('Files must be under 15 MB.');
     setBusy(true);
     setErr('');
     try {

@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
   if (!CATEGORY_BY_KEY[body.category]) return jsonError('Unknown document type.');
   if (!ALLOWED_MIME.includes(body.mime)) return jsonError('Please upload a PDF or a photo (JPG, PNG, WebP, HEIC).');
-  if (!(body.size > 0) || body.size > MAX_FILE_BYTES) return jsonError('Files must be under 25 MB.');
+  if (!(body.size > 0) || body.size > MAX_FILE_BYTES) return jsonError('Files must be under 15 MB.');
 
   await ensureDocsBucket();
   const path = `${sub.id}/${body.category}/${Date.now()}-${safeFileName(String(body.fileName || ''))}`;

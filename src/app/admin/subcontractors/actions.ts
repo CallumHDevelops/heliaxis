@@ -19,6 +19,7 @@ import {
   sendEmail,
   validSignature,
 } from '@/lib/subcontractors/server';
+import { syncQuietly, syncSubcontractorToRams, unsyncDocument } from '@/lib/subcontractors/rams-sync';
 import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow, type SubStatus } from '@/lib/subcontractors/types';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -223,6 +224,7 @@ export async function countersign(id: string, input: { name: string; title: stri
       ),
     });
   }
+  await syncQuietly(id, actor);
   revalidatePath(`/admin/subcontractors/${id}`);
   revalidatePath('/admin/subcontractors');
   return { ok: true };
@@ -247,6 +249,7 @@ export async function reviewDocument(docId: string, status: 'approved' | 'reject
     })
     .eq('id', docId);
   await logEvent(doc.subcontractor_id, actor, `document_${status}`, { file: doc.file_name, note: note || undefined });
+  await syncQuietly(doc.subcontractor_id, actor);
   revalidatePath(`/admin/subcontractors/${doc.subcontractor_id}`);
   return { ok: true };
 }
@@ -256,10 +259,11 @@ export async function deleteDocument(docId: string): Promise<Result> {
   const admin = createAdminClient();
   const { data: doc } = await admin
     .from('subcontractor_documents')
-    .select('id, subcontractor_id, storage_path, file_name')
+    .select('*')
     .eq('id', docId)
     .single();
   if (!doc) return { ok: false, error: 'Not found' };
+  await unsyncDocument(doc);
   await admin.storage.from(DOCS_BUCKET).remove([doc.storage_path]);
   await admin.from('subcontractor_documents').delete().eq('id', docId);
   await logEvent(doc.subcontractor_id, actor, 'document_deleted', { file: doc.file_name });
@@ -277,6 +281,7 @@ export async function setStatus(id: string, status: SubStatus): Promise<Result> 
   if (status === 'terminated') update.token_hash = null; // kill the portal link
   await admin.from('subcontractors').update(update).eq('id', id);
   await logEvent(id, actor, 'status_changed', { status });
+  await syncQuietly(id, actor);
   revalidatePath(`/admin/subcontractors/${id}`);
   revalidatePath('/admin/subcontractors');
   return { ok: true };
@@ -287,4 +292,13 @@ export async function saveNotes(id: string, notes: string): Promise<Result> {
   await createAdminClient().from('subcontractors').update({ notes: notes.slice(0, 5000) }).eq('id', id);
   revalidatePath(`/admin/subcontractors/${id}`);
   return { ok: true };
+}
+
+/** Manual "Sync to RAMS now" from the subcontractor page. */
+export async function syncToRams(id: string): Promise<Result<{ copied: number; skipped: string[] }>> {
+  const { email: actor } = await requireAdmin();
+  const r = await syncSubcontractorToRams(id, actor);
+  revalidatePath(`/admin/subcontractors/${id}`);
+  if (!r.ok) return { ok: false, error: r.error };
+  return { ok: true, copied: r.copied, skipped: r.skipped };
 }
