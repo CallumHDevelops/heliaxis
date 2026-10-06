@@ -3,6 +3,7 @@ import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { agreementHash } from '@/lib/subcontractors/server';
+import { ramsAppUrl, ramsConfigured } from '@/lib/subcontractors/rams-sync';
 import {
   SUB_COLUMNS,
   type AgreementRow,
@@ -13,6 +14,8 @@ import {
 import { SubcontractorDetail } from './SubcontractorDetail';
 
 export const dynamic = 'force-dynamic';
+// Server actions on this page may copy several certificates to RAMS.
+export const maxDuration = 60;
 
 export default async function SubcontractorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,6 +39,12 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
       .limit(100),
   ]);
   if (!sub) notFound();
+  // Separate query: these columns only exist once supabase/rams-sync.sql has run.
+  const { data: ramsRow, error: ramsErr } = await admin
+    .from('subcontractors')
+    .select('rams_id, rams_synced_at, rams_sync_error')
+    .eq('id', id)
+    .maybeSingle();
   const agreement = agr as AgreementRow | null;
 
   return (
@@ -60,6 +69,14 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         documents={(docs ?? []) as DocumentRow[]}
         events={(events ?? []) as EventRow[]}
         adminName={profile?.full_name || ''}
+        rams={{
+          configured: ramsConfigured(),
+          appUrl: ramsAppUrl(),
+          ramsId: ramsRow?.rams_id ?? null,
+          syncedAt: ramsRow?.rams_synced_at ?? null,
+          error: ramsRow?.rams_sync_error ?? null,
+          setUp: !ramsErr,
+        }}
       />
     </AdminShell>
   );

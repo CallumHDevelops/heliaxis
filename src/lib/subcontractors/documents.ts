@@ -119,7 +119,8 @@ export const ALLOWED_MIME = [
   'image/heic',
   'image/heif',
 ];
-export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+// Matches the RAMS buckets, so every approved document can be copied across.
+export const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
 export function safeFileName(name: string) {
   const dot = name.lastIndexOf('.');
