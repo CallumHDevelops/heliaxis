@@ -15,9 +15,24 @@ import {
   type EventRow,
   type OperativeRow,
   type PullRow,
+  type NtpRow,
+  NTP_STATUS_LABEL,
   type SubcontractorRow,
 } from '@/lib/subcontractors/types';
-import { countersign, deleteDocument, reviewDocument, saveNotes, sendLink, setStatus, signOutEverywhere, updateTerms } from '../actions';
+import {
+  cancelNtp,
+  countersign,
+  countersignNtp,
+  deleteDocument,
+  reviewDocument,
+  saveNotes,
+  sendLink,
+  sendNtp,
+  setStatus,
+  signOutEverywhere,
+  updateTerms,
+} from '../actions';
+import { NTP_TECHNOLOGIES } from '@/lib/subcontractors/ntp-agreement';
 import { TermsForm } from '../TermsForm';
 import '../subcontractors.css';
 
@@ -45,6 +60,12 @@ const fmt = (iso: string | null | undefined, time = false) =>
 
 const EVENT_LABEL: Record<string, string> = {
   signed_in: 'Signed in',
+  ntp_sent: 'NTP agreement sent',
+  ntp_renewal_sent: 'NTP renewal sent',
+  ntp_signed: 'NTP agreement signed',
+  ntp_countersigned: 'NTP agreement countersigned',
+  ntp_cancelled: 'NTP agreement cancelled',
+  ntp_expired: 'NTP agreement expired',
   sessions_revoked: 'Signed out everywhere',
   document_viewed: 'Document viewed by Heliaxis',
   document_downloaded: 'Document downloaded by Heliaxis',
@@ -86,6 +107,7 @@ export function SubcontractorDetail({
   team,
   jobs,
   pulls,
+  ntps,
 }: {
   sub: SubcontractorRow;
   agreement: AgreementSummary;
@@ -95,6 +117,7 @@ export function SubcontractorDetail({
   team: OperativeRow[];
   jobs: AssignmentRow[];
   pulls: PullRow[];
+  ntps: NtpRow[];
 }) {
   const router = useRouter();
   const d = sub.details || {};
@@ -265,6 +288,7 @@ export function SubcontractorDetail({
               );
             })}
           </section>
+          <NtpPanel subId={sub.id} ntps={ntps} team={team} frameworkLive={!!agreement?.hlxSignedAt} adminName={adminName} />
           <PullsPanel pulls={pulls} />
         </div>
 
@@ -612,6 +636,214 @@ function Countersign({
         }}
       >
         {busy ? 'Countersigning…' : 'Countersign agreement'}
+      </button>
+    </div>
+  );
+}
+
+/** NTP (Nominated Technical Person) appointments — per technology, renewed yearly. */
+function NtpPanel({
+  subId,
+  ntps,
+  team,
+  frameworkLive,
+  adminName,
+}: {
+  subId: string;
+  ntps: NtpRow[];
+  team: OperativeRow[];
+  frameworkLive: boolean;
+  adminName: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [techs, setTechs] = useState<string[]>([]);
+  const [operativeId, setOperativeId] = useState('');
+  const [ntpName, setNtpName] = useState('');
+  const [days, setDays] = useState('');
+  const [geography, setGeography] = useState('');
+  const [installs, setInstalls] = useState('');
+  const [duration, setDuration] = useState('');
+  const [installers, setInstallers] = useState('');
+  const [notes, setNotes] = useState('');
+  const [fee, setFee] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [signing, setSigning] = useState<string | null>(null);
+  const active = team.filter((o) => !o.archived_at);
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr('');
+    const r = await sendNtp(subId, {
+      technologies: techs,
+      operativeId,
+      ntpName,
+      minDaysPerMonth: days,
+      supervision: { geography, installsPerMonth: installs, typicalDuration: duration, installersToSupervise: installers, notes },
+      fee,
+    });
+    setBusy(false);
+    if (!r.ok) return setErr(r.error);
+    setOpen(false);
+    router.refresh();
+  }
+
+  return (
+    <section className="sc-card">
+      <div className="sc-row-between">
+        <h2>NTP agreements</h2>
+        {!open && (
+          <button className="sc-btn-ghost" disabled={!frameworkLive} onClick={() => setOpen(true)} title={frameworkLive ? '' : 'Countersign the Framework Agreement first'}>
+            + Send NTP agreement
+          </button>
+        )}
+      </div>
+      {!frameworkLive && <p className="sc-muted">Available once their Framework Agreement is countersigned.</p>}
+
+      {ntps.length > 0 && (
+        <ul className="sc-list">
+          {ntps.map((n) => (
+            <li key={n.id} className={['cancelled', 'superseded'].includes(n.status) ? 'is-muted' : undefined}>
+              <span>
+                <strong>
+                  {n.ntp_name} — {n.technologies.map((k) => NTP_TECHNOLOGIES[k]?.label || k).join(', ')}
+                </strong>
+                <span className="sc-sub">
+                  {n.ref}
+                  {n.valid_from && ` · ${fmt(n.valid_from)} to ${fmt(n.expires_on)}`}
+                  {n.renewal_of && ' · renewal'}
+                </span>
+                <span className="sc-row" style={{ marginTop: '0.3rem' }}>
+                  <a className="sc-link-btn" href={`/admin/subcontractors/${subId}/ntp/${n.id}`} target="_blank" rel="noreferrer">
+                    View / print ↗
+                  </a>
+                  {n.status === 'awaiting_countersign' && signing !== n.id && (
+                    <button className="sc-btn-ghost" onClick={() => setSigning(n.id)}>Countersign</button>
+                  )}
+                  {['awaiting_signature', 'awaiting_countersign', 'active'].includes(n.status) && (
+                    <button
+                      className="sc-btn-ghost is-danger"
+                      onClick={async () => {
+                        if (!confirm(`Cancel ${n.ref}? ${n.status === 'active' ? 'They will stop being your NTP immediately — tell your Certification Body.' : ''}`)) return;
+                        const r = await cancelNtp(n.id);
+                        if (!r.ok) alert(r.error);
+                        router.refresh();
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </span>
+                {signing === n.id && (
+                  <NtpCountersign
+                    ntpId={n.id}
+                    defaultName={adminName}
+                    onDone={() => {
+                      setSigning(null);
+                      router.refresh();
+                    }}
+                  />
+                )}
+              </span>
+              <span className={`sc-pill ${n.status === 'active' ? 'is-ok' : n.status === 'expired' ? 'is-bad' : n.status.startsWith('awaiting') ? 'is-warn' : ''}`}>
+                {NTP_STATUS_LABEL[n.status]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {open && (
+        <form className="sc-form" onSubmit={send} style={{ marginTop: '0.8rem' }}>
+          <fieldset className="sc-rates">
+            <legend>Technologies</legend>
+            {Object.entries(NTP_TECHNOLOGIES).map(([k, t]) => (
+              <label key={k} className="sc-check">
+                <input
+                  type="checkbox"
+                  checked={techs.includes(k)}
+                  onChange={(e) => setTechs((x) => (e.target.checked ? [...x, k] : x.filter((y) => y !== k)))}
+                />
+                {t.label} <span className="sc-sub">({t.standard})</span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="sc-grid">
+            <label>
+              NTP (from their team)
+              <select value={operativeId} onChange={(e) => setOperativeId(e.target.value)}>
+                <option value="">Someone else — type below</option>
+                {active.map((o) => (
+                  <option key={o.id} value={o.id}>{o.full_name}</option>
+                ))}
+              </select>
+            </label>
+            {!operativeId && (
+              <label>
+                NTP full name
+                <input value={ntpName} onChange={(e) => setNtpName(e.target.value)} />
+              </label>
+            )}
+            <label>
+              Minimum days per month
+              <input type="number" min="0" max="31" step="0.5" value={days} onChange={(e) => setDays(e.target.value)} />
+            </label>
+            <label>
+              Fee (optional)
+              <input value={fee} onChange={(e) => setFee(e.target.value)} placeholder="Framework rates if blank" />
+            </label>
+          </div>
+          <div className="sc-grid">
+            <label>Geographical spread<input value={geography} onChange={(e) => setGeography(e.target.value)} placeholder="e.g. South Wales & Bristol" /></label>
+            <label>Installations per month<input value={installs} onChange={(e) => setInstalls(e.target.value)} placeholder="e.g. 8–12" /></label>
+            <label>Typical duration<input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="e.g. 1–2 days domestic" /></label>
+            <label>Installers to supervise<input value={installers} onChange={(e) => setInstallers(e.target.value)} placeholder="e.g. 2 teams of 2" /></label>
+          </div>
+          <label className="sc-field-wide">
+            Other supervision requirements
+            <textarea className="sc-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </label>
+          {err && <p className="sc-error">{err}</p>}
+          <div className="sc-row">
+            <button className="sc-btn" disabled={busy || !techs.length || (!operativeId && ntpName.trim().length < 2)}>
+              {busy ? 'Sending…' : 'Send for signature'}
+            </button>
+            <button type="button" className="sc-btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
+function NtpCountersign({ ntpId, defaultName, onDone }: { ntpId: string; defaultName: string; onDone: () => void }) {
+  const [name, setName] = useState(defaultName);
+  const [title, setTitle] = useState('Director');
+  const [sig, setSig] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  return (
+    <div className="sc-countersign">
+      <div className="sc-grid">
+        <label>Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label>Title<input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+      </div>
+      <SignaturePad onChange={setSig} height={130} />
+      {err && <p className="sc-error">{err}</p>}
+      <button
+        className="sc-btn"
+        disabled={busy || !sig || name.trim().length < 2}
+        onClick={async () => {
+          setBusy(true);
+          const r = await countersignNtp(ntpId, { name, title, signature: sig! });
+          setBusy(false);
+          if (r.ok) onDone();
+          else setErr(r.error);
+        }}
+      >
+        {busy ? 'Countersigning…' : 'Countersign NTP agreement'}
       </button>
     </div>
   );

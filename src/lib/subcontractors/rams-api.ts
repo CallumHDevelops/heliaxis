@@ -3,7 +3,8 @@ import { createHash, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { CATEGORY_BY_KEY, expiryState } from './documents';
-import { SUB_COLUMNS, type AssignmentRow, type DocumentRow, type OperativeRow, type SubcontractorRow } from './types';
+import { NTP_TECHNOLOGIES } from './ntp-agreement';
+import { SUB_COLUMNS, type AssignmentRow, type DocumentRow, type NtpRow, type OperativeRow, type SubcontractorRow } from './types';
 
 /**
  * Server-to-server API the RAMS app (rams.heliaxis.co.uk) uses to read
@@ -91,7 +92,7 @@ export function toPortalDoc(d: DocumentRow, ops: Map<string, OperativeRow>) {
   };
 }
 
-export function toPortalFirm(sub: SubcontractorRow, ops: OperativeRow[], docs: DocumentRow[]) {
+export function toPortalFirm(sub: SubcontractorRow, ops: OperativeRow[], docs: DocumentRow[], ntps: NtpRow[] = []) {
   const d = sub.details || {};
   const opMap = new Map(ops.map((o) => [o.id, o]));
   return {
@@ -111,6 +112,16 @@ export function toPortalFirm(sub: SubcontractorRow, ops: OperativeRow[], docs: D
     documents: docs
       .filter((x) => x.status === 'approved' && RAMS_CATEGORIES[x.category])
       .map((x) => toPortalDoc(x, opMap)),
+    // Active NTP appointments (in force today) — who is Heliaxis's NTP for which technology.
+    ntp: ntps.map((n) => ({
+      id: n.id,
+      ref: n.ref,
+      operativeId: n.operative_id,
+      ntpName: n.ntp_name,
+      technologies: n.technologies.map((k) => ({ key: k, label: NTP_TECHNOLOGIES[k]?.label ?? k, standard: NTP_TECHNOLOGIES[k]?.standard ?? null })),
+      validFrom: n.valid_from,
+      expiresOn: n.expires_on,
+    })),
   };
 }
 
@@ -123,15 +134,24 @@ export async function loadPortalFirms(onlyId?: string) {
   if (error) throw new Error(error.message);
   const ids = ((subs ?? []) as SubcontractorRow[]).map((s) => s.id);
   if (!ids.length) return [];
-  const [{ data: ops }, { data: docs }] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: ops }, { data: docs }, { data: ntps }] = await Promise.all([
     admin.from('subcontractor_operatives').select('*').in('subcontractor_id', ids).order('full_name'),
     admin.from('subcontractor_documents').select('*').in('subcontractor_id', ids).eq('status', 'approved'),
+    admin
+      .from('subcontractor_ntp_agreements')
+      .select('*')
+      .in('subcontractor_id', ids)
+      .eq('status', 'active')
+      .lte('valid_from', today)
+      .gte('expires_on', today),
   ]);
   return ((subs ?? []) as SubcontractorRow[]).map((s) =>
     toPortalFirm(
       s,
       ((ops ?? []) as OperativeRow[]).filter((o) => o.subcontractor_id === s.id),
-      ((docs ?? []) as DocumentRow[]).filter((d) => d.subcontractor_id === s.id)
+      ((docs ?? []) as DocumentRow[]).filter((d) => d.subcontractor_id === s.id),
+      ((ntps ?? []) as NtpRow[]).filter((n) => n.subcontractor_id === s.id)
     )
   );
 }

@@ -2,7 +2,7 @@ import { AGREEMENT_SUBTITLE, AGREEMENT_TITLE, type Block } from '@/lib/subcontra
 import { CIS_LABEL, ENTITY_LABEL, type AgreementRow, type AgreementSnapshot } from '@/lib/subcontractors/types';
 import './agreement.css';
 
-function fmtDate(iso: string | null | undefined, withTime = false) {
+export function fmtDate(iso: string | null | undefined, withTime = false) {
   if (!iso) return '';
   return new Date(iso).toLocaleString('en-GB', {
     day: 'numeric',
@@ -59,8 +59,8 @@ function Rates({ s }: { s: AgreementSnapshot }) {
   );
 }
 
-function BlockView({ b, s }: { b: Block; s: AgreementSnapshot }) {
-  if ('rates' in b) return <Rates s={s} />;
+export function BlockView({ b, s }: { b: Block; s?: AgreementSnapshot }) {
+  if ('rates' in b) return s ? <Rates s={s} /> : null;
   if ('h' in b) return <h3 className="agr-h3">{b.h}</h3>;
   if ('p' in b) return <p>{b.p}</p>;
   if ('note' in b) return <p className="agr-note">{b.note}</p>;
@@ -88,7 +88,7 @@ function BlockView({ b, s }: { b: Block; s: AgreementSnapshot }) {
   );
 }
 
-function SigBlock({
+export function SigBlock({
   party,
   name,
   title,

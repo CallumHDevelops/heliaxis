@@ -225,3 +225,65 @@ export type PullRow = {
   pulled_by_email: string | null;
   pulled_at: string;
 };
+
+export type NtpStatus = 'awaiting_signature' | 'awaiting_countersign' | 'active' | 'expired' | 'superseded' | 'cancelled';
+
+export const NTP_STATUS_LABEL: Record<NtpStatus, string> = {
+  awaiting_signature: 'Awaiting signature',
+  awaiting_countersign: 'Awaiting countersign',
+  active: 'Active',
+  expired: 'Expired',
+  superseded: 'Renewed',
+  cancelled: 'Cancelled',
+};
+
+/** Everything that varies per NTP agreement, frozen when it is issued. */
+export type NtpSnapshot = {
+  version: string;
+  ref: string;
+  frameworkRef: string;
+  companyName: string;
+  ntpName: string;
+  technologies: { key: string; label: string; standard: string }[];
+  minDaysPerMonth: number | null;
+  supervision: {
+    geography?: string;
+    installsPerMonth?: string;
+    typicalDuration?: string;
+    installersToSupervise?: string;
+    notes?: string;
+  };
+  fee: string | null;
+  heliaxis: { name: string; registeredAddress: string; companyNumber: string };
+  sections: import('./agreement').Section[];
+};
+
+export type NtpRow = {
+  id: string;
+  subcontractor_id: string;
+  ref: string;
+  status: NtpStatus;
+  technologies: string[];
+  operative_id: string | null;
+  ntp_name: string;
+  min_days_per_month: number | null;
+  supervision: NtpSnapshot['supervision'];
+  fee: string | null;
+  renewal_of: string | null;
+  snapshot: NtpSnapshot;
+  content_hash: string;
+  sub_name: string | null;
+  sub_title: string | null;
+  sub_signature: string | null;
+  sub_signed_at: string | null;
+  sub_ip: string | null;
+  hlx_name: string | null;
+  hlx_title: string | null;
+  hlx_signature: string | null;
+  hlx_signed_at: string | null;
+  hlx_signed_by: string | null;
+  valid_from: string | null;
+  expires_on: string | null;
+  requested_by: string | null;
+  created_at: string;
+};
