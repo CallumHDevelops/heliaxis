@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ...but the example IS meant to be committed: it is the only place the two
+# Supabase projects' variable names are written down side by side, and the
+# RAMS_ ones are easy to provision wrongly. It holds no values.
+!.env.example

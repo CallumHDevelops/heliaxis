@@ -37,6 +37,42 @@ SUPABASE_SERVICE_ROLE_KEY     = eyJ...
 **For local testing**, create a `.env.local` in the project root with the same three lines
 (this file is git-ignored). Then redeploy on Vercel so the vars take effect.
 
+## 5b. The RAMS project — a SECOND, DIFFERENT Supabase project
+
+Everything above belongs to **this site's** Supabase project. The subcontractor
+portal at `subcontract.heliaxis.co.uk` writes into a **different** one: the RAMS
+compliance platform behind `rams.heliaxis.co.uk`, which has its own schema, its
+own keys and its own policies. Do not paste one project's values under the
+other's names — the two sets of names are confusingly similar, and nothing about
+getting it wrong is loud.
+
+From the **RAMS** Supabase project (Project Settings → API), add to Vercel:
+```
+RAMS_SUPABASE_URL              = https://<rams-project-ref>.supabase.co
+RAMS_SUPABASE_SERVICE_ROLE_KEY = eyJ...        # secret — server only
+RAMS_APP_URL                   = https://rams.heliaxis.co.uk   # optional
+```
+
+- **Neither may ever be `NEXT_PUBLIC_`.** `NEXT_PUBLIC_` values are inlined into
+  the browser bundle; the portal only talks to RAMS from the server, and
+  `next.config.ts` already reads `NEXT_PUBLIC_SUPABASE_URL` to build its image
+  host allowlist, so the RAMS URL must not travel under that name either.
+- `RAMS_APP_URL` is optional. When set, the notification email links straight to
+  the new firm's record instead of leaving the office to search for it.
+- `createRamsClient()` refuses to run when `RAMS_SUPABASE_URL` equals
+  `NEXT_PUBLIC_SUPABASE_URL`. The two projects are never the same one, so
+  equality means somebody pasted the wrong values, and failing loudly beats
+  writing an application into the marketing database.
+- ⚠️ The RAMS **service_role** key bypasses row-level security across the whole
+  compliance platform — every project, document and signature. Keeping it here
+  widens its blast radius to this deployment: treat it as a RAMS credential,
+  never log it, and **rotate it if this site is ever compromised**.
+- The RAMS schema must already be applied in that project (it carries
+  `public.subcontractors`, `public.subcontractor_insurances` and the private
+  `subcontractor-docs` bucket). Until these variables are set, every portal
+  submission is refused with an honest message and the office is emailed a
+  "NOT RECORDED" alert — nothing is silently lost.
+
 ## 6. Make yourself the first admin
 There's no one to approve the *first* account, so seed it:
 1. Go to **/register** on the site and register with `callum@heliaxis.co.uk`.
