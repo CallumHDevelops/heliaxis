@@ -33,7 +33,7 @@ function clean(raw: Record<string, unknown>): SubDetails {
 }
 
 export async function POST(req: Request) {
-  const r = await portalRequest<{ token: string; details: Record<string, unknown> }>(req);
+  const r = await portalRequest<{ details: Record<string, unknown> }>(req);
   if ('error' in r) return r.error;
   const { sub, body } = r;
 

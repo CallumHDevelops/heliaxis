@@ -88,6 +88,7 @@ export type DocumentRow = {
   category: string;
   label: string | null;
   operative_name: string | null;
+  operative_id?: string | null;
   reference: string | null;
   cover_amount: string | null;
   expires_on: string | null;
@@ -163,3 +164,64 @@ export function missingDetails(d: SubDetails): string[] {
   if (typeof d.employsStaff !== 'boolean') miss.push('Whether you employ staff');
   return miss;
 }
+
+export type OperativeRow = {
+  id: string;
+  subcontractor_id: string;
+  full_name: string;
+  role: string | null;
+  phone: string | null;
+  email: string | null;
+  archived_at: string | null;
+  created_at: string;
+};
+
+export type AssignmentStatus = 'awaiting_crew' | 'crew_confirmed' | 'declined' | 'cancelled';
+
+export type AssignmentRow = {
+  id: string;
+  subcontractor_id: string;
+  status: AssignmentStatus;
+  rams_project_id: string;
+  rams_project_ref: string | null;
+  rams_project_name: string;
+  site_address: string | null;
+  rams_document_id: string;
+  rams_document_title: string | null;
+  scope: string | null;
+  start_date: string | null;
+  crew: string[];
+  decline_reason: string | null;
+  requested_by_name: string | null;
+  requested_by_email: string | null;
+  confirmed_at: string | null;
+  webhook_status: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const ASSIGNMENT_LABEL: Record<AssignmentStatus, string> = {
+  awaiting_crew: 'Choose your crew',
+  crew_confirmed: 'Crew confirmed',
+  declined: 'Declined',
+  cancelled: 'Cancelled',
+};
+
+export type PullRow = {
+  id: string;
+  subcontractor_id: string;
+  document_id: string | null;
+  assignment_id: string | null;
+  category: string | null;
+  title: string | null;
+  file_name: string | null;
+  sha256: string;
+  rams_project_id: string | null;
+  rams_project_ref: string | null;
+  rams_project_name: string | null;
+  rams_document_id: string | null;
+  rams_document_title: string | null;
+  pulled_by_name: string | null;
+  pulled_by_email: string | null;
+  pulled_at: string;
+};

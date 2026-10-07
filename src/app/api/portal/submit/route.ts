@@ -15,7 +15,7 @@ import type { DocumentRow } from '@/lib/subcontractors/types';
 
 /** "I've finished uploading" — tells Heliaxis there's something to review. */
 export async function POST(req: Request) {
-  const r = await portalRequest<{ token: string }>(req);
+  const r = await portalRequest<Record<string, never>>(req);
   if ('error' in r) return r.error;
   const { sub } = r;
 
