@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { findByToken, signedDocUrl } from '@/lib/subcontractors/server';
+import { signedDocUrl } from '@/lib/subcontractors/server';
+import { getPortalSub } from '@/lib/subcontractors/session';
 
 /** Open one of your own uploaded documents (short-lived signed URL). */
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const sub = await findByToken(new URL(req.url).searchParams.get('t'));
+  const sub = await getPortalSub();
   if (!sub) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const admin = createAdminClient();

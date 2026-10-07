@@ -10,7 +10,7 @@ import { jsonError, portalRequest } from '@/lib/subcontractors/portal-request';
  * often bigger). The path is always scoped to this subcontractor's folder.
  */
 export async function POST(req: Request) {
-  const r = await portalRequest<{ token: string; category: string; fileName: string; size: number; mime: string }>(req);
+  const r = await portalRequest<{ category: string; fileName: string; size: number; mime: string }>(req);
   if ('error' in r) return r.error;
   const { sub, body } = r;
 

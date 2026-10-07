@@ -10,14 +10,22 @@ import {
   DOC_CATEGORIES,
   expiryState,
   MAX_FILE_BYTES,
+  operativeCompliance,
   type DocCategory,
 } from '@/lib/subcontractors/documents';
-import { missingDetails, type DocumentRow, type SubDetails, type SubStatus } from '@/lib/subcontractors/types';
+import {
+  ASSIGNMENT_LABEL,
+  missingDetails,
+  type AssignmentRow,
+  type DocumentRow,
+  type OperativeRow,
+  type SubDetails,
+  type SubStatus,
+} from '@/lib/subcontractors/types';
 
 type PortalDoc = Omit<DocumentRow, 'storage_path'>;
 
 type Props = {
-  token: string;
   sub: {
     ref: string;
     companyName: string;
@@ -31,11 +39,13 @@ type Props = {
   };
   agreement: { subName: string; subSignedAt: string; hlxName: string | null; hlxSignedAt: string | null } | null;
   documents: PortalDoc[];
+  operatives: OperativeRow[];
+  jobs: AssignmentRow[];
   hash: string;
   agreementView: ReactNode;
 };
 
-type Step = 'details' | 'agreement' | 'documents';
+type Step = 'details' | 'agreement' | 'team' | 'documents' | 'jobs';
 
 async function post<T = Record<string, unknown>>(url: string, body: unknown, method = 'POST') {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -47,7 +57,7 @@ async function post<T = Record<string, unknown>>(url: string, body: unknown, met
 const fmt = (iso: string | null) =>
   iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-export function PortalApp({ token, sub, agreement, documents, hash, agreementView }: Props) {
+export function PortalApp({ sub, agreement, documents, operatives, jobs, hash, agreementView }: Props) {
   const router = useRouter();
   const signed = !!agreement;
   const [details, setDetails] = useState<SubDetails>(() => ({
@@ -59,21 +69,40 @@ export function PortalApp({ token, sub, agreement, documents, hash, agreementVie
     ...sub.details,
   }));
   const savedComplete = missingDetails(sub.details).length === 0;
-  const [step, setStep] = useState<Step>(!savedComplete ? 'details' : !signed ? 'agreement' : 'documents');
   const [docs, setDocs] = useState<PortalDoc[]>(documents);
+  const [team, setTeam] = useState<OperativeRow[]>(operatives);
+  const activeTeam = team.filter((o) => !o.archived_at);
+  const waitingJobs = jobs.filter((j) => j.status === 'awaiting_crew').length;
+  const [step, setStep] = useState<Step>(
+    !savedComplete ? 'details' : !signed ? 'agreement' : waitingJobs ? 'jobs' : !activeTeam.length ? 'team' : 'documents'
+  );
 
   const comp = useMemo(() => compliance(details, docs as DocumentRow[]), [details, docs]);
 
   const steps: { key: Step; label: string; done: boolean }[] = [
     { key: 'details', label: 'Your details', done: savedComplete },
     { key: 'agreement', label: 'Sign agreement', done: signed },
+    { key: 'team', label: 'Your team', done: activeTeam.length > 0 },
     { key: 'documents', label: 'Documents', done: !!sub.docsSubmittedAt && comp.ok },
+    { key: 'jobs', label: waitingJobs ? `Jobs (${waitingJobs} to answer)` : 'Jobs', done: !!jobs.length && !waitingJobs },
   ];
 
   return (
     <div className="pt-wrap">
       <section className="pt-hero">
-        <p className="pt-kicker">{sub.ref}</p>
+        <div className="pt-row-between">
+          <p className="pt-kicker">{sub.ref}</p>
+          <button
+            type="button"
+            className="pt-inline pt-signout"
+            onClick={async () => {
+              await fetch('/api/portal/logout', { method: 'POST' });
+              router.replace('/portal');
+            }}
+          >
+            Sign out
+          </button>
+        </div>
         <h1>{sub.companyName}</h1>
         <StatusBanner status={sub.status} agreement={agreement} comp={comp} />
       </section>
@@ -95,7 +124,6 @@ export function PortalApp({ token, sub, agreement, documents, hash, agreementVie
 
       {step === 'details' && (
         <DetailsStep
-          token={token}
           details={details}
           setDetails={setDetails}
           locked={signed}
@@ -107,7 +135,6 @@ export function PortalApp({ token, sub, agreement, documents, hash, agreementVie
       )}
       {step === 'agreement' && (
         <AgreementStep
-          token={token}
           hash={hash}
           agreement={agreement}
           detailsComplete={savedComplete}
@@ -121,9 +148,11 @@ export function PortalApp({ token, sub, agreement, documents, hash, agreementVie
           }}
         />
       )}
+      {step === 'team' && <TeamStep team={team} setTeam={setTeam} docs={docs} />}
+      {step === 'jobs' && <JobsStep jobs={jobs} team={activeTeam} docs={docs} onChanged={() => router.refresh()} />}
       {step === 'documents' && (
         <DocumentsStep
-          token={token}
+          operatives={activeTeam}
           details={details}
           docs={docs}
           setDocs={setDocs}
@@ -165,7 +194,7 @@ function StatusBanner({
         You signed on {fmt(agreement.subSignedAt)}. Heliaxis will countersign once your documents have been checked.
       </p>
     );
-  return <p className="pt-banner is-info">Three short steps: confirm your details, sign the agreement, upload your documents.</p>;
+  return <p className="pt-banner is-info">Confirm your details, sign the agreement, add your team and upload your documents.</p>;
 }
 
 // ---------------------------------------------------------------- details
@@ -191,13 +220,11 @@ function Field({
 }
 
 function DetailsStep({
-  token,
   details: d,
   setDetails,
   locked,
   onSaved,
 }: {
-  token: string;
   details: SubDetails;
   setDetails: (fn: (d: SubDetails) => SubDetails) => void;
   locked: boolean;
@@ -217,7 +244,7 @@ function DetailsStep({
     setBusy(true);
     setMsg(null);
     try {
-      const r = await post<{ complete: boolean; missing: string[] }>('/api/portal/details', { token, details: d });
+      const r = await post<{ complete: boolean; missing: string[] }>('/api/portal/details', { details: d });
       setMsg(
         r.complete
           ? { kind: 'ok', text: 'Saved.' }
@@ -303,9 +330,6 @@ function DetailsStep({
             <option value="yes">Yes</option>
           </select>
         </Field>
-        <Field label="Operatives who will attend site" hint="One name per line — we need photo ID and qualifications for each" wide>
-          <textarea rows={3} {...text('operatives')} />
-        </Field>
       </fieldset>
 
       {!locked && (
@@ -321,7 +345,6 @@ function DetailsStep({
 // ---------------------------------------------------------------- agreement
 
 function AgreementStep({
-  token,
   hash,
   agreement,
   detailsComplete,
@@ -331,7 +354,6 @@ function AgreementStep({
   goDetails,
   onSigned,
 }: {
-  token: string;
   hash: string;
   agreement: Props['agreement'];
   detailsComplete: boolean;
@@ -352,7 +374,7 @@ function AgreementStep({
     setBusy(true);
     setErr('');
     try {
-      await post('/api/portal/sign', { token, name, title, signature: sig, agree, hash });
+      await post('/api/portal/sign', { name, title, signature: sig, agree, hash });
       onSigned();
     } catch (e) {
       setErr((e as Error).message);
@@ -365,7 +387,7 @@ function AgreementStep({
     <div className="pt-card">
       <div className="pt-row-between">
         <h2>Subcontractor Framework Agreement</h2>
-        <a className="pt-link" href={`/portal/${token}/agreement`} target="_blank" rel="noreferrer">
+        <a className="pt-link" href="/portal/app/agreement" target="_blank" rel="noreferrer">
           Open full page / print ↗
         </a>
       </div>
@@ -423,14 +445,14 @@ function chip(d: PortalDoc) {
 }
 
 function DocumentsStep({
-  token,
+  operatives,
   details,
   docs,
   setDocs,
   submittedAt,
   onSubmitted,
 }: {
-  token: string;
+  operatives: OperativeRow[];
   details: SubDetails;
   docs: PortalDoc[];
   setDocs: (fn: (d: PortalDoc[]) => PortalDoc[]) => void;
@@ -440,16 +462,12 @@ function DocumentsStep({
   const comp = compliance(details, docs as DocumentRow[]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
-  const operatives = (details.operatives || '')
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
 
   async function submit() {
     setBusy(true);
     setMsg(null);
     try {
-      await post('/api/portal/submit', { token });
+      await post('/api/portal/submit', {});
       setMsg({ kind: 'ok', text: "Thanks — we've been notified and will review your documents." });
       onSubmitted();
     } catch (e) {
@@ -462,7 +480,7 @@ function DocumentsStep({
   async function remove(id: string) {
     if (!confirm('Remove this document?')) return;
     try {
-      await post('/api/portal/documents', { token, id }, 'DELETE');
+      await post('/api/portal/documents', { id }, 'DELETE');
       setDocs((list) => list.filter((d) => d.id !== id));
     } catch (e) {
       alert((e as Error).message);
@@ -484,7 +502,6 @@ function DocumentsStep({
             cat={cat}
             required={cat.required(details)}
             docs={docs.filter((d) => d.category === cat.key)}
-            token={token}
             operatives={operatives}
             onAdded={(doc) => setDocs((list) => [doc, ...list])}
             onRemove={remove}
@@ -508,7 +525,6 @@ function CategoryCard({
   cat,
   required,
   docs,
-  token,
   operatives,
   onAdded,
   onRemove,
@@ -516,14 +532,13 @@ function CategoryCard({
   cat: DocCategory;
   required: boolean;
   docs: PortalDoc[];
-  token: string;
-  operatives: string[];
+  operatives: OperativeRow[];
   onAdded: (d: PortalDoc) => void;
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [operative, setOperative] = useState(operatives[0] || '');
+  const [operativeId, setOperativeId] = useState(operatives[0]?.id || '');
   const [label, setLabel] = useState('');
   const [reference, setReference] = useState('');
   const [cover, setCover] = useState('');
@@ -543,7 +558,6 @@ function CategoryCard({
     setErr('');
     try {
       const u = await post<{ path: string; uploadToken: string; bucket: string }>('/api/portal/upload-url', {
-        token,
         category: cat.key,
         fileName: file.name,
         size: file.size,
@@ -554,14 +568,13 @@ function CategoryCard({
       });
       if (error) throw new Error('Upload failed — please check your connection and try again.');
       const r = await post<{ document: PortalDoc }>('/api/portal/documents', {
-        token,
         path: u.path,
         fileName: file.name,
         mime,
         size: file.size,
         category: cat.key,
         label,
-        operative,
+        operativeId,
         reference,
         cover,
         expiresOn,
@@ -603,7 +616,7 @@ function CategoryCard({
         <ul className="pt-doclist">
           {docs.map((d) => (
             <li key={d.id}>
-              <a href={`/api/portal/documents/${d.id}?t=${encodeURIComponent(token)}`} target="_blank" rel="noreferrer">
+              <a href={`/api/portal/documents/${d.id}`} target="_blank" rel="noreferrer">
                 {d.label || d.file_name}
               </a>
               <span className="pt-docmeta">
@@ -632,11 +645,13 @@ function CategoryCard({
               />
             </Field>
             {cat.operative && (
-              <Field label="Operative">
-                <input list={`ops-${cat.key}`} value={operative} onChange={(e) => setOperative(e.target.value)} />
-                <datalist id={`ops-${cat.key}`}>
-                  {operatives.map((o) => <option key={o} value={o} />)}
-                </datalist>
+              <Field label="Team member" hint={operatives.length ? undefined : 'Add your team first (Your team tab)'}>
+                <select value={operativeId} onChange={(e) => setOperativeId(e.target.value)} required>
+                  <option value="">Choose…</option>
+                  {operatives.map((o) => (
+                    <option key={o.id} value={o.id}>{o.full_name}</option>
+                  ))}
+                </select>
               </Field>
             )}
             <Field label="Description" hint={cat.key === 'qualification' ? 'e.g. C&G 2391-52' : cat.key === 'card' ? 'e.g. ECS Gold card' : undefined}>
@@ -664,6 +679,304 @@ function CategoryCard({
             </button>
           </div>
         </form>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- team
+
+function ReadyChip({ c }: { c: ReturnType<typeof operativeCompliance> }) {
+  if (c.ready && !c.expiring) return <span className="pt-chip is-ok">Ready for site</span>;
+  if (c.ready) return <span className="pt-chip is-warn">{c.expiring} expiring soon</span>;
+  return (
+    <span className="pt-chip is-bad" title={c.missing.join(', ')}>
+      {c.missing.length ? `Needs ${c.missing.join(' + ').toLowerCase()}` : `${c.expired} expired`}
+    </span>
+  );
+}
+
+function TeamStep({
+  team,
+  setTeam,
+  docs,
+}: {
+  team: OperativeRow[];
+  setTeam: (fn: (t: OperativeRow[]) => OperativeRow[]) => void;
+  docs: PortalDoc[];
+}) {
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('');
+  const [phone, setPhone] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr('');
+    try {
+      const r = await post<{ operative: OperativeRow }>('/api/portal/operatives', { fullName: name, role, phone });
+      setTeam((t) => [...t, r.operative].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+      setName('');
+      setRole('');
+      setPhone('');
+    } catch (e2) {
+      setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function archive(o: OperativeRow, archived: boolean) {
+    if (archived && !confirm(`Remove ${o.full_name} from your active team? Past jobs keep their record.`)) return;
+    try {
+      const r = await post<{ operative: OperativeRow }>('/api/portal/operatives', { id: o.id, archive: archived }, 'PATCH');
+      setTeam((t) => t.map((x) => (x.id === o.id ? r.operative : x)));
+    } catch (e2) {
+      alert((e2 as Error).message);
+    }
+  }
+
+  const active = team.filter((o) => !o.archived_at);
+  const archived = team.filter((o) => o.archived_at);
+
+  return (
+    <div className="pt-card">
+      <h2>Your team</h2>
+      <p className="pt-muted">
+        Everyone you might send to a Heliaxis site. Each person needs photo ID and their qualifications uploaded (Documents
+        tab) before they can be put on a job.
+      </p>
+
+      {active.length > 0 && (
+        <ul className="pt-team">
+          {active.map((o) => (
+            <li key={o.id}>
+              <div>
+                <strong>{o.full_name}</strong>
+                <span className="pt-docmeta">{[o.role, o.phone].filter(Boolean).join(' · ')}</span>
+              </div>
+              <ReadyChip c={operativeCompliance(o.id, docs)} />
+              <button type="button" className="pt-x" onClick={() => archive(o, true)} aria-label={`Remove ${o.full_name}`}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form className="pt-upload" onSubmit={add}>
+        <h3 className="pt-h3">Add someone</h3>
+        <div className="pt-grid">
+          <Field label="Full name">
+            <input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="off" />
+          </Field>
+          <Field label="Role / trade" hint="e.g. Electrician, Roofer, Labourer">
+            <input value={role} onChange={(e) => setRole(e.target.value)} />
+          </Field>
+          <Field label="Mobile" hint="Optional">
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" />
+          </Field>
+        </div>
+        {err && <p className="pt-msg is-err">{err}</p>}
+        <div className="pt-row">
+          <button className="pt-btn" disabled={busy || name.trim().length < 2}>{busy ? 'Adding…' : 'Add to team'}</button>
+        </div>
+      </form>
+
+      {archived.length > 0 && (
+        <p className="pt-hint" style={{ marginTop: '1rem' }}>
+          <button type="button" className="pt-inline" onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? 'Hide' : 'Show'} {archived.length} former team member{archived.length > 1 ? 's' : ''}
+          </button>
+        </p>
+      )}
+      {showArchived && (
+        <ul className="pt-team is-archived">
+          {archived.map((o) => (
+            <li key={o.id}>
+              <div><strong>{o.full_name}</strong></div>
+              <button type="button" className="pt-btn-ghost" onClick={() => archive(o, false)}>Restore</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- jobs
+
+function JobsStep({
+  jobs,
+  team,
+  docs,
+  onChanged,
+}: {
+  jobs: AssignmentRow[];
+  team: OperativeRow[];
+  docs: PortalDoc[];
+  onChanged: () => void;
+}) {
+  if (!jobs.length)
+    return (
+      <div className="pt-card">
+        <h2>Jobs</h2>
+        <p className="pt-muted">
+          When Heliaxis books you onto a job you&apos;ll get an email, and it will appear here for you to choose who&apos;s going.
+        </p>
+      </div>
+    );
+  return (
+    <div className="pt-card">
+      <h2>Jobs</h2>
+      <p className="pt-muted">
+        Choose who you&apos;re sending to each job. Their qualifications and cards, plus your insurance, are then added to
+        the job&apos;s RAMS automatically.
+      </p>
+      <div className="pt-cats">
+        {jobs.map((j) => (
+          <JobCard key={j.id} job={j} team={team} docs={docs} onChanged={onChanged} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function JobCard({
+  job,
+  team,
+  docs,
+  onChanged,
+}: {
+  job: AssignmentRow;
+  team: OperativeRow[];
+  docs: PortalDoc[];
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(job.status === 'awaiting_crew');
+  const [crew, setCrew] = useState<string[]>(job.crew);
+  const [declining, setDeclining] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const chosenNames = team.filter((o) => job.crew.includes(o.id)).map((o) => o.full_name);
+
+  async function send(body: unknown) {
+    setBusy(true);
+    setErr('');
+    try {
+      await post(`/api/portal/assignments/${job.id}`, body);
+      setEditing(false);
+      setDeclining(false);
+      onChanged();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const statusClass = job.status === 'awaiting_crew' ? 'is-warn' : job.status === 'crew_confirmed' ? 'is-ok' : 'is-bad';
+
+  return (
+    <section className={`pt-cat${job.status === 'awaiting_crew' ? ' is-needed' : ''}`}>
+      <header className="pt-cat-head">
+        <div>
+          <h3>{job.rams_project_name}</h3>
+          <p className="pt-hint">
+            {[job.rams_project_ref, job.start_date && `Starts ${fmt(job.start_date)}`, job.site_address].filter(Boolean).join(' · ')}
+          </p>
+          {job.scope && <p className="pt-hint">Scope: {job.scope}</p>}
+        </div>
+        <span className={`pt-chip ${statusClass}`}>{ASSIGNMENT_LABEL[job.status]}</span>
+      </header>
+
+      {job.status === 'declined' && <p className="pt-hint">You declined: {job.decline_reason}</p>}
+
+      {job.status === 'crew_confirmed' && !editing && (
+        <div className="pt-row" style={{ marginTop: '0.6rem' }}>
+          <span>
+            Crew: <strong>{chosenNames.join(', ') || '—'}</strong>
+          </span>
+          <button type="button" className="pt-btn-ghost" onClick={() => setEditing(true)}>Change crew</button>
+        </div>
+      )}
+
+      {editing && !declining && (
+        <div className="pt-upload">
+          {team.length === 0 ? (
+            <p className="pt-msg is-err">Add your team first (Your team tab).</p>
+          ) : (
+            <ul className="pt-crew">
+              {team.map((o) => (
+                <li key={o.id}>
+                  <label className="pt-check">
+                    <input
+                      type="checkbox"
+                      checked={crew.includes(o.id)}
+                      onChange={(e) => setCrew((x) => (e.target.checked ? [...x, o.id] : x.filter((y) => y !== o.id)))}
+                    />
+                    <span>
+                      {o.full_name}
+                      {o.role && <span className="pt-docmeta"> · {o.role}</span>}
+                    </span>
+                  </label>
+                  <ReadyChip c={operativeCompliance(o.id, docs)} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {crew.some((id) => !operativeCompliance(id, docs).ready) && (
+            <p className="pt-msg is-err">
+              Someone you&apos;ve chosen is missing documents — upload them on the Documents tab so they appear on the RAMS.
+            </p>
+          )}
+          {err && <p className="pt-msg is-err">{err}</p>}
+          <div className="pt-row">
+            <button
+              className="pt-btn"
+              disabled={busy || !crew.length}
+              onClick={() => send({ action: 'confirm', operativeIds: crew })}
+            >
+              {busy ? 'Saving…' : job.status === 'crew_confirmed' ? 'Save crew' : 'Confirm crew'}
+            </button>
+            {job.status === 'awaiting_crew' && (
+              <button type="button" className="pt-btn-ghost" onClick={() => setDeclining(true)}>
+                Can&apos;t do this job
+              </button>
+            )}
+            {job.status === 'crew_confirmed' && (
+              <button
+                type="button"
+                className="pt-btn-ghost"
+                onClick={() => {
+                  setEditing(false);
+                  setCrew(job.crew);
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {declining && (
+        <div className="pt-upload">
+          <Field label="Why can't you do it?" wide>
+            <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </Field>
+          {err && <p className="pt-msg is-err">{err}</p>}
+          <div className="pt-row">
+            <button className="pt-btn" disabled={busy || !reason.trim()} onClick={() => send({ action: 'decline', reason })}>
+              Decline job
+            </button>
+            <button type="button" className="pt-btn-ghost" onClick={() => setDeclining(false)}>Back</button>
+          </div>
+        </div>
       )}
     </section>
   );

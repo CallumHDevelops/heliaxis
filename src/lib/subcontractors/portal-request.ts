@@ -1,25 +1,42 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { findByToken } from './server';
+import { getPortalSub } from './session';
 import type { SubcontractorRow } from './types';
 
 export function jsonError(error: string, status = 400) {
-  return NextResponse.json({ ok: false, error }, { status });
+  return NextResponse.json({ ok: false, error }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-/** Parse a portal JSON request and resolve its magic-link token to a subcontractor. */
-export async function portalRequest<T extends { token?: string }>(
+/**
+ * Same-origin check for state-changing portal calls (defence in depth on top of
+ * the SameSite=Lax session cookie): a browser always sends Origin on POST/DELETE.
+ */
+export function sameOrigin(req: Request) {
+  const origin = req.headers.get('origin');
+  if (!origin) return false;
+  try {
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve the signed-in subcontractor from the session cookie and parse the JSON body. */
+export async function portalRequest<T = Record<string, unknown>>(
   req: Request
 ): Promise<{ sub: SubcontractorRow; body: T } | { error: NextResponse }> {
-  let body: T;
-  try {
-    body = (await req.json()) as T;
-  } catch {
-    return { error: jsonError('Invalid request') };
+  if (req.method !== 'GET' && !sameOrigin(req)) return { error: jsonError('Forbidden', 403) };
+  const sub = await getPortalSub();
+  if (!sub) return { error: jsonError('Your session has ended — please sign in again.', 401) };
+  let body = {} as T;
+  if (req.method !== 'GET') {
+    try {
+      body = (await req.json()) as T;
+    } catch {
+      return { error: jsonError('Invalid request') };
+    }
   }
-  const sub = await findByToken(body.token);
-  if (!sub) return { error: jsonError('This link is no longer valid. Ask Heliaxis to send you a new one.', 401) };
-  if (sub.status === 'terminated') return { error: jsonError('This account has been closed.', 403) };
   return { sub, body };
 }
 

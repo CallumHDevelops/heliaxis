@@ -179,3 +179,17 @@ export function compliance(details: SubDetails, docs: DocumentRow[], now = new D
 
   return { missing, expired, expiring, pendingReview, ok: !missing.length && !expired.length };
 }
+
+/** Per-operative readiness: photo ID and a qualification in date (Cl. 3A.1). */
+export function operativeCompliance(
+  operativeId: string,
+  docs: Pick<DocumentRow, 'category' | 'status' | 'expires_on' | 'operative_id'>[],
+  now = new Date()
+) {
+  const mine = docs.filter((d) => d.operative_id === operativeId && d.status !== 'rejected');
+  const live = (cat: string) => mine.some((d) => d.category === cat && expiryState(d.expires_on, now) !== 'expired');
+  const missing = DOC_CATEGORIES.filter((c) => c.operative && c.required({}) && !live(c.key)).map((c) => c.label);
+  const expired = mine.filter((d) => expiryState(d.expires_on, now) === 'expired').length;
+  const expiring = mine.filter((d) => expiryState(d.expires_on, now) === 'expiring').length;
+  return { missing, expired, expiring, ready: missing.length === 0 && expired === 0 };
+}

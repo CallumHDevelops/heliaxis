@@ -27,15 +27,23 @@ export function newToken() {
   return { token, hash: sha256(token) };
 }
 
+/**
+ * Resolve an emailed invite link. Links are single-purpose bearer secrets, so they
+ * expire after 14 days; afterwards the subcontractor signs in with an email code.
+ */
 export async function findByToken(token: string | null | undefined) {
   if (!token || token.length < 30 || token.length > 100) return null;
   const admin = createAdminClient();
   const { data } = await admin
     .from('subcontractors')
-    .select(SUB_COLUMNS)
+    .select(`${SUB_COLUMNS}, token_created_at`)
     .eq('token_hash', sha256(token))
     .maybeSingle();
-  return (data as SubcontractorRow | null) ?? null;
+  const row = data as (SubcontractorRow & { token_created_at: string | null }) | null;
+  if (!row) return null;
+  const issued = row.token_created_at ? new Date(row.token_created_at).getTime() : 0;
+  if (Date.now() - issued > 14 * 86_400_000) return null;
+  return row as SubcontractorRow;
 }
 
 /** Public URL of the portal. Production uses the subdomain; previews/local use the current origin. */
@@ -229,7 +237,7 @@ export function inviteEmail(sub: SubcontractorRow, link: string, reminder = fals
          <li>Read and sign our Subcontractor Framework Agreement (ref ${esc(sub.ref)})</li>
          <li>Upload photo ID, qualifications, cards and insurance certificates</li>
        </ol>
-       <p>It takes about 10 minutes. You can stop and come back to the same link any time, and use it later to upload renewed certificates.</p>`,
+       <p>It takes about 10 minutes. This link works for 14 days; after that, or any time later, sign in at the portal with this email address and we will email you a one-time code.</p>`,
       { href: link, label: 'Start onboarding' }
     ),
   };

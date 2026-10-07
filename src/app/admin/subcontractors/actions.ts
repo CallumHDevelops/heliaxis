@@ -19,7 +19,7 @@ import {
   sendEmail,
   validSignature,
 } from '@/lib/subcontractors/server';
-import { syncQuietly, syncSubcontractorToRams, unsyncDocument } from '@/lib/subcontractors/rams-sync';
+import { revokeAllSessions } from '@/lib/subcontractors/session';
 import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow, type SubStatus } from '@/lib/subcontractors/types';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -224,7 +224,6 @@ export async function countersign(id: string, input: { name: string; title: stri
       ),
     });
   }
-  await syncQuietly(id, actor);
   revalidatePath(`/admin/subcontractors/${id}`);
   revalidatePath('/admin/subcontractors');
   return { ok: true };
@@ -249,7 +248,6 @@ export async function reviewDocument(docId: string, status: 'approved' | 'reject
     })
     .eq('id', docId);
   await logEvent(doc.subcontractor_id, actor, `document_${status}`, { file: doc.file_name, note: note || undefined });
-  await syncQuietly(doc.subcontractor_id, actor);
   revalidatePath(`/admin/subcontractors/${doc.subcontractor_id}`);
   return { ok: true };
 }
@@ -263,7 +261,6 @@ export async function deleteDocument(docId: string): Promise<Result> {
     .eq('id', docId)
     .single();
   if (!doc) return { ok: false, error: 'Not found' };
-  await unsyncDocument(doc);
   await admin.storage.from(DOCS_BUCKET).remove([doc.storage_path]);
   await admin.from('subcontractor_documents').delete().eq('id', docId);
   await logEvent(doc.subcontractor_id, actor, 'document_deleted', { file: doc.file_name });
@@ -278,10 +275,10 @@ export async function setStatus(id: string, status: SubStatus): Promise<Result> 
   }
   const admin = createAdminClient();
   const update: Record<string, unknown> = { status };
-  if (status === 'terminated') update.token_hash = null; // kill the portal link
+  if (status === 'terminated') update.token_hash = null; // kill the invite link
   await admin.from('subcontractors').update(update).eq('id', id);
   await logEvent(id, actor, 'status_changed', { status });
-  await syncQuietly(id, actor);
+  if (status === 'terminated') await revokeAllSessions(id); // and sign them out everywhere
   revalidatePath(`/admin/subcontractors/${id}`);
   revalidatePath('/admin/subcontractors');
   return { ok: true };
@@ -294,11 +291,11 @@ export async function saveNotes(id: string, notes: string): Promise<Result> {
   return { ok: true };
 }
 
-/** Manual "Sync to RAMS now" from the subcontractor page. */
-export async function syncToRams(id: string): Promise<Result<{ copied: number; skipped: string[] }>> {
+/** Sign a subcontractor out of every device (e.g. a lost phone). */
+export async function signOutEverywhere(id: string): Promise<Result> {
   const { email: actor } = await requireAdmin();
-  const r = await syncSubcontractorToRams(id, actor);
+  await revokeAllSessions(id);
+  await logEvent(id, actor, 'sessions_revoked');
   revalidatePath(`/admin/subcontractors/${id}`);
-  if (!r.ok) return { ok: false, error: r.error };
-  return { ok: true, copied: r.copied, skipped: r.skipped };
+  return { ok: true };
 }

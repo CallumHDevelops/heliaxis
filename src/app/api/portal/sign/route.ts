@@ -17,7 +17,6 @@ import { missingDetails } from '@/lib/subcontractors/types';
 
 export async function POST(req: Request) {
   const r = await portalRequest<{
-    token: string;
     name: string;
     title: string;
     signature: string;

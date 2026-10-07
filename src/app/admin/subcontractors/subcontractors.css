@@ -140,3 +140,9 @@
   .sc-noprint { display: none !important; }
   .sc-print { padding: 0; }
 }
+
+.sc-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.45rem; font-size: 0.86rem; }
+.sc-list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; }
+.sc-list li > span:first-child { display: flex; flex-direction: column; min-width: 0; }
+.sc-list li.is-muted { opacity: 0.55; }
+.sc-hash { font-family: ui-monospace, Menlo, monospace; font-size: 0.76rem; background: var(--paper); padding: 0.1rem 0.3rem; border-radius: 2px; }

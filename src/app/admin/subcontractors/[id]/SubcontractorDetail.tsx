@@ -4,16 +4,20 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
-import { CATEGORY_BY_KEY, compliance, DOC_CATEGORIES, expiryState } from '@/lib/subcontractors/documents';
+import { CATEGORY_BY_KEY, compliance, DOC_CATEGORIES, expiryState, operativeCompliance } from '@/lib/subcontractors/documents';
 import {
   CIS_LABEL,
   ENTITY_LABEL,
+  ASSIGNMENT_LABEL,
   STATUS_LABEL,
+  type AssignmentRow,
   type DocumentRow,
   type EventRow,
+  type OperativeRow,
+  type PullRow,
   type SubcontractorRow,
 } from '@/lib/subcontractors/types';
-import { countersign, deleteDocument, reviewDocument, saveNotes, sendLink, setStatus, syncToRams, updateTerms } from '../actions';
+import { countersign, deleteDocument, reviewDocument, saveNotes, sendLink, setStatus, signOutEverywhere, updateTerms } from '../actions';
 import { TermsForm } from '../TermsForm';
 import '../subcontractors.css';
 
@@ -40,6 +44,21 @@ const fmt = (iso: string | null | undefined, time = false) =>
     : '—';
 
 const EVENT_LABEL: Record<string, string> = {
+  signed_in: 'Signed in',
+  sessions_revoked: 'Signed out everywhere',
+  document_viewed: 'Document viewed by Heliaxis',
+  document_downloaded: 'Document downloaded by Heliaxis',
+  operative_added: 'Team member added',
+  operative_updated: 'Team member updated',
+  operative_archived: 'Team member removed',
+  assignment_created: 'Booked onto a job',
+  assignment_cancelled: 'Job cancelled',
+  assignment_declined: 'Job declined',
+  crew_confirmed: 'Crew confirmed',
+  crew_changed: 'Crew changed',
+  rams_webhook: 'RAMS notified',
+  documents_pulled: 'Documents pulled by RAMS',
+  expiry_reminder_sent: 'Expiry reminder emailed',
   created: 'Record created',
   invite_sent: 'Invite emailed',
   reminder_sent: 'Reminder emailed',
@@ -64,14 +83,18 @@ export function SubcontractorDetail({
   documents,
   events,
   adminName,
-  rams,
+  team,
+  jobs,
+  pulls,
 }: {
   sub: SubcontractorRow;
   agreement: AgreementSummary;
   documents: DocumentRow[];
   events: EventRow[];
   adminName: string;
-  rams: RamsInfo;
+  team: OperativeRow[];
+  jobs: AssignmentRow[];
+  pulls: PullRow[];
 }) {
   const router = useRouter();
   const d = sub.details || {};
@@ -142,6 +165,18 @@ export function SubcontractorDetail({
               New link to copy
             </button>
           </>
+        )}
+        {sub.status !== 'terminated' && (
+          <button
+            className="sc-btn-ghost"
+            disabled={busy}
+            onClick={() => {
+              if (confirm('Sign this subcontractor out of every device? They can sign back in with an email code.'))
+                run(() => signOutEverywhere(sub.id), 'Signed out everywhere.');
+            }}
+          >
+            Sign out everywhere
+          </button>
         )}
         {sub.status === 'active' && (
           <button className="sc-btn-ghost" disabled={busy} onClick={() => run(() => setStatus(sub.id, 'suspended'), 'Suspended.')}>
@@ -230,10 +265,12 @@ export function SubcontractorDetail({
               );
             })}
           </section>
+          <PullsPanel pulls={pulls} />
         </div>
 
         <aside className="sc-col-side">
-          <RamsPanel rams={rams} subId={sub.id} status={sub.status} />
+          <TeamPanel team={team} documents={documents} />
+          <JobsPanel jobs={jobs} team={team} />
 
           {/* ---------------- terms ---------------- */}
           <section className="sc-card">
@@ -347,72 +384,119 @@ function ComplianceSummary({ comp }: { comp: ReturnType<typeof compliance> }) {
   );
 }
 
-type RamsInfo = {
-  configured: boolean;
-  appUrl: string;
-  ramsId: string | null;
-  syncedAt: string | null;
-  error: string | null;
-  /** False until supabase/rams-sync.sql has been run. */
-  setUp: boolean;
-};
-
-/** Copies of approved insurance, cards and qualifications go to the RAMS app. */
-function RamsPanel({ rams, subId, status }: { rams: RamsInfo; subId: string; status: SubcontractorRow['status'] }) {
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  let body: React.ReactNode;
-  if (!rams.configured) body = <p className="sc-muted">RAMS isn&apos;t connected — add RAMS_SUPABASE_URL and RAMS_SUPABASE_SERVICE_ROLE_KEY in Vercel.</p>;
-  else if (!rams.setUp) body = <p className="sc-muted">Run <code>supabase/rams-sync.sql</code> in Supabase to switch syncing on.</p>;
-  else
-    body = (
-      <>
-        <dl className="sc-dl">
-          <dt>Status</dt>
-          <dd>
-            {rams.ramsId ? `Synced ${fmt(rams.syncedAt, true)}` : status === 'active' ? 'Not synced yet' : 'Sent once countersigned'}
-          </dd>
-        </dl>
-        {rams.error && <p className="sc-error">{rams.error}</p>}
-        <div className="sc-row">
-          <button
-            className="sc-btn-ghost"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setMsg(null);
-              const r = await syncToRams(subId);
-              setBusy(false);
-              setMsg(
-                r.ok
-                  ? { ok: true, text: `Synced — ${r.copied} new document${r.copied === 1 ? '' : 's'} copied.` }
-                  : { ok: false, text: r.error }
-              );
-              router.refresh();
-            }}
-          >
-            {busy ? 'Syncing…' : 'Sync to RAMS now'}
-          </button>
-          {rams.ramsId && (
-            <a className="sc-link-btn" href={`${rams.appUrl}/subcontractors/${rams.ramsId}`} target="_blank" rel="noreferrer">
-              Open in RAMS ↗
-            </a>
-          )}
-        </div>
-        {msg && <p className={msg.ok ? 'sc-muted' : 'sc-error'}>{msg.text}</p>}
-      </>
-    );
-
+/** The firm's own team, with each person's readiness for site. */
+function TeamPanel({ team, documents }: { team: OperativeRow[]; documents: DocumentRow[] }) {
+  const active = team.filter((o) => !o.archived_at);
   return (
     <section className="sc-card">
-      <h2>RAMS</h2>
+      <h2>Team ({active.length})</h2>
+      {active.length === 0 && <p className="sc-muted">They haven&apos;t added anyone yet.</p>}
+      <ul className="sc-list">
+        {active.map((o) => {
+          const c = operativeCompliance(o.id, documents);
+          return (
+            <li key={o.id}>
+              <span>
+                <strong>{o.full_name}</strong>
+                {o.role && <span className="sc-sub">{o.role}</span>}
+              </span>
+              <span
+                className={`sc-pill ${c.ready ? (c.expiring ? 'is-warn' : 'is-ok') : 'is-bad'}`}
+                title={c.missing.join(', ')}
+              >
+                {c.ready
+                  ? c.expiring
+                    ? `${c.expiring} expiring`
+                    : 'Ready'
+                  : c.missing.length
+                    ? `Needs ${c.missing.length}`
+                    : `${c.expired} expired`}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** Jobs RAMS has booked them onto, and who they chose. */
+function JobsPanel({ jobs, team }: { jobs: AssignmentRow[]; team: OperativeRow[] }) {
+  const names = new Map(team.map((o) => [o.id, o.full_name]));
+  return (
+    <section className="sc-card">
+      <h2>Jobs ({jobs.filter((j) => j.status !== 'cancelled').length})</h2>
+      {jobs.length === 0 && <p className="sc-muted">Not booked on any RAMS yet.</p>}
+      <ul className="sc-list">
+        {jobs.map((j) => (
+          <li key={j.id} className={j.status === 'cancelled' ? 'is-muted' : undefined}>
+            <span>
+              <strong>{j.rams_project_name}</strong>
+              <span className="sc-sub">
+                {[j.rams_project_ref, j.rams_document_title, j.start_date && `starts ${fmt(j.start_date)}`]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+              {j.status === 'crew_confirmed' && (
+                <span className="sc-sub">Crew: {j.crew.map((c) => names.get(c) || '?').join(', ')}</span>
+              )}
+              {j.decline_reason && <span className="sc-sub is-bad">Declined: {j.decline_reason}</span>}
+              {j.webhook_status && !j.webhook_status.startsWith('delivered') && (
+                <span className="sc-sub is-bad">RAMS: {j.webhook_status}</span>
+              )}
+            </span>
+            <span className="sc-pill">{ASSIGNMENT_LABEL[j.status]}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Append-only fingerprint record of every document RAMS has pulled. */
+function PullsPanel({ pulls }: { pulls: PullRow[] }) {
+  return (
+    <section className="sc-card">
+      <h2>Pulled by RAMS</h2>
       <p className="sc-muted">
-        Approved insurance, cards and qualifications are copied to RAMS so this firm can be named on a RAMS. Photo ID and
-        bank details stay here.
+        Every document handed to RAMS, with the SHA-256 fingerprint of the exact file, the project and RAMS document it
+        was pulled for, and who pulled it.
       </p>
-      {body}
+      {pulls.length === 0 ? (
+        <p className="sc-muted">Nothing pulled yet.</p>
+      ) : (
+        <div className="sc-table-wrap">
+          <table className="sc-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Document</th>
+                <th>Project / RAMS</th>
+                <th>Fingerprint</th>
+                <th>By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pulls.map((p) => (
+                <tr key={p.id}>
+                  <td>{fmt(p.pulled_at, true)}</td>
+                  <td>{p.title || p.file_name}</td>
+                  <td>
+                    {p.rams_project_name}
+                    <span className="sc-sub">{[p.rams_project_ref, p.rams_document_title].filter(Boolean).join(' · ')}</span>
+                  </td>
+                  <td>
+                    <code className="sc-hash" title={p.sha256}>
+                      {p.sha256.slice(0, 12)}
+                    </code>
+                  </td>
+                  <td>{p.pulled_by_name || p.pulled_by_email || 'automatic'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
@@ -444,9 +528,6 @@ function DocRow({ doc, onChanged }: { doc: DocumentRow; onChanged: () => void })
         {doc.review_note && <span className="sc-sub is-bad">Rejected: {doc.review_note}</span>}
       </div>
       <div className="sc-doc-side">
-        {(doc as DocumentRow & { rams_row_id?: string | null }).rams_row_id && (
-          <span className="sc-pill is-ok" title="Copied into RAMS">In RAMS</span>
-        )}
         {doc.expires_on && (
           <span className={`sc-pill ${ex === 'expired' ? 'is-bad' : ex === 'expiring' ? 'is-warn' : ''}`}>
             {ex === 'expired' ? 'Expired' : 'Expires'} {fmt(doc.expires_on)}

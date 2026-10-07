@@ -1,19 +1,19 @@
+import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { agreementHash, buildSnapshot, findByToken } from '@/lib/subcontractors/server';
-import type { AgreementRow, DocumentRow } from '@/lib/subcontractors/types';
+import { agreementHash, buildSnapshot } from '@/lib/subcontractors/server';
+import { getPortalSub } from '@/lib/subcontractors/session';
+import type { AgreementRow, AssignmentRow, DocumentRow, OperativeRow } from '@/lib/subcontractors/types';
 import { AgreementDocument } from '@/components/subcontractors/AgreementDocument';
 import { PortalApp } from './PortalApp';
-import { InvalidLink } from '../InvalidLink';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PortalPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const sub = await findByToken(token);
-  if (!sub || sub.status === 'terminated') return <InvalidLink />;
+export default async function PortalPage() {
+  const sub = await getPortalSub();
+  if (!sub) redirect('/portal');
 
   const admin = createAdminClient();
-  const [{ data: agr }, { data: docs }] = await Promise.all([
+  const [{ data: agr }, { data: docs }, { data: ops }, { data: jobs }] = await Promise.all([
     admin
       .from('subcontractor_agreements')
       .select('*')
@@ -21,12 +21,14 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    admin.from('subcontractor_documents').select('*').eq('subcontractor_id', sub.id).order('uploaded_at', { ascending: false }),
+    admin.from('subcontractor_operatives').select('*').eq('subcontractor_id', sub.id).order('full_name'),
     admin
-      .from('subcontractor_documents')
+      .from('subcontractor_assignments')
       .select('*')
       .eq('subcontractor_id', sub.id)
-      .order('uploaded_at', { ascending: false }),
-    admin.from('subcontractors').update({ last_seen_at: new Date().toISOString() }).eq('id', sub.id),
+      .neq('status', 'cancelled')
+      .order('start_date', { ascending: true, nullsFirst: false }),
   ]);
   const agreement = agr as AgreementRow | null;
 
@@ -37,7 +39,6 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
 
   return (
     <PortalApp
-      token={token}
       sub={{
         ref: sub.ref,
         companyName: sub.company_name,
@@ -60,6 +61,8 @@ export default async function PortalPage({ params }: { params: Promise<{ token: 
           : null
       }
       documents={((docs ?? []) as DocumentRow[]).map((d) => ({ ...d, storage_path: undefined }))}
+      operatives={(ops ?? []) as OperativeRow[]}
+      jobs={(jobs ?? []) as AssignmentRow[]}
       hash={hash}
       agreementView={<AgreementDocument snapshot={snapshot} agreement={agreement} showAudit={false} />}
     />

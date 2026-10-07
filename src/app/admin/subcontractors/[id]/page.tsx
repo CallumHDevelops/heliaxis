@@ -3,10 +3,12 @@ import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { agreementHash } from '@/lib/subcontractors/server';
-import { ramsAppUrl, ramsConfigured } from '@/lib/subcontractors/rams-sync';
 import {
   SUB_COLUMNS,
   type AgreementRow,
+  type AssignmentRow,
+  type OperativeRow,
+  type PullRow,
   type DocumentRow,
   type EventRow,
   type SubcontractorRow,
@@ -39,12 +41,17 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
       .limit(100),
   ]);
   if (!sub) notFound();
-  // Separate query: these columns only exist once supabase/rams-sync.sql has run.
-  const { data: ramsRow, error: ramsErr } = await admin
-    .from('subcontractors')
-    .select('rams_id, rams_synced_at, rams_sync_error')
-    .eq('id', id)
-    .maybeSingle();
+  // Team, jobs and the RAMS pull ledger (tables from supabase/portal-v2.sql).
+  const [{ data: team }, { data: jobs }, { data: pulls }] = await Promise.all([
+    admin.from('subcontractor_operatives').select('*').eq('subcontractor_id', id).order('full_name'),
+    admin.from('subcontractor_assignments').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
+    admin
+      .from('subcontractor_document_pulls')
+      .select('*')
+      .eq('subcontractor_id', id)
+      .order('pulled_at', { ascending: false })
+      .limit(200),
+  ]);
   const agreement = agr as AgreementRow | null;
 
   return (
@@ -69,14 +76,9 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         documents={(docs ?? []) as DocumentRow[]}
         events={(events ?? []) as EventRow[]}
         adminName={profile?.full_name || ''}
-        rams={{
-          configured: ramsConfigured(),
-          appUrl: ramsAppUrl(),
-          ramsId: ramsRow?.rams_id ?? null,
-          syncedAt: ramsRow?.rams_synced_at ?? null,
-          error: ramsRow?.rams_sync_error ?? null,
-          setUp: !ramsErr,
-        }}
+        team={(team ?? []) as OperativeRow[]}
+        jobs={(jobs ?? []) as AssignmentRow[]}
+        pulls={(pulls ?? []) as PullRow[]}
       />
     </AdminShell>
   );
