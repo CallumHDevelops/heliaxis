@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
+import { NTP_TECHNOLOGIES } from '@/lib/subcontractors/ntp-agreement';
 import {
   ALLOWED_MIME,
   compliance,
@@ -16,6 +17,8 @@ import {
 import {
   ASSIGNMENT_LABEL,
   missingDetails,
+  NTP_STATUS_LABEL,
+  type NtpStatus,
   type AssignmentRow,
   type DocumentRow,
   type OperativeRow,
@@ -41,11 +44,13 @@ type Props = {
   documents: PortalDoc[];
   operatives: OperativeRow[];
   jobs: AssignmentRow[];
+  ntps: PortalNtp[];
+  ntpViews: Record<string, ReactNode>;
   hash: string;
   agreementView: ReactNode;
 };
 
-type Step = 'details' | 'agreement' | 'team' | 'documents' | 'jobs';
+type Step = 'details' | 'agreement' | 'team' | 'documents' | 'jobs' | 'ntp';
 
 async function post<T = Record<string, unknown>>(url: string, body: unknown, method = 'POST') {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -57,7 +62,7 @@ async function post<T = Record<string, unknown>>(url: string, body: unknown, met
 const fmt = (iso: string | null) =>
   iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-export function PortalApp({ sub, agreement, documents, operatives, jobs, hash, agreementView }: Props) {
+export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, ntpViews, hash, agreementView }: Props) {
   const router = useRouter();
   const signed = !!agreement;
   const [details, setDetails] = useState<SubDetails>(() => ({
@@ -73,8 +78,19 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, hash, a
   const [team, setTeam] = useState<OperativeRow[]>(operatives);
   const activeTeam = team.filter((o) => !o.archived_at);
   const waitingJobs = jobs.filter((j) => j.status === 'awaiting_crew').length;
+  const ntpToSign = ntps.filter((n) => n.status === 'awaiting_signature').length;
   const [step, setStep] = useState<Step>(
-    !savedComplete ? 'details' : !signed ? 'agreement' : waitingJobs ? 'jobs' : !activeTeam.length ? 'team' : 'documents'
+    !savedComplete
+      ? 'details'
+      : !signed
+        ? 'agreement'
+        : ntpToSign
+          ? 'ntp'
+          : waitingJobs
+            ? 'jobs'
+            : !activeTeam.length
+              ? 'team'
+              : 'documents'
   );
 
   const comp = useMemo(() => compliance(details, docs as DocumentRow[]), [details, docs]);
@@ -85,6 +101,9 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, hash, a
     { key: 'team', label: 'Your team', done: activeTeam.length > 0 },
     { key: 'documents', label: 'Documents', done: !!sub.docsSubmittedAt && comp.ok },
     { key: 'jobs', label: waitingJobs ? `Jobs (${waitingJobs} to answer)` : 'Jobs', done: !!jobs.length && !waitingJobs },
+    ...(ntps.length
+      ? [{ key: 'ntp' as Step, label: ntpToSign ? `NTP (${ntpToSign} to sign)` : 'NTP', done: !ntpToSign }]
+      : []),
   ];
 
   return (
@@ -149,6 +168,7 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, hash, a
         />
       )}
       {step === 'team' && <TeamStep team={team} setTeam={setTeam} docs={docs} />}
+      {step === 'ntp' && <NtpStep ntps={ntps} views={ntpViews} onChanged={() => router.refresh()} />}
       {step === 'jobs' && <JobsStep jobs={jobs} team={activeTeam} docs={docs} onChanged={() => router.refresh()} />}
       {step === 'documents' && (
         <DocumentsStep
@@ -977,6 +997,104 @@ function JobCard({
             <button type="button" className="pt-btn-ghost" onClick={() => setDeclining(false)}>Back</button>
           </div>
         </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- NTP
+
+export type PortalNtp = {
+  id: string;
+  ref: string;
+  status: NtpStatus;
+  ntpName: string;
+  technologies: string[];
+  validFrom: string | null;
+  expiresOn: string | null;
+  hash: string;
+};
+
+function NtpStep({ ntps, views, onChanged }: { ntps: PortalNtp[]; views: Record<string, ReactNode>; onChanged: () => void }) {
+  return (
+    <div className="pt-card">
+      <h2>NTP agreements</h2>
+      <p className="pt-muted">
+        Appointments of your named person as Heliaxis&apos;s Nominated Technical Person (NTP) for MCS technologies. Each runs
+        for 12 months and is renewed every year.
+      </p>
+      <div className="pt-cats">
+        {ntps.map((n) => (
+          <NtpCard key={n.id} ntp={n} view={views[n.id]} onChanged={onChanged} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NtpCard({ ntp, view, onChanged }: { ntp: PortalNtp; view?: ReactNode; onChanged: () => void }) {
+  const [name, setName] = useState(ntp.ntpName);
+  const [title, setTitle] = useState('Nominated Technical Person');
+  const [agree, setAgree] = useState(false);
+  const [sig, setSig] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const techs = ntp.technologies.map((k) => NTP_TECHNOLOGIES[k]?.label || k).join(', ');
+  const cls = ntp.status === 'active' ? 'is-ok' : ntp.status === 'awaiting_signature' ? 'is-warn' : ntp.status === 'expired' ? 'is-bad' : '';
+
+  async function sign() {
+    setBusy(true);
+    setErr('');
+    try {
+      await post(`/api/portal/ntp/${ntp.id}/sign`, { name, title, signature: sig, agree, hash: ntp.hash });
+      onChanged();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className={`pt-cat${ntp.status === 'awaiting_signature' ? ' is-needed' : ''}`}>
+      <header className="pt-cat-head">
+        <div>
+          <h3>{ntp.ntpName} — {techs}</h3>
+          <p className="pt-hint">
+            {ntp.ref}
+            {ntp.validFrom && ` · ${fmt(ntp.validFrom)} to ${fmt(ntp.expiresOn)}`}
+          </p>
+        </div>
+        <span className={`pt-chip ${cls}`}>{NTP_STATUS_LABEL[ntp.status]}</span>
+      </header>
+
+      {ntp.status === 'awaiting_signature' ? (
+        <>
+          <div className="pt-doc">{view}</div>
+          <div className="pt-sign">
+            <h3>Sign as the NTP, for yourself and your business</h3>
+            <div className="pt-grid">
+              <Field label="Full name"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+              <Field label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
+            </div>
+            <SignaturePad onChange={setSig} />
+            <label className="pt-check">
+              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+              <span>
+                I have read this NTP agreement, I am the person named as NTP, I am authorised to sign for the Subcontractor,
+                and I agree that my electronic signature is legally binding.
+              </span>
+            </label>
+            {err && <p className="pt-msg is-err">{err}</p>}
+            <button className="pt-btn" type="button" disabled={busy || !agree || !sig || name.trim().length < 2} onClick={sign}>
+              {busy ? 'Signing…' : 'Sign NTP agreement'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="pt-hint" style={{ marginTop: '0.5rem' }}>
+          <a className="pt-link" href={`/portal/app/ntp/${ntp.id}`} target="_blank" rel="noreferrer">View / print ↗</a>
+        </p>
       )}
     </section>
   );

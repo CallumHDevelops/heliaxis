@@ -15,12 +15,15 @@ import {
   logEvent,
   newToken,
   nextRef,
+  portalBaseUrl,
   portalLink,
   sendEmail,
   validSignature,
 } from '@/lib/subcontractors/server';
 import { revokeAllSessions } from '@/lib/subcontractors/session';
-import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow, type SubStatus } from '@/lib/subcontractors/types';
+import { createNtpAgreement, ntpHash, parseNtpRequest } from '@/lib/subcontractors/ntp';
+import { NTP_TERM_MONTHS } from '@/lib/subcontractors/ntp-agreement';
+import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -297,5 +300,108 @@ export async function signOutEverywhere(id: string): Promise<Result> {
   await revokeAllSessions(id);
   await logEvent(id, actor, 'sessions_revoked');
   revalidatePath(`/admin/subcontractors/${id}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------- NTP agreements
+
+/** Issue an NTP agreement for signature. The Framework Agreement must already be countersigned. */
+export async function sendNtp(subId: string, input: Record<string, unknown>): Promise<Result> {
+  const { email: actor } = await requireAdmin();
+  const sub = await loadSub(subId);
+  if (!sub) return { ok: false, error: 'Not found' };
+  const admin = createAdminClient();
+  const { data: fw } = await admin
+    .from('subcontractor_agreements')
+    .select('hlx_signed_at')
+    .eq('subcontractor_id', subId)
+    .not('hlx_signed_at', 'is', null)
+    .limit(1)
+    .maybeSingle();
+  if (!fw) return { ok: false, error: 'Countersign their Subcontractor Framework Agreement first — the NTP agreement sits on top of it.' };
+  const req = parseNtpRequest(input);
+  if (req.operativeId) {
+    const { data: op } = await admin
+      .from('subcontractor_operatives')
+      .select('full_name')
+      .eq('id', req.operativeId)
+      .eq('subcontractor_id', subId)
+      .maybeSingle();
+    if (!op) return { ok: false, error: 'That person is not on their team.' };
+    req.ntpName = op.full_name;
+  }
+  const r = await createNtpAgreement(sub, req, actor);
+  revalidatePath(`/admin/subcontractors/${subId}`);
+  return r.ok ? { ok: true } : r;
+}
+
+export async function countersignNtp(ntpId: string, input: { name: string; title: string; signature: string }): Promise<Result> {
+  const { email: actor } = await requireAdmin();
+  const name = input.name?.trim();
+  if (!name || name.length < 2) return { ok: false, error: 'Type your full name.' };
+  if (!validSignature(input.signature)) return { ok: false, error: 'Draw your signature.' };
+  const admin = createAdminClient();
+  const { data } = await admin.from('subcontractor_ntp_agreements').select('*').eq('id', ntpId).maybeSingle();
+  const ntp = data as NtpRow | null;
+  if (!ntp) return { ok: false, error: 'Not found' };
+  if (ntp.status !== 'awaiting_countersign') return { ok: false, error: 'Not awaiting countersignature.' };
+  if (ntpHash(ntp.snapshot) !== ntp.content_hash) return { ok: false, error: 'Integrity check failed — do not countersign; reissue it.' };
+
+  // A renewal starts the day after the agreement it renews ends, so there's no gap or overlap.
+  let from = new Date();
+  if (ntp.renewal_of) {
+    const { data: prev } = await admin.from('subcontractor_ntp_agreements').select('status, expires_on').eq('id', ntp.renewal_of).maybeSingle();
+    if (prev?.status === 'active' && prev.expires_on) {
+      const next = new Date(`${prev.expires_on}T12:00:00Z`);
+      next.setUTCDate(next.getUTCDate() + 1);
+      if (next > from) from = next;
+    }
+  }
+  const to = new Date(from);
+  to.setUTCMonth(to.getUTCMonth() + NTP_TERM_MONTHS);
+  to.setUTCDate(to.getUTCDate() - 1);
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+
+  await admin
+    .from('subcontractor_ntp_agreements')
+    .update({
+      status: 'active',
+      hlx_name: name.slice(0, 120),
+      hlx_title: input.title?.trim().slice(0, 120) || null,
+      hlx_signature: input.signature,
+      hlx_signed_at: new Date().toISOString(),
+      hlx_signed_by: actor,
+      hlx_ip: clientIp(await headers()),
+      valid_from: ymd(from),
+      expires_on: ymd(to),
+    })
+    .eq('id', ntpId);
+  await logEvent(ntp.subcontractor_id, actor, 'ntp_countersigned', { ref: ntp.ref, from: ymd(from), to: ymd(to) });
+
+  const sub = await loadSub(ntp.subcontractor_id);
+  if (sub) {
+    await sendEmail({
+      to: sub.email,
+      subject: `NTP agreement ${ntp.ref} is in force`,
+      html: emailShell(
+        'NTP agreement countersigned',
+        `<p>Heliaxis has countersigned NTP agreement <strong>${esc(ntp.ref)}</strong> appointing ${esc(ntp.ntp_name)}. It runs from ${esc(ymd(from))} to ${esc(ymd(to))}. We'll send the renewal before it ends.</p>`,
+        { href: `${portalBaseUrl()}/portal`, label: 'View in the portal' }
+      ),
+    });
+  }
+  revalidatePath(`/admin/subcontractors/${ntp.subcontractor_id}`);
+  return { ok: true };
+}
+
+export async function cancelNtp(ntpId: string): Promise<Result> {
+  const { email: actor } = await requireAdmin();
+  const admin = createAdminClient();
+  const { data: ntp } = await admin.from('subcontractor_ntp_agreements').select('id, subcontractor_id, ref, status').eq('id', ntpId).maybeSingle();
+  if (!ntp) return { ok: false, error: 'Not found' };
+  if (['cancelled', 'superseded'].includes(ntp.status)) return { ok: true };
+  await admin.from('subcontractor_ntp_agreements').update({ status: 'cancelled' }).eq('id', ntpId);
+  await logEvent(ntp.subcontractor_id, actor, 'ntp_cancelled', { ref: ntp.ref, was: ntp.status });
+  revalidatePath(`/admin/subcontractors/${ntp.subcontractor_id}`);
   return { ok: true };
 }

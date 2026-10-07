@@ -9,6 +9,7 @@ import {
   type AssignmentRow,
   type OperativeRow,
   type PullRow,
+  type NtpRow,
   type DocumentRow,
   type EventRow,
   type SubcontractorRow,
@@ -42,7 +43,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
   ]);
   if (!sub) notFound();
   // Team, jobs and the RAMS pull ledger (tables from supabase/portal-v2.sql).
-  const [{ data: team }, { data: jobs }, { data: pulls }] = await Promise.all([
+  const [{ data: team }, { data: jobs }, { data: pulls }, { data: ntps }] = await Promise.all([
     admin.from('subcontractor_operatives').select('*').eq('subcontractor_id', id).order('full_name'),
     admin.from('subcontractor_assignments').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
     admin
@@ -51,6 +52,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
       .eq('subcontractor_id', id)
       .order('pulled_at', { ascending: false })
       .limit(200),
+    admin.from('subcontractor_ntp_agreements').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
   ]);
   const agreement = agr as AgreementRow | null;
 
@@ -79,6 +81,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         team={(team ?? []) as OperativeRow[]}
         jobs={(jobs ?? []) as AssignmentRow[]}
         pulls={(pulls ?? []) as PullRow[]}
+        ntps={(ntps ?? []) as NtpRow[]}
       />
     </AdminShell>
   );

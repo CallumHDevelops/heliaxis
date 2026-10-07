@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { CATEGORY_BY_KEY } from '@/lib/subcontractors/documents';
-import { ADMIN_EMAIL, emailShell, esc, logEvent, portalBaseUrl, sendEmail } from '@/lib/subcontractors/server';
-import type { DocumentRow } from '@/lib/subcontractors/types';
+import { ADMIN_EMAIL, emailShell, esc, logEvent, portalBaseUrl, sendEmail, siteBaseUrl } from '@/lib/subcontractors/server';
+import { createNtpAgreement } from '@/lib/subcontractors/ntp';
+import { SUB_COLUMNS, type DocumentRow, type NtpRow, type SubcontractorRow } from '@/lib/subcontractors/types';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -30,6 +31,7 @@ function daysUntil(date: string) {
  */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const ntp = await runNtpRenewals();
   const admin = createAdminClient();
   const horizon = new Date(Date.now() + 31 * 86_400_000).toISOString().slice(0, 10);
 
@@ -38,7 +40,7 @@ export async function GET(req: Request) {
     .select('id, ref, company_name, contact_name, email')
     .in('status', ['active', 'awaiting_countersign', 'in_progress', 'suspended']);
   const subMap = new Map((subs ?? []).map((s) => [s.id as string, s]));
-  if (!subMap.size) return NextResponse.json({ ok: true, sent: 0 });
+  if (!subMap.size) return NextResponse.json({ ok: true, sent: 0, ...ntp });
 
   const { data: docData } = await admin
     .from('subcontractor_documents')
@@ -122,5 +124,95 @@ export async function GET(req: Request) {
       html: emailShell('Renewal reminders sent today', `<ul style="padding-left:18px">${summary.join('')}</ul>`),
     });
   }
-  return NextResponse.json({ ok: true, firms: summary.length, items: todo.length });
+  return NextResponse.json({ ok: true, firms: summary.length, items: todo.length, ...ntp });
+}
+
+/**
+ * NTP agreements run 12 months and renew yearly:
+ *  - 30 days before expiry the renewal is issued automatically (same terms) for signature;
+ *  - unsigned / uncountersigned renewals are chased at 30 / 14 / 7 days (firm + Heliaxis);
+ *  - on expiry the agreement is marked expired (or "renewed" if a renewal is in force).
+ */
+async function runNtpRenewals() {
+  const admin = createAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const horizon = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+  const { data } = await admin
+    .from('subcontractor_ntp_agreements')
+    .select('*')
+    .in('status', ['active', 'awaiting_signature', 'awaiting_countersign']);
+  const all = (data ?? []) as NtpRow[];
+  const renewalOf = new Map(all.filter((n) => n.renewal_of).map((n) => [n.renewal_of!, n]));
+  let issued = 0;
+  let chased = 0;
+  let expired = 0;
+
+  for (const n of all.filter((x) => x.status === 'active' && x.expires_on)) {
+    const renewal = renewalOf.get(n.id);
+
+    if (n.expires_on! < today) {
+      const live = renewal?.status === 'active';
+      await admin.from('subcontractor_ntp_agreements').update({ status: live ? 'superseded' : 'expired' }).eq('id', n.id);
+      if (!live) {
+        await logEvent(n.subcontractor_id, 'system', 'ntp_expired', { ref: n.ref });
+        await sendEmail({
+          to: ADMIN_EMAIL(),
+          subject: `NTP agreement expired: ${n.ref} (${n.ntp_name})`,
+          html: emailShell(
+            'NTP agreement expired',
+            `<p>${esc(n.ntp_name)} is no longer Heliaxis's NTP for ${esc(n.technologies.join(', '))} (${esc(n.ref)} expired ${esc(n.expires_on!)}). Notify your Certification Body if no replacement is in place.</p>`
+          ),
+        });
+        expired++;
+      }
+      continue;
+    }
+    if (n.expires_on! > horizon) continue;
+
+    const { data: subData } = await admin.from('subcontractors').select(SUB_COLUMNS).eq('id', n.subcontractor_id).maybeSingle();
+    const sub = subData as SubcontractorRow | null;
+    if (!sub || sub.status !== 'active') continue;
+
+    if (!renewal) {
+      const r = await createNtpAgreement(
+        sub,
+        {
+          technologies: n.technologies,
+          operativeId: n.operative_id,
+          ntpName: n.ntp_name,
+          minDaysPerMonth: n.min_days_per_month,
+          supervision: n.supervision || {},
+          fee: n.fee,
+        },
+        'system (annual renewal)',
+        n
+      );
+      if (r.ok) issued++;
+      continue;
+    }
+
+    // Renewal exists but isn't in force yet — chase whoever it's waiting on.
+    if (renewal.status === 'active') continue;
+    const days = Math.round((new Date(`${n.expires_on}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86_400_000);
+    const threshold = [7, 14, 30].find((t) => days <= t);
+    if (threshold === undefined) continue;
+    const { error: dup } = await admin.from('subcontractor_ntp_reminders').insert({ ntp_id: renewal.id, threshold_days: threshold });
+    if (dup) continue; // already chased at this point
+    const waitingOnUs = renewal.status === 'awaiting_countersign';
+    await sendEmail({
+      to: waitingOnUs ? ADMIN_EMAIL() : sub.email,
+      subject: `${days <= 7 ? 'Urgent: ' : ''}NTP agreement ${n.ref} expires in ${days} day${days === 1 ? '' : 's'}`,
+      html: emailShell(
+        waitingOnUs ? 'NTP renewal needs countersigning' : 'Please sign your NTP renewal',
+        waitingOnUs
+          ? `<p>${esc(sub.company_name)} has signed renewal ${esc(renewal.ref)} for ${esc(n.ntp_name)}. Countersign before ${esc(n.expires_on!)} to avoid a gap.</p>`
+          : `<p>Hi ${esc(sub.contact_name.split(' ')[0])},</p><p>${esc(n.ntp_name)}'s NTP agreement with Heliaxis ends on ${esc(n.expires_on!)}. The renewal (${esc(renewal.ref)}) is waiting for signature in the portal — without it, ${esc(n.ntp_name)} can't act as our NTP after that date.</p>`,
+        waitingOnUs
+          ? { href: `${siteBaseUrl()}/admin/subcontractors/${sub.id}`, label: 'Countersign renewal' }
+          : { href: `${portalBaseUrl()}/portal`, label: 'Sign renewal' }
+      ),
+    });
+    chased++;
+  }
+  return { ntpRenewalsIssued: issued, ntpChased: chased, ntpExpired: expired };
 }

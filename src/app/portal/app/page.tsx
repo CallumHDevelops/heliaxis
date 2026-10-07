@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { agreementHash, buildSnapshot } from '@/lib/subcontractors/server';
 import { getPortalSub } from '@/lib/subcontractors/session';
-import type { AgreementRow, AssignmentRow, DocumentRow, OperativeRow } from '@/lib/subcontractors/types';
+import type { AgreementRow, AssignmentRow, DocumentRow, NtpRow, OperativeRow } from '@/lib/subcontractors/types';
+import { NtpDocument } from '@/components/subcontractors/NtpDocument';
 import { AgreementDocument } from '@/components/subcontractors/AgreementDocument';
 import { PortalApp } from './PortalApp';
 
@@ -13,7 +14,7 @@ export default async function PortalPage() {
   if (!sub) redirect('/portal');
 
   const admin = createAdminClient();
-  const [{ data: agr }, { data: docs }, { data: ops }, { data: jobs }] = await Promise.all([
+  const [{ data: agr }, { data: docs }, { data: ops }, { data: jobs }, { data: ntpData }] = await Promise.all([
     admin
       .from('subcontractor_agreements')
       .select('*')
@@ -29,7 +30,14 @@ export default async function PortalPage() {
       .eq('subcontractor_id', sub.id)
       .neq('status', 'cancelled')
       .order('start_date', { ascending: true, nullsFirst: false }),
+    admin
+      .from('subcontractor_ntp_agreements')
+      .select('*')
+      .eq('subcontractor_id', sub.id)
+      .not('status', 'in', '(cancelled,superseded)')
+      .order('created_at', { ascending: false }),
   ]);
+  const ntps = (ntpData ?? []) as NtpRow[];
   const agreement = agr as AgreementRow | null;
 
   // Unsigned: show the live text built from their current details (and its hash, which
@@ -63,6 +71,21 @@ export default async function PortalPage() {
       documents={((docs ?? []) as DocumentRow[]).map((d) => ({ ...d, storage_path: undefined }))}
       operatives={(ops ?? []) as OperativeRow[]}
       jobs={(jobs ?? []) as AssignmentRow[]}
+      ntps={ntps.map((n) => ({
+        id: n.id,
+        ref: n.ref,
+        status: n.status,
+        ntpName: n.ntp_name,
+        technologies: n.technologies,
+        validFrom: n.valid_from,
+        expiresOn: n.expires_on,
+        hash: n.content_hash,
+      }))}
+      ntpViews={Object.fromEntries(
+        ntps
+          .filter((n) => n.status === 'awaiting_signature')
+          .map((n) => [n.id, <NtpDocument key={n.id} snapshot={n.snapshot} showAudit={false} />])
+      )}
       hash={hash}
       agreementView={<AgreementDocument snapshot={snapshot} agreement={agreement} showAudit={false} />}
     />

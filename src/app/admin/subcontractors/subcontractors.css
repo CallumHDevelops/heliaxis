@@ -146,3 +146,5 @@
 .sc-list li > span:first-child { display: flex; flex-direction: column; min-width: 0; }
 .sc-list li.is-muted { opacity: 0.55; }
 .sc-hash { font-family: ui-monospace, Menlo, monospace; font-size: 0.76rem; background: var(--paper); padding: 0.1rem 0.3rem; border-radius: 2px; }
+
+.sc-field-wide { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.78rem; font-weight: 600; }
