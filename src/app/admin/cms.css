@@ -211,6 +211,24 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .modalbox.imglib-box .imglib-lede{padding:8px 24px 0;margin:0;font-size:.88rem;color:var(--muted);line-height:1.5;text-align:center}
 .modalbox.imglib-box .close{position:absolute;top:16px;right:16px;margin:0;background:var(--paper-2);border-radius:50%;width:32px;height:32px;display:grid;place-items:center;transition:background .2s, color .2s;color:var(--muted)}
 .modalbox.imglib-box .close:hover{background:var(--line);color:var(--ink)}
+.modalbox.bulk-box{max-width:min(760px,96vw);width:min(760px,96vw)}
+.bulk-head{display:flex;align-items:center;justify-content:space-between;margin:12px 0 6px}
+.bulk-all{display:inline-flex;align-items:center;gap:7px;font-size:.85rem;font-weight:600;cursor:pointer}
+.bulk-count{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.bulk-list{display:flex;flex-direction:column;max-height:48vh;overflow-y:auto;border:1px solid var(--line);border-radius:6px;margin:0 0 4px}
+.bulk-row{display:grid;grid-template-columns:20px 26px 1fr auto;align-items:center;gap:10px;padding:8px 11px;border-bottom:1px solid var(--line)}
+.bulk-row:last-child{border-bottom:0}
+.bulk-row:hover{background:var(--paper-2)}
+.bulk-row.is-exists{opacity:.55}
+.bulk-prio{font-family:var(--mono);font-size:.68rem;color:var(--muted);text-align:right}
+.bulk-name{display:flex;flex-direction:column;gap:1px;min-width:0}
+.bulk-name b{font-size:.86rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bulk-slug{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.bulk-status{justify-self:end}
+.bulk-pill{font-family:var(--mono);font-size:.62rem;letter-spacing:.02em;padding:3px 8px;border-radius:20px;white-space:nowrap;background:var(--paper-2);color:var(--muted);border:1px solid var(--line)}
+.bulk-pill.is-ok{background:rgba(63,125,78,.12);color:#2f6b3f;border-color:rgba(63,125,78,.3)}
+.bulk-pill.is-err{background:rgba(180,70,47,.1);color:#b4462f;border-color:rgba(180,70,47,.3);max-width:230px;overflow:hidden;text-overflow:ellipsis}
+.bulk-pill.is-run{background:rgba(248,188,30,.18);color:var(--amber-2);border-color:rgba(248,188,30,.4)}
 .imglib-toolbar{display:flex;gap:12px;padding:24px 32px 0;align-items:center;justify-content:center}
 .imglib-toolbar input{flex:1;min-width:0;padding:10px 16px;border:1px solid var(--line);border-radius:24px;background:var(--paper-2);font-family:var(--body);font-size:.9rem;color:var(--ink);transition:all .2s}
 .imglib-toolbar input:focus{outline:none;background:#fff;border-color:var(--solar);box-shadow:0 0 0 3px rgba(248,188,30,.25)}
