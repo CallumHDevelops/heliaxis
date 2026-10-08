@@ -82,7 +82,16 @@ export async function requestPasswordReset(_prev: NoticeState, formData: FormDat
           'Too many emails have been sent in the last hour, so Supabase refused to send another. Wait an hour and try again, or ask an admin to set your password.',
       };
     }
-    return { error: `The reset email could not be sent (${error.message}). Please contact an admin.` };
+    const detail = [error.status && `status ${error.status}`, error.code, error.message && error.message !== '{}' && error.message]
+      .filter(Boolean)
+      .join(', ');
+    return {
+      error: `The reset email could not be sent (${detail || error.name}). ${
+        error.status === 504 || error.message === '{}'
+          ? 'The email server did not answer in time — check the SMTP settings in Supabase.'
+          : 'Please contact an admin.'
+      }`,
+    };
   }
   return { ok: 'If that email has an account, a reset link is on its way. Check your inbox (and spam).' };
 }
