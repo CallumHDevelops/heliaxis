@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSessionProfile } from '@/lib/auth';
 import { getResendApiKey } from '@/lib/resend';
+import { smtpProbe } from '@/lib/smtp-probe';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const SENDER_DOMAIN = 'heliaxis.co.uk';
 
@@ -12,6 +14,7 @@ type ResendDomain = { id: string; name: string; status: string; region?: string;
  * Admin diagnostic: is the Resend key in this deployment able to send as
  * @heliaxis.co.uk? Reads the key's account domains (never returns the key).
  * Add ?send=1 to email a test to yourself and see Resend's exact response.
+ * Add ?smtp=1 to send the test over SMTP exactly as Supabase Auth does (465 and 587).
  * Supabase Auth SMTP uses the same key, so this explains its failures too.
  */
 export async function GET(req: Request) {
@@ -68,6 +71,16 @@ export async function GET(req: Request) {
       cache: 'no-store',
     });
     out.testSend = { to: user.email, status: sendRes.status, response: await sendRes.json().catch(() => null) };
+  }
+
+  if (new URL(req.url).searchParams.get('smtp') === '1' && user.email) {
+    const base = { host: 'smtp.resend.com', user: 'resend', pass: key, from: `noreply@${SENDER_DOMAIN}`, to: user.email };
+    const [p465, p587] = await Promise.all([smtpProbe({ ...base, port: 465 }), smtpProbe({ ...base, port: 587 })]);
+    out.smtp = { port465: p465, port587: p587 };
+    out.smtpVerdict =
+      p465.ok || p587.ok
+        ? `SMTP works with this key (${[p465.ok && '465', p587.ok && '587'].filter(Boolean).join(' and ')}). Supabase uses the same host/username, so if its emails still fail, the password stored in Supabase's SMTP settings is not this key — paste it again and Save.`
+        : `SMTP failed on both ports: 465 → ${p465.error}; 587 → ${p587.error}.`;
   }
 
   return NextResponse.json(out, { headers: { 'Cache-Control': 'no-store' } });
