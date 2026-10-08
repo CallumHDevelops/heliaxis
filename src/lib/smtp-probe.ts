@@ -7,7 +7,21 @@ import tls from 'tls';
  * SMTP does (connect, EHLO, AUTH, MAIL/RCPT/DATA) and returns the transcript with
  * credentials redacted. Port 465 = implicit TLS, 587 = STARTTLS.
  */
-export async function smtpProbe(opts: {
+/** Same as probe, but never takes longer than `capMs` overall. */
+export async function smtpProbe(opts: Parameters<typeof probe>[0] & { capMs?: number }) {
+  const capMs = opts.capMs ?? 20_000;
+  return Promise.race([
+    probe(opts),
+    new Promise<Awaited<ReturnType<typeof probe>>>((resolve) =>
+      setTimeout(
+        () => resolve({ ok: false, transcript: [], error: `no complete answer within ${capMs / 1000}s (connection stalled)`, ms: capMs }),
+        capMs
+      )
+    ),
+  ]);
+}
+
+async function probe(opts: {
   host: string;
   port: 465 | 587;
   user: string;
@@ -22,6 +36,13 @@ export async function smtpProbe(opts: {
   let sock!: net.Socket | tls.TLSSocket;
   let buffer = '';
   let waiter: ((line: string) => void) | null = null;
+  let failer: ((e: Error) => void) | null = null;
+  const fail = (e: Error) => {
+    const f = failer;
+    failer = null;
+    waiter = null;
+    f?.(e);
+  };
 
   const onData = (chunk: Buffer) => {
     buffer += chunk.toString('utf8');
@@ -45,7 +66,12 @@ export async function smtpProbe(opts: {
       const t = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms waiting for the server`)), timeoutMs);
       waiter = (line) => {
         clearTimeout(t);
+        failer = null;
         resolve(line);
+      };
+      failer = (e) => {
+        clearTimeout(t);
+        reject(e);
       };
     });
 
@@ -64,7 +90,11 @@ export async function smtpProbe(opts: {
         ? tls.connect({ host: opts.host, port: 465, servername: opts.host })
         : net.connect({ host: opts.host, port: opts.port });
     sock.on('data', onData);
-    sock.on('error', (e) => transcript.push(`! socket error: ${e.message}`));
+    sock.on('error', (e) => {
+      transcript.push(`! socket error: ${e.message}`);
+      fail(e);
+    });
+    sock.on('close', () => fail(new Error('connection closed by server')));
     expect(await read(), '220');
     let ehlo = await send('EHLO heliaxis.co.uk');
     expect(ehlo, '250');
@@ -75,8 +105,15 @@ export async function smtpProbe(opts: {
       sock = tls.connect({ socket: sock as net.Socket, servername: opts.host });
       sock.on('data', onData);
       await new Promise<void>((res, rej) => {
-        (sock as tls.TLSSocket).once('secureConnect', () => res());
-        (sock as tls.TLSSocket).once('error', rej);
+        const t = setTimeout(() => rej(new Error('TLS upgrade timed out')), timeoutMs);
+        (sock as tls.TLSSocket).once('secureConnect', () => {
+          clearTimeout(t);
+          res();
+        });
+        (sock as tls.TLSSocket).once('error', (e) => {
+          clearTimeout(t);
+          rej(e);
+        });
       });
       transcript.push('-- TLS upgraded');
       ehlo = await send('EHLO heliaxis.co.uk');

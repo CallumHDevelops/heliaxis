@@ -169,7 +169,7 @@ export function esc(s: unknown) {
 
 export const ADMIN_EMAIL = () => process.env.ADMIN_EMAIL || 'callum@heliaxis.co.uk';
 
-export async function sendEmail(opts: { to: string; subject: string; html: string; replyTo?: string }) {
+export async function sendEmail(opts: { to: string; subject: string; html: string; replyTo?: string; from?: string; text?: string }) {
   const key = getResendApiKey();
   if (!key) {
     console.warn('[subcontractors] RESEND_API_KEY missing — email not sent:', opts.subject);
@@ -179,10 +179,11 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      from: 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
+      from: opts.from || 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
       to: [opts.to],
       subject: opts.subject,
       html: opts.html,
+      text: opts.text,
       reply_to: opts.replyTo,
     }),
   });
@@ -195,14 +196,19 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
 }
 
 /** Brand-styled transactional email shell (inline styles only — email clients). */
-export function emailShell(title: string, bodyHtml: string, cta?: { href: string; label: string }) {
+export function emailShell(
+  title: string,
+  bodyHtml: string,
+  cta?: { href: string; label: string },
+  tag = 'Subcontractor portal'
+) {
   return `<!doctype html><html><body style="margin:0;background:#F7F2E7;font-family:Arial,Helvetica,sans-serif;color:#211F18">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F2E7;padding:28px 12px">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFDF8;border:1px solid #e4ddcc">
       <tr><td style="background:#211F18;padding:18px 26px">
         <span style="color:#F8BC1E;font-weight:800;letter-spacing:.08em;font-size:15px">HELIAXIS</span>
-        <span style="color:#bdb6a4;font-size:12px;margin-left:10px">Subcontractor portal</span>
+        <span style="color:#bdb6a4;font-size:12px;margin-left:10px">${esc(tag)}</span>
       </td></tr>
       <tr><td style="padding:28px 26px 8px">
         <h1 style="margin:0 0 14px;font-size:21px;line-height:1.3">${esc(title)}</h1>
