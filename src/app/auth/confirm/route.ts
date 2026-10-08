@@ -6,10 +6,25 @@ import { createClient } from '@/lib/supabase/server';
  * Landing point for Supabase email links (password reset). Exchanges the code
  * (PKCE) or token hash for a session, then continues to `next` (same-site paths only).
  */
+/**
+ * Only continue within this site. Resolve against our origin and compare,
+ * rather than testing for a leading "/": the URL parser folds backslashes into
+ * slashes, so "/\evil.com" passes a startsWith check and then lands on another host.
+ */
+function safeNext(requested: string | null, origin: string): string {
+  if (!requested) return '/admin';
+  try {
+    const candidate = new URL(requested, origin);
+    if (candidate.origin !== origin || candidate.pathname === '/auth/confirm') return '/admin';
+    return `${candidate.pathname}${candidate.search}`;
+  } catch {
+    return '/admin';
+  }
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const nextRaw = url.searchParams.get('next') || '/admin';
-  const next = nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/admin';
+  const next = safeNext(url.searchParams.get('next'), url.origin);
   const supabase = await createClient();
 
   const code = url.searchParams.get('code');
