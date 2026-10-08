@@ -55,6 +55,9 @@ export default function LoginForm() {
         >
           {pending ? 'Signing in…' : 'Sign in'}
         </button>
+        <Link href="/forgot-password" style={{ fontSize: '.85rem', color: '#C77F04', fontWeight: 600, justifySelf: 'start' }}>
+          Forgot your password?
+        </Link>
       </form>
     </AuthShell>
   );

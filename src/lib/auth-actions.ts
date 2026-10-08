@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { safeAdminPath } from '@/lib/auth-utils';
@@ -55,4 +56,34 @@ export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect('/login');
+}
+
+export type NoticeState = { error?: string; ok?: string } | null;
+
+/** Email a password-reset link. Same reply whether or not the address has an account. */
+export async function requestPasswordReset(_prev: NoticeState, formData: FormData): Promise<NoticeState> {
+  const email = String(formData.get('email') || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Enter your email address.' };
+  const h = await headers();
+  const host = h.get('x-forwarded-host') || h.get('host');
+  const proto = h.get('x-forwarded-proto') || 'https';
+  const supabase = await createClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${proto}://${host}/auth/confirm?next=/reset-password`,
+  });
+  return { ok: 'If that email has an account, a reset link is on its way. Check your inbox (and spam).' };
+}
+
+/** Set a new password for the signed-in user (arrived via the reset link). */
+export async function updatePassword(_prev: NoticeState, formData: FormData): Promise<NoticeState> {
+  const password = String(formData.get('password') || '');
+  const confirm = String(formData.get('confirm') || '');
+  if (password.length < 10) return { error: 'Use at least 10 characters.' };
+  if (password !== confirm) return { error: "The passwords don't match." };
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return { error: 'Your reset link has expired. Request a new one.' };
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+  redirect('/admin');
 }

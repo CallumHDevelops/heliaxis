@@ -9,6 +9,8 @@ const BLOCKED_EXACT = new Set([
   '/pending',
   '/preview',
   '/portal',
+  '/forgot-password',
+  '/reset-password',
 ]);
 
 const BLOCKED_PREFIXES = [
