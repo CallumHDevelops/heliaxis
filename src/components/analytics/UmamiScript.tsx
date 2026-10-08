@@ -34,7 +34,7 @@ export function UmamiScript() {
               }
               if (path.charAt(0) !== '/') path = '/' + path;
 
-              if (path === '/login' || path === '/register' || path === '/pending' || path === '/preview') return false;
+              if (path === '/login' || path === '/register' || path === '/pending' || path === '/preview' || path === '/forgot-password' || path === '/reset-password') return false;
               if (path === '/admin' || path.indexOf('/admin/') === 0) return false;
               if (path.indexOf('/login/') === 0 || path.indexOf('/register/') === 0) return false;
               if (path.indexOf('/pending/') === 0 || path.indexOf('/preview/') === 0) return false;

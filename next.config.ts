@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
       { source: '/api/portal/:path*', headers: sensitiveHeaders },
       { source: '/api/rams/:path*', headers: sensitiveHeaders },
       { source: '/api/admin/:path*', headers: sensitiveHeaders },
+      { source: '/reset-password', headers: sensitiveHeaders },
+      { source: '/auth/:path*', headers: sensitiveHeaders },
       // SAMEORIGIN, not DENY: the CMS previews pages in same-origin iframes.
       { source: '/admin/:path*', headers: [...sensitiveHeaders, { key: 'X-Frame-Options', value: 'SAMEORIGIN' }] },
     ];
