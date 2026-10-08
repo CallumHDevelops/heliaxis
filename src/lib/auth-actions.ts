@@ -68,9 +68,22 @@ export async function requestPasswordReset(_prev: NoticeState, formData: FormDat
   const host = h.get('x-forwarded-host') || h.get('host');
   const proto = h.get('x-forwarded-proto') || 'https';
   const supabase = await createClient();
-  await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${proto}://${host}/auth/confirm?next=/reset-password`,
   });
+  // Supabase answers the same for known and unknown addresses, so surfacing a
+  // send failure doesn't reveal who has an account — and hiding it made a
+  // mis-configured mail sender look like "it's on its way".
+  if (error) {
+    console.error('[password-reset]', error.status, error.code, error.message);
+    if (error.status === 429 || /rate limit/i.test(error.message)) {
+      return {
+        error:
+          'Too many emails have been sent in the last hour, so Supabase refused to send another. Wait an hour and try again, or ask an admin to set your password.',
+      };
+    }
+    return { error: `The reset email could not be sent (${error.message}). Please contact an admin.` };
+  }
   return { ok: 'If that email has an account, a reset link is on its way. Check your inbox (and spam).' };
 }
 
