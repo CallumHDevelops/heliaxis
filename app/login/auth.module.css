@@ -37,6 +37,9 @@
 }
 .brand img {
   height: 34px;
+  width: auto;
+  align-self: flex-start; /* don't let the flex column stretch the logo wide */
+  object-fit: contain;
 }
 .pitch {
   max-width: 22ch;
