@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { clientIp, logEvent } from '@/lib/subcontractors/server';
 import { jsonError, portalRequest, str } from '@/lib/subcontractors/portal-request';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 type Body = { id?: string; fullName?: string; role?: string; phone?: string; email?: string; archive?: boolean };
 
 /**
@@ -15,6 +17,7 @@ export async function POST(req: Request) {
   const { sub, body } = r;
   const fullName = str(body.fullName, 120);
   if (fullName.length < 2) return jsonError('Enter their full name.');
+  if (str(body.email, 160) && !EMAIL_RE.test(str(body.email, 160))) return jsonError("That email address doesn't look right.");
   const admin = createAdminClient();
   const { count } = await admin
     .from('subcontractor_operatives')
@@ -51,7 +54,11 @@ export async function PATCH(req: Request) {
   }
   if (body.role !== undefined) update.role = str(body.role, 80) || null;
   if (body.phone !== undefined) update.phone = str(body.phone, 40) || null;
-  if (body.email !== undefined) update.email = str(body.email, 160) || null;
+  if (body.email !== undefined) {
+    const email = str(body.email, 160);
+    if (email && !EMAIL_RE.test(email)) return jsonError("That email address doesn't look right.");
+    update.email = email || null;
+  }
 
   const { data, error } = await createAdminClient()
     .from('subcontractor_operatives')
@@ -61,6 +68,14 @@ export async function PATCH(req: Request) {
     .select('*')
     .maybeSingle();
   if (error || !data) return jsonError('Could not update — please try again.', error ? 500 : 404);
+  // Someone who leaves the team can no longer sign an NTP agreement on its behalf.
+  if (body.archive) {
+    await createAdminClient()
+      .from('subcontractor_ntp_agreements')
+      .update({ sign_token_hash: null })
+      .eq('operative_id', data.id)
+      .eq('status', 'awaiting_signature');
+  }
   await logEvent(sub.id, 'subcontractor', body.archive ? 'operative_archived' : 'operative_updated', { name: data.full_name }, clientIp(req.headers));
   return NextResponse.json({ ok: true, operative: data });
 }

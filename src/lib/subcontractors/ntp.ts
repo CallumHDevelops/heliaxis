@@ -60,10 +60,11 @@ export type NtpRequest = {
 /** Create an NTP agreement awaiting the subcontractor's signature, and email them. */
 export async function createNtpAgreement(
   sub: SubcontractorRow,
-  req: NtpRequest,
+  reqIn: NtpRequest,
   actor: string,
   renewalOf: NtpRow | null = null
 ): Promise<{ ok: true; ntp: NtpRow; warning?: string } | { ok: false; error: string }> {
+  let req = reqIn;
   const techs = [...new Set(req.technologies)].filter((k) => NTP_TECHNOLOGIES[k]);
   if (!techs.length) return { ok: false, error: 'Choose at least one technology.' };
   if (req.ntpName.trim().length < 2) return { ok: false, error: 'Name the NTP.' };
@@ -134,6 +135,11 @@ export async function createNtpAgreement(
         });
       }
       return { ok: true, ntp, warning };
+    }
+    // Before supabase/reminders.sql there's no ntp_email column: fall back to the firm-portal flow.
+    if (error && req.ntpEmail && (error.code === 'PGRST204' || /ntp_email/.test(error.message))) {
+      req = { ...req, ntpEmail: null };
+      continue;
     }
     if (error && error.code !== '23505') return { ok: false, error: error.message };
   }
@@ -250,7 +256,7 @@ export async function recordNtpSignature(
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
   if (ntp.status !== 'awaiting_signature') return { ok: false, error: 'This agreement is not waiting for a signature.', status: 409 };
-  if (meta.via === 'portal' && signsByLink(ntp, sub)) {
+  if (meta.via === 'portal' && signsByLink(ntp)) {
     return { ok: false, error: `${ntp.ntp_name} signs this themselves, from the personal link we emailed them.`, status: 409 };
   }
   if (body.agree !== true) return { ok: false, error: 'Please confirm you have read and agree to the agreement.', status: 400 };
@@ -295,6 +301,12 @@ export async function recordNtpSignature(
 }
 
 /** True when the agreement went to the NTP personally (someone other than the firm contact). */
-export function signsByLink(ntp: Pick<NtpRow, 'ntp_email'>, sub: Pick<SubcontractorRow, 'email'>) {
-  return !!ntp.ntp_email && ntp.ntp_email.toLowerCase() !== sub.email.toLowerCase();
+export function signsByLink(ntp: Pick<NtpRow, 'ntp_email'>) {
+  // Any agreement issued with a personal link is signed only from that link — even if the
+  // address happens to be the firm contact's (it then just arrives in their inbox).
+  return !!ntp.ntp_email;
+}
+
+export function isEmail(v: string | null | undefined): v is string {
+  return !!v && EMAIL_RE.test(v.trim());
 }

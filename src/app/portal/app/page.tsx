@@ -78,7 +78,7 @@ export default async function PortalPage() {
         status: n.status,
         ntpName: n.ntp_name,
         operativeId: n.operative_id,
-        signsByLink: signsByLink(n, sub),
+        signsByLink: signsByLink(n),
         technologies: n.technologies,
         validFrom: n.valid_from,
         expiresOn: n.expires_on,
@@ -86,7 +86,7 @@ export default async function PortalPage() {
       }))}
       ntpViews={Object.fromEntries(
         ntps
-          .filter((n) => n.status === 'awaiting_signature' && !signsByLink(n, sub))
+          .filter((n) => n.status === 'awaiting_signature' && !signsByLink(n))
           .map((n) => [n.id, <NtpDocument key={n.id} snapshot={n.snapshot} showAudit={false} />])
       )}
       hash={hash}
