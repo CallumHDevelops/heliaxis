@@ -1,12 +1,16 @@
 /**
  * Heliaxis top-20 content briefs — the ready-to-run prompts behind the CMS
- * "Bulk create pages" tool. Each brief is fed (prompt + a compact requirements
- * footer + the shared brand rules) to the research-driven page generator in
+ * "Bulk create pages" tool. Each brief's prompt is fed (plus a compact
+ * requirements footer) to the research-driven page generator in
  * src/lib/cms/ai-page.ts, exactly like the single AI page builder.
  *
- * Source of truth: these were authored as a content plan; keep the slug / CTA /
- * audience fields accurate because the bulk tool uses them to name the page,
- * place it at its intended URL, and flag collisions with existing routes.
+ * The prompts are optimised FOR that generator: they name the page's angle,
+ * keywords and audience, map the "Must cover" substance onto the generator's
+ * real block types (hero/grid/steps/funding/split/media/faq/cta), list the
+ * exact FAQ questions, and restate the page-specific guardrails.
+ *
+ * Keep the slug / CTA / audience fields accurate — the bulk tool uses them to
+ * name the page, place it at its intended URL, and flag route collisions.
  */
 
 export interface PageBrief {
@@ -28,11 +32,12 @@ export interface PageBrief {
   ctaLink: string;
   /** Approximate target word count. */
   words: string;
-  /** The full generation brief. */
+  /** The full generation brief, optimised for the AI page builder. */
   prompt: string;
 }
 
-/** Brand writing rules shared by every brief. Appended to each generation. */
+/** Brand writing rules shared by every brief (the generator's SYSTEM prompt
+ *  also enforces these; kept here for reference and the briefs API). */
 export const GLOBAL_RULES = `Write for Heliaxis, a South Wales renewable-energy installer.
 
 The brand voice should be: plain English, technically competent, authoritative, calm, transparent, commercially aware, never pushy.
@@ -44,473 +49,774 @@ Where suitability, performance or return depends on the site, explain what facto
 export const PAGE_BRIEFS: PageBrief[] = [
   {
     priority: 1,
-    name: 'Commercial Solar Installation South Wales',
-    slug: '/commercial-solar',
-    keywords: 'commercial solar installation South Wales',
-    audience: 'Business owners, directors, facilities managers and estates teams',
-    goal: 'Book a free commercial site survey',
-    ctaText: 'Book a site survey',
-    ctaLink: '#quote',
-    words: '1,500–2,000',
-    prompt: `Write a commercial solar page targeting **"commercial solar installation South Wales"** for business owners, directors, facilities managers and estates teams.
+    name: "Commercial Solar Installation South Wales",
+    slug: "/commercial-solar",
+    keywords: "commercial solar installation South Wales",
+    audience: "Business owners, directors, facilities managers and estates teams",
+    goal: "Book a free commercial site survey",
+    ctaText: "Book a site survey",
+    ctaLink: "#quote",
+    words: "1,500–2,000",
+    prompt: `POSITIONING: The South Wales commercial PV contractor that turns a business's daytime electricity use into on-site generation, survey-led and MCS-certified.
 
-Primary goal: get the visitor to book a free commercial site survey.
+KEYWORDS & INTENT: Primary: commercial solar installation South Wales. Secondary: commercial solar PV, business solar panels, commercial battery storage. Intent: a business weighing rooftop solar - suitability, savings, install, funding, next step. Audience: owners, directors, facilities and estates teams prioritising cost control, minimal disruption, reliability and warranties.
 
-Search intent: businesses in South Wales considering rooftop solar PV and wanting to understand suitability, savings, installation, funding and next steps.
+SECTION PLAN:
+1. hero - H1 (keyword) + direct answer: what commercial rooftop solar is, how it works, why it suits South Wales businesses; CTA.
+2. grid(4) - how PV works on your roof; why high daytime consumption suits solar; self-consumption vs export; premises that suit.
+3. explorer - roof types: trapezoidal metal, standing seam, flat/membrane; plus structural and roof-condition checks.
+4. grid(4) - payback/ROI drivers, qualitative only: energy price & consumption profile; roof space, orientation & shading; system size; self-consumption vs export.
+5. media - assessing consumption: bills and, where available, half-hourly data to size the system.
+6. funding(3) -> /commercial-funding: CAPEX; asset finance; solar PPA; no grant claimed unless supplied.
+7. grid(4) - battery storage & peak-shaving; workplace/fleet EV charging; monitoring & performance; grid connection & DNO (G99).
+8. steps(8) - initial discussion & data review -> site survey -> design -> proposal -> DNO/permissions -> installation -> testing & commissioning -> monitoring & handover.
+9. grid(4) - accreditations in practice: MCS (design/install standards & certification), RECC (consumer protection), NICEIC (electrical safety), TrustMark (govt-endorsed quality & warranties).
+10. faq - questions below.
+11. cta - closing "Book a site survey"; note Heliaxis works across South Wales.
 
-Must cover:
-- What commercial rooftop solar is and how it works
-- Why businesses with significant daytime electricity consumption are often well suited to solar
-- Roof types including trapezoidal metal, standing seam and flat roofs
-- How we assess electricity consumption and, where available, half-hourly data
-- What drives payback and ROI: energy price, consumption profile, roof space, orientation, shading, system size, self-consumption and export
-- Keep all financial figures qualitative; do not invent prices, savings, payback periods or percentages
-- Grid connection and DNO considerations, including G99/export limitations where relevant
-- Structural and roof-condition considerations
-- Commercial battery storage and peak-shaving
-- Combining solar with workplace or fleet EV charging
-- Monitoring and ongoing performance
-- Heliaxis accreditation: MCS, RECC, NICEIC and TrustMark
-- Explain what those accreditations mean in practical terms for design standards, electrical work, consumer protection, certification and applicable warranties/guarantees
-- The full process: initial discussion -> electricity data review -> site survey -> design -> proposal -> DNO/permissions -> installation -> testing -> commissioning -> monitoring -> handover
-- CAPEX, asset finance and solar PPA options
-- Link business finance/PPA information naturally to /commercial-funding
-- Include a dedicated funding section without claiming any specific grant is currently available unless supplied in the source information
-- Mention that Heliaxis works across South Wales
+FAQ (keep all, verbatim): Are grants available for commercial solar? Does commercial solar need planning permission? Will installation disrupt our business? How much maintenance does commercial solar require? Can solar be installed without a battery? Can a battery be added later? What happens to excess solar electricity? Will we need permission from the DNO?
 
-FAQ must answer: Are grants available for commercial solar? Does commercial solar need planning permission? Will installation disrupt our business? How much maintenance does commercial solar require? Can solar be installed without a battery? Can a battery be added later? What happens to excess solar electricity? Will we need permission from the DNO?
+CTA & LINKS: label "Book a site survey" -> #quote, used in hero, mid-page and closing. Internal link: /commercial-funding.
 
-Use the CTA naturally several times through the page without making the page feel sales-heavy. Tone: plain, authoritative, technically competent and commercially focused. No hype, no exaggerated environmental claims and no invented statistics. Use clear H1/H2/H3 structure. Write as an experienced South Wales commercial renewable-energy contractor rather than a marketing agency.`,
+GUARDRAILS: Qualitative only - never invent prices, savings, payback, percentages or grants. Accreditations as a grid explaining each; no testimonials/pricing/case-study blocks. Don't claim solar powers an entire site; frame as offsetting daytime demand. Backup/resilience must be specifically designed, not assumed from a battery. Flag roof condition and asbestos as needing specialist advice. Export may be subject to DNO G99 limits.`,
   },
   {
     priority: 2,
-    name: 'Residential Renewable Energy South Wales',
-    slug: '/residential',
-    keywords: 'renewable energy installer South Wales; solar battery heat pump installer South Wales',
-    audience: 'Homeowners considering solar PV, battery storage, heat pumps or EV charging',
-    goal: 'Book a free home survey',
-    ctaText: 'Book a home survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write the main residential renewable energy page for Heliaxis targeting **"renewable energy installer South Wales"**, **"solar battery heat pump installer South Wales"** and related homeowner searches.
+    name: "Residential Renewable Energy South Wales",
+    slug: "/residential",
+    keywords: "renewable energy installer South Wales; solar battery heat pump installer South Wales",
+    audience: "Homeowners considering solar PV, battery storage, heat pumps or EV charging",
+    goal: "Book a free home survey",
+    ctaText: "Book a home survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: Heliaxis designs one joined-up home energy system for South Wales homeowners - solar, battery, heat pump and EV charging sized to how your home uses power, not a list of separate products.
 
-Audience: homeowners considering solar PV, battery storage, heat pumps or EV charging.
-Primary goal: get the homeowner to book a free home survey.
+KEYWORDS & INTENT: Primary "renewable energy installer South Wales" in H1/intro. Secondary: "solar battery heat pump installer South Wales", "solar panel installer South Wales", "air source heat pump installer South Wales". Intent: homeowners shortlisting a trusted local installer. Priorities: bill impact, suitability, low disruption, reliable kit, warranties/aftercare, clear next step.
 
-Position Heliaxis as a company that designs the whole home energy system, rather than simply selling individual products.
+SECTION PLAN (ordered; no two dark adjacent):
+1. hero (dark): H1 with primary keyword; one-line positioning; "Book a home survey" to #quote.
+2. grid (4): solar PV, home battery, air source heat pump, EV charging - homeowner outcomes, not definitions.
+3. explorer (dark): "Why combine technologies" - Solar -> Battery -> Home -> EV -> Heat Pump -> Grid/Smart Tariff; power flow, self-use, smart-tariff charging, exporting excess.
+4. split (2, balanced): electricity picture (usage, roof suitability, EV ownership, export) vs heating picture (heat-pump requirements, heat demand) - why sizing to real demand matters.
+5. steps (6): survey, design, install, commission, handover, aftercare; survey checks usage, roof, EV, heat-pump suitability.
+6. grid (4): accreditations MCS, RECC, NICEIC, TrustMark - what each means: quality, consumer protection, electrical safety, standards.
+7. media (blank): "Recent projects" placeholder - qualitative local installs only, no figures.
+8. faq: all questions below.
+9. cta (dark): "Book a home survey" to #quote.
 
-Core concept to communicate: Solar -> Battery -> Home -> EV -> Heat Pump -> Grid / Smart Tariff
+FAQ (answer all, keep order):
+- Which renewable technologies can Heliaxis install?
+- Is my roof suitable for solar panels?
+- Do I need a home battery, and what does it do?
+- Is an air source heat pump right for my home?
+- How do smart tariffs and exporting excess electricity work?
+- Why does system sizing matter?
+- What happens during a free home survey?
+- What warranties, aftercare and funding or support are available?
 
-Must cover: solar panels; home battery storage; air source heat pumps; EV charging; how the technologies can work together; the importance of designing around the home's real electricity and heating demand; existing electricity usage; roof suitability; EV ownership; heat-pump requirements; smart tariffs; exporting excess electricity; why system sizing matters; survey, design, installation, commissioning and handover; Heliaxis MCS / RECC / NICEIC / TrustMark accreditation; warranties and aftercare; funding and available support without inventing live schemes or values; link relevant funding information where appropriate.
+CTA & LINKS: "Book a home survey" to #quote; reuse in hero, mid-page, closing cta. Only #quote is a confirmed internal link - do not invent URLs; link funding only to a genuine Heliaxis page, else describe support on-page.
 
-Include sections for: Why choose renewable energy? Why combine technologies? What happens during a Heliaxis survey? Our installation process; Our accreditations; Recent projects; FAQ.
-
-Tone: approachable, authoritative and clear. Avoid technical overload and avoid sales hype.`,
+GUARDRAILS: Qualitative only - no invented savings, prices, percentages, grants, payback or project counts. Accreditations as a 4-card grid explaining each, never a stat row. No testimonials. "Recent projects" is a placeholder: blank image, non-numeric. Describe funding generally; never name live schemes. Never claim solar alone powers the whole home - value is the designed, sized system; back-up/off-grid must be specifically designed. Stay on South Wales homeowners; no commercial drift.`,
   },
   {
     priority: 3,
-    name: 'Solar Panels South Wales',
-    slug: '/solar-panels',
-    keywords: 'solar panel installation South Wales; solar panels South Wales; solar panel installers Wales',
-    audience: 'Homeowners researching whether solar PV is right for their property',
-    goal: 'Book a free solar survey',
-    ctaText: 'Book a solar survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a residential service page targeting **"solar panel installation South Wales"**, **"solar panels South Wales"** and **"solar panel installers Wales"**.
+    name: "Solar Panels South Wales",
+    slug: "/solar-panels",
+    keywords: "solar panel installation South Wales; solar panels South Wales; solar panel installers Wales",
+    audience: "Homeowners researching whether solar PV is right for their property",
+    goal: "Book a free solar survey",
+    ctaText: "Book a solar survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `Build the residential page "Solar panel installation South Wales" for homeowners deciding whether solar PV suits their home.
 
-Audience: homeowners researching whether solar PV is right for their property.
-Goal: get the visitor to book a free solar survey.
+POSITIONING: A plain, authoritative guide that turns "will solar work on my roof in our weather?" into a booked, no-obligation survey with a local MCS-certified installer.
 
-Must cover: how solar PV works; why solar can still perform well in the Welsh climate; roof orientation; south-facing versus east/west arrays; shading; roof pitch; usable roof area; slate, tile, metal and flat-roof considerations; on-roof versus in-roof solar; panel and inverter basics; how system size is determined; self-consumption versus export; Smart Export Guarantee at a high level; solar with battery storage; solar with EV charging; solar with heat pumps; DNO notification/application at an appropriate homeowner level; MCS certification; installation process; monitoring; warranties; maintenance.
+KEYWORDS & INTENT: Primary: solar panel installation South Wales. Secondary: solar panels South Wales; solar panel installers Wales; home solar PV. Intent: homeowner researching suitability before committing; keyword in H1 and intro. Priorities: real performance (not hype), roof suitability, disruption/process, kit quality, warranties/aftercare, a low-risk next step.
 
-Do not invent panel prices, annual savings, generation figures, payback periods or percentages. Explain that these depend on the individual property and consumption profile.
+SECTION PLAN (in order; no two dark sections adjacent):
+1. hero (dark): H1 with keyword; GEO direct-answer lead — what home solar does, that it suits many Welsh roofs, and that it starts with a free survey. CTA.
+2. grid: How solar PV works + Welsh-climate performance — generates from daylight not heat; works under UK cloud; quiet, low-maintenance. Outcome-led, no figures.
+3. explorer (dark): Is your roof suitable? — clickable roof types slate, tile, metal, flat; plus on-roof vs in-roof mounting.
+4. media: Orientation, pitch, shading & usable area — south-facing vs east/west arrays, shading, pitch, available roof area; image blank.
+5. split: Self-consumption vs export — using power as generated vs sending surplus to the grid under the Smart Export Guarantee (high level, no rates).
+6. grid: Kit & sizing — panels, inverter basics, matching system size to property and consumption, monitoring.
+7. steps: Survey to switch-on — survey, design, DNO notification/application (homeowner level), MCS install, commissioning, handover, monitoring.
+8. grid: Accreditations — 4 cards on what MCS, RECC, NICEIC and TrustMark each mean in practice.
+9. grid: Complete home energy system — add battery storage, EV charging, heat pump (3 cards).
+10. faq.
+11. cta (dark).
 
-FAQ: planning permission, cloudy weather, power cuts, roof suitability, lifespan, maintenance and whether a battery is necessary.
+FAQ (keep all): Do I need planning permission? Do solar panels work in cloudy weather? Will solar keep my power on in a power cut? Is my roof suitable for solar? How long do solar panels last? What maintenance do panels need? Do I need a battery with solar?
 
-Plain, authoritative tone. Make it technically credible but understandable to a homeowner.`,
+CTA & LINKS: Button "Book a solar survey" -> #quote; reuse in hero, mid-page and closing cta. Use only real Heliaxis internal links; link battery/EV/heat-pump mentions to their pages only if those exist.
+
+GUARDRAILS: Qualitative only — never invent prices, savings, generation, payback or percentages; say these depend on the property and consumption. Accreditations stay a grid explaining each, not a stats brag. No testimonials block. Power cuts: grid-tied solar shuts off; backup needs a specifically designed battery/islanding setup. Don't claim solar covers all a home's electricity. Keep warranty/lifespan claims qualitative.`,
   },
   {
     priority: 4,
-    name: 'Solar Panels and Battery Storage',
-    slug: '/solar-and-battery',
-    keywords: 'solar panels and battery storage South Wales',
-    audience: 'Homeowners considering installing solar PV and a battery together',
-    goal: 'Book a free home survey',
-    ctaText: 'Book a home energy survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a residential landing page targeting **"solar panels and battery storage South Wales"** and related searches.
+    name: "Solar Panels and Battery Storage",
+    slug: "/solar-and-battery",
+    keywords: "solar panels and battery storage South Wales",
+    audience: "Homeowners considering installing solar PV and a battery together",
+    goal: "Book a free home survey",
+    ctaText: "Book a home energy survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: For South Wales homeowners, pairing solar with a battery means using far more of the power your roof makes - running evenings and nights on stored sunshine, not the grid. Goal: a free home survey.
 
-Audience: homeowners considering installing solar PV and a battery together.
-Primary goal: book a free home survey.
+KEYWORDS & INTENT: Primary "solar panels and battery storage South Wales". Secondary: home solar and battery South Wales; solar battery storage for homes; solar self-consumption; smart export tariff. Intent: research/commercial - weighing solar + battery together. Priorities: more self-use of own generation, less grid reliance, right sizing, warranties/aftercare, next step. Lead with outcomes, not definitions.
 
-Explain clearly how a combined system operates: Daytime solar -> immediate household demand -> battery charging -> export of remaining excess. Later demand -> battery -> grid when required.
+SECTION PLAN (no two dark sections adjacent):
+1. hero (dark) - positioning line + CTA.
+2. rich - how it works across a day (GEO direct answer): daytime solar meets demand first, surplus charges the battery, excess is exported; evening/night the battery powers the home, drawing grid only when needed; overnight cheap-rate charging where suitable.
+3. grid (4) - why pair them: use more of your own generation; shift solar into evening/night use; charge from cheap-rate/smart tariffs where it pays; ready for EV charging and heat pumps.
+4. split - AC vs DC coupling, simply: define both, which suits new vs existing solar.
+5. grid (3) - sized around your home: array sizing to the roof; battery sizing to real consumption and habits; usage shapes the design - not every home needs one.
+6. media (blank image) - control: smart import and export tariffs; app monitoring of generation, use, battery level.
+7. explorer (dark) - add later: EV charger, heat pump, backup/EPS, extra battery. Backup/EPS is separate and must be specifically designed in.
+8. grid (4) - accreditations: MCS (certified install, unlocks export tariffs), RECC (consumer protection), NICEIC (electrical standards, BS 7671), TrustMark (endorsed quality).
+9. steps - survey, design, install, commission, handover, warranties & aftercare.
+10. faq - questions below.
+11. cta (dark) - book a free home energy survey.
 
-Must cover: why combining solar and battery storage can increase use of electricity generated at home; how batteries help shift solar generation into evenings/night-time use; battery charging from cheap-rate electricity where suitable; smart electricity tariffs; export tariffs; battery sizing; solar array sizing; household consumption; EV charging; heat pumps; AC versus DC coupling at a simple level; monitoring; backup/EPS as a separate feature that must be specifically designed; MCS and electrical standards; installation process; warranties and aftercare.
+FAQ (keep all, verbatim):
+- Is solar worth having without a battery?
+- What size battery do I need?
+- Can the battery charge from the grid?
+- Can it power my house in a blackout?
+- Can I add more batteries later?
+- What happens when the battery is full?
 
-Avoid claiming every property needs a battery. Do not invent costs, savings or payback periods.
+CTA & LINKS: label "Book a home survey" -> #quote, reused in hero and cta. Links: only #quote; link EV charging and heat pump mentions to Heliaxis service pages if they exist.
 
-FAQ: Is solar worth having without a battery? What size battery do I need? Can the battery charge from the grid? Can it power my house in a blackout? Can I add more batteries later? What happens when the battery is full?
-
-Tone: informative, practical and non-salesy.`,
+GUARDRAILS: Qualitative only - invent no costs, savings, payback, percentages, grants or tariff rates. Never claim every property needs a battery, or that solar powers the whole home round the clock. Backup/EPS is optional and must be specifically designed; a standard battery does not keep lights on in a blackout. No testimonials, no invented project figures.`,
   },
   {
     priority: 5,
-    name: 'Home Battery Storage',
-    slug: '/battery-storage',
-    keywords: 'home battery storage South Wales; solar battery installer South Wales',
-    audience: 'Homeowners with or without existing solar PV',
-    goal: 'Generate battery-storage survey enquiries',
-    ctaText: 'Book a battery survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a service page targeting **"home battery storage South Wales"**, **"solar battery installer South Wales"** and related searches.
+    name: "Home Battery Storage",
+    slug: "/battery-storage",
+    keywords: "home battery storage South Wales; solar battery installer South Wales",
+    audience: "Homeowners with or without existing solar PV",
+    goal: "Generate battery-storage survey enquiries",
+    ctaText: "Book a battery survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `Build the Heliaxis Home Battery Storage page for South Wales homeowners.
 
-Audience: homeowners with or without existing solar PV.
-Goal: generate battery-storage survey enquiries.
+POSITIONING: Store your solar or cheap off-peak power and run the house on it when grid electricity is dearest — a home battery sized around your real usage, by a four-way-accredited South Wales installer.
 
-Must cover: what a home battery does; storing excess solar; charging from the grid; time-of-use tariffs; using stored electricity during expensive periods; battery capacity versus usable capacity; power rating versus storage capacity; AC-coupled and DC-coupled systems; battery placement and safe installation; monitoring; adding batteries to an existing home; solar-compatible and battery-only systems; EVs and heat pumps; EPS/backup versus ordinary battery operation; MCS battery-storage installation standards; Heliaxis MCS / RECC / NICEIC / TrustMark credentials; warranty considerations.
+KEYWORDS & INTENT: Primary "home battery storage South Wales". Secondary "solar battery installer South Wales", "battery storage without solar", "AC vs DC coupled battery". Intent: commercial research, comparing systems and installers pre-survey. Audience: homeowners with OR without existing solar PV; priorities = real payback for THEIR usage, install disruption, safe placement, backup in cuts, warranty, future EV/heat-pump expansion.
 
-Do not make blanket claims that batteries always save money. Explain that economics depend on electricity usage, solar generation, tariffs and system design.
+SECTION PLAN (keep order; no two dark sections adjacent):
+1. hero — H1 with primary keyword; positioning line; "Book a battery survey".
+2. grid (4) — how it works: store excess solar; charge from grid on cheap off-peak/time-of-use tariffs; discharge at expensive peak times; live app monitoring.
+3. split — AC vs DC coupled: define BOTH (retrofit onto existing solar or standalone vs most efficient with new solar) and when each suits.
+4. rich — sizing honestly: total vs usable capacity; power rating (kW) vs storage (kWh); savings depend on usage, solar, tariff and design, never a blanket "batteries save money"; readiness for EV charging and heat pumps later.
+5. steps (5-7) — survey → design & sizing → safe placement + install to MCS battery-storage standards → commissioning → monitoring → handover.
+6. explorer (dark, 5) — options: add battery to existing solar; solar + battery together; battery-only (no solar); pair with EV/heat pump; EPS backup for power cuts.
+7. grid (4) — accreditations MCS, RECC, NICEIC, TrustMark; each explains what it means for a battery install.
+8. faq — questions below.
+9. cta (dark) — "Book a battery survey" → #quote.
 
-FAQ: lifespan, location, safety, warranties, battery without solar, power cuts and battery expansion.`,
+FAQ (keep all):
+- How long does a home battery last?
+- Where is the battery installed in my home?
+- Are home batteries safe?
+- What warranties come with a home battery?
+- Can I have a battery without solar panels?
+- Will my battery keep the lights on in a power cut?
+- Can I add more battery capacity later?
+
+CTA & LINKS: "Book a battery survey" → #quote, in hero and closing cta. Real internal links only: #quote, #faq, /add-battery-to-existing-solar, /solar-and-battery, /battery-backup.
+
+GUARDRAILS: Qualitative only — no invented capacities, kWh, prices, %, payback or warranty terms. Never claim batteries always save money; economics depend on usage, solar, tariffs and design. EPS/backup is NOT automatic — must be specifically designed and sized, and won't run the house indefinitely. Accreditations in an explainer grid. No testimonials or pricing.`,
   },
   {
     priority: 6,
-    name: 'Add a Battery to Existing Solar',
-    slug: '/add-battery-to-existing-solar',
-    keywords: 'add battery to existing solar panels; retrofit solar battery South Wales',
-    audience: 'Homeowners who already have solar PV',
-    goal: 'Book a technical survey to assess battery compatibility',
-    ctaText: 'Book a battery survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write an SEO landing page targeting **"add battery to existing solar panels"**, **"retrofit solar battery South Wales"** and similar searches.
+    name: "Add a Battery to Existing Solar",
+    slug: "/add-battery-to-existing-solar",
+    keywords: "add battery to existing solar panels; retrofit solar battery South Wales",
+    audience: "Homeowners who already have solar PV",
+    goal: "Book a technical survey to assess battery compatibility",
+    ctaText: "Book a battery survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `Build "Add a Battery to Existing Solar" at /add-battery-to-existing-solar for Heliaxis (South Wales).
 
-Audience: homeowners who already have solar PV.
-Goal: get them to book a technical survey to assess battery compatibility.
+POSITIONING: Already have solar? In most cases we can add a battery so the daytime power you now export is stored for evenings, EV charging and heat-pump use - after a survey of your array, inverter, meter and consumer unit.
 
-Must cover: yes, batteries can often be added to existing solar installations; why the existing inverter, array, meter and electrical installation need assessment; AC-coupled battery systems; DC-coupled options where inverter replacement or system redesign is appropriate; existing MCS documentation; older solar systems; Feed-in Tariff considerations without giving legal/financial advice; smart meters; export arrangements; battery sizing from household consumption; overnight grid charging; EVs; heat pumps; backup capability; what Heliaxis checks during a retrofit survey; installation and commissioning; monitoring; warranties.
+KEYWORDS & INTENT: Primary "add battery to existing solar panels". Secondary "retrofit solar battery South Wales", "AC-coupled battery retrofit", "battery for existing solar system". Intent: a PV owner judging if a retrofit is feasible and worth a survey. Audience: homeowners with working solar wanting more self-use and resilience; they care about kit compatibility, whether the inverter must change, disruption, warranties, monitoring and the next step.
 
-Include a section titled "Do I need to replace my existing solar inverter?" Answer: not always; it depends on the proposed battery architecture and compatibility.
+SECTION PLAN (ordered; no two dark blocks adjacent; balance cards):
+1 hero - H1 keyword; yes, batteries can usually be retrofitted; book a survey.
+2 grid (4) - how retrofit works: AC-coupled battery beside the existing inverter; DC-coupled where inverter replacement/redesign suits; what gets reused; what the survey confirms.
+3 split - AC-coupled retrofit (keep inverter, add battery inverter) vs DC-coupled/hybrid (replace/redesign around a hybrid inverter) - when each suits.
+4 rich - "Do I need to replace my existing solar inverter?" Not always; depends on battery architecture and compatibility with the current inverter and array; older systems and existing MCS docs are reviewed.
+5 steps (5-7) - survey to handover: assess array/inverter/meter/consumer unit and electrics, check smart meter and export arrangement, size battery from consumption, design, install, commission, monitor.
+6 grid (4) - more from stored power: overnight off-peak charging, EV charging, heat-pump running, backup (specifically designed in).
+7 faq - below.
+8 cta - closing band.
+Fold in: Feed-in Tariff (factual only, no advice), warranties.
 
-Do not invent financial savings or payback.`,
+FAQ (keep all):
+- Can I add a battery to my existing solar panels?
+- Why do my existing inverter, array, meter and electrical installation need assessing first?
+- What is an AC-coupled battery system?
+- When is a DC-coupled option or inverter replacement the right choice?
+- Does adding a battery affect my Feed-in Tariff or export arrangement?
+- Can the battery charge overnight and power an EV or heat pump?
+- Will I have backup power in a cut?
+- What does Heliaxis check during a retrofit survey?
+
+CTA & LINKS: "Book a battery survey" -> #quote, in hero and closing cta. Real internal links only: #quote, /battery-storage, /solar-and-battery, /battery-backup.
+
+GUARDRAILS: Qualitative only - no savings, payback, prices or percentages. Don't claim every system can take a battery; feasibility follows the survey. Backup must be specifically designed in. Feed-in Tariff/export points factual, not advice. No testimonials block.`,
   },
   {
     priority: 7,
-    name: 'Battery Backup / Power Cuts',
-    slug: '/battery-backup',
-    keywords: 'home battery backup South Wales; solar battery power cut backup',
-    audience: 'Homeowners interested in backup power and resilience',
-    goal: 'Request a backup/resilience survey',
-    ctaText: 'Book a backup power survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a residential page targeting **"home battery backup South Wales"**, **"solar battery power cut backup"** and similar searches.
+    name: "Battery Backup / Power Cuts",
+    slug: "/battery-backup",
+    keywords: "home battery backup South Wales; solar battery power cut backup",
+    audience: "Homeowners interested in backup power and resilience",
+    goal: "Request a backup/resilience survey",
+    ctaText: "Book a backup power survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: For South Wales homeowners who want the fridge, heating and lights to stay on when the grid fails — and the truth that backup only works if designed in.
 
-Goal: get homeowners interested in backup/resilience to request a survey.
+KEYWORDS & INTENT: Primary: home battery backup South Wales. Secondary: solar battery power cut backup; EPS backup power; essential-load backup. Intent: resilience research, weighing a survey. Priorities: will it work in an outage, what stays on, reliability, safety, next step.
 
-Clearly explain an important point: a standard grid-connected solar and battery installation does not automatically mean the house will remain powered during a grid outage. Backup functionality needs to be specifically designed into the system.
+SECTION PLAN (no two dark adjacent):
+1. hero (dark) — H1 with primary keyword; lead: a standard grid-tied solar+battery system shuts down in a power cut — backup is designed in, not automatic.
+2. grid (4) — Why systems go dark: inverters shut off in outages; anti-islanding protects network engineers; EPS/backup output; inverter output capped whatever the capacity.
+3. explorer (dark) — "What do you need to keep running?": fridge/freezer, heating & hot-water controls, lights & sockets, broadband, medical equipment, whole home.
+4. split (2) — Essential-load backup (chosen circuits, smaller, longer runtime) vs Whole-property backup (all circuits where technically appropriate; needs more power, capacity, design).
+5. rich — Sizing: battery power (kW, runs at once) vs capacity (kWh, how long); high-load appliances (ovens, showers, heat pumps) can exceed backup output; solar can recharge in long outages where equipment/design supports it; changeover gear, electrical design, earthing/protection to standards.
+6. steps (5–7) — survey & load assessment (why it is essential), design around priority circuits, equipment choice, install, commission/test backup, handover.
+7. faq.
+8. cta (dark band).
 
-Must cover: why ordinary grid-connected inverters shut down during power cuts; anti-islanding safety; EPS / backup output; essential-load backup; whole-property backup where technically appropriate; battery power versus battery capacity; high-load appliances; inverter limitations; solar charging during prolonged outages where supported by the chosen equipment/system design; changeover equipment; electrical design; earthing/protection considerations at a high level; why a site survey is necessary; how Heliaxis designs backup requirements around what the customer actually needs powered.
+FAQ (keep all):
+- Does a standard solar and battery system keep my home powered in a power cut?
+- Why does my solar inverter switch off during a grid outage?
+- Can I back up my whole house or only essential circuits?
+- What is the difference between battery power and battery capacity?
+- Will my solar panels recharge the battery during a long power cut?
+- Can backup run high-load appliances like an oven or heat pump?
+- Why do I need a site survey before you can design backup?
+- Can you guarantee the power never goes off?
 
-Do not promise uninterrupted power under all circumstances. Include an FAQ.
+CTA & LINKS: Label "Book a backup survey" -> #quote; reuse in hero, after split, closing band. Page at /battery-backup; real Heliaxis paths only.
 
-Tone: technically accurate, reassuring and non-alarmist.`,
+GUARDRAILS: Never promise uninterrupted or guaranteed power — backup keeps selected loads running for a period, subject to design/conditions. A normal grid-tied install does NOT auto-backup; it must be specifically designed in. Qualitative only — no invented kWh/kW, runtimes, prices, % or grants. Earthing/protection and electrical design at a high level only, confirmed by survey. Tone: accurate, reassuring, non-alarmist. Accreditations only as a grid; no testimonials.`,
   },
   {
     priority: 8,
-    name: 'Air Source Heat Pumps South Wales',
-    slug: '/air-source-heat-pumps',
-    keywords: 'air source heat pump installer South Wales; heat pump installation South Wales',
-    audience: 'Homeowners considering replacing gas, oil, LPG or direct electric heating',
-    goal: 'Book a heat-pump survey',
-    ctaText: 'Book a heat pump survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a residential service page targeting **"air source heat pump installer South Wales"** and **"heat pump installation South Wales"**.
+    name: "Air Source Heat Pumps South Wales",
+    slug: "/air-source-heat-pumps",
+    keywords: "air source heat pump installer South Wales; heat pump installation South Wales",
+    audience: "Homeowners considering replacing gas, oil, LPG or direct electric heating",
+    goal: "Book a heat-pump survey",
+    ctaText: "Book a heat pump survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: An MCS-certified South Wales installer who makes heat pumps work by getting the design right for YOUR home - heat-loss, flow temperature, emitters - not a blanket promise to slash everyone's bills.
 
-Audience: homeowners considering replacing gas, oil, LPG or direct electric heating.
-Primary goal: book a heat-pump survey.
+KEYWORDS & INTENT: Primary "air source heat pump installer South Wales". Secondary: "heat pump installation South Wales", "MCS heat pump survey", "replace gas/oil/LPG boiler". Intent: homeowners choosing an installer, ready to book a survey. Audience: replacing gas, oil, LPG or direct-electric heating; priorities = warmth, cost vs current fuel, disruption, noise, warranties, grants.
 
-Must cover: how an air source heat pump works; why heat pumps operate differently from boilers; room-by-room heat-loss calculations; design outdoor temperature; flow temperature; radiator and emitter sizing; underfloor heating; hot-water cylinder requirements; weather compensation; controls; electrical supply considerations; noise and outdoor unit placement; insulation and building fabric; existing radiators; solar PV and heat pumps; battery storage and heat pumps; tariffs; MCS design/installation; Boiler Upgrade Scheme/funding in general terms without inventing current figures unless provided; survey -> design -> quotation -> installation -> commissioning -> handover; warranties and aftercare.
+SECTION PLAN (keep order; no two dark sections adjacent):
+1. hero (dark) - H1 with primary keyword; lead with a warm, well-designed home, less reliance on gas/oil.
+2. grid (4) - how an ASHP works vs a boiler: heat from outside air even in winter; low steady flow temps, running longer not hotter; performance follows design and property, not a guaranteed bill cut.
+3. rich - getting the design right: room-by-room heat-loss, design outdoor temperature, flow temperature, radiator/emitter sizing, weather compensation, controls.
+4. steps (6) - survey -> design -> quotation -> installation -> commissioning -> handover; heat-loss/property checks in survey, MCS design in design; handover covers MCS cert, warranties/aftercare, Boiler Upgrade Scheme eligibility via MCS (general, no figures).
+5. grid (4) - will it suit your home: existing radiators and upsizing emitters; underfloor heating; hot-water cylinder; insulation and fabric.
+6. explorer (dark) - siting the outdoor unit: 3-5 options affecting noise, clearances, pipe runs, electrical supply.
+7. split - go further: "Pair with solar PV" vs "Add battery storage and a smart tariff"; define both (daytime self-use vs cheap-rate charging).
+8. grid (4) - accreditations: MCS, RECC, NICEIC, TrustMark - what each means in practice.
+9. faq - questions below.
+10. cta (dark) - book a survey.
 
-Avoid simplistic claims such as "a heat pump will cut everyone's bills". Explain that performance depends on correct design and property characteristics.
+FAQ (keep all, near-verbatim):
+- Can a heat pump work in an old house?
+- Will I need to change my radiators?
+- Can a heat pump heat my hot water?
+- Do heat pumps work in cold weather?
+- What will it cost to run compared with my current heating?
+- What grants are available?
+- How long does installation take?
 
-FAQ: old houses, radiators, hot water, cold weather, running costs, grants and installation duration.`,
+CTA & LINKS: Label "Book a heat pump survey" -> #quote (hero and closing cta). Real internal links only: /solar-panels (pair with solar PV), /battery-storage (add battery + smart tariff), /whole-home-energy (heating, solar, battery, EV together), jump to #faq. No invented paths.
+
+GUARDRAILS: Qualitative only - no invented COP, prices, savings %, grant amounts or run costs; savings depend on design, property and tariff, never "cuts everyone's bills". No testimonials/pricing block. Hot water via a cylinder, not combi. Don't claim it suits any home unchanged; fabric/emitters may need work. Boiler Upgrade Scheme general, no amounts unless given.`,
   },
   {
     priority: 9,
-    name: 'Home EV Charging',
-    slug: '/ev-chargers',
-    keywords: 'home EV charger installation South Wales',
-    audience: 'EV owners and homeowners planning to buy an electric vehicle',
-    goal: 'Request an EV charger survey or quote',
-    ctaText: 'Book an EV charger survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a residential page targeting **"home EV charger installation South Wales"**.
+    name: "Home EV Charging",
+    slug: "/ev-chargers",
+    keywords: "home EV charger installation South Wales",
+    audience: "EV owners and homeowners planning to buy an electric vehicle",
+    goal: "Request an EV charger survey or quote",
+    ctaText: "Book an EV charger survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `Build the page "Home EV Charging" at /ev-chargers for Heliaxis, a South Wales installer.
 
-Audience: EV owners and homeowners planning to buy an electric vehicle.
-Goal: get the visitor to request an EV charger survey/quote.
+POSITIONING: Wake to a full battery on your drive — a surveyed, smart home charger fitted by NICEIC-certified electricians, running on cheap off-peak power or your own surplus solar.
 
-Must cover: benefits of charging at home; typical home charging concept without inventing charging times; smart charging; off-peak tariffs; solar-compatible EV charging; using surplus solar to charge an EV; battery storage and EV charging; load management; CT monitoring; electrical supply assessment; existing consumer unit; earthing/protection; cable routes; charger location; app connectivity; tethered versus untethered chargers; DNO notification where relevant; installation, testing and commissioning; NICEIC electrical competence; warranty and aftercare.
+KEYWORDS & INTENT: Primary "home EV charger installation South Wales"; secondary "smart EV charger", "solar EV charging", "tethered vs untethered charger", "EV charger survey". Intent: a homeowner who owns or is about to buy an EV, ready to book a survey. Priorities: overnight charging, off-peak cost, safe install on the existing supply, low disruption, accountability, clear next step.
 
-FAQ: Can I charge from solar? Do I need three phase? Can a charger be installed away from the house? Will I need a consumer-unit upgrade? What size charger do I need? Can two EV chargers share one supply?
+SECTION PLAN (keep order; no two dark sections adjacent):
+1 hero (dark): H1 keyword; direct-answer intro on charging at home overnight. Explain the concept without inventing charge times or speeds.
+2 grid (3-4): benefits of home charging — convenience vs public, overnight off-peak cost, control, adds to the property. Figures qualitative.
+3 split: Tethered vs Untethered. Define BOTH — tethered = captive cable, grab-and-go; untethered = socketed, bring your own cable, tidier. Give the trade-off, not a winner.
+4 steps (6-8): survey → supply assessment (consumer unit, earthing & protection, load check) → design (charger location, cable routes) → DNO notification where relevant → installation → testing, commissioning & app setup → handover with warranty & aftercare.
+5 grid (4): smart features — smart charging, off-peak tariff scheduling, app connectivity, load management with CT-clamp monitoring to protect the main fuse.
+6 explorer (dark): "Power your charge" — grid off-peak, surplus solar diversion, home battery, all balanced by load management. Frame solar/battery as supplementing, not fully powering, charging.
+7 grid (4): accreditations — MCS, RECC, NICEIC, TrustMark; each card explains what it means here (NICEIC = proven electrical competence).
+8 faq
+9 cta (dark): book the survey.
 
-Do not invent grant availability.`,
+FAQ (use all, verbatim): Can I charge from solar? Do I need three phase? Can a charger be installed away from the house? Will I need a consumer-unit upgrade? What size charger do I need? Can two EV chargers share one supply?
+
+CTA & LINKS: Button "Book EV survey" → #quote at hero, after steps and closing cta. Internal links only to real paths: /solar-panels, /battery-storage.
+
+GUARDRAILS: Figures qualitative — never invent charge times, kW speeds, tariff rates, prices or warranty lengths. Do NOT claim any grant is available. No testimonials block. Accreditations as the grid above. Present solar/battery as reducing grid charging, not powering the car outright. Describe load management/CT monitoring and consumer-unit/earthing work functionally; the survey confirms what each home needs. Images left blank.`,
   },
   {
     priority: 10,
-    name: 'Whole Home Energy',
-    slug: '/whole-home-energy',
-    keywords: 'whole home energy systems; solar battery heat pump EV',
-    audience: 'Homeowners interested in integrated solar, battery, heat pump and EV systems',
-    goal: 'Book a whole-home energy survey',
-    ctaText: 'Book a home energy survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a flagship Heliaxis page targeting homeowners interested in **whole home energy systems**, solar, battery storage, heat pumps and EV charging. This is primarily a brand and conversion page, not a narrow product page.
+    name: "Whole Home Energy",
+    slug: "/whole-home-energy",
+    keywords: "whole home energy systems; solar battery heat pump EV",
+    audience: "Homeowners interested in integrated solar, battery, heat pump and EV systems",
+    goal: "Book a whole-home energy survey",
+    ctaText: "Book a home energy survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: Show South Wales homeowners one designed energy system - solar, battery, EV charging and a heat pump working as one - not four separate products.
 
-Core message: Heliaxis designs the home as one connected energy system.
+KEYWORDS & INTENT: Primary: whole home energy systems. Secondary: integrated solar battery heat pump EV; whole-home energy design; home energy survey. Intent: research/consideration. Audience: homeowners planning integrated/phased upgrades; priorities are how the parts work together, disruption, electrical capacity, reliability, cheaper/greener running, upgrade path, warranties.
 
-Show conceptually: Solar PV -> Home electricity demand -> Battery storage -> EV charging -> Heat pump -> Smart tariff / grid.
+SECTION PLAN (hero/explorer/cta dark, rest light; no two dark adjacent):
+1. hero: H1 with keyword; the home as one connected system, solar through to smart tariff; outcome-led.
+2. grid: why designing together beats buying kit independently - consumption profiling matched to solar generation; battery charge/discharge strategy; capacity headroom with backup designed in; future-proofing. Icons chart, battery, bolt.
+3. explorer: system layers - Solar PV (generation), Battery (charge/discharge), EV charging (demand), Heat pump (heating demand), Hot water, Smart tariff/grid (import/export, smart controls).
+4. split: "Designed as one system" vs "Technologies chosen separately" - define both (shared sizing, spare capacity, one app, upgrade path vs clashing kit, wasted export).
+5. steps: home energy survey & consumption profiling; whole-home design; phased or full install (solar now, battery/EV/heat pump later); commissioning; monitoring & aftercare.
+6. grid: accreditations - MCS, RECC, NICEIC, TrustMark - what each means in practice. Icons shield, award, check.
+7. media (once): monitoring - live visibility of generation, storage and use; image blank.
+8. rich (one only): phasing and future-proofing - solar first, add battery/EV/heat pump later; warranties and aftercare.
+9. faq.
+10. cta: book the survey.
 
-Must cover: why designing technologies together is better than selecting equipment independently; electricity consumption profiling; solar generation; battery charge/discharge strategy; EV demand; heating demand; hot water; import/export tariffs; smart controls; future-proofing; electrical capacity; backup requirements; monitoring; phased installations, e.g. solar today and battery/EV/heat pump later; survey and whole-home design; MCS / RECC / NICEIC / TrustMark; warranties and aftercare.
+FAQ (ask all):
+- Why design solar, battery, heat pump and EV charging together instead of buying them separately?
+- Can I start with solar now and add battery, EV charging or a heat pump later?
+- How do you decide the right size for each part of my system?
+- Will my home's electrical capacity cope with a heat pump and EV charging?
+- Do I get backup power during a power cut?
+- How do smart tariffs and controls use import and export?
+- What accreditations and warranties does Heliaxis provide?
+- How do I monitor how the system is performing?
 
-Use examples conceptually but do not invent financial performance.
+CTA & LINKS: Button "Book a Home Survey" -> #quote; reuse in hero, mid-page, cta. Real Heliaxis links only; invent none.
 
-Tone: intelligent and sophisticated but still understandable to a homeowner.`,
+GUARDRAILS: Qualitative only - no invented savings, percentages, kWh, payback or figures. Accreditations as an explaining grid; no testimonials, pricing, case-study, gallery. Never claim solar powers the whole home - generation offsets demand. Backup specifically designed, not assumed.`,
   },
   {
     priority: 11,
-    name: 'Commercial Renewable Energy South Wales',
-    slug: '/commercial',
-    keywords: 'commercial renewable energy South Wales',
-    audience: 'Business owners, managing directors, finance directors, facilities managers, estates teams and property managers',
-    goal: 'Book a free commercial site survey',
-    ctaText: 'Book a site survey',
-    ctaLink: '#quote',
-    words: '1,500–2,000',
-    prompt: `Write the main commercial landing page targeting **"commercial renewable energy South Wales"**.
+    name: "Commercial Renewable Energy South Wales",
+    slug: "/commercial",
+    keywords: "commercial renewable energy South Wales",
+    audience: "Business owners, managing directors, finance directors, facilities managers, estates teams and property managers",
+    goal: "Book a free commercial site survey",
+    ctaText: "Book a site survey",
+    ctaLink: "#quote",
+    words: "1,500–2,000",
+    prompt: `POSITIONING: One South Wales contractor engineering integrated solar, storage, EV and heat-pump systems around your site's real demand — to cut imported electricity and keep costs predictable, not to sell separate kit.
 
-Audience: business owners, managing directors, finance directors, facilities managers, estates teams and property managers.
-Primary goal: generate free commercial site-survey enquiries.
+KEYWORDS & INTENT: Primary: commercial renewable energy South Wales. Secondary: commercial solar PV, battery/BESS, workplace & fleet EV charging, heat pumps. Intent: vetting a contractor, booking a survey. Audience: owners, MDs, finance/facilities/estates/property managers. Priorities: lower imported electricity, cost visibility, minimal disruption, warranties, clear next step.
 
-Present Heliaxis as a commercial energy contractor capable of designing integrated systems rather than selling individual technologies.
+SECTION PLAN (order; no two dark adjacent):
+1. hero (dark) — H1 with keyword; GEO answer: Heliaxis designs & installs integrated commercial renewable systems across South Wales to cut imported electricity and improve cost visibility.
+2. grid — Integrated systems (4): solar PV; battery/BESS; EV charging (workplace & fleet); heat pumps. Icons solar,battery,ev,heatpump.
+3. split — CAPEX vs financed/PPA: buy outright (own asset, upfront capital) vs finance/PPA (spread cost, pay from savings). Detail → /commercial-funding.
+4. steps (5-7) — survey → analyse half-hourly data & demand → roof/site assessment + DNO/grid & capacity check → design matching generation to consumption, phased to limit disruption → install & commission → monitoring, solar O&M & asset performance.
+5. explorer (dark) — Sectors (6): warehousing & logistics; manufacturing; agriculture; care & education; hospitality & retail; public sector & commercial property.
+6. grid — Accreditations (4, explain each in practice): MCS, RECC, NICEIC, TrustMark. Icons shield,award,check,star.
+7. funding — 3 cards (CAPEX, asset finance/PPA, funding support) → /commercial-funding.
+8. faq.
+9. cta (dark) — Book a site survey → #quote.
 
-Services to cover: commercial solar PV; commercial battery storage/BESS; workplace and fleet EV charging; commercial heat pumps; energy monitoring; solar O&M; finance/PPA; relevant funding support.
+FAQ (keep all):
+- How do you size a system to match our actual consumption?
+- How do you use our half-hourly electricity data?
+- Will grid connection, DNO capacity or infrastructure limit what we install?
+- Can work be phased to avoid disrupting operations?
+- How do you assess our roof or site before design?
+- CAPEX vs financed/PPA — what's the difference?
+- What ongoing monitoring and O&M do you provide?
+- Which accreditations do you hold and what do they mean?
 
-Must explain: reducing imported electricity; improving long-term energy-cost visibility; matching generation to site consumption; half-hourly electricity data; roof/site assessment; DNO/grid considerations; infrastructure capacity; site phasing; monitoring; asset performance; CAPEX versus financed options.
+CTA & LINKS: "Book a site survey" → #quote (hero, funding, cta). Real internal link: /commercial-funding. This page: /commercial.
 
-Include sector examples: warehouses, manufacturing, agriculture, care, education, hospitality, public sector and commercial property.
-
-Include Heliaxis MCS / RECC / NICEIC / TrustMark accreditation. Also link naturally to /commercial-funding. No invented savings, prices or carbon figures.`,
+GUARDRAILS: Qualitative only — no invented savings, prices, payback or carbon figures. Accreditations as a grid explaining each, not logos. No testimonials block. Frame solar as cutting imported electricity and matching on-site demand — never claim it powers a whole site or eliminates bills. Battery backup only as specifically designed. Balance split cards.`,
   },
   {
     priority: 12,
-    name: 'Commercial Battery Storage / BESS',
-    slug: '/commercial-battery-storage',
-    keywords: 'commercial battery storage South Wales; commercial BESS South Wales',
-    audience: 'Business owners, finance directors, facilities managers and energy managers',
-    goal: 'Generate commercial battery feasibility/site-survey enquiries',
-    ctaText: 'Book a battery feasibility survey',
-    ctaLink: '#quote',
-    words: '1,500–2,000',
-    prompt: `Write a commercial page targeting **"commercial battery storage South Wales"**, **"commercial BESS South Wales"** and related searches.
+    name: "Commercial Battery Storage / BESS",
+    slug: "/commercial-battery-storage",
+    keywords: "commercial battery storage South Wales; commercial BESS South Wales",
+    audience: "Business owners, finance directors, facilities managers and energy managers",
+    goal: "Generate commercial battery feasibility/site-survey enquiries",
+    ctaText: "Book a battery feasibility survey",
+    ctaLink: "#quote",
+    words: "1,500–2,000",
+    prompt: `POSITIONING: Show South Wales businesses how a commercial battery cuts peak demand charges and shifts load against their own half-hourly consumption — not a box for spare solar.
 
-Audience: business owners, finance directors, facilities managers and energy managers.
-Goal: generate commercial battery feasibility/site-survey enquiries.
+KEYWORDS & INTENT: Primary: commercial battery storage South Wales. Secondary: commercial BESS South Wales; peak shaving; load shifting; time-of-use tariff optimisation. Intent: commercial feasibility research — does BESS stack up here. Audience: business owners, finance directors, facilities and energy managers. Priorities: demand/energy cost drivers, reliability, site disruption, warranties, DNO/grid risk, a clear route to a survey.
 
-Do not describe a commercial battery simply as somewhere to store excess solar.
+SECTION PLAN:
+- hero (dark): H1 with primary keyword; direct-answer intro — what a commercial battery does for a South Wales site, modelled on real data.
+- grid: four value drivers — peak shaving, load shifting, time-of-use tariff optimisation, managing maximum site demand.
+- explorer (dark): "Which applies to your site?" clickable uses — solar self-consumption, charging in lower-cost periods, supporting large EV charging loads, export management, resilience/backup where specifically designed.
+- split: battery capacity (kWh, how much energy) vs discharge power (kW, how fast); define both and why each is sized to the load profile.
+- steps: feasibility & design — gather half-hourly data + metering, model the load profile, assess electrical infrastructure, DNO and grid-capacity constraints, design (integrate existing solar or add new solar + BESS), install & commission, monitoring handover.
+- grid: fire/safety at a non-specialist level, monitoring and controls, warranty and lifecycle.
+- funding: three finance routes (CAPEX, asset finance, grants) to /commercial-funding.
+- grid: accreditations — MCS, RECC, NICEIC, TrustMark, each explained in practice.
+- faq
+- cta (dark): book the survey.
 
-Must cover: peak shaving; load shifting; time-of-use tariff optimisation; increasing solar self-consumption; charging during lower-cost periods; supporting large EV charging loads; managing maximum site demand; potential grid-capacity constraints; export management; resilience/backup where specifically designed; battery capacity versus discharge power; site load profile; half-hourly data; metering; existing solar integration; new solar + BESS; electrical infrastructure; DNO considerations; fire/safety considerations at a suitable non-specialist level; monitoring and controls; warranty and lifecycle considerations.
+FAQ:
+- Is battery storage right for my business?
+- How do you size the battery for our site?
+- Do you need our half-hourly data to assess feasibility?
+- Can a battery work with our existing solar, or should we add solar too?
+- Will it keep us running during a power cut?
+- What are the fire and safety considerations?
+- Are there DNO or grid-capacity issues?
+- What warranty and lifespan should we expect?
 
-Explain that commercial BESS suitability must be modelled against real consumption data. Do not invent ROI or revenue claims.
+CTA & LINKS: Label "Book a feasibility survey" to #quote (use in hero, after steps, and closing cta). Internal link: finance to /commercial-funding.
 
-Include: "Is battery storage right for my business?", survey/design process, finance options, FAQ. Link finance to /commercial-funding.`,
+GUARDRAILS: Qualitative only — no invented ROI, payback, revenue, prices, percentages or grant figures; state suitability must be modelled against real half-hourly data. Don't frame the battery as just storing excess solar. Resilience/backup only where specifically designed. Fire/safety at a non-specialist level. Accreditations as a grid explaining each; no testimonials, pricing or case-study blocks.`,
   },
   {
     priority: 13,
-    name: 'Commercial EV Charging',
-    slug: '/commercial-ev-charging',
-    keywords: 'commercial EV charging installation South Wales; workplace EV charging South Wales',
-    audience: 'Businesses, fleet operators, landlords, property managers and facilities managers',
-    goal: 'Book a commercial EV charging survey',
-    ctaText: 'Book an EV charging survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a page targeting **"commercial EV charging installation South Wales"** and **"workplace EV charging South Wales"**.
+    name: "Commercial EV Charging",
+    slug: "/commercial-ev-charging",
+    keywords: "commercial EV charging installation South Wales; workplace EV charging South Wales",
+    audience: "Businesses, fleet operators, landlords, property managers and facilities managers",
+    goal: "Book a commercial EV charging survey",
+    ctaText: "Book an EV charging survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `Build the Heliaxis "Commercial EV Charging" page.
 
-Audience: businesses, fleet operators, landlords, property managers and facilities managers.
-Goal: book a commercial EV charging survey.
+POSITIONING: Charge points sized around how your vehicles use the site - dwell time, mileage and available power - designed, DNO-managed and installed for South Wales businesses by one MCS/NICEIC team.
 
-Must cover: workplace charging; fleet/depot charging; staff charging; visitor/customer charging; shared-car-park charging; AC versus DC charging at a high level; existing electrical capacity; three-phase supplies; load management; dynamic load balancing; phased deployment; solar PV integration; battery storage integration; charging from on-site renewable energy; back-office/payment functionality where applicable; cable routes and civils; DNO upgrades where required; future expansion; monitoring; installation and commissioning.
+KEYWORDS & INTENT: Primary "commercial EV charging installation South Wales"; secondary "workplace EV charging South Wales", "fleet depot charging", "dynamic load balancing". Intent: scoping a project and choosing an installer. Audience: businesses, fleet operators, landlords, property and facilities managers. Priorities: will our supply cope, cost/disruption of civils and DNO works, uptime, billing drivers back, future expansion.
 
-Explain why charger quantity and kW rating should be designed around: vehicle dwell time, fleet mileage, arrival/departure patterns, available power and future fleet plans.
+SECTION PLAN:
+1. hero (dark): H1 with primary keyword; GEO direct-answer intro naming workplace, fleet/depot, staff, visitor/customer and shared-car-park charging in South Wales.
+2. grid (4): scenarios - workplace & staff; fleet/depot; visitor/customer; shared/landlord car parks.
+3. split: AC vs DC at a HIGH LEVEL - define both for commercial sites (AC for long dwell/overnight; DC rapid for quick turnaround).
+4. explorer (dark) "How we size your installation": clickable factors driving charger count and kW - dwell time, fleet mileage, arrival/departure patterns, available power, future fleet plans.
+5. grid (4): power & capacity - existing electrical capacity; three-phase supplies; load management; dynamic load balancing.
+6. media (image blank): on-site renewables - solar PV, battery storage and charging from on-site renewable energy to offset grid draw.
+7. rich (brief): back-office, payment and monitoring where applicable - billing staff/visitors/public, usage reporting, uptime alerts.
+8. steps (6-8): survey, design, DNO upgrades/civils & cable routes, install, commission, handover, monitoring; cover phased rollout and future expansion.
+9. faq.
+10. cta (dark).
 
-Include an FAQ. Do not invent grant availability.`,
+FAQ (answer all):
+- How many charge points does my business need?
+- What is the difference between AC and DC charging for a commercial site?
+- Will our existing supply cope, or do we need a DNO upgrade?
+- What is dynamic load balancing and why does it matter?
+- Can we charge vehicles from our own solar or battery storage?
+- Can we start small and expand later?
+- Can we bill staff, visitors or the public for charging?
+- How long does installation and commissioning take?
+
+CTA & LINKS: "Book an EV charging survey" -> #quote; use in hero, after steps and the closing cta.
+
+GUARDRAILS: Qualitative only - never invent kW ratings, prices, uptime %, project counts or grants (do not claim grants exist). Keep AC vs DC high-level. Frame on-site renewables as offsetting grid draw, not powering all charging. Back-office/payment "where applicable"; DNO upgrade "where required". Accreditations as a grid explaining MCS/RECC/NICEIC/TrustMark; no testimonials, pricing or project-number blocks.`,
   },
   {
     priority: 14,
-    name: 'Commercial Solar O&M',
-    slug: '/solar-operation-maintenance',
-    keywords: 'commercial solar maintenance South Wales; solar PV O&M South Wales; commercial solar repair South Wales',
-    audience: 'Businesses and property owners with existing solar arrays, including systems installed by another contractor',
-    goal: 'Generate O&M, fault-finding and system-takeover enquiries',
-    ctaText: 'Arrange a solar system assessment',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a commercial page targeting **"commercial solar maintenance South Wales"**, **"solar PV O&M South Wales"** and **"commercial solar repair South Wales"**.
+    name: "Commercial Solar O&M",
+    slug: "/solar-operation-maintenance",
+    keywords: "commercial solar maintenance South Wales; solar PV O&M South Wales; commercial solar repair South Wales",
+    audience: "Businesses and property owners with existing solar arrays, including systems installed by another contractor",
+    goal: "Generate O&M, fault-finding and system-takeover enquiries",
+    ctaText: "Arrange a solar system assessment",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: Keep your commercial solar array safe, compliant and generating well - whoever installed it - with assessment-led O&M, repair and full system takeover across South Wales.
 
-Audience: businesses and property owners with existing solar arrays, including systems installed by another contractor.
-Primary goal: generate O&M, fault-finding and system-takeover enquiries.
+KEYWORDS & INTENT: Primary "commercial solar maintenance South Wales"; secondary "solar PV O&M South Wales", "commercial solar repair South Wales", "system takeover". Intent: owners of an existing, underperforming or orphaned array wanting a maintainer or fault fix. Priorities: lost yield from hidden faults, safety, warranties, minimal disruption.
 
-Must cover: why commercial PV should be monitored and maintained; performance monitoring; fault investigation; inverter faults; DC and AC electrical inspections; visual array inspection; roof/mounting inspection; thermal imaging where appropriate; testing and diagnostics; monitoring communication faults; panel damage; vegetation management on applicable systems; cleaning only where inspection/performance data indicates it is justified; reporting; planned maintenance; reactive call-outs; system takeover; legacy systems; failed/orphaned installer situations; repowering; inverter replacement; adding batteries; expanding existing arrays.
+SECTION PLAN (no two dark adjacent):
+1. hero (dark): H1 with primary keyword; we monitor, maintain and repair commercial PV, any installer.
+2. grid (4): why monitor & maintain - hidden faults lose yield; electrical safety & compliance; protect warranties; catch problems early.
+3. steps (6): baseline assessment > inspection & testing > fault diagnosis > written report > planned schedule or remedial works > ongoing monitoring.
+4. explorer (dark, 5): scope - performance monitoring & comms faults; fault investigation, diagnostics & inverter faults; DC & AC inspection & testing; visual array/roof/mounting & thermal checks, panel damage; vegetation & cleaning where data justifies.
+5. split: Planned maintenance (inspections, monitoring, reporting) vs Reactive call-outs (outages, inverter/system faults).
+6. rich: "We didn't install your system - can Heliaxis maintain it?" Yes, subject to assessment; covers legacy and failed/orphaned-installer systems; set a baseline so output is measurable.
+7. grid (4): upgrades & repowering - inverter replacement; repower ageing arrays; add batteries; expand arrays.
+8. grid (4): accreditations - MCS, RECC, NICEIC, TrustMark - what each proves.
+9. faq.
+10. cta (dark): assessment invite.
 
-Include a section: "We didn't install your system — can Heliaxis maintain it?" Answer yes, subject to assessment. Explain the benefit of establishing a performance baseline.
+FAQ (keep all):
+- Can you maintain a system another company installed?
+- What does commercial solar O&M include?
+- How often should a commercial array be inspected?
+- Do you offer reactive call-outs and planned maintenance?
+- When is panel cleaning worth paying for?
+- Can you replace an old inverter, add batteries or expand our array?
+- What if our original installer has gone out of business?
+- Do you use thermal imaging to find faults?
 
-Mention NICEIC/MCS technical competence appropriately without implying MCS certification of historic third-party workmanship.`,
+CTA & LINKS: "Arrange an assessment" > #quote (hero, mid-page, cta). Links: #quote only; no other paths.
+
+GUARDRAILS: Qualitative only - no invented yields, savings, prices, grants, warranties or figures. Accreditations grid explains each; cite NICEIC/MCS competence of our own work but DO NOT imply MCS certification of third-party workmanship or that we retro-certify a third-party install. No testimonials/pricing. Takeover always "subject to assessment"; never promise results on others' work. Clean only where data justifies it. Flag asbestos/structural concerns for specialist advice.`,
   },
   {
     priority: 15,
-    name: 'Commercial Funding & Finance',
-    slug: '/commercial-funding',
-    keywords: 'commercial solar finance South Wales; business solar funding Wales',
-    audience: 'Business owners, FDs and decision-makers comparing ways to fund the project',
-    goal: 'Generate enquiries for financially viable commercial renewable-energy projects',
-    ctaText: 'Discuss funding your project',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a commercial renewable-energy funding and finance page targeting **"commercial solar finance South Wales"**, **"business solar funding Wales"** and related searches.
+    name: "Commercial Funding & Finance",
+    slug: "/commercial-funding",
+    keywords: "commercial solar finance South Wales; business solar funding Wales",
+    audience: "Business owners, FDs and decision-makers comparing ways to fund the project",
+    goal: "Generate enquiries for financially viable commercial renewable-energy projects",
+    ctaText: "Discuss funding your project",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `Build the Heliaxis commercial renewable-energy funding & finance page.
 
-Audience: business owners, FDs and decision-makers interested in renewable energy but comparing ways to fund the project.
-Goal: generate enquiries for financially viable commercial renewable-energy projects.
+ANGLE: For South Wales business owners and FDs weighing a solar, battery or heat-pump project, lay the funding routes side by side so a viable scheme is built around cash flow, ownership and risk, not just capital.
 
-Must cover the main routes: Capital purchase / CAPEX; Asset finance; Solar PPA; Grant funding where available; Potential blended approaches. Explain each in plain language.
+KEYWORDS & INTENT: Primary "commercial solar finance South Wales". Secondary "business solar funding Wales", "commercial solar PPA", "asset finance for solar". Intent: commercial, comparison-stage, evaluating how to pay. Audience: owners, FDs, directors. Priorities: capital vs preserving cash, asset ownership, cash-flow impact, maintenance liability, contract term and exit, owner-occupier vs tenant.
 
-For each route discuss: who pays upfront; who owns the equipment; cash-flow implications; maintenance responsibility; contract considerations; suitability for owner-occupiers versus tenants where relevant.
+SECTION PLAN (keep order; no two dark blocks adjacent):
+1. hero (dark): H1 with primary keyword; one-line direct answer naming the routes (CAPEX, asset finance, PPA, grants, blended).
+2. split: CAPEX vs Solar PPA. Left CAPEX = pay upfront, you own it, keep all generation value, you hold warranties/maintenance. Right PPA = no capital, third party owns and maintains, you buy units at an agreed rate, contract term matters; link to /solar-ppa.
+3. explorer (dark): "Explore the funding routes", 5 options - CAPEX, Asset finance, Solar PPA, Grant funding, Blended. For EACH: who pays upfront, who owns the kit, cash-flow, maintenance responsibility, contract considerations, owner-occupier vs tenant suitability.
+4. grid (4 cards): technical evidence Heliaxis prepares for a funding application - system scope; estimated generation & consumption matching; technical proposal & project cost; carbon/energy outputs where appropriate.
+5. steps (5-7): getting funding-ready - survey, design, technical proposal, funding support, install, commission, handover.
+6. grid (4 cards): accreditations - MCS, RECC, NICEIC, TrustMark, each explaining what it means in practice for a funded project.
+7. faq.
+8. cta (dark): closing band.
 
-Include a strong warning: do not state that a particular grant is available unless confirmed from current source information.
+FAQ (answer all):
+- What are the main ways to fund a commercial solar project?
+- What's the difference between buying outright (CAPEX) and a solar PPA?
+- With asset finance, who owns and maintains the system?
+- Are grants available for commercial renewables in Wales?
+- Can tenants fund solar, or does it suit owner-occupiers better?
+- Can funding routes be blended?
+- What technical information do you provide for a funding application?
 
-Explain that Heliaxis can help businesses understand the technical information needed to support funding applications, such as: system scope, estimated generation, consumption matching, technical proposal, project cost, carbon/energy outputs where appropriate.
+CTA & LINKS: Button "Discuss funding your project" -> #quote (in hero and closing cta). Real internal link: /solar-ppa.
 
-Link to /solar-ppa for detailed PPA information. No invented interest rates, grant amounts or savings.`,
+GUARDRAILS: Qualitative only - no invented interest rates, grant amounts, savings or percentages. Do NOT state any specific grant is available unless confirmed from current source; describe grants in general, conditional terms. Accreditations as a grid explaining each; no testimonials, prices or project figures.`,
   },
   {
     priority: 16,
-    name: 'Solar PPA',
-    slug: '/solar-ppa',
-    keywords: 'solar PPA South Wales; commercial solar PPA Wales; solar panels with no upfront capital business',
-    audience: 'Businesses with suitable premises and significant electricity use that want commercial solar without purchasing the system outright',
-    goal: 'Request a PPA feasibility assessment',
-    ctaText: 'Request a PPA assessment',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a commercial landing page targeting **"solar PPA South Wales"**, **"commercial solar PPA Wales"** and **"solar panels with no upfront capital business"**.
+    name: "Solar PPA",
+    slug: "/solar-ppa",
+    keywords: "solar PPA South Wales; commercial solar PPA Wales; solar panels with no upfront capital business",
+    audience: "Businesses with suitable premises and significant electricity use that want commercial solar without purchasing the system outright",
+    goal: "Request a PPA feasibility assessment",
+    ctaText: "Request a PPA assessment",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: Commercial solar on your South Wales premises with no upfront capital - a funder owns and maintains the system; you buy only the power it generates, under contract.
 
-Audience: businesses with suitable premises and significant electricity use that want commercial solar without purchasing the system outright.
-Goal: encourage businesses to request a PPA feasibility assessment.
+KEYWORDS & INTENT: Primary: solar PPA South Wales. Secondary: commercial solar PPA Wales; solar panels with no upfront capital business; power purchase agreement solar. Intent: comparison of funding routes for rooftop/ground solar. Audience: businesses with suitable premises and high electricity use wanting solar without ownership. Priorities: capital preservation, price certainty, contract length and exit, maintenance/performance/insurance risk, landlord/tenant rights, next step.
 
-Explain a Power Purchase Agreement simply: a third party funds/owns the solar system; the host business uses the electricity generated and pays for it under an agreed contract; commercial and legal structure varies by project.
+SECTION PLAN (no two dark adjacent):
+1. hero (dark): H1 with primary keyword; no-upfront-capital angle; PPA-assessment button.
+2. grid (4 cards): how a PPA works - a third party funds and owns the system; your business uses the power generated; you pay per unit under an agreed contract; the funder maintains and monitors it.
+3. steps (6-7): site suitability and roof/ground survey; consumption review and credit assessment; design and feasibility; contract; metering and install; commissioning and performance monitoring; end-of-term options.
+4. rich: what a PPA contract typically covers - term; electricity-price structure and indexation; roof/site rights; landlord/tenant considerations; metering; performance; insurance; end-of-term arrangements; buyout options where available.
+5. grid (4 cards): is your site suitable? - high on-site daytime consumption (why on-site use matters); suitable roof or land with secured rights; long-term occupancy/lease; creditworthy business.
+6. funding (3 cards -> /commercial-funding): PPA vs outright purchase vs asset finance - define each by ownership, capital, balance-sheet and risk.
+7. faq.
+8. cta (dark): Request a PPA assessment -> #quote.
 
-Must cover: how a solar PPA works; who owns the equipment; who maintains it; PPA term; electricity-price structure; indexation; roof/site rights; landlord and tenant considerations; metering; performance; insurance; end-of-term arrangements; buyout options where available; credit assessment; site suitability; electricity consumption; why high on-site solar use matters; PPA versus outright purchase; PPA versus asset finance.
+FAQ (ask all):
+- How does a solar PPA work?
+- Who owns and who maintains the system?
+- How long is a PPA term and what happens at the end?
+- How is the electricity price set and how does indexation work?
+- Can we buy the system during or at the end?
+- What makes a site suitable, and why does high on-site use matter?
+- How does a PPA compare with outright purchase or asset finance?
+- What do landlords and tenants need to consider?
 
-Do not invent PPA rates, savings percentages or contract terms. Link to /commercial-funding. Include FAQ.
+CTA & LINKS: Button "Request a PPA assessment" -> #quote; used in hero and cta. Internal link: /commercial-funding.
 
-Tone: financial and factual rather than promotional.`,
+GUARDRAILS: Financial, factual, not promotional. Do not invent PPA rates, savings or contract terms - describe qualitatively; say structure varies by project. Present buyout as "where available," not guaranteed. Do not claim solar powers the whole site; value depends on on-site use. No testimonials or pricing blocks. Accreditations, if shown, as a grid explaining MCS/RECC/NICEIC/TrustMark.`,
   },
   {
     priority: 17,
-    name: 'Solar for Warehouses & Distribution',
-    slug: '/warehousing',
-    keywords: 'solar panels for warehouses South Wales; warehouse solar installation Wales',
-    audience: 'Warehouse owners, logistics businesses, distribution centres, facilities managers and commercial landlords',
-    goal: 'Book a commercial site survey',
-    ctaText: 'Book a warehouse solar survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a sector landing page targeting **"solar panels for warehouses South Wales"**, **"warehouse solar installation Wales"** and related searches.
+    name: "Solar for Warehouses & Distribution",
+    slug: "/warehousing",
+    keywords: "solar panels for warehouses South Wales; warehouse solar installation Wales",
+    audience: "Warehouse owners, logistics businesses, distribution centres, facilities managers and commercial landlords",
+    goal: "Book a commercial site survey",
+    ctaText: "Book a warehouse solar survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: Turn a warehouse's biggest unused asset - acres of roof - into on-site generation that covers the daytime baseload of South Wales logistics sites.
 
-Audience: warehouse owners, logistics businesses, distribution centres, facilities managers and commercial landlords.
-Goal: book a commercial site survey.
+KEYWORDS & INTENT: Primary: solar panels for warehouses South Wales. Secondary: warehouse solar installation Wales; commercial solar for distribution centres; warehouse rooftop PV. Intent: commercial, toward a site survey. Audience: warehouse owners, logistics firms, distribution centres, facilities managers, commercial landlords. Priorities: cutting daytime costs, roof/structural risk, zero disruption, warranties, DNO/export limits, a clear next step.
 
-Explain why warehouses can be well suited to solar: large roof areas; daytime baseloads; lighting; conveyor systems; HVAC; refrigeration where applicable; automation; office loads; EV/fleet charging.
+SECTION PLAN (ordered; no two dark adjacent):
+- hero (dark): H1 with primary keyword; angle on large roofs + daytime loads; primary CTA.
+- grid (4): why warehouses suit solar - large roof areas; daytime baseload from lighting, conveyors, automation, HVAC, refrigeration where applicable, office loads; matching generation to demand; headroom for EV/fleet charging.
+- explorer (dark, 3-4): roof types - trapezoidal metal, standing seam, flat; fold in roof condition, structural assessment, warranties, skylights, fire/access zones.
+- steps (6-8): half-hourly consumption analysis > survey > structural assessment > layout and design > DNO and export limitation > install around operations, shutdowns only where needed > commissioning and handover > monitoring + O&M.
+- split: TWO cards - "Battery storage and peak shaving" vs "Fleet and EV charging" - both for a warehouse load profile.
+- grid (4): accreditations - MCS, RECC, NICEIC, TrustMark, each with what it means in practice.
+- funding (3): CAPEX purchase / asset finance / PPA, linking to /commercial-funding.
+- casestudy: PLACEHOLDER only - no invented customer, site or numbers.
+- faq
+- cta (dark): closing band driving survey booking.
 
-Must cover: trapezoidal metal roofs; standing seam roofs; flat roofs; roof condition; structural assessment; roof warranties; skylights; fire/access zones; system layout; half-hourly consumption analysis; DNO; export limitation; commercial battery storage; peak shaving; fleet EV charging; installation around business operations; planned shutdowns where needed; monitoring; O&M; finance/PPA.
+FAQ (keep all):
+- Is my warehouse roof suitable for solar?
+- Can you install on trapezoidal, standing seam and flat roofs?
+- Will you assess the roof structure and protect our roof warranties?
+- How much of our daytime energy could solar realistically cover?
+- Do we need a DNO application, and what is export limitation?
+- Will installation disrupt day-to-day warehouse operations?
+- Should we add battery storage, peak shaving or EV charging?
+- How is a commercial warehouse system funded?
 
-Include a case-study placeholder structure but do not invent a customer/project. Link finance to /commercial-funding.`,
+CTA & LINKS: label "Book a warehouse solar survey" > #quote (use 2-3x). Internal link: /commercial-funding.
+
+GUARDRAILS: Qualitative only - never invent kWp, savings %, payback, grants or prices. Accreditations as a grid explaining each; no testimonials. Case study stays a placeholder. Do not claim solar powers the whole site; frame as offsetting daytime load, sized to measured consumption. Battery backup must be specifically designed. Flag asbestos or ageing roofs for specialist survey.`,
   },
   {
     priority: 18,
-    name: 'Solar for Manufacturing',
-    slug: '/manufacturing',
-    keywords: 'solar panels for manufacturing South Wales; factory solar panels Wales',
-    audience: 'Manufacturing directors, operations managers, engineering managers, facilities managers and FDs',
-    goal: 'Book a commercial energy/site survey',
-    ctaText: 'Book a manufacturing site survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a sector page targeting **"solar panels for manufacturing South Wales"**, **"factory solar panels Wales"** and related commercial searches.
+    name: "Solar for Manufacturing",
+    slug: "/manufacturing",
+    keywords: "solar panels for manufacturing South Wales; factory solar panels Wales",
+    audience: "Manufacturing directors, operations managers, engineering managers, facilities managers and FDs",
+    goal: "Book a commercial energy/site survey",
+    ctaText: "Book a manufacturing site survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `Build the sector page "Solar panels for manufacturing in South Wales".
 
-Audience: manufacturing directors, operations managers, engineering managers, facilities managers and FDs.
-Primary goal: book a commercial energy/site survey.
+POSITIONING: South Wales manufacturers draw heavy loads in daytime, when a factory-roof array generates most — show directors, ops/facilities managers and FDs how rooftop solar plus storage offsets CNC, compressors and process plant, then book a site survey.
 
-Core angle: manufacturing businesses often use significant electricity while solar is generating.
+KEYWORDS & INTENT: Primary "solar panels for manufacturing South Wales". Secondary "factory solar panels Wales", commercial solar South Wales, industrial battery storage. Intent: B2B feasibility/ROI research by a decision-maker. Priorities: electricity cost, self-consumption vs export, production uptime and disruption, roof and electrical condition, warranties, reliability, next step.
 
-Discuss loads such as: CNC machinery; compressors; extraction; pumps; production lines; refrigeration; HVAC; process equipment; offices; EV/fleet charging.
+SECTION PLAN (ordered; no two dark adjacent):
+1 hero (dark) — H1 with primary keyword; daytime load-match angle; CTA.
+2 stats — true facts only: MCS, RECC, NICEIC, TrustMark accreditations. No invented figures.
+3 grid 4 — what manufacturers gain: solar self-consumption, battery peak shaving, load shifting, EV/fleet charging.
+4 explorer (dark) — loads solar offsets: CNC machinery, compressors, extraction, pumps, production lines, refrigeration, HVAC, process equipment, offices.
+5 steps 6-8 — load profiling from half-hourly data and maximum demand; system sizing; roof + structural survey and electrical infrastructure review; DNO application; install with RAMS, site coordination, minimal disruption; commissioning; monitoring, O&M, handover.
+6 split — two-way: "Solar self-consumption" vs "Battery storage: peak shaving and load shifting"; define both against a factory load.
+7 grid 4 — accreditations MCS, RECC, NICEIC, TrustMark, each explained for a commercial buyer.
+8 funding 3 — CAPEX, asset finance, PPA.
+9 faq.
+10 cta (dark) — book the survey.
 
-Must cover: electricity load profiling; half-hourly data; maximum demand; system sizing; roof and structural surveys; electrical infrastructure; DNO applications; solar self-consumption; battery peak shaving; load shifting; EV integration; avoiding unnecessary operational disruption; RAMS and site coordination; commissioning; monitoring; O&M; CAPEX / finance / PPA.
+FAQ (answer all, keep wording):
+- Can solar power our entire factory?
+- How do you size a solar system for a manufacturing site?
+- Will the installation disrupt our production?
+- Do we need a DNO application?
+- How do battery storage, peak shaving and load shifting help manufacturers?
+- Can we charge EV or fleet vehicles from solar?
+- What funding options are there — CAPEX, finance or PPA?
+- What happens after commissioning — monitoring and O&M?
 
-Do not claim solar can power an entire factory unless site-specific analysis supports it. Use commercially competent language.`,
+CTA & LINKS: button "Book a site survey" -> #quote, reused in hero, mid-page and cta. Funding cards -> /commercial-funding. Real Heliaxis paths only.
+
+GUARDRAILS: Never claim solar powers the whole factory — frame generation as a share of demand, confirmed by site-specific load profiling. Qualitative only; invent no outputs, savings, prices, percentages or payback. Accreditations live in the grid; no testimonials/reviews block; no pricing block. Battery backup and peak shaving must be designed per site. Commercially competent tone.`,
   },
   {
     priority: 19,
-    name: 'Solar for Farms & Agriculture',
-    slug: '/agriculture',
-    keywords: 'solar panels for farms Wales; agricultural solar South Wales',
-    audience: 'Farmers, agricultural businesses, estates and rural enterprises',
-    goal: 'Generate site-survey enquiries',
-    ctaText: 'Book a farm energy survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a commercial/agricultural renewable-energy page targeting **"solar panels for farms Wales"**, **"agricultural solar South Wales"** and related searches.
+    name: "Solar for Farms & Agriculture",
+    slug: "/agriculture",
+    keywords: "solar panels for farms Wales; agricultural solar South Wales",
+    audience: "Farmers, agricultural businesses, estates and rural enterprises",
+    goal: "Generate site-survey enquiries",
+    ctaText: "Book a farm energy survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: Cut a farm's biggest overhead — all-day grid power for milking, refrigeration, ventilation, pumps and drying — with solar sized to how a South Wales farm runs, roof or spare field.
 
-Audience: farmers, agricultural businesses, estates and rural enterprises.
-Goal: generate site-survey enquiries.
+KEYWORDS & INTENT: Primary: solar panels for farms Wales. Secondary: agricultural solar South Wales; farm solar PV; ground-mounted solar for farms; three-phase farm solar. Intent: commercial research → booked site survey. Audience: farmers, agricultural businesses, estates, rural enterprises. Priorities: cost on high all-day loads, no disruption to operations, farm-grade kit, long warranties, export/DNO limits, a clear next step.
 
-Discuss agricultural electricity loads such as: dairy/milking; refrigeration; ventilation; poultry systems; pumps; irrigation; grain handling/drying where applicable; workshops; farm offices; EV/equipment charging.
+SECTION PLAN (in order; no two dark sections adjacent):
+1 hero (dark) — H1 with primary keyword + one-line direct answer.
+2 grid (4) — loads solar offsets: dairy/milking & refrigeration; ventilation & poultry; pumps & irrigation; grain drying, workshops, offices, EV/equipment charging.
+3 explorer (dark) — where panels go: portal-frame barn roof; multi-pitch/older roofs; ground-mount in a field; mixed roof+ground.
+4 grid (4) — what the survey checks: roof condition; asbestos (flag, refer to specialist); structural assessment; site electrics — three-phase, long cable runs, existing infrastructure.
+5 steps (6–7) — survey → structural & electrical assessment → design + DNO / export limits → install → commission → handover + O&M.
+6 split — roof-mounted vs ground-mounted here: roof = existing buildings, no land lost; ground = scale/orientation when roofs are unsuitable or demand large.
+7 grid (3–4) — match generation to on-farm consumption; battery storage; backup/resilience ONLY where specifically designed; remote monitoring.
+8 funding (3) — asset finance, PPA, grant routes where available → /commercial-funding.
+9 grid (4) — accreditations: MCS, RECC, NICEIC, TrustMark, each explained.
+10 faq.
+11 cta (dark) — Book a farm energy survey → #quote.
 
-Must cover: barn and agricultural building roofs; roof condition; asbestos considerations without giving specialist asbestos advice; structural assessment; ground-mounted solar where appropriate; three-phase supplies; long cable runs; site electrical infrastructure; DNO; export limits; matching solar to farm consumption; battery storage; backup/resilience where technically designed; remote monitoring; O&M; finance; PPA; grant/funding opportunities where available.
+FAQ (keep all five):
+- Do I need planning permission for solar on my farm?
+- Can I have ground-mounted solar instead of roof panels?
+- Will solar work on my barn and agricultural building roofs?
+- What maintenance does a farm solar system need?
+- Should I add battery storage?
 
-Do not state that a current agricultural grant is available unless verified information is supplied.
+CTA & LINKS: "Book a farm energy survey" → #quote (use ~3x). Internal link: /commercial-funding only.
 
-FAQ: planning, ground mounts, roofs, maintenance and battery storage.`,
+GUARDRAILS: Qualitative only — no invented prices, percentages, payback, grant amounts or project figures. Do NOT claim a specific agricultural grant is currently available unless verified info supplied; keep funding routes generic. Asbestos: flag as a survey item, refer to a licensed specialist, no handling advice. Backup/resilience only where specifically designed, never implied as standard. Never claim solar powers the whole farm — frame as reducing grid demand. No testimonials/pricing/case-study/gallery blocks.`,
   },
   {
     priority: 20,
-    name: 'Renewable Energy for Care Homes',
-    slug: '/care-homes',
-    keywords: 'solar panels for care homes South Wales; renewable energy for care homes Wales',
-    audience: 'Care-home owners, operators, estates managers, finance directors and facilities managers',
-    goal: 'Book a commercial site survey',
-    ctaText: 'Book a care home energy survey',
-    ctaLink: '#quote',
-    words: '1,300–1,700',
-    prompt: `Write a sector landing page targeting **"solar panels for care homes South Wales"**, **"renewable energy for care homes Wales"** and related searches.
+    name: "Renewable Energy for Care Homes",
+    slug: "/care-homes",
+    keywords: "solar panels for care homes South Wales; renewable energy for care homes Wales",
+    audience: "Care-home owners, operators, estates managers, finance directors and facilities managers",
+    goal: "Book a commercial site survey",
+    ctaText: "Book a care home energy survey",
+    ctaLink: "#quote",
+    words: "1,300–1,700",
+    prompt: `POSITIONING: Heliaxis plans solar, battery, heat-pump and EV work around a live 24/7 South Wales care home, so residents stay safe and warm while running costs and risk fall.
 
-Audience: care-home owners, operators, estates managers, finance directors and facilities managers.
-Goal: book a commercial site survey.
+KEYWORDS & INTENT: Primary: solar panels for care homes South Wales. Secondary: renewable energy for care homes Wales; commercial solar for care homes; care home battery storage. Intent: a decision-maker comparing installers and booking a survey. Audience: owners, operators, estates/facilities managers, finance directors. Priorities: predictable running costs, zero risk to residents, minimal disruption, reliability/resilience, warranties/accreditation, clear next step.
 
-Explain why care facilities have distinctive energy demands: 24/7 occupancy; hot water; heating; kitchens; laundry; lighting; ventilation; medical/assistive equipment where applicable; EV charging.
+SECTION PLAN:
+1. hero - H1 with primary keyword; direct-answer opening on what renewable energy delivers for a South Wales care home and how a survey starts it; sub-CTA to #quote.
+2. grid (4) - why care homes are energy-intensive: 24/7 occupancy & lighting; hot water & laundry; heating & ventilation; kitchens & medical/assistive equipment.
+3. grid (4) - the renewable mix: commercial solar PV with high self-consumption; battery storage; heat pumps where appropriate for heating & hot water; EV charging.
+4. split - two-way: LEFT "Everyday savings: peak shaving & self-consumption"; RIGHT "Resilience: backup designed for critical loads" (backup ONLY where specifically designed around named essential circuits).
+5. steps (6) - load analysis; site survey; design incl. DNO/grid application; phased install around residents & staff with noise/disruption & health-and-safety controls; commissioning; monitoring, O&M, handover.
+6. grid (4) - accreditations, what each means for a care operator: MCS (certified installs), RECC (consumer code), NICEIC (electrical safety), TrustMark (government-endorsed).
+7. funding - 3 cards (CAPEX/asset finance; PPA; grants where available) to /commercial-funding.
+8. faq - questions below.
+9. cta (dark) - Book a care home energy survey to #quote.
 
-Must cover: commercial solar PV; battery storage; peak shaving; solar self-consumption; heat pumps where appropriate; hot-water demand; EV charging; electricity load analysis; reliability and resilience; backup systems only where specifically designed; installation phasing around residents and staff; noise and disruption management; health and safety; DNO/grid requirements; monitoring; O&M; finance/PPA; funding where available.
+FAQ (keep all):
+- Can installation happen while the home remains open?
+- Can solar work with a heat pump?
+- Is battery storage worthwhile?
+- Does commercial solar require planning permission?
+- What maintenance is needed?
+- What finance options are available?
 
-Emphasise that occupied care environments require careful programme planning and communication. Do not make unsupported claims about savings or carbon reduction.
+CTA & LINKS: label "Book a care home energy survey" to #quote (hero, funding, closing band). Internal link: /commercial-funding. No other paths.
 
-FAQ: Can installation happen while the home remains open? Can solar work with a heat pump? Is battery storage worthwhile? Does commercial solar require planning? What maintenance is needed? What finance options are available?
-
-Link finance to /commercial-funding.`,
+GUARDRAILS: Qualitative only - no invented savings %, payback, kWh, carbon or prices; benefits depend on the survey. Do NOT claim solar powers the whole home; frame as cutting import and cost. Backup/resilience must be specifically designed around defined critical loads, never assumed. Heat pumps only where appropriate. Accreditations as a grid explaining each; no testimonials, case-study or performance-stats blocks. DNO/grid approval is a required step.`,
   },
 ];
