@@ -24,9 +24,19 @@ import { revokeAllSessions } from '@/lib/subcontractors/session';
 import { createNtpAgreement, isEmail, issueNtpSigningLink, parseNtpRequest } from '@/lib/subcontractors/ntp';
 import { agreementIntact, ntpIntact } from '@/lib/subcontractors/hashing';
 import { sendReminderNow } from '@/lib/subcontractors/reminders';
+import {
+  cancelDocRequest,
+  cancelReplacementRequests,
+  createDocRequest,
+  fulfilReplacementsWith,
+  alreadyAsked,
+  newerReplacement,
+  reopenRequestsForDocument,
+  resendDocRequest,
+} from '@/lib/subcontractors/requests';
 import { NTP_TECHNOLOGIES, NTP_TERM_MONTHS } from '@/lib/subcontractors/ntp-agreement';
-import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type DocumentRow, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
-import { CATEGORY_BY_KEY } from '@/lib/subcontractors/documents';
+import { CIS_RATE_LABEL, SUB_COLUMNS, type AgreementRow, type BespokeRate, type CisRate, type DocRequestRow, type DocumentRow, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
+import { CATEGORY_BY_KEY, londonToday } from '@/lib/subcontractors/documents';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -242,7 +252,27 @@ export async function countersign(id: string, input: { name: string; title: stri
   return { ok: true };
 }
 
-export async function reviewDocument(docId: string, status: 'approved' | 'rejected' | 'pending', note: string): Promise<Result<{ reviewedAt: string | null; reviewNote: string | null }>> {
+type ReviewResult = Result<{
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  /** Replacement request made while rejecting. */
+  request?: DocRequestRow;
+  /** Open requests closed by this decision (the document isn't rejected any more, or answers them). */
+  closedRequests?: string[];
+  warning?: string;
+}>;
+
+/**
+ * Approve / reject / reset a document. Rejecting can also ask the firm for a replacement:
+ * that emails them now (with the reason) and opens a request that's chased until they
+ * upload one. Un-rejecting withdraws any replacement request still open.
+ */
+export async function reviewDocument(
+  docId: string,
+  status: 'approved' | 'rejected' | 'pending',
+  note: string,
+  opts: { requestReplacement?: boolean } = {}
+): Promise<ReviewResult> {
   const { email: actor } = await requireAdmin();
   if (!['approved', 'rejected', 'pending'].includes(status)) return { ok: false, error: 'Bad status' };
   const reviewNote = status === 'rejected' ? note?.trim().slice(0, 300) || null : null;
@@ -252,14 +282,92 @@ export async function reviewDocument(docId: string, status: 'approved' | 'reject
     .from('subcontractor_documents')
     .update({ status, review_note: reviewNote, reviewed_by: status === 'pending' ? null : actor, reviewed_at: reviewedAt })
     .eq('id', docId)
-    .select('subcontractor_id, file_name')
+    .select('*')
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
   if (!doc) return { ok: false, error: 'Not found' };
   await logEvent(doc.subcontractor_id, actor, `document_${status}`, { file: doc.file_name, note: note || undefined });
   // No revalidatePath: the page updates this row itself (and refreshes quietly afterwards),
   // instead of making the click wait for the whole page to be rebuilt.
-  return { ok: true, reviewedAt, reviewNote };
+  if (status !== 'rejected') {
+    const closedRequests = [
+      ...(await cancelReplacementRequests(docId, doc.subcontractor_id, actor)),
+      ...(status === 'approved' ? await fulfilReplacementsWith(doc as DocumentRow, actor) : []),
+    ];
+    return { ok: true, reviewedAt, reviewNote, ...(closedRequests.length ? { closedRequests } : {}) };
+  }
+  if (!opts.requestReplacement) return { ok: true, reviewedAt, reviewNote };
+  // They may already have sent the fix (uploaded after this one) — don't ask for it again.
+  const newer = await newerReplacement(doc as DocumentRow);
+  if (newer) {
+    return {
+      ok: true,
+      reviewedAt,
+      reviewNote,
+      warning: `Rejected. They've already uploaded a newer one (${newer.label || newer.file_name}), so no replacement was requested — review that instead.`,
+    };
+  }
+  if (await alreadyAsked(doc as DocumentRow)) {
+    return { ok: true, reviewedAt, reviewNote, warning: "Rejected. They've already been asked for this (there's an open request), so no new request was made." };
+  }
+  const sub = await loadSub(doc.subcontractor_id);
+  if (!sub) return { ok: true, reviewedAt, reviewNote, warning: 'Rejected, but the subcontractor record could not be loaded to ask for a replacement.' };
+  const req = await createDocRequest(
+    sub,
+    { category: doc.category, operativeId: doc.operative_id, label: doc.label, note: reviewNote, replacesDocumentId: docId },
+    actor,
+    true
+  );
+  if (!req.ok) return { ok: true, reviewedAt, reviewNote, warning: `Rejected, but asking for a replacement failed: ${req.error}` };
+  return { ok: true, reviewedAt, reviewNote, request: req.request, ...(req.warning ? { warning: req.warning } : {}) };
+}
+
+// ---------------------------------------------------------------- document requests
+
+/** Ask the firm for a document (any category, optionally for one person, with a note and a date). */
+export async function requestDocument(
+  subId: string,
+  input: {
+    category: string;
+    operativeId: string | null;
+    label: string;
+    note: string;
+    dueOn: string | null;
+    email: boolean;
+    replacesDocumentId?: string | null;
+  }
+): Promise<Result<{ request: DocRequestRow; warning?: string }>> {
+  const { email: actor } = await requireAdmin();
+  const sub = await loadSub(subId);
+  if (!sub) return { ok: false, error: 'Not found' };
+  let replaced: DocumentRow | null = null;
+  if (input.replacesDocumentId) {
+    const { data: doc } = await createAdminClient()
+      .from('subcontractor_documents')
+      .select('*')
+      .eq('id', input.replacesDocumentId)
+      .eq('subcontractor_id', subId)
+      .maybeSingle();
+    replaced = doc as DocumentRow | null;
+    if (!replaced) return { ok: false, error: 'That document is no longer on file.' };
+    if (replaced.status !== 'rejected') return { ok: false, error: 'That document is no longer rejected.' };
+    if (await alreadyAsked(replaced)) return { ok: false, error: "They've already been asked for this — see the open request." };
+    const newer = await newerReplacement(replaced);
+    if (newer) return { ok: false, error: `They've already uploaded a newer one (${newer.label || newer.file_name}) — review that instead.` };
+  }
+  const r = await createDocRequest(sub, input, actor, !!input.email);
+  if (!r.ok) return r;
+  return { ok: true, request: r.request, ...(r.warning ? { warning: r.warning } : {}) };
+}
+
+export async function resendDocumentRequest(id: string): Promise<Result<{ request: DocRequestRow }>> {
+  const { email: actor } = await requireAdmin();
+  return resendDocRequest(id, actor);
+}
+
+export async function cancelDocumentRequest(id: string): Promise<Result<{ request: DocRequestRow }>> {
+  const { email: actor } = await requireAdmin();
+  return cancelDocRequest(id, actor);
 }
 
 export async function deleteDocument(docId: string): Promise<Result> {
@@ -271,6 +379,8 @@ export async function deleteDocument(docId: string): Promise<Result> {
     .eq('id', docId)
     .single();
   if (!doc) return { ok: false, error: 'Not found' };
+  // If it was the (unreviewed) answer to a request, the request is open again — before the delete clears the link.
+  await reopenRequestsForDocument(doc.subcontractor_id, doc, actor);
   await admin.storage.from(DOCS_BUCKET).remove([doc.storage_path]);
   await admin.from('subcontractor_documents').delete().eq('id', docId);
   await logEvent(doc.subcontractor_id, actor, 'document_deleted', { file: doc.file_name });
@@ -574,3 +684,50 @@ export async function updateDocumentDetails(
   }
   return { ok: true, doc: data as DocumentRow };
 }
+
+// ---------------------------------------------------------------- CIS verification
+
+/**
+ * Record that our accountants have verified this firm with HMRC under CIS (or undo it):
+ * the deduction rate HMRC gave, its verification number and the date it was done.
+ */
+export async function setCisVerification(
+  subId: string,
+  input: { verified: true; rate: CisRate; ref: string; verifiedOn: string } | { verified: false }
+): Promise<Result<{ cis: CisRecord }>> {
+  const { email: actor } = await requireAdmin();
+  let update: CisRecord;
+  if (input.verified) {
+    if (!Object.hasOwn(CIS_RATE_LABEL, input.rate)) return { ok: false, error: 'Choose the rate HMRC gave.' };
+    // HMRC verification numbers: V + 10 digits, plus 1–2 letters when the higher rate applies.
+    const ref = String(input.ref || '').toUpperCase().replace(/\s+/g, '');
+    if (ref && !/^V\d{10}(\/?[A-Z]{1,2})?$/.test(ref)) {
+      return { ok: false, error: 'Verification numbers look like V1234567890 (with letters on the end for the higher rate).' };
+    }
+    const today = londonToday();
+    const on = /^\d{4}-\d{2}-\d{2}$/.test(input.verifiedOn || '') ? input.verifiedOn : today;
+    if (on > today) return { ok: false, error: "The verification date can't be in the future." };
+    update = { cis_verified_on: on, cis_rate: input.rate, cis_verification_ref: ref || null, cis_verified_by: actor, cis_verified_at: new Date().toISOString() };
+  } else {
+    update = { cis_verified_on: null, cis_rate: null, cis_verification_ref: null, cis_verified_by: null, cis_verified_at: null };
+  }
+  const { error } = await createAdminClient().from('subcontractors').update(update).eq('id', subId);
+  if (error) return { ok: false, error: /cis_/.test(error.message) ? 'Run supabase/portal-v3.sql in Supabase first.' : error.message };
+  await logEvent(
+    subId,
+    actor,
+    input.verified ? 'cis_verified' : 'cis_verification_removed',
+    input.verified ? { rate: update.cis_rate, ref: update.cis_verification_ref || undefined, on: update.cis_verified_on } : null
+  );
+  revalidatePath(`/admin/subcontractors/${subId}`);
+  revalidatePath('/admin/subcontractors');
+  return { ok: true, cis: update };
+}
+
+type CisRecord = {
+  cis_verified_on: string | null;
+  cis_rate: CisRate | null;
+  cis_verification_ref: string | null;
+  cis_verified_by: string | null;
+  cis_verified_at: string | null;
+};

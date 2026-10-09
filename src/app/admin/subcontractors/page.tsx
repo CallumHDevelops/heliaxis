@@ -2,7 +2,7 @@ import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { compliance } from '@/lib/subcontractors/documents';
-import { SUB_COLUMNS, type DocumentRow, type SubcontractorRow } from '@/lib/subcontractors/types';
+import { type DocumentRow, type SubcontractorRow } from '@/lib/subcontractors/types';
 import { SubcontractorsList, type ListRow } from './SubcontractorsList';
 import { lastReminderRun } from '@/lib/subcontractors/reminders';
 import './subcontractors.css';
@@ -16,7 +16,8 @@ export default async function SubcontractorsPage() {
   const admin = createAdminClient();
   const lastRun = await lastReminderRun().catch(() => ({ available: false as const }));
   const [{ data: subs, error }, { data: docs }] = await Promise.all([
-    admin.from('subcontractors').select(SUB_COLUMNS).order('created_at', { ascending: false }),
+    // '*' so the CIS verification columns come along once supabase/portal-v3.sql has run.
+    admin.from('subcontractors').select('*').order('created_at', { ascending: false }),
     admin
       .from('subcontractor_documents')
       .select('id, subcontractor_id, category, label, operative_name, expires_on, status, uploaded_at'),
@@ -44,6 +45,8 @@ export default async function SubcontractorsPage() {
       expired: c.expired.length,
       expiring: c.expiring.length,
       pendingReview: c.pendingReview,
+      cisRate: s.cis_verified_on ? (s.cis_rate ?? null) : null,
+      cisVerified: !!s.cis_verified_on,
     };
   });
 

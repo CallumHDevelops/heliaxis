@@ -7,6 +7,7 @@ import { chasesFor } from '@/lib/subcontractors/reminders';
 import {
   type AgreementRow,
   type AssignmentRow,
+  type DocRequestRow,
   type OperativeRow,
   type PullRow,
   type NtpRow,
@@ -24,7 +25,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const admin = createAdminClient();
   // Everything in one round trip batch (each query is independent).
-  const [{ profile }, { data: sub }, { data: agr }, { data: docs }, { data: events }, { data: team }, { data: jobs }, { data: pulls }, { data: ntps }] =
+  const [{ profile }, { data: sub }, { data: agr }, { data: docs }, { data: events }, { data: team }, { data: jobs }, { data: pulls }, { data: ntps }, { data: reqs }] =
     await Promise.all([
       getSessionProfile(),
       // '*' so reminders_paused comes along when supabase/reminders.sql has run (and nothing breaks if not).
@@ -52,11 +53,14 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         .order('pulled_at', { ascending: false })
         .limit(200),
       admin.from('subcontractor_ntp_agreements').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
+      // Empty (not an error page) until supabase/portal-v3.sql has been run.
+      admin.from('subcontractor_doc_requests').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }).limit(200),
     ]);
   if (!sub) notFound();
   const agreement = agr as AgreementRow | null;
   const ntpRows = (ntps ?? []) as NtpRow[];
   const subRow = sub as SubcontractorRow & { reminders_paused?: boolean };
+  const requests = (reqs ?? []) as DocRequestRow[];
 
   // What the firm would be chased for today — worked out from the data already loaded.
   let outstanding: { kind: string; text: string; urgent: boolean }[] = [];
@@ -70,6 +74,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
       jobs: ((jobs ?? []) as AssignmentRow[]).filter((j) => j.status === 'awaiting_crew'),
       ntps: ntpRows.filter((n) => n.status === 'awaiting_signature' || n.status === 'awaiting_countersign'),
       activeNtpIds: new Set(ntpRows.filter((n) => n.status === 'active').map((n) => n.id)),
+      requests,
     }).firm.map((c) => ({ kind: c.kind, text: c.text, urgent: !!c.urgent }));
   } catch {
     outstanding = [];
@@ -101,6 +106,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         jobs={(jobs ?? []) as AssignmentRow[]}
         pulls={(pulls ?? []) as PullRow[]}
         ntps={(ntps ?? []) as NtpRow[]}
+        requests={requests}
         reminders={{ paused: !!subRow.reminders_paused, outstanding }}
       />
     </AdminShell>

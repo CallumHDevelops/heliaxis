@@ -1,12 +1,14 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { CATEGORY_BY_KEY, DOC_CATEGORIES } from './documents';
+import { CATEGORY_BY_KEY, DOC_CATEGORIES, requestCovers, requestTitle } from './documents';
 import { issueNtpSigningLink } from './ntp';
+import { requestsTableMissing } from './requests';
 import { ADMIN_EMAIL, emailShell, esc, logEvent, portalBaseUrl, sendEmail, siteBaseUrl } from './server';
 import {
   missingDetails,
   SUB_COLUMNS,
   type AssignmentRow,
+  type DocRequestRow,
   type DocumentRow,
   type NtpRow,
   type OperativeRow,
@@ -25,6 +27,7 @@ import {
  * missed day sends the latest due step once, not a backlog.
  *
  * Firms with reminders paused (admin switch) and terminated firms are skipped.
+ * Documents Heliaxis has asked for (requests.ts) are chased here too.
  */
 
 const DAY = 86_400_000;
@@ -52,6 +55,8 @@ export type FirmData = {
   ntps: NtpRow[];
   /** In-force NTP agreements — a renewal whose original has lapsed is chased on its own. */
   activeNtpIds: Set<string>;
+  /** Document requests: open ones are chased; any that asked to replace a rejected document stop that being chased separately. */
+  requests?: DocRequestRow[];
 };
 
 const today0 = () => new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
@@ -80,7 +85,7 @@ function currentDocs(docs: DocumentRow[]) {
  * uploading one of several things doesn't restart a sequence.
  */
 export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
-  const { sub, framework, docs, ops, jobs, ntps, activeNtpIds } = f;
+  const { sub, framework, docs, ops, jobs, ntps, activeNtpIds, requests = [] } = f;
   const firm: Chase[] = [];
   const admin: AdminNote[] = [];
   const due = (elapsed: number, steps: number[]) => steps.filter((s) => elapsed >= s);
@@ -89,6 +94,24 @@ export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
   // Documents of people the firm has removed from its team are no longer its business to renew.
   const archived = new Set(ops.filter((o) => o.archived_at).map((o) => o.id));
   const activeDocs = docs.filter((x) => !(x.operative_id && archived.has(x.operative_id)));
+
+  // A document that an open request already asks for is chased UNDER that request (9): the
+  // request's own steps plus this document's (rejection, expiry bands), each recorded once under
+  // the request. So it's never listed twice, and never goes quiet just because the request's
+  // own day-14 chase has passed. Offsets keep the folded steps apart from the request's own.
+  const folded = new Map<string, { steps: number[]; urgent: boolean; notes: string[] }>();
+  const chaseDoc = (d: DocumentRow, c: Chase, offset: number, note: string) => {
+    const q = requests.find((x) => requestCovers(x, d) && !(x.operative_id && archived.has(x.operative_id)));
+    if (!q) {
+      firm.push(c);
+      return;
+    }
+    const f = folded.get(q.id) ?? { steps: [], urgent: false, notes: [] };
+    f.steps.push(...c.dueSteps.map((step) => offset + step));
+    f.urgent ||= !!c.urgent;
+    if (note) f.notes.push(note);
+    folded.set(q.id, f);
+  };
 
   // 1. Onboarding not finished (details / framework signature), measured from the latest invite.
   if (!signedAt && sub.invited_at && (sub.status === 'invited' || sub.status === 'in_progress')) {
@@ -130,11 +153,14 @@ export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
 
   if (signedAt) {
     const signedDay = signedAt.slice(0, 10);
+    // Something already asked for by a request is chased by the request (9), not listed twice.
+    const asked = (cat: string, opId: string | null) =>
+      requests.some((q) => q.status === 'open' && q.category === cat && (q.operative_id || null) === opId);
 
     // 3. Required documents never uploaded. Rejected and expired ones are chased separately
     //    below, so only "nothing at all" counts here.
     const missingCats = DOC_CATEGORIES.filter(
-      (c) => c.required(sub.details || {}) && !c.operative && !docs.some((x) => x.category === c.key)
+      (c) => c.required(sub.details || {}) && !c.operative && !docs.some((x) => x.category === c.key) && !asked(c.key, null)
     ).map((c) => c.label);
     if (missingCats.length) {
       firm.push({
@@ -156,7 +182,7 @@ export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
     // Each person's sequence runs from when they were added (or signing, if earlier).
     for (const o of team) {
       const missing = DOC_CATEGORIES.filter(
-        (c) => c.operative && c.required({}) && !docs.some((x) => x.operative_id === o.id && x.category === c.key)
+        (c) => c.operative && c.required({}) && !docs.some((x) => x.operative_id === o.id && x.category === c.key) && !asked(c.key, o.id)
       ).map((c) => c.label.toLowerCase());
       if (!missing.length) continue;
       firm.push({
@@ -167,18 +193,41 @@ export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
       });
     }
 
-    // 4. Rejected and not replaced. Any later upload of the same kind replaces it (including
-    //    one sent before we got round to reviewing), and only the newest rejection is chased.
+    // 4. A REQUIRED document whose only upload was rejected (the firm or person has nothing
+    //    acceptable of that kind). Any other rejection is chased only if Heliaxis asked for a
+    //    replacement — that's a document request (9, below).
     const live = activeDocs.filter((x) => x.status !== 'rejected');
+    const required = (r: DocumentRow) => {
+      const c = CATEGORY_BY_KEY[r.category];
+      return !!c && (c.operative ? c.required({}) : c.required(sub.details || {}));
+    };
+    // A request takes over this rejection if it's open, was answered (by a document still on
+    // file), or was cancelled by us AFTER this rejection — one cancelled earlier (e.g. when the
+    // document was approved for a while) says nothing about the rejection now.
+    const handled = (r: DocumentRow) =>
+      requests.some(
+        (q) =>
+          q.replaces_document_id === r.id &&
+          (q.status === 'open' ||
+            (q.status === 'fulfilled' && !!q.fulfilled_document_id) ||
+            (q.status === 'cancelled' && (q.cancelled_at ?? '') >= (r.reviewed_at ?? '')))
+      );
     for (const r of activeDocs.filter((x) => x.status === 'rejected' && x.reviewed_at)) {
-      if (live.some((x) => sameKind(x, r) && x.uploaded_at > r.uploaded_at)) continue;
+      if (!required(r) || handled(r)) continue;
+      // Covered by something acceptable: a newer upload, or one still in date.
+      if (live.some((x) => sameKind(x, r) && (x.uploaded_at > r.uploaded_at || !x.expires_on || daysUntil(x.expires_on) >= 0))) continue;
       if (activeDocs.some((x) => x.id !== r.id && x.status === 'rejected' && sameKind(x, r) && x.uploaded_at > r.uploaded_at)) continue;
-      firm.push({
-        kind: 'rejected',
-        subjectKey: r.id,
-        dueSteps: due(daysSince(r.reviewed_at as string), [2, 7]),
-        text: `Please upload a new ${docLabel(r)} — we couldn't accept the last one${r.review_note ? `: “${r.review_note}”` : '.'}`,
-      });
+      chaseDoc(
+        r,
+        {
+          kind: 'rejected',
+          subjectKey: r.id,
+          dueSteps: due(daysSince(r.reviewed_at as string), [2, 7]),
+          text: `Please upload a new ${docLabel(r)} — we couldn't accept the last one${r.review_note ? `: “${r.review_note}”` : '.'}`,
+        },
+        4000,
+        `We couldn't accept the last one${r.review_note ? ` (“${r.review_note}”)` : ''}.`
+      );
     }
   }
 
@@ -192,23 +241,35 @@ export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
       const siteCritical = d.category !== 'other';
       if (until >= 0 && until <= 30) {
         const band = [7, 14, 30].find((t) => until <= t)!;
-        firm.push({
-          kind: 'expiring',
-          subjectKey: key,
-          dueSteps: [band],
-          urgent: until <= 7,
-          text: `${docLabel(d)} expires on ${fmtDate(d.expires_on as string)} (in ${until} day${until === 1 ? '' : 's'}) — upload the renewal.`,
-        });
+        chaseDoc(
+          d,
+          {
+            kind: 'expiring',
+            subjectKey: key,
+            dueSteps: [band],
+            urgent: until <= 7,
+            text: `${docLabel(d)} expires on ${fmtDate(d.expires_on as string)} (in ${until} day${until === 1 ? '' : 's'}) — upload the renewal.`,
+          },
+          2000,
+          `Your current one expires on ${fmtDate(d.expires_on as string)}.`
+        );
       } else if (until < 0) {
-        firm.push({
-          kind: 'expired',
-          subjectKey: key,
-          dueSteps: due(-until, [0, 7, 14, 28]),
-          urgent: siteCritical,
-          text: siteCritical
-            ? `${docLabel(d)} EXPIRED on ${fmtDate(d.expires_on as string)}. Anyone relying on it can't work on a Heliaxis site until the renewal is uploaded (clause 3A.2).`
-            : `${docLabel(d)} expired on ${fmtDate(d.expires_on as string)} — upload the current version if you have one.`,
-        });
+        chaseDoc(
+          d,
+          {
+            kind: 'expired',
+            subjectKey: key,
+            dueSteps: due(-until, [0, 7, 14, 28]),
+            urgent: siteCritical,
+            text: siteCritical
+              ? `${docLabel(d)} EXPIRED on ${fmtDate(d.expires_on as string)}. Anyone relying on it can't work on a Heliaxis site until the renewal is uploaded (clause 3A.2).`
+              : `${docLabel(d)} expired on ${fmtDate(d.expires_on as string)} — upload the current version if you have one.`,
+          },
+          3000,
+          siteCritical
+            ? `Your current one EXPIRED on ${fmtDate(d.expires_on as string)} — anyone relying on it can't work on a Heliaxis site until it's replaced (clause 3A.2).`
+            : `Your current one expired on ${fmtDate(d.expires_on as string)}.`
+        );
         if (signedAt && siteCritical) {
           admin.push({
             kind: 'escalation',
@@ -270,6 +331,39 @@ export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
     }
   }
 
+  // 9. Documents Heliaxis has asked for (including replacements for rejected ones), until the
+  //    firm uploads against the request. The request itself was emailed when it was made.
+  //    A request for someone who has since left the team isn't chased.
+  for (const q of requests.filter((x) => x.status === 'open' && !(x.operative_id && archived.has(x.operative_id)))) {
+    const what = requestTitle(q);
+    const toDue = q.due_on ? daysUntil(q.due_on) : null;
+    const overdue = toDue !== null && toDue < 0;
+    const steps = due(daysSince(q.created_at), [3, 7, 14]);
+    if (toDue !== null && toDue >= 0 && toDue <= 1) steps.push(1001); // the day before it's needed
+    if (overdue) steps.push(1000);
+    const extra = folded.get(q.id); // the covered document's own chases (expiry, rejection)
+    if (extra) steps.push(...extra.steps);
+    const by = q.due_on ? ` — needed by ${fmtDate(q.due_on)}` : '';
+    const text = q.replaces_document_id
+      ? `Upload a new ${what} — we couldn't accept the last one${q.note ? `: “${q.note}”` : ''}${by}.`
+      : `Upload ${what} — requested by Heliaxis on ${fmtDate(q.created_at)}${by}${q.note ? ` (“${q.note}”)` : ''}.`;
+    firm.push({
+      kind: 'requested',
+      subjectKey: q.id,
+      dueSteps: steps,
+      urgent: overdue || (toDue !== null && toDue <= 1) || !!extra?.urgent,
+      text: extra?.notes.length ? `${text} ${[...new Set(extra.notes)].join(' ')}` : text,
+    });
+    if (overdue) {
+      admin.push({
+        kind: 'escalation',
+        subjectKey: `request:${q.id}`,
+        steps: [1000],
+        text: `${sub.company_name} hasn't uploaded ${what}, which you needed by ${fmtDate(q.due_on as string)}.`,
+      });
+    }
+  }
+
   return { firm, admin };
 }
 
@@ -323,6 +417,7 @@ export async function loadFirms(onlyId?: string): Promise<FirmData[]> {
     return m;
   };
   const [agrBy, docBy, opBy, jobBy, ntpBy] = [group(agrs), group(docs), group(ops), group(jobs), group(ntps)];
+  const reqBy = group(await loadRequests(onlyId));
 
   return subs.map((sub) => {
     const framework = (agrBy.get(sub.id) ?? []).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
@@ -335,8 +430,28 @@ export async function loadFirms(onlyId?: string): Promise<FirmData[]> {
       jobs: jobBy.get(sub.id) ?? [],
       ntps: firmNtps.filter((n) => n.status !== 'active'),
       activeNtpIds: new Set(firmNtps.filter((n) => n.status === 'active').map((n) => n.id)),
+      requests: reqBy.get(sub.id) ?? [],
     };
   });
+}
+
+/**
+ * Open document requests, plus any request that asked to replace a rejected document
+ * (whatever its status — it means that rejection is handled by the request, not chased
+ * on its own). Empty until supabase/portal-v3.sql has been run.
+ */
+async function loadRequests(onlyId?: string): Promise<DocRequestRow[]> {
+  const db = createAdminClient();
+  try {
+    return await readAll<DocRequestRow>((a, b) => {
+      let q = db.from('subcontractor_doc_requests').select('*').or('status.eq.open,replaces_document_id.not.is.null');
+      if (onlyId) q = q.eq('subcontractor_id', onlyId);
+      return q.order('id').range(a, b) as unknown as PromiseLike<{ data: DocRequestRow[] | null; error: { message: string } | null }>;
+    });
+  } catch (e) {
+    if (requestsTableMissing({ message: (e as Error).message })) return [];
+    throw e;
+  }
 }
 
 /** Every chase step already sent (new table + the previous expiry job's table). */

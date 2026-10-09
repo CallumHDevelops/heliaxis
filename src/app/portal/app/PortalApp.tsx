@@ -1,17 +1,19 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { NTP_TECHNOLOGIES } from '@/lib/subcontractors/ntp-agreement';
 import {
   ALLOWED_MIME,
+  CATEGORY_BY_KEY,
   compliance,
   DOC_CATEGORIES,
   expiryState,
   MAX_FILE_BYTES,
   operativeCompliance,
+  requestTitle,
   type DocCategory,
 } from '@/lib/subcontractors/documents';
 import {
@@ -22,6 +24,7 @@ import {
   type AssignmentRow,
   type DocumentRow,
   type OperativeRow,
+  type PortalRequest,
   type SubDetails,
   type SubStatus,
 } from '@/lib/subcontractors/types';
@@ -43,6 +46,8 @@ type Props = {
   agreement: { subName: string; subSignedAt: string; hlxName: string | null; hlxSignedAt: string | null } | null;
   documents: PortalDoc[];
   operatives: OperativeRow[];
+  /** Documents Heliaxis has asked for that haven't been uploaded yet. */
+  requests: PortalRequest[];
   jobs: AssignmentRow[];
   ntps: PortalNtp[];
   ntpViews: Record<string, ReactNode>;
@@ -62,7 +67,7 @@ async function post<T = Record<string, unknown>>(url: string, body: unknown, met
 const fmt = (iso: string | null) =>
   iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, ntpViews, hash, agreementView }: Props) {
+export function PortalApp({ sub, agreement, documents, operatives, requests, jobs, ntps, ntpViews, hash, agreementView }: Props) {
   const router = useRouter();
   const signed = !!agreement;
   const [details, setDetails] = useState<SubDetails>(() => ({
@@ -77,6 +82,9 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, n
   const [docs, setDocs] = useState<PortalDoc[]>(documents);
   const [team, setTeam] = useState<OperativeRow[]>(operatives);
   const activeTeam = team.filter((o) => !o.archived_at);
+  const [reqs, setReqs] = useState<PortalRequest[]>(requests);
+  // A request for someone who has since left the team can't be answered here.
+  const openReqs = reqs.filter((q) => !q.operativeId || activeTeam.some((o) => o.id === q.operativeId));
   const waitingJobs = jobs.filter((j) => j.status === 'awaiting_crew').length;
   const ntpToSign = ntps.filter((n) => n.status === 'awaiting_signature' && !n.signsByLink).length;
   const [step, setStep] = useState<Step>(
@@ -88,7 +96,9 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, n
           ? 'ntp'
           : waitingJobs
             ? 'jobs'
-            : !activeTeam.length
+            : openReqs.length
+              ? 'documents'
+              : !activeTeam.length
               ? 'team'
               : 'documents'
   );
@@ -99,7 +109,11 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, n
     { key: 'details', label: 'Your details', done: savedComplete },
     { key: 'agreement', label: 'Sign agreement', done: signed },
     { key: 'team', label: 'Your team', done: activeTeam.length > 0 },
-    { key: 'documents', label: 'Documents', done: !!sub.docsSubmittedAt && comp.ok },
+    {
+      key: 'documents',
+      label: openReqs.length ? `Documents (${openReqs.length} requested)` : 'Documents',
+      done: !!sub.docsSubmittedAt && comp.ok && !openReqs.length,
+    },
     { key: 'jobs', label: waitingJobs ? `Jobs (${waitingJobs} to answer)` : 'Jobs', done: !!jobs.length && !waitingJobs },
     ...(ntps.length
       ? [{ key: 'ntp' as Step, label: ntpToSign ? `NTP (${ntpToSign} to sign)` : 'NTP', done: !ntpToSign }]
@@ -123,7 +137,7 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, n
           </button>
         </div>
         <h1>{sub.companyName}</h1>
-        <StatusBanner status={sub.status} agreement={agreement} comp={comp} />
+        <StatusBanner status={sub.status} agreement={agreement} comp={comp} requested={openReqs.length} />
       </section>
 
       <nav className="pt-steps" aria-label="Onboarding steps">
@@ -176,6 +190,9 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, n
           details={details}
           docs={docs}
           setDocs={setDocs}
+          requests={openReqs}
+          onFulfilled={(ids) => setReqs((list) => list.filter((q) => !ids.includes(q.id)))}
+          onReopened={(back) => setReqs((list) => [...list.filter((q) => !back.some((b) => b.id === q.id)), ...back])}
           submittedAt={sub.docsSubmittedAt}
           onSubmitted={() => router.refresh()}
         />
@@ -188,16 +205,19 @@ function StatusBanner({
   status,
   agreement,
   comp,
+  requested,
 }: {
   status: SubStatus;
   agreement: Props['agreement'];
   comp: ReturnType<typeof compliance>;
+  /** Open document requests from Heliaxis. */
+  requested: number;
 }) {
   if (status === 'suspended')
     return <p className="pt-banner is-bad">Your account is suspended. Please contact Heliaxis.</p>;
   if (agreement?.hlxSignedAt)
     return (
-      <p className={`pt-banner ${comp.ok && !comp.expiring.length ? 'is-ok' : 'is-warn'}`}>
+      <p className={`pt-banner ${comp.ok && !comp.expiring.length && !requested ? 'is-ok' : 'is-warn'}`}>
         Agreement live since {fmt(agreement.hlxSignedAt)}.{' '}
         {comp.expired.length
           ? `${comp.expired.length} document(s) have expired — please upload renewals.`
@@ -205,7 +225,9 @@ function StatusBanner({
             ? `${comp.expiring.length} document(s) expire within 30 days — please upload renewals.`
             : comp.missing.length
               ? `Still needed: ${comp.missing.join(', ')}.`
-              : 'Your documents are up to date.'}
+              : requested
+                ? `Heliaxis has asked for ${requested === 1 ? 'a document' : `${requested} documents`} — see Documents.`
+                : 'Your documents are up to date.'}
       </p>
     );
   if (agreement)
@@ -469,6 +491,9 @@ function DocumentsStep({
   details,
   docs,
   setDocs,
+  requests,
+  onFulfilled,
+  onReopened,
   submittedAt,
   onSubmitted,
 }: {
@@ -476,6 +501,9 @@ function DocumentsStep({
   details: SubDetails;
   docs: PortalDoc[];
   setDocs: (fn: (d: PortalDoc[]) => PortalDoc[]) => void;
+  requests: PortalRequest[];
+  onFulfilled: (ids: string[]) => void;
+  onReopened: (reqs: PortalRequest[]) => void;
   submittedAt: string | null;
   onSubmitted: () => void;
 }) {
@@ -500,20 +528,46 @@ function DocumentsStep({
   async function remove(id: string) {
     if (!confirm('Remove this document?')) return;
     try {
-      await post('/api/portal/documents', { id }, 'DELETE');
+      const r = await post<{ reopened?: PortalRequest[] }>('/api/portal/documents', { id }, 'DELETE');
       setDocs((list) => list.filter((d) => d.id !== id));
+      // It was answering a request — that request is back on the list.
+      if (r.reopened?.length) onReopened(r.reopened);
     } catch (e) {
       alert((e as Error).message);
     }
   }
 
+  const [notice, setNotice] = useState('');
+  const liveRef = useRef<HTMLParagraphElement>(null);
+  const headRef = useRef<HTMLHeadingElement>(null);
+  const added = (doc: PortalDoc, fulfilled: string[], note?: string, fromCard = false) => {
+    setDocs((list) => [doc, ...list]);
+    if (fulfilled.length) onFulfilled(fulfilled);
+    setNotice(note || '');
+    // Uploaded from a request card: the card (and the button focused in it) has gone — keep the user's place.
+    if (fromCard) setTimeout(() => (note ? liveRef.current : headRef.current)?.focus(), 0);
+  };
+
   return (
     <div className="pt-card">
-      <h2>Documents</h2>
+      <h2 ref={headRef} tabIndex={-1}>Documents</h2>
       <p className="pt-muted">
         PDFs or clear photos, up to 15 MB each. Come back to this page whenever something renews — the agreement asks you
         to send renewals at least 30 days before expiry (Clause 3A.2).
       </p>
+
+      {/* Always present, so screen readers announce the text when it appears. */}
+      <p ref={liveRef} tabIndex={-1} className="pt-msg is-ok pt-live" role="status" aria-live="polite">
+        {notice}
+      </p>
+      {requests.length > 0 && (
+        <section className="pt-requests" aria-label="Requested by Heliaxis">
+          <h3>Heliaxis has asked for {requests.length === 1 ? 'this' : `these ${requests.length}`}</h3>
+          {requests.map((q) => (
+            <RequestCard key={q.id} q={q} operatives={operatives} onAdded={added} />
+          ))}
+        </section>
+      )}
 
       <div className="pt-cats">
         {DOC_CATEGORIES.map((cat) => (
@@ -523,7 +577,8 @@ function DocumentsStep({
             required={cat.required(details)}
             docs={docs.filter((d) => d.category === cat.key)}
             operatives={operatives}
-            onAdded={(doc) => setDocs((list) => [doc, ...list])}
+            requests={requests.filter((q) => q.category === cat.key)}
+            onAdded={added}
             onRemove={remove}
           />
         ))}
@@ -541,11 +596,50 @@ function DocumentsStep({
   );
 }
 
+const reqTitle = (q: PortalRequest) => requestTitle({ category: q.category, label: q.label, operative_name: q.operativeName });
+
+/** Something Heliaxis has asked for, with its own upload form. */
+function RequestCard({
+  q,
+  operatives,
+  onAdded,
+}: {
+  q: PortalRequest;
+  operatives: OperativeRow[];
+  onAdded: (d: PortalDoc, fulfilled: string[], notice?: string, fromCard?: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const cat = CATEGORY_BY_KEY[q.category];
+  const overdue = !!q.dueOn && expiryState(q.dueOn) === 'expired';
+  return (
+    <div className={`pt-request${overdue ? ' is-overdue' : ''}`}>
+      <div className="pt-request-head">
+        <div>
+          <strong>{q.replacement ? `New ${reqTitle(q)}` : reqTitle(q)}</strong>
+          <span className="pt-docmeta">
+            {[q.replacement ? 'Replacement for one we couldn’t accept' : `Requested ${fmt(q.createdAt)}`, q.dueOn && `${overdue ? 'was ' : ''}needed by ${fmt(q.dueOn)}`]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {q.note && <span className={q.replacement ? 'pt-docnote' : 'pt-reqnote'}>{q.replacement ? `Why: ${q.note}` : q.note}</span>}
+        </div>
+        {!open && cat && (
+          <button type="button" className="pt-btn" onClick={() => setOpen(true)}>
+            Upload
+          </button>
+        )}
+      </div>
+      {open && cat && <UploadForm cat={cat} operatives={operatives} requests={[]} fixed={q} onAdded={onAdded} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
 function CategoryCard({
   cat,
   required,
   docs,
   operatives,
+  requests,
   onAdded,
   onRemove,
 }: {
@@ -553,72 +647,21 @@ function CategoryCard({
   required: boolean;
   docs: PortalDoc[];
   operatives: OperativeRow[];
-  onAdded: (d: PortalDoc) => void;
+  /** Open requests in this category. */
+  requests: PortalRequest[];
+  onAdded: (d: PortalDoc, fulfilled: string[], notice?: string, fromCard?: boolean) => void;
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [operativeId, setOperativeId] = useState(operatives[0]?.id || '');
-  const [label, setLabel] = useState('');
-  const [reference, setReference] = useState('');
-  const [cover, setCover] = useState('');
-  const [expiresOn, setExpiresOn] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
   const has = docs.some((d) => d.status !== 'rejected');
 
-  async function upload(e: React.FormEvent) {
-    e.preventDefault();
-    if (!file) return setErr('Choose a file.');
-    // Some browsers (notably Windows) report HEIC photos with an empty type.
-    const mime = file.type || (/\.hei[cf]$/i.test(file.name) ? 'image/heic' : '');
-    if (!ALLOWED_MIME.includes(mime)) return setErr('Please upload a PDF or a photo (JPG, PNG, WebP, HEIC).');
-    if (file.size > MAX_FILE_BYTES) return setErr('Files must be under 15 MB.');
-    setBusy(true);
-    setErr('');
-    try {
-      const u = await post<{ path: string; uploadToken: string; bucket: string }>('/api/portal/upload-url', {
-        category: cat.key,
-        fileName: file.name,
-        size: file.size,
-        mime,
-      });
-      const { error } = await createClient().storage.from(u.bucket).uploadToSignedUrl(u.path, u.uploadToken, file, {
-        contentType: mime,
-      });
-      if (error) throw new Error('Upload failed — please check your connection and try again.');
-      const r = await post<{ document: PortalDoc }>('/api/portal/documents', {
-        path: u.path,
-        fileName: file.name,
-        mime,
-        size: file.size,
-        category: cat.key,
-        label,
-        operativeId,
-        reference,
-        cover,
-        expiresOn,
-      });
-      onAdded(r.document);
-      setFile(null);
-      setLabel('');
-      setReference('');
-      setCover('');
-      setExpiresOn('');
-      setOpen(false);
-    } catch (e2) {
-      setErr((e2 as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <section className={`pt-cat${required && !has ? ' is-needed' : ''}`}>
+    <section className={`pt-cat${(required && !has) || requests.length ? ' is-needed' : ''}`}>
       <header className="pt-cat-head">
         <div>
           <h3>
             {cat.label} {required ? <span className="pt-req">Required</span> : <span className="pt-opt">If applicable</span>}
+            {requests.length > 0 && <> <span className="pt-req">Requested</span></>}
           </h3>
           <p className="pt-hint">
             {cat.hint}
@@ -654,53 +697,165 @@ function CategoryCard({
         </ul>
       )}
 
-      {open && (
-        <form className="pt-upload" onSubmit={upload}>
-          <div className="pt-grid">
-            <Field label="File" wide>
-              <input
-                type="file"
-                accept={ALLOWED_MIME.join(',')}
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-            </Field>
-            {cat.operative && (
-              <Field label="Team member" hint={operatives.length ? undefined : 'Add your team first (Your team tab)'}>
-                <select value={operativeId} onChange={(e) => setOperativeId(e.target.value)} required>
-                  <option value="">Choose…</option>
-                  {operatives.map((o) => (
-                    <option key={o.id} value={o.id}>{o.full_name}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-            <Field label="Description" hint={cat.key === 'qualification' ? 'e.g. C&G 2391-52' : cat.key === 'card' ? 'e.g. ECS Gold card' : undefined}>
-              <input value={label} onChange={(e) => setLabel(e.target.value)} />
-            </Field>
-            <Field label={cat.cover ? 'Policy number' : 'Reference / card number'}>
-              <input value={reference} onChange={(e) => setReference(e.target.value)} />
-            </Field>
-            {cat.cover && (
-              <Field label="Cover amount" hint="e.g. £2,000,000">
-                <input value={cover} onChange={(e) => setCover(e.target.value)} />
-              </Field>
-            )}
-            {cat.expiry !== 'none' && (
-              <Field label={`Expiry date${cat.expiry === 'optional' ? ' (if any)' : ''}`}>
-                <input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} required={cat.expiry === 'required'} />
-              </Field>
-            )}
-          </div>
-          {err && <p className="pt-msg is-err">{err}</p>}
-          <div className="pt-row">
-            <button className="pt-btn" disabled={busy || !file}>{busy ? 'Uploading…' : 'Upload'}</button>
-            <button type="button" className="pt-btn-ghost" onClick={() => setOpen(false)} disabled={busy}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+      {open && <UploadForm cat={cat} operatives={operatives} requests={requests} onAdded={onAdded} onClose={() => setOpen(false)} />}
     </section>
+  );
+}
+
+/**
+ * Upload one file into a category. From a request card it answers that request (and the
+ * person is fixed); from a category with open requests it asks which one, if any, it's for.
+ */
+function UploadForm({
+  cat,
+  operatives,
+  requests,
+  fixed,
+  onAdded,
+  onClose,
+}: {
+  cat: DocCategory;
+  operatives: OperativeRow[];
+  requests: PortalRequest[];
+  fixed?: PortalRequest;
+  onAdded: (d: PortalDoc, fulfilled: string[], notice?: string, fromCard?: boolean) => void;
+  onClose: () => void;
+}) {
+  // From a category's "+ Add", the firm says which request (if any) this answers — never assumed,
+  // except when there's exactly one and it's a plain "any one of these" request.
+  const only = requests.length === 1 && !requests[0].label && !requests[0].operativeId ? requests[0].id : '';
+  const [forReq, setForReq] = useState(fixed?.id ?? only);
+  // The chosen request may have been answered (from its card) since this form opened.
+  const cur = fixed ? fixed.id : forReq === 'none' || requests.some((q) => q.id === forReq) ? forReq : '';
+  const sel = fixed ?? requests.find((q) => q.id === cur);
+  const [file, setFile] = useState<File | null>(null);
+  const [operativeId, setOperativeId] = useState(sel?.operativeId || operatives[0]?.id || '');
+  const [label, setLabel] = useState(sel?.label || '');
+  // The description we filled in from a request (replaced when the choice changes; typed text is kept).
+  const [autoLabel, setAutoLabel] = useState(sel?.label || '');
+  const [reference, setReference] = useState('');
+  const [cover, setCover] = useState('');
+  const [expiresOn, setExpiresOn] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  // A request for a named person can only be answered with that person's document.
+  const person = sel?.operativeId || operativeId;
+
+  function chooseRequest(id: string) {
+    setForReq(id);
+    const q = requests.find((x) => x.id === id);
+    if (q?.operativeId) setOperativeId(q.operativeId);
+    if (label === autoLabel) {
+      setLabel(q?.label || '');
+      setAutoLabel(q?.label || '');
+    }
+  }
+
+  async function upload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return setErr('Choose a file.');
+    if (!fixed && requests.length && !cur) return setErr('Say whether this is for something Heliaxis asked for.');
+    // Some browsers (notably Windows) report HEIC photos with an empty type.
+    const mime = file.type || (/\.hei[cf]$/i.test(file.name) ? 'image/heic' : '');
+    if (!ALLOWED_MIME.includes(mime)) return setErr('Please upload a PDF or a photo (JPG, PNG, WebP, HEIC).');
+    if (file.size > MAX_FILE_BYTES) return setErr('Files must be under 15 MB.');
+    setBusy(true);
+    setErr('');
+    try {
+      const u = await post<{ path: string; uploadToken: string; bucket: string }>('/api/portal/upload-url', {
+        category: cat.key,
+        fileName: file.name,
+        size: file.size,
+        mime,
+      });
+      const { error } = await createClient().storage.from(u.bucket).uploadToSignedUrl(u.path, u.uploadToken, file, {
+        contentType: mime,
+      });
+      if (error) throw new Error('Upload failed — please check your connection and try again.');
+      const r = await post<{ document: PortalDoc; fulfilled?: string[] }>('/api/portal/documents', {
+        path: u.path,
+        fileName: file.name,
+        mime,
+        size: file.size,
+        category: cat.key,
+        label,
+        operativeId: person,
+        reference,
+        cover,
+        expiresOn,
+        requestId: fixed ? fixed.id : requests.length ? cur : undefined,
+      });
+      const fulfilled = r.fulfilled ?? [];
+      // Uploaded against a request that had already been closed (by Heliaxis, or from another
+      // device): drop it from the page and say so, rather than leave it looking unanswered.
+      const asked = fixed?.id ?? (cur && cur !== 'none' ? cur : '');
+      if (asked && !fulfilled.includes(asked)) {
+        onAdded(r.document, [...fulfilled, asked], 'Uploaded. That request had already been closed, so there was nothing left to tick off.', !!fixed);
+      } else {
+        onAdded(r.document, fulfilled, undefined, !!fixed);
+      }
+      onClose();
+    } catch (e2) {
+      setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="pt-upload" onSubmit={upload}>
+      <div className="pt-grid">
+        {!fixed && requests.length > 0 && (
+          <Field label="Is this for something Heliaxis asked for?" wide>
+            <select value={cur} onChange={(e) => chooseRequest(e.target.value)} required>
+              <option value="" disabled>
+                Choose…
+              </option>
+              {requests.map((q) => (
+                <option key={q.id} value={q.id}>Yes — {reqTitle(q)}</option>
+              ))}
+              <option value="none">No — something else</option>
+            </select>
+          </Field>
+        )}
+        <Field label="File" wide>
+          <input type="file" accept={ALLOWED_MIME.join(',')} onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </Field>
+        {cat.operative && (
+          <Field label="Team member" hint={operatives.length ? undefined : 'Add your team first (Your team tab)'}>
+            <select value={person} onChange={(e) => setOperativeId(e.target.value)} disabled={!!sel?.operativeId} required>
+              <option value="">Choose…</option>
+              {operatives.map((o) => (
+                <option key={o.id} value={o.id}>{o.full_name}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Field label="Description" hint={cat.key === 'qualification' ? 'e.g. C&G 2391-52' : cat.key === 'card' ? 'e.g. ECS Gold card' : undefined}>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} />
+        </Field>
+        <Field label={cat.cover ? 'Policy number' : 'Reference / card number'}>
+          <input value={reference} onChange={(e) => setReference(e.target.value)} />
+        </Field>
+        {cat.cover && (
+          <Field label="Cover amount" hint="e.g. £2,000,000">
+            <input value={cover} onChange={(e) => setCover(e.target.value)} />
+          </Field>
+        )}
+        {cat.expiry !== 'none' && (
+          <Field label={`Expiry date${cat.expiry === 'optional' ? ' (if any)' : ''}`}>
+            <input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} required={cat.expiry === 'required'} />
+          </Field>
+        )}
+      </div>
+      {err && <p className="pt-msg is-err">{err}</p>}
+      <div className="pt-row">
+        <button className="pt-btn" disabled={busy || !file}>{busy ? 'Uploading…' : 'Upload'}</button>
+        <button type="button" className="pt-btn-ghost" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

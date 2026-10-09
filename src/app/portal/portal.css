@@ -311,3 +311,18 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-team li > div { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .pt-crew .pt-check { flex: 1; }
 .pt-team.is-archived li { opacity: 0.7; }
+
+/* Documents Heliaxis has asked for */
+.pt-requests { border: 1px solid rgba(199, 127, 4, 0.5); border-left: 3px solid var(--amber); background: rgba(199, 127, 4, 0.07); border-radius: 3px; padding: 0.85rem; margin: 0 0 1rem; display: grid; gap: 0.6rem; }
+.pt-requests > h3 { margin: 0; font-size: 1rem; }
+.pt-request { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 0.7rem; min-width: 0; }
+.pt-request.is-overdue { border-color: rgba(163, 50, 42, 0.45); }
+.pt-request-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; flex-wrap: wrap; }
+.pt-request-head > div { display: grid; gap: 0.2rem; min-width: 0; }
+.pt-request.is-overdue .pt-docmeta { color: var(--bad); }
+.pt-reqnote { font-size: 0.85rem; color: var(--ink); }
+/* Long URLs / references in a request note mustn't widen the page on a phone. */
+.pt-request-head > div, .pt-reqnote, .pt-request .pt-docnote { overflow-wrap: anywhere; }
+.pt-live:empty { margin: 0; }
+/* Rejection reasons and firm-entered references can be long unbroken strings. */
+.pt-docnote, .pt-doclist li { overflow-wrap: anywhere; }

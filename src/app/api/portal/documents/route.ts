@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { CATEGORY_BY_KEY } from '@/lib/subcontractors/documents';
 import { clientIp, DOCS_BUCKET, logEvent } from '@/lib/subcontractors/server';
 import { jsonError, portalRequest, str } from '@/lib/subcontractors/portal-request';
+import { fulfilRequestsForUpload, reopenRequestsForDocument, toPortalRequest } from '@/lib/subcontractors/requests';
+import type { DocumentRow } from '@/lib/subcontractors/types';
 
 type Body = {
   path: string;
@@ -15,6 +17,8 @@ type Body = {
   reference?: string;
   cover?: string;
   expiresOn?: string;
+  /** The document request this upload answers ('none' = not for a request). */
+  requestId?: string;
 };
 
 /** Identify a file by its magic bytes. Returns the real MIME type or null. */
@@ -87,7 +91,10 @@ export async function POST(req: Request) {
   if (error) return jsonError('Could not save the document — please try again.', 500);
 
   await logEvent(sub.id, 'subcontractor', 'document_uploaded', { category: cat.key, file: body.fileName }, clientIp(req.headers));
-  return NextResponse.json({ ok: true, document: data });
+  const fulfilled = await fulfilRequestsForUpload(sub, data as DocumentRow, body.requestId);
+  const document: Partial<DocumentRow> = { ...(data as DocumentRow) };
+  delete document.storage_path; // the browser never needs the storage key
+  return NextResponse.json({ ok: true, document, fulfilled });
 }
 
 /** Subcontractors may withdraw a document until Heliaxis has reviewed it. */
@@ -106,8 +113,10 @@ export async function DELETE(req: Request) {
   if (!doc) return jsonError('Document not found.', 404);
   if (doc.status === 'approved') return jsonError('Approved documents can only be removed by Heliaxis.', 409);
 
+  // Anything this document answered is open again (done before the delete clears the link).
+  const reopened = await reopenRequestsForDocument(sub.id, doc);
   await admin.storage.from(DOCS_BUCKET).remove([doc.storage_path]);
   await admin.from('subcontractor_documents').delete().eq('id', doc.id);
   await logEvent(sub.id, 'subcontractor', 'document_removed', { file: doc.file_name }, clientIp(req.headers));
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, reopened: reopened.map(toPortalRequest) });
 }

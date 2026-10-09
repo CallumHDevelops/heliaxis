@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { STATUS_LABEL, type SubStatus } from '@/lib/subcontractors/types';
+import { STATUS_LABEL, type CisRate, type SubStatus } from '@/lib/subcontractors/types';
 import { createSubcontractor, sendFreshLinksToAll } from './actions';
 import { FRESH_LINK_MESSAGE } from '@/lib/subcontractors/messages';
 import { EMPTY_TERMS, TermsForm } from './TermsForm';
@@ -23,7 +23,15 @@ export type ListRow = {
   expired: number;
   expiring: number;
   pendingReview: number;
+  /** Verified with HMRC by our accountants (and at what rate). */
+  cisVerified: boolean;
+  cisRate: CisRate | null;
 };
+
+const CIS_SHORT: Record<CisRate, string> = { gross: 'gross', net: '20%', higher: '30%' };
+
+/** Firms we work with (or are about to) need verifying with HMRC before they're paid. */
+const needsCis = (r: ListRow) => !r.cisVerified && (r.status === 'active' || r.status === 'awaiting_countersign');
 
 type Filter = 'all' | 'onboarding' | 'awaiting_countersign' | 'active' | 'attention' | 'inactive';
 
@@ -32,7 +40,7 @@ const fmt = (iso: string | null) =>
 
 function needsAttention(r: ListRow) {
   return r.status === 'awaiting_countersign' || r.pendingReview > 0 || r.expired > 0 || r.expiring > 0 ||
-    (r.status === 'active' && r.missing.length > 0);
+    (r.status === 'active' && r.missing.length > 0) || needsCis(r);
 }
 
 export function SubcontractorsList({ rows, recipients }: { rows: ListRow[]; recipients: number }) {
@@ -165,7 +173,16 @@ export function SubcontractorsList({ rows, recipients }: { rows: ListRow[]; reci
                     <span className="sc-sub">{r.contactName} · {r.ref}</span>
                   </td>
                   <td>{r.trade || '—'}</td>
-                  <td><span className={`sc-status s-${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
+                  <td>
+                    <span className="sc-doc-cell">
+                      <span className={`sc-status s-${r.status}`}>{STATUS_LABEL[r.status]}</span>
+                      {r.cisVerified ? (
+                        <span className="sc-pill is-ok" title="Verified with HMRC">CIS ✓{r.cisRate ? ` ${CIS_SHORT[r.cisRate]}` : ''}</span>
+                      ) : (
+                        needsCis(r) && <span className="sc-pill is-warn">CIS not verified</span>
+                      )}
+                    </span>
+                  </td>
                   <td>
                     <span className="sc-doc-cell">
                       {r.docCount} on file

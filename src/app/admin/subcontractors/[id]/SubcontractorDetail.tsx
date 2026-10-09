@@ -4,13 +4,27 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
-import { CATEGORY_BY_KEY, compliance, DOC_CATEGORIES, expiryState, operativeCompliance } from '@/lib/subcontractors/documents';
+import {
+  CATEGORY_BY_KEY,
+  compliance,
+  DOC_CATEGORIES,
+  expiryState,
+  londonToday,
+  operativeCompliance,
+  requestCovers,
+  requestTitle,
+  sameDocKind,
+} from '@/lib/subcontractors/documents';
 import {
   CIS_LABEL,
+  CIS_RATE_LABEL,
+  DECLARED_CIS_RATE,
+  type CisRate,
   ENTITY_LABEL,
   ASSIGNMENT_LABEL,
   STATUS_LABEL,
   type AssignmentRow,
+  type DocRequestRow,
   type DocumentRow,
   type EventRow,
   type OperativeRow,
@@ -20,11 +34,15 @@ import {
   type SubcontractorRow,
 } from '@/lib/subcontractors/types';
 import {
+  cancelDocumentRequest,
+  requestDocument,
+  resendDocumentRequest,
   updateDocumentDetails,
   cancelNtp,
   remindNow,
   resendNtpLink,
   setRemindersPaused,
+  setCisVerification,
   countersign,
   countersignNtp,
   deleteDocument,
@@ -73,6 +91,13 @@ const CHANGE_LABEL: Record<string, string> = {
 const EVENT_LABEL: Record<string, string> = {
   signed_in: 'Signed in',
   document_updated: 'Document renamed / moved',
+  cis_verified: 'CIS verified with HMRC',
+  cis_verification_removed: 'CIS verification removed',
+  document_requested: 'Document requested',
+  document_request_resent: 'Document request emailed again',
+  document_request_cancelled: 'Document request cancelled',
+  document_request_fulfilled: 'Requested document uploaded',
+  document_request_reopened: 'Document request reopened (upload withdrawn)',
   reminder_digest_sent: 'Reminder emailed',
   reminders_paused: 'Reminders paused',
   reminders_resumed: 'Reminders resumed',
@@ -125,6 +150,7 @@ export function SubcontractorDetail({
   jobs,
   pulls,
   ntps,
+  requests,
   reminders,
 }: {
   sub: SubcontractorRow;
@@ -136,6 +162,8 @@ export function SubcontractorDetail({
   jobs: AssignmentRow[];
   pulls: PullRow[];
   ntps: NtpRow[];
+  /** Document requests (newest first), every status. */
+  requests: DocRequestRow[];
   reminders: { paused: boolean; outstanding: { kind: string; text: string; urgent: boolean }[] };
 }) {
   const router = useRouter();
@@ -160,6 +188,20 @@ export function SubcontractorDetail({
     );
     setPending(still);
   }
+  // Document requests, kept locally the same way (server copy wins on refresh).
+  const [reqs, setReqs] = useState(requests);
+  const [reqsFrom, setReqsFrom] = useState(requests);
+  if (reqsFrom !== requests) {
+    setReqsFrom(requests);
+    setReqs(requests);
+  }
+  const openReqs = reqs.filter((q) => q.status === 'open');
+  const upsertReq = (next: DocRequestRow) => setReqs((all) => [next, ...all.filter((x) => x.id !== next.id)]);
+  const [requesting, setRequesting] = useState(false);
+  // Focus to restore once a form closes: the "Request a document" button, or a row moved to another category.
+  const focusReqBtn = useRef(false);
+  const focusRemindersBtn = useRef(false);
+  const focusDocRef = useRef<string | null>(null);
   // After a burst of changes, quietly re-sync the server-worked-out bits (reminders preview, activity).
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resyncSoon = () => {
@@ -204,7 +246,11 @@ export function SubcontractorDetail({
         <span className={`sc-status s-${sub.status}`}>{STATUS_LABEL[sub.status]}</span>
       </div>
 
-      {flash && <div className={`sc-banner is-${flash.kind}`}>{flash.text}</div>}
+      {flash && (
+        <div className={`sc-banner is-${flash.kind}`} role="status">
+          {flash.text}
+        </div>
+      )}
       {link && (
         <div className="sc-banner is-ok">
           New portal link (the previous one no longer works):
@@ -247,6 +293,26 @@ export function SubcontractorDetail({
             }}
           >
             Sign out everywhere
+          </button>
+        )}
+        {sub.status !== 'terminated' && (
+          <button
+            className="sc-btn-ghost"
+            disabled={busy}
+            ref={(el) => {
+              if (el && focusRemindersBtn.current) {
+                focusRemindersBtn.current = false;
+                el.focus();
+              }
+            }}
+            onClick={() =>
+              run(
+                () => setRemindersPaused(sub.id, !reminders.paused),
+                reminders.paused ? 'Automatic reminders resumed.' : 'Automatic reminders paused.'
+              )
+            }
+          >
+            {reminders.paused ? 'Resume reminders' : 'Pause reminders'}
           </button>
         )}
         {sub.status === 'active' && (
@@ -319,8 +385,56 @@ export function SubcontractorDetail({
 
           {/* ---------------- documents ---------------- */}
           <section className="sc-card">
-            <h2>Documents</h2>
+            <div className="sc-row-between">
+              <h2>Documents</h2>
+              {sub.status !== 'terminated' && !requesting && (
+                <button
+                  className="sc-btn-ghost"
+                  onClick={() => setRequesting(true)}
+                  ref={(el) => {
+                    if (el && focusReqBtn.current) {
+                      focusReqBtn.current = false;
+                      el.focus();
+                    }
+                  }}
+                >
+                  Request a document
+                </button>
+              )}
+            </div>
+            {requesting && (
+              <RequestForm
+                subId={sub.id}
+                team={team}
+                onDone={(req, warning) => {
+                  upsertReq(req);
+                  focusReqBtn.current = true;
+                  setRequesting(false);
+                  if (warning) alert(warning);
+                  resyncSoon();
+                }}
+                onCancel={() => {
+                  focusReqBtn.current = true;
+                  setRequesting(false);
+                }}
+              />
+            )}
             <ComplianceSummary comp={comp} />
+            {openReqs.length > 0 && (
+              <div className="sc-doc-group">
+                <h3>Requested from them</h3>
+                {openReqs.map((q) => (
+                  <RequestRow
+                    key={q.id}
+                    req={q}
+                    onChange={(next) => {
+                      upsertReq(next);
+                      resyncSoon();
+                    }}
+                  />
+                ))}
+              </div>
+            )}
             {DOC_CATEGORIES.map((cat) => {
               const list = docs.filter((x) => x.category === cat.key);
               if (!list.length && !cat.required(d)) return null;
@@ -334,8 +448,31 @@ export function SubcontractorDetail({
                   {list.map((doc) => (
                     <DocRow
                       key={doc.id}
+                      subId={sub.id}
                       doc={doc}
                       team={team}
+                      replacementAsked={
+                        openReqs.some((q) => requestCovers(q, doc)) ||
+                        reqs.some(
+                          (q) =>
+                            q.status === 'fulfilled' &&
+                            q.replaces_document_id === doc.id &&
+                            docs.some((x) => x.id === q.fulfilled_document_id && x.status !== 'rejected')
+                        )
+                      }
+                      superseded={docs.some(
+                        (x) => x.id !== doc.id && x.status !== 'rejected' && x.uploaded_at > doc.uploaded_at && sameDocKind(doc, x)
+                      )}
+                      focusDocRef={focusDocRef}
+                      onRequested={(req, warning) => {
+                        upsertReq(req);
+                        if (warning) alert(warning);
+                        resyncSoon();
+                      }}
+                      onRequestsClosed={(ids) => {
+                        setReqs((all) => all.filter((x) => !ids.includes(x.id)));
+                        resyncSoon();
+                      }}
                       onChange={(id, patch, review) => {
                         if (review === 'start') setPending((p) => ({ ...p, [id]: patch }));
                         if (review === 'failed')
@@ -369,12 +506,18 @@ export function SubcontractorDetail({
         </div>
 
         <aside className="sc-col-side">
-          <RemindersPanel
-            subId={sub.id}
-            paused={reminders.paused}
-            terminated={sub.status === 'terminated'}
-            outstanding={reminders.outstanding}
-          />
+          {sub.status !== 'terminated' && (reminders.paused || reminders.outstanding.length > 0) && (
+            <RemindersPanel
+              subId={sub.id}
+              paused={reminders.paused}
+              outstanding={reminders.outstanding}
+              onFlash={(f, toggled) => {
+                if (toggled) focusRemindersBtn.current = true;
+                setFlash(f);
+              }}
+            />
+          )}
+          <CisPanel sub={sub} />
           <TeamPanel
             team={team}
             documents={docs}
@@ -466,6 +609,8 @@ export function SubcontractorDetail({
                   <span>
                     {EVENT_LABEL[e.type] || e.type}
                     {e.type === 'status_changed' && e.detail?.status ? ` → ${STATUS_LABEL[e.detail.status as keyof typeof STATUS_LABEL]}` : ''}
+                    {e.type === 'cis_verified' && typeof e.detail?.rate === 'string' && ` — ${CIS_RATE_LABEL[e.detail.rate as CisRate] ?? e.detail.rate}`}
+                    {typeof e.detail?.request === 'string' && <em> {e.detail.request}</em>}
                     {typeof e.detail?.file === 'string' && <em> {e.detail.file}</em>}
                     {e.type === 'document_updated' && !!e.detail?.changes && typeof e.detail.changes === 'object' && (
                       <span className="sc-sub">
@@ -653,29 +798,54 @@ function PullsPanel({ pulls }: { pulls: PullRow[] }) {
 }
 
 function DocRow({
+  subId,
   doc,
   team,
+  replacementAsked,
+  superseded,
+  focusDocRef,
+  onRequested,
+  onRequestsClosed,
   onChange,
   onRemoved,
 }: {
+  subId: string;
   doc: DocumentRow;
   team: OperativeRow[];
+  /** They've already been asked for this document (an open request, or a replacement that's been sent in). */
+  replacementAsked: boolean;
+  /** A newer copy of the same document has been uploaded (and isn't rejected). */
+  superseded: boolean;
+  /** Set to this row's id before it moves category, so the re-mounted row takes focus. */
+  focusDocRef: React.MutableRefObject<string | null>;
+  onRequested: (req: DocRequestRow, warning?: string) => void;
+  /** Open requests this decision closed (cancelled, or answered by this document). */
+  onRequestsClosed: (ids: string[]) => void;
   /** Merge a change into the row. `review`: 'start' = optimistic decision, 'failed' = put it back. */
   onChange: (id: string, patch: Partial<DocumentRow>, review?: 'start' | 'failed') => void;
   onRemoved: (id: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [asking, setAsking] = useState(false);
   const ex = expiryState(doc.expires_on);
+  // The person it belongs to has left the team: a replacement can't be asked of them.
+  const personLeft = !!doc.operative_id && !team.some((o) => o.id === doc.operative_id && !o.archived_at);
+  // When an inline form closes, put keyboard focus back on the row (its ▾, or its link while busy).
+  const rowRef = useRef<HTMLDivElement>(null);
+  // (A timer, not requestAnimationFrame — that never fires while the tab is in the background.)
+  const refocus = () =>
+    setTimeout(() => {
+      const btn = rowRef.current?.querySelector<HTMLButtonElement>('.sc-menu-btn');
+      (btn && !btn.disabled ? btn : rowRef.current?.querySelector<HTMLAnchorElement>('.sc-doc-main a'))?.focus();
+    }, 0);
 
   // Optimistic: the row (and everything worked out from it) changes the moment you click;
   // the save runs in the background and the row is put back if it fails.
-  async function review(status: 'approved' | 'rejected' | 'pending') {
-    let note = '';
-    if (status === 'rejected') {
-      note = prompt('Reason for rejecting (shown to the subcontractor):') || '';
-      if (!note) return;
-    }
+  async function review(status: 'approved' | 'rejected' | 'pending', note = '', askForReplacement = false) {
+    setRejecting(false);
+    setAsking(false);
     const before = { status: doc.status, review_note: doc.review_note, reviewed_at: doc.reviewed_at };
     onChange(
       doc.id,
@@ -683,12 +853,17 @@ function DocRow({
       'start'
     );
     setBusy(true);
-    const r = await safe(() => reviewDocument(doc.id, status, note));
+    const r = await safe(() => reviewDocument(doc.id, status, note, { requestReplacement: askForReplacement }));
     setBusy(false);
     if (!r.ok) {
       onChange(doc.id, before, 'failed');
       alert(`Couldn't save: ${r.error}`);
+      return;
     }
+    const done = r as { request?: DocRequestRow; closedRequests?: string[]; warning?: string };
+    if (done.request) onRequested(done.request, done.warning);
+    else if (done.warning) alert(done.warning);
+    if (done.closedRequests?.length) onRequestsClosed(done.closedRequests);
   }
 
   async function remove() {
@@ -702,7 +877,10 @@ function DocRow({
 
   const items: MenuItem[] = [
     ...(doc.status !== 'approved' && doc.status !== 'pending' ? [{ label: 'Approve', onSelect: () => review('approved') }] : []),
-    ...(doc.status !== 'rejected' && doc.status !== 'pending' ? [{ label: 'Reject…', onSelect: () => review('rejected') }] : []),
+    ...(doc.status !== 'rejected' && doc.status !== 'pending' ? [{ label: 'Reject…', onSelect: () => setRejecting(true) }] : []),
+    ...(doc.status === 'rejected' && !replacementAsked && !personLeft && !superseded
+      ? [{ label: 'Ask for a replacement…', onSelect: () => setAsking(true) }]
+      : []),
     ...(doc.status !== 'pending' ? [{ label: 'Reset to “to review”', onSelect: () => review('pending') }] : []),
     { label: 'Rename / move…', onSelect: () => setEditing(true) },
     { label: 'Download', href: `/api/admin/subcontractor-docs/${doc.id}?download=1` },
@@ -710,13 +888,23 @@ function DocRow({
   ];
 
   return (
-    <div className={`sc-doc s-${doc.status}`}>
+    <div
+      className={`sc-doc s-${doc.status}`}
+      ref={(el) => {
+        rowRef.current = el;
+        if (el && focusDocRef.current === doc.id) {
+          focusDocRef.current = null;
+          el.querySelector<HTMLButtonElement>('.sc-menu-btn')?.focus();
+        }
+      }}
+    >
       <div className="sc-doc-main">
         <a href={`/api/admin/subcontractor-docs/${doc.id}`} target="_blank" rel="noreferrer">{doc.label || doc.file_name}</a>
         <span className="sc-sub">
           {[doc.operative_name, doc.cover_amount, doc.reference, `uploaded ${fmt(doc.uploaded_at)}`].filter(Boolean).join(' · ')}
         </span>
         {doc.status === 'rejected' && doc.review_note && <span className="sc-sub is-bad">Rejected: {doc.review_note}</span>}
+        {doc.status === 'rejected' && replacementAsked && <span className="sc-sub">Replacement asked for</span>}
       </div>
       <div className="sc-doc-side">
         {doc.expires_on && (
@@ -734,18 +922,63 @@ function DocRow({
           {doc.status === 'pending' && (
             <>
               <button className="is-primary" disabled={busy} onClick={() => review('approved')}>Approve</button>
-              <button disabled={busy} onClick={() => review('rejected')}>Reject</button>
+              <button disabled={busy || rejecting} onClick={() => setRejecting(true)}>Reject</button>
             </>
           )}
           <DocMenu items={items} disabled={busy} label={`More actions for ${doc.label || doc.file_name}`} />
         </div>
       </div>
+      {rejecting && (
+        <RejectForm
+          doc={doc}
+          personLeft={personLeft}
+          superseded={superseded}
+          alreadyAsked={replacementAsked}
+          onSubmit={(note, ask) => {
+            review('rejected', note, ask);
+            refocus();
+          }}
+          onCancel={() => {
+            setRejecting(false);
+            refocus();
+          }}
+        />
+      )}
+      {asking && doc.status === 'rejected' && (
+        <RequestForm
+          subId={subId}
+          team={team}
+          preset={{
+            category: doc.category,
+            operativeId: doc.operative_id ?? null,
+            label: doc.label,
+            note: doc.review_note,
+            replacesDocumentId: doc.id,
+          }}
+          onDone={(req, warning, closed) => {
+            setAsking(false);
+            onRequested(req, warning);
+            if (closed?.length) onRequestsClosed(closed);
+            refocus();
+          }}
+          onCancel={() => {
+            setAsking(false);
+            refocus();
+          }}
+        />
+      )}
       {editing && (
         <DocEditor
           doc={doc}
           team={team}
-          onCancel={() => setEditing(false)}
+          onCancel={() => {
+            setEditing(false);
+            refocus();
+          }}
           onSaved={(next) => {
+            // Moving category re-mounts the row under its new heading; it takes focus itself then.
+            const moved = next.category !== doc.category;
+            if (moved) focusDocRef.current = doc.id;
             onChange(doc.id, {
               label: next.label,
               category: next.category,
@@ -755,6 +988,7 @@ function DocRow({
               cover_amount: next.cover_amount,
             });
             setEditing(false);
+            if (!moved) refocus();
           }}
         />
       )}
@@ -837,8 +1071,8 @@ function DocMenu({ items, disabled, label }: { items: MenuItem[]; disabled?: boo
                 role="menuitem"
                 className={it.danger ? 'is-danger' : undefined}
                 onClick={() => {
-                  // Delete removes the row and Rename opens a form that takes focus itself.
-                  close(!it.danger && !it.label.startsWith('Rename'));
+                  // "…" items open a form (which takes focus itself) or a confirm; Delete removes the row.
+                  close(!it.danger && !it.label.endsWith('…'));
                   it.onSelect?.();
                 }}
               >
@@ -937,6 +1171,350 @@ function DocEditor({
         <button type="button" className="sc-btn-ghost" onClick={onCancel}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+/** Ask the firm for a document — anything, or a replacement for one that was rejected. */
+function RequestForm({
+  subId,
+  team,
+  preset,
+  onDone,
+  onCancel,
+}: {
+  subId: string;
+  team: OperativeRow[];
+  /** Asking for a replacement: what was rejected, and why. */
+  preset?: { category: string; operativeId: string | null; label: string | null; note: string | null; replacesDocumentId: string };
+  onDone: (request: DocRequestRow, warning?: string, closed?: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [category, setCategory] = useState(preset?.category || DOC_CATEGORIES[0].key);
+  const people = team.filter((o) => !o.archived_at);
+  const [operativeId, setOperativeId] = useState(
+    preset?.operativeId && people.some((o) => o.id === preset.operativeId) ? preset.operativeId : ''
+  );
+  const [label, setLabel] = useState(preset?.label || '');
+  const [note, setNote] = useState(preset?.note || '');
+  const [dueOn, setDueOn] = useState('');
+  const [email, setEmail] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const cat = CATEGORY_BY_KEY[category];
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr('');
+    const r = await safe(() =>
+      requestDocument(subId, {
+        category,
+        operativeId: cat?.operative ? operativeId || null : null,
+        label,
+        note,
+        dueOn: dueOn || null,
+        email,
+        replacesDocumentId: preset?.replacesDocumentId ?? null,
+      })
+    );
+    setBusy(false);
+    if (r.ok) {
+      const done = r as { request: DocRequestRow; warning?: string; closedRequests?: string[] };
+      onDone(done.request, done.warning, done.closedRequests);
+    }
+    else setErr(r.error || 'Could not save');
+  }
+
+  return (
+    <form className="sc-doc-edit sc-request-form" onSubmit={save}>
+      <div className="sc-grid">
+        <label>
+          Document
+          <select value={category} onChange={(e) => setCategory(e.target.value)} autoFocus={!preset}>
+            {DOC_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>{c.label}</option>
+            ))}
+          </select>
+        </label>
+        {cat?.operative && (
+          <label>
+            For
+            <select value={operativeId} onChange={(e) => setOperativeId(e.target.value)}>
+              <option value="">Anyone on their team</option>
+              {people.map((o) => (
+                <option key={o.id} value={o.id}>{o.full_name}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label>
+          What exactly (optional)
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={category === 'card' ? 'e.g. IPAF card' : category === 'qualification' ? 'e.g. 18th Edition' : 'e.g. current certificate'}
+          />
+        </label>
+        <label>
+          Needed by (optional)
+          <input type="date" value={dueOn} onChange={(e) => setDueOn(e.target.value)} />
+        </label>
+      </div>
+      <label className="sc-field-wide">
+        {preset ? 'Reason (they see this)' : 'Note to them (optional)'}
+        <textarea className="sc-notes" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} autoFocus={!!preset} />
+      </label>
+      <label className="sc-check">
+        <input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} />
+        Email them now (they&apos;re reminded on day 3, 7 and 14 until they upload it)
+      </label>
+      {err && <p className="sc-error">{err}</p>}
+      <div className="sc-row">
+        <button className="sc-btn" disabled={busy}>{busy ? 'Sending…' : email ? 'Send request' : 'Save request'}</button>
+        <button type="button" className="sc-btn-ghost" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+/** An open request: what was asked for, when, and resend / cancel behind the ▾. */
+function RequestRow({
+  req,
+  onChange,
+}: {
+  req: DocRequestRow;
+  onChange: (next: DocRequestRow) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const overdue = !!req.due_on && expiryState(req.due_on) === 'expired';
+
+  async function act(fn: () => Promise<{ ok: boolean; error?: string }>) {
+    setBusy(true);
+    const r = await safe(fn);
+    setBusy(false);
+    if (r.ok) onChange((r as unknown as { request: DocRequestRow }).request);
+    else alert(r.error || 'Something went wrong');
+  }
+
+  return (
+    <div className={`sc-doc sc-request${overdue ? ' is-overdue' : ''}`}>
+      <div className="sc-doc-main">
+        <strong>{req.replaces_document_id ? `Replacement: ${requestTitle(req)}` : requestTitle(req)}</strong>
+        <span className="sc-sub">
+          {[
+            `asked ${fmt(req.created_at)}`,
+            req.emailed_at ? `emailed ${fmt(req.emailed_at)}` : 'not emailed',
+            req.due_on && `${overdue ? 'was ' : ''}needed by ${fmt(req.due_on)}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+        {req.note && <span className="sc-sub">“{req.note}”</span>}
+      </div>
+      <div className="sc-doc-side">
+        <span className={`sc-pill ${overdue ? 'is-bad' : 'is-warn'}`}>{overdue ? 'Overdue' : 'Requested'}{busy ? '…' : ''}</span>
+        <div className="sc-doc-btns">
+          <DocMenu
+            disabled={busy}
+            label={`Actions for the request for ${requestTitle(req)}`}
+            items={[
+              { label: req.emailed_at ? 'Resend email' : 'Email it now', onSelect: () => act(() => resendDocumentRequest(req.id)) },
+              {
+                label: 'Cancel request…',
+                danger: true,
+                onSelect: () => {
+                  if (confirm(`Cancel the request for ${requestTitle(req)}? They won't be chased for it.`))
+                    act(() => cancelDocumentRequest(req.id));
+                },
+              },
+            ]}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Reject with a reason, optionally asking for a replacement (emailed now, then chased). */
+function RejectForm({
+  doc,
+  personLeft,
+  superseded,
+  alreadyAsked,
+  onSubmit,
+  onCancel,
+}: {
+  doc: DocumentRow;
+  /** Its person has left the team — no replacement can be asked for. */
+  personLeft: boolean;
+  /** A newer copy is already uploaded — review that instead of asking again. */
+  superseded: boolean;
+  /** There's already an open request for it. */
+  alreadyAsked: boolean;
+  onSubmit: (note: string, askForReplacement: boolean) => void;
+  onCancel: () => void;
+}) {
+  const [note, setNote] = useState('');
+  const [ask, setAsk] = useState(!personLeft && !superseded && !alreadyAsked);
+  return (
+    <form
+      className="sc-doc-edit"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (note.trim()) onSubmit(note.trim(), ask);
+      }}
+    >
+      <label className="sc-field-wide">
+        Reason for rejecting {doc.label || doc.file_name} (they see this)
+        <textarea className="sc-notes" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} required autoFocus />
+      </label>
+      {personLeft ? (
+        <p className="sc-muted">{doc.operative_name || 'This person'} has left their team, so no replacement will be asked for.</p>
+      ) : superseded ? (
+        <p className="sc-muted">They&apos;ve already uploaded a newer copy, so no replacement will be asked for — review that one.</p>
+      ) : alreadyAsked ? (
+        <p className="sc-muted">They&apos;ve already been asked for this (open request), so no new request will be made.</p>
+      ) : (
+        <label className="sc-check">
+          <input type="checkbox" checked={ask} onChange={(e) => setAsk(e.target.checked)} />
+          Email them now and ask for a replacement (chased on day 3, 7 and 14 until they upload one)
+        </label>
+      )}
+      <div className="sc-row">
+        <button className="sc-btn" disabled={!note.trim()}>Reject</button>
+        <button type="button" className="sc-btn-ghost" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+const CIS_RATE_SHORT: Record<CisRate, string> = { gross: 'gross (0%)', net: 'net (20%)', higher: 'the higher rate (30%)' };
+
+/**
+ * CIS: has our accountant verified this firm with HMRC, and at what rate? A tick-box —
+ * ticking asks for what HMRC said; unticking removes the verification.
+ */
+function CisPanel({ sub }: { sub: SubcontractorRow }) {
+  const router = useRouter();
+  const d = sub.details || {};
+  const declared = d.cisStatus ? DECLARED_CIS_RATE[d.cisStatus] : null;
+  // What we just saved, shown until the refreshed page brings the same back (it changes cis_verified_at).
+  type CisView = Pick<SubcontractorRow, 'cis_verified_on' | 'cis_rate' | 'cis_verification_ref' | 'cis_verified_by' | 'cis_verified_at'>;
+  const [saved, setSaved] = useState<CisView | null>(null);
+  const [savedFrom, setSavedFrom] = useState(sub.cis_verified_at ?? null);
+  if ((sub.cis_verified_at ?? null) !== savedFrom) {
+    setSavedFrom(sub.cis_verified_at ?? null);
+    setSaved(null);
+  }
+  const v: CisView = saved ?? sub;
+  const verified = !!v.cis_verified_on && !!v.cis_rate;
+  const [editing, setEditing] = useState(false);
+  const [rate, setRate] = useState<CisRate>(v.cis_rate || declared || 'net');
+  const [ref, setRef] = useState('');
+  const [on, setOn] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  // Every time the form opens it starts from what's recorded now.
+  function startEdit() {
+    setRate(v.cis_rate || declared || 'net');
+    setRef(v.cis_verification_ref || '');
+    setOn(v.cis_verified_on || '');
+    setErr('');
+    setEditing(true);
+  }
+
+  async function save(next: Parameters<typeof setCisVerification>[1]) {
+    setBusy(true);
+    setErr('');
+    const r = await safe(() => setCisVerification(sub.id, next));
+    setBusy(false);
+    if (!r.ok) return setErr(r.error || 'Could not save');
+    setSaved((r as { cis: CisView }).cis);
+    setEditing(false);
+    router.refresh();
+  }
+
+  return (
+    <section className="sc-card">
+      <div className="sc-row-between">
+        <h2>CIS verification</h2>
+        <span className={`sc-pill ${verified ? 'is-ok' : 'is-warn'}`}>{verified ? 'Verified' : 'Not verified'}</span>
+      </div>
+      <p className="sc-muted">
+        They told us: {d.cisStatus ? CIS_LABEL[d.cisStatus] : 'not given yet'}
+        {d.utr && ` · UTR ${d.utr}`}
+        {d.companyNumber && ` · Co. no. ${d.companyNumber}`}
+      </p>
+      <label className="sc-check">
+        <input
+          type="checkbox"
+          checked={verified || editing}
+          disabled={busy}
+          onChange={(e) => {
+            if (e.target.checked) return startEdit();
+            if (!verified) return setEditing(false);
+            if (confirm('Remove the CIS verification? It will show as not verified until it is ticked again.')) save({ verified: false });
+          }}
+        />
+        Verified with HMRC by our accountants
+      </label>
+
+      {verified && !editing && v.cis_rate && (
+        <>
+          <dl className="sc-dl">
+            <dt>HMRC rate</dt>
+            <dd>{CIS_RATE_LABEL[v.cis_rate]}</dd>
+            <dt>Verification no.</dt>
+            <dd>{v.cis_verification_ref || '—'}</dd>
+            <dt>Verified</dt>
+            <dd>{fmt(v.cis_verified_on)}{v.cis_verified_by && ` · recorded by ${v.cis_verified_by}`}</dd>
+          </dl>
+          {declared && declared !== v.cis_rate && (
+            <p className="sc-error">
+              They told us {CIS_LABEL[d.cisStatus as string]}, but HMRC verified them at {CIS_RATE_SHORT[v.cis_rate]}. Deduct at HMRC&apos;s
+              rate.
+            </p>
+          )}
+          <button className="sc-btn-ghost" onClick={startEdit}>Edit details</button>
+        </>
+      )}
+
+      {editing && (
+        <form
+          className="sc-doc-edit"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save({ verified: true, rate, ref, verifiedOn: on });
+          }}
+        >
+          <div className="sc-grid">
+            <label>
+              Rate HMRC gave
+              <select value={rate} onChange={(e) => setRate(e.target.value as CisRate)} autoFocus>
+                {(Object.keys(CIS_RATE_LABEL) as CisRate[]).map((k) => (
+                  <option key={k} value={k}>{CIS_RATE_LABEL[k]}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Verification number
+              <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="V1234567890" />
+            </label>
+            <label>
+              Date verified (blank = today)
+              <input type="date" value={on} onChange={(e) => setOn(e.target.value)} max={londonToday()} />
+            </label>
+          </div>
+          {err && <p className="sc-error">{err}</p>}
+          <div className="sc-row">
+            <button className="sc-btn" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+            <button type="button" className="sc-btn-ghost" onClick={() => { setEditing(false); setErr(''); }}>Cancel</button>
+          </div>
+        </form>
+      )}
+      {!editing && err && <p className="sc-error">{err}</p>}
+    </section>
   );
 }
 
@@ -1242,28 +1820,33 @@ function NtpCountersign({ ntpId, defaultName, onDone }: { ntpId: string; default
   );
 }
 
-/** Daily digest reminders for this firm: on/off, what they'd be told, and "send now". */
+/**
+ * Daily digest reminders for this firm: on/off, what they'd be told, and "send now".
+ * Only shown while something is outstanding (or reminders are paused, so they can be resumed).
+ */
 function RemindersPanel({
   subId,
   paused,
-  terminated,
   outstanding,
+  onFlash,
 }: {
   subId: string;
   paused: boolean;
-  terminated: boolean;
   outstanding: { kind: string; text: string; urgent: boolean }[];
+  /** Success goes to the page banner — resuming with nothing outstanding hides this panel. `toggled`: pause/resume. */
+  onFlash: (f: { kind: 'ok' | 'err'; text: string }, toggled?: boolean) => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  async function act(fn: () => Promise<{ ok: boolean; error?: string }>, okText: string) {
+  async function act(fn: () => Promise<{ ok: boolean; error?: string }>, okText: string, toggled = false) {
     setBusy(true);
     setMsg(null);
-    const r = await fn();
+    const r = await safe(fn);
     setBusy(false);
-    setMsg(r.ok ? { ok: true, text: okText } : { ok: false, text: (r as { error: string }).error });
+    if (r.ok) onFlash({ kind: 'ok', text: okText }, toggled);
+    else setMsg({ ok: false, text: r.error || 'Something went wrong' });
     router.refresh();
   }
 
@@ -1271,13 +1854,11 @@ function RemindersPanel({
     <section className="sc-card">
       <div className="sc-row-between">
         <h2>Reminders</h2>
-        <span className={`sc-pill ${terminated ? '' : paused ? 'is-warn' : 'is-ok'}`}>
-          {terminated ? 'Off (terminated)' : paused ? 'Paused' : 'On'}
-        </span>
+        <span className={`sc-pill ${paused ? 'is-warn' : 'is-ok'}`}>{paused ? 'Paused' : 'On'}</span>
       </div>
       <p className="sc-muted">
-        Automatic daily email listing everything outstanding — onboarding, missing, rejected or expiring documents,
-        crews to choose, NTP agreements to sign. Each chase goes once (e.g. day 3, 7, 14).
+        Automatic daily email listing everything outstanding — onboarding, missing or expiring documents, documents you
+        have requested, crews to choose, NTP agreements to sign. Each chase goes once (e.g. day 3, 7, 14).
       </p>
       {outstanding.length === 0 ? (
         <p className="sc-muted">Nothing outstanding right now.</p>
@@ -1291,15 +1872,15 @@ function RemindersPanel({
       <div className="sc-row">
         <button
           className="sc-btn-ghost"
-          disabled={busy || terminated || outstanding.length === 0}
+          disabled={busy || outstanding.length === 0}
           onClick={() => act(() => remindNow(subId), 'Reminder emailed.')}
         >
           Send reminder now
         </button>
         <button
           className="sc-btn-ghost"
-          disabled={busy || terminated}
-          onClick={() => act(() => setRemindersPaused(subId, !paused), paused ? 'Reminders resumed.' : 'Reminders paused.')}
+          disabled={busy}
+          onClick={() => act(() => setRemindersPaused(subId, !paused), paused ? 'Reminders resumed.' : 'Reminders paused.', true)}
         >
           {paused ? 'Resume automatic reminders' : 'Pause automatic reminders'}
         </button>
