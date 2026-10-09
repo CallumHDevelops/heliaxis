@@ -1,4 +1,4 @@
-import type { DocumentRow, SubDetails } from './types';
+import type { DocRequestRow, DocumentRow, SubDetails } from './types';
 
 export type DocCategory = {
   key: string;
@@ -131,6 +131,43 @@ export function safeFileName(name: string) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 60) || 'document';
   return ext ? `${base}.${ext}` : base;
+}
+
+/** Categories where one person / firm can hold several different documents (CSCS and IPAF, 2391 and 18th Edition…). */
+const MULTI = new Set(['card', 'qualification', 'registration', 'other']);
+
+/** Is `b` the same document as `a` — a renewal or replacement of it — rather than a different one? */
+export function sameDocKind(
+  a: Pick<DocumentRow, 'category' | 'operative_id' | 'label'>,
+  b: Pick<DocumentRow, 'category' | 'operative_id' | 'label'>
+) {
+  const norm = (s: string | null | undefined) => (s || '').toLowerCase().trim();
+  if (a.category !== b.category || (a.operative_id || null) !== (b.operative_id || null)) return false;
+  return !MULTI.has(a.category) || norm(a.label) === norm(b.label);
+}
+
+/** Today's date in the UK (YYYY-MM-DD) — date inputs are local, and UTC lags an hour in summer. */
+export const londonToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
+
+/**
+ * Does an open request already ask for this document? A request with no description is
+ * answered by anything in its category (for its person, if it names one); one with a
+ * description only by the same described document.
+ */
+export function requestCovers(
+  q: Pick<DocRequestRow, 'status' | 'category' | 'operative_id' | 'label'>,
+  d: Pick<DocumentRow, 'category' | 'operative_id' | 'label'>
+) {
+  if (q.status !== 'open' || q.category !== d.category || (q.operative_id || null) !== (d.operative_id || null)) return false;
+  return !q.label || sameDocKind(q, d);
+}
+
+/** "IPAF card for Jordan Davies" — what a document request is asking for. */
+export function requestTitle(r: Pick<DocRequestRow, 'category' | 'label' | 'operative_name'>) {
+  const cat = CATEGORY_BY_KEY[r.category]?.label;
+  // "IPAF card" names the thing itself; "current certificate" needs its type: "Public liability insurance (current certificate)".
+  const what = !r.label ? cat || 'Document' : MULTI.has(r.category) || !cat ? r.label : `${cat} (${r.label})`;
+  return r.operative_name ? `${what} for ${r.operative_name}` : what;
 }
 
 /** Clause 3A.2: subcontractors must flag renewals 30 days before expiry. */

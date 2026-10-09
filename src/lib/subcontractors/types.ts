@@ -60,7 +60,25 @@ export type SubcontractorRow = {
   notes: string | null;
   created_by: string | null;
   created_at: string;
+  // CIS verification with HMRC (supabase/portal-v3.sql) — only on queries that select '*'.
+  cis_verified_on?: string | null;
+  cis_rate?: CisRate | null;
+  cis_verification_ref?: string | null;
+  cis_verified_by?: string | null;
+  cis_verified_at?: string | null;
 };
+
+/** The deduction rate HMRC gives when the firm is verified. */
+export type CisRate = 'gross' | 'net' | 'higher';
+
+export const CIS_RATE_LABEL: Record<CisRate, string> = {
+  gross: 'Gross — 0% deduction',
+  net: 'Net — 20% deduction',
+  higher: 'Higher rate — 30% deduction (unmatched)',
+};
+
+/** The rate a firm's own declared CIS status should verify at. */
+export const DECLARED_CIS_RATE: Record<string, CisRate> = { gross: 'gross', net: 'net', unregistered: 'higher' };
 
 export type AgreementRow = {
   id: string;
@@ -101,6 +119,42 @@ export type DocumentRow = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   uploaded_at: string;
+};
+
+/** Heliaxis asking a firm for a document (supabase/portal-v3.sql). */
+export type DocRequestRow = {
+  id: string;
+  subcontractor_id: string;
+  category: string;
+  operative_id: string | null;
+  operative_name: string | null;
+  label: string | null;
+  note: string | null;
+  due_on: string | null;
+  /** Set when asked for while rejecting a document. */
+  replaces_document_id: string | null;
+  status: 'open' | 'fulfilled' | 'cancelled';
+  requested_by: string;
+  created_at: string;
+  emailed_at: string | null;
+  fulfilled_at: string | null;
+  fulfilled_document_id: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+};
+
+/** A document request as the portal sees it — no admin-only fields. */
+export type PortalRequest = {
+  id: string;
+  category: string;
+  operativeId: string | null;
+  operativeName: string | null;
+  label: string | null;
+  note: string | null;
+  dueOn: string | null;
+  createdAt: string;
+  /** Asked for when rejecting a document; `note` is the reason. */
+  replacement: boolean;
 };
 
 export type EventRow = {

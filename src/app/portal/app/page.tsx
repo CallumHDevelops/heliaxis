@@ -5,6 +5,7 @@ import { getPortalSub } from '@/lib/subcontractors/session';
 import type { AgreementRow, AssignmentRow, DocumentRow, NtpRow, OperativeRow } from '@/lib/subcontractors/types';
 import { NtpDocument } from '@/components/subcontractors/NtpDocument';
 import { signsByLink } from '@/lib/subcontractors/ntp';
+import { openRequestsFor, toPortalRequest } from '@/lib/subcontractors/requests';
 import { AgreementDocument } from '@/components/subcontractors/AgreementDocument';
 import { PortalApp } from './PortalApp';
 
@@ -15,7 +16,7 @@ export default async function PortalPage() {
   if (!sub) redirect('/portal');
 
   const admin = createAdminClient();
-  const [{ data: agr }, { data: docs }, { data: ops }, { data: jobs }, { data: ntpData }] = await Promise.all([
+  const [{ data: agr }, { data: docs }, { data: ops }, { data: jobs }, { data: ntpData }, requests] = await Promise.all([
     admin
       .from('subcontractor_agreements')
       .select('*')
@@ -37,6 +38,7 @@ export default async function PortalPage() {
       .eq('subcontractor_id', sub.id)
       .not('status', 'in', '(cancelled,superseded)')
       .order('created_at', { ascending: false }),
+    openRequestsFor(sub.id),
   ]);
   const ntps = (ntpData ?? []) as NtpRow[];
   const agreement = agr as AgreementRow | null;
@@ -71,6 +73,7 @@ export default async function PortalPage() {
       }
       documents={((docs ?? []) as DocumentRow[]).map((d) => ({ ...d, storage_path: undefined }))}
       operatives={(ops ?? []) as OperativeRow[]}
+      requests={requests.map(toPortalRequest)}
       jobs={(jobs ?? []) as AssignmentRow[]}
       ntps={ntps.map((n) => ({
         id: n.id,
