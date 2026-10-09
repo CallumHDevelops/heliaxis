@@ -14,7 +14,8 @@ export default async function NtpSignPage({ params }: { params: Promise<{ token:
       <div className="pt-card pt-narrow">
         <h1>This link has expired</h1>
         <p>
-          Signing links work for 14 days and only once. If you still need to sign, ask Heliaxis to send a new link:{' '}
+          Signing links work for 14 days and only once, and each new email from us replaces the link in earlier ones — if
+          you have a newer email from Heliaxis, use the link in that one. Otherwise ask us to send a new link:{' '}
           <a href="mailto:hello@heliaxis.co.uk">hello@heliaxis.co.uk</a> / <a href="tel:01633965205">01633 965205</a>.
         </p>
       </div>

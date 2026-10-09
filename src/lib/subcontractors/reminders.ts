@@ -260,8 +260,10 @@ export function chasesFor(f: FirmData): { firm: Chase[]; admin: AdminNote[] } {
         : `Sign the NTP agreement ${n.ref} for ${n.ntp_name} (NTP tab in the portal).`,
     });
   }
-  // …and first-time NTP agreements waiting on us (renewal countersigning is chased by the renewal job).
-  for (const n of ntps.filter((x) => x.status === 'awaiting_countersign' && x.sub_signed_at && !x.renewal_of)) {
+  // …and NTP agreements waiting on us (a renewal is chased by the renewal job while the original is in force).
+  for (const n of ntps.filter(
+    (x) => x.status === 'awaiting_countersign' && x.sub_signed_at && (!x.renewal_of || !activeNtpIds.has(x.renewal_of))
+  )) {
     const steps = due(daysSince(n.sub_signed_at as string), [2, 7]);
     if (steps.length) {
       admin.push({ kind: 'countersign', subjectKey: `ntp:${n.id}`, steps, text: `NTP agreement ${n.ref} (${sub.company_name}) is waiting for your countersignature.` });
@@ -362,20 +364,22 @@ const unsentSteps = (sent: Set<string>, kind: string, subjectKey: string, steps:
  * Record steps BEFORE emailing, so a failed write can never cause a repeat send.
  * Returns the ids written (to undo if the email then fails), or null on failure.
  */
+type Claimed = { id: string; kind: string; subject_key: string; step: number };
 async function claim(rows: { subcontractor_id: string; kind: string; subject_key: string; step: number; sent_to: string }[]) {
-  if (!rows.length) return [] as string[];
+  if (!rows.length) return [] as Claimed[];
+  // ignoreDuplicates returns only rows WE inserted — anything another run recorded first isn't ours to send.
   const { data, error } = await createAdminClient()
     .from('subcontractor_nudges')
     .upsert(rows, { onConflict: 'kind,subject_key,step', ignoreDuplicates: true })
-    .select('id');
+    .select('id, kind, subject_key, step');
   if (error) {
     console.error('[reminders] could not record steps', error.message);
     return null;
   }
-  return (data ?? []).map((r) => r.id as string);
+  return (data ?? []) as Claimed[];
 }
-async function unclaim(ids: string[]) {
-  if (ids.length) await createAdminClient().from('subcontractor_nudges').delete().in('id', ids);
+async function unclaim(rows: Claimed[]) {
+  if (rows.length) await createAdminClient().from('subcontractor_nudges').delete().in('id', rows.map((r) => r.id));
 }
 
 function digestHtml(sub: SubcontractorRow, items: Chase[]) {
@@ -422,11 +426,16 @@ async function remindFirm(f: FirmData, sent: Set<string>, actor: string, force: 
     )
   );
   if (claimed === null) return { sent: false as const, reason: 'Could not record the reminder — not sent.' };
+  // Only act on steps this run actually recorded — an overlapping run may have taken them.
+  const mine = new Set(claimed.map((r) => `${r.kind}|${r.subject_key}`));
+  const ours = dueNow.filter((x) => mine.has(`${x.c.kind}|${x.c.subjectKey}`));
+  if (!ours.length && !force) return { sent: false as const, reason: 'nothing due' };
 
-  // A due NTP chase goes to the NTP too, with a fresh link; say so only if it went.
-  for (const { c } of dueNow.filter((x) => x.c.kind === 'ntp_sign' && x.c.ntpId)) {
+  // A due NTP chase goes to the NTP too, with a fresh link (if they're still on the team); say so only if it went.
+  for (const { c } of ours.filter((x) => x.c.kind === 'ntp_sign' && x.c.ntpId)) {
     const ntp = f.ntps.find((n) => n.id === c.ntpId);
     if (!ntp?.ntp_email) continue;
+    if (ntp.operative_id && !f.ops.some((o) => o.id === ntp.operative_id && !o.archived_at)) continue;
     const r = await issueNtpSigningLink(ntp, f.sub, true);
     if (r.ok) c.text = `${ntp.ntp_name} still needs to sign their NTP agreement ${ntp.ref} — we've just emailed them a fresh signing link.`;
   }
@@ -472,7 +481,10 @@ export async function runReminders() {
       continue;
     }
     const r = await remindFirm(f, sent, 'system', false);
-    if (r.sent) digests++;
+    if (r.sent) {
+      digests++;
+      await new Promise((res) => setTimeout(res, 550)); // Resend allows ~2 requests a second
+    }
     else if (r.reason !== 'nothing due' && r.reason !== 'Nothing is outstanding for this subcontractor.') failures++;
   }
 
@@ -483,13 +495,15 @@ export async function runReminders() {
         steps.map((step) => ({ subcontractor_id: subId, kind: note.kind, subject_key: note.subjectKey, step, sent_to: ADMIN_EMAIL() }))
       )
     );
-    if (claimed !== null) {
+    const mine = new Set((claimed ?? []).map((r) => `${r.kind}|${r.subject_key}`));
+    const ours = adminNotes.filter(({ note }) => mine.has(`${note.kind}|${note.subjectKey}`));
+    if (claimed !== null && ours.length) {
       const res = await sendEmail({
         to: ADMIN_EMAIL(),
-        subject: `Subcontractors: ${adminNotes.length} thing${adminNotes.length === 1 ? '' : 's'} need you`,
+        subject: `Subcontractors: ${ours.length} thing${ours.length === 1 ? '' : 's'} need you`,
         html: emailShell(
           'Needs your attention',
-          `<ul style="padding-left:18px">${adminNotes.map(({ note }) => `<li style="margin:0 0 8px">${esc(note.text)}</li>`).join('')}</ul>
+          `<ul style="padding-left:18px">${ours.map(({ note }) => `<li style="margin:0 0 8px">${esc(note.text)}</li>`).join('')}</ul>
            <p>${digests} subcontractor reminder email${digests === 1 ? '' : 's'} went out today.</p>`,
           { href: `${siteBaseUrl()}/admin/subcontractors`, label: 'Open subcontractors' },
           'Daily summary'

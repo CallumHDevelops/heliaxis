@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ADMIN_EMAIL, emailShell, esc, logEvent, portalBaseUrl, sendEmail, siteBaseUrl } from '@/lib/subcontractors/server';
-import { createNtpAgreement, issueNtpSigningLink } from '@/lib/subcontractors/ntp';
+import { createNtpAgreement, isEmail, issueNtpSigningLink } from '@/lib/subcontractors/ntp';
 import { runReminders } from '@/lib/subcontractors/reminders';
 import type { NtpRow, SubcontractorRow } from '@/lib/subcontractors/types';
 
@@ -62,6 +62,7 @@ async function runNtpRenewals() {
   let issued = 0;
   let chased = 0;
   let expired = 0;
+  const warnings: string[] = [];
 
   for (const n of all.filter((x) => x.status === 'active' && x.expires_on)) {
     const renewal = renewalOf.get(n.id);
@@ -104,7 +105,7 @@ async function runNtpRenewals() {
           .eq('subcontractor_id', n.subcontractor_id)
           .maybeSingle();
         const onTeam = !!op && !op.archived_at;
-        ntpEmail = onTeam ? (op?.email ? String(op.email).toLowerCase() : ntpEmail) : null;
+        ntpEmail = onTeam ? (isEmail(op?.email) ? String(op?.email).trim().toLowerCase() : ntpEmail) : null;
         if (!onTeam) await logEvent(n.subcontractor_id, 'system', 'ntp_renewal_to_firm', { ref: n.ref, reason: `${n.ntp_name} is no longer on the team` });
       }
       const r = await createNtpAgreement(
@@ -123,10 +124,17 @@ async function runNtpRenewals() {
       );
       if (r.ok) {
         issued++;
-        // Issuing it is this band's chase — don't chase (and rotate the link) tomorrow.
-        if (threshold !== undefined) {
+        if (r.warning) {
+          // The link didn't go — leave the band open so tomorrow's chase retries it.
+          warnings.push(r.warning);
+          console.error('[cron] ntp renewal', r.warning);
+        } else if (threshold !== undefined) {
+          // Issuing it is this band's chase — don't chase (and rotate the link) tomorrow.
           await admin.from('subcontractor_ntp_reminders').insert({ ntp_id: r.ntp.id, threshold_days: threshold });
         }
+      } else {
+        warnings.push(`${n.ref}: renewal could not be issued (${r.error})`);
+        await logEvent(n.subcontractor_id, 'system', 'ntp_renewal_failed', { ref: n.ref, error: r.error });
       }
       continue;
     }
@@ -139,6 +147,27 @@ async function runNtpRenewals() {
     if (!waitingOnUs && sub.reminders_paused) continue;
     const { error: dup } = await admin.from('subcontractor_ntp_reminders').insert({ ntp_id: renewal.id, threshold_days: threshold });
     if (dup) continue; // already chased at this point
+
+    // The NTP signs from their own link, so chase them directly first — fresh link — but only
+    // while they're still on the firm's team. The firm's email then says what actually happened.
+    let linkSent = false;
+    if (!waitingOnUs && renewal.ntp_email) {
+      const { data: op } = renewal.operative_id
+        ? await admin.from('subcontractor_operatives').select('archived_at').eq('id', renewal.operative_id).maybeSingle()
+        : { data: null };
+      const onTeam = !renewal.operative_id || (!!op && !op.archived_at);
+      if (onTeam) {
+        const l = await issueNtpSigningLink(renewal, sub, true);
+        await logEvent(sub.id, 'system', 'ntp_link_sent', { ref: renewal.ref, to: renewal.ntp_email, delivered: l.ok });
+        if (l.ok) linkSent = true;
+        else {
+          warnings.push(`${renewal.ref}: signing link to ${renewal.ntp_email} failed (${l.error})`);
+          // Not chased after all — let tomorrow's run try again.
+          await admin.from('subcontractor_ntp_reminders').delete().eq('ntp_id', renewal.id).eq('threshold_days', threshold);
+          continue;
+        }
+      }
+    }
     await sendEmail({
       to: waitingOnUs ? ADMIN_EMAIL() : sub.email,
       subject: `${days <= 7 ? 'Urgent: ' : ''}NTP agreement ${n.ref} expires in ${days} day${days === 1 ? '' : 's'}`,
@@ -146,15 +175,13 @@ async function runNtpRenewals() {
         waitingOnUs ? 'NTP renewal needs countersigning' : 'Please sign your NTP renewal',
         waitingOnUs
           ? `<p>${esc(sub.company_name)} has signed renewal ${esc(renewal.ref)} for ${esc(n.ntp_name)}. Countersign before ${esc(n.expires_on!)} to avoid a gap.</p>`
-          : `<p>Hi ${esc((sub.contact_name || '').split(' ')[0] || 'there')},</p><p>${esc(n.ntp_name)}'s NTP agreement with Heliaxis ends on ${esc(n.expires_on!)}. The renewal (${esc(renewal.ref)}) is waiting for ${renewal.ntp_email ? `${esc(n.ntp_name)} to sign from the personal link we've emailed them` : 'signature in the portal'} — without it, ${esc(n.ntp_name)} can't act as our NTP after that date.</p>`,
+          : `<p>Hi ${esc((sub.contact_name || '').split(' ')[0] || 'there')},</p><p>${esc(n.ntp_name)}'s NTP agreement with Heliaxis ends on ${esc(n.expires_on!)}. The renewal (${esc(renewal.ref)}) is waiting for ${linkSent ? `${esc(n.ntp_name)} to sign — we've just emailed them a fresh signing link` : 'signature in the portal'} — without it, ${esc(n.ntp_name)} can't act as our NTP after that date.</p>`,
         waitingOnUs
           ? { href: `${siteBaseUrl()}/admin/subcontractors/${sub.id}`, label: 'Countersign renewal' }
           : { href: `${portalBaseUrl()}/portal`, label: 'Sign renewal' }
       ),
     });
-    // The NTP signs from their own link, so chase them directly too (fresh link each time).
-    if (!waitingOnUs && renewal.ntp_email) await issueNtpSigningLink(renewal, sub, true);
     chased++;
   }
-  return { ntpRenewalsIssued: issued, ntpChased: chased, ntpExpired: expired };
+  return { ntpRenewalsIssued: issued, ntpChased: chased, ntpExpired: expired, warnings };
 }

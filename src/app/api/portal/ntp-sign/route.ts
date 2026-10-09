@@ -12,7 +12,12 @@ export async function POST(req: Request) {
   if (!sameOrigin(req)) return jsonError('Forbidden', 403);
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const ntp = await findNtpBySigningToken(typeof body.token === 'string' ? body.token : null);
-  if (!ntp) return jsonError('This signing link has expired or has already been used. Ask Heliaxis to send a new one.', 401);
+  if (!ntp) {
+    return jsonError(
+      'This signing link has expired, been used, or been replaced by a newer one. Use the link in our most recent email, or ask Heliaxis to send a new one.',
+      401
+    );
+  }
 
   const { data: sub } = await createAdminClient()
     .from('subcontractors')

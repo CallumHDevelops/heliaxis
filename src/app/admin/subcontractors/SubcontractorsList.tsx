@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { STATUS_LABEL, type SubStatus } from '@/lib/subcontractors/types';
 import { createSubcontractor, sendFreshLinksToAll } from './actions';
@@ -191,24 +191,25 @@ export function SubcontractorsList({ rows, recipients }: { rows: ListRow[]; reci
 /** Preview of the apology email, then a batched send to every subcontractor. */
 function FreshLinks({ recipients, onDone }: { recipients: number; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ sent: number; failed: string[] } | null>(null);
+  const [result, setResult] = useState<{ sent: number; failed: string[]; remaining: number } | null>(null);
   const [err, setErr] = useState('');
+  // The server stamps the run on the first call; retries reuse it so nobody is emailed twice.
+  const since = useRef<string | undefined>(undefined);
+  const total = useRef(0);
   const m = FRESH_LINK_MESSAGE;
 
   async function send() {
-    if (!confirm(`Email ${recipients} subcontractor${recipients === 1 ? '' : 's'} an apology and a new personal link? Any older links they have stop working.`)) return;
+    if (!since.current && !confirm(`Email ${recipients} subcontractor${recipients === 1 ? '' : 's'} an apology and a new personal link? Any older links they have stop working.`)) return;
     setBusy(true);
     setErr('');
-    const since = new Date().toISOString();
-    let sent = 0;
-    const failed: string[] = [];
     try {
       for (let i = 0; i < 20; i++) {
-        const r = await sendFreshLinksToAll(since);
+        const r = await sendFreshLinksToAll(since.current);
         if (!r.ok) throw new Error(r.error);
-        sent += r.sent;
-        failed.push(...r.failed);
-        setResult({ sent, failed: [...failed] });
+        since.current = r.since;
+        total.current += r.sent;
+        setResult({ sent: total.current, failed: r.failed, remaining: r.remaining });
+        // Stop when everyone's done, or a batch made no progress (only failures left).
         if (r.remaining <= 0 || r.sent === 0) break;
       }
       onDone();
@@ -219,6 +220,7 @@ function FreshLinks({ recipients, onDone }: { recipients: number; onDone: () => 
     }
   }
 
+  const finished = !!result && result.remaining <= 0;
   return (
     <div className="sc-card">
       <h2>Send everyone a fresh link</h2>
@@ -236,12 +238,13 @@ function FreshLinks({ recipients, onDone }: { recipients: number; onDone: () => 
       </div>
       {err && <p className="sc-error">{err}</p>}
       {result && (
-        <p className={result.failed.length ? 'sc-error' : 'sc-muted'}>
-          Sent to {result.sent}.{result.failed.length ? ` Failed: ${result.failed.join('; ')}` : ''}
+        <p className={result.remaining > 0 ? 'sc-error' : 'sc-muted'}>
+          Sent to {result.sent}.
+          {result.remaining > 0 && ` ${result.remaining} not sent yet${result.failed.length ? ` (${result.failed.join('; ')})` : ''} — press Retry to send to just those.`}
         </p>
       )}
-      <button className="sc-btn" disabled={busy || !!(result && !result.failed.length && result.sent)} onClick={send}>
-        {busy ? 'Sending…' : `Send to ${recipients}`}
+      <button className="sc-btn" disabled={busy || finished} onClick={send}>
+        {busy ? 'Sending…' : finished ? 'All sent' : since.current ? 'Retry the rest' : `Send to ${recipients}`}
       </button>
     </div>
   );

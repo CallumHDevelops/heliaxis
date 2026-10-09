@@ -22,7 +22,7 @@ import {
   validSignature,
 } from '@/lib/subcontractors/server';
 import { revokeAllSessions } from '@/lib/subcontractors/session';
-import { createNtpAgreement, issueNtpSigningLink, ntpHash, parseNtpRequest } from '@/lib/subcontractors/ntp';
+import { createNtpAgreement, isEmail, issueNtpSigningLink, ntpHash, parseNtpRequest } from '@/lib/subcontractors/ntp';
 import { sendReminderNow } from '@/lib/subcontractors/reminders';
 import { NTP_TECHNOLOGIES, NTP_TERM_MONTHS } from '@/lib/subcontractors/ntp-agreement';
 import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
@@ -330,7 +330,7 @@ export async function sendNtp(subId: string, input: Record<string, unknown>): Pr
   if (!fw) return { ok: false, error: 'Countersign their Subcontractor Framework Agreement first — the NTP agreement sits on top of it.' };
   const req = parseNtpRequest(input);
   if (req.ntpEmailInvalid) {
-    return { ok: false, error: "That isn't a valid email for the NTP — fix it, or leave it blank for the firm to sign in its portal." };
+    return { ok: false, error: "That isn't a valid email address for the NTP — please correct it." };
   }
   if (req.operativeId) {
     const { data: op } = await admin
@@ -342,8 +342,8 @@ export async function sendNtp(subId: string, input: Record<string, unknown>): Pr
     if (!op) return { ok: false, error: 'That person is not on their team.' };
     req.ntpName = op.full_name;
     // They sign from a personal link: use their email on file, or remember the one given here.
-    if (!req.ntpEmail && op.email) req.ntpEmail = String(op.email).toLowerCase();
-    if (req.ntpEmail && !op.email) {
+    if (!req.ntpEmail && isEmail(op.email)) req.ntpEmail = String(op.email).trim().toLowerCase();
+    if (req.ntpEmail && !isEmail(op.email)) {
       await admin.from('subcontractor_operatives').update({ email: req.ntpEmail }).eq('id', req.operativeId);
     }
   }
@@ -479,21 +479,31 @@ export async function setRemindersPaused(subId: string, paused: boolean): Promis
 
 /**
  * Email every (non-terminated) subcontractor an apology and a fresh personal link.
- * Runs in batches under the function time limit: the page calls it until
- * `remaining` is 0, passing the same `since` so nobody is emailed twice.
+ * Runs in batches under the function time limit. The first call (no `since`)
+ * stamps the run with the SERVER's clock; later calls pass it back. A firm counts
+ * as done only once its email was actually delivered in this run, so retries reach
+ * just the failed / unsent firms and nobody gets it twice.
  */
-export async function sendFreshLinksToAll(since: string): Promise<Result<{ sent: number; failed: string[]; remaining: number }>> {
+export async function sendFreshLinksToAll(
+  since?: string
+): Promise<Result<{ since: string; sent: number; failed: string[]; remaining: number }>> {
   const { email: actor } = await requireAdmin();
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(since)) return { ok: false, error: 'Bad request' };
+  const runSince = since && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(since) ? since : new Date().toISOString();
   const started = Date.now();
-  const { data, error } = await createAdminClient()
-    .from('subcontractors')
-    .select(SUB_COLUMNS)
-    .neq('status', 'terminated')
-    .order('created_at');
-  if (error) return { ok: false, error: error.message };
-  // Anyone invited since this run began has already had theirs.
-  const todo = ((data ?? []) as SubcontractorRow[]).filter((s) => s.email && !(s.invited_at && s.invited_at >= since));
+  const db = createAdminClient();
+  const [{ data, error }, { data: doneRows, error: doneErr }] = await Promise.all([
+    db.from('subcontractors').select(SUB_COLUMNS).neq('status', 'terminated').order('created_at'),
+    db
+      .from('subcontractor_events')
+      .select('subcontractor_id')
+      .eq('type', 'fresh_link_sent')
+      .eq('detail->>delivered', 'true')
+      .gte('created_at', runSince),
+  ]);
+  if (error || doneErr) return { ok: false, error: (error || doneErr)!.message };
+  const done = new Set((doneRows ?? []).map((r) => r.subcontractor_id as string));
+  const todo = ((data ?? []) as SubcontractorRow[]).filter((s) => s.email && !done.has(s.id));
+
   let sent = 0;
   const failed: string[] = [];
   for (const sub of todo) {
@@ -501,7 +511,9 @@ export async function sendFreshLinksToAll(since: string): Promise<Result<{ sent:
     const r = await issueLink(sub, actor, true, false, freshLinkEmail, 'fresh_link_sent');
     if (r.ok) sent++;
     else failed.push(`${sub.company_name}: ${r.error}`);
+    // Resend allows ~2 requests a second.
+    await new Promise((res) => setTimeout(res, 550));
   }
   revalidatePath('/admin/subcontractors');
-  return { ok: true, sent, failed, remaining: todo.length - sent - failed.length };
+  return { ok: true, since: runSince, sent, failed, remaining: todo.length - sent };
 }
