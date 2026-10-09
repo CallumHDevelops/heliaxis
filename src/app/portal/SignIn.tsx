@@ -17,6 +17,7 @@ export function SignIn() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [notice, setNotice] = useState('');
 
   async function request(e: React.FormEvent) {
     e.preventDefault();
@@ -61,10 +62,32 @@ export function SignIn() {
           autoFocus
         />
       </label>
+      {notice && !err && <p className="pt-msg is-ok">{notice}</p>}
       {err && <p className="pt-msg is-err">{err}</p>}
       <div className="pt-row">
         <button className="pt-btn" disabled={busy || code.length !== 6}>{busy ? 'Checking…' : 'Sign in'}</button>
-        <button type="button" className="pt-btn-ghost" onClick={() => { setSent(false); setCode(''); setErr(''); }}>
+        <button
+          type="button"
+          className="pt-btn-ghost"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setErr('');
+            setCode('');
+            try {
+              await post('/api/portal/login/request', { email });
+              setErr('');
+              setNotice('New code sent — use the code in the newest email.');
+            } catch (e2) {
+              setErr((e2 as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Send a new code
+        </button>
+        <button type="button" className="pt-btn-ghost" onClick={() => { setSent(false); setCode(''); setErr(''); setNotice(''); }}>
           Use a different email
         </button>
       </div>
