@@ -3,6 +3,7 @@ import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { agreementHash } from '@/lib/subcontractors/server';
+import { outstandingFor } from '@/lib/subcontractors/reminders';
 import {
   SUB_COLUMNS,
   type AgreementRow,
@@ -55,6 +56,11 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
     admin.from('subcontractor_ntp_agreements').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
   ]);
   const agreement = agr as AgreementRow | null;
+  // Reminder switch + what the firm would be chased for today (tables from supabase/reminders.sql).
+  const [{ data: rem }, outstanding] = await Promise.all([
+    admin.from('subcontractors').select('reminders_paused').eq('id', id).maybeSingle(),
+    outstandingFor(id).catch(() => []),
+  ]);
 
   return (
     <AdminShell active="subcontractors" isAdmin={profile?.role === 'admin'}>
@@ -82,6 +88,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         jobs={(jobs ?? []) as AssignmentRow[]}
         pulls={(pulls ?? []) as PullRow[]}
         ntps={(ntps ?? []) as NtpRow[]}
+        reminders={{ paused: !!(rem as { reminders_paused?: boolean } | null)?.reminders_paused, outstanding }}
       />
     </AdminShell>
   );

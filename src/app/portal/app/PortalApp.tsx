@@ -78,7 +78,7 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, n
   const [team, setTeam] = useState<OperativeRow[]>(operatives);
   const activeTeam = team.filter((o) => !o.archived_at);
   const waitingJobs = jobs.filter((j) => j.status === 'awaiting_crew').length;
-  const ntpToSign = ntps.filter((n) => n.status === 'awaiting_signature').length;
+  const ntpToSign = ntps.filter((n) => n.status === 'awaiting_signature' && !n.signsByLink).length;
   const [step, setStep] = useState<Step>(
     !savedComplete
       ? 'details'
@@ -167,7 +167,7 @@ export function PortalApp({ sub, agreement, documents, operatives, jobs, ntps, n
           }}
         />
       )}
-      {step === 'team' && <TeamStep team={team} setTeam={setTeam} docs={docs} />}
+      {step === 'team' && <TeamStep team={team} setTeam={setTeam} docs={docs} ntps={ntps} />}
       {step === 'ntp' && <NtpStep ntps={ntps} views={ntpViews} onChanged={() => router.refresh()} />}
       {step === 'jobs' && <JobsStep jobs={jobs} team={activeTeam} docs={docs} onChanged={() => router.refresh()} />}
       {step === 'documents' && (
@@ -720,11 +720,21 @@ function TeamStep({
   team,
   setTeam,
   docs,
+  ntps,
 }: {
   team: OperativeRow[];
   setTeam: (fn: (t: OperativeRow[]) => OperativeRow[]) => void;
   docs: PortalDoc[];
+  ntps: PortalNtp[];
 }) {
+  const ntpOf = (id: string) =>
+    ntps
+      .filter((n) => n.operativeId === id && ['active', 'awaiting_signature', 'awaiting_countersign'].includes(n.status))
+      .map((n) => ({
+        techs: n.technologies.map((k) => NTP_TECHNOLOGIES[k]?.label.split(' (')[0] ?? k).join(', '),
+        live: n.status === 'active',
+        suffix: n.status === 'awaiting_signature' ? ' (to sign)' : n.status === 'awaiting_countersign' ? ' (signed — awaiting Heliaxis)' : '',
+      }));
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [phone, setPhone] = useState('');
@@ -777,6 +787,12 @@ function TeamStep({
               <div>
                 <strong>{o.full_name}</strong>
                 <span className="pt-docmeta">{[o.role, o.phone].filter(Boolean).join(' · ')}</span>
+                {ntpOf(o.id).map((x, i) => (
+                  <span key={i} className={`pt-chip ${x.live ? 'is-ok' : 'is-warn'}`} style={{ alignSelf: 'flex-start', marginLeft: 0, marginTop: '0.25rem' }}>
+                    Heliaxis NTP: {x.techs}
+                    {x.suffix}
+                  </span>
+                ))}
               </div>
               <ReadyChip c={operativeCompliance(o.id, docs)} />
               <button type="button" className="pt-x" onClick={() => archive(o, true)} aria-label={`Remove ${o.full_name}`}>
@@ -1009,6 +1025,9 @@ export type PortalNtp = {
   ref: string;
   status: NtpStatus;
   ntpName: string;
+  operativeId: string | null;
+  /** Sent to the NTP personally — they sign from their own link, not the firm. */
+  signsByLink: boolean;
   technologies: string[];
   validFrom: string | null;
   expiresOn: string | null;
@@ -1068,7 +1087,11 @@ function NtpCard({ ntp, view, onChanged }: { ntp: PortalNtp; view?: ReactNode; o
         <span className={`pt-chip ${cls}`}>{NTP_STATUS_LABEL[ntp.status]}</span>
       </header>
 
-      {ntp.status === 'awaiting_signature' ? (
+      {ntp.status === 'awaiting_signature' && ntp.signsByLink ? (
+        <p className="pt-hint" style={{ marginTop: '0.5rem' }}>
+          Sent to {ntp.ntpName} to sign from the personal link we emailed them. Nothing for you to do.
+        </p>
+      ) : ntp.status === 'awaiting_signature' ? (
         <>
           <div className="pt-doc">{view}</div>
           <div className="pt-sign">

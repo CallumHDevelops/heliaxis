@@ -11,6 +11,7 @@ import {
   DOCS_BUCKET,
   emailShell,
   esc,
+  freshLinkEmail,
   inviteEmail,
   logEvent,
   newToken,
@@ -21,8 +22,9 @@ import {
   validSignature,
 } from '@/lib/subcontractors/server';
 import { revokeAllSessions } from '@/lib/subcontractors/session';
-import { createNtpAgreement, ntpHash, parseNtpRequest } from '@/lib/subcontractors/ntp';
-import { NTP_TERM_MONTHS } from '@/lib/subcontractors/ntp-agreement';
+import { createNtpAgreement, issueNtpSigningLink, ntpHash, parseNtpRequest } from '@/lib/subcontractors/ntp';
+import { sendReminderNow } from '@/lib/subcontractors/reminders';
+import { NTP_TECHNOLOGIES, NTP_TERM_MONTHS } from '@/lib/subcontractors/ntp-agreement';
 import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -57,7 +59,14 @@ function cleanRates(rates: BespokeRate[]) {
 }
 
 /** Rotate the magic link (old one stops working) and optionally email it. */
-async function issueLink(sub: SubcontractorRow, actor: string, send: boolean, reminder = false): Promise<Result<{ link: string }>> {
+async function issueLink(
+  sub: SubcontractorRow,
+  actor: string,
+  send: boolean,
+  reminder = false,
+  compose: (sub: SubcontractorRow, link: string) => { to: string; subject: string; html: string } = (s, l) => inviteEmail(s, l, reminder),
+  event = reminder ? 'reminder_sent' : 'invite_sent'
+): Promise<Result<{ link: string }>> {
   const { token, hash } = newToken();
   const admin = createAdminClient();
   const now = new Date().toISOString();
@@ -67,8 +76,8 @@ async function issueLink(sub: SubcontractorRow, actor: string, send: boolean, re
     .eq('id', sub.id);
   const link = portalLink(token, await origin());
   if (send) {
-    const res = await sendEmail(inviteEmail(sub, link, reminder));
-    await logEvent(sub.id, actor, reminder ? 'reminder_sent' : 'invite_sent', { to: sub.email, delivered: res.ok });
+    const res = await sendEmail(compose(sub, link));
+    await logEvent(sub.id, actor, event, { to: sub.email, delivered: res.ok });
     if (!res.ok) return { ok: false, error: `Link created but the email failed: ${res.error}` };
   } else {
     await logEvent(sub.id, actor, 'link_created');
@@ -320,19 +329,28 @@ export async function sendNtp(subId: string, input: Record<string, unknown>): Pr
     .maybeSingle();
   if (!fw) return { ok: false, error: 'Countersign their Subcontractor Framework Agreement first — the NTP agreement sits on top of it.' };
   const req = parseNtpRequest(input);
+  if (req.ntpEmailInvalid) {
+    return { ok: false, error: "That isn't a valid email for the NTP — fix it, or leave it blank for the firm to sign in its portal." };
+  }
   if (req.operativeId) {
     const { data: op } = await admin
       .from('subcontractor_operatives')
-      .select('full_name')
+      .select('full_name, email')
       .eq('id', req.operativeId)
       .eq('subcontractor_id', subId)
       .maybeSingle();
     if (!op) return { ok: false, error: 'That person is not on their team.' };
     req.ntpName = op.full_name;
+    // They sign from a personal link: use their email on file, or remember the one given here.
+    if (!req.ntpEmail && op.email) req.ntpEmail = String(op.email).toLowerCase();
+    if (req.ntpEmail && !op.email) {
+      await admin.from('subcontractor_operatives').update({ email: req.ntpEmail }).eq('id', req.operativeId);
+    }
   }
   const r = await createNtpAgreement(sub, req, actor);
   revalidatePath(`/admin/subcontractors/${subId}`);
-  return r.ok ? { ok: true } : r;
+  if (!r.ok) return r;
+  return r.warning ? { ok: false, error: r.warning } : { ok: true };
 }
 
 export async function countersignNtp(ntpId: string, input: { name: string; title: string; signature: string }): Promise<Result> {
@@ -389,6 +407,22 @@ export async function countersignNtp(ntpId: string, input: { name: string; title
         { href: `${portalBaseUrl()}/portal`, label: 'View in the portal' }
       ),
     });
+    // The NTP is the person appointed — tell them too (they have no portal login).
+    if (ntp.ntp_email && ntp.ntp_email.toLowerCase() !== sub.email.toLowerCase()) {
+      await sendEmail({
+        to: ntp.ntp_email,
+        replyTo: sub.email,
+        subject: `Your Heliaxis NTP appointment is in force (${ntp.ref})`,
+        html: emailShell(
+          "You're appointed",
+          `<p>Hi ${esc(ntp.ntp_name.split(' ')[0])},</p>
+           <p>Heliaxis has countersigned NTP agreement <strong>${esc(ntp.ref)}</strong>. You are Heliaxis's Nominated Technical Person for <strong>${esc(ntp.technologies.map((k) => NTP_TECHNOLOGIES[k]?.label ?? k).join(', '))}</strong> from ${esc(ymd(from))} to ${esc(ymd(to))}.</p>
+           <p>${esc(sub.company_name)} can download the signed copy from the Heliaxis portal.</p>`,
+          undefined,
+          'NTP agreement'
+        ),
+      });
+    }
   }
   revalidatePath(`/admin/subcontractors/${ntp.subcontractor_id}`);
   return { ok: true };
@@ -404,4 +438,70 @@ export async function cancelNtp(ntpId: string): Promise<Result> {
   await logEvent(ntp.subcontractor_id, actor, 'ntp_cancelled', { ref: ntp.ref, was: ntp.status });
   revalidatePath(`/admin/subcontractors/${ntp.subcontractor_id}`);
   return { ok: true };
+}
+
+/** Email the NTP a fresh personal signing link (the previous one stops working). */
+export async function resendNtpLink(ntpId: string): Promise<Result> {
+  const { email: actor } = await requireAdmin();
+  const admin = createAdminClient();
+  const { data } = await admin.from('subcontractor_ntp_agreements').select('*').eq('id', ntpId).maybeSingle();
+  const ntp = data as NtpRow | null;
+  if (!ntp) return { ok: false, error: 'Not found' };
+  if (ntp.status !== 'awaiting_signature') return { ok: false, error: 'It is not waiting for a signature.' };
+  if (!ntp.ntp_email) return { ok: false, error: 'No email address for the NTP — cancel and resend with one.' };
+  const sub = await loadSub(ntp.subcontractor_id);
+  if (!sub) return { ok: false, error: 'Not found' };
+  const r = await issueNtpSigningLink(ntp, sub, true);
+  if (!r.ok) return { ok: false, error: r.error || 'Email failed' };
+  await logEvent(ntp.subcontractor_id, actor, 'ntp_link_sent', { ref: ntp.ref, to: ntp.ntp_email });
+  revalidatePath(`/admin/subcontractors/${ntp.subcontractor_id}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------- reminders
+
+/** Email the firm everything that's outstanding right now, outside the daily schedule. */
+export async function remindNow(subId: string): Promise<Result<{ items: number }>> {
+  const { email: actor } = await requireAdmin();
+  const r = await sendReminderNow(subId, actor);
+  revalidatePath(`/admin/subcontractors/${subId}`);
+  return r.ok ? { ok: true, items: r.items } : { ok: false, error: r.error };
+}
+
+export async function setRemindersPaused(subId: string, paused: boolean): Promise<Result> {
+  const { email: actor } = await requireAdmin();
+  const { error } = await createAdminClient().from('subcontractors').update({ reminders_paused: paused }).eq('id', subId);
+  if (error) return { ok: false, error: /reminders_paused/.test(error.message) ? 'Run supabase/reminders.sql first.' : error.message };
+  await logEvent(subId, actor, paused ? 'reminders_paused' : 'reminders_resumed');
+  revalidatePath(`/admin/subcontractors/${subId}`);
+  return { ok: true };
+}
+
+/**
+ * Email every (non-terminated) subcontractor an apology and a fresh personal link.
+ * Runs in batches under the function time limit: the page calls it until
+ * `remaining` is 0, passing the same `since` so nobody is emailed twice.
+ */
+export async function sendFreshLinksToAll(since: string): Promise<Result<{ sent: number; failed: string[]; remaining: number }>> {
+  const { email: actor } = await requireAdmin();
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(since)) return { ok: false, error: 'Bad request' };
+  const started = Date.now();
+  const { data, error } = await createAdminClient()
+    .from('subcontractors')
+    .select(SUB_COLUMNS)
+    .neq('status', 'terminated')
+    .order('created_at');
+  if (error) return { ok: false, error: error.message };
+  // Anyone invited since this run began has already had theirs.
+  const todo = ((data ?? []) as SubcontractorRow[]).filter((s) => s.email && !(s.invited_at && s.invited_at >= since));
+  let sent = 0;
+  const failed: string[] = [];
+  for (const sub of todo) {
+    if (Date.now() - started > 45_000) break;
+    const r = await issueLink(sub, actor, true, false, freshLinkEmail, 'fresh_link_sent');
+    if (r.ok) sent++;
+    else failed.push(`${sub.company_name}: ${r.error}`);
+  }
+  revalidatePath('/admin/subcontractors');
+  return { ok: true, sent, failed, remaining: todo.length - sent - failed.length };
 }

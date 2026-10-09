@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
@@ -21,6 +21,9 @@ import {
 } from '@/lib/subcontractors/types';
 import {
   cancelNtp,
+  remindNow,
+  resendNtpLink,
+  setRemindersPaused,
   countersign,
   countersignNtp,
   deleteDocument,
@@ -60,6 +63,10 @@ const fmt = (iso: string | null | undefined, time = false) =>
 
 const EVENT_LABEL: Record<string, string> = {
   signed_in: 'Signed in',
+  reminder_digest_sent: 'Reminder emailed',
+  reminders_paused: 'Reminders paused',
+  reminders_resumed: 'Reminders resumed',
+  ntp_link_sent: 'NTP signing link sent',
   ntp_sent: 'NTP agreement sent',
   ntp_renewal_sent: 'NTP renewal sent',
   ntp_signed: 'NTP agreement signed',
@@ -108,6 +115,7 @@ export function SubcontractorDetail({
   jobs,
   pulls,
   ntps,
+  reminders,
 }: {
   sub: SubcontractorRow;
   agreement: AgreementSummary;
@@ -118,8 +126,11 @@ export function SubcontractorDetail({
   jobs: AssignmentRow[];
   pulls: PullRow[];
   ntps: NtpRow[];
+  reminders: { paused: boolean; outstanding: { kind: string; text: string; urgent: boolean }[] };
 }) {
   const router = useRouter();
+  // "Make NTP" on a team member opens the NTP form with them chosen.
+  const [ntpFor, setNtpFor] = useState<{ id: string; n: number } | null>(null);
   const d = sub.details || {};
   const comp = compliance(d, documents);
   const [link, setLink] = useState<string | null>(null);
@@ -288,12 +299,26 @@ export function SubcontractorDetail({
               );
             })}
           </section>
-          <NtpPanel subId={sub.id} ntps={ntps} team={team} frameworkLive={!!agreement?.hlxSignedAt} adminName={adminName} />
+          <NtpPanel
+            subId={sub.id}
+            ntps={ntps}
+            team={team}
+            frameworkLive={!!agreement?.hlxSignedAt}
+            adminName={adminName}
+            preselect={ntpFor}
+          />
           <PullsPanel pulls={pulls} />
         </div>
 
         <aside className="sc-col-side">
-          <TeamPanel team={team} documents={documents} />
+          <RemindersPanel subId={sub.id} paused={reminders.paused} outstanding={reminders.outstanding} />
+          <TeamPanel
+            team={team}
+            documents={documents}
+            ntps={ntps}
+            canMakeNtp={!!agreement?.hlxSignedAt}
+            onMakeNtp={(id) => setNtpFor((p) => ({ id, n: (p?.n ?? 0) + 1 }))}
+          />
           <JobsPanel jobs={jobs} team={team} />
 
           {/* ---------------- terms ---------------- */}
@@ -409,8 +434,29 @@ function ComplianceSummary({ comp }: { comp: ReturnType<typeof compliance> }) {
 }
 
 /** The firm's own team, with each person's readiness for site. */
-function TeamPanel({ team, documents }: { team: OperativeRow[]; documents: DocumentRow[] }) {
+function TeamPanel({
+  team,
+  documents,
+  ntps,
+  canMakeNtp,
+  onMakeNtp,
+}: {
+  team: OperativeRow[];
+  documents: DocumentRow[];
+  ntps: NtpRow[];
+  canMakeNtp: boolean;
+  onMakeNtp: (operativeId: string) => void;
+}) {
   const active = team.filter((o) => !o.archived_at);
+  // Which technologies each person is (or is being made) the NTP for.
+  const ntpOf = (id: string) =>
+    ntps
+      .filter((n) => n.operative_id === id && ['active', 'awaiting_signature', 'awaiting_countersign'].includes(n.status))
+      .map((n) => ({
+        techs: n.technologies.map((k) => NTP_TECHNOLOGIES[k]?.label.split(' (')[0] ?? k).join(', '),
+        live: n.status === 'active',
+        suffix: n.status === 'awaiting_signature' ? ' (to sign)' : n.status === 'awaiting_countersign' ? ' (to countersign)' : '',
+      }));
   return (
     <section className="sc-card">
       <h2>Team ({active.length})</h2>
@@ -423,6 +469,17 @@ function TeamPanel({ team, documents }: { team: OperativeRow[]; documents: Docum
               <span>
                 <strong>{o.full_name}</strong>
                 {o.role && <span className="sc-sub">{o.role}</span>}
+                {ntpOf(o.id).map((x, i) => (
+                  <span key={i} className={`sc-pill ${x.live ? 'is-ok' : 'is-warn'}`} style={{ alignSelf: 'flex-start', marginTop: '0.2rem' }}>
+                    NTP: {x.techs}
+                    {x.suffix}
+                  </span>
+                ))}
+                {canMakeNtp && (
+                  <button type="button" className="sc-inline-link" onClick={() => onMakeNtp(o.id)}>
+                    Make NTP…
+                  </button>
+                )}
               </span>
               <span
                 className={`sc-pill ${c.ready ? (c.expiring ? 'is-warn' : 'is-ok') : 'is-bad'}`}
@@ -648,18 +705,22 @@ function NtpPanel({
   team,
   frameworkLive,
   adminName,
+  preselect,
 }: {
   subId: string;
   ntps: NtpRow[];
   team: OperativeRow[];
   frameworkLive: boolean;
   adminName: string;
+  preselect: { id: string; n: number } | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [techs, setTechs] = useState<string[]>([]);
   const [operativeId, setOperativeId] = useState('');
   const [ntpName, setNtpName] = useState('');
+  const [ntpEmail, setNtpEmail] = useState('');
+  const panelRef = useRef<HTMLElement>(null);
   const [days, setDays] = useState('');
   const [geography, setGeography] = useState('');
   const [installs, setInstalls] = useState('');
@@ -672,6 +733,20 @@ function NtpPanel({
   const [signing, setSigning] = useState<string | null>(null);
   const active = team.filter((o) => !o.archived_at);
 
+  const choose = (id: string) => {
+    setOperativeId(id);
+    setNtpEmail(active.find((o) => o.id === id)?.email || '');
+  };
+
+  // Opened from "Make NTP…" on a team member.
+  useEffect(() => {
+    if (!preselect) return;
+    setOpen(true);
+    choose(preselect.id);
+    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselect]);
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -680,6 +755,7 @@ function NtpPanel({
       technologies: techs,
       operativeId,
       ntpName,
+      ntpEmail,
       minDaysPerMonth: days,
       supervision: { geography, installsPerMonth: installs, typicalDuration: duration, installersToSupervise: installers, notes },
       fee,
@@ -691,7 +767,7 @@ function NtpPanel({
   }
 
   return (
-    <section className="sc-card">
+    <section className="sc-card" ref={panelRef}>
       <div className="sc-row-between">
         <h2>NTP agreements</h2>
         {!open && (
@@ -714,11 +790,25 @@ function NtpPanel({
                   {n.ref}
                   {n.valid_from && ` · ${fmt(n.valid_from)} to ${fmt(n.expires_on)}`}
                   {n.renewal_of && ' · renewal'}
+                  {n.status === 'awaiting_signature' && (n.ntp_email ? ` · link sent to ${n.ntp_email}` : ' · to sign in their portal')}
                 </span>
                 <span className="sc-row" style={{ marginTop: '0.3rem' }}>
                   <a className="sc-link-btn" href={`/admin/subcontractors/${subId}/ntp/${n.id}`} target="_blank" rel="noreferrer">
                     View / print ↗
                   </a>
+                  {n.status === 'awaiting_signature' && n.ntp_email && (
+                    <button
+                      className="sc-btn-ghost"
+                      title={`Sent to ${n.ntp_email}`}
+                      onClick={async () => {
+                        const r = await resendNtpLink(n.id);
+                        alert(r.ok ? `New signing link sent to ${n.ntp_email}.` : r.error);
+                        router.refresh();
+                      }}
+                    >
+                      Resend link
+                    </button>
+                  )}
                   {n.status === 'awaiting_countersign' && signing !== n.id && (
                     <button className="sc-btn-ghost" onClick={() => setSigning(n.id)}>Countersign</button>
                   )}
@@ -773,7 +863,7 @@ function NtpPanel({
           <div className="sc-grid">
             <label>
               NTP (from their team)
-              <select value={operativeId} onChange={(e) => setOperativeId(e.target.value)}>
+              <select value={operativeId} onChange={(e) => choose(e.target.value)}>
                 <option value="">Someone else — type below</option>
                 {active.map((o) => (
                   <option key={o.id} value={o.id}>{o.full_name}</option>
@@ -786,6 +876,10 @@ function NtpPanel({
                 <input value={ntpName} onChange={(e) => setNtpName(e.target.value)} />
               </label>
             )}
+            <label>
+              NTP&apos;s email
+              <input type="email" value={ntpEmail} onChange={(e) => setNtpEmail(e.target.value)} placeholder="They sign from a personal link" />
+            </label>
             <label>
               Minimum days per month
               <input type="number" min="0" max="31" step="0.5" value={days} onChange={(e) => setDays(e.target.value)} />
@@ -846,5 +940,68 @@ function NtpCountersign({ ntpId, defaultName, onDone }: { ntpId: string; default
         {busy ? 'Countersigning…' : 'Countersign NTP agreement'}
       </button>
     </div>
+  );
+}
+
+/** Daily digest reminders for this firm: on/off, what they'd be told, and "send now". */
+function RemindersPanel({
+  subId,
+  paused,
+  outstanding,
+}: {
+  subId: string;
+  paused: boolean;
+  outstanding: { kind: string; text: string; urgent: boolean }[];
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function act(fn: () => Promise<{ ok: boolean; error?: string }>, okText: string) {
+    setBusy(true);
+    setMsg(null);
+    const r = await fn();
+    setBusy(false);
+    setMsg(r.ok ? { ok: true, text: okText } : { ok: false, text: (r as { error: string }).error });
+    router.refresh();
+  }
+
+  return (
+    <section className="sc-card">
+      <div className="sc-row-between">
+        <h2>Reminders</h2>
+        <span className={`sc-pill ${paused ? 'is-warn' : 'is-ok'}`}>{paused ? 'Paused' : 'On'}</span>
+      </div>
+      <p className="sc-muted">
+        Automatic daily email listing everything outstanding — onboarding, missing, rejected or expiring documents,
+        crews to choose, NTP agreements to sign. Each chase goes once (e.g. day 3, 7, 14).
+      </p>
+      {outstanding.length === 0 ? (
+        <p className="sc-muted">Nothing outstanding right now.</p>
+      ) : (
+        <ul className="sc-comp">
+          {outstanding.map((o, i) => (
+            <li key={i} className={o.urgent ? 'is-bad' : 'is-warn'}>{o.text}</li>
+          ))}
+        </ul>
+      )}
+      <div className="sc-row">
+        <button
+          className="sc-btn-ghost"
+          disabled={busy || outstanding.length === 0}
+          onClick={() => act(() => remindNow(subId), 'Reminder emailed.')}
+        >
+          Send reminder now
+        </button>
+        <button
+          className="sc-btn-ghost"
+          disabled={busy}
+          onClick={() => act(() => setRemindersPaused(subId, !paused), paused ? 'Reminders resumed.' : 'Reminders paused.')}
+        >
+          {paused ? 'Resume automatic reminders' : 'Pause automatic reminders'}
+        </button>
+      </div>
+      {msg && <p className={msg.ok ? 'sc-muted' : 'sc-error'}>{msg.text}</p>}
+    </section>
   );
 }

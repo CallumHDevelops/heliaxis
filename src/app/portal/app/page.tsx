@@ -4,6 +4,7 @@ import { agreementHash, buildSnapshot } from '@/lib/subcontractors/server';
 import { getPortalSub } from '@/lib/subcontractors/session';
 import type { AgreementRow, AssignmentRow, DocumentRow, NtpRow, OperativeRow } from '@/lib/subcontractors/types';
 import { NtpDocument } from '@/components/subcontractors/NtpDocument';
+import { signsByLink } from '@/lib/subcontractors/ntp';
 import { AgreementDocument } from '@/components/subcontractors/AgreementDocument';
 import { PortalApp } from './PortalApp';
 
@@ -76,6 +77,8 @@ export default async function PortalPage() {
         ref: n.ref,
         status: n.status,
         ntpName: n.ntp_name,
+        operativeId: n.operative_id,
+        signsByLink: signsByLink(n, sub),
         technologies: n.technologies,
         validFrom: n.valid_from,
         expiresOn: n.expires_on,
@@ -83,7 +86,7 @@ export default async function PortalPage() {
       }))}
       ntpViews={Object.fromEntries(
         ntps
-          .filter((n) => n.status === 'awaiting_signature')
+          .filter((n) => n.status === 'awaiting_signature' && !signsByLink(n, sub))
           .map((n) => [n.id, <NtpDocument key={n.id} snapshot={n.snapshot} showAudit={false} />])
       )}
       hash={hash}

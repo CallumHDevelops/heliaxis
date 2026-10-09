@@ -10,6 +10,7 @@ import {
   SECTIONS,
 } from './agreement';
 import { ALLOWED_MIME, MAX_FILE_BYTES } from './documents';
+import { FRESH_LINK_MESSAGE } from './messages';
 import { SUB_COLUMNS, type AgreementSnapshot, type SubcontractorRow } from './types';
 
 export const DOCS_BUCKET = process.env.SUBCONTRACTOR_DOCS_BUCKET || 'subcontractor-docs';
@@ -245,6 +246,21 @@ export function inviteEmail(sub: SubcontractorRow, link: string, reminder = fals
        </ol>
        <p>It takes about 10 minutes. This link works for 14 days; after that, or any time later, sign in at the portal with this email address and we will email you a one-time code.</p>`,
       { href: link, label: 'Start onboarding' }
+    ),
+  };
+}
+
+/** One-off apology + fresh personal link (see messages.ts for the wording). */
+export function freshLinkEmail(sub: SubcontractorRow, link: string) {
+  const m = FRESH_LINK_MESSAGE;
+  return {
+    to: sub.email,
+    subject: m.subject,
+    html: emailShell(
+      m.title,
+      `<p>Hi ${esc((sub.contact_name || '').split(' ')[0] || 'there')},</p>${m.paragraphs.map((t) => `<p>${esc(t)}</p>`).join('')}
+       <p>The Heliaxis team</p>`,
+      { href: link, label: m.button }
     ),
   };
 }
