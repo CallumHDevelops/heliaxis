@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ntpHash } from '@/lib/subcontractors/ntp';
+import { ntpIntact } from '@/lib/subcontractors/hashing';
 import { getPortalSub } from '@/lib/subcontractors/session';
 import type { NtpRow } from '@/lib/subcontractors/types';
 import { NtpDocument } from '@/components/subcontractors/NtpDocument';
@@ -27,7 +28,7 @@ export default async function PortalNtpPage({ params }: { params: Promise<{ id: 
         <Link className="pt-link" href="/portal/app">← Back to portal</Link>
         <PrintButton />
       </div>
-      <NtpDocument snapshot={ntp.snapshot} ntp={ntp} contentHash={ntpHash(ntp.snapshot)} />
+      <NtpDocument snapshot={ntp.snapshot} ntp={ntp} contentHash={ntpIntact(ntp.snapshot, ntp.content_hash) ? ntp.content_hash : ntpHash(ntp.snapshot)} />
     </div>
   );
 }

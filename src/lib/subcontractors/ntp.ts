@@ -1,5 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'crypto';
+import { ntpFingerprint, ntpIntact } from './hashing';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { HELIAXIS_PARTY } from './agreement';
 import { NTP_SECTIONS, NTP_TECHNOLOGIES, NTP_VERSION, type NtpSupervision } from './ntp-agreement';
@@ -28,8 +29,9 @@ export function buildNtpSnapshot(
   };
 }
 
+/** Fingerprint for a new NTP agreement — canonical JSON (see hashing.ts). */
 export function ntpHash(s: NtpSnapshot) {
-  return sha256(JSON.stringify(s));
+  return ntpFingerprint(s);
 }
 
 async function nextNtpRef() {
@@ -263,7 +265,7 @@ export async function recordNtpSignature(
   const name = str(body.name, 120);
   if (name.length < 2) return { ok: false, error: 'Please type your full name.', status: 400 };
   if (!validSignature(body.signature)) return { ok: false, error: 'Please draw your signature.', status: 400 };
-  if (body.hash !== ntp.content_hash || ntpHash(ntp.snapshot) !== ntp.content_hash) {
+  if (body.hash !== ntp.content_hash || !ntpIntact(ntp.snapshot, ntp.content_hash)) {
     return { ok: false, error: 'The agreement has changed since you opened it. Please reload and review it again.', status: 409 };
   }
 

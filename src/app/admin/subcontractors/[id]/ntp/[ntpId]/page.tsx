@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ntpHash } from '@/lib/subcontractors/ntp';
+import { ntpIntact } from '@/lib/subcontractors/hashing';
 import type { NtpRow } from '@/lib/subcontractors/types';
 import { NtpDocument } from '@/components/subcontractors/NtpDocument';
 import { PrintButton } from '@/components/subcontractors/PrintButton';
@@ -25,7 +26,7 @@ export default async function AdminNtpPage({ params }: { params: Promise<{ id: s
         <Link className="sc-back" href={`/admin/subcontractors/${id}`}>← Back</Link>
         <PrintButton />
       </div>
-      <NtpDocument snapshot={ntp.snapshot} ntp={ntp} contentHash={ntpHash(ntp.snapshot)} />
+      <NtpDocument snapshot={ntp.snapshot} ntp={ntp} contentHash={ntpIntact(ntp.snapshot, ntp.content_hash) ? ntp.content_hash : ntpHash(ntp.snapshot)} />
     </div>
   );
 }

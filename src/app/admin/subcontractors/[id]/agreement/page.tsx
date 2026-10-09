@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { agreementHash, buildSnapshot } from '@/lib/subcontractors/server';
+import { agreementIntact } from '@/lib/subcontractors/hashing';
 import { SUB_COLUMNS, type AgreementRow, type SubcontractorRow } from '@/lib/subcontractors/types';
 import { AgreementDocument } from '@/components/subcontractors/AgreementDocument';
 import { PrintButton } from '@/components/subcontractors/PrintButton';
@@ -32,7 +33,7 @@ export default async function AdminAgreementPage({ params }: { params: Promise<{
         <PrintButton />
       </div>
       {!agreement && <p className="sc-banner is-warn sc-noprint">Preview — not signed yet.</p>}
-      <AgreementDocument snapshot={snapshot} agreement={agreement} contentHash={agreementHash(snapshot)} />
+      <AgreementDocument snapshot={snapshot} agreement={agreement} contentHash={agreement && agreementIntact(snapshot, agreement.content_hash) ? agreement.content_hash : agreementHash(snapshot)} />
     </div>
   );
 }
