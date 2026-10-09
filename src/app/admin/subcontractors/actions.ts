@@ -561,10 +561,16 @@ export async function updateDocumentDetails(
     .select('*')
     .single();
   if (error) return { ok: false, error: error.message };
-  await logEvent(current.subcontractor_id, actor, 'document_updated', {
-    file: current.file_name,
-    ...(current.category !== cat.key ? { from: current.category, to: cat.key } : {}),
-    ...(current.label !== data.label ? { renamed: data.label } : {}),
-  });
+  // Record exactly what changed (before → after) — expiry, person and cover on an approved
+  // certificate change what RAMS pulls and whether the firm is compliant.
+  const changes: Record<string, [unknown, unknown]> = {};
+  for (const k of ['label', 'category', 'operative_name', 'expires_on', 'cover_amount'] as const) {
+    const was = (current as Record<string, unknown>)[k] ?? null;
+    const now = (data as Record<string, unknown>)[k] ?? null;
+    if (was !== now) changes[k] = [was, now];
+  }
+  if (Object.keys(changes).length) {
+    await logEvent(current.subcontractor_id, actor, 'document_updated', { file: current.file_name, status: current.status, changes });
+  }
   return { ok: true, doc: data as DocumentRow };
 }

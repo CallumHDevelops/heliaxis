@@ -62,6 +62,14 @@ const fmt = (iso: string | null | undefined, time = false) =>
       })
     : '—';
 
+const CHANGE_LABEL: Record<string, string> = {
+  label: 'name',
+  category: 'category',
+  operative_name: 'team member',
+  expires_on: 'expiry',
+  cover_amount: 'cover',
+};
+
 const EVENT_LABEL: Record<string, string> = {
   signed_in: 'Signed in',
   document_updated: 'Document renamed / moved',
@@ -135,9 +143,22 @@ export function SubcontractorDetail({
   // and team readiness immediately; the server copy replaces it whenever the page refreshes.
   const [docs, setDocs] = useState(documents);
   const [docsFrom, setDocsFrom] = useState(documents);
+  // Review decisions not yet confirmed by the server. A refresh that was already in flight
+  // when you clicked mustn't put the old status back, so these are laid over server data
+  // until the server copy agrees.
+  const [pending, setPending] = useState<Record<string, Partial<DocumentRow>>>({});
   if (docsFrom !== documents) {
     setDocsFrom(documents);
-    setDocs(documents);
+    const still: Record<string, Partial<DocumentRow>> = {};
+    setDocs(
+      documents.map((x) => {
+        const p = pending[x.id];
+        if (!p || x.status === p.status) return x; // server has caught up (or nothing pending)
+        still[x.id] = p;
+        return { ...x, ...p };
+      })
+    );
+    setPending(still);
   }
   // After a burst of changes, quietly re-sync the server-worked-out bits (reminders preview, activity).
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -315,8 +336,15 @@ export function SubcontractorDetail({
                       key={doc.id}
                       doc={doc}
                       team={team}
-                      onChange={(next) => {
-                        setDocs((all) => all.map((x) => (x.id === next.id ? next : x)));
+                      onChange={(id, patch, review) => {
+                        if (review === 'start') setPending((p) => ({ ...p, [id]: patch }));
+                        if (review === 'failed')
+                          setPending((p) => {
+                            const next = { ...p };
+                            delete next[id];
+                            return next;
+                          });
+                        setDocs((all) => all.map((x) => (x.id === id ? { ...x, ...patch } : x)));
                         resyncSoon();
                       }}
                       onRemoved={(id) => {
@@ -341,7 +369,12 @@ export function SubcontractorDetail({
         </div>
 
         <aside className="sc-col-side">
-          <RemindersPanel subId={sub.id} paused={reminders.paused} outstanding={reminders.outstanding} />
+          <RemindersPanel
+            subId={sub.id}
+            paused={reminders.paused}
+            terminated={sub.status === 'terminated'}
+            outstanding={reminders.outstanding}
+          />
           <TeamPanel
             team={team}
             documents={docs}
@@ -434,6 +467,13 @@ export function SubcontractorDetail({
                     {EVENT_LABEL[e.type] || e.type}
                     {e.type === 'status_changed' && e.detail?.status ? ` → ${STATUS_LABEL[e.detail.status as keyof typeof STATUS_LABEL]}` : ''}
                     {typeof e.detail?.file === 'string' && <em> {e.detail.file}</em>}
+                    {e.type === 'document_updated' && !!e.detail?.changes && typeof e.detail.changes === 'object' && (
+                      <span className="sc-sub">
+                        {Object.entries(e.detail.changes as Record<string, [unknown, unknown]>)
+                          .map(([k, [from, to]]) => `${CHANGE_LABEL[k] ?? k}: ${from ?? '—'} → ${to ?? '—'}`)
+                          .join(' · ')}
+                      </span>
+                    )}
                     <span className="sc-log-a"> · {e.actor}</span>
                   </span>
                 </li>
@@ -620,7 +660,8 @@ function DocRow({
 }: {
   doc: DocumentRow;
   team: OperativeRow[];
-  onChange: (next: DocumentRow) => void;
+  /** Merge a change into the row. `review`: 'start' = optimistic decision, 'failed' = put it back. */
+  onChange: (id: string, patch: Partial<DocumentRow>, review?: 'start' | 'failed') => void;
   onRemoved: (id: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -635,18 +676,17 @@ function DocRow({
       note = prompt('Reason for rejecting (shown to the subcontractor):') || '';
       if (!note) return;
     }
-    const before = doc;
-    onChange({
-      ...doc,
-      status,
-      review_note: status === 'rejected' ? note : null,
-      reviewed_at: status === 'pending' ? null : new Date().toISOString(),
-    });
+    const before = { status: doc.status, review_note: doc.review_note, reviewed_at: doc.reviewed_at };
+    onChange(
+      doc.id,
+      { status, review_note: status === 'rejected' ? note : null, reviewed_at: status === 'pending' ? null : new Date().toISOString() },
+      'start'
+    );
     setBusy(true);
-    const r = await reviewDocument(doc.id, status, note);
+    const r = await safe(() => reviewDocument(doc.id, status, note));
     setBusy(false);
     if (!r.ok) {
-      onChange(before);
+      onChange(doc.id, before, 'failed');
       alert(`Couldn't save: ${r.error}`);
     }
   }
@@ -654,10 +694,10 @@ function DocRow({
   async function remove() {
     if (!confirm(`Permanently delete ${doc.file_name}? This can't be undone.`)) return;
     setBusy(true);
-    const r = await deleteDocument(doc.id);
+    const r = await safe(() => deleteDocument(doc.id));
     setBusy(false);
     if (r.ok) onRemoved(doc.id);
-    else alert(r.error);
+    else alert(`Couldn't delete: ${r.error}`);
   }
 
   const items: MenuItem[] = [
@@ -706,7 +746,14 @@ function DocRow({
           team={team}
           onCancel={() => setEditing(false)}
           onSaved={(next) => {
-            onChange(next);
+            onChange(doc.id, {
+              label: next.label,
+              category: next.category,
+              operative_id: next.operative_id,
+              operative_name: next.operative_name,
+              expires_on: next.expires_on,
+              cover_amount: next.cover_amount,
+            });
             setEditing(false);
           }}
         />
@@ -715,12 +762,26 @@ function DocRow({
   );
 }
 
+/** Run a server action; a thrown error (signed out, network drop) becomes { ok: false, error }. */
+async function safe<T extends { ok: boolean }>(fn: () => Promise<T>): Promise<T | { ok: false; error: string }> {
+  try {
+    return await fn();
+  } catch {
+    return { ok: false, error: 'Network or session problem — please reload the page and try again.' };
+  }
+}
+
 type MenuItem = { label: string; onSelect?: () => void; href?: string; danger?: boolean };
 
 /** Small ▾ menu: opens on click, closes on outside click / Escape / choosing an item. */
 function DocMenu({ items, disabled, label }: { items: MenuItem[]; disabled?: boolean; label: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) btnRef.current?.focus();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -728,7 +789,10 @@ function DocMenu({ items, disabled, label }: { items: MenuItem[]; disabled?: boo
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        btnRef.current?.focus();
+      }
     };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
@@ -739,8 +803,16 @@ function DocMenu({ items, disabled, label }: { items: MenuItem[]; disabled?: boo
   }, [open]);
 
   return (
-    <div className="sc-menu" ref={ref}>
+    <div
+      className="sc-menu"
+      ref={ref}
+      // Tabbing away closes it (a null relatedTarget is a mouse click, which the mousedown handler covers).
+      onBlur={(e) => {
+        if (e.relatedTarget && !ref.current?.contains(e.relatedTarget as Node)) setOpen(false);
+      }}
+    >
       <button
+        ref={btnRef}
         type="button"
         className="sc-menu-btn"
         aria-haspopup="menu"
@@ -755,7 +827,7 @@ function DocMenu({ items, disabled, label }: { items: MenuItem[]; disabled?: boo
         <div className="sc-menu-list" role="menu">
           {items.map((it) =>
             it.href ? (
-              <a key={it.label} role="menuitem" href={it.href} onClick={() => setOpen(false)}>
+              <a key={it.label} role="menuitem" href={it.href} onClick={() => close(true)}>
                 {it.label}
               </a>
             ) : (
@@ -765,7 +837,8 @@ function DocMenu({ items, disabled, label }: { items: MenuItem[]; disabled?: boo
                 role="menuitem"
                 className={it.danger ? 'is-danger' : undefined}
                 onClick={() => {
-                  setOpen(false);
+                  // Delete removes the row and Rename opens a form that takes focus itself.
+                  close(!it.danger && !it.label.startsWith('Rename'));
                   it.onSelect?.();
                 }}
               >
@@ -805,16 +878,18 @@ function DocEditor({
     e.preventDefault();
     setBusy(true);
     setErr('');
-    const r = await updateDocumentDetails(doc.id, {
-      label,
-      category,
-      operativeId: cat?.operative ? operativeId || null : null,
-      expiresOn: expiresOn || null,
-      coverAmount: cover || null,
-    });
+    const r = await safe(() =>
+      updateDocumentDetails(doc.id, {
+        label,
+        category,
+        operativeId: cat?.operative ? operativeId || null : null,
+        expiresOn: expiresOn || null,
+        coverAmount: cover || null,
+      })
+    );
     setBusy(false);
-    if (r.ok) onSaved(r.doc);
-    else setErr(r.error);
+    if (r.ok) onSaved((r as { doc: DocumentRow }).doc);
+    else setErr(r.error || 'Could not save');
   }
 
   return (
@@ -822,7 +897,7 @@ function DocEditor({
       <div className="sc-grid">
         <label>
           Name
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={doc.file_name} />
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={doc.file_name} autoFocus />
         </label>
         <label>
           Category
@@ -859,7 +934,7 @@ function DocEditor({
       {err && <p className="sc-error">{err}</p>}
       <div className="sc-row">
         <button className="sc-btn" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
-        <button type="button" className="sc-btn-ghost" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button type="button" className="sc-btn-ghost" onClick={onCancel}>Cancel</button>
       </div>
     </form>
   );
@@ -1171,10 +1246,12 @@ function NtpCountersign({ ntpId, defaultName, onDone }: { ntpId: string; default
 function RemindersPanel({
   subId,
   paused,
+  terminated,
   outstanding,
 }: {
   subId: string;
   paused: boolean;
+  terminated: boolean;
   outstanding: { kind: string; text: string; urgent: boolean }[];
 }) {
   const router = useRouter();
@@ -1194,7 +1271,9 @@ function RemindersPanel({
     <section className="sc-card">
       <div className="sc-row-between">
         <h2>Reminders</h2>
-        <span className={`sc-pill ${paused ? 'is-warn' : 'is-ok'}`}>{paused ? 'Paused' : 'On'}</span>
+        <span className={`sc-pill ${terminated ? '' : paused ? 'is-warn' : 'is-ok'}`}>
+          {terminated ? 'Off (terminated)' : paused ? 'Paused' : 'On'}
+        </span>
       </div>
       <p className="sc-muted">
         Automatic daily email listing everything outstanding — onboarding, missing, rejected or expiring documents,
@@ -1212,14 +1291,14 @@ function RemindersPanel({
       <div className="sc-row">
         <button
           className="sc-btn-ghost"
-          disabled={busy || outstanding.length === 0}
+          disabled={busy || terminated || outstanding.length === 0}
           onClick={() => act(() => remindNow(subId), 'Reminder emailed.')}
         >
           Send reminder now
         </button>
         <button
           className="sc-btn-ghost"
-          disabled={busy}
+          disabled={busy || terminated}
           onClick={() => act(() => setRemindersPaused(subId, !paused), paused ? 'Reminders resumed.' : 'Reminders paused.')}
         >
           {paused ? 'Resume automatic reminders' : 'Pause automatic reminders'}
