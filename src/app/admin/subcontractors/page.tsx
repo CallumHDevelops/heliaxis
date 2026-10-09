@@ -4,13 +4,17 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import { compliance } from '@/lib/subcontractors/documents';
 import { SUB_COLUMNS, type DocumentRow, type SubcontractorRow } from '@/lib/subcontractors/types';
 import { SubcontractorsList, type ListRow } from './SubcontractorsList';
+import { lastReminderRun } from '@/lib/subcontractors/reminders';
 import './subcontractors.css';
 
 export const dynamic = 'force-dynamic';
+// Bulk emails (fresh links) run as server actions on this page.
+export const maxDuration = 60;
 
 export default async function SubcontractorsPage() {
   const { profile } = await getSessionProfile();
   const admin = createAdminClient();
+  const lastRun = await lastReminderRun().catch(() => ({ available: false as const }));
   const [{ data: subs, error }, { data: docs }] = await Promise.all([
     admin.from('subcontractors').select(SUB_COLUMNS).order('created_at', { ascending: false }),
     admin
@@ -54,8 +58,34 @@ export default async function SubcontractorsPage() {
           </p>
         </div>
       ) : (
-        <SubcontractorsList rows={rows} />
+        <>
+          <ReminderStatus lastRun={lastRun} />
+          <SubcontractorsList rows={rows} recipients={rows.filter((r) => r.status !== 'terminated' && r.email).length} />
+        </>
       )}
     </AdminShell>
+  );
+}
+
+/** Is the daily reminder job running? Silent failure here means nobody gets chased. */
+function ReminderStatus({ lastRun }: { lastRun: Awaited<ReturnType<typeof lastReminderRun>> }) {
+  if (!lastRun.available) {
+    return <p className="sc-banner is-warn sc-page">Automatic reminders need setting up: run supabase/reminders.sql in Supabase.</p>;
+  }
+  const run = lastRun.run;
+  if (!run || lastRun.hoursAgo > 26) {
+    return (
+      <p className="sc-banner is-err sc-page">
+        Automatic reminders {run ? `haven't run since ${new Date(run.ran_at).toLocaleString('en-GB')}` : "haven't run yet"}. Check
+        CRON_SECRET is set in Vercel (Settings → Environment Variables) and redeploy.
+      </p>
+    );
+  }
+  const r = (run.summary?.reminders ?? {}) as { digests?: number; adminNotes?: number; error?: string };
+  return (
+    <p className={`sc-banner ${run.ok ? 'is-ok' : 'is-err'} sc-page`}>
+      Automatic reminders last ran {new Date(run.ran_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+      {run.ok ? ` — ${r.digests ?? 0} reminder email${r.digests === 1 ? '' : 's'} sent.` : ` — with an error: ${r.error ?? 'see logs'}.`}
+    </p>
   );
 }

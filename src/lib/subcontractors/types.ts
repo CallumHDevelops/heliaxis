@@ -266,6 +266,7 @@ export type NtpRow = {
   technologies: string[];
   operative_id: string | null;
   ntp_name: string;
+  ntp_email?: string | null;
   min_days_per_month: number | null;
   supervision: NtpSnapshot['supervision'];
   fee: string | null;

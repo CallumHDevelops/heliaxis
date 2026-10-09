@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { STATUS_LABEL, type SubStatus } from '@/lib/subcontractors/types';
-import { createSubcontractor } from './actions';
+import { createSubcontractor, sendFreshLinksToAll } from './actions';
+import { FRESH_LINK_MESSAGE } from '@/lib/subcontractors/messages';
 import { EMPTY_TERMS, TermsForm } from './TermsForm';
 import './subcontractors.css';
 
@@ -34,9 +35,10 @@ function needsAttention(r: ListRow) {
     (r.status === 'active' && r.missing.length > 0);
 }
 
-export function SubcontractorsList({ rows }: { rows: ListRow[] }) {
+export function SubcontractorsList({ rows, recipients }: { rows: ListRow[]; recipients: number }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
+  const [freshOpen, setFreshOpen] = useState(false);
   const [created, setCreated] = useState<{ id: string; link: string } | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
@@ -70,10 +72,17 @@ export function SubcontractorsList({ rows }: { rows: ListRow[] }) {
           <h1>Subcontractors</h1>
           <p>Add a subcontractor, send them the Framework Agreement to sign, and track their ID, cards, qualifications and insurance.</p>
         </div>
-        {!adding && (
-          <button className="sc-btn" onClick={() => { setAdding(true); setCreated(null); }}>+ Add subcontractor</button>
-        )}
+        <div className="sc-row">
+          <button className="sc-btn-ghost" onClick={() => setFreshOpen((v) => !v)} disabled={!recipients}>
+            Send everyone a fresh link
+          </button>
+          {!adding && (
+            <button className="sc-btn" onClick={() => { setAdding(true); setCreated(null); }}>+ Add subcontractor</button>
+          )}
+        </div>
       </div>
+
+      {freshOpen && <FreshLinks recipients={recipients} onDone={() => router.refresh()} />}
 
       {created && (
         <div className="sc-banner is-ok">
@@ -175,6 +184,65 @@ export function SubcontractorsList({ rows }: { rows: ListRow[] }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Preview of the apology email, then a batched send to every subcontractor. */
+function FreshLinks({ recipients, onDone }: { recipients: number; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ sent: number; failed: string[] } | null>(null);
+  const [err, setErr] = useState('');
+  const m = FRESH_LINK_MESSAGE;
+
+  async function send() {
+    if (!confirm(`Email ${recipients} subcontractor${recipients === 1 ? '' : 's'} an apology and a new personal link? Any older links they have stop working.`)) return;
+    setBusy(true);
+    setErr('');
+    const since = new Date().toISOString();
+    let sent = 0;
+    const failed: string[] = [];
+    try {
+      for (let i = 0; i < 20; i++) {
+        const r = await sendFreshLinksToAll(since);
+        if (!r.ok) throw new Error(r.error);
+        sent += r.sent;
+        failed.push(...r.failed);
+        setResult({ sent, failed: [...failed] });
+        if (r.remaining <= 0 || r.sent === 0) break;
+      }
+      onDone();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="sc-card">
+      <h2>Send everyone a fresh link</h2>
+      <p className="sc-muted">
+        Goes to {recipients} subcontractor{recipients === 1 ? '' : 's'} (everyone except terminated). Each gets their own link
+        straight into the portal, valid 14 days.
+      </p>
+      <div className="sc-preview">
+        <p><strong>Subject:</strong> {m.subject}</p>
+        <p><strong>{m.title}</strong></p>
+        <p>Hi [first name],</p>
+        {m.paragraphs.map((t, i) => <p key={i}>{t}</p>)}
+        <p>[{m.button}]</p>
+        <p>The Heliaxis team</p>
+      </div>
+      {err && <p className="sc-error">{err}</p>}
+      {result && (
+        <p className={result.failed.length ? 'sc-error' : 'sc-muted'}>
+          Sent to {result.sent}.{result.failed.length ? ` Failed: ${result.failed.join('; ')}` : ''}
+        </p>
+      )}
+      <button className="sc-btn" disabled={busy || !!(result && !result.failed.length && result.sent)} onClick={send}>
+        {busy ? 'Sending…' : `Send to ${recipients}`}
+      </button>
     </div>
   );
 }
