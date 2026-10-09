@@ -60,7 +60,8 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
 
   // What the firm would be chased for today — worked out from the data already loaded.
   let outstanding: { kind: string; text: string; urgent: boolean }[] = [];
-  try {
+  // Terminated firms are never chased (same rule as the daily job's loadFirms).
+  if (subRow.status !== 'terminated') try {
     outstanding = chasesFor({
       sub: subRow,
       framework: agreement ? { sub_signed_at: agreement.sub_signed_at, hlx_signed_at: agreement.hlx_signed_at } : null,

@@ -119,7 +119,8 @@
 .sc-doc-group { margin-top: 0.9rem; }
 .sc-missing { font-size: 0.84rem; color: var(--amber); margin: 0; }
 .sc-doc { display: flex; justify-content: space-between; gap: 0.8rem; padding: 0.55rem 0.65rem; border: 1px solid var(--line); background: #fff; border-radius: 3px; margin-bottom: 0.4rem; flex-wrap: wrap; }
-.sc-doc.s-rejected { opacity: 0.65; }
+/* Dim the content, not the row box: opacity on the row would trap the ▾ menu under later rows. */
+.sc-doc.s-rejected > .sc-doc-main, .sc-doc.s-rejected .sc-pill { opacity: 0.65; }
 .sc-doc-main { min-width: 0; flex: 1 1 220px; }
 .sc-doc-main a { font-weight: 700; color: var(--ink); font-size: 0.88rem; word-break: break-word; }
 .sc-doc-side { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; justify-content: flex-end; }
