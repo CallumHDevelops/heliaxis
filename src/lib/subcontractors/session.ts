@@ -89,10 +89,18 @@ export async function revokeAllSessions(subId: string) {
     .is('revoked_at', null);
 }
 
+/** ilike treats % and _ as wildcards — escape them so an email only matches itself. */
+const likeExact = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/** Thrown when the sign-in tables are missing or unreachable (e.g. supabase/portal-v2.sql not run). */
+export class LoginUnavailableError extends Error {}
+
 /**
  * Issue a sign-in code. Always "succeeds" from the caller's point of view so the
  * form can't be used to discover which emails belong to subcontractors.
- * Returns the code + firm only when one should actually be emailed.
+ * Returns the code + firm only when one should actually be emailed. Throws
+ * LoginUnavailableError if the code can't be stored — never email a code that
+ * could not be checked later.
  */
 export async function issueLoginCode(emailRaw: string, ip: string | null) {
   const email = emailRaw.trim().toLowerCase();
@@ -100,25 +108,26 @@ export async function issueLoginCode(emailRaw: string, ip: string | null) {
   const admin = createAdminClient();
   const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
 
-  const [{ count: byEmail }, { count: byIp }] = await Promise.all([
-    admin.from('subcontractor_login_codes').select('id', { count: 'exact', head: true }).ilike('email', email).gte('created_at', hourAgo),
+  const [byEmail, byIp] = await Promise.all([
+    admin.from('subcontractor_login_codes').select('id', { count: 'exact', head: true }).ilike('email', likeExact(email)).gte('created_at', hourAgo),
     ip
       ? admin.from('subcontractor_login_codes').select('id', { count: 'exact', head: true }).eq('ip', ip).gte('created_at', hourAgo)
-      : Promise.resolve({ count: 0 }),
+      : Promise.resolve({ count: 0, error: null }),
   ]);
-  if ((byEmail ?? 0) >= CODES_PER_EMAIL_PER_HOUR || (byIp ?? 0) >= CODES_PER_IP_PER_HOUR) return null;
+  if (byEmail.error) throw new LoginUnavailableError(byEmail.error.message);
+  if ((byEmail.count ?? 0) >= CODES_PER_EMAIL_PER_HOUR || (byIp.count ?? 0) >= CODES_PER_IP_PER_HOUR) return null;
 
   const { data: sub } = await admin
     .from('subcontractors')
     .select(SUB_COLUMNS)
-    .ilike('email', email)
+    .ilike('email', likeExact(email))
     .neq('status', 'terminated')
     .limit(1)
     .maybeSingle();
 
   // Record the attempt either way (rate limiting must count misses too).
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  await admin.from('subcontractor_login_codes').insert({
+  const { error } = await admin.from('subcontractor_login_codes').insert({
     subcontractor_id: sub?.id ?? null,
     email,
     code_hash: sha256(`${email}:${code}`),
@@ -127,29 +136,50 @@ export async function issueLoginCode(emailRaw: string, ip: string | null) {
     // A miss can never be redeemed.
     used_at: sub ? null : new Date().toISOString(),
   });
+  if (error) throw new LoginUnavailableError(error.message);
   return sub ? { sub: sub as SubcontractorRow, code } : null;
 }
 
-/** Check a code; on success returns the firm id (the caller creates the session). */
-export async function redeemLoginCode(emailRaw: string, codeRaw: string) {
+/** How many of the most recent unexpired codes are accepted — covers "I tapped send twice". */
+const LIVE_CODES_ACCEPTED = 3;
+
+export type RedeemResult = { ok: true; subId: string } | { ok: false; reason: 'wrong' | 'expired' | 'locked' };
+
+/**
+ * Check a code against the latest few unexpired codes for this email (people often
+ * request twice and type the one from the older email). Attempts are counted on
+ * the newest code; a new code resets them. On success every outstanding code for
+ * the email is used up.
+ */
+export async function redeemLoginCode(emailRaw: string, codeRaw: string): Promise<RedeemResult> {
   const email = emailRaw.trim().toLowerCase();
   const code = codeRaw.replace(/\D/g, '');
-  if (code.length !== 6) return null;
+  if (code.length !== 6) return { ok: false, reason: 'wrong' };
   const admin = createAdminClient();
-  const { data: row } = await admin
+  const { data: rows, error } = await admin
     .from('subcontractor_login_codes')
-    .select('id, subcontractor_id, code_hash, expires_at, attempts, used_at')
-    .ilike('email', email)
+    .select('id, subcontractor_id, code_hash, expires_at, attempts')
+    .ilike('email', likeExact(email))
     .is('used_at', null)
+    .not('subcontractor_id', 'is', null)
+    .gt('expires_at', new Date().toISOString())
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!row || !row.subcontractor_id || new Date(row.expires_at) < new Date() || row.attempts >= CODE_MAX_ATTEMPTS) return null;
+    .limit(LIVE_CODES_ACCEPTED);
+  if (error) throw new LoginUnavailableError(error.message);
+  if (!rows?.length) return { ok: false, reason: 'expired' };
 
-  if (row.code_hash !== sha256(`${email}:${code}`)) {
-    await admin.from('subcontractor_login_codes').update({ attempts: row.attempts + 1 }).eq('id', row.id);
-    return null;
+  const newest = rows[0];
+  if (newest.attempts >= CODE_MAX_ATTEMPTS) return { ok: false, reason: 'locked' };
+
+  const hash = sha256(`${email}:${code}`);
+  const match = rows.find((r) => r.code_hash === hash);
+  if (!match) {
+    await admin.from('subcontractor_login_codes').update({ attempts: newest.attempts + 1 }).eq('id', newest.id);
+    return { ok: false, reason: newest.attempts + 1 >= CODE_MAX_ATTEMPTS ? 'locked' : 'wrong' };
   }
-  await admin.from('subcontractor_login_codes').update({ used_at: new Date().toISOString() }).eq('id', row.id);
-  return row.subcontractor_id as string;
+  await admin
+    .from('subcontractor_login_codes')
+    .update({ used_at: new Date().toISOString() })
+    .in('id', rows.map((r) => r.id));
+  return { ok: true, subId: match.subcontractor_id as string };
 }

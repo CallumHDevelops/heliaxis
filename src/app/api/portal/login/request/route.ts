@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { clientIp, emailShell, esc, sendEmail } from '@/lib/subcontractors/server';
-import { issueLoginCode } from '@/lib/subcontractors/session';
+import { issueLoginCode, LoginUnavailableError } from '@/lib/subcontractors/session';
 import { jsonError, sameOrigin, str } from '@/lib/subcontractors/portal-request';
 
 /** Email a 6-digit sign-in code. Same response whether or not the address is known. */
@@ -8,7 +8,17 @@ export async function POST(req: Request) {
   if (!sameOrigin(req)) return jsonError('Forbidden', 403);
   const body = (await req.json().catch(() => ({}))) as { email?: string };
   const email = str(body.email, 160);
-  const issued = await issueLoginCode(email, clientIp(req.headers));
+  let issued: Awaited<ReturnType<typeof issueLoginCode>>;
+  try {
+    issued = await issueLoginCode(email, clientIp(req.headers));
+  } catch (e) {
+    // Same for every address, so it reveals nothing about who is registered.
+    console.error('[portal-login] cannot issue codes', e);
+    if (e instanceof LoginUnavailableError) {
+      return jsonError('Sign-in is temporarily unavailable. Please call 01633 965205 and we will get you in.', 503);
+    }
+    throw e;
+  }
   if (issued) {
     await sendEmail({
       to: issued.sub.email,
