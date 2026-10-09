@@ -10,6 +10,7 @@ import {
   SECTIONS,
 } from './agreement';
 import { ALLOWED_MIME, MAX_FILE_BYTES } from './documents';
+import { agreementFingerprint } from './hashing';
 import { FRESH_LINK_MESSAGE } from './messages';
 import { SUB_COLUMNS, type AgreementSnapshot, type SubcontractorRow } from './types';
 
@@ -123,18 +124,9 @@ export function buildSnapshot(sub: SubcontractorRow): AgreementSnapshot {
   };
 }
 
-/** Bank details are collected alongside Schedule B but are not part of the signed contract text. */
-function contractualSnapshot(s: AgreementSnapshot) {
-  const details = { ...s.details };
-  delete details.bankAccountName;
-  delete details.sortCode;
-  delete details.accountNumber;
-  return { ...s, details };
-}
-
-/** sha256 over the snapshot — which carries the full clause text, Schedule A and party details. */
+/** Fingerprint for a new signature — canonical JSON, so it survives the jsonb round trip (see hashing.ts). */
 export function agreementHash(snapshot: AgreementSnapshot) {
-  return sha256(JSON.stringify(contractualSnapshot(snapshot)));
+  return agreementFingerprint(snapshot);
 }
 
 // ---------- storage ----------

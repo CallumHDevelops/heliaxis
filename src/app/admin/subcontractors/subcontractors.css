@@ -153,3 +153,37 @@
 
 .sc-preview { border: 1px solid var(--line); background: #fff; padding: 0.8rem 1rem; margin: 0 0 0.9rem; font-size: 0.88rem; }
 .sc-preview p { margin: 0 0 0.5rem; }
+
+/* Document row: primary decision buttons + a ▾ menu for everything else */
+.sc-doc-btns .is-primary { background: var(--solar); border-color: var(--solar); }
+.sc-menu { position: relative; }
+.sc-menu-btn { font: inherit; font-size: 0.85rem; line-height: 1; padding: 0.3rem 0.55rem; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 2px; cursor: pointer; }
+.sc-menu-btn:disabled { opacity: 0.5; cursor: default; }
+.sc-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 8px 24px rgba(33, 31, 24, 0.14);
+  padding: 0.25rem 0;
+}
+.sc-menu-list button, .sc-menu-list a {
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  padding: 0.5rem 0.8rem;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.sc-menu-list button:hover, .sc-menu-list a:hover, .sc-menu-list button:focus-visible, .sc-menu-list a:focus-visible { background: var(--paper); }
+.sc-menu-list .is-danger { color: var(--bad); border-top: 1px solid var(--line); margin-top: 0.25rem; }
+.sc-doc-edit { flex-basis: 100%; border-top: 1px dashed var(--line); margin-top: 0.4rem; padding-top: 0.6rem; display: grid; gap: 0.6rem; }

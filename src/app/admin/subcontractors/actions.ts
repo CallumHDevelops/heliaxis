@@ -6,7 +6,6 @@ import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
-  agreementHash,
   clientIp,
   DOCS_BUCKET,
   emailShell,
@@ -22,10 +21,12 @@ import {
   validSignature,
 } from '@/lib/subcontractors/server';
 import { revokeAllSessions } from '@/lib/subcontractors/session';
-import { createNtpAgreement, isEmail, issueNtpSigningLink, ntpHash, parseNtpRequest } from '@/lib/subcontractors/ntp';
+import { createNtpAgreement, isEmail, issueNtpSigningLink, parseNtpRequest } from '@/lib/subcontractors/ntp';
+import { agreementIntact, ntpIntact } from '@/lib/subcontractors/hashing';
 import { sendReminderNow } from '@/lib/subcontractors/reminders';
 import { NTP_TECHNOLOGIES, NTP_TERM_MONTHS } from '@/lib/subcontractors/ntp-agreement';
-import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
+import { SUB_COLUMNS, type AgreementRow, type BespokeRate, type DocumentRow, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
+import { CATEGORY_BY_KEY } from '@/lib/subcontractors/documents';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -201,7 +202,7 @@ export async function countersign(id: string, input: { name: string; title: stri
   const agr = data as AgreementRow | null;
   if (!agr) return { ok: false, error: 'The subcontractor has not signed yet.' };
   if (agr.hlx_signed_at) return { ok: false, error: 'Already countersigned.' };
-  if (agreementHash(agr.snapshot) !== agr.content_hash) {
+  if (!agreementIntact(agr.snapshot, agr.content_hash)) {
     return { ok: false, error: 'Integrity check failed — the signed record has been altered since signing. Do not countersign; ask the subcontractor to re-sign.' };
   }
 
@@ -241,27 +242,24 @@ export async function countersign(id: string, input: { name: string; title: stri
   return { ok: true };
 }
 
-export async function reviewDocument(docId: string, status: 'approved' | 'rejected' | 'pending', note: string): Promise<Result> {
+export async function reviewDocument(docId: string, status: 'approved' | 'rejected' | 'pending', note: string): Promise<Result<{ reviewedAt: string | null; reviewNote: string | null }>> {
   const { email: actor } = await requireAdmin();
-  const admin = createAdminClient();
-  const { data: doc } = await admin
+  if (!['approved', 'rejected', 'pending'].includes(status)) return { ok: false, error: 'Bad status' };
+  const reviewNote = status === 'rejected' ? note?.trim().slice(0, 300) || null : null;
+  const reviewedAt = status === 'pending' ? null : new Date().toISOString();
+  // One round trip: update and read back what we need for the log.
+  const { data: doc, error } = await createAdminClient()
     .from('subcontractor_documents')
-    .select('id, subcontractor_id, file_name, category')
+    .update({ status, review_note: reviewNote, reviewed_by: status === 'pending' ? null : actor, reviewed_at: reviewedAt })
     .eq('id', docId)
-    .single();
+    .select('subcontractor_id, file_name')
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
   if (!doc) return { ok: false, error: 'Not found' };
-  await admin
-    .from('subcontractor_documents')
-    .update({
-      status,
-      review_note: status === 'rejected' ? note?.trim().slice(0, 300) || null : null,
-      reviewed_by: status === 'pending' ? null : actor,
-      reviewed_at: status === 'pending' ? null : new Date().toISOString(),
-    })
-    .eq('id', docId);
   await logEvent(doc.subcontractor_id, actor, `document_${status}`, { file: doc.file_name, note: note || undefined });
-  revalidatePath(`/admin/subcontractors/${doc.subcontractor_id}`);
-  return { ok: true };
+  // No revalidatePath: the page updates this row itself (and refreshes quietly afterwards),
+  // instead of making the click wait for the whole page to be rebuilt.
+  return { ok: true, reviewedAt, reviewNote };
 }
 
 export async function deleteDocument(docId: string): Promise<Result> {
@@ -363,7 +361,7 @@ export async function countersignNtp(ntpId: string, input: { name: string; title
   const ntp = data as NtpRow | null;
   if (!ntp) return { ok: false, error: 'Not found' };
   if (ntp.status !== 'awaiting_countersign') return { ok: false, error: 'Not awaiting countersignature.' };
-  if (ntpHash(ntp.snapshot) !== ntp.content_hash) return { ok: false, error: 'Integrity check failed — do not countersign; reissue it.' };
+  if (!ntpIntact(ntp.snapshot, ntp.content_hash)) return { ok: false, error: 'Integrity check failed — do not countersign; reissue it.' };
 
   // A renewal starts the day after the agreement it renews ends, so there's no gap or overlap.
   let from = new Date();
@@ -516,4 +514,57 @@ export async function sendFreshLinksToAll(
   }
   revalidatePath('/admin/subcontractors');
   return { ok: true, since: runSince, sent, failed, remaining: todo.length - sent };
+}
+
+/**
+ * Admin correction of a document's details: rename it, move it to another category,
+ * set which team member it belongs to, or fix its expiry date. The file itself is
+ * untouched (its storage key doesn't need to match the category).
+ */
+export async function updateDocumentDetails(
+  docId: string,
+  input: { label: string; category: string; operativeId: string | null; expiresOn: string | null; coverAmount: string | null }
+): Promise<Result<{ doc: DocumentRow }>> {
+  const { email: actor } = await requireAdmin();
+  const cat = CATEGORY_BY_KEY[input.category];
+  if (!cat) return { ok: false, error: 'Choose a category.' };
+  const db = createAdminClient();
+  const { data: current } = await db.from('subcontractor_documents').select('*').eq('id', docId).maybeSingle();
+  if (!current) return { ok: false, error: 'Not found' };
+
+  let operative: { id: string; full_name: string } | null = null;
+  if (cat.operative) {
+    if (!input.operativeId) return { ok: false, error: `${cat.label} belong to a person — choose who.` };
+    const { data: op } = await db
+      .from('subcontractor_operatives')
+      .select('id, full_name')
+      .eq('id', input.operativeId)
+      .eq('subcontractor_id', current.subcontractor_id)
+      .maybeSingle();
+    if (!op) return { ok: false, error: "That person isn't on this subcontractor's team." };
+    operative = op;
+  }
+  const expiresOn = input.expiresOn && /^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn) ? input.expiresOn : null;
+  if (cat.expiry === 'required' && !expiresOn) return { ok: false, error: `${cat.label} need an expiry date.` };
+
+  const { data, error } = await db
+    .from('subcontractor_documents')
+    .update({
+      label: input.label.trim().slice(0, 120) || null,
+      category: cat.key,
+      operative_id: operative?.id ?? null,
+      operative_name: operative?.full_name ?? null,
+      expires_on: cat.expiry === 'none' ? null : expiresOn,
+      cover_amount: cat.cover ? input.coverAmount?.trim().slice(0, 40) || null : null,
+    })
+    .eq('id', docId)
+    .select('*')
+    .single();
+  if (error) return { ok: false, error: error.message };
+  await logEvent(current.subcontractor_id, actor, 'document_updated', {
+    file: current.file_name,
+    ...(current.category !== cat.key ? { from: current.category, to: cat.key } : {}),
+    ...(current.label !== data.label ? { renamed: data.label } : {}),
+  });
+  return { ok: true, doc: data as DocumentRow };
 }

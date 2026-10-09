@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { canAccess, type PortalKey } from '@/lib/portals';
@@ -12,7 +13,8 @@ export type Profile = {
 };
 
 // Current signed-in user + their profile (or nulls). For use in admin pages.
-export async function getSessionProfile() {
+// cache(): the page, AdminShell and server actions in one request share one lookup.
+export const getSessionProfile = cache(async function getSessionProfile() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -26,7 +28,7 @@ export async function getSessionProfile() {
     .single();
 
   return { user, profile: (profile as Profile | null) ?? null };
-}
+});
 
 /** Approved users only — returns null otherwise. */
 export async function requireApproved() {

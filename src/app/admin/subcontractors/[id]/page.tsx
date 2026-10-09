@@ -2,10 +2,9 @@ import { notFound } from 'next/navigation';
 import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { agreementHash } from '@/lib/subcontractors/server';
-import { outstandingFor } from '@/lib/subcontractors/reminders';
+import { agreementIntact } from '@/lib/subcontractors/hashing';
+import { chasesFor } from '@/lib/subcontractors/reminders';
 import {
-  SUB_COLUMNS,
   type AgreementRow,
   type AssignmentRow,
   type OperativeRow,
@@ -23,49 +22,62 @@ export const maxDuration = 60;
 
 export default async function SubcontractorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { profile } = await getSessionProfile();
   const admin = createAdminClient();
-  const [{ data: sub }, { data: agr }, { data: docs }, { data: events }] = await Promise.all([
-    admin.from('subcontractors').select(SUB_COLUMNS).eq('id', id).maybeSingle(),
-    admin
-      .from('subcontractor_agreements')
-      .select('*')
-      .eq('subcontractor_id', id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    admin.from('subcontractor_documents').select('*').eq('subcontractor_id', id).order('uploaded_at', { ascending: false }),
-    admin
-      .from('subcontractor_events')
-      .select('id, actor, type, detail, ip, created_at')
-      .eq('subcontractor_id', id)
-      .order('created_at', { ascending: false })
-      .limit(100),
-  ]);
+  // Everything in one round trip batch (each query is independent).
+  const [{ profile }, { data: sub }, { data: agr }, { data: docs }, { data: events }, { data: team }, { data: jobs }, { data: pulls }, { data: ntps }] =
+    await Promise.all([
+      getSessionProfile(),
+      // '*' so reminders_paused comes along when supabase/reminders.sql has run (and nothing breaks if not).
+      admin.from('subcontractors').select('*').eq('id', id).maybeSingle(),
+      admin
+        .from('subcontractor_agreements')
+        .select('*')
+        .eq('subcontractor_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      admin.from('subcontractor_documents').select('*').eq('subcontractor_id', id).order('uploaded_at', { ascending: false }),
+      admin
+        .from('subcontractor_events')
+        .select('id, actor, type, detail, ip, created_at')
+        .eq('subcontractor_id', id)
+        .order('created_at', { ascending: false })
+        .limit(100),
+      admin.from('subcontractor_operatives').select('*').eq('subcontractor_id', id).order('full_name'),
+      admin.from('subcontractor_assignments').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
+      admin
+        .from('subcontractor_document_pulls')
+        .select('*')
+        .eq('subcontractor_id', id)
+        .order('pulled_at', { ascending: false })
+        .limit(200),
+      admin.from('subcontractor_ntp_agreements').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
+    ]);
   if (!sub) notFound();
-  // Team, jobs and the RAMS pull ledger (tables from supabase/portal-v2.sql).
-  const [{ data: team }, { data: jobs }, { data: pulls }, { data: ntps }] = await Promise.all([
-    admin.from('subcontractor_operatives').select('*').eq('subcontractor_id', id).order('full_name'),
-    admin.from('subcontractor_assignments').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
-    admin
-      .from('subcontractor_document_pulls')
-      .select('*')
-      .eq('subcontractor_id', id)
-      .order('pulled_at', { ascending: false })
-      .limit(200),
-    admin.from('subcontractor_ntp_agreements').select('*').eq('subcontractor_id', id).order('created_at', { ascending: false }),
-  ]);
   const agreement = agr as AgreementRow | null;
-  // Reminder switch + what the firm would be chased for today (tables from supabase/reminders.sql).
-  const [{ data: rem }, outstanding] = await Promise.all([
-    admin.from('subcontractors').select('reminders_paused').eq('id', id).maybeSingle(),
-    outstandingFor(id).catch(() => []),
-  ]);
+  const ntpRows = (ntps ?? []) as NtpRow[];
+  const subRow = sub as SubcontractorRow & { reminders_paused?: boolean };
+
+  // What the firm would be chased for today — worked out from the data already loaded.
+  let outstanding: { kind: string; text: string; urgent: boolean }[] = [];
+  try {
+    outstanding = chasesFor({
+      sub: subRow,
+      framework: agreement ? { sub_signed_at: agreement.sub_signed_at, hlx_signed_at: agreement.hlx_signed_at } : null,
+      docs: (docs ?? []) as DocumentRow[],
+      ops: (team ?? []) as OperativeRow[],
+      jobs: ((jobs ?? []) as AssignmentRow[]).filter((j) => j.status === 'awaiting_crew'),
+      ntps: ntpRows.filter((n) => n.status === 'awaiting_signature' || n.status === 'awaiting_countersign'),
+      activeNtpIds: new Set(ntpRows.filter((n) => n.status === 'active').map((n) => n.id)),
+    }).firm.map((c) => ({ kind: c.kind, text: c.text, urgent: !!c.urgent }));
+  } catch {
+    outstanding = [];
+  }
 
   return (
     <AdminShell active="subcontractors" isAdmin={profile?.role === 'admin'}>
       <SubcontractorDetail
-        sub={sub as SubcontractorRow}
+        sub={subRow}
         agreement={
           agreement
             ? {
@@ -77,7 +89,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
                 hlxSignedAt: agreement.hlx_signed_at,
                 hlxSignedBy: agreement.hlx_signed_by,
                 version: agreement.version,
-                intact: agreementHash(agreement.snapshot) === agreement.content_hash,
+                intact: agreementIntact(agreement.snapshot, agreement.content_hash),
               }
             : null
         }
@@ -88,7 +100,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         jobs={(jobs ?? []) as AssignmentRow[]}
         pulls={(pulls ?? []) as PullRow[]}
         ntps={(ntps ?? []) as NtpRow[]}
-        reminders={{ paused: !!(rem as { reminders_paused?: boolean } | null)?.reminders_paused, outstanding }}
+        reminders={{ paused: !!subRow.reminders_paused, outstanding }}
       />
     </AdminShell>
   );

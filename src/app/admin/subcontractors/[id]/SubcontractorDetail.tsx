@@ -20,6 +20,7 @@ import {
   type SubcontractorRow,
 } from '@/lib/subcontractors/types';
 import {
+  updateDocumentDetails,
   cancelNtp,
   remindNow,
   resendNtpLink,
@@ -63,6 +64,7 @@ const fmt = (iso: string | null | undefined, time = false) =>
 
 const EVENT_LABEL: Record<string, string> = {
   signed_in: 'Signed in',
+  document_updated: 'Document renamed / moved',
   reminder_digest_sent: 'Reminder emailed',
   reminders_paused: 'Reminders paused',
   reminders_resumed: 'Reminders resumed',
@@ -129,10 +131,24 @@ export function SubcontractorDetail({
   reminders: { paused: boolean; outstanding: { kind: string; text: string; urgent: boolean }[] };
 }) {
   const router = useRouter();
+  // Local copy of the documents: approving / editing updates the row, compliance summary
+  // and team readiness immediately; the server copy replaces it whenever the page refreshes.
+  const [docs, setDocs] = useState(documents);
+  const [docsFrom, setDocsFrom] = useState(documents);
+  if (docsFrom !== documents) {
+    setDocsFrom(documents);
+    setDocs(documents);
+  }
+  // After a burst of changes, quietly re-sync the server-worked-out bits (reminders preview, activity).
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resyncSoon = () => {
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => router.refresh(), 2500);
+  };
   // "Make NTP" on a team member opens the NTP form with them chosen.
   const [ntpFor, setNtpFor] = useState<{ id: string; n: number } | null>(null);
   const d = sub.details || {};
-  const comp = compliance(d, documents);
+  const comp = compliance(d, docs);
   const [link, setLink] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [editing, setEditing] = useState(false);
@@ -285,7 +301,7 @@ export function SubcontractorDetail({
             <h2>Documents</h2>
             <ComplianceSummary comp={comp} />
             {DOC_CATEGORIES.map((cat) => {
-              const list = documents.filter((x) => x.category === cat.key);
+              const list = docs.filter((x) => x.category === cat.key);
               if (!list.length && !cat.required(d)) return null;
               return (
                 <div key={cat.key} className="sc-doc-group">
@@ -294,7 +310,21 @@ export function SubcontractorDetail({
                     {cat.required(d) && <span className="sc-pill">Required</span>}
                   </h3>
                   {list.length === 0 && <p className="sc-missing">Nothing uploaded</p>}
-                  {list.map((doc) => <DocRow key={doc.id} doc={doc} onChanged={() => router.refresh()} />)}
+                  {list.map((doc) => (
+                    <DocRow
+                      key={doc.id}
+                      doc={doc}
+                      team={team}
+                      onChange={(next) => {
+                        setDocs((all) => all.map((x) => (x.id === next.id ? next : x)));
+                        resyncSoon();
+                      }}
+                      onRemoved={(id) => {
+                        setDocs((all) => all.filter((x) => x.id !== id));
+                        resyncSoon();
+                      }}
+                    />
+                  ))}
                 </div>
               );
             })}
@@ -314,7 +344,7 @@ export function SubcontractorDetail({
           <RemindersPanel subId={sub.id} paused={reminders.paused} outstanding={reminders.outstanding} />
           <TeamPanel
             team={team}
-            documents={documents}
+            documents={docs}
             ntps={ntps}
             canMakeNtp={!!agreement?.hlxSignedAt}
             onMakeNtp={(id) => setNtpFor((p) => ({ id, n: (p?.n ?? 0) + 1 }))}
@@ -582,22 +612,62 @@ function PullsPanel({ pulls }: { pulls: PullRow[] }) {
   );
 }
 
-function DocRow({ doc, onChanged }: { doc: DocumentRow; onChanged: () => void }) {
+function DocRow({
+  doc,
+  team,
+  onChange,
+  onRemoved,
+}: {
+  doc: DocumentRow;
+  team: OperativeRow[];
+  onChange: (next: DocumentRow) => void;
+  onRemoved: (id: string) => void;
+}) {
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
   const ex = expiryState(doc.expires_on);
 
+  // Optimistic: the row (and everything worked out from it) changes the moment you click;
+  // the save runs in the background and the row is put back if it fails.
   async function review(status: 'approved' | 'rejected' | 'pending') {
     let note = '';
     if (status === 'rejected') {
       note = prompt('Reason for rejecting (shown to the subcontractor):') || '';
       if (!note) return;
     }
+    const before = doc;
+    onChange({
+      ...doc,
+      status,
+      review_note: status === 'rejected' ? note : null,
+      reviewed_at: status === 'pending' ? null : new Date().toISOString(),
+    });
     setBusy(true);
     const r = await reviewDocument(doc.id, status, note);
     setBusy(false);
-    if (!r.ok) alert(r.error);
-    onChanged();
+    if (!r.ok) {
+      onChange(before);
+      alert(`Couldn't save: ${r.error}`);
+    }
   }
+
+  async function remove() {
+    if (!confirm(`Permanently delete ${doc.file_name}? This can't be undone.`)) return;
+    setBusy(true);
+    const r = await deleteDocument(doc.id);
+    setBusy(false);
+    if (r.ok) onRemoved(doc.id);
+    else alert(r.error);
+  }
+
+  const items: MenuItem[] = [
+    ...(doc.status !== 'approved' && doc.status !== 'pending' ? [{ label: 'Approve', onSelect: () => review('approved') }] : []),
+    ...(doc.status !== 'rejected' && doc.status !== 'pending' ? [{ label: 'Reject…', onSelect: () => review('rejected') }] : []),
+    ...(doc.status !== 'pending' ? [{ label: 'Reset to “to review”', onSelect: () => review('pending') }] : []),
+    { label: 'Rename / move…', onSelect: () => setEditing(true) },
+    { label: 'Download', href: `/api/admin/subcontractor-docs/${doc.id}?download=1` },
+    { label: 'Delete…', onSelect: remove, danger: true },
+  ];
 
   return (
     <div className={`sc-doc s-${doc.status}`}>
@@ -606,7 +676,7 @@ function DocRow({ doc, onChanged }: { doc: DocumentRow; onChanged: () => void })
         <span className="sc-sub">
           {[doc.operative_name, doc.cover_amount, doc.reference, `uploaded ${fmt(doc.uploaded_at)}`].filter(Boolean).join(' · ')}
         </span>
-        {doc.review_note && <span className="sc-sub is-bad">Rejected: {doc.review_note}</span>}
+        {doc.status === 'rejected' && doc.review_note && <span className="sc-sub is-bad">Rejected: {doc.review_note}</span>}
       </div>
       <div className="sc-doc-side">
         {doc.expires_on && (
@@ -616,28 +686,182 @@ function DocRow({ doc, onChanged }: { doc: DocumentRow; onChanged: () => void })
         )}
         <span className={`sc-pill is-${doc.status === 'approved' ? 'ok' : doc.status === 'rejected' ? 'bad' : 'info'}`}>
           {doc.status === 'pending' ? 'To review' : doc.status}
+          {busy ? '…' : ''}
         </span>
         <div className="sc-doc-btns">
-          {doc.status !== 'approved' && <button disabled={busy} onClick={() => review('approved')}>Approve</button>}
-          {doc.status !== 'rejected' && <button disabled={busy} onClick={() => review('rejected')}>Reject</button>}
-          {doc.status !== 'pending' && <button disabled={busy} onClick={() => review('pending')}>Reset</button>}
-          <a href={`/api/admin/subcontractor-docs/${doc.id}?download=1`}>Download</a>
-          <button
-            disabled={busy}
-            className="is-danger"
-            onClick={async () => {
-              if (!confirm(`Permanently delete ${doc.file_name}?`)) return;
-              setBusy(true);
-              await deleteDocument(doc.id);
-              setBusy(false);
-              onChanged();
-            }}
-          >
-            Delete
-          </button>
+          {/* Only a document waiting for review shows its decisions up front; once decided,
+              everything else lives behind the ▾ so it can't be pressed by accident. */}
+          {doc.status === 'pending' && (
+            <>
+              <button className="is-primary" disabled={busy} onClick={() => review('approved')}>Approve</button>
+              <button disabled={busy} onClick={() => review('rejected')}>Reject</button>
+            </>
+          )}
+          <DocMenu items={items} disabled={busy} label={`More actions for ${doc.label || doc.file_name}`} />
         </div>
       </div>
+      {editing && (
+        <DocEditor
+          doc={doc}
+          team={team}
+          onCancel={() => setEditing(false)}
+          onSaved={(next) => {
+            onChange(next);
+            setEditing(false);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+type MenuItem = { label: string; onSelect?: () => void; href?: string; danger?: boolean };
+
+/** Small ▾ menu: opens on click, closes on outside click / Escape / choosing an item. */
+function DocMenu({ items, disabled, label }: { items: MenuItem[]; disabled?: boolean; label: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="sc-menu" ref={ref}>
+      <button
+        type="button"
+        className="sc-menu-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+      >
+        ▾
+      </button>
+      {open && (
+        <div className="sc-menu-list" role="menu">
+          {items.map((it) =>
+            it.href ? (
+              <a key={it.label} role="menuitem" href={it.href} onClick={() => setOpen(false)}>
+                {it.label}
+              </a>
+            ) : (
+              <button
+                key={it.label}
+                type="button"
+                role="menuitem"
+                className={it.danger ? 'is-danger' : undefined}
+                onClick={() => {
+                  setOpen(false);
+                  it.onSelect?.();
+                }}
+              >
+                {it.label}
+              </button>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Rename a document, move it to another category, set whose it is, fix its expiry. */
+function DocEditor({
+  doc,
+  team,
+  onCancel,
+  onSaved,
+}: {
+  doc: DocumentRow;
+  team: OperativeRow[];
+  onCancel: () => void;
+  onSaved: (next: DocumentRow) => void;
+}) {
+  const [label, setLabel] = useState(doc.label || '');
+  const [category, setCategory] = useState(doc.category);
+  const [operativeId, setOperativeId] = useState(doc.operative_id || '');
+  const [expiresOn, setExpiresOn] = useState(doc.expires_on || '');
+  const [cover, setCover] = useState(doc.cover_amount || '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const cat = CATEGORY_BY_KEY[category];
+  const people = team.filter((o) => !o.archived_at || o.id === doc.operative_id);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr('');
+    const r = await updateDocumentDetails(doc.id, {
+      label,
+      category,
+      operativeId: cat?.operative ? operativeId || null : null,
+      expiresOn: expiresOn || null,
+      coverAmount: cover || null,
+    });
+    setBusy(false);
+    if (r.ok) onSaved(r.doc);
+    else setErr(r.error);
+  }
+
+  return (
+    <form className="sc-doc-edit" onSubmit={save}>
+      <div className="sc-grid">
+        <label>
+          Name
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={doc.file_name} />
+        </label>
+        <label>
+          Category
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {DOC_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>{c.label}</option>
+            ))}
+          </select>
+        </label>
+        {cat?.operative && (
+          <label>
+            Team member
+            <select value={operativeId} onChange={(e) => setOperativeId(e.target.value)} required>
+              <option value="">Choose…</option>
+              {people.map((o) => (
+                <option key={o.id} value={o.id}>{o.full_name}{o.archived_at ? ' (left)' : ''}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {cat && cat.expiry !== 'none' && (
+          <label>
+            Expiry date{cat.expiry === 'optional' ? ' (if any)' : ''}
+            <input type="date" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} required={cat.expiry === 'required'} />
+          </label>
+        )}
+        {cat?.cover && (
+          <label>
+            Cover amount
+            <input value={cover} onChange={(e) => setCover(e.target.value)} placeholder="e.g. £2,000,000" />
+          </label>
+        )}
+      </div>
+      {err && <p className="sc-error">{err}</p>}
+      <div className="sc-row">
+        <button className="sc-btn" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+        <button type="button" className="sc-btn-ghost" onClick={onCancel} disabled={busy}>Cancel</button>
+      </div>
+    </form>
   );
 }
 
