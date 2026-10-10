@@ -15,12 +15,13 @@ export default async function SubcontractorsPage() {
   const { profile } = await getSessionProfile();
   const admin = createAdminClient();
   const lastRun = await lastReminderRun().catch(() => ({ available: false as const }));
-  const [{ data: subs, error }, { data: docs }] = await Promise.all([
+  const [{ data: subs, error }, { data: docs }, { count: unprocessed, error: v4Missing }] = await Promise.all([
     // '*' so the CIS verification columns come along once supabase/portal-v3.sql has run.
     admin.from('subcontractors').select('*').order('created_at', { ascending: false }),
     admin
       .from('subcontractor_documents')
       .select('id, subcontractor_id, category, label, operative_name, expires_on, status, uploaded_at'),
+    admin.from('subcontractor_documents').select('id', { count: 'exact', head: true }).is('processed_at', null),
   ]);
 
   const bySub = new Map<string, DocumentRow[]>();
@@ -63,7 +64,11 @@ export default async function SubcontractorsPage() {
       ) : (
         <>
           <ReminderStatus lastRun={lastRun} />
-          <SubcontractorsList rows={rows} recipients={rows.filter((r) => r.status !== 'terminated' && r.email).length} />
+          <SubcontractorsList
+            rows={rows}
+            recipients={rows.filter((r) => r.status !== 'terminated' && r.email).length}
+            unprocessed={v4Missing ? null : unprocessed ?? 0}
+          />
         </>
       )}
     </AdminShell>

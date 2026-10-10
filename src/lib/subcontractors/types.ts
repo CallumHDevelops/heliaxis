@@ -119,7 +119,15 @@ export type DocumentRow = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   uploaded_at: string;
+  // Conversion to one compact PDF (supabase/portal-v4.sql) — absent until that has run.
+  /** What the firm uploaded, kept until the document is approved. */
+  original_files?: OriginalFile[] | null;
+  original_bytes?: number | null;
+  processed_at?: string | null;
+  processing_note?: string | null;
 };
+
+export type OriginalFile = { path: string; name: string; mime: string; size: number };
 
 /** Heliaxis asking a firm for a document (supabase/portal-v3.sql). */
 export type DocRequestRow = {

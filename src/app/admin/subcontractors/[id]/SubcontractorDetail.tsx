@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
+import { DocViewer } from '@/components/subcontractors/DocViewer';
 import {
   CATEGORY_BY_KEY,
   compliance,
@@ -612,6 +613,7 @@ export function SubcontractorDetail({
                     {e.type === 'cis_verified' && typeof e.detail?.rate === 'string' && ` — ${CIS_RATE_LABEL[e.detail.rate as CisRate] ?? e.detail.rate}`}
                     {typeof e.detail?.request === 'string' && <em> {e.detail.request}</em>}
                     {typeof e.detail?.file === 'string' && <em> {e.detail.file}</em>}
+                    {e.type === 'document_uploaded' && typeof e.detail?.note === 'string' && <span className="sc-sub">{e.detail.note}</span>}
                     {e.type === 'document_updated' && !!e.detail?.changes && typeof e.detail.changes === 'object' && (
                       <span className="sc-sub">
                         {Object.entries(e.detail.changes as Record<string, [unknown, unknown]>)
@@ -829,7 +831,10 @@ function DocRow({
   const [editing, setEditing] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [asking, setAsking] = useState(false);
+  // Opened in the in-page viewer; a pending document can be approved / rejected from there.
+  const [viewing, setViewing] = useState(false);
   const ex = expiryState(doc.expires_on);
+  const originals = doc.original_files ?? [];
   // The person it belongs to has left the team: a replacement can't be asked of them.
   const personLeft = !!doc.operative_id && !team.some((o) => o.id === doc.operative_id && !o.archived_at);
   // When an inline form closes, put keyboard focus back on the row (its ▾, or its link while busy).
@@ -884,6 +889,11 @@ function DocRow({
     ...(doc.status !== 'pending' ? [{ label: 'Reset to “to review”', onSelect: () => review('pending') }] : []),
     { label: 'Rename / move…', onSelect: () => setEditing(true) },
     { label: 'Download', href: `/api/admin/subcontractor-docs/${doc.id}?download=1` },
+    // What the firm actually uploaded — kept until the document is approved.
+    ...originals.map((o, i) => ({
+      label: originals.length > 1 ? `Original ${i + 1}: ${o.name}` : `Original upload (${o.name})`,
+      href: `/api/admin/subcontractor-docs/${doc.id}?original=${i}`,
+    })),
     { label: 'Delete…', onSelect: remove, danger: true },
   ];
 
@@ -899,10 +909,22 @@ function DocRow({
       }}
     >
       <div className="sc-doc-main">
-        <a href={`/api/admin/subcontractor-docs/${doc.id}`} target="_blank" rel="noreferrer">{doc.label || doc.file_name}</a>
+        <a
+          href={`/api/admin/subcontractor-docs/${doc.id}`}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            setViewing(true);
+          }}
+        >
+          {doc.label || doc.file_name}
+        </a>
         <span className="sc-sub">
           {[doc.operative_name, doc.cover_amount, doc.reference, `uploaded ${fmt(doc.uploaded_at)}`].filter(Boolean).join(' · ')}
         </span>
+        {doc.processing_note && <span className="sc-sub">{doc.processing_note}</span>}
         {doc.status === 'rejected' && doc.review_note && <span className="sc-sub is-bad">Rejected: {doc.review_note}</span>}
         {doc.status === 'rejected' && replacementAsked && <span className="sc-sub">Replacement asked for</span>}
       </div>
@@ -928,6 +950,45 @@ function DocRow({
           <DocMenu items={items} disabled={busy} label={`More actions for ${doc.label || doc.file_name}`} />
         </div>
       </div>
+      {viewing && (
+        <DocViewer
+          doc={{
+            src: `/api/admin/subcontractor-docs/${doc.id}`,
+            title: [doc.label || doc.file_name, doc.operative_name].filter(Boolean).join(' · '),
+            mime: doc.mime,
+            downloadHref: `/api/admin/subcontractor-docs/${doc.id}?download=1`,
+          }}
+          onClose={() => setViewing(false)}
+          actions={
+            doc.status === 'pending' ? (
+              <div className="sc-viewer-actions">
+                <span>{[CATEGORY_BY_KEY[doc.category]?.label, doc.expires_on && `expires ${fmt(doc.expires_on)}`].filter(Boolean).join(' · ')}</span>
+                <button
+                  className="sc-btn"
+                  disabled={busy}
+                  onClick={() => {
+                    setViewing(false);
+                    review('approved');
+                    refocus();
+                  }}
+                >
+                  Approve
+                </button>
+                <button
+                  className="sc-btn-ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setViewing(false);
+                    setRejecting(true);
+                  }}
+                >
+                  Reject…
+                </button>
+              </div>
+            ) : undefined
+          }
+        />
+      )}
       {rejecting && (
         <RejectForm
           doc={doc}

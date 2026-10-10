@@ -121,6 +121,8 @@ export const ALLOWED_MIME = [
 ];
 // Matches the RAMS buckets, so every approved document can be copied across.
 export const MAX_FILE_BYTES = 15 * 1024 * 1024;
+/** Everything uploaded for one document together (the PDF engine refuses more). */
+export const MAX_TOTAL_UPLOAD_BYTES = 80 * 1024 * 1024;
 
 export function safeFileName(name: string) {
   const dot = name.lastIndexOf('.');

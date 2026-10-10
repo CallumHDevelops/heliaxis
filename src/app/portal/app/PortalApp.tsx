@@ -1,13 +1,16 @@
 'use client';
 
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
+import { useDocViewer, type ViewerDoc } from '@/components/subcontractors/DocViewer';
+import { shrinkImage } from '@/lib/subcontractors/shrink-image';
 import { NTP_TECHNOLOGIES } from '@/lib/subcontractors/ntp-agreement';
 import {
   ALLOWED_MIME,
   CATEGORY_BY_KEY,
+  MAX_TOTAL_UPLOAD_BYTES,
   compliance,
   DOC_CATEGORIES,
   expiryState,
@@ -63,6 +66,10 @@ async function post<T = Record<string, unknown>>(url: string, body: unknown, met
   if (!r.ok || data.ok === false) throw new Error(data.error || 'Something went wrong — please try again.');
   return data;
 }
+
+// One document can be built from several files (pages); the server merges them into a PDF.
+const MAX_UPLOAD_FILES = 10;
+const fmtSize = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`);
 
 const fmt = (iso: string | null) =>
   iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -538,6 +545,8 @@ function DocumentsStep({
   }
 
   const [notice, setNotice] = useState('');
+  // Documents open in an in-page viewer (phones can't show PDFs in a new tab reliably).
+  const { open: view, viewer } = useDocViewer();
   const liveRef = useRef<HTMLParagraphElement>(null);
   const headRef = useRef<HTMLHeadingElement>(null);
   const added = (doc: PortalDoc, fulfilled: string[], note?: string, fromCard = false) => {
@@ -556,6 +565,7 @@ function DocumentsStep({
         to send renewals at least 30 days before expiry (Clause 3A.2).
       </p>
 
+      {viewer}
       {/* Always present, so screen readers announce the text when it appears. */}
       <p ref={liveRef} tabIndex={-1} className="pt-msg is-ok pt-live" role="status" aria-live="polite">
         {notice}
@@ -578,6 +588,7 @@ function DocumentsStep({
             docs={docs.filter((d) => d.category === cat.key)}
             operatives={operatives}
             requests={requests.filter((q) => q.category === cat.key)}
+            onView={view}
             onAdded={added}
             onRemove={remove}
           />
@@ -640,6 +651,7 @@ function CategoryCard({
   docs,
   operatives,
   requests,
+  onView,
   onAdded,
   onRemove,
 }: {
@@ -649,6 +661,7 @@ function CategoryCard({
   operatives: OperativeRow[];
   /** Open requests in this category. */
   requests: PortalRequest[];
+  onView: (doc: ViewerDoc) => void;
   onAdded: (d: PortalDoc, fulfilled: string[], notice?: string, fromCard?: boolean) => void;
   onRemove: (id: string) => void;
 }) {
@@ -679,7 +692,21 @@ function CategoryCard({
         <ul className="pt-doclist">
           {docs.map((d) => (
             <li key={d.id}>
-              <a href={`/api/portal/documents/${d.id}`} target="_blank" rel="noreferrer">
+              <a
+                href={`/api/portal/documents/${d.id}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                  e.preventDefault();
+                  onView({
+                    src: `/api/portal/documents/${d.id}`,
+                    title: d.label || d.file_name,
+                    mime: d.mime,
+                    downloadHref: `/api/portal/documents/${d.id}?download=1`,
+                  });
+                }}
+              >
                 {d.label || d.file_name}
               </a>
               <span className="pt-docmeta">
@@ -728,7 +755,11 @@ function UploadForm({
   // The chosen request may have been answered (from its card) since this form opened.
   const cur = fixed ? fixed.id : forReq === 'none' || requests.some((q) => q.id === forReq) ? forReq : '';
   const sel = fixed ?? requests.find((q) => q.id === cur);
-  const [file, setFile] = useState<File | null>(null);
+  // Several files (e.g. a card's front and back) become one PDF, in this order.
+  const [files, setFiles] = useState<File[]>([]);
+  const [pickerKey, setPickerKey] = useState(0);
+  const [stage, setStage] = useState('');
+  const uid = useId();
   const [operativeId, setOperativeId] = useState(sel?.operativeId || operatives[0]?.id || '');
   const [label, setLabel] = useState(sel?.label || '');
   // The description we filled in from a request (replaced when the choice changes; typed text is kept).
@@ -751,40 +782,90 @@ function UploadForm({
     }
   }
 
+  // Some browsers (notably Windows) report HEIC photos with an empty type.
+  const mimeOf = (f: File) => f.type || (/\.hei[cf]$/i.test(f.name) ? 'image/heic' : '');
+
+  function addFiles(list: FileList | null) {
+    const picked = Array.from(list ?? []);
+    setPickerKey((k) => k + 1); // so picking the same file again still fires
+    if (!picked.length) return;
+    const bad = picked.find((f) => !ALLOWED_MIME.includes(mimeOf(f)));
+    if (bad) return setErr(`${bad.name} isn't a PDF or a photo (JPG, PNG, WebP, HEIC).`);
+    const big = picked.find((f) => f.size > MAX_FILE_BYTES);
+    if (big) return setErr(`${big.name} is over 15 MB.`);
+    const next = [...files, ...picked];
+    if (next.length > MAX_UPLOAD_FILES) return setErr(`Up to ${MAX_UPLOAD_FILES} files per document.`);
+    // Roughly what will actually upload: big photos are shrunk to ~1.5 MB first; PDFs and HEIC go as they are.
+    const willSend = (f: File) => (/^image\/(jpeg|png|webp)$/.test(mimeOf(f)) ? Math.min(f.size, 1_500_000) : f.size);
+    if (next.reduce((n, f) => n + willSend(f), 0) > MAX_TOTAL_UPLOAD_BYTES) {
+      return setErr('Those files add up to more than 80 MB — upload them as separate documents.');
+    }
+    setErr('');
+    setFiles(next);
+  }
+
   async function upload(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) return setErr('Choose a file.');
+    if (!files.length) return setErr('Choose a file.');
     if (!fixed && requests.length && !cur) return setErr('Say whether this is for something Heliaxis asked for.');
-    // Some browsers (notably Windows) report HEIC photos with an empty type.
-    const mime = file.type || (/\.hei[cf]$/i.test(file.name) ? 'image/heic' : '');
-    if (!ALLOWED_MIME.includes(mime)) return setErr('Please upload a PDF or a photo (JPG, PNG, WebP, HEIC).');
-    if (file.size > MAX_FILE_BYTES) return setErr('Files must be under 15 MB.');
     setBusy(true);
     setErr('');
+    const uploaded: { path: string; fileName: string; size: number }[] = [];
+    // Files that went up but never became a document — removed if this attempt fails.
+    const cleanup = (paths: string[]) => {
+      if (paths.length) post('/api/portal/upload-url', { paths }, 'DELETE').catch(() => {});
+    };
+    let uploading = '';
     try {
-      const u = await post<{ path: string; uploadToken: string; bucket: string }>('/api/portal/upload-url', {
-        category: cat.key,
-        fileName: file.name,
-        size: file.size,
-        mime,
-      });
-      const { error } = await createClient().storage.from(u.bucket).uploadToSignedUrl(u.path, u.uploadToken, file, {
-        contentType: mime,
-      });
-      if (error) throw new Error('Upload failed — please check your connection and try again.');
-      const r = await post<{ document: PortalDoc; fulfilled?: string[] }>('/api/portal/documents', {
-        path: u.path,
-        fileName: file.name,
-        mime,
-        size: file.size,
-        category: cat.key,
-        label,
-        operativeId: person,
-        reference,
-        cover,
-        expiresOn,
-        requestId: fixed ? fixed.id : requests.length ? cur : undefined,
-      });
+      for (const [i, original] of files.entries()) {
+        setStage(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : 'Uploading…');
+        const file = await shrinkImage(original);
+        const mime = mimeOf(file);
+        const u = await post<{ path: string; uploadToken: string; bucket: string }>('/api/portal/upload-url', {
+          category: cat.key,
+          fileName: file.name,
+          size: file.size,
+          mime,
+        });
+        uploading = u.path; // it may have landed even if the upload reports an error
+        const { error } = await createClient().storage.from(u.bucket).uploadToSignedUrl(u.path, u.uploadToken, file, {
+          contentType: mime,
+        });
+        if (error) throw new Error('Upload failed — please check your connection and try again.');
+        // The name of what was actually sent (a shrunk photo is a .jpg).
+        uploaded.push({ path: u.path, fileName: file.name, size: file.size });
+        uploading = '';
+      }
+      setStage(files.length > 1 || files.some((f) => mimeOf(f) !== 'application/pdf') ? 'Converting to PDF…' : 'Saving…');
+      const posted = uploaded.splice(0); // the server owns them from here (and cleans up if it refuses)
+      const res = await fetch('/api/portal/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files: posted,
+          category: cat.key,
+          label,
+          operativeId: person,
+          reference,
+          cover,
+          expiresOn,
+          requestId: fixed ? fixed.id : requests.length ? cur : undefined,
+        }),
+      }).catch(() => null);
+      if (!res) {
+        // Signal dropped mid-request: the server may well have saved it. Reload to see, rather
+        // than invite a second upload (and don't delete files it may be using).
+        setErr('Connection lost — we may have received it. Reloading to check…');
+        setTimeout(() => window.location.reload(), 2500);
+        return;
+      }
+      const r = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; document: PortalDoc; fulfilled?: string[] } | null;
+      if (!r) {
+        // Not our reply — the request was cut off (timed out). Its files belong to no document.
+        cleanup(posted.map((p) => p.path));
+        throw new Error('That took too long — try fewer or smaller files.');
+      }
+      if (!res.ok || r.ok === false) throw new Error(r.error || 'Something went wrong — please try again.');
       const fulfilled = r.fulfilled ?? [];
       // Uploaded against a request that had already been closed (by Heliaxis, or from another
       // device): drop it from the page and say so, rather than leave it looking unanswered.
@@ -797,8 +878,11 @@ function UploadForm({
       onClose();
     } catch (e2) {
       setErr((e2 as Error).message);
+      // Files that went up before something failed aren't part of any document — remove them.
+      cleanup([...uploaded.map((u) => u.path), ...(uploading ? [uploading] : [])]);
     } finally {
       setBusy(false);
+      setStage('');
     }
   }
 
@@ -818,9 +902,46 @@ function UploadForm({
             </select>
           </Field>
         )}
-        <Field label="File" wide>
-          <input type="file" accept={ALLOWED_MIME.join(',')} onChange={(e) => setFile(e.target.files?.[0] || null)} />
-        </Field>
+        <div className="pt-field is-wide">
+          <span className="pt-label" id={`${uid}-files`}>{files.length ? 'Files (in page order)' : 'File'}</span>
+          {files.length > 0 && (
+            <ol className="pt-files" aria-labelledby={`${uid}-files`}>
+              {files.map((f, i) => (
+                <li key={`${f.name}-${f.size}-${i}`}>
+                  <span className="pt-file-n" aria-hidden="true">{i + 1}.</span>
+                  <span className="pt-file-name">{f.name}</span>
+                  <span className="pt-docmeta">{fmtSize(f.size)}</span>
+                  <button
+                    type="button"
+                    className="pt-x"
+                    disabled={busy}
+                    onClick={() => setFiles((list) => list.filter((_, j) => j !== i))}
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+          {files.length < MAX_UPLOAD_FILES && (
+            <input
+              key={pickerKey}
+              type="file"
+              multiple
+              accept={ALLOWED_MIME.join(',')}
+              onChange={(e) => addFiles(e.target.files)}
+              disabled={busy}
+              aria-labelledby={`${uid}-files`}
+              aria-describedby={`${uid}-hint`}
+            />
+          )}
+          <span className="pt-hint" id={`${uid}-hint`}>
+            {files.length
+              ? 'Add more to put them in the same PDF.'
+              : `A PDF or photos — several photos (e.g. ${cat.key === 'card' ? 'front and back' : 'each page'}) become one PDF. Up to 80 MB in total.`}
+          </span>
+        </div>
         {cat.operative && (
           <Field label="Team member" hint={operatives.length ? undefined : 'Add your team first (Your team tab)'}>
             <select value={person} onChange={(e) => setOperativeId(e.target.value)} disabled={!!sel?.operativeId} required>
@@ -849,8 +970,9 @@ function UploadForm({
         )}
       </div>
       {err && <p className="pt-msg is-err">{err}</p>}
+      {busy && stage && <p className="pt-msg" role="status">{stage}</p>}
       <div className="pt-row">
-        <button className="pt-btn" disabled={busy || !file}>{busy ? 'Uploading…' : 'Upload'}</button>
+        <button className="pt-btn" disabled={busy || !files.length}>{busy ? stage || 'Uploading…' : 'Upload'}</button>
         <button type="button" className="pt-btn-ghost" onClick={onClose} disabled={busy}>
           Cancel
         </button>

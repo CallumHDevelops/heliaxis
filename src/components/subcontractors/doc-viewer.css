@@ -1,0 +1,378 @@
+/* Full-screen document viewer (DocViewer.tsx) — portalled into <body>, so it brings its own tokens. */
+.dv-root {
+  --dv-chrome: #211f18;
+  --dv-chrome-text: #f6f1e4;
+  --dv-chrome-muted: #d9d1bd;
+  --dv-chrome-line: rgba(255, 253, 248, 0.2);
+  --dv-accent: #f8bc1e;
+  --dv-area: #d8d6d0;
+  --dv-text: #26231c;
+  --dv-muted: #5c584e;
+  --dv-line: rgba(33, 31, 24, 0.22);
+  --dv-sheet-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 18px rgba(0, 0, 0, 0.12);
+  --dv-font: 'Hanken Grotesk', var(--font-outfit, 'Outfit'), system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: var(--dv-area);
+  color: var(--dv-text);
+  font-family: var(--dv-font);
+  font-size: 16px;
+  line-height: 1.4;
+  color-scheme: light dark;
+  pointer-events: auto;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.dv-root *,
+.dv-root *::before,
+.dv-root *::after {
+  box-sizing: border-box;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dv-root {
+    --dv-area: #2b2924;
+    --dv-text: #f1ebdd;
+    --dv-muted: #bdb5a1;
+    --dv-line: rgba(255, 253, 248, 0.22);
+    --dv-sheet-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 8px 26px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/* ---- top bar ---------------------------------------------------------------------------- */
+.dv-bar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
+  background: var(--dv-chrome);
+  color: var(--dv-chrome-text);
+  border-bottom: 3px solid var(--dv-accent);
+  /* Old iOS ignores body overflow:hidden — don't let drags on the bar scroll the page behind. */
+  touch-action: none;
+}
+.dv-title {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  font-family: var(--dv-font);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: normal;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dv-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-right: 6px;
+}
+.dv-pageinfo {
+  font-size: 0.86rem;
+  color: var(--dv-chrome-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dv-pageinfo b {
+  color: var(--dv-accent);
+  font-weight: 700;
+}
+.dv-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto; /* right-aligned on phones even when there's no page count (images) */
+}
+.dv-zoomval {
+  min-width: 3.3em;
+  text-align: center;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--dv-chrome-muted);
+}
+
+.dv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 40px;
+  min-height: 40px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--dv-chrome-line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--dv-chrome-text);
+  font-family: var(--dv-font);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.dv-btn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dv-icon {
+  width: 40px;
+  padding: 0;
+}
+.dv-zoom .dv-btn,
+.dv-close {
+  border-color: transparent;
+}
+.dv-fit {
+  padding: 0 10px;
+}
+.dv-close svg {
+  width: 22px;
+  height: 22px;
+}
+.dv-btn:disabled,
+.dv-btn[aria-disabled='true'] {
+  opacity: 0.38;
+  cursor: default;
+}
+.dv-btn:focus-visible,
+.dv-cta:focus-visible,
+.dv-ghost:focus-visible {
+  outline: 2px solid var(--dv-accent);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .dv-btn:not(:disabled):not([aria-disabled='true']):hover {
+    background: rgba(255, 253, 248, 0.09);
+    border-color: rgba(248, 188, 30, 0.55);
+  }
+}
+.dv-btn:not(:disabled):not([aria-disabled='true']):active {
+  background: rgba(255, 253, 248, 0.14);
+}
+
+/* Phones: title + download + close on row 1, page / zoom tools on row 2. */
+@media (max-width: 719px) {
+  .dv-bar {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+    padding-bottom: 2px;
+  }
+  .dv-tools {
+    order: 10;
+    flex-basis: 100%;
+    justify-content: space-between;
+    margin: 0;
+    min-height: 40px;
+  }
+  .dv-download {
+    width: 40px;
+    padding: 0;
+    border-color: transparent;
+  }
+  .dv-btn-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* ---- page area -------------------------------------------------------------------------- */
+.dv-scroll {
+  position: relative; /* offsetParent for the pages */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Pan natively in both directions; pinch is handled by the viewer (re-renders sharp). */
+  touch-action: pan-x pan-y;
+  scrollbar-gutter: stable;
+  scroll-behavior: auto;
+  outline: none;
+}
+.dv-scroll:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--dv-accent);
+}
+.dv-root:not(.dv-has-actions) .dv-scroll {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dv-content {
+  flex: none;
+  min-width: 100%; /* exactly the viewport at "fit"; wider (scrollable) when zoomed in */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.dv-content--image {
+  margin-top: auto; /* centred when it fits, scrollable from the top when it doesn't */
+  margin-bottom: auto;
+}
+
+.dv-page {
+  position: relative;
+  flex: none;
+  background: #fff;
+  box-shadow: var(--dv-sheet-shadow);
+}
+.dv-page::before {
+  /* faint page number while the page is still drawing */
+  content: attr(data-page);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c9c5bb;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.dv-page-canvas,
+.dv-page-canvas canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dv-img {
+  display: block;
+  flex: none;
+  max-width: none;
+  background: #fff;
+  box-shadow: var(--dv-sheet-shadow);
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+.dv-img--sizing {
+  max-width: 100%;
+  height: auto;
+  visibility: hidden;
+}
+
+/* ---- loading / error -------------------------------------------------------------------- */
+.dv-center {
+  margin: auto;
+  padding: 32px 20px;
+  max-width: 30rem;
+  text-align: center;
+  color: var(--dv-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.dv-center p {
+  margin: 0;
+}
+.dv-error p {
+  color: var(--dv-text);
+  font-weight: 500;
+}
+.dv-spinner {
+  display: block;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto 14px;
+  border: 3px solid var(--dv-line);
+  border-top-color: var(--dv-accent);
+  border-radius: 50%;
+  animation: dv-spin 0.8s linear infinite;
+}
+@keyframes dv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dv-spinner {
+    animation-duration: 2.4s;
+  }
+}
+.dv-center-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+.dv-cta,
+.dv-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 3px;
+  font-family: var(--dv-font);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.dv-cta {
+  border: 0;
+  background: var(--dv-accent);
+  color: #211f18;
+}
+.dv-ghost {
+  border: 1px solid var(--dv-line);
+  background: transparent;
+  color: var(--dv-text);
+}
+
+/* ---- optional bottom action bar (admin approve / reject) ------------------------------- */
+.dv-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px max(16px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: var(--dv-chrome);
+  color: var(--dv-chrome-text);
+  border-top: 1px solid rgba(248, 188, 30, 0.45);
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
+}
+
+@media (forced-colors: active) {
+  .dv-btn,
+  .dv-cta,
+  .dv-ghost {
+    border: 1px solid ButtonText;
+  }
+  .dv-page,
+  .dv-img {
+    outline: 1px solid CanvasText;
+  }
+}

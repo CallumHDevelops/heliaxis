@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { ADMIN_EMAIL, emailShell, esc, logEvent, portalBaseUrl, sendEmail, siteBaseUrl } from '@/lib/subcontractors/server';
 import { createNtpAgreement, isEmail, issueNtpSigningLink } from '@/lib/subcontractors/ntp';
 import { runReminders } from '@/lib/subcontractors/reminders';
+import { sweepOrphanFiles } from '@/lib/subcontractors/doc-processing';
 import type { NtpRow, SubcontractorRow } from '@/lib/subcontractors/types';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,8 @@ export async function GET(req: Request) {
   for (const [name, job] of [
     ['ntp', runNtpRenewals],
     ['reminders', runReminders],
+    // Uploads abandoned part-way (lost signal, killed request) — mostly ID photos.
+    ['orphanFiles', () => sweepOrphanFiles(8_000)],
   ] as const) {
     try {
       result[name] = await job();
