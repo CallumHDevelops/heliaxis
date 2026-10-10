@@ -326,3 +326,8 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-live:empty { margin: 0; }
 /* Rejection reasons and firm-entered references can be long unbroken strings. */
 .pt-docnote, .pt-doclist li { overflow-wrap: anywhere; }
+/* Files picked for one document (they become one PDF, in this order) */
+.pt-files { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.3rem; }
+.pt-file-n { flex: none; min-width: 1.4rem; color: var(--muted); font-size: 0.85rem; }
+.pt-files li { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.pt-file-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 0.88rem; }

@@ -71,7 +71,7 @@ export default async function PortalPage() {
             }
           : null
       }
-      documents={((docs ?? []) as DocumentRow[]).map((d) => ({ ...d, storage_path: undefined }))}
+      documents={((docs ?? []) as DocumentRow[]).map((d) => ({ ...d, storage_path: undefined, original_files: undefined }))}
       operatives={(ops ?? []) as OperativeRow[]}
       requests={requests.map(toPortalRequest)}
       jobs={(jobs ?? []) as AssignmentRow[]}

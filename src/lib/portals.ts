@@ -6,7 +6,7 @@
  * (profiles.portals). Safe to import from middleware, server and client code.
  */
 
-export type PortalKey = 'cms' | 'enquiries' | 'analytics' | 'subcontractors' | 'social' | 'rams';
+export type PortalKey = 'cms' | 'enquiries' | 'analytics' | 'subcontractors' | 'team' | 'social' | 'rams';
 
 export type Portal = {
   key: PortalKey;
@@ -46,6 +46,15 @@ export const PORTALS: Portal[] = [
     description: 'Agreements, ID, qualifications, cards and insurance.',
     href: '/admin/subcontractors',
     paths: ['/admin/subcontractors'],
+  },
+  {
+    key: 'team',
+    label: 'Our team',
+    description: 'Heliaxis’s own operatives — cards, qualifications and expiry dates (kept in RAMS).',
+    // RAMS holds the one list of people (crews and RAMS documents name them); this opens it on our employees.
+    href: 'https://rams.heliaxis.co.uk/operatives?team=heliaxis',
+    external: true,
+    paths: [],
   },
   {
     key: 'social',

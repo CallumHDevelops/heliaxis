@@ -194,3 +194,9 @@
 .sc-request { border-left: 3px solid var(--amber); }
 .sc-request.is-overdue { border-left-color: var(--bad); }
 .sc-request .sc-doc-main strong { font-size: 0.88rem; }
+
+/* Review buttons inside the document viewer (rendered outside .sc-page, so it brings its own colours) */
+.sc-viewer-actions { --ink: #211f18; --solar: #f8bc1e; --line: rgba(255, 255, 255, 0.35); --card: transparent; --bad: #f0a59c;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; width: 100%; color: #f6f1e4; font-size: 0.85rem; }
+.sc-viewer-actions > span { flex: 1 1 12rem; min-width: 0; opacity: 0.8; }
+.sc-viewer-actions .sc-btn-ghost { color: #f6f1e4; }

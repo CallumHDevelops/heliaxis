@@ -26,3 +26,31 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, path: data.path, uploadToken: data.token, bucket: DOCS_BUCKET });
 }
+
+/**
+ * Remove files this firm uploaded that never became a document (an upload of several files
+ * failed part-way). Only its own folder, and never a file a document points at.
+ */
+export async function DELETE(req: Request) {
+  const r = await portalRequest<{ paths: string[] }>(req);
+  if ('error' in r) return r.error;
+  const { sub, body } = r;
+  const paths = (Array.isArray(body.paths) ? body.paths : [])
+    .filter((p): p is string => typeof p === 'string' && p.startsWith(`${sub.id}/`) && !p.includes('..'))
+    .slice(0, 10);
+  if (!paths.length) return NextResponse.json({ ok: true, removed: 0 });
+
+  const admin = createAdminClient();
+  // '*' so this works before supabase/portal-v4.sql (no original_files column yet) — and refuse
+  // to delete anything if the check itself fails.
+  const { data: docs, error } = await admin.from('subcontractor_documents').select('*').eq('subcontractor_id', sub.id);
+  if (error) return jsonError('Could not tidy up — please try again.', 500);
+  const inUse = new Set<string>();
+  for (const d of (docs ?? []) as { storage_path: string; original_files?: { path: string }[] | null }[]) {
+    inUse.add(d.storage_path);
+    for (const o of d.original_files ?? []) inUse.add(o.path);
+  }
+  const orphans = paths.filter((p) => !inUse.has(p));
+  if (orphans.length) await admin.storage.from(DOCS_BUCKET).remove(orphans);
+  return NextResponse.json({ ok: true, removed: orphans.length });
+}

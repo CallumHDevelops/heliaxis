@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { STATUS_LABEL, type CisRate, type SubStatus } from '@/lib/subcontractors/types';
-import { createSubcontractor, sendFreshLinksToAll } from './actions';
+import { createSubcontractor, optimiseExistingDocuments, sendFreshLinksToAll } from './actions';
 import { FRESH_LINK_MESSAGE } from '@/lib/subcontractors/messages';
 import { EMPTY_TERMS, TermsForm } from './TermsForm';
 import './subcontractors.css';
@@ -43,7 +43,16 @@ function needsAttention(r: ListRow) {
     (r.status === 'active' && r.missing.length > 0) || needsCis(r);
 }
 
-export function SubcontractorsList({ rows, recipients }: { rows: ListRow[]; recipients: number }) {
+export function SubcontractorsList({
+  rows,
+  recipients,
+  unprocessed,
+}: {
+  rows: ListRow[];
+  recipients: number;
+  /** Documents uploaded before conversion to PDF existed (null until portal-v4.sql has run). */
+  unprocessed: number | null;
+}) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [freshOpen, setFreshOpen] = useState(false);
@@ -91,6 +100,7 @@ export function SubcontractorsList({ rows, recipients }: { rows: ListRow[]; reci
       </div>
 
       {freshOpen && <FreshLinks recipients={recipients} onDone={() => router.refresh()} />}
+      {!!unprocessed && <OptimiseFiles count={unprocessed} onDone={() => router.refresh()} />}
 
       {created && (
         <div className="sc-banner is-ok">
@@ -263,6 +273,93 @@ function FreshLinks({ recipients, onDone }: { recipients: number; onDone: () => 
       <button className="sc-btn" disabled={busy || finished} onClick={send}>
         {busy ? 'Sending…' : finished ? 'All sent' : since.current ? 'Retry the rest' : `Send to ${recipients}`}
       </button>
+    </div>
+  );
+}
+
+const mb = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.round(n / 1000)} KB`);
+
+/** One-off: turn documents uploaded before conversion existed into compact PDFs, in batches. */
+function OptimiseFiles({ count, onDone }: { count: number; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [progress, setProgress] = useState<{ converted: number; kept: number; saved: number; remaining: number } | null>(null);
+  const [err, setErr] = useState('');
+  const stop = useRef(false);
+  // Leaving the page stops the run (otherwise it keeps going, and queues behind it every other action).
+  useEffect(() => () => {
+    stop.current = true;
+  }, []);
+
+  async function start() {
+    setBusy(true);
+    setStopping(false);
+    setErr('');
+    stop.current = false;
+    const total = { converted: 0, kept: 0, saved: 0 };
+    let before = Infinity;
+    try {
+      for (let i = 0; i < 200 && !stop.current; i++) {
+        const r = await optimiseExistingDocuments();
+        if (!r.ok) throw new Error(r.error);
+        total.converted += r.converted;
+        total.kept += r.kept;
+        total.saved += r.saved;
+        setProgress({ ...total, remaining: r.remaining });
+        if (r.remaining <= 0) break;
+        // Nothing got further this batch (e.g. storage full) — stop instead of looping.
+        if (r.remaining >= before) {
+          setErr(`${r.remaining} couldn’t be processed right now — try again later.`);
+          break;
+        }
+        before = r.remaining;
+      }
+      onDone();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+      setStopping(false);
+    }
+  }
+
+  const finished = !!progress && progress.remaining <= 0;
+  return (
+    <div className="sc-card">
+      <div className="sc-row-between">
+        <h2>Convert existing documents to PDF</h2>
+        <span className="sc-pill is-info">{progress ? progress.remaining : count} to do</span>
+      </div>
+      <p className="sc-muted">
+        New uploads are turned into one compact PDF automatically (photos converted, scans compressed). This does the same
+        for documents uploaded before that — approved ones keep only the PDF; others keep the original until approved.
+        Documents RAMS has already pulled are left exactly as they are.
+      </p>
+      {/* Always present, so each update is announced. */}
+      <p className="sc-muted" role="status">
+        {progress &&
+          `${progress.converted} converted · ${mb(progress.saved)} saved${progress.kept ? ` · ${progress.kept} left as they were` : ''}${
+            progress.remaining > 0 ? ` · ${progress.remaining} still to do` : ' · all done'
+          }`}
+      </p>
+      {err && <p className="sc-error">{err}</p>}
+      {!finished && (
+        <div className="sc-row">
+          {/* One button that changes, so keyboard focus stays put while it runs. */}
+          <button
+            className={busy ? 'sc-btn-ghost' : 'sc-btn'}
+            aria-disabled={stopping || undefined}
+            onClick={() => {
+              if (!busy) return void start();
+              if (stopping) return;
+              stop.current = true;
+              setStopping(true);
+            }}
+          >
+            {!busy ? (progress ? 'Carry on' : 'Convert them now') : stopping ? 'Stopping after this batch…' : 'Stop after this batch'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

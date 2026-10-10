@@ -7,7 +7,6 @@ import { canAccess } from '@/lib/portals';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   clientIp,
-  DOCS_BUCKET,
   emailShell,
   esc,
   freshLinkEmail,
@@ -37,6 +36,7 @@ import {
 import { NTP_TECHNOLOGIES, NTP_TERM_MONTHS } from '@/lib/subcontractors/ntp-agreement';
 import { CIS_RATE_LABEL, SUB_COLUMNS, type AgreementRow, type BespokeRate, type CisRate, type DocRequestRow, type DocumentRow, type SubcontractorRow, type SubStatus, type NtpRow } from '@/lib/subcontractors/types';
 import { CATEGORY_BY_KEY, londonToday } from '@/lib/subcontractors/documents';
+import { discardOriginals, documentPaths, optimiseStoredDocument, removeUnreferenced } from '@/lib/subcontractors/doc-processing';
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -289,6 +289,8 @@ export async function reviewDocument(
   await logEvent(doc.subcontractor_id, actor, `document_${status}`, { file: doc.file_name, note: note || undefined });
   // No revalidatePath: the page updates this row itself (and refreshes quietly afterwards),
   // instead of making the click wait for the whole page to be rebuilt.
+  // Approved: the PDF is the record — what was originally uploaded is no longer kept.
+  if (status === 'approved') await discardOriginals(doc as DocumentRow);
   if (status !== 'rejected') {
     const closedRequests = [
       ...(await cancelReplacementRequests(docId, doc.subcontractor_id, actor)),
@@ -381,8 +383,9 @@ export async function deleteDocument(docId: string): Promise<Result> {
   if (!doc) return { ok: false, error: 'Not found' };
   // If it was the (unreviewed) answer to a request, the request is open again — before the delete clears the link.
   await reopenRequestsForDocument(doc.subcontractor_id, doc, actor);
-  await admin.storage.from(DOCS_BUCKET).remove([doc.storage_path]);
   await admin.from('subcontractor_documents').delete().eq('id', docId);
+  // After the row is gone, so a file another document still points at is kept.
+  await removeUnreferenced(doc.subcontractor_id, documentPaths(doc as DocumentRow));
   await logEvent(doc.subcontractor_id, actor, 'document_deleted', { file: doc.file_name });
   revalidatePath(`/admin/subcontractors/${doc.subcontractor_id}`);
   return { ok: true };
@@ -731,3 +734,56 @@ type CisRecord = {
   cis_verified_by: string | null;
   cis_verified_at: string | null;
 };
+
+// ---------------------------------------------------------------- existing files → compact PDFs
+
+/**
+ * Convert / compress documents uploaded before conversion existed, oldest first, in batches
+ * that fit the function time limit. The page calls this repeatedly until nothing is left.
+ */
+export async function optimiseExistingDocuments(): Promise<
+  Result<{ converted: number; kept: number; retry: number; saved: number; remaining: number }>
+> {
+  const { email: actor } = await requireAdmin();
+  const started = Date.now();
+  const end = started + 50_000; // the page's maxDuration is 60 s
+  const FULL = 40_000; // the engine's normal budget per document
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from('subcontractor_documents')
+    .select('*')
+    .is('processed_at', null)
+    .order('uploaded_at')
+    .limit(25);
+  if (error) return { ok: false, error: /processed_at/.test(error.message) ? 'Run supabase/portal-v4.sql in Supabase first.' : error.message };
+  const tally = { converted: 0, kept: 0, retry: 0, saved: 0 };
+  for (const [i, doc] of ((data ?? []) as DocumentRow[]).entries()) {
+    const left = end - Date.now();
+    // The first document always gets a full budget; later ones only start with real time left.
+    if (i > 0 && left < 25_000) break;
+    const budget = Math.min(FULL, left - 8_000);
+    try {
+      const r = await optimiseStoredDocument(doc, { deadlineMs: Date.now() + budget, fullBudget: budget >= FULL, actor });
+      tally[r.outcome]++;
+      tally.saved += r.saved;
+    } catch (e) {
+      console.error('[optimise] failed', doc.id, e);
+      tally.kept++;
+      // Don't retry a file that throws on every run.
+      await db.from('subcontractor_documents').update({ processed_at: new Date().toISOString(), processing_note: 'Kept as uploaded (error)' }).eq('id', doc.id);
+    }
+  }
+  const { count } = await db.from('subcontractor_documents').select('id', { count: 'exact', head: true }).is('processed_at', null);
+  revalidatePath('/admin/subcontractors');
+  return { ok: true, ...tally, remaining: count ?? 0 };
+}
+
+/** How many documents still need converting (null if portal-v4.sql hasn't run). */
+export async function unprocessedDocumentCount(): Promise<number | null> {
+  await requireAdmin();
+  const { count, error } = await createAdminClient()
+    .from('subcontractor_documents')
+    .select('id', { count: 'exact', head: true })
+    .is('processed_at', null);
+  return error ? null : count ?? 0;
+}
