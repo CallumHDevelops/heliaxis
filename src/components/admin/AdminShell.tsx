@@ -6,7 +6,7 @@ import { brand } from '@/components/auth/authStyles';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
 
-type Tab = 'dashboard' | 'enquiries' | 'approvals' | 'users' | 'blog' | 'analytics' | 'heatmap' | 'subcontractors';
+type Tab = 'dashboard' | 'enquiries' | 'approvals' | 'users' | 'blog' | 'analytics' | 'heatmap' | 'subcontractors' | 'tasks';
 
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
@@ -92,6 +92,7 @@ export async function AdminShell({
           <NavLink href="/admin" label="Dashboard" active={active === 'dashboard'} />
           {can('cms') && <NavLink href="/admin/cms" label="CMS" active={false} />}
           {can('cms') && <NavLink href="/admin/blog" label="Blog" active={active === 'blog'} />}
+          {can('tasks') && <NavLink href="/admin/tasks" label="Tasks" active={active === 'tasks'} />}
           {can('enquiries') && <NavLink href="/admin/enquiries" label="Enquiries" active={active === 'enquiries'} />}
           {can('subcontractors') && (
             <NavLink href="/admin/subcontractors" label="Subcontractors" active={active === 'subcontractors'} />

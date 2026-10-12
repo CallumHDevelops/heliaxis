@@ -1,0 +1,515 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import {
+  addDaysISO,
+  PRIORITY_LABEL,
+  STATUS_LABEL,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  todayISO,
+  type Assignee,
+  type Task,
+  type TaskPriority,
+  type TaskStatus,
+} from '@/lib/tasks';
+import './tasks.css';
+
+type View = 'open' | 'overdue' | 'done' | 'all';
+type Draft = {
+  title: string;
+  notes: string;
+  /** profile id, '' = unassigned, OTHER = free-text name */
+  assignee: string;
+  assigneeName: string;
+  due: string;
+  priority: TaskPriority;
+};
+
+const OTHER = '__other__';
+const EMPTY: Draft = { title: '', notes: '', assignee: '', assigneeName: '', due: '', priority: 'normal' };
+const PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, normal: 1, low: 2 };
+
+function draftFrom(t: Task): Draft {
+  return {
+    title: t.title,
+    notes: t.notes ?? '',
+    assignee: t.assignee_id ?? (t.assignee_name ? OTHER : ''),
+    assigneeName: t.assignee_name ?? '',
+    due: t.due_date ?? '',
+    priority: t.priority,
+  };
+}
+
+function payloadFrom(d: Draft) {
+  return {
+    title: d.title,
+    notes: d.notes,
+    assignee_id: d.assignee && d.assignee !== OTHER ? d.assignee : '',
+    assignee_name: d.assignee === OTHER ? d.assigneeName : '',
+    due_date: d.due,
+    priority: d.priority,
+  };
+}
+
+function fmtDate(iso: string) {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** Days from today to the next Friday (0 if today is Friday). */
+function daysToFriday(today: string) {
+  const dow = new Date(`${today}T12:00:00Z`).getUTCDay();
+  return (5 - dow + 7) % 7;
+}
+
+function dueInfo(t: Task, today: string) {
+  if (!t.due_date) return { label: 'No deadline', cls: 'is-none' };
+  if (t.status === 'done') return { label: fmtDate(t.due_date), cls: 'is-done' };
+  if (t.due_date < today) {
+    const days = Math.round((Date.parse(today) - Date.parse(t.due_date)) / 86400000);
+    return { label: `${days} day${days > 1 ? 's' : ''} overdue`, cls: 'is-overdue' };
+  }
+  if (t.due_date === today) return { label: 'Due today', cls: 'is-today' };
+  if (t.due_date === addDaysISO(today, 1)) return { label: 'Tomorrow', cls: 'is-soon' };
+  if (t.due_date <= addDaysISO(today, 7)) return { label: fmtDate(t.due_date), cls: 'is-soon' };
+  return { label: fmtDate(t.due_date), cls: '' };
+}
+
+function TaskForm({
+  draft,
+  setDraft,
+  people,
+  meId,
+  submitLabel,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  draft: Draft;
+  setDraft: (d: Draft) => void;
+  people: Assignee[];
+  meId: string | null;
+  submitLabel: string;
+  busy: boolean;
+  onSubmit: () => void;
+  onCancel?: () => void;
+}) {
+  const today = todayISO();
+  const quick: [string, string][] = [
+    ['Today', today],
+    ['Tomorrow', addDaysISO(today, 1)],
+    ['Friday', addDaysISO(today, daysToFriday(today) || 7)],
+    ['Next week', addDaysISO(today, 7)],
+  ];
+  const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
+
+  return (
+    <form
+      className="tk-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (draft.title.trim()) onSubmit();
+      }}
+    >
+      <input
+        className="tk-title-input"
+        placeholder="What needs doing?"
+        value={draft.title}
+        onChange={(e) => set({ title: e.target.value })}
+        autoFocus
+        required
+      />
+      <textarea
+        placeholder="Notes, links, context (optional)"
+        rows={2}
+        value={draft.notes}
+        onChange={(e) => set({ notes: e.target.value })}
+      />
+      <div className="tk-form-row">
+        <label>
+          <span>Assign to</span>
+          <select value={draft.assignee} onChange={(e) => set({ assignee: e.target.value })}>
+            <option value="">Unassigned</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {p.id === meId ? ' (me)' : ''}
+              </option>
+            ))}
+            <option value={OTHER}>Someone else…</option>
+          </select>
+          {draft.assignee === OTHER && (
+            <input
+              placeholder="Their name"
+              value={draft.assigneeName}
+              onChange={(e) => set({ assigneeName: e.target.value })}
+            />
+          )}
+        </label>
+        <label>
+          <span>Deadline</span>
+          <input type="date" value={draft.due} onChange={(e) => set({ due: e.target.value })} />
+          <span className="tk-quick">
+            {quick.map(([label, iso]) => (
+              <button
+                key={label}
+                type="button"
+                className={draft.due === iso ? 'is-on' : ''}
+                onClick={() => set({ due: draft.due === iso ? '' : iso })}
+              >
+                {label}
+              </button>
+            ))}
+          </span>
+        </label>
+        <label>
+          <span>Priority</span>
+          <span className="tk-seg">
+            {TASK_PRIORITIES.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`pr-${p}${draft.priority === p ? ' is-on' : ''}`}
+                onClick={() => set({ priority: p })}
+              >
+                {PRIORITY_LABEL[p]}
+              </button>
+            ))}
+          </span>
+        </label>
+      </div>
+      <div className="tk-form-actions">
+        {onCancel && (
+          <button type="button" className="tk-btn" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+        <button type="submit" className="tk-btn tk-btn--primary" disabled={busy || !draft.title.trim()}>
+          {busy ? 'Saving…' : submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function TasksBoard({
+  initialTasks,
+  people,
+  meId,
+  setupNeeded,
+}: {
+  initialTasks: Task[];
+  people: Assignee[];
+  meId: string | null;
+  setupNeeded: boolean;
+}) {
+  const [tasks, setTasks] = useState(initialTasks);
+  const [view, setView] = useState<View>('open');
+  const [who, setWho] = useState<string>('all');
+  const [query, setQuery] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Draft>(EMPTY);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const today = todayISO();
+  const nameOf = (t: Task) =>
+    (t.assignee_id && people.find((p) => p.id === t.assignee_id)?.name) || t.assignee_name || null;
+
+  const stats = useMemo(() => {
+    const open = tasks.filter((t) => t.status !== 'done');
+    return {
+      overdue: open.filter((t) => t.due_date && t.due_date < today).length,
+      today: open.filter((t) => t.due_date === today).length,
+      week: open.filter((t) => t.due_date && t.due_date > today && t.due_date <= addDaysISO(today, 7)).length,
+      open: open.length,
+      done: tasks.length - open.length,
+    };
+  }, [tasks, today]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return tasks
+      .filter((t) => {
+        if (view === 'open' && t.status === 'done') return false;
+        if (view === 'done' && t.status !== 'done') return false;
+        if (view === 'overdue' && (t.status === 'done' || !t.due_date || t.due_date >= today)) return false;
+        if (who === 'none' && (t.assignee_id || t.assignee_name)) return false;
+        if (who !== 'all' && who !== 'none' && t.assignee_id !== who) return false;
+        if (q && !`${t.title} ${t.notes ?? ''} ${t.assignee_name ?? ''}`.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if ((a.status === 'done') !== (b.status === 'done')) return a.status === 'done' ? 1 : -1;
+        if (a.status === 'done') return (b.completed_at ?? '').localeCompare(a.completed_at ?? '');
+        if (a.due_date !== b.due_date) {
+          if (!a.due_date) return 1;
+          if (!b.due_date) return -1;
+          return a.due_date.localeCompare(b.due_date);
+        }
+        return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+      });
+  }, [tasks, view, who, query, today]);
+
+  async function call(method: string, body?: unknown, qs = '') {
+    setError(null);
+    const r = await fetch(`/api/tasks${qs}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || `Request failed (${r.status})`);
+    return d;
+  }
+
+  async function create() {
+    setBusy(true);
+    try {
+      const { task } = await call('POST', payloadFrom(draft));
+      setTasks((prev) => [task, ...prev]);
+      setDraft(EMPTY);
+      setAdding(false);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function update(id: string, patch: Record<string, unknown>) {
+    const before = tasks;
+    // Optimistic for quick toggles; the server's copy replaces it.
+    setTasks((prev) => prev.map((t) => (t.id === id ? ({ ...t, ...patch } as Task) : t)));
+    try {
+      const { task } = await call('PATCH', { id, ...patch });
+      setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
+      return true;
+    } catch (e) {
+      setTasks(before);
+      setError((e as Error).message);
+      return false;
+    }
+  }
+
+  async function saveEdit(id: string) {
+    setBusy(true);
+    if (await update(id, payloadFrom(editDraft))) setEditing(null);
+    setBusy(false);
+  }
+
+  async function remove(t: Task) {
+    if (!confirm(`Delete “${t.title}”? This can’t be undone.`)) return;
+    const before = tasks;
+    setTasks((prev) => prev.filter((x) => x.id !== t.id));
+    try {
+      await call('DELETE', undefined, `?id=${encodeURIComponent(t.id)}`);
+    } catch (e) {
+      setTasks(before);
+      setError((e as Error).message);
+    }
+  }
+
+  if (setupNeeded) {
+    return (
+      <div className="tk-page">
+        <h1>Tasks</h1>
+        <p className="tk-banner">
+          The tasks table isn&apos;t set up yet — run <code>supabase/tasks.sql</code> in the Supabase SQL editor, then
+          reload.
+        </p>
+      </div>
+    );
+  }
+
+  const VIEWS: [View, string, number][] = [
+    ['open', 'Open', stats.open],
+    ['overdue', 'Overdue', stats.overdue],
+    ['done', 'Done', stats.done],
+    ['all', 'All', tasks.length],
+  ];
+
+  return (
+    <div className="tk-page">
+      <div className="tk-head">
+        <div>
+          <h1>Tasks</h1>
+          <p>Create a task, assign it, give it a deadline — then tick it off.</p>
+        </div>
+        {!adding && (
+          <button type="button" className="tk-btn tk-btn--primary" onClick={() => setAdding(true)}>
+            + New task
+          </button>
+        )}
+      </div>
+
+      <div className="tk-stats">
+        <button type="button" className="tk-stat is-overdue" onClick={() => setView('overdue')}>
+          <b>{stats.overdue}</b>
+          <span>Overdue</span>
+        </button>
+        <div className="tk-stat is-today">
+          <b>{stats.today}</b>
+          <span>Due today</span>
+        </div>
+        <div className="tk-stat">
+          <b>{stats.week}</b>
+          <span>Next 7 days</span>
+        </div>
+        <button type="button" className="tk-stat" onClick={() => setView('open')}>
+          <b>{stats.open}</b>
+          <span>Open</span>
+        </button>
+        <button type="button" className="tk-stat is-done" onClick={() => setView('done')}>
+          <b>{stats.done}</b>
+          <span>Done</span>
+        </button>
+      </div>
+
+      {error && (
+        <p className="tk-banner tk-banner--error">
+          {error} <button type="button" onClick={() => setError(null)}>Dismiss</button>
+        </p>
+      )}
+
+      {adding && (
+        <div className="tk-panel tk-new">
+          <TaskForm
+            draft={draft}
+            setDraft={setDraft}
+            people={people}
+            meId={meId}
+            submitLabel="Add task"
+            busy={busy}
+            onSubmit={create}
+            onCancel={() => {
+              setAdding(false);
+              setDraft(EMPTY);
+            }}
+          />
+        </div>
+      )}
+
+      <div className="tk-toolbar">
+        <div className="tk-tabs" role="tablist">
+          {VIEWS.map(([v, label, n]) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              className={view === v ? 'is-on' : ''}
+              onClick={() => setView(v)}
+            >
+              {label} <span>{n}</span>
+            </button>
+          ))}
+        </div>
+        <div className="tk-filters">
+          <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Filter by person">
+            <option value="all">Everyone</option>
+            {meId && <option value={meId}>Assigned to me</option>}
+            {people
+              .filter((p) => p.id !== meId)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            <option value="none">Unassigned</option>
+          </select>
+          <input
+            type="search"
+            placeholder="Search…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search tasks"
+          />
+        </div>
+      </div>
+
+      <div className="tk-panel">
+        {visible.length === 0 && (
+          <p className="tk-empty">
+            {tasks.length === 0 ? 'No tasks yet — add the first one above.' : 'Nothing here.'}
+          </p>
+        )}
+        <ul className="tk-list">
+          {visible.map((t) => {
+            const due = dueInfo(t, today);
+            const name = nameOf(t);
+            if (editing === t.id) {
+              return (
+                <li key={t.id} className="tk-item is-editing">
+                  <TaskForm
+                    draft={editDraft}
+                    setDraft={setEditDraft}
+                    people={people}
+                    meId={meId}
+                    submitLabel="Save"
+                    busy={busy}
+                    onSubmit={() => saveEdit(t.id)}
+                    onCancel={() => setEditing(null)}
+                  />
+                </li>
+              );
+            }
+            return (
+              <li key={t.id} className={`tk-item${t.status === 'done' ? ' is-done' : ''}`}>
+                <button
+                  type="button"
+                  className="tk-check"
+                  aria-label={t.status === 'done' ? 'Mark as not done' : 'Mark as done'}
+                  onClick={() => update(t.id, { status: t.status === 'done' ? 'todo' : 'done' })}
+                >
+                  {t.status === 'done' ? '✓' : ''}
+                </button>
+                <div className="tk-main">
+                  <div className="tk-title">
+                    {t.priority === 'high' && <span className="tk-pri pr-high">High</span>}
+                    {t.priority === 'low' && <span className="tk-pri pr-low">Low</span>}
+                    {t.title}
+                  </div>
+                  {t.notes && <div className="tk-notes">{t.notes}</div>}
+                  <div className="tk-meta">
+                    <span className={`tk-who${name ? '' : ' is-none'}`}>{name ?? 'Unassigned'}</span>
+                    <span className={`tk-due ${due.cls}`}>{due.label}</span>
+                  </div>
+                </div>
+                <div className="tk-actions">
+                  <select
+                    className={`tk-status st-${t.status}`}
+                    value={t.status}
+                    onChange={(e) => update(t.id, { status: e.target.value as TaskStatus })}
+                    aria-label="Status"
+                  >
+                    {TASK_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {STATUS_LABEL[s]}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="tk-link"
+                    onClick={() => {
+                      setEditDraft(draftFrom(t));
+                      setEditing(t.id);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button type="button" className="tk-link tk-link--danger" onClick={() => remove(t)}>
+                    Delete
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
