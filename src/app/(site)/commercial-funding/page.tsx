@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import '../home.css';
 import './commercial-funding.css';
 import { Eyebrow } from '@/components/home/Eyebrow';
 import { SiteFooter } from '@/components/home/SiteFooter';
