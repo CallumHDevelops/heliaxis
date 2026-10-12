@@ -1,0 +1,37 @@
+import type { Metadata } from 'next';
+import { getSessionProfile } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { AdminShell } from '@/components/admin/AdminShell';
+import { TASK_COLUMNS, type Assignee, type Task } from '@/lib/tasks';
+import { TasksBoard } from './TasksBoard';
+
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Tasks · Heliaxis',
+  robots: { index: false, follow: false },
+};
+
+export default async function TasksPage() {
+  const { user } = await getSessionProfile();
+  const admin = createAdminClient();
+  const [tasksRes, peopleRes] = await Promise.all([
+    admin.from('tasks').select(TASK_COLUMNS).order('created_at', { ascending: false }),
+    admin.from('profiles').select('id, full_name, email').eq('status', 'approved'),
+  ]);
+
+  const people: Assignee[] = ((peopleRes.data ?? []) as { id: string; full_name: string | null; email: string | null }[])
+    .map((p) => ({ id: p.id, name: p.full_name || p.email || 'Unnamed' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <AdminShell active="tasks" wide>
+      <TasksBoard
+        initialTasks={(tasksRes.data ?? []) as Task[]}
+        people={people}
+        meId={user?.id ?? null}
+        setupNeeded={!!tasksRes.error}
+      />
+    </AdminShell>
+  );
+}

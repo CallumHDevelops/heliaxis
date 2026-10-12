@@ -3,6 +3,7 @@ import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { PORTALS, portalsFor, type PortalKey } from '@/lib/portals';
+import { todayISO } from '@/lib/tasks';
 import { HubView } from './HubView';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,12 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
     keys.includes('enquiries') &&
       count(admin.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'new')).then((n) => {
         if (n) out.enquiries = `${n} new`;
+      }),
+    keys.includes('tasks') &&
+      count(
+        admin.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'done').lt('due_date', todayISO())
+      ).then((n) => {
+        if (n) out.tasks = `${n} overdue`;
       }),
     keys.includes('subcontractors') &&
       Promise.all([
