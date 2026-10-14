@@ -25,7 +25,7 @@ function installedVersion(): number | null {
   }
 }
 
-export function AppDownload({ release }: { release: Release }) {
+export function AppDownload({ release, sendToPhone }: { release: Release; sendToPhone?: React.ReactNode }) {
   const android = useSyncExternalStore(noop, () => /android/i.test(navigator.userAgent), () => true);
   const installed = useSyncExternalStore(noop, installedVersion, () => null);
 
@@ -66,8 +66,8 @@ export function AppDownload({ release }: { release: Release }) {
         </a>
         {!android && (
           <p className="ad-hint">
-            You&apos;re not on an Android device — open this page on your phone or tablet (heliaxis.co.uk/admin/app)
-            to install.
+            You&apos;re not on an Android device — scan the code or email yourself the link below to install it on your
+            phone.
           </p>
         )}
         {release.notes.length > 0 && (
@@ -81,6 +81,8 @@ export function AppDownload({ release }: { release: Release }) {
           </>
         )}
       </section>
+
+      {sendToPhone}
 
       <section className="ad-card">
         <h2>Installing</h2>
