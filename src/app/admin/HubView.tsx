@@ -2,7 +2,8 @@ import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
 import './hub.css';
 
-const ICONS: Record<PortalKey | 'users', string> = {
+const ICONS: Record<PortalKey | 'users' | 'app', string> = {
+  app: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
   cms: '<path d="M4 5h16v14H4z"/><path d="M4 9h16M8 13h5M8 16h8"/>',
   tasks: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/>',
   enquiries: '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>',
@@ -41,6 +42,7 @@ function Card({
   badge,
   external,
   variant,
+  desktopOnly,
 }: {
   href: string;
   icon: keyof typeof ICONS;
@@ -49,6 +51,8 @@ function Card({
   badge?: string | null;
   external?: boolean;
   variant?: 'admin';
+  /** Shown on phones: this one needs a bigger screen. */
+  desktopOnly?: boolean;
 }) {
   const body = (
     <>
@@ -57,6 +61,7 @@ function Card({
         <span className="hub-title">{label}</span>
       </span>
       <span className="hub-desc">{description}</span>
+      {desktopOnly && <span className="hub-desktop">Best on a tablet or computer</span>}
       <span className="hub-card-foot">
         {badge ? <span className="hub-badge">{badge}</span> : <span />}
         <span className="hub-open">{external ? 'Open app ↗' : 'Open →'}</span>
@@ -131,7 +136,15 @@ export function HubView({
               <h2 className="hub-h2">Workspace</h2>
               <div className="hub-grid">
                 {internal.map((p) => (
-                  <Card key={p.key} href={p.href} icon={p.key} label={p.label} description={p.description} badge={p.badge} />
+                  <Card
+                    key={p.key}
+                    href={p.href}
+                    icon={p.key}
+                    label={p.label}
+                    description={p.description}
+                    badge={p.badge}
+                    desktopOnly={p.key === 'cms'}
+                  />
                 ))}
               </div>
             </section>
@@ -147,6 +160,18 @@ export function HubView({
               </div>
             </section>
           )}
+
+          <section className="hub-section">
+            <h2 className="hub-h2">On your phone</h2>
+            <div className="hub-grid">
+              <Card
+                href="/admin/app"
+                icon="app"
+                label="Android app"
+                description="Install Heliaxis on your phone or tablet. Tasks work offline."
+              />
+            </div>
+          </section>
 
           {isAdmin && (
             <section className="hub-section">

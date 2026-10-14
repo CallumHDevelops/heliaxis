@@ -430,3 +430,27 @@ button.tk-stat:hover {
     flex: 1;
   }
 }
+
+.tk-sync {
+  font-family: var(--mono);
+  font-size: 0.66rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ok) !important;
+}
+.tk-sync.is-offline {
+  color: var(--amber-2) !important;
+}
+
+.tk-item.is-flash {
+  animation: tk-flash 2.4s ease-out;
+}
+@keyframes tk-flash {
+  0%,
+  40% {
+    background: rgba(248, 188, 30, 0.28);
+  }
+  100% {
+    background: transparent;
+  }
+}

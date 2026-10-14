@@ -143,3 +143,20 @@
   .hub-grid { grid-template-columns: 1fr; }
   .hub-card { min-height: 0; }
 }
+
+.hub-desktop { display: none; }
+@media (max-width: 560px) {
+  .hub-desktop {
+    display: inline-block;
+    align-self: flex-start;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 2px;
+    background: rgba(33, 31, 24, 0.07);
+    color: #6e6a5e;
+  }
+}

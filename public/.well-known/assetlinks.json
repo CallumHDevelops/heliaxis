@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "uk.co.heliaxis.app",
+      "sha256_cert_fingerprints": [
+        "84:E0:65:84:CB:F5:67:12:22:CA:CF:3B:56:6C:BA:2B:79:12:C4:3B:A0:50:7C:B3:F1:FF:91:A6:0A:DF:B2:98"
+      ]
+    }
+  }
+]
