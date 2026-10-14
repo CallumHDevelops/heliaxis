@@ -89,6 +89,9 @@ export const ADMIN_ONLY_PATHS = ['/admin/users', '/admin/approvals'];
 /** The landing page after sign-in, open to every approved user. */
 export const HUB_PATH = '/admin';
 
+/** Also open to every approved user: the Android app download page. */
+export const APP_PATH = '/admin/app';
+
 /**
  * What members could reach before per-portal access existed. Used when a profile
  * has no `portals` column yet (migration not run) so nobody gets locked out.
@@ -119,7 +122,7 @@ export function canAccess(profile: AccessProfile | null | undefined, key: Portal
  */
 export function portalForPath(pathname: string): PortalKey | 'admin' | null {
   const p = pathname.replace(/\/$/, '') || '/';
-  if (p === HUB_PATH) return null;
+  if (p === HUB_PATH || p === APP_PATH) return null;
   if (ADMIN_ONLY_PATHS.some((a) => p === a || p.startsWith(`${a}/`))) return 'admin';
   for (const portal of PORTALS) {
     if (portal.paths.some((a) => p === a || p.startsWith(`${a}/`))) return portal.key;

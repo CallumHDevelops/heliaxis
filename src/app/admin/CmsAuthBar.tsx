@@ -88,7 +88,7 @@ export function CmsAuthBar({ profile }: { profile: Profile | null }) {
           </Link>
         )}
         <div className="menu-divider" role="separator" />
-        <form action={signOut} style={{ margin: 0 }}>
+        <form action={signOut} data-signout style={{ margin: 0 }}>
           <button type="submit" className="cms-user-link" role="menuitem">
             Sign out
           </button>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName">Heliaxis</string>
+    <string name="assetStatements" translatable="false">
+        [{ \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+           \"target\": { \"namespace\": \"web\", \"site\": \"https://heliaxis.co.uk\" } },
+         { \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+           \"target\": { \"namespace\": \"web\", \"site\": \"https://social.heliaxis.co.uk\" } },
+         { \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+           \"target\": { \"namespace\": \"web\", \"site\": \"https://rams.heliaxis.co.uk\" } }]
+    </string>
+    <string-array name="additionalTrustedOrigins" translatable="false">
+        <item>https://social.heliaxis.co.uk</item>
+        <item>https://rams.heliaxis.co.uk</item>
+    </string-array>
+</resources>

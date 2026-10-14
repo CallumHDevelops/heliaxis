@@ -1,0 +1,60 @@
+// Heliaxis staff app: a Trusted Web Activity around https://heliaxis.co.uk/admin.
+// The web app does the work (and updates on every deploy); this shell only needs a
+// new build for icon/name/permission changes. Release with `node scripts/android-release.mjs`.
+plugins {
+    id 'com.android.application'
+}
+
+def appRelease = new groovy.json.JsonSlurper().parse(file('../release.json'))
+def host = 'heliaxis.co.uk'
+
+// Signing key lives outside the repo (see android/README.md).
+def keyProps = new Properties()
+def keyFile = file(System.getenv('HELIAXIS_KEYSTORE_PROPS') ?: "${System.getProperty('user.home')}/.heliaxis-secrets/android-keystore.properties")
+if (keyFile.exists()) keyFile.withInputStream { keyProps.load(it) }
+
+android {
+    namespace 'uk.co.heliaxis.app'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'uk.co.heliaxis.app'
+        minSdk 24
+        targetSdk 36
+        versionCode appRelease.versionCode
+        versionName appRelease.versionName
+
+        // The web app reads ?app=android-<versionCode> to know which build is installed.
+        manifestPlaceholders = [
+            hostName : host,
+            launchUrl: "https://${host}/admin?app=android-${appRelease.versionCode}",
+        ]
+    }
+
+    signingConfigs {
+        release {
+            if (keyProps['storeFile']) {
+                storeFile file(keyProps['storeFile'])
+                storePassword keyProps['storePassword']
+                keyAlias keyProps['keyAlias']
+                keyPassword keyProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keyProps['storeFile'] ? signingConfigs.release : null
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+}

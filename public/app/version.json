@@ -1,0 +1,12 @@
+{
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "minVersionCode": 1,
+  "releasedAt": "2026-10-14",
+  "notes": [
+    "First release: dashboard, Tasks (works offline), Enquiries and links to Social and RAMS."
+  ],
+  "apk": "/app/heliaxis.apk",
+  "sizeBytes": 3709649,
+  "sha256": "bb3584c84920b3c59e5219a20dacaba9e99473193f3eee5ebb7d96f8c64c7d4b"
+}

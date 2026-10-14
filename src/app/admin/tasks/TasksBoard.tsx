@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addDaysISO,
   PRIORITY_LABEL,
@@ -13,6 +13,17 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from '@/lib/tasks';
+import {
+  applyOps,
+  enqueue,
+  flush,
+  loadCache,
+  loadOutbox,
+  saveCache,
+  saveOutbox,
+  withDerived,
+  type TaskOp,
+} from '@/lib/tasks-offline';
 import './tasks.css';
 
 type View = 'open' | 'overdue' | 'done' | 'all';
@@ -81,7 +92,6 @@ function TaskForm({
   people,
   meId,
   submitLabel,
-  busy,
   onSubmit,
   onCancel,
 }: {
@@ -90,7 +100,6 @@ function TaskForm({
   people: Assignee[];
   meId: string | null;
   submitLabel: string;
-  busy: boolean;
   onSubmit: () => void;
   onCancel?: () => void;
 }) {
@@ -184,8 +193,8 @@ function TaskForm({
             Cancel
           </button>
         )}
-        <button type="submit" className="tk-btn tk-btn--primary" disabled={busy || !draft.title.trim()}>
-          {busy ? 'Saving…' : submitLabel}
+        <button type="submit" className="tk-btn tk-btn--primary" disabled={!draft.title.trim()}>
+          {submitLabel}
         </button>
       </div>
     </form>
@@ -211,8 +220,101 @@ export function TasksBoard({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [editing, setEditing] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [online, setOnline] = useState(true);
+  const [pending, setPending] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  // Local-first: the outbox holds changes not yet on the server (see tasks-offline.ts).
+  const store = meId ?? 'anon';
+  const outbox = useRef<TaskOp[]>([]);
+  const server = useRef<Task[]>(initialTasks);
+  const flushing = useRef(false);
+
+  const publish = useCallback(() => {
+    const merged = applyOps(server.current, outbox.current);
+    setTasks(merged);
+    setPending(outbox.current.length);
+    saveOutbox(store, outbox.current);
+    saveCache(store, merged);
+  }, [store]);
+
+  const sync = useCallback(async () => {
+    if (flushing.current) return;
+    flushing.current = true;
+    setSyncing(true);
+    try {
+      if (outbox.current.length) {
+        const sent = outbox.current;
+        const r = await flush(sent);
+        // Keep anything queued while we were sending.
+        outbox.current = [...r.remaining, ...outbox.current.slice(sent.length)];
+        if (r.rejected.length) setError(r.rejected.join(' · '));
+        if (r.offline) {
+          setOnline(false);
+          return;
+        }
+      }
+      const res = await fetch('/api/tasks', { cache: 'no-store' }).catch(() => null);
+      if (!res) {
+        setOnline(false);
+        return;
+      }
+      if (res.ok) {
+        server.current = ((await res.json()).tasks ?? []) as Task[];
+        setOnline(true);
+      }
+    } finally {
+      flushing.current = false;
+      setSyncing(false);
+      publish();
+    }
+  }, [publish]);
+
+  useEffect(() => {
+    outbox.current = loadOutbox(store);
+    // Offline (page served from the app's cache): the saved copy is newer than the page.
+    if (!navigator.onLine) server.current = loadCache(store) ?? initialTasks;
+    setOnline(navigator.onLine);
+    publish();
+    if (navigator.onLine) void sync();
+
+    const onOnline = () => {
+      setOnline(true);
+      void sync();
+    };
+    const onOffline = () => setOnline(false);
+    const onVisible = () => document.visibilityState === 'visible' && navigator.onLine && void sync();
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+    // initialTasks is the server render — only read once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store]);
+
+  // Opened from a notification (?task=<id>): bring that task into view.
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('task');
+    if (!id) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`task-${id}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.classList.add('is-flash');
+    }, 150);
+    return () => clearTimeout(t);
+  }, []);
+
+  function mutate(op: TaskOp) {
+    setError(null);
+    outbox.current = enqueue(outbox.current, op);
+    publish();
+    void sync();
+  }
 
   const today = todayISO();
   const nameOf = (t: Task) =>
@@ -253,63 +355,50 @@ export function TasksBoard({
       });
   }, [tasks, view, who, query, today]);
 
-  async function call(method: string, body?: unknown, qs = '') {
-    setError(null);
-    const r = await fetch(`/api/tasks${qs}`, {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
+  function create() {
+    const now = new Date().toISOString();
+    const p = payloadFrom(draft);
+    mutate({
+      kind: 'create',
+      task: {
+        id: crypto.randomUUID(),
+        title: p.title.trim(),
+        notes: p.notes.trim() || null,
+        assignee_id: p.assignee_id || null,
+        assignee_name: p.assignee_name.trim() || null,
+        due_date: p.due_date || null,
+        priority: p.priority,
+        status: 'todo',
+        created_by: meId,
+        created_at: now,
+        updated_at: now,
+        completed_at: null,
+      },
     });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || `Request failed (${r.status})`);
-    return d;
+    setDraft(EMPTY);
+    setAdding(false);
   }
 
-  async function create() {
-    setBusy(true);
-    try {
-      const { task } = await call('POST', payloadFrom(draft));
-      setTasks((prev) => [task, ...prev]);
-      setDraft(EMPTY);
-      setAdding(false);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  function update(id: string, patch: Partial<Task>) {
+    mutate({ kind: 'update', id, patch: withDerived(patch) });
   }
 
-  async function update(id: string, patch: Record<string, unknown>) {
-    const before = tasks;
-    // Optimistic for quick toggles; the server's copy replaces it.
-    setTasks((prev) => prev.map((t) => (t.id === id ? ({ ...t, ...patch } as Task) : t)));
-    try {
-      const { task } = await call('PATCH', { id, ...patch });
-      setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
-      return true;
-    } catch (e) {
-      setTasks(before);
-      setError((e as Error).message);
-      return false;
-    }
+  function saveEdit(id: string) {
+    const p = payloadFrom(editDraft);
+    update(id, {
+      title: p.title.trim(),
+      notes: p.notes.trim() || null,
+      assignee_id: p.assignee_id || null,
+      assignee_name: p.assignee_name.trim() || null,
+      due_date: p.due_date || null,
+      priority: p.priority,
+    });
+    setEditing(null);
   }
 
-  async function saveEdit(id: string) {
-    setBusy(true);
-    if (await update(id, payloadFrom(editDraft))) setEditing(null);
-    setBusy(false);
-  }
-
-  async function remove(t: Task) {
+  function remove(t: Task) {
     if (!confirm(`Delete “${t.title}”? This can’t be undone.`)) return;
-    const before = tasks;
-    setTasks((prev) => prev.filter((x) => x.id !== t.id));
-    try {
-      await call('DELETE', undefined, `?id=${encodeURIComponent(t.id)}`);
-    } catch (e) {
-      setTasks(before);
-      setError((e as Error).message);
-    }
+    mutate({ kind: 'delete', id: t.id });
   }
 
   if (setupNeeded) {
@@ -337,6 +426,15 @@ export function TasksBoard({
         <div>
           <h1>Tasks</h1>
           <p>Create a task, assign it, give it a deadline — then tick it off.</p>
+          <p className={`tk-sync${online ? '' : ' is-offline'}`} aria-live="polite">
+            {!online
+              ? `Offline — ${pending ? `${pending} change${pending > 1 ? 's' : ''} will sync when you're back online` : 'showing your saved copy'}`
+              : syncing
+                ? 'Syncing…'
+                : pending
+                  ? `${pending} change${pending > 1 ? 's' : ''} waiting to sync`
+                  : 'All changes saved'}
+          </p>
         </div>
         {!adding && (
           <button type="button" className="tk-btn tk-btn--primary" onClick={() => setAdding(true)}>
@@ -382,7 +480,6 @@ export function TasksBoard({
             people={people}
             meId={meId}
             submitLabel="Add task"
-            busy={busy}
             onSubmit={create}
             onCancel={() => {
               setAdding(false);
@@ -449,7 +546,6 @@ export function TasksBoard({
                     people={people}
                     meId={meId}
                     submitLabel="Save"
-                    busy={busy}
                     onSubmit={() => saveEdit(t.id)}
                     onCancel={() => setEditing(null)}
                   />
@@ -457,7 +553,7 @@ export function TasksBoard({
               );
             }
             return (
-              <li key={t.id} className={`tk-item${t.status === 'done' ? ' is-done' : ''}`}>
+              <li key={t.id} id={`task-${t.id}`} className={`tk-item${t.status === 'done' ? ' is-done' : ''}`}>
                 <button
                   type="button"
                   className="tk-check"

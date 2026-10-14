@@ -5,8 +5,10 @@ import { signOut } from '@/lib/auth-actions';
 import { brand } from '@/components/auth/authStyles';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
+import { AppRuntime } from './AppRuntime';
+import { HeaderUser } from './HeaderUser';
 
-type Tab = 'dashboard' | 'enquiries' | 'approvals' | 'users' | 'blog' | 'analytics' | 'heatmap' | 'subcontractors' | 'tasks';
+type Tab = 'dashboard' | 'enquiries' | 'approvals' | 'users' | 'blog' | 'analytics' | 'heatmap' | 'subcontractors' | 'tasks' | 'app';
 
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
@@ -25,6 +27,13 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
       {label}
     </a>
   );
+}
+
+/** "Esther Smith" → "ES", "callum@…" → "C". */
+function initialsOf(name: string) {
+  const words = name.split('@')[0].split(/[\s._-]+/).filter(Boolean);
+  const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : (words[0] ?? '?').slice(0, 2);
+  return letters.toUpperCase();
 }
 
 export async function AdminShell({
@@ -46,6 +55,8 @@ export async function AdminShell({
   const { profile } = await getSessionProfile();
   const can = (k: Parameters<typeof canAccess>[1]) => canAccess(profile, k);
   const admin = profile?.role === 'admin';
+  const displayName = profile?.full_name || profile?.email || 'Account';
+  const initials = initialsOf(displayName);
   return (
     <div
       className={flush ? 'admin-shell admin-shell--flush' : 'admin-shell'}
@@ -102,23 +113,7 @@ export async function AdminShell({
             <NavLink href="/admin/analytics/heatmap" label="Heatmap" active={active === 'heatmap'} />
           )}
           {admin && <NavLink href="/admin/users" label="Users" active={active === 'users' || active === 'approvals'} />}
-          <form action={signOut} style={{ margin: 0 }}>
-            <button
-              type="submit"
-              style={{
-                padding: '.45rem .8rem',
-                fontSize: '.88rem',
-                fontWeight: 600,
-                color: brand.ink,
-                background: 'transparent',
-                border: `1px solid ${brand.line}`,
-                borderRadius: '2px',
-                cursor: 'pointer',
-              }}
-            >
-              Sign out
-            </button>
-          </form>
+          <HeaderUser initials={initials} name={displayName} email={profile?.email ?? ''} signOut={signOut} />
         </nav>
       </header>
 
@@ -150,6 +145,7 @@ export async function AdminShell({
       >
         {children}
       </main>
+      <AppRuntime />
     </div>
   );
 }
