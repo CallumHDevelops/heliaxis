@@ -304,3 +304,14 @@
   background: var(--solar);
   border-color: transparent;
 }
+
+.enq-head-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+a.enq-refresh {
+  text-decoration: none;
+  display: inline-block;
+}

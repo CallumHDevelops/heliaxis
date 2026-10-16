@@ -1,0 +1,177 @@
+'use client';
+
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
+import { matchRule, type SmartRule } from '@/lib/whatsapp/shared';
+import '../whatsapp.css';
+
+type Rule = SmartRule & { id: string };
+type Draft = Omit<Rule, 'id' | 'keywords'> & { id?: string; keywords: string };
+
+const BLANK: Draft = {
+  name: '',
+  keywords: '',
+  reply: '',
+  enabled: true,
+  delay_min_seconds: 240,
+  delay_max_seconds: 300,
+  priority: 0,
+};
+
+const mins = (s: number) => Math.round((s / 60) * 10) / 10;
+
+export function SmartReplies() {
+  const [rules, setRules] = useState<Rule[] | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [error, setError] = useState('');
+  const [test, setTest] = useState('Do you do air source heat pumps?');
+
+  const load = useCallback(
+    () =>
+      fetch('/api/whatsapp/rules', { cache: 'no-store' })
+        .then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) }))
+        .then(({ ok, d }) => {
+          if (!ok) setError(d.error || 'Could not load smart replies');
+          setRules(d.items || []);
+        }),
+    []
+  );
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function save() {
+    if (!draft) return;
+    setError('');
+    const body = {
+      ...draft,
+      keywords: draft.keywords.split(','),
+      delay_min_seconds: Math.round(Number(draft.delay_min_seconds)),
+      delay_max_seconds: Math.round(Number(draft.delay_max_seconds)),
+    };
+    const r = await fetch(draft.id ? `/api/whatsapp/rules/${draft.id}` : '/api/whatsapp/rules', {
+      method: draft.id ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setError(d.error || 'Not saved');
+    setDraft(null);
+    load();
+  }
+
+  async function toggle(rule: Rule) {
+    setRules((rs) => rs?.map((r) => (r.id === rule.id ? { ...r, enabled: !r.enabled } : r)) ?? null);
+    await fetch(`/api/whatsapp/rules/${rule.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !rule.enabled }),
+    });
+  }
+
+  async function remove(rule: Rule) {
+    if (!confirm(`Delete “${rule.name}”?`)) return;
+    await fetch(`/api/whatsapp/rules/${rule.id}`, { method: 'DELETE' });
+    load();
+  }
+
+  const hit = rules ? matchRule(test, rules) : null;
+
+  return (
+    <div className="wa-page">
+      <div className="wa-top">
+        <Link href="/admin/enquiries/inbox" className="wa-back">← WhatsApp</Link>
+        <button type="button" className="wa-link" onClick={() => setDraft({ ...BLANK })}>
+          + New reply
+        </button>
+      </div>
+      <h1 className="wa-h1">Smart replies</h1>
+      <p className="wa-muted">
+        When a WhatsApp message contains one of the keywords, the reply is queued and sent after a random
+        delay in the range you set (4–5 minutes by default), with a read receipt and “typing…” just before.
+        You get a notification straight away and can edit, send early or cancel it from the chat. Smart
+        replies stay quiet on a chat for 2 hours after anyone replies by hand, never repeat the same answer
+        within a day, and can be switched off per chat. Use <code>{'{first_name}'}</code> to insert their name.
+      </p>
+
+      <div className="wa-card">
+        <label className="wa-label">Try a message</label>
+        <input className="wa-input" value={test} onChange={(e) => setTest(e.target.value)} />
+        <p className="wa-muted">{hit ? <>Would send <b>“{hit.name}”</b></> : 'No smart reply would be sent.'}</p>
+      </div>
+
+      {error && <p className="wa-banner wa-banner--err">{error}</p>}
+
+      {draft && (
+        <div className="wa-card wa-edit">
+          <label className="wa-label">Name</label>
+          <input className="wa-input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Battery storage" />
+          <label className="wa-label">Keywords (comma separated — plurals match too)</label>
+          <input className="wa-input" value={draft.keywords} onChange={(e) => setDraft({ ...draft, keywords: e.target.value })} placeholder="battery, batteries, storage" />
+          <label className="wa-label">Reply</label>
+          <textarea className="wa-input" rows={6} value={draft.reply} onChange={(e) => setDraft({ ...draft, reply: e.target.value })} />
+          <div className="wa-grid3">
+            <div>
+              <label className="wa-label">Wait at least (min)</label>
+              <input
+                className="wa-input"
+                type="number"
+                min={0}
+                step={0.5}
+                value={mins(draft.delay_min_seconds)}
+                onChange={(e) => setDraft({ ...draft, delay_min_seconds: Number(e.target.value) * 60 })}
+              />
+            </div>
+            <div>
+              <label className="wa-label">At most (min)</label>
+              <input
+                className="wa-input"
+                type="number"
+                min={0}
+                step={0.5}
+                value={mins(draft.delay_max_seconds)}
+                onChange={(e) => setDraft({ ...draft, delay_max_seconds: Number(e.target.value) * 60 })}
+              />
+            </div>
+            <div>
+              <label className="wa-label">Priority</label>
+              <input className="wa-input" type="number" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })} />
+            </div>
+          </div>
+          <div className="wa-queued-actions">
+            <button type="button" onClick={save}>Save</button>
+            <button type="button" className="ghost" onClick={() => setDraft(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {rules === null ? (
+        <p className="wa-muted">Loading…</p>
+      ) : rules.length === 0 ? (
+        <p className="wa-muted">No smart replies yet. (Run supabase/whatsapp.sql if this page shows an error.)</p>
+      ) : (
+        rules.map((r) => (
+          <div key={r.id} className={`wa-card wa-rule${r.enabled ? '' : ' off'}`}>
+            <div className="wa-rule-head">
+              <b>{r.name}</b>
+              <span className="wa-muted">
+                {mins(r.delay_min_seconds)}–{mins(r.delay_max_seconds)} min{r.priority ? ` · priority ${r.priority}` : ''}
+              </span>
+            </div>
+            <div className="wa-kws">
+              {r.keywords.map((k) => (
+                <span key={k} className="wa-chip">{k}</span>
+              ))}
+            </div>
+            <p className="wa-rule-reply">{r.reply}</p>
+            <div className="wa-queued-actions">
+              <button type="button" className="ghost" onClick={() => toggle(r)}>{r.enabled ? 'Turn off' : 'Turn on'}</button>
+              <button type="button" className="ghost" onClick={() => setDraft({ ...r, keywords: r.keywords.join(', ') })}>Edit</button>
+              <button type="button" className="ghost" onClick={() => remove(r)}>Delete</button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
 import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS } from '@/lib/enquiries';
@@ -92,9 +93,17 @@ export function EnquiriesCrm({ initialLeads }: { initialLeads: CrmLead[] }) {
             {leads.length} leads · give each a status and track it through the pipeline.
           </p>
         </div>
-        <button type="button" className="enq-refresh" onClick={() => refresh()}>
-          Refresh
-        </button>
+        <div className="enq-head-actions">
+          <Link className="enq-refresh" href="/admin/enquiries/inbox">
+            WhatsApp inbox
+          </Link>
+          <Link className="enq-refresh" href="/admin/enquiries/smart-replies">
+            Smart replies
+          </Link>
+          <button type="button" className="enq-refresh" onClick={() => refresh()}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="enq-stat-ov">
@@ -235,6 +244,11 @@ export function EnquiriesCrm({ initialLeads }: { initialLeads: CrmLead[] }) {
                 <a className="enq-btn" href={`tel:${active.phone.replace(/\s/g, '')}`}>
                   Call
                 </a>
+              )}
+              {active.phone && (
+                <Link className="enq-btn" href={`/admin/enquiries/inbox/${active.id}`}>
+                  WhatsApp
+                </Link>
               )}
             </div>
           </div>
