@@ -2,6 +2,7 @@ import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { defaultTemplate, whatsappConfigured } from '@/lib/whatsapp/api';
 import { markChatRead, processOutbox, sendManual } from '@/lib/whatsapp/inbox';
+import { getSettings } from '@/lib/whatsapp/settings';
 import { isUuid, json, session } from '@/lib/whatsapp/routes';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const db = createAdminClient();
-  const [{ data: enquiry }, { data: messages }, { data: outbox }] = await Promise.all([
+  const [{ data: enquiry }, { data: messages }, { data: outbox }, settings] = await Promise.all([
     db
       .from('enquiries')
       .select('id, name, email, phone, postcode, source, status, wa_id, whatsapp_opt_in, wa_last_inbound_at, wa_unread, wa_auto_off, created_at')
@@ -21,16 +22,17 @@ export async function GET(_req: Request, { params }: Ctx) {
       .maybeSingle(),
     db
       .from('whatsapp_messages')
-      .select('id, direction, kind, body, template_name, status, error, sent_by, rule_id, created_at')
+      .select('id, direction, kind, body, template_name, status, error, sent_by, rule_id, via, created_at')
       .eq('enquiry_id', id)
       .order('created_at')
       .limit(500),
     db
       .from('whatsapp_outbox')
-      .select('id, rule_id, body, template_name, send_after, status, last_error, created_at')
+      .select('id, kind, chase_step, rule_id, body, template_name, send_after, status, last_error, created_at')
       .eq('enquiry_id', id)
       .in('status', ['pending', 'sending', 'failed'])
       .order('send_after'),
+    getSettings(),
   ]);
   if (!enquiry) return json({ error: 'Not found' }, 404);
 
@@ -49,16 +51,25 @@ export async function GET(_req: Request, { params }: Ctx) {
   return json({
     configured: whatsappConfigured(),
     defaultTemplate: defaultTemplate().name || null,
+    chase: { questions: settings.chaseQuestions, hours: settings.chaseAfterHours },
     enquiry,
     messages: (messages ?? []).map((m) => ({
       ...m,
-      by: m.sent_by ? personName.get(m.sent_by) || 'Team' : m.rule_id ? `Smart reply · ${ruleName.get(m.rule_id) || ''}` : null,
+      by: m.sent_by
+        ? personName.get(m.sent_by) || 'Team'
+        : m.via === 'whatsapp-app'
+          ? 'Sent from the WhatsApp app'
+          : m.via === 'chase'
+            ? 'Chaser'
+            : m.rule_id
+              ? `Smart reply · ${ruleName.get(m.rule_id) || ''}`
+              : null,
     })),
     outbox: (outbox ?? []).map((o) => ({ ...o, rule: o.rule_id ? ruleName.get(o.rule_id) || 'Smart reply' : null })),
   });
 }
 
-/** Send: { text } or { template, lang, params }. */
+/** Send: { text } or { template, lang, params }, plus optional { chaseHours } if they don't reply. */
 export async function POST(req: Request, { params }: Ctx) {
   const s = await session();
   if (!s) return json({ error: 'unauthorized' }, 401);
@@ -78,7 +89,8 @@ export async function POST(req: Request, { params }: Ctx) {
           template,
           lang: String(body.lang || defaultTemplate().lang),
           params: Array.isArray(body.params) ? body.params.map((p: unknown) => String(p ?? '')) : [],
-        }
+        },
+    Math.min(14 * 24, Math.max(0, Number(body.chaseHours) || 0))
   );
   return r.ok ? json({ ok: true, id: r.id }) : json({ error: r.error }, 400);
 }

@@ -412,3 +412,64 @@ textarea.wa-input {
   font-size: 0.88rem;
   margin: 0.3rem 0;
 }
+
+/* Chasers */
+.wa-filters {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+}
+.wa-filters button {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wa-filters button.on {
+  background: var(--ink);
+  color: var(--solar);
+  border-color: var(--ink);
+}
+.wa-filters button span {
+  opacity: 0.7;
+  margin-left: 2px;
+}
+.wa-chip--chase {
+  background: rgba(31, 122, 77, 0.12);
+  color: var(--wa);
+}
+.wa-chase-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding-top: 0.4rem;
+}
+.wa-chase-pick select {
+  font: inherit;
+  font-size: 0.78rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  padding: 0.15rem 0.3rem;
+}
+.wa-check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.88rem;
+  margin: 0.4rem 0;
+}
+.wa-h2 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 1.5rem 0 0.25rem;
+}

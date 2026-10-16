@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { windowLeft, windowOpen } from '@/lib/whatsapp/shared';
+import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import '../../whatsapp.css';
 
 type Msg = {
@@ -17,6 +17,8 @@ type Msg = {
 };
 type Queued = {
   id: string;
+  kind: 'reply' | 'intro' | 'chase';
+  chase_step: number;
   rule: string | null;
   body: string | null;
   template_name: string | null;
@@ -54,8 +56,26 @@ function dayLabel(iso: string) {
 }
 function countdown(iso: string, now: number) {
   const s = Math.max(0, Math.round((new Date(iso).getTime() - now) / 1000));
-  return s === 0 ? 'any moment' : `in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  if (s === 0) return 'any moment';
+  if (s >= 6 * 3600) {
+    const d = new Date(iso);
+    const day = d.toDateString() === new Date(now).toDateString() ? 'today' : dayLabel(iso).toLowerCase();
+    return `${day} at ${clock(iso)}`;
+  }
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h ? `in ${h}h ${m}m` : `in ${m}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/** Chase if no reply: 'auto' = the default when the message asks a question. */
+const CHASE_OPTIONS: [string, string][] = [
+  ['auto', 'Auto'],
+  ['0', 'Off'],
+  ['4', '4h'],
+  ['12', '12h'],
+  ['24', '24h'],
+  ['72', '3 days'],
+];
 
 export function ChatThread({ id }: { id: string }) {
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
@@ -63,6 +83,8 @@ export function ChatThread({ id }: { id: string }) {
   const [outbox, setOutbox] = useState<Queued[]>([]);
   const [configured, setConfigured] = useState(true);
   const [defaultTemplate, setDefaultTemplate] = useState<string | null>(null);
+  const [chaseDefaults, setChaseDefaults] = useState({ questions: true, hours: 12 });
+  const [chaseChoice, setChaseChoice] = useState('auto');
   const [error, setError] = useState('');
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -83,6 +105,7 @@ export function ChatThread({ id }: { id: string }) {
       setOutbox(d.outbox);
       setConfigured(d.configured);
       setDefaultTemplate(d.defaultTemplate);
+      if (d.chase) setChaseDefaults(d.chase);
       setError('');
       // Blue ticks + clear the badge while the chat is on screen.
       if (d.enquiry.wa_unread > 0 && document.visibilityState === 'visible') {
@@ -156,10 +179,22 @@ export function ChatThread({ id }: { id: string }) {
     }
   }
 
+  /**
+   * Hours to chase after for this message (0 = don't). Auto chases questions. A template's chaser is
+   * itself a paid template (the window never opened), so templates only chase if you pick a time.
+   */
+  function chaseHoursFor(message: string, isTemplate = false) {
+    if (chaseChoice !== 'auto') return Number(chaseChoice);
+    return chaseDefaults.questions && !isTemplate && message.includes('?') ? chaseDefaults.hours : 0;
+  }
+
   async function send() {
     const t = text.trim();
     if (!t) return;
-    if (await post({ text: t })) setText('');
+    if (await post({ text: t, chaseHours: chaseHoursFor(t) })) {
+      setText('');
+      setChaseChoice('auto');
+    }
   }
 
   async function outboxAction(qid: string, action: 'cancel' | 'send-now' | 'edit', body?: string) {
@@ -197,6 +232,22 @@ export function ChatThread({ id }: { id: string }) {
   }
 
   const selected = templates?.find((t) => t.name === tpl?.name && t.language === tpl?.lang);
+  const windowCloses = enquiry.wa_last_inbound_at ? new Date(enquiry.wa_last_inbound_at).getTime() + SERVICE_WINDOW_MS : 0;
+  const chasePicker = (message: string, isTemplate = false) => {
+    const h = chaseHoursFor(message, isTemplate);
+    return (
+      <div className="wa-chase-pick">
+        <span>Chase if no reply:</span>
+        <select value={chaseChoice} onChange={(e) => setChaseChoice(e.target.value)}>
+          {CHASE_OPTIONS.map(([v, label]) => (
+            <option key={v} value={v}>
+              {v === 'auto' ? `${label} (${h ? `${h}h` : 'off'})` : label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
   let lastDay = '';
 
   return (
@@ -247,10 +298,14 @@ export function ChatThread({ id }: { id: string }) {
           <div key={o.id} className={`wa-queued ${o.status}`}>
             <div className="wa-queued-head">
               {o.status === 'failed'
-                ? `⚠ ${o.rule || 'Message'} failed: ${o.last_error || ''}`
+                ? `⚠ ${o.kind === 'chase' ? 'Chaser' : o.rule || 'Message'} failed: ${o.last_error || ''}`
                 : o.status === 'sending'
-                  ? `Sending ${o.rule ? `“${o.rule}”` : 'message'}…`
-                  : `⏱ ${o.rule ? `Smart reply “${o.rule}”` : `Intro template “${o.template_name}”`} sends ${countdown(o.send_after, now)}`}
+                  ? `Sending ${o.rule ? `“${o.rule}”` : o.kind === 'chase' ? 'chaser' : 'message'}…`
+                  : o.kind === 'chase'
+                    ? `↻ ${o.chase_step > 1 ? 'Final nudge' : 'Chaser'} if they don’t reply — sends ${countdown(o.send_after, now)} · ${
+                        new Date(o.send_after).getTime() < windowCloses ? 'free message' : 'as a template (paid)'
+                      }`
+                    : `⏱ ${o.rule ? `Smart reply “${o.rule}”` : `Intro template “${o.template_name}”`} sends ${countdown(o.send_after, now)}`}
             </div>
             {editing?.id === o.id ? (
               <>
@@ -267,7 +322,13 @@ export function ChatThread({ id }: { id: string }) {
               </>
             ) : (
               <>
-                <p className="wa-queued-body">{o.template_name ? `Template, {{1}} = ${o.body}` : o.body}</p>
+                <p className="wa-queued-body">
+                  {o.template_name
+                    ? `Template, {{1}} = ${o.body}`
+                    : o.kind === 'chase' && new Date(o.send_after).getTime() >= windowCloses
+                      ? `The free window will have closed by then, so your chase template goes instead of: “${o.body}”`
+                      : o.body}
+                </p>
                 {o.status !== 'sending' && (
                   <div className="wa-queued-actions">
                     <button type="button" onClick={() => outboxAction(o.id, 'send-now')}>
@@ -293,6 +354,8 @@ export function ChatThread({ id }: { id: string }) {
       {error && <p className="wa-banner wa-banner--err">{error}</p>}
 
       {open ? (
+        <>
+        {chasePicker(text)}
         <div className="wa-compose">
           <textarea
             className="wa-input"
@@ -306,6 +369,7 @@ export function ChatThread({ id }: { id: string }) {
             {sending ? '…' : 'Send'}
           </button>
         </div>
+        </>
       ) : (
         <div className="wa-compose wa-compose--tpl">
           <p className="wa-muted">
@@ -346,11 +410,12 @@ export function ChatThread({ id }: { id: string }) {
                     onChange={(e) => setTpl({ ...tpl, params: tpl.params.map((x, j) => (j === i ? e.target.value : x)) })}
                   />
                 ))}
+                {chasePicker('', true)}
                 <button
                   type="button"
                   className="wa-send"
                   disabled={!configured || sending || tpl.params.some((p) => !p.trim())}
-                  onClick={() => post({ template: tpl.name, lang: tpl.lang, params: tpl.params })}
+                  onClick={() => post({ template: tpl.name, lang: tpl.lang, params: tpl.params, chaseHours: chaseHoursFor('', true) })}
                 >
                   {sending ? 'Sending…' : 'Send template'}
                 </button>

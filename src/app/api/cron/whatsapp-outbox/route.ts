@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { processOutbox } from '@/lib/whatsapp/inbox';
+import { processOutbox, remindUnanswered } from '@/lib/whatsapp/inbox';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -10,9 +10,13 @@ function authorized(req: Request) {
   return req.headers.get('authorization') === `Bearer ${secret}`;
 }
 
-/** Every minute (Supabase pg_cron → see supabase/whatsapp.sql): send smart replies that are due. */
+/**
+ * Every minute (Supabase pg_cron → see supabase/whatsapp.sql): send smart replies, intros and
+ * chasers that are due, and remind the team about customers left waiting.
+ */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const result = await processOutbox();
-  return NextResponse.json({ ok: true, ...result });
+  const reminded = await remindUnanswered().catch(() => 0);
+  return NextResponse.json({ ok: true, ...result, reminded });
 }

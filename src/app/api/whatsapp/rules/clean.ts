@@ -29,6 +29,12 @@ export function cleanRule(b: Record<string, unknown>, partial = false) {
     out.delay_min_seconds = Math.min(min, max);
     out.delay_max_seconds = Math.max(min, max);
   }
+  if ('follow_up_hours' in b) {
+    const h = b.follow_up_hours === null || b.follow_up_hours === '' ? null : Number(b.follow_up_hours);
+    if (h !== null && (!Number.isFinite(h) || h < 0.25 || h > 14 * 24)) return { error: 'Chase after 15 minutes to 14 days, or leave it blank.' };
+    out.follow_up_hours = h;
+  }
+  if ('follow_up_text' in b) out.follow_up_text = String(b.follow_up_text ?? '').trim().slice(0, 1000) || null;
   if (partial) out.updated_at = new Date().toISOString();
   return out;
 }

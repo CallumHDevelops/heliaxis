@@ -1,6 +1,6 @@
 import { after, NextResponse } from 'next/server';
 import { validSignature } from '@/lib/whatsapp/api';
-import { handleInboundMessage, handleStatus, processOutbox, type InboundMessage } from '@/lib/whatsapp/inbox';
+import { handleEcho, handleInboundMessage, handleStatus, processOutbox, type InboundMessage, type MessageEcho } from '@/lib/whatsapp/inbox';
 import { ingestLead } from '@/lib/whatsapp/lead-ads';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +10,8 @@ export const maxDuration = 60;
  * One webhook for the Meta app (see WHATSAPP_SETUP.md):
  *  - object "page", field "leadgen": a Lead Ads form was submitted.
  *  - object "whatsapp_business_account", field "messages": WhatsApp messages and delivery statuses.
+ *  - object "whatsapp_business_account", field "smb_message_echoes": messages you typed in the
+ *    WhatsApp Business app on the same number (coexistence), so the Heliaxis chat stays complete.
  */
 
 // Meta's one-off check when you save the callback URL.
@@ -52,6 +54,9 @@ export async function POST(req: Request) {
           jobs.push(() => handleInboundMessage(m, name));
         }
         for (const s of (v.statuses as Parameters<typeof handleStatus>[0][]) ?? []) jobs.push(() => handleStatus(s));
+      }
+      if (payload.object === 'whatsapp_business_account' && change.field === 'smb_message_echoes') {
+        for (const m of (v.message_echoes as MessageEcho[]) ?? []) jobs.push(() => handleEcho(m));
       }
     }
   }

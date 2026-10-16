@@ -18,13 +18,24 @@ type Convo = {
   created_at: string;
   last: { direction: string; body: string | null } | null;
   queued: boolean;
+  chasing: boolean;
 };
+
+type Filter = 'all' | 'reply' | 'waiting';
+const FILTERS: [Filter, string][] = [
+  ['all', 'All'],
+  ['reply', 'Needs reply'],
+  ['waiting', 'Waiting on them'],
+];
+const needsReply = (c: Convo) => c.last?.direction === 'in' && !c.queued;
+const waitingOnThem = (c: Convo) => c.last?.direction === 'out' || (!c.last && c.chasing);
 
 export function InboxList() {
   const [items, setItems] = useState<Convo[] | null>(null);
   const [configured, setConfigured] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
 
   const load = useCallback(async () => {
     try {
@@ -52,8 +63,11 @@ export function InboxList() {
   }, [load]);
 
   const shown = (items ?? []).filter(
-    (c) => !q || `${c.name} ${c.phone || ''}`.toLowerCase().includes(q.trim().toLowerCase())
+    (c) =>
+      (!q || `${c.name} ${c.phone || ''}`.toLowerCase().includes(q.trim().toLowerCase())) &&
+      (filter === 'all' || (filter === 'reply' ? needsReply(c) : waitingOnThem(c)))
   );
+  const count = (f: Filter) => (items ?? []).filter(f === 'reply' ? needsReply : f === 'waiting' ? waitingOnThem : () => true).length;
 
   return (
     <div className="wa-page">
@@ -70,6 +84,13 @@ export function InboxList() {
       )}
       {error && <p className="wa-banner wa-banner--err">{error}</p>}
       <input className="wa-search" placeholder="Search name or number" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="wa-filters">
+        {FILTERS.map(([f, label]) => (
+          <button key={f} type="button" className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
+            {label} <span>{count(f)}</span>
+          </button>
+        ))}
+      </div>
       {items === null ? (
         <p className="wa-muted">Loading…</p>
       ) : shown.length === 0 ? (
@@ -93,6 +114,7 @@ export function InboxList() {
                     <span className="wa-row-bottom">
                       <span className="wa-preview">{preview}</span>
                       {c.queued && <span className="wa-chip">⏱ reply queued</span>}
+                      {c.chasing && <span className="wa-chip wa-chip--chase">↻ chasing</span>}
                       {c.wa_unread > 0 && <span className="wa-badge">{c.wa_unread}</span>}
                     </span>
                     {!open && c.last && <span className="wa-closed">24h window closed · template only</span>}

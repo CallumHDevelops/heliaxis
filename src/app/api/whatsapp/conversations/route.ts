@@ -28,12 +28,13 @@ export async function GET() {
           .in('enquiry_id', ids)
           .order('created_at', { ascending: false })
           .limit(1000),
-        db.from('whatsapp_outbox').select('enquiry_id').in('enquiry_id', ids).eq('status', 'pending'),
+        db.from('whatsapp_outbox').select('enquiry_id, kind').in('enquiry_id', ids).eq('status', 'pending'),
       ])
     : [{ data: [] }, { data: [] }];
   const lastBy = new Map<string, { direction: string; body: string | null }>();
   for (const m of last ?? []) if (!lastBy.has(m.enquiry_id)) lastBy.set(m.enquiry_id, m);
-  const pendingSet = new Set((pending ?? []).map((p) => p.enquiry_id));
+  const pendingBy = new Map<string, Set<string>>();
+  for (const p of pending ?? []) pendingBy.set(p.enquiry_id, (pendingBy.get(p.enquiry_id) ?? new Set()).add(p.kind));
 
   // Someone has the app open — a good moment to send anything due.
   after(() => processOutbox().catch(() => {}));
@@ -42,7 +43,8 @@ export async function GET() {
     items: (data ?? []).map((d) => ({
       ...d,
       last: lastBy.get(d.id) ?? null,
-      queued: pendingSet.has(d.id),
+      queued: !!pendingBy.get(d.id)?.has('reply') || !!pendingBy.get(d.id)?.has('intro'),
+      chasing: !!pendingBy.get(d.id)?.has('chase'),
     })),
   });
 }

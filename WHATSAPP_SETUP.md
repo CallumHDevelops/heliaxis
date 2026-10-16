@@ -13,13 +13,14 @@ Meta Lead Ad form ──webhook──▶ /api/meta/webhook ──▶ enquiries (
                                                       └─ opted in? → intro template, 3–6 min later
 Customer WhatsApp ──webhook──▶ /api/meta/webhook ──▶ whatsapp_messages + push to the team
                                                       └─ keyword match? → whatsapp_outbox (send in 4–5 min)
-Supabase pg_cron (every minute) ──▶ /api/cron/whatsapp-outbox ──▶ read receipt → "typing…" → send
+You in the WhatsApp Business app ──echo──▶ /api/meta/webhook ──▶ same chat in Heliaxis (coexistence)
+Supabase pg_cron (every minute) ──▶ /api/cron/whatsapp-outbox ──▶ smart replies, chasers, "waiting for a reply" pushes
 You in the app ──▶ /api/whatsapp/conversations/<id> ──▶ WhatsApp Cloud API
 ```
 
 ## 1. Database
 
-Run `supabase/whatsapp.sql` in the Supabase SQL editor. Then turn on the **pg_cron** and **pg_net**
+Run `supabase/whatsapp.sql`, then `supabase/whatsapp-chasers.sql`, in the Supabase SQL editor. Then turn on the **pg_cron** and **pg_net**
 extensions (Database → Extensions) and run the `cron.schedule(...)` block at the bottom of that file,
 with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody has the app open.
 (Vercel's Hobby plan only allows daily crons, so Supabase triggers this one.)
@@ -38,7 +39,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
    `pages_manage_metadata`, `pages_show_list`, `pages_read_engagement`.
 5. **Webhook**: in the app → WhatsApp → Configuration → Callback URL
    `https://heliaxis.co.uk/api/meta/webhook`, verify token = your `META_WEBHOOK_VERIFY_TOKEN` →
-   subscribe to **messages**.
+   subscribe to **messages**, and also to **smb_message_echoes** if you use coexistence (below).
 6. **Lead Ads webhook**: app → Webhooks → **Page** → same callback URL and token → subscribe to
    **leadgen**. Then connect the Page to the app (the easiest way is Meta's *Leads Access Manager*
    in Business Settings → Integrations → Leads Access → give the app access, or use the
@@ -52,6 +53,10 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
    Meta decides the final category. Anything promotional ends up as Marketing.
 8. **Lead form**: add a custom question *"Happy for us to contact you on WhatsApp?"* (Yes/No).
    Any question with "whatsapp" in it counts as the opt-in.
+9. **Chase template** (optional): a second Utility template, e.g. `enquiry_follow_up`:
+   > Hi {{1}}, just following up on your Heliaxis enquiry. Reply here whenever suits and we'll pick up where we left off.
+
+   Set its name in Enquiries → Smart replies → Chasers. Chasers use it only once the free window has closed.
 
 ## 3. Vercel env vars
 
@@ -86,8 +91,34 @@ Redeploy after adding them.
     cancels any that are waiting.
   - The same reply is never sent twice to someone within 24h.
   - The *Smart replies on/off* button in a chat turns them off for that person.
+- **Chasers**: ask something ("can you send us a photo of the land?") and, if they don't answer, a
+  chaser goes after 12h (or whatever you pick under the message box: Auto / Off / 4h / 12h / 24h / 3
+  days). Auto = chase anything with a "?". A smart reply can have its own chaser too. Chasers:
+  - are cancelled the moment they reply, or when you send another message;
+  - never go out in quiet hours (21:00–08:00 UK by default), and move to the morning instead;
+  - stay **free** when they can: if 12h would land after the 24h window closes, the chaser goes about
+    an hour before it closes (at least 4h after your message). Otherwise the chase template is sent
+    (paid). The chat shows which it'll be;
+  - can have an optional final nudge (off by default).
+- **Monitoring**: the inbox has *Needs reply* and *Waiting on them* filters, and the team gets a push
+  when a customer has waited 30 min without an answer (outside quiet hours).
 - Website enquiries can be messaged too (template first). Only do that if they've agreed to
   WhatsApp contact.
+
+## Using the WhatsApp Business app as well (coexistence)
+
+You can keep the WhatsApp Business app on your phone **on the same number** and use Heliaxis
+alongside it. When you add the number to the API (step 3), pick *"Connect your existing WhatsApp
+Business app"* and scan the QR code from the app. Then subscribe the webhook to
+**smb_message_echoes** (step 5).
+
+- Messages you type in the WhatsApp Business app show up in the Heliaxis chat (marked "Sent from
+  the WhatsApp app"). They count as a person replying, so pending smart replies and chasers are
+  cancelled, and a question you ask there gets a chaser just like one sent from Heliaxis.
+- Messages sent from Heliaxis also appear in the WhatsApp Business app.
+- Meta's limits: open the WhatsApp Business app at least every couple of weeks or the link drops;
+  broadcast lists, disappearing and view-once messages are turned off; groups don't sync. Meta can
+  also import up to 6 months of old chat history at onboarding. This code doesn't import it yet.
 
 ## Costs (UK, billed by Meta per delivered message)
 
