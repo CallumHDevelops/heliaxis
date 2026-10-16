@@ -1,0 +1,54 @@
+/** WhatsApp chaser / automation settings (stored in cms_kv). Safe for client code. */
+export type WaSettings = {
+  /** Chase automatically when we ask a question (a message with "?") and they go quiet. */
+  chaseQuestions: boolean;
+  chaseAfterHours: number;
+  chaseText: string;
+  /** Move a chase earlier, inside the free 24h window, rather than pay for a template. */
+  keepChasesFree: boolean;
+  /** A second, final nudge this many hours after the first chase (0 = off). Usually a paid template. */
+  finalNudgeHours: number;
+  /** Template used when a chase can't be a free message. {{1}} = first name. Blank = the default template. */
+  chaseTemplate: string;
+  /** No chasers between these hours (UK time). */
+  quietFrom: number;
+  quietTo: number;
+  /** Hold smart replies to messages that arrive in quiet hours until the morning. */
+  smartRepliesQuietHours: boolean;
+  /** Push the team if a customer's message has had no answer for this long (0 = off). */
+  remindUnansweredMinutes: number;
+};
+
+export const DEFAULT_SETTINGS: WaSettings = {
+  chaseQuestions: true,
+  chaseAfterHours: 12,
+  chaseText: 'Hi {first_name}, just checking you saw my last message? No rush — whenever you get a minute.',
+  keepChasesFree: true,
+  finalNudgeHours: 0,
+  chaseTemplate: '',
+  quietFrom: 21,
+  quietTo: 8,
+  smartRepliesQuietHours: false,
+  remindUnansweredMinutes: 30,
+};
+
+const num = (v: unknown, lo: number, hi: number, d: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d;
+};
+
+export function cleanSettings(b: Partial<Record<keyof WaSettings, unknown>>): WaSettings {
+  const d = DEFAULT_SETTINGS;
+  return {
+    chaseQuestions: b.chaseQuestions === undefined ? d.chaseQuestions : !!b.chaseQuestions,
+    chaseAfterHours: num(b.chaseAfterHours, 0.25, 72, d.chaseAfterHours),
+    chaseText: String(b.chaseText ?? d.chaseText).trim().slice(0, 1000) || d.chaseText,
+    keepChasesFree: b.keepChasesFree === undefined ? d.keepChasesFree : !!b.keepChasesFree,
+    finalNudgeHours: num(b.finalNudgeHours, 0, 14 * 24, d.finalNudgeHours),
+    chaseTemplate: String(b.chaseTemplate ?? '').trim(),
+    quietFrom: Math.round(num(b.quietFrom, 0, 23, d.quietFrom)),
+    quietTo: Math.round(num(b.quietTo, 0, 23, d.quietTo)),
+    smartRepliesQuietHours: !!b.smartRepliesQuietHours,
+    remindUnansweredMinutes: Math.round(num(b.remindUnansweredMinutes, 0, 24 * 60, d.remindUnansweredMinutes)),
+  };
+}
