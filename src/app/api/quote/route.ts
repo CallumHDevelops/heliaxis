@@ -1,5 +1,6 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
+import { ATTR_COOKIE, parseAttribution, sourceLabel } from '@/lib/attribution';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest) {
       propertyType: (body.propertyType || '').toString().trim(),
       source: (body.source || 'quote-form').toString().trim() || 'quote-form',
     };
+    // Came from an ad or a tagged link? Label the enquiry with it ("meta-ad: <campaign>").
+    const adSource = sourceLabel(parseAttribution(request.cookies.get(ATTR_COOKIE)?.value));
+    if (adSource) data.source = adSource;
 
     if (!data.name || !data.email) {
       return NextResponse.json(

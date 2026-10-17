@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 import { canAccess, HUB_PATH, portalForPath } from '@/lib/portals';
+import { ATTR_COOKIE, ATTR_MAX_AGE, attributionFromUrl } from '@/lib/attribution';
 
 const AUTH_PATHS = ['/login', '/register', '/pending'];
 
@@ -52,9 +53,21 @@ export async function middleware(request: NextRequest) {
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
   const isAuthPath = AUTH_PATHS.includes(pathname);
 
-  // Anything outside admin/auth is public — let it through.
+  // Anything outside admin/auth is public — let it through, remembering which ad/campaign
+  // brought the visitor so their enquiry is labelled (see src/lib/attribution.ts).
   if (!isAdminPath && !isAuthPath) {
-    return NextResponse.next();
+    const res = NextResponse.next();
+    const attr = attributionFromUrl(request.nextUrl);
+    if (attr) {
+      res.cookies.set(ATTR_COOKIE, encodeURIComponent(JSON.stringify(attr)), {
+        maxAge: ATTR_MAX_AGE,
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+      });
+    }
+    return res;
   }
 
   // Fail closed: without Supabase there's no way to authenticate, so admin

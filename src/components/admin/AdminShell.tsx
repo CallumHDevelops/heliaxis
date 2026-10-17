@@ -23,6 +23,8 @@ type Tab =
   | 'tasks'
   | 'app';
 
+const RAMS_URL = 'https://rams.heliaxis.co.uk';
+
 const ICON = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
 const icons = {
   home: (
@@ -45,6 +47,13 @@ const icons = {
     <svg {...ICON}>
       <path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.5-4.3A8.5 8.5 0 1 1 20.5 11.6z" />
       <path d="M9 9.5c.3 1.8 1.7 3.6 3.6 4.4l1.2-1 1.7.8-.4 1.3c-2.9.3-6.4-2.8-6.6-5.8l1.3-.4.8 1.7z" />
+    </svg>
+  ),
+  rams: (
+    <svg {...ICON}>
+      <path d="M4 15a8 8 0 0 1 16 0" />
+      <path d="M2.5 15h19v2.5h-19z" />
+      <path d="M10 7.3V5h4v2.3" />
     </svg>
   ),
   more: (
@@ -139,6 +148,7 @@ export async function AdminShell({
     { href: '/admin/cms', label: 'CMS', active: false, show: can('cms') },
     { href: '/admin/blog', label: 'Blog', active: active === 'blog', show: can('cms') },
     { href: '/admin/tasks', label: 'Tasks', active: active === 'tasks', tab: true, show: can('tasks') },
+    { href: RAMS_URL, label: 'RAMS', active: false, tab: true, show: can('rams') },
     {
       href: '/admin/enquiries',
       label: 'Enquiries',
@@ -152,9 +162,13 @@ export async function AdminShell({
     { href: '/admin/users', label: 'Users', active: active === 'users' || active === 'approvals', show: admin },
   ];
   const links = items.filter((i) => i.show);
+  const tasksIsTab = !can('enquiries') && can('tasks');
   const more = [
+    ...(can('tasks') && !tasksIsTab ? [{ href: '/admin/tasks', label: 'Tasks', active: active === 'tasks' }] : []),
     ...links.filter((i) => !i.tab),
     ...(can('enquiries') ? [{ href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', active: false }] : []),
+    ...(can('social') ? [{ href: 'https://social.heliaxis.co.uk', label: 'Social media studio', active: false }] : []),
+    ...(can('team') ? [{ href: 'https://rams.heliaxis.co.uk/operatives?team=heliaxis', label: 'Our team', active: false }] : []),
     { href: '/admin/app', label: 'Get the app', active: active === 'app' },
   ];
   return (
@@ -221,9 +235,10 @@ export async function AdminShell({
       {/* Phones: app-style tabs along the bottom instead of the wrapping menu. */}
       <nav className={flush ? 'hx-tabs hx-tabs--static' : 'hx-tabs'} aria-label="Sections">
         <TabLink href="/admin" label="Home" icon={icons.home} active={active === 'dashboard'} />
-        {can('tasks') && <TabLink href="/admin/tasks" label="Tasks" icon={icons.tasks} active={active === 'tasks'} />}
-        {can('enquiries') && (
+        {can('enquiries') ? (
           <TabLink href="/admin/enquiries" label="Enquiries" icon={icons.enquiries} active={active === 'enquiries'} />
+        ) : (
+          can('tasks') && <TabLink href="/admin/tasks" label="Tasks" icon={icons.tasks} active={active === 'tasks'} />
         )}
         {can('enquiries') && (
           <TabLink
@@ -234,6 +249,8 @@ export async function AdminShell({
             badge={waUnread}
           />
         )}
+        {/* On site: RAMS one tap away. */}
+        {can('rams') && <TabLink href={RAMS_URL} label="RAMS" icon={icons.rams} active={false} />}
         {more.length > 0 && (
           <details className="hx-more">
             <summary className={more.some((l) => l.active) ? 'hx-tab is-active' : 'hx-tab'}>
