@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { PushBanner } from '@/components/admin/PushBanner';
 import { relativeTime } from '@/lib/enquiries';
 import { windowOpen } from '@/lib/whatsapp/shared';
 import '../whatsapp.css';
@@ -76,6 +77,7 @@ export function InboxList() {
         <Link href="/admin/enquiries/smart-replies" className="wa-link">Smart replies</Link>
       </div>
       <h1 className="wa-h1">WhatsApp</h1>
+      <PushBanner />
       {!configured && (
         <p className="wa-banner">
           WhatsApp isn’t connected yet — conversations will appear here once the Meta keys are added

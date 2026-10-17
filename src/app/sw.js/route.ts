@@ -58,8 +58,12 @@ self.addEventListener('push', (event) => {
       body: data.body || '',
       icon: '/icon-192.png',
       badge: '/badge-96.png',
-      tag: data.id || undefined,
-      data: { href: data.href || '/admin', id: data.id },
+      // One per WhatsApp chat: a new message replaces the old one and still buzzes.
+      tag: data.tag || data.id || undefined,
+      renotify: !!data.tag,
+      vibrate: [120, 60, 120],
+      actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
+      data: Object.assign({}, data.data || {}, { href: data.href || '/admin', id: data.id }),
     });
     // Tell open pages to refresh the bell.
     const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -69,7 +73,23 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const { href = '/admin', id } = event.notification.data || {};
+  const { href = '/admin', id, outboxId } = event.notification.data || {};
+  // Buttons on a "smart reply queued" notification: act without opening the app.
+  if ((event.action === 'outbox-send' || event.action === 'outbox-cancel') && outboxId) {
+    event.waitUntil((async () => {
+      if (id) fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }) }).catch(() => {});
+      const r = await fetch('/api/whatsapp/outbox/' + outboxId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: event.action === 'outbox-send' ? 'send-now' : 'cancel' }),
+      }).catch(() => null);
+      await self.registration.showNotification(
+        r && r.ok ? (event.action === 'outbox-send' ? 'Reply sent' : 'Smart reply cancelled') : 'Couldn’t do that — open the chat',
+        { body: '', icon: '/icon-192.png', badge: '/badge-96.png', tag: 'outbox-' + outboxId, data: { href } }
+      );
+    })());
+    return;
+  }
   event.waitUntil((async () => {
     if (id) fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }) }).catch(() => {});
     const target = new URL(href, self.location.origin).href;

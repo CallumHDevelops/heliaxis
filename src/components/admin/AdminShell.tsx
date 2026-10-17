@@ -5,28 +5,101 @@ import { signOut } from '@/lib/auth-actions';
 import { brand } from '@/components/auth/authStyles';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { AppRuntime } from './AppRuntime';
 import { HeaderUser } from './HeaderUser';
+import './admin-shell.css';
 
-type Tab = 'dashboard' | 'enquiries' | 'approvals' | 'users' | 'blog' | 'analytics' | 'heatmap' | 'subcontractors' | 'tasks' | 'app';
+type Tab =
+  | 'dashboard'
+  | 'enquiries'
+  | 'whatsapp'
+  | 'approvals'
+  | 'users'
+  | 'blog'
+  | 'analytics'
+  | 'heatmap'
+  | 'subcontractors'
+  | 'tasks'
+  | 'app';
+
+const ICON = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
+const icons = {
+  home: (
+    <svg {...ICON}>
+      <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+    </svg>
+  ),
+  tasks: (
+    <svg {...ICON}>
+      <path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" />
+    </svg>
+  ),
+  enquiries: (
+    <svg {...ICON}>
+      <path d="M4 4h16v12H8l-4 4z" />
+      <path d="M8 9h8M8 12h5" />
+    </svg>
+  ),
+  whatsapp: (
+    <svg {...ICON}>
+      <path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.5-4.3A8.5 8.5 0 1 1 20.5 11.6z" />
+      <path d="M9 9.5c.3 1.8 1.7 3.6 3.6 4.4l1.2-1 1.7.8-.4 1.3c-2.9.3-6.4-2.8-6.6-5.8l1.3-.4.8 1.7z" />
+    </svg>
+  ),
+  more: (
+    <svg {...ICON}>
+      <circle cx="5" cy="12" r="1.3" />
+      <circle cx="12" cy="12" r="1.3" />
+      <circle cx="19" cy="12" r="1.3" />
+    </svg>
+  ),
+};
 
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
-    <a
-      href={href}
-      style={{
-        padding: '.45rem .8rem',
-        fontSize: '.88rem',
-        fontWeight: 600,
-        textDecoration: 'none',
-        borderRadius: '2px',
-        color: active ? brand.ink : brand.muted,
-        background: active ? brand.solar : 'transparent',
-      }}
-    >
+    <a href={href} className={active ? 'hx-nav__link is-active' : 'hx-nav__link'}>
       {label}
     </a>
   );
+}
+
+/** Phone bottom bar: one tab, icon over label. */
+function TabLink({
+  href,
+  label,
+  active,
+  icon,
+  badge,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  icon: ReactNode;
+  badge?: number;
+}) {
+  return (
+    <Link href={href} className={active ? 'hx-tab is-active' : 'hx-tab'} aria-current={active ? 'page' : undefined}>
+      <span className="hx-tab__icon">
+        {icon}
+        {badge ? <span className="hx-tab__badge">{badge > 9 ? '9+' : badge}</span> : null}
+      </span>
+      <span className="hx-tab__label">{label}</span>
+    </Link>
+  );
+}
+
+/** Chats with unread WhatsApp messages (0 if the tables aren't there yet). */
+async function whatsappUnread() {
+  try {
+    const { count } = await createAdminClient()
+      .from('enquiries')
+      .select('id', { count: 'exact', head: true })
+      .gt('wa_unread', 0);
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** "Esther Smith" → "ES", "callum@…" → "C". */
@@ -57,6 +130,33 @@ export async function AdminShell({
   const admin = profile?.role === 'admin';
   const displayName = profile?.full_name || profile?.email || 'Account';
   const initials = initialsOf(displayName);
+  const waUnread = can('enquiries') ? await whatsappUnread() : 0;
+
+  // Desktop menu (all of it) and the phone "More" sheet (what isn't a bottom tab).
+  type Item = { href: string; label: string; active: boolean; tab?: boolean; show: boolean };
+  const items: Item[] = [
+    { href: '/admin', label: 'Dashboard', active: active === 'dashboard', tab: true, show: true },
+    { href: '/admin/cms', label: 'CMS', active: false, show: can('cms') },
+    { href: '/admin/blog', label: 'Blog', active: active === 'blog', show: can('cms') },
+    { href: '/admin/tasks', label: 'Tasks', active: active === 'tasks', tab: true, show: can('tasks') },
+    {
+      href: '/admin/enquiries',
+      label: 'Enquiries',
+      active: active === 'enquiries' || active === 'whatsapp',
+      tab: true,
+      show: can('enquiries'),
+    },
+    { href: '/admin/subcontractors', label: 'Subcontractors', active: active === 'subcontractors', show: can('subcontractors') },
+    { href: '/admin/analytics', label: 'Analytics', active: active === 'analytics', show: can('analytics') },
+    { href: '/admin/analytics/heatmap', label: 'Heatmap', active: active === 'heatmap', show: can('analytics') },
+    { href: '/admin/users', label: 'Users', active: active === 'users' || active === 'approvals', show: admin },
+  ];
+  const links = items.filter((i) => i.show);
+  const more = [
+    ...links.filter((i) => !i.tab),
+    ...(can('enquiries') ? [{ href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', active: false }] : []),
+    { href: '/admin/app', label: 'Get the app', active: active === 'app' },
+  ];
   return (
     <div
       className={flush ? 'admin-shell admin-shell--flush' : 'admin-shell'}
@@ -76,43 +176,16 @@ export async function AdminShell({
         color: brand.ink,
       }}
     >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          padding: '0.75rem 1.25rem',
-          borderBottom: `1px solid ${brand.line}`,
-          background: 'rgba(255,253,248,.92)',
-          flexWrap: 'wrap',
-          flexShrink: 0,
-          zIndex: 2,
-        }}
-      >
-        <Link href="/admin" style={{ display: 'flex', alignItems: 'center' }}>
-          <Image
-            src="/assets/heliaxis-logo.png"
-            alt="Heliaxis"
-            width={140}
-            height={32}
-            style={{ width: 140, height: 'auto' }}
-          />
+      <header className="hx-header">
+        <Link href="/admin" className="hx-header__logo">
+          <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={140} height={32} style={{ width: '100%', height: 'auto' }} />
         </Link>
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
-          <NavLink href="/admin" label="Dashboard" active={active === 'dashboard'} />
-          {can('cms') && <NavLink href="/admin/cms" label="CMS" active={false} />}
-          {can('cms') && <NavLink href="/admin/blog" label="Blog" active={active === 'blog'} />}
-          {can('tasks') && <NavLink href="/admin/tasks" label="Tasks" active={active === 'tasks'} />}
-          {can('enquiries') && <NavLink href="/admin/enquiries" label="Enquiries" active={active === 'enquiries'} />}
-          {can('subcontractors') && (
-            <NavLink href="/admin/subcontractors" label="Subcontractors" active={active === 'subcontractors'} />
-          )}
-          {can('analytics') && <NavLink href="/admin/analytics" label="Analytics" active={active === 'analytics'} />}
-          {can('analytics') && (
-            <NavLink href="/admin/analytics/heatmap" label="Heatmap" active={active === 'heatmap'} />
-          )}
-          {admin && <NavLink href="/admin/users" label="Users" active={active === 'users' || active === 'approvals'} />}
+        <nav className="hx-nav">
+          <span className="hx-nav__links">
+            {links.map((l) => (
+              <NavLink key={l.href} href={l.href} label={l.label} active={l.active} />
+            ))}
+          </span>
           <HeaderUser initials={initials} name={displayName} email={profile?.email ?? ''} signOut={signOut} />
         </nav>
       </header>
@@ -139,12 +212,44 @@ export async function AdminShell({
                 boxSizing: 'border-box',
                 maxWidth: wide ? 1200 : 1000,
                 margin: '0 auto',
-                padding: '2rem 1.5rem',
+                // Padding lives in admin-shell.css so phones can tighten it and clear the tab bar.
               }
         }
       >
         {children}
       </main>
+      {/* Phones: app-style tabs along the bottom instead of the wrapping menu. */}
+      <nav className={flush ? 'hx-tabs hx-tabs--static' : 'hx-tabs'} aria-label="Sections">
+        <TabLink href="/admin" label="Home" icon={icons.home} active={active === 'dashboard'} />
+        {can('tasks') && <TabLink href="/admin/tasks" label="Tasks" icon={icons.tasks} active={active === 'tasks'} />}
+        {can('enquiries') && (
+          <TabLink href="/admin/enquiries" label="Enquiries" icon={icons.enquiries} active={active === 'enquiries'} />
+        )}
+        {can('enquiries') && (
+          <TabLink
+            href="/admin/enquiries/inbox"
+            label="WhatsApp"
+            icon={icons.whatsapp}
+            active={active === 'whatsapp'}
+            badge={waUnread}
+          />
+        )}
+        {more.length > 0 && (
+          <details className="hx-more">
+            <summary className={more.some((l) => l.active) ? 'hx-tab is-active' : 'hx-tab'}>
+              <span className="hx-tab__icon">{icons.more}</span>
+              <span className="hx-tab__label">More</span>
+            </summary>
+            <div className="hx-more__sheet">
+              {more.map((l) => (
+                <a key={l.href} href={l.href} className={l.active ? 'hx-more__link is-active' : 'hx-more__link'}>
+                  {l.label}
+                </a>
+              ))}
+            </div>
+          </details>
+        )}
+      </nav>
       <AppRuntime />
     </div>
   );

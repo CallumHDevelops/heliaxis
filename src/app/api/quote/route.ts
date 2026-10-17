@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
+import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const supabase = createAdminClient();
-        const { error } = await supabase.from('enquiries').insert({
+        const { data: row, error } = await supabase.from('enquiries').insert({
           name: data.name,
           email: data.email,
           phone: data.phone || null,
@@ -67,8 +68,17 @@ export async function POST(request: NextRequest) {
           interest: interestStored,
           property_type: sectorStored,
           source: data.source,
-        });
+        }).select('id').single();
         if (error) console.error('❌ Supabase enquiry insert failed:', error.message);
+        else if (row) {
+          // Push to everyone on Enquiries (phone app + browsers), alongside the email below.
+          const where = data.postcode ? ` (${data.postcode})` : '';
+          after(() =>
+            notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', '/admin/enquiries', {
+              tag: `enq-${row.id}`,
+            }).catch(() => {})
+          );
+        }
       } catch (e) {
         console.error('❌ Supabase enquiry insert threw:', e);
       }

@@ -13,6 +13,12 @@ export type NotificationInput = {
   title: string;
   body?: string | null;
   href?: string | null;
+  /** Same tag = replaces the earlier notification (e.g. one per WhatsApp chat) and buzzes again. */
+  tag?: string;
+  /** Buttons on the notification (Android). Handled in the service worker's notificationclick. */
+  actions?: { action: string; title: string }[];
+  /** Extra data for those buttons, e.g. { outboxId }. */
+  data?: Record<string, string>;
 };
 
 let vapidReady: boolean | null = null;
@@ -44,6 +50,9 @@ export async function notify(n: NotificationInput) {
       title: n.title,
       body: n.body ?? '',
       href: n.href ?? '/admin',
+      tag: n.tag,
+      actions: n.actions,
+      data: n.data,
     });
     await Promise.all(
       (subs ?? []).map(async (s) => {

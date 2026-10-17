@@ -315,3 +315,84 @@ a.enq-refresh {
   text-decoration: none;
   display: inline-block;
 }
+
+/* Phones: buttons in one scrolling row, compact stats, and each lead as a card instead of a wide table. */
+@media (max-width: 640px) {
+  .enq-head {
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .enq-head-actions {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .enq-head-actions .enq-refresh {
+    white-space: nowrap;
+  }
+  .enq-stat-ov {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .enq-so {
+    padding: 8px 2px;
+  }
+  .enq-so .n {
+    font-size: 1.15rem;
+  }
+  .enq-so .stpill {
+    font-size: 0.5rem;
+    padding: 2px 4px;
+  }
+  .enq-panel {
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .enq-tbl thead {
+    display: none;
+  }
+  .enq-tbl,
+  .enq-tbl tbody {
+    display: block;
+    min-width: 0;
+  }
+  .enq-tbl tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .enq-tbl td {
+    display: block;
+    padding: 0;
+    border: 0 !important;
+    min-width: 0;
+  }
+  .enq-tbl td:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .enq-tbl td:nth-child(5) { grid-column: 2; grid-row: 1; text-align: right; color: var(--muted); font-size: 0.78rem; }
+  .enq-tbl td:nth-child(2) { grid-column: 1; grid-row: 2; font-size: 0.85rem; color: var(--muted); }
+  .enq-tbl td:nth-child(3) { grid-column: 2; grid-row: 2; text-align: right; font-size: 0.8rem; color: var(--muted); }
+  .enq-tbl td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; }
+  .enq-tbl td:nth-child(6) { grid-column: 1; grid-row: 4; }
+  .enq-tbl td:nth-child(7) { grid-column: 2; grid-row: 4; text-align: right; }
+  .enq-tbl td:nth-child(2) .enq-email { display: inline; margin-left: 6px; }
+  .enq-tbl td.enq-empty { grid-column: 1 / -1; }
+  .enq-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .enq-tbl select {
+    width: 100%;
+    max-width: 160px;
+  }
+}
