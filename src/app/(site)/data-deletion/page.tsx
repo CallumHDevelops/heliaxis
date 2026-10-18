@@ -46,7 +46,7 @@ const sections: LegalSection[] = [
         <ul>
           <li>your enquiry and contact details</li>
           <li>our notes, tasks and the timeline we keep about you</li>
-          <li>WhatsApp messages and emails stored in our systems</li>
+          <li>WhatsApp messages and emails stored in our systems, including the chat in our WhatsApp Business app</li>
           <li>photos and documents we hold for your project, and access to your customer portal</li>
           <li>any drafts or notes our team or our assistant prepared about you</li>
         </ul>
@@ -62,19 +62,33 @@ const sections: LegalSection[] = [
     title: 'What we may have to keep',
     body: (
       <>
-        <p>If we’ve done work for you, the law and the schemes we belong to require us to keep some records for a set time:</p>
+        <p>
+          If we’ve done work for you, we have to keep some records for a set time, because the law or the schemes we belong to
+          require it, or so that either of us can rely on them if there’s a dispute:
+        </p>
         <ul>
           <li>
-            <strong>Invoices and payment records</strong>, for at least 6 years, for HMRC
+            <strong>Invoices and payment records</strong>, for 6 years from the end of the financial year they relate to, as
+            HMRC and company law require
           </li>
           <li>
             <strong>Installation, certification and warranty records</strong> (for example MCS certificates, electrical
             certificates and grid (DNO) notifications), for as long as the warranty or scheme requires
           </li>
           <li>
+            <strong>Your signed quote or contract and the record of you accepting it</strong> (the name you typed, your
+            signature, the date and time and your IP address), for 6 years after our work for you ends, so either of us can
+            show what was agreed
+          </li>
+          <li>
             <strong>Records we need to deal with a complaint or legal claim</strong>, until it’s resolved
           </li>
         </ul>
+        <p>
+          Whether or not we’ve done work for you, we also keep a short record of your request (your name, the email address or
+          phone number you gave us and the date we dealt with it), so we can show we handled it and don’t contact you again by
+          mistake.
+        </p>
         <p>We keep only what those reasons need, use it only for them, and delete it when the time is up.</p>
       </>
     ),
@@ -91,13 +105,20 @@ const sections: LegalSection[] = [
   },
   {
     id: 'facebook',
-    title: 'If you contacted us through Facebook, Instagram or WhatsApp',
+    title: 'Facebook, Instagram, WhatsApp and Meta',
     body: (
       <>
         <p>
           If you sent us an enquiry through a Facebook or Instagram lead form, or messaged us on WhatsApp, the steps above
           delete the copy <strong>we</strong> hold. Meta (Facebook, Instagram and WhatsApp) keeps its own copy under its own
           privacy policy. You can manage that in your Facebook, Instagram or WhatsApp settings.
+        </p>
+        <p>
+          However you contacted us, if your enquiry moved forward (a survey booked, a quote sent or a job won), we may have sent
+          Meta your email address and phone number in scrambled (“hashed”) form to measure our adverts (see our{' '}
+          <Link href="/privacy-policy#advertising">privacy policy</Link>). We can’t take back what Meta has already received:
+          Meta handles it under its own terms and privacy policy. Once we’ve deleted your record, nothing more about you is sent
+          to Meta.
         </p>
         <p>We don’t use Facebook Login and we don’t get access to your Facebook account.</p>
       </>
