@@ -153,3 +153,4 @@
 .is-ticked .fc-title { color: var(--fc-muted); }
 .fc-title { display: flex; flex-direction: column; }
 .fc-waiting { font-size: 0.75rem; font-weight: 600; color: #3f7d4e; }
+.fc-envlink { display: inline-block; margin-top: 0.3rem; font-size: 0.82rem; font-weight: 700; color: #9a6200; text-decoration: none; }

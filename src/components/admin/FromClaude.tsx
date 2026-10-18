@@ -50,6 +50,9 @@ export function FromClaude({ todos }: { todos: SetupTodo[] }) {
                 ? 'All ticked. Each disappears once the app can see it’s working.'
                 : 'The essentials are done. Optional extras below.'}
           </p>
+          <Link href="/admin/setup/env" className="fc-envlink">
+            Check Vercel keys →
+          </Link>
         </div>
       </header>
       <ol className="fc-list">
