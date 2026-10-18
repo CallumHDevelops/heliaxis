@@ -160,3 +160,243 @@
     color: #6e6a5e;
   }
 }
+
+/* Needs you / My day: even rows in one card (phone-friendly). */
+.hub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.hub-list li + li {
+  border-top: 1px solid var(--line);
+}
+.hub-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  min-height: 56px;
+  box-sizing: border-box;
+  text-decoration: none;
+  color: inherit;
+}
+a.hub-row:hover {
+  background: rgba(248, 188, 30, 0.08);
+}
+.hub-row-icon {
+  flex: 0 0 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(248, 188, 30, 0.18);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+}
+.hub-row-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.hub-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+}
+.hub-row-main b {
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-row-main small {
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-row-main small.hub-high {
+  color: #b3261e;
+  font-weight: 700;
+}
+.hub-chev {
+  font-size: 1.4rem;
+  color: var(--muted);
+  line-height: 1;
+}
+.hub-due {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.hub-due.today {
+  color: var(--amber);
+}
+.hub-due.late {
+  color: #b3261e;
+}
+.hub-tick {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  margin: 0 5px;
+  border-radius: 50%;
+  border: 2px solid rgba(33, 31, 24, 0.35);
+  background: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.hub-tick:hover {
+  border-color: #3f7d4e;
+  background: rgba(63, 125, 78, 0.12);
+}
+.hub-more {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--amber);
+  text-decoration: none;
+}
+
+/* Phones: workspace as a compact app grid (icon + name), no descriptions. */
+@media (max-width: 560px) {
+  .hub-head {
+    margin-bottom: 1.1rem;
+  }
+  .hub-sub {
+    display: none;
+  }
+  .hub-live {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .hub-section .hub-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .hub-card {
+    padding: 0.8rem 0.4rem;
+    align-items: center;
+    text-align: center;
+    gap: 0.35rem;
+    position: relative;
+    border-radius: 12px;
+  }
+  .hub-card-top {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .hub-title {
+    font-size: 0.8rem;
+    line-height: 1.15;
+  }
+  .hub-desc,
+  .hub-open,
+  .hub-desktop {
+    display: none !important;
+  }
+  .hub-card-foot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+  }
+  .hub-badge {
+    font-size: 0 !important;
+    width: 10px;
+    height: 10px;
+    padding: 0 !important;
+    border-radius: 50%;
+    background: #f8bc1e;
+  }
+}
+
+/* Needs you: dark card, gold icons, big counts. */
+.hub-needs {
+  background: #211f18;
+  color: #fffdf8;
+  border-radius: 12px;
+  padding: 0.9rem 0.9rem 0.4rem;
+  margin: 0 0 1.75rem;
+}
+.hub-needs-h {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f8bc1e;
+  margin: 0 0 0.4rem 0.1rem;
+}
+.hub-needs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  column-gap: 1rem;
+}
+.hub-needs li {
+  border-bottom: 1px solid rgba(255, 253, 248, 0.1);
+}
+.hub-need {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.hub-need-icon {
+  flex: 0 0 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(248, 188, 30, 0.14);
+  color: #f8bc1e;
+  display: grid;
+  place-items: center;
+}
+.hub-need-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.hub-need-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hub-need-main b {
+  font-size: 0.95rem;
+}
+.hub-need-main small {
+  font-size: 0.75rem;
+  color: rgba(255, 253, 248, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-need-n {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #f8bc1e;
+  min-width: 2ch;
+  text-align: right;
+}
+.hub-need:hover .hub-need-n {
+  color: #fffdf8;
+}
+.hub-needs li:last-child {
+  border-bottom: 0;
+}

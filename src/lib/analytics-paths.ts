@@ -21,6 +21,7 @@ const BLOCKED_PREFIXES = [
   '/preview/',
   '/api/',
   '/portal/',
+  '/my/',
 ];
 
 /** Fixed marketing routes that always exist (even with 0 clicks). */

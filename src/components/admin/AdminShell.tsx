@@ -13,6 +13,7 @@ import './admin-shell.css';
 type Tab =
   | 'dashboard'
   | 'enquiries'
+  | 'crm'
   | 'whatsapp'
   | 'approvals'
   | 'users'
@@ -54,6 +55,12 @@ const icons = {
       <path d="M4 15a8 8 0 0 1 16 0" />
       <path d="M2.5 15h19v2.5h-19z" />
       <path d="M10 7.3V5h4v2.3" />
+    </svg>
+  ),
+  crm: (
+    <svg {...ICON}>
+      <path d="M3 7h18v12H3z" />
+      <path d="M8 7V5h8v2M3 12h18" />
     </svg>
   ),
   more: (
@@ -156,17 +163,26 @@ export async function AdminShell({
       tab: true,
       show: can('enquiries'),
     },
+    { href: '/admin/crm', label: 'CRM', active: active === 'crm', tab: true, show: can('crm') },
     { href: '/admin/subcontractors', label: 'Subcontractors', active: active === 'subcontractors', show: can('subcontractors') },
     { href: '/admin/analytics', label: 'Analytics', active: active === 'analytics', show: can('analytics') },
     { href: '/admin/analytics/heatmap', label: 'Heatmap', active: active === 'heatmap', show: can('analytics') },
     { href: '/admin/users', label: 'Users', active: active === 'users' || active === 'approvals', show: admin },
   ];
   const links = items.filter((i) => i.show);
-  const tasksIsTab = !can('enquiries') && can('tasks');
+  const tasksIsTab = !can('crm') && !can('enquiries') && can('tasks');
+  const enquiriesIsTab = !can('crm') && can('enquiries');
   const more = [
+    ...(can('enquiries') && !enquiriesIsTab ? [{ href: '/admin/enquiries', label: 'Enquiries', active: active === 'enquiries' }] : []),
     ...(can('tasks') && !tasksIsTab ? [{ href: '/admin/tasks', label: 'Tasks', active: active === 'tasks' }] : []),
     ...links.filter((i) => !i.tab),
     ...(can('enquiries') ? [{ href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', active: false }] : []),
+    ...(can('crm')
+      ? [
+          { href: '/admin/crm/reports', label: 'CRM reports', active: false },
+          { href: '/admin/crm/settings', label: 'CRM settings', active: false },
+        ]
+      : []),
     ...(can('social') ? [{ href: 'https://social.heliaxis.co.uk', label: 'Social media studio', active: false }] : []),
     ...(can('team') ? [{ href: 'https://rams.heliaxis.co.uk/operatives?team=heliaxis', label: 'Our team', active: false }] : []),
     { href: '/admin/app', label: 'Get the app', active: active === 'app' },
@@ -235,7 +251,9 @@ export async function AdminShell({
       {/* Phones: app-style tabs along the bottom instead of the wrapping menu. */}
       <nav className={flush ? 'hx-tabs hx-tabs--static' : 'hx-tabs'} aria-label="Sections">
         <TabLink href="/admin" label="Home" icon={icons.home} active={active === 'dashboard'} />
-        {can('enquiries') ? (
+        {can('crm') ? (
+          <TabLink href="/admin/crm" label="CRM" icon={icons.crm} active={active === 'crm'} />
+        ) : can('enquiries') ? (
           <TabLink href="/admin/enquiries" label="Enquiries" icon={icons.enquiries} active={active === 'enquiries'} />
         ) : (
           can('tasks') && <TabLink href="/admin/tasks" label="Tasks" icon={icons.tasks} active={active === 'tasks'} />

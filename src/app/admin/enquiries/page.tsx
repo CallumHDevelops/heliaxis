@@ -2,6 +2,7 @@ import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { enrichLeadsWithGeo, rowToCrmLead, type EnquiryRow } from '@/lib/enquiries';
+import { canAccess } from '@/lib/portals';
 import { EnquiriesCrm } from './EnquiriesCrm';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export default async function EnquiriesPage() {
 
   return (
     <AdminShell active="enquiries" isAdmin={profile?.role === 'admin'}>
-      <EnquiriesCrm initialLeads={leads} />
+      <EnquiriesCrm initialLeads={leads} canCrm={canAccess(profile, 'crm')} />
     </AdminShell>
   );
 }

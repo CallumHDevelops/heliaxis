@@ -75,6 +75,19 @@ export async function sendText(to: string, body: string): Promise<SendResult> {
   });
 }
 
+/** A document (PDF etc.) by link — Meta fetches it straight away, so a short-lived signed URL is fine. */
+export async function sendDocument(to: string, link: string, filename: string, caption?: string): Promise<SendResult> {
+  return graph(messagesPath(), {
+    method: 'POST',
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'document',
+      document: { link, filename, ...(caption ? { caption } : {}) },
+    }),
+  });
+}
+
 /** A pre-approved template. `params` fill the body's {{1}}, {{2}}… in order. */
 export async function sendTemplate(to: string, name: string, lang: string, params: string[] = []): Promise<SendResult> {
   return graph(messagesPath(), {

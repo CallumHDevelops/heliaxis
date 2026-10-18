@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notify, type NotificationInput } from '@/lib/notify';
 import { canAccess } from '@/lib/portals';
-import { defaultTemplate, markRead, sendTemplate, sendText, whatsappConfigured } from './api';
+import { defaultTemplate, markRead, sendDocument, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
   fillReply,
   HUMAN_TAKEOVER_MS,
@@ -14,6 +14,7 @@ import {
   type SmartRule,
 } from './shared';
 import { isQuiet, nextAwake, planChase } from './schedule';
+import { ensureOpportunity } from '@/lib/crm/server';
 import { getSettings } from './settings';
 
 /**
@@ -66,6 +67,8 @@ async function enquiryForNumber(
     .from('enquiries')
     .select(ENQ_COLS)
     .eq('wa_id', waId)
+    // Stay on the enquiry the chat is already on; otherwise their newest enquiry.
+    .order('wa_last_message_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(1);
   if (byWa?.[0]) return { enquiry: byWa[0] as EnquiryWa, created: false };
@@ -152,6 +155,7 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   if (dup) return; // Meta retries webhooks
 
   const { enquiry, created } = await enquiryForNumber(db, m.from, profileName, m.referral ?? null);
+  if (created) await ensureOpportunity(enquiry.id, m.referral ? 'WhatsApp ad' : 'WhatsApp');
   const { kind, body } = describe(m);
   const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
 
@@ -177,6 +181,17 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
       whatsapp_opt_in: true,
     })
     .eq('id', enquiry.id);
+
+  // They answered — stop any follow-up sequence on their opportunities.
+  await db
+    .from('crm_projects')
+    .update({ sequence_stopped_at: at })
+    .eq('enquiry_id', enquiry.id)
+    .is('sequence_stopped_at', null)
+    .then(
+      () => null,
+      () => null
+    );
 
   // They answered — stop chasing.
   await db
@@ -338,6 +353,7 @@ async function deliver(
     .from('enquiries')
     .update({ wa_last_message_at: now, ...(enquiry.status === 'new' && meta.sentBy ? { status: 'contacted' } : {}) })
     .eq('id', enquiry.id);
+  if (meta.sentBy || meta.via === 'whatsapp-app') await markFirstContact(db, enquiry.id, now);
   return { ok: true as const, id: row?.id as string | undefined };
 }
 
@@ -613,4 +629,72 @@ export async function remindUnanswered() {
     );
   }
   return n;
+}
+
+/** First time someone on the team reached this customer (speed-to-lead). Ignores missing CRM tables. */
+export async function markFirstContact(db: Db, enquiryId: string, at = new Date().toISOString()) {
+  await db
+    .from('crm_projects')
+    .update({ first_contact_at: at })
+    .eq('enquiry_id', enquiryId)
+    .is('first_contact_at', null)
+    .then(
+      () => null,
+      () => null
+    );
+}
+
+/**
+ * An automatic message (reminder, sequence step, review request): free text inside the 24h window,
+ * otherwise the given template. Returns why it couldn't send.
+ */
+export async function sendSystem(
+  enquiryId: string,
+  msg: { text: string; template?: string | null; params?: string[] },
+  via: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!whatsappConfigured()) return { ok: false, error: 'WhatsApp not connected' };
+  const db = createAdminClient();
+  const { data: enquiry } = await db.from('enquiries').select(ENQ_COLS).eq('id', enquiryId).maybeSingle();
+  if (!enquiry) return { ok: false, error: 'Customer not found' };
+  const e = enquiry as EnquiryWa;
+  if (!e.wa_id && !toWaId(e.phone)) return { ok: false, error: 'No mobile number' };
+  const input: SendInput = windowOpen(e.wa_last_inbound_at)
+    ? { text: msg.text }
+    : msg.template
+      ? { template: msg.template, lang: defaultTemplate().lang, params: msg.params ?? [] }
+      : { text: '' };
+  if ('text' in input && !input.text) return { ok: false, error: 'Outside the 24h window and no template set' };
+  const r = await deliver(db, e, input, { via });
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+/** Send a document (from the opportunity or the library) on WhatsApp. Needs the 24h window open. */
+export async function sendWhatsAppDocument(enquiryId: string, userId: string, link: string, filename: string, caption?: string) {
+  if (!whatsappConfigured()) return { ok: false as const, error: 'WhatsApp is not connected yet.' };
+  const db = createAdminClient();
+  const { data: enquiry } = await db.from('enquiries').select(ENQ_COLS).eq('id', enquiryId).maybeSingle();
+  if (!enquiry) return { ok: false as const, error: 'Customer not found' };
+  const e = enquiry as EnquiryWa;
+  const to = e.wa_id || toWaId(e.phone);
+  if (!to) return { ok: false as const, error: 'This customer has no mobile number.' };
+  if (!windowOpen(e.wa_last_inbound_at)) {
+    return { ok: false as const, error: 'Documents can only be sent within 24h of their last message — send it by email, or put it in their portal.' };
+  }
+  const r = await sendDocument(to, link, filename, caption);
+  if (!r.ok) return r;
+  const now = new Date().toISOString();
+  await db.from('whatsapp_messages').insert({
+    enquiry_id: e.id,
+    wa_message_id: r.data.messages?.[0]?.id ?? null,
+    direction: 'out',
+    kind: 'document',
+    body: `📄 ${filename}${caption ? ` — ${caption}` : ''}`,
+    status: 'sent',
+    sent_by: userId,
+    created_at: now,
+  });
+  await db.from('enquiries').update({ wa_last_message_at: now }).eq('id', e.id);
+  await markFirstContact(db, e.id, now);
+  return { ok: true as const };
 }

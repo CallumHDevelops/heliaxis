@@ -1,5 +1,6 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
+import { ensureOpportunity } from '@/lib/crm/server';
 import { ATTR_COOKIE, parseAttribution, sourceLabel } from '@/lib/attribution';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
@@ -35,7 +36,8 @@ export async function POST(request: NextRequest) {
       source: (body.source || 'quote-form').toString().trim() || 'quote-form',
     };
     // Came from an ad or a tagged link? Label the enquiry with it ("meta-ad: <campaign>").
-    const adSource = sourceLabel(parseAttribution(request.cookies.get(ATTR_COOKIE)?.value));
+    const attribution = parseAttribution(request.cookies.get(ATTR_COOKIE)?.value);
+    const adSource = sourceLabel(attribution);
     if (adSource) data.source = adSource;
 
     if (!data.name || !data.email) {
@@ -77,6 +79,11 @@ export async function POST(request: NextRequest) {
         else if (row) {
           // Push to everyone on Enquiries (phone app + browsers), alongside the email below.
           const where = data.postcode ? ` (${data.postcode})` : '';
+          after(async () => {
+            // Meta click id for the Conversions API (column added by crm-v2.sql; ignore if missing).
+            if (attribution?.fbc) await supabase.from('enquiries').update({ meta_fbc: attribution.fbc }).eq('id', row.id).then(() => null, () => null);
+            await ensureOpportunity(row.id, data.source);
+          });
           after(() =>
             notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', '/admin/enquiries', {
               tag: `enq-${row.id}`,

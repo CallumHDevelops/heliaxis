@@ -4,6 +4,7 @@ import { fetchLead } from './api';
 import { inboxHref, notifyEnquiryTeam, queueFirstContact } from './inbox';
 import { mapLeadFields } from './leads';
 import { toWaId } from './shared';
+import { ensureOpportunity } from '@/lib/crm/server';
 
 /** A Lead Ads webhook ping → fetch the answers → an enquiry (once, however often Meta retries). */
 export async function ingestLead(leadgenId: string) {
@@ -49,6 +50,7 @@ export async function ingestLead(leadgenId: string) {
     return;
   }
 
+  await ensureOpportunity(row.id, r.data.ad_name ? `Meta ad “${r.data.ad_name}”` : 'Meta lead form');
   const queued = optIn && toWaId(lead.phone) ? await queueFirstContact(row.id, lead.name) : false;
   await notifyEnquiryTeam(
     `New Meta lead: ${lead.name || 'unnamed'}`,

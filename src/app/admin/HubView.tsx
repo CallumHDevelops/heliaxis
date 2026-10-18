@@ -1,12 +1,17 @@
 import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
+import { HubMyDay } from './HubMyDay';
 import './hub.css';
+
+export type HubTask = { id: string; title: string; due_date: string | null; priority: string };
+export type HubFollowUp = { id: string; title: string; next_step: string | null; next_step_at: string | null };
 
 const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   app: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
   cms: '<path d="M4 5h16v14H4z"/><path d="M4 9h16M8 13h5M8 16h8"/>',
   tasks: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/>',
   enquiries: '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>',
+  crm: '<path d="M3 7h18v12H3z"/><path d="M8 7V5h8v2"/><path d="M3 12h18"/><path d="M11 12v2h2v-2"/>',
   analytics: '<path d="M5 19V10M10 19V5M15 19v-6M20 19v-9"/>',
   subcontractors: '<circle cx="9" cy="8" r="3"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="m15.5 10.5 2 2 3.5-4"/>',
   social: '<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="12" cy="12" r="3.5"/><circle cx="16.8" cy="7.2" r=".6" fill="currentColor"/>',
@@ -33,6 +38,15 @@ function Icon({ k }: { k: keyof typeof ICONS }) {
 }
 
 export type HubPortal = Portal & { badge?: string };
+
+function WaIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.5-4.3A8.5 8.5 0 1 1 20.5 11.6z" />
+      <path d="M9 9.5c.3 1.8 1.7 3.6 3.6 4.4l1.2-1 1.7.8-.4 1.3c-2.9.3-6.4-2.8-6.6-5.8l1.3-.4.8 1.7z" />
+    </svg>
+  );
+}
 
 function Card({
   href,
@@ -82,20 +96,34 @@ export function HubView({
   portals,
   usersBadge,
   denied,
+  tasks = [],
+  followUps = [],
+  needs = {},
+  today: todayIso = '',
 }: {
   firstName: string;
   portals: HubPortal[];
   /** undefined = not an admin (no Users card); null = admin with nothing pending. */
   usersBadge?: string | null;
   denied: boolean;
+  tasks?: HubTask[];
+  followUps?: HubFollowUp[];
+  needs?: Partial<Record<string, { n: number; detail: string }>>;
+  today?: string;
 }) {
   const isAdmin = usersBadge !== undefined;
   const internal = portals.filter((p) => !p.external);
   const apps = portals.filter((p) => p.external);
-  const attention = [
-    ...portals.filter((p) => p.badge).map((p) => ({ href: p.href, label: `${p.label}: ${p.badge}` })),
-    ...(usersBadge ? [{ href: '/admin/users', label: `Users: ${usersBadge}` }] : []),
+  // One even row per area that needs someone: icon, name, a big number.
+  const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' }[] = [
+    { key: 'whatsapp', label: 'WhatsApp', href: '/admin/enquiries/inbox', icon: 'whatsapp' },
+    { key: 'crm', label: 'CRM', href: '/admin/crm', icon: 'crm' },
+    { key: 'tasks', label: 'Tasks', href: '/admin/tasks', icon: 'tasks' },
+    { key: 'enquiries', label: 'Enquiries', href: '/admin/enquiries', icon: 'enquiries' },
+    { key: 'subcontractors', label: 'Subcontractors', href: '/admin/subcontractors', icon: 'subcontractors' },
+    { key: 'users', label: 'Users', href: '/admin/users', icon: 'users' },
   ];
+  const attention = ORDER.filter((o) => needs[o.key]?.n).map((o) => ({ ...o, ...needs[o.key]! }));
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -119,13 +147,28 @@ export function HubView({
       )}
 
       {attention.length > 0 && (
-        <section className="hub-attn" aria-label="Needs your attention">
-          <span className="hub-attn-label">Needs you</span>
-          {attention.map((a) => (
-            <Link key={a.href} href={a.href} className="hub-attn-item">{a.label} →</Link>
-          ))}
+        <section className="hub-needs" aria-label="Needs your attention">
+          <h2 className="hub-needs-h">Needs you</h2>
+          <ul>
+            {attention.map((a) => (
+              <li key={a.key}>
+                <Link href={a.href} className="hub-need">
+                  <span className="hub-need-icon">
+                    {a.icon === 'whatsapp' ? <WaIcon /> : <Icon k={a.icon} />}
+                  </span>
+                  <span className="hub-need-main">
+                    <b>{a.label}</b>
+                    <small>{a.detail}</small>
+                  </span>
+                  <span className="hub-need-n">{a.n}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
+
+      <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} />
 
       {portals.length === 0 && !isAdmin ? (
         <p className="hub-banner">No portals have been added to your account yet. Ask an admin to give you access.</p>
