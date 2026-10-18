@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { processOutbox } from '@/lib/whatsapp/inbox';
+import { cancelQueued, sendQueuedNow } from '@/lib/whatsapp/outbox-actions';
 import { isUuid, json, session } from '@/lib/whatsapp/routes';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const db = createAdminClient();
 
   if (body.action === 'cancel') {
-    await db.from('whatsapp_outbox').update({ status: 'cancelled', last_error: 'Cancelled' }).eq('id', id).in('status', ['pending', 'failed']);
+    await cancelQueued(id);
     return json({ ok: true });
   }
   if (body.action === 'edit') {
@@ -30,14 +30,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return data?.length ? json({ ok: true }) : json({ error: 'Already sent or cancelled' }, 409);
   }
   if (body.action === 'send-now') {
-    const { data } = await db
-      .from('whatsapp_outbox')
-      .update({ status: 'pending', send_after: new Date().toISOString() })
-      .eq('id', id)
-      .in('status', ['pending', 'failed'])
-      .select('id');
-    if (!data?.length) return json({ error: 'Already sent or cancelled' }, 409);
-    const r = await processOutbox();
+    const r = await sendQueuedNow(id);
+    if (!r) return json({ error: 'Already sent or cancelled' }, 409);
     return json({ ok: true, ...r });
   }
   return json({ error: 'Unknown action' }, 400);

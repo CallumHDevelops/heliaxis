@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { enablePush as subscribePush, PUSH_CHANGED, VAPID, type PushState } from '@/lib/push-client';
+import { enablePush as subscribePush, PUSH_CHANGED, readNative, VAPID, type PushState } from '@/lib/push-client';
 
 /**
  * Top-right of the admin header: the notifications bell and the signed-in user's
@@ -101,7 +101,11 @@ export function HeaderUser({
     let cancelled = false;
     (async () => {
       let state: PushState;
-      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      const native = readNative();
+      if (native) {
+        // Android app: notifications are native, managed in Android's settings.
+        state = native.enabled ? 'native' : 'native-off';
+      } else if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
         state = 'unsupported';
       } else if (!VAPID) {
         state = 'unconfigured';
@@ -237,6 +241,8 @@ export function HeaderUser({
                 </>
               )}
               {push === 'blocked' && <span>Notifications are blocked — allow them for this site in your browser or phone settings.</span>}
+              {push === 'native' && <span>Notifications come through the Heliaxis app. Change them in Settings → Apps → Heliaxis → Notifications.</span>}
+              {push === 'native-off' && <span>Notifications are off for the Heliaxis app. Turn them on in Settings → Apps → Heliaxis → Notifications.</span>}
               {push === 'working' && <span>One moment…</span>}
               {push === 'unsupported' && <span>This browser can&apos;t show notifications — install the app or use Chrome.</span>}
             </div>

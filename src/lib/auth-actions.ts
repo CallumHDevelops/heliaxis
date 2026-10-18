@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { safeAdminPath } from '@/lib/auth-utils';
 
@@ -52,8 +53,19 @@ export async function register(_prev: AuthState, formData: FormData): Promise<Au
   redirect('/pending?registered=1');
 }
 
-export async function signOut(): Promise<void> {
+export async function signOut(formData?: FormData): Promise<void> {
   const supabase = await createClient();
+  // The Android app's token on this phone (added by AppRuntime): stop sending it this person's
+  // notifications. Done here, before the session ends, so it can't lose a race with sign-out.
+  const token = formData?.get('hx-native');
+  if (typeof token === 'string' && /^[\w:.-]{20,4096}$/.test(token)) {
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) await createAdminClient().from('native_push_tokens').delete().eq('user_id', data.user.id).eq('token', token);
+    } catch {
+      // Table not there yet: nothing to remove.
+    }
+  }
   await supabase.auth.signOut();
   redirect('/login');
 }

@@ -42,6 +42,13 @@ export const ENV_GROUPS: EnvGroup[] = [
     ],
   },
   {
+    title: 'Android app notifications',
+    what: 'Native notifications in the Android app (Firebase). Without it the app falls back to the phone notifications above.',
+    vars: [
+      { name: 'FIREBASE_SERVICE_ACCOUNT', secret: true, hint: 'Firebase → Project settings → Service accounts → Generate new private key (paste the whole file)' },
+    ],
+  },
+  {
     title: 'WhatsApp',
     what: 'The WhatsApp inbox, smart replies, chasers and reminders.',
     vars: [

@@ -2,10 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Android 13+: task notifications (Web Push delegated from Chrome to the app). -->
+    <!-- Android 13+: notifications (native via Firebase; Web Push delegated from Chrome as a fallback). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".HeliaxisApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/appName"
@@ -17,8 +18,9 @@
              Mirrored by public/.well-known/assetlinks.json on the site. -->
         <meta-data android:name="asset_statements" android:resource="@string/assetStatements" />
 
+        <!-- The stock TWA launcher plus a Firebase token hand-off (see HeliaxisLauncherActivity). -->
         <activity
-            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:name=".HeliaxisLauncherActivity"
             android:alwaysRetainTaskState="true"
             android:exported="true"
             android:label="@string/appName">
@@ -32,10 +34,6 @@
             <meta-data android:name="android.support.customtabs.trusted.ADDITIONAL_TRUSTED_ORIGINS" android:resource="@array/additionalTrustedOrigins" />
             <meta-data android:name="android.support.customtabs.trusted.FALLBACK_STRATEGY" android:value="customtabs" />
 
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
             <!-- Open heliaxis.co.uk/admin links (e.g. from emails) in the app. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -44,6 +42,19 @@
                 <data android:scheme="https" android:host="${hostName}" android:pathPrefix="/admin" />
             </intent-filter>
         </activity>
+
+        <!-- The app icon. Keeps the launcher's original name so icons already on people's Home
+             Screens survive the update to HeliaxisLauncherActivity. -->
+        <activity-alias
+            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:exported="true"
+            android:label="@string/appName"
+            android:targetActivity=".HeliaxisLauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity" android:exported="false">
             <meta-data android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL" android:value="${launchUrl}" />
@@ -65,7 +76,27 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/filepaths" />
         </provider>
 
-        <!-- Lets Chrome show the site's notifications as this app's notifications. -->
+        <!-- Native notifications: data messages from the site (src/lib/notify.ts) via Firebase. -->
+        <service
+            android:name=".HeliaxisMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- Buttons on those notifications ("Send now" / "Cancel reply"). -->
+        <receiver
+            android:name=".NotificationActionReceiver"
+            android:exported="false" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification_icon" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
+
+        <!-- Fallback when the app is built without Firebase: Chrome shows the site's Web Push
+             notifications as this app's notifications. -->
         <service
             android:name="com.google.androidbrowserhelper.trusted.DelegationService"
             android:enabled="true"

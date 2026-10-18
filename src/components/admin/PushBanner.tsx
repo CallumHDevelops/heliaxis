@@ -18,7 +18,7 @@ export function PushBanner({ what = 'WhatsApp messages' }: { what?: string }) {
     };
   }, []);
 
-  if (!state || state === 'on') return null;
+  if (!state || state === 'on' || state === 'native') return null;
   const iPhone = typeof navigator !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent);
 
   return (
@@ -29,7 +29,7 @@ export function PushBanner({ what = 'WhatsApp messages' }: { what?: string }) {
           <>
             <b>Turn on notifications</b> so {what} reach this phone straight away.
           </>
-        ) : state === 'blocked' ? (
+        ) : state === 'blocked' || state === 'native-off' ? (
           <>
             <b>Notifications are blocked.</b> Allow them in your phone’s Settings → Apps → Heliaxis → Notifications.
           </>

@@ -1,5 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
+import { fcmConfigured } from '@/lib/fcm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import type { GuideKey, SqlFile } from '@/lib/setup-files';
@@ -85,17 +86,35 @@ async function has(table: string, column = '*') {
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
   {
-    id: 'apk-icon-release',
-    title: 'Publish a new Android app release',
-    detail: 'So phones pick up the new app icon. Website changes reach the app by themselves; only the icon needs a new APK.',
+    // Bumped from apk-icon-release: GitHub now builds the app, no Android Studio needed.
+    id: 'apk-native-release',
+    title: 'Publish the new Android app (GitHub builds it)',
+    detail:
+      'Brings the new icon and native Android notifications. Do “Set up native Android notifications” first. Then GitHub builds and publishes the app; nobody needs Android Studio.',
     steps: [
-      'On the computer that has Android Studio and the heliaxis code, open a terminal in the heliaxis folder.',
-      'Run `git pull` to get the latest code.',
-      'Run `node scripts/android-release.mjs --notes "New app icon"`.',
-      'Commit and push the changed files (`android/release.json` and `public/app/`). Vercel deploys them.',
-      'Everyone’s app then shows an **Update** banner. Tap it to install the new version.',
-      'Or ask Claude Code on that computer to “release a new Android app version with the new icon” and it will run these for you.',
+      'On the Windows PC that built the app before, open **PowerShell** (Start menu → type PowerShell).',
+      'Paste the first PowerShell line below and press Enter. It copies the signing passwords.',
+      'Tap **Open GitHub secrets** (above) → **New repository secret**. Name: `ANDROID_KEYSTORE_PROPERTIES`. Paste into **Secret** → **Add secret**.',
+      'Back in PowerShell, paste the second line and press Enter. It copies the signing key itself.',
+      '**New repository secret** again. Name: `ANDROID_KEYSTORE_BASE64`, paste, **Add secret**.',
+      'Open the `google-services.json` you downloaded from Firebase in Notepad, select all, copy. **New repository secret**: name `GOOGLE_SERVICES_JSON`, paste, **Add secret**.',
+      'In GitHub tap **Actions** (top menu) → **Android app** (left) → **Run workflow** → branch **main**, notes e.g. `Native notifications and the new icon` → **Run workflow**.',
+      'It takes about 5 minutes. A green tick means it’s published; Vercel then deploys it.',
+      'Everyone’s app shows an **Update** banner. Install it, open the app, and tap **Allow** when it asks about notifications.',
+      'If PowerShell says it can’t find the files, the signing key isn’t on that PC. Tell Claude: a new key works too, but everyone then uninstalls and reinstalls the app once.',
     ],
+    copies: [
+      { label: 'PowerShell 1', value: 'Get-Content "$HOME\\.heliaxis-secrets\\android-keystore.properties" | Set-Clipboard' },
+      {
+        label: 'PowerShell 2',
+        value: '[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\\.heliaxis-secrets\\heliaxis-android.jks")) | Set-Clipboard',
+      },
+      { label: 'Secret', value: 'ANDROID_KEYSTORE_PROPERTIES' },
+      { label: 'Secret', value: 'ANDROID_KEYSTORE_BASE64' },
+      { label: 'Secret', value: 'GOOGLE_SERVICES_JSON' },
+    ],
+    href: 'https://github.com/CallumHDevelops/heliaxis/settings/secrets/actions',
+    hrefLabel: 'Open GitHub secrets',
     order: 60,
     manual: true,
   },
@@ -203,13 +222,14 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 }
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
-  const [crm, crmV2, assistant, notifications, whatsapp, chasers, done, assign] = await Promise.all([
+  const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, done, assign] = await Promise.all([
     has('crm_projects', 'next_step'),
     has('crm_documents'),
     has('assistant_drafts'),
     has('push_subscriptions'),
     has('whatsapp_messages'),
     has('whatsapp_outbox', 'kind'),
+    has('native_push_tokens'),
     doneManual(),
     preloaded ?? setupAssignments(),
   ]);
@@ -241,6 +261,29 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!crmV2, sql('crm-v2.sql', 'Customer portal, documents, email, reminders and deposits.', 4, 'crm.sql'));
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
+  add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
+  add(!fcmConfigured(), {
+    id: 'env-firebase',
+    title: 'Set up native Android notifications',
+    detail:
+      'A free Firebase project lets the Android app show proper Android notifications (with their own sounds per type) instead of web ones.',
+    steps: [
+      'Open the [Firebase console](https://console.firebase.google.com) and sign in with a Google account the business will keep.',
+      '**Create a project** → name it `Heliaxis` → you can turn **Google Analytics** off → **Create project** → **Continue**.',
+      'On the project page tap the **Android** icon (“Add app”). Package name: `uk.co.heliaxis.app` (copy below), nickname `Heliaxis app` → **Register app**.',
+      'Tap **Download google-services.json** and keep the file: it goes into GitHub in the next to-do. Then **Next** → **Next** → **Continue to console** (skip the rest).',
+      'Tap the ⚙ next to **Project overview** → **Project settings** → **Service accounts** tab → **Generate new private key** → **Generate key**. Another .json file downloads.',
+      'Open that second file in Notepad, select all and copy it (all of it, from `{` to `}`). This is the Vercel value: it’s a password, so tick **Sensitive**. This to-do stays until the pasted file is readable.',
+      ...VERCEL_STEPS,
+    ],
+    copies: [
+      { label: 'Package name', value: 'uk.co.heliaxis.app' },
+      { label: 'Key', value: 'FIREBASE_SERVICE_ACCOUNT' },
+    ],
+    href: 'https://console.firebase.google.com',
+    hrefLabel: 'Open Firebase',
+    order: 10,
+  });
 
   add(!env('ANTHROPIC_API_KEY'), {
     id: 'env-anthropic',
