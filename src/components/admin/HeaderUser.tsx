@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { enablePush as subscribePush, PUSH_CHANGED, VAPID, type PushState } from '@/lib/push-client';
 
 /**
  * Top-right of the admin header: the notifications bell and the signed-in user's
@@ -19,16 +20,6 @@ type Notification = {
   created_at: string;
 };
 
-type PushState = 'unsupported' | 'unconfigured' | 'off' | 'on' | 'blocked' | 'working';
-
-const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
-
-function keyBytes(base64: string) {
-  const pad = '='.repeat((4 - (base64.length % 4)) % 4);
-  const raw = atob((base64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-}
-
 function ago(iso: string) {
   const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
   if (s < 60) return 'just now';
@@ -36,11 +27,6 @@ function ago(iso: string) {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 86400 * 7) return `${Math.floor(s / 86400)}d ago`;
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-}
-
-async function swRegistration() {
-  const existing = await navigator.serviceWorker.getRegistration('/admin');
-  return existing ?? navigator.serviceWorker.register('/sw.js', { scope: '/admin' });
 }
 
 function useOutsideClose(open: boolean, close: () => void) {
@@ -133,27 +119,15 @@ export function HeaderUser({
 
   async function enablePush() {
     setPush('working');
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        setPush(permission === 'denied' ? 'blocked' : 'off');
-        return;
-      }
-      const reg = await swRegistration();
-      await navigator.serviceWorker.ready;
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID) }));
-      const r = await fetch('/api/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub),
-      });
-      setPush(r.ok ? 'on' : 'off');
-    } catch {
-      setPush('off');
-    }
+    setPush(await subscribePush());
   }
+
+  // Turned on elsewhere on the page (e.g. the WhatsApp banner).
+  useEffect(() => {
+    const onChange = (e: Event) => setPush((e as CustomEvent<PushState>).detail);
+    window.addEventListener(PUSH_CHANGED, onChange);
+    return () => window.removeEventListener(PUSH_CHANGED, onChange);
+  }, []);
 
   async function disablePush() {
     setPush('working');
@@ -223,7 +197,7 @@ export function HeaderUser({
             </div>
             {nudge && (
               <div className="hu-push">
-                <span>Get a notification on this device when you&apos;re assigned a task.</span>
+                <span>Get a notification on this device for new WhatsApp messages, enquiries and tasks.</span>
                 <button type="button" className="hu-btn" onClick={enablePush}>
                   Turn on
                 </button>

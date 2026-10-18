@@ -86,7 +86,7 @@ export default function RootLayout({
     <html lang="en-GB">
       <head>
         <link rel="icon" href="/assets/favicon.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/assets/favicon.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#16222F" />
         <meta name="geo.region" content="GB-WLS" />

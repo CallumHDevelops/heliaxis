@@ -1262,3 +1262,22 @@ button.pv-seg{font:inherit}
 .honest b{color:var(--ink)}
 
 
+
+/* Phones: keep the toolbar and the dashboard inside the screen (nothing wider than the viewport). */
+@media(max-width:640px){
+.toolbar{padding:0 8px;gap:2px}
+.toolbar-brand img{display:none}
+.toolbar-brand{font-size:.86rem;padding:8px 2px}
+#btnPublishPreview{display:none}
+.toolbar-right{gap:2px}
+.toolbar-auth-slot{margin-left:2px;padding-left:6px}
+.tbtn{padding:8px 8px}
+.dashboard{overflow-x:hidden}
+.dashboard .dash-wrap{padding:66px 14px 90px}
+.dash-head h1{font-size:1.6rem}
+.dash-head p{white-space:normal;font-size:.85rem}
+.dash-actions{grid-template-columns:1fr}
+.dash-grid{grid-template-columns:1fr}
+.dash-search{min-width:0}
+.dash-sort{min-width:0}
+}

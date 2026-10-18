@@ -1,6 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { notify } from '@/lib/notify';
+import { notify, type NotificationInput } from '@/lib/notify';
 import { canAccess } from '@/lib/portals';
 import { defaultTemplate, markRead, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
@@ -40,13 +40,18 @@ const ENQ_COLS = 'id, name, phone, status, wa_id, wa_last_inbound_at, wa_unread,
 export const inboxHref = (enquiryId: string) => `/admin/enquiries/inbox/${enquiryId}`;
 
 /** Everyone who can open Enquiries gets the push. */
-export async function notifyEnquiryTeam(title: string, body: string, href: string) {
+export async function notifyEnquiryTeam(
+  title: string,
+  body: string,
+  href: string,
+  extra: Pick<NotificationInput, 'tag' | 'actions' | 'data'> = {}
+) {
   const db = createAdminClient();
   const { data } = await db.from('profiles').select('*').eq('status', 'approved');
   await Promise.all(
     (data ?? [])
       .filter((p) => canAccess(p, 'enquiries'))
-      .map((p) => notify({ userId: p.id, kind: 'whatsapp', title, body, href }))
+      .map((p) => notify({ userId: p.id, kind: 'whatsapp', title, body, href, ...extra }))
   );
 }
 
@@ -186,7 +191,18 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   const who = enquiry.name || `+${m.from}`;
   const lines = [body.slice(0, 140)];
   if (queued) lines.push(`Smart reply “${queued.rule}” sends in ~${Math.max(1, Math.round(queued.seconds / 60))} min — tap to check, edit or cancel.`);
-  await notifyEnquiryTeam(created ? `New WhatsApp lead: ${who}` : `WhatsApp from ${who}`, lines.join('\n'), inboxHref(enquiry.id));
+  await notifyEnquiryTeam(created ? `New WhatsApp lead: ${who}` : `WhatsApp from ${who}`, lines.join('\n'), inboxHref(enquiry.id), {
+    tag: `wa-${enquiry.id}`,
+    ...(queued?.outboxId
+      ? {
+          actions: [
+            { action: 'outbox-send', title: 'Send now' },
+            { action: 'outbox-cancel', title: 'Cancel reply' },
+          ],
+          data: { outboxId: queued.outboxId },
+        }
+      : {}),
+  });
 }
 
 /** Queue the matching smart reply, unless a person is handling this chat. */
@@ -219,15 +235,19 @@ async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo
   const settings = await getSettings();
   let at = new Date(Date.now() + pickDelaySeconds(rule.delay_min_seconds, rule.delay_max_seconds) * 1000);
   if (settings.smartRepliesQuietHours) at = nextAwake(at, settings.quietFrom, settings.quietTo);
-  await db.from('whatsapp_outbox').insert({
-    enquiry_id: enquiry.id,
-    rule_id: rule.id,
-    kind: 'reply',
-    body: fillReply(rule.reply, enquiry.name),
-    reply_to: replyTo,
-    send_after: at.toISOString(),
-  });
-  return { rule: rule.name, seconds: (at.getTime() - Date.now()) / 1000 };
+  const { data: row } = await db
+    .from('whatsapp_outbox')
+    .insert({
+      enquiry_id: enquiry.id,
+      rule_id: rule.id,
+      kind: 'reply',
+      body: fillReply(rule.reply, enquiry.name),
+      reply_to: replyTo,
+      send_after: at.toISOString(),
+    })
+    .select('id')
+    .single();
+  return { rule: rule.name, seconds: (at.getTime() - Date.now()) / 1000, outboxId: row?.id as string | undefined };
 }
 
 /** Opening message to a new Meta lead who opted in: the default template, a few minutes later. */

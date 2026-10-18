@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { PushBanner } from '@/components/admin/PushBanner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
 import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS } from '@/lib/enquiries';
@@ -106,6 +107,7 @@ export function EnquiriesCrm({ initialLeads }: { initialLeads: CrmLead[] }) {
         </div>
       </div>
 
+      <PushBanner what="new enquiries and WhatsApp messages" />
       <div className="enq-stat-ov">
         {STATUSES.map((s) => (
           <div key={s} className="enq-so">

@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
+import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
+import { ATTR_COOKIE, parseAttribution, sourceLabel } from '@/lib/attribution';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 
@@ -32,6 +34,9 @@ export async function POST(request: NextRequest) {
       propertyType: (body.propertyType || '').toString().trim(),
       source: (body.source || 'quote-form').toString().trim() || 'quote-form',
     };
+    // Came from an ad or a tagged link? Label the enquiry with it ("meta-ad: <campaign>").
+    const adSource = sourceLabel(parseAttribution(request.cookies.get(ATTR_COOKIE)?.value));
+    if (adSource) data.source = adSource;
 
     if (!data.name || !data.email) {
       return NextResponse.json(
@@ -59,7 +64,7 @@ export async function POST(request: NextRequest) {
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const supabase = createAdminClient();
-        const { error } = await supabase.from('enquiries').insert({
+        const { data: row, error } = await supabase.from('enquiries').insert({
           name: data.name,
           email: data.email,
           phone: data.phone || null,
@@ -67,8 +72,17 @@ export async function POST(request: NextRequest) {
           interest: interestStored,
           property_type: sectorStored,
           source: data.source,
-        });
+        }).select('id').single();
         if (error) console.error('❌ Supabase enquiry insert failed:', error.message);
+        else if (row) {
+          // Push to everyone on Enquiries (phone app + browsers), alongside the email below.
+          const where = data.postcode ? ` (${data.postcode})` : '';
+          after(() =>
+            notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', '/admin/enquiries', {
+              tag: `enq-${row.id}`,
+            }).catch(() => {})
+          );
+        }
       } catch (e) {
         console.error('❌ Supabase enquiry insert threw:', e);
       }
