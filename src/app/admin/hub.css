@@ -400,3 +400,41 @@ a.hub-row:hover {
 .hub-needs li:last-child {
   border-bottom: 0;
 }
+
+/* "Talk to Claude" bar */
+.hub-claude {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.hub-claude:hover { border-color: var(--ink); }
+.hub-claude-mark {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #c96442;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.hub-claude-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hub-claude-main b { font-size: 1rem; }
+.hub-claude-main small { color: var(--muted); font-size: 0.85rem; line-height: 1.35; }
+.hub-claude-mic {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}

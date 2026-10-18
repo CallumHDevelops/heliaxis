@@ -3,6 +3,8 @@ import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { TASK_COLUMNS, type Assignee, type Task } from '@/lib/tasks';
+import { FromClaude } from '@/components/admin/FromClaude';
+import { setupTodos } from '@/lib/setup-checks';
 import { TasksBoard } from './TasksBoard';
 
 export const dynamic = 'force-dynamic';
@@ -13,11 +15,12 @@ export const metadata: Metadata = {
 };
 
 export default async function TasksPage() {
-  const { user } = await getSessionProfile();
+  const { user, profile } = await getSessionProfile();
   const admin = createAdminClient();
-  const [tasksRes, peopleRes] = await Promise.all([
+  const [tasksRes, peopleRes, setup] = await Promise.all([
     admin.from('tasks').select(TASK_COLUMNS).order('created_at', { ascending: false }),
     admin.from('profiles').select('id, full_name, email').eq('status', 'approved'),
+    profile?.role === 'admin' ? setupTodos() : [],
   ]);
 
   const people: Assignee[] = ((peopleRes.data ?? []) as { id: string; full_name: string | null; email: string | null }[])
@@ -26,6 +29,7 @@ export default async function TasksPage() {
 
   return (
     <AdminShell active="tasks" wide>
+      <FromClaude todos={setup} />
       <TasksBoard
         initialTasks={(tasksRes.data ?? []) as Task[]}
         people={people}
