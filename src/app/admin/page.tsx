@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { PORTALS, portalsFor, type PortalKey } from '@/lib/portals';
 import { todayISO } from '@/lib/tasks';
-import { setupTodos } from '@/lib/setup-checks';
+import { setupPeople, visibleSetupTodos } from '@/lib/setup-checks';
 import { HubView, type HubTask, type HubFollowUp } from './HubView';
 
 export const dynamic = 'force-dynamic';
@@ -123,10 +123,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const isAdmin = profile?.role === 'admin';
   const keys = portalsFor(profile);
   const portals = PORTALS.filter((p) => keys.includes(p.key));
-  const [counts, day, setup] = await Promise.all([
+  const [counts, day, setup, people] = await Promise.all([
     badges(keys, isAdmin),
     user ? myDay(user.id, keys) : null,
-    isAdmin ? setupTodos() : [],
+    // Admins see the setup to-dos unless one's been passed to someone; members only theirs.
+    user ? visibleSetupTodos(user.id, isAdmin) : null,
+    isAdmin ? setupPeople() : [],
   ]);
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
 
@@ -141,7 +143,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         tasks={day?.tasks ?? []}
         followUps={day?.followUps ?? []}
         today={todayISO()}
-        setup={setup}
+        setup={{
+          todos: setup?.mine ?? [],
+          admin: isAdmin && user ? { others: setup?.others ?? [], people, meId: user.id } : undefined,
+        }}
         assistant={keys.includes('crm')}
       />
     </AdminShell>

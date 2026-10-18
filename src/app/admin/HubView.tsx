@@ -2,8 +2,7 @@ import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
 import { HubMyDay } from './HubMyDay';
 import { MetisIcon } from '@/components/admin/MetisIcon';
-import { FromClaude } from '@/components/admin/FromClaude';
-import type { SetupTodo } from '@/lib/setup-checks';
+import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import './hub.css';
 
 export type HubTask = { id: string; title: string; due_date: string | null; priority: string };
@@ -103,7 +102,7 @@ export function HubView({
   followUps = [],
   needs = {},
   today: todayIso = '',
-  setup = [],
+  setup = { todos: [] },
   assistant = false,
 }: {
   firstName: string;
@@ -115,8 +114,8 @@ export function HubView({
   followUps?: HubFollowUp[];
   needs?: Partial<Record<string, { n: number; detail: string }>>;
   today?: string;
-  /** Admins: setup jobs Claude has left (they tick themselves off). */
-  setup?: SetupTodo[];
+  /** Setup jobs Claude has left (they tick themselves off): admins', or ones passed to this person. */
+  setup?: FromClaudeProps;
   /** Show the "Talk to Metis" bar. */
   assistant?: boolean;
 }) {
@@ -194,7 +193,7 @@ export function HubView({
         </Link>
       )}
 
-      <FromClaude todos={setup} />
+      <FromClaude {...setup} />
 
       <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} />
 

@@ -93,6 +93,13 @@ export const PORTAL_KEYS = PORTALS.map((p) => p.key);
 /** Admin-only areas — never grantable to members. */
 export const ADMIN_ONLY_PATHS = ['/admin/users', '/admin/approvals', '/admin/setup'];
 
+/**
+ * The exceptions inside /admin/setup, open to every approved user: the guide and SQL viewers that
+ * "From Claude" to-dos link to, since an admin can pass a to-do to a member. The rest (the Vercel
+ * keys page) stays admin-only.
+ */
+export const OPEN_SETUP_PATHS = ['/admin/setup/guide', '/admin/setup/sql'];
+
 /** The landing page after sign-in, open to every approved user. */
 export const HUB_PATH = '/admin';
 
@@ -123,13 +130,14 @@ export function canAccess(profile: AccessProfile | null | undefined, key: Portal
 }
 
 /**
- * Which portal an /admin path belongs to: null = open to any approved user (the hub),
+ * Which portal an /admin path belongs to: null = open to any approved user (the hub, setup guides),
  * 'admin' = admin only. Unknown /admin/<x> paths are old CMS page-editor links
  * (now /admin/cms/<x>) and are redirected there, so they count as the CMS.
  */
 export function portalForPath(pathname: string): PortalKey | 'admin' | null {
   const p = pathname.replace(/\/$/, '') || '/';
   if (p === HUB_PATH || p === APP_PATH) return null;
+  if (OPEN_SETUP_PATHS.some((a) => p.startsWith(`${a}/`))) return null;
   if (ADMIN_ONLY_PATHS.some((a) => p === a || p.startsWith(`${a}/`))) return 'admin';
   for (const portal of PORTALS) {
     if (portal.paths.some((a) => p === a || p.startsWith(`${a}/`))) return portal.key;
