@@ -33,8 +33,10 @@ export type SetupTodo = {
   /** Lower = more important. */
   order: number;
   optional?: boolean;
-  /** Can't be checked automatically: shows a Done button. */
+  /** Can't be checked automatically: ticking it removes it. */
   manual?: boolean;
+  /** Ticked as done, but the app can't see it yet (e.g. Vercel keys need a redeploy). */
+  ticked?: boolean;
 };
 
 const DONE_KEY = 'setup-done';
@@ -94,13 +96,15 @@ export async function doneManual(): Promise<string[]> {
   }
 }
 
-export async function markManualDone(id: string) {
-  if (!MANUAL.some((m) => m.id === id)) return;
-  const done = new Set(await doneManual());
-  done.add(id);
+/** The admin ticked (or unticked) a to-do. Manual ones then disappear; checked ones wait for their check. */
+export async function markDone(id: string, done = true) {
+  if (!/^[a-z0-9.-]{1,60}$/.test(id)) return;
+  const set = new Set(await doneManual());
+  if (done) set.add(id);
+  else set.delete(id);
   await createAdminClient()
     .from('cms_kv')
-    .upsert({ key: DONE_KEY, value: JSON.stringify([...done]), updated_at: new Date().toISOString() });
+    .upsert({ key: DONE_KEY, value: JSON.stringify([...set]), updated_at: new Date().toISOString() });
 }
 
 export async function setupTodos(): Promise<SetupTodo[]> {
@@ -326,5 +330,7 @@ export async function setupTodos(): Promise<SetupTodo[]> {
     optional: true,
   });
   for (const m of MANUAL) add(!done.includes(m.id), m);
-  return out.sort((a, b) => a.order - b.order);
+  // Ticked but not detected yet: keep it, greyed, at the bottom.
+  for (const t of out) if (done.includes(t.id)) t.ticked = true;
+  return out.sort((a, b) => Number(!!a.ticked) - Number(!!b.ticked) || a.order - b.order);
 }
