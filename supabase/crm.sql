@@ -63,6 +63,21 @@ alter table public.crm_projects add column if not exists next_step_at          t
 alter table public.crm_projects add column if not exists next_step_notified_at timestamptz;
 create index if not exists crm_projects_next_step_idx on public.crm_projects (next_step_at) where next_step_at is not null;
 
+-- Tasks on an opportunity: the same tasks as the Tasks page, linked to the opportunity.
+alter table public.tasks add column if not exists crm_project_id uuid references public.crm_projects(id) on delete cascade;
+create index if not exists tasks_crm_project_idx on public.tasks (crm_project_id) where crm_project_id is not null;
+
+-- Every enquiry is an opportunity: create one for each existing enquiry that hasn't got one.
+-- (New enquiries get theirs automatically.) Safe to re-run.
+insert into public.crm_projects (enquiry_id, title, stage, postcode, created_at, updated_at, stage_changed_at)
+select e.id,
+       e.name || coalesce(' · ' || e.postcode, ''),
+       case e.status when 'contacted' then 'contacted' when 'qualified' then 'quote_sent'
+                     when 'won' then 'won' when 'lost' then 'lost' else 'lead' end,
+       e.postcode, e.created_at, e.created_at, e.created_at
+  from public.enquiries e
+ where not exists (select 1 from public.crm_projects p where p.enquiry_id = e.id);
+
 alter table public.crm_projects   enable row level security;
 alter table public.crm_activities enable row level security;
 alter table public.crm_photos     enable row level security;

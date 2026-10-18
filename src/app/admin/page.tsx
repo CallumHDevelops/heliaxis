@@ -14,9 +14,12 @@ export const metadata: Metadata = {
 };
 
 /** Small "needs you" counts per portal. Each is best-effort — a failing query just hides the badge. */
+export type NeedCount = { n: number; detail: string };
+
+/** How many things need someone, per area (shown as big numbers on the dashboard). */
 async function badges(keys: PortalKey[], isAdmin: boolean) {
   const admin = createAdminClient();
-  const out: Partial<Record<PortalKey | 'users', string>> = {};
+  const out: Partial<Record<PortalKey | 'users' | 'whatsapp', NeedCount>> = {};
   const count = async (q: PromiseLike<{ count: number | null }>) => {
     try {
       return (await q).count ?? 0;
@@ -24,16 +27,32 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
       return 0;
     }
   };
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
   await Promise.all([
     keys.includes('enquiries') &&
+      count(admin.from('enquiries').select('id', { count: 'exact', head: true }).gt('wa_unread', 0)).then((n) => {
+        if (n) out.whatsapp = { n, detail: `unread chat${n === 1 ? '' : 's'}` };
+      }),
+    keys.includes('enquiries') &&
       count(admin.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'new')).then((n) => {
-        if (n) out.enquiries = `${n} new`;
+        if (n) out.enquiries = { n, detail: 'new' };
       }),
     keys.includes('tasks') &&
       count(
         admin.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'done').lt('due_date', todayISO())
       ).then((n) => {
-        if (n) out.tasks = `${n} overdue`;
+        if (n) out.tasks = { n, detail: 'overdue' };
+      }),
+    keys.includes('crm') &&
+      count(
+        admin
+          .from('crm_projects')
+          .select('id', { count: 'exact', head: true })
+          .not('stage', 'in', '(complete,lost)')
+          .lte('next_step_at', endOfToday.toISOString())
+      ).then((n) => {
+        if (n) out.crm = { n, detail: `follow-up${n === 1 ? '' : 's'} due` };
       }),
     keys.includes('subcontractors') &&
       Promise.all([
@@ -41,17 +60,11 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
         count(admin.from('subcontractor_documents').select('id', { count: 'exact', head: true }).eq('status', 'pending')),
       ]).then(([sign, docs]) => {
         const parts = [sign && `${sign} to countersign`, docs && `${docs} docs to review`].filter(Boolean);
-        if (parts.length) out.subcontractors = parts.join(' · ');
-      }),
-    keys.includes('crm') &&
-      count(
-        admin.from('crm_projects').select('id', { count: 'exact', head: true }).not('stage', 'in', '(complete,lost)')
-      ).then((n) => {
-        if (n) out.crm = `${n} live project${n === 1 ? '' : 's'}`;
+        if (sign + docs) out.subcontractors = { n: sign + docs, detail: parts.join(' · ') };
       }),
     isAdmin &&
       count(admin.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending')).then((n) => {
-        if (n) out.users = `${n} awaiting approval`;
+        if (n) out.users = { n, detail: 'awaiting approval' };
       }),
   ]);
   return out;
@@ -69,7 +82,7 @@ async function myDay(userId: string, keys: PortalKey[]) {
       return fallback;
     }
   };
-  const [tasks, followUps, unread] = await Promise.all([
+  const [tasks, followUps] = await Promise.all([
     keys.includes('tasks')
       ? safe(
           admin
@@ -95,15 +108,8 @@ async function myDay(userId: string, keys: PortalKey[]) {
           [] as HubFollowUp[]
         )
       : ([] as HubFollowUp[]),
-    keys.includes('enquiries')
-      ? admin
-          .from('enquiries')
-          .select('id', { count: 'exact', head: true })
-          .gt('wa_unread', 0)
-          .then((r) => r.count ?? 0, () => 0)
-      : 0,
   ]);
-  return { tasks, followUps, unread };
+  return { tasks, followUps };
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
@@ -119,12 +125,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <AdminShell active="dashboard" isAdmin={isAdmin} wide>
       <HubView
         firstName={firstName}
-        portals={portals.map((p) => ({ ...p, badge: counts[p.key] }))}
-        usersBadge={isAdmin ? (counts.users ?? null) : undefined}
+        portals={portals.map((p) => ({ ...p, badge: counts[p.key] ? `${counts[p.key]!.n} ${counts[p.key]!.detail}` : undefined }))}
+        needs={counts}
+        usersBadge={isAdmin ? (counts.users ? `${counts.users.n} ${counts.users.detail}` : null) : undefined}
         denied={!!denied}
         tasks={day?.tasks ?? []}
         followUps={day?.followUps ?? []}
-        waUnread={day?.unread ?? 0}
         today={todayISO()}
       />
     </AdminShell>

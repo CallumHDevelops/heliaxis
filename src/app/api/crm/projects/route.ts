@@ -33,6 +33,18 @@ export async function GET() {
       ? db.from('profiles').select('id, full_name, email').in('id', ownerIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string | null }[] }),
   ]);
+  // The soonest open task on each opportunity (shown when it has no next step).
+  const projectIds = (projects ?? []).map((p) => p.id);
+  const nextTask = new Map<string, { title: string; due_date: string | null }>();
+  if (projectIds.length) {
+    const { data: open } = await db
+      .from('tasks')
+      .select('crm_project_id, title, due_date')
+      .in('crm_project_id', projectIds)
+      .neq('status', 'done')
+      .order('due_date', { ascending: true, nullsFirst: false });
+    for (const t of open ?? []) if (t.crm_project_id && !nextTask.has(t.crm_project_id)) nextTask.set(t.crm_project_id, t);
+  }
   const cust = new Map((customers ?? []).map((c) => [c.id, c]));
   const own = new Map((owners ?? []).map((o) => [o.id, o.full_name || o.email || '']));
   const withProject = new Set(enquiryIds);
@@ -44,6 +56,7 @@ export async function GET() {
       phone: cust.get(p.enquiry_id)?.phone ?? null,
       wa_unread: cust.get(p.enquiry_id)?.wa_unread ?? 0,
       owner: p.owner_id ? own.get(p.owner_id) ?? '' : '',
+      next_task: nextTask.get(p.id) ?? null,
     })),
     // Leads not yet turned into a project (excluding lost ones).
     unassigned: (recent ?? []).filter((e) => !withProject.has(e.id) && e.status !== 'lost').slice(0, 30),
@@ -112,7 +125,7 @@ export async function POST(req: Request) {
     })
     .select('id')
     .single();
-  if (error || !project) return json({ error: error?.message || 'Could not create the project' }, 500);
-  await logActivity({ enquiryId, projectId: project.id, kind: 'system', body: 'Project created', byId: s.user.id });
+  if (error || !project) return json({ error: error?.message || 'Could not create the opportunity' }, 500);
+  await logActivity({ enquiryId, projectId: project.id, kind: 'system', body: 'Opportunity created', byId: s.user.id });
   return json({ id: project.id });
 }

@@ -14,6 +14,7 @@ import {
   type SmartRule,
 } from './shared';
 import { isQuiet, nextAwake, planChase } from './schedule';
+import { ensureOpportunity } from '@/lib/crm/server';
 import { getSettings } from './settings';
 
 /**
@@ -154,6 +155,7 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   if (dup) return; // Meta retries webhooks
 
   const { enquiry, created } = await enquiryForNumber(db, m.from, profileName, m.referral ?? null);
+  if (created) await ensureOpportunity(enquiry.id, m.referral ? 'WhatsApp ad' : 'WhatsApp');
   const { kind, body } = describe(m);
   const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
 

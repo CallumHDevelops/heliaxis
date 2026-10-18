@@ -46,7 +46,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   const thread = [...linked].sort((a, b) => (b.wa_last_message_at || '').localeCompare(a.wa_last_message_at || ''))[0];
   const lastInbound = linked.map((l) => l.wa_last_inbound_at).filter(Boolean).sort().pop() ?? null;
 
-  const [{ data: acts }, { data: wa }, { data: photos }, { data: people }, { data: others }] = await Promise.all([
+  const [{ data: acts }, { data: wa }, { data: photos }, { data: people }, { data: others }, { data: tasks }] = await Promise.all([
     db.from('crm_activities').select('id, project_id, kind, body, meta, by_id, at').eq('enquiry_id', project.enquiry_id).order('at', { ascending: false }).limit(300),
     // WhatsApp is optional (tables may not exist yet).
     linkedIds.length
@@ -55,6 +55,13 @@ export async function GET(_req: Request, { params }: Ctx) {
     db.from('crm_photos').select('id, category, storage_path, caption, width, height, taken_at, created_at, uploaded_by').eq('project_id', id).order('created_at', { ascending: false }),
     db.from('profiles').select('*').eq('status', 'approved'),
     db.from('crm_projects').select('id, title, stage').eq('enquiry_id', project.enquiry_id).neq('id', id),
+    db
+      .from('tasks')
+      .select('id, title, due_date, priority, status, assignee_id, assignee_name, completed_at')
+      .eq('crm_project_id', id)
+      .order('status')
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(100),
   ]);
 
   const team = (people ?? []).filter((p) => canAccess(p, 'crm')).map((p) => ({ id: p.id as string, name: (p.full_name || p.email || 'Team') as string }));
@@ -122,6 +129,7 @@ export async function GET(_req: Request, { params }: Ctx) {
       by: p.uploaded_by ? nameOf.get(p.uploaded_by) ?? '' : '',
     })),
     team,
+    tasks: (tasks ?? []).map((t) => ({ ...t, assignee: t.assignee_id ? nameOf.get(t.assignee_id) ?? '' : t.assignee_name || '' })),
     others: others ?? [],
   });
 }

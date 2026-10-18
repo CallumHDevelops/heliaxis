@@ -39,6 +39,15 @@ function Icon({ k }: { k: keyof typeof ICONS }) {
 
 export type HubPortal = Portal & { badge?: string };
 
+function WaIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.5-4.3A8.5 8.5 0 1 1 20.5 11.6z" />
+      <path d="M9 9.5c.3 1.8 1.7 3.6 3.6 4.4l1.2-1 1.7.8-.4 1.3c-2.9.3-6.4-2.8-6.6-5.8l1.3-.4.8 1.7z" />
+    </svg>
+  );
+}
+
 function Card({
   href,
   icon,
@@ -89,7 +98,7 @@ export function HubView({
   denied,
   tasks = [],
   followUps = [],
-  waUnread = 0,
+  needs = {},
   today: todayIso = '',
 }: {
   firstName: string;
@@ -99,22 +108,22 @@ export function HubView({
   denied: boolean;
   tasks?: HubTask[];
   followUps?: HubFollowUp[];
-  waUnread?: number;
+  needs?: Partial<Record<string, { n: number; detail: string }>>;
   today?: string;
 }) {
   const isAdmin = usersBadge !== undefined;
   const internal = portals.filter((p) => !p.external);
   const apps = portals.filter((p) => p.external);
-  // One even row per thing that needs someone: icon, what, how many.
-  const attention: { href: string; icon: keyof typeof ICONS | 'whatsapp'; label: string; detail: string }[] = [
-    ...(waUnread
-      ? [{ href: '/admin/enquiries/inbox', icon: 'whatsapp' as const, label: 'WhatsApp', detail: `${waUnread} unread chat${waUnread === 1 ? '' : 's'}` }]
-      : []),
-    ...portals
-      .filter((p) => p.badge && p.key !== 'crm')
-      .map((p) => ({ href: p.href, icon: p.key, label: p.label, detail: p.badge as string })),
-    ...(usersBadge ? [{ href: '/admin/users', icon: 'users' as const, label: 'Users', detail: usersBadge }] : []),
+  // One even row per area that needs someone: icon, name, a big number.
+  const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' }[] = [
+    { key: 'whatsapp', label: 'WhatsApp', href: '/admin/enquiries/inbox', icon: 'whatsapp' },
+    { key: 'crm', label: 'CRM', href: '/admin/crm', icon: 'crm' },
+    { key: 'tasks', label: 'Tasks', href: '/admin/tasks', icon: 'tasks' },
+    { key: 'enquiries', label: 'Enquiries', href: '/admin/enquiries', icon: 'enquiries' },
+    { key: 'subcontractors', label: 'Subcontractors', href: '/admin/subcontractors', icon: 'subcontractors' },
+    { key: 'users', label: 'Users', href: '/admin/users', icon: 'users' },
   ];
+  const attention = ORDER.filter((o) => needs[o.key]?.n).map((o) => ({ ...o, ...needs[o.key]! }));
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -138,20 +147,20 @@ export function HubView({
       )}
 
       {attention.length > 0 && (
-        <section className="hub-section" aria-label="Needs your attention">
-          <h2 className="hub-h2">Needs you</h2>
-          <ul className="hub-list">
+        <section className="hub-needs" aria-label="Needs your attention">
+          <h2 className="hub-needs-h">Needs you</h2>
+          <ul>
             {attention.map((a) => (
-              <li key={a.href}>
-                <Link href={a.href} className="hub-row">
-                  <span className="hub-row-icon">
-                    {a.icon === 'whatsapp' ? <span aria-hidden="true">💬</span> : <Icon k={a.icon} />}
+              <li key={a.key}>
+                <Link href={a.href} className="hub-need">
+                  <span className="hub-need-icon">
+                    {a.icon === 'whatsapp' ? <WaIcon /> : <Icon k={a.icon} />}
                   </span>
-                  <span className="hub-row-main">
+                  <span className="hub-need-main">
                     <b>{a.label}</b>
                     <small>{a.detail}</small>
                   </span>
-                  <span className="hub-chev" aria-hidden="true">›</span>
+                  <span className="hub-need-n">{a.n}</span>
                 </Link>
               </li>
             ))}

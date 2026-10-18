@@ -43,7 +43,7 @@ export const PORTALS: Portal[] = [
   {
     key: 'crm',
     label: 'CRM',
-    description: 'Customers, projects, the sales pipeline, site photos and every conversation.',
+    description: 'Contacts, opportunities, tasks, site photos and every WhatsApp and email with the customer.',
     href: '/admin/crm',
     paths: ['/admin/crm'],
   },

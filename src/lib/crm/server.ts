@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePortal } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import type { StageKey } from './stages';
+import { guessProducts, type StageKey } from './stages';
 
 /** CRM server helpers: access, the photo bucket, activity logging. */
 
@@ -113,4 +113,34 @@ export async function remindNextSteps() {
     );
   }
   return due.length;
+}
+
+/**
+ * Every enquiry is an opportunity: make one (stage Lead) the moment an enquiry arrives — website,
+ * Meta lead form or a new WhatsApp number. The enquiry row is the contact. Never throws (the CRM
+ * tables may not exist yet), and never makes a second one.
+ */
+export async function ensureOpportunity(enquiryId: string, source: string) {
+  try {
+    const db = createAdminClient();
+    const { data: existing } = await db.from('crm_projects').select('id').eq('enquiry_id', enquiryId).limit(1);
+    if (existing?.length) return existing[0].id as string;
+    const { data: e } = await db.from('enquiries').select('name, postcode, interest').eq('id', enquiryId).maybeSingle();
+    if (!e) return null;
+    const { data: row } = await db
+      .from('crm_projects')
+      .insert({
+        enquiry_id: enquiryId,
+        title: `${e.name}${e.postcode ? ` · ${e.postcode}` : ''}`,
+        stage: 'lead',
+        postcode: e.postcode,
+        products: guessProducts(e.interest),
+      })
+      .select('id')
+      .single();
+    if (row) await logActivity({ enquiryId, projectId: row.id, kind: 'system', body: `New enquiry via ${source}` });
+    return (row?.id as string) ?? null;
+  } catch {
+    return null;
+  }
 }

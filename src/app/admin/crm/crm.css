@@ -1159,3 +1159,87 @@ textarea.crm-input {
     font-size: 1.3rem;
   }
 }
+
+/* Tasks on an opportunity */
+.crm-tasks {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  margin: 0 0 0.8rem;
+}
+.crm-tasks-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.crm-tasks-head .crm-link {
+  margin: 0;
+  text-decoration: none;
+}
+.crm-tasks ul {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+.crm-tasks li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+}
+.crm-tasks li.done .crm-task-main b {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.crm-tick {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(33, 31, 24, 0.35);
+  background: #fff;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0;
+}
+.crm-tasks li.done .crm-tick {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.crm-task-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.crm-task-main b {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.crm-task-main small {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.crm-task-due {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.crm-task-due.today {
+  color: var(--amber-2);
+}
+.crm-task-due.late {
+  color: var(--err);
+}
+.crm-tasks-done {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  text-decoration: none;
+  color: var(--muted);
+}

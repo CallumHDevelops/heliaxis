@@ -322,3 +322,81 @@ a.hub-row:hover {
     background: #f8bc1e;
   }
 }
+
+/* Needs you: dark card, gold icons, big counts. */
+.hub-needs {
+  background: #211f18;
+  color: #fffdf8;
+  border-radius: 12px;
+  padding: 0.9rem 0.9rem 0.4rem;
+  margin: 0 0 1.75rem;
+}
+.hub-needs-h {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f8bc1e;
+  margin: 0 0 0.4rem 0.1rem;
+}
+.hub-needs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  column-gap: 1rem;
+}
+.hub-needs li {
+  border-bottom: 1px solid rgba(255, 253, 248, 0.1);
+}
+.hub-need {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.hub-need-icon {
+  flex: 0 0 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(248, 188, 30, 0.14);
+  color: #f8bc1e;
+  display: grid;
+  place-items: center;
+}
+.hub-need-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.hub-need-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hub-need-main b {
+  font-size: 0.95rem;
+}
+.hub-need-main small {
+  font-size: 0.75rem;
+  color: rgba(255, 253, 248, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-need-n {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #f8bc1e;
+  min-width: 2ch;
+  text-align: right;
+}
+.hub-need:hover .hub-need-n {
+  color: #fffdf8;
+}
+.hub-needs li:last-child {
+  border-bottom: 0;
+}

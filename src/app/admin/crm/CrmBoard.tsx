@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { relativeTime } from '@/lib/enquiries';
-import { money, PRODUCTS, productLabel, STAGES, stageLabel } from '@/lib/crm/stages';
+import { guessProducts, money, PRODUCTS, productLabel, STAGES, stageLabel } from '@/lib/crm/stages';
 import './crm.css';
 
 type Project = {
@@ -24,6 +24,7 @@ type Project = {
   install_at: string | null;
   next_step: string | null;
   next_step_at: string | null;
+  next_task: { title: string; due_date: string | null } | null;
   updated_at: string;
 };
 type Lead = { id: string; name: string; phone: string | null; postcode: string | null; interest: string | null; source: string; created_at: string };
@@ -58,12 +59,12 @@ export function CrmBoard({ me }: { me: string }) {
     try {
       const r = await fetch('/api/crm/projects', { cache: 'no-store' });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Could not load projects');
+      if (!r.ok) throw new Error(d.error || 'Could not load opportunities');
       setProjects(d.projects);
       setLeads(d.unassigned);
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load projects');
+      setError(e instanceof Error ? e.message : 'Could not load opportunities');
       setProjects((p) => p ?? []);
     }
   }, []);
@@ -89,7 +90,7 @@ export function CrmBoard({ me }: { me: string }) {
   const today = {
     due: live.filter(isDue).length,
     unread: live.filter((p) => p.wa_unread > 0).length,
-    nostep: live.filter((p) => !p.next_step).length,
+    nostep: live.filter((p) => !p.next_step && !p.next_task).length,
   };
   const pipelineValue = live
     .filter((p) => ['lead', 'contacted', 'survey_booked', 'surveyed', 'quote_sent'].includes(p.stage))
@@ -106,7 +107,7 @@ export function CrmBoard({ me }: { me: string }) {
       case 'unread':
         return LIVE(p) && p.wa_unread > 0;
       case 'nostep':
-        return LIVE(p) && !p.next_step;
+        return LIVE(p) && !p.next_step && !p.next_task;
       case 'mine':
         return LIVE(p) && p.owner_id === me;
       default:
@@ -132,7 +133,7 @@ export function CrmBoard({ me }: { me: string }) {
     const d = await r.json().catch(() => ({}));
     setBusy(null);
     if (r.ok) router.push(`/admin/crm/${d.id}`);
-    else setError(d.error || 'Could not create the project');
+    else setError(d.error || 'Could not create the opportunity');
   }
 
   async function moveTo(id: string, stage: string) {
@@ -145,7 +146,7 @@ export function CrmBoard({ me }: { me: string }) {
       body: JSON.stringify({ stage }),
     });
     if (!r.ok) {
-      setError('Couldn’t move that project — try again.');
+      setError('Couldn’t move that opportunity — try again.');
       load();
     }
   }
@@ -163,7 +164,7 @@ export function CrmBoard({ me }: { me: string }) {
         <div>
           <h1>CRM</h1>
           <p>
-            {live.length} live project{live.length === 1 ? '' : 's'} · {money(pipelineValue) || '£0'} in sales
+            {live.length} open opportunit{live.length === 1 ? 'y' : 'ies'} · {money(pipelineValue) || '£0'} in sales
           </p>
         </div>
         <div className="crm-head-actions">
@@ -201,7 +202,7 @@ export function CrmBoard({ me }: { me: string }) {
 
       {leads.length > 0 && (
         <section className="crm-leads" id="crm-leads">
-          <h2>New enquiries — start a project</h2>
+          <h2>Enquiries without an opportunity</h2>
           <div className="crm-leads-row">
             {leads.slice(0, 12).map((l) => (
               <div key={l.id} className="crm-lead">
@@ -210,7 +211,7 @@ export function CrmBoard({ me }: { me: string }) {
                   {[l.postcode, l.source].filter(Boolean).join(' · ')} · {relativeTime(l.created_at)}
                 </span>
                 <button type="button" className="crm-btn crm-btn--small" disabled={busy === l.id} onClick={() => fromLead(l)}>
-                  {busy === l.id ? '…' : 'Start project'}
+                  {busy === l.id ? '…' : 'Create opportunity'}
                 </button>
               </div>
             ))}
@@ -234,8 +235,8 @@ export function CrmBoard({ me }: { me: string }) {
         <p className="crm-muted">Loading…</p>
       ) : all.length === 0 ? (
         <div className="crm-emptystate">
-          <b>No projects yet</b>
-          <p>Start one from a new enquiry above, or tap “+ New” for a customer who rang you. (If this shows an error, run supabase/crm.sql first.)</p>
+          <b>No opportunities yet</b>
+          <p>Every new enquiry (website, Meta or WhatsApp) becomes one automatically. Use “+ New” for anyone else. (If this shows an error, run supabase/crm.sql first.)</p>
         </div>
       ) : view === 'board' ? (
         <div className="crm-board">
@@ -295,6 +296,17 @@ export function CrmBoard({ me }: { me: string }) {
 
 function NextStepLine({ p }: { p: Project }) {
   if (!LIVE(p)) return null;
+  if (!p.next_step && p.next_task) {
+    const late = p.next_task.due_date && p.next_task.due_date < new Date().toLocaleDateString('en-CA');
+    return (
+      <span className={`crm-next${late ? ' late' : ''}`}>
+        ✅ {p.next_task.title}
+        {p.next_task.due_date
+          ? ` · ${new Date(`${p.next_task.due_date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+          : ''}
+      </span>
+    );
+  }
   if (!p.next_step) return <span className="crm-next none">No next step</span>;
   const tone = isOverdue(p) ? 'late' : isDue(p) ? 'today' : '';
   return (
@@ -357,17 +369,6 @@ function initials(name: string) {
 }
 
 
-function guessProducts(interest: string | null) {
-  const s = (interest || '').toLowerCase();
-  const out: string[] = [];
-  if (/solar|pv/.test(s)) out.push('solar');
-  if (/batter/.test(s)) out.push('battery');
-  if (/heat ?pump|ashp|air source/.test(s)) out.push('heatpump');
-  if (/infrared/.test(s)) out.push('infrared');
-  if (/\bev\b|charger/.test(s)) out.push('ev');
-  if (/\bled\b|lighting/.test(s)) out.push('led');
-  return out;
-}
 
 function NewProject({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
   const [f, setF] = useState({ name: '', phone: '', email: '', postcode: '', title: '', value: '', products: [] as string[] });
@@ -390,8 +391,8 @@ function NewProject({ onClose, onCreated }: { onClose: () => void; onCreated: (i
   return (
     <div className="crm-sheet" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="crm-sheet-box" onClick={(e) => e.stopPropagation()}>
-        <h2>New project</h2>
-        <p className="crm-muted">For a new customer (e.g. a phone call). For a web or Meta lead, use “Start project” on their enquiry.</p>
+        <h2>New opportunity</h2>
+        <p className="crm-muted">For someone who didn’t come in as an enquiry. Website, Meta and WhatsApp enquiries become opportunities automatically.</p>
         <label className="crm-label">Customer name</label>
         <input className="crm-input" value={f.name} onChange={set('name')} autoFocus />
         <div className="crm-grid2">
@@ -423,7 +424,7 @@ function NewProject({ onClose, onCreated }: { onClose: () => void; onCreated: (i
         </div>
         <div className="crm-grid2">
           <div>
-            <label className="crm-label">Project name (optional)</label>
+            <label className="crm-label">Opportunity name (optional)</label>
             <input className="crm-input" value={f.title} onChange={set('title')} placeholder="e.g. 6kW solar + battery" />
           </div>
           <div>
@@ -434,7 +435,7 @@ function NewProject({ onClose, onCreated }: { onClose: () => void; onCreated: (i
         {err && <p className="crm-banner crm-banner--err">{err}</p>}
         <div className="crm-actions">
           <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !f.name.trim()} onClick={save}>
-            {busy ? 'Creating…' : 'Create project'}
+            {busy ? 'Creating…' : 'Create opportunity'}
           </button>
           <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>
             Cancel

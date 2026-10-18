@@ -47,6 +47,15 @@ type Customer = {
   wa_unread: number;
 };
 type Entry = { id: string; kind: string; body: string | null; meta: Record<string, unknown> | null; by: string | null; at: string };
+type CrmTask = {
+  id: string;
+  title: string;
+  due_date: string | null;
+  priority: string;
+  status: string;
+  assignee_id: string | null;
+  assignee: string;
+};
 type Photo = { id: string; category: string; caption: string | null; url: string | null; thumb: string | null; by: string; created_at: string };
 
 const ICON: Record<string, string> = {
@@ -84,7 +93,7 @@ type WaInfo = {
   messages: number;
   chaseHours: number;
 };
-type Sheet = null | 'menu' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage';
+type Sheet = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage';
 
 /** Wide screens show details beside the activity (HubSpot-style); phones use a tab. */
 function useWide() {
@@ -106,6 +115,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
   const [timeline, setTimeline] = useState<Entry[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [team, setTeam] = useState<{ id: string; name: string }[]>([]);
+  const [tasks, setTasks] = useState<CrmTask[]>([]);
   const [wa, setWa] = useState<WaInfo | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'activity' | 'photos' | 'details'>('activity');
@@ -122,6 +132,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
       setTimeline(d.timeline);
       setPhotos(d.photos);
       setTeam(d.team);
+      setTasks(d.tasks ?? []);
       setWa(d.whatsapp);
       setError('');
     } catch (e) {
@@ -168,7 +179,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
     return (
       <div className="crm">
         <Link href="/admin/crm" className="crm-back">
-          ← Projects
+          ← Opportunities
         </Link>
         <p className={error ? 'crm-banner crm-banner--err' : 'crm-muted'}>{error || 'Loading…'}</p>
       </div>
@@ -184,7 +195,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
   return (
     <div className="crm crm-project">
       <div className="crm-phead">
-        <Link href="/admin/crm" className="crm-back" aria-label="Back to projects">
+        <Link href="/admin/crm" className="crm-back" aria-label="Back to opportunities">
           ←
         </Link>
         <div className="crm-phead-main">
@@ -204,6 +215,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
         onEdit={() => setSheet('next')}
         onDone={() => patch({ complete_next_step: true } as unknown as Partial<Project>)}
       />
+      <TaskList tasks={tasks} onAdd={() => setSheet('task')} onChanged={load} />
 
       <div className={wide ? 'crm-split' : ''}>
       <div className="crm-split-main">
@@ -238,7 +250,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
           onCustomerSaved={load}
           isAdmin={isAdmin}
           onDelete={async () => {
-            if (!confirm('Delete this project, its timeline entries and photos? This can’t be undone.')) return;
+            if (!confirm('Delete this opportunity, its timeline entries, tasks and photos? This can’t be undone.')) return;
             const r = await fetch(`/api/crm/projects/${id}`, { method: 'DELETE' });
             if (r.ok) router.push('/admin/crm');
             else setError((await r.json().catch(() => ({}))).error || 'Not deleted');
@@ -258,6 +270,17 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
         <div className="crm-sheet" role="dialog" aria-modal="true" onClick={() => setSheet(null)}>
           <div className="crm-sheet-box" onClick={(e) => e.stopPropagation()}>
             {sheet === 'menu' && <ActionMenu customer={customer} wa={wa} onPick={setSheet} />}
+            {sheet === 'task' && (
+              <TaskEditor
+                id={id}
+                team={team}
+                defaultAssignee={project.owner_id}
+                onSaved={async () => {
+                  setSheet(null);
+                  await load();
+                }}
+              />
+            )}
             {sheet === 'next' && (
               <NextStepEditor
                 project={project}
@@ -366,15 +389,17 @@ function Feed({ entries, customerName }: { entries: Entry[]; customerName: strin
 }
 
 function ActionMenu({ customer, wa, onPick }: { customer: Customer; wa: WaInfo | null; onPick: (s: Sheet) => void }) {
+  // Online first: the team messages customers rather than ringing them.
   const items: [Sheet, string, string, string?][] = [
-    ['next', '⏰', 'Next step', 'Follow-up + reminder'],
     ['whatsapp', '💬', 'WhatsApp', !wa?.number ? 'Add their mobile first' : wa.windowOpen ? 'Reply' : 'Template (paid)'],
-    ['note', '📝', 'Note'],
-    ['call', '📞', 'Call', customer.phone ? undefined : 'No number'],
     ['email', '✉️', 'Email', customer.email ? undefined : 'No email'],
-    ['visit', '🏠', 'Site visit'],
+    ['task', '✅', 'Task', 'Assign + due date'],
+    ['note', '📝', 'Note'],
+    ['next', '⏰', 'Next step', 'Follow-up reminder'],
     ['photo', '📷', 'Photos'],
+    ['visit', '🏠', 'Site visit'],
     ['stage', '➜', 'Move stage'],
+    ['call', '📞', 'Log a call'],
   ];
   return (
     <div>
@@ -624,6 +649,150 @@ function PhotoQuick({ id, onDone }: { id: string; onDone: () => Promise<void> })
       </div>
       <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFiles(e.target.files)} />
       <input ref={pick} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
+    </div>
+  );
+}
+
+function TaskList({ tasks, onAdd, onChanged }: { tasks: CrmTask[]; onAdd: () => void; onChanged: () => Promise<void> }) {
+  const [showDone, setShowDone] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const today = new Date().toLocaleDateString('en-CA');
+  const open = tasks.filter((t) => t.status !== 'done');
+  const done = tasks.filter((t) => t.status === 'done');
+  async function toggle(t: CrmTask) {
+    setBusy(t.id);
+    await fetch(`/api/crm/tasks/${t.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: t.status === 'done' ? 'todo' : 'done' }),
+    }).catch(() => null);
+    setBusy(null);
+    await onChanged();
+  }
+  const row = (t: CrmTask) => {
+    const late = t.status !== 'done' && t.due_date && t.due_date < today;
+    const isToday = t.due_date === today;
+    return (
+      <li key={t.id} className={t.status === 'done' ? 'done' : ''}>
+        <button type="button" className="crm-tick" disabled={busy === t.id} aria-label={t.status === 'done' ? 'Reopen' : 'Mark done'} onClick={() => toggle(t)}>
+          {t.status === 'done' ? '✓' : ''}
+        </button>
+        <span className="crm-task-main">
+          <b>{t.title}</b>
+          <small>
+            {[t.assignee, t.priority === 'high' ? 'High priority' : ''].filter(Boolean).join(' · ')}
+          </small>
+        </span>
+        {t.due_date && (
+          <span className={`crm-task-due${late ? ' late' : isToday ? ' today' : ''}`}>
+            {isToday
+              ? 'Today'
+              : new Date(`${t.due_date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+          </span>
+        )}
+      </li>
+    );
+  };
+  return (
+    <div className="crm-tasks">
+      <div className="crm-tasks-head">
+        <b>Tasks{open.length ? ` (${open.length})` : ''}</b>
+        <button type="button" className="crm-link" onClick={onAdd}>
+          + Add task
+        </button>
+      </div>
+      {open.length > 0 && <ul>{open.map(row)}</ul>}
+      {done.length > 0 && (
+        <>
+          <button type="button" className="crm-link crm-tasks-done" onClick={() => setShowDone((v) => !v)}>
+            {showDone ? 'Hide' : 'Show'} {done.length} done
+          </button>
+          {showDone && <ul>{done.map(row)}</ul>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TaskEditor({
+  id,
+  team,
+  defaultAssignee,
+  onSaved,
+}: {
+  id: string;
+  team: { id: string; name: string }[];
+  defaultAssignee: string | null;
+  onSaved: () => Promise<void>;
+}) {
+  const [title, setTitle] = useState('');
+  const [due, setDue] = useState('');
+  const [assignee, setAssignee] = useState(defaultAssignee || '');
+  const [high, setHigh] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const iso = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d.toLocaleDateString('en-CA');
+  };
+  async function save() {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/crm/projects/${id}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, due_date: due || null, assignee_id: assignee || null, priority: high ? 'high' : 'normal' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setErr(d.error || 'Not saved');
+    await onSaved();
+  }
+  const ideas = ['Send quote', 'Chase for photos', 'Book survey', 'Check funding eligibility', 'Order kit'];
+  return (
+    <div>
+      <h2>New task</h2>
+      <input className="crm-input" autoFocus placeholder="What needs doing?" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <div className="crm-quickpicks">
+        {ideas.map((i) => (
+          <button key={i} type="button" onClick={() => setTitle(i)}>
+            {i}
+          </button>
+        ))}
+      </div>
+      <div className="crm-grid2">
+        <div>
+          <label className="crm-label">Who</label>
+          <select className="crm-input" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+            <option value="">Unassigned</option>
+            {team.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="crm-label">Due</label>
+          <input className="crm-input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </div>
+      </div>
+      <div className="crm-quickpicks">
+        <button type="button" onClick={() => setDue(iso(0))}>Today</button>
+        <button type="button" onClick={() => setDue(iso(1))}>Tomorrow</button>
+        <button type="button" onClick={() => setDue(iso(7))}>Next week</button>
+        <label className="crm-check" style={{ marginTop: 0 }}>
+          <input type="checkbox" checked={high} onChange={(e) => setHigh(e.target.checked)} /> High priority
+        </label>
+      </div>
+      <p className="crm-muted crm-small">It also shows on the Tasks page, and the person gets a notification.</p>
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      <div className="crm-actions">
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !title.trim()} onClick={save}>
+          {busy ? 'Saving…' : 'Add task'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -919,7 +1088,7 @@ function CustomerEditor({ customer, wa, onSaved }: { customer: Customer; wa: WaI
   }
   return (
     <div className="crm-customer">
-      <h3>Customer</h3>
+      <h3>Contact</h3>
       <label className="crm-label">Name</label>
       <input className="crm-input" value={c.name} onChange={set('name')} />
       <div className="crm-grid2">
@@ -947,7 +1116,7 @@ function CustomerEditor({ customer, wa, onSaved }: { customer: Customer; wa: WaI
       {dirty && (
         <div className="crm-actions">
           <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={save}>
-            {busy ? 'Saving…' : 'Save customer'}
+            {busy ? 'Saving…' : 'Save contact'}
           </button>
           <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setC(init)}>
             Undo
@@ -1020,8 +1189,8 @@ function Details({
     <div className="crm-details">
       <CustomerEditor key={`${customer.id}-${customer.phone}-${customer.name}`} customer={customer} wa={wa} onSaved={onCustomerSaved} />
 
-      <h3 className="crm-h3">Project</h3>
-      <label className="crm-label">Project name</label>
+      <h3 className="crm-h3">Opportunity</h3>
+      <label className="crm-label">Opportunity name</label>
       <input className="crm-input" value={f.title} onChange={set('title')} />
 
       <label className="crm-label">Products</label>
@@ -1122,7 +1291,7 @@ function Details({
 
       {isAdmin && (
         <button type="button" className="crm-link crm-danger" onClick={onDelete}>
-          Delete project
+          Delete opportunity
         </button>
       )}
       <p className="crm-muted crm-small">Created {when(project.created_at)} · stage {stageLabel(project.stage)}</p>

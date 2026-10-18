@@ -58,3 +58,16 @@ export function money(v: number | null | undefined) {
   if (v == null || !Number.isFinite(Number(v))) return '';
   return Number(v).toLocaleString('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 });
 }
+
+/** Products from an enquiry's free-text interest ("Solar PV Installation, Battery Storage"). */
+export function guessProducts(interest: string | null | undefined): string[] {
+  const s = (interest || '').toLowerCase();
+  const out: string[] = [];
+  if (/solar|\bpv\b/.test(s)) out.push('solar');
+  if (/batter/.test(s)) out.push('battery');
+  if (/heat ?pump|ashp|air source/.test(s)) out.push('heatpump');
+  if (/infrared/.test(s)) out.push('infrared');
+  if (/\bev\b|charger/.test(s)) out.push('ev');
+  if (/\bled\b|lighting/.test(s)) out.push('led');
+  return out;
+}
