@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   addDaysISO,
   PRIORITY_LABEL,
@@ -94,6 +94,7 @@ function TaskForm({
   submitLabel,
   onSubmit,
   onCancel,
+  onDelete,
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
@@ -102,6 +103,7 @@ function TaskForm({
   submitLabel: string;
   onSubmit: () => void;
   onCancel?: () => void;
+  onDelete?: () => void;
 }) {
   const today = todayISO();
   const quick: [string, string][] = [
@@ -125,7 +127,7 @@ function TaskForm({
         placeholder="What needs doing?"
         value={draft.title}
         onChange={(e) => set({ title: e.target.value })}
-        autoFocus
+        autoFocus={!draft.title}
         required
       />
       <textarea
@@ -188,6 +190,11 @@ function TaskForm({
         </label>
       </div>
       <div className="tk-form-actions">
+        {onDelete && (
+          <button type="button" className="tk-link tk-link--danger tk-form-delete" onClick={onDelete}>
+            Delete
+          </button>
+        )}
         {onCancel && (
           <button type="button" className="tk-btn" onClick={onCancel}>
             Cancel
@@ -198,6 +205,33 @@ function TaskForm({
         </button>
       </div>
     </form>
+  );
+}
+
+/** The task form in a pop-up card (a sheet from the bottom on phones). Esc or the backdrop closes it. */
+function TaskModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+  return (
+    <div className="tk-modal" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="tk-modal-card" role="dialog" aria-modal="true" aria-label={title}>
+        <header className="tk-modal-head">
+          <h2>{title}</h2>
+          <button type="button" className="tk-modal-x" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </header>
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -383,6 +417,9 @@ export function TasksBoard({
     mutate({ kind: 'update', id, patch: withDerived(patch) });
   }
 
+  const editingTask = editing ? tasks.find((t) => t.id === editing) ?? null : null;
+  const closeEdit = useCallback(() => setEditing(null), []);
+
   function saveEdit(id: string) {
     const p = payloadFrom(editDraft);
     update(id, {
@@ -473,7 +510,13 @@ export function TasksBoard({
       )}
 
       {adding && (
-        <div className="tk-panel tk-new">
+        <TaskModal
+          title="New task"
+          onClose={() => {
+            setAdding(false);
+            setDraft(EMPTY);
+          }}
+        >
           <TaskForm
             draft={draft}
             setDraft={setDraft}
@@ -486,7 +529,25 @@ export function TasksBoard({
               setDraft(EMPTY);
             }}
           />
-        </div>
+        </TaskModal>
+      )}
+
+      {editingTask && (
+        <TaskModal title="Edit task" onClose={closeEdit}>
+          <TaskForm
+            draft={editDraft}
+            setDraft={setEditDraft}
+            people={people}
+            meId={meId}
+            submitLabel="Save changes"
+            onSubmit={() => saveEdit(editingTask.id)}
+            onCancel={closeEdit}
+            onDelete={() => {
+              closeEdit();
+              remove(editingTask);
+            }}
+          />
+        </TaskModal>
       )}
 
       <div className="tk-toolbar">
@@ -537,23 +598,8 @@ export function TasksBoard({
           {visible.map((t) => {
             const due = dueInfo(t, today);
             const name = nameOf(t);
-            if (editing === t.id) {
-              return (
-                <li key={t.id} className="tk-item is-editing">
-                  <TaskForm
-                    draft={editDraft}
-                    setDraft={setEditDraft}
-                    people={people}
-                    meId={meId}
-                    submitLabel="Save"
-                    onSubmit={() => saveEdit(t.id)}
-                    onCancel={() => setEditing(null)}
-                  />
-                </li>
-              );
-            }
             return (
-              <li key={t.id} id={`task-${t.id}`} className={`tk-item${t.status === 'done' ? ' is-done' : ''}`}>
+              <li key={t.id} id={`task-${t.id}`} className={`tk-item${t.status === 'done' ? ' is-done' : ''}${editing === t.id ? ' is-editing' : ''}`}>
                 <button
                   type="button"
                   className="tk-check"
