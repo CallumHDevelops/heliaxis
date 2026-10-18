@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchLead } from './api';
 import { inboxHref, notifyEnquiryTeam, queueFirstContact } from './inbox';
-import { mapLeadFields } from './leads';
+import { leadToEnquiry } from './leads';
 import { toWaId } from './shared';
 import { ensureOpportunity } from '@/lib/crm/server';
 
@@ -22,12 +22,11 @@ export async function ingestLead(leadgenId: string) {
     );
     return;
   }
-  const lead = mapLeadFields(r.data.field_data ?? []);
-  const optIn = lead.whatsappOptIn || process.env.META_LEADS_WHATSAPP_OPT_IN === 'true';
-  const interest =
-    [lead.interest, lead.organization ? `Org: ${lead.organization}` : '', lead.message ? `Message: ${lead.message}` : '']
-      .filter(Boolean)
-      .join(' · ') || null;
+  const { lead, interest, source, whatsappOptIn: optIn } = leadToEnquiry(
+    r.data.field_data ?? [],
+    r.data.ad_name,
+    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true'
+  );
 
   const { data: row, error } = await db
     .from('enquiries')
@@ -37,7 +36,7 @@ export async function ingestLead(leadgenId: string) {
       phone: lead.phone || null,
       postcode: lead.postcode || null,
       interest,
-      source: r.data.ad_name ? `meta: ${r.data.ad_name}` : 'meta-lead-ad',
+      source,
       meta_lead_id: leadgenId,
       wa_id: toWaId(lead.phone),
       whatsapp_opt_in: optIn,
