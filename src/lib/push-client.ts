@@ -60,40 +60,87 @@ export async function enablePush(): Promise<PushState> {
 // --- Android app: native notifications -------------------------------------------------------
 
 const NATIVE_KEY = 'hx.native';
-const NATIVE_SYNCED = 'hx.native.synced';
-/** Chrome sets this referrer when the Heliaxis app opens a page (Trusted Web Activity). */
-const APP_REFERRER = 'android-app://uk.co.heliaxis.app';
-/** Fragment keys the app adds: its Firebase token, whether Android lets it notify, and the notification tapped. */
+/** Set in the app's own tab (sessionStorage), so Chrome on the same phone keeps normal Web Push. */
+const NATIVE_TAB = 'hx.native.tab';
+/** Chrome's referrer when the Heliaxis app opens a page (Trusted Web Activity). */
+const APP_REFERRER = /^android-app:\/\/uk\.co\.heliaxis\.app(\/|$)/;
+/** Fragment keys the app adds: its Firebase token, whether Android lets it notify, the notification tapped. */
 const FRAGMENT_KEYS = ['hx-fcm', 'hx-np', 'hx-n'];
+const TOKEN = /^[\w:.-]{20,4096}$/;
 
-type Native = { token: string; enabled: boolean };
+/** `live`: the server confirmed it can send to this token (Firebase is set up in Vercel). */
+type Native = { token: string; enabled: boolean; live: boolean };
 
-export function readNative(): Native | null {
+function readStored(): Native | null {
   try {
     const n = JSON.parse(localStorage.getItem(NATIVE_KEY) || 'null');
-    return n && typeof n.token === 'string' ? { token: n.token, enabled: n.enabled !== false } : null;
+    return n && typeof n.token === 'string' ? { token: n.token, enabled: n.enabled !== false, live: n.live === true } : null;
   } catch {
     return null;
   }
 }
 
+function store(n: Native) {
+  try {
+    localStorage.setItem(NATIVE_KEY, JSON.stringify(n));
+  } catch {
+    /* ignore */
+  }
+}
+
+function inAppTab() {
+  try {
+    return sessionStorage.getItem(NATIVE_TAB) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Native notifications are in charge on this page: inside the app, and the server can send them. */
+export function readNative(): Native | null {
+  const n = readStored();
+  return n?.live && inAppTab() ? n : null;
+}
+
 /**
- * Runs on every admin page load. The Android app opens pages with
- * #hx-fcm=<token>&hx-np=<1|0>[&hx-n=<notification id>]; we take those off the address, mark a
- * tapped notification read, and register the token for whoever is signed in. Only accepted
- * when the app itself opened the page, so a crafted link can't route someone's notifications
- * to another device. The phone's web push is then switched off so nothing arrives twice.
+ * Takes the app's #hx-fcm=<token>&hx-np=<1|0>[&hx-n=<id>] off the address and keeps the token.
+ * Accepted only when the app itself opened the page, so a crafted link can't route someone's
+ * notifications to another device. Also runs on /login, so a first launch while signed out still
+ * hands the token over. Returns the id of the notification that was tapped, if any.
+ */
+export function captureNativeFromUrl(): string | null {
+  const parts = location.hash.replace(/^#/, '').split('&').filter(Boolean);
+  const isOurs = (p: string) => FRAGMENT_KEYS.includes(decodeURIComponent(p.split('=')[0]));
+  const ours = new URLSearchParams(parts.filter(isOurs).join('&'));
+  if (!parts.some(isOurs)) return null;
+  const rest = parts.filter((p) => !isOurs(p)).join('&');
+  // null state: Next.js then syncs its router to the new URL (passing history.state would not).
+  history.replaceState(null, '', `${location.pathname}${location.search}${rest ? `#${rest}` : ''}`);
+
+  // Exactly one token (the app strips any it didn't add itself).
+  const tokens = ours.getAll('hx-fcm');
+  const token = tokens.length === 1 ? tokens[0] : null;
+  if (token && TOKEN.test(token) && APP_REFERRER.test(document.referrer)) {
+    const prev = readStored();
+    store({ token, enabled: ours.get('hx-np') !== '0', live: prev?.token === token && prev.live });
+    try {
+      sessionStorage.setItem(NATIVE_TAB, '1');
+    } catch {
+      /* ignore */
+    }
+  }
+  const tapped = ours.get('hx-n');
+  return tapped && /^[0-9a-f-]{36}$/i.test(tapped) ? tapped : null;
+}
+
+/**
+ * Runs on every admin page load (and when the #fragment changes). Registers the app's token for
+ * whoever is signed in now. Once the server confirms it can send native notifications, this
+ * phone's Web Push is switched off so nothing arrives twice; until then Web Push stays as it is.
  */
 export async function syncNativePush(appVersion: number | null) {
-  const parts = location.hash.replace(/^#/, '').split('&').filter(Boolean);
-  const ours = new URLSearchParams(parts.filter((p) => FRAGMENT_KEYS.includes(p.split('=')[0])).join('&'));
-  if ([...ours.keys()].length) {
-    const rest = parts.filter((p) => !FRAGMENT_KEYS.includes(p.split('=')[0])).join('&');
-    history.replaceState(history.state, '', `${location.pathname}${location.search}${rest ? `#${rest}` : ''}`);
-  }
-
-  const tapped = ours.get('hx-n');
-  if (tapped && /^[0-9a-f-]{36}$/i.test(tapped)) {
+  const tapped = captureNativeFromUrl();
+  if (tapped) {
     fetch('/api/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,35 +148,19 @@ export async function syncNativePush(appVersion: number | null) {
     }).catch(() => {});
   }
 
-  // Exactly one token, from the app itself (the app also strips any it didn't add).
-  const tokens = ours.getAll('hx-fcm');
-  const token = tokens.length === 1 ? tokens[0] : null;
-  if (token && /^[\w:.-]{20,4096}$/.test(token) && document.referrer.startsWith(APP_REFERRER)) {
-    try {
-      localStorage.setItem(NATIVE_KEY, JSON.stringify({ token, enabled: ours.get('hx-np') !== '0' }));
-    } catch {
-      return;
-    }
-  }
-
-  const native = readNative();
-  if (!native) return;
-  const stamp = `${native.token}|${native.enabled}`;
-  try {
-    if (sessionStorage.getItem(NATIVE_SYNCED) === stamp) return;
-  } catch {
-    /* ignore */
-  }
+  const stored = readStored();
+  if (!stored || !inAppTab()) return;
   const r = await fetch('/api/push/native', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: native.token, enabled: native.enabled, appVersion }),
+    body: JSON.stringify({ token: stored.token, enabled: stored.enabled, appVersion }),
   }).catch(() => null);
   if (!r?.ok) return;
-  try {
-    sessionStorage.setItem(NATIVE_SYNCED, stamp);
-  } catch {
-    /* ignore */
+  const live = (await r.json().catch(() => null))?.native === true;
+  store({ ...stored, live });
+  if (!live) {
+    window.dispatchEvent(new CustomEvent(PUSH_CHANGED, { detail: await getPushState() }));
+    return;
   }
 
   // Web Push on this phone would duplicate every notification.
@@ -147,22 +178,13 @@ export async function syncNativePush(appVersion: number | null) {
   } catch {
     /* ignore */
   }
-  window.dispatchEvent(new CustomEvent(PUSH_CHANGED, { detail: native.enabled ? 'native' : 'native-off' }));
+  window.dispatchEvent(new CustomEvent(PUSH_CHANGED, { detail: stored.enabled ? 'native' : 'native-off' }));
 }
 
-/** On sign-out: this phone stops getting the signed-out person's notifications. */
-export function forgetNativePush() {
-  const native = readNative();
-  if (!native) return;
-  try {
-    sessionStorage.removeItem(NATIVE_SYNCED);
-  } catch {
-    /* ignore */
-  }
-  fetch('/api/push/native', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: native.token }),
-    keepalive: true,
-  }).catch(() => {});
+/**
+ * Signing out: the sign-out form carries this phone's token so the server action removes it for
+ * the person signing out, in the same request (a separate fetch would race the sign-out).
+ */
+export function nativeTokenForSignOut(): string | null {
+  return readStored()?.token ?? null;
 }

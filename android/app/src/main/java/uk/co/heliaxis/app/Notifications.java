@@ -77,12 +77,8 @@ final class Notifications {
                 .setShowWhen(true)
                 .setAutoCancel(true)
                 .setContentIntent(openApp(context, open, tag));
-        try {
-            int unread = Integer.parseInt(value(data, "unread", "0"));
-            if (unread > 0) b.setNumber(unread);
-        } catch (NumberFormatException ignored) {
-            // no count
-        }
+        // No setNumber(): launchers add the numbers up across notifications, so the badge already
+        // counts one per notification showing.
 
         // "Send now" / "Cancel reply" on a queued smart reply: each carries a signed token.
         try {

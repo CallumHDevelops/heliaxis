@@ -1,5 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
+import { fcmConfigured } from '@/lib/fcm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import type { GuideKey, SqlFile } from '@/lib/setup-files';
@@ -261,7 +262,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
-  add(!env('FIREBASE_SERVICE_ACCOUNT'), {
+  add(!fcmConfigured(), {
     id: 'env-firebase',
     title: 'Set up native Android notifications',
     detail:
@@ -272,7 +273,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       'On the project page tap the **Android** icon (“Add app”). Package name: `uk.co.heliaxis.app` (copy below), nickname `Heliaxis app` → **Register app**.',
       'Tap **Download google-services.json** and keep the file: it goes into GitHub in the next to-do. Then **Next** → **Next** → **Continue to console** (skip the rest).',
       'Tap the ⚙ next to **Project overview** → **Project settings** → **Service accounts** tab → **Generate new private key** → **Generate key**. Another .json file downloads.',
-      'Open that second file in Notepad, select all and copy it. This is the Vercel value: it’s a password, so tick **Sensitive**.',
+      'Open that second file in Notepad, select all and copy it (all of it, from `{` to `}`). This is the Vercel value: it’s a password, so tick **Sensitive**. This to-do stays until the pasted file is readable.',
       ...VERCEL_STEPS,
     ],
     copies: [

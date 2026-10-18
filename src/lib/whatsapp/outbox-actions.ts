@@ -2,13 +2,15 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { processOutbox } from './inbox';
 
-/** Cancel a queued reply (smart reply, chaser) that hasn't gone yet. */
+/** Cancel a queued reply (smart reply, chaser) that hasn't gone yet. False when it already went. */
 export async function cancelQueued(id: string) {
-  await createAdminClient()
+  const { data } = await createAdminClient()
     .from('whatsapp_outbox')
     .update({ status: 'cancelled', last_error: 'Cancelled' })
     .eq('id', id)
-    .in('status', ['pending', 'failed']);
+    .in('status', ['pending', 'failed'])
+    .select('id');
+  return !!data?.length;
 }
 
 /** Make a queued reply due now. False when it has already been sent or cancelled. */

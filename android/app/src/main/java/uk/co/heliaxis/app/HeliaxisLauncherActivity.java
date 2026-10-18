@@ -24,7 +24,7 @@ public class HeliaxisLauncherActivity extends LauncherActivity {
     private static final int ASK_NOTIFICATIONS = 1;
     private static final String ASKED = "askedNotifications";
     /** First launch only: how long to wait for a Firebase token before opening anyway. */
-    private static final long TOKEN_WAIT_MS = 2500;
+    private static final long TOKEN_WAIT_MS = 1500;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean preparing;
@@ -81,7 +81,8 @@ public class HeliaxisLauncherActivity extends LauncherActivity {
     }
 
     private void open() {
-        if (launched || isFinishing()) return;
+        // isDestroyed: the token can arrive after a rotation replaced this instance.
+        if (launched || isFinishing() || isDestroyed()) return;
         launched = true;
         handler.removeCallbacksAndMessages(null);
         launchTwa();

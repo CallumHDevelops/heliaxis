@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { forgetNativePush, syncNativePush } from '@/lib/push-client';
+import { nativeTokenForSignOut, syncNativePush } from '@/lib/push-client';
 import { clearTaskStorage } from '@/lib/tasks-offline';
 
 /**
@@ -116,9 +116,18 @@ export function AppRuntime() {
   // Sign-out cleanup.
   useEffect(() => {
     const onSubmit = (e: Event) => {
-      if (!(e.target as HTMLElement)?.closest?.('form[data-signout]')) return;
+      const form = (e.target as HTMLElement)?.closest?.('form[data-signout]');
+      if (!form) return;
       clearTaskStorage();
-      forgetNativePush();
+      // Runs before React reads the form, so signOut() gets the token and unregisters it.
+      const token = nativeTokenForSignOut();
+      if (token && !form.querySelector('input[name="hx-native"]')) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'hx-native';
+        input.value = token;
+        form.appendChild(input);
+      }
       navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR' });
     };
     document.addEventListener('submit', onSubmit, true);

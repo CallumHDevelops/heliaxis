@@ -60,8 +60,12 @@ final class Push {
         }
     }
 
-    /** {@code url} with our keys replaced by this phone's token and notification setting. */
+    /**
+     * {@code url} with our keys replaced by this phone's token and notification setting. Only for
+     * our own site: the launcher is exported, so another app could hand it any address.
+     */
     static Uri withToken(Uri url, @Nullable String token, boolean notificationsOn) {
+        if (!isOurSite(url)) return url;
         StringBuilder fragment = new StringBuilder(withoutAppKeys(url.getEncodedFragment()));
         if (token != null) {
             if (fragment.length() > 0) fragment.append('&');
@@ -77,6 +81,14 @@ final class Push {
         return url.buildUpon()
                 .encodedFragment(existing == null || existing.isEmpty() ? param : existing + "&" + param)
                 .build();
+    }
+
+    static boolean isOurSite(Uri url) {
+        Uri site = Uri.parse(BuildConfig.SITE_ORIGIN);
+        return "https".equalsIgnoreCase(url.getScheme())
+                && site.getHost() != null
+                && site.getHost().equalsIgnoreCase(url.getHost())
+                && url.getPort() == -1;
     }
 
     private static String withoutAppKeys(@Nullable String fragment) {

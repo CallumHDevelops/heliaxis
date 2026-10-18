@@ -143,5 +143,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android/release.json public/app/heliaxis.apk public/app/version.json
           git commit -m "Android app $version"
-          git push
+          # Others may have pushed while this built; put the release on top (a clash on
+          # release.json means another release beat this one, so it stops rather than overwrite).
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
           echo "### Heliaxis $version published to ${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApproved } from '@/lib/auth';
+import { fcmConfigured } from '@/lib/fcm';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,8 @@ export async function POST(req: NextRequest) {
       { onConflict: 'token' }
     );
   if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
-  return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  // native: false = Firebase isn't set up in Vercel yet, so the phone should keep its Web Push.
+  return NextResponse.json({ ok: true, native: fcmConfigured() }, { headers: NO_STORE });
 }
 
 /** Signing out on this phone: stop sending it this person's notifications. */
