@@ -248,6 +248,26 @@ export function PortalCard({
           </a>
         )}
       </div>
+      {url && (
+        <button
+          type="button"
+          className="crm-link"
+          style={{ marginTop: 6 }}
+          onClick={async () => {
+            if (!window.confirm('Make a new link? The current link will stop working, so send them the new one.')) return;
+            const r = await fetch(`/api/crm/projects/${id}/portal`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reset: true }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (d.url) setUrl(d.url);
+            else window.alert(d.error || 'Couldn’t reset the link.');
+          }}
+        >
+          Reset link (if it’s been shared by mistake)
+        </button>
+      )}
     </div>
   );
 }

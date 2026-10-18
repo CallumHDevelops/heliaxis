@@ -409,7 +409,7 @@ function renderBlock(b: LooseBlock): string {
         '<div class="pv-quote is-contact" id="quote"><div class="pv-quote-inner"><form class="pv-formcard pv-cms-form" action="/api/quote" method="post" novalidate>' +
         `<div class="pv-quote-head"><h2>${accentText(p.heading)}</h2><p>${esc(p.sub)}</p></div>${rows}` +
         `<div class="pv-form-msg" hidden></div><div class="pv-form-actions">${cta}</div>` +
-        '<p class="pv-form-note">By submitting this form, you agree to our privacy policy and terms of service.</p></form></div></div>'
+        '<p class="pv-form-note">We’ll use your details to reply to your enquiry. See our <a href="/privacy-policy">privacy policy</a>.</p></form></div></div>'
       );
     }
 
@@ -465,7 +465,10 @@ function renderBlock(b: LooseBlock): string {
     const foot = p.footnote
       ? `<p class="pv-form-re">${QUOTE_SHIELD_SVG}<span>${esc(p.footnote)}</span></p>`
       : '';
-    const legal = p.legalNote ? `<p class="pv-form-note">${esc(p.legalNote)}</p>` : '';
+    // Every enquiry form links the privacy policy; an optional CMS legal note sits above it.
+    const legal =
+      (p.legalNote ? `<p class="pv-form-note">${esc(p.legalNote)}</p>` : '') +
+      '<p class="pv-form-note">We’ll use your details to reply to your enquiry. See our <a href="/privacy-policy">privacy policy</a>.</p>';
     const feb =
       p.eyebrow != null && String(p.eyebrow).trim() !== ''
         ? String(p.eyebrow)

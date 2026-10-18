@@ -34,9 +34,9 @@ export function validSignature(rawBody: string, header: string | null): boolean 
   return got.length === want.length && crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
 }
 
-type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-async function graph<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<GraphResult<T>> {
+export async function graph<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<GraphResult<T>> {
   const token = init.token || process.env.WHATSAPP_TOKEN;
   if (!token) return { ok: false, error: 'WhatsApp is not connected yet (WHATSAPP_TOKEN missing).' };
   try {

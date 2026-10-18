@@ -67,3 +67,32 @@
 .su-var code { font-size: 0.85rem; overflow-wrap: anywhere; }
 .su-var small { color: var(--muted); font-size: 0.78rem; }
 .is-missing .su-var code { color: #b3261e; font-weight: 700; }
+
+/* WhatsApp live check */
+.wa-c { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 0.6rem; }
+.wa-c h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0.3rem 0 0; }
+.wa-c-card { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.7rem 0.8rem; border-radius: 10px; border: 1px solid var(--line); }
+.wa-c-card span { font-size: 0.9rem; }
+.wa-c-card small { color: var(--muted); }
+.wa-c-card.is-ok { background: #eef6ef; border-color: #b9d8bf; }
+.wa-c-card.is-warn { background: #fff7e6; border-color: #f0d4a8; }
+.wa-c-card.is-bad { background: #fdeeec; border-color: #f0b8b3; }
+.wa-c-ok { color: #3f7d4e; font-weight: 600; font-size: 0.9rem; margin: 0; }
+.wa-c-bad { color: #b3261e; font-size: 0.9rem; margin: 0; overflow-wrap: anywhere; }
+.wa-c-fix { background: #faf6ec; border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem 0.8rem; display: flex; flex-direction: column; gap: 0.55rem; }
+.wa-c-fix p { margin: 0; font-size: 0.9rem; line-height: 1.45; }
+.wa-c-check { display: flex; gap: 0.55rem; align-items: flex-start; font-size: 0.86rem; line-height: 1.45; }
+.wa-c-check input { margin-top: 0.2rem; width: 18px; height: 18px; flex: none; }
+.wa-c-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.wa-c-pin { font: inherit; font-size: 1.05rem; letter-spacing: 0.3em; width: 9.5rem; padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.wa-c-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.wa-c-list li { border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.wa-c-acc, .wa-c-num { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.86rem; }
+.wa-c-num { padding-left: 0.6rem; border-left: 3px solid #f8bc1e; }
+.wa-c-list code { font-size: 0.82rem; overflow-wrap: anywhere; }
+.wa-c-list em { color: #3f7d4e; font-style: normal; font-weight: 700; }
+.wa-c-copy { font: inherit; font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 5px; border: 1px solid var(--line); background: #fff; cursor: pointer; margin-left: 0.25rem; }
+.su-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.wa-c-sub { display: flex; flex-direction: column; gap: 0.45rem; align-items: flex-start; }
+.wa-c-sub p { margin: 0; font-size: 0.9rem; line-height: 1.45; }
+.wa-c-warnline { background: #fff4e0; border-radius: 8px; padding: 0.55rem 0.65rem; color: #6b3f00; }

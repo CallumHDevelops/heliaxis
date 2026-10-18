@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { guardAdmin } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { envReport } from '@/lib/env-check';
+import { WhatsAppConnection } from './WhatsAppConnection';
 import '../setup.css';
 
 export const dynamic = 'force-dynamic';
@@ -48,6 +49,7 @@ export default async function EnvPage() {
                   </li>
                 ))}
               </ul>
+              {g.title === 'WhatsApp' && <WhatsAppConnection />}
             </section>
           );
         })}

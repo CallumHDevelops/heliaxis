@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Eyebrow } from './Eyebrow';
+import Link from 'next/link';
 
 export function QuoteForm() {
   const [segment, setSegment] = useState<'home' | 'business'>('home');
@@ -68,7 +69,7 @@ export function QuoteForm() {
               <span className="ic">
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--ink)" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
               </span>
-              <div><b>Your details stay private</b><span>No spam, no third parties, no obligation.</span></div>
+              <div><b>Your details stay private</b><span>We never sell your details. No spam, no obligation. <Link href="/privacy-policy">Privacy policy</Link></span></div>
             </div>
             <div className="callnow">
               <div>
