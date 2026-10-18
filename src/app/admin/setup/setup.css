@@ -1,0 +1,51 @@
+.su {
+  --ink: #211f18;
+  --muted: #6e6a5e;
+  --line: rgba(33, 31, 24, 0.13);
+  --card: #fffdf8;
+  max-width: 820px;
+  margin: 0 auto;
+  color: var(--ink);
+}
+.su-back { font-size: 0.88rem; color: var(--muted); text-decoration: none; }
+.su-kicker { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 1rem 0 0.25rem; }
+.su-muted { color: var(--muted); font-size: 0.9rem; }
+.su-sqlhead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.su-sqlhead h1 { font-size: 1.6rem; margin: 0; }
+.su-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.su-btn--primary { background: #f8bc1e; border-color: #f8bc1e; }
+.su-pre {
+  background: #1d1b15;
+  color: #f3eee2;
+  border-radius: 10px;
+  padding: 1rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+}
+.su-doc { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem 1.25rem 0.5rem; line-height: 1.6; overflow-wrap: anywhere; }
+.su-doc h1 { font-size: 1.6rem; margin: 0 0 0.75rem; }
+.su-doc h2 { font-size: 1.2rem; margin: 1.75rem 0 0.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.su-doc h3 { font-size: 1rem; margin: 1.25rem 0 0.4rem; }
+.su-doc p, .su-doc li { font-size: 0.95rem; }
+.su-doc ol, .su-doc ul { padding-left: 1.3rem; }
+.su-doc li { margin-bottom: 0.4rem; }
+.su-doc code { background: #f3eee2; border-radius: 4px; padding: 0.05rem 0.3rem; font-size: 0.86em; }
+.su-doc pre { background: #1d1b15; color: #f3eee2; border-radius: 8px; padding: 0.8rem; overflow-x: auto; }
+.su-doc pre code { background: none; padding: 0; color: inherit; }
+.su-doc blockquote { margin: 0.5rem 0; padding: 0.5rem 0.9rem; border-left: 3px solid #f8bc1e; background: #faf5e8; color: #45423a; }
+.su-doc table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.86rem; margin: 0.75rem 0; }
+.su-doc th, .su-doc td { border: 1px solid var(--line); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+.su-doc th { background: #f3eee2; }
+.su-doc a { color: #9a6200; }

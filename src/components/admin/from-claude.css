@@ -70,3 +70,60 @@
   padding: 0.4rem 0.1rem;
   cursor: pointer;
 }
+
+/* Step-by-step */
+.fc-detail { margin: 0 0 0.75rem !important; }
+.fc-ghost {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--fc-ink);
+  border: 1px solid var(--fc-line);
+  background: #fff;
+  cursor: pointer;
+}
+.fc-steps { margin: 0.9rem 0 0; padding-left: 1.25rem; }
+.fc-steps li { font-size: 0.9rem; line-height: 1.5; margin-bottom: 0.45rem; color: #36332b; }
+.fc-steps code,
+.fc-copies code { background: #f3eee2; border-radius: 4px; padding: 0.05rem 0.3rem; font-size: 0.84em; overflow-wrap: anywhere; }
+.fc-steps a { color: #9a6200; font-weight: 600; }
+.fc-copies { list-style: none; margin: 0.75rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.fc-copies li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.35rem 0.6rem;
+  align-items: center;
+  background: #faf6ec;
+  border: 1px solid var(--fc-line);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.fc-copy-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fc-muted); }
+.fc-copies code { background: none; padding: 0; font-size: 0.82rem; min-width: 0; }
+.fc-secret { word-break: break-all; }
+.fc-copy {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--fc-line);
+  background: #fff;
+  color: var(--fc-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fc-vapid { margin-top: 0.75rem; }
+.fc-warn { font-size: 0.85rem !important; color: #8a4b00 !important; background: #fff4e0; border-radius: 6px; padding: 0.5rem 0.65rem; }
+.fc-err { color: #b3261e !important; font-size: 0.85rem !important; }
+.fc-done { margin-top: 0.9rem; }
+.fc-go:disabled { opacity: 0.6; }
+@media (max-width: 600px) {
+  .fc-body { padding-left: 0.1rem; }
+}
+.fc-list .fc-steps li { list-style: decimal; border-top: 0; }
+.fc-list .fc-copies li { border-top: 1px solid var(--fc-line); }
+.fc-steps li::marker { color: var(--fc-accent); font-weight: 700; }
