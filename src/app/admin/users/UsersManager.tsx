@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PORTALS } from '@/lib/portals';
-import { updateUser } from './actions';
+import { sendPasswordReset, updateUser } from './actions';
 import './users.css';
 
 export type UserRow = {
@@ -153,7 +153,54 @@ function UserCard({ u, self, hasPortals }: { u: UserRow; self: boolean; hasPorta
           </button>
         )}
         {msg && <span className={msg.ok ? 'us-ok' : 'us-err'}>{msg.text}</span>}
+        {u.email && <PasswordReset id={u.id} email={u.email} />}
       </div>
+    </div>
+  );
+}
+
+/** Email someone a password reset link, or copy one to send another way (e.g. WhatsApp). */
+function PasswordReset({ id, email }: { id: string; email: string }) {
+  const [busy, setBusy] = useState<'email' | 'link' | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+
+  async function run(mode: 'email' | 'link') {
+    if (mode === 'email' && !confirm(`Email a password reset link to ${email}?`)) return;
+    setBusy(mode);
+    setMsg(null);
+    setLink(null);
+    const r = await sendPasswordReset(id, mode);
+    setBusy(null);
+    if (!r.ok) return setMsg({ ok: false, text: r.error });
+    if (r.link) {
+      setLink(r.link);
+      const copied = await navigator.clipboard?.writeText(r.link).then(
+        () => true,
+        () => false
+      );
+      setMsg({ ok: true, text: copied ? 'Link copied. Send it to them; it works once, for an hour.' : 'Copy the link below and send it to them.' });
+    } else {
+      setMsg({ ok: true, text: `Reset link emailed to ${r.email}` });
+    }
+  }
+
+  return (
+    <div className="us-reset">
+      <span className="us-reset-label">Password</span>
+      <button className="us-btn-ghost" disabled={!!busy} onClick={() => run('email')}>
+        {busy === 'email' ? 'Sending…' : 'Email reset link'}
+      </button>
+      <button
+        className="us-btn-ghost"
+        disabled={!!busy}
+        onClick={() => run('link')}
+        title="Makes a new link (cancelling any earlier one) for you to send by WhatsApp or text. Don't open it yourself: it signs in as them."
+      >
+        {busy === 'link' ? 'Making…' : 'Copy link'}
+      </button>
+      {msg && <span className={msg.ok ? 'us-ok' : 'us-err'}>{msg.text}</span>}
+      {link && <input className="us-reset-link" readOnly value={link} onFocus={(e) => e.currentTarget.select()} />}
     </div>
   );
 }
