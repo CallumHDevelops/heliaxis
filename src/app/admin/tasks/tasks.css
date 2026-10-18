@@ -273,10 +273,6 @@ button.tk-stat:hover {
 .tk-item:first-child {
   border-top: 0;
 }
-.tk-item.is-editing {
-  display: block;
-  background: var(--paper);
-}
 .tk-check {
   flex: 0 0 auto;
   width: 22px;
@@ -452,5 +448,117 @@ button.tk-stat:hover {
   }
   100% {
     background: transparent;
+  }
+}
+
+/* Add / edit task: a pop-up card (bottom sheet on phones) */
+.tk-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(20, 18, 12, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  animation: tk-fade 0.15s ease-out;
+}
+.tk-modal-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: var(--card, #fffdf8);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  padding: 18px 20px 20px;
+  box-sizing: border-box;
+  animation: tk-rise 0.18s ease-out;
+}
+.tk-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.tk-modal-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.tk-modal-x {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(33, 31, 24, 0.07);
+  color: var(--ink);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.tk-modal .tk-form {
+  gap: 14px;
+}
+.tk-modal .tk-form input,
+.tk-modal .tk-form textarea,
+.tk-modal .tk-form select {
+  font-size: 1rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+}
+.tk-modal .tk-form-row {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.tk-modal .tk-quick button,
+.tk-modal .tk-seg button {
+  border-radius: 99px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+}
+.tk-modal .tk-seg button {
+  border-radius: 8px;
+  padding: 0.6rem 0.5rem;
+}
+.tk-modal .tk-form-actions {
+  align-items: center;
+  padding-top: 6px;
+}
+.tk-modal .tk-form-actions .tk-btn {
+  border-radius: 8px;
+  padding: 0.65rem 1.2rem;
+}
+.tk-form-delete {
+  margin-right: auto;
+}
+.tk-item.is-editing {
+  background: rgba(248, 188, 30, 0.12);
+}
+@keyframes tk-fade {
+  from { opacity: 0; }
+}
+@keyframes tk-rise {
+  from { transform: translateY(16px); opacity: 0; }
+}
+@media (max-width: 720px) {
+  .tk-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .tk-modal-card {
+    max-width: none;
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .tk-modal-card::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(33, 31, 24, 0.2);
+    margin: -4px auto 10px;
   }
 }
