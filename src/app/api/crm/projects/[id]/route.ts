@@ -113,7 +113,7 @@ export async function GET(_req: Request, { params }: Ctx) {
       id: `wa-${m.id}`,
       kind: 'whatsapp',
       body: m.body as string | null,
-      meta: { direction: m.direction, status: m.status, kind: m.kind },
+      meta: { direction: m.direction, status: m.status, kind: m.kind, via: m.via },
       by:
         m.direction === 'in'
           ? customer?.name ?? 'Customer'
@@ -121,7 +121,9 @@ export async function GET(_req: Request, { params }: Ctx) {
             ? nameOf.get(m.sent_by) ?? 'Team'
             : m.via === 'whatsapp-app'
               ? 'WhatsApp app'
-              : m.via === 'chase'
+              : m.via === 'import'
+                ? 'Imported · WhatsApp Business app'
+                : m.via === 'chase'
                 ? 'Chaser'
                 : m.rule_id
                   ? 'Smart reply'
