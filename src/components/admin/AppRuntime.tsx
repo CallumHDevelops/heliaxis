@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { forgetNativePush, syncNativePush } from '@/lib/push-client';
 import { clearTaskStorage } from '@/lib/tasks-offline';
 
 /**
@@ -9,7 +10,8 @@ import { clearTaskStorage } from '@/lib/tasks-offline';
  * - registers the service worker (/sw.js, scope /admin) for offline use;
  * - "Heliaxis has been updated" banner when a new deploy's worker is waiting;
  * - Android app: the APK opens /admin?app=android-<versionCode>, which we remember,
- *   then compare with /app/version.json to offer (or require) the new APK;
+ *   then compare with /app/version.json to offer (or require) the new APK; it also hands
+ *   over its Firebase token for native notifications (syncNativePush);
  * - offline pill;
  * - clears cached pages and local task data on sign-out.
  */
@@ -85,6 +87,7 @@ export function AppRuntime() {
   // Android app version check.
   useEffect(() => {
     const installed = readInstalledVersion();
+    void syncNativePush(installed);
     // The download page shows its own update status.
     if (!installed || location.pathname.startsWith('/admin/app')) return;
     fetch('/app/version.json', { cache: 'no-store' })
@@ -103,11 +106,19 @@ export function AppRuntime() {
       .catch(() => {});
   }, []);
 
+  // A notification tapped while the app is already on that page only changes the #fragment.
+  useEffect(() => {
+    const onHash = () => void syncNativePush(readInstalledVersion());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
   // Sign-out cleanup.
   useEffect(() => {
     const onSubmit = (e: Event) => {
       if (!(e.target as HTMLElement)?.closest?.('form[data-signout]')) return;
       clearTaskStorage();
+      forgetNativePush();
       navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR' });
     };
     document.addEventListener('submit', onSubmit, true);

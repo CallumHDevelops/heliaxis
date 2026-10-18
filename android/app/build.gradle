@@ -8,6 +8,28 @@ plugins {
 def appRelease = new groovy.json.JsonSlurper().parse(file('../release.json'))
 def host = 'heliaxis.co.uk'
 
+// Native notifications: the Firebase project's settings for this app, from google-services.json
+// (Firebase console → Project settings → Your apps → Android). Read here as plain string
+// resources, which is all the Google Services plugin would do for messaging. Without the file
+// the app still builds, and notifications fall back to Web Push through Chrome.
+def firebase = [:]
+def servicesFile = file('google-services.json')
+if (servicesFile.exists()) {
+    def services = new groovy.json.JsonSlurper().parse(servicesFile)
+    def client = services.client.find { it.client_info?.android_client_info?.package_name == 'uk.co.heliaxis.app' }
+    if (client) {
+        firebase = [
+            google_app_id       : client.client_info.mobilesdk_app_id,
+            google_api_key      : client.api_key?.getAt(0)?.current_key,
+            gcm_defaultSenderId : services.project_info.project_number,
+            project_id          : services.project_info.project_id,
+            google_storage_bucket: services.project_info.storage_bucket,
+        ].findAll { it.value }
+    } else {
+        logger.warn('google-services.json has no Android app for uk.co.heliaxis.app; building without Firebase.')
+    }
+}
+
 // Signing key lives outside the repo (see android/README.md).
 def keyProps = new Properties()
 def keyFile = file(System.getenv('HELIAXIS_KEYSTORE_PROPS') ?: "${System.getProperty('user.home')}/.heliaxis-secrets/android-keystore.properties")
@@ -23,6 +45,9 @@ android {
         targetSdk 36
         versionCode appRelease.versionCode
         versionName appRelease.versionName
+
+        buildConfigField 'String', 'SITE_ORIGIN', "\"https://${host}\""
+        firebase.each { name, value -> resValue 'string', name, value.toString() }
 
         // The web app reads ?app=android-<versionCode> to know which build is installed.
         manifestPlaceholders = [
@@ -49,6 +74,11 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+        resValues = true
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -57,4 +87,6 @@ android {
 
 dependencies {
     implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+    implementation 'com.google.firebase:firebase-messaging:26.0.0'
+    implementation 'androidx.core:core:1.13.1'
 }

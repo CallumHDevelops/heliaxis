@@ -1,0 +1,147 @@
+# Builds the Heliaxis Android app in the cloud, so nobody needs Android Studio.
+#
+# - Pull requests / pushes that touch android/: a test build (debug, unsigned) to catch mistakes.
+# - Actions → "Android app" → Run workflow: a signed release. It bumps the version, builds,
+#   checks the signing key still matches the website (public/.well-known/assetlinks.json),
+#   and commits public/app/heliaxis.apk + version.json to the branch it ran on. Run it on
+#   main and Vercel publishes it; installed apps then show an Update banner.
+#
+# Secrets (Settings → Secrets and variables → Actions), see android/README.md:
+#   ANDROID_KEYSTORE_BASE64      the signing key (.jks), base64
+#   ANDROID_KEYSTORE_PROPERTIES  the contents of android-keystore.properties (passwords + alias)
+#   GOOGLE_SERVICES_JSON         Firebase's google-services.json, for native notifications
+name: Android app
+
+on:
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "What's new (shown to staff in the update banner)"
+        required: true
+      bump:
+        description: Version bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      force:
+        description: Make everyone update before they can carry on
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  test-build:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Firebase settings
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ] && [ ! -f android/app/google-services.json ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          fi
+      - name: Build
+        working-directory: android
+        run: bash ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heliaxis-test-build
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PROPERTIES: ${{ secrets.ANDROID_KEYSTORE_PROPERTIES }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PROPERTIES" ]; then
+            echo "::error::Add the ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PROPERTIES secrets first (see android/README.md)."
+            exit 1
+          fi
+          keys="$RUNNER_TEMP/keys"
+          mkdir -p "$keys"
+          printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$keys/heliaxis-android.jks"
+          # The properties came from a Windows PC: drop its storeFile path and point at the copy here.
+          printf '%s\n' "$KEYSTORE_PROPERTIES" | tr -d '\r' | grep -v '^[[:space:]]*storeFile' > "$keys/android-keystore.properties"
+          echo "storeFile=$keys/heliaxis-android.jks" >> "$keys/android-keystore.properties"
+          echo "HELIAXIS_KEYSTORE_PROPS=$keys/android-keystore.properties" >> "$GITHUB_ENV"
+      - name: Firebase settings
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -f android/app/google-services.json ]; then exit 0; fi
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::No GOOGLE_SERVICES_JSON secret: this build has no native notifications (Web Push only)."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+      - name: Build
+        env:
+          NOTES: ${{ inputs.notes }}
+          BUMP: ${{ inputs.bump }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          args=(--notes "$NOTES")
+          if [ "$BUMP" = minor ]; then args+=(--minor); fi
+          if [ "$BUMP" = major ]; then args+=(--major); fi
+          if [ "$FORCE" = true ]; then args+=(--force); fi
+          node scripts/android-release.mjs "${args[@]}"
+      - name: Check the signing key matches the website
+        run: |
+          tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          signed=$("$tools/apksigner" verify --print-certs public/app/heliaxis.apk | grep -m1 'SHA-256 digest' | awk '{print $NF}' | tr 'a-f' 'A-F')
+          expected=$(node -p "require('./public/.well-known/assetlinks.json')[0].target.sha256_cert_fingerprints.map(f => f.replace(/:/g, '').toUpperCase()).join(' ')")
+          if [ -z "$signed" ] || ! printf '%s' "$expected" | grep -qw "$signed"; then
+            echo "::error::The APK is signed with a different key ($signed) from the one in assetlinks.json ($expected). Phones couldn't update to it, so it wasn't published."
+            exit 1
+          fi
+          echo "Signed with the website's key: $signed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heliaxis-apk
+          path: public/app/heliaxis.apk
+          retention-days: 30
+      - name: Publish
+        run: |
+          version=$(node -p "require('./android/release.json').versionName")
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android/release.json public/app/heliaxis.apk public/app/version.json
+          git commit -m "Android app $version"
+          git push
+          echo "### Heliaxis $version published to ${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"
