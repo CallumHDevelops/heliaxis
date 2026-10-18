@@ -92,3 +92,7 @@
 .wa-c-list code { font-size: 0.82rem; overflow-wrap: anywhere; }
 .wa-c-list em { color: #3f7d4e; font-style: normal; font-weight: 700; }
 .wa-c-copy { font: inherit; font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 5px; border: 1px solid var(--line); background: #fff; cursor: pointer; margin-left: 0.25rem; }
+.su-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.wa-c-sub { display: flex; flex-direction: column; gap: 0.45rem; align-items: flex-start; }
+.wa-c-sub p { margin: 0; font-size: 0.9rem; line-height: 1.45; }
+.wa-c-warnline { background: #fff4e0; border-radius: 8px; padding: 0.55rem 0.65rem; color: #6b3f00; }

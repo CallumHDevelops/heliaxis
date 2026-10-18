@@ -4,14 +4,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { CopyButton } from '@/components/admin/CopyButton';
 import type { ConnectionReport, PhoneInfo } from '@/lib/whatsapp/connection';
 
-/** Plain-English status for the number Meta reports. */
-function verdict(p: PhoneInfo) {
+type Tone = 'ok' | 'warn' | 'bad';
+type Action = 'register' | 'subscribe';
+
+/**
+ * Plain-English status for the number. platform_type says whether it's on the Cloud API at all
+ * (WhatsApp Manager shows an unregistered number as "Offline"); the status text alone can mislead.
+ */
+function verdict(p: PhoneInfo): { tone: Tone; text: string } {
   const s = (p.status || '').toUpperCase();
   if (s === 'CONNECTED') return { tone: 'ok', text: 'Connected. Ready to send and receive.' };
-  if (s === 'PENDING') return { tone: 'warn', text: 'Pending. Meta is still setting it up; check again in a few minutes.' };
-  if (s === 'FLAGGED' || s === 'RESTRICTED') return { tone: 'bad', text: `${p.status}. Check WhatsApp Manager → Phone numbers for Meta’s message.` };
-  if (s === 'OFFLINE' || p.platform === 'NOT_APPLICABLE')
-    return { tone: 'bad', text: 'Offline. It isn’t registered on the WhatsApp API yet. Register it below.' };
+  if (p.platform === 'NOT_APPLICABLE' || s === 'OFFLINE' || s === 'DISCONNECTED')
+    return { tone: 'bad', text: 'Not on the WhatsApp API yet (WhatsApp Manager shows this as “Offline”).' };
+  if (s === 'PENDING')
+    return p.platform === 'CLOUD_API'
+      ? { tone: 'warn', text: 'Pending. It’s registered and Meta is finishing setup, so check again in a few minutes.' }
+      : { tone: 'warn', text: 'Pending. Not on the API yet, or Meta is finishing setup if you’ve just connected it.' };
+  if (s === 'FLAGGED' || s === 'RESTRICTED' || s === 'BANNED')
+    return { tone: 'bad', text: `${p.status}. Check WhatsApp Manager → Phone numbers for Meta’s message.` };
   return { tone: 'warn', text: p.status ? `Meta says: ${p.status}` : 'Meta didn’t give a status.' };
 }
 
@@ -21,8 +31,8 @@ export function WhatsAppConnection() {
   const [error, setError] = useState('');
   const [pin, setPin] = useState('');
   const [notOnPhone, setNotOnPhone] = useState(false);
-  const [busy, setBusy] = useState<'register' | 'subscribe' | null>(null);
-  const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+  const [busy, setBusy] = useState<Action | null>(null);
+  const [msg, setMsg] = useState<{ action: Action; tone: 'ok' | 'bad'; text: string } | null>(null);
 
   // State is only set once the request comes back (the first load starts as loading).
   const fetchReport = useCallback(
@@ -38,10 +48,11 @@ export function WhatsAppConnection() {
   }, [fetchReport]);
   const load = () => {
     setLoading(true);
+    setMsg(null);
     return fetchReport();
   };
 
-  async function act(action: 'register' | 'subscribe') {
+  async function act(action: Action) {
     setBusy(action);
     setMsg(null);
     const res = await fetch('/api/setup/whatsapp', {
@@ -49,22 +60,34 @@ export function WhatsAppConnection() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(action === 'register' ? { action, pin, notOnPhone } : { action }),
     }).catch(() => null);
-    const d = await res?.json().catch(() => ({}));
+    const d = res ? await res.json().catch(() => ({})) : null;
     setBusy(null);
-    if (res?.ok) {
-      setMsg({ tone: 'ok', text: action === 'register' ? 'Registered. Keep that PIN safe.' : 'Connected to the app.' });
+    if (!res) return setMsg({ action, tone: 'bad', text: 'Couldn’t reach the server. Check your connection.' });
+    if (res.ok) {
       setPin('');
-      load();
-    } else setMsg({ tone: 'bad', text: d?.error || 'Meta didn’t accept that.' });
+      setLoading(true);
+      await fetchReport();
+      setMsg({ action, tone: 'ok', text: action === 'register' ? 'Registered. Keep that PIN safe.' : 'Done. The app is subscribed to this account.' });
+    } else setMsg({ action, tone: 'bad', text: d?.error || 'Meta didn’t accept that.' });
   }
 
+  const note = (action: Action) =>
+    msg?.action === action ? (
+      <p role="status" className={msg.tone === 'ok' ? 'wa-c-ok' : 'wa-c-bad'}>
+        {msg.text}
+      </p>
+    ) : null;
+
   if (loading && !r) return <p className="su-muted">Checking with Meta…</p>;
-  if (error) return <p className="wa-c-bad">{error}</p>;
+  if (error && !r) return <p className="wa-c-bad">{error}</p>;
   if (!r) return null;
   if (!r.env.token) return <p className="su-muted">Add WHATSAPP_TOKEN in Vercel (and redeploy) to check the connection.</p>;
 
   const v = r.phone ? verdict(r.phone) : null;
-  const registered = r.phone && (r.phone.status || '').toUpperCase() === 'CONNECTED';
+  const connected = (r.phone?.status || '').toUpperCase() === 'CONNECTED';
+  const disabled = busy !== null || loading;
+  const apps = r.subscribedApps;
+  const registerHint = !notOnPhone ? 'Tick the box above first.' : pin.length !== 6 ? 'Enter a 6-digit PIN.' : '';
 
   return (
     <div className="wa-c">
@@ -86,33 +109,42 @@ export function WhatsAppConnection() {
         <p className="wa-c-bad">Meta couldn’t find WHATSAPP_PHONE_NUMBER_ID ({r.env.phoneId}): {r.phoneError}</p>
       )}
 
-      {r.env.wabaId &&
-        (r.subscribed === true ? (
-          <p className="wa-c-ok">✓ The account is connected to the app, so incoming messages reach Heliaxis.</p>
-        ) : r.subscribed === false ? (
-          <div className="wa-c-fix">
+      {r.env.wabaId && (
+        <div className="wa-c-sub">
+          {apps === null ? (
+            <p className="wa-c-bad">Couldn’t check the account’s webhooks ({r.env.wabaId}): {r.subscribedError}</p>
+          ) : apps.length ? (
             <p>
-              <b>Incoming messages aren’t connected.</b> The account isn’t subscribed to the app’s webhooks yet.
+              Apps receiving this account’s messages: <b>{apps.map((a) => a.name || a.id || 'unnamed app').join(', ')}</b>.
+              {connected ? '' : ' Messages only flow once the number is connected.'}
             </p>
-            <button type="button" className="su-btn su-btn--primary" disabled={busy !== null} onClick={() => act('subscribe')}>
-              {busy === 'subscribe' ? 'Connecting…' : 'Connect to app'}
-            </button>
-          </div>
-        ) : (
-          <p className="wa-c-bad">Couldn’t check the account ({r.env.wabaId}): {r.subscribedError}</p>
-        ))}
+          ) : (
+            <p>
+              <b>No app receives this account’s messages yet.</b> Connect it so incoming WhatsApps reach Heliaxis.
+            </p>
+          )}
+          <button type="button" className="su-btn" disabled={disabled} onClick={() => act('subscribe')}>
+            {busy === 'subscribe' ? 'Connecting…' : apps?.length ? 'Connect Heliaxis CRM again' : 'Connect to app'}
+          </button>
+          {note('subscribe')}
+        </div>
+      )}
 
-      {r.phone && !registered && (
+      {r.phone && !connected && (
         <div className="wa-c-fix">
+          <p className="wa-c-warnline">
+            <b>Using this number in the WhatsApp Business app on a phone?</b> Don’t register it here. That moves it off the phone
+            for good. Connect it with Meta’s “coexistence” option instead, which keeps the app working. Ask Claude for the steps.
+          </p>
           <p>
-            <b>Register the number on the WhatsApp API.</b> Choose a 6-digit PIN. It becomes the number’s two-step verification
-            PIN, so write it down. If the number already has a PIN, use that one.
+            <b>Only if the number isn’t on a phone:</b> register it on the WhatsApp API with a 6-digit PIN. The PIN becomes its
+            two-step verification PIN, so write it down. If it already has a PIN, use that one.
           </p>
           <label className="wa-c-check">
             <input type="checkbox" checked={notOnPhone} onChange={(e) => setNotOnPhone(e.target.checked)} />
             <span>
-              This number <b>isn’t</b> in use in the WhatsApp or WhatsApp Business app on a phone. Registering moves it off the
-              phone app for good. To keep using the app as well, connect it with Meta’s “coexistence” option instead.
+              This number <b>isn’t</b> used in the WhatsApp or WhatsApp Business app on any phone, and I’m happy for it to work
+              only through Heliaxis.
             </span>
           </label>
           <div className="wa-c-row">
@@ -128,23 +160,24 @@ export function WhatsAppConnection() {
             <button
               type="button"
               className="su-btn su-btn--primary"
-              disabled={busy !== null || !notOnPhone || pin.length !== 6}
+              disabled={disabled || !notOnPhone || pin.length !== 6}
               onClick={() => act('register')}
             >
               {busy === 'register' ? 'Registering…' : 'Register number'}
             </button>
           </div>
+          {busy === null && registerHint && <small className="su-muted">{registerHint}</small>}
+          {note('register')}
         </div>
       )}
-
-      {msg && <p className={msg.tone === 'ok' ? 'wa-c-ok' : 'wa-c-bad'}>{msg.text}</p>}
+      {connected && note('register')}
 
       <h3>Numbers this token can see</h3>
       {r.found.length === 0 ? (
         <p className="su-muted">
           {r.foundError
-            ? `Meta didn’t list them (${r.foundError}). Get the IDs from the Meta app → WhatsApp → API setup instead.`
-            : 'None found. Get the IDs from the Meta app → WhatsApp → API setup.'}
+            ? `Meta didn’t list them (${r.foundError}). Get the IDs from Business Settings → WhatsApp accounts instead.`
+            : 'None found. Get the IDs from Business Settings → WhatsApp accounts.'}
         </p>
       ) : (
         <ul className="wa-c-list">
@@ -176,7 +209,8 @@ export function WhatsAppConnection() {
           ))}
         </ul>
       )}
-      <button type="button" className="su-btn" onClick={() => load()} disabled={loading}>
+      {error && <p className="wa-c-bad">{error}</p>}
+      <button type="button" className="su-btn" onClick={() => load()} disabled={disabled}>
         {loading ? 'Checking…' : 'Check again'}
       </button>
     </div>

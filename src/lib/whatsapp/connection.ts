@@ -11,7 +11,7 @@ export type PhoneInfo = {
   id: string;
   display: string | null;
   name: string | null;
-  /** CONNECTED, OFFLINE, PENDING, … (Meta's own words). */
+  /** CONNECTED, PENDING, DISCONNECTED, FLAGGED, … (Meta's own words; WhatsApp Manager calls an unregistered number "Offline"). */
   status: string | null;
   /** APPROVED, PENDING_REVIEW, DECLINED, … for the display name. */
   nameStatus: string | null;
@@ -26,8 +26,8 @@ export type ConnectionReport = {
   env: { token: boolean; phoneId: string | null; wabaId: string | null };
   phone: PhoneInfo | null;
   phoneError: string | null;
-  /** True if our app is subscribed to the account's webhooks. */
-  subscribed: boolean | null;
+  /** Apps subscribed to the account's webhooks (any app, not only ours); null if it couldn't be checked. */
+  subscribedApps: { id: string; name: string | null }[] | null;
   subscribedError: string | null;
   /** Accounts and numbers this token can see (to copy the right IDs). */
   found: FoundAccount[];
@@ -103,7 +103,7 @@ export async function connectionReport(): Promise<ConnectionReport> {
     env: { token, phoneId, wabaId },
     phone: null,
     phoneError: null,
-    subscribed: null,
+    subscribedApps: null,
     subscribedError: null,
     found: [],
     foundError: null,
@@ -112,7 +112,9 @@ export async function connectionReport(): Promise<ConnectionReport> {
 
   const [p, subs, disc] = await Promise.all([
     phoneId ? phone(phoneId) : Promise.resolve(null),
-    wabaId ? graph<{ data: unknown[] }>(`/${encodeURIComponent(wabaId)}/subscribed_apps`) : Promise.resolve(null),
+    wabaId
+      ? graph<{ data: { whatsapp_business_api_data?: { id?: string; name?: string } }[] }>(`/${encodeURIComponent(wabaId)}/subscribed_apps`)
+      : Promise.resolve(null),
     discover(),
   ]);
   if (p) {
@@ -120,8 +122,12 @@ export async function connectionReport(): Promise<ConnectionReport> {
     else report.phoneError = p.error;
   }
   if (subs) {
-    // Lists the apps subscribed to this account's webhooks; a system-user token sees its own app.
-    if (subs.ok) report.subscribed = (subs.data.data ?? []).length > 0;
+    // Every app subscribed to this account's webhooks, so the admin can see whether Heliaxis CRM is one.
+    if (subs.ok)
+      report.subscribedApps = (subs.data.data ?? []).map((a) => ({
+        id: a.whatsapp_business_api_data?.id ?? '',
+        name: a.whatsapp_business_api_data?.name ?? null,
+      }));
     else report.subscribedError = subs.error;
   }
   report.found = disc.found;
