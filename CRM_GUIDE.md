@@ -14,7 +14,8 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
 3. `supabase/assistant.sql` — Metis's (the assistant's) conversations and drafts.
 
 Admins see anything still to do as **From Claude** on the dashboard and the Tasks page. Each item
-ticks itself off once the app can see it's done.
+ticks itself off once the app can see it's done. To pass one to someone else, open it and pick them
+under **Who sees this**: then only they see it (admins can still find it under **Shared with others**).
 
 The every-minute job you already scheduled (`whatsapp-outbox`) also runs all CRM automation and
 picks up email — nothing else to schedule.

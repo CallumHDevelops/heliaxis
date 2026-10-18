@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import type { GuideKey, SqlFile } from '@/lib/setup-files';
@@ -10,6 +11,9 @@ import type { GuideKey, SqlFile } from '@/lib/setup-files';
  *
  * When a change needs setup, add its check here so it lands on the admin's to-do list. Write the
  * steps for someone who has never opened Supabase or Vercel: every click, in order.
+ *
+ * Who sees each one: admins, unless an admin has picked people for it ("Who sees this" on the
+ * card). Then only those people see it, admins or members, and they can tick it off.
  */
 
 export type SetupTodo = {
@@ -37,9 +41,20 @@ export type SetupTodo = {
   manual?: boolean;
   /** Ticked as done, but the app can't see it yet (e.g. Vercel keys need a redeploy). */
   ticked?: boolean;
+  /** Profile ids of the people picked to see it. Empty = every admin (the default). */
+  assignees?: string[];
 };
 
+/** An approved user, for the "Who sees this" picker. */
+export type SetupPerson = { id: string; name: string };
+
+/** { [todoId]: profile ids }. A to-do with no entry is seen by admins. */
+export type SetupAssign = Record<string, string[]>;
+
 const DONE_KEY = 'setup-done';
+const ASSIGN_KEY = 'setup-assign';
+const TODO_ID = /^[a-z0-9.-]{1,60}$/;
+const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VERCEL_ENV = 'https://vercel.com/dashboard';
 const env = (...keys: string[]) => keys.every((k) => !!process.env[k]);
 
@@ -96,9 +111,9 @@ export async function doneManual(): Promise<string[]> {
   }
 }
 
-/** The admin ticked (or unticked) a to-do. Manual ones then disappear; checked ones wait for their check. */
+/** Someone ticked (or unticked) a to-do. Manual ones then disappear; checked ones wait for their check. */
 export async function markDone(id: string, done = true) {
-  if (!/^[a-z0-9.-]{1,60}$/.test(id)) return;
+  if (!TODO_ID.test(id)) return;
   const set = new Set(await doneManual());
   if (done) set.add(id);
   else set.delete(id);
@@ -107,8 +122,88 @@ export async function markDone(id: string, done = true) {
     .upsert({ key: DONE_KEY, value: JSON.stringify([...set]), updated_at: new Date().toISOString() });
 }
 
-export async function setupTodos(): Promise<SetupTodo[]> {
-  const [crm, crmV2, assistant, notifications, whatsapp, chasers, done] = await Promise.all([
+/** Approved users (one lookup per request): who can be picked, and who still counts when picked. */
+const approvedPeople = cache(async (): Promise<SetupPerson[]> => {
+  const { data, error } = await createAdminClient().from('profiles').select('id, full_name, email').eq('status', 'approved');
+  if (error) throw error;
+  return ((data ?? []) as { id: string; full_name: string | null; email: string | null }[])
+    .map((p) => ({ id: p.id, name: p.full_name || p.email || 'Unnamed' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+});
+
+/** Everyone an admin can pick under "Who sees this". */
+export async function setupPeople(): Promise<SetupPerson[]> {
+  return approvedPeople().catch(() => []);
+}
+
+async function readAssign(): Promise<SetupAssign> {
+  const { data, error } = await createAdminClient().from('cms_kv').select('value').eq('key', ASSIGN_KEY).maybeSingle();
+  if (error) throw error;
+  let v: unknown = {};
+  try {
+    v = data?.value ? JSON.parse(data.value) : {};
+  } catch {
+    // Unreadable: start again.
+  }
+  const out: SetupAssign = {};
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    for (const [id, ids] of Object.entries(v)) if (Array.isArray(ids)) out[id] = ids.map(String);
+  }
+  return out;
+}
+
+/** Who each to-do has been passed to. */
+export async function setupAssignments(): Promise<SetupAssign> {
+  try {
+    return await readAssign();
+  } catch {
+    return {};
+  }
+}
+
+/** Is this to-do passed to this person? (Members may only tick those.) */
+export async function isAssigned(id: string, profileId: string) {
+  return !!(await setupAssignments())[id]?.includes(profileId);
+}
+
+/**
+ * An admin chose who sees a to-do. Nobody picked = back to admins (the default). Only approved
+ * users are kept. Returns who it's saved with.
+ */
+export async function assignTodo(id: string, userIds: unknown[]): Promise<string[]> {
+  if (!TODO_ID.test(id)) return [];
+  const approved = new Set((await approvedPeople()).map((p) => p.id));
+  const ids = [...new Set(userIds.filter((u): u is string => typeof u === 'string' && PROFILE_ID.test(u) && approved.has(u)))];
+  // Strict read: if it fails, don't overwrite everyone else's picks with just this one.
+  const map = await readAssign();
+  if (ids.length) map[id] = ids;
+  else delete map[id];
+  await createAdminClient()
+    .from('cms_kv')
+    .upsert({ key: ASSIGN_KEY, value: JSON.stringify(map), updated_at: new Date().toISOString() });
+  return ids;
+}
+
+/**
+ * What this person should see on the card (`mine`), and for admins the to-dos passed only to other
+ * people (`others`), so they can still tick or reassign them.
+ */
+export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Promise<{ mine: SetupTodo[]; others: SetupTodo[] }> {
+  const assign = await setupAssignments();
+  // Members only see what's passed to them; skip the checks for everyone else.
+  if (!isAdmin && !Object.values(assign).some((ids) => ids.includes(profileId))) return { mine: [], others: [] };
+  const mine: SetupTodo[] = [];
+  const others: SetupTodo[] = [];
+  for (const t of await setupTodos(assign)) {
+    const who = t.assignees ?? [];
+    if (who.length ? who.includes(profileId) : isAdmin) mine.push(t);
+    else if (isAdmin) others.push(t);
+  }
+  return { mine, others };
+}
+
+export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
+  const [crm, crmV2, assistant, notifications, whatsapp, chasers, done, assign] = await Promise.all([
     has('crm_projects', 'next_step'),
     has('crm_documents'),
     has('assistant_drafts'),
@@ -116,6 +211,7 @@ export async function setupTodos(): Promise<SetupTodo[]> {
     has('whatsapp_messages'),
     has('whatsapp_outbox', 'kind'),
     doneManual(),
+    preloaded ?? setupAssignments(),
   ]);
   const settings = crmV2 ? await getCrmSettings() : null;
   const out: SetupTodo[] = [];
@@ -329,8 +425,15 @@ export async function setupTodos(): Promise<SetupTodo[]> {
     order: 31,
     optional: true,
   });
-  for (const m of MANUAL) add(!done.includes(m.id), m);
+  // Copies: these are set per request below.
+  for (const m of MANUAL) add(!done.includes(m.id), { ...m });
   // Ticked but not detected yet: keep it, greyed, at the bottom.
   for (const t of out) if (done.includes(t.id)) t.ticked = true;
+  // Who sees it. Someone no longer approved drops off; with nobody left it goes back to admins.
+  // (If the lookup fails, keep the picks as they are.)
+  const approved = Object.keys(assign).length
+    ? await approvedPeople().then((ps) => new Set(ps.map((p) => p.id)), () => null)
+    : null;
+  for (const t of out) t.assignees = (assign[t.id] ?? []).filter((id) => !approved || approved.has(id));
   return out.sort((a, b) => Number(!!a.ticked) - Number(!!b.ticked) || a.order - b.order);
 }
