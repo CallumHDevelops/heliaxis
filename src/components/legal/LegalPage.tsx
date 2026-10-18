@@ -8,7 +8,7 @@ export const COMPANY = {
   name: 'Heliaxis Limited',
   number: '16734783',
   vat: 'GB507431316',
-  address: 'Current Electrical, Turner Street, Newport, NP19 7AZ',
+  address: '9 Turner Street, Newport, NP19 7AZ',
   email: 'hello@heliaxis.co.uk',
   phone: '01633 965205',
   phoneHref: 'tel:01633965205',
