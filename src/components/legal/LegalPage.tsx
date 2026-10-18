@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { Eyebrow } from '@/components/home/Eyebrow';
 import { SiteFooter } from '@/components/home/SiteFooter';
 import './legal.css';
@@ -36,7 +37,7 @@ export function LegalPage({
       <section className="lg-hero">
         <div className="wrap">
           <div className="lg-crumb">
-            <a href="/">Home</a> / {title}
+            <Link href="/">Home</Link> / {title}
           </div>
           <Eyebrow onDark>{eyebrow}</Eyebrow>
           <h1>{title}</h1>
