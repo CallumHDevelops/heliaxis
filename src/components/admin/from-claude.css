@@ -1,0 +1,72 @@
+.fc {
+  --fc-ink: #211f18;
+  --fc-muted: #6e6a5e;
+  --fc-line: rgba(33, 31, 24, 0.12);
+  --fc-accent: #c96442;
+  background: #fffdf8;
+  border: 1px solid var(--fc-line);
+  border-left: 3px solid var(--fc-accent);
+  border-radius: 10px;
+  padding: 1rem 1rem 0.6rem;
+  margin-bottom: 1.5rem;
+  color: var(--fc-ink);
+}
+.fc-head { display: flex; gap: 0.7rem; align-items: flex-start; margin-bottom: 0.5rem; }
+.fc-head h2 { font-size: 1rem; font-weight: 800; margin: 0; }
+.fc-head p { font-size: 0.85rem; color: var(--fc-muted); margin: 0.1rem 0 0; }
+.fc-badge {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--fc-accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+}
+.fc-list { list-style: none; margin: 0; padding: 0; }
+.fc-list li + li { border-top: 1px solid var(--fc-line); }
+.fc-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.1rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+.fc-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--fc-accent); }
+.fc-title { flex: 1; font-weight: 600; font-size: 0.93rem; }
+.fc-tag { font-size: 0.7rem; color: var(--fc-muted); border: 1px solid var(--fc-line); border-radius: 99px; padding: 0.1rem 0.45rem; }
+.fc-chev { color: var(--fc-muted); font-size: 1.2rem; transition: transform 0.15s; }
+.is-open .fc-chev { transform: rotate(90deg); }
+.fc-body { padding: 0 0.1rem 0.85rem 1.75rem; }
+.fc-body p { margin: 0 0 0.6rem; font-size: 0.88rem; line-height: 1.45; color: #45423a; }
+.fc-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.fc-go,
+.fc-done {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.fc-go { background: var(--fc-ink); color: #fff; border: 1px solid var(--fc-ink); }
+.fc-done { background: none; color: var(--fc-ink); border: 1px solid var(--fc-line); }
+.fc-more {
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--fc-muted);
+  padding: 0.4rem 0.1rem;
+  cursor: pointer;
+}

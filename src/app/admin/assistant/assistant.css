@@ -1,0 +1,182 @@
+.as {
+  --ink: #211f18;
+  --muted: #6e6a5e;
+  --line: rgba(33, 31, 24, 0.13);
+  --card: #fffdf8;
+  --claude: #c96442;
+  --wa: #1f7a4d;
+  --err: #b3261e;
+  color: var(--ink);
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 160px);
+}
+.as-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.as-head h1 { font-size: 1.8rem; font-weight: 800; margin: 0; }
+.as-head p { color: var(--muted); margin: 0.2rem 0 0; font-size: 0.92rem; }
+.as-new {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.as-banner {
+  background: #fff4e5;
+  border: 1px solid #f0d4a8;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+/* Drafts */
+.as-drafts { margin-bottom: 1.25rem; }
+.as-drafts h2 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+.as-draft { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 0.5rem; overflow: hidden; }
+.as-draft-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.as-kind { flex: none; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 99px; color: #fff; background: var(--ink); }
+.as-kind.is-whatsapp { background: var(--wa); }
+.as-draft-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.as-draft-who b { font-size: 0.95rem; }
+.as-draft-who small { color: var(--muted); font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.as-chev { color: var(--muted); font-size: 1.2rem; transition: transform 0.15s; }
+.as-draft.is-open .as-chev { transform: rotate(90deg); }
+.as-draft-body { padding: 0 0.85rem 0.85rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.as-to { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.as-draft-body input,
+.as-draft-body textarea {
+  font: inherit;
+  font-size: 0.95rem;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  background: #fff;
+  color: var(--ink);
+}
+.as-draft-body textarea { resize: vertical; line-height: 1.45; }
+.as-err { margin: 0; color: var(--err); font-size: 0.85rem; }
+.as-draft-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.as-btn {
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.as-btn.is-primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+.as-btn.is-quiet { border-color: transparent; background: none; color: var(--muted); margin-left: auto; }
+.as-btn:disabled { opacity: 0.6; }
+
+/* Chat */
+.as-chat { flex: 1; display: flex; flex-direction: column; gap: 0.6rem; padding-bottom: 1rem; }
+.as-empty p { color: var(--muted); line-height: 1.5; margin: 0 0 0.9rem; }
+.as-starters { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.as-starters button {
+  font: inherit;
+  font-size: 0.88rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+.as-msg { max-width: 88%; padding: 0.65rem 0.85rem; border-radius: 14px; line-height: 1.45; font-size: 0.95rem; }
+.as-msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.as-msg.is-user { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 4px; }
+.as-msg.is-assistant { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.as-msg.is-error { border-color: #f0b8b3; color: var(--err); }
+.as-actions { list-style: none; margin: 0.55rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.as-chip {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ink);
+  background: #f3eee2;
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid var(--claude);
+}
+.as-chip.is-draft { border-left-color: var(--wa); }
+.as-msg.is-busy { display: flex; gap: 5px; padding: 0.85rem 1rem; }
+.as-msg.is-busy span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: as-dot 1.1s infinite ease-in-out; }
+.as-msg.is-busy span:nth-child(2) { animation-delay: 0.15s; }
+.as-msg.is-busy span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes as-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+/* Composer: stays above the phone tab bar */
+.as-compose {
+  position: sticky;
+  bottom: calc(var(--hx-tabbar, 0px) + 0.5rem);
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 0.4rem;
+  box-shadow: 0 6px 24px rgba(33, 31, 24, 0.1);
+}
+.as-compose textarea {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 1rem;
+  border: 0;
+  resize: none;
+  background: none;
+  padding: 0.6rem 0.5rem;
+  color: var(--ink);
+  outline: none;
+  max-height: 40vh;
+}
+.as-mic,
+.as-send {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 0;
+  cursor: pointer;
+}
+.as-mic { background: #f3eee2; color: var(--ink); }
+.as-mic.is-on { background: var(--claude); color: #fff; animation: as-pulse 1.4s infinite; }
+.as-send { background: var(--ink); color: #fff; }
+.as-send:disabled { opacity: 0.35; cursor: default; }
+@keyframes as-pulse { 0% { box-shadow: 0 0 0 0 rgba(201, 100, 66, 0.45); } 100% { box-shadow: 0 0 0 12px rgba(201, 100, 66, 0); } }

@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { PORTALS, portalsFor, type PortalKey } from '@/lib/portals';
 import { todayISO } from '@/lib/tasks';
+import { setupTodos } from '@/lib/setup-checks';
 import { HubView, type HubTask, type HubFollowUp } from './HubView';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export type NeedCount = { n: number; detail: string };
 /** How many things need someone, per area (shown as big numbers on the dashboard). */
 async function badges(keys: PortalKey[], isAdmin: boolean) {
   const admin = createAdminClient();
-  const out: Partial<Record<PortalKey | 'users' | 'whatsapp', NeedCount>> = {};
+  const out: Partial<Record<PortalKey | 'users' | 'whatsapp' | 'drafts', NeedCount>> = {};
   const count = async (q: PromiseLike<{ count: number | null }>) => {
     try {
       return (await q).count ?? 0;
@@ -61,6 +62,10 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
       ]).then(([sign, docs]) => {
         const parts = [sign && `${sign} to countersign`, docs && `${docs} docs to review`].filter(Boolean);
         if (sign + docs) out.subcontractors = { n: sign + docs, detail: parts.join(' · ') };
+      }),
+    keys.includes('crm') &&
+      count(admin.from('assistant_drafts').select('id', { count: 'exact', head: true }).eq('status', 'draft')).then((n) => {
+        if (n) out.drafts = { n, detail: `draft${n === 1 ? '' : 's'} from Claude to send` };
       }),
     isAdmin &&
       count(admin.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending')).then((n) => {
@@ -118,7 +123,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const isAdmin = profile?.role === 'admin';
   const keys = portalsFor(profile);
   const portals = PORTALS.filter((p) => keys.includes(p.key));
-  const [counts, day] = await Promise.all([badges(keys, isAdmin), user ? myDay(user.id, keys) : null]);
+  const [counts, day, setup] = await Promise.all([
+    badges(keys, isAdmin),
+    user ? myDay(user.id, keys) : null,
+    isAdmin ? setupTodos() : [],
+  ]);
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
 
   return (
@@ -132,6 +141,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         tasks={day?.tasks ?? []}
         followUps={day?.followUps ?? []}
         today={todayISO()}
+        setup={setup}
+        assistant={keys.includes('crm')}
       />
     </AdminShell>
   );

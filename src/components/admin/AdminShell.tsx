@@ -22,6 +22,7 @@ type Tab =
   | 'heatmap'
   | 'subcontractors'
   | 'tasks'
+  | 'assistant'
   | 'app';
 
 const RAMS_URL = 'https://rams.heliaxis.co.uk';
@@ -164,6 +165,7 @@ export async function AdminShell({
       show: can('enquiries'),
     },
     { href: '/admin/crm', label: 'CRM', active: active === 'crm', tab: true, show: can('crm') },
+    { href: '/admin/assistant', label: 'Claude', active: active === 'assistant', show: can('crm') },
     { href: '/admin/subcontractors', label: 'Subcontractors', active: active === 'subcontractors', show: can('subcontractors') },
     { href: '/admin/analytics', label: 'Analytics', active: active === 'analytics', show: can('analytics') },
     { href: '/admin/analytics/heatmap', label: 'Heatmap', active: active === 'heatmap', show: can('analytics') },

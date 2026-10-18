@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
 import { HubMyDay } from './HubMyDay';
+import { FromClaude } from '@/components/admin/FromClaude';
+import type { SetupTodo } from '@/lib/setup-checks';
 import './hub.css';
 
 export type HubTask = { id: string; title: string; due_date: string | null; priority: string };
@@ -38,6 +40,14 @@ function Icon({ k }: { k: keyof typeof ICONS }) {
 }
 
 export type HubPortal = Portal & { badge?: string };
+
+function ClaudeMark() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" aria-hidden="true">
+      <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" />
+    </svg>
+  );
+}
 
 function WaIcon() {
   return (
@@ -100,6 +110,8 @@ export function HubView({
   followUps = [],
   needs = {},
   today: todayIso = '',
+  setup = [],
+  assistant = false,
 }: {
   firstName: string;
   portals: HubPortal[];
@@ -110,14 +122,19 @@ export function HubView({
   followUps?: HubFollowUp[];
   needs?: Partial<Record<string, { n: number; detail: string }>>;
   today?: string;
+  /** Admins: setup jobs Claude has left (they tick themselves off). */
+  setup?: SetupTodo[];
+  /** Show the "Talk to Claude" bar. */
+  assistant?: boolean;
 }) {
   const isAdmin = usersBadge !== undefined;
   const internal = portals.filter((p) => !p.external);
   const apps = portals.filter((p) => p.external);
   // One even row per area that needs someone: icon, name, a big number.
-  const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' }[] = [
+  const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' | 'claude' }[] = [
     { key: 'whatsapp', label: 'WhatsApp', href: '/admin/enquiries/inbox', icon: 'whatsapp' },
     { key: 'crm', label: 'CRM', href: '/admin/crm', icon: 'crm' },
+    { key: 'drafts', label: 'Drafts', href: '/admin/assistant', icon: 'claude' },
     { key: 'tasks', label: 'Tasks', href: '/admin/tasks', icon: 'tasks' },
     { key: 'enquiries', label: 'Enquiries', href: '/admin/enquiries', icon: 'enquiries' },
     { key: 'subcontractors', label: 'Subcontractors', href: '/admin/subcontractors', icon: 'subcontractors' },
@@ -154,7 +171,7 @@ export function HubView({
               <li key={a.key}>
                 <Link href={a.href} className="hub-need">
                   <span className="hub-need-icon">
-                    {a.icon === 'whatsapp' ? <WaIcon /> : <Icon k={a.icon} />}
+                    {a.icon === 'whatsapp' ? <WaIcon /> : a.icon === 'claude' ? <ClaudeMark /> : <Icon k={a.icon} />}
                   </span>
                   <span className="hub-need-main">
                     <b>{a.label}</b>
@@ -167,6 +184,24 @@ export function HubView({
           </ul>
         </section>
       )}
+
+      {assistant && (
+        <Link href="/admin/assistant" className="hub-claude">
+          <span className="hub-claude-mark"><ClaudeMark /></span>
+          <span className="hub-claude-main">
+            <b>Talk to Claude</b>
+            <small>Just finished a meeting? Say what happened — notes, tasks and drafts done for you.</small>
+          </span>
+          <span className="hub-claude-mic" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <rect x="9" y="3" width="6" height="12" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+            </svg>
+          </span>
+        </Link>
+      )}
+
+      <FromClaude todos={setup} />
 
       <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} />
 
