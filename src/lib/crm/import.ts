@@ -37,8 +37,12 @@ export async function findExistingEnquiry(p: {
   }
   const email = p.email?.trim().toLowerCase();
   if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    const { data } = await db.from('enquiries').select(cols).ilike('email', email).limit(1);
-    if (data?.length) return data[0] as Row;
+    // Ignoring case, with LIKE's wildcards escaped (PostgREST reads * as %, so that's one character),
+    // then compare properly: sam_jones@ mustn't match sam.jones@.
+    const like = email.replace(/[\\%_]/g, (c) => `\\${c}`).replace(/\*/g, '_');
+    const { data } = await db.from('enquiries').select(cols).ilike('email', like).limit(20);
+    const hit = ((data ?? []) as Row[]).find((r) => r.email?.trim().toLowerCase() === email);
+    if (hit) return hit;
   }
   return null;
 }
@@ -132,4 +136,17 @@ async function addImportedOpportunity(
 export async function opportunityFor(enquiryId: string): Promise<string | null> {
   const { data } = await createAdminClient().from('crm_projects').select('id').eq('enquiry_id', enquiryId).limit(1);
   return (data?.[0]?.id as string) ?? null;
+}
+
+/**
+ * Are crm.sql and crm-v2.sql in? Without them an import can't mark its opportunities as handled,
+ * and once they're run the new-lead alert and follow-ups would treat old leads as new ones.
+ */
+export async function importReady(): Promise<boolean> {
+  const db = createAdminClient();
+  const [projects, activities] = await Promise.all([
+    db.from('crm_projects').select('id, first_contact_at, first_response_alerted_at, sequence_stopped_at', { head: true }).limit(1),
+    db.from('crm_activities').select('id', { head: true }).limit(1),
+  ]);
+  return !projects.error && !activities.error;
 }

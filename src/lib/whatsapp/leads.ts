@@ -52,3 +52,22 @@ export function mapLeadFields(fields: LeadField[]): MappedLead {
   out.message = extra.join(' · ');
   return out;
 }
+
+/**
+ * What a lead becomes on the enquiry: its answers, the interest line (with company and any other
+ * answers folded in), the source and the WhatsApp opt-in. Shared by the live webhook and the
+ * importer so old and new leads look the same. `optInAll` is META_LEADS_WHATSAPP_OPT_IN.
+ */
+export function leadToEnquiry(fields: LeadField[], adName: string | null | undefined, optInAll: boolean) {
+  const lead = mapLeadFields(fields);
+  const interest =
+    [lead.interest, lead.organization ? `Org: ${lead.organization}` : '', lead.message ? `Message: ${lead.message}` : '']
+      .filter(Boolean)
+      .join(' · ') || null;
+  return {
+    lead,
+    interest,
+    source: adName ? `meta: ${adName}` : 'meta-lead-ad',
+    whatsappOptIn: lead.whatsappOptIn || optInAll,
+  };
+}

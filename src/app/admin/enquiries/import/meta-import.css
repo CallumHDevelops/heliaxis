@@ -1,0 +1,38 @@
+/* Meta lead import (MetaImport.tsx). Colours come from .imp-page in import.css. */
+.mi-section { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
+.mi-section h3 { font-size: 0.98rem; margin: 0 0 0.6rem; }
+.mi-muted { color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+.mi-msg { margin: 0.6rem 0 0; }
+.mi-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
+
+.mi-page { margin-top: 0.9rem; }
+.mi-page-name { font-weight: 700; font-size: 0.92rem; margin-bottom: 0.35rem; overflow-wrap: anywhere; }
+.mi-page .imp-err, .mi-page .mi-muted { margin: 0.2rem 0 0; line-height: 1.45; }
+.mi-forms { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: #fff; }
+.mi-form { padding: 0.6rem 0.75rem; border-top: 1px solid var(--line); }
+.mi-form:first-child { border-top: 0; }
+.mi-check { display: flex; gap: 0.6rem; align-items: flex-start; cursor: pointer; }
+.mi-check input { flex: none; width: 18px; height: 18px; margin: 0.1rem 0 0; accent-color: var(--ink); }
+.mi-form-text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.mi-form-name { font-weight: 600; font-size: 0.92rem; overflow-wrap: anywhere; }
+.mi-progress { margin: 0.35rem 0 0 calc(18px + 0.6rem); font-size: 0.84rem; line-height: 1.45; overflow-wrap: anywhere; }
+
+.mi-file { position: relative; display: inline-block; overflow: hidden; }
+.mi-file input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.mi-file:focus-within { outline: 2px solid var(--solar); outline-offset: 2px; }
+.mi-file.is-off { opacity: 0.45; }
+.mi-preview { margin-top: 0.9rem; }
+.mi-file-name { font-weight: 600; font-size: 0.9rem; overflow-wrap: anywhere; }
+.mi-warn { color: #7a5600; font-size: 0.84rem; line-height: 1.45; margin: 0.3rem 0; }
+.mi-bar { height: 6px; margin: 0.7rem 0 0; background: var(--paper); border-radius: 3px; overflow: hidden; }
+.mi-bar > div { height: 100%; background: var(--solar); transition: width 0.2s; }
+
+.mi-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 0.7rem 0; }
+.mi-stat { background: var(--paper); border-radius: 3px; padding: 0.55rem 0.7rem; min-width: 0; }
+.mi-stat b { display: block; font-size: 1.25rem; line-height: 1.2; }
+.mi-stat b.mi-dates { font-size: 0.92rem; padding: 0.15rem 0; }
+.mi-stat span { display: block; font-size: 0.8rem; color: var(--muted); line-height: 1.3; }
+.mi-stat.is-bad b { color: var(--bad); }
+.mi-summary { margin-top: 0.9rem; }
+.mi-errors { margin: 0 0 0.8rem; padding-left: 1.1rem; color: var(--bad); font-size: 0.84rem; line-height: 1.45; overflow-wrap: anywhere; }
+.mi-link { display: inline-block; text-decoration: none; }
