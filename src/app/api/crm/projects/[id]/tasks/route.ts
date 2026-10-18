@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { cleanTaskInput, TASK_COLUMNS } from '@/lib/tasks';
 import { notify } from '@/lib/notify';
+import { canAccess } from '@/lib/portals';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,13 +34,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     db.from('crm_projects').update({ updated_at: new Date().toISOString() }).eq('id', id),
   ]);
   if (task.assignee_id && task.assignee_id !== s.user.id) {
+    // Send them to the opportunity if they can open the CRM, otherwise to their Tasks page.
+    const { data: who2 } = await db.from('profiles').select('*').eq('id', task.assignee_id).maybeSingle();
+    const href = who2 && canAccess(who2, 'crm') ? `/admin/crm/${id}` : `/admin/tasks?task=${task.id}`;
     after(() =>
       notify({
         userId: task.assignee_id!,
         kind: 'task_assigned',
         title: `New task from ${who}`,
         body: `${task.title} · ${p.title}`,
-        href: `/admin/crm/${id}`,
+        href,
       })
     );
   }

@@ -749,7 +749,7 @@ function TaskEditor({
     if (!r.ok) return setErr(d.error || 'Not saved');
     await onSaved();
   }
-  const ideas = ['Send quote', 'Chase for photos', 'Book survey', 'Check funding eligibility', 'Order kit'];
+  const ideas = ['Send quote', 'Send invoice', 'Send EV guide', 'Chase for photos', 'Book survey', 'Check funding', 'Order kit'];
   return (
     <div>
       <h2>New task</h2>
@@ -786,7 +786,9 @@ function TaskEditor({
           <input type="checkbox" checked={high} onChange={(e) => setHigh(e.target.checked)} /> High priority
         </label>
       </div>
-      <p className="crm-muted crm-small">It also shows on the Tasks page, and the person gets a notification.</p>
+      <p className="crm-muted crm-small">
+        They get a notification, and it shows in their My day and on the Tasks page. Anyone with CRM or Tasks access can be picked.
+      </p>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       <div className="crm-actions">
         <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !title.trim()} onClick={save}>

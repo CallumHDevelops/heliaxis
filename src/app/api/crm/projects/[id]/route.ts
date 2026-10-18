@@ -64,7 +64,11 @@ export async function GET(_req: Request, { params }: Ctx) {
       .limit(100),
   ]);
 
-  const team = (people ?? []).filter((p) => canAccess(p, 'crm')).map((p) => ({ id: p.id as string, name: (p.full_name || p.email || 'Team') as string }));
+  // Anyone who can see the work: CRM users, or people who only have Tasks (they see it on the Tasks page).
+  const team = (people ?? [])
+    .filter((p) => canAccess(p, 'crm') || canAccess(p, 'tasks'))
+    .map((p) => ({ id: p.id as string, name: (p.full_name || p.email || 'Team') as string, crm: canAccess(p, 'crm') }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const nameOf = new Map((people ?? []).map((p) => [p.id as string, (p.full_name || p.email || 'Team') as string]));
 
   // Signed links (1h) for each photo and its thumbnail.
