@@ -128,7 +128,7 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {sent && <p className="crm-banner">{sent}</p>}
       {docs.length === 0 ? (
-        <p className="crm-muted crm-emptystate">No documents yet. Upload quotes, invoices, DNO letters and certificates — they appear in the customer’s portal.</p>
+        <p className="crm-muted crm-emptystate">No documents yet. Upload quotes, invoices, DNO letters and certificates — ones marked visible appear in the customer’s portal once the job starts.</p>
       ) : (
         <ul className="crm-doclist">
           {docs.map((d) => (
@@ -168,11 +168,14 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
 export function PortalCard({
   id,
   portal,
+  open,
   tracker,
   onSendWhatsApp,
 }: {
   id: string;
   portal: string | null;
+  /** The job has started (Won onwards) — before that the customer has no portal. */
+  open: boolean;
   tracker: TrackerStep[];
   onSendWhatsApp: (text: string) => void;
 }) {
@@ -186,6 +189,19 @@ export function PortalCard({
     return (d.url as string) || null;
   }
   const current = tracker.find((t) => t.state === 'current');
+  if (!open)
+    return (
+      <div className="crm-portal">
+        <div className="crm-portal-head">
+          <b>Customer portal</b>
+          <span className="crm-muted crm-small">🔒 Not yet</span>
+        </div>
+        <p className="crm-muted crm-small">
+          Opens when the job starts. Move this opportunity to <b>Won</b> and you can send them their private link with progress, documents,
+          photos and deposit.
+        </p>
+      </div>
+    );
   return (
     <div className="crm-portal">
       <div className="crm-portal-head">
@@ -197,7 +213,7 @@ export function PortalCard({
           <li key={t.key} className={t.state} title={t.label} />
         ))}
       </ol>
-      <p className="crm-muted crm-small">Their progress, dates, documents, photos, survey booking, quote signing and deposit — on one private link.</p>
+      <p className="crm-muted crm-small">Their progress, dates, documents, photos and deposit — on one private link.</p>
       <div className="crm-actions" style={{ marginTop: 0 }}>
         <button
           type="button"
@@ -281,7 +297,7 @@ export function DnoDeposit({ project, stripe, onSave }: { project: DnoProject; s
           ✍ Accepted and signed online by <b>{project.accepted_name}</b> on {short(project.accepted_at)}.
         </p>
       ) : (
-        <p className="crm-muted crm-small">Upload the quote under Documents (type: Quote) — the customer can accept and sign it in their portal.</p>
+        <p className="crm-muted crm-small">Once the job has started, quotes uploaded under Documents (type: Quote) can be accepted and signed in their portal.</p>
       )}
       <label className="crm-label" htmlFor="dep">
         Deposit £
@@ -296,7 +312,7 @@ export function DnoDeposit({ project, stripe, onSave }: { project: DnoProject; s
         {project.deposit_paid_at
           ? `💷 Paid ${short(project.deposit_paid_at)}.`
           : stripe
-            ? 'The customer can pay it by card from their portal once they’ve accepted.'
+            ? 'The customer can pay it by card from their portal once the job has started.'
             : 'Card payments aren’t connected yet (Stripe) — the portal shows the amount due.'}
       </p>
     </div>
@@ -319,7 +335,9 @@ export function SnippetPicker({ projectId, name, onPick }: { projectId: string; 
     let link: string | null = null;
     if (s.body.includes('{portal_link}')) {
       const r = await fetch(`/api/crm/projects/${projectId}/portal`, { method: 'POST' });
-      link = (await r.json().catch(() => ({}))).url || null;
+      const d = await r.json().catch(() => ({}));
+      link = d.url || null;
+      if (!link) window.alert(d.error || 'No portal link yet.');
     }
     onPick(fillText(s.body, { name, portalLink: link }));
     setOpen(false);

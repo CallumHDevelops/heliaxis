@@ -83,7 +83,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'draft_email',
     description:
-      'Write an email to the customer and save it as a draft for the user to check and send. Sign off as Heliaxis. {portal_link} in the text becomes their portal link.',
+      'Write an email to the customer and save it as a draft for the user to check and send. Sign off as Heliaxis. {portal_link} in the text becomes their portal link, but only once their job has started (stage Won or later).',
     input_schema: obj({ project_id: str, subject: str, body: str }),
   },
   {

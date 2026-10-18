@@ -61,13 +61,13 @@ export const DEFAULT_CRM_SETTINGS: CrmSettings = {
     {
       afterHours: 24,
       channel: 'whatsapp',
-      text: 'Hi {first_name}, just checking you saw our message about your enquiry? Happy to answer any questions — or book a free survey here: {portal_link}',
+      text: 'Hi {first_name}, just checking you saw our message about your enquiry? Happy to answer any questions, or just reply here to book a free survey.',
     },
     {
       afterHours: 72,
       channel: 'email',
       subject: 'Your Heliaxis enquiry',
-      text: 'Hi {first_name},\n\nThanks again for your enquiry. You can book a free survey at a time that suits you here: {portal_link}\n\nAny questions, just reply to this email.\n\nThe Heliaxis team',
+      text: 'Hi {first_name},\n\nThanks again for your enquiry. If you’d like to book a free survey, just reply with a couple of days and times that suit you.\n\nAny questions, just reply to this email.\n\nThe Heliaxis team',
     },
   ],
 };
@@ -130,5 +130,6 @@ export function fillText(text: string, v: { name?: string | null; portalLink?: s
   return text
     .replace(/\{first_name\}/g, first)
     .replace(/\{name\}/g, full || 'there')
-    .replace(/\{portal_link\}/g, v.portalLink || '');
+    .replace(/\{portal_link\}/g, v.portalLink || '')
+    .replace(/[ \t]+$/gm, '');
 }

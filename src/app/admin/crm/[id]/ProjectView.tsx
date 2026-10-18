@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addPhotos, queued, QUEUE_CHANGED, uploadQueued, watchQueue } from '@/lib/crm/photo-queue';
 import {
+  portalOpen,
   ACTIVITY_LABEL,
   PHOTO_CATEGORIES,
   photoLabel,
@@ -262,6 +263,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
         <PortalCard
           id={id}
           portal={portal}
+          open={portalOpen(project.stage)}
           tracker={tracker}
           onSendWhatsApp={(text) => {
             setWaDraft(text);

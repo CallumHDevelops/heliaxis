@@ -19,9 +19,12 @@ ticks itself off once the app can see it's done.
 The every-minute job you already scheduled (`whatsapp-outbox`) also runs all CRM automation and
 picks up email — nothing else to schedule.
 
-Then open **CRM → ⚙ Settings** and set up lead sharing, reminders, booking times and saved replies.
+Then open **CRM → ⚙ Settings** and set up lead sharing, reminders and saved replies.
 
 ## 2. Customer portal
+
+Customers only get a portal once their job starts: when the opportunity moves to **Won** or later.
+Before that there's no link, and old links stop working if a job goes back or is lost.
 
 Nothing to set up. Add to Vercel so the portal's "WhatsApp us" button works:
 
