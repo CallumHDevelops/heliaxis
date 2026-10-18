@@ -21,6 +21,10 @@ export type CsvLead = {
 /** Caps on one lead: the parser trims to these and the API refuses anything bigger. */
 export const CSV_LIMITS = { fields: 100, name: 200, value: 1000, text: 200 } as const;
 
+/** Made with Meta's Lead Ads Testing Tool: "<test lead: dummy data for full_name>", test@fb.com. */
+export const isTestLead = (fields: LeadField[]) =>
+  fields.some((f) => (f.values ?? []).some((v) => /^<test lead\b/i.test(v.trim()) || v.trim().toLowerCase() === 'test@fb.com'));
+
 /**
  * A downloaded file as text. Meta's own downloads are usually UTF-16 with tabs; other exports and
  * spreadsheets save UTF-8 (sometimes with a BOM) or, from older Excel, Windows-1252.
@@ -224,9 +228,9 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /**
  * A lead download → leads, plus plain-English notes on anything left out. Blank rows are skipped;
- * rows with no readable date, a date in the future, or no name, email or phone are left out (and
- * counted in the warnings). Columns it doesn't know become answers under their header text, so
- * they end up in the enquiry's message like any other question on the form.
+ * rows with no readable date, a date in the future, or no name, email or phone, and Meta's test
+ * leads, are left out (and counted in the warnings). Columns it doesn't know become answers under
+ * their header text, so they end up in the enquiry's message like any other question on the form.
  */
 export function parseLeadCsv(text: string, now = Date.now()): { leads: CsvLead[]; warnings: string[] } {
   const clean = text.replace(/^﻿/, '');
@@ -266,6 +270,7 @@ export function parseLeadCsv(text: string, now = Date.now()): { leads: CsvLead[]
   let noDate = 0;
   let future = 0;
   let noContact = 0;
+  let test = 0;
   for (const r of rows) {
     const ms = parseDate(r[dateCol] ?? '', dayFirst);
     if (ms === null) {
@@ -293,10 +298,15 @@ export function parseLeadCsv(text: string, now = Date.now()): { leads: CsvLead[]
       noContact++;
       continue;
     }
+    if (isTestLead(lead.field_data)) {
+      test++;
+      continue;
+    }
     leads.push(lead);
   }
   if (noDate) warnings.push(`${plural(noDate, 'row has', 'rows have')} no date we can read and will be left out.`);
   if (future) warnings.push(`${plural(future, 'row is', 'rows are')} dated in the future and will be left out.`);
   if (noContact) warnings.push(`${plural(noContact, 'row has', 'rows have')} no name, email or phone number and will be left out.`);
+  if (test) warnings.push(`${plural(test, 'test lead', 'test leads')} from Meta’s testing tool will be left out.`);
   return { leads, warnings };
 }

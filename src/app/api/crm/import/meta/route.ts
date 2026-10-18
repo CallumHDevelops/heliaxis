@@ -1,4 +1,5 @@
 import { requireApproved } from '@/lib/auth';
+import { importReady } from '@/lib/crm/import';
 import { json } from '@/lib/crm/server';
 import {
   errorText,
@@ -22,10 +23,15 @@ async function adminSession() {
   return s;
 }
 
+const NOT_READY =
+  'Run crm.sql and then crm-v2.sql in Supabase before importing (they’re on your “From Claude” list on the home page). ' +
+  'Until then, imported leads can’t be kept out of the new-lead alerts and follow-up messages.';
+
 /** The Pages and lead forms the CRM's Meta token can see. */
 export async function GET() {
   const s = await adminSession();
   if (s instanceof Response) return s;
+  if (!(await importReady())) return json({ pages: [], error: NOT_READY }, 503);
   const r = await listLeadSources();
   return json(r, r.error ? 502 : 200);
 }
@@ -84,6 +90,7 @@ export async function POST(req: Request) {
   if (s instanceof Response) return s;
   const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!b || typeof b !== 'object') return json({ error: 'bad request' }, 400);
+  if (!(await importReady())) return json({ error: NOT_READY }, 503);
 
   if (b.action === 'form') {
     if (!isGraphId(b.pageId) || !isGraphId(b.formId)) return json({ error: 'Unknown Page or form' }, 400);

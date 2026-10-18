@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createImportedEnquiry, findExistingEnquiry, opportunityFor } from '@/lib/crm/import';
+import { createImportedEnquiry, findExistingEnquiry, opportunityFor, type ExistingEnquiry } from '@/lib/crm/import';
+import { isTestLead } from '@/lib/meta-leads-csv';
 import { graph, type GraphResult, type LeadField } from '@/lib/whatsapp/api';
 import { leadToEnquiry, mapLeadFields } from '@/lib/whatsapp/leads';
 
@@ -71,6 +72,11 @@ async function findPages(fresh = false): Promise<{ ok: true; data: Page[] } | { 
   if (!fresh && pagesCache?.token === token && Date.now() - pagesCache.at < 10 * 60_000) return { ok: true, data: pagesCache.pages };
 
   const accounts = await all<{ id: string; name?: string; access_token?: string }>('/me/accounts?fields=id,name,access_token&limit=100', token);
+  // A Page token has no accounts ("nonexisting field (accounts) on node type (Page)"). Any other
+  // failure (permissions, rate limits, a blip) is said as it is, and not remembered.
+  if (!accounts.ok && !(accounts.code === 100 && /nonexist|node type/i.test(accounts.error))) {
+    return { ok: false, error: plainMetaError(accounts) };
+  }
   let pages: Page[] = accounts.ok
     ? accounts.data.map((p) => ({ id: p.id, name: p.name || p.id, token: p.access_token || token }))
     : [];
@@ -84,12 +90,14 @@ async function findPages(fresh = false): Promise<{ ok: true; data: Page[] } | { 
 }
 
 async function pageToken(pageId: string): Promise<{ ok: true; data: string } | { ok: false; error: string }> {
-  const pages = await findPages();
+  let pages = await findPages();
+  // Not in the remembered list (it may be from before the Page was shared): ask Meta once more.
+  if (pages.ok && !pages.data.some((x) => x.id === pageId)) pages = await findPages(true);
   if (!pages.ok) return pages;
   const p = pages.data.find((x) => x.id === pageId);
   return p
     ? { ok: true, data: p.token }
-    : { ok: false, error: 'The CRM’s Meta token can’t see that Page any more. Press “Find lead forms” again.' };
+    : { ok: false, error: 'The CRM’s Meta token can’t see that Page any more. Press “Look again” to see what it can reach.' };
 }
 
 export type LeadForm = { id: string; name: string; status: string | null; leads: number | null; createdTime: string | null };
@@ -151,8 +159,11 @@ export type GraphLead = {
   is_organic?: boolean;
 };
 
-export type ImportCounts = { imported: number; matched: number; already: number; failed: number };
-export const noCounts = (): ImportCounts => ({ imported: 0, matched: 0, already: 0, failed: 0 });
+export type ImportCounts = { imported: number; matched: number; already: number; skipped: number; failed: number };
+export const noCounts = (): ImportCounts => ({ imported: 0, matched: 0, already: 0, skipped: 0, failed: 0 });
+
+// Newer than this, a lead is the live webhook's: taking it first would skip its alert and rotation.
+const LIVE_MS = 60 * 60_000;
 
 const PLATFORMS: Record<string, string> = { fb: 'Facebook', facebook: 'Facebook', ig: 'Instagram', instagram: 'Instagram' };
 
@@ -169,21 +180,21 @@ export const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Unkn
 
 /**
  * One lead, from Meta or a CSV: 'already' if it's been brought in before, 'matched' if the person
- * is already in the CRM (their timeline gets a line saying so), otherwise 'imported' as a new
- * enquiry at its original date. Throws if it can't be saved.
+ * is already in the CRM (their timeline gets a line saying so), 'skipped' for Meta test leads and
+ * ones from the last hour (the live webhook's), otherwise 'imported' as a new enquiry at its
+ * original date. Throws if it can't be saved.
  */
 export async function importLead(
   lead: GraphLead,
   formName?: string | null,
   byId?: string | null
-): Promise<'imported' | 'matched' | 'already'> {
+): Promise<'imported' | 'matched' | 'already' | 'skipped'> {
+  if (isTestLead(lead.field_data ?? [])) return 'skipped';
   const metaLeadId = lead.id?.trim() || null;
-  const { lead: who, interest, source, whatsappOptIn } = leadToEnquiry(
-    lead.field_data ?? [],
-    lead.ad_name,
-    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true'
-  );
+  // Only their own answer counts: META_LEADS_WHATSAPP_OPT_IN is about what today's forms say, not old ones.
+  const { lead: who, interest, source, whatsappOptIn } = leadToEnquiry(lead.field_data ?? [], lead.ad_name, false);
   if (!who.name && !who.email && !who.phone) throw new Error('no name, email or phone number');
+  const name = (who.name || 'Meta lead').trim().slice(0, 200);
 
   const at = lead.created_time ? new Date(lead.created_time) : null;
   const when = at && Number.isFinite(at.getTime()) ? at.toISOString() : null;
@@ -193,19 +204,22 @@ export async function importLead(
     .filter(Boolean)
     .join(', ');
 
-  const existing = await findExistingEnquiry({ metaLeadId, phone: who.phone, email: who.email });
+  const db = createAdminClient();
+  let existing = await findExistingEnquiry({ metaLeadId, phone: who.phone, email: who.email });
+  if (!existing && when) {
+    // Nothing to match on (no lead id, phone or email we can use): an earlier import of this lead
+    // has the same name at the same moment.
+    const { data } = await db.from('enquiries').select('id, name, meta_lead_id, wa_id').eq('name', name).eq('created_at', when).limit(1);
+    existing = (data?.[0] as ExistingEnquiry | undefined) ?? null;
+  }
   if (existing && metaLeadId && existing.meta_lead_id === metaLeadId) return 'already';
+  if (when && Date.now() - Date.parse(when) < LIVE_MS) return 'skipped';
 
   if (existing) {
-    const db = createAdminClient();
-    if (metaLeadId && !existing.meta_lead_id) {
-      // So the Conversions API can name the lead. Unique: if another enquiry claimed it meanwhile, leave it.
-      const { error } = await db.from('enquiries').update({ meta_lead_id: metaLeadId }).eq('id', existing.id).is('meta_lead_id', null);
-      if (error && error.code !== '23505') throw new Error(error.message);
-    }
     // The same file (or the same lead without its id) imported again: it's on their timeline already.
+    let seen = false;
     if (when) {
-      const { data: seen } = await db
+      const { data } = await db
         .from('crm_activities')
         .select('id')
         .eq('enquiry_id', existing.id)
@@ -213,23 +227,31 @@ export async function importLead(
         .eq('at', when)
         .ilike('body', '%Meta lead form%')
         .limit(1);
-      if (seen?.length) return 'already';
+      seen = !!data?.length;
     }
-    const { error } = await db.from('crm_activities').insert({
-      enquiry_id: existing.id,
-      project_id: await opportunityFor(existing.id),
-      kind: 'system',
-      body: `Also filled in ${where}${when ? ` on ${day(when)}` : ''}${via ? ` (${via})` : ''}${interest ? `: ${interest}` : ''}. Added by import.`.slice(0, 2000),
-      by_id: byId ?? null,
-      at: when ?? new Date().toISOString(),
-    });
-    if (error) throw new Error(error.message);
-    return 'matched';
+    if (!seen) {
+      const { error } = await db.from('crm_activities').insert({
+        enquiry_id: existing.id,
+        project_id: await opportunityFor(existing.id),
+        kind: 'system',
+        body: `Also filled in ${where}${when ? ` on ${day(when)}` : ''}${via ? ` (${via})` : ''}${interest ? `: ${interest}` : ''}. Added by import.`.slice(0, 2000),
+        by_id: byId ?? null,
+        at: when ?? new Date().toISOString(),
+      });
+      if (error) throw new Error(error.message);
+    }
+    if (metaLeadId && !existing.meta_lead_id) {
+      // So the Conversions API can name the lead. After the line, so a line that failed isn't taken as
+      // already imported next time. Unique: if another enquiry claimed it meanwhile, leave it.
+      const { error } = await db.from('enquiries').update({ meta_lead_id: metaLeadId }).eq('id', existing.id).is('meta_lead_id', null);
+      if (error && error.code !== '23505') throw new Error(error.message);
+    }
+    return seen ? 'already' : 'matched';
   }
 
   try {
     await createImportedEnquiry({
-      name: who.name || 'Meta lead',
+      name,
       email: who.email,
       phone: who.phone || null,
       postcode: who.postcode || null,
