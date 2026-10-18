@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addPhotos, queued, QUEUE_CHANGED, uploadQueued, watchQueue } from '@/lib/crm/photo-queue';
 import {
-  ACTIVITY_KINDS,
   ACTIVITY_LABEL,
-  money,
   PHOTO_CATEGORIES,
   photoLabel,
   PRODUCTS,
@@ -74,6 +72,18 @@ const toLocalInput = (iso: string | null) => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 
+type WaInfo = {
+  configured: boolean;
+  number: string | null;
+  threadId: string | null;
+  windowOpen: boolean;
+  unread: number;
+  unreadIds: string[];
+  messages: number;
+  chaseHours: number;
+};
+type Sheet = null | 'menu' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage';
+
 export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
@@ -81,8 +91,10 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
   const [timeline, setTimeline] = useState<Entry[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [team, setTeam] = useState<{ id: string; name: string }[]>([]);
+  const [wa, setWa] = useState<WaInfo | null>(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'timeline' | 'photos' | 'details'>('timeline');
+  const [tab, setTab] = useState<'activity' | 'photos' | 'details'>('activity');
+  const [sheet, setSheet] = useState<Sheet>(null);
 
   const load = useCallback(async () => {
     try {
@@ -94,14 +106,31 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
       setTimeline(d.timeline);
       setPhotos(d.photos);
       setTeam(d.team);
+      setWa(d.whatsapp);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load this project');
     }
   }, [id]);
+
   useEffect(() => {
     load();
+    // New WhatsApp messages show up while you're looking.
+    const t = setInterval(() => document.visibilityState === 'visible' && load(), 15_000);
+    return () => clearInterval(t);
   }, [load]);
+
+  // Reading the feed counts as reading their WhatsApp (blue ticks, badge cleared).
+  useEffect(() => {
+    if (tab !== 'activity' || !wa?.unreadIds.length) return;
+    for (const eid of wa.unreadIds) {
+      fetch(`/api/whatsapp/conversations/${eid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ read: true }),
+      }).catch(() => {});
+    }
+  }, [tab, wa?.unreadIds]);
 
   async function patch(body: Partial<Project>) {
     setError('');
@@ -130,64 +159,34 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
     );
   }
 
-  const phone = customer.phone?.replace(/\s/g, '');
-  const where = project.address || project.postcode || customer.postcode;
+  const postcode = project.postcode || customer.postcode;
+  const done = async () => {
+    setSheet(null);
+    await load();
+  };
 
   return (
     <div className="crm crm-project">
-      <Link href="/admin/crm" className="crm-back">
-        ← Projects
-      </Link>
-      <div className="crm-ptitle">
-        <h1>{project.title}</h1>
-        <p>
-          {customer.name}
-          {where ? ` · ${where}` : ''}
-          {project.value ? ` · ${money(project.value)}` : ''}
-        </p>
+      <div className="crm-phead">
+        <Link href="/admin/crm" className="crm-back" aria-label="Back to projects">
+          ←
+        </Link>
+        <div className="crm-phead-main">
+          <h1>{customer.name}</h1>
+          <p>
+            {postcode || 'No postcode'}
+            {project.title !== customer.name && project.title !== `${customer.name} · ${postcode}` ? ` · ${project.title}` : ''}
+          </p>
+        </div>
+        <button type="button" className={`crm-stage crm-stage--btn st-${project.stage}`} onClick={() => setSheet('stage')}>
+          {stageLabel(project.stage)} ▾
+        </button>
       </div>
 
-      <label className="crm-stage-pick">
-        <span>Stage</span>
-        <select value={project.stage} onChange={(e) => patch({ stage: e.target.value })} className={`st-${project.stage}`}>
-          {STAGES.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="crm-quick">
-        {phone && (
-          <a href={`tel:${phone}`}>
-            <span aria-hidden="true">📞</span>Call
-          </a>
-        )}
-        {phone && (
-          <Link href={`/admin/enquiries/inbox/${customer.id}`}>
-            <span aria-hidden="true">💬</span>WhatsApp
-            {customer.wa_unread ? <i className="crm-quick-badge">{customer.wa_unread}</i> : null}
-          </Link>
-        )}
-        {customer.email && (
-          <a href={`mailto:${customer.email}`}>
-            <span aria-hidden="true">✉️</span>Email
-          </a>
-        )}
-        {where && (
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`} target="_blank" rel="noreferrer">
-            <span aria-hidden="true">📍</span>Map
-          </a>
-        )}
-      </div>
-
-      {error && <p className="crm-banner crm-banner--err">{error}</p>}
-
-      <div className="crm-tabs" role="tablist">
+      <div className="crm-tabs crm-tabs--slim" role="tablist">
         {(
           [
-            ['timeline', 'Timeline'],
+            ['activity', `Activity${wa?.unread ? ` · ${wa.unread} new` : ''}`],
             ['photos', `Photos${photos.length ? ` (${photos.length})` : ''}`],
             ['details', 'Details'],
           ] as const
@@ -198,15 +197,19 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
         ))}
       </div>
 
-      {tab === 'timeline' && <Timeline id={id} entries={timeline} onSaved={load} />}
+      {error && <p className="crm-banner crm-banner--err">{error}</p>}
+
+      {tab === 'activity' && <Feed entries={timeline} customerName={customer.name} />}
       {tab === 'photos' && <Photos id={id} photos={photos} onChanged={load} />}
       {tab === 'details' && (
         <Details
           key={project.id}
           project={project}
           customer={customer}
+          wa={wa}
           team={team}
           onSave={patch}
+          onCustomerSaved={load}
           isAdmin={isAdmin}
           onDelete={async () => {
             if (!confirm('Delete this project, its timeline entries and photos? This can’t be undone.')) return;
@@ -216,15 +219,276 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
           }}
         />
       )}
+
+      {tab !== 'details' && (
+        <button type="button" className="crm-fab" aria-label="Add" onClick={() => setSheet('menu')}>
+          +
+        </button>
+      )}
+
+      {sheet && (
+        <div className="crm-sheet" role="dialog" aria-modal="true" onClick={() => setSheet(null)}>
+          <div className="crm-sheet-box" onClick={(e) => e.stopPropagation()}>
+            {sheet === 'menu' && <ActionMenu customer={customer} wa={wa} onPick={setSheet} />}
+            {sheet === 'whatsapp' && <WhatsAppComposer customer={customer} wa={wa} onSent={done} />}
+            {(sheet === 'note' || sheet === 'call' || sheet === 'visit') && (
+              <LogComposer id={id} kind={sheet} phone={customer.phone} onSaved={done} />
+            )}
+            {sheet === 'email' && <EmailComposer id={id} customer={customer} onSaved={done} />}
+            {sheet === 'photo' && <PhotoQuick id={id} onDone={done} />}
+            {sheet === 'stage' && (
+              <div>
+                <h2>Move stage</h2>
+                <div className="crm-stage-list">
+                  {STAGES.map((st) => (
+                    <button
+                      key={st.key}
+                      type="button"
+                      className={project.stage === st.key ? 'on' : ''}
+                      onClick={async () => {
+                        setSheet(null);
+                        if (st.key !== project.stage) await patch({ stage: st.key });
+                      }}
+                    >
+                      <span className={`crm-stage st-${st.key}`}>{st.label}</span>
+                      {project.stage === st.key ? ' ✓' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function Timeline({ id, entries, onSaved }: { id: string; entries: Entry[]; onSaved: () => Promise<void> }) {
-  const [kind, setKind] = useState<(typeof ACTIVITY_KINDS)[number]>('note');
+/** Everything with the customer, oldest first like a chat — WhatsApp as bubbles, the rest as cards. */
+function Feed({ entries, customerName }: { entries: Entry[]; customerName: string }) {
+  const endRef = useRef<HTMLDivElement>(null);
+  // Oldest first, each flagged when it starts a new day.
+  const items = useMemo(() => {
+    const out: (Entry & { day: string; showDay: boolean })[] = [];
+    for (const e of [...entries].reverse()) {
+      const day = new Date(e.at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      out.push({ ...e, day, showDay: day !== out[out.length - 1]?.day });
+    }
+    return out;
+  }, [entries]);
+  const last = items[items.length - 1]?.id;
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: 'end' });
+  }, [last]);
+  if (!items.length) {
+    return <p className="crm-muted crm-empty">Nothing yet with {customerName}. Tap + to message them, log a call or add a note.</p>;
+  }
+  return (
+    <div className="crm-feed">
+      {items.map((e) => {
+        const time = new Date(e.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const sep = e.showDay ? <div className="crm-feed-day">{e.day}</div> : null;
+        if (e.kind === 'whatsapp') {
+          const inbound = e.meta?.direction === 'in';
+          const status = String(e.meta?.status || '');
+          return (
+            <div key={e.id}>
+              {sep}
+              <div className={`crm-bubble ${inbound ? 'in' : 'out'}`}>
+                {!inbound && e.by && <span className="crm-bubble-by">{e.by}</span>}
+                <span className="crm-bubble-text">{e.body}</span>
+                <span className="crm-bubble-meta">
+                  💬 {time}
+                  {!inbound && <span className={`crm-tick ${status}`}>{status === 'read' || status === 'delivered' ? ' ✓✓' : status === 'failed' ? ' !' : ' ✓'}</span>}
+                </span>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div key={e.id}>
+            {sep}
+            <div className={`crm-event k-${e.kind}`}>
+              <span className="crm-event-icon" aria-hidden="true">
+                {ICON[e.kind] || '•'}
+              </span>
+              <div className="crm-event-body">
+                <div className="crm-event-meta">
+                  <b>{ACTIVITY_LABEL[e.kind] || e.kind}</b>
+                  {e.by ? ` · ${e.by}` : ''} · {time}
+                </div>
+                {e.body && <p>{e.body}</p>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div ref={endRef} />
+    </div>
+  );
+}
+
+function ActionMenu({ customer, wa, onPick }: { customer: Customer; wa: WaInfo | null; onPick: (s: Sheet) => void }) {
+  const items: [Sheet, string, string, string?][] = [
+    ['whatsapp', '💬', 'WhatsApp', !wa?.number ? 'Add their mobile first' : wa.windowOpen ? 'Reply' : 'Template (paid)'],
+    ['note', '📝', 'Note'],
+    ['call', '📞', 'Call', customer.phone ? undefined : 'No number'],
+    ['email', '✉️', 'Email', customer.email ? undefined : 'No email'],
+    ['visit', '🏠', 'Site visit'],
+    ['photo', '📷', 'Photos'],
+    ['stage', '➜', 'Move stage'],
+  ];
+  return (
+    <div>
+      <h2>Add to {customer.name}</h2>
+      <div className="crm-menu">
+        {items.map(([k, icon, label, hint]) => (
+          <button key={k} type="button" onClick={() => onPick(k)}>
+            <span className="crm-menu-icon">{icon}</span>
+            <span>{label}</span>
+            {hint && <small>{hint}</small>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type Template = { name: string; language: string; body: string; params: number };
+
+function WhatsAppComposer({ customer, wa, onSent }: { customer: Customer; wa: WaInfo | null; onSent: () => Promise<void> }) {
+  const [text, setText] = useState('');
+  const [chase, setChase] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [templates, setTemplates] = useState<Template[] | null>(null);
+  const [tpl, setTpl] = useState<{ name: string; lang: string; params: string[] } | null>(null);
+  const first = customer.name.split(/\s+/)[0] || '';
+
+  useEffect(() => {
+    if (!wa?.number || wa.windowOpen || !wa.configured) return;
+    fetch('/api/whatsapp/templates', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        const list: Template[] = d.items || [];
+        setTemplates(list);
+        if (list[0]) setTpl({ name: list[0].name, lang: list[0].language, params: Array.from({ length: list[0].params }, (_, i) => (i === 0 ? first : '')) });
+      })
+      .catch(() => setTemplates([]));
+  }, [wa?.number, wa?.windowOpen, wa?.configured, first]);
+
+  if (!wa?.configured) return <ComposerNote title="WhatsApp" body="WhatsApp isn’t connected yet — finish the Meta setup (WHATSAPP_SETUP.md)." />;
+  if (!wa.number || !wa.threadId) return <ComposerNote title="WhatsApp" body="Add the customer’s mobile in Details first — any WhatsApp chat on that number then links here." />;
+
+  async function send(body: Record<string, unknown>) {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/whatsapp/conversations/${wa!.threadId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setErr(d.error || 'Not sent');
+    await onSent();
+  }
+  const asks = text.includes('?');
+
+  return (
+    <div>
+      <h2>WhatsApp {customer.name}</h2>
+      <p className="crm-muted crm-small">
+        +{wa.number} · {wa.windowOpen ? 'free to reply (inside 24h)' : 'outside 24h — an approved template is needed (~2–5p)'} ·{' '}
+        <Link href={`/admin/enquiries/inbox/${wa.threadId}`} className="crm-link">
+          Full chat
+        </Link>
+      </p>
+      {wa.windowOpen ? (
+        <>
+          <textarea className="crm-input" rows={4} autoFocus placeholder="Message" value={text} onChange={(e) => setText(e.target.value)} />
+          {asks && wa.chaseHours > 0 && (
+            <label className="crm-check">
+              <input type="checkbox" checked={chase} onChange={(e) => setChase(e.target.checked)} /> Chase if no reply in {wa.chaseHours}h
+            </label>
+          )}
+          {err && <p className="crm-banner crm-banner--err">{err}</p>}
+          <div className="crm-actions">
+            <button
+              type="button"
+              className="crm-btn crm-btn--wa"
+              disabled={busy || !text.trim()}
+              onClick={() => send({ text: text.trim(), chaseHours: asks && chase ? wa.chaseHours : 0 })}
+            >
+              {busy ? 'Sending…' : 'Send WhatsApp'}
+            </button>
+          </div>
+        </>
+      ) : templates === null ? (
+        <p className="crm-muted">Loading templates…</p>
+      ) : !templates.length || !tpl ? (
+        <p className="crm-muted">No approved templates yet — create one in WhatsApp Manager.</p>
+      ) : (
+        <>
+          <select
+            className="crm-input"
+            value={`${tpl.name}|${tpl.lang}`}
+            onChange={(e) => {
+              const [name, lang] = e.target.value.split('|');
+              const t = templates.find((x) => x.name === name && x.language === lang);
+              setTpl({ name, lang, params: Array.from({ length: t?.params ?? 0 }, (_, i) => (i === 0 ? first : '')) });
+            }}
+          >
+            {templates.map((t) => (
+              <option key={`${t.name}|${t.language}`} value={`${t.name}|${t.language}`}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          {templates.find((t) => t.name === tpl.name)?.body && (
+            <p className="crm-tpl">{templates.find((t) => t.name === tpl.name)?.body}</p>
+          )}
+          {tpl.params.map((p, i) => (
+            <input
+              key={i}
+              className="crm-input"
+              placeholder={`{{${i + 1}}}`}
+              value={p}
+              onChange={(e) => setTpl({ ...tpl, params: tpl.params.map((x, j) => (j === i ? e.target.value : x)) })}
+            />
+          ))}
+          {err && <p className="crm-banner crm-banner--err">{err}</p>}
+          <div className="crm-actions">
+            <button
+              type="button"
+              className="crm-btn crm-btn--wa"
+              disabled={busy || tpl.params.some((x) => !x.trim())}
+              onClick={() => send({ template: tpl.name, lang: tpl.lang, params: tpl.params })}
+            >
+              {busy ? 'Sending…' : 'Send template'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ComposerNote({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <h2>{title}</h2>
+      <p className="crm-muted">{body}</p>
+    </div>
+  );
+}
+
+function LogComposer({ id, kind, phone, onSaved }: { id: string; kind: 'note' | 'call' | 'visit'; phone: string | null; onSaved: () => Promise<void> }) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const title = { note: 'Add a note', call: 'Log a call', visit: 'Log a site visit' }[kind];
+  const placeholder = { note: 'Anything worth remembering…', call: 'What was said?', visit: 'How did the visit go?' }[kind];
   async function save() {
     setBusy(true);
     setErr('');
@@ -236,51 +500,92 @@ function Timeline({ id, entries, onSaved }: { id: string; entries: Entry[]; onSa
     const d = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) return setErr(d.error || 'Not saved');
-    setBody('');
     await onSaved();
   }
-  const placeholder: Record<string, string> = {
-    note: 'Add a note…',
-    call: 'What was said on the call?',
-    visit: 'How did the visit go?',
-    email: 'What was the email about?',
-  };
   return (
     <div>
-      <div className="crm-compose">
-        <div className="crm-seg">
-          {ACTIVITY_KINDS.map((k) => (
-            <button key={k} type="button" className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>
-              {ICON[k]} {ACTIVITY_LABEL[k]}
-            </button>
-          ))}
-        </div>
-        <textarea className="crm-input" rows={3} placeholder={placeholder[kind]} value={body} onChange={(e) => setBody(e.target.value)} />
-        {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      <h2>{title}</h2>
+      {kind === 'call' && phone && (
+        <a className="crm-btn crm-btn--ghost crm-callbtn" href={`tel:${phone.replace(/\s/g, '')}`}>
+          📞 Call {phone}
+        </a>
+      )}
+      <textarea className="crm-input" rows={5} autoFocus placeholder={placeholder} value={body} onChange={(e) => setBody(e.target.value)} />
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      <div className="crm-actions">
         <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={save}>
-          {busy ? 'Saving…' : `Log ${ACTIVITY_LABEL[kind].toLowerCase()}`}
+          {busy ? 'Saving…' : 'Save'}
         </button>
       </div>
-      {entries.length === 0 ? (
-        <p className="crm-muted">Nothing logged yet.</p>
-      ) : (
-        <ol className="crm-timeline">
-          {entries.map((e) => (
-            <li key={e.id} className={`k-${e.kind}${e.kind === 'whatsapp' && e.meta?.direction === 'in' ? ' in' : ''}`}>
-              <span className="crm-tl-icon" aria-hidden="true">
-                {ICON[e.kind] || '•'}
-              </span>
-              <div className="crm-tl-body">
-                <div className="crm-tl-meta">
-                  <b>{ACTIVITY_LABEL[e.kind] || e.kind}</b>
-                  {e.by ? ` · ${e.by}` : ''} · {when(e.at)}
-                </div>
-                {e.body && <p>{e.body}</p>}
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
+    </div>
+  );
+}
+
+/** Until Microsoft 365 is connected: write it here, it opens in your email app and is logged on the timeline. */
+function EmailComposer({ id, customer, onSaved }: { id: string; customer: Customer; onSaved: () => Promise<void> }) {
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState(`Hi ${customer.name.split(/\s+/)[0] || ''},\n\n`);
+  const [busy, setBusy] = useState(false);
+  if (!customer.email) return <ComposerNote title="Email" body="No email address for this customer — add one in Details." />;
+  async function go() {
+    setBusy(true);
+    window.location.href = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    await fetch(`/api/crm/projects/${id}/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'email', body: `To ${customer.email}${subject ? ` — ${subject}` : ''}\n\n${body.trim()}` }),
+    }).catch(() => {});
+    setBusy(false);
+    await onSaved();
+  }
+  return (
+    <div>
+      <h2>Email {customer.name}</h2>
+      <p className="crm-muted crm-small">To {customer.email} · opens in your email app and is saved to the timeline.</p>
+      <input className="crm-input" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+      <textarea className="crm-input" rows={7} value={body} onChange={(e) => setBody(e.target.value)} />
+      <div className="crm-actions">
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={go}>
+          Write email
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PhotoQuick({ id, onDone }: { id: string; onDone: () => Promise<void> }) {
+  const [cat, setCat] = useState('site');
+  const [busy, setBusy] = useState(false);
+  const cam = useRef<HTMLInputElement>(null);
+  const pick = useRef<HTMLInputElement>(null);
+  async function onFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setBusy(true);
+    await addPhotos(id, cat, files).catch(() => 0);
+    setBusy(false);
+    await onDone();
+  }
+  return (
+    <div>
+      <h2>Photos</h2>
+      <div className="crm-checks">
+        {PHOTO_CATEGORIES.map((c) => (
+          <label key={c.key} className={cat === c.key ? 'on' : ''}>
+            <input type="radio" name="cat" checked={cat === c.key} onChange={() => setCat(c.key)} />
+            {c.label}
+          </label>
+        ))}
+      </div>
+      <div className="crm-photo-actions" style={{ marginTop: '0.8rem' }}>
+        <button type="button" className="crm-btn crm-btn--solar crm-btn--big" disabled={busy} onClick={() => cam.current?.click()}>
+          {busy ? 'Preparing…' : `📷 Take ${photoLabel(cat).toLowerCase()} photo`}
+        </button>
+        <button type="button" className="crm-btn crm-btn--ghost" disabled={busy} onClick={() => pick.current?.click()}>
+          🖼 Gallery
+        </button>
+      </div>
+      <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFiles(e.target.files)} />
+      <input ref={pick} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
     </div>
   );
 }
@@ -460,18 +765,83 @@ function PhotoViewer({ photo, onClose, onChanged }: { photo: Photo; onClose: () 
   );
 }
 
+function CustomerEditor({ customer, wa, onSaved }: { customer: Customer; wa: WaInfo | null; onSaved: () => Promise<void> }) {
+  const init = { name: customer.name, phone: customer.phone || '', email: customer.email || '', postcode: customer.postcode || '' };
+  const [c, setC] = useState(init);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const dirty = JSON.stringify(c) !== JSON.stringify(init);
+  const set = (k: keyof typeof c) => (e: React.ChangeEvent<HTMLInputElement>) => setC({ ...c, [k]: e.target.value });
+  async function save() {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/crm/customers/${customer.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(c),
+    });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setErr(d.error || 'Not saved');
+    await onSaved();
+  }
+  return (
+    <div className="crm-customer">
+      <h3>Customer</h3>
+      <label className="crm-label">Name</label>
+      <input className="crm-input" value={c.name} onChange={set('name')} />
+      <div className="crm-grid2">
+        <div>
+          <label className="crm-label">Mobile</label>
+          <input className="crm-input" type="tel" value={c.phone} onChange={set('phone')} />
+        </div>
+        <div>
+          <label className="crm-label">Postcode</label>
+          <input className="crm-input" value={c.postcode} onChange={set('postcode')} />
+        </div>
+      </div>
+      <label className="crm-label">Email</label>
+      <input className="crm-input" type="email" value={c.email} onChange={set('email')} />
+      <p className="crm-muted crm-small">
+        {wa?.number
+          ? wa.messages
+            ? `💬 WhatsApp linked on +${wa.number} — ${wa.messages} message${wa.messages === 1 ? '' : 's'} on the timeline.`
+            : `💬 No WhatsApp chat on +${wa.number} yet — any chat on this number links here automatically.`
+          : 'Add a mobile and any WhatsApp chat on that number links here automatically.'}
+        {' · Source: '}
+        {customer.source}
+      </p>
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      {dirty && (
+        <div className="crm-actions">
+          <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={save}>
+            {busy ? 'Saving…' : 'Save customer'}
+          </button>
+          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setC(init)}>
+            Undo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Details({
   project,
   customer,
+  wa,
   team,
   onSave,
+  onCustomerSaved,
   isAdmin,
   onDelete,
 }: {
   project: Project;
   customer: Customer;
+  wa: WaInfo | null;
   team: { id: string; name: string }[];
   onSave: (b: Partial<Project>) => Promise<boolean>;
+  onCustomerSaved: () => Promise<void>;
   isAdmin: boolean;
   onDelete: () => void;
 }) {
@@ -516,6 +886,9 @@ function Details({
 
   return (
     <div className="crm-details">
+      <CustomerEditor key={`${customer.id}-${customer.phone}-${customer.name}`} customer={customer} wa={wa} onSaved={onCustomerSaved} />
+
+      <h3 className="crm-h3">Project</h3>
       <label className="crm-label">Project name</label>
       <input className="crm-input" value={f.title} onChange={set('title')} />
 
@@ -613,23 +986,6 @@ function Details({
             Undo
           </button>
         )}
-      </div>
-
-      <div className="crm-customer">
-        <h3>Customer</h3>
-        <p>
-          <b>{customer.name}</b>
-          <br />
-          {[customer.phone, customer.email, customer.postcode].filter(Boolean).join(' · ')}
-          <br />
-          <span className="crm-muted crm-small">
-            Source: {customer.source}
-            {customer.interest ? ` · ${customer.interest}` : ''}
-          </span>
-        </p>
-        <Link href="/admin/enquiries" className="crm-link">
-          Edit in Enquiries
-        </Link>
       </div>
 
       {isAdmin && (

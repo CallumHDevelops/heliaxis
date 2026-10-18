@@ -2,6 +2,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { CRM_BUCKET, crmSession, enquiryStatusFor, isUuid, json, logActivity, thumbPath } from '@/lib/crm/server';
 import { isStage, PRODUCT_KEYS, stageLabel } from '@/lib/crm/stages';
 import { canAccess } from '@/lib/portals';
+import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
+import { whatsappConfigured } from '@/lib/whatsapp/api';
+import { getSettings } from '@/lib/whatsapp/settings';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -15,15 +18,40 @@ export async function GET(_req: Request, { params }: Ctx) {
   const { data: project } = await db.from('crm_projects').select('*').eq('id', id).maybeSingle();
   if (!project) return json({ error: 'Not found' }, 404);
 
-  const [{ data: customer }, { data: acts }, { data: wa }, { data: photos }, { data: people }, { data: others }] = await Promise.all([
-    db
+  const { data: customer } = await db
+    .from('enquiries')
+    .select('id, name, email, phone, postcode, interest, property_type, source, status, created_at, wa_id, wa_unread')
+    .eq('id', project.enquiry_id)
+    .maybeSingle();
+
+  // WhatsApp is matched on the phone number, so a chat that started on another enquiry (a WhatsApp
+  // message, a second web form) still shows here. Backfill the number's WhatsApp id if missing.
+  const waId = customer?.wa_id || toWaId(customer?.phone);
+  if (customer && waId && !customer.wa_id) await db.from('enquiries').update({ wa_id: waId }).eq('id', customer.id);
+  type Linked = { id: string; wa_last_inbound_at: string | null; wa_last_message_at: string | null; wa_unread: number };
+  let linked: Linked[] = [];
+  if (waId) {
+    const { data } = await db
       .from('enquiries')
-      .select('id, name, email, phone, postcode, interest, property_type, source, status, created_at, wa_id, wa_unread')
-      .eq('id', project.enquiry_id)
-      .maybeSingle(),
+      .select('id, wa_last_inbound_at, wa_last_message_at, wa_unread')
+      .eq('wa_id', waId)
+      .limit(20);
+    linked = (data ?? []) as Linked[];
+  }
+  if (customer && !linked.some((l) => l.id === customer.id)) {
+    linked.push({ id: customer.id, wa_last_inbound_at: null, wa_last_message_at: null, wa_unread: 0 });
+  }
+  const linkedIds = linked.map((l) => l.id);
+  // The enquiry the live chat is on: the one with the latest WhatsApp activity (replies go there).
+  const thread = [...linked].sort((a, b) => (b.wa_last_message_at || '').localeCompare(a.wa_last_message_at || ''))[0];
+  const lastInbound = linked.map((l) => l.wa_last_inbound_at).filter(Boolean).sort().pop() ?? null;
+
+  const [{ data: acts }, { data: wa }, { data: photos }, { data: people }, { data: others }] = await Promise.all([
     db.from('crm_activities').select('id, project_id, kind, body, meta, by_id, at').eq('enquiry_id', project.enquiry_id).order('at', { ascending: false }).limit(300),
     // WhatsApp is optional (tables may not exist yet).
-    db.from('whatsapp_messages').select('id, direction, body, created_at, sent_by, via').eq('enquiry_id', project.enquiry_id).order('created_at', { ascending: false }).limit(200),
+    linkedIds.length
+      ? db.from('whatsapp_messages').select('id, direction, kind, body, status, created_at, sent_by, via, rule_id').in('enquiry_id', linkedIds).order('created_at', { ascending: false }).limit(300)
+      : Promise.resolve({ data: [] as { id: string; direction: string; kind: string; body: string | null; status: string; created_at: string; sent_by: string | null; via: string | null; rule_id: string | null }[] }),
     db.from('crm_photos').select('id, category, storage_path, caption, width, height, taken_at, created_at, uploaded_by').eq('project_id', id).order('created_at', { ascending: false }),
     db.from('profiles').select('*').eq('status', 'approved'),
     db.from('crm_projects').select('id, title, stage').eq('enquiry_id', project.enquiry_id).neq('id', id),
@@ -54,8 +82,19 @@ export async function GET(_req: Request, { params }: Ctx) {
       id: `wa-${m.id}`,
       kind: 'whatsapp',
       body: m.body as string | null,
-      meta: { direction: m.direction },
-      by: m.direction === 'in' ? customer?.name ?? 'Customer' : m.sent_by ? nameOf.get(m.sent_by) ?? 'Team' : m.via === 'whatsapp-app' ? 'WhatsApp app' : 'Automatic',
+      meta: { direction: m.direction, status: m.status, kind: m.kind },
+      by:
+        m.direction === 'in'
+          ? customer?.name ?? 'Customer'
+          : m.sent_by
+            ? nameOf.get(m.sent_by) ?? 'Team'
+            : m.via === 'whatsapp-app'
+              ? 'WhatsApp app'
+              : m.via === 'chase'
+                ? 'Chaser'
+                : m.rule_id
+                  ? 'Smart reply'
+                  : 'Automatic',
       at: m.created_at as string,
       other_project: null,
     })),
@@ -64,6 +103,17 @@ export async function GET(_req: Request, { params }: Ctx) {
   return json({
     project,
     customer,
+    whatsapp: {
+      configured: whatsappConfigured(),
+      number: waId,
+      threadId: thread?.id ?? customer?.id ?? null,
+      windowOpen: windowOpen(lastInbound),
+      lastInbound,
+      unread: linked.reduce((n, l) => n + (l.wa_unread || 0), 0),
+      unreadIds: linked.filter((l) => l.wa_unread > 0).map((l) => l.id),
+      messages: (wa ?? []).length,
+      chaseHours: await getSettings().then((st) => (st.chaseQuestions ? st.chaseAfterHours : 0)).catch(() => 0),
+    },
     timeline,
     photos: (photos ?? []).map((p) => ({
       ...p,

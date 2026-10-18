@@ -66,6 +66,8 @@ async function enquiryForNumber(
     .from('enquiries')
     .select(ENQ_COLS)
     .eq('wa_id', waId)
+    // Stay on the enquiry the chat is already on; otherwise their newest enquiry.
+    .order('wa_last_message_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .limit(1);
   if (byWa?.[0]) return { enquiry: byWa[0] as EnquiryWa, created: false };
