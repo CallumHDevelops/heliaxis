@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionProfile } from '@/lib/auth';
-import { markManualDone, setupTodos } from '@/lib/setup-checks';
+import { markDone, setupTodos } from '@/lib/setup-checks';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -16,10 +16,11 @@ export async function GET() {
   return NextResponse.json({ todos: await setupTodos() }, { headers: NO_STORE });
 }
 
-/** { done: id } ticks off a to-do that can't be checked automatically. */
+/** { done: id } ticks a to-do; { undone: id } unticks it. */
 export async function PATCH(req: Request) {
   if (!(await admin())) return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE });
   const b = await req.json().catch(() => ({}));
-  if (typeof b.done === 'string') await markManualDone(b.done);
+  if (typeof b.done === 'string') await markDone(b.done);
+  if (typeof b.undone === 'string') await markDone(b.undone, false);
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

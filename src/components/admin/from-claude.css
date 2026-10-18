@@ -127,3 +127,29 @@
 .fc-list .fc-steps li { list-style: decimal; border-top: 0; }
 .fc-list .fc-copies li { border-top: 1px solid var(--fc-line); }
 .fc-steps li::marker { color: var(--fc-accent); font-weight: 700; }
+
+/* Tick circle */
+.fc-rowwrap { display: flex; align-items: center; gap: 0.55rem; }
+.fc-rowwrap .fc-row { flex: 1; min-width: 0; padding-left: 0; }
+.fc-tick {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--fc-accent);
+  background: #fff;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  /* bigger hit area */
+  box-shadow: 0 0 0 9px transparent;
+}
+.fc-tick[aria-checked='true'] { background: #3f7d4e; border-color: #3f7d4e; }
+.is-ticked .fc-title { color: var(--fc-muted); }
+.fc-title { display: flex; flex-direction: column; }
+.fc-waiting { font-size: 0.75rem; font-weight: 600; color: #3f7d4e; }

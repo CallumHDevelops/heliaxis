@@ -15,18 +15,25 @@ export function FromClaude({ todos }: { todos: SetupTodo[] }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
   const [showOptional, setShowOptional] = useState(false);
+  // Ticks made on this visit (the server's view comes in as t.ticked).
+  const [ticks, setTicks] = useState<Record<string, boolean>>({});
+  const isTicked = (t: SetupTodo) => ticks[t.id] ?? !!t.ticked;
   const left = todos.filter((t) => !hidden.has(t.id));
   if (!left.length) return null;
   const main = left.filter((t) => !t.optional);
   const optional = left.filter((t) => t.optional);
   const shown = showOptional ? left : main;
+  const remaining = main.filter((t) => !isTicked(t)).length;
 
-  async function done(id: string) {
-    setHidden((s) => new Set(s).add(id));
+  async function tick(t: SetupTodo) {
+    const on = !isTicked(t);
+    // One-offs the app can't check go as soon as they're ticked; the rest wait to be confirmed.
+    if (on && t.manual) setHidden((s) => new Set(s).add(t.id));
+    else setTicks((m) => ({ ...m, [t.id]: on }));
     await fetch('/api/setup', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ done: id }),
+      body: JSON.stringify(on ? { done: t.id } : { undone: t.id }),
     }).catch(() => null);
   }
 
@@ -37,22 +44,38 @@ export function FromClaude({ todos }: { todos: SetupTodo[] }) {
         <div>
           <h2>From Claude</h2>
           <p>
-            {main.length
-              ? `${main.length} setup job${main.length === 1 ? '' : 's'} left. Tap one for step-by-step instructions. Each ticks itself off once it’s done.`
-              : 'The essentials are done. Optional extras below.'}
+            {remaining
+              ? `${remaining} setup job${remaining === 1 ? '' : 's'} left. Tap one for step-by-step instructions, and tick the circle when you’ve done it.`
+              : main.length
+                ? 'All ticked. Each disappears once the app can see it’s working.'
+                : 'The essentials are done. Optional extras below.'}
           </p>
         </div>
       </header>
       <ol className="fc-list">
         {shown.map((t) => (
-          <li key={t.id} className={open === t.id ? 'is-open' : ''}>
-            <button type="button" className="fc-row" onClick={() => setOpen(open === t.id ? null : t.id)} aria-expanded={open === t.id}>
-              <span className="fc-dot" aria-hidden="true" />
-              <span className="fc-title">{t.title}</span>
-              {t.optional && <span className="fc-tag">Optional</span>}
-              <span className="fc-chev" aria-hidden="true">›</span>
-            </button>
-            {open === t.id && <Steps t={t} onDone={() => done(t.id)} />}
+          <li key={t.id} className={`${open === t.id ? 'is-open' : ''}${isTicked(t) ? ' is-ticked' : ''}`}>
+            <div className="fc-rowwrap">
+              <button
+                type="button"
+                className="fc-tick"
+                role="checkbox"
+                aria-checked={isTicked(t)}
+                aria-label={`${isTicked(t) ? 'Untick' : 'Tick'}: ${t.title}`}
+                onClick={() => tick(t)}
+              >
+                {isTicked(t) ? '✓' : ''}
+              </button>
+              <button type="button" className="fc-row" onClick={() => setOpen(open === t.id ? null : t.id)} aria-expanded={open === t.id}>
+                <span className="fc-title">
+                  {t.title}
+                  {isTicked(t) && <small className="fc-waiting">Ticked. Waiting to confirm</small>}
+                </span>
+                {t.optional && <span className="fc-tag">Optional</span>}
+                <span className="fc-chev" aria-hidden="true">›</span>
+              </button>
+            </div>
+            {open === t.id && <Steps t={t} ticked={isTicked(t)} onTick={() => tick(t)} />}
           </li>
         ))}
       </ol>
@@ -65,10 +88,16 @@ export function FromClaude({ todos }: { todos: SetupTodo[] }) {
   );
 }
 
-function Steps({ t, onDone }: { t: SetupTodo; onDone: () => void }) {
+function Steps({ t, ticked, onTick }: { t: SetupTodo; ticked: boolean; onTick: () => void }) {
   const external = t.href && !t.href.startsWith('/');
   return (
     <div className="fc-body">
+      {ticked && (
+        <p className="fc-warn">
+          You’ve ticked this. It disappears once the app can see it working. Keys added in Vercel only show up after the redeploy finishes. If it’s
+          still here after that, check the names match exactly.
+        </p>
+      )}
       <p className="fc-detail">{t.detail}</p>
 
       <div className="fc-actions">
@@ -126,11 +155,9 @@ function Steps({ t, onDone }: { t: SetupTodo; onDone: () => void }) {
         </ul>
       )}
 
-      {t.manual && (
-        <button type="button" className="fc-done" onClick={onDone}>
-          ✓ I’ve done this
-        </button>
-      )}
+      <button type="button" className="fc-done" onClick={onTick}>
+        {ticked ? 'Untick' : '✓ I’ve done this'}
+      </button>
     </div>
   );
 }
