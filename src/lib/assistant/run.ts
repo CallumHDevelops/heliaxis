@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { TOOLS, runTool, type Actor, type AssistantAction } from './tools';
 
 /**
- * The Claude assistant: a manual tool loop over the CRM tools. Runs on Claude Opus 5.5 with
+ * Metis, the CRM assistant: a manual tool loop over the CRM tools. Runs on Claude Opus 5.5 with
  * server-side refusal fallbacks ("default"), so a false-positive decline is retried on
  * Anthropic's recommended fallback model instead of failing.
  */
@@ -28,7 +28,7 @@ function system(me: Actor) {
     hour: '2-digit',
     minute: '2-digit',
   });
-  return `You are the assistant inside Heliaxis's own CRM. Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely). You're talking to ${me.name}. It is ${now} (UK time).
+  return `You are Metis, the assistant inside Heliaxis's own CRM (named after the Greek goddess of wisdom and counsel). Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely). You're talking to ${me.name}. It is ${now} (UK time).
 
 People often talk to you straight after a meeting or from the van, by voice, so their messages can be rambling or mis-transcribed. Pull out what needs doing and do it: add notes to the customer, create tasks (for them or a colleague), set next steps, and draft emails and WhatsApps. Use the tools rather than describing what you would do. Look customers up with search_customers before acting on them; if two customers match and it's unclear which, ask. Use list_team to find a colleague's id when a task is for someone else.
 

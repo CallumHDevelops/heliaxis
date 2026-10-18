@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
 import { HubMyDay } from './HubMyDay';
+import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude } from '@/components/admin/FromClaude';
 import type { SetupTodo } from '@/lib/setup-checks';
 import './hub.css';
@@ -40,14 +41,6 @@ function Icon({ k }: { k: keyof typeof ICONS }) {
 }
 
 export type HubPortal = Portal & { badge?: string };
-
-function ClaudeMark() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" aria-hidden="true">
-      <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" />
-    </svg>
-  );
-}
 
 function WaIcon() {
   return (
@@ -124,17 +117,17 @@ export function HubView({
   today?: string;
   /** Admins: setup jobs Claude has left (they tick themselves off). */
   setup?: SetupTodo[];
-  /** Show the "Talk to Claude" bar. */
+  /** Show the "Talk to Metis" bar. */
   assistant?: boolean;
 }) {
   const isAdmin = usersBadge !== undefined;
   const internal = portals.filter((p) => !p.external);
   const apps = portals.filter((p) => p.external);
   // One even row per area that needs someone: icon, name, a big number.
-  const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' | 'claude' }[] = [
+  const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' | 'metis' }[] = [
     { key: 'whatsapp', label: 'WhatsApp', href: '/admin/enquiries/inbox', icon: 'whatsapp' },
     { key: 'crm', label: 'CRM', href: '/admin/crm', icon: 'crm' },
-    { key: 'drafts', label: 'Drafts', href: '/admin/assistant', icon: 'claude' },
+    { key: 'drafts', label: 'Drafts', href: '/admin/assistant', icon: 'metis' },
     { key: 'tasks', label: 'Tasks', href: '/admin/tasks', icon: 'tasks' },
     { key: 'enquiries', label: 'Enquiries', href: '/admin/enquiries', icon: 'enquiries' },
     { key: 'subcontractors', label: 'Subcontractors', href: '/admin/subcontractors', icon: 'subcontractors' },
@@ -171,7 +164,7 @@ export function HubView({
               <li key={a.key}>
                 <Link href={a.href} className="hub-need">
                   <span className="hub-need-icon">
-                    {a.icon === 'whatsapp' ? <WaIcon /> : a.icon === 'claude' ? <ClaudeMark /> : <Icon k={a.icon} />}
+                    {a.icon === 'whatsapp' ? <WaIcon /> : a.icon === 'metis' ? <MetisIcon size={38} className="hub-need-metis" /> : <Icon k={a.icon} />}
                   </span>
                   <span className="hub-need-main">
                     <b>{a.label}</b>
@@ -187,9 +180,9 @@ export function HubView({
 
       {assistant && (
         <Link href="/admin/assistant" className="hub-claude">
-          <span className="hub-claude-mark"><ClaudeMark /></span>
+          <MetisIcon size={42} className="hub-claude-mark" />
           <span className="hub-claude-main">
-            <b>Talk to Claude</b>
+            <b>Talk to Metis</b>
             <small>Just finished a meeting? Say what happened — notes, tasks and drafts done for you.</small>
           </span>
           <span className="hub-claude-mic" aria-hidden="true">

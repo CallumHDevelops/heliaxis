@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantAction } from '@/lib/assistant/tools';
+import { MetisIcon } from '@/components/admin/MetisIcon';
 import './assistant.css';
 
 type Line = { role: 'user' | 'assistant'; text: string; actions?: AssistantAction[]; error?: boolean };
@@ -148,7 +149,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
     <div className="as">
       <header className="as-head">
         <div>
-          <h1>Claude</h1>
+          <h1><MetisIcon size={36} /> Metis</h1>
           <p>Tell me what happened and I’ll add the notes, tasks and drafts.</p>
         </div>
         {lines.length > 0 && (
@@ -160,7 +161,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
 
       {!configured && (
         <p className="as-banner">
-          The assistant switches on once <b>ANTHROPIC_API_KEY</b> is added in Vercel — it’s on your “From Claude” list on the
+          Metis switches on once <b>ANTHROPIC_API_KEY</b> is added in Vercel — it’s on your “From Claude” list on the
           dashboard.
         </p>
       )}
@@ -171,7 +172,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
         {loaded && !lines.length && (
           <div className="as-empty">
             <p>
-              {firstName ? `Hi ${firstName}. ` : ''}Talk to me like you would a colleague in the van — I’ll sort it into the
+              {firstName ? `Hi ${firstName}, I’m Metis. ` : 'I’m Metis. '}Talk to me like you would a colleague in the van — I’ll sort it into the
               CRM. Nothing goes to a customer until you press Send.
             </p>
             <div className="as-starters">
@@ -190,6 +191,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
         )}
         {lines.map((l, i) => (
           <div key={i} className={`as-msg is-${l.role}${l.error ? ' is-error' : ''}`}>
+            {l.role === 'assistant' && <MetisIcon size={22} className="as-avatar" />}
             <p>{l.text}</p>
             {l.actions && l.actions.length > 0 && (
               <ul className="as-actions">
@@ -205,7 +207,8 @@ export function AssistantView({ firstName }: { firstName: string }) {
           </div>
         ))}
         {busy && (
-          <div className="as-msg is-assistant is-busy" aria-label="Claude is working">
+          <div className="as-msg is-assistant is-busy" aria-label="Metis is working">
+            <MetisIcon size={22} className="as-avatar" />
             <span />
             <span />
             <span />
@@ -230,7 +233,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
               send();
             }
           }}
-          placeholder={listening ? 'Listening…' : 'Message Claude'}
+          placeholder={listening ? 'Listening…' : 'Message Metis'}
           rows={text.length > 80 ? 4 : 1}
         />
         {canListen && (
@@ -256,7 +259,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
   );
 }
 
-/** Emails and WhatsApps Claude wrote, waiting for a person to check and send. */
+/** Emails and WhatsApps Metis wrote, waiting for a person to check and send. */
 function Drafts({ drafts, onChange }: { drafts: Draft[]; onChange: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   if (!drafts.length) return null;

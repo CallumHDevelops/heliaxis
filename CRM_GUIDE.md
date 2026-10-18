@@ -11,7 +11,7 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
    opportunity for every existing enquiry.
 2. `supabase/crm-v2.sql` — customer portal, documents, library, saved replies, email, reminders,
    lead routing, sequences, booking, quote acceptance, deposits.
-3. `supabase/assistant.sql` — the Claude assistant's conversations and drafts.
+3. `supabase/assistant.sql` — Metis's (the assistant's) conversations and drafts.
 
 Admins see anything still to do as **From Claude** on the dashboard and the Tasks page. Each item
 ticks itself off once the app can see it's done.
@@ -89,15 +89,15 @@ who actually buy.
 Website leads are matched by the ad click id, Meta lead-form leads by their lead id, and both by
 hashed email and phone.
 
-## 7. Claude assistant
+## 7. Metis, the assistant
 
-**More → Claude** (or *Talk to Claude* on the dashboard). Type or tap the mic and say what happened,
+**More → Metis** (or *Talk to Metis* on the dashboard). Type or tap the mic and say what happened,
 e.g. "Just left Jane Smith in BS5, wants 10 panels and a battery, quote Friday, get Esther to send the
-EV guide". Claude adds notes, sets next steps, creates tasks (for you or a colleague) and writes
+EV guide". Metis adds notes, sets next steps, creates tasks (for you or a colleague) and writes
 emails/WhatsApps as **drafts**. Nothing reaches a customer until someone checks the draft and presses Send.
 
 1. console.anthropic.com → API keys → **Create key** → Vercel `ANTHROPIC_API_KEY` → redeploy.
 2. Run `supabase/assistant.sql`.
 
-It uses Claude Opus 5.5. If Claude declines a request by mistake, the API automatically retries it on
+She runs on Claude Opus 5.5 (Anthropic). If Claude declines a request by mistake, the API automatically retries it on
 Anthropic's recommended fallback model.

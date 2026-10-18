@@ -415,16 +415,8 @@ a.hub-row:hover {
   text-decoration: none;
 }
 .hub-claude:hover { border-color: var(--ink); }
-.hub-claude-mark {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #c96442;
-  color: #fff;
-  display: grid;
-  place-items: center;
-}
+.hub-claude-mark { flex: none; }
+.hub-need-icon svg.hub-need-metis { width: 38px; height: 38px; }
 .hub-claude-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .hub-claude-main b { font-size: 1rem; }
 .hub-claude-main small { color: var(--muted); font-size: 0.85rem; line-height: 1.35; }

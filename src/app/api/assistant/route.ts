@@ -19,7 +19,7 @@ async function thread(userId: string) {
   return data?.[0] as { id: string; messages: Msg[] } | undefined;
 }
 
-/** What to show: the user's words and Claude's replies (tool calls and thinking left out). */
+/** What to show: the user's words and Metis's replies (tool calls and thinking left out). */
 function visible(messages: Msg[]) {
   const out: { role: 'user' | 'assistant'; text: string }[] = [];
   for (const m of messages) {
@@ -48,7 +48,7 @@ export async function GET() {
   return json({ configured: assistantConfigured(), messages: visible(t?.messages ?? []) });
 }
 
-/** { text } — one message to Claude. Returns its reply and what it did. */
+/** { text } — one message to Metis. Returns its reply and what it did. */
 export async function POST(req: Request) {
   const s = await crmSession();
   if (!s) return json({ error: 'unauthorized' }, 401);
@@ -65,8 +65,8 @@ export async function POST(req: Request) {
   try {
     result = await runAssistant(t?.messages ?? [], text, actor(s));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Claude didn’t answer';
-    return json({ error: /overloaded|529/i.test(msg) ? 'Claude is busy right now — try again in a minute.' : msg }, 502);
+    const msg = e instanceof Error ? e.message : 'Metis didn’t answer';
+    return json({ error: /overloaded|529/i.test(msg) ? 'Metis is busy right now — try again in a minute.' : msg }, 502);
   }
   const now = new Date().toISOString();
   if (t) await db.from('assistant_threads').update({ messages: result.messages, updated_at: now }).eq('id', t.id);
