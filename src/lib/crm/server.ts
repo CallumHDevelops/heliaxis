@@ -69,3 +69,48 @@ export function enquiryStatusFor(stage: StageKey): string {
       return 'won';
   }
 }
+
+/**
+ * Push the project's owner (or everyone on the CRM if it has none) when a next step falls due.
+ * Once per step; not in quiet hours (they go out in the morning). Runs with the every-minute cron.
+ */
+export async function remindNextSteps() {
+  const { getSettings } = await import('@/lib/whatsapp/settings');
+  const { isQuiet } = await import('@/lib/whatsapp/schedule');
+  const { notify } = await import('@/lib/notify');
+  const { canAccess } = await import('@/lib/portals');
+  const settings = await getSettings();
+  if (isQuiet(new Date(), settings.quietFrom, settings.quietTo)) return 0;
+  const db = createAdminClient();
+  const { data: due } = await db
+    .from('crm_projects')
+    .select('id, enquiry_id, title, owner_id, next_step, next_step_at')
+    .lte('next_step_at', new Date().toISOString())
+    .is('next_step_notified_at', null)
+    .not('stage', 'in', '(complete,lost)')
+    .limit(50);
+  if (!due?.length) return 0;
+  const [{ data: people }, { data: customers }] = await Promise.all([
+    db.from('profiles').select('*').eq('status', 'approved'),
+    db.from('enquiries').select('id, name').in('id', [...new Set(due.map((d) => d.enquiry_id))]),
+  ]);
+  const crmUsers = (people ?? []).filter((p) => canAccess(p, 'crm')).map((p) => p.id as string);
+  const nameOf = new Map((customers ?? []).map((c) => [c.id, c.name]));
+  for (const p of due) {
+    await db.from('crm_projects').update({ next_step_notified_at: new Date().toISOString() }).eq('id', p.id);
+    const to = p.owner_id && crmUsers.includes(p.owner_id) ? [p.owner_id] : crmUsers;
+    await Promise.all(
+      to.map((userId) =>
+        notify({
+          userId,
+          kind: 'crm_next_step',
+          title: `Follow up: ${nameOf.get(p.enquiry_id) || p.title}`,
+          body: p.next_step || 'Next step due',
+          href: `/admin/crm/${p.id}`,
+          tag: `crm-${p.id}`,
+        })
+      )
+    );
+  }
+  return due.length;
+}

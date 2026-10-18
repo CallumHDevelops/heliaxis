@@ -30,6 +30,8 @@ type Project = {
   opensolar_url: string | null;
   lost_reason: string | null;
   notes: string | null;
+  next_step: string | null;
+  next_step_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -82,7 +84,20 @@ type WaInfo = {
   messages: number;
   chaseHours: number;
 };
-type Sheet = null | 'menu' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage';
+type Sheet = null | 'menu' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage';
+
+/** Wide screens show details beside the activity (HubSpot-style); phones use a tab. */
+function useWide() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia('(min-width: 1000px)');
+    const on = () => setWide(m.matches);
+    on();
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return wide;
+}
 
 export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
   const router = useRouter();
@@ -95,6 +110,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'activity' | 'photos' | 'details'>('activity');
   const [sheet, setSheet] = useState<Sheet>(null);
+  const wide = useWide();
 
   const load = useCallback(async () => {
     try {
@@ -183,12 +199,20 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
         </button>
       </div>
 
+      <NextStepBar
+        project={project}
+        onEdit={() => setSheet('next')}
+        onDone={() => patch({ complete_next_step: true } as unknown as Partial<Project>)}
+      />
+
+      <div className={wide ? 'crm-split' : ''}>
+      <div className="crm-split-main">
       <div className="crm-tabs crm-tabs--slim" role="tablist">
         {(
           [
             ['activity', `Activity${wa?.unread ? ` · ${wa.unread} new` : ''}`],
             ['photos', `Photos${photos.length ? ` (${photos.length})` : ''}`],
-            ['details', 'Details'],
+            ...(wide ? [] : ([['details', 'Details']] as const)),
           ] as const
         ).map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
@@ -199,9 +223,11 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
 
       {error && <p className="crm-banner crm-banner--err">{error}</p>}
 
-      {tab === 'activity' && <Feed entries={timeline} customerName={customer.name} />}
+      {(tab === 'activity' || (wide && tab === 'details')) && <Feed entries={timeline} customerName={customer.name} />}
       {tab === 'photos' && <Photos id={id} photos={photos} onChanged={load} />}
-      {tab === 'details' && (
+      </div>
+      {(wide || tab === 'details') && (
+        <aside className={wide ? 'crm-split-side' : ''}>
         <Details
           key={project.id}
           project={project}
@@ -218,9 +244,11 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
             else setError((await r.json().catch(() => ({}))).error || 'Not deleted');
           }}
         />
+        </aside>
       )}
+      </div>
 
-      {tab !== 'details' && (
+      {(wide || tab !== 'details') && (
         <button type="button" className="crm-fab" aria-label="Add" onClick={() => setSheet('menu')}>
           +
         </button>
@@ -230,6 +258,15 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
         <div className="crm-sheet" role="dialog" aria-modal="true" onClick={() => setSheet(null)}>
           <div className="crm-sheet-box" onClick={(e) => e.stopPropagation()}>
             {sheet === 'menu' && <ActionMenu customer={customer} wa={wa} onPick={setSheet} />}
+            {sheet === 'next' && (
+              <NextStepEditor
+                project={project}
+                onSave={async (next_step, next_step_at) => {
+                  setSheet(null);
+                  await patch({ next_step, next_step_at } as Partial<Project>);
+                }}
+              />
+            )}
             {sheet === 'whatsapp' && <WhatsAppComposer customer={customer} wa={wa} onSent={done} />}
             {(sheet === 'note' || sheet === 'call' || sheet === 'visit') && (
               <LogComposer id={id} kind={sheet} phone={customer.phone} onSaved={done} />
@@ -330,6 +367,7 @@ function Feed({ entries, customerName }: { entries: Entry[]; customerName: strin
 
 function ActionMenu({ customer, wa, onPick }: { customer: Customer; wa: WaInfo | null; onPick: (s: Sheet) => void }) {
   const items: [Sheet, string, string, string?][] = [
+    ['next', '⏰', 'Next step', 'Follow-up + reminder'],
     ['whatsapp', '💬', 'WhatsApp', !wa?.number ? 'Add their mobile first' : wa.windowOpen ? 'Reply' : 'Template (paid)'],
     ['note', '📝', 'Note'],
     ['call', '📞', 'Call', customer.phone ? undefined : 'No number'],
@@ -586,6 +624,100 @@ function PhotoQuick({ id, onDone }: { id: string; onDone: () => Promise<void> })
       </div>
       <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFiles(e.target.files)} />
       <input ref={pick} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
+    </div>
+  );
+}
+
+/** The current time, refreshed each minute (so "overdue" flips without a reload). */
+function useNow() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+function NextStepBar({ project, onEdit, onDone }: { project: Project; onEdit: () => void; onDone: () => void }) {
+  const now = useNow();
+  if (project.stage === 'complete' || project.stage === 'lost') return null;
+  if (!project.next_step) {
+    return (
+      <button type="button" className="crm-nextbar empty" onClick={onEdit}>
+        ⏰ <span>No next step — add one so this doesn’t go quiet</span>
+      </button>
+    );
+  }
+  const at = project.next_step_at ? new Date(project.next_step_at) : null;
+  const late = at && at.getTime() < now;
+  const today = at && at.toDateString() === new Date(now).toDateString();
+  return (
+    <div className={`crm-nextbar${late ? ' late' : today ? ' today' : ''}`}>
+      <button type="button" className="crm-nextbar-main" onClick={onEdit}>
+        <small>Next step{at ? ` · ${late ? 'overdue · ' : ''}${when(at.toISOString())}` : ''}</small>
+        <span>{project.next_step}</span>
+      </button>
+      <button type="button" className="crm-nextbar-done" onClick={onDone} aria-label="Mark done">
+        ✓ Done
+      </button>
+    </div>
+  );
+}
+
+function NextStepEditor({ project, onSave }: { project: Project; onSave: (text: string | null, at: string | null) => Promise<void> }) {
+  const [text, setText] = useState(project.next_step || '');
+  const [at, setAt] = useState(toLocalInput(project.next_step_at));
+  const quick = (label: string, d: Date) => (
+    <button type="button" onClick={() => setAt(toLocalInput(d.toISOString()))}>
+      {label}
+    </button>
+  );
+  const day = (offset: number, h: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    d.setHours(h, 0, 0, 0);
+    return d;
+  };
+  const nextMonday = () => {
+    const d = day(((8 - new Date().getDay()) % 7) || 7, 9);
+    return d;
+  };
+  const ideas = ['Call back', 'Chase survey photos', 'Book survey', 'Send quote', 'Chase quote', 'Book install'];
+  return (
+    <div>
+      <h2>Next step</h2>
+      <input className="crm-input" autoFocus placeholder="e.g. Chase quote" value={text} onChange={(e) => setText(e.target.value)} />
+      <div className="crm-quickpicks">
+        {ideas.map((i) => (
+          <button key={i} type="button" onClick={() => setText(i)}>
+            {i}
+          </button>
+        ))}
+      </div>
+      <label className="crm-label">When</label>
+      <div className="crm-quickpicks">
+        {quick('Later today', day(0, Math.min(17, new Date().getHours() + 2)))}
+        {quick('Tomorrow 9am', day(1, 9))}
+        {quick('In 3 days', day(3, 9))}
+        {quick('Next Monday', nextMonday())}
+      </div>
+      <input className="crm-input" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
+      <p className="crm-muted crm-small">You’ll get a notification when it’s due.</p>
+      <div className="crm-actions">
+        <button
+          type="button"
+          className="crm-btn crm-btn--solar"
+          disabled={!text.trim()}
+          onClick={() => onSave(text.trim(), at ? new Date(at).toISOString() : null)}
+        >
+          Save
+        </button>
+        {project.next_step && (
+          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => onSave(null, null)}>
+            Clear
+          </button>
+        )}
+      </div>
     </div>
   );
 }

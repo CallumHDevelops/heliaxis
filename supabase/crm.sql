@@ -57,11 +57,19 @@ create table if not exists public.crm_photos (
 );
 create index if not exists crm_photos_project_idx on public.crm_photos (project_id, category, created_at desc);
 
+-- Next step (Pipedrive-style: every live deal should have one). Safe to re-run this file.
+alter table public.crm_projects add column if not exists next_step             text;
+alter table public.crm_projects add column if not exists next_step_at          timestamptz;
+alter table public.crm_projects add column if not exists next_step_notified_at timestamptz;
+create index if not exists crm_projects_next_step_idx on public.crm_projects (next_step_at) where next_step_at is not null;
+
 alter table public.crm_projects   enable row level security;
 alter table public.crm_activities enable row level security;
 alter table public.crm_photos     enable row level security;
 
--- Turn the CRM on for everyone who already has Enquiries (change any of them on the Users page).
+-- First run only: turn the CRM on for everyone who already has Enquiries (then manage it on the
+-- Users page — re-running this file never re-grants access you've removed).
 update public.profiles
    set portals = array_append(portals, 'crm')
- where portals is not null and 'enquiries' = any(portals) and not ('crm' = any(portals));
+ where portals is not null and 'enquiries' = any(portals) and not ('crm' = any(portals))
+   and not exists (select 1 from public.profiles p2 where p2.portals is not null and 'crm' = any(p2.portals));

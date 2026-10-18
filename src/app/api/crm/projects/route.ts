@@ -12,7 +12,7 @@ export async function GET() {
   const [{ data: projects, error }, { data: recent }] = await Promise.all([
     db
       .from('crm_projects')
-      .select('id, enquiry_id, title, stage, products, value, owner_id, postcode, survey_at, install_at, updated_at, stage_changed_at, created_at')
+      .select('id, enquiry_id, title, stage, products, value, owner_id, postcode, survey_at, install_at, next_step, next_step_at, updated_at, stage_changed_at, created_at')
       .order('updated_at', { ascending: false })
       .limit(1000),
     db

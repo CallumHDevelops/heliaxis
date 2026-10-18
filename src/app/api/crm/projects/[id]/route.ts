@@ -152,6 +152,21 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if ('products' in b) u.products = (Array.isArray(b.products) ? b.products : []).filter((k: unknown) => PRODUCT_KEYS.includes(String(k)));
   if ('value' in b) u.value = b.value === null || b.value === '' ? null : Number.isFinite(Number(b.value)) ? Number(b.value) : null;
   if ('owner_id' in b) u.owner_id = b.owner_id && isUuid(String(b.owner_id)) ? b.owner_id : null;
+  // Next step: set / change (re-arms its reminder), or mark done (logged on the timeline).
+  let doneStep: string | null = null;
+  if (b.complete_next_step) {
+    const { data: cur } = await db.from('crm_projects').select('next_step').eq('id', id).maybeSingle();
+    doneStep = cur?.next_step || null;
+    u.next_step = null;
+    u.next_step_at = null;
+    u.next_step_notified_at = null;
+  } else {
+    if ('next_step' in b) u.next_step = String(b.next_step || '').trim().slice(0, 300) || null;
+    if ('next_step_at' in b) {
+      u.next_step_at = b.next_step_at && !Number.isNaN(Date.parse(b.next_step_at)) ? new Date(b.next_step_at).toISOString() : null;
+      u.next_step_notified_at = null;
+    }
+  }
   for (const k of ['survey_at', 'install_at'] as const) {
     if (k in b) u[k] = b[k] && !Number.isNaN(Date.parse(b[k])) ? new Date(b[k]).toISOString() : null;
   }
@@ -167,6 +182,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   const { data, error } = await db.from('crm_projects').update(u).eq('id', id).select('*').single();
   if (error) return json({ error: error.message }, 500);
+  if (doneStep) {
+    await logActivity({ enquiryId: before.enquiry_id, projectId: id, kind: 'system', body: `✓ Done: ${doneStep}`, byId: s.user.id });
+  }
   if (stageMove && isStage(stageMove.to)) {
     await Promise.all([
       logActivity({
