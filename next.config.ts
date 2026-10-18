@@ -44,6 +44,11 @@ const nextConfig: NextConfig = {
     ];
   },
   transpilePackages: ['heatmap.js'],
+  // Setup guides and SQL files, opened from the "From Claude" to-dos (src/lib/setup-files.ts).
+  outputFileTracingIncludes: {
+    '/api/setup/file': ['./supabase/*.sql'],
+    '/admin/setup/**': ['./supabase/*.sql', './*.md'],
+  },
   images: {
     remotePatterns: [
       {
