@@ -41,9 +41,13 @@ const sections: LegalSection[] = [
           <li>We use your details to answer your enquiry, quote, install and look after your system.</li>
           <li>We talk to customers mainly by WhatsApp and email. Some reminders and replies are sent automatically.</li>
           <li>We use trusted service providers (for hosting, email, messaging and payments). Some are based in the US.</li>
-          <li>We don’t sell your data. We measure our website and our adverts, and you can object to that.</li>
           <li>
-            You can see, correct or delete your information at any time. See <Link href="/data-deletion">delete your data</Link>.
+            We don’t sell your data. We measure our website and our adverts, and share limited information with Meta to improve
+            who sees our adverts. You can object to that.
+          </li>
+          <li>
+            You can ask to see, correct or delete your information at any time. We may have to keep some records, for example for
+            tax, warranties and certification, or a complaint. See <Link href="/data-deletion">delete your data</Link>.
           </li>
         </ul>
       </div>
@@ -69,7 +73,10 @@ const sections: LegalSection[] = [
           </li>
           <li>
             If you use our <strong>roof designer</strong>, the postcode you type is looked up by a postcode service and the map
-            loads satellite images of that location. The design itself stays in your browser; we don’t receive it. The{' '}
+            loads satellite images of that location from Esri (US). Your roof drawing stays in your browser and we don’t receive
+            it. If you click “Get my exact quote”, the system size, number of panels and whether you chose a battery are added to
+            the web address, so our website analytics (Google Analytics and Umami) record them. They aren’t added to your
+            enquiry. The{' '}
             <strong>solar estimator</strong> runs entirely in your browser.
           </li>
         </ul>
@@ -83,14 +90,20 @@ const sections: LegalSection[] = [
           </li>
           <li>
             If you message us on WhatsApp: your WhatsApp number and profile name, and the messages you send, including captions,
-            file names and any location you share. Photos and files you send stay with WhatsApp (Meta). We don’t copy them into
-            our own systems.
+            file names and any location you share. Photos, videos, voice notes and files you send are held by WhatsApp (Meta),
+            and in the WhatsApp Business app on our team’s phone if you message that number. Our CRM records only the caption or
+            file name, not the file itself. If a photo or document is needed for your quote or installation, we may save a copy to
+            your project file.
           </li>
           <li>Which advert or campaign your enquiry came from.</li>
         </ul>
         <p>
           Please don’t send us health or other sensitive information unless it’s relevant (for example, if someone in the home
-          is vulnerable and we should take extra care). If you do, we’ll only use it for that purpose.
+          has a health condition or disability and we should take extra care during a visit). If you do tell us, we’ll ask
+          whether you, and the person it’s about if that’s someone else, are happy for us to keep a note of it. We rely on that
+          explicit consent and use the information only to take that care. If we don’t get it, we’ll delete it. You can withdraw
+          your consent at any time by telling us, and we’ll then delete it from our records. This doesn’t affect anything we did
+          before you withdrew it.
         </p>
 
         <h3>When you become a customer</h3>
@@ -161,7 +174,8 @@ const sections: LegalSection[] = [
             </tr>
             <tr>
               <td>
-                Measure how our website and adverts perform (see <a href="#advertising">advertising</a> and{' '}
+                Measure how our website and adverts perform, and tell Meta when an enquiry moves forward so it can measure our
+                adverts and show them to people more likely to be interested (see <a href="#advertising">advertising</a> and{' '}
                 <a href="#cookies">cookies</a>)
               </td>
               <td>Legitimate interests. You can object at any time</td>
@@ -175,6 +189,17 @@ const sections: LegalSection[] = [
         <p>
           Where we rely on legitimate interests, we’ve weighed our interests against yours, and you have the right to object
           (see <a href="#rights">your rights</a>).
+        </p>
+        <p>
+          You don’t have to give us your details. But without your name and an email address or phone number we can’t reply to
+          your enquiry. Without your address and contact details we can’t survey, quote for or install your system, and we
+          also need your address for the grid (DNO) notification and the certificates we must provide.
+        </p>
+        <p>
+          If you work with us as a subcontractor, we need your business and bank details to contract with you and pay you. We
+          also need insurance, qualifications and photo ID for each operative before they can work on our sites. The
+          Construction Industry Scheme (CIS) requires us to verify you with HMRC. If you don’t give us the details we need for
+          that, we may have to deduct tax from your payments at the higher rate.
         </p>
       </>
     ),
@@ -195,7 +220,7 @@ const sections: LegalSection[] = [
           <li>
             Our team uses an <strong>AI assistant</strong> (Claude, made by Anthropic) to help with admin, such as summarising
             notes, organising tasks and drafting messages. It can see the details we hold about the customers it’s helping with.
-            A member of our team reviews any message before it’s sent to you. The assistant doesn’t make decisions about you.
+            A member of our team reviews any message the assistant drafts before it’s sent to you. The assistant doesn’t make decisions about you.
           </li>
           <li>
             We use simple automatic rules to share new enquiries fairly between our team and to remind us to reply quickly. None
@@ -220,14 +245,28 @@ const sections: LegalSection[] = [
           (for example, when a survey is booked, a quote is sent or a job is won):
         </p>
         <ul>
-          <li>your email address and WhatsApp number in a scrambled (“hashed”) form, not as readable text</li>
+          <li>
+            your email address and phone number in a scrambled (“hashed”) form, not as readable text. Meta uses these to try to
+            match you to a Facebook or Instagram account, so hashing doesn’t make them anonymous
+          </li>
           <li>the advert click reference or Meta lead reference, if you came from one of our adverts</li>
           <li>the type of step and, when a job is won, its value</li>
         </ul>
         <p>
-          We don’t send your name, address or the content of your messages. Meta uses this under its own terms and may combine it
-          with what it already knows to measure and improve adverts.{' '}
-          <strong>You can object at any time</strong>. Tell us, and we’ll stop sending your information to Meta.
+          We don’t send your name, address or the content of your messages. This applies to every enquiry that reaches these
+          steps, not only people who came to us through an advert. For collecting and sending this information, we and Meta
+          Platforms Ireland Limited are joint controllers. We’re responsible for telling you about it, for having a lawful
+          reason to send it, and for stopping if you object. Meta is responsible for what it does with the information after it
+          receives it, which may include combining it with what it already knows to measure and target adverts. You can read{' '}
+          <a href="https://www.facebook.com/legal/controller_addendum" target="_blank" rel="noopener noreferrer">
+            Meta’s joint controller terms
+          </a>{' '}
+          and{' '}
+          <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer">
+            Meta’s privacy policy
+          </a>
+          . You can use your rights with us or with Meta. <strong>You can object at any time</strong>. Tell us, and we’ll stop
+          sending your information to Meta.
         </p>
         <p>
           If you fill in a lead form on Facebook or Instagram, Meta passes us the answers you give in that form.
@@ -241,9 +280,14 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          We don’t sell your personal information. We share it only with organisations that help us run our business, under
-          contracts that require them to protect it and use it only on our instructions, and with others where the law requires
-          or the job needs it:
+          We don’t sell your personal information. We share it with the organisations below, and only what each one needs. Most
+          are service providers that handle it for us under contracts that require them to protect it and use it only on our
+          instructions. Some also use it for their own purposes, under their own privacy policies: Meta (WhatsApp, Facebook and
+          Instagram lead forms, and the <a href="#advertising">advert measurement</a> described above), Stripe (payments and fraud
+          checks), Google (website analytics and web fonts), and the postcode, map and image services used by our roof designer
+          and maps. Our installation partners and subcontractors, your network operator, MCS and certification bodies, our
+          accountants, HMRC, insurers, legal advisers and, where required, the police or regulators receive what the job or the
+          law needs and are responsible for their own use of it:
         </p>
         <table className="lg-table">
           <thead>
@@ -354,8 +398,14 @@ const sections: LegalSection[] = [
           We use this to set up and manage our contract with you, pay you and meet our CIS tax duties (legal obligation), check
           that everyone on site is competent, insured and who they say they are (legal obligations under health and safety law,
           and our legitimate interests in site safety and security), and prepare site safety documents (RAMS). Bank details, UTR
-          and photo ID are only used for these purposes and aren’t shared with customers. If you’re an operative, your employer
-          shares your details with us. Please make sure they’ve given you this notice.
+          and photo ID are only used for these purposes and aren’t shared with customers. Operatives’ names and roles, and the
+          competency cards and qualifications of the crew on a job, go into that job’s site safety documents (RAMS), which we
+          may share with the customer, the principal contractor or regulators where site safety or compliance requires it. We
+          give our MCS certification body the names and qualifications of our Nominated Technical Persons, and we share CIS, tax
+          and payment records with our accountants and HMRC. Our service providers (see{' '}
+          <a href="#sharing">who we share it with</a>) also hold this information for us. If you’re an operative, we get your
+          details from the firm you work for. If you’re that firm, please show this notice to the operatives whose details you
+          give us.
         </p>
       </>
     ),
@@ -370,12 +420,16 @@ const sections: LegalSection[] = [
           off if you get back in touch.
         </li>
         <li>
-          <strong>Customer records:</strong> for at least 6 years after your installation (for tax and accounting), and
-          installation, certificate and warranty records for as long as your warranties and certification schemes need them.
+          <strong>Customer records:</strong> invoices, payment and accounting records for 6 years from the end of the financial
+          year they relate to (tax and company law); installation, certificate and warranty records for as long as your
+          warranties and certification schemes need them; and the rest of your project file (messages, notes, photos and other
+          documents) for 6 years after our work for you ends, in case of questions or claims about the work, unless you ask us to
+          delete it sooner (see <Link href="/data-deletion">delete your data</Link>).
         </li>
         <li>
-          <strong>Subcontractor records:</strong> for the length of our relationship and at least 6 years afterwards (for tax,
-          CIS and safety records).
+          <strong>Subcontractor records:</strong> for the length of our relationship and 6 years from the end of the financial
+          year in which it ends (for tax, CIS, contract and safety records). We delete copies of an operative’s photo ID once
+          that person no longer works on our jobs.
         </li>
         <li>
           <strong>Website analytics:</strong> for up to 14 months.
@@ -473,9 +527,12 @@ const sections: LegalSection[] = [
     title: 'Keeping it safe',
     body: (
       <p>
-        Your information is stored in secure, access-controlled systems. Files and photos are kept privately and shared only
-        through short-lived links. Only staff who need your details for their work can see them. Your project page is a private
-        link. If you think someone else has it, tell us and we’ll change it.
+        Your information is stored in secure, access-controlled systems, and only staff who need your details for their work can
+        see them. Files and photos are kept in private storage. When they’re opened in our systems or on your project page,
+        they’re shown through links that expire within an hour. Documents we send you by email or WhatsApp go as attachments,
+        so a copy is also kept in our email system and by WhatsApp (Meta), as well as in your own inbox or chat. Your project
+        page link doesn’t expire, and anyone who has it can open it, so please don’t share it. If you think someone else has it,
+        tell us and we’ll replace it so the old link stops working.
       </p>
     ),
   },
