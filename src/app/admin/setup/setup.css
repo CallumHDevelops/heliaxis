@@ -49,3 +49,21 @@
 .su-doc th, .su-doc td { border: 1px solid var(--line); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
 .su-doc th { background: #f3eee2; }
 .su-doc a { color: #9a6200; }
+.su-h1 { font-size: 1.7rem; margin: 0 0 0.4rem; }
+.su-group { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem 1rem; margin-top: 0.9rem; }
+.su-group h2 { font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+.su-group .su-muted { margin: 0.2rem 0 0.6rem; font-size: 0.85rem; }
+.su-state { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; color: #fff; flex: none; }
+.su-state.ok { background: #3f7d4e; }
+.su-state.no { background: #b3261e; }
+.su-state.opt { background: #c9c3b3; }
+.su-vars { list-style: none; margin: 0; padding: 0; }
+.su-vars li { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.45rem 0; border-top: 1px solid var(--line); }
+.su-mark { flex: none; width: 1.2rem; font-weight: 800; text-align: center; }
+.is-set .su-mark { color: #3f7d4e; }
+.is-missing .su-mark { color: #b3261e; }
+.is-opt .su-mark { color: var(--muted); }
+.su-var { display: flex; flex-direction: column; min-width: 0; }
+.su-var code { font-size: 0.85rem; overflow-wrap: anywhere; }
+.su-var small { color: var(--muted); font-size: 0.78rem; }
+.is-missing .su-var code { color: #b3261e; font-weight: 700; }
