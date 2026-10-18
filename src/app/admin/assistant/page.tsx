@@ -6,7 +6,7 @@ import { AssistantView } from './AssistantView';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Claude · Heliaxis',
+  title: 'Metis · Heliaxis',
   robots: { index: false, follow: false },
 };
 

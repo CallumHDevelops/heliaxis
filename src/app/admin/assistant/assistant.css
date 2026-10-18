@@ -180,3 +180,9 @@
 .as-send { background: var(--ink); color: #fff; }
 .as-send:disabled { opacity: 0.35; cursor: default; }
 @keyframes as-pulse { 0% { box-shadow: 0 0 0 0 rgba(201, 100, 66, 0.45); } 100% { box-shadow: 0 0 0 12px rgba(201, 100, 66, 0); } }
+
+/* Metis */
+.as-head h1 { display: flex; align-items: center; gap: 0.55rem; }
+.as-msg.is-assistant { position: relative; margin-left: 30px; }
+.as-avatar { position: absolute; left: -30px; bottom: 0; }
+.as-msg.is-assistant.is-busy { margin-left: 30px; }

@@ -234,7 +234,7 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
       if (pid && !p) return 'Unknown project_id.';
       const due = /^\d{4}-\d{2}-\d{2}$/.test(s(input.due_date)) ? s(input.due_date) : null;
       const priority = ['low', 'normal', 'high'].includes(s(input.priority)) ? s(input.priority) : 'normal';
-      const notes = [s(input.notes), `Added by Claude for ${me.name}`].filter(Boolean).join('\n\n');
+      const notes = [s(input.notes), `Added by Metis for ${me.name}`].filter(Boolean).join('\n\n');
       const who = person.full_name || person.email || 'Someone';
       const { data: task, error } = await db
         .from('tasks')
@@ -312,7 +312,7 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
         .select('id')
         .single();
       if (e2 || !p) return `Customer saved but not the opportunity: ${e2?.message}`;
-      await logActivity({ enquiryId: c.id, projectId: p.id, kind: 'system', body: 'Opportunity created by Claude', byId: me.id });
+      await logActivity({ enquiryId: c.id, projectId: p.id, kind: 'system', body: 'Opportunity created by Metis', byId: me.id });
       if (s(input.note)) await logActivity({ enquiryId: c.id, projectId: p.id, kind: 'note', body: s(input.note), meta: { via: 'claude' }, byId: me.id });
       actions.push({ kind: 'opportunity', label: `New opportunity: ${title}`, href: projectHref(p.id) });
       return JSON.stringify({ project_id: p.id, title });

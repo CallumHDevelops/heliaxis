@@ -65,7 +65,7 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
       }),
     keys.includes('crm') &&
       count(admin.from('assistant_drafts').select('id', { count: 'exact', head: true }).eq('status', 'draft')).then((n) => {
-        if (n) out.drafts = { n, detail: `draft${n === 1 ? '' : 's'} from Claude to send` };
+        if (n) out.drafts = { n, detail: `draft${n === 1 ? '' : 's'} from Metis to send` };
       }),
     isAdmin &&
       count(admin.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending')).then((n) => {
