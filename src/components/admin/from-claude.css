@@ -3,6 +3,7 @@
   --fc-muted: #6e6a5e;
   --fc-line: rgba(33, 31, 24, 0.12);
   --fc-accent: #c96442;
+  --fc-solar: #f8bc1e;
   background: #fffdf8;
   border: 1px solid var(--fc-line);
   border-left: 3px solid var(--fc-accent);
@@ -154,3 +155,58 @@
 .fc-title { display: flex; flex-direction: column; }
 .fc-waiting { font-size: 0.75rem; font-weight: 600; color: #3f7d4e; }
 .fc-envlink { display: inline-block; margin-top: 0.3rem; font-size: 0.82rem; font-weight: 700; color: #9a6200; text-decoration: none; }
+
+/* Who sees this (admins) */
+.fc-shared { font-size: 0.75rem; font-weight: 600; color: #9a6200; overflow-wrap: anywhere; }
+.fc-whobox { margin-top: 0.9rem; padding-top: 0.75rem; border-top: 1px dashed var(--fc-line); }
+.fc-whobox .fc-whobox-h {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fc-muted);
+  margin: 0 0 0.45rem;
+}
+.fc-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.fc-chip {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 0.35rem 0.8rem;
+  border-radius: 99px;
+  border: 1px solid var(--fc-line);
+  background: #fff;
+  color: var(--fc-ink);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.fc-chip[aria-pressed='true'] { background: var(--fc-solar); border-color: var(--fc-solar); }
+.fc-chip[aria-pressed='true']::before { content: '✓ '; font-weight: 800; }
+.fc-whobox .fc-whonote { font-size: 0.8rem; color: var(--fc-muted); margin: 0.5rem 0 0; }
+.fc-whobox .fc-err { margin: 0.35rem 0 0; }
+
+/* Shared with others (admins) */
+.fc-others { border-top: 1px solid var(--fc-line); margin-top: 0.35rem; }
+.fc-others-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-height: 44px;
+  padding: 0.5rem 0.1rem;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--fc-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.fc-others-toggle[aria-expanded='true'] .fc-chev { transform: rotate(90deg); }
+.fc .fc-others-note { font-size: 0.82rem; color: var(--fc-muted); margin: 0 0 0.25rem; }
+.fc-others .fc-list { border-top: 1px solid var(--fc-line); }
