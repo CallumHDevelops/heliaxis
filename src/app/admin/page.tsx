@@ -43,6 +43,12 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
         const parts = [sign && `${sign} to countersign`, docs && `${docs} docs to review`].filter(Boolean);
         if (parts.length) out.subcontractors = parts.join(' · ');
       }),
+    keys.includes('crm') &&
+      count(
+        admin.from('crm_projects').select('id', { count: 'exact', head: true }).not('stage', 'in', '(complete,lost)')
+      ).then((n) => {
+        if (n) out.crm = `${n} live project${n === 1 ? '' : 's'}`;
+      }),
     isAdmin &&
       count(admin.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending')).then((n) => {
         if (n) out.users = `${n} awaiting approval`;

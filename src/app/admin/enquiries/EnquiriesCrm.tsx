@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { PushBanner } from '@/components/admin/PushBanner';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
 import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS } from '@/lib/enquiries';
@@ -39,7 +40,22 @@ function IconRow({ keys }: { keys: string[] }) {
   );
 }
 
-export function EnquiriesCrm({ initialLeads }: { initialLeads: CrmLead[] }) {
+export function EnquiriesCrm({ initialLeads, canCrm = false }: { initialLeads: CrmLead[]; canCrm?: boolean }) {
+  const router = useRouter();
+  const [opening, setOpening] = useState(false);
+  async function openInCrm(l: CrmLead) {
+    setOpening(true);
+    const keys = l.interests.map((k) => (k === 'heatpump' ? 'infrared' : k)).filter((k) => ['solar', 'battery', 'infrared', 'led'].includes(k));
+    const r = await fetch('/api/crm/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enquiry_id: l.id, open_existing: true, products: keys }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setOpening(false);
+    if (r.ok) router.push(`/admin/crm/${d.id}`);
+    else alert(d.error || 'Could not open the CRM — has supabase/crm.sql been run?');
+  }
   const [leads, setLeads] = useState(initialLeads);
   const [active, setActive] = useState<CrmLead | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
@@ -239,6 +255,11 @@ export function EnquiriesCrm({ initialLeads }: { initialLeads: CrmLead[] }) {
             <div className="enq-label">Message</div>
             <p className="enq-msg">{active.msg || 'No message'}</p>
             <div className="enq-actions">
+              {canCrm && (
+                <button type="button" className="enq-btn solar" disabled={opening} onClick={() => openInCrm(active)}>
+                  {opening ? 'Opening…' : 'Open in CRM'}
+                </button>
+              )}
               <a className="enq-btn solar" href={`mailto:${active.email}`}>
                 Reply by email
               </a>
