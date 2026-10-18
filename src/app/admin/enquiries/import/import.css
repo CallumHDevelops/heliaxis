@@ -1,0 +1,24 @@
+.imp-page {
+  --ink: #211f18;
+  --muted: #6e6a5e;
+  --line: rgba(33, 31, 24, 0.14);
+  --card: #fffdf8;
+  --paper: #f7f2e7;
+  --solar: #f8bc1e;
+  --ok: #3f7d4e;
+  --bad: #a3322a;
+  max-width: 820px;
+  color: var(--ink);
+}
+.imp-back { color: var(--muted); font-size: 0.85rem; text-decoration: none; }
+.imp-page h1 { font-size: 1.5rem; font-weight: 800; margin: 0.4rem 0 0; }
+.imp-lede { color: var(--muted); font-size: 0.92rem; line-height: 1.5; margin: 0.35rem 0 1.25rem; }
+.imp-card { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 18px; margin-bottom: 16px; }
+.imp-card h2 { font-size: 1.1rem; margin: 0 0 0.3rem; }
+.imp-card > p { color: var(--muted); font-size: 0.9rem; line-height: 1.5; margin: 0 0 0.8rem; }
+.imp-btn { padding: 0.55rem 0.95rem; font: inherit; font-weight: 700; font-size: 0.88rem; color: var(--ink); background: var(--solar); border: 0; border-radius: 2px; cursor: pointer; }
+.imp-btn:disabled { opacity: 0.45; cursor: default; }
+.imp-btn-ghost { padding: 0.5rem 0.85rem; font: inherit; font-size: 0.85rem; font-weight: 600; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 2px; cursor: pointer; }
+.imp-ok { color: var(--ok); font-size: 0.85rem; }
+.imp-err { color: var(--bad); font-size: 0.85rem; }
+.imp-steps { margin: 0 0 0.8rem; padding-left: 1.2rem; color: #4a473e; font-size: 0.88rem; line-height: 1.55; }
