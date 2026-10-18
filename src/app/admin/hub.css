@@ -416,7 +416,7 @@ a.hub-row:hover {
 }
 .hub-claude:hover { border-color: var(--ink); }
 .hub-claude-mark { flex: none; }
-.hub-need-icon svg.hub-need-metis { width: 38px; height: 38px; }
+.hub-need-icon .hub-need-metis { width: 38px; height: 38px; }
 .hub-claude-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .hub-claude-main b { font-size: 1rem; }
 .hub-claude-main small { color: var(--muted); font-size: 0.85rem; line-height: 1.35; }
