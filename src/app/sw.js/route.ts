@@ -65,6 +65,7 @@ self.addEventListener('push', (event) => {
       actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
       data: Object.assign({}, data.data || {}, { href: data.href || '/admin', id: data.id }),
     });
+    if (typeof data.unread === 'number' && self.navigator.setAppBadge) self.navigator.setAppBadge(data.unread).catch(() => {});
     // Tell open pages to refresh the bell.
     const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     open.forEach((c) => c.postMessage({ type: 'NOTIFICATION' }));

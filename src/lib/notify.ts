@@ -41,12 +41,14 @@ export async function notify(n: NotificationInput) {
       .single();
 
     if (!vapid()) return;
-    const { data: subs } = await admin
-      .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth')
-      .eq('user_id', n.userId);
+    const [{ data: subs }, { count: unread }] = await Promise.all([
+      admin.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('user_id', n.userId),
+      admin.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', n.userId).is('read_at', null),
+    ]);
     const payload = JSON.stringify({
       id: row?.id,
+      // For the count on the app icon (iPhone Home Screen app).
+      unread: unread ?? undefined,
       title: n.title,
       body: n.body ?? '',
       href: n.href ?? '/admin',
