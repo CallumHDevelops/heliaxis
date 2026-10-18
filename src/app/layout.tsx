@@ -11,6 +11,8 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://heliaxis.co.uk"),
+  // The staff pages swap in /admin.webmanifest (src/app/admin/layout.tsx).
+  manifest: "/manifest.json",
   title: {
     default: "Heliaxis | Renewable Energy Solutions Wales & South West England",
     template: "%s | Heliaxis",
@@ -87,7 +89,6 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/assets/favicon.png" type="image/png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#16222F" />
         <meta name="geo.region" content="GB-WLS" />
         <meta name="geo.placename" content="Wales" />

@@ -10,7 +10,7 @@ import { SendToPhone } from './SendToPhone';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Android app · Heliaxis',
+  title: 'Phone app · Heliaxis',
   robots: { index: false, follow: false },
 };
 

@@ -1,0 +1,16 @@
+{
+  "id": "/admin",
+  "name": "Heliaxis",
+  "short_name": "Heliaxis",
+  "description": "The Heliaxis staff app: WhatsApp, enquiries, customers and tasks.",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFDF8",
+  "theme_color": "#FFFDF8",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

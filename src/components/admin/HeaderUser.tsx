@@ -90,6 +90,12 @@ export function HeaderUser({
     };
   }, [load]);
 
+  // Unread count on the app icon (iPhone Home Screen app; the service worker updates it on each push too).
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    (unread ? nav.setAppBadge?.(unread) : nav.clearAppBadge?.())?.catch(() => {});
+  }, [unread]);
+
   // What can this device do about push?
   useEffect(() => {
     let cancelled = false;

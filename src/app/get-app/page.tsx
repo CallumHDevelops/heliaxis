@@ -41,7 +41,9 @@ export default async function GetAppPage({ searchParams }: { searchParams: Promi
               </li>
               <li>Tap <b>Install</b>, then <b>Open</b> and sign in as usual.</li>
             </ol>
-            <p className="ga-note">On an iPhone? The app is Android-only for now — use heliaxis.co.uk/admin in Safari.</p>
+            <p className="ga-note">
+              On an iPhone? Open <b>heliaxis.co.uk/admin</b> in Safari and sign in, then tap Share → <b>Add to Home Screen</b>.
+            </p>
           </>
         ) : (
           <>
