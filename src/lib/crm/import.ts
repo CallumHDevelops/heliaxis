@@ -64,8 +64,23 @@ export type ImportedEnquiryInput = {
   byId?: string | null;
 };
 
+let quietReady = false;
+
+/**
+ * The crm-v2.sql columns that keep an imported opportunity out of the alerts and follow-ups. That
+ * migration adds them empty, so an opportunity saved without them would look like a live lead once
+ * it's run. (No CRM tables at all is fine: nothing would pick it up.)
+ */
+async function checkQuietColumns() {
+  if (quietReady) return;
+  const { error } = await createAdminClient().from('crm_projects').select('first_response_alerted_at, sequence_stopped_at, first_contact_at').limit(1);
+  if (error && /column/i.test(error.message)) throw new Error('Run supabase/crm-v2.sql in Supabase first, so imported people aren’t sent follow-ups.');
+  quietReady = !error;
+}
+
 /** Add someone from the past: enquiry + opportunity + timeline line, all at their original date. */
 export async function createImportedEnquiry(e: ImportedEnquiryInput): Promise<{ id: string; projectId: string | null }> {
+  await checkQuietColumns();
   const db = createAdminClient();
   const at = new Date(e.createdAt);
   const when = Number.isFinite(at.getTime()) && at.getTime() <= Date.now() ? at.toISOString() : new Date().toISOString();
@@ -118,13 +133,10 @@ async function addImportedOpportunity(
     stage_changed_at: o.when,
   };
   const now = new Date().toISOString();
-  // Already handled: no "hasn't been contacted" alert, no follow-up sequence (crm-v2.sql columns).
+  // Already handled: no "hasn't been contacted" alert, no follow-up sequence (crm-v2.sql columns,
+  // checked by checkQuietColumns).
   const quiet = { first_response_alerted_at: now, sequence_stopped_at: now, first_contact_at: o.firstContactAt };
-  let { data, error } = await db.from('crm_projects').insert({ ...base, ...quiet }).select('id').single();
-  if (error && /column/i.test(error.message)) {
-    // crm-v2.sql not run yet: those automations don't exist either.
-    ({ data, error } = await db.from('crm_projects').insert(base).select('id').single());
-  }
+  const { data, error } = await db.from('crm_projects').insert({ ...base, ...quiet }).select('id').single();
   return error ? null : ((data?.id as string) ?? null);
 }
 

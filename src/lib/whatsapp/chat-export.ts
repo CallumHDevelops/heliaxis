@@ -40,24 +40,28 @@ const TIME = String.raw`(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?(?:\s?([ap])\.?\s?m\
 const IOS_LINE = new RegExp(String.raw`^\[${DATE},?\s${TIME}\]\s(.*)$`, 'i');
 const ANDROID_LINE = new RegExp(String.raw`^${DATE},?\s${TIME}\s[-–]\s(.*)$`, 'i');
 
-/** WhatsApp's own notices. iPhones put them under the contact's name, so the text is checked too. */
+/**
+ * WhatsApp's own notices. Only lines WhatsApp wrote are checked against these: Android's have no
+ * name, and iPhones put them under the contact's name with U+200E straight after "Name: ". A
+ * customer's "Have you changed your phone number?" is an ordinary message.
+ */
 const SYSTEM = [
   /^Messages (and calls )?(to this (chat|group) )?(are|were) (now )?(secured with )?end-to-end encrypt/i,
-  /end-to-end encrypted\. (No one outside|Only people in this chat)/i,
+  /^.{0,120}end-to-end encrypted\. (No one outside|Only people in this chat)/i,
   /^Your security code with .+ changed/i,
-  /changed (their|your) phone number/i,
+  /^.{1,80} changed (their|your) phone number\b/i,
   /^\+?[\d\s().-]{7,} changed to \+?[\d\s().-]{7,}\.?$/,
   /^This (business|chat|account) .*(Meta|business account|standard account|other companies|Tap to learn more)/i,
   /^.{1,80} is a contact\.?$/i,
-  /\b(turned (on|off)|uses a default timer for|changed the timer for) disappearing messages/i,
+  /^.{1,80} (turned (on|off)|uses a default timer for|changed the timer for) disappearing messages/i,
   /^Disappearing messages (were|are) turned (on|off)/i,
   /^You (blocked|unblocked) this (contact|business)/i,
   /^Tap (here )?to (learn more|change|message|unblock|view)/i,
-  /^(You|.{1,80}) (created group|added|removed|left|joined using this group|changed the (subject|group|group description))\b/i,
 ];
 
 const DELETED = [/^This message was deleted\.?$/i, /^You deleted this message\.?$/i, /^Waiting for this message\b/i];
-const EDITED = /\s*<This message was edited>\s*$/i;
+/** Starts on the literal, so a long run of spaces or blank lines can't make it slow. */
+const EDITED = /<This message was edited>\s*$/i;
 
 const LABEL: Record<MediaType, string> = {
   photo: 'Photo',
@@ -89,6 +93,7 @@ function mediaFromFile(file: string): { media: MediaType; name?: string } {
 /** The first line of a message when it stands for a photo, voice note… (null for ordinary text). */
 function mediaLine(line: string): { media: MediaType; name?: string } | null {
   const l = line.trim();
+  if (l.length > 400) return null; // never media (and keeps the patterns below quick)
   if (/^<Media omitted>$/i.test(l) || l === 'null') return { media: 'other' };
   let m = l.match(/^<attached: (.+)>$/i) || l.match(/^(.+\.[a-z0-9]{2,5}) \(file attached\)$/i);
   if (m) return mediaFromFile(m[1]);
@@ -181,7 +186,8 @@ function splitAuthor(rest: string): { author: string; text: string } | null {
 }
 
 export function parseChatExport(input: string): ParsedChat {
-  const lines = input.split(/\r\n|\r|\n/).map((l) => l.replace(MARKS, '').replace(SPACES, ' '));
+  const raw = input.split(/\r\n|\r|\n/);
+  const lines = raw.map((l) => l.replace(MARKS, '').replace(SPACES, ' '));
   const heads = lines.map(readHead);
   const warnings: string[] = [];
   const found = heads.filter((h): h is Head => !!h);
@@ -199,43 +205,55 @@ export function parseChatExport(input: string): ParsedChat {
   }
 
   const messages: ChatMessage[] = [];
-  let current: { at: number; rest: string; extra: string[] } | null = null;
+  let current: { at: number; author: string; text: string; extra: string[]; byWhatsApp: boolean } | null = null;
   let orphans = 0;
   let badDates = 0;
   let last = -Infinity;
 
   const finish = () => {
     if (!current) return;
-    const who = splitAuthor(current.rest);
-    if (!who) return; // a notice without a name
-    const first = who.text.replace(EDITED, '');
+    const { author } = current;
+    const first = current.text.replace(EDITED, '');
     const caption = current.extra.join('\n').replace(EDITED, '').trim();
-    const text = (current.extra.length ? `${who.text}\n${current.extra.join('\n')}` : who.text).replace(EDITED, '').trim();
-    if (!text || SYSTEM.some((r) => r.test(text))) return;
+    const text = (current.extra.length ? `${current.text}\n${current.extra.join('\n')}` : current.text).replace(EDITED, '').trim();
+    if (!text || (current.byWhatsApp && SYSTEM.some((r) => r.test(text)))) return;
     const at = new Date(current.at).toISOString();
     if (DELETED.some((r) => r.test(text))) {
-      messages.push({ at, author: who.author, body: text.replace(/\.$/, ''), kind: 'deleted' });
+      messages.push({ at, author, body: text.replace(/\.$/, ''), kind: 'deleted' });
       return;
     }
     const media = mediaLine(first);
     if (media) {
       const label = media.name ? `[${LABEL[media.media]}: ${media.name}]` : `[${LABEL[media.media]}]`;
-      messages.push({ at, author: who.author, body: caption ? `${label} ${caption}` : label, kind: 'media', media: media.media });
+      messages.push({ at, author, body: caption ? `${label} ${caption}` : label, kind: 'media', media: media.media });
       return;
     }
-    messages.push({ at, author: who.author, body: text, kind: 'text' });
+    messages.push({ at, author, body: text, kind: 'text' });
   };
 
   for (let i = 0; i < lines.length; i++) {
     const h = heads[i];
     const wall = h ? wallClock(h, dayFirst) : null;
     if (h && wall !== null) {
-      finish();
-      const at = ukToUtc(wall, last);
-      last = at;
-      current = { at, rest: h.rest, extra: [] };
-    } else if (current) {
-      if (h) badDates++;
+      const who = splitAuthor(h.rest);
+      if (who) {
+        finish();
+        const at = ukToUtc(wall, last);
+        last = at;
+        const colon = raw[i].indexOf(': ');
+        current = { at, ...who, extra: [], byWhatsApp: colon >= 0 && raw[i][colon + 2] === '‎' };
+        continue;
+      }
+      if (SYSTEM.some((r) => r.test(h.rest.trim()))) {
+        finish(); // one of WhatsApp's own lines, with no name
+        current = null;
+        continue;
+      }
+      // No name and not a notice: a line in a message that starts with a date and time
+      // ("25/10/2026, 10:00 - 12:00"), so it stays part of that message.
+    }
+    if (current) {
+      if (h && wall === null) badDates++;
       current.extra.push(lines[i]);
     } else if (lines[i].trim()) {
       orphans++;
@@ -244,7 +262,7 @@ export function parseChatExport(input: string): ParsedChat {
   finish();
 
   if (orphans) {
-    warnings.push(`${orphans === 1 ? '1 line' : `${orphans} lines`} at the start of the file ${orphans === 1 ? 'wasn’t' : 'weren’t'} part of any message, so ${orphans === 1 ? 'it was' : 'they were'} left out.`);
+    warnings.push(`${orphans === 1 ? '1 line' : `${orphans} lines`} ${orphans === 1 ? 'wasn’t' : 'weren’t'} part of any message, so ${orphans === 1 ? 'it was' : 'they were'} left out.`);
   }
   if (badDates) {
     warnings.push(`${badDates === 1 ? '1 line has' : `${badDates} lines have`} a date that can’t be right, so ${badDates === 1 ? 'it was' : 'they were'} read as part of the message before.`);

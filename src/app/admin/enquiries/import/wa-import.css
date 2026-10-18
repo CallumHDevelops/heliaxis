@@ -4,6 +4,7 @@
 .wai-note { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin: 0 0 0.9rem; padding: 0.5rem 0.7rem; background: var(--paper); border-radius: 2px; }
 .wai-pick { display: inline-block; }
 .wai-pick input { display: none; }
+.wai-pick:has(input:disabled) { opacity: 0.45; cursor: default; }
 .wai-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
 .wai-row { border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: #fff; min-width: 0; }
 .wai-row.done { background: var(--paper); }
@@ -12,6 +13,7 @@
 .wai-file { display: block; color: var(--muted); font-size: 0.75rem; word-break: break-all; }
 .wai-x { flex: none; width: 2rem; height: 2rem; font-size: 1.2rem; line-height: 1; color: var(--muted); background: transparent; border: 0; cursor: pointer; }
 .wai-stats { color: var(--muted); font-size: 0.85rem; margin: 2px 0 6px; }
+.wai-lock { border: 0; margin: 0; padding: 0; min-width: 0; }
 .wai-warn { color: #8a5a00; font-size: 0.8rem; line-height: 1.4; margin: 0 0 6px; }
 .wai-field { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 10px 0; font-size: 0.88rem; }
 .wai-field > span:first-child { font-weight: 700; min-width: 6.5rem; }

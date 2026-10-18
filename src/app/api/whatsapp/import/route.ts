@@ -40,8 +40,38 @@ async function admin() {
   return s?.profile.role === 'admin' ? s : null;
 }
 
-const COLS = 'id, name, phone, email, wa_id, whatsapp_opt_in';
-type Enquiry = { id: string; name: string; phone: string | null; email: string | null; wa_id: string | null; whatsapp_opt_in: boolean };
+const COLS = 'id, name, phone, email, wa_id, whatsapp_opt_in, wa_last_message_at';
+type Enquiry = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  wa_id: string | null;
+  whatsapp_opt_in: boolean;
+  wa_last_message_at: string | null;
+};
+
+/** The enquiry live WhatsApp from this number goes to: the latest chat, as enquiryForNumber in inbox.ts picks it. */
+async function chatOn(wa: string): Promise<Enquiry | null> {
+  const { data } = await createAdminClient()
+    .from('enquiries')
+    .select(COLS)
+    .eq('wa_id', wa)
+    .order('wa_last_message_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(1);
+  return (data?.[0] as Enquiry | undefined) ?? null;
+}
+
+/** Whoever has this number: the enquiry its chat is on (so a chat always lands in the same place), else anyone with it as their phone. */
+async function byNumber(wa: string): Promise<Enquiry | null> {
+  const live = await chatOn(wa);
+  if (live) return live;
+  const hit = await findExistingEnquiry({ phone: wa });
+  if (!hit) return null;
+  const { data } = await createAdminClient().from('enquiries').select(COLS).eq('id', hit.id).maybeSingle();
+  return (data as Enquiry | null) ?? null;
+}
 
 /**
  * ?q= → up to 10 customers by name, phone or email (the "which customer is this?" picker).
@@ -54,11 +84,8 @@ export async function GET(req: Request) {
 
   const phone = url.searchParams.get('phone');
   if (phone !== null) {
-    if (phone.length > 40 || !toWaId(phone)) return json({ match: null });
-    const hit = await findExistingEnquiry({ phone });
-    if (!hit) return json({ match: null });
-    const { data } = await db.from('enquiries').select(COLS).eq('id', hit.id).maybeSingle();
-    return json({ match: data ?? null });
+    const wa = phone.length <= 40 ? toWaId(phone) : null;
+    return json({ match: wa ? await byNumber(wa) : null });
   }
 
   // Commas, brackets, quotes and colons would break the PostgREST filter; % and * are wildcards.
@@ -85,8 +112,8 @@ export async function GET(req: Request) {
  * { fileName, text, us, customer } → the chat saved to that customer.
  *   us: the author name that is Heliaxis, or null when only the customer wrote.
  *   customer: { enquiryId, phone? } for someone in the CRM, or { phone, name } to match by phone or add them.
- * Importing the same file again adds nothing: each message gets a fixed id from its customer, time,
- * direction and text.
+ * Importing the same file again adds nothing, even onto another of their enquiries: each message
+ * gets a fixed id from the customer's number, time, direction and text.
  */
 export async function POST(req: Request) {
   const s = await admin();
@@ -154,8 +181,15 @@ export async function POST(req: Request) {
   const ours = keep.filter((m) => m.author === us);
   const theyWrote = ours.length < keep.length;
 
-  // Who it is: the customer picked, else whoever has this number, else a new lead dated to the chat.
   const db = createAdminClient();
+  // Imported messages are told apart from live ones by via (whatsapp-chasers.sql). Saved without
+  // it they'd look live for good, as importing again skips messages that are already there.
+  const { error: noVia } = await db.from('whatsapp_messages').select('via').limit(1);
+  if (noVia) {
+    return json({ error: /\bvia\b/.test(noVia.message) ? 'Run supabase/whatsapp-chasers.sql in Supabase first.' : noVia.message }, 500);
+  }
+
+  // Who it is: the customer picked, else whoever has this number, else a new lead dated to the chat.
   let enquiry: Enquiry | null = null;
   let created = false;
   let projectId: string | null | undefined;
@@ -164,11 +198,7 @@ export async function POST(req: Request) {
     if (!data) return json({ error: 'That customer isn’t in the CRM any more.' }, 404);
     enquiry = data as Enquiry;
   } else {
-    const hit = await findExistingEnquiry({ phone });
-    if (hit) {
-      const { data } = await db.from('enquiries').select(COLS).eq('id', hit.id).maybeSingle();
-      enquiry = (data as Enquiry | null) ?? null;
-    }
+    enquiry = wa ? await byNumber(wa) : null;
     if (!enquiry) {
       const name = ((c.name as string | undefined) || '').trim() || customerAuthor || nameFromFileName(fileName) || `+${wa}`;
       try {
@@ -183,7 +213,7 @@ export async function POST(req: Request) {
           activity: 'Imported WhatsApp chat from the WhatsApp Business app (01633 965205)',
           byId: s.user.id,
         });
-        enquiry = { id: r.id, name, phone, email: null, wa_id: wa, whatsapp_opt_in: theyWrote };
+        enquiry = { id: r.id, name, phone, email: null, wa_id: wa, whatsapp_opt_in: theyWrote, wa_last_message_at: null };
         created = true;
         projectId = r.projectId;
       } catch (e) {
@@ -193,29 +223,31 @@ export async function POST(req: Request) {
   }
   const id = enquiry.id;
 
-  // Same message (customer, time, direction, text) → same id, so a second import is a no-op. Two
-  // identical messages in the same minute are told apart by which one they are.
+  // Same message (customer's number, time, direction, text) → same id, so a second import is a
+  // no-op, whichever of their enquiries it goes to. Two identical messages in the same minute are
+  // told apart by which one they are.
+  const customerKey = wa ?? enquiry.wa_id ?? toWaId(enquiry.phone) ?? id;
   const seen = new Map<string, number>();
   const rows = keep.map((m) => {
     const direction = m.author === us ? 'out' : 'in';
     const body = m.body.slice(0, MAX_BODY);
-    const key = [id, m.at, direction, body].join('|');
+    const key = JSON.stringify([customerKey, m.at, direction, body]);
     const n = seen.get(key) ?? 0;
     seen.set(key, n + 1);
     return {
       enquiry_id: id,
-      wa_message_id: `import:${createHash('sha256').update(n ? `${key}|${n}` : key).digest('hex').slice(0, 32)}`,
+      wa_message_id: `import:${createHash('sha256').update(JSON.stringify([customerKey, m.at, direction, body, n])).digest('hex').slice(0, 32)}`,
       direction,
       kind: m.kind === 'media' ? MEDIA_KIND[m.media ?? 'other'] : 'text',
       body,
       // 'read' so opening the chat never tries to send Meta a read receipt for these.
       status: direction === 'in' ? 'read' : 'delivered',
       sent_by: null,
+      via: 'import',
       created_at: m.at,
     };
   });
 
-  let withVia = true;
   let saved = 0;
   let imported = 0;
   let first = Infinity;
@@ -223,17 +255,10 @@ export async function POST(req: Request) {
   let failed: string | null = null;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
-    const save = () =>
-      db
-        .from('whatsapp_messages')
-        .upsert(withVia ? batch.map((r) => ({ ...r, via: 'import' })) : batch, { onConflict: 'wa_message_id', ignoreDuplicates: true })
-        .select('created_at');
-    let { data, error } = await save();
-    if (error && withVia && /\bvia\b/.test(error.message)) {
-      // whatsapp-chasers.sql not run yet: no via column.
-      withVia = false;
-      ({ data, error } = await save());
-    }
+    const { data, error } = await db
+      .from('whatsapp_messages')
+      .upsert(batch, { onConflict: 'wa_message_id', ignoreDuplicates: true })
+      .select('created_at');
     if (error) {
       failed = error.message;
       break;
@@ -247,10 +272,26 @@ export async function POST(req: Request) {
     }
   }
 
+  // WhatsApp from the CRM goes to wa_id first, so the chat's number only goes on this customer when
+  // it's theirs: the number they already have, or they have none and nobody else in the CRM has it.
+  let number = enquiry.wa_id ?? toWaId(enquiry.phone);
+  let note: string | null = null;
+  if (!created && wa && !number) {
+    const other = await byNumber(wa);
+    if (other && other.id !== id) note = `The chat’s number wasn’t added to ${enquiry.name}, as ${other.name} already has it in the CRM.`;
+    else number = wa;
+  } else if (!created && wa && number !== wa) {
+    note = `The chat’s number wasn’t added to ${enquiry.name}, as they have a different number in the CRM.`;
+  }
+  // If their live chat is on another of their enquiries it stays there: replies, chasers and smart
+  // replies follow the latest wa_last_message_at, so moving this one forward would move the chat.
+  const live = !created && number ? await chatOn(number) : null;
+  const chatHere = !live || live.id === id || !live.wa_last_message_at;
+
   // Inbox order: the chat moves up only if these are newer than what's there. wa_last_inbound_at
   // stays as it is; it opens the free 24-hour reply window, and these are old.
   const newest = rows.slice(0, saved).reduce((max, r) => (r.created_at > max ? r.created_at : max), '');
-  if (newest) {
+  if (newest && chatHere) {
     await db
       .from('enquiries')
       .update({ wa_last_message_at: newest })
@@ -259,10 +300,28 @@ export async function POST(req: Request) {
   }
   if (!created) {
     const patch: Record<string, unknown> = {};
-    if (wa && !enquiry.wa_id) patch.wa_id = wa; // their WhatsApp from now on lands on this customer
-    if (phone && !enquiry.phone) patch.phone = phone;
+    if (wa && wa === number) {
+      if (chatHere && !enquiry.wa_id) patch.wa_id = wa; // their WhatsApp from now on lands on this customer
+      if (phone && !enquiry.phone) patch.phone = phone;
+    }
     if (theyWrote && saved && !enquiry.whatsapp_opt_in) patch.whatsapp_opt_in = true; // they messaged us
     if (Object.keys(patch).length) await db.from('enquiries').update(patch).eq('id', id);
+
+    // They've been talking to us since the opportunity opened, so stop its "just following up"
+    // sequence, as a live reply does (handleInboundMessage).
+    const lastIn = rows.slice(0, saved).reduce((max, r) => (r.direction === 'in' && r.created_at > max ? r.created_at : max), '');
+    if (lastIn) {
+      await db
+        .from('crm_projects')
+        .update({ sequence_stopped_at: lastIn })
+        .eq('enquiry_id', id)
+        .is('sequence_stopped_at', null)
+        .lte('created_at', lastIn)
+        .then(
+          () => null,
+          () => null
+        );
+    }
   }
   if (imported) {
     await db.from('crm_activities').insert({
@@ -277,7 +336,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const result = { enquiryId: id, name: enquiry.name, created, imported, duplicates: saved - imported, skipped };
+  const result = { enquiryId: id, name: enquiry.name, created, imported, duplicates: saved - imported, skipped, note };
   if (failed) {
     return json({ ...result, error: `Saved ${saved.toLocaleString('en-GB')} of ${rows.length.toLocaleString('en-GB')} messages, then: ${failed}. Import it again to add the rest.` }, 500);
   }

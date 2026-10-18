@@ -15,6 +15,7 @@ async function view(file: Blob, start: number, end: number) {
 
 /** Far longer than any one chat: refuse rather than unpack something huge. */
 const MAX_UNZIPPED = 50 * 1024 * 1024;
+const TOO_BIG = 'The chat in this zip is too big to import.';
 
 type Entry = { name: string; flags: number; method: number; packed: number; size: number; offset: number };
 
@@ -78,6 +79,36 @@ async function listZip(zip: Blob): Promise<Entry[]> {
   return entries;
 }
 
+/**
+ * A deflated entry, unpacked. The sizes in a zip's directory can be wrong, so what comes out is
+ * counted, and it stops once that passes MAX_UNZIPPED rather than filling the tab's memory.
+ */
+async function inflate(data: Blob): Promise<Uint8Array> {
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  try {
+    const reader = data.stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    for (let r = await reader.read(); !r.done; r = await reader.read()) {
+      total += r.value.byteLength;
+      if (total > MAX_UNZIPPED) {
+        await reader.cancel();
+        break;
+      }
+      parts.push(r.value);
+    }
+  } catch {
+    throw new Error('This zip looks damaged.');
+  }
+  if (total > MAX_UNZIPPED) throw new Error(TOO_BIG);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.byteLength;
+  }
+  return out;
+}
+
 /** The chat .txt inside a WhatsApp export zip. */
 export async function readChatZip(zip: Blob): Promise<{ name: string; text: string }> {
   const txt = (await listZip(zip)).filter((e) => /\.txt$/i.test(e.name) && !/(^|\/)__MACOSX\//.test(e.name));
@@ -88,24 +119,20 @@ export async function readChatZip(zip: Blob): Promise<{ name: string; text: stri
     (txt.length === 1 ? txt[0] : null);
   if (!chat) throw new Error('There’s no WhatsApp chat in this zip.');
   if (chat.flags & 1) throw new Error('This zip is password-protected.');
-  if (chat.size > MAX_UNZIPPED) throw new Error('The chat in this zip is too big to import.');
+  if (chat.size > MAX_UNZIPPED || chat.packed > MAX_UNZIPPED) throw new Error(TOO_BIG);
 
   const local = await view(zip, chat.offset, chat.offset + 30);
   if (u32(local, 0) !== 0x04034b50) throw new Error('This zip looks damaged.');
   const start = chat.offset + 30 + u16(local, 26) + u16(local, 28);
   const data = zip.slice(start, start + chat.packed);
-  let raw: ArrayBuffer;
+  let raw: Uint8Array;
   if (chat.method === 0) {
-    raw = await data.arrayBuffer();
+    raw = new Uint8Array(await data.arrayBuffer());
   } else if (chat.method === 8) {
     if (typeof DecompressionStream === 'undefined') {
       throw new Error('This browser can’t open zip files. Unzip it first and choose the .txt inside, or update the browser.');
     }
-    try {
-      raw = await new Response(data.stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
-    } catch {
-      throw new Error('This zip looks damaged.');
-    }
+    raw = await inflate(data);
   } else {
     throw new Error('This zip is packed in a way the browser can’t open. Unzip it first and choose the .txt inside.');
   }

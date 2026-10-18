@@ -21,7 +21,16 @@ import './wa-import.css';
  */
 
 type Person = { id: string; name: string; phone: string | null; email: string | null; postcode?: string | null };
-type Result = { enquiryId: string; name: string; created: boolean; imported: number; duplicates: number; skipped: number };
+type Result = {
+  enquiryId: string;
+  name: string;
+  created: boolean;
+  imported: number;
+  duplicates: number;
+  skipped: number;
+  /** e.g. why the chat's number wasn't added to them. */
+  note?: string | null;
+};
 
 type Row = {
   key: number;
@@ -111,10 +120,14 @@ export function WhatsAppImport() {
         ? 'Choose which name is Heliaxis.'
         : 'This looks like a group chat. Only one-to-one chats can be imported.';
     }
-    if (!r.match && !toWaId(r.newPhone)) return r.adding ? 'Enter their mobile number to add them.' : 'Choose the customer.';
+    if (!r.match && !r.adding) return 'Choose the customer.';
+    if (!r.match && !toWaId(r.newPhone)) return 'Enter their mobile number to add them.';
     return null;
   };
   const ready = rows.filter((r) => !blocker(r));
+  // One import at a time, and nothing changes while it runs: Import all uses the rows as they are
+  // when it's clicked, and two new leads with the same number would both be added.
+  const busy = busyAll || rows.some((r) => r.state === 'importing');
 
   async function addFiles(files: File[]) {
     for (const file of files) {
@@ -242,6 +255,7 @@ export function WhatsAppImport() {
           type="file"
           multiple
           accept=".txt,.zip,text/plain,application/zip"
+          disabled={busy}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
             e.target.value = ''; // so the same file can be chosen again
@@ -264,7 +278,7 @@ export function WhatsAppImport() {
                     <b>{name}</b>
                     <span className="wai-file">{r.fileName}</span>
                   </div>
-                  {r.state !== 'importing' && (
+                  {!busy && (
                     <button
                       type="button"
                       className="wai-x"
@@ -294,15 +308,10 @@ export function WhatsAppImport() {
                 )}
 
                 {chat && r.state !== 'done' && (
-                  <>
+                  <fieldset className="wai-lock" disabled={busy}>
                     <label className="wai-field">
                       <span>Heliaxis is</span>
-                      <select
-                        className="wai-input"
-                        value={value}
-                        disabled={r.state === 'importing'}
-                        onChange={(e) => patch(r.key, { us: e.target.value })}
-                      >
+                      <select className="wai-input" value={value} onChange={(e) => patch(r.key, { us: e.target.value })}>
                         <option value="" disabled>
                           Choose…
                         </option>
@@ -322,11 +331,9 @@ export function WhatsAppImport() {
                           <b>{r.match.name}</b>
                           {r.match.phone ? ` · ${r.match.phone}` : r.match.email ? ` · ${r.match.email}` : ''}
                           {r.match.byPhone ? ' (already in the CRM with this number)' : ''}{' '}
-                          {r.state !== 'importing' && (
-                            <button type="button" className="wai-link" onClick={() => patch(r.key, { match: null })}>
-                              Change
-                            </button>
-                          )}
+                          <button type="button" className="wai-link" onClick={() => patch(r.key, { match: null })}>
+                            Change
+                          </button>
                         </span>
                       ) : r.adding ? (
                         <span className="wai-new">
@@ -412,18 +419,13 @@ export function WhatsAppImport() {
                     </details>
 
                     <div className="wai-actions">
-                      <button
-                        type="button"
-                        className="imp-btn"
-                        disabled={!!why || busyAll}
-                        onClick={() => importRow(r)}
-                      >
+                      <button type="button" className="imp-btn" disabled={!!why} onClick={() => importRow(r)}>
                         {r.state === 'importing' ? 'Importing…' : 'Import'}
                       </button>
                       {why && r.state === 'ready' && <span className="wai-hint">{why}</span>}
                     </div>
                     {r.error && r.state === 'ready' && <p className="imp-err">{r.error}</p>}
-                  </>
+                  </fieldset>
                 )}
 
                 {r.result && (
@@ -436,6 +438,7 @@ export function WhatsAppImport() {
                     <Link href={`/admin/enquiries/inbox/${r.result.enquiryId}`}>Open the chat</Link>
                   </p>
                 )}
+                {r.result?.note && <p className="wai-warn">{r.result.note}</p>}
               </div>
             );
           })}
@@ -444,7 +447,7 @@ export function WhatsAppImport() {
 
       {rows.length > 1 && (
         <div className="wai-actions">
-          <button type="button" className="imp-btn" disabled={busyAll || !ready.length} onClick={importAll}>
+          <button type="button" className="imp-btn" disabled={busy || !ready.length} onClick={importAll}>
             {busyAll ? 'Importing…' : `Import all ready (${ready.length})`}
           </button>
         </div>

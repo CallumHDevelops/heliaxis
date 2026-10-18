@@ -97,7 +97,6 @@ export function ChatThread({ id }: { id: string }) {
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [tpl, setTpl] = useState<{ name: string; lang: string; params: string[] } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const lastCount = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -137,12 +136,11 @@ export function ChatThread({ id }: { id: string }) {
     };
   }, [load]);
 
+  // By the newest message, not the count: a long chat shows the latest 500, so the count stays put.
+  const newest = messages.at(-1)?.id;
   useEffect(() => {
-    if (messages.length !== lastCount.current) {
-      lastCount.current = messages.length;
-      endRef.current?.scrollIntoView({ block: 'end' });
-    }
-  }, [messages.length]);
+    if (newest) endRef.current?.scrollIntoView({ block: 'end' });
+  }, [newest]);
 
   const open = windowOpen(enquiry?.wa_last_inbound_at, now);
   const left = windowLeft(enquiry?.wa_last_inbound_at, now);
