@@ -1,0 +1,38 @@
+/* WhatsApp Business app chat import (inside .imp-page, so it uses import.css's colours). */
+.wai-how { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.wai-how h3 { font-size: 0.9rem; margin: 0 0 0.25rem; }
+.wai-note { color: var(--muted); font-size: 0.85rem; line-height: 1.5; margin: 0 0 0.9rem; padding: 0.5rem 0.7rem; background: var(--paper); border-radius: 2px; }
+.wai-pick { display: inline-block; }
+.wai-pick input { display: none; }
+.wai-pick:has(input:disabled) { opacity: 0.45; cursor: default; }
+.wai-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.wai-row { border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: #fff; min-width: 0; }
+.wai-row.done { background: var(--paper); }
+.wai-row-head { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+.wai-row-head b { word-break: break-word; }
+.wai-file { display: block; color: var(--muted); font-size: 0.75rem; word-break: break-all; }
+.wai-x { flex: none; width: 2rem; height: 2rem; font-size: 1.2rem; line-height: 1; color: var(--muted); background: transparent; border: 0; cursor: pointer; }
+.wai-stats { color: var(--muted); font-size: 0.85rem; margin: 2px 0 6px; }
+.wai-lock { border: 0; margin: 0; padding: 0; min-width: 0; }
+.wai-warn { color: #8a5a00; font-size: 0.8rem; line-height: 1.4; margin: 0 0 6px; }
+.wai-field { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 10px 0; font-size: 0.88rem; }
+.wai-field > span:first-child { font-weight: 700; min-width: 6.5rem; }
+.wai-match { flex: 1 1 14rem; min-width: 0; word-break: break-word; }
+.wai-new { flex: 1 1 14rem; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.wai-search { display: flex; gap: 6px; }
+.wai-input { font: inherit; font-size: 16px; padding: 0.45rem 0.6rem; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 2px; min-width: 0; max-width: 100%; }
+.wai-field > .wai-input { flex: 1 1 14rem; }
+.wai-search .wai-input { flex: 1; }
+.wai-found { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.wai-found button { width: 100%; text-align: left; font: inherit; font-size: 0.85rem; padding: 0.45rem 0.6rem; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 2px; cursor: pointer; word-break: break-word; }
+.wai-hint { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.wai-link { padding: 0; font: inherit; color: var(--ink); text-decoration: underline; background: none; border: 0; cursor: pointer; }
+.wai-preview { font-size: 0.82rem; color: #4a473e; margin: 4px 0; }
+.wai-preview summary { cursor: pointer; color: var(--muted); }
+.wai-preview p { margin: 4px 0 0; word-break: break-word; white-space: pre-line; }
+.wai-actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 10px; }
+.wai .imp-ok a { color: var(--ok); font-weight: 700; }
+@media (max-width: 600px) {
+  .wai-how { grid-template-columns: 1fr; }
+  .wai-field > span:first-child { min-width: 100%; }
+}

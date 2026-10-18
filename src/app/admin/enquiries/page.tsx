@@ -19,7 +19,7 @@ export default async function EnquiriesPage() {
 
   return (
     <AdminShell active="enquiries" isAdmin={profile?.role === 'admin'}>
-      <EnquiriesCrm initialLeads={leads} canCrm={canAccess(profile, 'crm')} />
+      <EnquiriesCrm initialLeads={leads} canCrm={canAccess(profile, 'crm')} canImport={profile?.role === 'admin'} />
     </AdminShell>
   );
 }

@@ -34,7 +34,8 @@ export function validSignature(rawBody: string, header: string | null): boolean 
   return got.length === want.length && crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
 }
 
-export type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string };
+/** `code` is Meta's error code when it sent one (190 bad token, 10/200 permissions, 4/17/32 rate limits…). */
+export type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string; code?: number };
 
 export async function graph<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<GraphResult<T>> {
   const token = init.token || process.env.WHATSAPP_TOKEN;
@@ -47,8 +48,8 @@ export async function graph<T>(path: string, init: RequestInit & { token?: strin
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const e = (d as { error?: { message?: string; error_user_msg?: string } }).error;
-      return { ok: false, error: e?.error_user_msg || e?.message || `Meta returned ${r.status}` };
+      const e = (d as { error?: { message?: string; error_user_msg?: string; code?: number } }).error;
+      return { ok: false, error: e?.error_user_msg || e?.message || `Meta returned ${r.status}`, code: e?.code };
     }
     return { ok: true, data: d as T };
   } catch (e) {

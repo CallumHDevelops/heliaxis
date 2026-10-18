@@ -13,6 +13,8 @@ type Msg = {
   status: string;
   error: string | null;
   by: string | null;
+  /** 'import' = brought in from a WhatsApp Business app export. */
+  via?: string | null;
   created_at: string;
 };
 type Queued = {
@@ -52,7 +54,9 @@ function dayLabel(iso: string) {
   const y = new Date(Date.now() - 86_400_000);
   if (d.toDateString() === today.toDateString()) return 'Today';
   if (d.toDateString() === y.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  // Imported chats go back years.
+  const year = d.getFullYear() !== today.getFullYear() ? ({ year: 'numeric' } as const) : {};
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', ...year });
 }
 function countdown(iso: string, now: number) {
   const s = Math.max(0, Math.round((new Date(iso).getTime() - now) / 1000));
@@ -93,7 +97,6 @@ export function ChatThread({ id }: { id: string }) {
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [tpl, setTpl] = useState<{ name: string; lang: string; params: string[] } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const lastCount = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -133,12 +136,11 @@ export function ChatThread({ id }: { id: string }) {
     };
   }, [load]);
 
+  // By the newest message, not the count: a long chat shows the latest 500, so the count stays put.
+  const newest = messages.at(-1)?.id;
   useEffect(() => {
-    if (messages.length !== lastCount.current) {
-      lastCount.current = messages.length;
-      endRef.current?.scrollIntoView({ block: 'end' });
-    }
-  }, [messages.length]);
+    if (newest) endRef.current?.scrollIntoView({ block: 'end' });
+  }, [newest]);
 
   const open = windowOpen(enquiry?.wa_last_inbound_at, now);
   const left = windowLeft(enquiry?.wa_last_inbound_at, now);
@@ -249,6 +251,7 @@ export function ChatThread({ id }: { id: string }) {
     );
   };
   let lastDay = '';
+  let lastImported = false;
 
   return (
     <div className="wa-page wa-chat">
@@ -278,15 +281,20 @@ export function ChatThread({ id }: { id: string }) {
           const day = dayLabel(m.created_at);
           const showDay = day !== lastDay;
           lastDay = day;
+          // Imported history: one quiet label where it starts, and no ticks (we never saw them).
+          const imported = m.via === 'import';
+          const showImported = imported && !lastImported;
+          lastImported = imported;
           return (
             <div key={m.id}>
               {showDay && <div className="wa-day">{day}</div>}
+              {showImported && <div className="wa-day wa-imported">Imported from the WhatsApp Business app</div>}
               <div className={`wa-bubble ${m.direction}${m.kind === 'template' ? ' tpl' : ''}`}>
                 {m.by && <span className="wa-by">{m.by}</span>}
                 <span className="wa-text">{m.body}</span>
                 <span className="wa-meta">
                   {clock(m.created_at)}
-                  {m.direction === 'out' && <span className={`wa-tick ${m.status}`}>{TICKS[m.status] || ''}</span>}
+                  {m.direction === 'out' && !imported && <span className={`wa-tick ${m.status}`}>{TICKS[m.status] || ''}</span>}
                 </span>
                 {m.error && <span className="wa-err">{m.error}</span>}
               </div>
@@ -373,9 +381,11 @@ export function ChatThread({ id }: { id: string }) {
       ) : (
         <div className="wa-compose wa-compose--tpl">
           <p className="wa-muted">
-            {messages.some((m) => m.direction === 'in')
+            {messages.some((m) => m.direction === 'in' && m.via !== 'import')
               ? 'It’s been over 24 hours since they last messaged, so WhatsApp only allows an approved template. Free chat reopens as soon as they reply.'
-              : 'Start the conversation with an approved template. Once they reply you can chat freely for 24 hours.'}
+              : messages.some((m) => m.via === 'import')
+                ? 'This chat was imported from the WhatsApp Business app. They haven’t messaged the CRM’s WhatsApp number yet, so start with an approved template. Once they reply you can chat freely for 24 hours.'
+                : 'Start the conversation with an approved template. Once they reply you can chat freely for 24 hours.'}
           </p>
           {templates === null ? (
             <p className="wa-muted">Loading templates…</p>

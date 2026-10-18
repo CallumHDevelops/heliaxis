@@ -233,6 +233,10 @@ textarea.wa-input {
   color: var(--muted);
   margin: 0.6rem 0 0.3rem;
 }
+.wa-imported {
+  font-style: italic;
+  margin-top: 0.1rem;
+}
 .wa-bubble {
   max-width: 82%;
   padding: 0.45rem 0.65rem 0.3rem;

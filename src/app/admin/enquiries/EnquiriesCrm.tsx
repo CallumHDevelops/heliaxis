@@ -40,7 +40,16 @@ function IconRow({ keys }: { keys: string[] }) {
   );
 }
 
-export function EnquiriesCrm({ initialLeads, canCrm = false }: { initialLeads: CrmLead[]; canCrm?: boolean }) {
+export function EnquiriesCrm({
+  initialLeads,
+  canCrm = false,
+  canImport = false,
+}: {
+  initialLeads: CrmLead[];
+  canCrm?: boolean;
+  /** Admins: link to Import (old Meta leads, WhatsApp chats). */
+  canImport?: boolean;
+}) {
   const router = useRouter();
   const [opening, setOpening] = useState(false);
   async function openInCrm(l: CrmLead) {
@@ -117,6 +126,11 @@ export function EnquiriesCrm({ initialLeads, canCrm = false }: { initialLeads: C
           <Link className="enq-refresh" href="/admin/enquiries/smart-replies">
             Smart replies
           </Link>
+          {canImport && (
+            <Link className="enq-refresh" href="/admin/enquiries/import">
+              Import
+            </Link>
+          )}
           <button type="button" className="enq-refresh" onClick={() => refresh()}>
             Refresh
           </button>

@@ -24,8 +24,10 @@ export async function GET(_req: Request, { params }: Ctx) {
       .from('whatsapp_messages')
       .select('id, direction, kind, body, template_name, status, error, sent_by, rule_id, via, created_at')
       .eq('enquiry_id', id)
-      .order('created_at')
-      .limit(500),
+      // The newest 500 (an imported chat can be long), oldest first on screen.
+      .order('created_at', { ascending: false })
+      .limit(500)
+      .then((r) => ({ ...r, data: r.data?.reverse() ?? null })),
     db
       .from('whatsapp_outbox')
       .select('id, kind, chase_step, rule_id, body, template_name, send_after, status, last_error, created_at')
