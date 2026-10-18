@@ -176,6 +176,12 @@ export function CrmBoard({ me }: { me: string }) {
               Board
             </button>
           </div>
+          <Link href="/admin/crm/reports" className="crm-btn crm-btn--ghost crm-hide-sm">
+            Reports
+          </Link>
+          <Link href="/admin/crm/settings" className="crm-btn crm-btn--ghost" aria-label="CRM settings">
+            ⚙
+          </Link>
           <button type="button" className="crm-btn crm-btn--solar" onClick={() => setAdding(true)}>
             + New
           </button>

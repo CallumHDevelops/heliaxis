@@ -138,9 +138,67 @@ export async function ensureOpportunity(enquiryId: string, source: string) {
       })
       .select('id')
       .single();
-    if (row) await logActivity({ enquiryId, projectId: row.id, kind: 'system', body: `New enquiry via ${source}` });
+    if (row) {
+      await logActivity({ enquiryId, projectId: row.id, kind: 'system', body: `New enquiry via ${source}` });
+      const { assignNewLead } = await import('./automation');
+      await assignNewLead(row.id, e.name).catch(() => null);
+    }
     return (row?.id as string) ?? null;
   } catch {
     return null;
   }
+}
+
+/* ── Documents (opportunity paperwork + company library) ───────────────────────── */
+
+export const DOCS_BUCKET = 'crm-docs';
+export const DOC_MIME = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+export const MAX_DOC_BYTES = 25 * 1024 * 1024;
+export const DOC_CATEGORIES = ['quote', 'invoice', 'dno', 'mcs', 'warranty', 'handover', 'design', 'contract', 'receipt', 'other'] as const;
+
+let docsReady = false;
+export async function ensureDocsBucket() {
+  if (docsReady) return;
+  const admin = createAdminClient();
+  const { data } = await admin.storage.getBucket(DOCS_BUCKET);
+  if (!data) await admin.storage.createBucket(DOCS_BUCKET, { public: false, fileSizeLimit: MAX_DOC_BYTES, allowedMimeTypes: DOC_MIME });
+  docsReady = true;
+}
+
+export function safeName(name: string) {
+  return (name || 'document').replace(/[^\w.\- ]+/g, '').replace(/\s+/g, '-').slice(0, 80) || 'document';
+}
+
+export async function signedDoc(path: string, seconds = 600, download?: string) {
+  const { data } = await createAdminClient()
+    .storage.from(DOCS_BUCKET)
+    .createSignedUrl(path, seconds, download ? { download } : undefined);
+  return data?.signedUrl ?? null;
+}
+
+/* ── Customer portal ─────────────────────────────────────────────────────────── */
+
+export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
+export const portalUrl = (token: string) => `${siteUrl()}/my/${token}`;
+
+/** The opportunity's private portal link (created on first use). */
+export async function ensurePortalToken(projectId: string) {
+  const db = createAdminClient();
+  const { data } = await db.from('crm_projects').select('portal_token').eq('id', projectId).maybeSingle();
+  if (data?.portal_token) return data.portal_token as string;
+  const { randomBytes } = await import('node:crypto');
+  const token = randomBytes(18).toString('base64url');
+  await db.from('crm_projects').update({ portal_token: token }).eq('id', projectId).is('portal_token', null);
+  const { data: again } = await db.from('crm_projects').select('portal_token').eq('id', projectId).maybeSingle();
+  return (again?.portal_token as string) || token;
 }

@@ -12,6 +12,8 @@ import {
   STAGES,
   stageLabel,
 } from '@/lib/crm/stages';
+import { DnoDeposit, DocumentsTab, EmailComposerV2, PortalCard, SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
+import type { TrackerStep } from '@/lib/crm/tracker';
 import '../crm.css';
 
 type Project = {
@@ -32,6 +34,12 @@ type Project = {
   notes: string | null;
   next_step: string | null;
   next_step_at: string | null;
+  dno_status: string | null;
+  dno_ref: string | null;
+  deposit_amount: number | null;
+  deposit_paid_at: string | null;
+  accepted_at: string | null;
+  accepted_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -117,8 +125,13 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
   const [team, setTeam] = useState<{ id: string; name: string }[]>([]);
   const [tasks, setTasks] = useState<CrmTask[]>([]);
   const [wa, setWa] = useState<WaInfo | null>(null);
+  const [docs, setDocs] = useState<CrmDoc[]>([]);
+  const [portal, setPortal] = useState<string | null>(null);
+  const [tracker, setTracker] = useState<TrackerStep[]>([]);
+  const [connected, setConnected] = useState({ email: false, stripe: false });
+  const [waDraft, setWaDraft] = useState('');
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'activity' | 'photos' | 'details'>('activity');
+  const [tab, setTab] = useState<'activity' | 'photos' | 'docs' | 'details'>('activity');
   const [sheet, setSheet] = useState<Sheet>(null);
   const wide = useWide();
 
@@ -134,6 +147,10 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
       setTeam(d.team);
       setTasks(d.tasks ?? []);
       setWa(d.whatsapp);
+      setDocs(d.documents ?? []);
+      setPortal(d.portal ?? null);
+      setTracker(d.tracker ?? []);
+      if (d.connected) setConnected(d.connected);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load this project');
@@ -224,6 +241,7 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
           [
             ['activity', `Activity${wa?.unread ? ` · ${wa.unread} new` : ''}`],
             ['photos', `Photos${photos.length ? ` (${photos.length})` : ''}`],
+            ['docs', `Docs${docs.length ? ` (${docs.length})` : ''}`],
             ...(wide ? [] : ([['details', 'Details']] as const)),
           ] as const
         ).map(([k, label]) => (
@@ -237,9 +255,20 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
 
       {(tab === 'activity' || (wide && tab === 'details')) && <Feed entries={timeline} customerName={customer.name} />}
       {tab === 'photos' && <Photos id={id} photos={photos} onChanged={load} />}
+      {tab === 'docs' && <DocumentsTab id={id} docs={docs} onChanged={load} />}
       </div>
       {(wide || tab === 'details') && (
         <aside className={wide ? 'crm-split-side' : ''}>
+        <PortalCard
+          id={id}
+          portal={portal}
+          tracker={tracker}
+          onSendWhatsApp={(text) => {
+            setWaDraft(text);
+            setSheet('whatsapp');
+          }}
+        />
+        <DnoDeposit key={`${project.id}-${project.updated_at}`} project={project} stripe={connected.stripe} onSave={(b) => patch(b as Partial<Project>)} />
         <Details
           key={project.id}
           project={project}
@@ -290,11 +319,25 @@ export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
                 }}
               />
             )}
-            {sheet === 'whatsapp' && <WhatsAppComposer customer={customer} wa={wa} onSent={done} />}
+            {sheet === 'whatsapp' && (
+              <WhatsAppComposer
+                projectId={id}
+                docs={docs}
+                initialText={waDraft}
+                customer={customer}
+                wa={wa}
+                onSent={async () => {
+                  setWaDraft('');
+                  await done();
+                }}
+              />
+            )}
             {(sheet === 'note' || sheet === 'call' || sheet === 'visit') && (
               <LogComposer id={id} kind={sheet} phone={customer.phone} onSaved={done} />
             )}
-            {sheet === 'email' && <EmailComposer id={id} customer={customer} onSaved={done} />}
+            {sheet === 'email' && (
+              <EmailComposerV2 id={id} customer={{ name: customer.name, email: customer.email }} docs={docs} connected={connected.email} onSaved={done} />
+            )}
             {sheet === 'photo' && <PhotoQuick id={id} onDone={done} />}
             {sheet === 'stage' && (
               <div>
@@ -374,7 +417,13 @@ function Feed({ entries, customerName }: { entries: Entry[]; customerName: strin
               </span>
               <div className="crm-event-body">
                 <div className="crm-event-meta">
-                  <b>{ACTIVITY_LABEL[e.kind] || e.kind}</b>
+                  <b>
+                    {e.kind === 'email' && e.meta?.direction === 'in'
+                      ? '✉️ Email received'
+                      : e.kind === 'email' && e.meta?.synced
+                        ? '✉️ Email sent'
+                        : ACTIVITY_LABEL[e.kind] || e.kind}
+                  </b>
                   {e.by ? ` · ${e.by}` : ''} · {time}
                 </div>
                 {e.body && <p>{e.body}</p>}
@@ -419,8 +468,22 @@ function ActionMenu({ customer, wa, onPick }: { customer: Customer; wa: WaInfo |
 
 type Template = { name: string; language: string; body: string; params: number };
 
-function WhatsAppComposer({ customer, wa, onSent }: { customer: Customer; wa: WaInfo | null; onSent: () => Promise<void> }) {
-  const [text, setText] = useState('');
+function WhatsAppComposer({
+  projectId,
+  docs,
+  initialText = '',
+  customer,
+  wa,
+  onSent,
+}: {
+  projectId: string;
+  docs: CrmDoc[];
+  initialText?: string;
+  customer: Customer;
+  wa: WaInfo | null;
+  onSent: () => Promise<void>;
+}) {
+  const [text, setText] = useState(initialText);
   const [chase, setChase] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -469,6 +532,8 @@ function WhatsAppComposer({ customer, wa, onSent }: { customer: Customer; wa: Wa
       </p>
       {wa.windowOpen ? (
         <>
+          <SnippetPicker projectId={projectId} name={customer.name} onPick={(t) => setText((cur) => (cur.trim() ? `${cur}\n${t}` : t))} />
+          <WhatsAppDocSend id={projectId} docs={docs} onSent={onSent} />
           <textarea className="crm-input" rows={4} autoFocus placeholder="Message" value={text} onChange={(e) => setText(e.target.value)} />
           {asks && wa.chaseHours > 0 && (
             <label className="crm-check">
@@ -578,38 +643,6 @@ function LogComposer({ id, kind, phone, onSaved }: { id: string; kind: 'note' | 
       <div className="crm-actions">
         <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={save}>
           {busy ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Until Microsoft 365 is connected: write it here, it opens in your email app and is logged on the timeline. */
-function EmailComposer({ id, customer, onSaved }: { id: string; customer: Customer; onSaved: () => Promise<void> }) {
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState(`Hi ${customer.name.split(/\s+/)[0] || ''},\n\n`);
-  const [busy, setBusy] = useState(false);
-  if (!customer.email) return <ComposerNote title="Email" body="No email address for this customer — add one in Details." />;
-  async function go() {
-    setBusy(true);
-    window.location.href = `mailto:${customer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    await fetch(`/api/crm/projects/${id}/activities`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'email', body: `To ${customer.email}${subject ? ` — ${subject}` : ''}\n\n${body.trim()}` }),
-    }).catch(() => {});
-    setBusy(false);
-    await onSaved();
-  }
-  return (
-    <div>
-      <h2>Email {customer.name}</h2>
-      <p className="crm-muted crm-small">To {customer.email} · opens in your email app and is saved to the timeline.</p>
-      <input className="crm-input" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-      <textarea className="crm-input" rows={7} value={body} onChange={(e) => setBody(e.target.value)} />
-      <div className="crm-actions">
-        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={go}>
-          Write email
         </button>
       </div>
     </div>

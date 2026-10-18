@@ -1,5 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { CRM_BUCKET, crmSession, enquiryStatusFor, isUuid, json, logActivity, thumbPath } from '@/lib/crm/server';
+import { after } from 'next/server';
+import { CRM_BUCKET, crmSession, enquiryStatusFor, isUuid, json, logActivity, portalUrl, thumbPath } from '@/lib/crm/server';
+import { buildTracker } from '@/lib/crm/tracker';
+import { sendStageToMeta } from '@/lib/meta-capi';
+import { msConfigured } from '@/lib/ms365';
+import { stripeConfigured } from '@/lib/stripe';
 import { isStage, PRODUCT_KEYS, stageLabel } from '@/lib/crm/stages';
 import { canAccess } from '@/lib/portals';
 import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
@@ -46,7 +51,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   const thread = [...linked].sort((a, b) => (b.wa_last_message_at || '').localeCompare(a.wa_last_message_at || ''))[0];
   const lastInbound = linked.map((l) => l.wa_last_inbound_at).filter(Boolean).sort().pop() ?? null;
 
-  const [{ data: acts }, { data: wa }, { data: photos }, { data: people }, { data: others }, { data: tasks }] = await Promise.all([
+  const [{ data: acts }, { data: wa }, { data: photos }, { data: people }, { data: others }, { data: tasks }, { data: docs }, { data: emails }] = await Promise.all([
     db.from('crm_activities').select('id, project_id, kind, body, meta, by_id, at').eq('enquiry_id', project.enquiry_id).order('at', { ascending: false }).limit(300),
     // WhatsApp is optional (tables may not exist yet).
     linkedIds.length
@@ -62,6 +67,21 @@ export async function GET(_req: Request, { params }: Ctx) {
       .order('status')
       .order('due_date', { ascending: true, nullsFirst: false })
       .limit(100),
+    // v2 tables: empty until crm-v2.sql has been run.
+    db.from('crm_documents').select('*').eq('project_id', id).order('created_at', { ascending: false }).then(
+      (r) => r,
+      () => ({ data: [] })
+    ),
+    db
+      .from('crm_emails')
+      .select('id, direction, subject, body, sent_by, attachments, at, from_address')
+      .in('enquiry_id', linkedIds.length ? linkedIds : [project.enquiry_id])
+      .order('at', { ascending: false })
+      .limit(200)
+      .then(
+        (r) => r,
+        () => ({ data: [] })
+      ),
   ]);
 
   // Anyone who can see the work: CRM users, or people who only have Tasks (they see it on the Tasks page).
@@ -109,11 +129,24 @@ export async function GET(_req: Request, { params }: Ctx) {
       at: m.created_at as string,
       other_project: null,
     })),
+    ...((emails ?? []) as { id: string; direction: string; subject: string | null; body: string | null; sent_by: string | null; attachments: string[]; at: string }[]).map((m) => ({
+      id: `em-${m.id}`,
+      kind: 'email',
+      body: `${m.subject ? `${m.subject}\n\n` : ''}${m.body || ''}`.trim(),
+      meta: { direction: m.direction, attachments: m.attachments, synced: true },
+      by: m.direction === 'in' ? customer?.name ?? 'Customer' : m.sent_by ? nameOf.get(m.sent_by) ?? 'Team' : 'Outlook',
+      at: m.at,
+      other_project: null,
+    })),
   ].sort((a, b) => (a.at < b.at ? 1 : -1));
 
   return json({
     project,
     customer,
+    portal: project.portal_token ? portalUrl(project.portal_token) : null,
+    tracker: buildTracker({ ...project, products: project.products ?? [] }),
+    documents: docs ?? [],
+    connected: { email: msConfigured(), stripe: stripeConfigured() },
     whatsapp: {
       configured: whatsappConfigured(),
       number: waId,
@@ -138,7 +171,8 @@ export async function GET(_req: Request, { params }: Ctx) {
   });
 }
 
-const TEXT = ['title', 'address', 'postcode', 'simpliheat_url', 'opensolar_url', 'lost_reason', 'notes'] as const;
+const TEXT = ['title', 'address', 'postcode', 'simpliheat_url', 'opensolar_url', 'lost_reason', 'notes', 'dno_ref'] as const;
+const DNO = ['not_required', 'not_started', 'submitted', 'approved', 'rejected'];
 
 export async function PATCH(req: Request, { params }: Ctx) {
   const s = await crmSession();
@@ -179,7 +213,19 @@ export async function PATCH(req: Request, { params }: Ctx) {
       u.next_step_notified_at = null;
     }
   }
-  for (const k of ['survey_at', 'install_at'] as const) {
+  if ('deposit_amount' in b) {
+    const v = b.deposit_amount === null || b.deposit_amount === '' ? null : Number(b.deposit_amount);
+    u.deposit_amount = v !== null && Number.isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null;
+  }
+  let dnoMove: string | null = null;
+  if ('dno_status' in b && DNO.includes(String(b.dno_status))) {
+    u.dno_status = b.dno_status;
+    dnoMove = String(b.dno_status);
+    const now = new Date().toISOString();
+    if (b.dno_status === 'submitted' && !b.dno_submitted_at) u.dno_submitted_at = now;
+    if (b.dno_status === 'approved' && !b.dno_approved_at) u.dno_approved_at = now;
+  }
+  for (const k of ['survey_at', 'install_at', 'dno_submitted_at', 'dno_approved_at'] as const) {
     if (k in b) u[k] = b[k] && !Number.isNaN(Date.parse(b[k])) ? new Date(b[k]).toISOString() : null;
   }
   let stageMove: { from: string; to: string } | null = null;
@@ -194,6 +240,16 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   const { data, error } = await db.from('crm_projects').update(u).eq('id', id).select('*').single();
   if (error) return json({ error: error.message }, 500);
+  if (dnoMove) {
+    const label: Record<string, string> = {
+      not_required: 'not needed',
+      not_started: 'not started',
+      submitted: 'applied for',
+      approved: 'approved',
+      rejected: 'rejected',
+    };
+    await logActivity({ enquiryId: before.enquiry_id, projectId: id, kind: 'system', body: `DNO ${label[dnoMove]}`, byId: s.user.id });
+  }
   if (doneStep) {
     await logActivity({ enquiryId: before.enquiry_id, projectId: id, kind: 'system', body: `✓ Done: ${doneStep}`, byId: s.user.id });
   }
@@ -209,6 +265,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
       }),
       db.from('enquiries').update({ status: enquiryStatusFor(stageMove.to) }).eq('id', before.enquiry_id),
     ]);
+    const to = stageMove.to;
+    after(() => sendStageToMeta(id, to).catch(() => {}));
   }
   return json({ project: data });
 }

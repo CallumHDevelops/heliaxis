@@ -177,6 +177,12 @@ export async function AdminShell({
     ...(can('tasks') && !tasksIsTab ? [{ href: '/admin/tasks', label: 'Tasks', active: active === 'tasks' }] : []),
     ...links.filter((i) => !i.tab),
     ...(can('enquiries') ? [{ href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', active: false }] : []),
+    ...(can('crm')
+      ? [
+          { href: '/admin/crm/reports', label: 'CRM reports', active: false },
+          { href: '/admin/crm/settings', label: 'CRM settings', active: false },
+        ]
+      : []),
     ...(can('social') ? [{ href: 'https://social.heliaxis.co.uk', label: 'Social media studio', active: false }] : []),
     ...(can('team') ? [{ href: 'https://rams.heliaxis.co.uk/operatives?team=heliaxis', label: 'Our team', active: false }] : []),
     { href: '/admin/app', label: 'Get the app', active: active === 'app' },

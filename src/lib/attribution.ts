@@ -12,6 +12,7 @@ export type Attribution = {
   c?: string; // utm_campaign
   a?: string; // utm_content (the ad)
   fb?: 1; // arrived with fbclid (any Meta ad click)
+  fbc?: string; // Meta click id in fbc format, for the Conversions API
   g?: 1; // arrived with gclid (Google Ads)
   p?: string; // landing path
   t?: number; // when (ms)
@@ -27,7 +28,7 @@ export function attributionFromUrl(url: URL): Attribution | null {
     m: clip(q.get('utm_medium')),
     c: clip(q.get('utm_campaign')),
     a: clip(q.get('utm_content')),
-    ...(q.get('fbclid') ? { fb: 1 as const } : {}),
+    ...(q.get('fbclid') ? { fb: 1 as const, fbc: `fb.1.${Date.now()}.${q.get('fbclid')!.slice(0, 200)}` } : {}),
     ...(q.get('gclid') ? { g: 1 as const } : {}),
   };
   if (!a.s && !a.fb && !a.g) return null;

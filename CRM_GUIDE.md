@@ -1,0 +1,86 @@
+# Heliaxis CRM — setup
+
+Everything below is optional except step 1: each connection switches its feature on when its keys
+are added in Vercel, and the CRM works without it in the meantime.
+
+## 1. Database (required)
+
+In the Supabase SQL editor, in this order (each is safe to re-run):
+
+1. `supabase/crm.sql` — opportunities, timeline, photos, tasks on opportunities, next steps. Creates an
+   opportunity for every existing enquiry.
+2. `supabase/crm-v2.sql` — customer portal, documents, library, saved replies, email, reminders,
+   lead routing, sequences, booking, quote acceptance, deposits.
+
+The every-minute job you already scheduled (`whatsapp-outbox`) also runs all CRM automation and
+picks up email — nothing else to schedule.
+
+Then open **CRM → ⚙ Settings** and set up lead sharing, reminders, booking times and saved replies.
+
+## 2. Customer portal
+
+Nothing to set up. Add to Vercel so the portal's "WhatsApp us" button works:
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Your WhatsApp business number, e.g. `447700900123` |
+| `NEXT_PUBLIC_SITE_URL` | `https://heliaxis.co.uk` (used in portal links) |
+
+## 3. WhatsApp templates for reminders
+
+Countdowns and review requests are free WhatsApps when the customer has messaged in the last 24h.
+Otherwise WhatsApp needs an approved template (≈2p each, Utility). Create these in WhatsApp Manager
+→ Message templates (English UK, Utility) and put their names in CRM → Settings:
+
+- `install_reminder` — *Hi {{1}}, a reminder that your Heliaxis installation is {{2}} — {{3}}. Reply here with any questions.*
+- `survey_reminder` — *Hi {{1}}, a reminder that your Heliaxis survey is {{2}} — {{3}}. Reply here with any questions.*
+- `review_request` — *Hi {{1}}, thank you for choosing Heliaxis! If you're happy with your installation, would you leave us a quick review? {{2}}*
+
+({{2}} is "in 3 days" / "tomorrow" / "booked for Tuesday 21 October"; {{3}} is the date and time.)
+
+## 4. Microsoft 365 shared email
+
+Lets anyone send from e.g. hello@heliaxis.co.uk inside the CRM, with replies (and anything sent
+from Outlook to a customer) showing on their timeline. Also puts portal survey bookings in the
+mailbox's calendar.
+
+1. **entra.microsoft.com** → Identity → Applications → **App registrations → New registration**.
+   Name `Heliaxis CRM`, single tenant, no redirect URI → Register.
+2. Copy **Application (client) ID** and **Directory (tenant) ID**.
+3. **Certificates & secrets → New client secret** (24 months) → copy the **Value**.
+4. **API permissions → Add → Microsoft Graph → Application permissions**: `Mail.ReadWrite`,
+   `Mail.Send`, `Calendars.ReadWrite` → **Grant admin consent**.
+5. Recommended: limit the app to the one mailbox with an
+   [application access policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access)
+   (Exchange PowerShell `New-ApplicationAccessPolicy`).
+6. Vercel env vars, then redeploy:
+
+| Variable | Value |
+| --- | --- |
+| `MS_TENANT_ID` | Directory (tenant) ID |
+| `MS_CLIENT_ID` | Application (client) ID |
+| `MS_CLIENT_SECRET` | The secret **value** |
+| `MS_MAILBOX` | `hello@heliaxis.co.uk` (a shared mailbox is fine) |
+
+Emails are matched to customers by email address. Attachments over 3 MB are sent as a portal link.
+
+## 5. Card deposits (Stripe)
+
+1. stripe.com → Developers → API keys → copy the **Secret key** → Vercel `STRIPE_SECRET_KEY`.
+2. Developers → Webhooks → **Add endpoint** `https://heliaxis.co.uk/api/stripe/webhook`, event
+   `checkout.session.completed` → copy the **Signing secret** → Vercel `STRIPE_WEBHOOK_SECRET`.
+3. Redeploy. Set a deposit amount on an opportunity (Details) and the customer can pay it from
+   their portal after accepting the quote.
+
+## 6. Meta conversions (better ads)
+
+Sends "survey booked", "quote sent" and "won" (with value) back to Meta, so your ads find people
+who actually buy.
+
+1. Events Manager → your Pixel / dataset → copy its **ID** → Vercel `META_PIXEL_ID`.
+2. Settings → Conversions API → **Generate access token** → Vercel `META_CAPI_TOKEN`.
+3. For lead-form ads: Events Manager → set up the **CRM integration** / "conversion leads" on the
+   same dataset so Meta optimises lead ads for quality.
+
+Website leads are matched by the ad click id, Meta lead-form leads by their lead id, and both by
+hashed email and phone.

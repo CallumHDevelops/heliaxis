@@ -26,5 +26,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     byId: s.user.id,
   });
   await db.from('crm_projects').update({ updated_at: new Date().toISOString() }).eq('id', id);
+  // A logged call, visit or email counts as contacting them (speed-to-lead).
+  if (kind !== 'note') {
+    await db.from('crm_projects').update({ first_contact_at: new Date().toISOString() }).eq('id', id).is('first_contact_at', null).then(
+      () => null,
+      () => null
+    );
+  }
   return json({ ok: true });
 }
