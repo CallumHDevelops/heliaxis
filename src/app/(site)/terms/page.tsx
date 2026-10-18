@@ -58,12 +58,14 @@ const sections: LegalSection[] = [
     body: (
       <>
         <p>
-          When you send us an enquiry, you agree that we can contact you about it by WhatsApp, email or phone using the details
-          you gave. That includes follow-ups, booking confirmations and reminders about your survey or installation.
+          When you send us an enquiry, we’ll contact you about it by WhatsApp, email or phone using the details you gave.
+          That includes follow-ups, booking confirmations and reminders about your survey or installation. Some of these are sent
+          automatically.
         </p>
         <p>
-          You can ask us to stop at any time. Just tell us in reply on WhatsApp, or email{' '}
-          <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>, and we’ll stop. We don’t send marketing unless you’ve agreed to it.
+          You can ask us to stop follow-ups or review requests at any time. Just tell us in reply on WhatsApp, or email{' '}
+          <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>. Our <Link href="/privacy-policy">privacy policy</Link> explains how we use your
+          details.
         </p>
       </>
     ),

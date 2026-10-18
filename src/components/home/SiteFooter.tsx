@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export function SiteFooter() {
   return (
     <footer>
@@ -33,7 +35,10 @@ export function SiteFooter() {
           </div>
         </div>
         <div className="base">
-          <span>© 2026 Heliaxis. MCS · RECC · NICEIC · Covering South Wales.</span>
+          <span>© 2026 Heliaxis Limited. MCS · RECC · NICEIC · Covering South Wales.</span>
+          <span>
+            <Link href="/privacy-policy">Privacy</Link> · <Link href="/terms">Terms</Link> · <Link href="/data-deletion">Delete your data</Link>
+          </span>
           <span style={{ fontFamily: 'var(--mono)' }}>heliaxis.co.uk</span>
         </div>
       </div>
