@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, DOCS_BUCKET, ensurePortalToken, isUuid, json, portalUrl } from '@/lib/crm/server';
 import { fillText } from '@/lib/crm/settings-shared';
+import { PORTAL_CLOSED_MSG } from '@/lib/crm/stages';
 import { msConfigured, sendMail, type MailAttachment } from '@/lib/ms365';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { data: c } = await db.from('enquiries').select('id, name, email').eq('id', p.enquiry_id).maybeSingle();
   if (!c?.email) return json({ error: 'This customer has no email address.' }, 400);
 
-  const link = String(b.text || '').includes('{portal_link}') ? portalUrl(await ensurePortalToken(id)) : null;
+  const token = String(b.text || '').includes('{portal_link}') ? await ensurePortalToken(id) : null;
+  if (String(b.text || '').includes('{portal_link}') && !token) return json({ error: `This email uses {portal_link}. ${PORTAL_CLOSED_MSG}` }, 400);
+  const link = token ? portalUrl(token) : null;
   const subject = fillText(String(b.subject || '').trim(), { name: c.name, portalLink: link }) || 'Your Heliaxis project';
   let text = fillText(String(b.text || '').trim(), { name: c.name, portalLink: link });
   if (!text) return json({ error: 'Write the email first.' }, 400);
@@ -51,7 +54,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     attachments.push({ name: f.name.includes('.') ? f.name : `${f.name}.${ext}`, contentType: f.mime || 'application/octet-stream', bytes });
   }
   if (tooBig.length) {
-    const portal = portalUrl(await ensurePortalToken(id));
+    const portalToken = await ensurePortalToken(id);
+    if (!portalToken)
+      return json({ error: `${tooBig.join(', ')} is too big to attach (over 3 MB), and there's no customer portal to link to until the job starts.` }, 400);
+    const portal = portalUrl(portalToken);
     text += `\n\nYou can download ${tooBig.join(', ')} from your Heliaxis portal: ${portal}`;
   }
 

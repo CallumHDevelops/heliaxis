@@ -5,7 +5,7 @@ import { buildTracker } from '@/lib/crm/tracker';
 import { sendStageToMeta } from '@/lib/meta-capi';
 import { msConfigured } from '@/lib/ms365';
 import { stripeConfigured } from '@/lib/stripe';
-import { isStage, PRODUCT_KEYS, stageLabel } from '@/lib/crm/stages';
+import { isStage, portalOpen, PRODUCT_KEYS, stageLabel } from '@/lib/crm/stages';
 import { canAccess } from '@/lib/portals';
 import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
@@ -143,7 +143,8 @@ export async function GET(_req: Request, { params }: Ctx) {
   return json({
     project,
     customer,
-    portal: project.portal_token ? portalUrl(project.portal_token) : null,
+    portal: project.portal_token && portalOpen(project.stage) ? portalUrl(project.portal_token) : null,
+    portalOpen: portalOpen(project.stage),
     tracker: buildTracker({ ...project, products: project.products ?? [] }),
     documents: docs ?? [],
     connected: { email: msConfigured(), stripe: stripeConfigured() },

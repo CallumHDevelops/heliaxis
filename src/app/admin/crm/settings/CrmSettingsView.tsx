@@ -10,7 +10,6 @@ type Team = { id: string; name: string }[];
 type Snippet = { id: string; title: string; body: string };
 type Lib = { id: string; name: string; description: string | null };
 type Connected = { whatsapp: boolean; email: string | null; stripe: boolean; meta: boolean };
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
   const [s, setS] = useState<CrmSettings | null>(null);
@@ -155,38 +154,6 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
           </section>
 
           <section className="crm-set">
-            <h2>Online survey booking</h2>
-            <label className="crm-check">
-              <input type="checkbox" checked={s.bookingEnabled} onChange={(e) => set('bookingEnabled', e.target.checked)} /> Customers can book their survey from their portal
-            </label>
-            <label className="crm-label">Days</label>
-            <div className="crm-checks">
-              {DAYS.map((d, i) => (
-                <label key={d} className={s.bookingDays.includes(i + 1) ? 'on' : ''}>
-                  <input
-                    type="checkbox"
-                    checked={s.bookingDays.includes(i + 1)}
-                    onChange={(e) => set('bookingDays', e.target.checked ? [...s.bookingDays, i + 1].sort() : s.bookingDays.filter((x) => x !== i + 1))}
-                  />
-                  {d}
-                </label>
-              ))}
-            </div>
-            <label className="crm-label">Start times (one survey each)</label>
-            <input className="crm-input" value={s.bookingSlots.join(', ')} onChange={(e) => set('bookingSlots', e.target.value.split(',').map((x) => x.trim()))} />
-            <div className="crm-grid2">
-              <div>
-                <label className="crm-label">Minimum notice (hours)</label>
-                <input className="crm-input" type="number" min={0} value={s.bookingMinNoticeHours} onChange={(e) => set('bookingMinNoticeHours', Number(e.target.value))} />
-              </div>
-              <div>
-                <label className="crm-label">Show up to (days ahead)</label>
-                <input className="crm-input" type="number" min={1} value={s.bookingHorizonDays} onChange={(e) => set('bookingHorizonDays', Number(e.target.value))} />
-              </div>
-            </div>
-          </section>
-
-          <section className="crm-set">
             <h2>Follow-up sequence for new leads</h2>
             <label className="crm-check">
               <input type="checkbox" checked={s.sequenceEnabled} onChange={(e) => set('sequenceEnabled', e.target.checked)} /> On — stops the moment they reply, or when the
@@ -224,7 +191,7 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
                     <input className="crm-input" value={st.template || ''} onChange={(e) => step(i, { template: e.target.value })} />
                   </>
                 )}
-                <label className="crm-label">Message ({'{first_name}'}, {'{portal_link}'})</label>
+                <label className="crm-label">Message ({'{first_name}'})</label>
                 <textarea className="crm-input" rows={3} value={st.text} onChange={(e) => step(i, { text: e.target.value })} />
               </div>
             ))}
@@ -287,7 +254,7 @@ function Snippets() {
           + New
         </button>
       </div>
-      <p className="crm-muted crm-small">One tap in the WhatsApp and email composers. Use {'{first_name}'} and {'{portal_link}'}.</p>
+      <p className="crm-muted crm-small">One tap in the WhatsApp and email composers. Use {'{first_name}'}, and {'{portal_link}'} for customers whose job has started.</p>
       {edit && (
         <div className="crm-step">
           <label className="crm-label">Title</label>

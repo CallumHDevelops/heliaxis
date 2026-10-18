@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { CRM_BUCKET, thumbPath } from './server';
 import { buildTracker } from './tracker';
+import { portalOpen } from './stages';
 import { stripeConfigured } from '@/lib/stripe';
 
 /** Everything a customer sees in their portal (/my/<token>). Only what's marked visible. */
@@ -9,7 +10,7 @@ export async function loadPortal(token: string) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
   const db = createAdminClient();
   const { data: p } = await db.from('crm_projects').select('*').eq('portal_token', token).maybeSingle();
-  if (!p || p.stage === 'lost') return null;
+  if (!p || !portalOpen(p.stage)) return null;
   const [{ data: c }, { data: docs }, { data: photos }, { data: owner }] = await Promise.all([
     db.from('enquiries').select('id, name, email, phone, postcode').eq('id', p.enquiry_id).maybeSingle(),
     db.from('crm_documents').select('id, category, name, created_at, needs_signature').eq('project_id', p.id).eq('visible', true).order('created_at', { ascending: false }),
@@ -54,7 +55,7 @@ export async function loadPortal(token: string) {
       p.deposit_amount && Number(p.deposit_amount) > 0
         ? { amount: Number(p.deposit_amount), paidAt: p.deposit_paid_at as string | null, canPay: stripeConfigured() }
         : null,
-    canBook: ['lead', 'contacted', 'survey_booked'].includes(p.stage as string),
+    canBook: false, // surveys happen before the job starts, so before there's a portal
     whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || null,
     email: process.env.MS_MAILBOX || 'hello@heliaxis.co.uk',
   };
@@ -69,5 +70,5 @@ export async function projectByToken(token: string) {
     .select('id, enquiry_id, owner_id, stage, title, survey_at, deposit_amount, deposit_paid_at, accepted_at, postcode')
     .eq('portal_token', token)
     .maybeSingle();
-  return data && data.stage !== 'lost' ? data : null;
+  return data && portalOpen(data.stage) ? data : null;
 }

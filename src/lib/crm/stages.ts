@@ -16,6 +16,10 @@ export const STAGES = [
 export type StageKey = (typeof STAGES)[number]['key'];
 export const STAGE_KEYS = STAGES.map((s) => s.key) as StageKey[];
 export const stageLabel = (k: string) => STAGES.find((s) => s.key === k)?.label ?? k;
+/** The customer portal only exists once the job has started (Won onwards). */
+export const PORTAL_STAGES: readonly string[] = ['won', 'install_booked', 'installing', 'complete'];
+export const portalOpen = (stage: string | null | undefined) => !!stage && PORTAL_STAGES.includes(stage);
+export const PORTAL_CLOSED_MSG = 'The customer portal opens when the job starts — move the opportunity to Won first.';
 export const isStage = (k: unknown): k is StageKey => typeof k === 'string' && (STAGE_KEYS as string[]).includes(k);
 
 export const PRODUCTS = [

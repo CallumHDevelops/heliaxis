@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePortal } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { guessProducts, type StageKey } from './stages';
+import { guessProducts, portalOpen, type StageKey } from './stages';
 
 /** CRM server helpers: access, the photo bucket, activity logging. */
 
@@ -191,11 +191,15 @@ export async function signedDoc(path: string, seconds = 600, download?: string) 
 export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
 export const portalUrl = (token: string) => `${siteUrl()}/my/${token}`;
 
-/** The opportunity's private portal link (created on first use). */
-export async function ensurePortalToken(projectId: string) {
+/**
+ * The opportunity's private portal link (created on first use). Null until the job has started
+ * (Won onwards) — customers don't get a portal while they're still a lead.
+ */
+export async function ensurePortalToken(projectId: string): Promise<string | null> {
   const db = createAdminClient();
-  const { data } = await db.from('crm_projects').select('portal_token').eq('id', projectId).maybeSingle();
-  if (data?.portal_token) return data.portal_token as string;
+  const { data } = await db.from('crm_projects').select('portal_token, stage').eq('id', projectId).maybeSingle();
+  if (!data || !portalOpen(data.stage)) return null;
+  if (data.portal_token) return data.portal_token as string;
   const { randomBytes } = await import('node:crypto');
   const token = randomBytes(18).toString('base64url');
   await db.from('crm_projects').update({ portal_token: token }).eq('id', projectId).is('portal_token', null);

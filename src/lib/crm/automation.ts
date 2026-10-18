@@ -82,14 +82,15 @@ async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], h
   const c = await customer(p.enquiry_id);
   if (!c) return 0;
   const first = (c.name || '').split(/\s+/)[0] || 'there';
-  const link = portalUrl(await ensurePortalToken(p.id));
+  const token = await ensurePortalToken(p.id); // none before the job starts (e.g. survey reminders)
+  const link = token ? portalUrl(token) : null;
   const what = kind === 'install' ? 'installation' : 'survey';
   let sent = 0;
 
   // 1) Booking confirmation, as soon as the date is set.
   const bookedKey = `${kind}-booked:${day}`;
   if (!p.reminders_sent?.includes(bookedKey)) {
-    const text = `Hi ${first}, your Heliaxis ${what} is booked for ${dateLabel(when)} at ${timeLabel(when)}. We'll send you a reminder nearer the time. You can see all your details here: ${link}`;
+    const text = `Hi ${first}, your Heliaxis ${what} is booked for ${dateLabel(when)} at ${timeLabel(when)}. We'll send you a reminder nearer the time.${link ? ` You can see all your details here: ${link}` : ''}`;
     const r = await sendSystem(p.enquiry_id, { text, template, params: [first, `booked for ${dateLabel(when)}`, timeLabel(when)] }, 'reminder');
     await markSent(p, bookedKey);
     await logActivity({
@@ -119,7 +120,7 @@ async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], h
         : kind === 'survey' && n <= 1
           ? ' It helps if we can see your fuse box, meter and loft.'
           : '';
-    const text = `Hi ${first}, ${lead} — ${dateLabel(when)} at ${timeLabel(when)}.${extra} Any questions, just reply here. ${link}`;
+    const text = `Hi ${first}, ${lead} — ${dateLabel(when)} at ${timeLabel(when)}.${extra} Any questions, just reply here.${link ? ` ${link}` : ''}`;
     const r = await sendSystem(p.enquiry_id, { text, template, params: [first, daysWord(n), `${dateLabel(when)}, ${timeLabel(when)}`] }, 'reminder');
     await markSent(p, key);
     await logActivity({
@@ -225,7 +226,8 @@ export async function runCrmAutomations() {
       const step = s.sequence[p.sequence_step];
       if (!step || now.getTime() < new Date(p.created_at).getTime() + step.afterHours * 3_600_000) continue;
       const c = await customer(p.enquiry_id);
-      const link = step.text.includes('{portal_link}') ? portalUrl(await ensurePortalToken(p.id)) : null;
+      const token = step.text.includes('{portal_link}') ? await ensurePortalToken(p.id) : null;
+      const link = token ? portalUrl(token) : null;
       const text = fillText(step.text, { name: c?.name, portalLink: link });
       let ok = false;
       let why = '';
