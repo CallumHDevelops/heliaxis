@@ -4611,6 +4611,13 @@ button.crmb-rail {
   z-index: 1;
   border-radius: 12px 12px 0 0;
   background: var(--card);
+  /* One line in the panel: a long name ends in "…" rather than pushing + Task under it. */
+  flex-wrap: nowrap;
+}
+.crmr-tasks--dock .crmh-card__h h3 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Sheets and bits */

@@ -488,7 +488,7 @@ export function ProjectView({
   const tasksCard = (where: 'page' | 'dock' | 'dock-chats') => (
     <TasksCard
       // Under another customer's chat, say whose job these are.
-      heading={where === 'dock-chats' ? `Tasks · ${first}’s job` : undefined}
+      heading={where === 'dock-chats' ? `Tasks · ${first}` : undefined}
       projectId={id}
       tasks={rec.tasks}
       team={rec.team}

@@ -27,7 +27,7 @@ export function TasksCard({
   heading = 'Tasks',
   onChanged,
 }: {
-  /** "Tasks", or "Tasks · Jane’s job" under another customer's chat in the dock. */
+  /** "Tasks", or "Tasks · Jane" under another customer's chat in the dock. */
   heading?: string;
   projectId: string;
   tasks: CrmTask[];

@@ -191,7 +191,9 @@ function WaRun({ run, highlight, projectId, onChanged }: { run: Entry[]; highlig
   const templates = run.every((e) => kindOf(e) === 'template');
   const quote = (e: Entry) => {
     const who = e.meta?.direction === 'in' ? firstName(e.by) || 'They' : 'You';
-    const text = (MEDIA[kindOf(e)] ? captionOf(kindOf(e), e.body, (mediaOf(e)?.media_name as string | null | undefined) ?? null) : e.body || '').replace(/\s+/g, ' ').trim();
+    const name = mediaOf(e)?.media_name ?? null;
+    // A file with no message of its own goes by its name.
+    const text = (MEDIA[kindOf(e)] ? captionOf(kindOf(e), e.body, name) || name || '' : e.body || '').replace(/\s+/g, ' ').trim();
     const short = text.length > 70 ? `${text.slice(0, 68)}…` : text;
     const media = MEDIA[kindOf(e)];
     return media ? `${who}: ${media}${short ? ` “${short}”` : ''}` : `${who}: “${short}”`;
