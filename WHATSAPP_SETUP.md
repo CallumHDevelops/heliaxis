@@ -56,7 +56,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
    - Check with Meta's Lead Ads Testing Tool: a test lead should show **success** under Track status.
 7. **Templates**: easiest from Heliaxis, Enquiries → WhatsApp → *Smart replies & chasers* →
    **WhatsApp templates** (`/admin/enquiries/templates`). Its *Ready-made* tab sends Heliaxis's
-   templates to Meta with one tap (welcome, follow-up, booking link, quote ready, missed call,
+   templates to Meta with one tap (welcome, follow-up, quote ready, missed call,
    survey / install reminders, review request) and shows Meta's answer; *Use for* picks which one
    each automatic message uses; *New template* makes your own (admins only, needs
    `WHATSAPP_BUSINESS_ACCOUNT_ID` and a token with `whatsapp_business_management`). Or by hand:

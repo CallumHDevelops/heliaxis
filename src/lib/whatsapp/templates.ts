@@ -302,7 +302,6 @@ export async function leadValues(enquiryId: string, me: { name: string | null; c
     first_name: firstName(e?.name),
     my_first_name: firstName(me.name),
     interest: interestPhrase(p?.products?.length ? p.products : guessProducts(e?.interest)),
-    booking_link: portal,
     quote_link: portal,
     review_link: crm.reviewUrl,
   };

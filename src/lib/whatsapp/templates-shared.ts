@@ -32,7 +32,6 @@ export type FieldKey =
   | 'first_name'
   | 'my_first_name'
   | 'interest'
-  | 'booking_link'
   | 'quote_link'
   | 'when_words'
   | 'date_time'
@@ -47,7 +46,6 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
     help: 'From the products on their opportunity, e.g. “solar panels and battery storage”',
     token: 'asked_about',
   },
-  booking_link: { label: 'Booking link', example: 'https://heliaxis.co.uk/my/Xk2pQ7', help: 'The link they book their survey from', token: 'booking_link' },
   quote_link: { label: 'Quote / portal link', example: 'https://heliaxis.co.uk/my/Xk2pQ7', help: 'Their customer portal link', token: 'quote_link' },
   when_words: { label: 'When (“tomorrow”, “in 3 days”)', example: 'tomorrow', help: 'Filled in by the reminder' },
   date_time: { label: 'Date and time', example: 'Monday 3 November, 10:00', help: 'Filled in by the reminder' },
@@ -55,7 +53,7 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
 };
 
 /** The fields the "New template" form offers as insert chips, typed into the message as {token}. */
-export const INSERTABLE: FieldKey[] = ['first_name', 'my_first_name', 'interest', 'booking_link', 'quote_link'];
+export const INSERTABLE: FieldKey[] = ['first_name', 'my_first_name', 'interest', 'quote_link'];
 
 /** One blank: a CRM field, or something typed in when sending (described by its label). */
 export type Blank = { field: FieldKey } | { field: 'custom'; label: string };
@@ -134,15 +132,6 @@ export const READY_MADE: ReadyTemplate[] = [
     body: 'Hi {{1}}, it’s {{2}} from Heliaxis. A while ago you asked us about {{3}}. Are you still thinking about it? We’re happy to answer questions or book a free, no-obligation survey.',
     fields: ['first_name', 'my_first_name', 'interest'],
     buttons: ['Yes, still interested', 'Not right now'],
-  },
-  {
-    name: 'survey_booking_link',
-    title: 'Survey booking link',
-    category: 'UTILITY',
-    use: 'Send them the link to book their free survey.',
-    body: 'Hi {{1}}, here’s your link to book your free Heliaxis survey: {{2}} Pick whichever time suits you.',
-    fields: ['first_name', 'booking_link'],
-    buttons: [],
   },
   {
     name: 'quote_ready',
