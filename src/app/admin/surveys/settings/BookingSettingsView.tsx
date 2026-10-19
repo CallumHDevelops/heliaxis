@@ -130,6 +130,8 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
     error: '',
   });
   const [review, setReview] = useState<Review | null>(null);
+  // The country areas as typed (so a comma or space isn't swallowed while typing).
+  const [ruralText, setRuralText] = useState<string | null>(null);
 
   useEffect(() => {
     let gone = false;
@@ -194,6 +196,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
     if (!r.ok) return setErr(r.data.error || 'Not saved. Try again.');
     setS(r.data.settings as BookingSettings);
     setDirty(false);
+    setRuralText(null);
     setMsg('Saved ✓');
   }
 
@@ -770,16 +773,17 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
               id="adv-rural-list"
               className="dy-input"
               rows={2}
-              value={s.advanced.ruralOutcodes.join(', ')}
-              onChange={(e) =>
+              value={ruralText ?? s.advanced.ruralOutcodes.join(', ')}
+              onChange={(e) => {
+                setRuralText(e.target.value);
                 adv(
                   'ruralOutcodes',
                   e.target.value
                     .split(/[,\s]+/)
                     .map((x) => x.trim().toUpperCase())
                     .filter(Boolean)
-                )
-              }
+                );
+              }}
             />
             <label className="dy-check">
               <input type="checkbox" checked={s.advanced.skipBankHolidays} onChange={(e) => adv('skipBankHolidays', e.target.checked)} />
