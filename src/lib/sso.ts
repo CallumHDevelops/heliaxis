@@ -28,7 +28,10 @@ export function safeRamsPath(next: string | null): string {
   if (!next) return '/';
   try {
     const u = new URL(next, RAMS_ORIGIN);
-    return u.origin === RAMS_ORIGIN && u.pathname !== '/auth/callback' ? `${u.pathname}${u.search}` : '/';
+    // Collapse "//" (a path like "/.//evil.com" normalises to "//evil.com", which reads as another site).
+    const path = u.pathname.replace(/\/{2,}/g, '/');
+    if (u.origin !== RAMS_ORIGIN || path.replace(/\/+$/, '') === '/auth/callback') return '/';
+    return `${path}${u.search}`;
   } catch {
     return '/';
   }
@@ -40,7 +43,6 @@ const norm = (email: string | null | undefined) => email?.trim().toLowerCase() |
 
 const CODE_TTL_MS = 15 * 60_000;
 const RESEND_AFTER_MS = 2 * 60_000;
-const MAX_TRIES = 5;
 
 function codeHash(userId: string, code: string) {
   const s = process.env.APP_LINK_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -58,39 +60,40 @@ export async function emailProven(user: User): Promise<boolean> {
 
 export type CodeResult = 'ok' | 'wrong' | 'expired' | 'locked' | 'wait' | 'failed' | 'setup';
 
+/** sso.sql not run yet: missing table (PGRST205 / 42P01) or function (PGRST202 / 42883). */
+const notSetUp = (e: { code?: string; message?: string }) =>
+  ['PGRST205', 'PGRST202', '42P01', '42883'].includes(e.code || '') || /relation|does not exist|schema cache/i.test(e.message || '');
+
 /**
  * Email a 6-digit code to their sign-in address. It only counts when typed back in by the same
- * signed-in person, so a link scanner or someone else's inbox can't prove it for them.
+ * signed-in person, so a link scanner or someone else's inbox can't prove it for them. The
+ * database decides atomically whether a new code may go out (sso.sql: 2 minutes apart, none
+ * after 10 wrong codes in 24 hours).
  */
 export async function sendProofCode(user: User, name: string): Promise<CodeResult> {
   const email = norm(user.email);
   if (!email) return 'failed';
   const db = createAdminClient();
-  const { data: last, error } = await db.from('sso_email_codes').select('sent_at').eq('user_id', user.id).maybeSingle();
-  if (error) return /relation|does not exist/i.test(error.message) ? 'setup' : 'failed';
-  if (last && Date.now() - new Date(last.sent_at).getTime() < RESEND_AFTER_MS) return 'wait';
-
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  const { error: saveErr } = await db.from('sso_email_codes').upsert({
-    user_id: user.id,
-    email,
-    code_hash: codeHash(user.id, code),
-    expires_at: new Date(Date.now() + CODE_TTL_MS).toISOString(),
-    attempts: 0,
-    sent_at: new Date().toISOString(),
+  const { data: stored, error } = await db.rpc('sso_store_code', {
+    p_user: user.id,
+    p_email: email,
+    p_hash: codeHash(user.id, code),
+    p_expires: new Date(Date.now() + CODE_TTL_MS).toISOString(),
   });
-  if (saveErr) return 'failed';
+  if (error) return notSetUp(error) ? 'setup' : 'failed';
+  if (!stored) {
+    const { data: row } = await db.from('sso_email_codes').select('failures, failures_since').eq('user_id', user.id).maybeSingle();
+    const lockedOut = row && row.failures >= 10 && Date.now() - new Date(row.failures_since).getTime() < 86_400_000;
+    return lockedOut ? 'locked' : 'wait';
+  }
 
   const who = name ? `${name} (${email})` : email;
   const sent = await sendEmail({
     to: email,
     from: 'Heliaxis <noreply@heliaxis.co.uk>',
     subject: `${code} is your Heliaxis code`,
-    text: `Your code is ${code}
-
-Someone signed in to Heliaxis as ${who} asked to open RAMS without signing in again. If that's you, type this code into the Heliaxis app. It works for 15 minutes.
-
-If it isn't you, don't share the code with anyone, and tell Callum.`,
+    text: `Your code is ${code}\n\nSomeone signed in to Heliaxis as ${who} asked to open RAMS without signing in again. If that's you, type this code into the Heliaxis app. It works for 15 minutes.\n\nIf it isn't you, don't share the code with anyone, and tell Callum.`,
     html: emailShell(
       'Your code',
       `<p style="font-size:30px;font-weight:800;letter-spacing:.3em;margin:18px 0">${esc(code)}</p>
@@ -100,7 +103,15 @@ If it isn't you, don't share the code with anyone, and tell Callum.`,
       'Account'
     ),
   });
-  return sent.ok ? 'ok' : 'failed';
+  if (!sent.ok) {
+    // Nobody received it: retire it and let them ask again straight away.
+    await db
+      .from('sso_email_codes')
+      .update({ expires_at: new Date().toISOString(), sent_at: new Date(Date.now() - RESEND_AFTER_MS).toISOString() })
+      .eq('user_id', user.id);
+    return 'failed';
+  }
+  return 'ok';
 }
 
 /** Check a typed code; on success the address counts as theirs from now on. */
@@ -108,26 +119,32 @@ export async function checkProofCode(user: User, typed: string): Promise<CodeRes
   const email = norm(user.email);
   const code = typed.replace(/\D/g, '');
   const db = createAdminClient();
-  const { data: row, error } = await db
-    .from('sso_email_codes')
-    .select('email, code_hash, expires_at, attempts')
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (error) return /relation|does not exist/i.test(error.message) ? 'setup' : 'failed';
-  if (!row || row.email !== email || new Date(row.expires_at).getTime() < Date.now()) return 'expired';
-  if (row.attempts >= MAX_TRIES) return 'locked';
+  // Uses up a try first (atomically), so parallel guesses can't get more than 5 between them.
+  const { data, error } = await db.rpc('sso_take_attempt', { p_user: user.id });
+  if (error) return notSetUp(error) ? 'setup' : 'failed';
+  const row = (Array.isArray(data) ? data[0] : data) as { code_hash: string; email: string } | null | undefined;
+  if (!row) {
+    const { data: state } = await db
+      .from('sso_email_codes')
+      .select('attempts, expires_at, failures, failures_since')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!state || new Date(state.expires_at).getTime() < Date.now()) return 'expired';
+    return 'locked';
+  }
+  if (row.email !== email) return 'expired';
 
   const expected = Buffer.from(row.code_hash);
   const given = Buffer.from(code.length === 6 ? codeHash(user.id, code) : '');
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
-    await db.from('sso_email_codes').update({ attempts: row.attempts + 1 }).eq('user_id', user.id);
-    return row.attempts + 1 >= MAX_TRIES ? 'locked' : 'wrong';
+    await db.rpc('sso_record_failure', { p_user: user.id });
+    return 'wrong';
   }
   const { error: saveErr } = await db
     .from('sso_email_proofs')
     .upsert({ user_id: user.id, email, proven_at: new Date().toISOString() });
   if (saveErr) return 'failed';
-  await db.from('sso_email_codes').delete().eq('user_id', user.id);
+  await db.from('sso_email_codes').update({ expires_at: new Date().toISOString() }).eq('user_id', user.id);
   return 'ok';
 }
 

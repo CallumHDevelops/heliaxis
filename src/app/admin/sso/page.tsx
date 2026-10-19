@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: 'Open RAMS · Heliaxis', robots: { in
 const ERRORS: Record<string, string> = {
   wrong: 'That code isn’t right. Check the email and try again.',
   expired: 'That code has expired. Send a new one.',
-  locked: 'Too many wrong tries. Send a new code.',
-  wait: 'A code was sent less than two minutes ago. Use that one, or wait a moment before asking again.',
+  locked: 'Too many wrong tries. Send a new code, or if that’s refused, try again tomorrow.',
+  wait: 'Codes can only be sent every two minutes. Use the last one, or ask again shortly.',
   failed: 'The email couldn’t be sent. Try again in a minute.',
   setup: 'This isn’t switched on yet: sso.sql needs running in Supabase (it’s on the From Claude card).',
 };
@@ -23,7 +23,7 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
   const next = safeRamsPath(q.next ?? null);
   const { user, profile } = await getSessionProfile();
   const email = user?.email ?? '';
-  const error = q.e ? ERRORS[q.e] : null;
+  const error = q.e && Object.hasOwn(ERRORS, q.e) ? ERRORS[q.e] : null;
 
   return (
     <AdminShell active="dashboard" isAdmin={profile?.role === 'admin'}>
