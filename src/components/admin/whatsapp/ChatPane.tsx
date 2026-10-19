@@ -12,6 +12,8 @@ import { closeShownNotifications } from '@/lib/push-client';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
+import type { MediaFields } from '@/lib/whatsapp/media-shared';
+import { MediaBubble } from './MediaBubble';
 import '@/app/admin/enquiries/whatsapp.css';
 
 /**
@@ -40,7 +42,7 @@ type Msg = {
   /** 'import' = brought in from a WhatsApp Business app export. */
   via?: string | null;
   created_at: string;
-};
+} & MediaFields; // a photo, voice note or file they sent (whatsapp-media.sql): MediaBubble
 type Queued = {
   id: string;
   kind: 'reply' | 'intro' | 'chase';
@@ -526,7 +528,11 @@ export function ChatPane({
             {showImported && <div className="wa-day wa-imported">Imported from the WhatsApp Business app</div>}
             <div className={`wa-bubble ${m.direction}${m.kind === 'template' ? ' tpl' : ''}`} data-mid={m.id}>
               {m.by && <span className="wa-by">{m.by}</span>}
-              <span className="wa-text">{shownBody(m.body)}</span>
+              {m.media_status ? (
+                <MediaBubble m={m} jobId={projectId ?? job?.projectId ?? null} onChange={reload} />
+              ) : (
+                <span className="wa-text">{shownBody(m.body)}</span>
+              )}
               <span className="wa-meta">
                 {clock(m.created_at)}
                 {m.direction === 'out' && !imported && <span className={`wa-tick ${m.status}`}>{TICKS[m.status] || ''}</span>}

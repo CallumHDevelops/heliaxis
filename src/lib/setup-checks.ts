@@ -421,6 +421,10 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
 
   add(!whatsapp, sql('whatsapp.sql', 'The WhatsApp inbox, smart replies and outbox.', 1));
   add(whatsapp && !chasers, sql('whatsapp-chasers.sql', 'WhatsApp chasers and syncing with the WhatsApp Business app.', 2, 'whatsapp.sql'));
+  add(
+    whatsapp && !(await has('whatsapp_messages', 'media_status')),
+    sql('whatsapp-media.sql', 'Shows the photos, videos, voice notes and files customers send on WhatsApp in the chat, and lets you save their photos to the job.', 2, 'whatsapp.sql')
+  );
   add(!crm, sql('crm.sql', 'Switches the CRM on: opportunities, the timeline, site photos and tasks on opportunities.', 3));
   add(!crmV2, sql('crm-v2.sql', 'Customer portal, documents, email, reminders and deposits.', 4, 'crm.sql'));
   add(
