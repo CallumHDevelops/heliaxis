@@ -2,12 +2,15 @@ package uk.co.heliaxis.app;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
+import android.service.notification.StatusBarNotification;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationChannelCompat;
@@ -31,6 +34,8 @@ final class Notifications {
     static final String GENERAL = "general";
     private static final List<String> CHANNELS = Arrays.asList("whatsapp", "leads", "tasks", "jobs", GENERAL);
     private static final int ID = 1; // one notification per tag; the tag says which
+    /** The site's id for a notification (notifications.id), kept on it for dismiss(). */
+    private static final String EXTRA_ID = "uk.co.heliaxis.app.NOTIFICATION_ID";
 
     private Notifications() {}
 
@@ -77,6 +82,11 @@ final class Notifications {
                 .setShowWhen(true)
                 .setAutoCancel(true)
                 .setContentIntent(openApp(context, open, tag));
+        if (!id.isEmpty()) {
+            Bundle extras = new Bundle();
+            extras.putString(EXTRA_ID, id);
+            b.addExtras(extras);
+        }
         // No setNumber(): launchers add the numbers up across notifications, so the badge already
         // counts one per notification showing.
 
@@ -99,6 +109,29 @@ final class Notifications {
         }
 
         post(context, tag, b);
+    }
+
+    /**
+     * { type: dismiss, ids, tag }: someone read the chat or contacted the lead, so the site marked
+     * these notifications read; take down any still showing. By id, so a newer one on the same tag
+     * stays (a new message, or "Survey booked" after "New lead"); the tag only matches one shown
+     * without an id (e.g. "Reply sent").
+     */
+    static void dismiss(Context context, Map<String, String> data) {
+        List<String> ids = Arrays.asList(value(data, "ids", "").split(","));
+        String tag = value(data, "tag", "");
+        NotificationManager nm = context.getSystemService(NotificationManager.class);
+        if (nm == null) return;
+        try {
+            for (StatusBarNotification shown : nm.getActiveNotifications()) {
+                Bundle extras = shown.getNotification().extras;
+                String id = extras == null ? null : extras.getString(EXTRA_ID);
+                boolean match = id != null && !id.isEmpty() ? ids.contains(id) : !tag.isEmpty() && tag.equals(shown.getTag());
+                if (match) nm.cancel(shown.getTag(), shown.getId());
+            }
+        } catch (RuntimeException ignored) {
+            // can't list them on this phone: leave them, tapping one still opens the app
+        }
     }
 
     /** Replaces a notification after one of its buttons was tapped ("Reply sent" etc.). */

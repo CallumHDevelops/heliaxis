@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { crmSession, DOCS_BUCKET, ensurePortalToken, isUuid, json, portalUrl } from '@/lib/crm/server';
+import { crmSession, DOCS_BUCKET, ensurePortalToken, isUuid, json, markContacted, portalUrl } from '@/lib/crm/server';
 import { fillText } from '@/lib/crm/settings-shared';
 import { PORTAL_CLOSED_MSG } from '@/lib/crm/stages';
 import { msConfigured, sendMail, type MailAttachment } from '@/lib/ms365';
@@ -82,6 +82,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     at: now,
   });
   await db.from('crm_projects').update({ updated_at: now }).eq('id', id);
-  await db.from('crm_projects').update({ first_contact_at: now }).eq('id', id).is('first_contact_at', null);
+  await markContacted({ projectId: id }, now);
   return json({ ok: true });
 }

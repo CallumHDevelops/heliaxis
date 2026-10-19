@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePortal } from '@/lib/auth';
+import { clearLeadNotifications } from '@/lib/notify';
 import { NextResponse } from 'next/server';
 import { guessProducts, portalOpen, type StageKey } from './stages';
 
@@ -50,6 +51,29 @@ export async function logActivity(a: {
       meta: a.meta ?? null,
       by_id: a.byId ?? null,
     });
+}
+
+/**
+ * Speed to lead: the first time anyone contacts the customer (WhatsApp, a logged call or visit, an
+ * email). Their "new lead" and "hasn't been contacted" notifications go, for everyone. Ignores
+ * missing CRM tables.
+ */
+export async function markContacted(where: { projectId: string } | { enquiryId: string }, at = new Date().toISOString()) {
+  try {
+    const update = createAdminClient().from('crm_projects').update({ first_contact_at: at }).is('first_contact_at', null);
+    const q = 'projectId' in where ? update.eq('id', where.projectId) : update.eq('enquiry_id', where.enquiryId);
+    const { data, error } = await q.select('id, enquiry_id');
+    if (error) {
+      // No CRM tables yet: a new lead's notifications can still go.
+      if ('enquiryId' in where) await clearLeadNotifications(where.enquiryId, []);
+      return;
+    }
+    const byEnquiry = new Map<string, string[]>();
+    for (const p of data ?? []) byEnquiry.set(p.enquiry_id, [...(byEnquiry.get(p.enquiry_id) ?? []), p.id]);
+    for (const [enquiryId, projectIds] of byEnquiry) await clearLeadNotifications(enquiryId, projectIds);
+  } catch {
+    // never block the caller
+  }
 }
 
 /** Keep the Enquiries pipeline in step with the project's stage. */
@@ -141,7 +165,7 @@ export async function ensureOpportunity(enquiryId: string, source: string) {
     if (row) {
       await logActivity({ enquiryId, projectId: row.id, kind: 'system', body: `New enquiry via ${source}` });
       const { assignNewLead } = await import('./automation');
-      await assignNewLead(row.id, e.name).catch(() => null);
+      await assignNewLead(row.id, e.name, enquiryId).catch(() => null);
     }
     return (row?.id as string) ?? null;
   } catch {

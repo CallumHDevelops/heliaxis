@@ -57,6 +57,24 @@ export async function enablePush(): Promise<PushState> {
   }
 }
 
+/** This device's Web Push notifications still on screen (none where that isn't supported). */
+export async function shownNotifications(): Promise<Notification[]> {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration('/admin');
+    return (await reg?.getNotifications()) ?? [];
+  } catch {
+    return []; // e.g. inside the Android app, where notifications are native
+  }
+}
+
+/**
+ * Close the ones that `match` (a chat that's now open, or ones read elsewhere). The server can't
+ * take them down itself: a browser must show a notification for every push it gets.
+ */
+export async function closeShownNotifications(match: (n: Notification) => boolean) {
+  for (const n of await shownNotifications()) if (match(n)) n.close();
+}
+
 // --- Android app: native notifications -------------------------------------------------------
 
 const NATIVE_KEY = 'hx.native';

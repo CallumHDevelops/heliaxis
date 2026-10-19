@@ -63,7 +63,8 @@ self.addEventListener('push', (event) => {
       renotify: !!data.tag,
       vibrate: [120, 60, 120],
       actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
-      data: Object.assign({}, data.data || {}, { href: data.href || '/admin', id: data.id }),
+      // ref: what it's about, so open pages can close it once it's been read (closeShownNotifications).
+      data: Object.assign({}, data.data || {}, { href: data.href || '/admin', id: data.id, ref: data.ref }),
     });
     if (typeof data.unread === 'number' && self.navigator.setAppBadge) self.navigator.setAppBadge(data.unread).catch(() => {});
     // Tell open pages to refresh the bell.
