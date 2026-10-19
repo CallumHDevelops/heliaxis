@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
             await ensureOpportunity(row.id, data.source);
           });
           after(() =>
-            notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', '/admin/enquiries', {
+            notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', `/admin/enquiries?enquiry=${row.id}`, {
               tag: `enq-${row.id}`,
               ref: leadRef(row.id),
             }).catch(() => {})

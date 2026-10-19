@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createImportedEnquiry, findExistingEnquiry, opportunityFor, type ExistingEnquiry } from '@/lib/crm/import';
+import { deletedBefore } from '@/lib/crm/delete-customer';
 import { isTestLead } from '@/lib/meta-leads-csv';
 import { graph, type GraphResult, type LeadField } from '@/lib/whatsapp/api';
 import { leadToEnquiry, mapLeadFields } from '@/lib/whatsapp/leads';
@@ -269,8 +270,8 @@ export type GraphLead = {
   is_organic?: boolean;
 };
 
-export type ImportCounts = { imported: number; matched: number; already: number; skipped: number; failed: number };
-export const noCounts = (): ImportCounts => ({ imported: 0, matched: 0, already: 0, skipped: 0, failed: 0 });
+export type ImportCounts = { imported: number; matched: number; already: number; skipped: number; deleted: number; failed: number };
+export const noCounts = (): ImportCounts => ({ imported: 0, matched: 0, already: 0, skipped: 0, deleted: 0, failed: 0 });
 
 // Newer than this, a lead is the live webhook's: taking it first would skip its alert and rotation.
 const LIVE_MS = 60 * 60_000;
@@ -291,14 +292,14 @@ export const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Unkn
 /**
  * One lead, from Meta or a CSV: 'already' if it's been brought in before, 'matched' if the person
  * is already in the CRM (their timeline gets a line saying so), 'skipped' for Meta test leads and
- * ones from the last hour (the live webhook's), otherwise 'imported' as a new enquiry at its
- * original date. Throws if it can't be saved.
+ * ones from the last hour (the live webhook's), 'deleted' for someone deleted from the CRM on
+ * purpose, otherwise 'imported' as a new enquiry at its original date. Throws if it can't be saved.
  */
 export async function importLead(
   lead: GraphLead,
   formName?: string | null,
   byId?: string | null
-): Promise<'imported' | 'matched' | 'already' | 'skipped'> {
+): Promise<'imported' | 'matched' | 'already' | 'skipped' | 'deleted'> {
   if (isTestLead(lead.field_data ?? [])) return 'skipped';
   const metaLeadId = lead.id?.trim() || null;
   // Only their own answer counts: META_LEADS_WHATSAPP_OPT_IN is about what today's forms say, not old ones.
@@ -324,6 +325,11 @@ export async function importLead(
   }
   if (existing && metaLeadId && existing.meta_lead_id === metaLeadId) return 'already';
   if (when && Date.now() - Date.parse(when) < LIVE_MS) return 'skipped';
+  // Deleted on purpose: this lead never comes back. Nor do they, unless they're in the CRM again
+  // (a new lead or WhatsApp since), when it's matched as usual, or this lead is from after they
+  // were deleted. Null: the deleted list isn't set up.
+  const gone = await deletedBefore({ metaLeadId, phone: who.phone, email: who.email }, when);
+  if (gone === 'meta_lead' || (gone && !existing)) return 'deleted';
 
   if (existing) {
     // The same file (or the same lead without its id) imported again: it's on their timeline already.

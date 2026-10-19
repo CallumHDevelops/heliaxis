@@ -25,7 +25,8 @@ export default async function ImportPage() {
         <h1>Import</h1>
         <p className="imp-lede">
           Bring in leads and chats from before the CRM. They keep their original dates, and nobody is messaged or
-          notified. Anyone already in the CRM is matched by phone or email, not added twice.
+          notified. Anyone already in the CRM is matched by phone or email, not added twice, and anyone you’ve deleted
+          from the CRM is skipped.
         </p>
         <MetaImport />
         <WhatsAppImport />

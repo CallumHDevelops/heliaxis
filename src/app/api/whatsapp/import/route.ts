@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { requireApproved } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createImportedEnquiry, findExistingEnquiry, opportunityFor } from '@/lib/crm/import';
+import { deletedBefore } from '@/lib/crm/delete-customer';
 import { chatSides, dateRange, MAX_CHAT_CHARS, nameFromFileName, parseChatExport, type MediaType } from '@/lib/whatsapp/chat-export';
 import { isUuid, json } from '@/lib/whatsapp/routes';
 import { toWaId } from '@/lib/whatsapp/shared';
@@ -109,9 +110,10 @@ export async function GET(req: Request) {
 }
 
 /**
- * { fileName, text, us, customer } → the chat saved to that customer.
+ * { fileName, text, us, customer, anyway? } → the chat saved to that customer.
  *   us: the author name that is Heliaxis, or null when only the customer wrote.
  *   customer: { enquiryId, phone? } for someone in the CRM, or { phone, name } to match by phone or add them.
+ *   anyway: add them even though they were deleted from the CRM before (else { deletedBefore: true }).
  * Importing the same file again adds nothing, even onto another of their enquiries: each message
  * gets a fixed id from the customer's number, time, direction and text.
  */
@@ -200,6 +202,11 @@ export async function POST(req: Request) {
   } else {
     enquiry = wa ? await byNumber(wa) : null;
     if (!enquiry) {
+      // Deleted from the CRM on purpose: an old chat doesn't bring them back unless asked to. (A new
+      // WhatsApp from them still does; the live inbox doesn't look at the deleted list. So does a
+      // chat they've written in since: dated by their last message.)
+      const theirLast = keep.findLast((m) => m.author !== us)?.at;
+      if (b.anyway !== true && (await deletedBefore({ phone }, theirLast))) return json({ deletedBefore: true });
       const name = ((c.name as string | undefined) || '').trim() || customerAuthor || nameFromFileName(fileName) || `+${wa}`;
       try {
         const r = await createImportedEnquiry({
