@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-// Let a signed-in user change their OWN sign-in email. Acts only on the
-// caller's id (from their session), and auto-confirms so the change takes
-// effect immediately without relying on a confirmation email.
+// Let a signed-in user change their OWN sign-in email, through their own
+// session. Supabase emails a confirmation link to the new address (and the old
+// one, with secure email change on); nothing changes until it's confirmed, so
+// nobody can take an address they don't own. The link comes back through
+// /auth/callback?code=.
 export async function PATCH(req: Request) {
   const supabase = await createClient();
   const {
@@ -30,12 +31,9 @@ export async function PATCH(req: Request) {
   if (email === (user.email || '').toLowerCase())
     return NextResponse.json({ error: 'That is already your email.' }, { status: 400 });
 
-  const admin = createAdminClient();
-  const { error } = await admin.auth.admin.updateUserById(user.id, {
-    email,
-    email_confirm: true,
-  });
-  if (error) return NextResponse.json({ error: error.message }, { status: 502 });
+  const { origin } = new URL(req.url);
+  const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: `${origin}/auth/callback` });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   return NextResponse.json({ ok: true });
 }

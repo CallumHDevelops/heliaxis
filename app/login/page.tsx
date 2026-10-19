@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Spark } from '@/components/Spark';
 import styles from './auth.module.css';
@@ -11,6 +11,13 @@ export default function LoginPage() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // /auth/callback sends people here with ?error=link when a sign-in link didn't work.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('error') === 'link') {
+      setErr('Sorry, that sign-in link didn’t work. It may have expired, been used already, or been opened on a different device. Enter your email to get a new one.');
+    }
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr('');
@@ -20,12 +27,18 @@ export default function LoginPage() {
       email: email.trim(),
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
-        shouldCreateUser: true, // passwordless sign-in doubles as sign-up
+        shouldCreateUser: false, // invite-only: accounts are added by an admin
       },
     });
     setBusy(false);
     if (error) {
-      setErr(error.message);
+      const noAccount =
+        error.code === 'otp_disabled' || error.code === 'signup_disabled' || /signups not allowed/i.test(error.message);
+      setErr(
+        noAccount
+          ? 'We couldn’t find a Post Studio account for that email. Heliaxis staff: open the studio from the Heliaxis admin menu (Social media studio) and your account is set up for you. If it isn’t in your menu, ask Callum for Social media studio access.'
+          : error.message
+      );
       return;
     }
     setSent(true);

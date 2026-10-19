@@ -1672,9 +1672,10 @@ export default function Studio({
         setEmailMsg(json.error || 'Could not update email.');
         return;
       }
-      setEmailMsg('Email updated.');
-      router.refresh();
-      setTimeout(() => setEmailOpen(false), 900);
+      // Nothing changes until they click the link Supabase emails them.
+      setEmailMsg(
+        `Check your inbox: we’ve sent a link to ${email} to confirm the change. If one also arrives at your current address, click that too. Your email changes once that’s done.`
+      );
     } catch {
       setEmailBusy(false);
       setEmailErr(true);
@@ -2796,7 +2797,10 @@ export default function Studio({
             <h2 className={styles.mtitle}>
               <Spark size={16} /> Your account
             </h2>
-            <p className={styles.msub}>Update the email address you sign in with.</p>
+            <p className={styles.msub}>
+              Update the email address you sign in with. We&rsquo;ll email the new address a link to
+              confirm it.
+            </p>
             <div className={styles.fld}>
               <label>Email</label>
               <input
