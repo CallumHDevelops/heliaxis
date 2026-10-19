@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHmac, randomInt, timingSafeEqual } from 'crypto';
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { emailShell, esc, sendEmail } from '@/lib/subcontractors/server';
@@ -15,7 +15,8 @@ import { canAccess, type AccessProfile } from '@/lib/portals';
  * a colleague's address; one-tap sign-in therefore waits until the person has proved the address
  * is theirs, once, by typing in a code emailed to it (supabase/sso.sql; one proof covers both apps).
  * And only an existing account in the other app whose sign-in email matches gets a link (for RAMS,
- * an APPROVED one); anyone else just lands on that app as before. We never create accounts there.
+ * an APPROVED one; for the studio, one whose email it has confirmed); anyone else just lands on that
+ * app as before. We never create accounts there.
  * Needs RAMS_SUPABASE_URL + RAMS_SUPABASE_SERVICE_ROLE_KEY, and SOCIAL_SUPABASE_URL +
  * SOCIAL_SUPABASE_SERVICE_ROLE_KEY for the studio.
  */
@@ -195,18 +196,31 @@ function serviceClient(url: string, key: string) {
 /**
  * A one-time link into `origin`'s /auth/callback, signed in as an account we've already found
  * there, or null. magiclink for an existing account only (it would otherwise create one), so the
- * link must come back for that same account.
+ * link must come back for that same account. `extra` is added to the link (the studio's state).
  */
-async function callbackLink(app: SupabaseClient, account: { id: string; email: string }, origin: string, next: string, label: string) {
+async function callbackLink(
+  app: SupabaseClient,
+  account: { id: string; email: string },
+  origin: string,
+  next: string,
+  label: string,
+  extra: Record<string, string> = {}
+) {
   const { data, error } = await app.auth.admin.generateLink({ type: 'magiclink', email: account.email });
   const tokenHash = data?.properties?.hashed_token;
   if (error || !tokenHash || data.properties.verification_type !== 'magiclink' || data.user?.id !== account.id) {
     if (error) console.error(`[sso] ${label} link failed`, error.message);
     return null;
   }
-  const q = new URLSearchParams({ token_hash: tokenHash, type: 'magiclink', next });
+  const q = new URLSearchParams({ token_hash: tokenHash, type: 'magiclink', next, ...extra });
   return `${origin}/auth/callback?${q}`;
 }
+
+/** A sign-in address, and a cookie to set alongside it when the app needs one (the studio). */
+export type SsoLink = {
+  url: string;
+  cookie?: { name: string; value: string; domain: string; path: string; maxAge: number; httpOnly: true; secure: true; sameSite: 'lax' };
+};
 
 /** Where to send this person: a signed-in link when we can make one, else RAMS's normal door. */
 export async function ramsLink(email: string | null | undefined, next: string): Promise<string> {
@@ -239,7 +253,8 @@ const SOCIAL_MAX_PAGES = 5;
 
 /**
  * The studio account signed in with exactly this email (any capitals), if there's one and only
- * one and it isn't blocked. The studio has no profiles table: any account there can use it.
+ * one, it isn't blocked and its email is confirmed there. The studio has no profiles table: any
+ * account there can use it.
  */
 async function findSocialAccount(social: SupabaseClient, address: string): Promise<User | null> {
   const matches: User[] = [];
@@ -254,23 +269,39 @@ async function findSocialAccount(social: SupabaseClient, address: string): Promi
   }
   const account = matches.length === 1 ? matches[0] : null;
   const blocked = !!account?.banned_until && new Date(account.banned_until).getTime() > Date.now();
-  return account && !blocked && !account.deleted_at ? account : null;
+  // An unconfirmed account may be a sign-up someone else started under this address; our link
+  // would confirm it with their password still on it. Those people use the studio's own sign-in.
+  return account && !blocked && !account.deleted_at && account.email_confirmed_at ? account : null;
 }
 
 /**
- * Where to send this person: a signed-in studio link when we can make one, else the studio's
- * normal door (signed out, every studio page goes to its own sign-in). Never creates an account
- * there: no existing studio account under this email, no link.
+ * The studio only accepts our link in the browser that tapped the button: alongside it we set this
+ * cookie for 5 minutes on heliaxis.co.uk (so social.heliaxis.co.uk can read it), holding the same
+ * random value as the link's ?state=. A link copied out and sent to someone else signs nobody in.
  */
-export async function socialLink(email: string | null | undefined, next: string): Promise<string> {
-  const plain = `${SOCIAL_ORIGIN}${next}`;
+const SOCIAL_STATE_COOKIE = 'hx_social_sso';
+
+/**
+ * Where to send this person: a signed-in studio link (plus its state cookie, which the caller must
+ * set) when we can make one, else the studio's normal door (signed out, every studio page goes to
+ * its own sign-in). Never creates an account there: no existing studio account under this email,
+ * no link.
+ */
+export async function socialLink(email: string | null | undefined, next: string): Promise<SsoLink> {
+  const plain = { url: `${SOCIAL_ORIGIN}${next}` };
   const address = norm(email);
   if (!address || !socialSsoConfigured()) return plain;
   try {
     const social = serviceClient(process.env.SOCIAL_SUPABASE_URL!, process.env.SOCIAL_SUPABASE_SERVICE_ROLE_KEY!);
     const account = await findSocialAccount(social, address);
     if (!account?.email || norm(account.email) !== address) return plain;
-    return (await callbackLink(social, { id: account.id, email: account.email }, SOCIAL_ORIGIN, next, 'social studio')) ?? plain;
+    const state = randomBytes(32).toString('base64url');
+    const url = await callbackLink(social, { id: account.id, email: account.email }, SOCIAL_ORIGIN, next, 'social studio', { state });
+    if (!url) return plain;
+    return {
+      url,
+      cookie: { name: SOCIAL_STATE_COOKIE, value: state, domain: 'heliaxis.co.uk', path: '/auth/callback', maxAge: 300, httpOnly: true, secure: true, sameSite: 'lax' },
+    };
   } catch (e) {
     console.error('[sso] social studio link failed', e instanceof Error ? e.message : e);
     return plain;
@@ -287,7 +318,7 @@ type SsoAppInfo = {
   safePath: (next: string | null) => string;
   /** Who here may be signed in to it. */
   canUse: (profile: AccessProfile | null | undefined) => boolean;
-  link: (email: string | null | undefined, next: string) => Promise<string>;
+  link: (email: string | null | undefined, next: string) => Promise<SsoLink>;
 };
 
 export const SSO_APPS: Record<SsoApp, SsoAppInfo> = {
@@ -297,7 +328,7 @@ export const SSO_APPS: Record<SsoApp, SsoAppInfo> = {
     configured: ramsSsoConfigured,
     safePath: safeRamsPath,
     canUse: (p) => canAccess(p, 'rams') || canAccess(p, 'team'),
-    link: ramsLink,
+    link: async (email, next) => ({ url: await ramsLink(email, next) }),
   },
   social: {
     name: 'the social studio',

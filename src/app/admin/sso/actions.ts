@@ -1,5 +1,6 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getSessionProfile } from '@/lib/auth';
 import { checkProofCode, sendProofCode, SSO_APPS, ssoApp, type SsoApp } from '@/lib/sso';
@@ -35,7 +36,12 @@ export async function verifySsoCode(formData: FormData): Promise<void> {
   const { app, next } = target(formData);
   const { user } = await who(app);
   const r = await checkProofCode(user, String(formData.get('code') || ''));
-  // Straight to the app (an absolute URL, so Next doesn't fetch it server-side first).
-  if (r === 'ok') redirect(await SSO_APPS[app].link(user.email, next));
+  // Straight to the app (an absolute URL, so Next doesn't fetch it server-side first), with the
+  // cookie the studio's link needs.
+  if (r === 'ok') {
+    const { url, cookie } = await SSO_APPS[app].link(user.email, next);
+    if (cookie) (await cookies()).set(cookie);
+    redirect(url);
+  }
   back(app, r === 'wrong' ? { step: 'code', e: r, next } : { e: r, next });
 }

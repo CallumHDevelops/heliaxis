@@ -30,5 +30,9 @@ export async function GET(req: Request) {
   if (!(await emailProven(user))) {
     return NextResponse.redirect(new URL(`${SSO_PATH}?${new URLSearchParams({ app: 'social', next })}`, url), { status: 303, headers });
   }
-  return NextResponse.redirect(await socialLink(user.email, next), { status: 303, headers });
+  // A signed-in link comes with a cookie that ties it to this browser (src/lib/sso.ts).
+  const { url: dest, cookie } = await socialLink(user.email, next);
+  const res = NextResponse.redirect(dest, { status: 303, headers });
+  if (cookie) res.cookies.set(cookie);
+  return res;
 }

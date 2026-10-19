@@ -88,6 +88,28 @@ async function has(table: string, column = '*') {
   }
 }
 
+/**
+ * Can anyone still give themselves a social studio account? null when we can't tell (no studio
+ * keys, or its Supabase didn't answer), so the card doesn't nag on a guess.
+ */
+async function socialSignupsOpen(): Promise<boolean | null> {
+  const url = process.env.SOCIAL_SUPABASE_URL;
+  const key = process.env.SOCIAL_SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  try {
+    const res = await fetch(`${url.replace(/\/+$/, '')}/auth/v1/settings`, {
+      headers: { apikey: key },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const settings = (await res.json()) as { disable_signup?: boolean };
+    return settings.disable_signup === false;
+  } catch {
+    return null;
+  }
+}
+
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
   {
@@ -304,7 +326,7 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 }
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
-  const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, sso, done, assign] = await Promise.all([
+  const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, sso, socialSignups, done, assign] = await Promise.all([
     has('crm_projects', 'next_step'),
     has('crm_documents'),
     has('assistant_drafts'),
@@ -313,6 +335,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     has('whatsapp_outbox', 'kind'),
     has('native_push_tokens'),
     has('sso_email_proofs'),
+    socialSignupsOpen(),
     doneManual(),
     preloaded ?? setupAssignments(),
   ]);
@@ -351,6 +374,23 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     env('SOCIAL_SUPABASE_URL', 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY') && 'the social studio',
   ].filter(Boolean);
   add(!!ssoApps.length && !sso, sql('sso.sql', `Lets people open ${ssoApps.join(' and ')} without signing in again (each confirms their email once).`, 13));
+  const socialRef = (process.env.SOCIAL_SUPABASE_URL || '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
+  add(socialSignups === true, {
+    id: 'social-signups-off',
+    title: 'Make the social studio invite-only',
+    detail:
+      'Anyone can still give themselves a social studio account. Someone could set one up under a colleague’s email before the colleague does, and get into it once the colleague signs in.',
+    steps: [
+      'Tap **Open Supabase** and pick the **social studio** project if it asks (not the Heliaxis one, and not RAMS).',
+      '**Authentication** (left menu) → **Sign In / Providers** (on older screens, **Providers** or **Settings**).',
+      'Turn off **Allow new users to sign up** and tap **Save**. People who already have a studio account can still sign in.',
+      'From now on, add people in **Authentication** → **Users** → **Add user** → **Send invitation**.',
+      'Come back here and refresh. This item disappears once it’s worked.',
+    ],
+    href: socialRef ? `https://supabase.com/dashboard/project/${socialRef}/auth/providers` : 'https://supabase.com/dashboard',
+    hrefLabel: 'Open Supabase',
+    order: 14,
+  });
   add(!fcmConfigured(), {
     id: 'env-firebase',
     title: 'Set up native Android notifications',
@@ -573,7 +613,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       'Copy the **Project URL**. That’s the value for `SOCIAL_SUPABASE_URL`.',
       'Still in Project Settings, open **API Keys** (on older screens it’s further down the same page). Find the **service_role** key (if there’s a **Legacy API keys** tab, it’s on that tab), reveal it and copy it. That’s `SOCIAL_SUPABASE_SERVICE_ROLE_KEY`, and it’s a password: tick **Sensitive** in Vercel.',
       ...VERCEL_STEPS,
-      'Then run sso.sql if it appears on this card. It works for anyone who already has a social studio account under the same email as their Heliaxis login. It never creates studio accounts, so anyone else still sees the studio’s own sign-in.',
+      'Then run sso.sql if it appears on this card. It works for anyone who already has a social studio account under the same email as their Heliaxis login, and has signed in to the studio at least once. It never creates studio accounts, so anyone else still sees the studio’s own sign-in.',
     ],
     copies: [
       { label: 'Key', value: 'SOCIAL_SUPABASE_URL' },
