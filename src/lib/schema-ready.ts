@@ -12,10 +12,13 @@ const TTL = 60_000;
 let cached: { at: number; value: SchemaReady } | null = null;
 let pending: Promise<SchemaReady> | null = null;
 
-/** True if the table (and optionally a column) can be read. */
+/**
+ * True if the table (and optionally a column) can be read. Reads at most one row: a HEAD request
+ * can't see a missing table (supabase-js turns PostgREST's bodiless 404 into a success).
+ */
 async function has(table: string, column = 'id') {
   try {
-    const { error } = await createAdminClient().from(table).select(column, { head: true }).limit(1);
+    const { error } = await createAdminClient().from(table).select(column).limit(1);
     return !error;
   } catch {
     return false;

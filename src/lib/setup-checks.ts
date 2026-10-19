@@ -82,7 +82,7 @@ const VERCEL_STEPS = [
 /** True if the table (and optionally a column) exists. */
 async function has(table: string, column = '*') {
   try {
-    const { error } = await createAdminClient().from(table).select(column, { head: true, count: 'exact' }).limit(1);
+    const { error } = await createAdminClient().from(table).select(column).limit(1);
     return !error;
   } catch {
     return false;
@@ -123,7 +123,7 @@ async function instantBookingReady() {
 /**
  * Pages that arrive in later changes: Surveys → ⚙ booking settings and the Diary, and the WhatsApp
  * permission list. Their to-dos wait for them, so nobody is sent to a missing page. Switch each on
- * when its page is live.
+ * when its page is live (both are in by the final step that adds the Projects and Surveys menu links).
  */
 const PAGE_LIVE = { surveySettings: false, waPermission: false };
 

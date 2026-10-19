@@ -118,6 +118,7 @@ create table if not exists public.diary_entries (
   calendar_dirty_at timestamptz default now(),
   calendar_claim_at timestamptz,
   calendar_error    text,
+  calendar_error_at timestamptz,                   -- the sync waits 15 minutes before trying a failed entry again
   deleted_at        timestamptz,                   -- soft delete, so the sync can remove the Outlook copy first
   created_by        uuid references public.profiles(id) on delete set null,
   created_at        timestamptz not null default now(),
@@ -127,6 +128,7 @@ create table if not exists public.diary_entries (
     or (not all_day and starts_at is not null and ends_at is not null and ends_at > starts_at)),
   constraint diary_entries_where_chk check (where_kind <> 'address' or postcode is not null)
 );
+alter table public.diary_entries add column if not exists calendar_error_at timestamptz;
 create index if not exists diary_entries_range_idx on public.diary_entries (surveyor_key, starts_at) where deleted_at is null;
 create index if not exists diary_entries_days_idx  on public.diary_entries (surveyor_key, day_from, day_to) where deleted_at is null and all_day;
 create index if not exists diary_entries_dirty_idx on public.diary_entries (calendar_dirty_at) where calendar_dirty_at is not null;
@@ -328,7 +330,7 @@ end $$;
 -- Turn a hold (or an expired hold, or a request) into a request or a confirmed booking, under the same lock.
 create or replace function public.survey_slot_confirm(p_id uuid, p_expected_version bigint, p jsonb)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
-declare b public.survey_bookings%rowtype; v bigint; st text := p->>'status'; was text;
+declare b public.survey_bookings%rowtype; v bigint; st text := p->>'status'; was text; bump boolean;
 begin
   if st not in ('requested','confirmed') then return jsonb_build_object('ok', false, 'reason', 'bad_status'); end if;
   select * into b from public.survey_bookings where id = p_id;
@@ -342,6 +344,15 @@ begin
   select * into b from public.survey_bookings where id = p_id for update;
   was := b.status;
   if was not in ('held','expired','requested') then return jsonb_build_object('ok', false, 'reason', 'not_open', 'status', was); end if;
+  -- Taking time again bumps the day: an expired hold, a hold past expires_at (every search already
+  -- treats it as free), or a booking moved to another spot (the drives either side change).
+  bump := was = 'expired' or (was = 'held' and b.expires_at <= now())
+          or upper(replace(coalesce(p->>'postcode', b.postcode), ' ', '')) is distinct from upper(replace(b.postcode, ' ', ''))
+          or coalesce((p->>'lat')::float8, b.lat) is distinct from b.lat
+          or coalesce((p->>'lng')::float8, b.lng) is distinct from b.lng;
+  -- Clear other lapsed holds first, as survey_slot_take does, so they can't block this one.
+  update public.survey_bookings set status = 'expired', cancelled_at = now(), updated_at = now()
+   where surveyor_key = b.surveyor_key and day = b.day and status = 'held' and expires_at < now() and id <> p_id;
   begin
     update public.survey_bookings set
       status        = st,
@@ -369,7 +380,7 @@ begin
            survey_mailbox = b.surveyor_key, survey_booking_id = b.id, updated_at = now()
      where id = b.project_id;
   end if;
-  if was = 'expired' then   -- re-taking expired time takes time again; hold → request/confirmed doesn't
+  if bump then   -- a live hold → request/confirmed in the same place doesn't take new time
     update public.survey_booking_days set version = version + 1 where day = b.day;
     v := v + 1;
   end if;
