@@ -1,6 +1,6 @@
 import { crmSession, ensurePortalToken, isUuid, json, logActivity, portalUrl, resetPortalToken } from '@/lib/crm/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
+import { quoteMessages, SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 import { PORTAL_CLOSED_MSG, portalMode } from '@/lib/crm/stages';
 import { msConfigured } from '@/lib/ms365';
 import { schemaReady } from '@/lib/schema-ready';
@@ -29,9 +29,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const db = createAdminClient();
   const { data: p } = await db.from('crm_projects').select('*').eq('id', id).maybeSingle();
   if (!p) return json({ error: 'Not found' }, 404);
-  const [{ data: docRows }, { data: c }, ready] = await Promise.all([
+  const [{ data: docRows }, { data: c }, { data: owner }, ready] = await Promise.all([
     db.from('crm_documents').select('*').eq('project_id', id).in('category', SIGNABLE_CATEGORIES).order('created_at', { ascending: false }),
     db.from('enquiries').select('name, email').eq('id', p.enquiry_id).maybeSingle(),
+    p.owner_id ? db.from('profiles').select('full_name, email').eq('id', p.owner_id).maybeSingle() : Promise.resolve({ data: null }),
     schemaReady(),
   ]);
   const docs = (docRows ?? []) as DocRow[];
@@ -39,9 +40,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { data: people } = byIds.length ? await db.from('profiles').select('id, full_name, email').in('id', byIds) : { data: [] };
   const nameOf = new Map((people ?? []).map((x) => [x.id as string, ((x.full_name || x.email || 'Someone') as string).split(/[\s@]/)[0]]));
   const mode = portalMode(p.stage);
+  const url = p.portal_token && mode ? portalUrl(p.portal_token) : null;
+  const first = ((c?.name as string) || '').split(/\s+/)[0] || '';
+  const toSign = docs.find((d) => d.needs_signature);
+  const from = ((owner?.full_name || owner?.email || s.profile.full_name || s.profile.email || '') as string).split(/[\s@]/)[0];
   return json({
-    url: p.portal_token && mode ? portalUrl(p.portal_token) : null,
+    url,
     mode,
+    /** The wording to send with the quote-only link. */
+    messages: url && mode === 'quote' && toSign ? quoteMessages({ first, url, category: toSign.category, from }) : null,
     stage: p.stage,
     accepted: p.accepted_at
       ? {
@@ -61,7 +68,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       signed_outside_by: d.signed_outside_by ? nameOf.get(d.signed_outside_by) || 'Someone' : null,
       signed_outside_note: d.signed_outside_note ?? null,
     })),
-    customer: { first: ((c?.name as string) || '').split(/\s+/)[0] || '', email: (c?.email as string) || null },
+    customer: { first, email: (c?.email as string) || null },
     emailConnected: msConfigured(),
     crmV3: ready.crmV3,
   });

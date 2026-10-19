@@ -1,0 +1,159 @@
+/* Quotes, signing marks and the customer link card (ProjectExtras.tsx), plus Today on Home
+   (HubMyDay.tsx). crm.css belongs to the record page; these are additions only. */
+
+/* Documents: signed marks */
+.qx-signed {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ok, #3f7d4e);
+  font-weight: 600;
+}
+.qx-signed small {
+  color: var(--muted, #6e6a5e);
+  font-weight: 400;
+}
+.qx-markform {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.6rem;
+  border-radius: 8px;
+  background: var(--paper, #f7f2e7);
+  border: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+}
+.qx-markform p {
+  margin: 0;
+}
+/* "+ Add" from elsewhere on the page: show where the upload is. */
+.crm-doc-upload.qx-flash {
+  outline: 2px solid var(--solar, #f8bc1e);
+  outline-offset: 4px;
+  border-radius: 8px;
+  transition: outline-color 0.3s;
+}
+.crm-doc-actions .crm-chipbtn {
+  min-height: 32px;
+}
+
+/* Customer portal card (dark) */
+.crm-portal .qx-light {
+  color: #fffdf8;
+}
+.crm-portal .qx-dim {
+  color: var(--muted, #6e6a5e);
+}
+.crm-portal .crm-docpick label {
+  color: var(--ink, #211f18);
+}
+.crm-portal .qx-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.crm-portal .qx-pick > .qx-dim {
+  color: rgba(255, 253, 248, 0.65);
+  margin: 0;
+}
+.qx-note {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #7cc28f;
+}
+.qx-hash {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--muted, #6e6a5e);
+  cursor: help;
+}
+
+/* Home → Today: surveys, installs and diary entries */
+.hub-today .hub-row {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.hub-today-time {
+  flex: 0 0 auto;
+  min-width: 3.4rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+  padding-top: 0.15rem;
+  white-space: nowrap;
+}
+.hub-today .hub-row-main b,
+.hub-today .hub-row-main small {
+  white-space: normal;
+}
+.hub-today-tag {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(248, 188, 30, 0.22);
+  color: #6b4b00;
+  vertical-align: 1px;
+}
+.hub-today-tag.is-install {
+  background: rgba(63, 125, 78, 0.16);
+  color: #2f5e3a;
+}
+.hub-today-tag.is-diary {
+  background: rgba(33, 31, 24, 0.08);
+  color: #4a463b;
+}
+.hub-today-actions {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-left: 4.15rem;
+}
+.hub-today-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(33, 31, 24, 0.18);
+  background: #fff;
+  color: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.hub-today-btn.is-primary {
+  background: #211f18;
+  border-color: #211f18;
+  color: #f8bc1e;
+}
+.hub-today-empty {
+  padding: 0.85rem 0.9rem;
+  margin: 0;
+  color: var(--muted, #6e6a5e);
+  font-size: 0.9rem;
+}
+.hub-today-add {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--amber, #c77f04);
+  text-decoration: none;
+}
+@media (max-width: 420px) {
+  .hub-today-actions {
+    padding-left: 0;
+  }
+  .hub-today-btn {
+    flex: 1 1 auto;
+    min-height: 48px;
+  }
+}

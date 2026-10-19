@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, ensurePortalToken, isUuid, json, logActivity, portalUrl } from '@/lib/crm/server';
 import { applyStageEvent } from '@/lib/crm/move-stage';
-import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
+import { quoteMessages, SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 import { SALES_STAGES } from '@/lib/crm/stages';
 
 export const dynamic = 'force-dynamic';
@@ -61,15 +61,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     p.owner_id ? db.from('profiles').select('full_name, email').eq('id', p.owner_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const url = portalUrl(token);
-  const first = firstName(c?.name as string | undefined);
-  const hi = first ? `Hi ${first}` : 'Hi';
   const from = firstName((owner?.full_name || owner?.email || s.profile.full_name || s.profile.email) as string | null);
-  const what = doc.category === 'contract' ? 'contract' : 'quote';
-  const cancel = 'You can change your mind and cancel within 14 days of signing, free of charge.';
-  return json({
-    url,
-    whatsappText: `${hi}, your Heliaxis ${what} is ready. You can read it and sign it on your phone here: ${url}\n\n${cancel} Any questions, just reply here.`,
-    emailSubject: `Your Heliaxis ${what}`,
-    emailText: `${hi},\n\nYour ${what} from Heliaxis is ready. You can read it and sign it online here:\n${url}\n\n${cancel}\n\nAny questions, just reply to this email.\n\nThanks,\n${from || 'The Heliaxis team'}\nHeliaxis`,
-  });
+  return json({ url, ...quoteMessages({ first: firstName(c?.name as string | undefined), url, category: doc.category as string, from }) });
 }

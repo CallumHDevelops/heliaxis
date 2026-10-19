@@ -122,6 +122,18 @@ export async function projectByToken(token: string) {
   return data && mode ? { ...data, mode } : null;
 }
 
+/** What staff send with the quote-only link (WhatsApp it / Email it). */
+export function quoteMessages(o: { first: string; url: string; category: string; from: string }) {
+  const hi = o.first ? `Hi ${o.first}` : 'Hi';
+  const what = o.category === 'contract' ? 'contract' : 'quote';
+  const cancel = 'You can change your mind and cancel within 14 days of signing, free of charge.';
+  return {
+    whatsappText: `${hi}, your Heliaxis ${what} is ready. You can read it and sign it on your phone here: ${o.url}\n\n${cancel} Any questions, just reply here.`,
+    emailSubject: `Your Heliaxis ${what}`,
+    emailText: `${hi},\n\nYour ${what} from Heliaxis is ready. You can read it and sign it online here:\n${o.url}\n\n${cancel}\n\nAny questions, just reply to this email.\n\nThanks,\n${o.from || 'The Heliaxis team'}\nHeliaxis`,
+  };
+}
+
 /** Signed in the portal, or a quote or contract on the job ticked as signed outside it. */
 export async function projectSigned(p: { id: string; accepted_at?: string | null }): Promise<boolean> {
   if (p.accepted_at) return true;
