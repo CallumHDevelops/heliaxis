@@ -10,8 +10,13 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  if (!(await session())) return json({ error: 'unauthorized' }, 401);
-  const settings = cleanSettings(await req.json().catch(() => ({})));
+  const s = await session();
+  if (!s) return json({ error: 'unauthorized' }, 401);
+  // Merged with what's saved, so a page can change one setting (WhatsApp templates → Use for).
+  const current = await getSettings();
+  const settings = cleanSettings({ ...current, ...(await req.json().catch(() => ({}))) });
+  // What every new Meta lead receives automatically: admins only.
+  if (s.profile.role !== 'admin') settings.firstContactTemplate = current.firstContactTemplate;
   try {
     await saveSettings(settings);
   } catch (e) {

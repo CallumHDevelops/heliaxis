@@ -247,6 +247,9 @@ export function SmartReplies() {
           <input className="wa-input" type="number" min={0} step={1} value={settings.finalNudgeHours} onChange={(e) => set('finalNudgeHours', Number(e.target.value))} />
           <label className="wa-label">Template for chasers outside the free window ({'{{1}}'} = first name; blank = default template)</label>
           <input className="wa-input" value={settings.chaseTemplate} onChange={(e) => set('chaseTemplate', e.target.value)} placeholder="e.g. enquiry_follow_up" />
+          <p className="wa-muted">
+            <Link href="/admin/enquiries/templates" className="wa-link">WhatsApp templates →</Link> Send ready-made templates to Meta in one tap, and choose which one chasers and first messages to new leads use.
+          </p>
           <div className="wa-grid3">
             <div>
               <label className="wa-label">Quiet from (UK hour)</label>

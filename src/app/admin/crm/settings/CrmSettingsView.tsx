@@ -134,7 +134,12 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
                 <input className="crm-input" placeholder="survey_reminder" value={s.surveyTemplate} onChange={(e) => set('surveyTemplate', e.target.value)} />
               </div>
             </div>
-            <p className="crm-muted crm-small">Templates: {'{{1}}'} first name, {'{{2}}'} “in 3 days” / “tomorrow” / “booked for …”, {'{{3}}'} the date and time.</p>
+            <p className="crm-muted crm-small">
+              Templates: {'{{1}}'} first name, {'{{2}}'} “in 3 days” / “tomorrow” / “booked for …”, {'{{3}}'} the date and time.{' '}
+              <Link href="/admin/enquiries/templates" className="crm-link">
+                Send them to Meta and choose them in WhatsApp templates →
+              </Link>
+            </p>
           </section>
 
           <section className="crm-set">

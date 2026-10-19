@@ -840,14 +840,6 @@ textarea.crm-input {
   font-size: 0.85rem;
   margin-top: 0.5rem;
 }
-.crm-tpl {
-  white-space: pre-wrap;
-  font-size: 0.85rem;
-  background: var(--card);
-  border: 1px dashed var(--line);
-  border-radius: 6px;
-  padding: 0.5rem 0.7rem;
-}
 .crm-callbtn {
   width: 100%;
   margin-bottom: 0.6rem;

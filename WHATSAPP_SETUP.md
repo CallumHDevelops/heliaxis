@@ -54,7 +54,13 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
      `POST /{page-id}/subscribed_apps?subscribed_fields=leadgen` with the Page's token (needs
      `pages_manage_metadata`), keeping any other fields the app already gets from the Page.
    - Check with Meta's Lead Ads Testing Tool: a test lead should show **success** under Track status.
-7. **Template**: WhatsApp Manager → Message templates → Create, category **Utility** (cheaper) or
+7. **Templates**: easiest from Heliaxis, Enquiries → WhatsApp → *Smart replies & chasers* →
+   **WhatsApp templates** (`/admin/enquiries/templates`). Its *Ready-made* tab sends Heliaxis's
+   templates to Meta with one tap (welcome, follow-up, booking link, quote ready, missed call,
+   survey / install reminders, review request) and shows Meta's answer; *Use for* picks which one
+   each automatic message uses; *New template* makes your own (admins only, needs
+   `WHATSAPP_BUSINESS_ACCOUNT_ID` and a token with `whatsapp_business_management`). Or by hand:
+   WhatsApp Manager → Message templates → Create, category **Utility** (cheaper) or
    **Marketing**, language English (UK). For example, name `enquiry_intro`:
    > Hi {{1}}, it's Heliaxis — thanks for your enquiry. Is now a good time for a couple of quick
    > questions so we can get you an accurate quote?
@@ -65,7 +71,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
 9. **Chase template** (optional): a second Utility template, e.g. `enquiry_follow_up`:
    > Hi {{1}}, just following up on your Heliaxis enquiry. Reply here whenever suits and we'll pick up where we left off.
 
-   Set its name in Enquiries → Smart replies → Chasers. Chasers use it only once the free window has closed.
+   Set its name in Enquiries → Smart replies → Chasers (or *Use for* on the templates page). Chasers use it only once the free window has closed.
 
 ## 3. Vercel env vars
 
@@ -77,7 +83,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
 | `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp → API setup → Phone number ID |
 | `WHATSAPP_BUSINESS_ACCOUNT_ID` | WhatsApp → API setup → WhatsApp Business Account ID (lists your templates in the app) |
 | `META_PAGE_ACCESS_TOKEN` | Optional. A Page token for fetching leads, if the system-user token doesn't cover the Page |
-| `WHATSAPP_DEFAULT_TEMPLATE` | e.g. `enquiry_intro`. Its `{{1}}` is filled with the lead's first name |
+| `WHATSAPP_DEFAULT_TEMPLATE` | e.g. `enquiry_intro`. Its `{{1}}` is filled with the lead's first name. Optional: *Use for → First message to new Meta leads* on the templates page overrides it |
 | `WHATSAPP_TEMPLATE_LANG` | Default `en_GB` |
 | `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = send the default template to opted-in Meta leads 3–6 min after they submit |
 | `META_LEADS_WHATSAPP_OPT_IN` | `true` = treat every Meta lead as opted in (only if the form itself says you'll contact them on WhatsApp) |
