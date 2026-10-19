@@ -31,7 +31,9 @@ import {
   type Loaded,
   type OutboxItem,
   type SaveStatus,
+  type SurveysChangedDetail,
 } from '@/lib/surveys/offline';
+import { mergeSurvey, same } from '@/lib/surveys/merge';
 import { evaluate, isShown, levelOf, missingWords, roofName, roofsOf, slotFor, type Evaluation, type Miss } from '@/lib/surveys/rules';
 import {
   fieldIndex,
@@ -177,34 +179,15 @@ export function SurveyForm() {
 
   /* ── Loading ── */
 
-  useEffect(() => {
-    if (!id) return;
-    let alive = true;
-    void loadSurvey(id).then((l) => {
-      if (!alive) return;
-      answersRef.current = l.answers;
-      setAnswersState(l.answers);
-      setServerPhotos(l.payload?.photos ?? []);
-      setLoaded(l);
-      try {
-        const at = JSON.parse(localStorage.getItem(AT_KEY + id) || 'null') as { screen?: number; roof?: string } | null;
-        if (at && typeof at.screen === 'number') setScreen(Math.max(0, Math.min(SCREENS.length - 1, at.screen)));
-        if (at?.roof) setRoofId(at.roof);
-      } catch {
-        /* no saved place */
-      }
-    });
-    return () => {
-      alive = false;
-    };
-  }, [id, loadTick]);
-
-  // Opened with no signal and no copy on the phone: try again when the signal comes back.
-  useEffect(() => {
-    if (!online || !loaded || loaded.payload || loaded.error !== 'offline') return;
-    const t = setTimeout(() => setLoadTick((n) => n + 1), 500);
-    return () => clearTimeout(t);
-  }, [online, loaded]);
+  /** Photos taken on this phone this time keep showing the phone's copy: quicker, and it works with no signal. */
+  const withLocal = useCallback(
+    (list: SurveyPhoto[]) =>
+      list.map((p) => {
+        const u = p.clientId ? urls.current.get(p.clientId) : undefined;
+        return u ? { ...p, url: u.full, thumb: u.thumb } : p;
+      }),
+    []
+  );
 
   /** The queue, the outbox and the save state for this survey, read again after any change. */
   const refresh = useCallback(async () => {
@@ -258,9 +241,51 @@ export function SurveyForm() {
 
   useEffect(() => {
     if (!id) return;
+    let alive = true;
+    void loadSurvey(id).then((l) => {
+      if (!alive) return;
+      answersRef.current = l.answers;
+      setAnswersState(l.answers);
+      setServerPhotos(withLocal(l.payload?.photos ?? []));
+      setLoaded(l);
+      // Opening may have unlocked or locked the phone's copy (reopened, finished elsewhere).
+      void refresh();
+      try {
+        const at = JSON.parse(localStorage.getItem(AT_KEY + id) || 'null') as { screen?: number; roof?: string } | null;
+        if (at && typeof at.screen === 'number') setScreen(Math.max(0, Math.min(SCREENS.length - 1, at.screen)));
+        if (at?.roof) setRoofId(at.roof);
+      } catch {
+        /* no saved place */
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [id, loadTick, refresh, withLocal]);
+
+  // Opened with no signal and no copy on the phone: try again when the signal comes back.
+  useEffect(() => {
+    if (!online || !loaded || loaded.payload || loaded.error !== 'offline') return;
+    const t = setTimeout(() => setLoadTick((n) => n + 1), 500);
+    return () => clearTimeout(t);
+  }, [online, loaded]);
+
+  useEffect(() => {
+    if (!id) return;
     const onSurveys = (e: Event) => {
-      const d = (e as CustomEvent<{ id?: string }>).detail;
-      if (!d?.id || d.id === id) void refresh();
+      const d = (e as CustomEvent<SurveysChangedDetail>).detail;
+      if (d?.id && d.id !== id) return;
+      // Answers saved on another phone were merged into the copy here: show them too, or the next
+      // change on this screen would save over them.
+      if (d?.merged) {
+        const m = mergeSurvey(d.merged.base, answersRef.current, d.merged.server).answers;
+        if (!same(m, answersRef.current)) {
+          answersRef.current = m;
+          setAnswersState(m);
+          void saveAnswers(id, m).catch(() => null);
+        }
+      }
+      void refresh();
     };
     const onQueue = () => void refresh();
     window.addEventListener(SURVEYS_CHANGED, onSurveys);
@@ -304,7 +329,7 @@ export function SurveyForm() {
         void fetch(`/api/crm/surveys/${id}`, { cache: 'no-store' })
           .then((r) => (r.ok ? r.json() : null))
           .then((p: { photos?: SurveyPhoto[] } | null) => {
-            if (p?.photos) setServerPhotos(p.photos);
+            if (p?.photos) setServerPhotos(withLocal(p.photos));
           })
           .catch(() => null);
       }, 2500);
@@ -314,7 +339,7 @@ export function SurveyForm() {
       window.removeEventListener(PHOTO_UPLOADED, onUploaded);
       clearTimeout(refetchTimer.current);
     };
-  }, [id]);
+  }, [id, withLocal]);
 
   // The screen stays on while the survey is open.
   useEffect(() => keepScreenOn(), []);

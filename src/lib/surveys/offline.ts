@@ -20,7 +20,10 @@ import type { Answers, SurveyPayload } from './solar-schema';
  * until the answers are saved and the survey's photos have gone up, then POSTs /complete.
  * Photos themselves stay in the photo queue (src/lib/crm/photo-queue.ts).
  *
- * Window events: SURVEYS_CHANGED (detail { id? }) whenever a draft, the outbox or a sync state changes.
+ * Window events: SURVEYS_CHANGED (detail { id?, merged? }) whenever a draft, the outbox or a sync state
+ * changes. `merged` means answers saved elsewhere were merged into this phone's copy: a survey open on
+ * screen merges them into what it shows (mergeSurvey(merged.base, onScreen, merged.server)), or its
+ * next save would undo them.
  */
 
 export type Finish = { signature: string | null; signedName: string; at: string };
@@ -49,6 +52,7 @@ export type OutboxItem =
 type Pack = { id: string; payload: SurveyPayload; storedAt: string };
 
 export const SURVEYS_CHANGED = 'hx-surveys-changed';
+export type SurveysChangedDetail = { id?: string; merged?: { base: Answers; server: Answers } };
 
 const DB = 'hx-surveys';
 const DRAFTS = 'drafts';
@@ -110,7 +114,8 @@ export const outboxItems = () => tx<OutboxItem[]>(OUTBOX, 'readonly', (s) => s.g
 const putOutbox = (i: OutboxItem) => tx(OUTBOX, 'readwrite', (s) => s.put(i));
 const deleteOutbox = (id: string) => tx(OUTBOX, 'readwrite', (s) => s.delete(id));
 
-const emit = (id?: string) => window.dispatchEvent(new CustomEvent(SURVEYS_CHANGED, { detail: { id } }));
+const emit = (id?: string, merged?: SurveysChangedDetail['merged']) =>
+  window.dispatchEvent(new CustomEvent<SurveysChangedDetail>(SURVEYS_CHANGED, { detail: { id, merged } }));
 const isOpen = (status: string) => status === 'booked' || status === 'draft';
 const isEmpty = (a: Answers | null | undefined) => !a || Object.keys(a).length === 0;
 const online = () => typeof navigator === 'undefined' || navigator.onLine !== false;
@@ -297,13 +302,16 @@ async function doSync(id: string): Promise<SyncResult> {
     if (r.status === 409 && typeof body.rev === 'number') {
       const serverRev = body.rev;
       const serverAnswers = body.answers ?? {};
+      const seen: { base?: Answers } = {};
       await serial(id, async () => {
         const now = await getDraft(id);
         if (!now) return;
+        seen.base = now.base;
         const m = mergeSurvey(now.base, now.answers, serverAnswers);
         await putDraft({ ...now, answers: m.answers, base: serverAnswers, baseRev: serverRev, synced: same(m.answers, serverAnswers) });
         await renameSlots(id, m.renamedRoofs);
       });
+      if (seen.base) emit(id, { base: seen.base, server: serverAnswers });
       continue;
     }
     if (r.status === 401 || r.status === 403) return 'signin';
@@ -606,6 +614,7 @@ export async function warmSurveys(opts: { force?: boolean } = {}): Promise<numbe
       await putPack(p);
       if (d && d.synced && p.survey.rev > d.baseRev) {
         await putDraft({ ...d, answers: p.survey.answers, base: p.survey.answers, baseRev: p.survey.rev, locked: isOpen(p.survey.status) ? undefined : p.survey.status });
+        emit(id, { base: d.answers, server: p.survey.answers }); // saved elsewhere: an open form takes it in
       }
     }).catch(() => null);
   }
