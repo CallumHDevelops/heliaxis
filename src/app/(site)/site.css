@@ -50,3 +50,27 @@
 .site .pv-page .lead,
 .site .pv-page blockquote,
 .site .pv-pt span { white-space: pre-line; }
+
+/* WhatsApp us: floating button on every website page (src/components/site/WhatsAppButton.tsx). */
+.site .hx-wa-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:60;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-width:56px;height:56px;padding:0 18px 0 16px;border-radius:999px;background:#1F7A4D;color:#fff;font-family:var(--display);font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 10px 28px -10px rgba(0,0,0,.55);transition:transform .2s,opacity .2s}
+.site .hx-wa-fab:hover{transform:translateY(-2px);color:#fff}
+.site .hx-wa-fab:focus-visible{outline:3px solid var(--solar);outline-offset:3px}
+/* A page with its own fixed bottom bar (e.g. a booking step's Continue button) can hide it with any element of this class. */
+.site:has(.hx-hide-wa-fab) .hx-wa-fab{display:none}
+@media(max-width:680px){
+  .site .hx-wa-fab{width:56px;padding:0}
+  .site .hx-wa-fab__label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  /* The home page's call bar has its own WhatsApp button, so this steps aside while the bar shows. */
+  .site:has(.mobcta.show) .hx-wa-fab{opacity:0;pointer-events:none;transform:translateY(12px)}
+}
+
+/* The home page's mobile call bar: Call · WhatsApp · Get my free quote. */
+.site .mobcta .wa{border:1.5px solid #1F7A4D;color:#1F7A4D}
+@media(max-width:420px){
+  .site .mobcta .call,.site .mobcta .wa{flex:0 0 52px;padding:0;min-height:48px}
+  .site .mobcta .call span,.site .mobcta .wa span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+}
+
+/* "OK to message me on WhatsApp" on the quote form. */
+.site .hx-optin{display:flex;align-items:flex-start;gap:.6rem;margin:2px 0 16px;font-size:.92rem;line-height:1.35;color:var(--ink);cursor:pointer}
+.site .hx-optin input{width:20px;height:20px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--ink)}

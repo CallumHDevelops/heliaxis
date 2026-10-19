@@ -17,6 +17,7 @@ export function QuoteForm() {
     const phone = (document.getElementById('q-phone') as HTMLInputElement)?.value.trim() ?? '';
     const postcode = (document.getElementById('q-postcode') as HTMLInputElement)?.value.trim() ?? '';
     const interest = (document.getElementById('q-interest') as HTMLTextAreaElement)?.value.trim() ?? '';
+    const whatsappOptIn = (document.getElementById('q-wa') as HTMLInputElement | null)?.checked === true;
 
     if (!name) { setMsg({ text: 'Please enter your name.', ok: false }); return; }
     if (!email || email.indexOf('@') < 1) { setMsg({ text: 'Please enter a valid email.', ok: false }); return; }
@@ -26,7 +27,7 @@ export function QuoteForm() {
       const r = await fetch('/api/quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, postcode, interest, propertyType: segment }),
+        body: JSON.stringify({ name, email, phone, postcode, interest, propertyType: segment, whatsappOptIn }),
       });
       const d = await r.json();
       if (r.ok && d.success) {
@@ -35,6 +36,8 @@ export function QuoteForm() {
           const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement;
           if (el) el.value = '';
         });
+        const wa = document.getElementById('q-wa') as HTMLInputElement | null;
+        if (wa) wa.checked = false;
         setSubmitted(true);
       } else {
         setMsg({ text: d.error || 'Something went wrong. Please try again or call us.', ok: false });
@@ -89,6 +92,10 @@ export function QuoteForm() {
             <div className="field"><label>Email</label><input id="q-email" type="email" placeholder="you@email.com" /></div>
             <div className="field"><label>Postcode</label><input id="q-postcode" type="text" placeholder="e.g. CF10 1AA" /></div>
             <div className="field"><label>What are you interested in? (optional)</label><textarea id="q-interest" rows={2} placeholder="Solar, battery, heat pump, EV…" /></div>
+            <label className="hx-optin" htmlFor="q-wa">
+              <input id="q-wa" type="checkbox" />
+              <span>OK to message me on WhatsApp about my enquiry</span>
+            </label>
             {msg && (
               <div style={{
                 display: 'block',

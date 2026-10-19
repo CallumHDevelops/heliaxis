@@ -39,6 +39,9 @@ export function UmamiScript() {
               if (path.indexOf('/login/') === 0 || path.indexOf('/register/') === 0) return false;
               if (path.indexOf('/pending/') === 0 || path.indexOf('/preview/') === 0) return false;
               if (path.indexOf('/api/') === 0) return false;
+              // Personal links carry a token in the address (keep in step with src/lib/analytics-paths.ts).
+              if (path === '/my' || path.indexOf('/my/') === 0 || path === '/book' || path.indexOf('/book/') === 0) return false;
+              if (path === '/portal' || path.indexOf('/portal/') === 0) return false;
 
               return payload;
             } catch (e) {

@@ -1,5 +1,33 @@
 /** Shared CMS contact-form behaviour for published pages + admin preview. */
 
+const OPT_IN_LABEL = 'OK to message me on WhatsApp about my enquiry';
+const OPT_IN_LABEL_CSS = 'display:flex;align-items:flex-start;gap:.55rem;margin:.25rem 0 .9rem;font-size:.9rem;line-height:1.35;cursor:pointer;text-align:left;text-transform:none;letter-spacing:normal';
+const OPT_IN_BOX_CSS = 'width:20px;height:20px;min-width:20px;padding:0;margin:1px 0 0;border:0;box-shadow:none;flex:0 0 auto;appearance:auto;-webkit-appearance:checkbox;accent-color:#C77F04';
+
+/**
+ * The unticked "OK to message me on WhatsApp" box (WhatsApp permission), added to every enquiry form
+ * that doesn't have one yet. Not while the form is being edited in the CMS.
+ */
+export function addWhatsAppOptIn(root: ParentNode = document) {
+  if (typeof document === 'undefined') return;
+  root.querySelectorAll<HTMLFormElement>('form.pv-cms-form').forEach((form) => {
+    if (form.querySelector('[name="whatsappOptIn"]') || form.querySelector('[contenteditable="true"]')) return;
+    const label = document.createElement('label');
+    label.className = 'pv-optin';
+    label.style.cssText = OPT_IN_LABEL_CSS;
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.name = 'whatsappOptIn';
+    box.style.cssText = OPT_IN_BOX_CSS;
+    const text = document.createElement('span');
+    text.textContent = OPT_IN_LABEL;
+    label.append(box, text);
+    const anchor = form.querySelector('.pv-form-msg') || form.querySelector('.pv-form-actions');
+    if (anchor) anchor.before(label);
+    else form.appendChild(label);
+  });
+}
+
 function closestForm(el: Element | null): HTMLFormElement | null {
   return el?.closest('form.pv-cms-form') as HTMLFormElement | null;
 }
@@ -46,6 +74,7 @@ async function submitCmsForm(form: HTMLFormElement) {
   const organization = String(fd.get('organization') || '').trim();
   const message = String(fd.get('message') || '').trim();
   const interestField = String(fd.get('interest') || '').trim();
+  const whatsappOptIn = fd.get('whatsappOptIn') === 'on';
   const sector = collectSector(form);
   const interests = collectInterests(form);
   const propertyType = collectPropertyType(form);
@@ -97,6 +126,7 @@ async function submitCmsForm(form: HTMLFormElement) {
             ? 'business'
             : ''),
         source: 'cms-form',
+        whatsappOptIn,
       }),
     });
     const d = await r.json().catch(() => ({}));
@@ -159,9 +189,11 @@ function onDocSubmit(e: Event) {
 
 let bound = false;
 
-/** Idempotent document-level listeners for CMS enquiry forms. */
+/** Idempotent document-level listeners for CMS enquiry forms (the WhatsApp box is added on every call). */
 export function initCmsFormRuntime() {
-  if (typeof document === 'undefined' || bound) return;
+  if (typeof document === 'undefined') return;
+  addWhatsAppOptIn();
+  if (bound) return;
   bound = true;
   document.addEventListener('click', onDocClick, true);
   document.addEventListener('submit', onDocSubmit, true);
@@ -179,6 +211,14 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
   function interests(form){return Array.prototype.map.call(form.querySelectorAll('.pv-tiles-interest .pv-tile.on'),function(el){return el.getAttribute('data-value')||(el.textContent||'').trim();}).filter(Boolean);}
   function sector(form){var on=form.querySelector('.pv-tiles-sector .pv-tile.on');return on?(on.getAttribute('data-value')||(on.textContent||'').trim()):'';}
   function propType(form){var on=form.querySelector('.pv-seg button.on');if(on)return on.getAttribute('data-value')||'home';var h=form.querySelector('input[name="propertyType"]');return h?h.value:'';}
+  function addOptIn(){document.querySelectorAll('form.pv-cms-form').forEach(function(form){
+    if(form.querySelector('[name="whatsappOptIn"]')||form.querySelector('[contenteditable="true"]'))return;
+    var l=document.createElement('label');l.className='pv-optin';l.style.cssText=${JSON.stringify(OPT_IN_LABEL_CSS)};
+    var b=document.createElement('input');b.type='checkbox';b.name='whatsappOptIn';b.style.cssText=${JSON.stringify(OPT_IN_BOX_CSS)};
+    var t=document.createElement('span');t.textContent=${JSON.stringify(OPT_IN_LABEL)};l.appendChild(b);l.appendChild(t);
+    var a=form.querySelector('.pv-form-msg')||form.querySelector('.pv-form-actions');if(a)a.parentNode.insertBefore(l,a);else form.appendChild(l);
+  });}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addOptIn);else addOptIn();
   document.addEventListener('click',function(e){
     var t=e.target;if(!t||!t.closest)return;
     var segBtn=t.closest('.pv-seg button');if(segBtn&&closestForm(segBtn)){e.preventDefault();e.stopPropagation();var g=segBtn.closest('.pv-seg');if(g)g.querySelectorAll('button.on').forEach(function(el){el.classList.remove('on');});segBtn.classList.add('on');return;}
@@ -199,6 +239,7 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
     var organization=String(fd.get('organization')||'').trim();
     var message=String(fd.get('message')||'').trim();
     var interestField=String(fd.get('interest')||'').trim();
+    var waOptIn=fd.get('whatsappOptIn')==='on';
     var sec=sector(form);var ints=interests(form);var ptype=propType(form);
     if(!name){setMsg(form,'Please enter your name.',false);return;}
     if(!email||email.indexOf('@')<1){setMsg(form,'Please enter a valid email.',false);return;}
@@ -210,7 +251,7 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
     setMsg(form,'',true);
     fetch('/api/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name:name,email:email,phone:phone,postcode:postcode,organization:organization,message:message,sector:sec,interests:ints,
-      interest:interestField||ints.join(', ')||message,propertyType:ptype||(/residential/i.test(sec)?'home':(sec?'business':'')),source:'cms-form'
+      interest:interestField||ints.join(', ')||message,propertyType:ptype||(/residential/i.test(sec)?'home':(sec?'business':'')),source:'cms-form',whatsappOptIn:waOptIn
     })}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});}).then(function(x){
       if(x.ok&&x.d.success){setMsg(form,x.d.message||"Thank you — we've received your enquiry and will be in touch shortly.",true);form.reset();form.querySelectorAll('.pv-tile.on').forEach(function(el){el.classList.remove('on');});if(btn)btn.style.display='none';}
       else{setMsg(form,(x.d&&x.d.error)||'Something went wrong. Please try again.',false);if(btn){btn.removeAttribute('aria-disabled');btn.classList.remove('busy');var lab2=btn.querySelector('[data-btn-label]')||btn;lab2.textContent=(prev||'Send Enquiry').replace(/Sending…/,'').trim()||'Send Enquiry';}}

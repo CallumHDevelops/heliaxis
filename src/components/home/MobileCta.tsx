@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { WhatsAppIcon, whatsappHref } from '@/components/site/WhatsAppButton';
 
 export function MobileCta() {
   const [visible, setVisible] = useState(false);
@@ -24,11 +25,15 @@ export function MobileCta() {
 
   return (
     <div className={`mobcta${visible ? ' show' : ''}`} id="mobcta">
-      <a className="call" href="tel:01633965205">
+      <a className="call" href="tel:01633965205" aria-label="Call us">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6.5 3h3l1.5 5-2 1.5a12 12 0 0 0 5 5l1.5-2 5 1.5v3a2 2 0 0 1-2 2A17 17 0 0 1 4.5 5a2 2 0 0 1 2-2Z" />
         </svg>
-        Call
+        <span>Call</span>
+      </a>
+      <a className="wa" href={whatsappHref()} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp us">
+        <WhatsAppIcon size={18} />
+        <span>WhatsApp</span>
       </a>
       <a className="quote-b" href="#quote">Get my free quote</a>
     </div>
