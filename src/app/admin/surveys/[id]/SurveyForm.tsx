@@ -736,7 +736,14 @@ export function SurveyForm() {
                 See the report
               </a>
             )}
-            <button type="button" className="svf-btn svf-btn--ghost" onClick={() => window.confirm('Reopen this survey to change it?') && void patchSurvey({ status: 'draft' }, 'Survey reopened')}>
+            <button
+              type="button"
+              className="svf-btn svf-btn--ghost"
+              onClick={() =>
+                window.confirm(`Reopen this survey to change it?${signed?.name || survey.customer_signed_name ? ' The customer will need to sign again.' : ''}`) &&
+                void patchSurvey({ status: 'draft' }, 'Survey reopened')
+              }
+            >
               Reopen
             </button>
           </div>

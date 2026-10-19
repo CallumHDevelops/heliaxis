@@ -1,6 +1,6 @@
 import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
+import { crmSession, DOCS_BUCKET, isUuid, json, logActivity } from '@/lib/crm/server';
 import { canAccess } from '@/lib/portals';
 import {
   buildPayload,
@@ -106,13 +106,29 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const who = personName(s.profile);
   const u: Record<string, unknown> = {};
   const notes: string[] = [];
+  /** Reopening a signed survey: the old signature's file, removed once it's reopened. */
+  let oldSignature: string | null = null;
 
   if ('status' in b) {
     const to = String(b.status);
     if (to === 'draft' && survey.status === 'complete') {
       if (!admin && survey.completed_by !== s.user.id) return json({ error: 'Only the person who finished it, or an admin, can reopen it.' }, 403);
-      Object.assign(u, { status: 'draft', completed_at: null, finished_on_site_at: null });
-      notes.push(`${kindLabel(survey.type)} reopened by ${who}`);
+      // The customer signed what was finished, not what it's about to be changed to: they sign again.
+      // The rev moves on so a phone still holding the old answers merges the sign-off away too.
+      const { Z8, ...answers } = (survey.answers ?? {}) as Record<string, unknown>;
+      const wasSigned = !!(survey.customer_signature || survey.customer_signed_name || Z8);
+      oldSignature = survey.customer_signature;
+      Object.assign(u, {
+        status: 'draft',
+        completed_at: null,
+        finished_on_site_at: null,
+        customer_signature: null,
+        customer_signed_name: null,
+        customer_signed_at: null,
+        answers,
+        rev: survey.rev + 1,
+      });
+      notes.push(`${kindLabel(survey.type)} reopened by ${who}${wasSigned ? '. The customer will need to sign again' : ''}`);
     } else if (to === 'draft' && survey.status === 'cancelled') {
       u.status = 'draft';
       notes.push(`${kindLabel(survey.type)} brought back by ${who}`);
@@ -150,11 +166,19 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (!Object.keys(u).length) return json({ ok: true });
 
   u.updated_at = new Date().toISOString();
-  const { error } = await db.from('crm_surveys').update(u).eq('id', id);
+  let q = db.from('crm_surveys').update(u).eq('id', id);
+  // A status change only lands on the status it was checked against (a phone may have just finished it).
+  // Cancelling takes either open status, so a booked survey started at the same moment still cancels.
+  if (u.status) q = q.in('status', isOpen(survey.status) ? OPEN_STATUSES : [survey.status]);
+  const { data: changed, error } = await q.select('id');
   if (error) {
     if (error.code === '23505') return json({ error: 'This job already has an open survey of this type.' }, 409);
     return json({ error: error.message }, 500);
   }
+  if (!changed?.length) {
+    return u.status ? json({ error: 'This survey changed a moment ago. Refresh and try again.' }, 409) : json({ error: 'Not found' }, 404);
+  }
+  if (oldSignature) await db.storage.from(DOCS_BUCKET).remove([oldSignature]).then(() => null, () => null);
   if (link) {
     const project = await getProject(db, survey.project_id);
     if (project && !project.simpliheat_url) {
