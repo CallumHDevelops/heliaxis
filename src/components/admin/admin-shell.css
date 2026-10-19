@@ -8,6 +8,8 @@
   --hx-wa: #1f7a4d;
   /* Height of the phone tab bar; 0 on desktop. Sticky bits (e.g. the chat composer) sit above it. */
   --hx-tabbar: 0px;
+  /* Room for the WhatsApp dock on the right (--hx-dock comes from its frame, src/components/admin/whatsapp/dock.css). Flush pages too. */
+  padding-right: var(--hx-dock, 0px);
 }
 /* Warm paper (set inline) with a soft gold glow in the top corner. A set size, so it looks the same on any screen. */
 .admin-shell:not(.admin-shell--flush) {
@@ -157,6 +159,68 @@
 }
 .hx-dd__item.is-current .hx-dd__icon {
   background: var(--hx-solar);
+}
+/* Unread WhatsApp people: on the menu item, and on its group's button while the menu is shut. */
+.hx-badge {
+  flex: 0 0 auto;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--hx-wa);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-grid;
+  place-items: center;
+}
+.hx-dd__item .hx-badge {
+  margin-left: auto;
+}
+.hx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Tablets (761–1023px), on pages with the WhatsApp dock: "WhatsApp 4" opens it over the page. */
+.hx-dockchip {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  height: 34px;
+  padding: 0 0.75rem;
+  border: 1px solid rgba(31, 122, 77, 0.35);
+  border-radius: 999px;
+  background: rgba(31, 122, 77, 0.08);
+  color: var(--hx-wa);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hx-dockchip:focus-visible {
+  outline: 2px solid var(--hx-ink);
+  outline-offset: 2px;
+}
+@media (min-width: 761px) and (max-width: 1023px) {
+  .hx-frame[data-dock='open'] .hx-dockchip,
+  .hx-frame[data-dock='collapsed'] .hx-dockchip {
+    display: inline-flex;
+  }
+}
+@media print {
+  .hxd,
+  .hx-dockchip {
+    display: none !important;
+  }
+  .admin-shell {
+    padding-right: 0 !important;
+  }
 }
 
 .admin-shell__main:not(.admin-shell__main--flush) {

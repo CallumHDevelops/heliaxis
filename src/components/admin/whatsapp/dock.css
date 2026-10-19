@@ -1,0 +1,902 @@
+/*
+ * The WhatsApp dock (WhatsAppDock.tsx) and the frame round every admin page (DockFrame.tsx).
+ * Layout is CSS only, keyed on .hx-frame[data-dock] (rendered on the server), so the first paint is
+ * right: the strip from 1024px, the docked panel from 1280px, nothing on phones.
+ * Layers: page sticky bits ≤ 25 · dock 26 · app header 30 · overlay scrim 45, overlay panel 46 · sheets
+ * and pop-ups 50 and up (they cover the dock on purpose).
+ */
+.hx-frame {
+  display: contents;
+  /* What the dock takes from the page right now. AdminShell (and the CMS) make room for it. */
+  --hx-dock: 0px;
+  --hxd-ink: #211f18;
+  --hxd-muted: #6e6a5e;
+  --hxd-line: rgba(33, 31, 24, 0.14);
+  --hxd-line2: rgba(33, 31, 24, 0.08);
+  --hxd-card: #fffdf8;
+  --hxd-paper: #f7f2e7;
+  --hxd-head: #fdfaf3;
+  --hxd-solar: #f8bc1e;
+  --hxd-amber: #c77f04;
+  --hxd-wa: #1f7a4d;
+  --hxd-wa-wash: rgba(31, 122, 77, 0.1);
+  --hxd-ok: #3f7d4e;
+  --hxd-err: #b3261e;
+  --hxd-blue: #2c5f99;
+  --hxd-avatar: #ebe3d1;
+  --hxd-font: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+}
+/* Also on the root, for things a page puts straight into <body> (pop-ups, the CMS's Report button). */
+@media (min-width: 1024px) {
+  .hx-frame[data-dock='open'],
+  .hx-frame[data-dock='collapsed'],
+  :root:has(.hx-frame[data-dock='open'], .hx-frame[data-dock='collapsed']) {
+    --hx-dock: 56px;
+  }
+}
+@media (min-width: 1280px) {
+  .hx-frame[data-dock='open'],
+  :root:has(.hx-frame[data-dock='open']) {
+    --hx-dock: 360px;
+  }
+}
+@media (min-width: 1600px) {
+  .hx-frame[data-dock='open'],
+  :root:has(.hx-frame[data-dock='open']) {
+    --hx-dock: 400px;
+  }
+}
+@media print {
+  :root,
+  .hx-frame {
+    --hx-dock: 0px !important;
+  }
+  .hxd {
+    display: none !important;
+  }
+}
+
+/* An older record page's + button (before its own WhatsApp button above it) stays clear of the strip. */
+.hx-frame .crm-fab:not(.crm-fabs *) {
+  right: calc(var(--hx-dock, 0px) + 18px);
+}
+/* The CMS editor's "Report" button (cms-engine.ts puts it straight into <body>, styled inline) too. */
+body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999'] {
+  right: calc(var(--hx-dock, 0px) + 16px) !important;
+}
+
+/* ── The dock ─────────────────────────────────────────────────────────────────────────────────────── */
+.hxd {
+  display: none;
+  color: var(--hxd-ink);
+  font-family: var(--hxd-font);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.hxd[hidden] {
+  display: none !important;
+}
+/* The root has no box of its own: the strip, panel and scrim are each fixed to the window. */
+@media (min-width: 761px) {
+  .hx-frame[data-dock='open'] > .hxd,
+  .hx-frame[data-dock='collapsed'] > .hxd {
+    display: block;
+  }
+}
+:where(.hxd) button {
+  font: inherit;
+  color: inherit;
+}
+.hxd :focus-visible,
+.hxd-list :focus-visible {
+  outline: 2px solid var(--hxd-ink);
+  outline-offset: 2px;
+}
+
+/* The strip of chat heads (1024px and up, unless the panel is docked open). */
+.hxd__strip {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .hxd__strip {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 26;
+    width: 56px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0 12px;
+    background: var(--hxd-card);
+    border-left: 1px solid var(--hxd-line);
+  }
+}
+@media (min-width: 1280px) {
+  .hx-frame[data-dock='open']:not([data-dock-overlay]) .hxd__strip {
+    display: none;
+  }
+}
+.hxd__logo {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--hxd-wa);
+  color: #fff;
+  cursor: pointer;
+}
+.hxd__heads {
+  flex: 1;
+  align-self: stretch;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  overflow: hidden;
+}
+.hxd-head {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hxd-avatar);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hxd-head.ring,
+.hxd-av.ring {
+  box-shadow: 0 0 0 2px var(--hxd-card), 0 0 0 4px var(--hxd-wa);
+}
+.hxd-head.is-job {
+  box-shadow: 0 0 0 2px var(--hxd-card), 0 0 0 4px var(--hxd-solar);
+}
+.hxd-head b {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--hxd-wa);
+  color: #fff;
+  font-size: 10.5px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--hxd-card);
+}
+.hxd__foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.hxd__total {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--hxd-wa);
+  text-align: center;
+  line-height: 1.2;
+}
+.hxd__toggle,
+.hxd__fold {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--hxd-line);
+  border-radius: 6px;
+  background: var(--hxd-card);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: var(--hxd-muted);
+  cursor: pointer;
+}
+.hxd__toggle:hover,
+.hxd__fold:hover {
+  color: var(--hxd-ink);
+  background: rgba(33, 31, 24, 0.05);
+}
+
+/* The panel: docked open from 1280px, or over the page (the overlay) below that. */
+.hxd__panel {
+  display: none;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--hxd-card);
+  border-left: 1px solid var(--hxd-line);
+  outline: none;
+}
+@media (min-width: 1280px) {
+  .hx-frame[data-dock='open']:not([data-dock-overlay]) .hxd__panel {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 26;
+    width: var(--hx-dock);
+    box-shadow: -10px 0 26px -18px rgba(33, 31, 24, 0.28);
+  }
+}
+.hx-frame[data-dock-overlay] .hxd__panel {
+  display: flex;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: var(--hx-dock);
+  z-index: 46;
+  width: min(400px, calc(100vw - var(--hx-dock) - 48px));
+  box-shadow: -18px 0 44px -12px rgba(33, 31, 24, 0.38);
+  animation: hxd-in 0.16s ease-out;
+}
+.hxd__scrim {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: var(--hx-dock);
+  z-index: 45;
+  background: rgba(20, 18, 12, 0.24);
+  animation: hxd-fade 0.16s ease-out;
+}
+@keyframes hxd-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+@keyframes hxd-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-frame[data-dock-overlay] .hxd__panel,
+  .hxd__scrim {
+    animation: none;
+  }
+}
+
+/* Lined up with the app header (61px with its bottom line). */
+.hxd__head {
+  flex: none;
+  height: 61px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px 0 14px;
+  border-bottom: 1px solid var(--hxd-line);
+  background: var(--hxd-head);
+}
+/* The CMS editor's toolbar is 56px. */
+.hx-frame:has(#cmsAppRoot) .hxd__head {
+  height: 56px;
+}
+.hxd__waic {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--hxd-wa);
+  color: #fff;
+}
+.hxd__waic svg {
+  width: 16px;
+  height: 16px;
+}
+.hxd__tabs {
+  display: inline-flex;
+  min-width: 0;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(33, 31, 24, 0.06);
+}
+.hxd__tabs button {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--hxd-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.hxd__tabs button.on {
+  background: var(--hxd-card);
+  color: var(--hxd-ink);
+  box-shadow: 0 1px 2px rgba(33, 31, 24, 0.15);
+}
+.hxd__tabs em,
+.hxd-count {
+  flex: none;
+  font-style: normal;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--hxd-wa);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: inline-grid;
+  place-items: center;
+}
+.hxd__all {
+  margin-left: auto;
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--hxd-amber);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hxd__all:hover {
+  text-decoration: underline;
+}
+.hxd__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hxd__body--job {
+  gap: 12px;
+  padding: 12px;
+  background: var(--hxd-paper);
+  /* Below about 520px high, scroll rather than cut off the reply box. */
+  overflow-y: auto;
+}
+/* The record page puts its Tasks card here (from 1280px, docked open, on a job). It gives way first on short windows. */
+.hxd__tasks {
+  flex: 0 1 auto;
+  min-height: min(96px, 20%);
+  max-height: 45%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hxd__tasks:empty {
+  display: none;
+}
+.hxd__chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hxd__body--job > .hxd__chat {
+  min-height: 320px;
+  border: 1px solid var(--hxd-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--hxd-card);
+}
+.hxd-banner {
+  flex: none;
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(248, 188, 30, 0.16);
+  border: 1px solid rgba(199, 127, 4, 0.3);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.hxd-empty {
+  margin: 0;
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--hxd-muted);
+}
+.hxd-problem {
+  margin: 8px 12px 0;
+  font-size: 12.5px;
+  color: var(--hxd-err);
+}
+.hxd-btn {
+  border: 1px solid var(--hxd-ink);
+  border-radius: 6px;
+  background: var(--hxd-ink);
+  color: var(--hxd-solar);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.hxd-nomobile {
+  padding: 24px 16px;
+  border: 1px dashed rgba(33, 31, 24, 0.22);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--hxd-muted);
+}
+.hxd-nomobile p {
+  margin: 0 0 12px;
+}
+
+/* ── The chat list (the dock's Chats tab and /admin/crm/chats) ───────────────────────────────────── */
+.hxd-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--hxd-ink);
+  font-family: var(--hxd-font);
+  font-size: 14px;
+}
+.hxd-list__tools {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--hxd-line2);
+}
+.hxd-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hxd-filters button {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--hxd-line);
+  border-radius: 999px;
+  background: var(--hxd-card);
+  color: var(--hxd-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hxd-filters button span {
+  opacity: 0.65;
+}
+.hxd-filters button.on {
+  background: var(--hxd-ink);
+  border-color: var(--hxd-ink);
+  color: var(--hxd-solar);
+}
+.hxd-search {
+  width: 100%;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--hxd-line);
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--hxd-ink);
+}
+.hxd-list__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hxd-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hxd-row {
+  position: relative;
+  border-top: 1px solid var(--hxd-line2);
+}
+.hxd-row:first-child {
+  border-top: 0;
+}
+.hxd-row.is-unread {
+  background: var(--hxd-wa-wash);
+}
+.hxd-row__link {
+  display: flex;
+  gap: 11px;
+  min-height: 64px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.hxd-row__link:hover {
+  background: rgba(33, 31, 24, 0.03);
+}
+.hxd-row__link:focus-visible {
+  outline-offset: -2px;
+}
+.hxd-av {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--hxd-avatar);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12.5px;
+}
+.hxd-row__b {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hxd-row__h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.hxd-row__h b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.is-unread .hxd-row__h b {
+  font-weight: 800;
+}
+.hxd-row__h time {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--hxd-muted);
+  white-space: nowrap;
+}
+.is-unread .hxd-row__h time {
+  color: var(--hxd-wa);
+  font-weight: 800;
+}
+.hxd-row__p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--hxd-muted);
+}
+.hxd-row__p > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-unread .hxd-row__p {
+  color: var(--hxd-ink);
+}
+.hxd-row__f {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  /* Room for "Open job ↗" / "Create opportunity" on the right. */
+  padding-right: 128px;
+}
+.hxd-win {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(33, 31, 24, 0.07);
+  color: var(--hxd-muted);
+}
+.hxd-win--ok {
+  background: rgba(31, 122, 77, 0.13);
+  color: var(--hxd-wa);
+}
+.hxd-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: rgba(248, 188, 30, 0.2);
+  color: var(--hxd-amber);
+}
+.hxd-chip--chase {
+  background: rgba(31, 122, 77, 0.12);
+  color: var(--hxd-wa);
+}
+.hxd-nocrm {
+  font-size: 11.5px;
+  color: var(--hxd-muted);
+}
+.hxd-row__act {
+  position: absolute;
+  right: 12px;
+  bottom: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--hxd-amber);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.hxd-row__act:hover {
+  text-decoration: underline;
+}
+/* "Open job" shows on hover or keyboard focus (it's also in the bar above an open chat). */
+.hxd-row__job {
+  opacity: 0;
+}
+.hxd-row:hover .hxd-row__job,
+.hxd-row:focus-within .hxd-row__job {
+  opacity: 1;
+}
+@media (hover: none) {
+  .hxd-row__job {
+    opacity: 1;
+  }
+}
+.hxd-row__make:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.hxd-stage {
+  /* Shares the line with the name (both shrink, ending in "…"), so a long stage never squeezes the name to a letter. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.3;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: rgba(33, 31, 24, 0.07);
+}
+/* One colour per phase: early sales, survey and quote, delivery, done. */
+.hxd-st-lead,
+.hxd-st-contacted {
+  background: rgba(248, 188, 30, 0.22);
+  color: var(--hxd-amber);
+}
+.hxd-st-survey_booked,
+.hxd-st-surveyed,
+.hxd-st-quote_sent {
+  background: rgba(44, 110, 180, 0.12);
+  color: var(--hxd-blue);
+}
+.hxd-st-won,
+.hxd-st-design,
+.hxd-st-ready,
+.hxd-st-install_booked,
+.hxd-st-installing,
+.hxd-st-commissioning,
+.hxd-st-handover {
+  background: rgba(63, 125, 78, 0.15);
+  color: var(--hxd-ok);
+}
+.hxd-st-complete {
+  background: var(--hxd-ok);
+  color: #fff;
+}
+.hxd-st-lost {
+  background: rgba(179, 38, 30, 0.08);
+  color: var(--hxd-err);
+}
+.hxd-ref {
+  flex: none;
+  font: 600 11.5px/1 ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  color: var(--hxd-muted);
+  white-space: nowrap;
+}
+.hxd-more {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 8px 12px 12px;
+  height: 34px;
+  border: 1px solid var(--hxd-line);
+  border-radius: 6px;
+  background: var(--hxd-card);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--hxd-ink);
+  cursor: pointer;
+}
+
+/* /admin/crm/chats: the same list as a page, the rows as cards across the width. */
+.hxd-list--page .hxd-list__tools {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 14px;
+  border: 0;
+}
+.hxd-list--page .hxd-search {
+  max-width: 360px;
+}
+.hxd-list--page .hxd-list__body {
+  overflow: visible;
+}
+.hxd-rows--page {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: 10px;
+}
+.hxd-rows--page .hxd-row {
+  border: 1px solid var(--hxd-line);
+  border-radius: 12px;
+  background: var(--hxd-card);
+  overflow: hidden;
+}
+.hxd-rows--page .hxd-row.is-unread {
+  background: #f1f6ef;
+}
+.hxd-list--page .hxd-empty {
+  text-align: left;
+  padding: 12px 0;
+}
+.hxd-list--page .hxd-more {
+  width: auto;
+  margin: 14px 0 0;
+  padding: 0 16px;
+}
+.hxd-list--page {
+  margin-top: 1.25rem;
+}
+@media (max-width: 760px) {
+  .hxd-list--page .hxd-search {
+    max-width: none;
+  }
+  /* 48px tap targets on phones. */
+  .hxd-filters button {
+    height: 40px;
+  }
+  .hxd-row__link {
+    min-height: 72px;
+  }
+}
+
+/* ── One open chat ───────────────────────────────────────────────────────────────────────────────── */
+.hxd-tbar {
+  flex: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--hxd-line2);
+  background: var(--hxd-card);
+}
+.hxd-tbar__a,
+.hxd-tbar__b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.hxd-tbar__b {
+  margin-top: 5px;
+}
+.hxd-tbar__a b {
+  min-width: 0;
+  font-size: 14.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hxd-back {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--hxd-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hxd-back:hover {
+  color: var(--hxd-ink);
+}
+.hxd-tbar__job,
+.hxd-tbar__full {
+  margin-left: auto;
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--hxd-amber);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hxd-tbar__full {
+  color: var(--hxd-muted);
+}
+.hxd-tbar__job:hover,
+.hxd-tbar__full:hover {
+  text-decoration: underline;
+}
+.hxd-sent {
+  flex: none;
+  margin: 0;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--hxd-wa);
+  background: var(--hxd-wa-wash);
+  border-bottom: 1px solid var(--hxd-line2);
+}
+.hxd-sent button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-weight: 800;
+  color: var(--hxd-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* "You're on Jane Smith's job. This chat is with R Evans." */
+.hxd-wrong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(199, 127, 4, 0.45);
+  background: rgba(248, 188, 30, 0.22);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.hxd-wrong span {
+  flex: 1 1 180px;
+}
+.hxd-wrong button {
+  border: 1px solid var(--hxd-ink);
+  border-radius: 6px;
+  background: var(--hxd-ink);
+  color: var(--hxd-solar);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
