@@ -1,0 +1,415 @@
+/*
+ * The Projects page (List, Schedule, Board). The header, chips, board columns and cards come from
+ * crm.css (.crmh-*, .crmb-*); this adds the list rows and the schedule. Phones are under 761px.
+ */
+.prj-filters {
+  gap: 8px 14px;
+}
+.prj-products button {
+  font-size: 0.78rem;
+}
+.prj .crmh-head__r .crmh-new {
+  white-space: nowrap;
+}
+
+/* List */
+.prj-list {
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.prj-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1.3fr) 150px minmax(0, 1fr) 96px minmax(0, 1.4fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--line2);
+  color: var(--ink);
+  text-decoration: none;
+}
+.prj-row:hover {
+  background: rgba(248, 188, 30, 0.07);
+}
+.prj-row:focus-visible {
+  outline: 2px solid var(--solar);
+  outline-offset: -2px;
+}
+.prj-row.is-attention {
+  box-shadow: inset 3px 0 0 var(--err);
+}
+.prj-row--head {
+  min-height: 0;
+  padding: 8px 16px;
+  border-top: 0;
+  background: rgba(33, 31, 24, 0.03);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.prj-row--head:hover {
+  background: rgba(33, 31, 24, 0.03);
+}
+.prj-section__h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 16px 6px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.prj-section__h.late {
+  color: var(--err);
+}
+.prj-ref {
+  font: 600 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.prj-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.prj-who b,
+.prj-who small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prj-who small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.prj-next {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.prj-next.none {
+  font-weight: 500;
+  color: var(--muted);
+}
+.prj-next small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prj-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.prj-progress__bar {
+  width: 44px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.1);
+}
+.prj-progress__bar i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+.prj-progress.is-key .prj-progress__bar i {
+  background: var(--solar);
+}
+.prj-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.prj-flag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.07);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.prj-flag.hot {
+  background: rgba(179, 38, 30, 0.09);
+  color: var(--err);
+}
+.prj-flag.hold {
+  background: rgba(44, 110, 180, 0.12);
+  color: var(--blue);
+}
+.prj-prods {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+.prj-prod {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: rgba(248, 188, 30, 0.2);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--amber-2);
+  text-decoration: none;
+}
+.prj-prod--heatpump {
+  background: rgba(44, 110, 180, 0.12);
+  color: var(--blue);
+}
+.prj-prod--ev,
+.prj-prod--battery {
+  background: rgba(63, 125, 78, 0.13);
+  color: var(--ok);
+}
+
+/* Narrower pages: the flags go on a second line. */
+@media (max-width: 1279px) {
+  .prj-row {
+    grid-template-columns: 96px minmax(0, 1fr) 140px 150px 90px;
+    row-gap: 4px;
+  }
+  .prj-flagcell {
+    grid-column: 2 / -1;
+  }
+  .prj-flagcell:empty,
+  .prj-row--head span:last-child {
+    display: none;
+  }
+}
+@media (min-width: 1280px) and (max-width: 1599px) {
+  .hx-frame[data-dock='open'] .prj-row {
+    grid-template-columns: 96px minmax(0, 1fr) 140px 150px 90px;
+    row-gap: 4px;
+  }
+  .hx-frame[data-dock='open'] .prj-flagcell {
+    grid-column: 2 / -1;
+  }
+  .hx-frame[data-dock='open'] .prj-row--head span:last-child {
+    display: none;
+  }
+}
+
+/* Board: a column per delivery stage (7 fit beside the strip from 1440px); Complete is a count at the end. */
+.prj-board .crmb-col {
+  min-width: 168px;
+}
+.prj-card.is-attention {
+  border-left: 3px solid var(--err);
+}
+.prj-card .crm-card-top {
+  justify-content: space-between;
+}
+.prj-donerail b {
+  color: var(--ok);
+}
+
+/* Schedule: 8 weeks, Monday to Sunday */
+.prj-sched {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.prj-notbooked ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  list-style: none;
+  margin: 0;
+  padding: 6px 14px 10px;
+}
+.prj-notbooked a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+.prj-notbooked small {
+  color: var(--muted);
+}
+.prj-weekhead,
+.prj-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.prj-weekhead {
+  padding: 0 2px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.prj-week__h {
+  margin: 4px 0 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.prj-week__h small {
+  font-weight: 600;
+}
+.prj-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+.prj-week.is-empty .prj-day {
+  min-height: 40px;
+}
+.prj-day:nth-child(n + 6) {
+  background: rgba(255, 253, 248, 0.55);
+}
+.prj-day.is-today {
+  border-color: var(--solar);
+  box-shadow: 0 0 0 2px rgba(248, 188, 30, 0.35);
+}
+.prj-day.is-past {
+  opacity: 0.6;
+}
+.prj-day__n {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.prj-day__n em {
+  font-style: normal;
+  color: var(--amber-2);
+}
+.prj-day__wd {
+  display: none;
+}
+.prj-ev {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 7px;
+  border-left: 3px solid var(--ok);
+  border-radius: 6px;
+  background: rgba(63, 125, 78, 0.12);
+  font-size: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.prj-ev:hover {
+  background: rgba(63, 125, 78, 0.2);
+}
+.prj-ev b {
+  font-size: 11.5px;
+}
+.prj-ev span,
+.prj-ev small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prj-ev small {
+  color: var(--muted);
+}
+.prj-ev--scaffold_up,
+.prj-ev--scaffold_down {
+  border-left-color: var(--blue);
+  background: rgba(44, 110, 180, 0.1);
+}
+
+/* Phones */
+@media (max-width: 760px) {
+  .prj .crmh-head {
+    grid-template-areas: 'h sum i' 'sp sp sp' 's s s' 'v v v';
+  }
+  .prj .crmh-search {
+    display: block;
+  }
+  .prj .crmh-new.prj-new {
+    display: inline-flex !important;
+    grid-area: i;
+  }
+  .prj-list {
+    border-radius: 12px;
+  }
+  .prj-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'ref stage' 'who who' 'next check' 'flags flags';
+    gap: 4px 10px;
+    padding: 12px 14px;
+  }
+  .prj-row--head {
+    display: none;
+  }
+  .prj-ref {
+    grid-area: ref;
+  }
+  .prj-stage {
+    grid-area: stage;
+  }
+  .prj-who {
+    grid-area: who;
+  }
+  .prj-who b {
+    font-size: 15px;
+  }
+  .prj-next {
+    grid-area: next;
+  }
+  .prj-check {
+    grid-area: check;
+  }
+  .prj-flagcell {
+    grid-area: flags;
+  }
+  .prj-flagcell:empty {
+    display: none;
+  }
+  .prj-weekhead {
+    display: none;
+  }
+  .prj-days {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prj-day {
+    min-height: 0;
+  }
+  .prj-day.is-free,
+  .prj-week.is-empty .prj-days {
+    display: none;
+  }
+  .prj-day__wd {
+    display: inline;
+  }
+  .prj-ev {
+    min-height: 48px;
+    justify-content: center;
+  }
+}

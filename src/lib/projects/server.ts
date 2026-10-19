@@ -5,6 +5,7 @@ import { enquiryStatusFor, logActivity } from '@/lib/crm/server';
 import { chunks } from '@/lib/crm/delete-customer';
 import { isProjectStage, isStage, PROJECT_STAGES, stageIndex, type StageKey } from '@/lib/crm/stages';
 import { msConfigured } from '@/lib/ms365';
+import { canAccess, type AccessProfile } from '@/lib/portals';
 import { stageProgress, type CheckCtx, type ProjectRow } from './checklist';
 import { deadlinesFor, shortDay, daysBetween, type Deadline, type DeadlineCal } from './deadlines';
 import { possibleDuplicates, type Duplicate } from './duplicates';
@@ -632,4 +633,17 @@ export async function projectsList(): Promise<{ ready: boolean; projects: Projec
     };
   });
   return { ready: true, projects: rows };
+}
+
+/* ── The team, for owner and assignee pickers ────────────────────────────────── */
+
+export type TeamMember = { id: string; name: string; crm: boolean };
+
+/** Approved staff who can see CRM work (the CRM, or Tasks only), by name. Empty if the read fails. */
+export async function crmTeam(): Promise<TeamMember[]> {
+  const { data } = await createAdminClient().from('profiles').select('*').eq('status', 'approved');
+  return ((data ?? []) as (AccessProfile & { id: string; full_name: string | null; email: string | null })[])
+    .filter((p) => canAccess(p, 'crm') || canAccess(p, 'tasks'))
+    .map((p) => ({ id: p.id, name: p.full_name || p.email || 'Team', crm: canAccess(p, 'crm') }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
