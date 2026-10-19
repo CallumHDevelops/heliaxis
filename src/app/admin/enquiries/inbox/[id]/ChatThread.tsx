@@ -85,7 +85,8 @@ const CHASE_OPTIONS: [string, string][] = [
   ['72', '3 days'],
 ];
 
-export function ChatThread({ id }: { id: string }) {
+/** customerRef: their HX-0042 for the header (customer-refs.sql), null until it's been run. */
+export function ChatThread({ id, customerRef = null }: { id: string; customerRef?: string | null }) {
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [outbox, setOutbox] = useState<Queued[]>([]);
@@ -270,6 +271,7 @@ export function ChatThread({ id }: { id: string }) {
         <div className="wa-chat-who">
           <b>{enquiry.name}</b>
           <span>
+            {customerRef ? `${customerRef} · ` : ''}
             {enquiry.wa_id ? `+${enquiry.wa_id}` : enquiry.phone || 'No number'} · {open ? left : 'window closed'}
           </span>
         </div>

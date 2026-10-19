@@ -1,4 +1,5 @@
 import { after } from 'next/server';
+import { customerRefs } from '@/lib/enquiries-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
 import { processOutbox } from '@/lib/whatsapp/inbox';
@@ -47,6 +48,8 @@ export async function GET(req: Request) {
   if (error) return json({ error: error.message, items: [] }, 500);
 
   const ids = (data ?? []).map((d) => d.id);
+  // HX-0042 beside each name (customer-refs.sql); none until it's been run.
+  const refs = customerRefs(ids);
   const [{ data: last }, { data: pending }] = ids.length
     ? await Promise.all([
         db
@@ -63,11 +66,14 @@ export async function GET(req: Request) {
   const pendingBy = new Map<string, Set<string>>();
   for (const p of pending ?? []) pendingBy.set(p.enquiry_id, (pendingBy.get(p.enquiry_id) ?? new Set()).add(p.kind));
 
+  const refBy = await refs;
+
   return json({
     v: await v,
     configured: whatsappConfigured(),
     items: (data ?? []).map((d) => ({
       ...d,
+      customer_ref: refBy.get(d.id) ?? null,
       last: lastBy.get(d.id) ?? null,
       queued: !!pendingBy.get(d.id)?.has('reply') || !!pendingBy.get(d.id)?.has('intro'),
       chasing: !!pendingBy.get(d.id)?.has('chase'),

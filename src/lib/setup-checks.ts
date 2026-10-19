@@ -152,19 +152,6 @@ const PAGE_LIVE = { surveySettings: false, waPermission: false };
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
   {
-    id: 'q-cut-out-image',
-    kind: 'question',
-    title: 'What do you mean by the “cut out image” in a solar survey?',
-    detail:
-      'Claude is building it as the aerial or roof photo with the panel area marked on it, using the drawing tool in the survey.',
-    steps: [
-      'If that’s right, type **yes** below and tap **Send to Claude**.',
-      'If you meant something else (for example a cut-out of the house for the proposal), describe it below instead.',
-    ],
-    order: 2,
-    manual: true,
-  },
-  {
     id: 'q-home-by',
     kind: 'question',
     title: 'After your last survey, do you need to be home by 18:00, or just finished on site by 18:00?',
@@ -172,16 +159,6 @@ const MANUAL: SetupTodo[] = [
       'We’ve set it as finished on site by 18:00, with the drive home counted towards the day’s driving. If you need to be home by 18:00, the last survey of the day moves earlier (about 16:00 for a customer 35 minutes away).',
     steps: ['Type **on site** or **home** below and tap **Send to Claude**.'],
     order: 2,
-    manual: true,
-  },
-  {
-    id: 'q-heatpump-label',
-    kind: 'question',
-    title: 'On your website form, does “Infrared Heating” mean infrared panels or heat pumps?',
-    detail:
-      'The website’s interest list has a heatpump option labelled “Infrared Heating”, and the CRM turns it into Infrared. If heat pump leads are labelled infrared, survey booking picks the wrong survey.',
-    steps: ['Type **infrared** or **heat pumps** below and tap **Send to Claude**.'],
-    order: 3,
     manual: true,
   },
   {
@@ -397,6 +374,7 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
   const notificationRefs = has('notifications', 'ref');
+  const customerRefs = has('enquiries', 'customer_ref');
   // Projects, surveys and survey booking (crm-v3.sql, surveys.sql, survey-booking.sql), checked alongside the rest.
   const bookingChecks = Promise.all([
     has('crm_projects', 'project_ref'),
@@ -449,11 +427,20 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     !crmV3,
     sql(
       'crm-v3.sql',
-      'Projects (job numbers, delivery checklists, paperwork), task reminders, WhatsApp permission records. Run all three of these now, in order: the new Projects, Surveys and Diary screens appear once they’re done.',
+      'Projects (job numbers, delivery checklists, paperwork), task reminders, WhatsApp permission records. Run this and the three below it now, in order: the new Projects, Surveys and Diary screens appear once they’re done.',
       4,
       'crm-v2.sql'
     )
   );
+  add(!(await customerRefs), {
+    ...sql(
+      'customer-refs.sql',
+      'Every customer gets a reference like HX-0042 as soon as they’re added, and their jobs share it: the first job is HX-0042, the next HX-0042-2, and so on. Search for it in Enquiries and WhatsApp. Any job numbers already given out change to match, once.',
+      4,
+      'crm-v3.sql'
+    ),
+    title: 'Give every customer a reference',
+  });
   add(!surveys, sql('surveys.sql', 'The solar survey tool: survey records, survey photos and drawings.', 4, 'crm-v3.sql'));
   add(
     !booking,

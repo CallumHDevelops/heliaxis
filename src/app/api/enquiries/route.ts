@@ -6,8 +6,8 @@ import {
   enrichLeadsWithGeo,
   labelToDbStatus,
   rowToCrmLead,
-  type EnquiryRow,
 } from '@/lib/enquiries';
+import { listEnquiryRows } from '@/lib/enquiries-server';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -18,17 +18,11 @@ export async function GET() {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE });
   }
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from('enquiries')
-    .select('id, name, email, phone, postcode, interest, property_type, source, status, created_at')
-    .order('created_at', { ascending: false });
-
+  const { rows, error } = await listEnquiryRows();
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
+    return NextResponse.json({ error }, { status: 500, headers: NO_STORE });
   }
 
-  const rows = (data ?? []) as EnquiryRow[];
   const leads = await enrichLeadsWithGeo(rows.map(rowToCrmLead));
   return NextResponse.json({ items: rows, leads }, { headers: NO_STORE });
 }

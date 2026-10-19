@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PushBanner } from '@/components/admin/PushBanner';
-import { relativeTime } from '@/lib/enquiries';
+import { refMatches, relativeTime } from '@/lib/enquiries';
 import { NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { windowOpen } from '@/lib/whatsapp/shared';
@@ -20,6 +20,8 @@ type Convo = {
   wa_last_message_at: string | null;
   wa_unread: number;
   created_at: string;
+  /** HX-0042 (customer-refs.sql); null until it's been run. */
+  customer_ref?: string | null;
   last: { direction: string; body: string | null } | null;
   queued: boolean;
   chasing: boolean;
@@ -75,7 +77,7 @@ export function InboxList() {
 
   const shown = (items ?? []).filter(
     (c) =>
-      (!q || `${c.name} ${c.phone || ''}`.toLowerCase().includes(q.trim().toLowerCase())) &&
+      (!q || `${c.name} ${c.phone || ''}`.toLowerCase().includes(q.trim().toLowerCase()) || refMatches(c.customer_ref, q)) &&
       (filter === 'all' || (filter === 'reply' ? needsReply(c) : waitingOnThem(c)))
   );
   const count = (f: Filter) => (items ?? []).filter(f === 'reply' ? needsReply : f === 'waiting' ? waitingOnThem : () => true).length;
@@ -100,7 +102,12 @@ export function InboxList() {
         </p>
       )}
       {error && <p className="wa-banner wa-banner--err">{error}</p>}
-      <input className="wa-search" placeholder="Search name or number" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input
+        className="wa-search"
+        placeholder={items?.some((c) => c.customer_ref) ? 'Search name, number or HX-0042' : 'Search name or number'}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
       <div className="wa-filters">
         {FILTERS.map(([f, label]) => (
           <button key={f} type="button" className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
@@ -126,6 +133,7 @@ export function InboxList() {
                   <span className="wa-row-main">
                     <span className="wa-row-top">
                       <b>{c.name}</b>
+                      {c.customer_ref && <span className="wa-ref">{c.customer_ref}</span>}
                       <span className="wa-time">{relativeTime(c.wa_last_message_at || c.created_at)}</span>
                     </span>
                     <span className="wa-row-bottom">

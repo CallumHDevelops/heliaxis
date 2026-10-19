@@ -157,6 +157,13 @@ textarea.wa-input {
   font-size: 0.75rem;
   color: var(--muted);
 }
+/* Customer reference (HX-0042) beside the name. */
+.wa-ref {
+  font-family: ui-monospace, 'Cascadia Code', Menlo, monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .wa-preview {
   flex: 1;
   min-width: 0;

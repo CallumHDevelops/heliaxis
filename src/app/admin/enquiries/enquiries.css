@@ -132,6 +132,27 @@
   color: var(--muted);
   padding: 1.5rem 0.8rem !important;
 }
+/* Customer reference (HX-0042) beside the name. */
+.enq-ref {
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.enq-search {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem; /* 16px: phones don't zoom in on it */
+}
 .enq-tbl select {
   font-family: var(--mono);
   font-size: 0.6rem;
