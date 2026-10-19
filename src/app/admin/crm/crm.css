@@ -14,9 +14,6 @@
   /* As wide as the page (AdminShell sets it: fluid for the board, record and reports). */
   margin: 0 auto;
 }
-.crm-project {
-  max-width: 760px;
-}
 .crm-head {
   display: flex;
   justify-content: space-between;
@@ -24,15 +21,13 @@
   gap: 1rem;
   margin-bottom: 1rem;
 }
-.crm-head h1,
-.crm-ptitle h1 {
+.crm-head h1 {
   font-size: 1.5rem;
   font-weight: 800;
   margin: 0;
   line-height: 1.2;
 }
-.crm-head p,
-.crm-ptitle p {
+.crm-head p {
   color: var(--muted);
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
@@ -134,9 +129,6 @@
 textarea.crm-input {
   resize: vertical;
 }
-.crm-search {
-  margin: 0.6rem 0 0.9rem;
-}
 .crm-label {
   display: block;
   font-size: 0.72rem;
@@ -181,43 +173,6 @@ textarea.crm-input {
 }
 .crm-checks input {
   display: none;
-}
-
-/* Leads strip */
-.crm-leads h2 {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--amber-2);
-  margin: 0.5rem 0 0.4rem;
-}
-.crm-leads-row {
-  display: flex;
-  gap: 0.6rem;
-  overflow-x: auto;
-  padding-bottom: 0.4rem;
-  margin-bottom: 0.6rem;
-}
-.crm-lead {
-  flex: 0 0 210px;
-  background: var(--card);
-  border: 1px solid rgba(199, 127, 4, 0.35);
-  border-radius: 8px;
-  padding: 0.65rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.crm-lead span {
-  font-size: 0.75rem;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.crm-lead .crm-btn {
-  align-self: flex-start;
-  margin-top: 0.2rem;
 }
 
 /* Stage chips */
@@ -287,13 +242,6 @@ textarea.crm-input {
   flex-wrap: wrap;
   gap: 0.3rem;
 }
-.crm-card-foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
 .crm-chip {
   font-size: 0.7rem;
   border: 1px solid var(--line);
@@ -320,170 +268,16 @@ textarea.crm-input {
 .st-surveyed,
 .st-quote_sent { background: rgba(44, 110, 180, 0.12); color: #2c5f99; }
 .st-won,
+.st-design,
+.st-ready,
 .st-install_booked,
-.st-installing { background: rgba(63, 125, 78, 0.15); color: var(--ok); }
+.st-installing,
+.st-commissioning,
+.st-handover { background: rgba(63, 125, 78, 0.15); color: var(--ok); }
 .st-complete { background: var(--ok); color: #fff; }
 .st-lost { background: rgba(179, 38, 30, 0.1); color: var(--err); }
 
-/* Project page */
-.crm-stage-pick {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin: 0.9rem 0 0.6rem;
-}
-.crm-stage-pick span {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.crm-stage-pick select {
-  flex: 1;
-  font: inherit;
-  font-weight: 800;
-  font-size: 1rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.6rem 0.7rem;
-}
-.crm-quick {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
-  gap: 0.4rem;
-  margin-bottom: 0.8rem;
-}
-.crm-quick a {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  text-align: center;
-  text-decoration: none;
-  color: var(--ink);
-  font-weight: 700;
-  font-size: 0.82rem;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.65rem 0.3rem;
-}
-.crm-quick a span {
-  font-size: 1.15rem;
-}
-.crm-quick-badge {
-  position: absolute;
-  top: 4px;
-  right: 8px;
-  font-style: normal;
-  font-size: 0.65rem;
-  background: var(--wa);
-  color: #fff;
-  border-radius: 999px;
-  min-width: 17px;
-  padding: 1px 5px;
-}
-.crm-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 0.9rem;
-}
-.crm-tabs button {
-  flex: 1;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.9rem;
-  background: none;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  padding: 0.65rem 0.3rem;
-  color: var(--muted);
-  cursor: pointer;
-}
-.crm-tabs button.on {
-  color: var(--ink);
-  border-bottom-color: var(--solar);
-}
-.crm-compose {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.7rem;
-  margin-bottom: 1rem;
-}
-.crm-compose .crm-btn {
-  align-self: flex-start;
-}
-.crm-seg {
-  display: flex;
-  gap: 0.3rem;
-  overflow-x: auto;
-}
-.crm-seg button {
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  border-radius: 999px;
-  padding: 0.3rem 0.7rem;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.crm-seg button.on {
-  background: var(--ink);
-  color: var(--solar);
-  border-color: var(--ink);
-}
-.crm-timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.crm-timeline li {
-  display: flex;
-  gap: 0.6rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--line);
-}
-.crm-tl-icon {
-  flex: 0 0 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--card);
-  border: 1px solid var(--line);
-  display: grid;
-  place-items: center;
-  font-size: 0.8rem;
-}
-.crm-timeline li.k-whatsapp .crm-tl-icon {
-  background: rgba(31, 122, 77, 0.1);
-}
-.crm-timeline li.k-stage .crm-tl-icon,
-.crm-timeline li.k-system .crm-tl-icon {
-  background: rgba(248, 188, 30, 0.2);
-}
-.crm-tl-body {
-  flex: 1;
-  min-width: 0;
-}
-.crm-tl-meta {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-.crm-tl-meta b {
-  color: var(--ink);
-}
-.crm-tl-body p {
-  margin: 0.2rem 0 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 0.92rem;
-}
+/* Record page photos, sheets and the photo viewer */
 .crm-photo-actions {
   display: flex;
   gap: 0.5rem;
@@ -569,26 +363,6 @@ textarea.crm-input {
   display: flex;
   gap: 0.4rem;
 }
-.crm-customer {
-  margin-top: 1.5rem;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.8rem;
-}
-.crm-customer h3 {
-  margin: 0 0 0.3rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.crm-customer p {
-  margin: 0 0 0.4rem;
-  font-size: 0.9rem;
-}
-.crm-customer .crm-link {
-  margin: 0;
-}
 
 @media (max-width: 640px) {
   .crm-list {
@@ -611,78 +385,10 @@ textarea.crm-input {
   }
 }
 
-/* Project screen v2: name + postcode, one feed, + button */
-.crm-phead {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.6rem;
-}
-.crm-phead .crm-back {
-  font-size: 1.3rem;
-  margin: 0;
-  padding: 0.2rem 0.3rem 0.2rem 0;
-}
-.crm-phead-main {
-  flex: 1;
-  min-width: 0;
-}
-.crm-phead-main h1 {
-  font-size: 1.35rem;
-  font-weight: 800;
-  margin: 0;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.crm-phead-main p {
-  margin: 0.15rem 0 0;
-  color: var(--muted);
-  font-size: 0.85rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.crm-stage--btn {
-  border: 0;
-  font: inherit;
-  font-size: 0.68rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  padding: 0.45rem 0.6rem;
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.crm-tabs--slim {
-  margin-bottom: 0.6rem;
-}
-.crm-tabs--slim button {
-  font-size: 0.82rem;
-  padding: 0.5rem 0.2rem;
-}
+/* Empty lists, WhatsApp bubbles (the record's Activity below 1280px), the CRM's + button and the sheets */
 .crm-empty {
   padding: 2rem 0.5rem;
   text-align: center;
-}
-.crm-feed {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding-bottom: 5rem; /* room for the + button */
-}
-.crm-feed-day {
-  align-self: center;
-  text-align: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--muted);
-  background: rgba(33, 31, 24, 0.06);
-  border-radius: 999px;
-  padding: 2px 10px;
-  margin: 0.6rem auto 0.2rem;
-  width: fit-content;
 }
 .crm-bubble {
   max-width: 82%;
@@ -715,7 +421,7 @@ textarea.crm-input {
   font-size: 0.66rem;
   color: var(--muted);
 }
-/* WhatsApp delivery ticks on our messages (not .crm-tick, which is the round task tick-box). */
+/* WhatsApp delivery ticks on our messages. */
 .crm-wa-tick {
   white-space: nowrap;
 }
@@ -725,54 +431,6 @@ textarea.crm-input {
 .crm-wa-tick.failed {
   color: var(--err);
   font-weight: 800;
-}
-.crm-event {
-  display: flex;
-  gap: 0.55rem;
-  align-items: flex-start;
-  background: rgba(255, 253, 248, 0.7);
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  padding: 0.5rem 0.65rem;
-  max-width: 92%;
-  margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
-}
-.crm-event.k-stage,
-.crm-event.k-system,
-.crm-event.k-photo {
-  background: transparent;
-  border: 0;
-  padding: 0.15rem 0.65rem;
-  justify-content: center;
-}
-.crm-event.k-stage .crm-event-body p,
-.crm-event.k-system .crm-event-body p,
-.crm-event.k-photo .crm-event-body p {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.crm-event-icon {
-  flex: 0 0 auto;
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-.crm-event-body {
-  min-width: 0;
-}
-.crm-event-meta {
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-.crm-event-meta b {
-  color: var(--ink);
-}
-.crm-event-body p {
-  margin: 0.15rem 0 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 0.9rem;
 }
 .crm-fab {
   position: fixed;
@@ -868,16 +526,8 @@ textarea.crm-input {
   color: var(--muted);
   margin: 1.5rem 0 0;
 }
-.crm-details .crm-customer {
-  margin-top: 0;
-}
 
-/* v3: Today strip, board, next steps, split layout */
-.crm-head-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
+/* v3: the view switch (Reports), cards and quick picks */
 .crm-viewtoggle {
   display: inline-flex;
   border: 1px solid var(--line);
@@ -897,47 +547,6 @@ textarea.crm-input {
 .crm-viewtoggle button.on {
   background: var(--ink);
   color: var(--solar);
-}
-.crm-today {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin: 0.2rem 0 1rem;
-}
-.crm-today-card {
-  font: inherit;
-  text-align: left;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.65rem 0.75rem;
-  cursor: pointer;
-  color: var(--ink);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.crm-today-card b {
-  font-size: 1.5rem;
-  line-height: 1.1;
-}
-.crm-today-card span {
-  font-size: 0.75rem;
-  color: var(--muted);
-  font-weight: 600;
-}
-.crm-today-card.hot {
-  border-color: rgba(179, 38, 30, 0.35);
-  background: rgba(179, 38, 30, 0.05);
-}
-.crm-today-card.hot b {
-  color: var(--err);
-}
-.crm-today-card.wa b {
-  color: var(--wa);
-}
-.crm-today-card.new b {
-  color: var(--amber-2);
 }
 .crm-stages button.warn span {
   color: var(--err);
@@ -998,116 +607,10 @@ textarea.crm-input {
   color: var(--ink);
   font-size: 1.05rem;
 }
-.crm-board {
-  display: flex;
-  gap: 0.7rem;
-  overflow-x: auto;
-  padding-bottom: 0.8rem;
-  align-items: flex-start;
-}
-.crm-col {
-  flex: 0 0 250px;
-  /* Long card lines shorten (they end in …) instead of widening the column. */
-  min-width: 0;
-  background: rgba(33, 31, 24, 0.04);
-  border-radius: 10px;
-  padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-height: 140px;
-  transition: background 0.15s;
-}
-.crm-col.drop {
-  background: rgba(248, 188, 30, 0.12);
-  outline: 1px dashed rgba(199, 127, 4, 0.4);
-}
-.crm-col-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 0.2rem 0.3rem 0.3rem;
-  font-size: 0.82rem;
-}
-.crm-col-head span {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
 .crm-card.compact {
   padding: 0.6rem 0.7rem;
   gap: 0.3rem;
   cursor: grab;
-}
-.crm-nextbar {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  border: 1px solid var(--line);
-  background: var(--card);
-  border-radius: 10px;
-  margin: 0 0 0.7rem;
-  overflow: hidden;
-}
-.crm-nextbar.empty {
-  font: inherit;
-  width: 100%;
-  text-align: left;
-  padding: 0.6rem 0.75rem;
-  gap: 0.5rem;
-  color: var(--muted);
-  font-size: 0.85rem;
-  border-style: dashed;
-  cursor: pointer;
-  align-items: center;
-}
-.crm-nextbar.today {
-  border-color: rgba(199, 127, 4, 0.45);
-  background: rgba(248, 188, 30, 0.1);
-}
-.crm-nextbar.late {
-  border-color: rgba(179, 38, 30, 0.4);
-  background: rgba(179, 38, 30, 0.05);
-}
-.crm-nextbar-main {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  text-align: left;
-  background: none;
-  border: 0;
-  padding: 0.5rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  cursor: pointer;
-  color: var(--ink);
-}
-.crm-nextbar-main small {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.crm-nextbar.late .crm-nextbar-main small {
-  color: var(--err);
-}
-.crm-nextbar-main span {
-  font-weight: 700;
-  font-size: 0.95rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.crm-nextbar-done {
-  font: inherit;
-  font-weight: 800;
-  font-size: 0.82rem;
-  border: 0;
-  border-left: 1px solid var(--line);
-  background: transparent;
-  padding: 0 0.9rem;
-  cursor: pointer;
-  color: var(--ok);
 }
 .crm-quickpicks {
   display: flex;
@@ -1124,25 +627,6 @@ textarea.crm-input {
   padding: 0.3rem 0.7rem;
   cursor: pointer;
 }
-.crm-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 1.5rem;
-  align-items: start;
-}
-.crm-split-side {
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
-  background: rgba(255, 253, 248, 0.6);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.8rem;
-}
-.crm-project:has(.crm-split) {
-  max-width: none;
-}
 @media (max-width: 640px) {
   .crm-head {
     align-items: center;
@@ -1153,93 +637,6 @@ textarea.crm-input {
   .crm-viewtoggle {
     display: none;
   }
-  .crm-today-card b {
-    font-size: 1.3rem;
-  }
-}
-
-/* Tasks on an opportunity */
-.crm-tasks {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.55rem 0.75rem;
-  margin: 0 0 0.8rem;
-}
-.crm-tasks-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-}
-.crm-tasks-head .crm-link {
-  margin: 0;
-  text-decoration: none;
-}
-.crm-tasks ul {
-  list-style: none;
-  margin: 0.35rem 0 0;
-  padding: 0;
-}
-.crm-tasks li {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0;
-  border-top: 1px solid var(--line);
-}
-.crm-tasks li.done .crm-task-main b {
-  text-decoration: line-through;
-  color: var(--muted);
-}
-.crm-tick {
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid rgba(33, 31, 24, 0.35);
-  background: #fff;
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 900;
-  cursor: pointer;
-  padding: 0;
-}
-.crm-tasks li.done .crm-tick {
-  background: var(--ok);
-  border-color: var(--ok);
-}
-.crm-task-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.crm-task-main b {
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-.crm-task-main small {
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-.crm-task-due {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.crm-task-due.today {
-  color: var(--amber-2);
-}
-.crm-task-due.late {
-  color: var(--err);
-}
-.crm-tasks-done {
-  margin: 0.35rem 0 0;
-  font-size: 0.78rem;
-  text-decoration: none;
-  color: var(--muted);
 }
 
 /* v2: documents, portal card, DNO, saved replies, pickers */
@@ -1594,5 +991,3757 @@ textarea.crm-input {
 @media (max-width: 640px) {
   .crm-hide-sm {
     display: none;
+  }
+}
+
+/* ── v4: the CRM home, Board and List (and the Projects pages, which share them) ─────────────────
+ * Columns follow the window and the WhatsApp dock (.hx-frame[data-dock], from 1280px): CSS decides
+ * the layout so the first paint is right. Phones are under 761px, as the admin shell.
+ */
+.crmh {
+  --blue: #2c5f99;
+  --line2: rgba(33, 31, 24, 0.08);
+  --avatar: #ebe3d1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.crmh *,
+.crmh *::before,
+.crmh *::after {
+  box-sizing: border-box;
+}
+
+/* Header: CRM · Sales | Projects · summary — search — Home · Board · List, Reports, ⚙, + New */
+.crmh-head {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  min-height: 56px;
+}
+.crmh-head__l {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.crmh-head__r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.crmh-h1 {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+}
+.crmh-sum {
+  color: var(--muted);
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.crmh-icons {
+  display: none;
+}
+/* The search takes what's left (at least 240px); only then does the summary shorten. */
+.crmh-search {
+  flex: 1 1 0;
+  min-width: 240px;
+  max-width: 520px;
+}
+/* "£48k quoted · 2 won in 30 days" where the header has room for it. */
+.crmh-sum__x {
+  display: none;
+}
+@media (min-width: 1600px) {
+  .hx-frame:not([data-dock='open']) .crmh-sum__x {
+    display: inline;
+  }
+}
+@media (min-width: 1880px) {
+  .crmh-sum__x {
+    display: inline;
+  }
+}
+.crmh-head .crm-btn {
+  height: 40px;
+  padding: 0 14px;
+}
+.crmh-gear {
+  width: 40px;
+  padding: 0 !important;
+}
+/* Narrower pages: the search goes on its own line under the rest. */
+@media (max-width: 1279px) {
+  .crmh-head {
+    flex-wrap: wrap;
+  }
+  .crmh-search {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+@media (min-width: 1280px) and (max-width: 1599px) {
+  .hx-frame[data-dock='open'] .crmh-head {
+    flex-wrap: wrap;
+  }
+  .hx-frame[data-dock='open'] .crmh-search {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+
+/* Segmented switches: Sales | Projects, Home · Board · List */
+.crmh-seg {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.crmh-seg a,
+.crmh-seg button {
+  display: grid;
+  place-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.crmh-seg a.on,
+.crmh-seg button.on {
+  background: var(--ink);
+  color: var(--solar);
+}
+.crmh-seg a:focus-visible,
+.crmh-seg button:focus-visible {
+  outline: 2px solid var(--solar);
+  outline-offset: 1px;
+}
+@media (max-width: 1023px) {
+  .crmh-view--board {
+    display: none !important;
+  }
+}
+
+/* Search box and its list */
+.crmh-searchbox {
+  position: relative;
+  display: block;
+}
+.crmh-searchbox__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--muted);
+  cursor: text;
+}
+.crmh-searchbox__field:focus-within {
+  border-color: rgba(199, 127, 4, 0.6);
+  box-shadow: 0 0 0 3px rgba(248, 188, 30, 0.2);
+}
+.crmh-searchbox input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+}
+.crmh-searchbox kbd {
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+.crmh-searchbox__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: min(60vh, 460px);
+  overflow: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px -12px rgba(33, 31, 24, 0.35);
+}
+.crmh-searchbox__list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmh-searchbox__list button.on,
+.crmh-searchbox__list button:hover {
+  background: rgba(248, 188, 30, 0.14);
+}
+.crmh-searchbox__main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.crmh-searchbox__main b,
+.crmh-searchbox__main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crmh-searchbox__main small,
+.crmh-searchbox__stage {
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmh-searchbox__stage {
+  white-space: nowrap;
+}
+.crmh-searchbox__none {
+  padding: 10px;
+  color: var(--muted);
+}
+.crmh-searchbox__all {
+  border-top: 1px solid var(--line2);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.crmh-searchbox__all button {
+  color: var(--amber-2);
+  font-weight: 700;
+}
+
+/* The five counts */
+.crmh-counts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.crmh-count {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  /* At least this tall; taller (all five together) when a label or line wraps beside the dock. */
+  min-height: 76px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmh-count:hover {
+  border-color: rgba(33, 31, 24, 0.3);
+}
+.crmh-count:focus-visible {
+  outline: 2px solid var(--solar);
+  outline-offset: 2px;
+}
+.crmh-count__lab {
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.crmh-count__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.crmh-count__row b {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+.crmh-count__sub {
+  /* Up to two lines: the when, who and how old are the useful part. */
+  display: -webkit-box;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--muted);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.crmh-count--hot {
+  border-color: rgba(179, 38, 30, 0.32);
+}
+.crmh-count--hot .crmh-count__sub {
+  color: var(--err);
+}
+.crmh-count--wa b,
+.crmh-count--wa .crmh-count__sub {
+  color: var(--wa);
+}
+
+/* Stage strip */
+.crmh-strip {
+  display: flex;
+  flex-wrap: wrap; /* "Open board →" drops to its own line when there's no room */
+  align-items: center;
+  gap: 2px;
+  min-height: 36px;
+  margin-top: 10px;
+  font-size: 13.5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.crmh-strip::-webkit-scrollbar {
+  display: none;
+}
+.crmh-strip__seg {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.crmh-strip__seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.crmh-strip__seg button:hover {
+  background: rgba(33, 31, 24, 0.06);
+}
+.crmh-strip__seg b {
+  font-weight: 800;
+}
+.crmh-strip__sep {
+  color: var(--muted);
+}
+.crmh-strip__board {
+  margin-left: auto;
+  flex: none;
+  padding: 5px 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--amber-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.crmh-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(33, 31, 24, 0.25);
+}
+.crmh-dot.ph-y {
+  background: var(--solar);
+}
+.crmh-dot.ph-b {
+  background: var(--blue);
+}
+.crmh-dot.ph-g,
+.crmh-dot.ph-done {
+  background: var(--ok);
+}
+.crmh-dot.ph-lost {
+  background: var(--err);
+}
+.crmh-tosort,
+.crmh-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+}
+.crmh-tosort .crm-link,
+.crmh-hint .crm-link {
+  margin: 0;
+}
+
+/* Stage chips in the phase colours */
+.crmh-stage {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  background: rgba(33, 31, 24, 0.07);
+  color: var(--muted);
+}
+.crmh-stage.ph-y {
+  background: rgba(248, 188, 30, 0.22);
+  color: var(--amber-2);
+}
+.crmh-stage.ph-b {
+  background: rgba(44, 110, 180, 0.12);
+  color: var(--blue);
+}
+.crmh-stage.ph-g {
+  background: rgba(63, 125, 78, 0.15);
+  color: var(--ok);
+}
+.crmh-stage.ph-done {
+  background: var(--ok);
+  color: #fff;
+}
+.crmh-stage.ph-lost {
+  background: rgba(179, 38, 30, 0.1);
+  color: var(--err);
+}
+
+/* Home: My work | Latest notes (the dock is the third column) */
+.crmh-lanes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-top: 16px;
+}
+@media (min-width: 1024px) {
+  .crmh-lanes {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+}
+@media (min-width: 1280px) {
+  .crmh-lanes {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+}
+@media (min-width: 1600px) {
+  .crmh-lanes {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+}
+.crmh-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.crmh-card {
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.crmh-card__h {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line2);
+}
+.crmh-card__h h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.crmh-card__b {
+  padding: 4px 14px 12px;
+}
+.crmh-ml {
+  margin-left: auto;
+}
+.crmh-link {
+  color: var(--amber-2);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.crmh-pad {
+  margin: 0;
+  padding: 12px 16px;
+}
+.crmh-none {
+  margin: 10px 0 4px;
+}
+.crmh-n {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.08);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+.crmh-tog {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.crmh-tog button {
+  padding: 3px 9px;
+  border: 0;
+  background: var(--card);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.crmh-tog button.on {
+  background: var(--ink);
+  color: var(--solar);
+}
+
+/* My work */
+.crmh-waiting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(44, 110, 180, 0.07);
+  border: 1px solid rgba(44, 110, 180, 0.2);
+  font-size: 13px;
+}
+.crmh-waiting b {
+  width: 100%;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--blue);
+}
+.crmh-waiting a {
+  color: var(--blue);
+  font-weight: 700;
+  text-underline-offset: 2px;
+}
+.crmh-visit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 2px;
+}
+.crmh-visit time {
+  width: 46px;
+  font-weight: 800;
+  font-size: 15px;
+}
+.crmh-visit > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.crmh-visit b a {
+  color: inherit;
+}
+.crmh-visit small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmh-visit .crm-btn {
+  flex: none;
+}
+.crmh-linkrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmh-linkrow > span:last-child {
+  margin-left: auto;
+  color: var(--amber-2);
+  font-weight: 800;
+}
+.crmh-todaylink,
+.crmh-pipelink {
+  display: none;
+}
+.crmh-group__h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 2px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.crmh-group__h.late {
+  color: var(--err);
+}
+.crmh-group__fold {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+.crmh-task {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line2);
+}
+.crmh-group__h + .crmh-task {
+  border-top: 0;
+}
+.crmh-tick {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -8px -10px -10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.crmh-tick span {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(33, 31, 24, 0.32);
+  background: var(--card);
+  transition: border-color 0.15s, background 0.15s;
+}
+.crmh-tick:hover span,
+.crmh-tick:focus-visible span {
+  border-color: var(--ok);
+  background: rgba(63, 125, 78, 0.12);
+}
+.crmh-task__b {
+  flex: 1;
+  min-width: 0;
+}
+.crmh-task__t {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.crmh-task__m {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmh-jobchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 1px 8px 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crmh-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(33, 31, 24, 0.07);
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.crmh-tag--deadline {
+  background: rgba(179, 38, 30, 0.08);
+  color: var(--err);
+}
+.crmh-due {
+  font-weight: 700;
+}
+.crmh-due.late {
+  color: var(--err);
+}
+.crmh-due.today {
+  color: var(--amber-2);
+}
+.crmh-ini {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--avatar);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.crmh-pri {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--err);
+}
+.crmh-task__acts {
+  position: absolute;
+  top: 5px;
+  right: 0;
+  display: none;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 4px 12px rgba(33, 31, 24, 0.12);
+}
+.crmh-task:hover .crmh-task__acts,
+.crmh-task:focus-within .crmh-task__acts {
+  display: flex;
+}
+.crmh-act {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.crmh-act:hover {
+  background: rgba(33, 31, 24, 0.07);
+}
+.crmh-act--wa {
+  background: var(--wa);
+  color: #fff;
+}
+.crmh-act--wa:hover {
+  background: #17633e;
+}
+/* Touch screens have no hover: the actions stay in the row. */
+@media (hover: none) {
+  .crmh-task__acts {
+    position: static;
+    display: flex;
+    align-self: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .crmh-act {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(33, 31, 24, 0.05);
+  }
+  .crmh-act--wa {
+    background: rgba(31, 122, 77, 0.12);
+    color: var(--wa);
+  }
+  .crmh-task__acts a.crmh-act {
+    display: none;
+  }
+}
+.crmh-fold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--line2);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--muted);
+  cursor: pointer;
+}
+.crmh-fold b {
+  color: var(--ink);
+}
+.crmh-donelist {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.crmh-donelist li {
+  padding: 3px 0;
+}
+.crmh-duebar {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(248, 188, 30, 0.14);
+  font-size: 13px;
+}
+.crmh-duebar .crm-link {
+  margin: 0;
+}
+.crmh-quick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line2);
+}
+.crmh-quick .crm-actions {
+  margin-top: 0;
+}
+.crmh-quick__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.crmh-quick__row .crm-chipbtn {
+  min-height: 32px;
+}
+.crmh-quick__date {
+  flex: 1 1 140px;
+  width: auto;
+}
+.crmh-nudge {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed rgba(33, 31, 24, 0.25);
+  border-radius: 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.crmh-nudge .crm-link {
+  margin: 0;
+}
+
+/* Pickers inside sheets and forms */
+.crmh-picker {
+  position: relative;
+}
+.crmh-picker__list {
+  max-height: 260px;
+  overflow: auto;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.crmh-picker__list > li.crm-muted {
+  padding: 8px;
+}
+.crmh-picker__list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmh-picker__list button:hover,
+.crmh-picker__list button:focus-visible {
+  background: rgba(248, 188, 30, 0.14);
+}
+.crmh-picker__list span,
+.crmh-picked > span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.crmh-picker__list small,
+.crmh-picked small {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crmh-picked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.crmh-picked > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crmh-picked .crm-link {
+  margin: 0;
+  flex: none;
+}
+
+/* Latest notes */
+.crmh-notes__h {
+  border-bottom: 0;
+}
+.crmh-notes__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 10px;
+  border-bottom: 1px solid var(--line2);
+}
+.crmh-chipsrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.crmh-chipf {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.crmh-chipf.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--solar);
+}
+.crmh-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.crmh-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.crmh-switch span {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.25);
+  transition: background 0.15s;
+}
+.crmh-switch span::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.crmh-switch input:checked + span {
+  background: var(--ink);
+}
+.crmh-switch input:checked + span::after {
+  transform: translateX(12px);
+  background: var(--solar);
+}
+.crmh-switch input:focus-visible + span {
+  outline: 2px solid var(--solar);
+  outline-offset: 2px;
+}
+.crmh-day__h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px 2px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.crmh-day__h::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line2);
+}
+.crmh-note {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 10px 16px;
+}
+.crmh-note:hover {
+  background: rgba(33, 31, 24, 0.025);
+}
+.crmh-av {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--avatar);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.crmh-av--sys {
+  background: transparent;
+  border: 1.5px dashed rgba(33, 31, 24, 0.25);
+  color: var(--muted);
+}
+.crmh-av--ok {
+  border: 0;
+  background: var(--ok);
+  color: #fff;
+}
+.crmh-note__b {
+  flex: 1;
+  min-width: 0;
+  max-width: 80ch;
+}
+.crmh-note__h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.crmh-note__h time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.crmh-kind {
+  font-weight: 700;
+  color: var(--ink);
+}
+.crmh-cust {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: rgba(33, 31, 24, 0.25);
+  text-underline-offset: 3px;
+}
+/* The whole note opens the job at that entry. */
+a.crmh-cust::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+a.crmh-cust:focus-visible {
+  outline: 2px solid var(--solar);
+  outline-offset: 2px;
+}
+.crmh-ref {
+  font: 600 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+}
+.crmh-note__p {
+  margin: 3px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.crmh-more {
+  position: relative;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--amber-2);
+  cursor: pointer;
+}
+.crmh-note__wa {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  opacity: 0;
+}
+.crmh-note:hover .crmh-note__wa,
+.crmh-note:focus-within .crmh-note__wa {
+  opacity: 1;
+}
+@media (hover: none) {
+  .crmh-note__wa {
+    opacity: 1;
+  }
+}
+.crmh-loadmore {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 0;
+  border-top: 1px solid var(--line2);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+.crmh-phone-only {
+  display: none;
+}
+
+/* Needs reply (tablets and phones; the dock does this from 1024px) */
+.crmh-needs {
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  .crmh-needs {
+    display: none;
+  }
+}
+.crmh-waic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--wa);
+  color: #fff;
+}
+.crmh-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.crmh-pill--wa {
+  background: var(--wa);
+  color: #fff;
+}
+.crmh-chats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.crmh-chats li + li {
+  border-top: 1px solid var(--line2);
+}
+.crmh-chats li.is-unread {
+  background: rgba(31, 122, 77, 0.08);
+}
+.crmh-chats a {
+  display: flex;
+  gap: 11px;
+  min-height: 64px;
+  padding: 10px 14px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.crmh-cav {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--avatar);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.crmh-cav.ring {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--wa);
+}
+.crmh-chat__b {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.crmh-chat__h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.crmh-chat__h b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.is-unread .crmh-chat__h b {
+  font-weight: 800;
+}
+.crmh-chat__h time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.is-unread .crmh-chat__h time {
+  color: var(--wa);
+  font-weight: 800;
+}
+.crmh-chat__p {
+  margin-top: 1px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.is-unread .crmh-chat__p {
+  color: var(--ink);
+}
+.crmh-chat__f {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  min-width: 0;
+}
+.crmh-win {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.07);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.crmh-win.ok {
+  background: rgba(31, 122, 77, 0.13);
+  color: var(--wa);
+}
+.crmh-unread {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--wa);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+.crmh-cardlink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 14px;
+  border-top: 1px solid var(--line2);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--amber-2);
+  text-decoration: none;
+}
+
+/* Board and List: the chips above */
+.crmh-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 16px 0 12px;
+}
+.crmh-chips {
+  min-width: 0;
+  padding-bottom: 0;
+}
+.crmh-chips button {
+  min-height: 32px;
+}
+.crmh-stagepick {
+  width: auto;
+  min-width: 170px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+.crmh-qchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 999px;
+  background: rgba(248, 188, 30, 0.18);
+  font-size: 13px;
+}
+.crmh-qchip button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.crmh-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+.crmh-list > * {
+  min-width: 0;
+}
+.crmh-listcount {
+  margin: 0 0 8px;
+}
+.crmh-listmore {
+  margin-top: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+/* The board: columns share the width (200–320px), empty ones fold to a rail; each column scrolls. */
+.crmb {
+  --crmb-top: 380px;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  height: max(300px, calc(100vh - var(--crmb-top) - 20px));
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  padding-bottom: 6px;
+}
+.crmb-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 200px;
+  max-width: 320px;
+  min-height: 0;
+  border-radius: 10px;
+  background: rgba(33, 31, 24, 0.045);
+  transition: background 0.15s;
+}
+.crmb-col__h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  font-size: 13px;
+}
+.crmb-col__h b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crmb-col__h span {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.crmb-col__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+.crmb-col.is-over,
+.crmb-rail.is-over {
+  background: rgba(248, 188, 30, 0.14);
+  outline: 1px dashed rgba(199, 127, 4, 0.45);
+}
+.crmb-col.is-flash {
+  animation: crmb-flash 1.6s ease-out;
+}
+@keyframes crmb-flash {
+  0%,
+  40% {
+    background: rgba(248, 188, 30, 0.25);
+  }
+}
+.crmb-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 56px;
+  gap: 8px;
+  padding: 12px 0;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(33, 31, 24, 0.03);
+  font: inherit;
+  color: var(--muted);
+}
+.crmb-rail span {
+  writing-mode: vertical-rl;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+button.crmb-rail {
+  cursor: pointer;
+}
+.crmb-more {
+  display: block;
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  color: var(--amber-2);
+  cursor: pointer;
+}
+
+/* Cards (Board and List): the whole card opens the job; Move works without dragging. */
+.crmh-card2 {
+  position: relative;
+}
+.crmh-card2:hover {
+  border-color: rgba(33, 31, 24, 0.3);
+}
+.crmh-card2.is-dragging {
+  opacity: 0.45;
+}
+.crmh-card2 .crm-card-top {
+  align-items: baseline;
+}
+.crmh-card2__link {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+.crmh-card2__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+}
+.crmh-card2__link:focus-visible {
+  outline: none;
+}
+.crmh-card2__link:focus-visible::after {
+  outline: 2px solid var(--solar);
+  outline-offset: 2px;
+}
+.crmh-card2__wa {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wa);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crmh-card2__wa span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crmh-wadot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wa);
+}
+.crmh-refchip {
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: 600 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.crmh-chip--dup {
+  background: rgba(179, 38, 30, 0.07);
+  border-color: rgba(179, 38, 30, 0.25);
+  color: var(--err);
+}
+.crmh-chip--hold {
+  background: rgba(44, 110, 180, 0.1);
+  color: var(--blue);
+}
+.crmh-card2__end {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.crmh-card2__end .crm-owner {
+  margin-left: 0;
+}
+.crmh-movebtn {
+  position: relative;
+  z-index: 1;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.crmh-movebtn:hover {
+  color: var(--ink);
+  border-color: rgba(33, 31, 24, 0.3);
+}
+
+/* Sheets */
+.crm-sheet-box--wide {
+  width: min(680px, 100%);
+}
+.crmh-sheethead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.crmh-x {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.crmh-sortlist {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+.crmh-sortlist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.crmh-sortlist li > span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.crmh-sortlist small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmh-snooze {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.crm-stage-list button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.crmh-fabs {
+  display: none;
+}
+
+/* Tablets: one column; counts 3 + 2. */
+@media (min-width: 761px) and (max-width: 1023px) {
+  .crmh-counts {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .crmh-count {
+    grid-column: span 2;
+  }
+  .crmh-count:nth-child(n + 4) {
+    grid-column: span 3;
+  }
+}
+
+/* Phones */
+@media (max-width: 760px) {
+  .crmh-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'h sum i' 'sp sp sp' 's s s' 'v v v';
+    gap: 10px;
+    align-items: center;
+  }
+  .crmh-head__l,
+  .crmh-head__r {
+    display: contents;
+  }
+  .crmh-h1 {
+    grid-area: h;
+    font-size: 24px;
+  }
+  .crmh-sum {
+    grid-area: sum;
+  }
+  .crmh-icons {
+    grid-area: i;
+    display: flex;
+    gap: 6px;
+  }
+  .crmh-iconbtn {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .crmh-sp {
+    grid-area: sp;
+    display: flex;
+    width: 100%;
+  }
+  .crmh-sp a {
+    flex: 1;
+    height: 40px;
+    font-size: 15px;
+  }
+  .crmh-search {
+    grid-area: s;
+    display: none;
+  }
+  .is-searching .crmh-search {
+    display: block;
+  }
+  .crmh-searchbox__field {
+    height: 48px;
+  }
+  .crmh-searchbox kbd {
+    display: none;
+  }
+  .crmh-views {
+    grid-area: v;
+    justify-self: start;
+  }
+  .crmh-views button {
+    height: 38px;
+    padding: 0 22px;
+  }
+  .crmh-reports,
+  .crmh-gear,
+  .crmh-new {
+    display: none !important;
+  }
+  .crmh-counts {
+    display: flex;
+    gap: 8px;
+    margin: 12px -16px 0;
+    padding: 0 16px 4px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .crmh-count {
+    /* As wide as its label ("Unread WhatsApp" in full), in the row that scrolls sideways. */
+    flex: 0 0 auto;
+    min-width: 132px;
+    flex-direction: column-reverse;
+    justify-content: center;
+    gap: 3px;
+    min-height: 64px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    scroll-snap-align: start;
+  }
+  .crmh-count__lab {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .crmh-count__row b {
+    font-size: 22px;
+  }
+  .crmh-count__sub {
+    display: none;
+  }
+  .crmh-count--hot b {
+    color: var(--err);
+  }
+  .crmh-strip {
+    display: none;
+  }
+  .crmh-lanes {
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .crmh-today,
+  .crmh-nudge {
+    display: none;
+  }
+  .crmh-todaylink,
+  .crmh-pipelink {
+    display: flex;
+  }
+  .crmh-chats li:nth-child(n + 4) {
+    display: none;
+  }
+  .crmh-tog button {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+  .crmh-card__h .crm-btn--small {
+    min-height: 40px;
+  }
+  .crmh-task {
+    min-height: 56px;
+    padding: 10px 0;
+  }
+  .crmh-tick {
+    width: 48px;
+    height: 48px;
+  }
+  .crmh-tick span {
+    width: 28px;
+    height: 28px;
+  }
+  .crmh-task__t {
+    font-size: 15px;
+  }
+  .crmh-fold {
+    min-height: 48px;
+  }
+  .crmh-notes__filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .crmh-chipsrow {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+  .crmh-chipf {
+    height: 36px;
+  }
+  .crmh-switch {
+    margin-left: 0;
+  }
+  .crmh-note__wa {
+    display: none;
+  }
+  .crmh-notes:not(.is-more) .is-extra {
+    display: none;
+  }
+  .crmh-phone-only {
+    display: block;
+  }
+  .crmh-notes:not(.is-more) .crmh-wide-only {
+    display: none;
+  }
+  .crmh-chips {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    margin: 0 -16px;
+    padding: 0 16px 2px;
+  }
+  .crmh-chips button {
+    min-height: 40px;
+  }
+  .crmh-stagepick {
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+  .crmh-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .crmh-movebtn {
+    min-height: 36px;
+    padding: 0 12px;
+  }
+  .crmh[data-view='home'],
+  .crmh[data-view='list'] {
+    padding-bottom: 76px;
+  }
+  /* The whole task row opens its job (the tick and the buttons sit above it). */
+  .crmh-jobchip::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .crmh-tick,
+  .crmh-task__acts {
+    position: relative;
+    z-index: 1;
+  }
+  .crmh-chipf {
+    height: 40px;
+  }
+  .crmh-fabs {
+    display: block;
+  }
+  .crm-sheet-box--wide {
+    width: 100%;
+  }
+}
+.crmh-fabmenu {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.crmh-fabmenu button,
+.crmh-fabmenu__link {
+  min-height: 72px;
+}
+.crmh-fabmenu__link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* New project / new opportunity sheet */
+.nps-fresh {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nps-fresh .crm-input + .crm-input,
+.nps-fresh .crm-grid2 + .crm-input {
+  margin-top: 0;
+}
+.nps-switch,
+.nps-new {
+  align-self: flex-start;
+  margin: 8px 0 0;
+}
+.nps-starts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.nps-starts legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+}
+.nps-starts label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.nps-starts label.on {
+  background: rgba(248, 188, 30, 0.22);
+  border-color: rgba(199, 127, 4, 0.45);
+  font-weight: 700;
+}
+.nps-starts input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.nps-starts label:has(input:focus-visible) {
+  outline: 2px solid var(--solar);
+  outline-offset: 2px;
+}
+@media (max-width: 760px) {
+  .nps-starts label {
+    min-height: 48px;
+    flex: 1 1 100%;
+  }
+  .crm-checks label {
+    min-height: 44px;
+  }
+}
+
+/* ── v5: the job record page (/admin/crm/{id} and /admin/projects/{id}) ─────────────────────────────
+ * Header rows A–D, then the grid: customer | the job | tasks. From 1280px the open WhatsApp dock
+ * (.hx-frame[data-dock='open']) is the right-hand column, so the page has two; folded, or with no dock,
+ * it has three. 761–1279px: a band of customer and tasks over the tabs (plus a Details tab). Phones:
+ * one column (research 2.5). The first paint is right because it's all CSS.
+ */
+.crmr {
+  --crmr-bar: 56px;
+  position: relative;
+}
+.crmr-sentinel {
+  height: 0;
+}
+
+/* Row A: back, name, badges, stage, the stage's main button, ⋯. Pinned to the top once you scroll. */
+.crmr-bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  min-height: var(--crmr-bar);
+  padding: 8px 0;
+}
+.crmr-bar[data-stuck] {
+  background: var(--paper);
+  /* Paper (and a hairline) from edge to edge, not just the page's width. */
+  box-shadow:
+    0 0 0 100vmax var(--paper),
+    0 1px 0 100vmax var(--line);
+  clip-path: inset(-100vmax -100vmax -1px -100vmax);
+}
+.crmr-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+}
+.crmr-name {
+  min-width: 0;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.crmr-name button {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.crmr-barmeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* Gives way first and all the way (the ref and date clip): its shrink is so large that the name
+     and the buttons only start to shrink once it has gone. */
+  flex: 0 100000 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.crmr-barmeta b {
+  color: var(--ink);
+}
+.crmr-bar__r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Then the main button's words clip (all of them are in its tooltip), never past the page's edge. */
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+}
+.crmr-stagebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(33, 31, 24, 0.18);
+  border-radius: 6px;
+  background: rgba(33, 31, 24, 0.07);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.crmr-stagebtn.ph-y {
+  background: rgba(248, 188, 30, 0.22);
+  border-color: rgba(199, 127, 4, 0.35);
+  color: var(--amber-2);
+}
+.crmr-stagebtn.ph-b {
+  background: rgba(44, 110, 180, 0.12);
+  border-color: rgba(44, 110, 180, 0.3);
+  color: var(--blue);
+}
+.crmr-stagebtn.ph-g {
+  background: rgba(63, 125, 78, 0.15);
+  border-color: rgba(63, 125, 78, 0.3);
+  color: var(--ok);
+}
+.crmr-stagebtn.ph-done {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+.crmr-stagebtn.ph-lost {
+  background: rgba(179, 38, 30, 0.1);
+  border-color: rgba(179, 38, 30, 0.3);
+  color: var(--err);
+}
+.crmr-primary {
+  min-width: 0;
+  height: 38px;
+  padding: 0 14px;
+}
+.crmr-primary__t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crmr-more {
+  position: relative;
+}
+.crmr-more__btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+.crmr-more__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 230px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(33, 31, 24, 0.16);
+}
+.crmr-more__list button {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmr-more__list button:hover,
+.crmr-more__list button:focus-visible {
+  background: rgba(33, 31, 24, 0.06);
+}
+.crmr-more__list button.danger {
+  color: var(--err);
+}
+
+/* Badges: On hold, Lost, Possible duplicate. Row A from 761px, under the name on phones. */
+.crmr-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+.crmr-badges--a {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.crmr-badges--b {
+  display: none;
+}
+.crmr-badge {
+  display: inline-block;
+  max-width: 320px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+}
+.crmr-badge--hold {
+  background: rgba(248, 188, 30, 0.22);
+  color: var(--amber-2);
+}
+.crmr-badge--lost {
+  background: rgba(179, 38, 30, 0.1);
+  color: var(--err);
+}
+.crmr-badge--dupe {
+  background: rgba(44, 110, 180, 0.1);
+  color: var(--blue);
+}
+
+/* Rows B–D */
+.crmr-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.crmr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.crmr-meta > :not(:first-child):not(details)::before {
+  content: '·';
+  margin-right: 8px;
+  opacity: 0.6;
+}
+.crmr-meta__next {
+  color: var(--ink);
+}
+.crmr-meta__title {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crmr-ref {
+  font: 600 12px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.crmr-ref--cust {
+  font-family: inherit;
+}
+.crmr-others {
+  position: relative;
+  margin-left: 6px;
+}
+.crmr-others summary {
+  font-weight: 700;
+  color: var(--amber-2);
+  list-style: none;
+  cursor: pointer;
+}
+.crmr-others summary::-webkit-details-marker {
+  display: none;
+}
+.crmr-others ul {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 280px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(33, 31, 24, 0.16);
+}
+.crmr-others li a,
+.crmr-others__list li a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.crmr-others li a:hover,
+.crmr-others__list li a:hover {
+  background: rgba(33, 31, 24, 0.05);
+}
+.crmr-others li a > span:nth-last-child(2),
+.crmr-others__t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crmr-others__list {
+  margin: 0;
+  padding: 4px 6px 8px;
+  list-style: none;
+}
+.crmr-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.crmr-contact .crm-btn {
+  height: 40px;
+  padding: 0 14px;
+}
+.crmr-contact .crm-btn:disabled {
+  opacity: 0.45;
+}
+
+/* Row D: the stage path. The phase the job is in, in full; the other folded. Scrolls sideways in itself. */
+.crmr-path {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.crmr-path::-webkit-scrollbar {
+  display: none;
+}
+.crmr-path ol {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.crmr-path li {
+  flex: none;
+  margin-left: -8px;
+}
+.crmr-path li:first-child {
+  margin-left: 0;
+}
+.crmr-path button {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 18px 0 24px;
+  border: 0;
+  background: rgba(33, 31, 24, 0.07);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
+  cursor: pointer;
+}
+.crmr-path li:first-child button {
+  padding-left: 14px;
+  border-radius: 6px 0 0 6px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+}
+.crmr-path button:hover:not(:disabled) {
+  background: rgba(33, 31, 24, 0.12);
+  color: var(--ink);
+}
+.crmr-path li.done button {
+  color: var(--ok);
+}
+.crmr-path li.cur button {
+  background: var(--solar);
+  color: var(--ink);
+  cursor: default;
+}
+.crmr-path li.cur.lost button {
+  background: rgba(179, 38, 30, 0.14);
+  color: var(--err);
+}
+.crmr-path__x {
+  font-weight: 600;
+}
+.crmr-path li.crmr-path__more button {
+  background: transparent;
+  color: var(--ok);
+  clip-path: none;
+  padding-left: 22px;
+}
+.crmr-stageline {
+  display: none;
+}
+
+/* The grid */
+.crmr-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'next' 'right' 'main' 'left';
+  column-gap: 20px;
+  align-items: start;
+}
+.crmr-left {
+  grid-area: left;
+  min-width: 0;
+  display: none;
+}
+.crmr[data-tab='details'] .crmr-left {
+  display: block;
+  padding-bottom: 150px;
+}
+.crmr[data-tab='details'] .crmr-pane {
+  padding-bottom: 0;
+}
+.crmr-band {
+  grid-area: band;
+  min-width: 0;
+  display: none;
+}
+.crmr-next {
+  grid-area: next;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+.crmr-right {
+  grid-area: right;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+.crmr-main {
+  grid-area: main;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+}
+.crmr-chathint {
+  display: none;
+}
+@media (min-width: 761px) {
+  /* The name never shrinks away: the pinned bar is how you know whose job you're on beside a chat. */
+  .crmr-name {
+    min-width: 120px;
+  }
+  .crmr-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: 'band right' 'next next' 'main main' 'left left';
+  }
+  .crmr-band {
+    display: block;
+    align-self: stretch;
+    margin-bottom: 14px;
+  }
+  .crmr-band > .crmh-card,
+  .crmr-right > .crmr-tasks {
+    height: 100%;
+  }
+  .crmr-right {
+    align-self: stretch;
+    margin-bottom: 14px;
+  }
+  .crmr-next {
+    margin-bottom: 14px;
+  }
+}
+@media (min-width: 1280px) {
+  .crmr-grid {
+    grid-template-columns: 300px minmax(0, 1fr) 320px;
+    grid-template-areas: 'left next right' 'left main right';
+    grid-template-rows: auto 1fr;
+  }
+  .crmr-left,
+  .crmr[data-tab='details'] .crmr-left {
+    display: block;
+    padding-bottom: 0;
+  }
+  .crmr-band,
+  .crmr-tab--details {
+    display: none !important;
+  }
+  .crmr-right {
+    position: sticky;
+    top: calc(var(--crmr-bar) + 12px);
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: calc(100vh - var(--crmr-bar) - 24px);
+    margin-bottom: 0;
+  }
+  .crmr-right > .crmr-tasks {
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .hx-frame[data-dock='open'] .crmr-grid {
+    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-areas: 'left next' 'left main';
+  }
+  .hx-frame[data-dock='open'] .crmr-right {
+    display: none;
+  }
+  .hx-frame[data-dock='collapsed'] .crmr-chathint {
+    display: block;
+  }
+}
+@media (min-width: 1600px) {
+  .crmr-grid {
+    grid-template-columns: 340px minmax(0, 1fr) 360px;
+  }
+  .hx-frame[data-dock='open'] .crmr-grid {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+}
+
+/* The left column's cards */
+.crmr-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.crmr-fields {
+  display: flex;
+  flex-direction: column;
+  padding-top: 2px;
+}
+.crmr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line2);
+}
+.crmr-field:first-child {
+  border-top: 0;
+}
+.crmr-field__l {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.crmr-field__v {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+}
+.crmr-field__x {
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmr-trunc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crmr-wrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.crmr-notes {
+  white-space: pre-wrap;
+}
+.crmr-copy {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+.crmr-inline {
+  margin: 0;
+}
+.crmr-edit {
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.crmr-edit:hover {
+  color: var(--ink);
+}
+.crmr-switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.22);
+  cursor: pointer;
+}
+.crmr-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.crmr-switch.on {
+  background: var(--wa);
+}
+.crmr-switch.on::after {
+  left: 17px;
+}
+.crmr-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.crmr-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.07);
+  font-size: 12px;
+  font-weight: 700;
+}
+.crmr-form .crm-label:first-child {
+  margin-top: 6px;
+}
+.crmr-savebar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.crmr-grey {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px dashed rgba(33, 31, 24, 0.22);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.crmr-grey b {
+  color: var(--ink);
+}
+.crmr-grey .crm-link {
+  margin: 0;
+}
+.crmr-important {
+  border-color: rgba(179, 38, 30, 0.35);
+  border-left: 4px solid var(--err);
+  background: rgba(179, 38, 30, 0.04);
+}
+.crmr-important p {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+}
+.crmr-slot .crm-portal {
+  margin-bottom: 0;
+}
+.crmr-slot--dno .crm-dno {
+  margin: 0;
+}
+.crmr-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmr-foot__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.crmr-foot .crm-link {
+  margin: 0;
+  font-size: 12px;
+}
+.crmr-danger,
+.crmr-foot .crmr-danger {
+  color: var(--err);
+}
+.crmr-linkbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Next step */
+.crmr-nextbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.crmr-nextbar.is-today {
+  border-color: rgba(199, 127, 4, 0.4);
+  background: rgba(248, 188, 30, 0.12);
+}
+.crmr-nextbar.is-late {
+  border-color: rgba(179, 38, 30, 0.38);
+  background: rgba(179, 38, 30, 0.05);
+}
+.crmr-nextbar.is-empty {
+  width: 100%;
+  min-height: 40px;
+  border-style: dashed;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmr-nextbar__lab {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--amber-2);
+  white-space: nowrap;
+}
+.crmr-nextbar.is-late .crmr-nextbar__lab,
+.crmr-nextbar.is-late .crmr-nextbar__due {
+  color: var(--err);
+}
+.crmr-nextbar__t {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.crmr-nextbar__due {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber-2);
+  white-space: nowrap;
+}
+.crmr-nextbar__acts {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.crmr-nextbar__acts .crm-btn {
+  height: 32px;
+}
+.crmr-snooze {
+  position: relative;
+}
+.crmr-snooze__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(33, 31, 24, 0.16);
+}
+.crmr-snooze__list button {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmr-snooze__list button:hover {
+  background: rgba(33, 31, 24, 0.06);
+}
+
+/* Tabs */
+.crmr-tabs {
+  position: sticky;
+  top: var(--crmr-bar);
+  z-index: 20;
+  display: flex;
+  gap: 2px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.crmr-tabs::-webkit-scrollbar {
+  display: none;
+}
+.crmr-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 44px;
+  margin-bottom: -1px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.crmr-tabs button.on {
+  border-bottom-color: var(--solar);
+  color: var(--ink);
+}
+.crmr-tabs em {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--wa);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+}
+.crmr-tabs i {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+/* Lines in the centre stay readable (about 80 characters). */
+.crmr-pane {
+  padding-bottom: 140px;
+}
+.crmr-act__b p,
+.crmr-act__p,
+.crmr-grey {
+  max-width: 80ch;
+}
+@media (max-height: 719px) {
+  .crmr-right,
+  .crmr-tabs {
+    position: static !important;
+    max-height: none !important;
+  }
+}
+
+/* Floating buttons: WhatsApp directly above +, centred, 12px apart. */
+.crmr-fabs {
+  position: fixed;
+  right: calc(var(--hx-dock, 0px) + 24px);
+  bottom: 24px;
+  z-index: 25;
+}
+.crmr-fabs__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.crmr-fab {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--solar);
+  color: var(--ink);
+  box-shadow: 0 8px 22px rgba(33, 31, 24, 0.28);
+  cursor: pointer;
+}
+.crmr-fab--wa {
+  width: 52px;
+  height: 52px;
+  background: var(--wa);
+  color: #fff;
+}
+.crmr-fab:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+.crmr-fab__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  border: 2px solid var(--card);
+  border-radius: 999px;
+  background: var(--err);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #fff;
+}
+/* From 1280px: pinned to the bottom right of the centre column, not the window. */
+@media (min-width: 1280px) {
+  .crmr-fabs {
+    position: sticky;
+    right: auto;
+    bottom: 24px;
+    z-index: 22;
+    align-self: flex-end;
+    height: 0;
+    margin-top: auto;
+  }
+  .crmr-fabs__stack {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+  }
+}
+
+/* Activity */
+.crmr-compose {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+.crmr-compose .crmh-tog {
+  margin-top: 5px;
+}
+.crmr-compose__box {
+  flex: 1 1 220px;
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 14px;
+}
+.crmr-compose > .crm-btn {
+  align-self: flex-end;
+}
+.crmr-compose .crm-banner {
+  flex: 1 1 100%;
+  margin: 0;
+}
+.crmr-chips {
+  margin: 12px 0 2px;
+}
+.crmr-day__h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 2px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.crmr-day__h::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line2);
+}
+.crmr-act {
+  display: flex;
+  gap: 12px;
+  padding: 9px 0;
+}
+.crmr-act__ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--avatar);
+  font-size: 11px;
+  font-weight: 800;
+}
+.crmr-act.k-whatsapp .crmr-act__ic {
+  background: rgba(31, 122, 77, 0.13);
+  color: var(--wa);
+}
+.crmr-act.is-sys .crmr-act__ic {
+  border: 1.5px dashed rgba(33, 31, 24, 0.25);
+  background: transparent;
+  color: var(--muted);
+}
+.crmr-act__b {
+  flex: 1;
+  min-width: 0;
+}
+.crmr-act__h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.crmr-act__h b {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.crmr-act.is-sys .crmr-act__h b {
+  font-weight: 600;
+  color: var(--muted);
+}
+.crmr-act__h time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmr-act__b p {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.crmr-act__other {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+}
+.crmr-act.is-hl .crmr-act__b {
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(248, 188, 30, 0.18);
+}
+.crm-bubble.is-hl {
+  outline: 2px solid var(--solar);
+}
+/* A run of WhatsApp: one row with the dock on the page from 1280px; the bubbles otherwise. */
+.crmr-warun {
+  display: none;
+}
+.crmr-warun .crmr-act__b {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(31, 122, 77, 0.08);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmr-warun .crmr-act__b:hover {
+  background: rgba(31, 122, 77, 0.13);
+}
+.crmr-act__p {
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.crmr-wabubbles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+}
+@media (min-width: 1280px) {
+  .hx-frame[data-dock='open'] .crmr-warun,
+  .hx-frame[data-dock='collapsed'] .crmr-warun {
+    display: flex;
+  }
+  .hx-frame[data-dock='open'] .crmr-wabubbles,
+  .hx-frame[data-dock='collapsed'] .crmr-wabubbles {
+    display: none;
+  }
+}
+.crmr-older {
+  justify-content: center;
+}
+
+/* Overview */
+.crmr .crm-grid2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.crmr .crm-grid2 > div {
+  min-width: 0;
+}
+.crmr-ov {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.crmr-ovh {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.crmr-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+/* Three across where the centre is about 720px or wider. */
+@media (min-width: 1024px) and (max-width: 1279px), (min-width: 1600px) {
+  .crmr-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.crmr-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+}
+.crmr-tile__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmr-tile__main:hover {
+  background: rgba(33, 31, 24, 0.03);
+}
+.crmr-tile__h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.crmr-tile__h b {
+  font-size: 14px;
+}
+.crmr-tile__b {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.crmr-tile__b small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmr-tile__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 12px 8px;
+}
+.crmr-minichip {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+.crmr-tile__add {
+  padding: 8px 12px;
+  border: 0;
+  border-top: 1px solid var(--line2);
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--amber-2);
+  cursor: pointer;
+}
+.crmr-check__stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 14px 2px;
+  list-style: none;
+}
+.crmr-check__stages li {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.06);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.crmr-check__stages li.done {
+  background: rgba(63, 125, 78, 0.14);
+  color: var(--ok);
+}
+.crmr-check__stages li.cur {
+  background: var(--solar);
+  color: var(--ink);
+}
+.crmr-check__list {
+  margin: 0;
+  padding: 4px 14px 0;
+  list-style: none;
+}
+.crmr-check__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line2);
+}
+.crmr-check__list li:first-child {
+  border-top: 0;
+}
+.crmr-check__list .crmh-tick {
+  margin: -8px -6px -8px -10px;
+}
+.crmr-check__list .crmh-tick span,
+.crmr-task .crmh-tick.is-done span {
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 900;
+  color: #fff;
+}
+.crmr-check__list li.done .crmh-tick span,
+.crmr-task .crmh-tick.is-done span {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+.crmr-check__list li.na .crmh-tick span {
+  border-color: rgba(33, 31, 24, 0.25);
+  background: rgba(33, 31, 24, 0.25);
+}
+.crmh-tick:disabled {
+  cursor: default;
+}
+.crmr-check__t {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+.crmr-check__list li.done .crmr-check__t > span:first-child {
+  color: var(--muted);
+}
+.crmr-check__t small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.crmr-key {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--amber-2);
+}
+.crmr-na {
+  flex: none;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.crmr-check__move {
+  padding: 10px 14px 14px;
+}
+.crmr-check__move .crm-btn {
+  white-space: normal;
+  text-align: left;
+}
+.crmr-ovh4 {
+  margin: 16px 0 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.crmh-card__b > .crmr-ovh4:first-child,
+.crmh-card__b > div:first-child > .crmr-ovh4 {
+  margin-top: 8px;
+}
+.crmr-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 0;
+}
+.crmr-actions--tight {
+  margin-top: 8px;
+}
+.crmr-subs {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.crmr-ovsec > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+.crmr-ovsec > summary::-webkit-details-marker {
+  display: none;
+}
+.crmr-ovsec > summary::after {
+  content: '▸';
+  margin-left: auto;
+  color: var(--muted);
+}
+.crmr-ovsec[open] > summary {
+  border-bottom: 1px solid var(--line2);
+}
+.crmr-ovsec[open] > summary::after {
+  content: '▾';
+}
+.crmr-ovsec > summary h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+.crmr-grid3 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 10px;
+}
+@media (min-width: 1024px) and (max-width: 1279px), (min-width: 1600px) {
+  .crmr-grid3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.crmr-deadlines {
+  margin: 4px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.crmr-deadlines li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line2);
+  font-size: 13.5px;
+}
+.crmr-deadlines li:first-child {
+  border-top: 0;
+}
+.crmr-deadlines li.late b {
+  color: var(--err);
+}
+.crmr-deadlines li.soon b {
+  color: var(--amber-2);
+}
+.crmr-deadlines li.done b {
+  color: var(--ok);
+}
+.crmr-surveylist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.crmr-surveylist a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+}
+.crmr-surveylist a > span:last-child {
+  margin-left: auto;
+}
+
+/* The Tasks card (in the page, or in the WhatsApp panel's This job tab) */
+.crmr-tasks {
+  margin: 0;
+}
+.crmr-tasklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.crmr-tasklist > .crmr-task:first-child {
+  border-top: 0;
+}
+.crmr-task .crmh-tick span {
+  width: 26px;
+  height: 26px;
+}
+.crmr-tasks:not(.is-all) .crmr-task.is-more {
+  display: none;
+}
+.crmr-tasks__allphone {
+  display: none;
+}
+.crmr-tasklist--done .crmh-task__t {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.crmr-tasks--dock {
+  border-radius: 12px;
+}
+.crmr-tasks--dock .crmh-card__h {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-radius: 12px 12px 0 0;
+  background: var(--card);
+}
+
+/* Sheets and bits */
+.crmr-menu-tile {
+  border-color: rgba(199, 127, 4, 0.45) !important;
+  background: rgba(248, 188, 30, 0.16) !important;
+}
+.crmr-stagego {
+  width: 100%;
+  margin: 6px 0 4px;
+  white-space: normal;
+}
+.crmr-stagegroup .crm-h3 {
+  margin-top: 1rem;
+}
+.crmr-btn--danger {
+  border-color: var(--err);
+  background: var(--err);
+  color: #fff;
+}
+.crmr-linkbox {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  font: 600 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+.crmr-plainsheet {
+  position: relative;
+}
+.crmr-plainsheet__x {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.crmr-callbar,
+.crmr-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 12px;
+}
+.crmr-callbar {
+  padding: 10px 14px;
+  border: 1px solid rgba(199, 127, 4, 0.35);
+  border-radius: 10px;
+  background: rgba(248, 188, 30, 0.14);
+  font-weight: 700;
+}
+.crmr-callbar .crm-link,
+.crmr-notice .crm-link {
+  margin: 0;
+}
+
+/* Phones */
+@media (max-width: 760px) {
+  .crmr-bar {
+    gap: 8px;
+    padding: 6px 0;
+  }
+  .crmr-back {
+    justify-content: center;
+    width: 44px;
+    margin-left: -10px;
+    font-size: 20px;
+  }
+  .crmr-back__w,
+  .crmr-barmeta,
+  .crmr-badges--a,
+  .crmr-primary,
+  .crmr-more,
+  .crmr-meta__wide,
+  .crmr-path,
+  .crmr-contact__num {
+    display: none !important;
+  }
+  .crmr-name {
+    flex: 1;
+    font-size: 20px;
+  }
+  .crmr-stagebtn {
+    height: 44px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .crmr-head {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .crmr-meta__next {
+    flex-basis: 100%;
+  }
+  .crmr-meta > .crmr-meta__next::before {
+    content: none !important;
+  }
+  .crmr-chips {
+    flex-wrap: nowrap;
+    margin: 12px -16px 2px;
+    padding: 0 16px 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .crmr-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .crmr-badges--b {
+    display: flex;
+  }
+  .crmr-contact {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .crmr-contact .crm-btn {
+    height: 48px;
+    padding: 0 8px;
+  }
+  .crmr-stageline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .crmr-stageline__go {
+    min-height: 44px;
+    margin-left: auto;
+    white-space: normal;
+    text-align: left;
+  }
+  .crmr-nextbar__t {
+    flex-basis: 100%;
+    white-space: normal;
+  }
+  .crmr-nextbar__acts {
+    margin-left: 0;
+  }
+  .crmr-nextbar__acts .crm-btn {
+    height: 44px;
+  }
+  .crmr-tabs {
+    margin: 0 -16px 12px;
+    padding: 0 16px;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  }
+  .crmr-tabs button {
+    min-height: 48px;
+    padding: 0 12px;
+  }
+  .crmr-pane {
+    padding-bottom: 150px;
+  }
+  /* Up to 3 tasks (at delivery stages, what's due now, at most 2); the rest one tap away. */
+  .crmr-tasks:not(.is-all) .crmr-task.is-more3,
+  .crmr-tasks.is-delivery:not(.is-all) .crmr-task:not(.is-due),
+  .crmr-tasks.is-delivery:not(.is-all) .crmr-task:nth-child(n + 3) {
+    display: none;
+  }
+  .crmr-tasks__all {
+    display: none;
+  }
+  .crmr-tasks__allphone {
+    display: flex;
+  }
+  .crmr-task {
+    min-height: 56px;
+  }
+  .crmr-fabs {
+    right: 18px;
+    bottom: calc(var(--hx-tabbar, 0px) + 18px);
+  }
+  /* Out of the way of the keyboard, and above a card's Save bar while it's being edited. */
+  .crmr:has(input:focus, textarea:focus, select:focus) .crmr-fabs {
+    display: none;
+  }
+  .crmr:has(.crmr-form) .crmr-fabs {
+    bottom: calc(var(--hx-tabbar, 0px) + 84px);
+  }
+  .crmr-form .crmr-savebar {
+    position: sticky;
+    bottom: var(--hx-tabbar, 0px);
+    margin: 12px -14px -12px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--card);
+  }
+  .crmr-grid3,
+  .crmr-dates .crm-grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .crmr-tile__main {
+    min-height: 72px;
+  }
+  .crmr-tile__add {
+    min-height: 48px;
+  }
+  .crmr-check__list li {
+    min-height: 52px;
+  }
+  /* Gloves: every phone tap target at least 48px. This block comes after the home's phone block, so
+     the same selectors here win over its 36–40px sizes. */
+  .crmr-copy,
+  .crmr-edit,
+  .crmr-minichip,
+  .crmr-foot .crm-link,
+  .crmr-inline,
+  .crmr-grey .crm-link,
+  .crmr-callbar .crm-link,
+  .crmr-notice .crm-link,
+  .crmh-tosort .crm-link,
+  .crmh-hint .crm-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+  }
+  .crmr-copy,
+  .crmr-minichip {
+    padding: 0 14px;
+  }
+  .crmr-edit {
+    padding: 0 12px;
+  }
+  .crmr-switch::before {
+    content: '';
+    position: absolute;
+    inset: -14px -7px; /* a 34×20 switch, 48×48 to tap */
+  }
+  /* Delete on its own line, well clear of New project (and both on the left, clear of the round buttons). */
+  .crmr-foot,
+  .crmr-foot__acts {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .crmr-foot__acts {
+    gap: 8px;
+  }
+  .crmr-snooze__list button,
+  .crmr-actions--tight .crm-btn,
+  .crmh-sp a,
+  .crmh-views button,
+  .crmh-tog button,
+  .crmh-chips button,
+  .crmh-chipf,
+  .crmh-movebtn,
+  .crmh-card__h .crm-btn--small {
+    min-height: 48px;
+  }
+  .crmh-sp a,
+  .crmh-views button,
+  .crmh-chipf {
+    height: 48px;
+  }
+  .crmh-act {
+    width: 48px;
+    height: 48px;
+  }
+  .crmr {
+    --crmr-bar: 60px; /* a 48px stage button, plus the bar's padding */
+  }
+  .crmr-back {
+    width: 48px;
+    min-height: 48px;
+  }
+  .crmr-stagebtn,
+  .crmr-nextbar__acts .crm-btn {
+    height: 48px;
+  }
+  .crmr-nextbar__t,
+  .crmr-name button,
+  .crmr-stageline__go,
+  .crmr-check__move .crm-btn,
+  .crmr-ovsec > summary {
+    min-height: 48px;
   }
 }

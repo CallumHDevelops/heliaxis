@@ -1,1303 +1,831 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { addPhotos, queued, QUEUE_CHANGED, uploadQueued, watchQueue } from '@/lib/crm/photo-queue';
+import { createPortal } from 'react-dom';
+import { isProjectStage } from '@/lib/crm/stages';
+import { primaryActionFor, type ActionKey, type PrimaryAction } from '@/lib/projects/primary-action';
+import type { SchemaReady } from '@/lib/schema-ready';
+import { useLiveRefresh } from '@/lib/use-live-refresh';
+import { useNow } from '@/lib/use-now';
+import { NewProjectSheet } from '../../projects/NewProjectSheet';
+import { ProjectOverview, SurveysPanel, type OverviewActions } from '../../projects/[id]/ProjectOverview';
+import { firstName, phaseOf, ukDayOf } from '../crm-shared';
+import { DOCK, openDock, sendDockJob, useDockState, type DockJob } from '../dock-link';
+import { useMedia } from '../use-stored';
+import { ActivityTab } from './ActivityTab';
+import { CompactCustomer, CustomerColumn } from './CustomerColumn';
+import { PhotosTab } from './PhotosTab';
+import { DocumentsTab, EmailComposerV2 } from './ProjectExtras';
+import { RecordFabs } from './RecordFabs';
+import { RecordHeader } from './RecordHeader';
 import {
-  portalOpen,
-  ACTIVITY_LABEL,
-  PHOTO_CATEGORIES,
-  photoLabel,
-  PRODUCTS,
-  STAGES,
-  stageLabel,
-} from '@/lib/crm/stages';
-import { DnoDeposit, DocumentsTab, EmailComposerV2, PortalCard, SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
-import type { TrackerStep } from '@/lib/crm/tracker';
-import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
+  ActionMenu,
+  CallPrompt,
+  DeleteSheet,
+  LinkSheet,
+  LogComposer,
+  NextStepEditor,
+  nextStepTimes,
+  PhotoQuick,
+  PlainSheet,
+  StageSheet,
+  TaskEditor,
+  WhatsAppComposer,
+  type SheetKey,
+} from './RecordSheets';
+import { TasksCard } from './TasksCard';
+import {
+  defaultTab,
+  nextDateWords,
+  phoneShown,
+  refOf,
+  send,
+  siteOf,
+  TABS,
+  ukWhen,
+  type Area,
+  type Entry,
+  type LightData,
+  type Project,
+  type RecordData,
+  type Tab,
+} from './record-shared';
 import '../crm.css';
 
-type Project = {
-  id: string;
-  enquiry_id: string;
-  title: string;
-  stage: string;
-  products: string[];
-  value: number | null;
-  owner_id: string | null;
-  address: string | null;
-  postcode: string | null;
-  survey_at: string | null;
-  install_at: string | null;
-  simpliheat_url: string | null;
-  opensolar_url: string | null;
-  lost_reason: string | null;
-  notes: string | null;
-  next_step: string | null;
-  next_step_at: string | null;
-  dno_status: string | null;
-  dno_ref: string | null;
-  deposit_amount: number | null;
-  deposit_paid_at: string | null;
-  accepted_at: string | null;
-  accepted_name: string | null;
-  created_at: string;
-  updated_at: string;
-};
-type Customer = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string | null;
-  postcode: string | null;
-  interest: string | null;
-  source: string;
-  wa_id: string | null;
-  wa_unread: number;
-};
-type Entry = { id: string; kind: string; body: string | null; meta: Record<string, unknown> | null; by: string | null; at: string };
-type CrmTask = {
-  id: string;
-  title: string;
-  due_date: string | null;
-  priority: string;
-  status: string;
-  assignee_id: string | null;
-  assignee: string;
-};
-type Photo = { id: string; category: string; caption: string | null; url: string | null; thumb: string | null; by: string; created_at: string };
+/** Signed photo links last an hour: read everything again after 50 minutes. */
+const PHOTO_LINKS_MS = 50 * 60_000;
+/** "Log the call?" when you come back within 30 minutes of tapping Call. */
+const CALL_PROMPT_MS = 30 * 60_000;
 
-const ICON: Record<string, string> = {
-  note: '📝',
-  call: '📞',
-  visit: '🏠',
-  email: '✉️',
-  stage: '➜',
-  photo: '📷',
-  system: '•',
-  whatsapp: '💬',
-};
+/**
+ * The jobs seen in this tab, so coming back to one (Back from its chat page) shows it straight away
+ * at the same scroll position, while it reads it again.
+ */
+const seen = new Map<string, RecordData>();
+const SCROLL_KEY = (id: string) => `hx-rec-scroll:${id}`;
 
-function when(iso: string) {
-  const d = new Date(iso);
-  const today = new Date();
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === today.toDateString()) return `Today ${time}`;
-  if (d.toDateString() === new Date(Date.now() - 86_400_000).toDateString()) return `Yesterday ${time}`;
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' })} ${time}`;
-}
-const toLocalInput = (iso: string | null) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-};
-
-type WaInfo = {
-  configured: boolean;
-  number: string | null;
-  threadId: string | null;
-  windowOpen: boolean;
-  unread: number;
-  unreadIds: string[];
-  messages: number;
-  chaseHours: number;
-};
-type Sheet = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage';
-
-/** Wide screens show details beside the activity (HubSpot-style); phones use a tab. */
-function useWide() {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const m = window.matchMedia('(min-width: 1000px)');
-    const on = () => setWide(m.matches);
-    on();
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, []);
-  return wide;
+/** Newer entries win; newest first. A poll re-reads the newest messages (for their ticks), so nothing new keeps the old list. */
+function mergeTimeline(old: Entry[], fresh: Entry[]): Entry[] {
+  const byId = new Map(old.map((e) => [e.id, e]));
+  const changed = fresh.filter((e) => {
+    const was = byId.get(e.id);
+    return !was || JSON.stringify(was) !== JSON.stringify(e);
+  });
+  if (!changed.length) return old;
+  for (const e of changed) byId.set(e.id, e);
+  return [...byId.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
 
-export function ProjectView({ id, isAdmin }: { id: string; isAdmin: boolean }) {
+/** Where a light poll picks up: a minute before the newest entry, so nothing saved meanwhile is missed (ids weed out repeats). */
+const cursorFrom = (timeline: Entry[]) => {
+  const newest = timeline[0]?.at;
+  return newest ? new Date(Date.parse(newest) - 60_000).toISOString() : null;
+};
+
+/**
+ * The job record page (`/admin/crm/{id}` and `/admin/projects/{id}`): the header, then the customer on
+ * the left, the job in the centre (next step and the tabs) and Tasks on the right. With the WhatsApp
+ * dock open (from 1280px) the dock is the right-hand column and the Tasks card moves into its This job
+ * tab; folded, Tasks is the page's third column. Tablets get a band of customer and tasks above the
+ * tabs (plus a Details tab), phones the stacked layout of research 2.5. CSS does the layout from
+ * `.hx-frame[data-dock]`, so the first paint is right.
+ *
+ * The page itself never marks WhatsApp read (the dock and the chat pages do), never scrolls by itself,
+ * and polls lightly: every 30s while it's on screen, without signing the photo links again.
+ */
+export function ProjectView({
+  id,
+  me,
+  isAdmin,
+  canInbox,
+  area = 'crm',
+  initialTab = null,
+  entry = null,
+  schema: serverSchema,
+}: {
+  id: string;
+  me: string;
+  isAdmin: boolean;
+  canInbox: boolean;
+  area?: Area;
+  initialTab?: Tab | null;
+  entry?: string | null;
+  schema: SchemaReady;
+}) {
   const router = useRouter();
-  const [project, setProject] = useState<Project | null>(null);
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [timeline, setTimeline] = useState<Entry[]>([]);
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [team, setTeam] = useState<{ id: string; name: string }[]>([]);
-  const [tasks, setTasks] = useState<CrmTask[]>([]);
-  const [wa, setWa] = useState<WaInfo | null>(null);
-  const [docs, setDocs] = useState<CrmDoc[]>([]);
-  const [portal, setPortal] = useState<string | null>(null);
-  const [tracker, setTracker] = useState<TrackerStep[]>([]);
-  const [connected, setConnected] = useState({ email: false, stripe: false });
-  const [waDraft, setWaDraft] = useState('');
+  const now = useNow(60_000);
+  const today = now ? ukDayOf(now) : '';
+  const wide1280 = useMedia('(min-width: 1280px)');
+  const wide761 = useMedia('(min-width: 761px)');
+  const dock = useDockState();
+
+  const [rec, setRec] = useState<RecordData | null>(() => seen.get(id) ?? null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'activity' | 'photos' | 'docs' | 'details'>('activity');
-  const [sheet, setSheet] = useState<Sheet>(null);
-  const wide = useWide();
+  const [notice, setNotice] = useState('');
+  const [tabSel, setTabSel] = useState<Tab | null>(initialTab && TABS.includes(initialTab) ? initialTab : null);
+  const [photoView, setPhotoView] = useState<{ cat: string | null; key: number }>({ cat: null, key: 0 });
+  const [sheet, setSheet] = useState<SheetKey>(null);
+  const [sheetOpts, setSheetOpts] = useState<{ draft?: string; photoCat?: string }>({});
+  const [editCustomer, setEditCustomer] = useState(0);
+  const [callPrompt, setCallPrompt] = useState(false);
+  const [pendingDoc, setPendingDoc] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [dockAck, setDockAck] = useState(false);
+
+  /* ── Loading: the whole job, then light polls ─────────────────────────────── */
+  const recRef = useRef<RecordData | null>(null);
+  const wantFull = useRef(true);
+  const signedAt = useRef(0);
+  const cursor = useRef<string | null>(null);
+  useEffect(() => {
+    recRef.current = rec;
+    if (rec) seen.set(id, rec);
+  });
+  // Back from the chat page: where the page was.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (!rec || restored.current) return;
+    restored.current = true;
+    let y = 0;
+    try {
+      // "{scrollY}:{when}", used within half an hour.
+      const [top, at] = (sessionStorage.getItem(SCROLL_KEY(id)) || '').split(':').map(Number);
+      sessionStorage.removeItem(SCROLL_KEY(id));
+      if (Date.now() - at < 30 * 60_000) y = top || 0;
+    } catch {
+      // Nothing kept.
+    }
+    if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y));
+  }, [id, rec]);
+
+  const loadFull = useCallback(async () => {
+    const started = Date.now();
+    const r = await fetch(`/api/crm/projects/${id}`, { cache: 'no-store' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Could not load this job');
+    wantFull.current = false;
+    signedAt.current = started;
+    cursor.current = cursorFrom(d.timeline ?? []);
+    setRec(d as RecordData);
+    setError('');
+  }, [id]);
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`/api/crm/projects/${id}`, { cache: 'no-store' });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Could not load this project');
-      setProject(d.project);
-      setCustomer(d.customer);
-      setTimeline(d.timeline);
-      setPhotos(d.photos);
-      setTeam(d.team);
-      setTasks(d.tasks ?? []);
-      setWa(d.whatsapp);
-      setDocs(d.documents ?? []);
-      setPortal(d.portal ?? null);
-      setTracker(d.tracker ?? []);
-      if (d.connected) setConnected(d.connected);
+      const cur = recRef.current;
+      if (wantFull.current || !cur || Date.now() - signedAt.current > PHOTO_LINKS_MS) {
+        await loadFull();
+        return true;
+      }
+      const since = cursor.current ? `&since=${encodeURIComponent(cursor.current)}` : '';
+      const r = await fetch(`/api/crm/projects/${id}?light=1${since}`, { cache: 'no-store' });
+      const d = (await r.json().catch(() => ({}))) as LightData & { error?: string };
+      if (!r.ok) throw new Error(d.error || 'Could not load this job');
+      // Something else changed the job, or its photos or documents: read it all again.
+      if (d.project.updated_at !== cur.project.updated_at || d.counts.photos !== cur.photos.length || d.counts.documents !== cur.documents.length) {
+        await loadFull();
+        return true;
+      }
+      cursor.current = d.cursor;
+      setRec((prev) =>
+        prev ? { ...prev, project: d.project, customer: d.customer, tasks: d.tasks, whatsapp: d.whatsapp, timeline: mergeTimeline(prev.timeline, d.timeline) } : prev
+      );
       setError('');
+      return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load this project');
-    }
-  }, [id]);
-
-  useEffect(() => {
-    load();
-    // New WhatsApp messages show up while you're looking.
-    const t = setInterval(() => document.visibilityState === 'visible' && load(), 15_000);
-    return () => clearInterval(t);
-  }, [load]);
-
-  // Reading the feed counts as reading their WhatsApp (blue ticks, badge cleared).
-  useEffect(() => {
-    if (tab !== 'activity' || !wa?.unreadIds.length) return;
-    for (const eid of wa.unreadIds) {
-      fetch(`/api/whatsapp/conversations/${eid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ read: true }),
-      }).catch(() => {});
-    }
-  }, [tab, wa?.unreadIds]);
-
-  async function patch(body: Partial<Project>) {
-    setError('');
-    const r = await fetch(`/api/crm/projects/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      setError(d.error || 'Not saved');
+      // Offline or a blip: keep what's on screen; say so only if there's nothing to show.
+      if (!recRef.current) setError(e instanceof Error ? e.message : 'Could not load this job');
       return false;
     }
-    await load();
-    return true;
-  }
+  }, [id, loadFull]);
+  const { reload } = useLiveRefresh(load, 30_000);
+  /** After an edit: everything again (the checklist, deadlines and dates follow from it). */
+  const refresh = useCallback(() => {
+    wantFull.current = true;
+    return reload();
+  }, [reload]);
 
-  if (!project || !customer) {
+  /* ── The WhatsApp dock: which job this is, and its Tasks slot ──────────────── */
+  const jobJson = useMemo(() => {
+    if (!rec) return '';
+    const job: DockJob = {
+      projectId: rec.project.id,
+      enquiryId: rec.customer.id,
+      enquiryIds: rec.whatsapp.enquiryIds?.length ? rec.whatsapp.enquiryIds : [rec.customer.id],
+      threadId: rec.whatsapp.number ? rec.whatsapp.threadId : null,
+      waId: rec.whatsapp.number,
+      name: rec.customer.name,
+      ref: rec.project.project_ref ?? null,
+      customerRef: rec.customer.customer_ref ?? null,
+      stage: rec.project.stage,
+      unread: rec.whatsapp.unread,
+      docs: rec.documents,
+    };
+    return JSON.stringify(job);
+  }, [rec]);
+  useEffect(() => {
+    if (!jobJson) return;
+    const job = JSON.parse(jobJson) as DockJob;
+    // The dock answers with its state (and the Tasks slot when This job is showing).
+    const ack = () => setDockAck(true);
+    window.addEventListener(DOCK.state, ack, { once: true });
+    sendDockJob(job);
+    const onReady = () => sendDockJob(job);
+    window.addEventListener(DOCK.ready, onReady);
+    return () => {
+      window.removeEventListener(DOCK.ready, onReady);
+      window.removeEventListener(DOCK.state, ack);
+    };
+  }, [jobJson]);
+  useEffect(() => () => sendDockJob(null), []);
+
+  // The dock's "Add mobile": the Customer card opens for editing (in the Details tab below 1280px).
+  useEffect(() => {
+    const onAction = (e: Event) => {
+      const d = (e as CustomEvent<{ action?: string; projectId?: string }>).detail;
+      if (d?.action !== 'edit-customer' || d.projectId !== id) return;
+      if (!window.matchMedia('(min-width: 1280px)').matches) setTabSel('details');
+      setEditCustomer((n) => n + 1);
+    };
+    window.addEventListener(DOCK.action, onAction);
+    return () => window.removeEventListener(DOCK.action, onAction);
+  }, [id]);
+
+  /* ── After a phone call ─────────────────────────────────────────────────────── */
+  const calledAt = useRef(0);
+  useEffect(() => {
+    const onBack = () => {
+      if (document.visibilityState !== 'visible' || !calledAt.current) return;
+      if (Date.now() - calledAt.current < CALL_PROMPT_MS) setCallPrompt(true);
+      calledAt.current = 0;
+    };
+    document.addEventListener('visibilitychange', onBack);
+    return () => document.removeEventListener('visibilitychange', onBack);
+  }, []);
+
+  /* ── Tabs ────────────────────────────────────────────────────────────────────── */
+  const schema = rec?.schema ?? serverSchema;
+  const stage = rec?.project.stage ?? '';
+  const fallbackTab = stage ? defaultTab(stage, area) : 'activity';
+  let tab: Tab = tabSel ?? fallbackTab;
+  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys)) tab = fallbackTab;
+
+  const pickTab = useCallback((t: Tab) => {
+    setTabSel(t);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', t);
+      url.searchParams.delete('entry');
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // The tab still changes; only Back won't remember it.
+    }
+  }, []);
+
+  // Phones: the tabs scroll sideways, so keep the one that's open in view.
+  const loaded = rec !== null;
+  useEffect(() => {
+    const bar = document.querySelector<HTMLElement>('.crmr-tabs');
+    const on = bar?.querySelector<HTMLElement>('button.on');
+    if (!bar || !on || bar.scrollWidth <= bar.clientWidth) return;
+    const left = on.offsetLeft - bar.offsetLeft;
+    if (left < bar.scrollLeft || left + on.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollTo({ left: Math.max(0, left - 16) });
+  }, [tab, loaded]);
+
+  // "+ Add" on a document tile: open Docs, then tell its upload which kind (Unit Q's DocumentsTab listens).
+  useEffect(() => {
+    if (!pendingDoc || tab !== 'docs') return;
+    const t = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('hx:add-document', { detail: { category: pendingDoc } }));
+      setPendingDoc(null);
+    }, 60);
+    return () => clearTimeout(t);
+  }, [pendingDoc, tab]);
+
+  /* ── Saving ──────────────────────────────────────────────────────────────────── */
+  const patch = useCallback(
+    async (body: Record<string, unknown>) => {
+      setError('');
+      try {
+        const d = await send<{ warning?: string }>(`/api/crm/projects/${id}`, 'PATCH', body);
+        setNotice(d.warning || '');
+        void refresh();
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Not saved');
+        return false;
+      }
+    },
+    [id, refresh]
+  );
+
+  if (!rec) {
     return (
-      <div className="crm">
-        <Link href="/admin/crm" className="crm-back">
-          ← Opportunities
-        </Link>
+      <div className="crm crmh crmr">
         <p className={error ? 'crm-banner crm-banner--err' : 'crm-muted'}>{error || 'Loading…'}</p>
       </div>
     );
   }
 
-  const postcode = project.postcode || customer.postcode;
-  const done = async () => {
-    setSheet(null);
-    await load();
+  const p = rec.project;
+  const c = rec.customer;
+  const wa = rec.whatsapp;
+  const first = firstName(c.name) || c.name;
+  const jobRef = refOf(p, c);
+  const site = siteOf(p, c);
+  const delivery = isProjectStage(p.stage);
+  const done = p.stage === 'complete' || p.stage === 'lost';
+  const primary = adjustPrimary(
+    primaryActionFor(p.stage, { surveyDay: p.survey_at ? ukDayOf(p.survey_at) : null, today, keyMissing: rec.progress.keyMissing }),
+    schema
+  );
+  const slotEl = dock.tasksSlot && typeof document !== 'undefined' ? document.getElementById(dock.tasksSlot) : null;
+  const tasksInDockTab = wide1280 && dock.state === 'open' && dock.panel && !slotEl && dockAck;
+  const counts = {
+    photos: rec.photos.length,
+    docs: rec.documents.length,
+    surveys: rec.surveys.length,
   };
 
+  function openSheet(s: SheetKey, opts: { draft?: string; photoCat?: string } = {}) {
+    setSheetOpts(opts);
+    setSheet(s);
+  }
+  const closeSheet = () => setSheet(null);
+  const savedAndClose = () => {
+    setSheet(null);
+    void reload();
+  };
+
+  /** The green button: the dock from 761px, the full-screen chat on phones, the old sheet without either. */
+  function openWhatsApp(draft?: string) {
+    if (!wa.number) {
+      // No mobile yet: add it first.
+      if (!wide1280) pickTab('details');
+      setEditCustomer((n) => n + 1);
+      setNotice(`Add ${first}’s mobile to message them on WhatsApp.`);
+      return;
+    }
+    if (openDock({ tab: 'job', focus: true, ...(draft ? { draft } : {}) })) return;
+    const el = document.getElementById('hx-dock');
+    if (el && !el.hidden && !wide761 && wa.threadId && !draft) {
+      try {
+        sessionStorage.setItem('hx-chat-from', id);
+        sessionStorage.setItem(SCROLL_KEY(id), `${Math.round(window.scrollY)}:${Date.now()}`);
+      } catch {
+        // "Back to job" then links back instead.
+      }
+      router.push(`/admin/crm/chats/${wa.threadId}?job=${id}&tab=${tab}`);
+      return;
+    }
+    openSheet('whatsapp', { draft: draft ?? '' });
+  }
+
+  function focusField(fieldId: string) {
+    pickTab('overview');
+    setTimeout(() => {
+      const el = document.getElementById(fieldId);
+      el?.scrollIntoView({ block: 'center' });
+      el?.focus({ preventScroll: true });
+    }, 80);
+  }
+
+  async function startSurvey(type: 'solar' | 'ashp') {
+    setStarting(true);
+    setError('');
+    try {
+      const d = await send<{ id: string }>('/api/crm/surveys', 'POST', { project_id: id, type }, 'Couldn’t start the survey.');
+      window.location.href = `/admin/surveys/${d.id}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t start the survey.');
+      setStarting(false);
+    }
+  }
+
+  function addDocument(category: string) {
+    pickTab('docs');
+    setPendingDoc(category);
+  }
+
+  async function runAction(a: ActionKey, to?: string, confirmText?: string) {
+    switch (a) {
+      case 'mark_contacted':
+        await patch({ stage: 'contacted' });
+        return;
+      case 'booking_link':
+        if (schema.booking) openSheet('link');
+        else focusField('rec-survey-at');
+        return;
+      case 'start_survey':
+        if (schema.surveys) void startSurvey('solar');
+        else focusField('rec-survey-at');
+        return;
+      case 'find_time':
+        if (schema.booking) router.push(`/admin/surveys?project=${id}`);
+        else focusField('rec-survey-at');
+        return;
+      case 'send_quote':
+        addDocument('quote');
+        return;
+      case 'chase_quote':
+        openWhatsApp(`Hi ${first}, just checking you got our quote and whether you have any questions. Happy to talk it through.`);
+        return;
+      case 'mark_won':
+        if (window.confirm(`Mark ${c.name}’s job as Won?`)) await patch({ stage: 'won' });
+        return;
+      case 'move_next':
+        if (!to || (confirmText && !window.confirm(confirmText))) return;
+        await patch({ stage: to });
+        return;
+      case 'install_dates':
+        focusField('rec-install-at');
+        return;
+      case 'upload_certificate':
+        addDocument('mcs');
+        return;
+      case 'ask_review':
+        openWhatsApp(`Hi ${first}, thank you for choosing Heliaxis. If you’re happy with everything, would you leave us a quick review? It really helps us.`);
+        return;
+      case 'reopen':
+        openSheet('stage');
+        return;
+    }
+  }
+
+  const overviewActions: OverviewActions = {
+    patch,
+    checklist: async (item, b) => {
+      try {
+        const d = await send<Pick<RecordData, 'checklist' | 'progress'>>(`/api/crm/projects/${id}/checklist`, 'POST', { item, ...b });
+        setRec((r) => (r ? { ...r, checklist: d.checklist, progress: d.progress } : r));
+        void reload();
+        return null;
+      } catch (e) {
+        return e instanceof Error ? e.message : 'Not saved';
+      }
+    },
+    moveTo: async (s) => {
+      await patch({ stage: s });
+    },
+    openTab: (t, cat) => {
+      if (t === 'photos') setPhotoView((v) => ({ cat: cat ?? null, key: v.key + 1 }));
+      // From 1280px the customer's details are the left column, not a tab.
+      if (t === 'details' && wide1280) document.querySelector('.crmr-customer')?.scrollIntoView({ block: 'nearest' });
+      else pickTab(t);
+    },
+    addDocument,
+    addPhoto: (cat) => openSheet('photo', { photoCat: cat }),
+    startSurvey: (type) => void startSurvey(type),
+    bookingLink: () => openSheet('link'),
+  };
+
+  const tasksCard = (where: 'page' | 'dock') => (
+    <TasksCard
+      projectId={id}
+      tasks={rec.tasks}
+      team={rec.team}
+      me={me}
+      today={today}
+      defaultAssignee={p.owner_id}
+      delivery={delivery}
+      where={where}
+      onChanged={() => reload()}
+    />
+  );
+  const tabLabel: Record<Exclude<Tab, 'details'>, React.ReactNode> = {
+    overview: 'Overview',
+    activity: (
+      <>
+        Activity{wa.unread > 0 && <em>{wa.unread} new</em>}
+      </>
+    ),
+    photos: <>Photos{counts.photos > 0 && <i>{counts.photos}</i>}</>,
+    docs: <>Docs{counts.docs > 0 && <i>{counts.docs}</i>}</>,
+    surveys: <>Surveys{counts.surveys > 0 && <i>{counts.surveys}</i>}</>,
+  };
+  const shownTabs = (['overview', 'activity', 'photos', 'docs', ...(schema.surveys ? ['surveys'] : [])] as Exclude<Tab, 'details'>[]);
+
   return (
-    <div className="crm crm-project">
-      <div className="crm-phead">
-        <Link href="/admin/crm" className="crm-back" aria-label="Back to opportunities">
-          ←
-        </Link>
-        <div className="crm-phead-main">
-          <h1>{customer.name}</h1>
-          <p>
-            {postcode || 'No postcode'}
-            {project.title !== customer.name && project.title !== `${customer.name} · ${postcode}` ? ` · ${project.title}` : ''}
-          </p>
-        </div>
-        <button type="button" className={`crm-stage crm-stage--btn st-${project.stage}`} onClick={() => setSheet('stage')}>
-          {stageLabel(project.stage)} ▾
-        </button>
-      </div>
-
-      <NextStepBar
-        project={project}
-        onEdit={() => setSheet('next')}
-        onDone={() => patch({ complete_next_step: true } as unknown as Partial<Project>)}
+    <div className="crm crmh crmr" data-tab={tab} data-phase={phaseOf(p.stage)}>
+      <RecordHeader
+        project={p}
+        customer={c}
+        waNumber={wa.number}
+        others={rec.others}
+        duplicates={rec.duplicates}
+        area={area}
+        now={now}
+        progress={delivery ? rec.progress : null}
+        primary={primary}
+        nextDate={nextDateWords(rec.next_date, p)}
+        jobRef={jobRef}
+        isAdmin={isAdmin}
+        site={site}
+        onStage={() => openSheet('stage')}
+        onMoveTo={(s) => void patch({ stage: s })}
+        onPrimary={(a, to, confirmText) => void runAction(a, to, confirmText)}
+        onEmail={() => openSheet('email')}
+        onCall={() => {
+          calledAt.current = Date.now();
+        }}
+        onName={() => {
+          if (!wide1280) pickTab('details');
+          else document.querySelector('.crmr-customer')?.scrollIntoView({ block: 'nearest' });
+        }}
+        onNewProject={() => openSheet('newproject')}
+        onDelete={() => openSheet('delete')}
       />
-      <TaskList tasks={tasks} onAdd={() => setSheet('task')} onChanged={load} />
 
-      <div className={wide ? 'crm-split' : ''}>
-      <div className="crm-split-main">
-      <div className="crm-tabs crm-tabs--slim" role="tablist">
-        {(
-          [
-            ['activity', `Activity${wa?.unread ? ` · ${wa.unread} new` : ''}`],
-            ['photos', `Photos${photos.length ? ` (${photos.length})` : ''}`],
-            ['docs', `Docs${docs.length ? ` (${docs.length})` : ''}`],
-            ...(wide ? [] : ([['details', 'Details']] as const)),
-          ] as const
-        ).map(([k, label]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-            {label}
+      {callPrompt && (
+        <CallPrompt
+          name={c.name}
+          onAnswered={() => {
+            setCallPrompt(false);
+            openSheet('call');
+          }}
+          onNoAnswer={async () => {
+            setCallPrompt(false);
+            await send(`/api/crm/projects/${id}/activities`, 'POST', { kind: 'call', body: 'Called, no answer.' }).catch(() => null);
+            void reload();
+          }}
+          onSkip={() => setCallPrompt(false)}
+        />
+      )}
+      {notice && (
+        <p className="crm-banner crmr-notice">
+          {notice}
+          <button type="button" className="crm-link" onClick={() => setNotice('')}>
+            OK
           </button>
-        ))}
-      </div>
-
+        </p>
+      )}
       {error && <p className="crm-banner crm-banner--err">{error}</p>}
 
-      {(tab === 'activity' || (wide && tab === 'details')) && <Feed entries={timeline} customerName={customer.name} />}
-      {tab === 'photos' && <Photos id={id} photos={photos} onChanged={load} />}
-      {tab === 'docs' && <DocumentsTab id={id} docs={docs} onChanged={load} />}
-      </div>
-      {(wide || tab === 'details') && (
-        <aside className={wide ? 'crm-split-side' : ''}>
-        <PortalCard
-          id={id}
-          portal={portal}
-          open={portalOpen(project.stage)}
-          tracker={tracker}
-          onSendWhatsApp={(text) => {
-            setWaDraft(text);
-            setSheet('whatsapp');
-          }}
-        />
-        <DnoDeposit key={`${project.id}-${project.updated_at}`} project={project} stripe={connected.stripe} onSave={(b) => patch(b as Partial<Project>)} />
-        <Details
-          key={project.id}
-          project={project}
-          customer={customer}
-          wa={wa}
-          team={team}
-          onSave={patch}
-          onCustomerSaved={load}
-          isAdmin={isAdmin}
-          onDelete={async () => {
-            if (!confirm('Delete this opportunity, its timeline entries, tasks and photos? This can’t be undone.')) return;
-            const r = await fetch(`/api/crm/projects/${id}`, { method: 'DELETE' });
-            if (r.ok) router.push('/admin/crm');
-            else setError((await r.json().catch(() => ({}))).error || 'Not deleted');
-          }}
-        />
+      <div className="crmr-grid">
+        <aside className="crmr-left" aria-label="Customer and job details">
+          <CustomerColumn
+            project={p}
+            customer={c}
+            wa={wa}
+            others={rec.others}
+            surveys={rec.surveys}
+            team={rec.team}
+            schema={schema}
+            area={area}
+            now={now}
+            portal={rec.portal}
+            tracker={rec.tracker}
+            stripe={rec.connected.stripe}
+            isAdmin={isAdmin}
+            editCustomer={editCustomer}
+            onSaved={() => refresh()}
+            onSaveProject={patch}
+            onSendWhatsApp={(text) => openWhatsApp(text)}
+            onDelete={() => openSheet('delete')}
+            onNewProject={() => openSheet('newproject')}
+            // The dock is open on Chats, so there's no right-hand column and no Tasks space in the dock:
+            // the card itself comes here, so Tasks are never missing and the chat stays open.
+            tasksElsewhere={tasksInDockTab ? tasksCard('page') : null}
+          />
         </aside>
-      )}
-      </div>
 
-      {(wide || tab !== 'details') && (
-        <button type="button" className="crm-fab" aria-label="Add" onClick={() => setSheet('menu')}>
-          +
-        </button>
-      )}
-
-      {sheet && (
-        <div className="crm-sheet" role="dialog" aria-modal="true" onClick={() => setSheet(null)}>
-          <div className="crm-sheet-box" onClick={(e) => e.stopPropagation()}>
-            {sheet === 'menu' && <ActionMenu customer={customer} wa={wa} onPick={setSheet} />}
-            {sheet === 'task' && (
-              <TaskEditor
-                id={id}
-                team={team}
-                defaultAssignee={project.owner_id}
-                onSaved={async () => {
-                  setSheet(null);
-                  await load();
-                }}
-              />
-            )}
-            {sheet === 'next' && (
-              <NextStepEditor
-                project={project}
-                onSave={async (next_step, next_step_at) => {
-                  setSheet(null);
-                  await patch({ next_step, next_step_at } as Partial<Project>);
-                }}
-              />
-            )}
-            {sheet === 'whatsapp' && (
-              <WhatsAppComposer
-                projectId={id}
-                docs={docs}
-                initialText={waDraft}
-                customer={customer}
-                wa={wa}
-                onSent={async () => {
-                  setWaDraft('');
-                  await done();
-                }}
-              />
-            )}
-            {(sheet === 'note' || sheet === 'call' || sheet === 'visit') && (
-              <LogComposer id={id} kind={sheet} phone={customer.phone} onSaved={done} />
-            )}
-            {sheet === 'email' && (
-              <EmailComposerV2 id={id} customer={{ name: customer.name, email: customer.email }} docs={docs} connected={connected.email} onSaved={done} />
-            )}
-            {sheet === 'photo' && <PhotoQuick id={id} onDone={done} />}
-            {sheet === 'stage' && (
-              <div>
-                <h2>Move stage</h2>
-                <div className="crm-stage-list">
-                  {STAGES.map((st) => (
-                    <button
-                      key={st.key}
-                      type="button"
-                      className={project.stage === st.key ? 'on' : ''}
-                      onClick={async () => {
-                        setSheet(null);
-                        if (st.key !== project.stage) await patch({ stage: st.key });
-                      }}
-                    >
-                      <span className={`crm-stage st-${st.key}`}>{st.label}</span>
-                      {project.stage === st.key ? ' ✓' : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="crmr-band">
+          <CompactCustomer project={p} customer={c} wa={wa} onDetails={() => pickTab('details')} />
         </div>
-      )}
-    </div>
-  );
-}
 
-/** Everything with the customer, oldest first like a chat — WhatsApp as bubbles, the rest as cards. */
-function Feed({ entries, customerName }: { entries: Entry[]; customerName: string }) {
-  const endRef = useRef<HTMLDivElement>(null);
-  // Oldest first, each flagged when it starts a new day.
-  const items = useMemo(() => {
-    const out: (Entry & { day: string; showDay: boolean })[] = [];
-    for (const e of [...entries].reverse()) {
-      const day = new Date(e.at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-      out.push({ ...e, day, showDay: day !== out[out.length - 1]?.day });
-    }
-    return out;
-  }, [entries]);
-  const last = items[items.length - 1]?.id;
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' });
-  }, [last]);
-  if (!items.length) {
-    return <p className="crm-muted crm-empty">Nothing yet with {customerName}. Tap + to message them, log a call or add a note.</p>;
-  }
-  return (
-    <div className="crm-feed">
-      {items.map((e) => {
-        const time = new Date(e.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-        const sep = e.showDay ? <div className="crm-feed-day">{e.day}</div> : null;
-        if (e.kind === 'whatsapp') {
-          const inbound = e.meta?.direction === 'in';
-          const status = String(e.meta?.status || '');
-          return (
-            <div key={e.id}>
-              {sep}
-              <div className={`crm-bubble ${inbound ? 'in' : 'out'}`}>
-                {!inbound && e.by && <span className="crm-bubble-by">{e.by}</span>}
-                <span className="crm-bubble-text">{e.body}</span>
-                <span className="crm-bubble-meta">
-                  💬 {time}
-                  {!inbound && e.meta?.via !== 'import' && <span className={`crm-wa-tick ${status}`}>{status === 'read' || status === 'delivered' ? ' ✓✓' : status === 'failed' ? ' !' : ' ✓'}</span>}
-                </span>
-              </div>
-            </div>
-          );
-        }
-        return (
-          <div key={e.id}>
-            {sep}
-            <div className={`crm-event k-${e.kind}`}>
-              <span className="crm-event-icon" aria-hidden="true">
-                {ICON[e.kind] || '•'}
-              </span>
-              <div className="crm-event-body">
-                <div className="crm-event-meta">
-                  <b>
-                    {e.kind === 'email' && e.meta?.direction === 'in'
-                      ? '✉️ Email received'
-                      : e.kind === 'email' && e.meta?.synced
-                        ? '✉️ Email sent'
-                        : ACTIVITY_LABEL[e.kind] || e.kind}
-                  </b>
-                  {e.by ? ` · ${e.by}` : ''} · {time}
-                </div>
-                {e.body && <p>{e.body}</p>}
-              </div>
-            </div>
+        {!done && (
+          <div className="crmr-next">
+            <NextStepBar
+              project={p}
+              now={now}
+              onEdit={() => openSheet('next')}
+              onDone={() => void patch({ complete_next_step: true })}
+              onSnooze={(at) => void patch({ next_step_at: at })}
+            />
           </div>
-        );
-      })}
-      <div ref={endRef} />
-    </div>
-  );
-}
-
-function ActionMenu({ customer, wa, onPick }: { customer: Customer; wa: WaInfo | null; onPick: (s: Sheet) => void }) {
-  // Online first: the team messages customers rather than ringing them.
-  const items: [Sheet, string, string, string?][] = [
-    ['whatsapp', '💬', 'WhatsApp', !wa?.number ? 'Add their mobile first' : wa.windowOpen ? 'Reply' : 'Template (paid)'],
-    ['email', '✉️', 'Email', customer.email ? undefined : 'No email'],
-    ['task', '✅', 'Task', 'Assign + due date'],
-    ['note', '📝', 'Note'],
-    ['next', '⏰', 'Next step', 'Follow-up reminder'],
-    ['photo', '📷', 'Photos'],
-    ['visit', '🏠', 'Site visit'],
-    ['stage', '➜', 'Move stage'],
-    ['call', '📞', 'Log a call'],
-  ];
-  return (
-    <div>
-      <h2>Add to {customer.name}</h2>
-      <div className="crm-menu">
-        {items.map(([k, icon, label, hint]) => (
-          <button key={k} type="button" onClick={() => onPick(k)}>
-            <span className="crm-menu-icon">{icon}</span>
-            <span>{label}</span>
-            {hint && <small>{hint}</small>}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function WhatsAppComposer({
-  projectId,
-  docs,
-  initialText = '',
-  customer,
-  wa,
-  onSent,
-}: {
-  projectId: string;
-  docs: CrmDoc[];
-  initialText?: string;
-  customer: Customer;
-  wa: WaInfo | null;
-  onSent: () => Promise<void>;
-}) {
-  const [text, setText] = useState(initialText);
-  const [chase, setChase] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
-  const tplSend = useTemplateSend(customer.id, !!wa?.number && !wa.windowOpen && !!wa.configured);
-  const { templates, pick: tpl } = tplSend;
-
-  if (!wa?.configured) return <ComposerNote title="WhatsApp" body="WhatsApp isn’t connected yet — finish the Meta setup (WHATSAPP_SETUP.md)." />;
-  if (!wa.number || !wa.threadId) return <ComposerNote title="WhatsApp" body="Add the customer’s mobile in Details first — any WhatsApp chat on that number then links here." />;
-
-  async function send(body: Record<string, unknown>) {
-    setBusy(true);
-    setErr('');
-    const r = await fetch(`/api/whatsapp/conversations/${wa!.threadId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const d = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) return setErr(d.error || 'Not sent');
-    await onSent();
-  }
-  const asks = text.includes('?');
-
-  return (
-    <div>
-      <h2>WhatsApp {customer.name}</h2>
-      <p className="crm-muted crm-small">
-        +{wa.number} · {wa.windowOpen ? 'free to reply (inside 24h)' : 'outside 24h — an approved template is needed (~2–5p)'} ·{' '}
-        <Link href={`/admin/enquiries/inbox/${wa.threadId}`} className="crm-link">
-          Full chat
-        </Link>
-      </p>
-      {wa.windowOpen ? (
-        <>
-          <SnippetPicker projectId={projectId} name={customer.name} onPick={(t) => setText((cur) => (cur.trim() ? `${cur}\n${t}` : t))} />
-          <WhatsAppDocSend id={projectId} docs={docs} onSent={onSent} />
-          <textarea className="crm-input" rows={4} autoFocus placeholder="Message" value={text} onChange={(e) => setText(e.target.value)} />
-          {asks && wa.chaseHours > 0 && (
-            <label className="crm-check">
-              <input type="checkbox" checked={chase} onChange={(e) => setChase(e.target.checked)} /> Chase if no reply in {wa.chaseHours}h
-            </label>
-          )}
-          {err && <p className="crm-banner crm-banner--err">{err}</p>}
-          <div className="crm-actions">
-            <button
-              type="button"
-              className="crm-btn crm-btn--wa"
-              disabled={busy || !text.trim()}
-              onClick={() => send({ text: text.trim(), chaseHours: asks && chase ? wa.chaseHours : 0 })}
-            >
-              {busy ? 'Sending…' : 'Send WhatsApp'}
-            </button>
-          </div>
-        </>
-      ) : templates === null ? (
-        <p className="crm-muted">Loading templates…</p>
-      ) : !templates.length || !tpl ? (
-        <p className="crm-muted">
-          No approved templates yet.{' '}
-          <Link href="/admin/enquiries/templates" className="crm-link">
-            Send one to Meta from WhatsApp templates
-          </Link>
-        </p>
-      ) : (
-        <>
-          <TemplateSendFields send={tplSend} inputClass="crm-input" />
-          {err && <p className="crm-banner crm-banner--err">{err}</p>}
-          <div className="crm-actions">
-            <button
-              type="button"
-              className="crm-btn crm-btn--wa"
-              disabled={busy || !tplSend.ready}
-              onClick={() => send({ template: tpl.name, lang: tpl.lang, params: tpl.params })}
-            >
-              {busy ? 'Sending…' : 'Send template'}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function ComposerNote({ title, body }: { title: string; body: string }) {
-  return (
-    <div>
-      <h2>{title}</h2>
-      <p className="crm-muted">{body}</p>
-    </div>
-  );
-}
-
-function LogComposer({ id, kind, phone, onSaved }: { id: string; kind: 'note' | 'call' | 'visit'; phone: string | null; onSaved: () => Promise<void> }) {
-  const [body, setBody] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const title = { note: 'Add a note', call: 'Log a call', visit: 'Log a site visit' }[kind];
-  const placeholder = { note: 'Anything worth remembering…', call: 'What was said?', visit: 'How did the visit go?' }[kind];
-  async function save() {
-    setBusy(true);
-    setErr('');
-    const r = await fetch(`/api/crm/projects/${id}/activities`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, body }),
-    });
-    const d = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) return setErr(d.error || 'Not saved');
-    await onSaved();
-  }
-  return (
-    <div>
-      <h2>{title}</h2>
-      {kind === 'call' && phone && (
-        <a className="crm-btn crm-btn--ghost crm-callbtn" href={`tel:${phone.replace(/\s/g, '')}`}>
-          📞 Call {phone}
-        </a>
-      )}
-      <textarea className="crm-input" rows={5} autoFocus placeholder={placeholder} value={body} onChange={(e) => setBody(e.target.value)} />
-      {err && <p className="crm-banner crm-banner--err">{err}</p>}
-      <div className="crm-actions">
-        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={save}>
-          {busy ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PhotoQuick({ id, onDone }: { id: string; onDone: () => Promise<void> }) {
-  const [cat, setCat] = useState('site');
-  const [busy, setBusy] = useState(false);
-  const cam = useRef<HTMLInputElement>(null);
-  const pick = useRef<HTMLInputElement>(null);
-  async function onFiles(files: FileList | null) {
-    if (!files?.length) return;
-    setBusy(true);
-    await addPhotos(id, cat, files).catch(() => 0);
-    setBusy(false);
-    await onDone();
-  }
-  return (
-    <div>
-      <h2>Photos</h2>
-      <div className="crm-checks">
-        {PHOTO_CATEGORIES.map((c) => (
-          <label key={c.key} className={cat === c.key ? 'on' : ''}>
-            <input type="radio" name="cat" checked={cat === c.key} onChange={() => setCat(c.key)} />
-            {c.label}
-          </label>
-        ))}
-      </div>
-      <div className="crm-photo-actions" style={{ marginTop: '0.8rem' }}>
-        <button type="button" className="crm-btn crm-btn--solar crm-btn--big" disabled={busy} onClick={() => cam.current?.click()}>
-          {busy ? 'Preparing…' : `📷 Take ${photoLabel(cat).toLowerCase()} photo`}
-        </button>
-        <button type="button" className="crm-btn crm-btn--ghost" disabled={busy} onClick={() => pick.current?.click()}>
-          🖼 Gallery
-        </button>
-      </div>
-      <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFiles(e.target.files)} />
-      <input ref={pick} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
-    </div>
-  );
-}
-
-function TaskList({ tasks, onAdd, onChanged }: { tasks: CrmTask[]; onAdd: () => void; onChanged: () => Promise<void> }) {
-  const [showDone, setShowDone] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const today = new Date().toLocaleDateString('en-CA');
-  const open = tasks.filter((t) => t.status !== 'done');
-  const done = tasks.filter((t) => t.status === 'done');
-  async function toggle(t: CrmTask) {
-    setBusy(t.id);
-    await fetch(`/api/crm/tasks/${t.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: t.status === 'done' ? 'todo' : 'done' }),
-    }).catch(() => null);
-    setBusy(null);
-    await onChanged();
-  }
-  const row = (t: CrmTask) => {
-    const late = t.status !== 'done' && t.due_date && t.due_date < today;
-    const isToday = t.due_date === today;
-    return (
-      <li key={t.id} className={t.status === 'done' ? 'done' : ''}>
-        <button type="button" className="crm-tick" disabled={busy === t.id} aria-label={t.status === 'done' ? 'Reopen' : 'Mark done'} onClick={() => toggle(t)}>
-          {t.status === 'done' ? '✓' : ''}
-        </button>
-        <span className="crm-task-main">
-          <b>{t.title}</b>
-          <small>
-            {[t.assignee, t.priority === 'high' ? 'High priority' : ''].filter(Boolean).join(' · ')}
-          </small>
-        </span>
-        {t.due_date && (
-          <span className={`crm-task-due${late ? ' late' : isToday ? ' today' : ''}`}>
-            {isToday
-              ? 'Today'
-              : new Date(`${t.due_date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-          </span>
         )}
-      </li>
-    );
-  };
-  return (
-    <div className="crm-tasks">
-      <div className="crm-tasks-head">
-        <b>Tasks{open.length ? ` (${open.length})` : ''}</b>
-        <button type="button" className="crm-link" onClick={onAdd}>
-          + Add task
-        </button>
-      </div>
-      {open.length > 0 && <ul>{open.map(row)}</ul>}
-      {done.length > 0 && (
-        <>
-          <button type="button" className="crm-link crm-tasks-done" onClick={() => setShowDone((v) => !v)}>
-            {showDone ? 'Hide' : 'Show'} {done.length} done
-          </button>
-          {showDone && <ul>{done.map(row)}</ul>}
-        </>
-      )}
-    </div>
-  );
-}
 
-function TaskEditor({
-  id,
-  team,
-  defaultAssignee,
-  onSaved,
-}: {
-  id: string;
-  team: { id: string; name: string }[];
-  defaultAssignee: string | null;
-  onSaved: () => Promise<void>;
-}) {
-  const [title, setTitle] = useState('');
-  const [due, setDue] = useState('');
-  const [assignee, setAssignee] = useState(defaultAssignee || '');
-  const [high, setHigh] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const iso = (offset: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    return d.toLocaleDateString('en-CA');
-  };
-  async function save() {
-    setBusy(true);
-    setErr('');
-    const r = await fetch(`/api/crm/projects/${id}/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, due_date: due || null, assignee_id: assignee || null, priority: high ? 'high' : 'normal' }),
-    });
-    const d = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) return setErr(d.error || 'Not saved');
-    await onSaved();
-  }
-  const ideas = ['Send quote', 'Send invoice', 'Send EV guide', 'Chase for photos', 'Book survey', 'Check funding', 'Order kit'];
-  return (
-    <div>
-      <h2>New task</h2>
-      <input className="crm-input" autoFocus placeholder="What needs doing?" value={title} onChange={(e) => setTitle(e.target.value)} />
-      <div className="crm-quickpicks">
-        {ideas.map((i) => (
-          <button key={i} type="button" onClick={() => setTitle(i)}>
-            {i}
-          </button>
-        ))}
-      </div>
-      <div className="crm-grid2">
-        <div>
-          <label className="crm-label">Who</label>
-          <select className="crm-input" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-            <option value="">Unassigned</option>
-            {team.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
+        <aside className="crmr-right" aria-label="Tasks">
+          {!slotEl && !tasksInDockTab && tasksCard('page')}
+          <p className="crmr-grey crmr-chathint">Chat with {first} is in the strip on the right, or press the green button.</p>
+        </aside>
+
+        <section className="crmr-main" aria-label="The job">
+          <div className="crmr-tabs" role="tablist" aria-label="Job">
+            {shownTabs.map((k) => (
+              <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => pickTab(k)}>
+                {tabLabel[k]}
+              </button>
             ))}
-          </select>
-        </div>
-        <div>
-          <label className="crm-label">Due</label>
-          <input className="crm-input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
-        </div>
-      </div>
-      <div className="crm-quickpicks">
-        <button type="button" onClick={() => setDue(iso(0))}>Today</button>
-        <button type="button" onClick={() => setDue(iso(1))}>Tomorrow</button>
-        <button type="button" onClick={() => setDue(iso(7))}>Next week</button>
-        <label className="crm-check" style={{ marginTop: 0 }}>
-          <input type="checkbox" checked={high} onChange={(e) => setHigh(e.target.checked)} /> High priority
-        </label>
-      </div>
-      <p className="crm-muted crm-small">
-        They get a notification, and it shows in their My day and on the Tasks page. Anyone with CRM or Tasks access can be picked.
-      </p>
-      {err && <p className="crm-banner crm-banner--err">{err}</p>}
-      <div className="crm-actions">
-        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !title.trim()} onClick={save}>
-          {busy ? 'Saving…' : 'Add task'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** The current time, refreshed each minute (so "overdue" flips without a reload). */
-function useNow() {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(t);
-  }, []);
-  return now;
-}
-
-function NextStepBar({ project, onEdit, onDone }: { project: Project; onEdit: () => void; onDone: () => void }) {
-  const now = useNow();
-  if (project.stage === 'complete' || project.stage === 'lost') return null;
-  if (!project.next_step) {
-    return (
-      <button type="button" className="crm-nextbar empty" onClick={onEdit}>
-        ⏰ <span>No next step — add one so this doesn’t go quiet</span>
-      </button>
-    );
-  }
-  const at = project.next_step_at ? new Date(project.next_step_at) : null;
-  const late = at && at.getTime() < now;
-  const today = at && at.toDateString() === new Date(now).toDateString();
-  return (
-    <div className={`crm-nextbar${late ? ' late' : today ? ' today' : ''}`}>
-      <button type="button" className="crm-nextbar-main" onClick={onEdit}>
-        <small>Next step{at ? ` · ${late ? 'overdue · ' : ''}${when(at.toISOString())}` : ''}</small>
-        <span>{project.next_step}</span>
-      </button>
-      <button type="button" className="crm-nextbar-done" onClick={onDone} aria-label="Mark done">
-        ✓ Done
-      </button>
-    </div>
-  );
-}
-
-function NextStepEditor({ project, onSave }: { project: Project; onSave: (text: string | null, at: string | null) => Promise<void> }) {
-  const [text, setText] = useState(project.next_step || '');
-  const [at, setAt] = useState(toLocalInput(project.next_step_at));
-  const quick = (label: string, d: Date) => (
-    <button type="button" onClick={() => setAt(toLocalInput(d.toISOString()))}>
-      {label}
-    </button>
-  );
-  const day = (offset: number, h: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    d.setHours(h, 0, 0, 0);
-    return d;
-  };
-  const nextMonday = () => {
-    const d = day(((8 - new Date().getDay()) % 7) || 7, 9);
-    return d;
-  };
-  const ideas = ['Call back', 'Chase survey photos', 'Book survey', 'Send quote', 'Chase quote', 'Book install'];
-  return (
-    <div>
-      <h2>Next step</h2>
-      <input className="crm-input" autoFocus placeholder="e.g. Chase quote" value={text} onChange={(e) => setText(e.target.value)} />
-      <div className="crm-quickpicks">
-        {ideas.map((i) => (
-          <button key={i} type="button" onClick={() => setText(i)}>
-            {i}
-          </button>
-        ))}
-      </div>
-      <label className="crm-label">When</label>
-      <div className="crm-quickpicks">
-        {quick('Later today', day(0, Math.min(17, new Date().getHours() + 2)))}
-        {quick('Tomorrow 9am', day(1, 9))}
-        {quick('In 3 days', day(3, 9))}
-        {quick('Next Monday', nextMonday())}
-      </div>
-      <input className="crm-input" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} />
-      <p className="crm-muted crm-small">You’ll get a notification when it’s due.</p>
-      <div className="crm-actions">
-        <button
-          type="button"
-          className="crm-btn crm-btn--solar"
-          disabled={!text.trim()}
-          onClick={() => onSave(text.trim(), at ? new Date(at).toISOString() : null)}
-        >
-          Save
-        </button>
-        {project.next_step && (
-          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => onSave(null, null)}>
-            Clear
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Photos({ id, photos, onChanged }: { id: string; photos: Photo[]; onChanged: () => Promise<void> }) {
-  const [cat, setCat] = useState<string>('all');
-  const [waiting, setWaiting] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState<Photo | null>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const pickRef = useRef<HTMLInputElement>(null);
-  const target = cat === 'all' ? 'site' : cat;
-
-  const refreshQueue = useCallback(async () => {
-    const q = await queued().catch(() => []);
-    setWaiting(q.filter((p) => p.projectId === id).length);
-  }, [id]);
-
-  useEffect(() => {
-    const stop = watchQueue();
-    let before = -1;
-    const onQ = async () => {
-      const q = await queued().catch(() => []);
-      const n = q.filter((p) => p.projectId === id).length;
-      setWaiting(n);
-      if (before > n) void onChanged(); // something finished uploading
-      before = n;
-    };
-    window.addEventListener(QUEUE_CHANGED, onQ);
-    void onQ();
-    return () => {
-      stop();
-      window.removeEventListener(QUEUE_CHANGED, onQ);
-    };
-  }, [id, onChanged]);
-
-  async function onFiles(files: FileList | null) {
-    if (!files?.length) return;
-    setBusy(true);
-    try {
-      await addPhotos(id, target, files);
-    } finally {
-      setBusy(false);
-      await refreshQueue();
-      await onChanged();
-    }
-  }
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const p of photos) c[p.category] = (c[p.category] || 0) + 1;
-    return c;
-  }, [photos]);
-  const shown = cat === 'all' ? photos : photos.filter((p) => p.category === cat);
-
-  return (
-    <div>
-      <div className="crm-stages crm-stages--tight">
-        <button type="button" className={cat === 'all' ? 'on' : ''} onClick={() => setCat('all')}>
-          All <span>{photos.length}</span>
-        </button>
-        {PHOTO_CATEGORIES.map((c) => (
-          <button key={c.key} type="button" className={cat === c.key ? 'on' : ''} onClick={() => setCat(c.key)}>
-            {c.label} <span>{counts[c.key] || 0}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="crm-photo-actions">
-        <button type="button" className="crm-btn crm-btn--solar crm-btn--big" disabled={busy} onClick={() => cameraRef.current?.click()}>
-          📷 Take {photoLabel(target).toLowerCase()} photo
-        </button>
-        <button type="button" className="crm-btn crm-btn--ghost" disabled={busy} onClick={() => pickRef.current?.click()}>
-          🖼 From gallery
-        </button>
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFiles(e.target.files).then(() => (e.target.value = ''))} />
-        <input ref={pickRef} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files).then(() => (e.target.value = ''))} />
-      </div>
-      {cat === 'all' && <p className="crm-muted crm-small">Pick a type above first — photos taken from “All” are filed under Site.</p>}
-      {(busy || waiting > 0) && (
-        <p className="crm-banner">
-          {busy ? 'Preparing photos…' : `${waiting} photo${waiting === 1 ? '' : 's'} waiting to upload`}
-          {!busy && (typeof navigator !== 'undefined' && !navigator.onLine ? ' — no signal, they’ll go up when it’s back.' : '…')}
-          {!busy && (
-            <button type="button" className="crm-link" onClick={() => void uploadQueued()}>
-              Retry now
+            <button type="button" role="tab" aria-selected={tab === 'details'} className={`crmr-tab--details${tab === 'details' ? ' on' : ''}`} onClick={() => pickTab('details')}>
+              Details
             </button>
-          )}
-        </p>
-      )}
+          </div>
+          <div className="crmr-pane" role="tabpanel">
+            {tab === 'overview' && <ProjectOverview rec={rec} team={rec.team} today={today} actions={overviewActions} />}
+            {tab === 'activity' && (
+              <ActivityTab
+                projectId={id}
+                entries={rec.timeline}
+                others={rec.others}
+                customerName={c.name}
+                today={today}
+                entry={entry}
+                base={area === 'projects' ? '/admin/projects' : '/admin/crm'}
+                onChanged={() => void reload()}
+              />
+            )}
+            {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={() => refresh()} />}
+            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={() => refresh()} />}
+            {tab === 'surveys' && <SurveysPanel surveys={rec.surveys} busy={starting} onStart={(type) => void startSurvey(type)} />}
+          </div>
+          <RecordFabs unread={wa.unread} name={c.name} onWhatsApp={() => openWhatsApp()} onAdd={() => openSheet('menu')} />
+        </section>
+      </div>
 
-      {shown.length === 0 ? (
-        <p className="crm-muted">No {cat === 'all' ? '' : `${photoLabel(cat).toLowerCase()} `}photos yet.</p>
-      ) : (
-        <div className="crm-photos">
-          {shown.map((p) => (
-            <button key={p.id} type="button" className="crm-photo" onClick={() => setOpen(p)}>
-              {/* Signed storage links — next/image can't optimise them. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {p.thumb ? <img src={p.thumb} alt={p.caption || photoLabel(p.category)} loading="lazy" /> : <span>📷</span>}
-              {cat === 'all' && <span className="crm-photo-tag">{photoLabel(p.category)}</span>}
-            </button>
-          ))}
-        </div>
-      )}
+      {slotEl && createPortal(tasksCard('dock'), slotEl)}
 
-      {open && (
-        <PhotoViewer
-          photo={open}
-          onClose={() => setOpen(null)}
-          onChanged={async () => {
-            setOpen(null);
-            await onChanged();
+      {sheet === 'menu' && (
+        <ActionMenu
+          customer={c}
+          tile={primary.tile}
+          onPick={(s) => (s ? openSheet(s) : closeSheet())}
+          onTile={() => {
+            closeSheet();
+            if (primary.tile) void runAction(primary.tile.action, primary.tile.action === primary.action ? primary.to : undefined);
           }}
+        />
+      )}
+      {sheet === 'task' && <TaskEditor id={id} team={rec.team} today={today} defaultAssignee={p.owner_id} onSaved={savedAndClose} onClose={closeSheet} />}
+      {sheet === 'next' && (
+        <NextStepEditor
+          project={p}
+          now={now}
+          onClose={closeSheet}
+          onSave={(next_step, next_step_at) => {
+            closeSheet();
+            void patch({ next_step, next_step_at });
+          }}
+        />
+      )}
+      {sheet === 'whatsapp' && (
+        <WhatsAppComposer projectId={id} docs={rec.documents} initialText={sheetOpts.draft ?? ''} customer={c} wa={wa} onSent={savedAndClose} onClose={closeSheet} />
+      )}
+      {(sheet === 'note' || sheet === 'call' || sheet === 'visit') && (
+        <LogComposer id={id} kind={sheet} phone={phoneShown(c, wa.number)} onSaved={savedAndClose} onClose={closeSheet} />
+      )}
+      {sheet === 'email' && (
+        <PlainSheet label={`Email ${c.name}`} onClose={closeSheet}>
+          <EmailComposerV2
+            id={id}
+            customer={{ name: c.name, email: c.email || '' }}
+            docs={rec.documents}
+            connected={rec.connected.email}
+            onSaved={async () => {
+              savedAndClose();
+            }}
+          />
+        </PlainSheet>
+      )}
+      {sheet === 'photo' && (
+        <PhotoQuick
+          id={id}
+          initialCat={sheetOpts.photoCat}
+          onClose={closeSheet}
+          onDone={() => {
+            closeSheet();
+            void refresh();
+          }}
+        />
+      )}
+      {sheet === 'stage' && (
+        <StageSheet
+          stage={p.stage}
+          primary={primary}
+          onClose={closeSheet}
+          onPrimary={() => {
+            closeSheet();
+            void runAction(primary.action, primary.to, primary.confirm);
+          }}
+          onPick={(s) => {
+            closeSheet();
+            if (s !== 'lost') return void patch({ stage: s });
+            // Lost: why, if they know (it shows in Job details and the reports).
+            const why = window.prompt(`Why was ${c.name}’s job lost? (optional, e.g. price, timing, went elsewhere)`, p.lost_reason || '');
+            if (why === null) return;
+            void patch({ stage: 'lost', ...(why.trim() ? { lost_reason: why.trim() } : {}) });
+          }}
+        />
+      )}
+      {sheet === 'link' && <LinkSheet projectId={id} onClose={closeSheet} onWhatsApp={(text) => (closeSheet(), openWhatsApp(text))} />}
+      {sheet === 'delete' && <DeleteSheet project={p} customer={c} canInbox={canInbox} area={area} onClose={closeSheet} onDone={(to) => router.push(to)} />}
+      {sheet === 'newproject' && (
+        <NewProjectSheet
+          mode="project"
+          me={me}
+          team={rec.team}
+          customer={{
+            id: c.id,
+            name: c.name,
+            email: c.email,
+            phone: c.phone,
+            postcode: c.postcode,
+            customer_ref: c.customer_ref ?? null,
+            projects: rec.others.length + 1,
+            latest: { address: p.address, postcode: p.postcode, products: p.products },
+            possible_duplicate: null,
+          }}
+          onClose={closeSheet}
+          onCreated={(newId) => router.push(`/admin/projects/${newId}`)}
         />
       )}
     </div>
   );
 }
 
-function PhotoViewer({ photo, onClose, onChanged }: { photo: Photo; onClose: () => void; onChanged: () => Promise<void> }) {
-  const [caption, setCaption] = useState(photo.caption || '');
-  const [category, setCategory] = useState(photo.category);
-  const dirty = caption !== (photo.caption || '') || category !== photo.category;
-  async function save() {
-    await fetch(`/api/crm/photos/${photo.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ caption, category }),
-    });
-    await onChanged();
-  }
-  async function remove() {
-    if (!confirm('Delete this photo?')) return;
-    await fetch(`/api/crm/photos/${photo.id}`, { method: 'DELETE' });
-    await onChanged();
-  }
-  return (
-    <div className="crm-viewer" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="crm-viewer-box" onClick={(e) => e.stopPropagation()}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {photo.url ? <img src={photo.url} alt={photo.caption || ''} /> : <p className="crm-muted">Image unavailable</p>}
-        <div className="crm-viewer-meta">
-          <span className="crm-muted crm-small">
-            {photo.by ? `${photo.by} · ` : ''}
-            {when(photo.created_at)}
-          </span>
-          <input className="crm-input" placeholder="Caption (e.g. consumer unit, roof south face)" value={caption} onChange={(e) => setCaption(e.target.value)} />
-          <select className="crm-input" value={category} onChange={(e) => setCategory(e.target.value)}>
-            {PHOTO_CATEGORIES.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <div className="crm-actions">
-            {dirty && (
-              <button type="button" className="crm-btn crm-btn--solar" onClick={save}>
-                Save
-              </button>
-            )}
-            {photo.url && (
-              <a className="crm-btn crm-btn--ghost" href={photo.url} target="_blank" rel="noreferrer">
-                Full size
-              </a>
-            )}
-            <button type="button" className="crm-btn crm-btn--ghost" onClick={remove}>
-              Delete
-            </button>
-            <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+/**
+ * The stage's main button, for what's set up: before the booking diary (survey-booking.sql) a booking
+ * link or "Find a time" becomes "Add survey date"; before surveys.sql there's no "Start survey".
+ */
+function adjustPrimary(a: PrimaryAction, schema: SchemaReady): PrimaryAction {
+  const noBooking = !schema.booking && (a.action === 'booking_link' || a.action === 'find_time');
+  const noSurveys = !schema.surveys && a.action === 'start_survey';
+  const label = schema.booking ? 'Find a time' : a.action === 'booking_link' ? 'Add survey date' : 'Change survey date';
+  const base = noBooking || noSurveys ? { ...a, action: 'find_time' as const, label, menu: a.menu.filter((m) => m.action !== 'find_time') } : a;
+  const t = base.tile;
+  // No booking diary yet: the tile adds the survey date by hand. No surveys yet: no Start survey tile.
+  const tile = t && !schema.booking && t.action === 'booking_link' ? { action: 'find_time' as const, label: 'Add survey date' } : t && !schema.surveys && t.action === 'start_survey' ? null : t;
+  return { ...base, tile };
 }
 
-function CustomerEditor({ customer, wa, onSaved }: { customer: Customer; wa: WaInfo | null; onSaved: () => Promise<void> }) {
-  const init = { name: customer.name, phone: customer.phone || '', email: customer.email || '', postcode: customer.postcode || '' };
-  const [c, setC] = useState(init);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const dirty = JSON.stringify(c) !== JSON.stringify(init);
-  const set = (k: keyof typeof c) => (e: React.ChangeEvent<HTMLInputElement>) => setC({ ...c, [k]: e.target.value });
-  async function save() {
-    setBusy(true);
-    setErr('');
-    const r = await fetch(`/api/crm/customers/${customer.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(c),
-    });
-    const d = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) return setErr(d.error || 'Not saved');
-    await onSaved();
-  }
-  return (
-    <div className="crm-customer">
-      <h3>Contact</h3>
-      <label className="crm-label">Name</label>
-      <input className="crm-input" value={c.name} onChange={set('name')} />
-      <div className="crm-grid2">
-        <div>
-          <label className="crm-label">Mobile</label>
-          <input className="crm-input" type="tel" value={c.phone} onChange={set('phone')} />
-        </div>
-        <div>
-          <label className="crm-label">Postcode</label>
-          <input className="crm-input" value={c.postcode} onChange={set('postcode')} />
-        </div>
-      </div>
-      <label className="crm-label">Email</label>
-      <input className="crm-input" type="email" value={c.email} onChange={set('email')} />
-      <p className="crm-muted crm-small">
-        {wa?.number
-          ? wa.messages
-            ? `💬 WhatsApp linked on +${wa.number} — ${wa.messages} message${wa.messages === 1 ? '' : 's'} on the timeline.`
-            : `💬 No WhatsApp chat on +${wa.number} yet — any chat on this number links here automatically.`
-          : 'Add a mobile and any WhatsApp chat on that number links here automatically.'}
-        {' · Source: '}
-        {customer.source}
-      </p>
-      {err && <p className="crm-banner crm-banner--err">{err}</p>}
-      {dirty && (
-        <div className="crm-actions">
-          <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={save}>
-            {busy ? 'Saving…' : 'Save contact'}
-          </button>
-          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setC(init)}>
-            Undo
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Details({
+function NextStepBar({
   project,
-  customer,
-  wa,
-  team,
-  onSave,
-  onCustomerSaved,
-  isAdmin,
-  onDelete,
+  now,
+  onEdit,
+  onDone,
+  onSnooze,
 }: {
   project: Project;
-  customer: Customer;
-  wa: WaInfo | null;
-  team: { id: string; name: string }[];
-  onSave: (b: Partial<Project>) => Promise<boolean>;
-  onCustomerSaved: () => Promise<void>;
-  isAdmin: boolean;
-  onDelete: () => void;
+  now: number;
+  onEdit: () => void;
+  onDone: () => void;
+  onSnooze: (at: string) => void;
 }) {
-  const initial = useMemo(
-    () => ({
-      title: project.title,
-      products: project.products,
-      value: project.value == null ? '' : String(project.value),
-      owner_id: project.owner_id || '',
-      address: project.address || '',
-      postcode: project.postcode || '',
-      survey_at: toLocalInput(project.survey_at),
-      install_at: toLocalInput(project.install_at),
-      simpliheat_url: project.simpliheat_url || '',
-      opensolar_url: project.opensolar_url || '',
-      lost_reason: project.lost_reason || '',
-      notes: project.notes || '',
-    }),
-    [project]
-  );
-  const [f, setF] = useState(initial);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const dirty = JSON.stringify(f) !== JSON.stringify(initial);
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setSaved(false);
-    setF({ ...f, [k]: e.target.value });
-  };
-
-  async function save() {
-    setSaving(true);
-    const ok = await onSave({
-      ...f,
-      value: f.value === '' ? null : Number(f.value),
-      owner_id: f.owner_id || null,
-      survey_at: f.survey_at ? new Date(f.survey_at).toISOString() : null,
-      install_at: f.install_at ? new Date(f.install_at).toISOString() : null,
-    } as unknown as Partial<Project>);
-    setSaving(false);
-    setSaved(ok);
+  const [snoozing, setSnoozing] = useState(false);
+  if (!project.next_step) {
+    return (
+      <button type="button" className="crmr-nextbar is-empty" onClick={onEdit}>
+        + Add a next step <span className="crm-muted">so this doesn’t go quiet</span>
+      </button>
+    );
   }
-
+  const at = project.next_step_at;
+  const late = !!at && !!now && Date.parse(at) < now;
+  const isToday = !!at && !!now && ukDayOf(at) === ukDayOf(now);
   return (
-    <div className="crm-details">
-      <CustomerEditor key={`${customer.id}-${customer.phone}-${customer.name}`} customer={customer} wa={wa} onSaved={onCustomerSaved} />
-
-      <h3 className="crm-h3">Opportunity</h3>
-      <label className="crm-label">Opportunity name</label>
-      <input className="crm-input" value={f.title} onChange={set('title')} />
-
-      <label className="crm-label">Products</label>
-      <div className="crm-checks">
-        {PRODUCTS.map((p) => (
-          <label key={p.key} className={f.products.includes(p.key) ? 'on' : ''}>
-            <input
-              type="checkbox"
-              checked={f.products.includes(p.key)}
-              onChange={(e) => {
-                setSaved(false);
-                setF({ ...f, products: e.target.checked ? [...f.products, p.key] : f.products.filter((x) => x !== p.key) });
-              }}
-            />
-            {p.label}
-          </label>
-        ))}
-      </div>
-
-      <div className="crm-grid2">
-        <div>
-          <label className="crm-label">Value £ (inc. VAT)</label>
-          <input className="crm-input" inputMode="decimal" value={f.value} onChange={set('value')} />
-        </div>
-        <div>
-          <label className="crm-label">Owner</label>
-          <select className="crm-input" value={f.owner_id} onChange={set('owner_id')}>
-            <option value="">—</option>
-            {team.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <label className="crm-label">Site address</label>
-      <input className="crm-input" value={f.address} onChange={set('address')} placeholder="If different from the customer’s" />
-      <div className="crm-grid2">
-        <div>
-          <label className="crm-label">Postcode</label>
-          <input className="crm-input" value={f.postcode} onChange={set('postcode')} />
-        </div>
-        <div />
-      </div>
-
-      <div className="crm-grid2">
-        <div>
-          <label className="crm-label">Survey</label>
-          <input className="crm-input" type="datetime-local" value={f.survey_at} onChange={set('survey_at')} />
-        </div>
-        <div>
-          <label className="crm-label">Install</label>
-          <input className="crm-input" type="datetime-local" value={f.install_at} onChange={set('install_at')} />
-        </div>
-      </div>
-
-      <label className="crm-label">SimpliHeat project link</label>
-      <div className="crm-linkrow">
-        <input className="crm-input" type="url" value={f.simpliheat_url} onChange={set('simpliheat_url')} placeholder="https://…" />
-        {initial.simpliheat_url && (
-          <a className="crm-btn crm-btn--ghost" href={initial.simpliheat_url} target="_blank" rel="noreferrer">
-            Open
-          </a>
-        )}
-      </div>
-      <label className="crm-label">OpenSolar project link</label>
-      <div className="crm-linkrow">
-        <input className="crm-input" type="url" value={f.opensolar_url} onChange={set('opensolar_url')} placeholder="https://…" />
-        {initial.opensolar_url && (
-          <a className="crm-btn crm-btn--ghost" href={initial.opensolar_url} target="_blank" rel="noreferrer">
-            Open
-          </a>
-        )}
-      </div>
-
-      {project.stage === 'lost' && (
-        <>
-          <label className="crm-label">Why was it lost?</label>
-          <input className="crm-input" value={f.lost_reason} onChange={set('lost_reason')} placeholder="Price, timing, went elsewhere…" />
-        </>
+    <div className={`crmr-nextbar${late ? ' is-late' : isToday ? ' is-today' : ''}`}>
+      <span className="crmr-nextbar__lab">Next step</span>
+      <button type="button" className="crmr-nextbar__t" onClick={onEdit} title="Change the next step">
+        {project.next_step}
+      </button>
+      {at && (
+        <span className="crmr-nextbar__due">
+          {late ? 'Overdue · ' : ''}
+          {isToday ? `Today ${ukWhen(at).split(', ')[1]}` : ukWhen(at)}
+        </span>
       )}
-
-      <label className="crm-label">Notes</label>
-      <textarea className="crm-input" rows={5} value={f.notes} onChange={set('notes')} />
-
-      <div className="crm-savebar">
-        <button type="button" className="crm-btn crm-btn--solar" disabled={!dirty || saving} onClick={save}>
-          {saving ? 'Saving…' : saved && !dirty ? 'Saved ✓' : 'Save changes'}
+      <span className="crmr-nextbar__acts">
+        <button type="button" className="crm-btn crm-btn--small" onClick={onDone}>
+          ✓ Done
         </button>
-        {dirty && (
-          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setF(initial)}>
-            Undo
+        <span className="crmr-snooze">
+          <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" aria-expanded={snoozing} onClick={() => setSnoozing((s) => !s)}>
+            Snooze ▾
           </button>
-        )}
-      </div>
-
-      {isAdmin && (
-        <button type="button" className="crm-link crm-danger" onClick={onDelete}>
-          Delete opportunity
+          {snoozing && (
+            <span className="crmr-snooze__list" role="menu">
+              {nextStepTimes(now).map(([label, iso]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setSnoozing(false);
+                    onSnooze(iso);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
+          )}
+        </span>
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small crmr-nextbar__edit" onClick={onEdit}>
+          Edit
         </button>
-      )}
-      <p className="crm-muted crm-small">Created {when(project.created_at)} · stage {stageLabel(project.stage)}</p>
+      </span>
     </div>
   );
 }
+
