@@ -152,19 +152,6 @@ const PAGE_LIVE = { surveySettings: false, waPermission: false };
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
   {
-    id: 'q-cut-out-image',
-    kind: 'question',
-    title: 'What do you mean by the “cut out image” in a solar survey?',
-    detail:
-      'Claude is building it as the aerial or roof photo with the panel area marked on it, using the drawing tool in the survey.',
-    steps: [
-      'If that’s right, type **yes** below and tap **Send to Claude**.',
-      'If you meant something else (for example a cut-out of the house for the proposal), describe it below instead.',
-    ],
-    order: 2,
-    manual: true,
-  },
-  {
     id: 'q-home-by',
     kind: 'question',
     title: 'After your last survey, do you need to be home by 18:00, or just finished on site by 18:00?',
@@ -172,16 +159,6 @@ const MANUAL: SetupTodo[] = [
       'We’ve set it as finished on site by 18:00, with the drive home counted towards the day’s driving. If you need to be home by 18:00, the last survey of the day moves earlier (about 16:00 for a customer 35 minutes away).',
     steps: ['Type **on site** or **home** below and tap **Send to Claude**.'],
     order: 2,
-    manual: true,
-  },
-  {
-    id: 'q-heatpump-label',
-    kind: 'question',
-    title: 'On your website form, does “Infrared Heating” mean infrared panels or heat pumps?',
-    detail:
-      'The website’s interest list has a heatpump option labelled “Infrared Heating”, and the CRM turns it into Infrared. If heat pump leads are labelled infrared, survey booking picks the wrong survey.',
-    steps: ['Type **infrared** or **heat pumps** below and tap **Send to Claude**.'],
-    order: 3,
     manual: true,
   },
   {
