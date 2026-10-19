@@ -561,7 +561,8 @@ function DayCard({
   const notBlocking = sv.notBlocking.filter((i) => i.id.endsWith(`:${d.day}`) || ukDate(Date.parse(i.start)) === d.day);
   const first = d.legs.find((l) => l.afterId === null);
   const last = d.legs.find((l) => l.beforeId === null && l.afterId !== null);
-  const after = new Map(d.legs.filter((l) => l.afterId && l.beforeId).map((l) => [l.afterId as string, l]));
+  // Each drive is shown just before the appointment it leads to.
+  const into = new Map(d.legs.filter((l) => l.afterId && l.beforeId).map((l) => [l.beforeId as string, l]));
   // Bank holidays and closed days are already the reason the day has no times.
   const allDay = d.allDay.filter((i) => i.kind !== 'closed');
   const empty = !d.items.length && !allDay.length;
@@ -606,19 +607,27 @@ function DayCard({
               </div>
             </li>
           ))}
-          {first && (
-            <li className="dy-line dy-line--home">
-              <b>{sv.leaveHomeFrom ? `${sv.leaveHomeFrom} leave` : 'From home'}</b>
-              <div>
-                {sv.base.label} {sv.base.postcode} → {first.minutes} min{rush(first)}
-              </div>
-            </li>
-          )}
-          {d.items.map((i) => {
-            const leg = after.get(i.id);
+          {d.items.map((i, k) => {
+            const leg = into.get(i.id);
             return (
               <Fragment key={i.id}>
                 {freeBefore(Date.parse(i.start)).map(freeLine)}
+                {k === 0 && first && (
+                  <li className="dy-line dy-line--home">
+                    <b>{sv.leaveHomeFrom ? `${sv.leaveHomeFrom} leave` : 'From home'}</b>
+                    <div>
+                      {sv.base.label} {sv.base.postcode} → {first.minutes} min{rush(first)}
+                    </div>
+                  </li>
+                )}
+                {leg && (
+                  <li className="dy-line dy-line--leg">
+                    <b />
+                    <div>
+                      → {leg.minutes} min{rush(leg)} · buffer {diary.bufferMins} · coffee {diary.coffeeMins}
+                    </div>
+                  </li>
+                )}
                 <li className="dy-line">
                   <b>{i.time}</b>
                   <div>
@@ -642,14 +651,6 @@ function DayCard({
                         </button>
                       </div>
                     )}
-                  </li>
-                )}
-                {leg && (
-                  <li className="dy-line dy-line--leg">
-                    <b />
-                    <div>
-                      → {leg.minutes} min{rush(leg)} · buffer {diary.bufferMins} · coffee {diary.coffeeMins}
-                    </div>
                   </li>
                 )}
               </Fragment>
