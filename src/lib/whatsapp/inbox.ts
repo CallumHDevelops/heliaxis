@@ -18,6 +18,7 @@ import { isQuiet, nextAwake, planChase } from './schedule';
 import { ensureOpportunity, markContacted } from '@/lib/crm/server';
 import { getSettings } from './settings';
 import { autoParams } from './templates';
+import { describeMessage as describe, type InboundMessage } from './describe';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -107,49 +108,8 @@ async function enquiryForNumber(
   return { enquiry: row as EnquiryWa, created: true };
 }
 
-export type InboundMessage = {
-  id: string;
-  from: string;
-  timestamp?: string;
-  type: string;
-  text?: { body?: string };
-  button?: { text?: string };
-  interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
-  image?: { caption?: string };
-  video?: { caption?: string };
-  document?: { filename?: string; caption?: string };
-  location?: { latitude?: number; longitude?: number; name?: string };
-  reaction?: { emoji?: string };
-  referral?: { headline?: string; source_url?: string };
-};
-
-function describe(m: InboundMessage): { kind: string; body: string } {
-  switch (m.type) {
-    case 'text':
-      return { kind: 'text', body: m.text?.body || '' };
-    case 'button':
-      return { kind: 'text', body: m.button?.text || '' };
-    case 'interactive':
-      return { kind: 'text', body: m.interactive?.button_reply?.title || m.interactive?.list_reply?.title || '' };
-    case 'image':
-      return { kind: 'image', body: `📷 Photo${m.image?.caption ? `: ${m.image.caption}` : ''}` };
-    case 'video':
-      return { kind: 'video', body: `🎥 Video${m.video?.caption ? `: ${m.video.caption}` : ''}` };
-    case 'document':
-      return { kind: 'document', body: `📄 ${m.document?.filename || 'Document'}` };
-    case 'audio':
-      return { kind: 'audio', body: '🎤 Voice note' };
-    case 'location':
-      return {
-        kind: 'location',
-        body: `📍 ${m.location?.name || 'Location'} (${m.location?.latitude}, ${m.location?.longitude})`,
-      };
-    case 'reaction':
-      return { kind: 'other', body: `Reacted ${m.reaction?.emoji || ''}`.trim() };
-    default:
-      return { kind: 'other', body: `[${m.type} message — open WhatsApp to see it]` };
-  }
-}
+// What each kind of message says in the chat: describe.ts (pure, so it can be tested).
+export type { InboundMessage };
 
 export async function handleInboundMessage(m: InboundMessage, profileName: string) {
   const db = createAdminClient();
