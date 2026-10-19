@@ -4,7 +4,7 @@ import { requirePortal } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isUuid, logActivity } from '@/lib/crm/server';
-import { ensureOpenSurvey, getProject, isSurveyKind, kindLabel, kindsFor, surveysReady } from '@/lib/surveys/server';
+import { ensureOpenSurvey, getProject, isSurveyKind, kindLabel, kindsFor, markCustomerSeen, surveysReady } from '@/lib/surveys/server';
 import '../surveys.css';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +37,7 @@ export default async function StartSurveyPage({ searchParams }: { searchParams: 
       const r = await ensureOpenSurvey(db, project, kind, { byId: session.user.id });
       if (!r) problem = 'The survey couldn’t be started. Try again.';
       else {
+        if (r.status === 'draft') await markCustomerSeen(db, projectId);
         if (r.created && r.status === 'draft') {
           await logActivity({ enquiryId: project.enquiry_id, projectId, kind: 'visit', body: `${kindLabel(kind)} started`, byId: session.user.id }).catch(() => null);
         }

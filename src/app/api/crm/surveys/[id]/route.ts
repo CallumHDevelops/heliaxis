@@ -10,6 +10,7 @@ import {
   getSurvey,
   isOpen,
   kindLabel,
+  markCustomerSeen,
   OPEN_STATUSES,
   personName,
   productsOf,
@@ -81,9 +82,10 @@ export async function PUT(req: Request, { params }: Ctx) {
     return again ? conflict(again) : json({ error: 'Not found' }, 404);
   }
   if (starting && project) {
-    after(() =>
-      logActivity({ enquiryId: survey.enquiry_id, projectId: survey.project_id, kind: 'visit', body: `${kindLabel(survey.type)} started`, byId: s.user.id }).catch(() => null)
-    );
+    after(async () => {
+      await markCustomerSeen(db, survey.project_id);
+      await logActivity({ enquiryId: survey.enquiry_id, projectId: survey.project_id, kind: 'visit', body: `${kindLabel(survey.type)} started`, byId: s.user.id }).catch(() => null);
+    });
   }
   return json({ rev: saved[0].rev as number, status: saved[0].status as string, flags });
 }

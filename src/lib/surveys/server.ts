@@ -400,6 +400,28 @@ export async function ensureOpenSurvey(
   return null;
 }
 
+/**
+ * A survey has started, so someone is with the customer: no "hasn't been contacted" alert or new-lead
+ * follow-ups for this job (a survey on an existing customer's new opportunity, say). Each stamp is
+ * only filled if empty; errors are ignored.
+ */
+export async function markCustomerSeen(db: Db, projectId: string): Promise<void> {
+  const at = new Date().toISOString();
+  await Promise.all(
+    (['first_contact_at', 'first_response_alerted_at', 'sequence_stopped_at'] as const).map((col) =>
+      db
+        .from('crm_projects')
+        .update({ [col]: at })
+        .eq('id', projectId)
+        .is(col, null)
+        .then(
+          () => null,
+          () => null
+        )
+    )
+  );
+}
+
 /** The survey kinds a job needs: its survey type if booked with one, else from its products. */
 export function kindsFor(project: ProjectRow): SurveyKind[] {
   const t = (project.survey_type as string | null | undefined) || surveyTypeFor(productsOf(project));

@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { DRAWINGS_FLAG } from '@/lib/surveys/rules';
-import { ensureOpenSurvey, getProject, isOpen, isSurveyKind, kindLabel, surveysReady, ukInstant } from '@/lib/surveys/server';
+import { ensureOpenSurvey, getProject, isOpen, isSurveyKind, kindLabel, markCustomerSeen, surveysReady, ukInstant } from '@/lib/surveys/server';
 import type { SurveyStatus } from '@/lib/surveys/solar-schema';
 
 export const dynamic = 'force-dynamic';
@@ -145,6 +145,7 @@ export async function POST(req: Request) {
   if (!project) return json({ error: 'Not found' }, 404);
   const r = await ensureOpenSurvey(db, project, type, { byId: s.user.id });
   if (!r) return json({ error: 'Couldn’t start the survey. Try again.' }, 500);
+  if (r.status === 'draft') await markCustomerSeen(db, projectId);
   if (r.created && r.status === 'draft') {
     await logActivity({ enquiryId: project.enquiry_id, projectId, kind: 'visit', body: `${kindLabel(type)} started`, byId: s.user.id }).catch(() => null);
   }
