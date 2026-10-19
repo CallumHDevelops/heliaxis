@@ -155,7 +155,7 @@ export async function GET(req: Request, { params }: Ctx) {
     .select('id, direction, subject, body, sent_by, attachments, at, from_address')
     .in('enquiry_id', linkedIds.length ? linkedIds : [project.enquiry_id]);
   if (since) emailQ = emailQ.gt('at', since);
-  const [{ data: acts }, { data: wa }, { data: people }, { data: tasks }, { data: emails }] = await Promise.all([
+  const [{ data: acts }, { data: wa }, { data: people }, { data: tasks }, { data: emails }, deadlineTasks] = await Promise.all([
     actsQ.order('at', { ascending: false }).limit(300),
     // WhatsApp is optional (tables may not exist yet).
     linkedIds.length ? waQ.order('created_at', { ascending: false }).limit(300) : Promise.resolve({ data: [] as Wa[] }),
@@ -174,6 +174,17 @@ export async function GET(req: Request, { params }: Ctx) {
       .then(
         (r) => r,
         () => ({ data: [] as Email[] })
+      ),
+    // Tasks made by the paperwork deadlines (source_key arrives with crm-v3.sql; none before).
+    db
+      .from('tasks')
+      .select('id')
+      .eq('crm_project_id', id)
+      .like('source_key', 'deadline:%')
+      .limit(100)
+      .then(
+        (r) => new Set(r.error ? [] : (r.data ?? []).map((t) => t.id as string)),
+        () => new Set<string>()
       ),
   ]);
 
@@ -241,7 +252,11 @@ export async function GET(req: Request, { params }: Ctx) {
       .then((st) => (st.chaseQuestions ? st.chaseAfterHours : 0))
       .catch(() => 0),
   };
-  const taskList = (tasks ?? []).map((t) => ({ ...t, assignee: t.assignee_id ? (nameOf.get(t.assignee_id) ?? '') : t.assignee_name || '' }));
+  const taskList = (tasks ?? []).map((t) => ({
+    ...t,
+    assignee: t.assignee_id ? (nameOf.get(t.assignee_id) ?? '') : t.assignee_name || '',
+    deadline: deadlineTasks.has(t.id),
+  }));
 
   if (light) {
     const count = (table: string) =>
