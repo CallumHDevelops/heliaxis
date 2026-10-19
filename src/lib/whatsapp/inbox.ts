@@ -22,6 +22,7 @@ import { autoParams } from './templates';
 import { describeMessage as describe, type InboundMessage } from './describe';
 import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waPermission } from './permission';
 import { templateText } from './template-text';
+import { saveAdIds } from '@/lib/meta-ads';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -67,7 +68,7 @@ async function enquiryForNumber(
   db: Db,
   waId: string,
   profileName: string,
-  referral: { headline?: string; source_url?: string } | null
+  referral: InboundMessage['referral'] | null
 ): Promise<{ enquiry: EnquiryWa; created: boolean }> {
   const { data: byWa } = await db
     .from('enquiries')
@@ -108,6 +109,8 @@ async function enquiryForNumber(
     .select(ENQ_COLS)
     .single();
   if (error || !row) throw new Error(error?.message || 'Could not create enquiry');
+  // The ad they tapped, for the ad spend in Reports (ad-spend.sql; a no-op before it's run).
+  if (referral?.source_type === 'ad' && referral.source_id) await saveAdIds(row.id as string, { ad_id: referral.source_id });
   return { enquiry: row as EnquiryWa, created: true };
 }
 

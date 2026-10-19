@@ -58,8 +58,9 @@ export function mapLeadFields(fields: LeadField[]): MappedLead {
  * answers folded in), the source and the WhatsApp opt-in. Shared by the live webhook and the
  * importer so old and new leads look the same. `optInAll` is META_LEADS_WHATSAPP_OPT_IN (the forms
  * ask for WhatsApp permission). `optInSource` is how the permission is recorded on the enquiry.
+ * `organic`: Meta's is_organic, a form from a shared post or not on an ad, so no ad spend is behind it.
  */
-export function leadToEnquiry(fields: LeadField[], adName: string | null | undefined, optInAll: boolean) {
+export function leadToEnquiry(fields: LeadField[], adName: string | null | undefined, optInAll: boolean, organic = false) {
   const lead = mapLeadFields(fields);
   const interest =
     [lead.interest, lead.organization ? `Org: ${lead.organization}` : '', lead.message ? `Message: ${lead.message}` : '']
@@ -69,7 +70,7 @@ export function leadToEnquiry(fields: LeadField[], adName: string | null | undef
   return {
     lead,
     interest,
-    source: adName ? `meta: ${adName}` : 'meta-lead-ad',
+    source: organic ? 'meta-organic' : adName ? `meta: ${adName}` : 'meta-lead-ad',
     whatsappOptIn,
     optInSource: whatsappOptIn ? ('meta-lead-form' as const) : null,
   };

@@ -902,6 +902,10 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 36,
     optional: true,
   });
+  add(!(await has('enquiries', 'meta_ad_id')), {
+    ...sql('ad-spend.sql', 'Records which Meta ad each new lead came from, so Reports can show each ad’s spend beside its leads and sales, even when two ads share a name or one is renamed.', 38),
+    optional: true,
+  });
   add(!env('META_ADS_TOKEN', 'META_AD_ACCOUNT_ID'), {
     id: 'env-meta-ads',
     title: 'Show ad spend in your reports (cost per lead and per sale)',

@@ -8,6 +8,7 @@ import { toWaId } from './shared';
 import { ensureOpportunity } from '@/lib/crm/server';
 import { leadRef } from '@/lib/notification-refs';
 import { isTestLead } from '@/lib/meta-leads-csv';
+import { saveAdIds } from '@/lib/meta-ads';
 
 /** A Lead Ads webhook ping → fetch the answers → an enquiry (once, however often Meta retries). */
 export async function ingestLead(leadgenId: string) {
@@ -35,7 +36,8 @@ export async function ingestLead(leadgenId: string) {
   const { lead, interest, source, whatsappOptIn: optIn, optInSource } = leadToEnquiry(
     r.data.field_data ?? [],
     r.data.ad_name,
-    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true'
+    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true',
+    r.data.is_organic === true
   );
 
   const { data: row, error } = await db
@@ -58,6 +60,8 @@ export async function ingestLead(leadgenId: string) {
     if (error?.code !== '23505') console.error('Meta lead insert failed', error?.message);
     return;
   }
+  // Which ad it came from, for the ad spend in Reports (ad-spend.sql columns; a no-op before it's run).
+  await saveAdIds(row.id, r.data);
 
   // When and how they agreed (crm-v3.sql columns; a separate step so the lead is saved without them).
   if (optInSource) await grantPermission(row.id, optInSource, { at: r.data.created_time ? new Date(r.data.created_time).toISOString() : undefined });

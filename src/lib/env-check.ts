@@ -137,6 +137,7 @@ export const ENV_GROUPS: EnvGroup[] = [
     vars: [
       { name: 'META_ADS_TOKEN', secret: true, optional: true, hint: 'Business settings → System users → Generate new token (ads_read)' },
       { name: 'META_AD_ACCOUNT_ID', secret: false, optional: true, hint: 'Ads Manager → your ad account number (act_…)' },
+      { name: 'META_ADS_GRAPH_VERSION', secret: false, optional: true, hint: 'Leave unset (v26.0) unless Reports says Meta has retired it' },
     ],
   },
   {
