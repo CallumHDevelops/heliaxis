@@ -23,7 +23,7 @@ const MAX_BODY = 10_000;
 /** JSON escaping can grow the text a little; Vercel stops bodies over 4.5 MB before this anyway. */
 const MAX_REQUEST = MAX_CHAT_CHARS + 512 * 1024;
 
-/** Closest whatsapp_messages kind to a live message of the same sort (see describe() in inbox.ts). */
+/** Closest whatsapp_messages kind to a live message of the same sort (see describeMessage() in describe.ts). */
 const MEDIA_KIND: Record<MediaType, string> = {
   photo: 'image',
   video: 'video',

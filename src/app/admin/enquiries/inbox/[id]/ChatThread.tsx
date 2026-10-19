@@ -6,6 +6,7 @@ import { chatRef, chatTag, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs
 import { closeShownNotifications } from '@/lib/push-client';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
+import { shownBody } from '@/lib/whatsapp/describe';
 import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
 import '../../whatsapp.css';
 
@@ -302,7 +303,7 @@ export function ChatThread({ id }: { id: string }) {
               {showImported && <div className="wa-day wa-imported">Imported from the WhatsApp Business app</div>}
               <div className={`wa-bubble ${m.direction}${m.kind === 'template' ? ' tpl' : ''}`}>
                 {m.by && <span className="wa-by">{m.by}</span>}
-                <span className="wa-text">{m.body}</span>
+                <span className="wa-text">{shownBody(m.body)}</span>
                 <span className="wa-meta">
                   {clock(m.created_at)}
                   {m.direction === 'out' && !imported && <span className={`wa-tick ${m.status}`}>{TICKS[m.status] || ''}</span>}
