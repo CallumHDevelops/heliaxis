@@ -49,7 +49,12 @@ function preview(r: ActiveChat) {
 
 export function StageChip({ stage }: { stage: string | null | undefined }) {
   if (!stage) return null;
-  return <span className={`hxd-stage hxd-st-${stage}`}>{stageLabel(stage)}</span>;
+  // The title shows the whole stage when the chip is cut short.
+  return (
+    <span className={`hxd-stage hxd-st-${stage}`} title={stageLabel(stage)}>
+      {stageLabel(stage)}
+    </span>
+  );
 }
 
 export function WindowPill({ closesAt, now }: { closesAt: string | null; now: number }) {

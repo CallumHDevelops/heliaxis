@@ -673,7 +673,9 @@ export function ChatPane({
                   value={text}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={onKey}
-                  disabled={!configured || sending}
+                  disabled={!configured}
+                  // Read-only (not disabled) while sending, so the cursor stays in the box for the next message.
+                  readOnly={sending}
                 />
                 <button type="button" className="wa-send" onClick={send} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
                   {sending ? '…' : 'Send'}
@@ -727,7 +729,8 @@ export function ChatPane({
               value={text}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={onKey}
-              disabled={!configured || sending}
+              disabled={!configured}
+              readOnly={sending}
             />
             <button type="button" className="wa-send" onClick={send} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
               {sending ? '…' : 'Send'}

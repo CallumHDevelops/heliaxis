@@ -374,10 +374,13 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   gap: 12px;
   padding: 12px;
   background: var(--hxd-paper);
+  /* Below about 520px high, scroll rather than cut off the reply box. */
+  overflow-y: auto;
 }
-/* The record page puts its Tasks card here (from 1280px, docked open, on a job). */
+/* The record page puts its Tasks card here (from 1280px, docked open, on a job). It gives way first on short windows. */
 .hxd__tasks {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: min(96px, 20%);
   max-height: 45%;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -675,7 +678,12 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   cursor: default;
 }
 .hxd-stage {
-  flex: none;
+  /* Shares the line with the name (both shrink, ending in "…"), so a long stage never squeezes the name to a letter. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 10.5px;
   font-weight: 800;
   text-transform: uppercase;

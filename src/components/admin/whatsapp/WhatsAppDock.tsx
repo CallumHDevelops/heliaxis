@@ -32,8 +32,10 @@ import './dock.css';
 type Tab = 'job' | 'chats';
 type Kept = { thread: ActiveChat | null; tab: Tab; path: string };
 const KEEP = 'hx-dock-open';
+/** Set once a record page in this tab has said which job it is (sessionStorage). */
+const SPOKE = 'hx-dock-spoke';
 const SLOT = 'hx-dock-tasks';
-/** How long a job page has to say which job it is before This job gives up (an older record page never says). */
+/** How long a job page has to say which job it is before This job gives up (once one has ever said, see SPOKE). */
 const JOB_WAIT_MS = 5_000;
 
 const WA_ICON = (
@@ -128,6 +130,15 @@ export function WhatsAppDock({
   const [query, setQuery] = useState('');
   const [job, setJob] = useState<DockJob | null>(null);
   const [gaveUp, setGaveUp] = useState<string | null>(null);
+  const [spokeState, setSpoke] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && sessionStorage.getItem(SPOKE) === '1';
+    } catch {
+      return false;
+    }
+  });
+  /** A record page in this tab has said which job it is, so it's worth waiting for one (today's record page never does). */
+  const spoke = hydrated && spokeState;
   const [focus, setFocus] = useState<{ key: number; thread: string } | null>(null);
   const [scrollTo, setScrollTo] = useState<{ thread: string; message: string } | null>(null);
   /** Just replied in this chat: "Sent ✓ · Next needing reply: …". */
@@ -137,7 +148,7 @@ export function WhatsAppDock({
 
   const pageJob = jobIdFromPath(pathname);
   const jobHere = job && pageJob === job.projectId ? job : null;
-  const waitingForJob = !!pageJob && !jobHere && gaveUp !== pathname;
+  const waitingForJob = spoke && !!pageJob && !jobHere && gaveUp !== pathname;
   const showJobTab = !!jobHere || waitingForJob;
   const tab: Tab = showJobTab && (picked?.path !== pathname || picked.tab === 'job') ? 'job' : 'chats';
   // The live row for the open chat (fresh counts and window), or what was kept.
@@ -145,12 +156,12 @@ export function WhatsAppDock({
   const jobRow = jobHere?.threadId ? (rows?.find((r) => isJobsChat(jobHere, r)) ?? rowFromJob(jobHere, canInbox)) : null;
   const tasksSlot = docked && tab === 'job' && !!jobHere;
 
-  // A record page that never says which job it is (before the new record page): stop waiting.
+  // A record page that never says which job it is: stop waiting.
   useEffect(() => {
-    if (!pageJob || jobHere) return;
+    if (!spoke || !pageJob || jobHere) return;
     const t = setTimeout(() => setGaveUp(pathname), JOB_WAIT_MS);
     return () => clearTimeout(t);
-  }, [pageJob, jobHere, pathname]);
+  }, [spoke, pageJob, jobHere, pathname]);
 
   useEffect(() => {
     try {
@@ -177,16 +188,33 @@ export function WhatsAppDock({
   useEffect(() => {
     if (!overlay) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape' && !panelRef.current?.contains(e.target as Node)) onCloseOverlay();
+      // (Not one the panel has dealt with: going back to the list takes the chat, and its reply box, away.)
+      if (e.key === 'Escape' && !e.defaultPrevented && !panelRef.current?.contains(e.target as Node)) onCloseOverlay();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [overlay, onCloseOverlay]);
 
+  // Where the cursor goes once a change here is on screen: the control just pressed has often gone (the
+  // strip hides when the panel docks, a row gives way to its chat, the chat to the list). The first of these
+  // that's there, else the panel.
+  const pendingFocus = useRef<string[] | null>(null);
+  useEffect(() => {
+    const want = pendingFocus.current;
+    if (!want) return;
+    pendingFocus.current = null;
+    const root = panelRef.current?.parentElement;
+    const el = want.map((s) => root?.querySelector<HTMLElement>(s)).find(Boolean) ?? panelRef.current;
+    el?.focus({ preventScroll: true });
+  });
+
   const show = useCallback(
     (from?: Element | null) => {
-      opener.current = from ?? document.activeElement;
-      if (!panel) onOpen();
+      if (!panel) {
+        opener.current = from ?? document.activeElement;
+        pendingFocus.current = ['.hxd__panel'];
+        onOpen();
+      }
     },
     [panel, onOpen]
   );
@@ -204,6 +232,13 @@ export function WhatsAppDock({
       setThread(row);
       setTab('chats');
     }
+  }
+
+  /** From a chat back to the list, with the cursor on that chat's row (or the search box). */
+  function backToList() {
+    pendingFocus.current = [`.hxd-row__link[href="${openRow?.chatHref}"]`, '.hxd-search'];
+    setThread(null);
+    setSent(null);
   }
 
   // What the page asks for (window events), with today's state rather than the first render's.
@@ -268,6 +303,14 @@ export function WhatsAppDock({
         if (!j && job && tab === 'job' && job.threadId) {
           setThread(rows?.find((r) => isJobsChat(job, r)) ?? rowFromJob(job, canInbox));
         }
+        if (j && !spokeState) {
+          setSpoke(true);
+          try {
+            sessionStorage.setItem(SPOKE, '1');
+          } catch {
+            // Only kept in memory.
+          }
+        }
         setJob(j);
       },
     };
@@ -291,11 +334,22 @@ export function WhatsAppDock({
 
   /** Escape: from a chat back to the list, or (with the list showing) close the overlay. Never folds the docked panel. */
   function onPanelKey(e: KeyboardEvent<HTMLElement>) {
-    if (e.key !== 'Escape' || (e.target as Element).closest?.(`#${SLOT}`)) return;
+    const el = e.target as Element;
+    if (e.key !== 'Escape' || el.closest?.(`#${SLOT}`)) return;
+    // An open Saved replies / Send a document list closes first (closed, each is just its toggle button).
+    const picker = el.closest?.('.wa-pane__chips .crm-snippets');
+    if (picker && picker.childElementCount > 1) {
+      const toggle = picker.firstElementChild as HTMLElement | null;
+      e.preventDefault();
+      toggle?.click();
+      toggle?.focus();
+      return;
+    }
+    // Esc on the Chase select belongs to the select (some browsers pass it on from the open list).
+    if (el.tagName === 'SELECT') return;
     if (tab === 'chats' && thread) {
       e.preventDefault();
-      setThread(null);
-      setSent(null);
+      backToList();
     } else if (overlay) {
       e.preventDefault();
       onCloseOverlay();
@@ -403,7 +457,16 @@ export function WhatsAppDock({
               ✕
             </button>
           ) : (
-            <button type="button" className="hxd__fold" aria-label="Fold away" title="Fold away" onClick={onFold}>
+            <button
+              type="button"
+              className="hxd__fold"
+              aria-label="Fold away"
+              title="Fold away"
+              onClick={() => {
+                pendingFocus.current = ['.hxd__toggle'];
+                onFold();
+              }}
+            >
               »
             </button>
           )}
@@ -460,10 +523,7 @@ export function WhatsAppDock({
               row={openRow}
               name={openRow.name}
               canCrm={access.crm}
-              onBack={() => {
-                setThread(null);
-                setSent(null);
-              }}
+              onBack={backToList}
             />
             {sent === openRow.threadId && (
               <p className="hxd-sent" role="status">
@@ -471,7 +531,13 @@ export function WhatsAppDock({
                 {nextUp && (
                   <>
                     {' · Next needing reply: '}
-                    <button type="button" onClick={() => openChat(nextUp)}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        pendingFocus.current = ['.hxd-back'];
+                        openChat(nextUp);
+                      }}
+                    >
                       {nextUp.name}
                       {nextUp.last ? ` (${shortWait(nextUp.last.at, now)})` : ''} →
                     </button>
@@ -520,6 +586,7 @@ export function WhatsAppDock({
               query={query}
               onQuery={setQuery}
               onOpen={(row, from) => {
+                pendingFocus.current = ['.hxd-back'];
                 openChat(row);
                 show(from);
               }}
