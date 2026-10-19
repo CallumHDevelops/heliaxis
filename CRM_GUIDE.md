@@ -317,7 +317,9 @@ remembers which you used last. On a computer the WhatsApp panel is on the right 
   button for the next move, and Call, Directions and Email.
 - **On the left, the customer**: mobile, WhatsApp permission (with its switch), email, site
   address, where they came from and who looks after them. Then Job details, the customer's portal
-  card, the DNO and deposit, and their other jobs. Each card has its own **Edit**.
+  card (from Surveyed), the DNO and deposit, and their other jobs. Each card has its own **Edit**.
+  At Surveyed, **Send quote for signing** (the main button, or on the portal card) sends the quote
+  that's under Docs; with no quote there yet, it opens Docs to upload one first.
 - **In the middle**: the next step, then the tabs **Overview** (everything for this job, the
   checklist, dates and team, the system and the paperwork), **Activity** (notes, calls, WhatsApp
   messages with their photos and voice notes, emails and stage changes, newest first), **Photos**,

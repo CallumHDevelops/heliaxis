@@ -373,6 +373,12 @@ async function copyText(text: string) {
   }
 }
 
+/*
+ * The record page's own "Send quote for signing" (the header button and the + sheet, runtime contract):
+ * window.dispatchEvent(new CustomEvent('hx:send-quote', { detail: { id } })) opens this card's quote picker.
+ */
+export const SEND_QUOTE = 'hx:send-quote';
+
 /**
  * The customer's private link. Before it exists (a sales stage): Send quote for signing. At Quote
  * sent: the quote-only page and how to send it. From Won: their full portal. Loads its own state, so
@@ -403,6 +409,15 @@ export function PortalCard({
   const [note, setNote] = useState('');
   const url = state?.url ?? made ?? portal;
   const mode = state ? state.mode : open ? 'full' : null;
+  useEffect(() => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent<{ id?: string }>).detail?.id !== id) return;
+      setErr('');
+      setPicking(true);
+    };
+    window.addEventListener(SEND_QUOTE, on);
+    return () => window.removeEventListener(SEND_QUOTE, on);
+  }, [id]);
 
   async function ensure() {
     if (url) return url;

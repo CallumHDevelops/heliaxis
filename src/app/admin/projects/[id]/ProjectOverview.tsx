@@ -394,7 +394,7 @@ function DatesTeam({ rec, team, actions }: { rec: RecordData; team: TeamMember[]
         : b.booked_by
           ? `Booked by ${b.booked_by}`
           : 'Booked online by the customer';
-  const told = { whatsapp: 'They’ll be told on WhatsApp', email: 'They’ll be told by email', call: 'No WhatsApp permission or email yet: give them a call' }[rec.notify];
+  const told = { whatsapp: 'They’ll be told on WhatsApp', email: 'They’ll be told by email', call: 'We can’t WhatsApp or email them yet: give them a call' }[rec.notify];
   const cal = rec.calendar;
   const outlook = !cal.outlook
     ? 'Goes into Outlook once Microsoft 365 is connected'

@@ -127,7 +127,15 @@ export async function jobLookups(
       : readAll<{ project_id: string; category: string }>(ids, (b, from, to) =>
           db.from('crm_photos').select('project_id, category').in('project_id', b).in('category', ['progress', 'completion']).order('id').range(from, to)
         ),
-    readAll<SurveyRow>(ids, (b, from, to) => db.from('crm_surveys').select('*').in('project_id', b).order('id').range(from, to) as unknown as PromiseLike<Res<SurveyRow>>),
+    // Only what the checklist and the job page use (not the answers or summary).
+    readAll<SurveyRow>(ids, (b, from, to) =>
+      db
+        .from('crm_surveys')
+        .select('id, project_id, type, status, simpliheat_url, completed_at, flags, surveyor_id')
+        .in('project_id', b)
+        .order('id')
+        .range(from, to) as unknown as PromiseLike<Res<SurveyRow>>
+    ),
     readAll<Omit<Assignment, 'firm'> & { subcontractors?: { company_name?: string | null } | null }>(rams, (b, from, to) =>
       db
         .from('subcontractor_assignments')

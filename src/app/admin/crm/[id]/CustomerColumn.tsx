@@ -80,6 +80,8 @@ export function CustomerColumn({
   const important = !!project.on_hold || flagged.length > 0;
   const atQuote = project.stage === 'lost' ? stageIndex('quote_sent') : stageIndex(project.stage);
   const quoteOn = atQuote >= stageIndex('quote_sent');
+  // The portal card from Surveyed: its "Send quote for signing" is how the quote goes out (research 2.6).
+  const portalShown = atQuote >= stageIndex('surveyed') || !!portal;
   const dnoShown = quoteOn || !!project.deposit_amount || !!project.accepted_at || (!!project.dno_status && project.dno_status !== 'not_started');
   const days = daysSince(project.stage_changed_at || project.created_at, now);
 
@@ -133,13 +135,13 @@ export function CustomerColumn({
 
       <JobDetails key={project.id} project={project} customer={customer} team={team} schema={schema} onSave={onSaveProject} />
 
-      {quoteOn || portal ? (
+      {portalShown ? (
         <section className="crmr-slot" aria-label="Customer portal">
           <PortalCard id={project.id} portal={portal} open={portalOpen(project.stage)} tracker={tracker} onSendWhatsApp={onSendWhatsApp} />
         </section>
       ) : (
         <p className="crmr-grey">
-          <b>Customer portal</b> opens when you send the quote for signing, or when the job is Won.
+          <b>Customer portal</b> appears at Surveyed, to send the quote for signing.
         </p>
       )}
       {dnoShown ? (
@@ -223,7 +225,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/** "Agreed on 3 Oct via website form", "Replied STOP on 3 Oct: …" (the server's words), "Linked · 42 messages", or how to link one. */
+/** "Agreed on 3 Oct via the website form", "Replied STOP on 3 Oct: …" (the server's words), "Linked · 42 messages", or how to link one. */
 function waLine(customer: Customer, wa: WaInfo): string {
   if (customer.whatsapp_permission_words) return customer.whatsapp_permission_words;
   if (customer.whatsapp_opt_in) {

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { dayListWords, installDayList, ukDay } from '@/lib/bank-holidays';
 import { CRM_BUCKET, crmSession, isUuid, json, logActivity, portalUrl, thumbPath } from '@/lib/crm/server';
 import { BOOKABLE_STAGES, bookingUrl } from '@/lib/crm/booking-link';
+import { notifyChannel } from '@/lib/booking/book';
 import { applyStageEvent, moveStage } from '@/lib/crm/move-stage';
 import { buildTracker } from '@/lib/crm/tracker';
 import { msConfigured } from '@/lib/ms365';
@@ -49,9 +50,18 @@ const CUSTOMER_FIELDS = [
 ] as const;
 const pick = (row: Row | null, keys: readonly string[]) => (row ? Object.fromEntries(keys.filter((k) => k in row).map((k) => [k, row[k]])) : null);
 
+/** How they agreed, after "Agreed on 3 Oct" (permissionSourceLabel's words are labels, not phrases). */
+const AGREED_HOW: Record<string, string> = {
+  'website-form': ' via the website form',
+  'booking-form': ' via the booking form',
+  'meta-lead-form': ' via a Meta lead form',
+  inbound: ' when they messaged us',
+  import: ' (from an imported chat or lead)',
+};
+
 /**
  * The Customer card's WhatsApp permission line, from this enquiry's own record (src/lib/whatsapp/permission.ts):
- * "Agreed on 3 Oct via website form", "Replied STOP on 3 Oct: no automatic WhatsApps", "Not agreed yet".
+ * "Agreed on 3 Oct via the website form", "Replied STOP on 3 Oct: no automatic WhatsApps", "Not agreed yet".
  * Before crm-v3.sql there's no when or how, only on or off.
  */
 function permissionWords(c: Row): string {
@@ -61,12 +71,12 @@ function permissionWords(c: Row): string {
   const row = { id: String(c.id), phone: null, wa_id: null, whatsapp_opt_in: (c.whatsapp_opt_in as boolean | null) ?? null, whatsapp_opt_in_source: source };
   if (c.whatsapp_opt_in === true) {
     if (source?.startsWith('staff:')) return `Agreed${when} (recorded by ${permissionSourceLabel(source)})`;
-    return source ? `Agreed${when} via ${permissionSourceLabel(source)}` : `Agreed${when}`;
+    return source ? `Agreed${when}${AGREED_HOW[source] ?? ` (${permissionSourceLabel(source)})`}` : `Agreed${when}`;
   }
   if (isStopped(row)) {
     return source === STOP_SOURCE ? `Replied STOP${when}: no automatic WhatsApps` : `${permissionSourceLabel(source).replace(/^t/, 'T')}${when}: no automatic WhatsApps`;
   }
-  return source?.startsWith(NOT_ASKED_PREFIX) ? `Not agreed yet (${permissionSourceLabel(source)})` : 'Not agreed yet';
+  return source?.startsWith(NOT_ASKED_PREFIX) ? `Not agreed yet (checked by ${source.slice(NOT_ASKED_PREFIX.length) || 'staff'})` : 'Not agreed yet';
 }
 
 /** survey_bookings.onsite as Postgres prints it: ["2026-11-03 11:45:00+00","2026-11-03 12:45:00+00"). */
@@ -167,6 +177,8 @@ export async function GET(req: Request, { params }: Ctx) {
             (r) => (r.error ? null : ((r.data?.[0] as Row | undefined) ?? null)),
             () => null
           ),
+        // How the customer will hear about a booking: the Diary's rule, so the two always agree. Never throws.
+        notifyChannel(project.enquiry_id ? String(project.enquiry_id) : null),
       ]);
 
   type Wa = { id: string; direction: string; kind: string; body: string | null; status: string; created_at: string; sent_by: string | null; via: string | null; rule_id: string | null } & MediaFields;
@@ -330,7 +342,7 @@ export async function GET(req: Request, { params }: Ctx) {
     });
   }
 
-  const [{ data: photos }, { data: docs }, othersRes, dupes, cal, schema, booking] = await fullReads!;
+  const [{ data: photos }, { data: docs }, othersRes, dupes, cal, schema, booking, notify] = await fullReads!;
 
   // Signed links (1h) for each photo and its thumbnail.
   const paths = (photos ?? []).flatMap((p) => [p.storage_path, thumbPath(p.storage_path)]);
@@ -362,9 +374,6 @@ export async function GET(req: Request, { params }: Ctx) {
   const installAt = typeof p.install_at === 'string' ? p.install_at : null;
   const installDates = installAt ? installDayList(ukDay(installAt), Math.max(1, Number(p.install_days) || 1), cal.hols) : [];
   const token = typeof p.booking_token === 'string' ? p.booking_token : null;
-  const email = String(customer?.email ?? '').trim();
-  const notify =
-    customer?.whatsapp_opt_in && whatsappConfigured() && waId ? 'whatsapp' : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && msConfigured() ? 'email' : 'call';
 
   return json({
     project,

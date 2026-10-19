@@ -16,7 +16,7 @@ import { useMedia } from '../use-stored';
 import { ActivityTab } from './ActivityTab';
 import { CompactCustomer, CustomerColumn } from './CustomerColumn';
 import { PhotosTab } from './PhotosTab';
-import { DocumentsTab, EmailComposerV2 } from './ProjectExtras';
+import { DocumentsTab, EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
 import {
@@ -206,6 +206,15 @@ export function ProjectView({
     return reload();
   }, [reload]);
 
+  // Unit Q's portal card changed the job (Send quote for signing moves it to Quote sent): read it again now.
+  useEffect(() => {
+    const on = (e: Event) => {
+      if ((e as CustomEvent<{ id?: string }>).detail?.id === id) void refresh();
+    };
+    window.addEventListener('hx:project-changed', on);
+    return () => window.removeEventListener('hx:project-changed', on);
+  }, [id, refresh]);
+
   /* ── The WhatsApp dock: which job this is, and its Tasks slot ──────────────── */
   const jobJson = useMemo(() => {
     if (!rec) return '';
@@ -346,6 +355,8 @@ export function ProjectView({
   const slotEl = dock.tasksSlot && typeof document !== 'undefined' ? document.getElementById(dock.tasksSlot) : null;
   // Docked open but with no Tasks space (the dock hasn't taken this job yet): the left column keeps them meanwhile.
   const tasksInDockTab = wide1280 && dock.state === 'open' && dock.panel && !slotEl && dockAck;
+  // A quote or contract to send for signing (Unit Q's signable types).
+  const hasQuote = rec.documents.some((d) => d.category === 'quote' || d.category === 'contract');
   const counts = {
     photos: rec.photos.length,
     docs: rec.documents.length,
@@ -412,6 +423,14 @@ export function ProjectView({
     setPendingDoc(category);
   }
 
+  /** Send quote for signing: no quote or contract yet, upload it first; else the customer portal card's picker (Details below 1280px). */
+  function sendQuote() {
+    if (!hasQuote) return addDocument('quote');
+    if (!wide1280) pickTab('details');
+    window.dispatchEvent(new CustomEvent(SEND_QUOTE, { detail: { id } }));
+    setTimeout(() => document.querySelector('.crmr-slot[aria-label="Customer portal"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
+  }
+
   async function runAction(a: ActionKey, to?: string, confirmText?: string) {
     switch (a) {
       case 'mark_contacted':
@@ -431,7 +450,7 @@ export function ProjectView({
         else focusField('rec-survey-at');
         return;
       case 'send_quote':
-        addDocument('quote');
+        sendQuote();
         return;
       case 'chase_quote':
         openWhatsApp(`Hi ${first}, just checking you got our quote and whether you have any questions. Happy to talk it through.`);
@@ -640,11 +659,12 @@ export function ProjectView({
                 today={today}
                 entry={entry}
                 base={area === 'projects' ? '/admin/projects' : '/admin/crm'}
-                onChanged={() => void reload()}
+                // Stable, and a full read: a file's "on its way" check runs once, and an older message's new status still shows.
+                onChanged={refresh}
               />
             )}
-            {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={() => refresh()} />}
-            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={() => refresh()} />}
+            {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={refresh} />}
+            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} />}
             {tab === 'surveys' && <SurveysPanel surveys={rec.surveys} busy={starting} onStart={(type) => void startSurvey(type)} />}
           </div>
           <RecordFabs unread={wa.unread} name={c.name} onWhatsApp={() => openWhatsApp()} onAdd={() => openSheet('menu')} />
