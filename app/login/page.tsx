@@ -36,7 +36,7 @@ export default function LoginPage() {
         error.code === 'otp_disabled' || error.code === 'signup_disabled' || /signups not allowed/i.test(error.message);
       setErr(
         noAccount
-          ? 'We couldn’t find a Post Studio account for that email. Post Studio is invite-only: if you’ve been invited, open the link in your invitation email first. Otherwise ask Callum to add you.'
+          ? 'We couldn’t find a Post Studio account for that email. Heliaxis staff: open the studio from the Heliaxis admin menu (Social media studio) and your account is set up for you. If it isn’t in your menu, ask Callum for Social media studio access.'
           : error.message
       );
       return;
