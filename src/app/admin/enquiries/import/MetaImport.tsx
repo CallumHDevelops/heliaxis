@@ -9,11 +9,22 @@ import './meta-import.css';
 /**
  * Old Facebook & Instagram lead-form leads: straight from Meta (the last 90 days), or from the
  * form's CSV download for anything older. Both go through /api/crm/import/meta, which keeps their
- * dates, matches people already in the CRM and never messages or notifies anyone.
+ * dates, matches people already in the CRM and never messages or notifies anyone. Each Page also
+ * shows whether live leads are on (new leads reaching Enquiries by themselves), with a button to
+ * switch them on (PATCH, which subscribes the CRM's Meta app to the Page).
  */
 
 type Form = { id: string; name: string; status: string | null; leads: number | null; createdTime: string | null };
-type Source = { pageId: string; pageName: string; forms: (Form & { made: string })[]; error: string | null };
+type LiveLeads = 'on' | 'off' | 'unknown';
+type Source = {
+  pageId: string;
+  pageName: string;
+  forms: (Form & { made: string })[];
+  error: string | null;
+  liveLeads: LiveLeads;
+  liveLeadsError: string | null;
+};
+type Note = { ok: boolean; text: string };
 type Counts = { imported: number; matched: number; already: number; skipped: number; failed: number };
 type Progress = { done: boolean; counts: Counts; error: string | null };
 type Result = { counts: Counts; errors: string[]; stopped?: string };
@@ -83,6 +94,8 @@ function FromMeta() {
   const [progress, setProgress] = useState<Record<string, Progress>>({});
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [switching, setSwitching] = useState<string | null>(null);
+  const [liveNotes, setLiveNotes] = useState<Record<string, Note>>({});
   useLeaveWarning(running);
 
   async function find() {
@@ -90,6 +103,7 @@ function FromMeta() {
     setFindError('');
     setResult(null);
     setProgress({});
+    setLiveNotes({});
     try {
       const r = await fetch(API, { cache: 'no-store' });
       const d = await r.json().catch(() => ({}));
@@ -112,6 +126,36 @@ function FromMeta() {
     } finally {
       setFinding(false);
     }
+  }
+
+  /** Live leads on for one Page, then show what Meta says now. */
+  async function switchOn(pageId: string) {
+    setSwitching(pageId);
+    setLiveNotes((n) => {
+      const next = { ...n };
+      delete next[pageId];
+      return next;
+    });
+    let note: Note;
+    try {
+      const r = await fetch(API, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.error) {
+        note = { ok: false, text: typeof d.error === 'string' ? d.error : 'Couldn’t switch on live leads. Try again.' };
+      } else {
+        const liveLeads: LiveLeads = d.liveLeads === 'on' || d.liveLeads === 'off' ? d.liveLeads : 'unknown';
+        const liveLeadsError = typeof d.liveLeadsError === 'string' ? d.liveLeadsError : null;
+        setSources((all) => all?.map((p) => (p.pageId === pageId ? { ...p, liveLeads, liveLeadsError } : p)) ?? null);
+        note =
+          liveLeads === 'on'
+            ? { ok: true, text: 'Live leads are on. To check, create a test lead in Meta’s Lead Ads Testing Tool: it should show “success” under Track status.' }
+            : { ok: false, text: 'Meta said yes, but doesn’t show live leads as on yet. Wait a minute, then press “Look again”.' };
+      }
+    } catch {
+      note = { ok: false, text: 'Couldn’t reach the CRM. Check your connection and try again.' };
+    }
+    setLiveNotes((n) => ({ ...n, [pageId]: note }));
+    setSwitching(null);
   }
 
   function toggle(k: string) {
@@ -169,16 +213,49 @@ function FromMeta() {
     <div className="mi-section">
       <h3>Last 90 days, straight from Meta</h3>
       <div className="mi-actions">
-        <button type="button" className={sources ? 'imp-btn-ghost' : 'imp-btn'} onClick={find} disabled={finding || running}>
+        <button
+          type="button"
+          className={sources ? 'imp-btn-ghost' : 'imp-btn'}
+          onClick={find}
+          disabled={finding || running || !!switching}
+        >
           {finding ? 'Looking…' : sources ? 'Look again' : 'Find lead forms'}
         </button>
       </div>
       {findError && <p className="imp-err mi-msg">{findError}</p>}
 
       {sources && !sources.length && <p className="mi-muted mi-msg">Meta didn’t return any Facebook Pages.</p>}
+      {sources && sources.length > 0 && (
+        <p className="mi-muted mi-msg">New lead-form leads only reach Enquiries by themselves when live leads are On for their Page.</p>
+      )}
       {sources?.map((p) => (
         <div key={p.pageId} className="mi-page">
-          <div className="mi-page-name">{p.pageName}</div>
+          <div className="mi-page-head">
+            <div className="mi-page-name">{p.pageName}</div>
+            <div className="mi-live">
+              <span className={`mi-live-state${p.liveLeads === 'on' ? ' is-on' : ''}`}>
+                {p.liveLeads === 'on' ? 'Live leads: On ✓' : p.liveLeads === 'off' ? 'Live leads: Off' : 'Live leads: couldn’t check'}
+              </span>
+              {p.liveLeads !== 'on' && (
+                <button
+                  type="button"
+                  className="imp-btn mi-live-btn"
+                  onClick={() => switchOn(p.pageId)}
+                  disabled={finding || !!switching}
+                >
+                  {switching === p.pageId ? 'Switching on…' : 'Switch on live leads'}
+                </button>
+              )}
+            </div>
+          </div>
+          {liveNotes[p.pageId] ? (
+            <p className={`${liveNotes[p.pageId].ok ? 'imp-ok' : 'imp-err'} mi-live-note`} role="status">
+              {liveNotes[p.pageId].text}
+            </p>
+          ) : (
+            p.liveLeadsError &&
+            p.liveLeadsError !== p.error && <p className="imp-err mi-live-note">Couldn’t check live leads: {p.liveLeadsError}</p>
+          )}
           {p.error && <p className="imp-err">{p.error}</p>}
           {!p.error && !p.forms.length && <p className="mi-muted">No lead forms on this Page.</p>}
           {p.forms.length > 0 && (

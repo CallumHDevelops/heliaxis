@@ -122,13 +122,15 @@ const MANUAL: SetupTodo[] = [
     detail:
       'So new Facebook and Instagram lead-form leads arrive by themselves, and Enquiries → Import can bring in the last 90 days.',
     steps: [
-      'Open the [Meta app](https://developers.facebook.com/apps) → **Heliaxis CRM** → **Webhooks** (left menu).',
-      'In the drop-down at the top choose **Page** → **Subscribe to this object**. Callback URL and verify token are the same as for WhatsApp (copy the URL below; the token is your `META_WEBHOOK_VERIFY_TOKEN`).',
-      'Find **leadgen** in the list → **Subscribe**.',
+      'Open the [Meta app dashboard](https://developers.facebook.com/apps) → **Heliaxis CRM**. If **Use cases** (left menu) doesn’t list **Capture & manage ad leads with Marketing API**, tap **Add use cases** (top right), pick it and add it. The `leads_retrieval` permission lives in this use case.',
+      'Go to **Use cases** → **Capture & manage ad leads with Marketing API** → **Customize** → **Webhooks**. (The old way, **Webhooks** in the app’s left menu, may still work, but this route is the reliable one.)',
+      'Choose **Page** in the drop-down. Paste the callback URL below. For **Verify token**, use the value of `META_WEBHOOK_VERIFY_TOKEN` in Vercel (Settings → Environment Variables). If Vercel hides it as **Sensitive**, make up a new long random value, save it in Vercel as `META_WEBHOOK_VERIFY_TOKEN` and type the same here, then redeploy (**Deployments** → the ⋯ on the top deployment → **Redeploy**) and wait a minute. WhatsApp keeps working: Meta only checks the token when you save.',
+      'Tap **Verify and save**. Then find **leadgen** in the list of fields → **Subscribe**.',
       'In [Business Settings](https://business.facebook.com/settings) → **Integrations** → **Leads Access**: pick the Heliaxis Page and give **Heliaxis CRM** access.',
-      'In **Users → System users**, check the CRM’s system user has the Facebook Page as an asset, and that its token includes `leads_retrieval`, `pages_show_list`, `pages_read_engagement` and `pages_manage_metadata`. If not, generate a new token with them and paste it into Vercel as `META_PAGE_ACCESS_TOKEN`.',
+      'In **Users → System users**, check the CRM’s system user has the Facebook Page as an asset (with **Full control**), and that its token includes `leads_retrieval`, `pages_show_list`, `pages_read_engagement` and `pages_manage_metadata`. If not, generate a new token with them and paste it into Vercel as `META_PAGE_ACCESS_TOKEN`.',
+      'In the Heliaxis app, open **Enquiries → Import** → **Find lead forms**, and tap **Switch on live leads** next to the Heliaxis Page. It should then say **Live leads: On ✓**. Without this, Meta never sends the Page’s new leads to the CRM.',
       'Test it with Meta’s [Lead Ads Testing Tool](https://developers.facebook.com/tools/lead-ads-testing): create a test lead, and it should show **success** under Track status. (Test leads aren’t imported.)',
-      'Then open **Enquiries → Import → Find lead forms** to bring in the last 90 days.',
+      'Then back on **Enquiries → Import**, tap **Import selected** to bring in the last 90 days.',
     ],
     copies: [
       { label: 'Callback URL', value: 'https://heliaxis.co.uk/api/meta/webhook' },

@@ -11,17 +11,43 @@ import { leadToEnquiry, mapLeadFields } from '@/lib/whatsapp/leads';
  * days; older ones come from the form's CSV download (src/lib/meta-leads-csv.ts) and go through
  * importLead too. Everything goes in via src/lib/crm/import.ts, so nobody is messaged or notified.
  * Page access tokens never leave the server: each request finds the Page's token again by its id.
+ *
+ * Live leads: the webhook (/api/meta/webhook) only hears about a new lead if the Meta app has a Page
+ * webhook for leadgen (set up in Meta's dashboard) AND the Page itself is subscribed to the app
+ * (subscribePageToLeads below, from the button on Enquiries → Import).
  */
 
 const baseToken = () => process.env.META_PAGE_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || '';
 
 const PERMISSIONS = 'leads_retrieval, pages_show_list, pages_read_engagement and pages_manage_metadata';
 
-/** Meta's error → what to do about it, in plain English. */
-export function plainMetaError(r: { error: string; code?: number }): string {
+/**
+ * Meta's error → what to do about it, in plain English. 'live' is for checking or switching on a
+ * Page's live leads, which needs pages_manage_metadata and control of the Page.
+ */
+export function plainMetaError(r: { error: string; code?: number }, what: 'leads' | 'live' = 'leads'): string {
   const m = r.error;
-  if (r.code === 190 || /access token|session has expired|has not authori[sz]ed application/i.test(m)) {
+  // Our own time limit (AbortSignal.timeout), not Meta's words.
+  if (/operation was aborted/i.test(m)) return 'Meta took too long to answer. Try again in a minute.';
+  // 210 is "A page access token is required": the wrong kind of token, not an expired one.
+  if (r.code === 190 || (r.code !== 210 && /access token|session has expired|has not authori[sz]ed application/i.test(m))) {
     return `Meta didn’t accept the CRM’s access token (it may have expired or been removed). Make a new one with ${PERMISSIONS}, and update META_PAGE_ACCESS_TOKEN (or WHATSAPP_TOKEN) in Vercel.`;
+  }
+  if (what === 'live' && r.code === 100 && /subscribed_fields|leadgen/i.test(m)) {
+    return (
+      'Meta wouldn’t take leadgen for this app yet. In the Meta app, add the “Capture & manage ad leads with ' +
+      'Marketing API” use case and subscribe its Page webhook to leadgen (the steps are on your “From Claude” ' +
+      `list), then try again. (Meta said: “${m}”)`
+    );
+  }
+  if (what === 'live' && ([10, 200, 210].includes(r.code ?? 0) || /permission|pages_manage_metadata|page access token/i.test(m))) {
+    return (
+      'Meta won’t let the CRM check or switch on live leads for this Page. Its access token needs ' +
+      'pages_manage_metadata (as well as leads_retrieval and pages_show_list), and the CRM’s system user needs ' +
+      'full control of the Page: Business Settings → Users → System users → the CRM’s user → Assign assets. ' +
+      'If the token was made without pages_manage_metadata, make a new one with it and update ' +
+      `META_PAGE_ACCESS_TOKEN in Vercel. (Meta said: “${m}”)`
+    );
   }
   if (
     r.code === 10 ||
@@ -35,7 +61,7 @@ export function plainMetaError(r: { error: string; code?: number }): string {
     );
   }
   if ([4, 17, 32, 613].includes(r.code ?? 0) || /request limit|too many calls/i.test(m)) {
-    return 'Meta is limiting how fast the CRM can fetch leads. Wait a few minutes, then try again.';
+    return `Meta is limiting how fast the CRM can ${what === 'live' ? 'ask about Pages' : 'fetch leads'}. Wait a few minutes, then try again.`;
   }
   return `Meta said: “${m}”`;
 }
@@ -43,11 +69,11 @@ export function plainMetaError(r: { error: string; code?: number }): string {
 type Paged<T> = { data?: T[]; paging?: { cursors?: { after?: string }; next?: string } };
 
 /** Every page of a Graph list (up to `max` pages). `path` already has a query string. */
-async function all<T>(path: string, token: string, max = 20): Promise<GraphResult<T[]>> {
+async function all<T>(path: string, token: string, max = 20, signal?: AbortSignal): Promise<GraphResult<T[]>> {
   const out: T[] = [];
   let after = '';
   for (let i = 0; i < max; i++) {
-    const r = await graph<Paged<T>>(`${path}${after ? `&after=${encodeURIComponent(after)}` : ''}`, { token });
+    const r = await graph<Paged<T>>(`${path}${after ? `&after=${encodeURIComponent(after)}` : ''}`, { token, signal });
     if (!r.ok) return r;
     out.push(...(r.data.data ?? []));
     // Only the cursor: paging.next is a full URL with the token in it.
@@ -100,38 +126,122 @@ async function pageToken(pageId: string): Promise<{ ok: true; data: string } | {
     : { ok: false, error: 'The CRM’s Meta token can’t see that Page any more. Press “Look again” to see what it can reach.' };
 }
 
+// The app behind the CRM's token. Pages are matched to it by id, not name: a Page's subscribed_apps
+// can list other apps too, and names change. Page tokens from /me/accounts belong to the same app.
+let appCache: { token: string; id: string } | null = null;
+
+/** This app's id. GET /app answers with the app of whichever token asks. */
+async function thisAppId(): Promise<GraphResult<string>> {
+  const token = baseToken();
+  if (appCache?.token === token) return { ok: true, data: appCache.id };
+  const r = await graph<{ id?: string }>('/app?fields=id', { token });
+  if (!r.ok) return r;
+  if (!r.data.id) return { ok: false, error: 'Meta didn’t say which app the CRM’s token belongs to.' };
+  appCache = { token, id: r.data.id };
+  return { ok: true, data: r.data.id };
+}
+
+/**
+ * The webhook fields this app gets from a Page, from the Page's own list of apps (null: the app
+ * isn't subscribed to the Page at all). Needs the Page's token, with pages_manage_metadata.
+ */
+async function fieldsOnPage(pageId: string, token: string, appId: string, signal?: AbortSignal): Promise<GraphResult<string[] | null>> {
+  const r = await all<{ id?: string; subscribed_fields?: unknown }>(`/${encodeURIComponent(pageId)}/subscribed_apps?limit=100`, token, 5, signal);
+  if (!r.ok) return r;
+  const app = r.data.find((a) => a.id === appId);
+  if (!app) return { ok: true, data: null };
+  // Meta lists them for every app; without the list there's nothing known to keep.
+  const fields = Array.isArray(app.subscribed_fields) ? app.subscribed_fields : [];
+  return { ok: true, data: fields.filter((f): f is string => typeof f === 'string') };
+}
+
+/**
+ * 'on': the Page sends this app its new leads (with the app's Page webhook set up, they reach
+ * Enquiries by themselves). 'unknown': the check failed.
+ */
+export type LiveLeads = 'on' | 'off' | 'unknown';
+type LiveState = { liveLeads: LiveLeads; liveLeadsError: string | null };
+
+// The check runs beside each Page's forms and mustn't hold up the list.
+const LIVE_CHECK_MS = 8_000;
+
+async function liveLeadsState(pageId: string, token: string, app: GraphResult<string>, signal?: AbortSignal): Promise<LiveState> {
+  if (!app.ok) return { liveLeads: 'unknown', liveLeadsError: plainMetaError(app, 'live') };
+  const r = await fieldsOnPage(pageId, token, app.data, signal);
+  if (!r.ok) return { liveLeads: 'unknown', liveLeadsError: plainMetaError(r, 'live') };
+  return { liveLeads: r.data?.includes('leadgen') ? 'on' : 'off', liveLeadsError: null };
+}
+
+/**
+ * Live leads on for a Page: subscribes this app to the Page's leadgen field, with the Page's own
+ * token (pages_manage_metadata). Meta replaces the app's whole list of fields on each call, so the
+ * ones it already gets from the Page (feed, messages…) go in again with leadgen. Then reads it back.
+ */
+export async function subscribePageToLeads(pageId: string): Promise<({ ok: true } & LiveState) | { ok: false; error: string }> {
+  const [token, app] = await Promise.all([pageToken(pageId), thisAppId()]);
+  if (!token.ok) return token;
+  if (!app.ok) return { ok: false, error: plainMetaError(app, 'live') };
+  // Without today's list, subscribing could switch off something else this app gets from the Page.
+  const now = await fieldsOnPage(pageId, token.data, app.data);
+  if (!now.ok) return { ok: false, error: plainMetaError(now, 'live') };
+  if (now.data?.includes('leadgen')) return { ok: true, liveLeads: 'on', liveLeadsError: null };
+
+  const fields = [...new Set([...(now.data ?? []), 'leadgen'])].join(',');
+  const r = await graph<{ success?: boolean | string }>(
+    `/${encodeURIComponent(pageId)}/subscribed_apps?subscribed_fields=${encodeURIComponent(fields)}`,
+    { method: 'POST', token: token.data }
+  );
+  if (!r.ok) return { ok: false, error: plainMetaError(r, 'live') };
+  if (String(r.data.success) === 'false') {
+    return { ok: false, error: 'Meta didn’t switch live leads on for this Page. Try again in a minute.' };
+  }
+  const after = await liveLeadsState(pageId, token.data, app);
+  // Meta said yes: if reading it back fails, take its word for it.
+  return after.liveLeads === 'unknown' ? { ok: true, liveLeads: 'on', liveLeadsError: null } : { ok: true, ...after };
+}
+
 export type LeadForm = { id: string; name: string; status: string | null; leads: number | null; createdTime: string | null };
-export type LeadSource = { pageId: string; pageName: string; forms: LeadForm[]; error: string | null };
+export type LeadSource = { pageId: string; pageName: string; forms: LeadForm[]; error: string | null } & LiveState;
 
 type RawForm = { id: string; name?: string; status?: string; leads_count?: number; created_time?: string };
 
-/** The Pages the CRM can see and their lead forms, newest first. */
+/** The Pages the CRM can see, their lead forms (newest first) and whether live leads are on. */
 export async function listLeadSources(): Promise<{ pages: LeadSource[]; error: string | null }> {
-  const pages = await findPages(true);
+  const [pages, app] = await Promise.all([findPages(true), thisAppId()]);
   if (!pages.ok) return { pages: [], error: pages.error };
 
   let noPages = false;
   const out = await Promise.all(
     pages.data.map(async (p): Promise<LeadSource> => {
-      const path = (fields: string) => `/${encodeURIComponent(p.id)}/leadgen_forms?fields=${fields}&limit=100`;
-      let r = await all<RawForm>(path('id,name,status,leads_count,created_time'), p.token);
-      // A field this API version won't give: names alone will do.
-      if (!r.ok && r.code === 100 && !/permission/i.test(r.error)) r = await all<RawForm>(path('id,name'), p.token);
-      if (!r.ok) {
-        // /me was a person or system user, not a Page, and they have no Pages.
-        if (p.viaMe && r.code === 100 && /nonexist|node type/i.test(r.error)) noPages = true;
-        return { pageId: p.id, pageName: p.name, forms: [], error: plainMetaError(r) };
-      }
-      const forms = r.data
-        .map((f) => ({
-          id: f.id,
-          name: f.name || `Form ${f.id}`,
-          status: f.status ?? null,
-          leads: typeof f.leads_count === 'number' ? f.leads_count : null,
-          createdTime: f.created_time ?? null,
-        }))
-        .sort((a, b) => (b.createdTime ?? '').localeCompare(a.createdTime ?? ''));
-      return { pageId: p.id, pageName: p.name, forms, error: null };
+      const formsOf = async (): Promise<Omit<LeadSource, keyof LiveState>> => {
+        const path = (fields: string) => `/${encodeURIComponent(p.id)}/leadgen_forms?fields=${fields}&limit=100`;
+        let r = await all<RawForm>(path('id,name,status,leads_count,created_time'), p.token);
+        // A field this API version won't give: names alone will do.
+        if (!r.ok && r.code === 100 && !/permission/i.test(r.error)) r = await all<RawForm>(path('id,name'), p.token);
+        if (!r.ok) {
+          // /me was a person or system user, not a Page, and they have no Pages.
+          if (p.viaMe && r.code === 100 && /nonexist|node type/i.test(r.error)) noPages = true;
+          return { pageId: p.id, pageName: p.name, forms: [], error: plainMetaError(r) };
+        }
+        const forms = r.data
+          .map((f) => ({
+            id: f.id,
+            name: f.name || `Form ${f.id}`,
+            status: f.status ?? null,
+            leads: typeof f.leads_count === 'number' ? f.leads_count : null,
+            createdTime: f.created_time ?? null,
+          }))
+          .sort((a, b) => (b.createdTime ?? '').localeCompare(a.createdTime ?? ''));
+        return { pageId: p.id, pageName: p.name, forms, error: null };
+      };
+      // Side by side with the forms; if it fails, the Page just says it couldn't check.
+      const [source, live] = await Promise.all([
+        formsOf(),
+        liveLeadsState(p.id, p.token, app, AbortSignal.timeout(LIVE_CHECK_MS)).catch(
+          (e): LiveState => ({ liveLeads: 'unknown', liveLeadsError: plainMetaError({ error: errorText(e) }, 'live') })
+        ),
+      ]);
+      return { ...source, ...live };
     })
   );
   if (noPages) {
