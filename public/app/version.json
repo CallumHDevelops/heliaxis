@@ -1,12 +1,12 @@
 {
-  "versionCode": 3,
-  "versionName": "1.0.2",
+  "versionCode": 4,
+  "versionName": "1.0.3",
   "minVersionCode": 1,
   "releasedAt": "2026-10-19",
   "notes": [
-    "Native notifications and the new icon"
+    "Updated icons"
   ],
   "apk": "/app/heliaxis.apk",
-  "sizeBytes": 5008315,
-  "sha256": "9d1e4c04238ea999573c1c34c9a7155ffb34307a32b21efaf9810fb9db9e5edf"
+  "sizeBytes": 5106707,
+  "sha256": "63e60b1df31284eb841f44d33e890c2ef44b95e062771480a03d5c665555ed99"
 }
