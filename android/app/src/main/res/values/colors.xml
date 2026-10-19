@@ -2,7 +2,7 @@
 <resources>
     <color name="statusBar">#FFFDF8</color>
     <color name="navigationBar">#FFFDF8</color>
-    <color name="splashBackground">#FEC10F</color>
+    <color name="splashBackground">#211F18</color>
     <!-- Tint for the small icon on native notifications (dark gold reads on light and dark shades). -->
     <color name="notificationAccent">#C77F04</color>
 </resources>
