@@ -98,6 +98,8 @@ export type FindOpts = {
   override?: boolean;
   /** When the customer's hold was made: the cut-off is judged at that moment (held at 14:58, confirmed at 15:02 is fine). */
   heldAt?: number;
+  /** Staff "Preview": what a customer would see, even while online booking is switched off. */
+  preview?: boolean;
   signal?: AbortSignal;
 };
 export type FindOk = {
@@ -172,7 +174,7 @@ export async function basePlace(sv: Surveyor): Promise<Place | null> {
  */
 export async function findSlots(o: FindOpts): Promise<FindResult> {
   const s = await getBookingSettings();
-  if (!s.enabled && !o.staff) return { ok: false, closed: true };
+  if (!s.enabled && !o.staff && !o.preview) return { ok: false, closed: true };
   const surveyors = s.surveyors.filter((sv) => !o.onlySurveyorKey || sv.key === o.onlySurveyorKey);
   if (!surveyors.length) return o.staff ? { ok: false, code: 'no_surveyors', error: 'No surveyors are set up in booking settings.' } : { ok: false, closed: true };
   if (!isSurveyType(o.type)) return { ok: false, code: 'type', error: 'Please choose what the survey is for.' };
@@ -1271,11 +1273,24 @@ export type TokenView = {
   projectId: string;
   enquiryId: string;
   firstName: string;
+  /** The customer's own details, to pre-fill "Is this right?" (it's their own private link). */
+  name: string;
+  email: string;
+  phone: string;
   address: string;
   postcode: string;
   /** Pre-selected from the products; null = ask. */
   type: SurveyTypeKey | null;
-  booking: { id: string; status: 'requested' | 'confirmed'; start: string; end: string; label: string } | null;
+  booking: {
+    id: string;
+    status: 'requested' | 'confirmed';
+    start: string;
+    end: string;
+    label: string;
+    type: SurveyTypeKey;
+    postcode: string;
+    minutes: number;
+  } | null;
   /** Online changes are allowed until changeNoticeHours before. */
   canChange: boolean;
   enabled: boolean;
@@ -1286,19 +1301,31 @@ export async function tokenView(token: string): Promise<TokenView | null> {
   const p = await projectByBookingToken(token);
   if (!p) return null;
   const s = await getBookingSettings();
-  const { data: e } = await createAdminClient().from('enquiries').select('name').eq('id', p.enquiry_id).maybeSingle();
+  const { data: e } = await createAdminClient().from('enquiries').select('name, email, phone').eq('id', p.enquiry_id).maybeSingle();
   const live = await liveBookingFor(p.id).catch(() => null);
   const r = live ? parseRange(live.onsite) : null;
   return {
     projectId: p.id,
     enquiryId: p.enquiry_id,
     firstName: firstName(e?.name as string),
+    name: (e?.name as string | null) ?? '',
+    email: (e?.email as string | null) ?? '',
+    phone: (e?.phone as string | null) ?? '',
     address: p.address ?? '',
     postcode: p.postcode ?? '',
     type: isSurveyType(p.survey_type) ? p.survey_type : surveyTypeFor(p.products),
     booking:
       live && r && (live.status === 'requested' || live.status === 'confirmed')
-        ? { id: live.id, status: live.status, start: new Date(r.start).toISOString(), end: new Date(r.end).toISOString(), label: `${longDayLabel(ukDate(r.start))}, around ${ukTime(r.start)}` }
+        ? {
+            id: live.id,
+            status: live.status,
+            start: new Date(r.start).toISOString(),
+            end: new Date(r.end).toISOString(),
+            label: `${longDayLabel(ukDate(r.start))}, around ${ukTime(r.start)}`,
+            type: live.survey_type,
+            postcode: live.postcode,
+            minutes: live.minutes,
+          }
         : null,
     canChange: !!r && r.start - Date.now() > s.advanced.changeNoticeHours * HOUR,
     enabled: s.enabled && s.surveyors.length > 0,
