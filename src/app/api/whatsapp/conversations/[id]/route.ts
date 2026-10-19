@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { defaultTemplate, whatsappConfigured } from '@/lib/whatsapp/api';
 import { markChatRead, processOutbox, sendManual } from '@/lib/whatsapp/inbox';
 import { getSettings } from '@/lib/whatsapp/settings';
-import { isUuid, json, session, version } from '@/lib/whatsapp/routes';
+import { chatSession, json, mayOpenChat, version } from '@/lib/whatsapp/routes';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -12,11 +12,15 @@ type Ctx = { params: Promise<{ id: string }> };
  * One chat: the lead, its messages and any smart reply waiting to go. An open chat polls with
  * ?v=<last version>: if nothing on screen has changed (no new message, tick, queued reply or edit
  * to the lead) the answer is just { same: true } and the messages aren't read at all.
+ *
+ * Enquiries staff can open any chat; CRM staff only those whose number has an opportunity (404
+ * otherwise, so it doesn't give away that the chat exists).
  */
 export async function GET(req: Request, { params }: Ctx) {
-  if (!(await session())) return json({ error: 'unauthorized' }, 401);
+  const s = await chatSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
-  if (!isUuid(id)) return json({ error: 'Not found' }, 404);
+  if (!(await mayOpenChat(s, id))) return json({ error: 'Not found' }, 404);
   const db = createAdminClient();
   const known = new URL(req.url).searchParams.get('v');
   const everything = () =>
@@ -98,10 +102,10 @@ export async function GET(req: Request, { params }: Ctx) {
 
 /** Send: { text } or { template, lang, params }, plus optional { chaseHours } if they don't reply. */
 export async function POST(req: Request, { params }: Ctx) {
-  const s = await session();
+  const s = await chatSession();
   if (!s) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
-  if (!isUuid(id)) return json({ error: 'Not found' }, 404);
+  if (!(await mayOpenChat(s, id))) return json({ error: 'Not found' }, 404);
   const body = await req.json().catch(() => ({}));
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   const template = typeof body.template === 'string' ? body.template.trim() : '';
@@ -122,12 +126,17 @@ export async function POST(req: Request, { params }: Ctx) {
   return r.ok ? json({ ok: true, id: r.id }) : json({ error: r.error }, 400);
 }
 
-/** { read: true } clears the unread badge (and sends blue ticks); { autoOff } toggles smart replies. */
+/**
+ * { read: true } clears the unread badge (and sends blue ticks); { autoOff } toggles smart replies,
+ * which are an Enquiries setting, so CRM-only staff can only mark a chat read.
+ */
 export async function PATCH(req: Request, { params }: Ctx) {
-  if (!(await session())) return json({ error: 'unauthorized' }, 401);
+  const s = await chatSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
-  if (!isUuid(id)) return json({ error: 'Not found' }, 404);
+  if (!(await mayOpenChat(s, id))) return json({ error: 'Not found' }, 404);
   const body = await req.json().catch(() => ({}));
+  if (s.scope === 'linked' && typeof body.autoOff === 'boolean') return json({ error: 'Only Enquiries staff can turn smart replies on or off.' }, 403);
   const db = createAdminClient();
   if (body.read) await markChatRead(id);
   if (typeof body.autoOff === 'boolean') {

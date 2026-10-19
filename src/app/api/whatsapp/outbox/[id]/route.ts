@@ -1,17 +1,25 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { cancelQueued, sendQueuedNow } from '@/lib/whatsapp/outbox-actions';
-import { isUuid, json, session } from '@/lib/whatsapp/routes';
+import { chatSession, isUuid, json, mayOpenChat } from '@/lib/whatsapp/routes';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/** A queued reply: { action: 'edit', body } | { action: 'send-now' } | { action: 'cancel' }. */
+/**
+ * A queued reply: { action: 'edit', body } | { action: 'send-now' } | { action: 'cancel' }. CRM staff
+ * too, for a customer with a job (as the chat it's in).
+ */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await session())) return json({ error: 'unauthorized' }, 401);
+  const s = await chatSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const body = await req.json().catch(() => ({}));
   const db = createAdminClient();
+  if (s.scope !== 'all') {
+    const { data: item } = await db.from('whatsapp_outbox').select('enquiry_id').eq('id', id).maybeSingle();
+    if (!item || !(await mayOpenChat(s, item.enquiry_id))) return json({ error: 'Not found' }, 404);
+  }
 
   if (body.action === 'cancel') {
     await cancelQueued(id);
