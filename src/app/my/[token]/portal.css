@@ -124,6 +124,11 @@
   cursor: pointer;
   text-decoration: none;
   text-align: center;
+  min-height: 48px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .pt-btn:disabled {
   opacity: 0.5;
@@ -316,56 +321,45 @@
   gap: 8px;
   align-items: flex-start;
   font-size: 0.92rem;
+  min-height: 48px;
+  line-height: 1.45;
+  cursor: pointer;
 }
 .pt-err {
   color: #9b2d24;
   margin: 0;
   font-size: 0.9rem;
 }
-.pt-days {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+/* Signing: the quote-only page shows the form in the card; the full portal in a sheet. */
+.pt-sign {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 14px;
 }
-.pt-days button,
-.pt-times button {
-  font: inherit;
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 10px;
-  cursor: pointer;
-}
-.pt-days button {
-  flex: 0 0 64px;
-  padding: 8px 4px;
+.pt-signform {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  font-size: 0.75rem;
-  color: var(--muted);
+  gap: 10px;
 }
-.pt-days button b {
-  font-size: 1.3rem;
-  color: var(--ink);
+.pt-cancel {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(47, 110, 65, 0.1);
+  color: var(--ok);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.45;
 }
-.pt-times {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+.pt-check input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin: 1px 0 0;
+  accent-color: var(--ink);
 }
-.pt-times button {
-  padding: 12px 4px;
-  font-weight: 700;
-}
-.pt-days button.on,
-.pt-times button.on {
-  background: var(--ink);
-  color: var(--solar);
-  border-color: var(--ink);
-}
-.pt-days button.on b {
-  color: var(--solar);
+.pt-handover {
+  border-color: rgba(47, 110, 65, 0.35);
 }
 @media (min-width: 640px) {
   .pt-sheet {

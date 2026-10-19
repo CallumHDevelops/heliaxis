@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePortal } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { guessProducts, portalOpen, type StageKey } from './stages';
+import { guessProducts, portalMode, type StageKey } from './stages';
 
 /** CRM server helpers: access, the photo bucket, activity logging. */
 
@@ -186,19 +186,41 @@ export async function signedDoc(path: string, seconds = 600, download?: string) 
   return data?.signedUrl ?? null;
 }
 
+/**
+ * A fingerprint (sha256) of a stored document, so a signed quote can be matched to the exact file.
+ * Worked out once and kept on the document (crm-v3.sql; until then it's just returned). Never throws.
+ */
+export async function fingerprintDocument(docId: string): Promise<string | null> {
+  try {
+    const db = createAdminClient();
+    const { data: d } = await db.from('crm_documents').select('*').eq('id', docId).maybeSingle();
+    if (!d?.storage_path) return null;
+    if (d.sha256) return d.sha256 as string;
+    const { data: blob } = await db.storage.from(DOCS_BUCKET).download(d.storage_path as string);
+    if (!blob) return null;
+    const { createHash } = await import('node:crypto');
+    const hash = createHash('sha256').update(Buffer.from(await blob.arrayBuffer())).digest('hex');
+    await db.from('crm_documents').update({ sha256: hash }).eq('id', docId);
+    return hash;
+  } catch {
+    return null;
+  }
+}
+
 /* ── Customer portal ─────────────────────────────────────────────────────────── */
 
 export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
 export const portalUrl = (token: string) => `${siteUrl()}/my/${token}`;
 
 /**
- * The opportunity's private portal link (created on first use). Null until the job has started
- * (Won onwards) — customers don't get a portal while they're still a lead.
+ * The opportunity's private customer link (created on first use). It opens as a quote-only page
+ * once the quote is sent for signing, and as the full portal from Won. Null before that (and when
+ * Lost): customers don't get a link while they're still a lead.
  */
 export async function ensurePortalToken(projectId: string): Promise<string | null> {
   const db = createAdminClient();
   const { data } = await db.from('crm_projects').select('portal_token, stage').eq('id', projectId).maybeSingle();
-  if (!data || !portalOpen(data.stage)) return null;
+  if (!data || !portalMode(data.stage)) return null;
   if (data.portal_token) return data.portal_token as string;
   const { randomBytes } = await import('node:crypto');
   const token = randomBytes(18).toString('base64url');
@@ -211,7 +233,7 @@ export async function ensurePortalToken(projectId: string): Promise<string | nul
 export async function resetPortalToken(projectId: string): Promise<string | null> {
   const db = createAdminClient();
   const { data } = await db.from('crm_projects').select('stage').eq('id', projectId).maybeSingle();
-  if (!data || !portalOpen(data.stage)) return null;
+  if (!data || !portalMode(data.stage)) return null;
   const { randomBytes } = await import('node:crypto');
   const token = randomBytes(18).toString('base64url');
   const { error } = await db.from('crm_projects').update({ portal_token: token }).eq('id', projectId);

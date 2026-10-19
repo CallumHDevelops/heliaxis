@@ -9,7 +9,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** The customer's private portal: progress, dates, documents, photos, booking, quote acceptance, deposit. */
+/**
+ * The customer's private link: a quote-only page while the quote waits to be signed (Quote sent),
+ * then their portal from Won: progress, dates, documents, photos, quote acceptance and the deposit.
+ */
 export default async function CustomerPortal({
   params,
   searchParams,

@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, DOCS_BUCKET, ensurePortalToken, isUuid, json, portalUrl } from '@/lib/crm/server';
 import { fillText } from '@/lib/crm/settings-shared';
-import { PORTAL_CLOSED_MSG } from '@/lib/crm/stages';
+import { PORTAL_CLOSED_MSG, portalMode } from '@/lib/crm/stages';
 import { msConfigured, sendMail, type MailAttachment } from '@/lib/ms365';
 
 export const dynamic = 'force-dynamic';
@@ -18,11 +18,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const b = await req.json().catch(() => ({}));
   const db = createAdminClient();
-  const { data: p } = await db.from('crm_projects').select('id, enquiry_id').eq('id', id).maybeSingle();
+  const { data: p } = await db.from('crm_projects').select('id, enquiry_id, stage').eq('id', id).maybeSingle();
   if (!p) return json({ error: 'Not found' }, 404);
   const { data: c } = await db.from('enquiries').select('id, name, email').eq('id', p.enquiry_id).maybeSingle();
   if (!c?.email) return json({ error: 'This customer has no email address.' }, 400);
 
+  // {portal_link} is the quote-only page at Quote sent and the full portal from Won (portalMode).
   const token = String(b.text || '').includes('{portal_link}') ? await ensurePortalToken(id) : null;
   if (String(b.text || '').includes('{portal_link}') && !token) return json({ error: `This email uses {portal_link}. ${PORTAL_CLOSED_MSG}` }, 400);
   const link = token ? portalUrl(token) : null;
@@ -54,9 +55,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     attachments.push({ name: f.name.includes('.') ? f.name : `${f.name}.${ext}`, contentType: f.mime || 'application/octet-stream', bytes });
   }
   if (tooBig.length) {
-    const portalToken = await ensurePortalToken(id);
+    // Only the full portal lists their documents (the quote-only page shows just the quote).
+    const portalToken = portalMode(p.stage) === 'full' ? await ensurePortalToken(id) : null;
     if (!portalToken)
-      return json({ error: `${tooBig.join(', ')} is too big to attach (over 3 MB), and there's no customer portal to link to until the job starts.` }, 400);
+      return json({ error: `${tooBig.join(', ')} is too big to attach (over 3 MB). Their portal can share it once the job is Won; until then, send it on WhatsApp.` }, 400);
     const portal = portalUrl(portalToken);
     text += `\n\nYou can download ${tooBig.join(', ')} from your Heliaxis portal: ${portal}`;
   }

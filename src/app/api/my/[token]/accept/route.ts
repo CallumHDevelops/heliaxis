@@ -1,55 +1,82 @@
 import { after, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { projectByToken } from '@/lib/crm/portal';
-import { DOCS_BUCKET, ensureDocsBucket, isUuid, logActivity } from '@/lib/crm/server';
+import { projectByToken, SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
+import { DOCS_BUCKET, ensureDocsBucket, fingerprintDocument, isUuid, logActivity } from '@/lib/crm/server';
+import { applyStageEvent } from '@/lib/crm/move-stage';
 import { notify } from '@/lib/notify';
 import { canAccess } from '@/lib/portals';
-import { sendStageToMeta } from '@/lib/meta-capi';
 
 export const dynamic = 'force-dynamic';
 
-/** The customer accepts their quote: typed name + drawn signature, recorded with time and IP. */
+const fail = (error: string, status: number) => NextResponse.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
+
+/**
+ * The customer signs their quote (on the quote-only page or in the full portal): typed name + drawn
+ * signature, recorded with time and IP. Only the first signature counts, so two quick taps record
+ * one. Signing moves the job to Won, which opens the full portal on the same link.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const p = await projectByToken(token);
-  if (!p) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (p.accepted_at) return NextResponse.json({ error: 'This quote has already been accepted.' }, { status: 409 });
+  if (!p) return fail('Not found', 404);
+  if (p.accepted_at) return fail('This quote has already been accepted.', 409);
   const b = await req.json().catch(() => ({}));
   const name = String(b.name || '').trim().slice(0, 120);
   const docId = String(b.documentId || '');
   const sig = String(b.signature || '');
-  if (name.length < 3) return NextResponse.json({ error: 'Type your full name.' }, { status: 400 });
-  if (!b.agree) return NextResponse.json({ error: 'Please tick to confirm you accept the quote.' }, { status: 400 });
-  if (!sig.startsWith('data:image/png;base64,') || sig.length > 600_000) return NextResponse.json({ error: 'Please sign in the box.' }, { status: 400 });
+  if (name.length < 3) return fail('Type your full name.', 400);
+  if (!b.agree) return fail('Please tick to confirm you accept the quote.', 400);
+  if (!sig.startsWith('data:image/png;base64,') || sig.length > 600_000) return fail('Please sign in the box.', 400);
   const db = createAdminClient();
-  if (!isUuid(docId)) return NextResponse.json({ error: 'Quote not found' }, { status: 400 });
-  const { data: doc } = await db.from('crm_documents').select('id, name').eq('id', docId).eq('project_id', p.id).eq('needs_signature', true).maybeSingle();
-  if (!doc) return NextResponse.json({ error: 'Quote not found' }, { status: 400 });
+  if (!isUuid(docId)) return fail('Quote not found', 400);
+  const { data: doc } = await db
+    .from('crm_documents')
+    .select('*')
+    .eq('id', docId)
+    .eq('project_id', p.id)
+    .eq('needs_signature', true)
+    .in('category', SIGNABLE_CATEGORIES)
+    .maybeSingle();
+  if (!doc) return fail('Quote not found', 400);
 
   await ensureDocsBucket();
   const path = `signatures/${p.id}/${Date.now()}.png`;
   const bytes = Buffer.from(sig.split(',')[1], 'base64');
   const up = await db.storage.from(DOCS_BUCKET).upload(path, bytes, { contentType: 'image/png', upsert: false });
-  if (up.error) return NextResponse.json({ error: 'Could not save your signature — please try again.' }, { status: 500 });
+  if (up.error) return fail('Could not save your signature. Please try again.', 500);
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || null;
   const now = new Date().toISOString();
-  const won = ['lead', 'contacted', 'survey_booked', 'surveyed', 'quote_sent'].includes(p.stage);
+  // Only if nobody has signed in the meantime (a second tap, or another phone).
+  const { data: signed } = await db
+    .from('crm_projects')
+    .update({ accepted_at: now, accepted_name: name, accepted_ip: ip, accepted_document_id: doc.id, accepted_signature: path, updated_at: now })
+    .eq('id', p.id)
+    .is('accepted_at', null)
+    .select('id');
+  if (!signed?.length) {
+    await db.storage.from(DOCS_BUCKET).remove([path]);
+    return fail('This quote has already been accepted.', 409);
+  }
+  // crm-v3.sql columns go in their own update, so signing still works before it's been run.
+  const startEarly = b.startEarly === true;
+  const hash = (doc.sha256 as string | null | undefined) || null;
   await db
     .from('crm_projects')
-    .update({
-      accepted_at: now,
-      accepted_name: name,
-      accepted_ip: ip,
-      accepted_document_id: doc.id,
-      accepted_signature: path,
-      ...(won ? { stage: 'won', stage_changed_at: now } : {}),
-      updated_at: now,
-    })
+    .update({ accepted_start_early: startEarly, ...(hash ? { accepted_hash: hash } : {}) })
     .eq('id', p.id);
-  if (won) await db.from('enquiries').update({ status: 'won' }).eq('id', p.enquiry_id);
-  await logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'stage', body: `✍️ Quote “${doc.name}” accepted and signed online by ${name}` });
+  await logActivity({
+    enquiryId: p.enquiry_id,
+    projectId: p.id,
+    kind: 'stage',
+    body: `✍️ Quote “${doc.name}” accepted and signed online by ${name}${startEarly ? '. They asked us to start within the 14 days' : ''}`,
+  });
+  await applyStageEvent(p.id, 'accepted', { note: 'signed online' });
 
   after(async () => {
+    if (!hash) {
+      const h = await fingerprintDocument(doc.id as string);
+      if (h) await db.from('crm_projects').update({ accepted_hash: h }).eq('id', p.id);
+    }
     const { data: people } = await db.from('profiles').select('*').eq('status', 'approved');
     const team = (people ?? []).filter((x) => canAccess(x, 'crm')).map((x) => x.id as string);
     await Promise.all(
@@ -57,7 +84,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         notify({ userId, kind: 'crm_accepted', title: `🎉 Quote accepted: ${p.title}`, body: `Signed by ${name}`, href: `/admin/crm/${p.id}`, tag: `crm-${p.id}` })
       )
     );
-    if (won) await sendStageToMeta(p.id, 'won').catch(() => null);
   });
-  return NextResponse.json({ ok: true, deposit: !!(p.deposit_amount && !p.deposit_paid_at) });
+  return NextResponse.json({ ok: true, deposit: Number(p.deposit_amount) > 0 && !p.deposit_paid_at }, { headers: { 'Cache-Control': 'no-store' } });
 }
