@@ -30,6 +30,8 @@ type Done = {
   changeUrl?: string | null;
   moved?: boolean;
   where?: string;
+  /** The booking's id: the calendar event's id, so adding it again updates rather than repeats. */
+  uid?: string;
 };
 export type ExistingBooking = {
   id: string;
@@ -217,6 +219,7 @@ export function BookingFlow(p: BookingFlowProps) {
           end: String(r.data.end),
           moved: true,
           where: [p.initialAddress, p.initialPostcode].filter(Boolean).join(', '),
+          uid: booking?.id,
         });
         setBooking((b) => (b ? { ...b, status, start: String(r.data.start), end: String(r.data.end), label: String(r.data.label || '') } : b));
         return go('done');
@@ -287,6 +290,7 @@ export function BookingFlow(p: BookingFlowProps) {
         notify: r.data.notify === 'whatsapp' || r.data.notify === 'email' ? r.data.notify : 'call',
         changeUrl: typeof r.data.changeUrl === 'string' ? r.data.changeUrl : null,
         where: [d.address.trim(), d.town.trim(), d.postcode.trim().toUpperCase()].filter(Boolean).join(', '),
+        uid: hold.holdId,
       });
       if (isLink)
         setBooking({
@@ -354,9 +358,9 @@ export function BookingFlow(p: BookingFlowProps) {
     showTimes(r.data as unknown as Slots);
   }
 
-  function addToCalendar(start: string, end: string, where?: string) {
+  function addToCalendar(start: string, end: string, where?: string, uid?: string) {
     downloadIcs('heliaxis-survey.ics', {
-      uid: `survey-${Date.parse(start)}`,
+      uid: `survey-${uid || Date.parse(start)}`,
       title: 'Heliaxis survey',
       start,
       end,
@@ -424,7 +428,7 @@ export function BookingFlow(p: BookingFlowProps) {
           {heading(
             <>
               Your survey: {longDay(booking.start)}, around {timeOf(booking.start)}
-            </>,
+            </>
           )}
           <p className="bk-muted">
             {booking.status === 'requested' ? 'Waiting for us to confirm. We’ll be in touch shortly.' : `It takes ${minutesWords(booking.minutes)}.`}
@@ -433,7 +437,9 @@ export function BookingFlow(p: BookingFlowProps) {
             <button
               type="button"
               className="bk-btn bk-btn--ghost"
-              onClick={() => addToCalendar(booking.start, booking.end, p.initialAddress ? `${p.initialAddress}, ${p.initialPostcode}` : p.initialPostcode)}
+              onClick={() =>
+                addToCalendar(booking.start, booking.end, p.initialAddress ? `${p.initialAddress}, ${p.initialPostcode}` : p.initialPostcode, booking.id)
+              }
             >
               Add to my calendar
             </button>
@@ -711,6 +717,18 @@ export function BookingFlow(p: BookingFlowProps) {
               <button type="submit" className="bk-btn bk-btn--wide" disabled={busy}>
                 {busy ? 'Booking…' : slots?.mode === 'instant' ? 'Book my survey' : 'Send my request'}
               </button>
+              {slots && (
+                <button
+                  type="button"
+                  className="bk-link"
+                  onClick={() => {
+                    setError('');
+                    go('times');
+                  }}
+                >
+                  Pick a different time
+                </button>
+              )}
             </div>
           </form>
         </section>
@@ -723,7 +741,7 @@ export function BookingFlow(p: BookingFlowProps) {
               {heading(
                 done.status === 'confirmed'
                   ? `Done: your survey is now ${longDay(done.start)}, arriving around ${timeOf(done.start)}`
-                  : `Thanks! We’ve got your request to move to ${longDay(done.start)}, around ${timeOf(done.start)}`,
+                  : `Thanks! We’ve got your request to move to ${longDay(done.start)}, around ${timeOf(done.start)}`
               )}
               {done.status === 'requested' && <p>We’ll confirm by WhatsApp, email or a quick call, usually within a few working hours.</p>}
             </>
@@ -745,7 +763,7 @@ export function BookingFlow(p: BookingFlowProps) {
             </>
           )}
           {done.status === 'confirmed' && (
-            <button type="button" className="bk-btn bk-btn--ghost" onClick={() => addToCalendar(done.start, done.end, done.where)}>
+            <button type="button" className="bk-btn bk-btn--ghost" onClick={() => addToCalendar(done.start, done.end, done.where, done.uid)}>
               Add to my calendar
             </button>
           )}

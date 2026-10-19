@@ -43,7 +43,8 @@ const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "Tue 3 Nov" */
 const dayWords = (ymd: string) => `${WD[Number(weekday(ymd)) - 1]} ${Number(ymd.slice(8, 10))} ${MON[Number(ymd.slice(5, 7)) - 1]}`;
-const n = (v: string) => (v.trim() === '' ? 0 : Number(v));
+/** A number field's value (empty while typing = NaN: shown blank, and saved as the default). */
+const n = (v: string) => (v.trim() === '' ? NaN : Number(v));
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function call(url: string, method = 'GET', body?: unknown): Promise<{ ok: boolean; data: Record<string, unknown> & { error?: string } }> {
@@ -175,7 +176,20 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
     if (!s.surveyors.length) return setErr('Add at least one surveyor.');
     setBusy('save');
     setErr('');
-    const r = await call('/api/crm/booking/settings', 'PUT', s);
+    // A distance limit left blank keeps the usual 30 minutes rather than disappearing.
+    const body: BookingSettings = {
+      ...s,
+      surveyors: s.surveyors.map((x) => ({
+        ...x,
+        hours: Object.fromEntries(
+          WEEKDAYS.map((w) => {
+            const h = x.hours[w];
+            return [w, h && h.maxFromBaseMins != null && !Number.isFinite(h.maxFromBaseMins) ? { ...h, maxFromBaseMins: 30 } : h];
+          })
+        ) as Surveyor['hours'],
+      })),
+    };
+    const r = await call('/api/crm/booking/settings', 'PUT', body);
     setBusy('');
     if (!r.ok) return setErr(r.data.error || 'Not saved. Try again.');
     setS(r.data.settings as BookingSettings);
@@ -433,7 +447,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
                           min={5}
                           max={240}
                           aria-label={`${WEEKDAY_NAMES[w]}: minutes from home`}
-                          value={h.maxFromBaseMins}
+                          value={Number.isFinite(h.maxFromBaseMins) ? h.maxFromBaseMins : ''}
                           onChange={(e) => hours(i, w, { ...h, maxFromBaseMins: n(e.target.value) })}
                         />
                       ) : (
@@ -531,7 +545,8 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
             />
           </div>
           <p className="dy-small">
-            Between two appointments the app leaves the drive plus {s.bufferMins + s.coffeeMins} minutes ({s.bufferMins} buffer, {s.coffeeMins} coffee).
+            Between two appointments the app leaves the drive plus {(s.bufferMins || 0) + (s.coffeeMins || 0)} minutes ({s.bufferMins || 0} buffer,{' '}
+            {s.coffeeMins || 0} coffee).
           </p>
           <label className="dy-check">
             <input type="checkbox" checked={s.solarBeforeSunset} onChange={(e) => set('solarBeforeSunset', e.target.checked)} />
@@ -543,14 +558,14 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
           <div className="dy-dates">
             {s.closedDates.map((d) => (
               <span key={d}>
-                {d}
+                {dayWords(d)} {d.slice(0, 4)}
                 <button
                   type="button"
                   aria-label={`Remove ${d}`}
                   onClick={() =>
                     set(
                       'closedDates',
-                      s.closedDates.filter((x) => x !== d),
+                      s.closedDates.filter((x) => x !== d)
                     )
                   }
                 >
@@ -714,7 +729,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
                   onChange={(e) =>
                     adv(
                       'rushWindows',
-                      s.advanced.rushWindows.map((x, j) => (j === i ? [e.target.value, x[1]] : x)),
+                      s.advanced.rushWindows.map((x, j) => (j === i ? [e.target.value, x[1]] : x))
                     )
                   }
                 />
@@ -728,7 +743,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
                   onChange={(e) =>
                     adv(
                       'rushWindows',
-                      s.advanced.rushWindows.map((x, j) => (j === i ? [x[0], e.target.value] : x)),
+                      s.advanced.rushWindows.map((x, j) => (j === i ? [x[0], e.target.value] : x))
                     )
                   }
                 />
@@ -738,7 +753,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
                   onClick={() =>
                     adv(
                       'rushWindows',
-                      s.advanced.rushWindows.filter((_, j) => j !== i),
+                      s.advanced.rushWindows.filter((_, j) => j !== i)
                     )
                   }
                 >
@@ -763,7 +778,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
                   e.target.value
                     .split(/[,\s]+/)
                     .map((x) => x.trim().toUpperCase())
-                    .filter(Boolean),
+                    .filter(Boolean)
                 )
               }
             />

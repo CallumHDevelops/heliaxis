@@ -204,7 +204,7 @@ export function FindTimeSheet({
     >
       <b>{x.time}</b>
       <small>
-        {surveyors.length > 1 ? `${x.surveyorName} · ` : ''}
+        {x.surveyorName ? `${x.surveyorName} · ` : ''}
         {x.recommended ? `Nearby · ${detourText(x.detour)}` : detourText(x.detour)}
       </small>
     </button>
@@ -287,7 +287,10 @@ export function FindTimeSheet({
               type="button"
               className={type === t.key ? 'dy-chip is-on' : 'dy-chip'}
               aria-pressed={type === t.key}
-              onClick={() => setType(t.key)}
+              onClick={() => {
+                setType(t.key);
+                if (found) void find({ t: t.key });
+              }}
             >
               {t.short}
             </button>

@@ -99,7 +99,7 @@ const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`;
 async function send(
   url: string,
   method: string,
-  body?: unknown,
+  body?: unknown
 ): Promise<{ ok: boolean; status: number; data: Record<string, unknown> & { error?: string; message?: string } }> {
   try {
     const r = await fetch(url, {
@@ -153,7 +153,7 @@ export function DiaryView({
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState('');
   const [sheet, setSheet] = useState<{ kind: 'entry'; entry: EntryView | null } | { kind: 'find'; project: string | null } | null>(
-    project ? { kind: 'find', project } : add ? { kind: 'entry', entry: null } : null,
+    project ? { kind: 'find', project } : add ? { kind: 'entry', entry: null } : null
   );
   const [declined, setDeclined] = useState<Declined | null>(null);
   const [bf, setBf] = useState<{ items: Backfill[]; off: string[] } | null>(null);
@@ -189,6 +189,7 @@ export function DiaryView({
   /* Waiting for you */
   async function confirmRequest(rq: Request, force = false) {
     setBusy(`confirm:${rq.id}`);
+    setError('');
     setMsg('');
     const r = await send(`/api/crm/booking/${rq.id}`, 'POST', { action: 'confirm', force });
     setBusy('');
@@ -202,6 +203,7 @@ export function DiaryView({
   async function offerAnother(rq: Request) {
     if (!window.confirm(`Turn down ${rq.customer}’s request for ${rq.label}? You’ll get a message to send them with their booking link.`)) return;
     setBusy(`decline:${rq.id}`);
+    setError('');
     setMsg('');
     const r = await send(`/api/crm/booking/${rq.id}`, 'POST', { action: 'decline' });
     setBusy('');
@@ -221,6 +223,7 @@ export function DiaryView({
   async function useOutlookTime(i: Item) {
     if (!window.confirm(`Change it to ${ukTime(Date.parse(i.start))} on ${dayShort(i.start)}, the time in Outlook?`)) return;
     setBusy(`moved:${i.id}`);
+    setError('');
     const r = i.entryId
       ? await send(`/api/crm/diary-entries/${i.entryId}`, 'PATCH', { starts_at: i.start, ends_at: i.end })
       : i.projectId
@@ -232,6 +235,7 @@ export function DiaryView({
   }
   async function putBack(i: Item) {
     setBusy(`moved:${i.id}`);
+    setError('');
     const r = await send('/api/crm/booking/outlook-backfill', 'POST', {
       project_ids: i.entryId ? [] : [i.projectId],
       entry_ids: i.entryId ? [i.entryId] : [],
@@ -245,6 +249,7 @@ export function DiaryView({
   /* Copy these dates into Outlook */
   async function openBackfill() {
     setBusy('backfill');
+    setError('');
     const r = await send('/api/crm/booking/outlook-backfill', 'GET');
     setBusy('');
     if (!r.ok) return setError(r.data.error || 'Couldn’t load the list.');
@@ -254,6 +259,7 @@ export function DiaryView({
     if (!bf) return;
     const keep = bf.items.filter((x) => !bf.off.includes(`${x.kind}:${x.id}`));
     setBusy('backfill');
+    setError('');
     const r = await send('/api/crm/booking/outlook-backfill', 'POST', {
       project_ids: [...new Set(keep.filter((x) => x.kind !== 'entry').map((x) => x.id))],
       entry_ids: keep.filter((x) => x.kind === 'entry').map((x) => x.id),
@@ -354,7 +360,7 @@ export function DiaryView({
               onClick={() =>
                 navigator.clipboard.writeText(declined.text).then(
                   () => setMsg('Message copied ✓ Paste it into their WhatsApp chat or an email.'),
-                  () => setMsg('Couldn’t copy: select the text instead.'),
+                  () => setMsg('Couldn’t copy: select the text instead.')
                 )
               }
             >
@@ -556,7 +562,9 @@ function DayCard({
   const first = d.legs.find((l) => l.afterId === null);
   const last = d.legs.find((l) => l.beforeId === null && l.afterId !== null);
   const after = new Map(d.legs.filter((l) => l.afterId && l.beforeId).map((l) => [l.afterId as string, l]));
-  const empty = !d.items.length && !d.allDay.length;
+  // Bank holidays and closed days are already the reason the day has no times.
+  const allDay = d.allDay.filter((i) => i.kind !== 'closed');
+  const empty = !d.items.length && !allDay.length;
   const off = !d.hours;
   const rush = (l: Leg) => (l.rush ? ' + rush hour' : '');
   const shownFree = new Set<string>();
@@ -588,9 +596,9 @@ function DayCard({
       {d.note && <p className="dy-why">{d.note}</p>}
       {d.reason && d.hours && <p className="dy-why">{d.reason}</p>}
 
-      {(d.allDay.length > 0 || d.items.length > 0 || d.free.length > 0) && (
+      {(allDay.length > 0 || d.items.length > 0 || d.free.length > 0) && (
         <ul className="dy-lines">
-          {d.allDay.map((i) => (
+          {allDay.map((i) => (
             <li key={i.id} className="dy-line dy-line--allday">
               <b>All day</b>
               <div>

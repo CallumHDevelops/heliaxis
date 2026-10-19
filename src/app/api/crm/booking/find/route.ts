@@ -35,7 +35,7 @@ export async function GET(req: Request) {
         `email.ilike.%${q}%`,
         `postcode.ilike.%${q}%`,
         ...(digits.length >= 6 ? [`wa_id.ilike.%${digits.slice(-9)}%`, `phone.ilike.%${digits.slice(-6)}%`] : []),
-      ].join(','),
+      ].join(',')
     )
     .order('created_at', { ascending: false })
     .limit(40);
