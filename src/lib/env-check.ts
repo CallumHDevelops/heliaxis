@@ -42,6 +42,14 @@ export const ENV_GROUPS: EnvGroup[] = [
     ],
   },
   {
+    title: 'One-tap sign-in to RAMS',
+    what: 'Opens RAMS from the Heliaxis menu already signed in, for anyone with an approved RAMS account under the same email.',
+    vars: [
+      { name: 'RAMS_SUPABASE_URL', secret: false, optional: true, hint: 'RAMS Supabase project → Project settings → API → Project URL' },
+      { name: 'RAMS_SUPABASE_SERVICE_ROLE_KEY', secret: true, optional: true, hint: 'RAMS Supabase project → Project settings → API → service_role key' },
+    ],
+  },
+  {
     title: 'Android app notifications',
     what: 'Native notifications in the Android app (Firebase). Without it the app falls back to the phone notifications above.',
     vars: [

@@ -404,7 +404,7 @@ function Feed({ entries, customerName }: { entries: Entry[]; customerName: strin
                 <span className="crm-bubble-text">{e.body}</span>
                 <span className="crm-bubble-meta">
                   💬 {time}
-                  {!inbound && e.meta?.via !== 'import' && <span className={`crm-tick ${status}`}>{status === 'read' || status === 'delivered' ? ' ✓✓' : status === 'failed' ? ' !' : ' ✓'}</span>}
+                  {!inbound && e.meta?.via !== 'import' && <span className={`crm-wa-tick ${status}`}>{status === 'read' || status === 'delivered' ? ' ✓✓' : status === 'failed' ? ' !' : ' ✓'}</span>}
                 </span>
               </div>
             </div>

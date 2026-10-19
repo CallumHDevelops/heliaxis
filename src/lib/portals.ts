@@ -66,7 +66,8 @@ export const PORTALS: Portal[] = [
     label: 'Our team',
     description: 'Heliaxis’s own operatives — cards, qualifications and expiry dates (kept in RAMS).',
     // RAMS holds the one list of people (crews and RAMS documents name them); this opens it on our employees.
-    href: 'https://rams.heliaxis.co.uk/operatives?team=heliaxis',
+    // Through /api/sso/rams so it opens signed in (src/lib/sso.ts).
+    href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis',
     external: true,
     paths: [],
   },
@@ -82,7 +83,7 @@ export const PORTALS: Portal[] = [
     key: 'rams',
     label: 'RAMS',
     description: 'Risk assessments and method statements for jobs.',
-    href: 'https://rams.heliaxis.co.uk',
+    href: '/api/sso/rams',
     external: true,
     paths: [],
   },

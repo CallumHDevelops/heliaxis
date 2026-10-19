@@ -430,6 +430,27 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     hrefLabel: 'Open Entra',
     order: 20,
   });
+  add(!env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY'), {
+    id: 'env-rams-sso',
+    title: 'Open RAMS without signing in again',
+    detail: 'Two keys from the RAMS database let the Heliaxis menu open RAMS already signed in.',
+    steps: [
+      'Open [Supabase](https://supabase.com/dashboard) and pick the **RAMS** project (not the Heliaxis one).',
+      '**Project settings** (cog, bottom left) → **API**.',
+      'Copy the **Project URL**. That’s the value for `RAMS_SUPABASE_URL`.',
+      'Under **Project API keys**, reveal and copy the **service_role** key. That’s `RAMS_SUPABASE_SERVICE_ROLE_KEY`, and it’s a password: tick **Sensitive** in Vercel.',
+      ...VERCEL_STEPS,
+      'It works for anyone with an approved RAMS account under the same email as their Heliaxis login. Anyone else still sees the RAMS sign-in.',
+    ],
+    copies: [
+      { label: 'Key', value: 'RAMS_SUPABASE_URL' },
+      { label: 'Key', value: 'RAMS_SUPABASE_SERVICE_ROLE_KEY' },
+    ],
+    href: 'https://supabase.com/dashboard',
+    hrefLabel: 'Open Supabase',
+    order: 40,
+    optional: true,
+  });
   add(!env('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'), {
     id: 'env-stripe',
     title: 'Connect Stripe for card deposits',
