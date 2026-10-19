@@ -52,6 +52,7 @@ async function customerName(enquiryId: string | null): Promise<string> {
 
 export async function runBookingJobs({ until }: { until: number }): Promise<BookingJobsResult> {
   const out: BookingJobsResult = { expiredHolds: 0, expiredRequests: 0, cancelled: 0, reminded: 0, synced: 0, errors: 0 };
+  if (Date.now() >= until) return { ...out, skipped: 'out of time' };
   if (!(await schemaReady()).booking) return { ...out, skipped: 'survey-booking.sql not run yet' };
   const lease = await takeLease();
   if (!lease) return { ...out, skipped: 'already running' };
@@ -96,11 +97,14 @@ export async function runBookingJobs({ until }: { until: number }): Promise<Book
     const live = ((conf ?? []) as BookingRow[]).filter((b) => (parseRange(b.onsite)?.end ?? 0) > now);
     const ids = [...new Set(live.map((b) => b.project_id).filter((x): x is string => !!x))];
     const jobs = new Map<string, ProjectRow>();
-    for (let i = 0; i < ids.length; i += 100) {
-      const { data } = await db.from('crm_projects').select('*').in('id', ids.slice(i, i + 100));
+    let readOk = true;
+    for (let i = 0; i < ids.length && readOk; i += 100) {
+      const { data, error } = await db.from('crm_projects').select('*').in('id', ids.slice(i, i + 100));
+      if (error) readOk = false;
       for (const p of (data ?? []) as ProjectRow[]) jobs.set(p.id, p);
     }
-    for (const b of live) {
+    // A failed read would make every job look gone: leave the bookings for the next run.
+    for (const b of readOk ? live : []) {
       const p = b.project_id ? jobs.get(b.project_id) : undefined;
       const start = parseRange(b.onsite)?.start;
       const gone = !p || p.stage === 'lost' || p.survey_booking_id !== b.id;
@@ -139,7 +143,7 @@ export async function runBookingJobs({ until }: { until: number }): Promise<Book
           surveyorKey: b.surveyor_key,
           title: `Still waiting: ${await customerName(b.enquiry_id)}’s survey request`,
           body: `${when ? whenText(when.start) : ''}. Tap to confirm or offer another time`,
-          href: '/admin/surveys',
+          href: b.project_id ? `/admin/surveys?job=${b.project_id}` : '/admin/surveys', // the job id so deleting the customer finds it
           tag: b.project_id ? `crm-${b.project_id}` : undefined,
         });
         out.reminded++;

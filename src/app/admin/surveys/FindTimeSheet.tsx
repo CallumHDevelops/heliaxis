@@ -39,7 +39,7 @@ type Found = {
   outlookOk: boolean;
   outlookError: string | null;
 };
-type Reply = Record<string, unknown> & { error?: string; message?: string; days?: SlotDay[]; project?: Project | null; type?: SurveyTypeKey };
+type Reply = Record<string, unknown> & { error?: string; message?: string; days?: SlotDay[]; project?: Project | null; type?: SurveyTypeKey | null };
 
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -83,7 +83,7 @@ export function FindTimeSheet({
   const [q, setQ] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [postcode, setPostcode] = useState('');
-  const [type, setType] = useState<SurveyTypeKey>('solar');
+  const [type, setType] = useState<SurveyTypeKey | null>('solar');
   const [found, setFound] = useState<Found | null>(null);
   const [pick, setPick] = useState<StaffSlot | null>(null);
   const [busy, setBusy] = useState(!!projectId);
@@ -98,7 +98,8 @@ export function FindTimeSheet({
 
   function apply(r: { ok: boolean; data: Reply }) {
     if (r.data.project !== undefined) setJob(r.data.project ?? null);
-    if (r.data.type) setType(r.data.type);
+    // null: an infrared, EV or LED job, so no survey type until staff pick one.
+    if (r.data.type !== undefined) setType(r.data.type);
     if (!r.ok) {
       setFound(null);
       return setError(r.data.error || 'Couldn’t find times. Try again.');
@@ -127,14 +128,14 @@ export function FindTimeSheet({
     };
   }, [projectId]);
 
-  async function find(o: { job?: Project | null; pc?: string; t?: SurveyTypeKey } = {}) {
+  async function find(o: { job?: Project | null; pc?: string; t?: SurveyTypeKey | null } = {}) {
     const j = o.job !== undefined ? o.job : job;
     const pc = (o.pc ?? postcode).trim();
     if (!j && pc.replace(/\s/g, '').length < 5) return setError('Pick a customer or enter a postcode.');
     setBusy(true);
     setError('');
     setLink(null);
-    const r = await post('/api/crm/booking/find', { project_id: j?.id, postcode: pc || undefined, type: o.t ?? type });
+    const r = await post('/api/crm/booking/find', { project_id: j?.id, postcode: pc || undefined, type: o.t !== undefined ? o.t : type });
     setBusy(false);
     apply(r);
   }
@@ -268,7 +269,7 @@ export function FindTimeSheet({
                       type="button"
                       onClick={() => {
                         const p: Project = { id: j.id, title: j.title, customer: j.customer, postcode: j.postcode, surveyAt: j.surveyAt, stage: j.stage };
-                        const t = j.type === 'solar' || j.type === 'ashp' || j.type === 'solar_ashp' ? j.type : type;
+                        const t = j.type === 'solar' || j.type === 'ashp' || j.type === 'solar_ashp' ? j.type : null;
                         setJob(p);
                         setJobs([]);
                         setQ('');
@@ -298,7 +299,7 @@ export function FindTimeSheet({
               aria-pressed={type === t.key}
               onClick={() => {
                 setType(t.key);
-                if (found) void find({ t: t.key });
+                if (found || job) void find({ t: t.key });
               }}
             >
               {t.short}
@@ -437,7 +438,7 @@ export function FindTimeSheet({
             )}
             <div className="dy-row">
               <button type="button" className="dy-btn dy-btn--solar" disabled={busy || !job} onClick={() => bookAnyway()}>
-                {busy ? 'Booking…' : `Book ${typeLabel(type).toLowerCase()} survey anyway`}
+                {busy ? 'Booking…' : `Book ${type ? `${typeLabel(type).toLowerCase()} ` : ''}survey anyway`}
               </button>
             </div>
             {!job && <p className="dy-small">Pick the customer first.</p>}

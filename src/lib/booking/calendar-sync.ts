@@ -13,7 +13,7 @@ import {
   type CalWrite,
 } from '@/lib/ms365';
 import { logActivity, siteUrl } from '@/lib/crm/server';
-import { isSurveyType, productLabel, surveyTypeFor, surveyTypeLabel } from '@/lib/crm/stages';
+import { isSurveyType, noSurveyNeeded, productLabel, surveyTypeFor, surveyTypeLabel } from '@/lib/crm/stages';
 import { addDays, londonSlot } from './engine';
 import { ENTRY_KIND_LABEL, surveyMinutesFor, type EntryRow, type ProjectRow } from './diary';
 import { getBookingSettings } from './settings-server';
@@ -99,7 +99,10 @@ async function syncSurvey(p: ProjectRow, c: Customer, ctx: Ctx): Promise<Partial
   }
   const mailbox = (p.survey_mailbox || s.surveyors[0]?.key || msMailbox()).toLowerCase();
   const want: CalWrite = {
-    subject: `Survey: ${c.name}${p.postcode ? ` (${p.postcode})` : ''} · ${surveyTypeLabel(type)}`,
+    // Infrared, EV or LED only: a home visit, not a survey.
+    subject: noSurveyNeeded(p)
+      ? `Home visit: ${c.name}${p.postcode ? ` (${p.postcode})` : ''}`
+      : `Survey: ${c.name}${p.postcode ? ` (${p.postcode})` : ''} · ${surveyTypeLabel(type)}`,
     start: new Date(start),
     end: new Date(start + minutes * MIN),
     location: where(p),

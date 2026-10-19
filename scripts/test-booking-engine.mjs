@@ -22,6 +22,7 @@ import {
 } from '../src/lib/booking/engine.ts';
 import { sunsetMs } from '../src/lib/booking/sun.ts';
 import { CALLUM, cleanBookingSettings, DEFAULT_BOOKING_SETTINGS } from '../src/lib/booking/settings.ts';
+import { noSurveyNeeded } from '../src/lib/crm/stages.ts';
 
 let failed = 0;
 function eq(name, got, want) {
@@ -331,6 +332,16 @@ eq('ukTime both sides', [ukTime(Date.parse('2026-10-24T23:30:00Z')), ukTime(Date
   eq('cleaned surveyor', [c.surveyors[0].key, c.surveyors[0].name, c.surveyors[0].basePostcode, c.surveyors[0].hours['6'], c.surveyors[0].hours['1']], ['callum@heliaxis.co.uk', 'Callum', 'NP26 5ST', null, { start: '08:30', end: '18:00' }]);
   eq('cleaned advanced', [c.advanced.rushWindows, c.advanced.stepMins, c.advanced.travelProvider], [[['07:00', '09:00']], 15, 'auto']);
   eq('no surveyors stays no surveyors', cleanBookingSettings({ surveyors: [] }).surveyors, []);
+}
+
+// Infrared, EV or LED only: a home visit, never a survey slot (the owner's answer, 19 Oct 2026).
+{
+  const no = (products, survey_type = null) => noSurveyNeeded({ products, survey_type });
+  eq('infrared only needs no survey', no(['infrared']), true);
+  eq('EV, LED or Other only need no survey', [no(['ev']), no(['led']), no(['other']), no(['ev', 'infrared'])], [true, true, true, true]);
+  eq('solar, battery or heat pump with infrared still needs one', [no(['solar', 'infrared']), no(['battery', 'infrared']), no(['heatpump', 'infrared'])], [false, false, false]);
+  eq('no products yet: unknown, so still bookable', [no([]), no(null)], [false, false]);
+  eq('a survey type set on the job wins', no(['infrared'], 'solar'), false);
 }
 
 console.log(failed ? `${failed} failed` : 'all passed');

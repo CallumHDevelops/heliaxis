@@ -36,7 +36,7 @@ function TodayList({ today }: { today: HubToday }) {
             const main = (
               <>
                 <b>
-                  <span className={`hub-today-tag is-${it.kind}`}>{TAG[it.kind]}</span>
+                  <span className={`hub-today-tag is-${it.kind}`}>{it.tag ?? TAG[it.kind]}</span>
                   {it.title}
                 </b>
                 {it.sub && <small>{it.sub}</small>}

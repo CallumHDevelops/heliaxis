@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { schemaReady } from '@/lib/schema-ready';
 import { ukDay } from '@/lib/bank-holidays';
-import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from '@/lib/crm/server';
+import { CRM_BUCKET, DOCS_BUCKET, markContacted, thumbPath } from '@/lib/crm/server';
 import { surveyTypeFor } from '@/lib/crm/stages';
 import { cleanMarkup } from './markup';
 import { evaluate, type Evaluation, type PhotoInfo } from './rules';
@@ -431,14 +431,16 @@ export async function ensureOpenSurvey(
 }
 
 /**
- * A survey has started, so someone is with the customer: no "hasn't been contacted" alert or new-lead
- * follow-ups for this job (a survey on an existing customer's new opportunity, say). Each stamp is
- * only filled if empty; errors are ignored.
+ * A survey has started, so someone is with the customer: first contact the usual way (its new-lead
+ * notifications go for everyone, and a job at Lead moves to Contacted), and no "hasn't been
+ * contacted" alert or new-lead follow-ups for this job (a survey on an existing customer's new
+ * opportunity, say). Each stamp is only filled if empty; errors are ignored.
  */
 export async function markCustomerSeen(db: Db, projectId: string): Promise<void> {
   const at = new Date().toISOString();
-  await Promise.all(
-    (['first_contact_at', 'first_response_alerted_at', 'sequence_stopped_at'] as const).map((col) =>
+  await Promise.all([
+    markContacted({ projectId }, at),
+    ...(['first_response_alerted_at', 'sequence_stopped_at'] as const).map((col) =>
       db
         .from('crm_projects')
         .update({ [col]: at })
@@ -448,8 +450,8 @@ export async function markCustomerSeen(db: Db, projectId: string): Promise<void>
           () => null,
           () => null
         )
-    )
-  );
+    ),
+  ]);
 }
 
 /** The survey kinds a job needs: its survey type if booked with one, else from its products. */

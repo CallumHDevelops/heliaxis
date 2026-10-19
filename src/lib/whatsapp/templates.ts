@@ -1,6 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { guessProducts, portalOpen } from '@/lib/crm/stages';
+import { guessProducts, portalMode } from '@/lib/crm/stages';
 import { portalUrl } from '@/lib/crm/server';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { defaultTemplate, graph, type GraphResult } from './api';
@@ -287,7 +287,8 @@ const firstName = (name: string | null | undefined) => {
 
 /**
  * What Heliaxis knows for a customer's blanks, to pre-fill the Send template pickers (still editable).
- * Links only for people who can open the CRM, and only once the customer has a portal.
+ * Links only for people who can open the CRM, and only once the customer has a link (the quote-only
+ * page from Quote sent, the full portal from Won).
  */
 export async function leadValues(enquiryId: string, me: { name: string | null; crm: boolean }): Promise<Partial<Record<FieldKey, string>>> {
   const db = createAdminClient();
@@ -297,7 +298,7 @@ export async function leadValues(enquiryId: string, me: { name: string | null; c
     getCrmSettings(),
   ]);
   const p = projects?.[0] as { products?: string[] | null; stage?: string; portal_token?: string | null } | undefined;
-  const portal = me.crm && p?.portal_token && portalOpen(p.stage) ? portalUrl(p.portal_token) : '';
+  const portal = me.crm && p?.portal_token && portalMode(p.stage) ? portalUrl(p.portal_token) : '';
   const values: Partial<Record<FieldKey, string>> = {
     first_name: firstName(e?.name),
     my_first_name: firstName(me.name),

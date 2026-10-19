@@ -95,6 +95,8 @@ type Project = {
   accepted_at?: string | null;
   accepted_signature?: string | null;
   deposit_paid_at?: string | null;
+  /** A quote or contract on it ticked as signed on paper or with another e-sign service (crm-v3.sql). */
+  signed_outside?: boolean;
 };
 
 async function customersIn(db: Db, ids: string[]): Promise<Customer[]> {
@@ -108,16 +110,31 @@ async function customersIn(db: Db, ids: string[]): Promise<Customer[]> {
 }
 
 async function projectsOf(db: Db, enquiryIds: string[]): Promise<Project[]> {
+  let projects: Project[];
   try {
-    return await rowsIn<Project>(db, 'crm_projects', 'id, enquiry_id, accepted_at, accepted_signature, deposit_paid_at', 'enquiry_id', enquiryIds, true);
+    projects = await rowsIn<Project>(db, 'crm_projects', 'id, enquiry_id, accepted_at, accepted_signature, deposit_paid_at', 'enquiry_id', enquiryIds, true);
   } catch (e) {
     // Before crm-v2.sql nobody can sign or pay.
     if (!/accepted_|deposit_/.test(errorText(e))) throw e;
-    return rowsIn<Project>(db, 'crm_projects', 'id, enquiry_id', 'enquiry_id', enquiryIds, true);
+    projects = await rowsIn<Project>(db, 'crm_projects', 'id, enquiry_id', 'enquiry_id', enquiryIds, true);
   }
+  // Before crm-v3.sql nothing can be ticked as signed.
+  const docs = await rowsIn<{ project_id: string; signed_outside_at: string | null }>(
+    db,
+    'crm_documents',
+    'project_id, signed_outside_at',
+    'project_id',
+    projects.map((p) => p.id),
+    true
+  ).catch((e: unknown) => {
+    if (!/signed_outside/.test(errorText(e))) throw e;
+    return [];
+  });
+  const ticked = new Set(docs.filter((d) => d.signed_outside_at).map((d) => d.project_id));
+  return projects.map((p) => ({ ...p, signed_outside: ticked.has(p.id) }));
 }
 
-const signed = (p: Project) => !!(p.accepted_at || p.accepted_signature);
+const signed = (p: Project) => !!(p.accepted_at || p.accepted_signature || p.signed_outside);
 const paid = (p: Project) => !!p.deposit_paid_at;
 
 /* ── The deleted list ────────────────────────────────────────────────────────── */
@@ -319,11 +336,13 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
   // Their files, read before the rows that list them go.
   let files: Files;
   let taskIds: string[];
+  let surveyIds: string[];
   try {
-    const [photos, docs, tasks] = await Promise.all([
+    const [photos, docs, tasks, surveys] = await Promise.all([
       rowsIn<{ project_id: string; storage_path: string }>(db, 'crm_photos', 'project_id, storage_path', 'project_id', projectIds, true),
       rowsIn<{ project_id: string; storage_path: string }>(db, 'crm_documents', 'project_id, storage_path', 'project_id', projectIds, true),
       rowsIn<{ id: string }>(db, 'tasks', 'id', 'crm_project_id', projectIds, true),
+      rowsIn<{ id: string }>(db, 'crm_surveys', 'id', 'project_id', projectIds, true),
     ]);
     files = [
       ...photos.flatMap((p) => [p.storage_path, thumbPath(p.storage_path)].map((path) => ({ bucket: CRM_BUCKET, path }))),
@@ -331,15 +350,16 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
       ...theirs.flatMap((p) => (p.accepted_signature ? [{ bucket: DOCS_BUCKET, path: p.accepted_signature }] : [])),
     ];
     taskIds = tasks.map((t) => t.id);
+    surveyIds = surveys.map((s) => s.id);
   } catch (e) {
     return fail(going, e);
   }
 
-  // 2. Notifications that link to them, their opportunities or those tasks, and the new enquiry and
-  //    email alerts that name them. Links are text, so nothing cascades to these; a failure here
-  //    stops before the customer goes, so it can be re-run.
+  // 2. Notifications that link to them, their opportunities, those tasks or their surveys, and the new
+  //    enquiry and email alerts that name them. Links are text, so nothing cascades to these; a
+  //    failure here stops before the customer goes, so it can be re-run.
   try {
-    await deleteNotifications(db, [...goingIds, ...projectIds, ...taskIds]);
+    await deleteNotifications(db, [...goingIds, ...projectIds, ...taskIds, ...surveyIds]);
     await deleteRefNotifications(db, [...goingIds]);
     await deleteListNotifications(db, going, goingIds);
   } catch (e) {

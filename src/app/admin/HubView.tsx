@@ -11,6 +11,8 @@ export type HubFollowUp = { id: string; title: string; next_step: string | null;
 export type HubTodayItem = {
   key: string;
   kind: 'survey' | 'install' | 'diary';
+  /** The tag's word when it isn't the kind's (a home visit on a job that needs no survey). */
+  tag?: string;
   /** Sort order (epoch ms; all-day items 0, first). */
   sort: number;
   time: string;

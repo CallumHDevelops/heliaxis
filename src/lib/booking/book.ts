@@ -11,7 +11,7 @@ import { applyStageEvent } from '@/lib/crm/move-stage';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { bookingUrl, ensureBookingToken, projectByBookingToken, type BookingProject } from '@/lib/crm/booking-link';
 import { ensureOpportunity, isUuid, logActivity } from '@/lib/crm/server';
-import { isSurveyType, minutesWords, surveyTypeFor, surveyTypeLabel, type SurveyTypeKey } from '@/lib/crm/stages';
+import { isSurveyType, minutesWords, noSurveyNeeded, surveyTypeFor, surveyTypeLabel, type SurveyTypeKey } from '@/lib/crm/stages';
 import {
   addDays,
   dayRange,
@@ -409,6 +409,9 @@ export async function jobSurvey(p: BookingProject, s: BookingSettings): Promise<
 const callToChange = { status: 409, body: { error: `You already have a survey booked. To change it, please call us on ${OFFICE_PHONE}.` } };
 
 const UNAVAILABLE: Outcome = { status: 503, body: { error: `Online booking isn’t available right now. Please call us on ${OFFICE_PHONE}.` } };
+/** No solar, battery or heat pump on the job (noSurveyNeeded): no survey slot, online or from Find a time. */
+const NO_SURVEY = 'This job has no solar, battery or heat pump on it, so it doesn’t need a survey. Use + Add to my diary for a home visit, or add Solar PV or Heat pump to the job if they want a survey too.';
+const linkGone: Outcome = { status: 404, body: { error: 'This link has expired. Message us on WhatsApp.' } };
 
 /** When an unconfirmed request lapses: 48 h, or the cut-off on the working day before, whichever is first (at least 2 h). */
 export async function requestExpiry(day: string, s?: BookingSettings): Promise<string> {
@@ -813,7 +816,7 @@ export async function afterConfirm(x: AfterConfirm) {
       surveyorKey: b.surveyor_key,
       title: `Survey request: ${name}, ${whenText(start)}`,
       body: 'Tap to confirm',
-      href: '/admin/surveys',
+      href: `/admin/surveys?job=${projectId}`, // the job id only so deleting the customer finds it
       tag: `crm-${projectId}`,
     });
   }
@@ -846,6 +849,7 @@ export async function hold(x: {
     if (!project) return { status: 404, body: { error: 'This link has expired. Message us on WhatsApp.' } };
     if (await liveBookingFor(project.id)) return { status: 409, body: { error: 'You already have a survey booked. Use “Change time” instead.' } };
     if (await jobSurvey(project, s)) return callToChange;
+    if (noSurveyNeeded(project)) return linkGone;
   }
   const db = createAdminClient();
   const now = Date.now();
@@ -1289,6 +1293,7 @@ export async function staffBook(x: {
   const p = data as ProjectRow | null;
   if (!p) return { status: 404, body: { error: 'Not found' } };
   if (p.stage === 'lost') return { status: 409, body: { error: 'This job is Lost.' } };
+  if (!isSurveyType(x.type) && noSurveyNeeded(p)) return { status: 409, body: { error: NO_SURVEY } };
   const pc = x.postcode?.trim() || p.postcode;
   if (!pc) return { status: 400, body: { error: 'Enter the customer’s postcode first.' } };
   const geo = await lookupPostcode(pc);
@@ -1403,6 +1408,7 @@ export async function bookingLinkFor(projectId: string, by: Staff): Promise<Outc
   const { data } = await db.from('crm_projects').select('*').eq('id', projectId).maybeSingle();
   const p = data as ProjectRow | null;
   if (!p) return { status: 404, body: { error: 'Not found' } };
+  if (noSurveyNeeded(p)) return { status: 409, body: { error: NO_SURVEY } };
   const token = await ensureBookingToken(projectId);
   if (!token) return { status: 409, body: { error: 'Booking links are for jobs at Lead, Contacted or Survey booked.' } };
   const s = await getBookingSettings();
@@ -1456,6 +1462,8 @@ export async function tokenView(token: string): Promise<TokenView | null> {
   const r = live ? parseRange(live.onsite) : null;
   // No booking, but a date on the job (set by staff): that's their survey, changed by calling us.
   const own = live ? null : await jobSurvey(p, s).catch(() => null);
+  // Infrared, EV or LED only: nothing to book online (a survey they already have still shows).
+  if (!live && !own && noSurveyNeeded(p)) return null;
   return {
     projectId: p.id,
     enquiryId: p.enquiry_id,

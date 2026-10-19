@@ -21,8 +21,9 @@ function authorized(req: Request) {
  * lead alerts, sequences), new emails from Microsoft 365, and WhatsApp smart replies, intros and
  * chasers that are due, remind the team about customers left waiting, push CRM next steps that
  * have fallen due, the morning task round-up, and survey booking's background jobs (lapsed holds,
- * reminders, the Outlook copy). Booking starts no new work after 40 s, inside the 60 s limit; a
- * failure in either of those two never stops the rest.
+ * reminders, the Outlook copy). Booking runs last, so a long Outlook copy never holds up the customer
+ * messages; it starts no new work after 40 s, inside the 60 s limit. A failure in either of those two
+ * never stops the rest.
  */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -31,10 +32,11 @@ export async function GET(req: Request) {
   const reminded = await remindUnanswered().catch(() => 0);
   const followUps = await remindNextSteps().catch(() => 0);
   const tasksDue = await remindDueTasks().catch(() => 0);
-  const booking = await runBookingJobs({ until: started + 40_000 }).catch((e) => ({ error: String(e) }));
   const crm = await runCrmAutomations().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
   const emails = await pollMailbox((enquiryId, name, subject) =>
     notifyEnquiryTeam(`Email from ${name}`, subject, `/admin/crm?enquiry=${enquiryId}`, { tag: `em-${enquiryId}` })
   ).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
+  // Last, so a long Outlook copy never holds up the customer messages or the mailbox.
+  const booking = await runBookingJobs({ until: started + 40_000 }).catch((e) => ({ error: String(e) }));
   return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, booking, crm, emails });
 }

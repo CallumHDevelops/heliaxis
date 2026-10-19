@@ -7,7 +7,7 @@ import { todayISO } from '@/lib/tasks';
 import { setupPeople, visibleSetupTodos } from '@/lib/setup-checks';
 import { schemaReady } from '@/lib/schema-ready';
 import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
-import { DEFAULT_SURVEY_MINUTES, isSurveyType, SURVEY_TYPES, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
+import { DEFAULT_SURVEY_MINUTES, isSurveyType, noSurveyNeeded, SURVEY_TYPES, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
 import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem } from './HubView';
 
 export const dynamic = 'force-dynamic';
@@ -207,19 +207,24 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
     const done = mineRows.find((r) => r.status === 'complete');
     const start = Date.parse(String(p.survey_at));
     const minutes = Number(p.survey_minutes) || DEFAULT_SURVEY_MINUTES[type];
+    // Infrared, EV or LED only (and no survey started for it): a home visit, with no survey form.
+    const visit = !open && !done && noSurveyNeeded({ survey_type: p.survey_type as string | null, products: p.products as string[] | null });
     items.push({
       key: `s-${p.id}`,
       kind: 'survey',
+      ...(visit ? { tag: 'Visit' } : {}),
       sort: start,
       time: `${timeOf(p.survey_at)}–${hhmm.format(new Date(start + minutes * 60_000))}`,
       title: nameOf(p),
-      sub: [`${SURVEY_TYPES.find((t) => t.key === type)?.short ?? 'Solar'} survey`, postcodeOf(p)].filter(Boolean).join(' · '),
+      sub: [visit ? 'Home visit' : `${SURVEY_TYPES.find((t) => t.key === type)?.short ?? 'Solar'} survey`, postcodeOf(p)].filter(Boolean).join(' · '),
       href: `/admin/crm/${p.id}`,
       action: open
         ? { href: `/admin/surveys/${open.id}`, label: open.status === 'draft' ? 'Continue' : 'Start survey' }
         : done
           ? { href: `/admin/surveys/${done.id}/report`, label: 'Report' }
-          : { href: `/admin/surveys/start?project=${p.id}&type=${appType}`, label: 'Start survey' },
+          : visit
+            ? null
+            : { href: `/admin/surveys/start?project=${p.id}&type=${appType}`, label: 'Start survey' },
       directions: directions(p.address, postcodeOf(p)),
     });
   }

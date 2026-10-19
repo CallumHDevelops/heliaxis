@@ -237,6 +237,9 @@ nothing about the other customer is shown or changed.
 - At most **4 surveys a day**. After **15:00**, nothing can be booked for the next working day.
 - Solar 1 hour, heat pump 1 hour, both 1½ hours. Solar surveys finish before sunset.
 - Customers can move or cancel online up to 24 hours before.
+- Jobs with no solar, battery or heat pump (infrared, an EV charger or LED lighting, say) don't need a
+  survey, so they aren't offered survey times and their booking link won't open. Use **+ Add to my diary** for a home visit, or add Solar PV or Heat pump to
+  the job if they want a survey too.
 
 **The Diary** (Surveys → Diary) shows the next 3 weeks: surveys, installs, Outlook and your own
 entries, with the drives between them. Use **+ Add to my diary** for anything that isn't in the CRM

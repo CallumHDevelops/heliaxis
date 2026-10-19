@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
-import { isSurveyType, stageLabel, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
+import { isSurveyType, noSurveyNeeded, stageLabel, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
 import { schemaReady } from '@/lib/schema-ready';
 import { findSlots, liveBookingFor, publicDays } from '@/lib/booking/book';
 import type { ProjectRow } from '@/lib/booking/diary';
@@ -129,11 +129,15 @@ export async function POST(req: Request) {
     const p = data as ProjectRow | null;
     if (!p) return json({ error: 'Not found' }, 404);
     postcode ||= p.postcode || '';
+    // Infrared, EV or LED only (no solar, battery or heat pump): no survey times unless staff pick a type.
+    const none = !type && noSurveyNeeded(p);
     type ??= isSurveyType(p.survey_type) ? p.survey_type : (surveyTypeFor(p.products ?? []) ?? 'solar');
     // Moving their booking (or the date on the job): their own time doesn't count as busy.
     ignore = (await liveBookingFor(p.id))?.id ?? null;
     const { data: e } = await db.from('enquiries').select('name').eq('id', p.enquiry_id).maybeSingle();
     project = { id: p.id, title: p.title, customer: (e?.name as string) || p.title, postcode: p.postcode, surveyAt: p.survey_at, stage: p.stage };
+    if (none)
+      return json({ project, type: null, code: 'no_survey', error: 'This job has no solar, battery or heat pump on it, so it doesn’t need a survey. Use + Add to my diary for a home visit, or pick Solar or Heat pump above if they want a survey too.' }, 409);
   }
   if (!postcode)
     return json({ project, type: type ?? 'solar', error: project ? 'This job has no postcode yet. Enter it below.' : 'Enter the customer’s postcode.' }, 400);
