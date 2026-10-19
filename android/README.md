@@ -5,6 +5,10 @@ A [Trusted Web Activity](https://developer.chrome.com/docs/android/trusted-web-a
 icon. Web changes reach the app on every deploy; you only need a new APK to change the shell
 (name, icon, permissions, trusted domains).
 
+- **Icons**: `node scripts/android-icons.mjs` regenerates the launcher icon (square and adaptive,
+  with a themed-icon layer), the notification icon, `public/badge-96.png` and the splash from the
+  brand artwork, matching the website's and iPhone's icon. Then release a new APK.
+
 - **Offline**: the service worker (`src/app/sw.js/route.ts`) keeps the dashboard and Tasks; Tasks
   queues changes and syncs when back online (`src/lib/tasks-offline.ts`).
 - **Notifications**: native, via Firebase Cloud Messaging. `HeliaxisLauncherActivity` gets the
