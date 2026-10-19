@@ -276,8 +276,9 @@ const sections: LegalSection[] = [
         <p id="whatsapp">
           <strong>WhatsApp permission.</strong> We record when and how you agreed to hear from us on WhatsApp: by ticking “OK to
           message me on WhatsApp” on our website, in a Facebook or Instagram lead form that asks, by messaging us first, or by
-          telling one of our team. <strong>Reply STOP</strong> to any of our WhatsApp messages and our system won’t send you any
-          more automatic WhatsApp messages (reminders, follow-ups or quick replies). Reply START to turn them back on. We’ll
+          telling one of our team. <strong>Reply STOP</strong> to any of our WhatsApp messages (or ask one of our team) and our
+          system won’t send you any more automatic WhatsApp messages (reminders, follow-ups or quick replies). Reply START to
+          turn them back on. We’ll
           still answer if you message us, and we may send booking details by email instead.
         </p>
       </>
