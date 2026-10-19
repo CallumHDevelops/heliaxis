@@ -3,40 +3,67 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { defaultTemplate, whatsappConfigured } from '@/lib/whatsapp/api';
 import { markChatRead, processOutbox, sendManual } from '@/lib/whatsapp/inbox';
 import { getSettings } from '@/lib/whatsapp/settings';
-import { isUuid, json, session } from '@/lib/whatsapp/routes';
+import { isUuid, json, session, version } from '@/lib/whatsapp/routes';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
 
-/** One chat: the lead, its messages and any smart reply waiting to go. */
-export async function GET(_req: Request, { params }: Ctx) {
+/**
+ * One chat: the lead, its messages and any smart reply waiting to go. An open chat polls with
+ * ?v=<last version>: if nothing on screen has changed (no new message, tick, queued reply or edit
+ * to the lead) the answer is just { same: true } and the messages aren't read at all.
+ */
+export async function GET(req: Request, { params }: Ctx) {
   if (!(await session())) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const db = createAdminClient();
-  const [{ data: enquiry }, { data: messages }, { data: outbox }, settings] = await Promise.all([
+  const known = new URL(req.url).searchParams.get('v');
+  const everything = () =>
+    Promise.all([
+      db
+        .from('whatsapp_messages')
+        .select('id, direction, kind, body, template_name, status, error, sent_by, rule_id, via, created_at')
+        .eq('enquiry_id', id)
+        // The newest 500 (an imported chat can be long), oldest first on screen.
+        .order('created_at', { ascending: false })
+        .limit(500)
+        .then((r) => ({ ...r, data: r.data?.reverse() ?? null })),
+      getSettings(),
+    ]);
+  // Nothing to compare with (first load, Refresh): read it all straight away.
+  const early = known ? null : everything();
+  const [{ data: enquiry }, { data: outbox }, { data: newest, count }, { data: ticked }] = await Promise.all([
     db
       .from('enquiries')
       .select('id, name, email, phone, postcode, source, status, wa_id, whatsapp_opt_in, wa_last_inbound_at, wa_unread, wa_auto_off, created_at')
       .eq('id', id)
       .maybeSingle(),
     db
-      .from('whatsapp_messages')
-      .select('id, direction, kind, body, template_name, status, error, sent_by, rule_id, via, created_at')
-      .eq('enquiry_id', id)
-      // The newest 500 (an imported chat can be long), oldest first on screen.
-      .order('created_at', { ascending: false })
-      .limit(500)
-      .then((r) => ({ ...r, data: r.data?.reverse() ?? null })),
-    db
       .from('whatsapp_outbox')
       .select('id, kind, chase_step, rule_id, body, template_name, send_after, status, last_error, created_at')
       .eq('enquiry_id', id)
       .in('status', ['pending', 'sending', 'failed'])
       .order('send_after'),
-    getSettings(),
+    db.from('whatsapp_messages').select('id', { count: 'exact' }).eq('enquiry_id', id).order('created_at', { ascending: false }).limit(1),
+    // Delivery ticks and failures change older messages.
+    db
+      .from('whatsapp_messages')
+      .select('status_at')
+      .eq('enquiry_id', id)
+      .not('status_at', 'is', null)
+      .order('status_at', { ascending: false })
+      .limit(1),
   ]);
   if (!enquiry) return json({ error: 'Not found' }, 404);
+
+  if ((outbox ?? []).some((o) => o.status === 'pending' && new Date(o.send_after).getTime() <= Date.now())) {
+    after(() => processOutbox().catch(() => {}));
+  }
+  const v = version([enquiry, outbox, count, newest, ticked]);
+  if (known === v) return json({ same: true, v, unread: enquiry.wa_unread });
+
+  const [{ data: messages }, settings] = await (early ?? everything());
 
   const senders = [...new Set((messages ?? []).map((m) => m.sent_by).filter(Boolean))] as string[];
   const ruleIds = [...new Set([...(messages ?? []), ...(outbox ?? [])].map((m) => m.rule_id).filter(Boolean))] as string[];
@@ -47,10 +74,8 @@ export async function GET(_req: Request, { params }: Ctx) {
   const personName = new Map((people ?? []).map((p) => [p.id, p.full_name || p.email || 'Team']));
   const ruleName = new Map((rules ?? []).map((r) => [r.id, r.name]));
 
-  if ((outbox ?? []).some((o) => o.status === 'pending' && new Date(o.send_after).getTime() <= Date.now())) {
-    after(() => processOutbox().catch(() => {}));
-  }
   return json({
+    v,
     configured: whatsappConfigured(),
     defaultTemplate: defaultTemplate().name || null,
     chase: { questions: settings.chaseQuestions, hours: settings.chaseAfterHours },

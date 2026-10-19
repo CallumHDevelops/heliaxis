@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PushBanner } from '@/components/admin/PushBanner';
 import { relativeTime } from '@/lib/enquiries';
+import { NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
+import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { windowOpen } from '@/lib/whatsapp/shared';
 import '../whatsapp.css';
 
@@ -37,31 +39,38 @@ export function InboxList() {
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [now, setNow] = useState(() => Date.now());
+  /** The last full list's version: polls send it, and get { same: true } if nothing changed. */
+  const version = useRef('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (full: boolean) => {
     try {
-      const r = await fetch('/api/whatsapp/conversations', { cache: 'no-store' });
+      const r = await fetch(`/api/whatsapp/conversations${!full && version.current ? `?v=${version.current}` : ''}`, { cache: 'no-store' });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Could not load the inbox');
-      setItems(d.items);
-      setConfigured(d.configured);
+      if (!d.same) {
+        // Something changed (a new message, or a chat read elsewhere): the bell catches up too.
+        if (version.current && d.v !== version.current) window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
+        setItems(d.items);
+        setConfigured(d.configured);
+        version.current = d.v || '';
+      }
       setError('');
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load the inbox');
       setItems((prev) => prev ?? []);
+      return false;
     }
   }, []);
 
+  // New chats, messages and unread counts show up by themselves (every 12s while it's on screen).
+  const { refresh, busy } = useLiveRefresh(load, 12_000);
+  // "5m ago" and the 24h window move on even when nothing new arrives.
   useEffect(() => {
-    load();
-    const t = setInterval(load, 15_000);
-    const onFocus = () => load();
-    window.addEventListener('focus', onFocus);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [load]);
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const shown = (items ?? []).filter(
     (c) =>
@@ -74,7 +83,12 @@ export function InboxList() {
     <div className="wa-page">
       <div className="wa-top">
         <Link href="/admin/enquiries" className="wa-back">← Enquiries</Link>
-        <Link href="/admin/enquiries/smart-replies" className="wa-link">Smart replies</Link>
+        <span className="wa-top-actions">
+          <Link href="/admin/enquiries/smart-replies" className="wa-link">Smart replies</Link>
+          <button type="button" className="wa-refresh" onClick={refresh} disabled={busy}>
+            {busy ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </span>
       </div>
       <h1 className="wa-h1">WhatsApp</h1>
       <PushBanner />
@@ -100,7 +114,7 @@ export function InboxList() {
       ) : (
         <ul className="wa-list">
           {shown.map((c) => {
-            const open = windowOpen(c.wa_last_inbound_at);
+            const open = windowOpen(c.wa_last_inbound_at, now);
             const preview = c.last
               ? `${c.last.direction === 'out' ? 'You: ' : ''}${c.last.body || ''}`
               : 'Opted in — not messaged yet';

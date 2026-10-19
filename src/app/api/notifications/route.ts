@@ -1,31 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApproved } from '@/lib/auth';
+import { isChatNotification } from '@/lib/notification-refs';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
+const ID = /^[0-9a-f-]{36}$/i;
 
-/** The signed-in user's latest notifications and unread count (header bell). */
-export async function GET() {
+/**
+ * The signed-in user's latest notifications and unread count (header bell). Read WhatsApp chat
+ * notifications are left out (noise once read). ?shown=<ids>: the ones on this device's screen;
+ * `gone` says which of them have been read since (here or anywhere), so the page can close them.
+ */
+export async function GET(req: NextRequest) {
   const session = await requireApproved();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE });
 
   const admin = createAdminClient();
-  const [list, unread] = await Promise.all([
-    admin
-      .from('notifications')
-      .select('id, kind, title, body, href, read_at, created_at')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .limit(30),
+  const latest = (cols: string) =>
+    admin.from('notifications').select(cols).eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(100);
+  const shown = (req.nextUrl.searchParams.get('shown') || '').split(',').filter((id) => ID.test(id)).slice(0, 50);
+  const COLS = 'id, kind, title, body, href, read_at, created_at';
+  const [first, unread, stillUnread] = await Promise.all([
+    latest(`${COLS}, ref`),
     admin
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', session.user.id)
       .is('read_at', null),
+    shown.length
+      ? admin.from('notifications').select('id').eq('user_id', session.user.id).is('read_at', null).in('id', shown)
+      : null,
   ]);
+  // No ref column until notifications-ref.sql has been run.
+  const list = first.error ? await latest(COLS) : first;
+  type Row = { id: string; kind: string; title: string; href: string | null; read_at: string | null; ref?: string | null };
+  const rows = ((list.data ?? []) as unknown as Row[]).filter((n) => !n.read_at || !isChatNotification(n)).slice(0, 30);
+  const keep = new Set((stillUnread?.data ?? []).map((n) => n.id));
   return NextResponse.json(
-    { notifications: list.data ?? [], unread: unread.count ?? 0, ready: !list.error },
+    {
+      notifications: rows,
+      unread: unread.count ?? 0,
+      ready: !list.error,
+      gone: stillUnread && !stillUnread.error ? shown.filter((id) => !keep.has(id)) : [],
+    },
     { headers: NO_STORE }
   );
 }

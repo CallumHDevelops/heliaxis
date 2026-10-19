@@ -1,6 +1,7 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { ensureOpportunity } from '@/lib/crm/server';
+import { leadRef } from '@/lib/notification-refs';
 import { ATTR_COOKIE, parseAttribution, sourceLabel } from '@/lib/attribution';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
           after(() =>
             notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', '/admin/enquiries', {
               tag: `enq-${row.id}`,
+              ref: leadRef(row.id),
             }).catch(() => {})
           );
         }

@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { notify, type NotificationInput } from '@/lib/notify';
+import { clearChatNotifications, clearReplyNotifications, notify, type NotificationInput } from '@/lib/notify';
+import { chatHref, chatRef, chatTag, replyRef } from '@/lib/notification-refs';
 import { canAccess } from '@/lib/portals';
 import { defaultTemplate, markRead, sendDocument, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
@@ -14,7 +15,7 @@ import {
   type SmartRule,
 } from './shared';
 import { isQuiet, nextAwake, planChase } from './schedule';
-import { ensureOpportunity } from '@/lib/crm/server';
+import { ensureOpportunity, markContacted } from '@/lib/crm/server';
 import { getSettings } from './settings';
 
 /**
@@ -38,14 +39,14 @@ type EnquiryWa = {
 
 const ENQ_COLS = 'id, name, phone, status, wa_id, wa_last_inbound_at, wa_unread, wa_auto_off';
 
-export const inboxHref = (enquiryId: string) => `/admin/enquiries/inbox/${enquiryId}`;
+export const inboxHref = chatHref;
 
 /** Everyone who can open Enquiries gets the push. */
 export async function notifyEnquiryTeam(
   title: string,
   body: string,
   href: string,
-  extra: Pick<NotificationInput, 'tag' | 'actions' | 'data'> = {}
+  extra: Pick<NotificationInput, 'tag' | 'actions' | 'data' | 'ref'> = {}
 ) {
   const db = createAdminClient();
   const { data } = await db.from('profiles').select('*').eq('status', 'approved');
@@ -207,7 +208,8 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   const lines = [body.slice(0, 140)];
   if (queued) lines.push(`Smart reply “${queued.rule}” sends in ~${Math.max(1, Math.round(queued.seconds / 60))} min — tap to check, edit or cancel.`);
   await notifyEnquiryTeam(created ? `New WhatsApp lead: ${who}` : `WhatsApp from ${who}`, lines.join('\n'), inboxHref(enquiry.id), {
-    tag: `wa-${enquiry.id}`,
+    tag: chatTag(enquiry.id),
+    ref: chatRef(enquiry.id),
     ...(queued?.outboxId
       ? {
           actions: [
@@ -218,6 +220,9 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
         }
       : {}),
   });
+  // Read while that went out (the chat is open somewhere): the notification can go straight away.
+  const { data: seen } = await db.from('enquiries').select('wa_unread').eq('id', enquiry.id).maybeSingle();
+  if (seen && !seen.wa_unread) await clearChatNotifications(enquiry.id);
 }
 
 /** Queue the matching smart reply, unless a person is handling this chat. */
@@ -418,7 +423,7 @@ export async function scheduleChase(db: Db, enquiry: EnquiryWa, opts: { hours: n
   return plan;
 }
 
-/** Opening a chat: blue ticks for the customer, unread badge cleared for us. */
+/** Opening a chat: blue ticks for the customer, unread badge cleared for us, its notifications gone for everyone. */
 export async function markChatRead(enquiryId: string) {
   const db = createAdminClient();
   const { data: unread } = await db
@@ -429,6 +434,7 @@ export async function markChatRead(enquiryId: string) {
     .eq('status', 'received')
     .order('created_at', { ascending: false });
   await db.from('enquiries').update({ wa_unread: 0 }).eq('id', enquiryId);
+  await clearChatNotifications(enquiryId);
   if (!unread?.length) return;
   await db.from('whatsapp_messages').update({ status: 'read' }).in('id', unread.map((u) => u.id));
   const latest = unread[0].wa_message_id;
@@ -585,11 +591,13 @@ export async function handleEcho(m: MessageEcho) {
     if (error.code === '23505') return;
     throw new Error(error.message);
   }
+  // Replying in the app means they've read the chat there, so it isn't unread here either.
   await db
     .from('enquiries')
-    .update({ wa_last_message_at: at, ...(enquiry.status === 'new' ? { status: 'contacted' } : {}) })
+    .update({ wa_last_message_at: at, wa_unread: 0, ...(enquiry.status === 'new' ? { status: 'contacted' } : {}) })
     .eq('id', enquiry.id);
   await cancelAutomatic(db, enquiry.id, 'Replied in the WhatsApp app');
+  await markFirstContact(db, enquiry.id, at);
   const settings = await getSettings();
   if (settings.chaseQuestions && body.includes('?')) await scheduleChase(db, enquiry, { hours: settings.chaseAfterHours });
 }
@@ -625,23 +633,20 @@ export async function remindUnanswered() {
     await notifyEnquiryTeam(
       `${e.name} is waiting for a reply`,
       `Their WhatsApp message has had no answer for ${mins >= 90 ? `${Math.round(mins / 60)}h` : `${mins} min`}.`,
-      inboxHref(e.id)
+      inboxHref(e.id),
+      { ref: replyRef(e.id) }
     );
   }
   return n;
 }
 
-/** First time someone on the team reached this customer (speed-to-lead). Ignores missing CRM tables. */
-export async function markFirstContact(db: Db, enquiryId: string, at = new Date().toISOString()) {
-  await db
-    .from('crm_projects')
-    .update({ first_contact_at: at })
-    .eq('enquiry_id', enquiryId)
-    .is('first_contact_at', null)
-    .then(
-      () => null,
-      () => null
-    );
+/**
+ * Someone on the team messaged this customer (here or in the WhatsApp Business app). The first time
+ * counts as first contact (speed to lead; the new-lead alerts go). And replying means they've read
+ * it: the chat's notifications and "… is waiting for a reply" go, for everyone.
+ */
+export async function markFirstContact(_db: Db, enquiryId: string, at = new Date().toISOString()) {
+  await Promise.all([markContacted({ enquiryId }, at), clearChatNotifications(enquiryId), clearReplyNotifications(enquiryId)]);
 }
 
 /**

@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requirePortal } from '@/lib/auth';
 
@@ -10,3 +11,6 @@ export const isUuid = (s: string) => /^[0-9a-f-]{36}$/i.test(s);
 export async function session() {
   return requirePortal('enquiries');
 }
+
+/** A short fingerprint of what a page shows: the same value means nothing on screen has changed. */
+export const version = (parts: unknown) => createHash('sha1').update(JSON.stringify(parts)).digest('base64url').slice(0, 16);

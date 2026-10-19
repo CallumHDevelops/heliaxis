@@ -161,7 +161,8 @@ export async function pollMailbox(onInbound: (enquiryId: string, name: string, s
       await db.from('crm_projects').update({ sequence_stopped_at: new Date().toISOString() }).eq('enquiry_id', e.id).is('sequence_stopped_at', null);
       await onInbound(e.id, e.name, m.subject || '(no subject)');
     } else {
-      await db.from('crm_projects').update({ first_contact_at: new Date().toISOString() }).eq('enquiry_id', e.id).is('first_contact_at', null);
+      const { markContacted } = await import('@/lib/crm/server');
+      await markContacted({ enquiryId: e.id });
     }
   };
   for (const m of inbox.value ?? []) await handle(m, 'in');
