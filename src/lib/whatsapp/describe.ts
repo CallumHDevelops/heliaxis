@@ -4,9 +4,9 @@
  * Reference → messages).
  *
  * The number has no WhatsApp app attached, so nothing here may say "open WhatsApp": anything Meta
- * doesn't pass on is gone, and the customer has to send it again. Only real text (typed, or a button
- * or list option they tapped) is kind 'text', so only that can trigger a smart reply. The messages
- * we write ourselves stay within 140 characters, the length of a notification.
+ * doesn't pass on is gone. Only real text (typed, or a button or list option they tapped) is kind
+ * 'text', so only that can trigger a smart reply. The messages we write ourselves stay within 140
+ * characters, the length of a notification.
  *
  * No imports: scripts/test-wa-describe.mjs loads this file straight into node. Safe for client code.
  */
@@ -105,6 +105,7 @@ export function describeMessage(m: InboundMessage): { kind: string; body: string
       return { kind: 'other', body: system(m) };
     case 'request_welcome':
       return { kind: 'other', body: '👋 They opened a WhatsApp chat with you but haven’t written anything yet.' };
+    // The Cloud API sends a deleted message as 'unsupported' (see notPassedOn), not as these.
     case 'revoked':
     case 'deleted':
       return { kind: 'other', body: '🗑️ They deleted a message.' };
@@ -136,7 +137,11 @@ function interactive(i: InboundMessage['interactive']): { kind: string; body: st
   return { kind: 'other', body: `⚠️ They answered in a way this inbox can’t show. ${RESEND}` };
 }
 
-/** Polls, edits, view-once photos…: Meta tells us one came, but not what was in it. */
+/**
+ * Polls, edits, view-once photos…: Meta tells us one came, but not what was in it. A message they
+ * deleted, or one sent from another business's API number (an automated sender), comes the same way
+ * with no unsupported.type, so then we can't tell what it was or whether to ask for it again.
+ */
 function notPassedOn(m: InboundMessage) {
   const type = m.unsupported?.type || '';
   const info = JUST_SO_YOU_KNOW.get(type);
@@ -147,7 +152,7 @@ function notPassedOn(m: InboundMessage) {
   if (why) return `⚠️ WhatsApp didn’t pass this message on (“${why.replace(/\.$/, '')}”). ${RESEND}`;
   const did = NOT_PASSED_ON.get(type);
   if (did) return `⚠️ ${did}, which WhatsApp doesn’t pass on. ${RESEND}`;
-  return `⚠️ WhatsApp didn’t pass this on (it might be a poll, a view-once photo or an edit). ${RESEND}`;
+  return '⚠️ WhatsApp didn’t pass this on. It may have been deleted, or be a poll, a view-once photo or another business’s automated message.';
 }
 
 function sharedContacts(list: SharedContact[]) {

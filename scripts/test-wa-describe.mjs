@@ -11,7 +11,7 @@ function eq(name, got, want) {
 
 const msg = (type, extra = {}) => describeMessage({ id: 'wamid.1', from: '12135550123', type, ...extra });
 const RESEND = 'Ask them to send it again as a normal message or photo.';
-const NOT_PASSED_ON = `⚠️ WhatsApp didn’t pass this on (it might be a poll, a view-once photo or an edit). ${RESEND}`;
+const NOT_PASSED_ON = '⚠️ WhatsApp didn’t pass this on. It may have been deleted, or be a poll, a view-once photo or another business’s automated message.';
 
 // Real text: the only kind that can trigger a smart reply.
 eq('text', msg('text', { text: { body: 'How much for 10 panels?' } }), { kind: 'text', body: 'How much for 10 panels?' });
