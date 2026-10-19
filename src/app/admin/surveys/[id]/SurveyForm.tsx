@@ -290,7 +290,7 @@ export function SurveyForm() {
     const onQueue = () => void refresh();
     window.addEventListener(SURVEYS_CHANGED, onSurveys);
     window.addEventListener(QUEUE_CHANGED, onQueue);
-    void refresh();
+    // The first read is after the survey has opened (the load above), so it sees the opened copy.
     return () => {
       window.removeEventListener(SURVEYS_CHANGED, onSurveys);
       window.removeEventListener(QUEUE_CHANGED, onQueue);
@@ -705,10 +705,12 @@ export function SurveyForm() {
   const banners = (
     <>
       {needSignIn && (
-        <p className="svf-banner svf-banner--err" role="alert">
-          Sign in again to upload your photos.{' '}
-          <a href={`/login?next=${encodeURIComponent(path)}`}>Sign in</a>
-        </p>
+        <div className="svf-banner svf-banner--err" role="alert">
+          <p>Sign in again to upload your photos.</p>
+          <a className="svf-btn svf-btn--ghost" href={`/login?next=${encodeURIComponent(path)}`}>
+            Sign in
+          </a>
+        </div>
       )}
       {status?.error && !lockedReason && (
         <p className="svf-banner svf-banner--err" role="alert">

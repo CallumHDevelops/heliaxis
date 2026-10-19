@@ -135,9 +135,12 @@ export function NewSurveySheet({ onClose }: { onClose: () => void }) {
               />
               {!customers && !error && <p className="svf-help">Loading customers…</p>}
               {customers && !matches.length && (
-                <p className="svf-help">
-                  No customer found. Add them in the CRM first (<Link href="/admin/crm">CRM → + New</Link>).
-                </p>
+                <>
+                  <p className="svf-help">No customer found. Add them in the CRM first.</p>
+                  <Link className="svf-btn svf-btn--ghost" href="/admin/crm">
+                    Open the CRM
+                  </Link>
+                </>
               )}
               <ul className="svl-pick">
                 {matches.map((c) => (

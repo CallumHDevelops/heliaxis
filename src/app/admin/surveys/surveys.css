@@ -76,7 +76,7 @@
   background: none;
   border: 0;
   padding: 0.5rem 0;
-  min-height: 44px;
+  min-height: 48px;
   font: inherit;
   font-weight: 700;
   color: var(--sv-ink, #14130f);
@@ -163,7 +163,9 @@
   min-width: 0;
 }
 .svl-name {
-  display: block;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
   font-weight: 700;
   font-size: 1.05rem;
   color: var(--sv-ink);
@@ -174,8 +176,8 @@
 }
 .svl-meta,
 .svl-status {
-  margin: 2px 0 0;
-  font-size: 0.92rem;
+  margin: 0;
+  font-size: 1rem;
   line-height: 1.35;
 }
 .svl-status {
@@ -246,7 +248,7 @@
 .svf-back {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 48px;
   font-weight: 700;
   color: var(--sv-ink);
   text-decoration: none;
@@ -426,11 +428,10 @@
 
 .svf-roofs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
   padding: 4px 0 10px;
   margin-bottom: 4px;
-  scrollbar-width: thin;
 }
 .svf-roof {
   flex-shrink: 0;
@@ -690,9 +691,14 @@
   margin: 0;
   font-weight: 600;
 }
-.svf-grid2 .svf-input--num {
+.svf-grid2 .svf-numbox {
+  display: flex;
   width: 100%;
-  max-width: 9rem;
+}
+.svf-grid2 .svf-input--num {
+  flex: 1;
+  min-width: 0;
+  width: auto;
 }
 
 .svf-more,
@@ -781,7 +787,7 @@
   flex-direction: column;
 }
 .svf-notfilled summary {
-  min-height: 44px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   font-weight: 800;
@@ -976,9 +982,22 @@
 .svf-docs span {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 48px;
   font-weight: 700;
   color: var(--sv-ink);
+}
+
+/* The signature pad's own Clear button, big enough for a finger. */
+.svf-sheet .sigpad-foot button {
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* Links inside a notice, as buttons. */
+.svf-banner .svf-btn {
+  margin-top: 6px;
 }
 
 /* Full-screen: the photo run and the photo viewer. */
@@ -1085,7 +1104,7 @@
   padding: 3px 4px;
   background: rgba(10, 10, 8, 0.82);
   color: #fff;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 800;
   text-align: center;
 }

@@ -177,7 +177,10 @@ export function SurveysList({ view, ready }: { view: ListView; ready: boolean })
         <p className={signIn ? 'svf-banner svf-banner--err' : 'svf-banner'} role="status">
           {signIn ? (
             <>
-              Signed out: showing the surveys saved on this phone. <a href="/login?next=%2Fadmin%2Fsurveys%2Ftodo">Sign in</a>
+              Signed out: showing the surveys saved on this phone.{' '}
+              <a className="svf-btn svf-btn--ghost" href="/login?next=%2Fadmin%2Fsurveys%2Ftodo">
+                Sign in
+              </a>
             </>
           ) : (
             'No signal: showing the surveys saved on this phone.'
