@@ -155,7 +155,9 @@ eq('never messaged us', windowPill(null, now), { open: false, label: 'Template o
 for (const f of ['src/app/api/whatsapp/active/route.ts', 'src/lib/whatsapp/active.ts']) {
   const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   eq(`${f} never runs the outbox`, /processOutbox/.test(src), false);
-  eq(`${f} never marks chats read or changes a row`, /markChatRead|wa_unread:\s*0|\.(update|insert|upsert|delete)\(\s*[{[]?/.test(src.replace(/createHash\([^)]*\)\.update\(/g, '')), false);
+  // (Supabase writes: .update({…}), .insert(…), .upsert(…), .delete(); not a hash's .update or a Map's .delete(key).)
+  const writes = /markChatRead|wa_unread:\s*0|\.(update|insert|upsert)\(\s*[{[]|\.delete\(\s*\)/;
+  eq(`${f} never marks chats read or changes a row`, writes.test(src), false);
 }
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
