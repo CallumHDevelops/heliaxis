@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
  * Lead Ads (fetch a lead). Everything is off until the env vars in WHATSAPP_SETUP.md are set.
  */
 
-const GRAPH = () => `https://graph.facebook.com/${process.env.META_GRAPH_VERSION || 'v23.0'}`;
+const GRAPH = (version?: string) => `https://graph.facebook.com/${version || process.env.META_GRAPH_VERSION || 'v23.0'}`;
 
 export function whatsappConfigured() {
   return !!(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
@@ -37,11 +37,12 @@ export function validSignature(rawBody: string, header: string | null): boolean 
 /** `code` is Meta's error code when it sent one (190 bad token, 10/200 permissions, 4/17/32 rate limits…). */
 export type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string; code?: number; subcode?: number };
 
-export async function graph<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<GraphResult<T>> {
+/** `version` overrides META_GRAPH_VERSION (the ad figures pin their own: src/lib/meta-ads.ts). */
+export async function graph<T>(path: string, init: RequestInit & { token?: string; version?: string } = {}): Promise<GraphResult<T>> {
   const token = init.token || process.env.WHATSAPP_TOKEN;
   if (!token) return { ok: false, error: 'WhatsApp is not connected yet (WHATSAPP_TOKEN missing).' };
   try {
-    const r = await fetch(`${GRAPH()}${path}`, {
+    const r = await fetch(`${GRAPH(init.version)}${path}`, {
       ...init,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
       cache: 'no-store',
@@ -137,10 +138,13 @@ export async function markRead(waMessageId: string, typing = false) {
 
 export type LeadField = { name: string; values: string[] };
 
+/** The ad a lead came from (the ids need the same ads access as the name). */
+type LeadAd = { ad_name?: string; ad_id?: string; adset_id?: string; campaign_id?: string };
+
 /** A Lead Ads submission's answers. Needs a Page token with leads_retrieval. */
 export async function fetchLead(leadgenId: string) {
-  return graph<{ id: string; created_time?: string; field_data?: LeadField[]; ad_name?: string; form_id?: string }>(
-    `/${encodeURIComponent(leadgenId)}?fields=id,created_time,field_data,ad_name,form_id`,
+  return graph<{ id: string; created_time?: string; field_data?: LeadField[]; form_id?: string } & LeadAd>(
+    `/${encodeURIComponent(leadgenId)}?fields=id,created_time,field_data,ad_name,form_id,ad_id,adset_id,campaign_id`,
     { token: process.env.META_PAGE_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN }
   );
 }
