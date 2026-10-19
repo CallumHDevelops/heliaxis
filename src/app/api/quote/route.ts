@@ -1,7 +1,7 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { ensureOpportunity } from '@/lib/crm/server';
-import { ATTR_COOKIE, parseAttribution, sourceLabel } from '@/lib/attribution';
+import { ATTR_COOKIE, CONSENT_COOKIE, hasConsent, parseAttribution, sourceLabel } from '@/lib/attribution';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 import { grantPermission } from '@/lib/whatsapp/permission';
@@ -38,8 +38,11 @@ export async function POST(request: NextRequest) {
       // The unticked "OK to message me on WhatsApp about my enquiry" box.
       whatsappOptIn: body.whatsappOptIn === true || body.whatsappOptIn === 'on' || body.whatsappOptIn === 'true',
     };
-    // Came from an ad or a tagged link? Label the enquiry with it ("meta-ad: <campaign>").
-    const attribution = parseAttribution(request.cookies.get(ATTR_COOKIE)?.value);
+    // Came from an ad or a tagged link? Label the enquiry with it ("meta-ad: <campaign>"). Only with
+    // cookie consent: an hx_attr set before the cookie banner existed (or without Accept) is ignored.
+    const attribution = hasConsent(request.cookies.get(CONSENT_COOKIE)?.value)
+      ? parseAttribution(request.cookies.get(ATTR_COOKIE)?.value)
+      : null;
     const adSource = sourceLabel(attribution);
     if (adSource) data.source = adSource;
 

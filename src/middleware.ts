@@ -58,8 +58,11 @@ export async function middleware(request: NextRequest) {
   // accepted cookies: before that, the banner sends their landing page to /api/attr if they accept.
   if (!isAdminPath && !isAuthPath) {
     const res = NextResponse.next();
-    const attr = hasConsent(request.cookies.get(CONSENT_COOKIE)?.value) ? attributionFromUrl(request.nextUrl) : null;
+    const consented = hasConsent(request.cookies.get(CONSENT_COOKIE)?.value);
+    const attr = consented ? attributionFromUrl(request.nextUrl) : null;
     if (attr) res.cookies.set(ATTR_COOKIE, encodeURIComponent(JSON.stringify(attr)), attrCookieOptions());
+    // An hx_attr set before the cookie banner existed (or without Accept) goes.
+    else if (!consented && request.cookies.has(ATTR_COOKIE)) res.cookies.set(ATTR_COOKIE, '', { ...attrCookieOptions(), maxAge: 0 });
     return res;
   }
 
