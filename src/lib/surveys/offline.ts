@@ -595,7 +595,16 @@ export async function warmSurveys(opts: { force?: boolean } = {}): Promise<numbe
   let body: { ready?: boolean; surveys?: SurveyPayload[] };
   try {
     const r = await fetch('/api/crm/surveys/offline-pack?days=2', { cache: 'no-store' });
-    if (!r.ok) return null; // signed out, no CRM access, or the server's busy
+    if (r.status === 401 || r.status === 403) {
+      // Signed out, or no CRM access: don't ask again on every page for the next 10 minutes.
+      try {
+        localStorage.setItem(WARM_KEY, String(Date.now()));
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
+    if (!r.ok) return null; // the server's busy: try again next time
     body = await r.json();
   } catch {
     return null;
