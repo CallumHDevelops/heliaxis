@@ -25,8 +25,9 @@ type Tab =
   | 'assistant'
   | 'app';
 
-// Opens RAMS already signed in when it can (src/lib/sso.ts).
+// Open RAMS and the social studio already signed in when they can (src/lib/sso.ts).
 const RAMS_URL = '/api/sso/rams';
+const SOCIAL_URL = '/api/sso/social';
 
 const ICON = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
 const icons = {
@@ -194,7 +195,7 @@ export async function AdminShell({
           { href: '/admin/crm/settings', label: 'CRM settings', active: false },
         ]
       : []),
-    ...(can('social') ? [{ href: 'https://social.heliaxis.co.uk', label: 'Social media studio', active: false }] : []),
+    ...(can('social') ? [{ href: SOCIAL_URL, label: 'Social media studio', active: false }] : []),
     ...(can('team') ? [{ href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis', label: 'Our team', active: false }] : []),
     { href: '/admin/app', label: 'Get the app', active: active === 'app' },
   ];
