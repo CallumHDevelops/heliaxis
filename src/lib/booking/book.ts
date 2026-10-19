@@ -6,8 +6,9 @@ import { msConfigured } from '@/lib/ms365';
 import { notify } from '@/lib/notify';
 import { canAccess } from '@/lib/portals';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
-import { toWaId } from '@/lib/whatsapp/shared';
+import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
 import { applyStageEvent } from '@/lib/crm/move-stage';
+import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { bookingUrl, ensureBookingToken, projectByBookingToken, type BookingProject } from '@/lib/crm/booking-link';
 import { ensureOpportunity, isUuid, logActivity } from '@/lib/crm/server';
 import { isSurveyType, minutesWords, surveyTypeFor, surveyTypeLabel, type SurveyTypeKey } from '@/lib/crm/stages';
@@ -472,22 +473,46 @@ async function clearRequestStep(projectId: string) {
   await createAdminClient().from('crm_projects').update({ next_step: null, next_step_at: null }).eq('id', projectId).like('next_step', 'Confirm %survey request%');
 }
 
-/**
- * How the customer will hear about it: WhatsApp if allowed (mirrors the WhatsApp permission rule:
- * never after STOP; only with permission once "Only send to customers who've agreed" is on), else
- * email once Microsoft 365 is connected, else a call.
+/*
+ * The WhatsApp permission rule, as the WhatsApp permission code has it (inlined: that file isn't
+ * this unit's). Every enquiry with the number counts; the record columns come with crm-v3.sql.
  */
-export async function notifyChannel(enquiryId: string | null): Promise<'whatsapp' | 'email' | 'call'> {
+type PermRow = { id: string; wa_id?: string | null; phone?: string | null; whatsapp_opt_in?: boolean | null; whatsapp_opt_in_source?: string | null };
+/** Replied STOP, or staff switched it off because they asked us to stop. */
+const isStopped = (r: PermRow) =>
+  r.whatsapp_opt_in === false && (r.whatsapp_opt_in_source === 'stop-reply' || !!r.whatsapp_opt_in_source?.startsWith('staff-stop:'));
+/** A ticked public form only counts for that enquiry (anyone can type any number into one). */
+const agreedFor = (r: PermRow, selfId: string) =>
+  r.whatsapp_opt_in === true && (r.id === selfId || !['website-form', 'booking-form'].includes(r.whatsapp_opt_in_source ?? ''));
+
+/**
+ * How the customer will hear about it: WhatsApp if allowed (never after STOP; only with permission
+ * once "Only send to customers who've agreed" is on) and the automation can send it (inside the
+ * 24-hour window, or with the survey template set), else email once Microsoft 365 is connected, else
+ * a call. `ownOnly` (website bookings) looks at this enquiry alone, so the reply never shows another
+ * customer's STOP or permission.
+ */
+export async function notifyChannel(enquiryId: string | null, o: { ownOnly?: boolean } = {}): Promise<'whatsapp' | 'email' | 'call'> {
   if (!enquiryId) return 'call';
   try {
     const db = createAdminClient();
     const { data: e } = await db.from('enquiries').select('*').eq('id', enquiryId).maybeSingle();
     if (!e) return 'call';
-    const wa = (e.wa_id as string | null) || toWaId(e.phone as string | null);
-    if (whatsappConfigured() && wa) {
-      const { data: same } = await db.from('enquiries').select('*').eq('wa_id', wa).limit(50);
-      const all = [e, ...(same ?? [])];
-      const stopped = all.some((x) => x.whatsapp_opt_in === false && x.whatsapp_opt_in_source === 'stop-reply');
+    const me = e as PermRow;
+    const wa = String(me.wa_id || toWaId(me.phone ?? null) || '').replace(/\D/g, '');
+    const canSend = whatsappConfigured() && !!wa && (windowOpen(e.wa_last_inbound_at as string | null) || !!(await getCrmSettings()).surveyTemplate);
+    if (canSend) {
+      const rows: PermRow[] = [me];
+      if (!o.ownOnly) {
+        // The same number, including phones typed another way (07…, +44 …).
+        const tail = wa.slice(-9);
+        const { data: same } = await db
+          .from('enquiries')
+          .select('*')
+          .or(`wa_id.eq.${wa},phone.ilike.%${tail.slice(0, 3)}%${tail.slice(3, 6)}%${tail.slice(6)}%`)
+          .limit(50);
+        for (const r of (same ?? []) as PermRow[]) if (r.id !== me.id && (r.wa_id === wa || (!r.wa_id && toWaId(r.phone ?? null) === wa))) rows.push(r);
+      }
       const { data: kv } = await db.from('cms_kv').select('value').eq('key', 'wa-permission').maybeSingle();
       let requireOptIn = false;
       try {
@@ -495,7 +520,7 @@ export async function notifyChannel(enquiryId: string | null): Promise<'whatsapp
       } catch {
         requireOptIn = false;
       }
-      if (!stopped && (!requireOptIn || all.some((x) => x.whatsapp_opt_in === true))) return 'whatsapp';
+      if (!rows.some(isStopped) && (!requireOptIn || rows.some((r) => agreedFor(r, me.id)))) return 'whatsapp';
     }
     return msConfigured() && e.email ? 'email' : 'call';
   } catch {
@@ -673,16 +698,23 @@ export async function afterConfirm(x: AfterConfirm) {
     if (!enq.wa_id && toWaId(x.details.phone)) fill.wa_id = toWaId(x.details.phone);
     if (Object.keys(fill).length) await db.from('enquiries').update(fill).eq('id', enquiryId);
     // Their own link: the tick is their permission (website customers got it when they were created).
-    if (x.how === 'online' && b.source === 'link' && x.details.whatsappOptIn) {
+    // As the permission rule: it never undoes a STOP (only START or staff do), and the first agreement
+    // recorded is kept. The record columns come with crm-v3.sql.
+    const row = enq as PermRow;
+    const hasRecord = 'whatsapp_opt_in_source' in row;
+    const recorded = row.whatsapp_opt_in === true && (!hasRecord || !!row.whatsapp_opt_in_source);
+    if (x.how === 'online' && b.source === 'link' && x.details.whatsappOptIn && !isStopped(row) && !recorded) {
       await db.from('enquiries').update({ whatsapp_opt_in: true }).eq('id', enquiryId);
-      await db
-        .from('enquiries')
-        .update({ whatsapp_opt_in_at: new Date().toISOString(), whatsapp_opt_in_source: 'booking-form' })
-        .eq('id', enquiryId)
-        .then(
-          () => null,
-          () => null
-        );
+      if (hasRecord) {
+        await db
+          .from('enquiries')
+          .update({ whatsapp_opt_in_at: new Date().toISOString(), whatsapp_opt_in_source: 'booking-form' })
+          .eq('id', enquiryId)
+          .then(
+            () => null,
+            () => null
+          );
+      }
     }
   }
 
@@ -894,7 +926,8 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
       end: new Date(range.end).toISOString(),
       label: `${longDayLabel(ukDate(range.start))}, around ${ukTime(range.start)}`,
       firstName: sv?.name ?? '',
-      notify: await notifyChannel(enquiryId),
+      // A website booking's reply only ever looks at the new customer (another one may share the number).
+      notify: await notifyChannel(enquiryId, { ownOnly: !project }),
       changeUrl: await ensureBookingToken(projectId).then((t) => (t ? bookingUrl(t) : null)),
     },
   });
