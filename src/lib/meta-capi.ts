@@ -1,6 +1,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PROJECT_STAGES } from '@/lib/crm/stages';
 
 /**
  * Meta Conversions API: tell Meta when a lead becomes a booked survey or a sale, so the ads optimise
@@ -11,11 +12,14 @@ export const capiConfigured = () => !!(process.env.META_PIXEL_ID && process.env.
 
 const sha = (v: string) => crypto.createHash('sha256').update(v.trim().toLowerCase()).digest('hex');
 
-/** CRM stage → Meta event. */
+/**
+ * CRM stage → Meta event. Every stage from Won onwards is the sale, so a job loaded straight in at
+ * Design or Install booked still reports it. Each event goes once per job (capi_sent).
+ */
 const EVENTS: Record<string, string> = {
   survey_booked: 'Schedule',
   quote_sent: 'SubmitApplication',
-  won: 'Purchase',
+  ...Object.fromEntries(PROJECT_STAGES.map((s) => [s, 'Purchase'])),
 };
 
 export async function sendStageToMeta(projectId: string, stage: string) {
