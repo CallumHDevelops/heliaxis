@@ -51,7 +51,8 @@ export type InboundMessage = {
   /** What they really sent when type is 'unsupported': poll_creation, edit, gif… */
   unsupported?: { type?: string };
   errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
-  referral?: { headline?: string; source_url?: string };
+  /** A click-to-WhatsApp ad: source_id is the ad's id when source_type is 'ad'. */
+  referral?: { headline?: string; source_url?: string; source_id?: string; source_type?: string };
 };
 
 const RESEND = 'Ask them to send it again as a normal message or photo.';

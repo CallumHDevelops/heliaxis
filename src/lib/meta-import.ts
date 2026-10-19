@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createImportedEnquiry, findExistingEnquiry, opportunityFor, type ExistingEnquiry } from '@/lib/crm/import';
 import { deletedBefore } from '@/lib/crm/delete-customer';
 import { isTestLead } from '@/lib/meta-leads-csv';
+import { saveAdIds } from '@/lib/meta-ads';
 import { graph, type GraphResult, type LeadField } from '@/lib/whatsapp/api';
 import { leadToEnquiry, mapLeadFields } from '@/lib/whatsapp/leads';
 
@@ -264,6 +265,9 @@ export type GraphLead = {
   ad_name?: string;
   adset_name?: string;
   campaign_name?: string;
+  ad_id?: string;
+  adset_id?: string;
+  campaign_id?: string;
   form_id?: string;
   form_name?: string;
   platform?: string;
@@ -323,7 +327,11 @@ export async function importLead(
     const { data } = await db.from('enquiries').select('id, name, meta_lead_id, wa_id').eq('name', name).eq('created_at', when).limit(1);
     existing = (data?.[0] as ExistingEnquiry | undefined) ?? null;
   }
-  if (existing && metaLeadId && existing.meta_lead_id === metaLeadId) return 'already';
+  if (existing && metaLeadId && existing.meta_lead_id === metaLeadId) {
+    // In from before ad-spend.sql (by import or live): its ad ids now, for the ad spend in Reports.
+    await saveAdIds(existing.id, lead, true);
+    return 'already';
+  }
   if (when && Date.now() - Date.parse(when) < LIVE_MS) return 'skipped';
   // Deleted on purpose: this lead never comes back. Nor do they, unless they're in the CRM again
   // (a new lead or WhatsApp since), when it's matched as usual, or this lead is from after they
@@ -366,7 +374,7 @@ export async function importLead(
   }
 
   try {
-    await createImportedEnquiry({
+    const created = await createImportedEnquiry({
       name,
       email: who.email,
       phone: who.phone || null,
@@ -379,6 +387,7 @@ export async function importLead(
       activity: `Imported from ${where}${via ? ` (${via})` : ''}`,
       byId,
     });
+    await saveAdIds(created.id, lead);
   } catch (e) {
     // The same lead saved a moment ago (the webhook, or another import running): that one stands.
     if (/duplicate key|unique/i.test(errorText(e))) return 'already';
@@ -387,7 +396,7 @@ export async function importLead(
   return 'imported';
 }
 
-const LEAD_FIELDS = 'id,created_time,field_data,ad_name,adset_name,campaign_name,form_id,platform,is_organic';
+const LEAD_FIELDS = 'id,created_time,field_data,ad_name,adset_name,campaign_name,ad_id,adset_id,campaign_id,form_id,platform,is_organic';
 // Ad and campaign names need ads access on some setups; the answers matter more.
 const LEAD_FIELDS_MIN = 'id,created_time,field_data,form_id,platform,is_organic';
 
