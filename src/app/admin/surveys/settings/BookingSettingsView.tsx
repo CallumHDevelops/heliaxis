@@ -85,7 +85,7 @@ function Num({
       <label className="dy-label" htmlFor={id}>
         {label}
       </label>
-      <div className="dy-stepper" style={{ alignItems: 'center' }}>
+      <div className="dy-inline">
         <input
           id={id}
           className="dy-input dy-input--short"
@@ -485,7 +485,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
           <label className="dy-label" htmlFor="set-cutoff">
             Cut-off
           </label>
-          <p className="dy-stepper" style={{ alignItems: 'center', margin: 0 }}>
+          <p className="dy-inline" style={{ margin: 0 }}>
             <span className="dy-muted">No bookings for the next working day after</span>
             <input
               id="set-cutoff"
@@ -579,12 +579,11 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
               </span>
             )}
           </div>
-          <div className="dy-stepper" style={{ marginTop: 8 }}>
+          <div className="dy-inline" style={{ marginTop: 8 }}>
             <input className="dy-input" type="date" aria-label="Closed day to add" value={closedNew} onChange={(e) => setClosedNew(e.target.value)} />
             <button
               type="button"
               className="dy-btn dy-btn--ghost"
-              style={{ width: 'auto' }}
               disabled={!closedNew}
               onClick={() => {
                 if (!s.closedDates.includes(closedNew)) set('closedDates', [...s.closedDates, closedNew].sort());
@@ -719,7 +718,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
             </div>
             <span className="dy-label">Rush hours (weekdays)</span>
             {s.advanced.rushWindows.map((w, i) => (
-              <div key={i} className="dy-stepper" style={{ marginBottom: 6, alignItems: 'center' }}>
+              <div key={i} className="dy-stepper dy-inline" style={{ marginBottom: 6 }}>
                 <input
                   className="dy-input"
                   type="time"
@@ -867,7 +866,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
           ))}
         </div>
         <form
-          className="dy-stepper"
+          className="dy-inline"
           style={{ marginTop: 8 }}
           onSubmit={(e) => {
             e.preventDefault();
@@ -882,7 +881,7 @@ export function BookingSettingsView({ isAdmin }: { isAdmin: boolean }) {
             maxLength={10}
             onChange={(e) => setPv({ ...pv, postcode: e.target.value })}
           />
-          <button type="submit" className="dy-btn" style={{ width: 'auto' }} disabled={busy === 'preview' || !ready}>
+          <button type="submit" className="dy-btn" disabled={busy === 'preview' || !ready}>
             {busy === 'preview' ? 'Looking…' : 'Preview'}
           </button>
         </form>

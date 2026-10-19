@@ -300,7 +300,7 @@ export function FindTimeSheet({
           Postcode
         </label>
         <form
-          className="dy-stepper"
+          className="dy-inline"
           onSubmit={(e) => {
             e.preventDefault();
             void find();
@@ -314,7 +314,7 @@ export function FindTimeSheet({
             autoCapitalize="characters"
             onChange={(e) => setPostcode(e.target.value)}
           />
-          <button type="submit" className="dy-btn" style={{ width: 'auto', fontSize: '0.95rem' }} disabled={busy}>
+          <button type="submit" className="dy-btn" disabled={busy}>
             {busy ? 'Finding…' : 'Find times'}
           </button>
         </form>

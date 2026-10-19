@@ -479,6 +479,23 @@ textarea.dy-input {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+/* A field with its button (or words) beside it. */
+.dy-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dy-inline > .dy-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dy-inline > .dy-input--short {
+  flex: 0 0 auto;
+}
+.dy-inline > .dy-btn {
+  flex: none;
+}
 .dy-check {
   display: flex;
   align-items: center;
