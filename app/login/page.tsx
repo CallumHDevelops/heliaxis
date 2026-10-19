@@ -27,12 +27,18 @@ export default function LoginPage() {
       email: email.trim(),
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
-        shouldCreateUser: true, // passwordless sign-in doubles as sign-up
+        shouldCreateUser: false, // invite-only: accounts are added by an admin
       },
     });
     setBusy(false);
     if (error) {
-      setErr(error.message);
+      const noAccount =
+        error.code === 'otp_disabled' || error.code === 'signup_disabled' || /signups not allowed/i.test(error.message);
+      setErr(
+        noAccount
+          ? 'We couldn’t find a Post Studio account for that email. Post Studio is invite-only: if you’ve been invited, open the link in your invitation email first. Otherwise ask Callum to add you.'
+          : error.message
+      );
       return;
     }
     setSent(true);

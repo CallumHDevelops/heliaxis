@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
-// Sign-in is now passwordless (magic link), which also creates the account on
-// first use — so there's no separate registration step.
+// Sign-in is passwordless (magic link) and invite-only: an admin adds each
+// account, so there's no registration step.
 export default function RegisterPage() {
   redirect('/login');
 }
