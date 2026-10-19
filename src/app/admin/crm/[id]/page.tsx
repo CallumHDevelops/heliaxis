@@ -8,7 +8,7 @@ export default async function CrmProjectPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const { profile } = await getSessionProfile();
   return (
-    <AdminShell active="crm">
+    <AdminShell active="crm" fluid>
       <ProjectView id={id} isAdmin={profile?.role === 'admin'} />
     </AdminShell>
   );

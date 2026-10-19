@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function CrmPage() {
   const { user } = await getSessionProfile();
   return (
-    <AdminShell active="crm" wide>
+    <AdminShell active="crm" fluid>
       <CrmBoard me={user?.id ?? ''} />
     </AdminShell>
   );

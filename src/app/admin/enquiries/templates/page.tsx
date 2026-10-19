@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function WhatsAppTemplatesPage() {
   return (
-    <AdminShell active="whatsapp">
+    <AdminShell active="whatsapp" fluid>
       <TemplatesManager />
     </AdminShell>
   );

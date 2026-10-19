@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { AppRuntime } from './AppRuntime';
 import { HeaderUser } from './HeaderUser';
 import { MoreMenu } from './MoreMenu';
+import { TopMenu } from './TopMenu';
 import './admin-shell.css';
 
 type Tab =
@@ -54,6 +55,12 @@ const icons = {
     <svg {...ICON}>
       <path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.5-4.3A8.5 8.5 0 1 1 20.5 11.6z" />
       <path d="M9 9.5c.3 1.8 1.7 3.6 3.6 4.4l1.2-1 1.7.8-.4 1.3c-2.9.3-6.4-2.8-6.6-5.8l1.3-.4.8 1.7z" />
+    </svg>
+  ),
+  templates: (
+    <svg {...ICON}>
+      <path d="M4 4h16v12H9l-5 4z" />
+      <path d="m8.5 10 2.5 2.5 4.5-4.5" />
     </svg>
   ),
   rams: (
@@ -153,13 +160,6 @@ const icons = {
       <path d="M8.5 13.4l7 4.2M15.5 6.4l-7 4.2" />
     </svg>
   ),
-  users: (
-    <svg {...ICON}>
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
-      <path d="M16 11l2 2 4-4" />
-    </svg>
-  ),
   app: (
     <svg {...ICON}>
       <path d="M8 2.5h8A1.5 1.5 0 0 1 17.5 4v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5z" />
@@ -167,14 +167,6 @@ const icons = {
     </svg>
   ),
 };
-
-function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
-  return (
-    <a href={href} className={active ? 'hx-nav__link is-active' : 'hx-nav__link'}>
-      {label}
-    </a>
-  );
-}
 
 /** Phone bottom bar: one tab, icon over label. */
 function TabLink({
@@ -209,18 +201,24 @@ function TabLink({
   );
 }
 
-type MoreItem = {
+/** A page in the menus: an item in a desktop dropdown and, unless it's a bottom tab, a phone "More" tile. */
+type NavItem = {
   href: string;
   label: string;
   /** What the tile says when the full name is too long for it. */
   short?: string;
   icon: ReactNode;
+  /** Highlights the phone tile (the desktop menu goes by the URL). */
   active?: boolean;
   show: boolean;
+  /** On the phone bottom bar, so left out of "More". */
+  tab?: boolean;
+  /** A full page load from the desktop menu too (the CMS's own stylesheet would stay on after a soft one). */
+  reload?: boolean;
 };
 
 /** One tile in the phone "More" sheet: icon over a short label. A plain link (a full page load), as before. */
-function MoreTile({ href, label, short, icon, active }: MoreItem) {
+function MoreTile({ href, label, short, icon, active }: NavItem) {
   return (
     <a
       href={href}
@@ -258,6 +256,7 @@ export async function AdminShell({
   active,
   children,
   wide,
+  fluid,
   flush,
 }: {
   active: Tab;
@@ -266,6 +265,8 @@ export async function AdminShell({
   children: ReactNode;
   /** Wider main column (e.g. analytics embed). */
   wide?: boolean;
+  /** Uses the screen, up to 1680px — for boards, tables and lists (the CRM, enquiries, WhatsApp). */
+  fluid?: boolean;
   /** Edge-to-edge main (no max-width / side padding) — for full iframe pages. */
   flush?: boolean;
 }) {
@@ -277,77 +278,70 @@ export async function AdminShell({
   const initials = initialsOf(displayName);
   const waUnread = can('enquiries') ? await whatsappUnread() : 0;
 
-  // Desktop menu (all of it).
-  type Item = { href: string; label: string; active: boolean; show: boolean };
-  const items: Item[] = [
-    { href: '/admin', label: 'Dashboard', active: active === 'dashboard', show: true },
-    { href: '/admin/cms', label: 'CMS', active: false, show: can('cms') },
-    { href: '/admin/blog', label: 'Blog', active: active === 'blog', show: can('cms') },
-    { href: '/admin/tasks', label: 'Tasks', active: active === 'tasks', show: can('tasks') },
-    { href: RAMS_URL, label: 'RAMS', active: false, show: can('rams') },
-    {
-      href: '/admin/enquiries',
-      label: 'Enquiries',
-      active: active === 'enquiries' || active === 'whatsapp',
-      show: can('enquiries'),
-    },
-    { href: '/admin/crm', label: 'CRM', active: active === 'crm', show: can('crm') },
-    { href: '/admin/assistant', label: 'Metis', active: active === 'assistant', show: can('crm') },
-    { href: '/admin/subcontractors', label: 'Subcontractors', active: active === 'subcontractors', show: can('subcontractors') },
-    { href: '/admin/analytics', label: 'Analytics', active: active === 'analytics', show: can('analytics') },
-    { href: '/admin/analytics/heatmap', label: 'Heatmap', active: active === 'heatmap', show: can('analytics') },
-    { href: '/admin/users', label: 'Users', active: active === 'users' || active === 'approvals', show: admin },
-  ];
-  const links = items.filter((i) => i.show);
   const tasksIsTab = !can('crm') && !can('enquiries') && can('tasks');
   const enquiriesIsTab = !can('crm') && can('enquiries');
-  // Phone "More" sheet: what isn't a bottom tab, in groups. A new page is one entry here;
-  // empty groups are left out.
-  const groups: { id: string; title: string; items: MoreItem[] }[] = [
+  // Both menus, in groups: the desktop header's dropdowns and the phone "More" sheet (less what's
+  // on the bottom bar). A new page is one entry here; empty groups are left out of both.
+  const groups: { id: string; label: string; items: NavItem[] }[] = [
     {
-      id: 'sales',
-      title: 'Sales',
+      id: 'home',
+      label: 'Dashboard',
+      items: [{ href: '/admin', label: 'Dashboard', icon: icons.home, show: true, tab: true }],
+    },
+    {
+      id: 'crm',
+      label: 'CRM',
       items: [
-        { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries') && !enquiriesIsTab },
+        { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
+        { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
+        { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true },
         { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries') },
+        { href: '/admin/enquiries/templates', label: 'WhatsApp templates', short: 'Templates', icon: icons.templates, show: can('enquiries') },
         { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm') },
         { href: '/admin/crm/settings', label: 'CRM settings', icon: icons.settings, show: can('crm') },
         { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm') },
       ],
     },
     {
-      id: 'jobs',
-      title: 'Jobs & team',
+      id: 'team',
+      label: 'Team',
       items: [
-        { href: '/admin/tasks', label: 'Tasks', icon: icons.tasks, active: active === 'tasks', show: can('tasks') && !tasksIsTab },
+        { href: '/admin/tasks', label: 'Tasks', icon: icons.tasks, active: active === 'tasks', show: can('tasks'), tab: tasksIsTab },
         { href: '/admin/subcontractors', label: 'Subcontractors', icon: icons.subcontractors, active: active === 'subcontractors', show: can('subcontractors') },
         { href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis', label: 'Our team', icon: icons.team, show: can('team') },
+        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
       ],
     },
     {
-      id: 'website',
-      title: 'Website',
+      id: 'cms',
+      label: 'CMS',
       items: [
-        { href: '/admin/cms', label: 'CMS', icon: icons.cms, show: can('cms') },
+        { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true },
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms') },
-        { href: '/admin/analytics', label: 'Analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics') },
+        { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics') },
         { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics') },
       ],
     },
     {
       id: 'apps',
-      title: 'Apps & admin',
+      label: 'Apps',
       items: [
         { href: SOCIAL_URL, label: 'Social media studio', short: 'Social media', icon: icons.social, show: can('social') },
-        { href: '/admin/users', label: 'Users', icon: icons.users, active: active === 'users' || active === 'approvals', show: admin },
         { href: '/admin/app', label: 'Get the app', icon: icons.app, active: active === 'app', show: true },
       ],
     },
   ];
-  const shown = groups.map((g) => ({ ...g, items: g.items.filter((i) => i.show) })).filter((g) => g.items.length > 0);
-  const tiles = shown.flatMap((g) => g.items);
+  const pick = (keep: (i: NavItem) => boolean) =>
+    groups.map((g) => ({ ...g, items: g.items.filter(keep) })).filter((g) => g.items.length > 0);
+  // Each icon goes to the (client) menu inside a span made here: passed bare, React's dev build warns about keys.
+  const menu = pick((i) => i.show).map((g) => ({
+    ...g,
+    items: g.items.map(({ href, label, icon, reload }) => ({ href, label, reload, icon: <span className="hx-dd__icon">{icon}</span> })),
+  }));
+  const sheet = pick((i) => i.show && !i.tab);
+  const tiles = sheet.flatMap((g) => g.items);
   // Two rows or fewer need no headings: one grid.
-  const more = tiles.length > 6 ? shown : [{ id: 'all', title: '', items: tiles }];
+  const more = tiles.length > 6 ? sheet : [{ id: 'all', label: '', items: tiles }];
   const moreActive = tiles.some((i) => i.active);
   return (
     <div
@@ -359,11 +353,8 @@ export async function AdminShell({
         overflow: flush ? 'hidden' : undefined,
         display: 'flex',
         flexDirection: 'column',
+        // The soft glow on top is in admin-shell.css.
         backgroundColor: flush ? '#111' : brand.paper,
-        backgroundImage: flush ? 'none' : 'url(/assets/heliaxis-card-fill-light.svg)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'top right',
-        backgroundRepeat: 'no-repeat',
         fontFamily: brand.body,
         color: brand.ink,
       }}
@@ -372,18 +363,16 @@ export async function AdminShell({
         <Link href="/admin" className="hx-header__logo">
           <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={140} height={32} style={{ width: '100%', height: 'auto' }} />
         </Link>
-        <nav className="hx-nav">
-          <span className="hx-nav__links">
-            {links.map((l) => (
-              <NavLink key={l.href} href={l.href} label={l.label} active={l.active} />
-            ))}
-          </span>
-          <HeaderUser initials={initials} name={displayName} email={profile?.email ?? ''} signOut={signOut} />
+        <nav className="hx-nav" aria-label="Main">
+          <TopMenu groups={menu} fallback={active === 'dashboard' ? '/admin' : undefined} />
+          <HeaderUser initials={initials} name={displayName} email={profile?.email ?? ''} signOut={signOut} admin={admin} />
         </nav>
       </header>
 
       <main
-        className={flush ? 'admin-shell__main admin-shell__main--flush' : 'admin-shell__main'}
+        className={
+          flush ? 'admin-shell__main admin-shell__main--flush' : fluid ? 'admin-shell__main admin-shell__main--fluid' : 'admin-shell__main'
+        }
         style={
           flush
             ? {
@@ -402,7 +391,7 @@ export async function AdminShell({
                 // otherwise shrink-wraps the page to its content.
                 width: '100%',
                 boxSizing: 'border-box',
-                maxWidth: wide ? 1200 : 1000,
+                maxWidth: fluid ? 1680 : wide ? 1200 : 1000,
                 margin: '0 auto',
                 // Padding lives in admin-shell.css so phones can tighten it and clear the tab bar.
               }
@@ -410,7 +399,7 @@ export async function AdminShell({
       >
         {children}
       </main>
-      {/* Phones: app-style tabs along the bottom instead of the wrapping menu. */}
+      {/* Phones: app-style tabs along the bottom instead of the header menu. */}
       <nav className={flush ? 'hx-tabs hx-tabs--static' : 'hx-tabs'} aria-label="Sections">
         <TabLink href="/admin" label="Home" icon={icons.home} active={active === 'dashboard'} />
         {can('crm') ? (
@@ -449,12 +438,12 @@ export async function AdminShell({
                 <div
                   key={g.id}
                   className="hx-more__group"
-                  role={g.title ? 'group' : undefined}
-                  aria-labelledby={g.title ? `hx-more-${g.id}` : undefined}
+                  role={g.label ? 'group' : undefined}
+                  aria-labelledby={g.label ? `hx-more-${g.id}` : undefined}
                 >
-                  {g.title && (
+                  {g.label && (
                     <p id={`hx-more-${g.id}`} className="hx-more__title">
-                      {g.title}
+                      {g.label}
                     </p>
                   )}
                   <div className="hx-more__grid">
