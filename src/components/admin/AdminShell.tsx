@@ -14,6 +14,8 @@ type Tab =
   | 'dashboard'
   | 'enquiries'
   | 'crm'
+  | 'projects'
+  | 'surveys'
   | 'whatsapp'
   | 'approvals'
   | 'users'

@@ -99,6 +99,15 @@ export const ENV_GROUPS: EnvGroup[] = [
     ],
   },
   {
+    title: 'Survey booking',
+    what: 'Optional. Google drive times for booking (the app estimates them without it) and a bot check on the website booking form.',
+    vars: [
+      { name: 'GOOGLE_MAPS_API_KEY', secret: true, optional: true, hint: 'Google Cloud → APIs & Services → Credentials (Routes API only)' },
+      { name: 'NEXT_PUBLIC_TURNSTILE_SITE_KEY', secret: false, optional: true, hint: 'Cloudflare → Turnstile → Add widget' },
+      { name: 'TURNSTILE_SECRET_KEY', secret: true, optional: true, hint: 'Cloudflare → Turnstile → Add widget' },
+    ],
+  },
+  {
     title: 'Website emails',
     what: 'Quote-form confirmations, sign-in emails and alerts.',
     vars: [
@@ -120,6 +129,14 @@ export const ENV_GROUPS: EnvGroup[] = [
     vars: [
       { name: 'META_PIXEL_ID', secret: false, optional: true, hint: 'Events Manager → your dataset ID' },
       { name: 'META_CAPI_TOKEN', secret: true, optional: true, hint: 'Events Manager → Settings → Conversions API → Generate access token' },
+    ],
+  },
+  {
+    title: 'Ad spend in reports',
+    what: 'Optional. Read-only access to your Meta ad account, for cost per lead and per sale.',
+    vars: [
+      { name: 'META_ADS_TOKEN', secret: true, optional: true, hint: 'Business settings → System users → Generate new token (ads_read)' },
+      { name: 'META_AD_ACCOUNT_ID', secret: false, optional: true, hint: 'Ads Manager → your ad account number (act_…)' },
     ],
   },
   {

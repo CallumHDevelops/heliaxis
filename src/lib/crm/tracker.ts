@@ -1,5 +1,6 @@
 /** The customer's progress tracker (portal + CRM). Pure, so it works on server and client. */
-import { STAGE_KEYS } from './stages';
+import { portalStageLabel, STAGE_KEYS } from './stages';
+import { dayListWords, installDayList, ukDay } from '../bank-holidays';
 
 export type TrackerProject = {
   stage: string;
@@ -14,13 +15,16 @@ export type TrackerProject = {
   deposit_paid_at: string | null;
   stage_changed_at: string | null;
   products: string[];
+  /** Working days from install_at (crm-v3.sql); missing = 1. */
+  install_days?: number | null;
 };
 
 export type TrackerStep = { key: string; label: string; state: 'done' | 'current' | 'upcoming'; date?: string | null; note?: string };
 
 const at = (stage: string) => STAGE_KEYS.indexOf(stage as (typeof STAGE_KEYS)[number]);
 
-export function buildTracker(p: TrackerProject): TrackerStep[] {
+/** `hols`: bank holidays (ukBankHolidays()), so a multi-day install lists the right days. */
+export function buildTracker(p: TrackerProject, hols: ReadonlySet<string> = new Set()): TrackerStep[] {
   if (p.stage === 'lost') return [];
   const i = at(p.stage);
   const past = (k: string) => i >= at(k);
@@ -37,11 +41,12 @@ export function buildTracker(p: TrackerProject): TrackerStep[] {
     { key: 'quote', label: 'Your quote', state: past('quote_sent') ? (past('won') || p.accepted_at ? 'done' : 'current') : 'upcoming' },
     {
       key: 'order',
-      label: 'Order confirmed',
+      label: portalStageLabel('won'),
       state: past('won') || p.accepted_at ? 'done' : 'upcoming',
       date: p.accepted_at,
       note: p.deposit_amount && !p.deposit_paid_at && (past('won') || p.accepted_at) ? 'Deposit due' : p.deposit_paid_at ? 'Deposit paid' : undefined,
     },
+    { key: 'design', label: 'Design & approvals', state: past('ready') ? 'done' : p.stage === 'design' ? 'current' : 'upcoming' },
   ];
   if (needsDno) {
     steps.push({
@@ -52,15 +57,29 @@ export function buildTracker(p: TrackerProject): TrackerStep[] {
       note: p.dno_status === 'submitted' ? 'Applied — waiting for approval' : p.dno_status === 'rejected' ? 'We’re dealing with it' : undefined,
     });
   }
+  const days = p.install_at && (p.install_days ?? 1) > 1 ? installDayList(ukDay(p.install_at), p.install_days ?? 1, hols) : [];
+  const installNote = [
+    p.stage === 'installing' ? 'In progress' : p.install_at && !past('installing') ? 'Booked' : null,
+    days.length ? `${days.length} days: ${dayListWords(days)}` : null,
+  ].filter(Boolean);
   steps.push(
     {
       key: 'install',
       label: 'Installation',
-      state: past('complete') ? 'done' : p.stage === 'installing' || p.install_at ? 'current' : 'upcoming',
+      state: past('commissioning')
+        ? 'done'
+        : p.stage === 'install_booked' || p.stage === 'installing' || (p.install_at && !past('installing'))
+          ? 'current'
+          : 'upcoming',
       date: p.install_at,
-      note: p.stage === 'installing' ? 'In progress' : p.install_at && !past('installing') ? 'Booked' : undefined,
+      note: installNote.length ? installNote.join(' · ') : undefined,
     },
-    { key: 'handover', label: 'Handover & certificates', state: past('complete') ? 'done' : 'upcoming', date: past('complete') ? p.stage_changed_at : null }
+    {
+      key: 'handover',
+      label: 'Handover & certificates',
+      state: past('complete') ? 'done' : p.stage === 'commissioning' || p.stage === 'handover' ? 'current' : 'upcoming',
+      date: past('complete') ? p.stage_changed_at : null,
+    }
   );
   // Only one "current": the first not-done step that's in play.
   let seen = false;

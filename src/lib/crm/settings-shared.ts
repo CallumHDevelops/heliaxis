@@ -4,7 +4,7 @@ export type SequenceStep = {
   /** Hours after the enquiry arrived. */
   afterHours: number;
   channel: 'whatsapp' | 'email';
-  /** Message text ({first_name}, {portal_link}). WhatsApp uses it inside the free 24h window. */
+  /** Message text ({first_name}, {portal_link}, {booking_link}). WhatsApp uses it inside the free 24h window. */
   text: string;
   /** WhatsApp template used when the 24h window is closed ({{1}} = first name). */
   template?: string;
@@ -28,11 +28,15 @@ export type CrmSettings = {
   reviewUrl: string;
   reviewDelayDays: number;
   reviewTemplate: string;
-  /** Online survey booking from the portal. */
+  /** @deprecated The old portal booking. Survey booking settings live in cms_kv 'survey-booking' (src/lib/booking/settings.ts). Still parsed so saved settings load. */
   bookingEnabled: boolean;
-  bookingDays: number[]; // 1 = Monday … 7 = Sunday
-  bookingSlots: string[]; // "09:00", "11:00" …
+  /** @deprecated See bookingEnabled. 1 = Monday … 7 = Sunday. */
+  bookingDays: number[];
+  /** @deprecated See bookingEnabled. "09:00", "11:00" … */
+  bookingSlots: string[];
+  /** @deprecated See bookingEnabled. */
   bookingMinNoticeHours: number;
+  /** @deprecated See bookingEnabled. */
   bookingHorizonDays: number;
   /** Follow-up sequence for new leads; stops when they reply or the stage moves past Contacted. */
   sequenceEnabled: boolean;
@@ -123,13 +127,14 @@ export function cleanCrmSettings(b: Partial<Record<keyof CrmSettings, unknown>>)
   };
 }
 
-/** {first_name}, {name}, {portal_link} in saved replies, sequences and reminders. */
-export function fillText(text: string, v: { name?: string | null; portalLink?: string | null }) {
+/** {first_name}, {name}, {portal_link}, {booking_link} in saved replies, sequences and reminders. */
+export function fillText(text: string, v: { name?: string | null; portalLink?: string | null; bookingLink?: string | null }) {
   const full = (v.name || '').trim();
   const first = full.split(/\s+/)[0] || 'there';
   return text
     .replace(/\{first_name\}/g, first)
     .replace(/\{name\}/g, full || 'there')
     .replace(/\{portal_link\}/g, v.portalLink || '')
+    .replace(/\{booking_link\}/g, v.bookingLink || '')
     .replace(/[ \t]+$/gm, '');
 }
