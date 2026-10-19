@@ -11,9 +11,11 @@ import { isStage, stageIndex, stageLabel, type StageKey } from './stages';
  */
 
 /** Things that happen to a job, and the stage each moves it to (only from the stages listed). */
-export type StageEvent = 'survey_booked' | 'surveyed' | 'quote_sent' | 'accepted' | 'install_booked' | 'install_started';
+export type StageEvent = 'contacted' | 'survey_booked' | 'surveyed' | 'quote_sent' | 'accepted' | 'install_booked' | 'install_started';
 
 const RULES: Record<StageEvent, { to: StageKey; from: StageKey[] }> = {
+  // Someone on the team got in touch (WhatsApp, email, a logged call or visit).
+  contacted: { to: 'contacted', from: ['lead'] },
   survey_booked: { to: 'survey_booked', from: ['lead', 'contacted'] },
   surveyed: { to: 'surveyed', from: ['lead', 'contacted', 'survey_booked'] },
   quote_sent: { to: 'quote_sent', from: ['lead', 'contacted', 'survey_booked', 'surveyed'] },

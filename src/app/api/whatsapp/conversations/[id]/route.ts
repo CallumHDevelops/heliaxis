@@ -3,7 +3,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { defaultTemplate, whatsappConfigured } from '@/lib/whatsapp/api';
 import { markChatRead, processOutbox, sendManual } from '@/lib/whatsapp/inbox';
 import { getSettings } from '@/lib/whatsapp/settings';
+import { mediaVersion, withChatMedia } from '@/lib/whatsapp/media';
 import { chatSession, json, mayOpenChat, version } from '@/lib/whatsapp/routes';
+import { wordingForNote } from '@/lib/whatsapp/template-text';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -23,11 +25,13 @@ export async function GET(req: Request, { params }: Ctx) {
   if (!(await mayOpenChat(s, id))) return json({ error: 'Not found' }, 404);
   const db = createAdminClient();
   const known = new URL(req.url).searchParams.get('v');
+  // With their photos, voice notes and files once whatsapp-media.sql has been run.
+  const cols = await withChatMedia('id, direction, kind, body, template_name, status, error, sent_by, rule_id, via, created_at');
   const everything = () =>
     Promise.all([
       db
         .from('whatsapp_messages')
-        .select('id, direction, kind, body, template_name, status, error, sent_by, rule_id, via, created_at')
+        .select(cols)
         .eq('enquiry_id', id)
         // The newest 500 (an imported chat can be long), oldest first on screen.
         .order('created_at', { ascending: false })
@@ -37,7 +41,7 @@ export async function GET(req: Request, { params }: Ctx) {
     ]);
   // Nothing to compare with (first load, Refresh): read it all straight away.
   const early = known ? null : everything();
-  const [{ data: enquiry }, { data: outbox }, { data: newest, count }, { data: ticked }] = await Promise.all([
+  const [{ data: enquiry }, { data: outbox }, { data: newest, count }, { data: ticked }, files] = await Promise.all([
     db
       .from('enquiries')
       .select('id, name, email, phone, postcode, source, status, wa_id, whatsapp_opt_in, wa_last_inbound_at, wa_unread, wa_auto_off, created_at')
@@ -58,16 +62,34 @@ export async function GET(req: Request, { params }: Ctx) {
       .not('status_at', 'is', null)
       .order('status_at', { ascending: false })
       .limit(1),
+    // A photo or file arriving (or failing) changes an older message too.
+    mediaVersion(db, id),
   ]);
   if (!enquiry) return json({ error: 'Not found' }, 404);
 
   if ((outbox ?? []).some((o) => o.status === 'pending' && new Date(o.send_after).getTime() <= Date.now())) {
     after(() => processOutbox().catch(() => {}));
   }
-  const v = version([enquiry, outbox, count, newest, ticked]);
+  const v = version(files ? [enquiry, outbox, count, newest, ticked, files] : [enquiry, outbox, count, newest, ticked]);
   if (known === v) return json({ same: true, v, unread: enquiry.wa_unread });
 
   const [{ data: messages }, settings] = await (early ?? everything());
+
+  // Templates sent before the wording was saved: show it as the customer saw it, and save it.
+  const notes = (messages ?? []).filter((m) => m.kind === 'template' && m.body?.startsWith('Template “'));
+  if (notes.length) {
+    const fixed = await Promise.all(notes.map(async (m) => ({ m, wording: await wordingForNote(m.body).catch(() => null) })));
+    const done = fixed.filter((f): f is { m: (typeof notes)[number]; wording: string } => !!f.wording);
+    for (const { m, wording } of done) m.body = wording;
+    if (done.length) {
+      after(() =>
+        Promise.all(done.map(({ m, wording }) => db.from('whatsapp_messages').update({ body: wording }).eq('id', m.id))).then(
+          () => {},
+          () => {}
+        )
+      );
+    }
+  }
 
   const senders = [...new Set((messages ?? []).map((m) => m.sent_by).filter(Boolean))] as string[];
   const ruleIds = [...new Set([...(messages ?? []), ...(outbox ?? [])].map((m) => m.rule_id).filter(Boolean))] as string[];

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { clearChatNotifications, clearReplyNotifications, notify, type NotificationInput } from '@/lib/notify';
 import { chatHref, chatRef, chatTag, replyRef } from '@/lib/notification-refs';
 import { canAccess } from '@/lib/portals';
+import { inboundMediaColumns, storeMediaSoon } from './media';
 import { defaultTemplate, markRead, sendDocument, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
   fillReply,
@@ -20,6 +21,7 @@ import { getSettings } from './settings';
 import { autoParams } from './templates';
 import { describeMessage as describe, type InboundMessage } from './describe';
 import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waPermission } from './permission';
+import { templateText } from './template-text';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -121,6 +123,7 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   if (created) await ensureOpportunity(enquiry.id, m.referral ? 'WhatsApp ad' : 'WhatsApp');
   const { kind, body } = describe(m);
   const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
+  const media = await inboundMediaColumns(m); // a photo, voice note or file to fetch (whatsapp-media.sql)
 
   const { error } = await db.from('whatsapp_messages').insert({
     enquiry_id: enquiry.id,
@@ -130,11 +133,13 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
     body,
     status: 'received',
     created_at: at,
+    ...media,
   });
   if (error) {
     if (error.code === '23505') return; // a parallel retry got there first
     throw new Error(error.message);
   }
+  if (media.media_id) storeMediaSoon(m.id); // downloaded from WhatsApp alongside the rest of this
   await db
     .from('enquiries')
     .update({
@@ -336,7 +341,11 @@ async function deliver(
   if (!r.ok) return r;
 
   const now = new Date().toISOString();
-  const body = isText ? input.text : `Template “${input.template}”${input.params?.length ? ` (${input.params.join(', ')})` : ''}`;
+  // Templates are saved as the customer saw them; the short note only if Meta can't say the wording.
+  const body = isText
+    ? input.text
+    : ((await templateText(input.template, input.lang, input.params ?? []).catch(() => null)) ??
+      `Template “${input.template}”${input.params?.length ? ` (${input.params.join(', ')})` : ''}`);
   const { data: row } = await db
     .from('whatsapp_messages')
     .insert({

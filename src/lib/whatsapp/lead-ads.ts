@@ -7,6 +7,7 @@ import { grantPermission } from './permission';
 import { toWaId } from './shared';
 import { ensureOpportunity } from '@/lib/crm/server';
 import { leadRef } from '@/lib/notification-refs';
+import { isTestLead } from '@/lib/meta-leads-csv';
 
 /** A Lead Ads webhook ping → fetch the answers → an enquiry (once, however often Meta retries). */
 export async function ingestLead(leadgenId: string) {
@@ -22,6 +23,13 @@ export async function ingestLead(leadgenId: string) {
       `Lead ${leadgenId}: ${r.error}. Check META_PAGE_ACCESS_TOKEN.`,
       '/admin/enquiries'
     );
+    return;
+  }
+  // Meta's Lead Ads Testing Tool: say it arrived, but keep it out of Enquiries (as the import does).
+  if (isTestLead(r.data.field_data ?? [])) {
+    await notifyEnquiryTeam('Meta test lead arrived ✓', 'Live leads are working. Test leads aren’t added to Enquiries.', '/admin/enquiries/import', {
+      tag: `meta-test-${leadgenId}`,
+    });
     return;
   }
   const { lead, interest, source, whatsappOptIn: optIn, optInSource } = leadToEnquiry(

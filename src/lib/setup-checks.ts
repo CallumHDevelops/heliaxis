@@ -180,10 +180,10 @@ const MANUAL: SetupTodo[] = [
       'Go to **Use cases** → **Capture & manage ad leads with Marketing API** → **Customize** → **Webhooks**. (The old way, **Webhooks** in the app’s left menu, may still work, but this route is the reliable one.)',
       'Choose **Page** in the drop-down. Paste the callback URL below. For **Verify token**, use the value of `META_WEBHOOK_VERIFY_TOKEN` in Vercel (Settings → Environment Variables). If Vercel hides it as **Sensitive**, make up a new long random value, save it in Vercel as `META_WEBHOOK_VERIFY_TOKEN` and type the same here, then redeploy (**Deployments** → the ⋯ on the top deployment → **Redeploy**) and wait a minute. WhatsApp keeps working: Meta only checks the token when you save.',
       'Tap **Verify and save**. Then find **leadgen** in the list of fields → **Subscribe**.',
-      'In [Business Settings](https://business.facebook.com/settings) → **Integrations** → **Leads Access**: pick the Heliaxis Page and give **Heliaxis CRM** access.',
+      'In [Business Settings](https://business.facebook.com/settings) → **Integrations** → **Leads Access**: pick the Heliaxis Page and give **Heliaxis CRM** access. If **Assign CRM** can’t find it (Meta only lists apps it has reviewed), tap **Restore default access** instead: every app connected to the Page can then get its leads, Zapier included.',
       'In **Users → System users**, check the CRM’s system user has the Facebook Page as an asset (with **Full control**), and that its token includes `leads_retrieval`, `pages_show_list`, `pages_read_engagement` and `pages_manage_metadata`. If not, generate a new token with them, paste it into Vercel as `META_PAGE_ACCESS_TOKEN`, then redeploy (**Deployments** → the ⋯ on the top deployment → **Redeploy**) and wait a minute.',
       'In the Heliaxis app, open **Enquiries → Import** → **Find lead forms**, and tap **Switch on live leads** next to the Heliaxis Page. It should then say **Live leads: On ✓**. Without this, Meta never sends the Page’s new leads to the CRM.',
-      'Test it with Meta’s [Lead Ads Testing Tool](https://developers.facebook.com/tools/lead-ads-testing): create a test lead, and it should show **success** under Track status. (Test leads aren’t imported.)',
+      'Test it with Meta’s [Lead Ads Testing Tool](https://developers.facebook.com/tools/lead-ads-testing): create a test lead, and it should show **success** under Track status. You’ll get a “Meta test lead arrived ✓” notification; test leads aren’t added to Enquiries.',
       'Then back on **Enquiries → Import**, tap **Import selected** to bring in the last 90 days.',
     ],
     copies: [
@@ -421,6 +421,10 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
 
   add(!whatsapp, sql('whatsapp.sql', 'The WhatsApp inbox, smart replies and outbox.', 1));
   add(whatsapp && !chasers, sql('whatsapp-chasers.sql', 'WhatsApp chasers and syncing with the WhatsApp Business app.', 2, 'whatsapp.sql'));
+  add(
+    whatsapp && !(await has('whatsapp_messages', 'media_status')),
+    sql('whatsapp-media.sql', 'Shows the photos, videos, voice notes and files customers send on WhatsApp in the chat, and lets you save their photos to the job.', 2, 'whatsapp.sql')
+  );
   add(!crm, sql('crm.sql', 'Switches the CRM on: opportunities, the timeline, site photos and tasks on opportunities.', 3));
   add(!crmV2, sql('crm-v2.sql', 'Customer portal, documents, email, reminders and deposits.', 4, 'crm.sql'));
   add(

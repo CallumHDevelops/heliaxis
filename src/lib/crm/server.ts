@@ -71,6 +71,14 @@ export async function markContacted(where: { projectId: string } | { enquiryId: 
     const byEnquiry = new Map<string, string[]>();
     for (const p of data ?? []) byEnquiry.set(p.enquiry_id, [...(byEnquiry.get(p.enquiry_id) ?? []), p.id]);
     for (const [enquiryId, projectIds] of byEnquiry) await clearLeadNotifications(enquiryId, projectIds);
+
+    // We've been in touch, so a job still at Lead moves to Contacted (never back from further on).
+    const atLead = createAdminClient().from('crm_projects').select('id').eq('stage', 'lead');
+    const { data: leads } = await ('projectId' in where ? atLead.eq('id', where.projectId) : atLead.eq('enquiry_id', where.enquiryId));
+    if (leads?.length) {
+      const { applyStageEvent } = await import('./move-stage');
+      for (const p of leads) await applyStageEvent(p.id, 'contacted', { note: 'we got in touch' });
+    }
   } catch {
     // never block the caller
   }
