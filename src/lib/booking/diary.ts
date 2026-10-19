@@ -74,6 +74,7 @@ export type BookingRow = {
   reminded_at: string | null;
   client_ip: string | null;
   created_at: string;
+  updated_at: string;
 };
 
 export type EntryRow = {

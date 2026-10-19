@@ -858,6 +858,15 @@ export async function hold(x: {
 
 /* ── Confirming (the details step) ───────────────────────────────────────────── */
 
+/**
+ * A hold a confirm is working on: cancel_reason 'confirming' (unused on a hold; survey_slot_confirm
+ * clears it, a cancel replaces it). A second tap while the first is still going waits for it rather
+ * than making a second customer or cancelling the booking the first one made. Lapses after 2 minutes,
+ * in case that first request never finished.
+ */
+const CONFIRMING = 'confirming';
+const CLAIM_MS = 2 * MIN;
+
 export async function confirm(x: { holdId: string; token?: string | null; details: Details; source: string | null }): Promise<Outcome> {
   const s = await getBookingSettings();
   const bad = checkDetails(x.details);
@@ -898,6 +907,44 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
   const geo = await lookupPostcode(x.details.postcode);
   if (!isHit(geo)) return { status: 400, body: { error: POSTCODE_ERRORS[geo.error] } };
 
+  // Claim the hold before making the customer: only one request books it.
+  const db = createAdminClient();
+  const taken = b.cancel_reason === CONFIRMING && Date.now() - Date.parse(b.updated_at) < CLAIM_MS;
+  const claim = taken
+    ? { data: [] as { id: string }[], error: null }
+    : await db
+        .from('survey_bookings')
+        .update({ cancel_reason: CONFIRMING, updated_at: new Date().toISOString() })
+        .eq('id', b.id)
+        .in('status', ['held', 'expired'])
+        .eq('updated_at', b.updated_at)
+        .select('id');
+  if (claim.error) return UNAVAILABLE;
+  if (!claim.data?.length) {
+    const cur = await bookingById(b.id);
+    if (cur && (cur.status === 'requested' || cur.status === 'confirmed') && cur.project_id && (!project || cur.project_id === project.id)) {
+      return reply(cur.status, cur.project_id, cur.enquiry_id);
+    }
+    if (cur && (cur.status === 'held' || cur.status === 'expired')) {
+      return { status: 503, body: { error: 'We’re still booking that time. Wait a few seconds, then tap the button again.' } };
+    }
+    return { status: 409, body: { error: 'Your held time has gone. Please pick again.' } };
+  }
+  /** Let go of the claim (an early way out), so the customer can try again straight away. */
+  const unclaim = async <T,>(out: T): Promise<T> => {
+    await db
+      .from('survey_bookings')
+      .update({ cancel_reason: null })
+      .eq('id', b.id)
+      .eq('cancel_reason', CONFIRMING)
+      .in('status', ['held', 'expired'])
+      .then(
+        () => null,
+        () => null
+      );
+    return out;
+  };
+
   let target: { projectId: string; enquiryId: string; duplicateOf: string | null; isNew: boolean } | null = project
     ? { projectId: project.id, enquiryId: project.enquiry_id, duplicateOf: null, isNew: false }
     : null;
@@ -916,8 +963,8 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
       heldAt: Date.parse(b.created_at),
     });
     if (!r.ok) {
-      if (r.closed) return { status: 409, body: { error: `Online booking has just been switched off. Please call us on ${OFFICE_PHONE}.` } };
-      return findFailOutcome(r);
+      if (r.closed) return unclaim({ status: 409, body: { error: `Online booking has just been switched off. Please call us on ${OFFICE_PHONE}.` } });
+      return unclaim(findFailOutcome(r));
     }
     if (!r.raw.some((c) => c.start === range.start)) break;
     if (!target) {
@@ -926,7 +973,7 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
         b.survey_type,
         x.source
       );
-      if (!made) return UNAVAILABLE;
+      if (!made) return unclaim(UNAVAILABLE);
       target = { ...made, isNew: true };
     }
     const status = r.mode === 'instant' ? 'confirmed' : 'requested';
@@ -946,7 +993,7 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
       done = { status, wouldConfirm: r.wouldConfirm };
       break;
     }
-    if (res.reason === 'missing') return UNAVAILABLE;
+    if (res.reason === 'missing') return unclaim(UNAVAILABLE);
     if (res.reason !== 'changed') {
       failure = res.reason;
       break;
@@ -954,7 +1001,8 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
   }
 
   if (!done) {
-    await slotCancel(b.id, 'no longer free');
+    // Let the time go, unless something else has already moved this booking on (never cancel that).
+    if (failure !== 'not_open') await slotCancel(b.id, 'no longer free');
     if (target?.isNew) {
       const first = firstName(x.details.name) || x.details.name;
       await setNextStep(target.projectId, `Call ${first}: their online booking didn’t go through`);
