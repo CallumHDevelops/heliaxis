@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
+import { DOCK_EVENTS, type WaCounts } from './whatsapp/dock-shared';
 
 /**
  * The desktop header menu: a dropdown per group, from the same groups as the phone "More" sheet
@@ -11,8 +12,12 @@ import { flushSync } from 'react-dom';
  * on click, or on hover with a mouse, and close on a click outside, Escape, or picking a page.
  */
 
-/** `icon` is shown as given (AdminShell wraps it in .hx-dd__icon); `reload` opens it with a full page load. */
-export type MenuItem = { href: string; label: string; icon?: ReactNode; reload?: boolean };
+/**
+ * `icon` is shown as given (AdminShell wraps it in .hx-dd__icon); `reload` opens it with a full page load;
+ * `badge` is a count beside it, kept live in the browser for `liveBadge: 'wa'` (unread WhatsApp people,
+ * from the dock's hx:wa-counts). A group's button shows the total of its items' counts.
+ */
+export type MenuItem = { href: string; label: string; icon?: ReactNode; reload?: boolean; badge?: number; liveBadge?: 'wa' };
 export type MenuGroup = { id: string; label: string; items: MenuItem[] };
 
 // Not a page here (e.g. /api/sso/rams): a plain link, so it's never prefetched. As the phone tab bar.
@@ -33,16 +38,26 @@ function currentHref(groups: MenuGroup[], path: string) {
 const groupEl = (root: HTMLElement | null, id: string) => root?.querySelector<HTMLElement>(`[data-group="${id}"]`) ?? null;
 const itemsOf = (root: HTMLElement | null, id: string) => Array.from(groupEl(root, id)?.querySelectorAll<HTMLElement>('.hx-dd__item') ?? []);
 
+const Badge = ({ n }: { n: number }) =>
+  n > 0 ? (
+    <span className="hx-badge">
+      {n > 99 ? '99+' : n}
+      <span className="hx-sr"> unread</span>
+    </span>
+  ) : null;
+
 function ItemLink({
   item,
   className,
   current,
+  badge = 0,
   onPick,
   onKeyDown,
 }: {
   item: MenuItem;
   className: string;
   current: boolean;
+  badge?: number;
   onPick?: () => void;
   onKeyDown?: (e: KeyboardEvent<HTMLElement>) => void;
 }) {
@@ -56,6 +71,7 @@ function ItemLink({
     <>
       {item.icon}
       {item.label}
+      <Badge n={badge} />
     </>
   );
   if (item.reload || !isPage(item.href)) return <a href={item.href} {...props}>{body}</a>;
@@ -74,6 +90,14 @@ export function TopMenu({ groups, fallback }: { groups: MenuGroup[]; fallback?: 
   const current = currentHref(groups, pathname) || fallback || '';
   const [open, setOpen] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  // Unread WhatsApp people, as the dock last counted them (until then, the count the page came with).
+  const [liveWa, setLiveWa] = useState<number | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => setLiveWa((e as CustomEvent<WaCounts>).detail.unread);
+    window.addEventListener(DOCK_EVENTS.counts, on);
+    return () => window.removeEventListener(DOCK_EVENTS.counts, on);
+  }, []);
+  const badgeOf = (i: MenuItem) => (i.liveBadge === 'wa' && liveWa !== null ? liveWa : (i.badge ?? 0));
   // Opened by the mouse passing over it, so it closes when the mouse leaves (a click keeps it open).
   const byHover = useRef(false);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -105,13 +129,15 @@ export function TopMenu({ groups, fallback }: { groups: MenuGroup[]; fallback?: 
     };
   }, [open, close]);
 
-  // Keep the open dropdown on screen: nudged left when it would run past the right edge.
+  // Keep the open dropdown on screen: nudged left when it would run past the header's right edge
+  // (which stops short of the WhatsApp dock, so it never slides under it).
   useLayoutEffect(() => {
     const panel = open ? groupEl(listRef.current, open)?.querySelector<HTMLElement>('.hx-dd__panel') : null;
     if (!panel) return;
     const place = () => {
       panel.style.left = '';
-      const over = panel.getBoundingClientRect().right - (document.documentElement.clientWidth - 12);
+      const edge = panel.closest('.hx-header')?.getBoundingClientRect().right ?? document.documentElement.clientWidth;
+      const over = panel.getBoundingClientRect().right - (edge - 12);
       if (over > 0) panel.style.left = `${-over}px`;
     };
     place();
@@ -154,10 +180,11 @@ export function TopMenu({ groups, fallback }: { groups: MenuGroup[]; fallback?: 
     <ul className="hx-menu" ref={listRef}>
       {groups.map((g) => {
         const active = g.items.some((i) => i.href === current);
+        const total = g.items.reduce((n, i) => n + badgeOf(i), 0);
         if (g.items.length === 1) {
           return (
             <li key={g.id}>
-              <ItemLink item={{ ...g.items[0], icon: undefined }} className="hx-nav__link" current={active} onKeyDown={onRowKey} />
+              <ItemLink item={{ ...g.items[0], icon: undefined }} className="hx-nav__link" current={active} badge={total} onKeyDown={onRowKey} />
             </li>
           );
         }
@@ -206,13 +233,14 @@ export function TopMenu({ groups, fallback }: { groups: MenuGroup[]; fallback?: 
               }}
             >
               {g.label}
+              <Badge n={total} />
               {chevron}
             </button>
             <div id={`hx-menu-${g.id}`} className="hx-dd__panel" hidden={!isOpen} onKeyDown={(e) => onPanelKey(e, g.id)}>
               <ul>
                 {g.items.map((i) => (
                   <li key={i.href}>
-                    <ItemLink item={i} className="hx-dd__item" current={i.href === current} onPick={close} />
+                    <ItemLink item={i} className="hx-dd__item" current={i.href === current} badge={badgeOf(i)} onPick={close} />
                   </li>
                 ))}
               </ul>

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { STATUS_LABEL, type CisRate, type SubStatus } from '@/lib/subcontractors/types';
@@ -108,7 +109,7 @@ export function SubcontractorsList({
           <code className="sc-link">{created.link}</code>
           <div className="sc-row">
             <button className="sc-btn-ghost" onClick={() => navigator.clipboard.writeText(created.link)}>Copy link</button>
-            <a className="sc-btn-ghost" href={`/admin/subcontractors/${created.id}`}>Open record →</a>
+            <Link className="sc-btn-ghost" href={`/admin/subcontractors/${created.id}`}>Open record →</Link>
           </div>
         </div>
       )}
@@ -179,7 +180,7 @@ export function SubcontractorsList({
               {shown.map((r) => (
                 <tr key={r.id} onClick={() => router.push(`/admin/subcontractors/${r.id}`)}>
                   <td>
-                    <a href={`/admin/subcontractors/${r.id}`} onClick={(e) => e.stopPropagation()}>{r.companyName}</a>
+                    <Link href={`/admin/subcontractors/${r.id}`} onClick={(e) => e.stopPropagation()}>{r.companyName}</Link>
                     <span className="sc-sub">{r.contactName} · {r.ref}</span>
                   </td>
                   <td>{r.trade || '—'}</td>

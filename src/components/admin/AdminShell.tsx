@@ -5,11 +5,12 @@ import { signOut } from '@/lib/auth-actions';
 import { brand } from '@/components/auth/authStyles';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { unreadPeople } from '@/lib/whatsapp/active';
 import { AppRuntime } from './AppRuntime';
 import { HeaderUser } from './HeaderUser';
 import { MoreMenu } from './MoreMenu';
 import { TopMenu } from './TopMenu';
+import { DockChip } from './whatsapp/DockChip';
 import './admin-shell.css';
 
 type Tab =
@@ -215,6 +216,10 @@ type NavItem = {
   tab?: boolean;
   /** A full page load from the desktop menu too (the CMS's own stylesheet would stay on after a soft one). */
   reload?: boolean;
+  /** A count beside it in the desktop menu (and on its group's button). */
+  badge?: number;
+  /** Kept up to date in the browser: 'wa' = people with unread WhatsApp messages (the dock's hx:wa-counts). */
+  liveBadge?: 'wa';
 };
 
 /** One tile in the phone "More" sheet: icon over a short label. A plain link (a full page load), as before. */
@@ -230,19 +235,6 @@ function MoreTile({ href, label, short, icon, active }: NavItem) {
       <span className="hx-tile__label">{short ?? label}</span>
     </a>
   );
-}
-
-/** Chats with unread WhatsApp messages (0 if the tables aren't there yet). */
-async function whatsappUnread() {
-  try {
-    const { count } = await createAdminClient()
-      .from('enquiries')
-      .select('id', { count: 'exact', head: true })
-      .gt('wa_unread', 0);
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
 }
 
 /** "Esther Smith" → "ES", "callum@…" → "C". */
@@ -276,7 +268,11 @@ export async function AdminShell({
   const admin = profile?.role === 'admin';
   const displayName = profile?.full_name || profile?.email || 'Account';
   const initials = initialsOf(displayName);
-  const waUnread = can('enquiries') ? await whatsappUnread() : 0;
+  // People with unread WhatsApp messages, once per number: every chat for Enquiries staff, chats with
+  // a job for CRM staff (who use /admin/crm/chats instead of the inbox).
+  const chats = can('enquiries') || can('crm');
+  const waUnread = chats ? await unreadPeople(can('enquiries') ? 'all' : 'linked') : 0;
+  const waHref = can('enquiries') ? '/admin/enquiries/inbox' : '/admin/crm/chats';
 
   const tasksIsTab = !can('crm') && !can('enquiries') && can('tasks');
   const enquiriesIsTab = !can('crm') && can('enquiries');
@@ -294,7 +290,8 @@ export async function AdminShell({
       items: [
         { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
-        { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true },
+        { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },
+        { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa' },
         { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries') },
         { href: '/admin/enquiries/templates', label: 'WhatsApp templates', short: 'Templates', icon: icons.templates, show: can('enquiries') },
         { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm') },
@@ -336,7 +333,14 @@ export async function AdminShell({
   // Each icon goes to the (client) menu inside a span made here: passed bare, React's dev build warns about keys.
   const menu = pick((i) => i.show).map((g) => ({
     ...g,
-    items: g.items.map(({ href, label, icon, reload }) => ({ href, label, reload, icon: <span className="hx-dd__icon">{icon}</span> })),
+    items: g.items.map(({ href, label, icon, reload, badge, liveBadge }) => ({
+      href,
+      label,
+      reload,
+      badge,
+      liveBadge,
+      icon: <span className="hx-dd__icon">{icon}</span>,
+    })),
   }));
   const sheet = pick((i) => i.show && !i.tab);
   const tiles = sheet.flatMap((g) => g.items);
@@ -365,6 +369,8 @@ export async function AdminShell({
         </Link>
         <nav className="hx-nav" aria-label="Main">
           <TopMenu groups={menu} fallback={active === 'dashboard' ? '/admin' : undefined} />
+          {/* Tablets: opens the WhatsApp dock over the page (CSS shows it only there, on pages with the dock). */}
+          {chats && <DockChip initial={waUnread} />}
           <HeaderUser initials={initials} name={displayName} email={profile?.email ?? ''} signOut={signOut} admin={admin} />
         </nav>
       </header>
@@ -409,9 +415,9 @@ export async function AdminShell({
         ) : (
           can('tasks') && <TabLink href="/admin/tasks" label="Tasks" icon={icons.tasks} active={active === 'tasks'} />
         )}
-        {can('enquiries') && (
+        {chats && (
           <TabLink
-            href="/admin/enquiries/inbox"
+            href={waHref}
             label="WhatsApp"
             icon={icons.whatsapp}
             active={active === 'whatsapp'}
