@@ -7,6 +7,7 @@ import { refMatches, relativeTime } from '@/lib/enquiries';
 import { NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { windowOpen } from '@/lib/whatsapp/shared';
+import { shownBody } from '@/lib/whatsapp/describe';
 import '../whatsapp.css';
 
 type Convo = {
@@ -123,7 +124,7 @@ export function InboxList() {
           {shown.map((c) => {
             const open = windowOpen(c.wa_last_inbound_at, now);
             const preview = c.last
-              ? `${c.last.direction === 'out' ? 'You: ' : ''}${c.last.body || ''}`
+              ? `${c.last.direction === 'out' ? 'You: ' : ''}${shownBody(c.last.body) || ''}`
               : 'Opted in — not messaged yet';
             return (
               <li key={c.id}>

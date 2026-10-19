@@ -6,6 +6,7 @@ import { PRODUCT_KEYS, stageLabel } from '@/lib/crm/stages';
 import { notify } from '@/lib/notify';
 import { todayISO } from '@/lib/tasks';
 import { toWaId } from '@/lib/whatsapp/shared';
+import { shownBody } from '@/lib/whatsapp/describe';
 
 /**
  * What the assistant can do. It never contacts a customer: emails and WhatsApps are saved as
@@ -185,7 +186,7 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
         next_step_at: p.next_step_at,
         notes: p.notes,
         timeline: acts.data ?? [],
-        whatsapp: (wa.data ?? []).map((m) => ({ ...m, body: m.body?.slice(0, 400) })),
+        whatsapp: (wa.data ?? []).map((m) => ({ ...m, body: shownBody(m.body)?.slice(0, 400) })),
         emails: (emails.data ?? []).map((m) => ({ ...m, body: m.body?.slice(0, 600) })),
         open_tasks: tasks.data ?? [],
         unsent_drafts: drafts.data ?? [],
