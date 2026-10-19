@@ -50,11 +50,14 @@ export function HeaderUser({
   name,
   email,
   signOut,
+  admin,
 }: {
   initials: string;
   name: string;
   email: string;
   signOut: () => Promise<void>;
+  /** Adds Users (who can sign in and what they can open) to the menu. */
+  admin?: boolean;
 }) {
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -273,6 +276,11 @@ export function HeaderUser({
             <Link href="/admin/app" className="hu-item" role="menuitem" onClick={closeMenu}>
               Android app
             </Link>
+            {admin && (
+              <Link href="/admin/users" className="hu-item" role="menuitem" onClick={closeMenu}>
+                Users
+              </Link>
+            )}
             <form action={signOut} data-signout>
               <button type="submit" className="hu-item" role="menuitem">
                 Sign out

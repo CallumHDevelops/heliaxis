@@ -18,7 +18,7 @@ export default async function EnquiriesPage() {
   const leads = await enrichLeadsWithGeo(((data ?? []) as EnquiryRow[]).map(rowToCrmLead));
 
   return (
-    <AdminShell active="enquiries" isAdmin={profile?.role === 'admin'}>
+    <AdminShell active="enquiries" isAdmin={profile?.role === 'admin'} fluid>
       <EnquiriesCrm initialLeads={leads} canCrm={canAccess(profile, 'crm')} canImport={profile?.role === 'admin'} />
     </AdminShell>
   );

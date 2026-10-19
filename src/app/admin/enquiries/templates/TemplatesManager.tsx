@@ -215,35 +215,40 @@ export function TemplatesManager() {
               </button>
             </p>
           )}
-          {yours.map((t) => (
-            <TemplateCard
-              key={keyOf(t)}
-              t={t}
-              data={data}
-              busy={busy === keyOf(t)}
-              msg={msgs[keyOf(t)]}
-              open={open?.key === keyOf(t) ? open.panel : null}
-              onOpen={(panel) => setOpen(panel && { key: keyOf(t), panel })}
-              onJob={(job, name) => setJob(job, name, keyOf(t))}
-              onBlanks={(b) => saveBlanks(t, b)}
-              onDelete={() => remove(t)}
-            />
-          ))}
+          <div className="wat-grid">
+            {yours.map((t) => (
+              <TemplateCard
+                key={keyOf(t)}
+                t={t}
+                data={data}
+                busy={busy === keyOf(t)}
+                msg={msgs[keyOf(t)]}
+                open={open?.key === keyOf(t) ? open.panel : null}
+                onOpen={(panel) => setOpen(panel && { key: keyOf(t), panel })}
+                onJob={(job, name) => setJob(job, name, keyOf(t))}
+                onBlanks={(b) => saveBlanks(t, b)}
+                onDelete={() => remove(t)}
+              />
+            ))}
+          </div>
         </>
       )}
 
-      {data && tab === 'ready' &&
-        READY_MADE.map((r) => (
-          <ReadyCard
-            key={r.name}
-            r={r}
-            data={data}
-            busy={busy === `ready:${r.name}`}
-            msg={msgs[`ready:${r.name}`]}
-            onSend={() => sendReady(r)}
-            onJob={(job, name) => setJob(job, name, `ready:${r.name}`)}
-          />
-        ))}
+      {data && tab === 'ready' && (
+        <div className="wat-grid">
+          {READY_MADE.map((r) => (
+            <ReadyCard
+              key={r.name}
+              r={r}
+              data={data}
+              busy={busy === `ready:${r.name}`}
+              msg={msgs[`ready:${r.name}`]}
+              onSend={() => sendReady(r)}
+              onJob={(job, name) => setJob(job, name, `ready:${r.name}`)}
+            />
+          ))}
+        </div>
+      )}
 
       {data && tab === 'new' && isAdmin && <NewTemplate taken={new Set(yours.map((t) => t.name))} disabled={!!data.problem} onCreated={created} />}
 

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function CrmReportsPage() {
   return (
-    <AdminShell active="crm" wide>
+    <AdminShell active="crm" fluid>
       <CrmReports />
     </AdminShell>
   );
