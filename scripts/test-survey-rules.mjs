@@ -1,7 +1,7 @@
 // Solar survey rules (src/lib/surveys/rules.ts), the answers merge (merge.ts), drawings (markup.ts)
 // and the phone-sensor maths (device.ts).
 // Usage: node --experimental-strip-types scripts/test-survey-rules.mjs
-import { SCREENS, SOLAR_SCHEMA, SLOT_RE, fieldIndex } from '../src/lib/surveys/solar-schema.ts';
+import { ENA_PHOTOS, ROOF_LAYOUT_LABEL, SCREENS, SOLAR_SCHEMA, SLOT_RE, enaFileName, fieldIndex } from '../src/lib/surveys/solar-schema.ts';
 import { DRAWINGS_FLAG, evaluate } from '../src/lib/surveys/rules.ts';
 import { mergeAnswers, mergeSurvey, same } from '../src/lib/surveys/merge.ts';
 import { cleanMarkup, markupPathFor, markupShapes } from '../src/lib/surveys/markup.ts';
@@ -26,6 +26,22 @@ eq('field ids are unique', ids.length, new Set(SOLAR_SCHEMA.flatMap((s) => [...(
 yes('every photo field id makes a valid slot (with and without a roof)', SOLAR_SCHEMA.flatMap((s) => [...(s.once ?? []), ...s.fields]).filter((f) => f.type === 'photo' || f.type === 'photos').every((f) => SLOT_RE.test(f.id) && SLOT_RE.test(`${f.id}:r6`)));
 yes('each section sits on the screen that lists it', SOLAR_SCHEMA.every((s) => SCREENS[s.screen]?.sections.includes(s.key)));
 eq('8 screens', SCREENS.length, 8);
+
+// ── The main cut-out (for ENA) and the roof layout ──
+{
+  const F = fieldIndex();
+  const e1 = F.get('E1')?.field;
+  eq('E1 is the main electric cut-out, a Must photo', [e1?.label, e1?.type, e1?.level], ['Main electric cut-out (DNO)', 'photo', 'must']);
+  yes('E1 asks for a close-up (fuse rating and seal) and a wide shot with the meter', /fuse rating and the seal/.test(e1?.hint ?? '') && /wide shot with the meter/.test(e1?.hint ?? ''), e1?.hint);
+  eq('R13 is the roof layout', [F.get('R13')?.field.label, ROOF_LAYOUT_LABEL], ['Roof layout (aerial, panel area drawn on)', 'Roof layout (aerial, panel area drawn on)']);
+  const saysCutOut = [...F.values()].filter(({ field: f }) => /cut[- ]?out/i.test(`${f.label} ${f.help ?? ''} ${f.hint ?? ''}`)).map(({ field: f }) => f.id);
+  eq('only the electric cut-out questions say "cut-out"', saysCutOut, ['E1', 'E3']);
+  eq('ENA photos: the main cut-out and the meter', ENA_PHOTOS.map((p) => p.slot), ['E1', 'E6']);
+  eq('ENA file name: job ref', enaFileName('HX-0042', 'main-cut-out', 1, 1, 'jpg'), 'HX-0042-main-cut-out.jpg');
+  eq('ENA file name: second of two, later job', enaFileName('HX-0042-2', 'meter', 2, 2, 'JPEG'), 'HX-0042-2-meter-2.jpeg');
+  eq('ENA file name: a name before refs exist', enaFileName('Jane O’Brien', 'meter', 1, 1, 'jpg'), 'Jane-O-Brien-meter.jpg');
+  eq('ENA file name: nothing usable', enaFileName('  ', 'meter', 1, 1, ''), 'survey-meter.jpg');
+}
 
 // ── A full one-roof solar + battery job, everything answered ──
 const full = {
@@ -142,14 +158,14 @@ eq('full sample: battery adds F5 to the 24 must items', ev.counts.must, 25);
 }
 {
   const e = run(full, fullPhotos.map((p) => (p.slot === 'R13' ? P('R13', false) : p)));
-  eq('cut-out photo without a drawing: drawings to do, not missing', [fields(e.drawingsToDo), fields(e.missing)], [['R13'], []]);
-  yes('cut-out photo without a drawing: red flag "Drawings to do"', e.flags.includes(DRAWINGS_FLAG), e.flags);
-  eq('cut-out photo without a drawing: still 100%', e.percent, 100);
+  eq('roof layout photo without a drawing: drawings to do, not missing', [fields(e.drawingsToDo), fields(e.missing)], [['R13'], []]);
+  yes('roof layout photo without a drawing: red flag "Drawings to do"', e.flags.includes(DRAWINGS_FLAG), e.flags);
+  eq('roof layout photo without a drawing: still 100%', e.percent, 100);
 }
 {
   const e = run(full, fullPhotos);
   const order = e.photoRun.map((s) => s.slot);
-  yes('photo run: front before rear before the cut-out before the loft', order.indexOf('B1') < order.indexOf('B3') && order.indexOf('B3') < order.indexOf('R13') && order.indexOf('R13') < order.indexOf('L3:r1'), order);
+  yes('photo run: front before rear before the roof layout before the loft', order.indexOf('B1') < order.indexOf('B3') && order.indexOf('B3') < order.indexOf('R13') && order.indexOf('R13') < order.indexOf('L3:r1'), order);
   const firstOptional = e.photoRun.findIndex((s) => s.level === 'optional');
   yes('photo run: optional photos come last', firstOptional > 0 && e.photoRun.slice(firstOptional).every((s) => s.level === 'optional'), order);
   const outside = e.photoRun.filter((s) => s.screen === 1 && s.level !== 'optional').map((s) => s.level);

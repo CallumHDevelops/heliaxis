@@ -77,8 +77,21 @@ export type Section = {
   fields: Field[];
 };
 
-/** owner-settings line 12: the owner hasn't confirmed what "cut out image" means. Rename it here only. */
-export const CUT_OUT_LABEL = 'Roof cut-out image (aerial, panel area drawn on)';
+/** R13, the aerial view of the roof with the panel area drawn on. Rename it here only. */
+export const ROOF_LAYOUT_LABEL = 'Roof layout (aerial, panel area drawn on)';
+
+/** The photos the DNO application on ENA (Connect Direct) needs: shown together on the report, each to download. */
+export const ENA_PHOTOS = [
+  { slot: 'E1', file: 'main-cut-out' },
+  { slot: 'E6', file: 'meter' },
+] as const;
+
+/** A downloaded ENA photo's name: "HX-0042-main-cut-out.jpg", or "…-main-cut-out-2.jpg" when there are several. */
+export function enaFileName(base: string, file: string, n: number, of: number, ext: string): string {
+  const safe = base.replace(/[^A-Za-z0-9-]+/g, '-').replace(/-{2,}/g, '-').replace(/^-|-$/g, '') || 'survey';
+  const kind = ext.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  return `${safe}-${file}${of > 1 ? `-${n}` : ''}.${kind}`;
+}
 
 export const SCREENS: { title: string; sections: SectionKey[] }[] = [
   { title: 'Chat with the customer', sections: ['A', 'I'] },
@@ -384,7 +397,7 @@ export const SOLAR_SCHEMA: Section[] = [
     once: [
       {
         id: 'R13',
-        label: CUT_OUT_LABEL,
+        label: ROOF_LAYOUT_LABEL,
         help: 'A photo or a screenshot of the aerial view, with the panel area and any no-go areas drawn on. Draw now or later in the van.',
         type: 'photo',
         level: 'must',
@@ -658,7 +671,15 @@ export const SOLAR_SCHEMA: Section[] = [
     screen: 4,
     skippable: true,
     fields: [
-      { id: 'E1', label: 'DNO cut-out (main fuse) with the rating visible', type: 'photo', level: 'must', drawing: 'optional', hint: 'Get the fuse rating in shot' },
+      {
+        id: 'E1',
+        label: 'Main electric cut-out (DNO)',
+        help: 'Goes with the DNO application on ENA (Connect Direct).',
+        type: 'photo',
+        level: 'must',
+        drawing: 'optional',
+        hint: 'A close-up where the fuse rating and the seal can be read, plus a wide shot with the meter',
+      },
       {
         id: 'E2',
         label: 'Main fuse rating',

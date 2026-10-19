@@ -4,7 +4,7 @@ import { requirePortal } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isUuid } from '@/lib/crm/server';
-import { buildPayload, getSurvey, surveysReady } from '@/lib/surveys/server';
+import { buildPayload, enaDownloads, getSurvey, surveysReady } from '@/lib/surveys/server';
 import { SurveyReport } from './SurveyReport';
 import '../../surveys.css';
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** The survey as a report: answers by screen, photos with their drawings, red flags, sign-off. Prints to A4. */
+/** The survey as a report: answers by screen, photos with their drawings, red flags, the ENA photos, sign-off. Prints to A4. */
 export default async function SurveyReportPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePortal('crm');
   if (!session) {
@@ -39,9 +39,11 @@ export default async function SurveyReportPage({ params }: { params: Promise<{ i
   if (!survey) notFound();
   const payload = await buildPayload(db, survey);
   if (!payload) notFound();
+  // The main cut-out and meter photos to download for the ENA application (CRM staff only: this page).
+  const ena = survey.type === 'solar' ? await enaDownloads(db, survey.id, payload.project.ref || payload.customer?.name || 'survey') : undefined;
   return (
     <AdminShell active="surveys">
-      <SurveyReport payload={payload} />
+      <SurveyReport payload={payload} ena={ena} />
     </AdminShell>
   );
 }

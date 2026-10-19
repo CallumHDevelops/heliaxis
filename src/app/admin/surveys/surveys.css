@@ -1437,6 +1437,32 @@
   font-size: 0.85rem;
   margin-top: 4px;
 }
+.svr-ena__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.svr-ena__item {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+.svr-ena__item .svr-photos-q__label {
+  margin: 0;
+}
+.svr-ena__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .svr-ena__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .svr-doc {
   display: block;
   font-weight: 700;
@@ -1501,7 +1527,8 @@
   .hx-header,
   .hx-tabs,
   .hx-rt-bar,
-  .svr-tools {
+  .svr-tools,
+  .svr-ena {
     display: none !important;
   }
   .admin-shell__main {

@@ -2,13 +2,15 @@
 
 import { compassLabel } from '@/lib/surveys/device';
 import { evaluate, isShown, levelOf, roofName, roofsOf, slotFor, toSend, DRAWINGS_FLAG } from '@/lib/surveys/rules';
-import { fieldIndex, SCREENS, SOLAR_SCHEMA, type Answers, type Ctx, type Field, type RoofAnswers, type Section, type SurveyPayload, type SurveyPhoto } from '@/lib/surveys/solar-schema';
+import { ENA_PHOTOS, fieldIndex, SCREENS, SOLAR_SCHEMA, type Answers, type Ctx, type Field, type RoofAnswers, type Section, type SurveyPayload, type SurveyPhoto } from '@/lib/surveys/solar-schema';
 import { PhotoFigure } from '../PhotoSlot';
 
 /**
  * The survey report: header with the DNO route, planning and structural verdicts, red flags, each
  * screen's answers (Should items not filled in grey), every photo with its drawing laid over it,
  * drawings still to do, what the customer will send, and the sign-off. Prints cleanly to A4.
+ * For CRM staff (`ena`), the main cut-out and meter photos together, each to download for the DNO
+ * application on ENA (left out of the print).
  */
 
 const FIELDS = fieldIndex();
@@ -72,7 +74,7 @@ function words(f: Field, v: unknown, src: Record<string, unknown>, roofs: RoofAn
   }
 }
 
-export function SurveyReport({ payload }: { payload: SurveyPayload }) {
+export function SurveyReport({ payload, ena }: { payload: SurveyPayload; /** Photo id → download link (the original file). */ ena?: Record<string, string> }) {
   const s = payload.survey;
   const answers: Answers = s.answers ?? {};
   const roofs = roofsOf(answers);
@@ -287,6 +289,43 @@ export function SurveyReport({ payload }: { payload: SurveyPayload }) {
               <li key={`s:${k}`}>Customer will send: {FIELDS.get(k.split(':')[0])?.field.label ?? k}</li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {ena && (
+        <section className="svr-section svr-ena">
+          <h2>For the ENA application</h2>
+          <p className="svr-note">The photos to upload to ENA (Connect Direct) for the DNO application. Download saves the original photo, without any drawing.</p>
+          <div className="svr-ena__grid">
+            {ENA_PHOTOS.map(({ slot }) => {
+              const label = FIELDS.get(slot)?.field.label ?? slot;
+              const list = slotPhotos(slot);
+              return (
+                <div key={slot} className="svr-ena__item">
+                  <p className="svr-photos-q__label">{label}</p>
+                  {list.length ? (
+                    list.map((p, i) => (
+                      <figure key={p.id} className="svr-photo">
+                        <PhotoFigure src={p.url ?? p.thumb} markup={null} width={p.width} height={p.height} alt={`${label} ${i + 1}`} />
+                        <figcaption className="svr-ena__foot">
+                          <span>{list.length > 1 ? `Photo ${i + 1} of ${list.length}` : 'Photo'}</span>
+                          {ena[p.id] ? (
+                            <a className="svf-btn svf-btn--ghost" href={ena[p.id]} download>
+                              ⬇ Download
+                            </a>
+                          ) : (
+                            <span className="svr-none">Can’t download right now. Reload the page to try again.</span>
+                          )}
+                        </figcaption>
+                      </figure>
+                    ))
+                  ) : (
+                    <p className="svr-none">No photo yet</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 

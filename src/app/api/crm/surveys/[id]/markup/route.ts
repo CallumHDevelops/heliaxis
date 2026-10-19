@@ -8,7 +8,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /**
  * A drawing on a photo that has already gone up (drawings on queued photos travel with the photo).
- * Works on finished surveys too: the cut-out and cable routes can be drawn later in the van.
+ * Works on finished surveys too: the roof layout and cable routes can be drawn later in the van.
  * { action: 'prepare', photo_id } → a one-time upload URL for the flattened JPEG;
  * { action: 'save', photo_id, markup, markup_path } → keep the drawing (markup null removes it).
  */

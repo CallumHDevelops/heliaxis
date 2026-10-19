@@ -7,6 +7,8 @@ import { surveyTypeFor } from '@/lib/crm/stages';
 import { cleanMarkup } from './markup';
 import { evaluate, type Evaluation, type PhotoInfo } from './rules';
 import {
+  ENA_PHOTOS,
+  enaFileName,
   MAX_ROOFS,
   ROOF_ID_RE,
   SOLAR_SCHEMA,
@@ -257,6 +259,34 @@ export async function signPhotos(db: Db, rows: PhotoRow[]): Promise<SurveyPhoto[
     rows.flatMap((p) => [p.storage_path, thumbPath(p.storage_path), p.markup_path ?? ''])
   );
   return photoPayload(rows, signed);
+}
+
+/**
+ * Download links for the ENA photos (the main cut-out and the meter), keyed by photo id: the original
+ * file, without any drawing, saved as "HX-0042-main-cut-out.jpg" (`base` is the job's ref, or the
+ * customer's name before refs exist). Empty if there are none or the storage can't be reached.
+ */
+export async function enaDownloads(db: Db, surveyId: string, base: string): Promise<Record<string, string>> {
+  const rows = await surveyPhotos(db, surveyId);
+  const out: Record<string, string> = {};
+  await Promise.all(
+    ENA_PHOTOS.flatMap(({ slot, file }) => {
+      const list = rows.filter((p) => p.slot === slot);
+      return list.map(async (p, i) => {
+        const ext = /\.([a-z0-9]+)$/i.exec(p.storage_path)?.[1] ?? 'jpg';
+        const name = enaFileName(base, file, i + 1, list.length, ext);
+        const { data } = await db.storage
+          .from(CRM_BUCKET)
+          .createSignedUrl(p.storage_path, SIGNED_SECONDS, { download: name })
+          .then(
+            (r) => r,
+            () => ({ data: null })
+          );
+        if (data?.signedUrl) out[p.id] = data.signedUrl;
+      });
+    })
+  );
+  return out;
 }
 
 const nameOf = (p: { full_name?: string | null; email?: string | null } | undefined) => (p ? p.full_name || p.email || 'Team' : null);

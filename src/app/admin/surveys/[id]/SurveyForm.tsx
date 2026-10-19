@@ -903,7 +903,7 @@ export function SurveyForm() {
           </button>
         )}
 
-        {/* Once per property (the cut-out image), above the roof areas. */}
+        {/* Once per property (the roof layout), above the roof areas. */}
         {sections.map((s) =>
           s.perRoof && s.once?.length ? (
             <div key={`${s.key}-once`} className="svf-section">

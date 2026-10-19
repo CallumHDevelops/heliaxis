@@ -226,7 +226,7 @@ export async function POST(req: Request, { params }: Ctx) {
         });
     }
     if (drawings.length) {
-      const what = [...new Set(drawings.map((d) => (d.field === 'R13' ? 'cut-out' : 'cable routes')))].join(', ');
+      const what = [...new Set(drawings.map((d) => (d.field === 'R13' ? 'roof layout' : 'cable routes')))].join(', ');
       await addSourceTask(db, {
         projectId: project.id,
         key: `survey-drawings:${id}`,

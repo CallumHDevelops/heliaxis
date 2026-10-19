@@ -1,5 +1,5 @@
 /**
- * Drawings on survey photos (the cut-out panel area, cable routes, "battery here").
+ * Drawings on survey photos (the panel area on the roof layout, cable routes, "battery here").
  *
  * Stored as vectors in crm_photos.markup, every coordinate 0..1 of the photo's width and height, so a
  * drawing fits the photo at any size (phone, report, print). Stroke widths and text sizes are a
