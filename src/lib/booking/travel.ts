@@ -26,18 +26,27 @@ const llKey = (p: LatLng) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
 
 /**
  * Count `n` elements against today's budget (cms_kv 'google-routes-usage:YYYY-MM-DD'). False once the
- * day's allowance would be passed: the rest of the day uses the estimate.
+ * day's allowance would be passed: the rest of the day uses the estimate. A compare-and-swap, so
+ * searches running at the same time can't both count from the same total (only this writes the row).
  */
 async function spend(n: number, limit: number): Promise<boolean> {
   if (limit <= 0) return false;
   try {
     const db = createAdminClient();
     const key = `google-routes-usage:${ukDate(Date.now())}`;
-    const { data } = await db.from('cms_kv').select('value').eq('key', key).maybeSingle();
-    const used = Number(data?.value) || 0;
-    if (used + n > limit) return false;
-    await db.from('cms_kv').upsert({ key, value: String(used + n), updated_at: new Date().toISOString() });
-    return true;
+    for (let tries = 0; tries < 8; tries++) {
+      const { data, error } = await db.from('cms_kv').select('value').eq('key', key).maybeSingle();
+      if (error) return false;
+      const used = Number(data?.value) || 0;
+      if (used + n > limit) return false;
+      const updated_at = new Date().toISOString();
+      const r = data
+        ? await db.from('cms_kv').update({ value: String(used + n), updated_at }).eq('key', key).eq('value', data.value).select('key')
+        : await db.from('cms_kv').insert({ key, value: String(n), updated_at }).select('key'); // a racing first insert fails on the key
+      if (!r.error && r.data?.length) return true;
+      // Someone else counted first: read the total again.
+    }
+    return false; // too busy to count: use the estimate
   } catch {
     return false;
   }
