@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Spark } from '@/components/Spark';
 import styles from './auth.module.css';
@@ -10,6 +10,13 @@ export default function LoginPage() {
   const [err, setErr] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // /auth/callback sends people here with ?error=link when a sign-in link didn't work.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('error') === 'link') {
+      setErr('Sorry, that sign-in link didn’t work. It may have expired, been used already, or been opened on a different device. Enter your email to get a new one.');
+    }
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
