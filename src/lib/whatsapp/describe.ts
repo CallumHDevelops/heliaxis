@@ -66,6 +66,8 @@ const NOT_PASSED_ON = new Map([
   ['product', 'They sent a product from a shop'],
   ['view_once', 'They sent a view-once photo or video'],
 ]);
+/** Template, button and list messages: only a business's own WhatsApp system sends these (a login code, an alert). */
+const AUTOMATED = new Set(['hsm', 'template', 'interactive', 'button', 'list']);
 /** …and the ones that need nothing from us. */
 const JUST_SO_YOU_KNOW = new Map([
   ['pin', '📌 They pinned a message in the chat.'],
@@ -146,12 +148,15 @@ function notPassedOn(m: InboundMessage) {
   const type = m.unsupported?.type || '';
   const info = JUST_SO_YOU_KNOW.get(type);
   if (info) return info;
+  if (AUTOMATED.has(type)) return '⚠️ An automated message from another business’s WhatsApp system (a code or an alert, say). WhatsApp doesn’t pass these on.';
   const e = m.errors?.[0];
   // 131051 is the plain "message type not supported", which says nothing the wording below doesn't.
   const why = e && e.code !== 131051 ? e.error_data?.details || e.message || e.title : '';
   if (why) return `⚠️ WhatsApp didn’t pass this message on (“${why.replace(/\.$/, '')}”). ${RESEND}`;
   const did = NOT_PASSED_ON.get(type);
   if (did) return `⚠️ ${did}, which WhatsApp doesn’t pass on. ${RESEND}`;
+  // Meta named it, but it's nothing we have words for: don't guess at polls.
+  if (type) return '⚠️ WhatsApp didn’t pass this message on. If it matters, ask them to send it again.';
   return '⚠️ WhatsApp didn’t pass this on. It may have been deleted, or be a poll, a view-once photo or another business’s automated message.';
 }
 

@@ -10,6 +10,7 @@ import { canAccess } from '@/lib/portals';
 import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
 import { getSettings } from '@/lib/whatsapp/settings';
+import { shownBody } from '@/lib/whatsapp/describe';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -112,7 +113,7 @@ export async function GET(_req: Request, { params }: Ctx) {
     ...(wa ?? []).map((m) => ({
       id: `wa-${m.id}`,
       kind: 'whatsapp',
-      body: m.body as string | null,
+      body: shownBody(m.body as string | null),
       meta: { direction: m.direction, status: m.status, kind: m.kind, via: m.via },
       by:
         m.direction === 'in'

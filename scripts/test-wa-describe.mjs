@@ -12,6 +12,8 @@ function eq(name, got, want) {
 const msg = (type, extra = {}) => describeMessage({ id: 'wamid.1', from: '12135550123', type, ...extra });
 const RESEND = 'Ask them to send it again as a normal message or photo.';
 const NOT_PASSED_ON = '⚠️ WhatsApp didn’t pass this on. It may have been deleted, or be a poll, a view-once photo or another business’s automated message.';
+const NAMED = '⚠️ WhatsApp didn’t pass this message on. If it matters, ask them to send it again.';
+const AUTOMATED = '⚠️ An automated message from another business’s WhatsApp system (a code or an alert, say). WhatsApp doesn’t pass these on.';
 
 // Real text: the only kind that can trigger a smart reply.
 eq('text', msg('text', { text: { body: 'How much for 10 panels?' } }), { kind: 'text', body: 'How much for 10 panels?' });
@@ -79,8 +81,11 @@ eq('unsupported edit', msg('unsupported', { unsupported: { type: 'edit' }, error
 });
 eq('unsupported gif', msg('unsupported', { unsupported: { type: 'gif' } }).body, `⚠️ They sent a GIF, which WhatsApp doesn’t pass on. ${RESEND}`);
 eq('unsupported pin: nothing to do', msg('unsupported', { unsupported: { type: 'pin' } }), { kind: 'other', body: '📌 They pinned a message in the chat.' });
-eq('unsupported type named like an Object property', msg('unsupported', { unsupported: { type: 'constructor' } }).body, NOT_PASSED_ON);
-eq('unsupported type we have no name for', msg('unsupported', { unsupported: { type: 'media_placeholder' }, errors: [unsupportedError] }).body, NOT_PASSED_ON);
+eq('unsupported type named like an Object property', msg('unsupported', { unsupported: { type: 'constructor' } }).body, NAMED);
+eq('unsupported type we have no name for', msg('unsupported', { unsupported: { type: 'media_placeholder' }, errors: [unsupportedError] }).body, NAMED);
+for (const t of ['hsm', 'template', 'interactive', 'button', 'list']) {
+  eq(`unsupported ${t}: another business's automated message, no resend`, msg('unsupported', { unsupported: { type: t }, errors: [unsupportedError] }).body, AUTOMATED);
+}
 eq(
   'unsupported with another reason from Meta (131060)',
   msg('unsupported', { errors: [{ code: 131060, title: 'Message unavailable', error_data: { details: 'This message is currently unavailable.' } }] }),
