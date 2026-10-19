@@ -27,6 +27,7 @@ alter table public.enquiries add column if not exists last_job_no  int not null 
 
 create sequence if not exists public.customer_ref_seq;
 revoke all on sequence public.customer_ref_seq from public, anon, authenticated;
+grant usage on sequence public.customer_ref_seq to service_role;
 
 -- 42 → HX-0042, 10000 → HX-10000.
 create or replace function public.hx_ref(n bigint) returns text
@@ -36,8 +37,10 @@ $$;
 
 -- A new customer takes the next number. Afterwards the reference stays put, and the job counter only
 -- goes up, so a deleted job's number is never handed out again.
+-- Not security definer: a browser-key insert is refused (no access to hx_ref) before it can use up a
+-- number, as numbers taken from the sequence are never given back.
 create or replace function public.enquiries_customer_ref() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql set search_path = public as $$
 begin
   if tg_op = 'INSERT' then
     new.customer_ref := public.hx_ref(nextval('public.customer_ref_seq'));
