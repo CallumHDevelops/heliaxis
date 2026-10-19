@@ -35,6 +35,8 @@ export type Draft = {
   synced: boolean;
   /** "Finish on site" was tapped on this phone. */
   finish?: Finish;
+  /** The customer's signature (PNG data URL), kept here until "Finish on site" sends it. */
+  signature?: string;
   /** The server won't take changes: 'complete', 'cancelled' or 'deleted'. */
   locked?: string;
   /** The last save was refused (shown to the surveyor). */
@@ -196,6 +198,7 @@ export async function loadSurvey(id: string): Promise<Loaded> {
         // booked survey doesn't start it.
         synced: true,
         finish: d?.finish,
+        signature: d?.signature,
         locked,
       };
       await putDraft(d);
@@ -331,6 +334,16 @@ async function renameSlots(surveyId: string, renamed: Record<string, string>) {
     if (roof && renamed[roof]) await setQueuedSlot(p.id, `${field}:${renamed[roof]}`).catch(() => null);
   }
 }
+
+/** Keep (or with null, forget) the customer's signature on the phone; it goes up with "Finish on site". */
+export async function setSignature(id: string, image: string | null) {
+  await serial(id, async () => {
+    const d = await getDraft(id);
+    if (d) await putDraft({ ...d, signature: image ?? undefined });
+  });
+}
+
+export const getSignature = (id: string) => getDraft(id).then((d) => d?.signature ?? null, () => null);
 
 /* ── Drawings and finishing (the outbox) ──────────────────────────────────────── */
 
