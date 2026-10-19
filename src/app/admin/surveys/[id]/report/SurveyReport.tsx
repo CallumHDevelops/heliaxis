@@ -14,8 +14,12 @@ import { PhotoFigure } from '../PhotoSlot';
  */
 
 const FIELDS = fieldIndex();
-const UK_DATE = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
-const UK_WHEN = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+// Put together from the parts: the server and the phone's browser punctuate format() differently
+// ("Fri, 16 October" vs "Fri 16 October"), which would break hydration.
+const UK_PARTS = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const partsOf = (d: Date) => Object.fromEntries(UK_PARTS.formatToParts(d).map((p) => [p.type, p.value])) as Record<Intl.DateTimeFormatPartTypes, string>;
+const UK_DATE = { format: (d: Date) => ((p) => `${p.weekday} ${p.day} ${p.month} ${p.year}`)(partsOf(d)) };
+const UK_WHEN = { format: (d: Date) => ((p) => `${p.day} ${p.month} ${p.year} at ${p.hour}:${p.minute}`)(partsOf(d)) };
 const DNO = { g98: 'G98', g99: 'G99', unknown: 'Not known' } as const;
 const PLANNING = { permitted: 'Permitted development', check: 'Check with the council', consent: 'Listed building consent' } as const;
 const STRUCTURAL = { desktop_ok: 'Desktop check', engineer: 'Structural engineer', not_suitable: 'Not suitable', unknown: 'Not known' } as const;
