@@ -11,6 +11,7 @@
  *   On a weak signal a kept survey page falls back to its copy after a few seconds.
  * - WARM { urls } (from the survey offline pack): fetch and keep those pages, plus every
  *   /_next/static file their HTML refers to, so they open after a cold start with no signal.
+ *   A new version carries those pages (and their files) over from the old caches when it takes over.
  * - Everything else under /admin: network, with /offline.html when there's no signal.
  * - /api is never cached here (Tasks and Surveys keep their own offline copies and outboxes).
  */
@@ -43,10 +44,38 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('hx-') && k !== STATIC && k !== PAGES).map((k) => caches.delete(k))))
+      .then(async (keys) => {
+        const old = keys.filter((k) => k.startsWith('hx-') && k !== STATIC && k !== PAGES);
+        await carryForward(old).catch(() => {});
+        await Promise.all(old.map((k) => caches.delete(k)));
+      })
       .then(() => self.clients.claim())
   );
 });
+
+// A new deploy: keep the last version's offline pages, and the scripts their HTML refers to, so a
+// phone that updated after the morning warm-up still opens surveys with no signal. Each page is
+// replaced by a fresh copy the next time it loads with signal.
+async function carryForward(old) {
+  const pages = await caches.open(PAGES);
+  const stat = await caches.open(STATIC);
+  for (const name of old.filter((k) => k.startsWith('hx-pages-')).reverse()) {
+    const from = await caches.open(name);
+    const fromStatic = 'hx-static-' + name.slice('hx-pages-'.length);
+    for (const req of await from.keys()) {
+      if (!keepPage(pagePath(new URL(req.url))) || (await pages.match(req))) continue;
+      const res = await from.match(req);
+      if (!res) continue;
+      const html = await res.clone().text();
+      await pages.put(req, res);
+      for (const a of new Set(html.match(STATIC_IN_HTML) || [])) {
+        if (await stat.match(a)) continue;
+        const hit = await caches.match(a, { cacheName: fromStatic });
+        if (hit) await stat.put(a, hit);
+      }
+    }
+  }
+}
 
 self.addEventListener('message', (event) => {
   const msg = event.data || {};
