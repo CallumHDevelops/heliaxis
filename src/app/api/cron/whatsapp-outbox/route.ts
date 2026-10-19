@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const followUps = await remindNextSteps().catch(() => 0);
   const crm = await runCrmAutomations().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
   const emails = await pollMailbox((enquiryId, name, subject) =>
-    notifyEnquiryTeam(`Email from ${name}`, subject, '/admin/crm', { tag: `em-${enquiryId}` })
+    notifyEnquiryTeam(`Email from ${name}`, subject, `/admin/crm?enquiry=${enquiryId}`, { tag: `em-${enquiryId}` })
   ).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
   return NextResponse.json({ ok: true, ...result, reminded, followUps, crm, emails });
 }

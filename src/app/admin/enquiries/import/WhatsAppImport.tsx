@@ -52,6 +52,8 @@ type Row = {
   found: Person[] | null;
   searching: boolean;
   result?: Result;
+  /** Skipped: no one in the CRM has this number, and the customer who had it was deleted on purpose. */
+  deletedBefore?: boolean;
 };
 
 /** "Heliaxis is: nobody here" (we never replied to this one). */
@@ -185,18 +187,19 @@ export function WhatsAppImport() {
     return found;
   }
 
-  async function importRow(r: Row) {
+  /** `anyway`: they were deleted from the CRM before, and they're to be added back all the same. */
+  async function importRow(r: Row, anyway = false) {
     if (blocker(r) || !r.text) return;
     const us = usOf(usValue(r)) ?? null;
     const customer = r.match
       ? { enquiryId: r.match.id, phone: phoneIn(r) ?? undefined }
       : { phone: r.newPhone.trim(), name: (r.newName.trim() || nameFor(r)).slice(0, 200) };
-    const body = JSON.stringify({ fileName: r.fileName, text: r.text, us, customer });
+    const body = JSON.stringify({ fileName: r.fileName, text: r.text, us, customer, anyway });
     if (new Blob([body]).size > MAX_REQUEST_BYTES) {
       patch(r.key, { error: 'This chat is too big to import in one go.' });
       return;
     }
-    patch(r.key, { state: 'importing', error: undefined });
+    patch(r.key, { state: 'importing', error: undefined, deletedBefore: false });
     try {
       const res = await fetch('/api/whatsapp/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       const d = await res.json().catch(() => ({}));
@@ -204,7 +207,8 @@ export function WhatsAppImport() {
         patch(r.key, { state: 'ready', error: d.error || 'That didn’t work. Try again.' });
         return;
       }
-      patch(r.key, { state: 'done', result: d as Result });
+      if (d.deletedBefore) patch(r.key, { state: 'done', deletedBefore: true });
+      else patch(r.key, { state: 'done', result: d as Result });
     } catch {
       patch(r.key, { state: 'ready', error: 'Couldn’t reach the server. Check your connection and try again.' });
     }
@@ -439,6 +443,15 @@ export function WhatsAppImport() {
                   </p>
                 )}
                 {r.result?.note && <p className="wai-warn">{r.result.note}</p>}
+                {r.deletedBefore && (
+                  <p className="wai-warn">
+                    Deleted before, skipped: you deleted this customer from the CRM, so their old chat doesn’t bring them
+                    back.{' '}
+                    <button type="button" className="wai-link" disabled={busy} onClick={() => importRow({ ...r, state: 'ready' }, true)}>
+                      Import anyway
+                    </button>
+                  </p>
+                )}
               </div>
             );
           })}
