@@ -397,6 +397,7 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
   const notificationRefs = has('notifications', 'ref');
+  const customerRefs = has('enquiries', 'customer_ref');
   // Projects, surveys and survey booking (crm-v3.sql, surveys.sql, survey-booking.sql), checked alongside the rest.
   const bookingChecks = Promise.all([
     has('crm_projects', 'project_ref'),
@@ -454,6 +455,15 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       'crm-v2.sql'
     )
   );
+  add(!(await customerRefs), {
+    ...sql(
+      'customer-refs.sql',
+      'Every customer gets a reference like HX-0042 as soon as they’re added, and their jobs share it: the first job is HX-0042, the next HX-0042-2, and so on. Search for it in Enquiries and WhatsApp. Any job numbers already given out change to match, once.',
+      4,
+      'crm-v3.sql'
+    ),
+    title: 'Give every customer a reference',
+  });
   add(!surveys, sql('surveys.sql', 'The solar survey tool: survey records, survey photos and drawings.', 4, 'crm-v3.sql'));
   add(
     !booking,

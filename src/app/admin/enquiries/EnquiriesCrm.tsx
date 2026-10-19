@@ -5,7 +5,7 @@ import { PushBanner } from '@/components/admin/PushBanner';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
-import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS } from '@/lib/enquiries';
+import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS, refMatches } from '@/lib/enquiries';
 import { osmEmbedUrl } from '@/lib/geocode-postcode';
 import { DeleteCustomers, type DeleteDone } from './DeleteCustomers';
 import './enquiries.css';
@@ -25,6 +25,22 @@ const ICONS: Record<string, string> = {
   coin:
     '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M12 7v10M9.5 9.5c.8-1 2-1.5 2.5-1.5s1.8.4 2.5 1.5M9.5 14.5c.8 1 2 1.5 2.5 1.5s1.8-.4 2.5-1.5"/></svg>',
 };
+
+/** Name, email, phone, postcode or customer reference (HX-0042, hx42, 0042). */
+function matches(l: CrmLead, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (`${l.name} ${l.org} ${l.email} ${l.postcode}`.toLowerCase().includes(q)) return true;
+  const squashed = q.replace(/\s+/g, '');
+  if (l.postcode.replace(/\s+/g, '').toLowerCase().includes(squashed)) return true;
+  const digits = q.replace(/\D/g, '');
+  if (digits.length >= 3 && /^[\d\s()+-]+$/.test(q)) {
+    const phone = l.phone.replace(/\D/g, '');
+    const national = (d: string) => d.replace(/^(?:44|0)/, ''); // 07700 900123 finds +44 7700 900123
+    if (phone.includes(digits) || (digits.length >= 6 && national(phone).includes(national(digits)))) return true;
+  }
+  return refMatches(l.ref, q);
+}
 
 function IconRow({ keys }: { keys: string[] }) {
   return (
@@ -76,6 +92,7 @@ export function EnquiriesCrm({
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [deleting, setDeleting] = useState<{ ids: string[]; name?: string } | null>(null);
   const [notice, setNotice] = useState<{ text: string; errors: string[] } | null>(null);
+  const [q, setQ] = useState('');
 
   const refresh = useCallback(async () => {
     const r = await fetch('/api/enquiries', { cache: 'no-store' });
@@ -99,9 +116,20 @@ export function EnquiriesCrm({
     return c;
   }, [leads]);
 
-  // Only people still on the list count (a refresh may have dropped some).
+  const shown = q.trim() ? leads.filter((l) => matches(l, q)) : leads;
+  // Only people still on the list count (a refresh may have dropped some). Ticks stay while you search.
   const pickedIds = leads.filter((l) => picked.has(l.id)).map((l) => l.id);
-  const allPicked = leads.length > 0 && pickedIds.length === leads.length;
+  // "Select all" means everyone the search shows.
+  const allPicked = shown.length > 0 && shown.every((l) => picked.has(l.id));
+  const pickAll = () =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      for (const l of shown) {
+        if (allPicked) next.delete(l.id);
+        else next.add(l.id);
+      }
+      return next;
+    });
   const togglePick = (id: string) =>
     setPicked((prev) => {
       const next = new Set(prev);
@@ -220,6 +248,15 @@ export function EnquiriesCrm({
         </div>
       )}
 
+      <input
+        className="enq-search"
+        type="search"
+        placeholder={leads.some((l) => l.ref) ? 'Search name, phone or HX-0042' : 'Search name, email or phone'}
+        aria-label="Search enquiries"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+
       <div className="enq-panel">
         <table className="enq-tbl">
           <thead>
@@ -242,7 +279,14 @@ export function EnquiriesCrm({
                 </td>
               </tr>
             )}
-            {leads.map((l) => (
+            {leads.length > 0 && shown.length === 0 && (
+              <tr>
+                <td colSpan={7} className="enq-empty">
+                  Nobody matches “{q.trim()}”.
+                </td>
+              </tr>
+            )}
+            {shown.map((l) => (
               <tr key={l.id} className={selecting && picked.has(l.id) ? 'is-picked' : undefined}>
                 <td>
                   {selecting ? (
@@ -250,12 +294,14 @@ export function EnquiriesCrm({
                       <input type="checkbox" checked={picked.has(l.id)} onChange={() => togglePick(l.id)} />
                       <span>
                         <b>{l.name}</b>
+                        {l.ref && <span className="enq-ref">{l.ref}</span>}
                         <span className="enq-email">{l.email}</span>
                       </span>
                     </label>
                   ) : (
                     <>
                       <b>{l.name}</b>
+                      {l.ref && <span className="enq-ref">{l.ref}</span>}
                       <div className="enq-email">{l.email}</div>
                     </>
                   )}
@@ -298,13 +344,8 @@ export function EnquiriesCrm({
       {selecting && (
         <div className="enq-selbar">
           <label className="enq-pickname">
-            <input
-              type="checkbox"
-              checked={allPicked}
-              disabled={!leads.length}
-              onChange={() => setPicked(allPicked ? new Set() : new Set(leads.map((l) => l.id)))}
-            />
-            Select all ({leads.length})
+            <input type="checkbox" checked={allPicked} disabled={!shown.length} onChange={pickAll} />
+            Select all ({shown.length})
           </label>
           <span className="enq-selcount">{pickedIds.length} selected</span>
           <button
@@ -326,6 +367,7 @@ export function EnquiriesCrm({
             </button>
             <h2>{active.name}</h2>
             <p className="enq-sub">
+              {active.ref ? `${active.ref} · ` : ''}
               {active.sector}
               {active.org ? ` · ${active.org}` : ''} · via {active.src} · {active.time}
             </p>

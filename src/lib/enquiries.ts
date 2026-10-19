@@ -32,6 +32,8 @@ export type EnquiryRow = {
   source: string;
   status: string;
   created_at: string;
+  /** HX-0042, from customer-refs.sql; missing until it's been run. */
+  customer_ref?: string | null;
 };
 
 export type CrmLead = {
@@ -50,6 +52,8 @@ export type CrmLead = {
   isnew: boolean;
   status: string; // UI label: New | Contacted | Quoted | Won | Lost
   created_at: string;
+  /** Customer reference, e.g. HX-0042 ('' until customer-refs.sql has been run). */
+  ref: string;
   lat?: number;
   lng?: number;
 };
@@ -142,7 +146,23 @@ export function rowToCrmLead(row: EnquiryRow): CrmLead {
     isnew: ui === 'New',
     status: ui,
     created_at: row.created_at,
+    ref: row.customer_ref || '',
   };
+}
+
+/**
+ * Does a search match this customer reference? "HX-0042", "hx42", "hx 42", "0042" and "42" all find
+ * HX-0042, and a ref typed with a leading zero matches as you type ("HX-004" also finds HX-0040 to
+ * HX-0049). A job's reference (HX-0042-2) finds its customer. Long numbers (phone numbers) never match.
+ */
+export function refMatches(ref: string | null | undefined, query: string): boolean {
+  const have = ref?.match(/^HX-(\d+)/i)?.[1];
+  if (!have) return false;
+  const q = query.toLowerCase().replace(/\s+/g, '');
+  if (q === 'hx' || q === 'hx-') return true; // still typing
+  const want = q.match(/^(?:hx)?-?(\d{1,9})(?:-\d*)?$/)?.[1];
+  if (!want) return false;
+  return Number(have) === Number(want) || (want.startsWith('0') && have.startsWith(want));
 }
 
 /** Attach lat/lng + town from postcodes.io onto CRM leads. */
