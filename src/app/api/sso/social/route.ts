@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 /**
  * /api/sso/social?next=/studio — opens the social studio already signed in (src/lib/sso.ts).
  * For anyone with Social media studio access here who has confirmed their email once (for this
- * or RAMS) and already has a studio account under it; everyone else goes to the studio's own
- * sign-in as before.
+ * or RAMS). If the studio has no account under that email yet, one is added for them; if it has
+ * one it can't use (unconfirmed or blocked), or for everyone else, it's the studio's own sign-in.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL(`${SSO_PATH}?${new URLSearchParams({ app: 'social', next })}`, url), { status: 303, headers });
   }
   // A signed-in link comes with a cookie that ties it to this browser (src/lib/sso.ts).
-  const { url: dest, cookie } = await socialLink(user.email, next);
+  const { url: dest, cookie } = await socialLink(user, profile, next);
   const res = NextResponse.redirect(dest, { status: 303, headers });
   if (cookie) res.cookies.set(cookie);
   return res;

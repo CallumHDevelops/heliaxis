@@ -14,9 +14,12 @@ import { canAccess, type AccessProfile } from '@/lib/portals';
  * Two guards. Heliaxis sign-ups don't confirm email addresses, so someone could register with
  * a colleague's address; one-tap sign-in therefore waits until the person has proved the address
  * is theirs, once, by typing in a code emailed to it (supabase/sso.sql; one proof covers both apps).
- * And only an existing account in the other app whose sign-in email matches gets a link (for RAMS,
- * an APPROVED one; for the studio, one whose email it has confirmed); anyone else just lands on that
- * app as before. We never create accounts there.
+ * And only an account in the other app whose sign-in email matches gets a link (for RAMS, an
+ * existing APPROVED one; for the studio, one whose email it has confirmed); anyone else just lands
+ * on that app as before. We never create RAMS accounts. For the studio, Heliaxis Users decides who
+ * gets in: someone with Social media studio access here who has proved their email and has no
+ * studio account at all gets one, confirmed, the first time. We never change an account that's
+ * already there (its email, password or details).
  * Needs RAMS_SUPABASE_URL + RAMS_SUPABASE_SERVICE_ROLE_KEY, and SOCIAL_SUPABASE_URL +
  * SOCIAL_SUPABASE_SERVICE_ROLE_KEY for the studio.
  */
@@ -247,31 +250,69 @@ export async function ramsLink(email: string | null | undefined, next: string): 
   }
 }
 
-/** The studio is a small invite-only team: look through up to 1,000 accounts. */
+/** The studio is a small team: look through up to 1,000 accounts. */
 const SOCIAL_PER_PAGE = 200;
 const SOCIAL_MAX_PAGES = 5;
 
 /**
- * The studio account signed in with exactly this email (any capitals), if there's one and only
- * one, it isn't blocked and its email is confirmed there. The studio has no profiles table: any
- * account there can use it.
+ * What the studio has under exactly this email (any capitals). 'ok': one account, confirmed there
+ * and not blocked or deleted (the studio has no profiles table: any account there can use it).
+ * 'none': we read every account and none has this email. 'leave': one we mustn't use or touch.
+ * 'unknown': the studio didn't answer, or has more accounts than we read.
  */
-async function findSocialAccount(social: SupabaseClient, address: string): Promise<User | null> {
-  const matches: User[] = [];
-  for (let page = 1; page <= SOCIAL_MAX_PAGES; page++) {
+type SocialAccount = { status: 'ok'; account: User } | { status: 'none' | 'leave' | 'unknown' };
+
+async function findSocialAccount(social: SupabaseClient, address: string): Promise<SocialAccount> {
+  // Keyed by id: an account added mid-read can push another onto the next page, so we'd see it twice.
+  const matches = new Map<string, User>();
+  let complete = false;
+  for (let page = 1; page <= SOCIAL_MAX_PAGES && !complete; page++) {
     const { data, error } = await social.auth.admin.listUsers({ page, perPage: SOCIAL_PER_PAGE });
     if (error) {
       console.error('[sso] social studio accounts unavailable', error.message);
-      return null;
+      return { status: 'unknown' };
     }
-    matches.push(...data.users.filter((u) => norm(u.email) === address));
-    if (!data.nextPage || data.users.length < SOCIAL_PER_PAGE) break;
+    for (const u of data.users) if (norm(u.email) === address) matches.set(u.id, u);
+    complete = !data.nextPage || data.users.length < SOCIAL_PER_PAGE;
   }
-  const account = matches.length === 1 ? matches[0] : null;
-  const blocked = !!account?.banned_until && new Date(account.banned_until).getTime() > Date.now();
+  if (!matches.size) {
+    if (!complete) console.warn(`[sso] social studio has over ${SOCIAL_PER_PAGE * SOCIAL_MAX_PAGES} accounts; not adding one`);
+    return { status: complete ? 'none' : 'unknown' };
+  }
+  const leave = (why: string) => {
+    console.warn(`[sso] social studio ${why}: sending them to its own sign-in`);
+    return { status: 'leave' } as const;
+  };
+  if (matches.size > 1) return leave('has more than one account under this email');
+  const [account] = matches.values();
+  if (account.deleted_at) return leave(`account ${account.id} is deleted`);
+  if (account.banned_until && new Date(account.banned_until).getTime() > Date.now()) return leave(`account ${account.id} is blocked`);
   // An unconfirmed account may be a sign-up someone else started under this address; our link
   // would confirm it with their password still on it. Those people use the studio's own sign-in.
-  return account && !blocked && !account.deleted_at && account.email_confirmed_at ? account : null;
+  if (!account.email_confirmed_at) return leave(`account ${account.id} isn't confirmed`);
+  return { status: 'ok', account };
+}
+
+/**
+ * Add a studio account under exactly this address: confirmed (they've proved it's theirs here), no
+ * password, nothing else on it. The studio refuses a second account under an email it already has,
+ * so this never changes one that's there. If that's why it fails (two taps at once, or one we
+ * didn't see), we look again and carry on only with an account we'd have used anyway.
+ */
+async function addSocialAccount(social: SupabaseClient, address: string): Promise<SocialAccount> {
+  const { data, error } = await social.auth.admin.createUser({ email: address, email_confirm: true });
+  if (error) {
+    const taken = error.code === 'email_exists' || /already (been )?registered/i.test(error.message);
+    // A clash in the studio's database can also come back as a plain error: look again either way.
+    if (!taken) console.error('[sso] social studio account not added', error.code ?? error.status ?? 'error');
+    return findSocialAccount(social, address);
+  }
+  const account = data.user;
+  if (!account || norm(account.email) !== address || !account.email_confirmed_at) {
+    console.error("[sso] new social studio account doesn't match");
+    return { status: 'unknown' };
+  }
+  return { status: 'ok', account };
 }
 
 /**
@@ -284,17 +325,26 @@ const SOCIAL_STATE_COOKIE = 'hx_social_sso';
 /**
  * Where to send this person: a signed-in studio link (plus its state cookie, which the caller must
  * set) when we can make one, else the studio's normal door (signed out, every studio page goes to
- * its own sign-in). Never creates an account there: no existing studio account under this email,
- * no link.
+ * its own sign-in). Heliaxis Users decides who can use the studio: if it has no account at all
+ * under their email, and they're approved here with Social media studio access and have proved the
+ * address with our code, we add one for them first. An account that's already there is used only
+ * if it's confirmed and not blocked, and never changed.
  */
-export async function socialLink(email: string | null | undefined, next: string): Promise<SsoLink> {
+export async function socialLink(user: User, profile: AccessProfile | null | undefined, next: string): Promise<SsoLink> {
   const plain = { url: `${SOCIAL_ORIGIN}${next}` };
-  const address = norm(email);
+  const address = norm(user.email);
   if (!address || !socialSsoConfigured()) return plain;
   try {
     const social = serviceClient(process.env.SOCIAL_SUPABASE_URL!, process.env.SOCIAL_SUPABASE_SERVICE_ROLE_KEY!);
-    const account = await findSocialAccount(social, address);
-    if (!account?.email || norm(account.email) !== address) return plain;
+    let found = await findSocialAccount(social, address);
+    if (found.status === 'none') {
+      // The callers check these too; adding an account is the one thing here that writes, so again.
+      if (!canAccess(profile, 'social') || !(await emailProven(user))) return plain;
+      found = await addSocialAccount(social, address);
+    }
+    if (found.status !== 'ok') return plain;
+    const { account } = found;
+    if (!account.email || norm(account.email) !== address) return plain;
     const state = randomBytes(32).toString('base64url');
     const url = await callbackLink(social, { id: account.id, email: account.email }, SOCIAL_ORIGIN, next, 'social studio', { state });
     if (!url) return plain;
@@ -318,7 +368,7 @@ type SsoAppInfo = {
   safePath: (next: string | null) => string;
   /** Who here may be signed in to it. */
   canUse: (profile: AccessProfile | null | undefined) => boolean;
-  link: (email: string | null | undefined, next: string) => Promise<SsoLink>;
+  link: (user: User, profile: AccessProfile | null | undefined, next: string) => Promise<SsoLink>;
 };
 
 export const SSO_APPS: Record<SsoApp, SsoAppInfo> = {
@@ -328,7 +378,7 @@ export const SSO_APPS: Record<SsoApp, SsoAppInfo> = {
     configured: ramsSsoConfigured,
     safePath: safeRamsPath,
     canUse: (p) => canAccess(p, 'rams') || canAccess(p, 'team'),
-    link: async (email, next) => ({ url: await ramsLink(email, next) }),
+    link: async (user, _profile, next) => ({ url: await ramsLink(user.email, next) }),
   },
   social: {
     name: 'the social studio',

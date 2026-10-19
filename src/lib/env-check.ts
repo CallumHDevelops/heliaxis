@@ -59,7 +59,7 @@ export const ENV_GROUPS: EnvGroup[] = [
   },
   {
     title: 'One-tap sign-in to the social studio',
-    what: 'Opens Social media studio from the Heliaxis menu already signed in, for anyone with a studio account under the same email.',
+    what: 'Opens Social media studio from the Heliaxis menu already signed in, for anyone with Social media studio access in Users. Their studio account is set up the first time they open it.',
     vars: [
       { name: 'SOCIAL_SUPABASE_URL', secret: false, optional: true, hint: 'Social studio Supabase project → Project settings → Data API → Project URL' },
       { name: 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY', secret: true, optional: true, hint: 'Social studio Supabase project → Project settings → API Keys → service_role key' },

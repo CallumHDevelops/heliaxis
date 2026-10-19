@@ -384,7 +384,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       'Tap **Open Supabase** and pick the **social studio** project if it asks (not the Heliaxis one, and not RAMS).',
       '**Authentication** (left menu) → **Sign In / Providers** (on older screens, **Providers** or **Settings**).',
       'Turn off **Allow new users to sign up** and tap **Save**. People who already have a studio account can still sign in.',
-      'From now on, add people in **Authentication** → **Users** → **Add user** → **Send invitation**.',
+      'From now on, give people **Social media studio** access in **Users** here. Their studio account is set up the first time they open it from the Heliaxis menu.',
       'Come back here and refresh. This item disappears once it’s worked.',
     ],
     href: socialRef ? `https://supabase.com/dashboard/project/${socialRef}/auth/providers` : 'https://supabase.com/dashboard',
@@ -613,7 +613,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       'Copy the **Project URL**. That’s the value for `SOCIAL_SUPABASE_URL`.',
       'Still in Project Settings, open **API Keys** (on older screens it’s further down the same page). Find the **service_role** key (if there’s a **Legacy API keys** tab, it’s on that tab), reveal it and copy it. That’s `SOCIAL_SUPABASE_SERVICE_ROLE_KEY`, and it’s a password: tick **Sensitive** in Vercel.',
       ...VERCEL_STEPS,
-      'Then run sso.sql if it appears on this card. It works for anyone who already has a social studio account under the same email as their Heliaxis login, and has signed in to the studio at least once. It never creates studio accounts, so anyone else still sees the studio’s own sign-in.',
+      'Then run sso.sql if it appears on this card. From then on, staff with **Social media studio** access in **Users** get a studio account automatically the first time they open it, under the same email as their Heliaxis login. Anyone who already has a studio account under that email keeps it. If that account is blocked, or its email was never confirmed, they see the studio’s own sign-in instead.',
     ],
     copies: [
       { label: 'Key', value: 'SOCIAL_SUPABASE_URL' },

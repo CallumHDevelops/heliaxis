@@ -79,6 +79,7 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
             <p>
               First, confirm that <b>{email}</b> is your email address. You only do this once. It stops anyone else using your
               address to open {name} as you.
+              {app === 'social' && ' If you don’t have a studio account yet, we’ll set one up for you.'}
             </p>
             <form action={sendSsoCode}>
               <input type="hidden" name="app" value={app} />

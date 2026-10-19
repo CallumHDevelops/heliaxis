@@ -9,7 +9,7 @@ async function who(app: SsoApp) {
   const { user, profile } = await getSessionProfile();
   if (!user?.email || profile?.status !== 'approved') redirect('/login');
   if (!SSO_APPS[app].configured() || !SSO_APPS[app].canUse(profile)) redirect('/admin');
-  return { user, name: profile?.full_name || '' };
+  return { user, profile, name: profile?.full_name || '' };
 }
 
 /** Which app (RAMS unless it's exactly "social") and where in it. */
@@ -34,12 +34,12 @@ export async function sendSsoCode(formData: FormData): Promise<void> {
 /** Check the typed code; once right, the app opens signed in. */
 export async function verifySsoCode(formData: FormData): Promise<void> {
   const { app, next } = target(formData);
-  const { user } = await who(app);
+  const { user, profile } = await who(app);
   const r = await checkProofCode(user, String(formData.get('code') || ''));
   // Straight to the app (an absolute URL, so Next doesn't fetch it server-side first), with the
   // cookie the studio's link needs.
   if (r === 'ok') {
-    const { url, cookie } = await SSO_APPS[app].link(user.email, next);
+    const { url, cookie } = await SSO_APPS[app].link(user, profile, next);
     if (cookie) (await cookies()).set(cookie);
     redirect(url);
   }
