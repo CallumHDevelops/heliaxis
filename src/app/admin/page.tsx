@@ -169,7 +169,7 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
   // Wide windows, then the exact UK day in code (no time-zone maths in the query).
   const [surveyJobs, installJobs] = await Promise.all([
     rows(db.from('crm_projects').select('*').gte('survey_at', at(-36)).lte('survey_at', at(36)).neq('stage', 'lost').limit(100)),
-    rows(db.from('crm_projects').select('*').gte('install_at', at(-24 * 62)).lte('install_at', at(36)).neq('stage', 'lost').limit(300)),
+    rows(db.from('crm_projects').select('*').gte('install_at', at(-24 * 62)).lte('install_at', at(36)).neq('stage', 'lost').order('install_at', { ascending: false }).limit(300)),
   ]);
   const surveys = surveyJobs.filter((p) => ukDay(String(p.survey_at)) === today);
   const longInstall = installJobs.some((p) => Number(p.install_days ?? 1) > 1);

@@ -34,8 +34,9 @@ const PRIORITY: Record<string, number> = { high: 0, normal: 1, low: 2 };
  * The morning round-up: one push per person ("Tasks: 2 due today, 1 overdue") for open tasks due
  * today or before, sent once the CRM reminder hour has passed and outside quiet hours (UK time),
  * and not again that day. A task is reminded once per day until it's done; changing its due date
- * re-arms it. Tasks on jobs that are on hold are skipped. The person is the assignee, or whoever
- * made the task. Runs with the every-minute cron; returns how many people were told. Never throws.
+ * re-arms it. Tasks on jobs that are on hold are skipped. The person is the assignee, or else
+ * whoever made the task (approved accounts only). Runs with the every-minute cron; returns how many
+ * people were told. Never throws.
  */
 export async function remindDueTasks(now = new Date()): Promise<number> {
   try {
@@ -64,14 +65,14 @@ export async function remindDueTasks(now = new Date()): Promise<number> {
       for (const p of held ?? []) onHold.add(p.id as string);
     }
 
-    // Approved people only, and only one round-up each per UK day.
-    const who = (t: DueTask) => t.assignee_id ?? t.created_by;
-    const ids = [...new Set(tasks.map(who).filter((x): x is string => !!x))];
+    // The assignee, or else whoever made it; approved accounts only. One round-up each per UK day.
+    const ids = [...new Set(tasks.flatMap((t) => [t.assignee_id, t.created_by]).filter((x): x is string => !!x))];
     const approved = new Set<string>();
     for (const batch of chunks(ids)) {
       const { data: people } = await db.from('profiles').select('id').eq('status', 'approved').in('id', batch);
       for (const p of people ?? []) approved.add(p.id as string);
     }
+    const who = (t: DueTask) => [t.assignee_id, t.created_by].find((x): x is string => !!x && approved.has(x)) ?? null;
     const hadToday = new Set<string>();
     const since = new Date(now.getTime() - 36 * 3_600_000).toISOString();
     for (const batch of chunks([...approved])) {
@@ -90,7 +91,7 @@ export async function remindDueTasks(now = new Date()): Promise<number> {
     const byPerson = new Map<string, DueTask[]>();
     for (const t of tasks) {
       const to = who(t);
-      if (!claimed.has(t.id) || !to || !approved.has(to) || hadToday.has(to)) continue;
+      if (!claimed.has(t.id) || !to || hadToday.has(to)) continue;
       if (t.crm_project_id && onHold.has(t.crm_project_id)) continue;
       byPerson.set(to, [...(byPerson.get(to) ?? []), t]);
     }

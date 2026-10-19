@@ -515,7 +515,13 @@ export function PortalCard({
         className="crm-btn crm-btn--wa"
         onClick={async () => {
           const u = await ensure();
-          if (u) onSendWhatsApp(whatsappText ?? `Here's your Heliaxis project page. You can see your progress, documents and key dates any time: ${u}`);
+          if (!u) return;
+          onSendWhatsApp(
+            whatsappText ??
+              (mode === 'quote'
+                ? `Here's your Heliaxis quote page: ${u}`
+                : `Here's your Heliaxis project page. You can see your progress, documents and key dates any time: ${u}`)
+          );
         }}
       >
         {whatsappText ? 'WhatsApp it' : 'Send on WhatsApp'}
