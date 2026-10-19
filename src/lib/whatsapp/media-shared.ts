@@ -43,16 +43,24 @@ export const KEPT_AT_WHATSAPP_DAYS = 7;
 
 /**
  * The most we'll fetch of each kind. WhatsApp's own limits are for what a business sends (photos 5 MB,
- * video and audio 16 MB, documents 100 MB, stickers 500 KB); a customer's HD photo or long video can be
- * bigger, and Meta passes nothing on over 100 MB at all, so photos and video get room to spare.
+ * video and audio 16 MB, documents 100 MB, stickers 500 KB); a customer's HD photo can be bigger, so
+ * photos get room to spare. Video and documents stop at 50 MB, the most the CRM's file storage takes
+ * in one file (Supabase's standard limit; raise both together), so a bigger one is turned down before
+ * any of it is downloaded.
  */
 export const SIZE_CAP: Record<MediaType, number> = {
   image: 16 * MB,
-  video: 100 * MB,
+  video: 50 * MB,
   audio: 16 * MB,
-  document: 100 * MB,
+  document: 50 * MB,
   sticker: 1 * MB,
 };
+
+/**
+ * What one chat fetches by itself in 24 hours. Past it, a file waits for someone to tap Try again
+ * (WhatsApp keeps it 7 days), so nobody can fill the CRM's file storage by sending file after file.
+ */
+export const DAILY_ALLOWANCE = { bytes: 250 * MB, files: 30 };
 
 /** The cap for a saved message, by its kind ('other' is a sticker). */
 export function capFor(kind: string): number {
@@ -134,8 +142,11 @@ export function cleanName(name: unknown): string | null {
   return n ? n.slice(0, 200) : null;
 }
 
-/** File types that run something when opened: downloaded as .bin, so a click doesn't open them. */
-const RUNS = new Set(['html', 'htm', 'xhtml', 'shtml', 'svg', 'svgz', 'xml', 'js', 'mjs', 'exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'ps1', 'vbs', 'vbe', 'wsf', 'jar', 'hta', 'lnk', 'reg', 'sh', 'apk', 'app', 'dmg', 'pkg', 'url', 'website']);
+/**
+ * Their own extension is kept only for these harmless kinds whose type we don't know (a drawing, a Mac
+ * document). Anything else unknown downloads as .bin, so a double-click can't run it or mount it.
+ */
+const KEEP_THEIRS = new Set(['dwg', 'dxf', 'odt', 'ods', 'odp', 'rtf', 'pages', 'numbers', 'key', 'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', 'webp', 'tif', 'tiff', 'mov', 'mp4', 'm4a', 'mp3', 'ogg', 'wav']);
 
 const NOUN: Record<string, string> = { photo: 'photo', video: 'video', voice: 'voice-note', audio: 'audio', sticker: 'sticker', file: 'file' };
 
@@ -164,8 +175,8 @@ export function downloadName(m: { kind: string; body?: string | null; media_mime
     const what = NOUN[voiceAware(m.kind, m.media_mime, m.body)] ?? 'file';
     stem = `whatsapp-${what}${day ? `-${day}` : ''}`;
   }
-  // Our extension when we know the type; theirs for other harmless files (a .dwg, a .numbers).
-  const end = ext !== 'bin' ? ext : /^[a-z0-9]{1,8}$/.test(theirExt) && !RUNS.has(theirExt) ? theirExt : 'bin';
+  // Our extension when we know the type; theirs only for the harmless ones above (a .dwg, a .numbers).
+  const end = ext !== 'bin' ? ext : KEEP_THEIRS.has(theirExt) ? theirExt : 'bin';
   return `${stem}.${end}`;
 }
 
@@ -249,6 +260,7 @@ export const MEDIA_ERRORS = {
   storage: 'Couldn’t save it in the CRM’s file storage. Try again.',
   storageLimit: 'Too big for the CRM’s file storage. Ask them to email it instead.',
   expired: 'WhatsApp only keeps files for 7 days, and this one wasn’t saved in time.',
+  held: 'They’ve sent a lot of files today, so this one wasn’t fetched automatically. Tap Try again to fetch it.',
 };
 
 export function tooBigText(bytes: number, cap: number): string {

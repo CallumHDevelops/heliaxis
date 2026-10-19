@@ -4,7 +4,7 @@ import { mediaStatusText } from '@/lib/whatsapp/media-shared';
 import { chatSession, isUuid, json, mayOpenChat } from '@/lib/whatsapp/routes';
 
 export const dynamic = 'force-dynamic';
-// A file that didn't arrive with the webhook is fetched from WhatsApp here (up to 100 MB).
+// A file that didn't arrive with the webhook is fetched from WhatsApp here (up to 50 MB), in one try.
 export const maxDuration = 60;
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -15,6 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * copy. ?download=1: as a download, whatever it is. ?info=1: { status, error } instead of the file.
  *
  * Not saved yet (still coming, or it went wrong) but still at WhatsApp: it's fetched once, now.
+ * Only Try again (a failed one) fetches it past the chat's daily allowance.
  */
 export async function GET(req: Request, { params }: Ctx) {
   const s = await chatSession();
@@ -22,7 +23,7 @@ export async function GET(req: Request, { params }: Ctx) {
   const { id } = await params;
   const found = isUuid(id) ? await mediaRow(id) : null;
   if (!found?.media_status || !(await mayOpenChat(s, found.enquiry_id))) return json({ error: 'Not found' }, 404);
-  const row = found.media_status === 'saved' ? found : ((await fetchAndStore(found.id)) ?? found);
+  const row = found.media_status === 'saved' ? found : ((await fetchAndStore(found.id, { tries: 1, asked: found.media_status === 'failed' })) ?? found);
 
   const q = new URL(req.url).searchParams;
   if (q.has('info')) return json({ status: row.media_status, error: row.media_status === 'saved' ? null : mediaStatusText(row) });

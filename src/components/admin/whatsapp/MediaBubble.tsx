@@ -38,6 +38,13 @@ type Props = {
 /** No longer "on its way" after this: WhatsApp normally hands a file over within seconds. */
 const STUCK_MS = 60_000;
 
+/** The automatic asks about files still on their way, one after another: each can fetch a file at the server. */
+let asking: Promise<unknown> = Promise.resolve();
+function askInTurn(src: string): Promise<unknown> {
+  asking = asking.then(() => fetch(`${src}?info=1`, { cache: 'no-store' })).catch(() => null);
+  return asking;
+}
+
 export function MediaBubble({ m, jobId = null, onChange }: Props) {
   const src = `/api/whatsapp/media/${m.id}`;
   const shape = mediaShape(m.kind, m.media_mime);
@@ -99,9 +106,7 @@ function Waiting({ m, src, onChange }: { m: MediaMessage; src: string; onChange?
     if (!pending) return;
     const wait = Math.max(0, Date.parse(m.created_at) + STUCK_MS - Date.now());
     const t = setTimeout(() => {
-      void fetch(`${src}?info=1`, { cache: 'no-store' })
-        .then(() => onChange?.())
-        .catch(() => null);
+      void askInTurn(src).then(() => onChange?.());
     }, wait);
     return () => clearTimeout(t);
   }, [pending, m.created_at, src, onChange]);

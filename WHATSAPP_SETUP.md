@@ -120,8 +120,9 @@ Redeploy after adding them.
   as it arrives and kept in a private storage bucket, `whatsapp-media` (the app creates it). Tap a
   photo to see it full size; in a job's chat, **Save to job photos** copies it into the job's Site
   photos. Voice notes play in Chrome, Edge, Firefox and Safari 18.4 or later (older iPhones and Macs
-  get a Download instead). Anything over 100 MB (16 MB for photos and voice notes) isn't kept: the
-  chat says so. Deleting a customer deletes their files too.
+  get a Download instead). Anything over 50 MB (16 MB for photos and voice notes) isn't kept: the
+  chat says so. Past 250 MB or 30 files in a day from one chat, the rest wait for someone to tap
+  **Try again**. Deleting a customer deletes their files too.
 - **Monitoring**: the inbox has *Needs reply* and *Waiting on them* filters, and the team gets a push
   when a customer has waited 30 min without an answer (outside quiet hours).
 - Website enquiries can be messaged too (template first). Only do that if they've agreed to

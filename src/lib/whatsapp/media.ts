@@ -7,6 +7,7 @@ import { graph } from './api';
 import {
   capFor,
   captionOf,
+  DAILY_ALLOWANCE,
   downloadName,
   graphErrorText,
   hashMatches,
@@ -29,9 +30,11 @@ import {
  * Photos, videos, voice notes, stickers and files customers send on WhatsApp (whatsapp-media.sql).
  * The webhook saves the message with Meta's media id and 'pending'; straight after, fetchAndStore()
  * asks Meta for a download link (valid 5 minutes), downloads the file with the WhatsApp access key and
- * keeps it in the private whatsapp-media bucket at {enquiry id}/{message id}.{ext}, with a small JPEG
+ * keeps it in the private whatsapp-media bucket at {enquiry id}/{its SHA-256}.{ext}, with a small JPEG
  * beside photos for the chat. WhatsApp only keeps them for 7 days, so they're fetched at once, and
- * again when someone opens one that didn't make it (GET /api/whatsapp/media/{id}).
+ * again when someone opens one that didn't make it (GET /api/whatsapp/media/{id}). Two at a time per
+ * server, and up to a daily allowance per chat (DAILY_ALLOWANCE), so a stranger sending big file
+ * after big file can't use up the server's memory or the CRM's file storage.
  *
  * Until the SQL is run none of this does anything: the chat shows "📷 Photo" as it always has.
  * The rules (types, sizes, names, wording) are in media-shared.ts, where they're tested.
@@ -120,31 +123,60 @@ export async function mediaRow(id: string, db: Db = createAdminClient()): Promis
   return error || !data ? null : (data as unknown as MediaRow);
 }
 
-type Got = { ok: true; bytes: Buffer } | { ok: false; status: MediaStatus; error: string; again?: boolean };
+type Got = { ok: true; bytes: Buffer; sha256: string } | { ok: false; status: MediaStatus; error: string; again?: boolean };
+type FetchOpts = {
+  /** Someone tapped Try again: fetched whatever the chat's daily allowance says. */
+  asked?: boolean;
+  /** Fresh links to try (2). The media route tries 1, so it finishes inside its time limit. */
+  tries?: number;
+};
+
+/** Files downloading at once in this server: each is held in memory while it's saved. */
+const AT_ONCE = 2;
+let running = 0;
+const waiting: (() => void)[] = [];
+async function inTurn<T>(work: () => Promise<T>): Promise<T> {
+  if (running < AT_ONCE) running++;
+  else await new Promise<void>((go) => waiting.push(go)); // a finished one hands its place over
+  try {
+    return await work();
+  } finally {
+    const next = waiting.shift();
+    if (next) next();
+    else running--;
+  }
+}
 
 /**
- * Download one message's file from WhatsApp and keep it. Safe to run twice or at the same time (the
- * file goes to the same place either way); does nothing once it's saved, too big or past 7 days.
- * Returns the row as it now stands, or null if it has no file (or the SQL hasn't been run).
+ * Download one message's file from WhatsApp and keep it. Waits its turn (AT_ONCE), then reads the row
+ * afresh, so one saved meanwhile isn't fetched again; does nothing once it's saved, too big or past
+ * 7 days. Safe to run twice or at the same time (the file goes to the same place either way).
+ * Returns the row as it now stands, or null if it has no file, it's been deleted (or the SQL hasn't been run).
  */
-export async function fetchAndStore(rowId: string): Promise<MediaRow | null> {
+export function fetchAndStore(rowId: string, opts: FetchOpts = {}): Promise<MediaRow | null> {
+  return inTurn(() => fetchAndStoreNow(rowId, opts));
+}
+
+async function fetchAndStoreNow(rowId: string, { asked = false, tries = AGENTS.length }: FetchOpts): Promise<MediaRow | null> {
   const db = createAdminClient();
   const row = await mediaRow(rowId, db);
   if (!row?.media_id) return null;
   if ((row.media_status === 'saved' && row.media_path) || row.media_status === 'too_big' || row.media_status === 'expired') return row;
 
   const finish = async (patch: Partial<MediaRow>) => {
-    const { error } = await db.from('whatsapp_messages').update(patch).eq('id', row.id);
+    const { data, error } = await db.from('whatsapp_messages').update(patch).eq('id', row.id).select('id');
     if (error) console.error('[whatsapp media] row not updated', row.id, error.message);
+    else if (!data?.length) return null; // gone meanwhile: the customer was deleted
     return { ...row, ...patch };
   };
   if (!stillAtWhatsApp(row.created_at)) return finish({ media_status: 'expired', media_error: MEDIA_ERRORS.expired });
 
-  const got = await download(row.media_id, capFor(row.kind));
+  const got = await download(row.media_id, capFor(row.kind), tries, asked ? undefined : (size) => withinAllowance(db, row, size));
   if (!got.ok) return finish({ media_status: got.status, media_error: got.error });
 
   const kept = storedAs(row.media_mime);
-  const path = `${row.enquiry_id}/${row.id}.${kept.ext}`;
+  // Named by what's in it, so the same file sent again (forwarded, resent) is kept once.
+  const path = `${row.enquiry_id}/${got.sha256}.${kept.ext}`;
   await ensureMediaBucket();
   const store = db.storage.from(MEDIA_BUCKET);
   const up = await store.upload(path, got.bytes, { contentType: kept.contentType, upsert: true });
@@ -159,16 +191,46 @@ export async function fetchAndStore(rowId: string): Promise<MediaRow | null> {
     const small = await thumbnail(got.bytes);
     if (small) await store.upload(thumbPath(path), small.thumb, { contentType: 'image/jpeg', upsert: true });
   }
-  return finish({ media_status: 'saved', media_path: path, media_size: got.bytes.length, media_error: null });
+  const done = await finish({ media_status: 'saved', media_path: path, media_size: got.bytes.length, media_error: null });
+  // Deleted while it downloaded: delete-customer.ts has already cleared their folder, so these go now.
+  if (!done) await store.remove([path, thumbPath(path)]);
+  return done;
 }
 
-/** Meta's lookup (GET /{media-id}) for a fresh link, then the file. Twice at most: links last 5 minutes. */
-async function download(mediaId: string, cap: number): Promise<Got> {
+/**
+ * Room in the chat's DAILY_ALLOWANCE for a file this size? Its size goes on the row first, so files
+ * arriving together count each other's; the file count is of the ones that came before it. Can't
+ * tell: it's fetched.
+ */
+async function withinAllowance(db: Db, row: MediaRow, size: number): Promise<boolean> {
+  await db.from('whatsapp_messages').update({ media_size: size }).eq('id', row.id);
+  const { data, error } = await db
+    .from('whatsapp_messages')
+    .select('id, created_at, media_size')
+    .eq('enquiry_id', row.enquiry_id)
+    .in('media_status', ['pending', 'saved'])
+    .gte('created_at', new Date(Date.now() - 86_400_000).toISOString())
+    .neq('id', row.id);
+  if (error || !data) return true;
+  const at = Date.parse(row.created_at);
+  const before = data.filter((r) => {
+    const t = Date.parse(r.created_at as string);
+    return t < at || (t === at && (r.id as string) < row.id);
+  });
+  const used = data.reduce((n, r) => n + (Number(r.media_size) || 0), 0);
+  return before.length < DAILY_ALLOWANCE.files && used + size <= DAILY_ALLOWANCE.bytes;
+}
+
+/**
+ * Meta's lookup (GET /{media-id}) for a fresh link, then the file: `tries` times at most (links last
+ * 5 minutes). `allow` says whether a file of the size Meta gives may be fetched now.
+ */
+async function download(mediaId: string, cap: number, tries: number, allow?: (size: number) => Promise<boolean>): Promise<Got> {
   const token = process.env.WHATSAPP_TOKEN;
   if (!token) return { ok: false, status: 'failed', error: MEDIA_ERRORS.notConnected };
   const phone = process.env.WHATSAPP_PHONE_NUMBER_ID;
   let last: Got = { ok: false, status: 'failed', error: MEDIA_ERRORS.network };
-  for (const agent of AGENTS) {
+  for (const agent of AGENTS.slice(0, Math.max(1, tries))) {
     const meta = await graph<{ url?: string; mime_type?: string; sha256?: string; file_size?: string | number }>(
       `/${encodeURIComponent(mediaId)}${phone ? `?phone_number_id=${encodeURIComponent(phone)}` : ''}`,
       { signal: AbortSignal.timeout(LOOKUP_MS) }
@@ -180,6 +242,7 @@ async function download(mediaId: string, cap: number): Promise<Got> {
     // Meta sends the size as a string in its docs and a number elsewhere.
     const size = Number(meta.data.file_size);
     if (Number.isFinite(size) && size > cap) return { ok: false, status: 'too_big', error: tooBigText(size, cap) };
+    if (allow && !(await allow(Number.isFinite(size) ? size : cap))) return { ok: false, status: 'failed', error: MEDIA_ERRORS.held };
     const url = meta.data.url ?? '';
     if (!isFileHost(url)) {
       console.error('[whatsapp media] unexpected download host', safeHost(url));
@@ -187,9 +250,8 @@ async function download(mediaId: string, cap: number): Promise<Got> {
     }
     last = await getFile(url, token, cap, agent);
     if (last.ok) {
-      const hex = createHash('sha256').update(last.bytes).digest('hex');
-      if (hashMatches(hex, meta.data.sha256)) return last;
-      console.error('[whatsapp media] fingerprint mismatch', mediaId, { got: hex, meta: meta.data.sha256 });
+      if (hashMatches(last.sha256, meta.data.sha256)) return last;
+      console.error('[whatsapp media] fingerprint mismatch', mediaId, { got: last.sha256, meta: meta.data.sha256 });
       last = { ok: false, status: 'failed', error: MEDIA_ERRORS.incomplete, again: true };
     }
     if (!last.again) return last;
@@ -237,6 +299,7 @@ async function getFile(first: string, token: string, cap: number, agent: string)
       return { ok: false, status: 'too_big', error: tooBigText(length, cap) };
     }
     const chunks: Uint8Array[] = [];
+    const hash = createHash('sha256');
     let total = 0;
     const reader = res.body?.getReader();
     if (!reader) return { ok: false, status: 'failed', error: MEDIA_ERRORS.network, again: true };
@@ -249,9 +312,10 @@ async function getFile(first: string, token: string, cap: number, agent: string)
         return { ok: false, status: 'too_big', error: tooBigText(total, cap) };
       }
       chunks.push(value);
+      hash.update(value);
     }
     if (!total) return { ok: false, status: 'failed', error: MEDIA_ERRORS.incomplete, again: true };
-    return { ok: true, bytes: Buffer.concat(chunks) };
+    return { ok: true, bytes: Buffer.concat(chunks, total), sha256: hash.digest('hex') };
   } catch {
     return { ok: false, status: 'failed', error: MEDIA_ERRORS.network, again: true };
   }

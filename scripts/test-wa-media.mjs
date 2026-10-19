@@ -10,6 +10,7 @@ import {
   capFor,
   captionOf,
   cleanMime,
+  DAILY_ALLOWANCE,
   downloadName,
   fileKind,
   formatSize,
@@ -139,6 +140,25 @@ eq('folders and odd characters go', downloadName({ kind: 'document', media_mime:
 eq('an unknown type keeps a harmless extension', downloadName({ kind: 'document', media_mime: 'application/x-dwg', media_name: 'plan.dwg' }), 'plan.dwg');
 eq('an unknown type that would run something', downloadName({ kind: 'document', media_mime: 'text/html', media_name: 'invoice.html' }), 'invoice.bin');
 eq('SVG pretending to be a photo', downloadName({ kind: 'document', media_mime: 'image/svg+xml', media_name: 'roof.svg' }), 'roof.bin');
+// Only a short list of harmless extensions is kept for unknown types: disk images, macros, help files… are .bin.
+for (const [name, mime] of [
+  ['Signed_quote.iso', 'application/x-iso9660-image'],
+  ['Quote.one', 'application/onenote'],
+  ['Remittance.docm', 'application/vnd.ms-word.document.macroenabled.12'],
+  ['Prices.xlsm', 'application/vnd.ms-excel.sheet.macroenabled.12'],
+  ['scan.chm', 'application/vnd.ms-htmlhelp'],
+  ['setup.cpl', 'application/octet-stream'],
+  ['photo.pif', 'application/octet-stream'],
+  ['run.jse', 'application/octet-stream'],
+  ['installer.msix', 'application/octet-stream'],
+  ['disk.vhd', 'application/octet-stream'],
+  ['disk.img', 'application/octet-stream'],
+  ['setup.exe', 'application/x-msdownload'],
+]) {
+  eq(`an unknown type that runs or mounts something: ${name}`, downloadName({ kind: 'document', media_mime: mime, media_name: name }), `${name.replace(/\.[^.]+$/, '')}.bin`);
+}
+eq('a Mac Numbers file keeps its extension', downloadName({ kind: 'document', media_mime: 'application/x-iwork-numbers-sffnumbers', media_name: 'Costs.numbers' }), 'Costs.numbers');
+eq('an iPhone video sent as a file keeps .mov', downloadName({ kind: 'document', media_mime: 'video/quicktime', media_name: 'IMG_0042.MOV' }), 'IMG_0042.mov');
 eq('a name of only dots', downloadName({ kind: 'document', media_mime: 'application/pdf', media_name: '...', created_at: '2026-10-19T10:00:00Z' }), 'whatsapp-file-2026-10-19.pdf');
 eq('photo with no name', downloadName({ kind: 'image', media_mime: 'image/jpeg', created_at: '2026-10-19T10:00:00Z' }), 'whatsapp-photo-2026-10-19.jpg');
 eq('voice note with no name', downloadName({ kind: 'audio', media_mime: 'audio/ogg; codecs=opus', body: '🎤 Voice note', created_at: '2026-10-19T10:00:00Z' }), 'whatsapp-voice-note-2026-10-19.ogg');
@@ -149,8 +169,11 @@ eq('Content-Disposition-safe characters only', /^[\w .()-]+$/.test(downloadName(
 // ── Size caps (WhatsApp's limits, with room for customers' HD photos) ────────────────────────────────
 eq('photo cap', capFor('image'), 16 * MB);
 eq('voice note cap', capFor('audio'), 16 * MB);
-eq('video cap (Meta passes nothing over 100 MB)', capFor('video'), 100 * MB);
-eq('document cap', capFor('document'), 100 * MB);
+eq('video cap (the most the CRM’s file storage takes in one file)', capFor('video'), 50 * MB);
+eq('document cap', capFor('document'), 50 * MB);
+eq('no cap is past what storage takes in one file', Object.values(SIZE_CAP).every((c) => c <= 50 * MB), true);
+eq('daily allowance per chat', DAILY_ALLOWANCE, { bytes: 250 * MB, files: 30 });
+eq('held wording says to tap Try again', /Tap Try again/.test(MEDIA_ERRORS.held), true);
 eq('sticker cap (kind other)', capFor('other'), 1 * MB);
 eq('caps cover every type', Object.keys(SIZE_CAP).sort(), ['audio', 'document', 'image', 'sticker', 'video']);
 eq('size wording', [formatSize(900), formatSize(820 * 1024), formatSize(1.44 * MB), formatSize(23.6 * MB), formatSize(0)], ['900 bytes', '820 KB', '1.4 MB', '24 MB', '']);
@@ -227,7 +250,12 @@ const sql = src('supabase/whatsapp-media.sql');
 eq('the key only goes to the file host', /if \(isFileHost\(url\)\) headers\.Authorization/.test(media), true);
 eq('redirects are followed by hand', media.includes("redirect: 'manual'"), true);
 eq('downloads time out', /AbortSignal\.timeout\(DOWNLOAD_MS\)/.test(media) && /AbortSignal\.timeout\(LOOKUP_MS\)/.test(media), true);
-eq('stored under a fixed path per message, extension from the allow-list', media.includes('const path = `${row.enquiry_id}/${row.id}.${kept.ext}`'), true);
+eq('stored by its SHA-256 in the customer’s folder (the same file sent again is kept once), extension from the allow-list', media.includes('const path = `${row.enquiry_id}/${got.sha256}.${kept.ext}`'), true);
+eq('two downloads at a time per server', media.includes('const AT_ONCE = 2;') && media.includes('return inTurn(() => fetchAndStoreNow(rowId, opts))'), true);
+eq('the row is read afresh once its turn comes', /async function fetchAndStoreNow[^]*?const row = await mediaRow\(rowId, db\)/.test(media), true);
+eq('the chat’s daily allowance is checked before any bytes are fetched', /size > cap\) return[^\n]*\n\s*if \(allow && !\(await allow\(/.test(media) && media.includes('asked ? undefined : (size) => withinAllowance(db, row, size)'), true);
+eq('deleted while downloading: the file is removed again', media.includes(".update(patch).eq('id', row.id).select('id')") && media.includes('if (!done) await store.remove([path, thumbPath(path)])'), true);
+eq('the route tries once (inside its 60 s); only Try again passes the allowance', route.includes("fetchAndStore(found.id, { tries: 1, asked: found.media_status === 'failed' })"), true);
 eq('stored with the allow-listed type, not Meta’s', media.includes('contentType: kept.contentType, upsert: true'), true);
 eq('private bucket', media.includes('createBucket(MEDIA_BUCKET, { public: false })'), true);
 eq('the route asks chatSession + mayOpenChat', route.includes('await chatSession()') && route.includes('mayOpenChat(s, found.enquiry_id)') && route.includes('mayOpenChat(s, row.enquiry_id)'), true);

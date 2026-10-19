@@ -8,8 +8,8 @@
 alter table public.whatsapp_messages add column if not exists media_id     text;   -- Meta's media id (from the webhook)
 alter table public.whatsapp_messages add column if not exists media_mime   text;   -- e.g. image/jpeg, audio/ogg; codecs=opus
 alter table public.whatsapp_messages add column if not exists media_name   text;   -- a document's file name, as they sent it
-alter table public.whatsapp_messages add column if not exists media_size   bigint; -- bytes, once saved
-alter table public.whatsapp_messages add column if not exists media_path   text;   -- {enquiry id}/{message id}.{ext} in whatsapp-media
+alter table public.whatsapp_messages add column if not exists media_size   bigint; -- bytes (WhatsApp's figure until it's saved)
+alter table public.whatsapp_messages add column if not exists media_path   text;   -- {enquiry id}/{SHA-256}.{ext} in whatsapp-media
 alter table public.whatsapp_messages add column if not exists media_status text
   check (media_status in ('pending','saved','failed','too_big','expired'));       -- null: no file
 alter table public.whatsapp_messages add column if not exists media_error  text;   -- why it couldn't be kept, in plain words
