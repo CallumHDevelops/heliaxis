@@ -25,7 +25,8 @@
   background: rgba(255, 253, 248, 0.92);
   flex-wrap: wrap;
   flex-shrink: 0;
-  z-index: 3;
+  /* Over the page's own floating bits (Umami button, heatmap dock) so the menus drop over them; under pop-ups (50 and up). */
+  z-index: 30;
 }
 .hx-header__logo {
   display: flex;
@@ -68,7 +69,8 @@
   color: var(--hx-ink);
   background: rgba(33, 31, 24, 0.06);
 }
-.hx-nav__link.is-active {
+.hx-nav__link.is-active,
+.hx-nav__link.is-current {
   color: var(--hx-ink);
   background: var(--hx-solar);
 }

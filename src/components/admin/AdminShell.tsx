@@ -213,6 +213,8 @@ type NavItem = {
   show: boolean;
   /** On the phone bottom bar, so left out of "More". */
   tab?: boolean;
+  /** A full page load from the desktop menu too (the CMS's own stylesheet would stay on after a soft one). */
+  reload?: boolean;
 };
 
 /** One tile in the phone "More" sheet: icon over a short label. A plain link (a full page load), as before. */
@@ -314,7 +316,7 @@ export async function AdminShell({
       id: 'cms',
       label: 'CMS',
       items: [
-        { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms') },
+        { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true },
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms') },
         { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics') },
         { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics') },
@@ -334,7 +336,7 @@ export async function AdminShell({
   // Each icon goes to the (client) menu inside a span made here: passed bare, React's dev build warns about keys.
   const menu = pick((i) => i.show).map((g) => ({
     ...g,
-    items: g.items.map(({ href, label, icon }) => ({ href, label, icon: <span className="hx-dd__icon">{icon}</span> })),
+    items: g.items.map(({ href, label, icon, reload }) => ({ href, label, reload, icon: <span className="hx-dd__icon">{icon}</span> })),
   }));
   const sheet = pick((i) => i.show && !i.tab);
   const tiles = sheet.flatMap((g) => g.items);
@@ -362,7 +364,7 @@ export async function AdminShell({
           <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={140} height={32} style={{ width: '100%', height: 'auto' }} />
         </Link>
         <nav className="hx-nav" aria-label="Main">
-          <TopMenu groups={menu} />
+          <TopMenu groups={menu} fallback={active === 'dashboard' ? '/admin' : undefined} />
           <HeaderUser initials={initials} name={displayName} email={profile?.email ?? ''} signOut={signOut} admin={admin} />
         </nav>
       </header>

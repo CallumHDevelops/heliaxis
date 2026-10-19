@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function WhatsAppInboxPage() {
   return (
-    <AdminShell active="whatsapp" fluid>
+    <AdminShell active="whatsapp">
       <InboxList />
     </AdminShell>
   );

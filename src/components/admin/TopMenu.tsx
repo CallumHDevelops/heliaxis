@@ -11,8 +11,8 @@ import { flushSync } from 'react-dom';
  * on click, or on hover with a mouse, and close on a click outside, Escape, or picking a page.
  */
 
-/** `icon` is shown as given (AdminShell wraps it in .hx-dd__icon). */
-export type MenuItem = { href: string; label: string; icon?: ReactNode };
+/** `icon` is shown as given (AdminShell wraps it in .hx-dd__icon); `reload` opens it with a full page load. */
+export type MenuItem = { href: string; label: string; icon?: ReactNode; reload?: boolean };
 export type MenuGroup = { id: string; label: string; items: MenuItem[] };
 
 // Not a page here (e.g. /api/sso/rams): a plain link, so it's never prefetched. As the phone tab bar.
@@ -58,7 +58,7 @@ function ItemLink({
       {item.label}
     </>
   );
-  if (!isPage(item.href)) return <a href={item.href} {...props}>{body}</a>;
+  if (item.reload || !isPage(item.href)) return <a href={item.href} {...props}>{body}</a>;
   return <Link href={item.href} {...props}>{body}</Link>;
 }
 
@@ -68,9 +68,10 @@ const chevron = (
   </svg>
 );
 
-export function TopMenu({ groups }: { groups: MenuGroup[] }) {
+/** `fallback`: the item to mark when the URL matches none (e.g. setup pages count as the dashboard). */
+export function TopMenu({ groups, fallback }: { groups: MenuGroup[]; fallback?: string }) {
   const pathname = usePathname();
-  const current = currentHref(groups, pathname);
+  const current = currentHref(groups, pathname) || fallback || '';
   const [open, setOpen] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   // Opened by the mouse passing over it, so it closes when the mouse leaves (a click keeps it open).
@@ -186,6 +187,8 @@ export function TopMenu({ groups }: { groups: MenuGroup[] }) {
               className={active ? 'hx-nav__link hx-dd__btn is-active' : 'hx-nav__link hx-dd__btn'}
               aria-expanded={isOpen}
               aria-controls={`hx-menu-${g.id}`}
+              // Its pages are hidden while it's shut, so say here that the current one is in it.
+              aria-current={active ? 'true' : undefined}
               onClick={() => {
                 if (!isOpen) {
                   byHover.current = false;

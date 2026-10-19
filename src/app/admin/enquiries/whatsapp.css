@@ -14,7 +14,7 @@
   max-width: 760px;
   margin: 0 auto;
 }
-/* Pages that ask AdminShell for the full width (the inbox, templates) use it; text keeps a readable line length. */
+/* Pages that ask AdminShell for the full width (templates) use it; text keeps a readable line length. */
 .admin-shell__main--fluid > .wa-page {
   max-width: none;
 }
