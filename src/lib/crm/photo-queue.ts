@@ -31,6 +31,8 @@ export type QueuedPhoto = {
   markupBlob?: Blob;
   /** Set when the server said no for good ("survey deleted"): it waits for a retake or Remove. */
   failed?: string;
+  /** The photo is up (this is its id) but a drawing made while it was uploading still has to follow. */
+  uploadedAs?: string;
 };
 
 const DB = 'hx-crm';
@@ -85,7 +87,11 @@ export async function retryQueued(id: string) {
   return uploadQueued();
 }
 
-/** A drawing made on a photo that hasn't gone up yet: kept on the queue item and sent with it. */
+/**
+ * A drawing made on a photo that hasn't gone up yet: kept on the queue item and sent with it (or
+ * straight after it, if it was already on its way). False if the photo has gone up meanwhile: then
+ * save the drawing against the uploaded photo instead (its clientId is this queue id).
+ */
 export async function setQueuedMarkup(id: string, markup: unknown, blob: Blob | null) {
   const p = await getOne(id);
   if (!p) return false;
@@ -260,34 +266,69 @@ async function sendOne(supabase: Supabase, p: QueuedPhoto): Promise<Outcome> {
   }
 }
 
+/** A drawing made on a survey photo while it was uploading: sent on its own once the photo is up. */
+async function sendLateMarkup(supabase: Supabase, p: QueuedPhoto, photoId: string): Promise<Outcome> {
+  const url = `/api/crm/surveys/${p.surveyId}/markup`;
+  let markupPath: string | null = null;
+  if (p.markup && p.markupBlob) {
+    const prep = await post(url, { action: 'prepare', photo_id: photoId });
+    if (!prep) return { kind: 'later' };
+    if (prep.status !== 200) return outcomeOf(prep.status, String(prep.data.error || ''));
+    const u = prep.data as { bucket: string; path: string; token: string };
+    const up = await supabase.storage
+      .from(u.bucket)
+      .uploadToSignedUrl(u.path, u.token, p.markupBlob, { contentType: 'image/jpeg', upsert: true })
+      .catch(() => ({ error: new Error('offline') }));
+    if (up.error) return { kind: 'later' };
+    markupPath = u.path;
+  }
+  const save = await post(url, { action: 'save', photo_id: photoId, markup: p.markup ?? null, markup_path: markupPath });
+  if (!save) return { kind: 'later' };
+  return save.status === 200 ? { kind: 'ok', photoId } : outcomeOf(save.status, String(save.data.error || ''));
+}
+
+const sameMarkup = (a: QueuedPhoto, b: QueuedPhoto) => JSON.stringify(a.markup ?? null) === JSON.stringify(b.markup ?? null);
+
+/** Write back an item after an attempt, unless it was removed (or retaken) meanwhile. */
+async function update(id: string, patch: Partial<QueuedPhoto>) {
+  const now = await getOne(id);
+  if (now) await put({ ...now, ...patch });
+}
+
 async function drain(): Promise<number> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 0;
   const supabase = createClient();
   let done = 0;
   for (const p of await queued()) {
     if (p.failed) continue;
-    const r = await sendOne(supabase, p);
+    const r = p.uploadedAs ? await sendLateMarkup(supabase, p, p.uploadedAs) : await sendOne(supabase, p);
     if (r.kind === 'ok') {
       signInNeeded = false;
-      await remove(p.id);
-      done++;
-      window.dispatchEvent(
-        new CustomEvent<PhotoUploadedDetail>(PHOTO_UPLOADED, {
-          detail: { id: p.id, photoId: r.photoId, projectId: p.projectId, surveyId: p.surveyId, slot: p.slot },
-        })
-      );
+      const now = await getOne(p.id);
+      const photoId = p.uploadedAs ?? r.photoId;
+      // A drawing saved on the phone while this was uploading: keep it to send next.
+      if (now && !sameMarkup(now, p) && photoId) await put({ ...now, uploadedAs: photoId, tries: 0 });
+      else await remove(p.id);
+      if (!p.uploadedAs) {
+        done++;
+        window.dispatchEvent(
+          new CustomEvent<PhotoUploadedDetail>(PHOTO_UPLOADED, {
+            detail: { id: p.id, photoId: r.photoId, projectId: p.projectId, surveyId: p.surveyId, slot: p.slot },
+          })
+        );
+      }
       changed();
     } else if (r.kind === 'gone') {
       await remove(p.id); // the job was deleted
       changed();
     } else if (r.kind === 'failed') {
-      await put({ ...p, failed: r.message, tries: p.tries + 1 });
+      await update(p.id, { failed: r.message, tries: p.tries + 1 });
       changed(); // carry on with the next photo
     } else if (r.kind === 'signin') {
       signInNeeded = true;
       break;
     } else {
-      await put({ ...p, tries: p.tries + 1 });
+      await update(p.id, { tries: p.tries + 1 });
       break; // probably offline — try again later
     }
   }
@@ -295,13 +336,19 @@ async function drain(): Promise<number> {
 }
 
 let running: Promise<number> | null = null;
+let again = false;
 
 /**
  * Upload everything waiting (one at a time). Returns how many went up. Only one tab uploads at a
  * time (Web Locks; another tab already uploading means this one skips), so no photo goes up twice.
+ * Photos added during a run go up straight after it.
  */
 export function uploadQueued(): Promise<number> {
-  if (running) return running;
+  if (running) {
+    again = true;
+    return running;
+  }
+  again = false;
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
   const job = locks?.request
     ? (async () => await locks.request('hx-photo-queue', { ifAvailable: true }, async (lock) => (lock ? drain() : 0)))()
@@ -311,6 +358,7 @@ export function uploadQueued(): Promise<number> {
     .finally(() => {
       running = null;
       changed();
+      if (again && !signInNeeded) void uploadQueued();
     });
   return running;
 }
