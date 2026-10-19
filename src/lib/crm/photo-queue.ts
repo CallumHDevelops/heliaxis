@@ -94,6 +94,15 @@ export async function setQueuedMarkup(id: string, markup: unknown, blob: Blob | 
   return true;
 }
 
+/** Move a waiting survey photo to another question (a roof area renumbered when two phones' answers merged). */
+export async function setQueuedSlot(id: string, slot: string) {
+  const p = await getOne(id);
+  if (!p) return false;
+  await put({ ...p, slot });
+  changed();
+  return true;
+}
+
 /** Some Android galleries give HEIC photos no type; go by the file name. */
 const mimeOf = (f: File) => f.type || (/\.hei[cf]$/i.test(f.name) ? 'image/heic' : '');
 
