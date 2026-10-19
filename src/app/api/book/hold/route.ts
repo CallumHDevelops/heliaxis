@@ -16,7 +16,11 @@ export async function POST(req: Request) {
     return publicJson({ error: 'Please tick the box to show you’re not a robot.', code: 'turnstile' }, 400);
   }
   const key = ipKey(req);
-  if (!(await rateHit(`hold:${key}`, 3600, 12))) return publicJson({ error: 'Too many tries. Please wait a little and try again, or call us.' }, 429);
+  // 6 an hour and 10 a day: one address can't keep 2 times held round the clock (12 an hour of
+  // 10-minute holds would), so a handful of addresses can't keep website booking "busy".
+  if (!(await rateHit(`hold:${key}`, 3600, 6)) || !(await rateHit(`hold-day:${key}`, 86400, 10))) {
+    return publicJson({ error: 'Too many tries. Please wait a little and try again, or call us.' }, 429);
+  }
   if (!isSurveyType(b.type)) return publicJson({ error: 'Please choose what the survey is for.' }, 400);
   const start = Date.parse(String(b.start || ''));
   if (!Number.isFinite(start)) return publicJson({ error: 'Please pick a time.' }, 400);
