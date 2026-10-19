@@ -506,16 +506,38 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!env('MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_MAILBOX'), {
     id: 'env-ms365',
     title: 'Connect Microsoft 365 email',
-    detail: 'So emails send from hello@heliaxis.co.uk inside the CRM, and replies land on the customer.',
+    detail:
+      'So emails send from hello@heliaxis.co.uk inside the CRM, replies land on the customer, and survey booking can see your calendar. It only gets access to hello@ and callum@, not every mailbox. Needs a computer and the Microsoft 365 admin sign-in.',
     steps: [
       'Open [Microsoft Entra](https://entra.microsoft.com) as the Microsoft 365 admin.',
-      '**Identity → Applications → App registrations → New registration**. Name it `Heliaxis CRM`, leave the rest, tap **Register**.',
-      'On its overview page, copy the **Application (client) ID** and the **Directory (tenant) ID**.',
-      '**Certificates & secrets → New client secret** → 24 months → **Add**, then copy the **Value** (not the ID). It’s only shown once.',
-      '**API permissions → Add a permission → Microsoft Graph → Application permissions**: tick `Mail.ReadWrite`, `Mail.Send` and `Calendars.ReadWrite` → **Add**, then **Grant admin consent**.',
+      '**Identity → Applications → App registrations → New registration**. Name it `Heliaxis CRM`, choose **Single tenant**, leave Redirect URI blank, tap **Register**.',
+      'On its overview page, copy the **Application (client) ID** and the **Directory (tenant) ID** into Notepad.',
+      '**Certificates & secrets → New client secret** → 24 months → **Add**, then copy the **Value** (not the Secret ID). It’s only shown once.',
+      'Don’t add any **API permissions**: the PowerShell lines below give it just the two mailboxes. If you ticked Mail permissions before, remove them.',
+      '**Identity → Applications → Enterprise applications** → search **Heliaxis CRM** → copy its **Object ID** (it’s different from the one on the app registration).',
+      'On a Windows PC open **PowerShell** (Start menu → type PowerShell) and paste the PowerShell lines below one at a time, pressing Enter after each. Say **Y** or **A** if it asks to install. Line 2 opens a Microsoft sign-in; line 3 asks for the two IDs.',
+      'After line 6, every row should say **True** under **InScope**. If not, send Claude a screenshot.',
       ...VERCEL_STEPS,
     ],
     copies: [
+      { label: 'PowerShell 1', value: 'Install-Module ExchangeOnlineManagement -Scope CurrentUser' },
+      { label: 'PowerShell 2', value: 'Connect-ExchangeOnline' },
+      {
+        label: 'PowerShell 3',
+        value:
+          '$app = Read-Host "Application (client) ID"; $obj = Read-Host "Enterprise app Object ID"; New-ServicePrincipal -AppId $app -ObjectId $obj -DisplayName "Heliaxis CRM"',
+      },
+      {
+        label: 'PowerShell 4',
+        value:
+          'New-ManagementScope -Name "Heliaxis CRM mailboxes" -RecipientRestrictionFilter "PrimarySmtpAddress -eq \'hello@heliaxis.co.uk\' -or PrimarySmtpAddress -eq \'callum@heliaxis.co.uk\'"',
+      },
+      {
+        label: 'PowerShell 5',
+        value:
+          '"Application Mail.ReadWrite","Application Mail.Send","Application Calendars.ReadWrite" | ForEach-Object { New-ManagementRoleAssignment -App $app -Role $_ -CustomResourceScope "Heliaxis CRM mailboxes" }',
+      },
+      { label: 'PowerShell 6', value: 'Test-ServicePrincipalAuthorization -Identity $app -Resource hello@heliaxis.co.uk' },
       { label: 'Key', value: 'MS_TENANT_ID' },
       { label: 'Key', value: 'MS_CLIENT_ID' },
       { label: 'Key', value: 'MS_CLIENT_SECRET' },
