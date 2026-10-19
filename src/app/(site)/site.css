@@ -55,6 +55,8 @@
 .site .hx-wa-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:60;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-width:56px;height:56px;padding:0 18px 0 16px;border-radius:999px;background:#1F7A4D;color:#fff;font-family:var(--display);font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 10px 28px -10px rgba(0,0,0,.55);transition:transform .2s,opacity .2s}
 .site .hx-wa-fab:hover{transform:translateY(-2px);color:#fff}
 .site .hx-wa-fab:focus-visible{outline:3px solid var(--solar);outline-offset:3px}
+/* A page with its own fixed bottom bar (e.g. a booking step's Continue button) can hide it with any element of this class. */
+.site:has(.hx-hide-wa-fab) .hx-wa-fab{display:none}
 @media(max-width:680px){
   .site .hx-wa-fab{width:56px;padding:0}
   .site .hx-wa-fab__label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
