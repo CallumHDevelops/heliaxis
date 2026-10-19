@@ -61,6 +61,8 @@ const OUTBOX = 'outbox';
 const WARM_KEY = 'hx.surveys.warmedAt';
 const WARM_EVERY = 10 * 60_000;
 const SAVE_DELAY = 800;
+/** How long to wait for the server before using the phone's copy (the same as the service worker). */
+export const WEAK_SIGNAL_MS = 6000;
 
 /* ── IndexedDB ────────────────────────────────────────────────────────────────── */
 
@@ -159,8 +161,13 @@ export async function loadSurvey(id: string): Promise<Loaded> {
   let payload: SurveyPayload | null = null;
   let source: Loaded['source'] = 'network';
   let error: Loaded['error'];
+  // On a weak signal (bars, but nothing gets through) open the phone's copy after a few seconds
+  // rather than wait for the request to give up. With no copy there's nothing else to show, so wait.
+  const kept = await getPack(id).catch(() => null);
+  const ac = new AbortController();
+  const timer = kept ? setTimeout(() => ac.abort(), WEAK_SIGNAL_MS) : undefined;
   try {
-    const r = await fetch(`/api/crm/surveys/${id}`, { cache: 'no-store' });
+    const r = await fetch(`/api/crm/surveys/${id}`, { cache: 'no-store', signal: ac.signal });
     if (r.ok) {
       payload = (await r.json()) as SurveyPayload;
       await putPack(payload).catch(() => null);
@@ -169,9 +176,11 @@ export async function loadSurvey(id: string): Promise<Loaded> {
     else error = 'offline';
   } catch {
     error = 'offline';
+  } finally {
+    clearTimeout(timer);
   }
   if (!payload) {
-    payload = await getPack(id).catch(() => null);
+    payload = kept;
     source = 'phone';
   }
 

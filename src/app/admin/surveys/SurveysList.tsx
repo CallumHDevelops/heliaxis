@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNow } from '@/lib/use-now';
-import { allDrafts, allPacks, outboxItems, SURVEYS_CHANGED, type Draft, type OutboxItem } from '@/lib/surveys/offline';
+import { allDrafts, allPacks, outboxItems, SURVEYS_CHANGED, WEAK_SIGNAL_MS, type Draft, type OutboxItem } from '@/lib/surveys/offline';
 import type { SurveyPayload } from '@/lib/surveys/solar-schema';
 import { NewSurveySheet } from './NewSurveySheet';
 import './surveys.css';
@@ -91,22 +91,34 @@ export function SurveysList({ view, ready }: { view: ListView; ready: boolean })
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
+    let answered = false;
+    // No signal (or signed out): what's on this phone.
+    const fromPhoneNow = async () => {
+      const packs = await allPacks().catch(() => [] as SurveyPayload[]);
+      if (answered) return;
+      const list = packs.map(rowFromPack).filter((r) => wanted(view, r.status));
+      list.sort((a, b) => (a.date && b.date ? (view === 'done' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)) : a.date ? -1 : b.date ? 1 : 0));
+      setRows(list);
+      setFromPhone(true);
+    };
+    // A weak signal (bars, but nothing gets through): show the phone's copy after a few seconds, and
+    // the server's list if it does arrive.
+    const weak = setTimeout(() => void fromPhoneNow(), WEAK_SIGNAL_MS);
     try {
       const r = await fetch(`/api/crm/surveys?${QUERY[view]}`, { cache: 'no-store' });
       if (r.status === 401 || r.status === 403) throw new Error('signin');
       if (!r.ok) throw new Error('offline');
       const j = (await r.json()) as { surveys?: Row[] };
+      answered = true;
       setRows(j.surveys ?? []);
       setFromPhone(false);
       setSignIn(false);
     } catch (err) {
-      // No signal (or signed out): what's on this phone.
       setSignIn(err instanceof Error && err.message === 'signin');
-      const packs = await allPacks().catch(() => [] as SurveyPayload[]);
-      const list = packs.map(rowFromPack).filter((r) => wanted(view, r.status));
-      list.sort((a, b) => (a.date && b.date ? (view === 'done' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)) : a.date ? -1 : b.date ? 1 : 0));
-      setRows(list);
-      setFromPhone(true);
+      await fromPhoneNow();
+      answered = true;
+    } finally {
+      clearTimeout(weak);
     }
   }, [view]);
 
