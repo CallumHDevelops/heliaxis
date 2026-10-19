@@ -388,6 +388,13 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
 .hxd__tasks:empty {
   display: none;
 }
+/* On Chats (a job page, docked open): the job's Tasks under the list or the other chat, so they stay on the right. */
+.hxd__tasks--chats {
+  max-height: 40%;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--hxd-line);
+  background: var(--hxd-paper);
+}
 .hxd__chat {
   flex: 1;
   min-height: 0;

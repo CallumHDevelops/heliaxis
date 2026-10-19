@@ -459,6 +459,17 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   );
   // Deleting customers works without it; until it's run, Enquiries → Import can bring deleted people back.
   add(crm && !(await has('crm_deleted_people')), sql('deleted-customers.sql', 'Stops Enquiries → Import bringing back customers you’ve deleted.', 7, 'crm.sql'));
+  // Optional: the notes work without it. The app can't see an index, so this one is ticked by hand.
+  const notesIndex = sql('crm-activities-index.sql', 'Makes Latest notes on the CRM home load faster once there are lots of notes. Nothing depends on it.', 38, 'crm.sql');
+  add(crm && !done.includes(notesIndex.id), {
+    ...notesIndex,
+    title: 'Speed up Latest notes on the CRM home',
+    steps: notesIndex.steps.map((s) =>
+      s.startsWith('Come back here') ? 'Then tick this (**✓ I’ve done this**): the app can’t check this one by itself, so it goes once ticked.' : s
+    ),
+    optional: true,
+    manual: true,
+  });
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

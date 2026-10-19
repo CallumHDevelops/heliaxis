@@ -90,6 +90,12 @@ const icons = {
     </svg>
   ),
   // The "More" sheet's tiles.
+  projects: (
+    <svg {...ICON}>
+      <path d="M4 4v16h16" />
+      <path d="M8 8h6M10 12h7M8 16h5" />
+    </svg>
+  ),
   surveys: (
     <svg {...ICON}>
       <path d="M9 3.5h6v3H9z" />
@@ -296,6 +302,8 @@ export async function AdminShell({
       label: 'CRM',
       items: [
         { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
+        // Projects pages light up the CRM tab (they use active="crm"), so this tile never does.
+        { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },
