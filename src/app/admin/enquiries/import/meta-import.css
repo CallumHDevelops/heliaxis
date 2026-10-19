@@ -8,6 +8,13 @@
 .mi-page { margin-top: 0.9rem; }
 .mi-page-name { font-weight: 700; font-size: 0.92rem; margin-bottom: 0.35rem; overflow-wrap: anywhere; }
 .mi-page .imp-err, .mi-page .mi-muted { margin: 0.2rem 0 0; line-height: 1.45; }
+.mi-page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 0.75rem; margin-bottom: 0.35rem; }
+.mi-page-head .mi-page-name { margin-bottom: 0; min-width: 0; }
+.mi-live { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.mi-live-state { font-size: 0.84rem; font-weight: 600; color: var(--muted); }
+.mi-live-state.is-on { color: var(--ok); }
+.mi-live-btn { padding: 0.4rem 0.75rem; font-size: 0.82rem; }
+.mi-page .mi-live-note { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
 .mi-forms { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: #fff; }
 .mi-form { padding: 0.6rem 0.75rem; border-top: 1px solid var(--line); }
 .mi-form:first-child { border-top: 0; }

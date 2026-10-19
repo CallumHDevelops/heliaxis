@@ -8,6 +8,7 @@ import {
   leadLabel,
   listLeadSources,
   noCounts,
+  subscribePageToLeads,
   type GraphLead,
 } from '@/lib/meta-import';
 import { CSV_LIMITS } from '@/lib/meta-leads-csv';
@@ -27,7 +28,7 @@ const NOT_READY =
   'Run crm.sql and then crm-v2.sql in Supabase before importing (they’re on your “From Claude” list on the home page). ' +
   'Until then, imported leads can’t be kept out of the new-lead alerts and follow-up messages.';
 
-/** The Pages and lead forms the CRM's Meta token can see. */
+/** The Pages and lead forms the CRM's Meta token can see, and whether each Page's live leads are on. */
 export async function GET() {
   const s = await adminSession();
   if (s instanceof Response) return s;
@@ -120,4 +121,20 @@ export async function POST(req: Request) {
   }
 
   return json({ error: 'bad request' }, 400);
+}
+
+/**
+ * { pageId } switches live leads on for that Page (subscribes the CRM's app to its leadgen field),
+ * so new lead-form leads reach /api/meta/webhook by themselves. Answers with the Page's state after.
+ * Not an import, so it doesn't wait for the import SQL.
+ */
+export async function PATCH(req: Request) {
+  const s = await adminSession();
+  if (s instanceof Response) return s;
+  const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!b || typeof b !== 'object' || !isGraphId(b.pageId)) return json({ error: 'Unknown Page' }, 400);
+  const r = await subscribePageToLeads(b.pageId);
+  return r.ok
+    ? json({ pageId: b.pageId, liveLeads: r.liveLeads, liveLeadsError: r.liveLeadsError })
+    : json({ error: r.error }, 502);
 }

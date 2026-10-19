@@ -122,13 +122,15 @@ const MANUAL: SetupTodo[] = [
     detail:
       'So new Facebook and Instagram lead-form leads arrive by themselves, and Enquiries → Import can bring in the last 90 days.',
     steps: [
-      'Open the [Meta app](https://developers.facebook.com/apps) → **Heliaxis CRM** → **Webhooks** (left menu).',
-      'In the drop-down at the top choose **Page** → **Subscribe to this object**. Callback URL and verify token are the same as for WhatsApp (copy the URL below; the token is your `META_WEBHOOK_VERIFY_TOKEN`).',
-      'Find **leadgen** in the list → **Subscribe**.',
+      'Open the [Meta app dashboard](https://developers.facebook.com/apps) → **Heliaxis CRM**. If **Use cases** (left menu) doesn’t list **Capture & manage ad leads with Marketing API**, tap **Add use cases** (top right), pick it and add it. The `leads_retrieval` permission lives in this use case.',
+      'Go to **Use cases** → **Capture & manage ad leads with Marketing API** → **Customize** → **Webhooks**. (The old way, **Webhooks** in the app’s left menu, may still work, but this route is the reliable one.)',
+      'Choose **Page** in the drop-down. Paste the callback URL below. For **Verify token**, use the value of `META_WEBHOOK_VERIFY_TOKEN` in Vercel (Settings → Environment Variables). If Vercel hides it as **Sensitive**, make up a new long random value, save it in Vercel as `META_WEBHOOK_VERIFY_TOKEN` and type the same here, then redeploy (**Deployments** → the ⋯ on the top deployment → **Redeploy**) and wait a minute. WhatsApp keeps working: Meta only checks the token when you save.',
+      'Tap **Verify and save**. Then find **leadgen** in the list of fields → **Subscribe**.',
       'In [Business Settings](https://business.facebook.com/settings) → **Integrations** → **Leads Access**: pick the Heliaxis Page and give **Heliaxis CRM** access.',
-      'In **Users → System users**, check the CRM’s system user has the Facebook Page as an asset, and that its token includes `leads_retrieval`, `pages_show_list`, `pages_read_engagement` and `pages_manage_metadata`. If not, generate a new token with them and paste it into Vercel as `META_PAGE_ACCESS_TOKEN`.',
+      'In **Users → System users**, check the CRM’s system user has the Facebook Page as an asset (with **Full control**), and that its token includes `leads_retrieval`, `pages_show_list`, `pages_read_engagement` and `pages_manage_metadata`. If not, generate a new token with them, paste it into Vercel as `META_PAGE_ACCESS_TOKEN`, then redeploy (**Deployments** → the ⋯ on the top deployment → **Redeploy**) and wait a minute.',
+      'In the Heliaxis app, open **Enquiries → Import** → **Find lead forms**, and tap **Switch on live leads** next to the Heliaxis Page. It should then say **Live leads: On ✓**. Without this, Meta never sends the Page’s new leads to the CRM.',
       'Test it with Meta’s [Lead Ads Testing Tool](https://developers.facebook.com/tools/lead-ads-testing): create a test lead, and it should show **success** under Track status. (Test leads aren’t imported.)',
-      'Then open **Enquiries → Import → Find lead forms** to bring in the last 90 days.',
+      'Then back on **Enquiries → Import**, tap **Import selected** to bring in the last 90 days.',
     ],
     copies: [
       { label: 'Callback URL', value: 'https://heliaxis.co.uk/api/meta/webhook' },
@@ -506,16 +508,38 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!env('MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_MAILBOX'), {
     id: 'env-ms365',
     title: 'Connect Microsoft 365 email',
-    detail: 'So emails send from hello@heliaxis.co.uk inside the CRM, and replies land on the customer.',
+    detail:
+      'So emails send from hello@heliaxis.co.uk inside the CRM, replies land on the customer, and survey booking can see your calendar. It only gets access to hello@ and callum@, not every mailbox. Needs a computer and the Microsoft 365 admin sign-in.',
     steps: [
       'Open [Microsoft Entra](https://entra.microsoft.com) as the Microsoft 365 admin.',
-      '**Identity → Applications → App registrations → New registration**. Name it `Heliaxis CRM`, leave the rest, tap **Register**.',
-      'On its overview page, copy the **Application (client) ID** and the **Directory (tenant) ID**.',
-      '**Certificates & secrets → New client secret** → 24 months → **Add**, then copy the **Value** (not the ID). It’s only shown once.',
-      '**API permissions → Add a permission → Microsoft Graph → Application permissions**: tick `Mail.ReadWrite`, `Mail.Send` and `Calendars.ReadWrite` → **Add**, then **Grant admin consent**.',
+      '**Identity → Applications → App registrations → New registration**. Name it `Heliaxis CRM`, choose **Single tenant**, leave Redirect URI blank, tap **Register**.',
+      'On its overview page, copy the **Application (client) ID** and the **Directory (tenant) ID** into Notepad.',
+      '**Certificates & secrets → New client secret** → 24 months → **Add**, then copy the **Value** (not the Secret ID). It’s only shown once.',
+      'Don’t add any **API permissions**: the PowerShell lines below give it just the two mailboxes. If you ticked Mail permissions before, remove them.',
+      '**Identity → Applications → Enterprise applications** → search **Heliaxis CRM** → copy its **Object ID** (it’s different from the one on the app registration).',
+      'On a Windows PC open **PowerShell** (Start menu → type PowerShell) and paste the PowerShell lines below one at a time, pressing Enter after each. Say **Y** or **A** if it asks to install. Line 2 opens a Microsoft sign-in; line 3 asks for the two IDs.',
+      'After line 6, every row should say **True** under **InScope**. If not, send Claude a screenshot.',
       ...VERCEL_STEPS,
     ],
     copies: [
+      { label: 'PowerShell 1', value: 'Install-Module ExchangeOnlineManagement -Scope CurrentUser' },
+      { label: 'PowerShell 2', value: 'Connect-ExchangeOnline' },
+      {
+        label: 'PowerShell 3',
+        value:
+          '$app = Read-Host "Application (client) ID"; $obj = Read-Host "Enterprise app Object ID"; New-ServicePrincipal -AppId $app -ObjectId $obj -DisplayName "Heliaxis CRM"',
+      },
+      {
+        label: 'PowerShell 4',
+        value:
+          'New-ManagementScope -Name "Heliaxis CRM mailboxes" -RecipientRestrictionFilter "PrimarySmtpAddress -eq \'hello@heliaxis.co.uk\' -or PrimarySmtpAddress -eq \'callum@heliaxis.co.uk\'"',
+      },
+      {
+        label: 'PowerShell 5',
+        value:
+          '"Application Mail.ReadWrite","Application Mail.Send","Application Calendars.ReadWrite" | ForEach-Object { New-ManagementRoleAssignment -App $app -Role $_ -CustomResourceScope "Heliaxis CRM mailboxes" }',
+      },
+      { label: 'PowerShell 6', value: 'Test-ServicePrincipalAuthorization -Identity $app -Resource hello@heliaxis.co.uk' },
       { label: 'Key', value: 'MS_TENANT_ID' },
       { label: 'Key', value: 'MS_CLIENT_ID' },
       { label: 'Key', value: 'MS_CLIENT_SECRET' },

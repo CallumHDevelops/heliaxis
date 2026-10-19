@@ -40,11 +40,20 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
 5. **Webhook**: in the app → WhatsApp → Configuration → Callback URL
    `https://heliaxis.co.uk/api/meta/webhook`, verify token = your `META_WEBHOOK_VERIFY_TOKEN` →
    subscribe to **messages**, and also to **smb_message_echoes** if you use coexistence (below).
-6. **Lead Ads webhook**: app → Webhooks → **Page** → same callback URL and token → subscribe to
-   **leadgen**. Then connect the Page to the app (the easiest way is Meta's *Leads Access Manager*
-   in Business Settings → Integrations → Leads Access → give the app access, or use the
-   *Webhooks* tool in Graph API Explorer: `POST /{page-id}/subscribed_apps?subscribed_fields=leadgen`
-   with a Page token).
+6. **Lead Ads webhook**: Meta now keeps this under *use cases*. On the app dashboard tap **Add use
+   cases** (top right) → **Capture & manage ad leads with Marketing API** (this is also where
+   `leads_retrieval` lives). Then **Use cases** → that use case → **Customize** → **Webhooks** →
+   **Page** → same callback URL and token → **Verify and save** → subscribe to **leadgen**. (The old
+   app → Webhooks menu may still work, but the use-case route is the reliable one.) If Vercel hides
+   `META_WEBHOOK_VERIFY_TOKEN` as Sensitive, set a new long random value in Vercel and in Meta, and
+   redeploy before saving; Meta only checks it when you save, so WhatsApp keeps working.
+   Then:
+   - **Leads Access**: Business Settings → Integrations → Leads Access → the Page → give the app access.
+   - **Subscribe the Page to the app**, or no leads arrive even with the webhook above. In Heliaxis:
+     Enquiries → Import → *Find lead forms* → **Switch on live leads** next to the Page. That calls
+     `POST /{page-id}/subscribed_apps?subscribed_fields=leadgen` with the Page's token (needs
+     `pages_manage_metadata`), keeping any other fields the app already gets from the Page.
+   - Check with Meta's Lead Ads Testing Tool: a test lead should show **success** under Track status.
 7. **Template**: WhatsApp Manager → Message templates → Create, category **Utility** (cheaper) or
    **Marketing**, language English (UK). For example, name `enquiry_intro`:
    > Hi {{1}}, it's Heliaxis — thanks for your enquiry. Is now a good time for a couple of quick
