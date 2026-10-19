@@ -14,6 +14,7 @@ import type { Answers, SurveyPayload } from './solar-schema';
  *   they've been saved to the server (synced), and "Finish on site" details (signature, name, time).
  * - packs:  the last full copy of each survey from the server (the offline pack, or opening it online).
  * - outbox: drawings on photos already uploaded, and finishing a survey, waiting for signal.
+ * A survey that isn't in the pack, hasn't been used for 3 days and has nothing waiting is forgotten.
  *
  * Every change writes the draft first, then (after 800 ms) PUTs it with the rev it started from. A 409
  * means someone else saved meanwhile: the two are merged (merge.ts) and sent again. Finishing waits
@@ -60,6 +61,8 @@ const PACKS = 'packs';
 const OUTBOX = 'outbox';
 const WARM_KEY = 'hx.surveys.warmedAt';
 const WARM_EVERY = 10 * 60_000;
+/** A survey opened, saved or in the offline pack within this long stays on the phone. */
+const KEEP_FOR = 3 * 86_400_000;
 const SAVE_DELAY = 800;
 /** How long to wait for the server before using the phone's copy (the same as the service worker). */
 export const WEAK_SIGNAL_MS = 6000;
@@ -109,6 +112,15 @@ export const allDrafts = () => tx<Draft[]>(DRAFTS, 'readonly', (s) => s.getAll()
 export const getPack = (id: string) =>
   tx<Pack | undefined>(PACKS, 'readonly', (s) => s.get(id) as IDBRequest<Pack | undefined>).then((p) => p?.payload ?? null);
 const putPack = (payload: SurveyPayload) => tx(PACKS, 'readwrite', (s) => s.put({ id: payload.survey.id, payload, storedAt: new Date().toISOString() } satisfies Pack));
+/** Opened from the phone's copy: counts as recently used, so it isn't forgotten while it's in use. */
+const touchPack = (id: string) =>
+  tx(PACKS, 'readwrite', (s) => {
+    const r = s.get(id) as IDBRequest<Pack | undefined>;
+    r.onsuccess = () => {
+      if (r.result) s.put({ ...r.result, storedAt: new Date().toISOString() } satisfies Pack);
+    };
+    return r;
+  });
 /** Every survey copied to this phone (for the lists when there's no signal). */
 export const allPacks = () => tx<Pack[]>(PACKS, 'readonly', (s) => s.getAll() as IDBRequest<Pack[]>).then((l) => l.map((p) => p.payload));
 
@@ -182,6 +194,7 @@ export async function loadSurvey(id: string): Promise<Loaded> {
   if (!payload) {
     payload = kept;
     source = 'phone';
+    if (kept) await touchPack(id).catch(() => null);
   }
 
   const draft = await serial(id, async () => {
@@ -638,8 +651,46 @@ export async function warmSurveys(opts: { force?: boolean } = {}): Promise<numbe
     }).catch(() => null);
   }
   warmPages(['/admin', '/admin/surveys/todo', '/admin/surveys/shell', ...surveys.map((p) => `/admin/surveys/${p.survey.id}`)]);
+  await forgetOldSurveys(new Set(surveys.map((p) => p.survey.id))).catch(() => null);
   emit();
   return surveys.length;
+}
+
+/* ── Not keeping more than the phone needs ────────────────────────────────────── */
+
+/** Something on this phone still has to go up for this survey (or "Finish on site" is waiting). */
+const busyDraft = (d: Draft | null | undefined) => !!d && (!d.synced || !!d.finish || !!d.signature);
+
+/**
+ * Forget surveys (the customer's details and answers) that aren't in the current pack, haven't been
+ * opened, saved or refreshed for `keepFor`, and have nothing waiting to upload. Run after a
+ * successful pack download (signal and access) and on sign-out, so a lost phone holds little.
+ */
+async function forgetOldSurveys(current: Set<string>, keepFor = KEEP_FOR) {
+  const [packs, drafts, out, photos] = await Promise.all([
+    tx<Pack[]>(PACKS, 'readonly', (s) => s.getAll() as IDBRequest<Pack[]>),
+    allDrafts(),
+    outboxItems(),
+    queued().catch(() => []),
+  ]);
+  const busy = new Set<string>([
+    ...drafts.filter(busyDraft).map((d) => d.id),
+    ...out.map((o) => o.surveyId),
+    ...photos.flatMap((p) => (p.surveyId ? [p.surveyId] : [])),
+  ]);
+  const seen = new Map<string, number>();
+  const saw = (id: string, at: string) => seen.set(id, Math.max(seen.get(id) ?? 0, Date.parse(at) || 0));
+  for (const d of drafts) saw(d.id, d.savedAt);
+  for (const p of packs) saw(p.id, p.storedAt);
+  const cutoff = Date.now() - keepFor;
+  for (const [id, at] of seen) {
+    if (current.has(id) || busy.has(id) || at > cutoff) continue;
+    await serial(id, async () => {
+      if (busyDraft(await getDraft(id))) return; // changed a moment ago
+      await tx(PACKS, 'readwrite', (s) => s.delete(id));
+      await deleteDraft(id);
+    }).catch(() => null);
+  }
 }
 
 /* ── Signing out ──────────────────────────────────────────────────────────────── */
@@ -650,10 +701,16 @@ export async function unsyncedSurveyChanges(): Promise<number> {
   return drafts.filter((d) => !d.synced && !d.locked).length + out.filter((o) => !o.failed).length;
 }
 
-/** On sign-out: wipe surveys from the phone, unless changes haven't uploaded (then returns how many). */
+/**
+ * On sign-out: wipe surveys from the phone. If changes haven't uploaded, only the surveys they belong
+ * to stay (returns how many changes are waiting).
+ */
 export async function clearSurveyStorage(): Promise<number> {
   const waiting = await unsyncedSurveyChanges();
-  if (waiting) return waiting;
+  if (waiting) {
+    await forgetOldSurveys(new Set(), 0).catch(() => null);
+    return waiting;
+  }
   try {
     (await dbp)?.close();
   } catch {
