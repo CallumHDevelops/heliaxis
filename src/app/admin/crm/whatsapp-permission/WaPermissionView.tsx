@@ -13,7 +13,8 @@ type Customer = {
   job: { id: string; title: string | null; stage: string; created_at: string };
 };
 type Settings = { requireOptIn: boolean; changedAt: string | null; changedBy: string | null };
-type Data = { ready: boolean; settings: Settings; customers: Customer[]; count: number; email: boolean; isAdmin: boolean };
+/** count: still to check (the list); affected: open-job customers the rule would stop, including those marked Not asked. */
+type Data = { ready: boolean; settings: Settings; customers: Customer[]; count: number; affected: number; email: boolean; isAdmin: boolean };
 
 const CSS = `
 .wap-list{list-style:none;margin:.4rem 0 0;padding:0}
@@ -77,7 +78,17 @@ export function WaPermissionView({ isAdmin, ready }: { isAdmin: boolean; ready: 
     setErr('');
     try {
       await post({ action, enquiryId: c.id });
-      setData((cur) => (cur ? { ...cur, customers: cur.customers.filter((x) => x.id !== c.id), count: Math.max(0, cur.count - 1) } : cur));
+      setData((cur) =>
+        cur
+          ? {
+              ...cur,
+              customers: cur.customers.filter((x) => x.id !== c.id),
+              count: Math.max(0, cur.count - 1),
+              // Not asked takes them off the list, but the rule would still stop them.
+              affected: action === 'agreed' ? Math.max(0, cur.affected - 1) : cur.affected,
+            }
+          : cur
+      );
       setUndo({ id: c.id, text: action === 'agreed' ? `${c.name}: agreed` : `${c.name}: not asked yet` });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved');
@@ -115,6 +126,9 @@ export function WaPermissionView({ isAdmin, ready }: { isAdmin: boolean; ready: 
   }
 
   const on = !!data?.settings.requireOptIn;
+  // Off the list but still not agreed (everyone the rule would stop who isn't on the list).
+  const notAsked = data ? Math.max(0, data.affected - data.count) : 0;
+  const notAskedNote = notAsked ? ` (${notAsked} of them marked Not asked)` : '';
   // What happens instead of WhatsApp (automation.ts sends the same message by email when it can).
   const wouldEmail = data?.email ? 'they’d get an email instead, if we have their email address' : 'they’d get email once Microsoft 365 is connected';
   const willEmail = data?.email ? 'they get an email instead, if we have their email address' : 'they’ll get email once Microsoft 365 is connected';
@@ -152,11 +166,16 @@ export function WaPermissionView({ isAdmin, ready }: { isAdmin: boolean; ready: 
               <p className="crm-muted">
                 Customers who haven’t agreed get no automatic WhatsApps; {willEmail}. You can still message anyone by hand.
               </p>
-            ) : (
+            ) : !data.ready ? (
+              <p className="crm-muted">Once crm-v3.sql is run, this shows how many customers with open jobs would stop getting reminders by WhatsApp.</p>
+            ) : data.affected > 0 ? (
               <p className="crm-muted">
-                Right now {people(data.count)} with open jobs {data.count === 1 ? 'has' : 'have'} no permission recorded. If you switch
-                this on, they’d stop getting reminders by WhatsApp ({wouldEmail}). Check the list below first.
+                Right now {people(data.affected)} with open jobs {data.affected === 1 ? 'hasn’t' : 'haven’t'} agreed to WhatsApp
+                messages{notAskedNote}. If you switch this on, they’d stop getting reminders by WhatsApp ({wouldEmail}). Check the
+                list below first.
               </p>
+            ) : (
+              <p className="crm-muted">Everyone with an open job has agreed to WhatsApp messages, so switching this on wouldn’t stop anyone’s reminders.</p>
             )}
             <p className="crm-muted crm-small">
               Anyone who replies STOP never gets automatic WhatsApps, whether this is on or off. START turns them back on.
@@ -182,24 +201,28 @@ export function WaPermissionView({ isAdmin, ready }: { isAdmin: boolean; ready: 
             ) : (
               <p className="crm-muted crm-small">Only admins can change this.</p>
             )}
-            {confirmRule && !on && data.count > 0 && (
+            {confirmRule && !on && data.affected > 0 && (
               <p className="crm-banner">
-                {people(data.count)} would stop getting automatic WhatsApps until you mark them as agreed.
+                {people(data.affected)} would stop getting automatic WhatsApps until they agree{notAskedNote}.
               </p>
             )}
           </section>
 
           {data.ready && (
             <section className="crm-set">
-              <h2>Open jobs with no permission recorded ({data.count})</h2>
+              <h2>Open jobs to check ({data.count})</h2>
               <p className="crm-muted crm-small">
                 Tap <b>They agreed</b> if they messaged you first, ticked the box on the website, or said yes on the phone.{' '}
-                <b>Not asked</b> takes them off this list without giving permission.
+                <b>Not asked</b> takes them off this list without giving permission: with the rule on, they still get no automatic
+                WhatsApps until they agree.
               </p>
               {data.customers.length === 0 ? (
                 <div className="crm-emptystate">
                   <b>Nothing to check</b>
-                  <p>Everyone with an open job has their WhatsApp permission recorded.</p>
+                  <p>
+                    You’ve been through everyone with an open job.
+                    {notAsked ? ` ${people(notAsked)} marked Not asked still ${notAsked === 1 ? 'hasn’t' : 'haven’t'} agreed.` : ''}
+                  </p>
                 </div>
               ) : (
                 <ul className="wap-list">

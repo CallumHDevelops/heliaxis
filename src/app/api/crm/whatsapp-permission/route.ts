@@ -7,6 +7,8 @@ import { stageLabel } from '@/lib/crm/stages';
 import {
   getPermissionSettings,
   grantPermission,
+  isFormSource,
+  isStopped,
   markNotAsked,
   savePermissionSettings,
   undoStaffRecord,
@@ -18,10 +20,12 @@ export const dynamic = 'force-dynamic';
 /**
  * The WhatsApp permission review list (/admin/crm/whatsapp-permission).
  * GET: customers with an open job (not Complete or Lost), a mobile number, and no WhatsApp permission
- *      recorded for that number on any of their enquiries, newest job first; plus the rule.
- * POST { action: 'agreed' | 'not_asked' | 'undo', enquiryId } records it as staff:<name>;
- *      { action: 'rule', requireOptIn } (admins) switches "Only send automatic WhatsApps to customers
- *      who've agreed" on or off.
+ *      recorded for that number on any of their enquiries, newest job first (`count` of them); plus
+ *      the rule, and `affected`: how many open-job customers the rule would stop, including those
+ *      marked Not asked.
+ * POST { action: 'agreed' | 'not_asked' | 'undo', enquiryId } records staff:<name> (agreed) or
+ *      not-asked:<name>; { action: 'rule', requireOptIn } (admins) switches "Only send automatic
+ *      WhatsApps to customers who've agreed" on or off.
  */
 
 type Job = { id: string; enquiry_id: string; title: string | null; stage: string; created_at: string };
@@ -47,18 +51,28 @@ async function waitingList() {
     customers.push(...((data ?? []) as Row[]));
   }
   const numberOf = (r: Row) => r.wa_id || toWaId(r.phone);
-  const candidates = customers.filter((r) => numberOf(r) && r.whatsapp_opt_in !== true && !r.whatsapp_opt_in_source);
+  // Not agreed on this enquiry and not stopped: the rule would stop these, unless another enquiry covers them.
+  const open = customers.filter((r) => numberOf(r) && r.whatsapp_opt_in !== true && !isStopped(r));
 
-  // Anything recorded on another enquiry with the same number (agreed, STOP, staff) counts for them too.
-  const recorded = new Set<string>();
-  for (const numbers of chunks([...new Set(candidates.map((r) => numberOf(r)!))])) {
+  // Every enquiry with the same number counts, as in waPermission: a STOP (or staff switch-off) or an
+  // agreement a stranger couldn't have typed in (not a website or booking form) covers the person;
+  // anything else staff noted (Not asked) takes them off the list, but the rule would still stop them.
+  const covered = new Set<string>();
+  const noted = new Set<string>();
+  const note = (n: string, r: Row) => {
+    if (isStopped(r) || (r.whatsapp_opt_in === true && !isFormSource(r.whatsapp_opt_in_source))) covered.add(n);
+    else if (r.whatsapp_opt_in !== true && r.whatsapp_opt_in_source) noted.add(n);
+  };
+  for (const r of customers) if (numberOf(r)) note(numberOf(r)!, r);
+  for (const numbers of chunks([...new Set(open.map((r) => numberOf(r)!))])) {
     const { data } = await db.from('enquiries').select('*').in('wa_id', numbers);
-    for (const r of (data ?? []) as Row[]) if (r.wa_id && (r.whatsapp_opt_in === true || r.whatsapp_opt_in_source)) recorded.add(r.wa_id);
+    for (const r of (data ?? []) as Row[]) if (r.wa_id) note(r.wa_id, r);
   }
+  const affected = new Set(open.map((r) => numberOf(r)!).filter((n) => !covered.has(n))).size;
 
   const seen = new Set<string>();
-  const list = candidates
-    .filter((r) => !recorded.has(numberOf(r)!))
+  const list = open
+    .filter((r) => !r.whatsapp_opt_in_source && !covered.has(numberOf(r)!) && !noted.has(numberOf(r)!))
     .map((r) => ({ r, job: latestJob.get(r.id)! }))
     .sort((a, b) => (a.job.created_at < b.job.created_at ? 1 : -1))
     .filter(({ r }) => {
@@ -67,7 +81,7 @@ async function waitingList() {
       seen.add(n);
       return true;
     });
-  return list.map(({ r, job }) => ({
+  const rows = list.map(({ r, job }) => ({
     id: r.id,
     name: r.name || 'Unnamed',
     phone: r.phone || (r.wa_id ? `+${r.wa_id}` : ''),
@@ -75,19 +89,23 @@ async function waitingList() {
     email: !!r.email,
     job: { id: job.id, title: job.title, stage: stageLabel(job.stage), created_at: job.created_at },
   }));
+  return { list: rows, affected };
 }
 
 export async function GET() {
   const s = await crmSession();
   if (!s) return json({ error: 'unauthorized' }, 401);
   const [schema, settings] = await Promise.all([schemaReady(), getPermissionSettings()]);
-  if (!schema.crmV3) return json({ ready: false, settings, customers: [], count: 0, email: msConfigured(), isAdmin: s.profile.role === 'admin' });
-  const customers = await waitingList();
+  if (!schema.crmV3) {
+    return json({ ready: false, settings, customers: [], count: 0, affected: 0, email: msConfigured(), isAdmin: s.profile.role === 'admin' });
+  }
+  const { list, affected } = await waitingList();
   return json({
     ready: true,
     settings,
-    customers: customers.slice(0, 300),
-    count: customers.length,
+    customers: list.slice(0, 300),
+    count: list.length,
+    affected,
     email: msConfigured(),
     isAdmin: s.profile.role === 'admin',
   });
@@ -113,7 +131,7 @@ export async function POST(req: Request) {
   const id = String(b.enquiryId || '');
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   if (b.action === 'agreed') {
-    // Only this enquiry (nothing is recorded on their others, or they wouldn't be listed), so Undo is exact.
+    // Only this enquiry, so Undo is exact (a staff "agreed" covers their other enquiries too).
     if (!(await grantPermission(id, `staff:${who}`))) return json({ error: 'Already recorded. Refresh the list.' }, 409);
     await logActivity({ enquiryId: id, kind: 'system', body: `WhatsApp permission turned on by ${who}`, byId: s.user.id });
     return json({ ok: true });
