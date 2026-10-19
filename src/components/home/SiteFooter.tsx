@@ -27,9 +27,9 @@ export function SiteFooter() {
           </div>
           <div>
             <h4>More</h4>
-            <a href="/commercial-funding">Funding &amp; finance</a>
-            <a href="/solar-estimator">Solar estimator</a>
-            <a href="/blog">Blog</a>
+            <Link href="/commercial-funding">Funding &amp; finance</Link>
+            <Link href="/solar-estimator">Solar estimator</Link>
+            <Link href="/blog">Blog</Link>
             <a href="#faq">FAQs</a>
             <a href="#quote">Free quote</a>
           </div>
@@ -37,7 +37,8 @@ export function SiteFooter() {
         <div className="base">
           <span>© 2026 Heliaxis Limited. MCS · RECC · NICEIC · Covering South Wales.</span>
           <span>
-            <Link href="/privacy-policy">Privacy</Link> · <Link href="/terms">Terms</Link> · <Link href="/data-deletion">Delete your data</Link>
+            <Link href="/privacy-policy">Privacy</Link> · <a href="#cookie-settings">Cookie settings</a> · <Link href="/terms">Terms</Link> ·{' '}
+            <Link href="/data-deletion">Delete your data</Link>
           </span>
           <span style={{ fontFamily: 'var(--mono)' }}>heliaxis.co.uk</span>
         </div>

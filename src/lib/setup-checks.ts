@@ -143,11 +143,11 @@ async function instantBookingReady() {
 }
 
 /**
- * Pages that arrive in later changes: Surveys → ⚙ booking settings and the Diary, and the WhatsApp
- * permission list. Their to-dos wait for them, so nobody is sent to a missing page. Switch each on
- * when its page is live (both are in by the final step that adds the Projects and Surveys menu links).
+ * Pages some to-dos send people to: Surveys → ⚙ booking settings and the Diary, and the WhatsApp
+ * permission list. A to-do waits while its page is off here, so nobody is sent to a missing page.
+ * Both are live now.
  */
-const PAGE_LIVE = { surveySettings: false, waPermission: false };
+const PAGE_LIVE = { surveySettings: true, waPermission: true };
 
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [

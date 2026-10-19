@@ -7,6 +7,23 @@ import './hub.css';
 
 export type HubTask = { id: string; title: string; due_date: string | null; priority: string };
 export type HubFollowUp = { id: string; title: string; next_step: string | null; next_step_at: string | null };
+/** One line of Home → Today: a survey, an install day or one of my diary entries (times already in UK time). */
+export type HubTodayItem = {
+  key: string;
+  kind: 'survey' | 'install' | 'diary';
+  /** The tag's word when it isn't the kind's (a home visit on a job that needs no survey). */
+  tag?: string;
+  /** Sort order (epoch ms; all-day items 0, first). */
+  sort: number;
+  time: string;
+  title: string;
+  sub: string;
+  href: string | null;
+  /** Start survey / Continue / Report (plain links: survey pages work offline). */
+  action: { href: string; label: string } | null;
+  directions: string | null;
+};
+export type HubToday = { items: HubTodayItem[]; canAddDiary: boolean };
 
 const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   app: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
@@ -108,6 +125,7 @@ export function HubView({
   followUps = [],
   needs = {},
   today: todayIso = '',
+  todayList = null,
   setup = { todos: [] },
   assistant = false,
 }: {
@@ -120,6 +138,8 @@ export function HubView({
   followUps?: HubFollowUp[];
   needs?: Partial<Record<string, { n: number; detail: string }>>;
   today?: string;
+  /** Home → Today (CRM users, once surveys.sql has run); null hides it. */
+  todayList?: HubToday | null;
   /** Setup jobs Claude has left (they tick themselves off): admins', or ones passed to this person. */
   setup?: FromClaudeProps;
   /** Show the "Talk to Metis" bar. */
@@ -201,7 +221,7 @@ export function HubView({
 
       <FromClaude {...setup} />
 
-      <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} />
+      <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} todayList={todayList} />
 
       {portals.length === 0 && !isAdmin ? (
         <p className="hub-banner">No portals have been added to your account yet. Ask an admin to give you access.</p>

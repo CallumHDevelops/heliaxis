@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { QUEUE_CHANGED, queued } from '@/lib/crm/photo-queue';
 import { nativeTokenForSignOut, syncNativePush } from '@/lib/push-client';
+import { clearSurveyStorage, SURVEYS_CHANGED, unsyncedSurveyChanges, warmSurveys, watchSurveys } from '@/lib/surveys/offline';
 import { clearTaskStorage } from '@/lib/tasks-offline';
 
 /**
@@ -13,7 +15,11 @@ import { clearTaskStorage } from '@/lib/tasks-offline';
  *   then compare with /app/version.json to offer (or require) the new APK; it also hands
  *   over its Firebase token for native notifications (syncNativePush);
  * - offline pill;
- * - clears cached pages and local task data on sign-out.
+ * - surveys: copies today's and tomorrow's to the phone (open, back to the front, back online) for
+ *   people who can use the CRM (`surveys`), and keeps sending survey answers, photos and drawings
+ *   that are waiting (src/lib/surveys/offline.ts);
+ * - clears cached pages, local task data and surveys on sign-out (warning first if survey changes
+ *   or photos haven't uploaded yet).
  */
 
 type Release = { versionCode: number; versionName: string; minVersionCode: number; notes?: string[] };
@@ -41,10 +47,12 @@ function subscribeOnline(cb: () => void) {
   };
 }
 
-export function AppRuntime() {
+export function AppRuntime({ surveys = false }: { /** Can use the CRM: keep the next two days' surveys on this phone. */ surveys?: boolean }) {
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [apkUpdate, setApkUpdate] = useState<{ release: Release; forced: boolean } | null>(null);
+  // What hasn't uploaded yet, kept current so the sign-out warning can be shown straight away.
+  const unsent = useRef({ surveys: 0, photos: 0 });
 
   // Service worker + web updates.
   useEffect(() => {
@@ -113,12 +121,55 @@ export function AppRuntime() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // Surveys on the phone: warm the offline pack (CRM people only; anyone else would be refused on
+  // every page) and keep the outbox moving.
+  useEffect(() => {
+    const warm = () => void (surveys ? warmSurveys().catch(() => null) : null);
+    const onVisible = () => document.visibilityState === 'visible' && warm();
+    window.addEventListener('online', warm);
+    document.addEventListener('visibilitychange', onVisible);
+    warm();
+    const stop = watchSurveys();
+    const count = () =>
+      void Promise.all([unsyncedSurveyChanges().catch(() => 0), queued().catch(() => [])]).then(([surveys, photos]) => {
+        unsent.current = { surveys, photos: photos.filter((p) => !p.failed && !p.uploadedAs).length };
+      });
+    window.addEventListener(SURVEYS_CHANGED, count);
+    window.addEventListener(QUEUE_CHANGED, count);
+    count();
+    return () => {
+      stop();
+      window.removeEventListener('online', warm);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener(SURVEYS_CHANGED, count);
+      window.removeEventListener(QUEUE_CHANGED, count);
+    };
+  }, [surveys]);
+
   // Sign-out cleanup.
   useEffect(() => {
     const onSubmit = (e: Event) => {
       const form = (e.target as HTMLElement)?.closest?.('form[data-signout]');
       if (!form) return;
+      const { surveys, photos } = unsent.current;
+      if (surveys || photos) {
+        const what = [
+          surveys ? `${surveys} survey change${surveys === 1 ? '' : 's'}` : '',
+          photos ? `${photos} photo${photos === 1 ? '' : 's'}` : '',
+        ].filter(Boolean);
+        const ok = window.confirm(
+          `${what.join(' and ')} ${surveys + photos === 1 ? 'hasn’t' : 'haven’t'} uploaded yet. They stay on this phone and upload when you next sign in. Sign out anyway?`
+        );
+        if (!ok) {
+          // Stop here, before the sign-out form is sent.
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
       clearTaskStorage();
+      // Wipes surveys from the phone unless some haven't uploaded (those stay).
+      void clearSurveyStorage().catch(() => 0);
       // Runs before React reads the form, so signOut() gets the token and unregisters it.
       const token = nativeTokenForSignOut();
       if (token && !form.querySelector('input[name="hx-native"]')) {
@@ -199,7 +250,7 @@ export function AppRuntime() {
       )}
 
       <style>{`
-        .hx-rt-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50;
+        .hx-rt-bar { position: fixed; left: 50%; bottom: var(--hx-rt-bottom, 16px); transform: translateX(-50%); z-index: 50;
           display: flex; flex-direction: column; gap: 6px; align-items: center; width: max-content; max-width: calc(100vw - 32px); }
         .hx-rt-note, .hx-rt-pill { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
           background: #211f18; color: #fffdf8; padding: 10px 14px; border-radius: 4px; font-size: .88rem; font-weight: 600;

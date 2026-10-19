@@ -2,9 +2,10 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { ensureOpportunity } from '@/lib/crm/server';
 import { leadRef } from '@/lib/notification-refs';
-import { ATTR_COOKIE, parseAttribution, sourceLabel } from '@/lib/attribution';
+import { ATTR_COOKIE, CONSENT_COOKIE, hasConsent, parseAttribution, sourceLabel } from '@/lib/attribution';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
+import { grantPermission } from '@/lib/whatsapp/permission';
 
 function escHtml(s: string) {
   return s
@@ -35,9 +36,14 @@ export async function POST(request: NextRequest) {
       interest: (body.interest || interestFromArr || '').toString().trim(),
       propertyType: (body.propertyType || '').toString().trim(),
       source: (body.source || 'quote-form').toString().trim() || 'quote-form',
+      // The unticked "OK to message me on WhatsApp about my enquiry" box.
+      whatsappOptIn: body.whatsappOptIn === true || body.whatsappOptIn === 'on' || body.whatsappOptIn === 'true',
     };
-    // Came from an ad or a tagged link? Label the enquiry with it ("meta-ad: <campaign>").
-    const attribution = parseAttribution(request.cookies.get(ATTR_COOKIE)?.value);
+    // Came from an ad or a tagged link? Label the enquiry with it ("meta-ad: <campaign>"). Only with
+    // cookie consent: an hx_attr set before the cookie banner existed (or without Accept) is ignored.
+    const attribution = hasConsent(request.cookies.get(CONSENT_COOKIE)?.value)
+      ? parseAttribution(request.cookies.get(ATTR_COOKIE)?.value)
+      : null;
     const adSource = sourceLabel(attribution);
     if (adSource) data.source = adSource;
 
@@ -83,6 +89,8 @@ export async function POST(request: NextRequest) {
           after(async () => {
             // Meta click id for the Conversions API (column added by crm-v2.sql; ignore if missing).
             if (attribution?.fbc) await supabase.from('enquiries').update({ meta_fbc: attribution.fbc }).eq('id', row.id).then(() => null, () => null);
+            // Ticked the WhatsApp box: permission, with when and how (crm-v3.sql columns, when they exist).
+            if (data.whatsappOptIn) await grantPermission(row.id, 'website-form');
             await ensureOpportunity(row.id, data.source);
           });
           after(() =>
@@ -138,6 +146,7 @@ export async function POST(request: NextRequest) {
               ${data.organization ? `<div class="row"><div class="label">Organisation</div><div class="value">${escHtml(data.organization)}</div></div>` : ''}
               <div class="row"><div class="label">Email</div><div class="value"><a href="mailto:${escHtml(data.email)}">${escHtml(data.email)}</a></div></div>
               <div class="row"><div class="label">Phone</div><div class="value">${escHtml(data.phone || 'Not provided')}</div></div>
+              <div class="row"><div class="label">WhatsApp</div><div class="value">${data.whatsappOptIn ? 'Happy to be messaged on WhatsApp' : 'Didn’t tick the WhatsApp box'}</div></div>
               <div class="row"><div class="label">Postcode</div><div class="value">${escHtml(data.postcode || 'Not provided')}</div></div>
               <div class="row"><div class="label">Interested in</div><div class="value">${escHtml(data.interest || 'Not specified')}</div></div>
               ${data.message ? `<div class="row"><div class="label">Message</div><div class="value">${escHtml(data.message)}</div></div>` : ''}

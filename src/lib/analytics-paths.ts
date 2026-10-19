@@ -1,6 +1,8 @@
 /**
- * Which routes may send Umami pageviews / scroll events / click heatmaps.
- * Admin wants analytics about public visitors (site, blog, tools) — not CMS/auth usage.
+ * Which routes may send Umami pageviews / scroll events / click heatmaps, and load Google Analytics
+ * and the cookie banner. Admin wants analytics about public visitors (site, blog, tools) — not
+ * CMS/auth usage, and never the personal /my/ and /book/ links. UmamiScript has its own copy of
+ * this list for client-side navigations: keep them in step.
  */
 
 const BLOCKED_EXACT = new Set([
@@ -21,7 +23,9 @@ const BLOCKED_PREFIXES = [
   '/preview/',
   '/api/',
   '/portal/',
+  // Personal links (customer project page, survey booking link): the token is in the address.
   '/my/',
+  '/book/',
 ];
 
 /** Fixed marketing routes that always exist (even with 0 clicks). */

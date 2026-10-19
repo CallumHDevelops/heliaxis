@@ -6,8 +6,14 @@
  * - /_next/static (hashed, immutable): cache-first.
  * - Pages in OFFLINE_PAGES: network-first, fall back to the last copy when offline.
  *   Only low-sensitivity pages are kept on the device (never subcontractor ID/bank data).
+ * - Survey pages (SURVEY_PAGES and /admin/surveys/{id}) the same way; a survey with no copy yet opens
+ *   the cached /admin/surveys/shell, which loads the survey from the phone (src/lib/surveys/offline.ts).
+ *   On a weak signal a kept survey page falls back to its copy after a few seconds.
+ * - WARM { urls } (from the survey offline pack): fetch and keep those pages, plus every
+ *   /_next/static file their HTML refers to, so they open after a cold start with no signal.
+ *   A new version carries those pages (and their files) over from the old caches when it takes over.
  * - Everything else under /admin: network, with /offline.html when there's no signal.
- * - /api is never cached here (Tasks keeps its own offline copy and outbox).
+ * - /api is never cached here (Tasks and Surveys keep their own offline copies and outboxes).
  */
 export const dynamic = 'force-dynamic';
 
@@ -15,11 +21,20 @@ const VERSION = (process.env.VERCEL_GIT_COMMIT_SHA || 'dev').slice(0, 12);
 
 const OFFLINE_PAGES = ['/admin', '/admin/tasks', '/admin/app'];
 
+// Solar surveys work with no signal. Not /report, /settings or /start.
+const SURVEY_PAGES = ['/admin/surveys', '/admin/surveys/todo', '/admin/surveys/drafts', '/admin/surveys/done', '/admin/surveys/shell'];
+const SURVEY_PAGE = '^/admin/surveys/[0-9a-fA-F-]{36}$';
+const STATIC_IN_HTML = String.raw`/_next/static/[^"'\s\\)]+`;
+
 const script = `
 const VERSION = ${JSON.stringify(VERSION)};
 const STATIC = 'hx-static-' + VERSION;
 const PAGES = 'hx-pages-' + VERSION;
 const OFFLINE_PAGES = ${JSON.stringify(OFFLINE_PAGES)};
+const SURVEY_PAGES = ${JSON.stringify(SURVEY_PAGES)};
+const SURVEY_PAGE = new RegExp(${JSON.stringify(SURVEY_PAGE)});
+const SURVEY_SHELL = '/admin/surveys/shell';
+const STATIC_IN_HTML = new RegExp(${JSON.stringify(STATIC_IN_HTML)}, 'g');
 const OFFLINE_URL = '/offline.html';
 
 self.addEventListener('install', (event) => {
@@ -29,10 +44,38 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('hx-') && k !== STATIC && k !== PAGES).map((k) => caches.delete(k))))
+      .then(async (keys) => {
+        const old = keys.filter((k) => k.startsWith('hx-') && k !== STATIC && k !== PAGES);
+        await carryForward(old).catch(() => {});
+        await Promise.all(old.map((k) => caches.delete(k)));
+      })
       .then(() => self.clients.claim())
   );
 });
+
+// A new deploy: keep the last version's offline pages, and the scripts their HTML refers to, so a
+// phone that updated after the morning warm-up still opens surveys with no signal. Each page is
+// replaced by a fresh copy the next time it loads with signal.
+async function carryForward(old) {
+  const pages = await caches.open(PAGES);
+  const stat = await caches.open(STATIC);
+  for (const name of old.filter((k) => k.startsWith('hx-pages-')).reverse()) {
+    const from = await caches.open(name);
+    const fromStatic = 'hx-static-' + name.slice('hx-pages-'.length);
+    for (const req of await from.keys()) {
+      if (!keepPage(pagePath(new URL(req.url))) || (await pages.match(req))) continue;
+      const res = await from.match(req);
+      if (!res) continue;
+      const html = await res.clone().text();
+      await pages.put(req, res);
+      for (const a of new Set(html.match(STATIC_IN_HTML) || [])) {
+        if (await stat.match(a)) continue;
+        const hit = await caches.match(a, { cacheName: fromStatic });
+        if (hit) await stat.put(a, hit);
+      }
+    }
+  }
+}
 
 self.addEventListener('message', (event) => {
   const msg = event.data || {};
@@ -40,6 +83,7 @@ self.addEventListener('message', (event) => {
   if (msg.type === 'CLEAR') {
     event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('hx-')).map((k) => caches.delete(k)))));
   }
+  if (msg.type === 'WARM' && Array.isArray(msg.urls)) event.waitUntil(warm(msg.urls));
   if (msg.type === 'CACHE_URLS' && Array.isArray(msg.urls)) {
     event.waitUntil(
       caches.open(STATIC).then((c) =>
@@ -114,6 +158,28 @@ function pagePath(url) {
   return url.pathname.replace(/\\/$/, '') || '/';
 }
 
+const isSurveyPage = (path) => SURVEY_PAGES.includes(path) || SURVEY_PAGE.test(path);
+const keepPage = (path) => OFFLINE_PAGES.includes(path) || isSurveyPage(path);
+
+// Fetch and keep pages for offline use, with the scripts and styles their HTML needs.
+async function warm(urls) {
+  const pages = await caches.open(PAGES);
+  const stat = await caches.open(STATIC);
+  for (const u of urls.slice(0, 40)) {
+    try {
+      const url = new URL(u, self.location.origin);
+      const path = pagePath(url);
+      if (url.origin !== self.location.origin || !keepPage(path)) continue;
+      const res = await fetch(url.href, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+      if (!res.ok || res.redirected) continue;
+      const html = await res.clone().text();
+      await pages.put(path, res);
+      const assets = [...new Set(html.match(STATIC_IN_HTML) || [])];
+      await Promise.all(assets.map((a) => stat.match(a).then((hit) => hit || stat.add(a).catch(() => {}))));
+    } catch {}
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -138,25 +204,49 @@ self.addEventListener('fetch', (event) => {
 
   if (req.mode !== 'navigate') return;
 
-  const keep = OFFLINE_PAGES.includes(pagePath(url));
+  const path = pagePath(url);
+  const keep = keepPage(path);
+  const network = fetch(req).then((res) => {
+    // Don't keep redirects (e.g. to /login) or errors as the offline copy.
+    if (keep && res.ok && !res.redirected) {
+      const copy = res.clone();
+      caches.open(PAGES).then((c) => c.put(path, copy));
+    }
+    return res;
+  });
+  const fallback = async () => {
+    if (keep) {
+      const hit = await caches.match(path, { cacheName: PAGES });
+      if (hit) return hit;
+      if (SURVEY_PAGE.test(path)) {
+        const shell = await caches.match(SURVEY_SHELL, { cacheName: PAGES });
+        if (shell) return shell;
+      }
+    }
+    return (await caches.match(OFFLINE_URL)) || Response.error();
+  };
+  if (!isSurveyPage(path)) {
+    event.respondWith(network.catch(fallback));
+    return;
+  }
+  // Survey pages on a weak signal (on a roof, in a loft): use the copy after 6 s, keep it fresh meanwhile.
   event.respondWith(
-    fetch(req)
-      .then((res) => {
-        // Don't keep redirects (e.g. to /login) or errors as the offline copy.
-        if (keep && res.ok && !res.redirected) {
-          const copy = res.clone();
-          caches.open(PAGES).then((c) => c.put(pagePath(url), copy));
+    new Promise((resolve) => {
+      let done = false;
+      const finish = (r) => {
+        if (!done) {
+          done = true;
+          resolve(r);
         }
-        return res;
-      })
-      .catch(async () => {
-        if (keep) {
-          const hit = await caches.match(pagePath(url), { cacheName: PAGES });
-          if (hit) return hit;
-        }
-        return (await caches.match(OFFLINE_URL)) || Response.error();
-      })
+      };
+      const timer = setTimeout(async () => {
+        const hit = (await caches.match(path, { cacheName: PAGES })) || (SURVEY_PAGE.test(path) && (await caches.match(SURVEY_SHELL, { cacheName: PAGES })));
+        if (hit) finish(hit);
+      }, 6000);
+      network.then((res) => { clearTimeout(timer); finish(res); }, async () => { clearTimeout(timer); finish(await fallback()); });
+    })
   );
+  event.waitUntil(network.catch(() => {}));
 });
 `;
 

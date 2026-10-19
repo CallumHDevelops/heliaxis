@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchLead } from './api';
 import { inboxHref, notifyEnquiryTeam, queueFirstContact } from './inbox';
 import { leadToEnquiry } from './leads';
+import { grantPermission } from './permission';
 import { toWaId } from './shared';
 import { ensureOpportunity } from '@/lib/crm/server';
 import { leadRef } from '@/lib/notification-refs';
@@ -31,7 +32,7 @@ export async function ingestLead(leadgenId: string) {
     });
     return;
   }
-  const { lead, interest, source, whatsappOptIn: optIn } = leadToEnquiry(
+  const { lead, interest, source, whatsappOptIn: optIn, optInSource } = leadToEnquiry(
     r.data.field_data ?? [],
     r.data.ad_name,
     process.env.META_LEADS_WHATSAPP_OPT_IN === 'true'
@@ -58,6 +59,8 @@ export async function ingestLead(leadgenId: string) {
     return;
   }
 
+  // When and how they agreed (crm-v3.sql columns; a separate step so the lead is saved without them).
+  if (optInSource) await grantPermission(row.id, optInSource, { at: r.data.created_time ? new Date(r.data.created_time).toISOString() : undefined });
   await ensureOpportunity(row.id, r.data.ad_name ? `Meta ad “${r.data.ad_name}”` : 'Meta lead form');
   const queued = optIn && toWaId(lead.phone) ? await queueFirstContact(row.id, lead.name) : false;
   await notifyEnquiryTeam(

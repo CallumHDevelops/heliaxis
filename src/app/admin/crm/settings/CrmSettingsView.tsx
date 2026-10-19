@@ -82,6 +82,11 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
         </section>
       )}
 
+      <Link href="/admin/surveys/settings" className="crm-set" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+        <h2>Survey booking and diary →</h2>
+        <p className="crm-muted crm-small">Online survey booking, your hours, travel between appointments, and your own diary entries.</p>
+      </Link>
+
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {!s ? (
         <p className="crm-muted">Loading…</p>

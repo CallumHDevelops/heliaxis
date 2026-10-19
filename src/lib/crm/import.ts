@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { toWaId } from '@/lib/whatsapp/shared';
+import { grantPermission } from '@/lib/whatsapp/permission';
 import { guessProducts } from './stages';
 
 /**
@@ -108,6 +109,8 @@ export async function createImportedEnquiry(e: ImportedEnquiryInput): Promise<{ 
     .select('id, name, postcode, interest')
     .single();
   if (error || !row) throw new Error(error?.message || 'Could not add the enquiry');
+  // How they agreed to WhatsApp (crm-v3.sql columns, a separate step that can't lose the enquiry).
+  if (e.whatsappOptIn) await grantPermission(row.id as string, 'import', { at: when });
 
   const projectId = await addImportedOpportunity(row, { stage, when, firstContactAt: e.firstContactAt ?? null });
   await db.from('crm_activities').insert({

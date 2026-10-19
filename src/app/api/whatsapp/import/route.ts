@@ -6,6 +6,7 @@ import { deletedBefore } from '@/lib/crm/delete-customer';
 import { chatSides, dateRange, MAX_CHAT_CHARS, nameFromFileName, parseChatExport, type MediaType } from '@/lib/whatsapp/chat-export';
 import { isUuid, json } from '@/lib/whatsapp/routes';
 import { toWaId } from '@/lib/whatsapp/shared';
+import { grantPermission } from '@/lib/whatsapp/permission';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -311,8 +312,9 @@ export async function POST(req: Request) {
       if (chatHere && !enquiry.wa_id) patch.wa_id = wa; // their WhatsApp from now on lands on this customer
       if (phone && !enquiry.phone) patch.phone = phone;
     }
-    if (theyWrote && saved && !enquiry.whatsapp_opt_in) patch.whatsapp_opt_in = true; // they messaged us
     if (Object.keys(patch).length) await db.from('enquiries').update(patch).eq('id', id);
+    // They messaged us, so they've agreed to WhatsApp (recorded as 'import'; never undoes a STOP).
+    if (theyWrote && saved && !enquiry.whatsapp_opt_in) await grantPermission(id, 'import');
 
     // They've been talking to us since the opportunity opened, so stop its "just following up"
     // sequence, as a live reply does (handleInboundMessage).

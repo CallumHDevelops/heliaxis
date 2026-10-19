@@ -8,7 +8,8 @@ const at = (s: string) => STAGE_KEYS.indexOf(s as (typeof STAGE_KEYS)[number]);
 
 /** Sales numbers for a period: by source / campaign, by person, the funnel and response times. */
 export async function GET(req: Request) {
-  if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
+  const s = await crmSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
   const days = Math.min(730, Math.max(7, Number(new URL(req.url).searchParams.get('days')) || 90));
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const db = createAdminClient();
@@ -74,5 +75,7 @@ export async function GET(req: Request) {
     bySource: sort(bySource),
     byOwner: sort(byOwner),
     funnel,
+    /** Admins get the CSV export buttons (GET /api/crm/export). */
+    canExport: s.profile.role === 'admin',
   });
 }

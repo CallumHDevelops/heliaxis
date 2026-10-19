@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 import { canAccess, HUB_PATH, portalForPath } from '@/lib/portals';
-import { ATTR_COOKIE, ATTR_MAX_AGE, attributionFromUrl } from '@/lib/attribution';
+import { ATTR_COOKIE, attrCookieOptions, attributionFromUrl, CONSENT_COOKIE, hasConsent } from '@/lib/attribution';
 
 const AUTH_PATHS = ['/login', '/register', '/pending'];
 
@@ -54,19 +54,15 @@ export async function middleware(request: NextRequest) {
   const isAuthPath = AUTH_PATHS.includes(pathname);
 
   // Anything outside admin/auth is public — let it through, remembering which ad/campaign
-  // brought the visitor so their enquiry is labelled (see src/lib/attribution.ts).
+  // brought the visitor so their enquiry is labelled (see src/lib/attribution.ts). Only once they've
+  // accepted cookies: before that, the banner sends their landing page to /api/attr if they accept.
   if (!isAdminPath && !isAuthPath) {
     const res = NextResponse.next();
-    const attr = attributionFromUrl(request.nextUrl);
-    if (attr) {
-      res.cookies.set(ATTR_COOKIE, encodeURIComponent(JSON.stringify(attr)), {
-        maxAge: ATTR_MAX_AGE,
-        path: '/',
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-      });
-    }
+    const consented = hasConsent(request.cookies.get(CONSENT_COOKIE)?.value);
+    const attr = consented ? attributionFromUrl(request.nextUrl) : null;
+    if (attr) res.cookies.set(ATTR_COOKIE, encodeURIComponent(JSON.stringify(attr)), attrCookieOptions());
+    // An hx_attr set before the cookie banner existed (or without Accept) goes.
+    else if (!consented && request.cookies.has(ATTR_COOKIE)) res.cookies.set(ATTR_COOKIE, '', { ...attrCookieOptions(), maxAge: 0 });
     return res;
   }
 

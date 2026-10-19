@@ -71,6 +71,12 @@ export function surveyTypeFor(products: string[]): SurveyTypeKey | null {
   const heat = products.includes('heatpump');
   return solar && heat ? 'solar_ashp' : heat ? 'ashp' : solar ? 'solar' : null;
 }
+/**
+ * Infrared, EV, LED or Other only (no solar, battery or heat pump) and no survey type set on the job: a
+ * home visit or a quote, never a survey slot. A job with no products yet isn't one: we don't know yet.
+ */
+export const noSurveyNeeded = (p: { survey_type?: string | null; products?: string[] | null }): boolean =>
+  !isSurveyType(p.survey_type) && !!p.products?.length && surveyTypeFor(p.products) === null;
 
 export const PHOTO_CATEGORIES = [
   { key: 'survey', label: 'Survey' },

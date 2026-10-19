@@ -1,0 +1,723 @@
+/* The Diary, Find a time, + Add to my diary and booking settings. Phone first: 48 px targets,
+   one column at 360 px, no sideways scrolling, nothing that needs a swipe. */
+.dy {
+  --ink: #211f18;
+  --muted: #6e6a5e;
+  --line: rgba(33, 31, 24, 0.14);
+  --card: #fffdf8;
+  --paper: #f7f2e7;
+  --solar: #f8bc1e;
+  --amber: #c77f04;
+  --ok: #3f7d4e;
+  --err: #b3261e;
+  --wa: #1f7a4d;
+  --warn-bg: rgba(248, 188, 30, 0.16);
+  --warn-line: rgba(199, 127, 4, 0.35);
+  color: var(--ink);
+  max-width: 860px;
+  margin: 0 auto;
+  min-width: 0;
+}
+.dy *,
+.dy *::before,
+.dy *::after {
+  box-sizing: border-box;
+}
+.dy-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.dy-head h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.2;
+}
+.dy-head p {
+  color: var(--muted);
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+}
+.dy-muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.dy-small {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.dy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.dy-actions .dy-btn {
+  flex: 1 1 140px;
+}
+.dy-btn {
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  min-height: 48px;
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--solar);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.dy-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dy-btn--solar {
+  background: var(--solar);
+  border-color: var(--solar);
+  color: var(--ink);
+}
+.dy-btn--ghost {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.dy-btn--danger {
+  background: var(--card);
+  border-color: rgba(179, 38, 30, 0.45);
+  color: var(--err);
+}
+.dy-btn--small {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+.dy-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--amber);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.dy-banner {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  margin: 0 0 12px;
+}
+.dy-banner--err {
+  background: rgba(179, 38, 30, 0.07);
+  border-color: rgba(179, 38, 30, 0.3);
+  color: var(--err);
+}
+.dy-banner--ok {
+  background: rgba(63, 125, 78, 0.09);
+  border-color: rgba(63, 125, 78, 0.35);
+  color: var(--ok);
+}
+.dy-section {
+  margin: 18px 0 10px;
+}
+.dy-section > h2 {
+  font-size: 1.1rem;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dy-count {
+  background: var(--ink);
+  color: var(--solar);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  padding: 2px 9px;
+}
+.dy-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.dy-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.dy-card p {
+  margin: 4px 0;
+}
+.dy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.dy-row > .dy-btn {
+  flex: 1 1 130px;
+}
+.dy-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: rgba(33, 31, 24, 0.07);
+  color: var(--muted);
+  vertical-align: middle;
+}
+.dy-tag--req {
+  background: var(--warn-bg);
+  color: var(--amber);
+}
+.dy-tag--ok {
+  background: rgba(63, 125, 78, 0.12);
+  color: var(--ok);
+}
+.dy-tag--err {
+  background: rgba(179, 38, 30, 0.1);
+  color: var(--err);
+}
+.dy-yes {
+  color: var(--ok);
+  font-weight: 600;
+}
+.dy-no {
+  color: var(--err);
+  font-weight: 600;
+}
+.dy-msg {
+  background: #fff;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  margin: 8px 0 0;
+}
+
+/* One day in the diary */
+.dy-day {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.dy-day--today {
+  border-color: var(--amber);
+  box-shadow: inset 4px 0 0 var(--solar);
+}
+.dy-day--off {
+  background: rgba(255, 253, 248, 0.6);
+}
+.dy-dayhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px 6px;
+}
+.dy-dayhead h3 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+.dy-dayhead span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.dy-why {
+  margin: 0 14px 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.dy-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+}
+.dy-line {
+  display: flex;
+  gap: 10px;
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+.dy-line b {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: none;
+  min-width: 92px;
+}
+.dy-line > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dy-line--leg {
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.dy-line--leg b {
+  font-weight: 400;
+}
+.dy-line--home {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.dy-line--free {
+  color: var(--ok);
+  font-size: 0.85rem;
+}
+.dy-line--allday {
+  background: rgba(33, 31, 24, 0.05);
+}
+.dy-item {
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  min-height: 32px;
+}
+a.dy-item:hover,
+button.dy-item:hover {
+  text-decoration: underline;
+}
+.dy-item--survey {
+  font-weight: 700;
+}
+.dy-flag {
+  margin: 4px 14px 6px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+.dy-flag--warn {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+}
+.dy-flag--grey {
+  background: rgba(33, 31, 24, 0.05);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.dy-flag--moved {
+  background: rgba(227, 120, 12, 0.12);
+  border: 1px solid rgba(199, 90, 4, 0.4);
+}
+.dy-flag .dy-row {
+  margin-top: 6px;
+}
+.dy-backfill label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.dy-backfill input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--ink);
+}
+
+/* Sheets (+ Add to my diary, Find a time) */
+.dy-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(20, 18, 14, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+.dy-sheet-box {
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 14px;
+  width: min(600px, 100%);
+  max-height: 94vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 18px;
+}
+.dy-sheet-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: sticky;
+  top: -14px;
+  background: var(--paper);
+  margin: -14px -16px 6px;
+  padding: 10px 8px 8px 16px;
+  z-index: 2;
+  border-bottom: 1px solid var(--line);
+}
+.dy-sheet-top h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.dy-x {
+  font: inherit;
+  font-size: 1.4rem;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  flex: none;
+}
+.dy-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+.dy-input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+}
+textarea.dy-input {
+  min-height: 70px;
+  resize: vertical;
+}
+.dy-input--short {
+  max-width: 130px;
+}
+.dy-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.dy-grid2 > div {
+  min-width: 0;
+}
+.dy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dy-chip {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.dy-chip.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--solar);
+}
+.dy-stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.dy-stepper button {
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 700;
+  width: 48px;
+  min-height: 48px;
+  flex: none;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  color: var(--ink);
+}
+.dy-stepper input {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* A field with its button (or words) beside it. */
+.dy-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dy-inline > .dy-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dy-inline > .dy-input--short {
+  flex: 0 0 auto;
+}
+.dy-inline > .dy-btn {
+  flex: none;
+}
+.dy-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.dy-check input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--ink);
+}
+.dy-results {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.dy-results button {
+  font: inherit;
+  width: 100%;
+  text-align: left;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  cursor: pointer;
+  color: var(--ink);
+}
+.dy-results li:last-child button {
+  border-bottom: 0;
+}
+.dy-results small {
+  display: block;
+  color: var(--muted);
+}
+.dy-picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-height: 52px;
+}
+.dy-times {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+.dy-time {
+  font: inherit;
+  text-align: left;
+  min-height: 56px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.dy-time b {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+.dy-time small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.dy-time.is-near small {
+  color: var(--ok);
+  font-weight: 600;
+}
+.dy-time.is-on {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  background: rgba(248, 188, 30, 0.18);
+}
+.dy-dayname {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin: 12px 0 2px;
+}
+.dy-bar {
+  position: sticky;
+  bottom: -18px;
+  background: var(--paper);
+  margin: 12px -16px -18px;
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dy-bar .dy-btn {
+  flex: 1 1 140px;
+}
+
+/* Booking settings */
+.dy-set {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.dy-set > h2 {
+  font-size: 1.05rem;
+  margin: 0 0 4px;
+}
+.dy-set details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.dy-hours {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.dy-hours td {
+  padding: 4px 4px 4px 0;
+  vertical-align: middle;
+}
+.dy-hours td:first-child {
+  width: 1%;
+  white-space: nowrap;
+}
+.dy-hours .dy-input {
+  min-height: 44px;
+  padding: 6px 8px;
+}
+.dy-hours .dy-check {
+  min-height: 44px;
+}
+.dy-sv {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: #fff;
+}
+.dy-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.dy-dates span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 4px 2px 12px;
+  font-size: 0.85rem;
+}
+.dy-dates button {
+  border: 0;
+  background: none;
+  width: 36px;
+  height: 36px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--muted);
+}
+.dy-savebar {
+  position: sticky;
+  bottom: var(--hx-tabbar, 0px);
+  z-index: 4;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dy-facts {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.dy-facts li {
+  margin: 4px 0;
+}
+
+@media (max-width: 640px) {
+  .dy-sheet {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .dy-sheet-box {
+    border-radius: 14px 14px 0 0;
+    max-height: 96vh;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+  .dy-line b {
+    min-width: 84px;
+  }
+}
+@media (max-width: 380px) {
+  .dy-grid2 {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .dy-line {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .dy-line b {
+    min-width: 76px;
+  }
+}

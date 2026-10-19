@@ -31,13 +31,18 @@ export type Task = {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  /** The CRM job the task belongs to (opportunity tasks, deadline and survey follow-ups). */
+  crm_project_id?: string | null;
 };
+
+/** The job a task belongs to, for the "Job: HX-0042 / Jane Smith" chip. */
+export type TaskJob = { ref: string | null; name: string };
 
 /** Someone a task can be assigned to (an approved account). */
 export type Assignee = { id: string; name: string };
 
 export const TASK_COLUMNS =
-  'id, title, notes, assignee_id, assignee_name, due_date, priority, status, created_by, created_at, updated_at, completed_at';
+  'id, title, notes, assignee_id, assignee_name, due_date, priority, status, created_by, created_at, updated_at, completed_at, crm_project_id';
 
 /** Today as YYYY-MM-DD in UK time — due dates are plain dates, so compare as strings. */
 export function todayISO() {
