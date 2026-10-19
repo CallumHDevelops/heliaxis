@@ -66,7 +66,8 @@ export const PORTALS: Portal[] = [
     label: 'Our team',
     description: 'Heliaxis’s own operatives — cards, qualifications and expiry dates (kept in RAMS).',
     // RAMS holds the one list of people (crews and RAMS documents name them); this opens it on our employees.
-    href: 'https://rams.heliaxis.co.uk/operatives?team=heliaxis',
+    // Through /api/sso/rams so it opens signed in (src/lib/sso.ts).
+    href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis',
     external: true,
     paths: [],
   },
@@ -82,7 +83,7 @@ export const PORTALS: Portal[] = [
     key: 'rams',
     label: 'RAMS',
     description: 'Risk assessments and method statements for jobs.',
-    href: 'https://rams.heliaxis.co.uk',
+    href: '/api/sso/rams',
     external: true,
     paths: [],
   },
@@ -105,6 +106,9 @@ export const HUB_PATH = '/admin';
 
 /** Also open to every approved user: the Android app download page. */
 export const APP_PATH = '/admin/app';
+
+/** Confirming your email before one-tap sign-in to RAMS (src/lib/sso.ts): open to any approved user. */
+export const SSO_PATH = '/admin/sso';
 
 /**
  * What members could reach before per-portal access existed. Used when a profile
@@ -136,7 +140,7 @@ export function canAccess(profile: AccessProfile | null | undefined, key: Portal
  */
 export function portalForPath(pathname: string): PortalKey | 'admin' | null {
   const p = pathname.replace(/\/$/, '') || '/';
-  if (p === HUB_PATH || p === APP_PATH) return null;
+  if (p === HUB_PATH || p === APP_PATH || p === SSO_PATH || p.startsWith(`${SSO_PATH}/`)) return null;
   if (OPEN_SETUP_PATHS.some((a) => p.startsWith(`${a}/`))) return null;
   if (ADMIN_ONLY_PATHS.some((a) => p === a || p.startsWith(`${a}/`))) return 'admin';
   for (const portal of PORTALS) {

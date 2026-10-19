@@ -85,8 +85,14 @@ function Card({
     </>
   );
   const cls = `hub-card${variant ? ` is-${variant}` : ''}${badge ? ' has-badge' : ''}`;
+  // Our own /api/sso/… links stay in this window: on an iPhone Home Screen app a new window is
+  // Safari, which doesn't have this sign-in.
   return external ? (
-    <a className={cls} href={href} target="_blank" rel="noopener noreferrer">{body}</a>
+    href.startsWith('/') ? (
+      <a className={cls} href={href}>{body}</a>
+    ) : (
+      <a className={cls} href={href} target="_blank" rel="noopener noreferrer">{body}</a>
+    )
   ) : (
     <Link className={cls} href={href}>{body}</Link>
   );

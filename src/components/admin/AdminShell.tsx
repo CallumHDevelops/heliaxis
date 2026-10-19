@@ -25,7 +25,8 @@ type Tab =
   | 'assistant'
   | 'app';
 
-const RAMS_URL = 'https://rams.heliaxis.co.uk';
+// Opens RAMS already signed in when it can (src/lib/sso.ts).
+const RAMS_URL = '/api/sso/rams';
 
 const ICON = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
 const icons = {
@@ -95,13 +96,21 @@ function TabLink({
   icon: ReactNode;
   badge?: number;
 }) {
-  return (
-    <Link href={href} className={active ? 'hx-tab is-active' : 'hx-tab'} aria-current={active ? 'page' : undefined}>
+  const body = (
+    <>
       <span className="hx-tab__icon">
         {icon}
         {badge ? <span className="hx-tab__badge">{badge > 9 ? '9+' : badge}</span> : null}
       </span>
       <span className="hx-tab__label">{label}</span>
+    </>
+  );
+  const cls = active ? 'hx-tab is-active' : 'hx-tab';
+  // Not a page here (e.g. /api/sso/rams): a plain link, so it's never prefetched.
+  if (href.startsWith('/api/') || /^https?:/.test(href)) return <a href={href} className={cls}>{body}</a>;
+  return (
+    <Link href={href} className={cls} aria-current={active ? 'page' : undefined}>
+      {body}
     </Link>
   );
 }
@@ -186,7 +195,7 @@ export async function AdminShell({
         ]
       : []),
     ...(can('social') ? [{ href: 'https://social.heliaxis.co.uk', label: 'Social media studio', active: false }] : []),
-    ...(can('team') ? [{ href: 'https://rams.heliaxis.co.uk/operatives?team=heliaxis', label: 'Our team', active: false }] : []),
+    ...(can('team') ? [{ href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis', label: 'Our team', active: false }] : []),
     { href: '/admin/app', label: 'Get the app', active: active === 'app' },
   ];
   return (

@@ -715,10 +715,14 @@ textarea.crm-input {
   font-size: 0.66rem;
   color: var(--muted);
 }
-.crm-tick.read {
+/* WhatsApp delivery ticks on our messages (not .crm-tick, which is the round task tick-box). */
+.crm-wa-tick {
+  white-space: nowrap;
+}
+.crm-wa-tick.read {
   color: #2c8bd6;
 }
-.crm-tick.failed {
+.crm-wa-tick.failed {
   color: var(--err);
   font-weight: 800;
 }
