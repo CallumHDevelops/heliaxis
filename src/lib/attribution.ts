@@ -1,10 +1,25 @@
 /**
- * Where a website visitor came from (ad click → enquiry). The middleware stores the last paid/tagged
- * landing in a first-party cookie; /api/quote reads it so every form's enquiries are labelled
- * without each form having to pass anything.
+ * Where a website visitor came from (ad click → enquiry). Once the visitor accepts cookies, the
+ * landing they arrived on (POST /api/attr) and any later paid/tagged landing (the middleware) are kept
+ * in a first-party cookie; /api/quote reads it so every form's enquiries are labelled without each
+ * form having to pass anything. Without consent there's no cookie and enquiries keep their form's source.
  */
 export const ATTR_COOKIE = 'hx_attr';
 export const ATTR_MAX_AGE = 60 * 60 * 24 * 60; // 60 days
+
+/** The visitor's cookie choice ('yes' | 'no'). Strictly necessary (it only remembers the choice), so it needs no consent. */
+export const CONSENT_COOKIE = 'hx_consent';
+export const CONSENT_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
+export const hasConsent = (value: string | null | undefined) => value === 'yes';
+
+/** How hx_attr is set (middleware and /api/attr). httpOnly: only the server reads it. */
+export const attrCookieOptions = () => ({
+  maxAge: ATTR_MAX_AGE,
+  path: '/',
+  sameSite: 'lax' as const,
+  secure: process.env.NODE_ENV === 'production',
+  httpOnly: true,
+});
 
 export type Attribution = {
   s?: string; // utm_source

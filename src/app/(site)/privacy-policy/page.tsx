@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/privacy-policy' },
 };
 
-const UPDATED = '18 October 2026';
+const UPDATED = '19 October 2026';
 const mail = <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>;
 
 const sections: LegalSection[] = [
@@ -39,7 +39,11 @@ const sections: LegalSection[] = [
       <div className="lg-box">
         <ul>
           <li>We use your details to answer your enquiry, quote, install and look after your system.</li>
-          <li>We talk to customers mainly by WhatsApp and email. Some reminders and replies are sent automatically.</li>
+          <li>
+            We talk to customers mainly by WhatsApp and email. Some reminders and replies are sent automatically. Reply STOP on
+            WhatsApp and the automatic ones stop.
+          </li>
+          <li>We only use analytics and advert cookies if you accept them.</li>
           <li>We use trusted service providers (for hosting, email, messaging and payments). Some are based in the US.</li>
           <li>
             We don’t sell your data. We measure our website and our adverts, and share limited information with Meta to improve
@@ -65,8 +69,8 @@ const sections: LegalSection[] = [
             the website or advert that brought you here.
           </li>
           <li>
-            If you arrive from one of our adverts, the campaign details and the Facebook/Google click reference in the web
-            address (see <a href="#cookies">cookies</a>).
+            If you accept cookies and arrived from one of our adverts, the campaign details and the Facebook/Google click
+            reference in the web address (see <a href="#cookies">cookies</a>). If you reject cookies, we don’t keep these.
           </li>
           <li>
             Where you click on our pages (as anonymous positions on the page, not linked to you), to help us improve the design.
@@ -95,7 +99,34 @@ const sections: LegalSection[] = [
             file name, not the file itself. If a photo or document is needed for your quote or installation, we may save a copy to
             your project file.
           </li>
-          <li>Which advert or campaign your enquiry came from.</li>
+          <li>Which advert or campaign your enquiry came from, if you accepted cookies or came from a Facebook or Instagram lead form.</li>
+          <li>
+            Whether you’re happy for us to message you on WhatsApp: if you tick the box on our forms, agree in a lead form, or
+            message us first, we record that you agreed, when and how. If you reply STOP, we record that too.
+          </li>
+        </ul>
+
+        <h3 id="booking">When you book a survey online</h3>
+        <ul>
+          <li>
+            What the survey is for, your postcode, the time you pick, and then your name, mobile, email, address and anything you
+            tell us about parking or access.
+          </li>
+          <li>
+            Your postcode is looked up with postcodes.io (which uses Ordnance Survey and Royal Mail data) to find roughly where
+            you are. We then check our surveyor’s diary, including their Outlook calendar, for free times, and work out drive
+            times between appointments. We do that ourselves or, if we’ve switched it on, with Google Maps Platform, which
+            receives the locations of the trip (not your name or contact details).
+          </li>
+          <li>
+            To stop misuse of the form we keep a scrambled (hashed) form of your IP address with the booking. If we’ve switched it
+            on, Cloudflare Turnstile checks that you’re not a robot. While you’re booking, your browser remembers the time you’re
+            holding until you close the tab.
+          </li>
+          <li>
+            Booking online creates a new enquiry. If your email or mobile matches someone already in our records, we flag it for
+            our team to check. We don’t show you anything about the other record or change it.
+          </li>
         </ul>
         <p>
           Please don’t send us health or other sensitive information unless it’s relevant (for example, if someone in the home
@@ -148,6 +179,17 @@ const sections: LegalSection[] = [
             <tr>
               <td>Reply to your enquiry, arrange a survey and prepare a quote</td>
               <td>Taking steps at your request before a contract; our legitimate interests for business enquiries</td>
+            </tr>
+            <tr>
+              <td>
+                Book your survey online: find free times, work out drive times, and stop misuse of the booking form (see{' '}
+                <a href="#booking">booking a survey online</a>)
+              </td>
+              <td>Taking steps at your request before a contract; legitimate interests (keeping the form safe)</td>
+            </tr>
+            <tr>
+              <td>Keep a record of whether you’ve agreed to WhatsApp messages, and of any STOP reply</td>
+              <td>Legitimate interests (showing what you agreed to and respecting your choice)</td>
             </tr>
             <tr>
               <td>
@@ -230,6 +272,13 @@ const sections: LegalSection[] = [
         <p>
           To stop follow-ups or review requests, just tell us in reply on WhatsApp or email {mail}. We’ll still send messages we
           need to for a job that’s in progress (such as installation details) unless you ask us to use another method.
+        </p>
+        <p id="whatsapp">
+          <strong>WhatsApp permission.</strong> We record when and how you agreed to hear from us on WhatsApp: by ticking “OK to
+          message me on WhatsApp” on our website, in a Facebook or Instagram lead form that asks, by messaging us first, or by
+          telling one of our team. <strong>Reply STOP</strong> to any of our WhatsApp messages and our system won’t send you any
+          more automatic WhatsApp messages (reminders, follow-ups or quick replies). Reply START to turn them back on. We’ll
+          still answer if you message us, and we may send booking details by email instead.
         </p>
       </>
     ),
@@ -331,7 +380,10 @@ const sections: LegalSection[] = [
             </tr>
             <tr>
               <td>Google (US)</td>
-              <td>Website analytics, web fonts, and delivery of our team’s app notifications</td>
+              <td>
+                Website analytics (only if you accept cookies), web fonts, delivery of our team’s app notifications, and, if we’ve
+                switched it on, drive times for <a href="#booking">online survey booking</a> (Google Maps Platform)
+              </td>
             </tr>
             <tr>
               <td>Umami (US)</td>
@@ -339,7 +391,10 @@ const sections: LegalSection[] = [
             </tr>
             <tr>
               <td>postcodes.io (UK), Esri (US), OpenStreetMap (UK), Cloudflare (US)</td>
-              <td>Postcode lookups, maps and satellite images in our roof designer and internal maps</td>
+              <td>
+                Postcode lookups (including for online survey booking), maps and satellite images in our roof designer and internal
+                maps, and, if we’ve switched it on, Cloudflare’s “not a robot” check on the booking form
+              </td>
             </tr>
             <tr>
               <td>Our installation partners and subcontractors</td>
@@ -432,6 +487,11 @@ const sections: LegalSection[] = [
           that person no longer works on our jobs.
         </li>
         <li>
+          <strong>Online survey bookings:</strong> as part of your enquiry or customer record, as above. If you start booking but
+          don’t finish, the time you held lapses after a few minutes, and we keep only the postcode you typed and the scrambled
+          form of your IP address, for up to 2 years like other enquiries that don’t go ahead.
+        </li>
+        <li>
           <strong>Website analytics:</strong> for up to 14 months.
         </li>
         <li>
@@ -445,7 +505,11 @@ const sections: LegalSection[] = [
     title: 'Cookies and similar technologies',
     body: (
       <>
-        <p>Our public website uses:</p>
+        <p>
+          When you first visit our website we ask whether you accept cookies. <strong>Accept</strong> and{' '}
+          <strong>Reject</strong> are equally easy, and nothing optional is stored until you choose Accept. You can change your
+          mind at any time with <a href="#cookie-settings">Cookie settings</a> at the bottom of every page.
+        </p>
         <table className="lg-table">
           <thead>
             <tr>
@@ -457,28 +521,40 @@ const sections: LegalSection[] = [
           <tbody>
             <tr>
               <td>
+                <code>hx_consent</code>
+              </td>
+              <td>Remembers whether you chose Accept or Reject, so we don’t ask on every page. Always set once you choose</td>
+              <td>180 days</td>
+            </tr>
+            <tr>
+              <td>
                 <code>_ga</code>, <code>_ga_…</code> (Google Analytics)
               </td>
-              <td>Counts visits and shows how people use the site</td>
+              <td>Counts visits and shows how people use the site. Only if you accept</td>
               <td>Up to 2 years</td>
             </tr>
             <tr>
               <td>
                 <code>hx_attr</code>
               </td>
-              <td>Remembers which advert or campaign brought you to us, so we can tell which adverts work</td>
+              <td>
+                Remembers which advert or campaign brought you to us, so we can tell which adverts work. Only if you accept
+              </td>
               <td>60 days</td>
             </tr>
           </tbody>
         </table>
         <p>
-          We also use Umami for website statistics, which doesn’t use cookies, and record anonymous click positions to improve
-          page layouts. Web fonts are loaded from Google, which receives your IP address when the page loads.
+          If you choose Reject, we remove the Google Analytics and <code>hx_attr</code> cookies if they were set before. We also
+          use Umami for website statistics, which doesn’t use cookies, and record anonymous click positions to improve page
+          layouts. Web fonts are loaded from Google, which receives your IP address when the page loads. Clicking our{' '}
+          <strong>WhatsApp us</strong> button opens WhatsApp (Meta), which has its own privacy policy.
         </p>
         <p>
-          Your customer project page sets no cookies of its own. Our team’s sign-in areas use cookies that are needed to keep
-          staff and subcontractors logged in. You can block or delete cookies in your browser settings; the website will still
-          work.
+          Your customer project page and your survey booking link set no cookies of their own, and our website statistics never
+          record them. While you book a survey, the booking page remembers the time you’re holding in your browser tab until
+          you close it. Our team’s sign-in areas use cookies that are needed to keep staff and subcontractors logged in. You
+          can also block or delete cookies in your browser settings; the website will still work.
         </p>
       </>
     ),
