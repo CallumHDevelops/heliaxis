@@ -450,7 +450,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     !crmV3,
     sql(
       'crm-v3.sql',
-      'Projects (job numbers, delivery checklists, paperwork), task reminders, WhatsApp permission records. Run all three of these now, in order: the new Projects, Surveys and Diary screens appear once they’re done.',
+      'Projects (job numbers, delivery checklists, paperwork), task reminders, WhatsApp permission records. Run this and the three below it now, in order: the new Projects, Surveys and Diary screens appear once they’re done.',
       4,
       'crm-v2.sql'
     )
