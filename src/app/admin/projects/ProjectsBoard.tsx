@@ -414,15 +414,16 @@ function ProjectsBoardView({ rows, onMove, onComplete }: { rows: ProjectListRow[
                       setOver(null);
                     }}
                   >
+                    {/* The name gets the card's whole width (the ref sits with the meta, as on CRM cards). */}
                     <div className="crm-card-top">
-                      <Link href={`/admin/projects/${p.id}`} className="crmh-card2__link" draggable={false}>
+                      <Link href={`/admin/projects/${p.id}`} className="crmh-card2__link" draggable={false} title={p.customer?.name || p.title}>
                         {p.customer?.name || p.title}
                       </Link>
-                      {refOf(p) && <span className="crmh-refchip">{refOf(p)}</span>}
                     </div>
                     <div className="crm-card-sub">{p.title}</div>
                     <span className={`crm-next${p.next_date ? '' : ' none'}`}>{nextWords(p)}</span>
                     <div className="crm-card-mid">
+                      {refOf(p) && <span className="crmh-refchip">{refOf(p)}</span>}
                       <Progress p={p} />
                       <Flags p={p} max={2} />
                       <span className="crmh-card2__end">

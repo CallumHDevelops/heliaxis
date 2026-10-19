@@ -120,8 +120,10 @@ export function RecordHeader({
             {stageLabel(project.stage)} <span aria-hidden="true">▾</span>
           </button>
           {primary.action !== 'reopen' && (
-            <button type="button" className="crm-btn crmr-primary" onClick={() => onPrimary(primary.action, primary.to, primary.confirm)}>
-              {primary.label}
+            // The short wording here ("Move to Complete anyway"), so the name keeps its room; the checklist
+            // card's button, this tooltip and the confirm still say how many key items aren't done.
+            <button type="button" className="crm-btn crmr-primary" title={primary.label} onClick={() => onPrimary(primary.action, primary.to, primary.confirm)}>
+              <span className="crmr-primary__t">{primary.label.replace(/ · .*$/, '')}</span>
             </button>
           )}
           <MoreMenu

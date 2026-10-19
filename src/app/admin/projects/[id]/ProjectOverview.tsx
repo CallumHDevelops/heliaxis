@@ -58,26 +58,45 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
           <b>Checklist, install team, system and paperwork</b> appear once crm-v3.sql has been run (see your to-do list).
         </p>
       )}
-      <DatesTeam key={`${p.id}-${p.updated_at}`} rec={rec} team={team} actions={actions} />
+      <DatesTeam key={p.id} rec={rec} team={team} actions={actions} />
       {v3 && (
         <>
           <details className="crmh-card crmr-ovsec" open={wide && delivery} key={`sys-${wide}`}>
             <summary>
               <h3>System details</h3>
             </summary>
-            <SystemDetails key={`${p.id}-${p.updated_at}`} rec={rec} actions={actions} />
+            <SystemDetails key={p.id} rec={rec} actions={actions} />
           </details>
           <details className="crmh-card crmr-ovsec" open={wide && delivery} key={`paper-${wide}`}>
             <summary>
               <h3>Paperwork</h3>
               {rec.deadlines.some((d) => !d.done && d.daysLeft < 0) && <span className="crmh-tag crmh-tag--deadline">Overdue</span>}
             </summary>
-            <Paperwork key={`${p.id}-${p.updated_at}`} rec={rec} today={today} actions={actions} />
+            <Paperwork key={p.id} rec={rec} today={today} actions={actions} />
           </details>
         </>
       )}
     </div>
   );
+}
+
+/**
+ * A form's draft of the saved values that survives the page's polls. Untouched, it follows what's
+ * saved (a colleague's change, or this form's own save coming back tidied, e.g. the BUS expiry filled
+ * in); once someone starts typing, their changes stay until they save or cancel. After a save,
+ * `sent(f)` marks what went, so the reload that follows replaces it.
+ */
+function useDraft<T>(init: T) {
+  const key = JSON.stringify(init);
+  const [f, setF] = useState(init);
+  // key: the saved values last seen; base: what the draft counts as untouched against.
+  const [seen, setSeen] = useState({ key, base: key });
+  if (seen.key !== key) {
+    setSeen({ key, base: key });
+    if (JSON.stringify(f) === seen.base) setF(init);
+  }
+  const sent = (v: T) => setSeen((s) => ({ ...s, base: JSON.stringify(v) }));
+  return [f, setF, sent] as const;
 }
 
 /* ── Everything for this job ─────────────────────────────────────────────────── */
@@ -337,7 +356,7 @@ function DatesTeam({ rec, team, actions }: { rec: RecordData; team: TeamMember[]
     handover_at: dayInput(p.handover_at),
     rams_project_id: p.rams_project_id || '',
   };
-  const [f, setF] = useState(init);
+  const [f, setF, sent] = useDraft(init);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
@@ -379,7 +398,7 @@ function DatesTeam({ rec, team, actions }: { rec: RecordData; team: TeamMember[]
     }
     if (!Object.keys(body).length) return;
     setBusy(true);
-    await actions.patch(body);
+    if (await actions.patch(body)) sent(f);
     setBusy(false);
   }
 
@@ -560,7 +579,7 @@ function SystemDetails({ rec, actions }: { rec: RecordData; actions: OverviewAct
   const sys = (p.system ?? {}) as Record<string, unknown>;
   const fields = SYSTEM_FIELDS.filter((x) => !p.products.length || x.for.some((k) => p.products.includes(k)) || sys[x.key] != null);
   const init = Object.fromEntries(fields.map((x) => [x.key, sys[x.key] == null ? '' : String(sys[x.key])]));
-  const [f, setF] = useState<Record<string, string>>(init);
+  const [f, setF, sent] = useDraft<Record<string, string>>(init);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   return (
@@ -569,7 +588,7 @@ function SystemDetails({ rec, actions }: { rec: RecordData; actions: OverviewAct
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
-        await actions.patch({ system: Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== init[k])) });
+        if (await actions.patch({ system: Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== init[k])) })) sent(f);
         setBusy(false);
       }}
     >
@@ -641,7 +660,7 @@ function Paperwork({ rec, today, actions }: { rec: RecordData; today: string; ac
   const groups = PAPER_GROUPS.filter((g) => !g.heat || heat).map((g) => ({ ...g, fields: g.fields.filter((x) => !x.solar || solar) }));
   const keys = ['dno_route', ...groups.flatMap((g) => g.fields.map((x) => x.key))];
   const init = Object.fromEntries(keys.map((k) => [k, paper[k] ?? '']));
-  const [f, setF] = useState<Record<string, string>>(init);
+  const [f, setF, sent] = useDraft<Record<string, string>>(init);
   const [busy, setBusy] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   const open = rec.deadlines.filter((d) => !d.done);
@@ -651,7 +670,7 @@ function Paperwork({ rec, today, actions }: { rec: RecordData; today: string; ac
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
-        await actions.patch({ paperwork: Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== init[k])) });
+        if (await actions.patch({ paperwork: Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== init[k])) })) sent(f);
         setBusy(false);
       }}
     >

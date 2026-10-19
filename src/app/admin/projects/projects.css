@@ -217,9 +217,6 @@
 .prj-card.is-attention {
   border-left: 3px solid var(--err);
 }
-.prj-card .crm-card-top {
-  justify-content: space-between;
-}
 .prj-donerail b {
   color: var(--ok);
 }
@@ -355,6 +352,7 @@
   .prj .crmh-new.prj-new {
     display: inline-flex !important;
     grid-area: i;
+    min-height: 48px; /* gloves */
   }
   .prj-list {
     border-radius: 12px;

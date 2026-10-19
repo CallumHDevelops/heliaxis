@@ -72,7 +72,7 @@ export function CustomerColumn({
   onSendWhatsApp: (text: string) => void;
   onDelete: () => void;
   onNewProject: () => void;
-  /** Shown at the top when the Tasks card is in the WhatsApp panel's other tab. */
+  /** The Tasks card, at the top, while the open WhatsApp panel is showing Chats (no right-hand column then). */
   tasksElsewhere?: ReactNode;
 }) {
   const base = area === 'projects' ? '/admin/projects' : '/admin/crm';
@@ -131,7 +131,7 @@ export function CustomerColumn({
         </section>
       )}
 
-      <JobDetails key={`${project.id}-${project.updated_at}`} project={project} customer={customer} team={team} schema={schema} onSave={onSaveProject} />
+      <JobDetails key={project.id} project={project} customer={customer} team={team} schema={schema} onSave={onSaveProject} />
 
       {quoteOn || portal ? (
         <section className="crmr-slot" aria-label="Customer portal">
@@ -295,9 +295,18 @@ function CustomerCard({
       : `Turn off WhatsApp permission for ${customer.name}? Messages that need permission stop until it’s back on.`;
     if (!window.confirm(ask)) return;
     setErr('');
+    const url = `/api/crm/customers/${customer.id}`;
     try {
-      await send(`/api/crm/customers/${customer.id}`, 'PATCH', { whatsapp_opt_in: on });
+      const d = await send<{ warning?: string }>(url, 'PATCH', { whatsapp_opt_in: on }).catch(async (e: Error & { status?: number; data?: { stopped?: boolean } }) => {
+        // They replied STOP, or someone here switched it off: it only comes back on once you've
+        // confirmed the customer asked us to start again.
+        if (!on || e.status !== 409 || !e.data?.stopped) throw e;
+        if (!window.confirm(`${e.message}\n\nHas ${customer.name} asked us to start messaging them again? OK switches it back on.`)) return null;
+        return send<{ warning?: string }>(url, 'PATCH', { whatsapp_opt_in: true, lift_stop: true });
+      });
+      if (!d) return;
       await onSaved();
+      if (d.warning) setErr(d.warning);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved');
     }
@@ -477,7 +486,15 @@ function JobDetails({
       <div className="crmh-card__h">
         <h3>Job details</h3>
         {!editing && (
-          <button type="button" className="crmr-edit crmh-ml" onClick={() => setEditing(true)}>
+          <button
+            type="button"
+            className="crmr-edit crmh-ml"
+            onClick={() => {
+              // What's saved now, not when the card first showed (it isn't remounted by the page's polls).
+              setF(init);
+              setEditing(true);
+            }}
+          >
             ✎ Edit
           </button>
         )}

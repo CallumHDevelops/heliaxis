@@ -59,7 +59,7 @@ function rangeOf(v: unknown): { start: string | null; end: string | null } {
  * Everything for one job: customer, timeline (incl. WhatsApp and email), photos, documents, the team,
  * and the Projects parts (checklist, deadlines, surveys, booking, Outlook, other jobs and possible
  * duplicates). ?light=1&since={iso}: only what the page polls for (the job, customer, tasks, WhatsApp
- * summary, counts and timeline entries since then), without signing photo links.
+ * summary, counts, the notes since then and the newest emails and WhatsApps), without signing photo links.
  */
 export async function GET(req: Request, { params }: Ctx) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
@@ -145,20 +145,32 @@ export async function GET(req: Request, { params }: Ctx) {
 
   type Wa = { id: string; direction: string; kind: string; body: string | null; status: string; created_at: string; sent_by: string | null; via: string | null; rule_id: string | null };
   type Email = { id: string; direction: string; subject: string | null; body: string | null; sent_by: string | null; attachments: string[]; at: string };
-  // Polling (?since=): only what's newer than the last look.
+  // Polling (?since=): only the notes and calls newer than the last look. Emails carry the time they
+  // arrived (the mailbox sync saves them up to a few minutes later), and WhatsApp ticks change on
+  // messages already shown, so a poll reads the newest few of those again (ids weed out repeats).
   let actsQ = db.from('crm_activities').select('id, project_id, kind, body, meta, by_id, at').eq('enquiry_id', project.enquiry_id);
   if (since) actsQ = actsQ.gt('at', since);
-  let waQ = db.from('whatsapp_messages').select('id, direction, kind, body, status, created_at, sent_by, via, rule_id').in('enquiry_id', linkedIds);
-  if (since) waQ = waQ.gt('created_at', since);
-  let emailQ = db
+  const waQ = db.from('whatsapp_messages').select('id, direction, kind, body, status, created_at, sent_by, via, rule_id').in('enquiry_id', linkedIds);
+  const emailQ = db
     .from('crm_emails')
     .select('id, direction, subject, body, sent_by, attachments, at, from_address')
     .in('enquiry_id', linkedIds.length ? linkedIds : [project.enquiry_id]);
-  if (since) emailQ = emailQ.gt('at', since);
+  // A poll reads only the newest few messages, so it counts the chat separately (the Customer card's "42 messages").
+  const waTotal =
+    since && linkedIds.length
+      ? db
+          .from('whatsapp_messages')
+          .select('id', { count: 'exact', head: true })
+          .in('enquiry_id', linkedIds)
+          .then(
+            (r) => r.count ?? 0,
+            () => 0
+          )
+      : null;
   const [{ data: acts }, { data: wa }, { data: people }, { data: tasks }, { data: emails }, deadlineTasks] = await Promise.all([
     actsQ.order('at', { ascending: false }).limit(300),
     // WhatsApp is optional (tables may not exist yet).
-    linkedIds.length ? waQ.order('created_at', { ascending: false }).limit(300) : Promise.resolve({ data: [] as Wa[] }),
+    linkedIds.length ? waQ.order('created_at', { ascending: false }).limit(since ? 30 : 300) : Promise.resolve({ data: [] as Wa[] }),
     db.from('profiles').select('*').eq('status', 'approved'),
     db
       .from('tasks')
@@ -170,7 +182,7 @@ export async function GET(req: Request, { params }: Ctx) {
     // v2 tables: empty until crm-v2.sql has been run.
     emailQ
       .order('at', { ascending: false })
-      .limit(200)
+      .limit(since ? 20 : 200)
       .then(
         (r) => r,
         () => ({ data: [] as Email[] })
@@ -247,7 +259,7 @@ export async function GET(req: Request, { params }: Ctx) {
     lastInbound,
     unread: linked.reduce((n, l) => n + (l.wa_unread || 0), 0),
     unreadIds: linked.filter((l) => l.wa_unread > 0).map((l) => l.id),
-    messages: (wa ?? []).length,
+    messages: waTotal ? await waTotal : (wa ?? []).length,
     chaseHours: await getSettings()
       .then((st) => (st.chaseQuestions ? st.chaseAfterHours : 0))
       .catch(() => 0),

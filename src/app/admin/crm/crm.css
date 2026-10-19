@@ -1263,7 +1263,8 @@ textarea.crm-input {
   flex-direction: column;
   justify-content: space-between;
   min-width: 0;
-  height: 76px;
+  /* At least this tall; taller (all five together) when a label or line wraps beside the dock. */
+  min-height: 76px;
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1286,9 +1287,6 @@ textarea.crm-input {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .crmh-count__row {
   display: flex;
@@ -1302,13 +1300,17 @@ textarea.crm-input {
   line-height: 1;
 }
 .crmh-count__sub {
+  /* Up to two lines: the when, who and how old are the useful part. */
+  display: -webkit-box;
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.25;
   color: var(--muted);
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .crmh-count--hot {
   border-color: rgba(179, 38, 30, 0.32);
@@ -1324,6 +1326,7 @@ textarea.crm-input {
 /* Stage strip */
 .crmh-strip {
   display: flex;
+  flex-wrap: wrap; /* "Open board →" drops to its own line when there's no room */
   align-items: center;
   gap: 2px;
   min-height: 36px;
@@ -2769,11 +2772,13 @@ button.crmb-rail {
     scroll-snap-type: x proximity;
   }
   .crmh-count {
-    flex: 0 0 132px;
+    /* As wide as its label ("Unread WhatsApp" in full), in the row that scrolls sideways. */
+    flex: 0 0 auto;
+    min-width: 132px;
     flex-direction: column-reverse;
     justify-content: center;
     gap: 3px;
-    height: 64px;
+    min-height: 64px;
     padding: 8px 12px;
     border-radius: 12px;
     scroll-snap-align: start;
@@ -3063,7 +3068,11 @@ button.crmb-rail {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex: none;
+  /* Gives way first and all the way (the ref and date clip): its shrink is so large that the name
+     and the buttons only start to shrink once it has gone. */
+  flex: 0 100000 auto;
+  min-width: 0;
+  overflow: hidden;
   font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
@@ -3075,7 +3084,9 @@ button.crmb-rail {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: none;
+  /* Then the main button's words clip (all of them are in its tooltip), never past the page's edge. */
+  flex: 0 1 auto;
+  min-width: 0;
   margin-left: auto;
 }
 .crmr-stagebtn {
@@ -3122,8 +3133,14 @@ button.crmb-rail {
   color: var(--err);
 }
 .crmr-primary {
+  min-width: 0;
   height: 38px;
   padding: 0 14px;
+}
+.crmr-primary__t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .crmr-more {
   position: relative;
@@ -3432,6 +3449,10 @@ button.crmb-rail {
   display: none;
 }
 @media (min-width: 761px) {
+  /* The name never shrinks away: the pinned bar is how you know whose job you're on beside a chat. */
+  .crmr-name {
+    min-width: 120px;
+  }
   .crmr-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas: 'band right' 'next next' 'main main' 'left left';
@@ -4643,9 +4664,84 @@ button.crmb-rail {
     min-height: 72px;
   }
   .crmr-tile__add {
-    min-height: 44px;
+    min-height: 48px;
   }
   .crmr-check__list li {
     min-height: 52px;
+  }
+  /* Gloves: every phone tap target at least 48px. This block comes after the home's phone block, so
+     the same selectors here win over its 36–40px sizes. */
+  .crmr-copy,
+  .crmr-edit,
+  .crmr-minichip,
+  .crmr-foot .crm-link,
+  .crmr-inline,
+  .crmr-grey .crm-link,
+  .crmr-callbar .crm-link,
+  .crmr-notice .crm-link,
+  .crmh-tosort .crm-link,
+  .crmh-hint .crm-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+  }
+  .crmr-copy,
+  .crmr-minichip {
+    padding: 0 14px;
+  }
+  .crmr-edit {
+    padding: 0 12px;
+  }
+  .crmr-switch::before {
+    content: '';
+    position: absolute;
+    inset: -14px -7px; /* a 34×20 switch, 48×48 to tap */
+  }
+  /* Delete on its own line, well clear of New project (and both on the left, clear of the round buttons). */
+  .crmr-foot,
+  .crmr-foot__acts {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .crmr-foot__acts {
+    gap: 8px;
+  }
+  .crmr-snooze__list button,
+  .crmr-actions--tight .crm-btn,
+  .crmh-sp a,
+  .crmh-views button,
+  .crmh-tog button,
+  .crmh-chips button,
+  .crmh-chipf,
+  .crmh-movebtn,
+  .crmh-card__h .crm-btn--small {
+    min-height: 48px;
+  }
+  .crmh-sp a,
+  .crmh-views button,
+  .crmh-chipf {
+    height: 48px;
+  }
+  .crmh-act {
+    width: 48px;
+    height: 48px;
+  }
+  .crmr {
+    --crmr-bar: 60px; /* a 48px stage button, plus the bar's padding */
+  }
+  .crmr-back {
+    width: 48px;
+    min-height: 48px;
+  }
+  .crmr-stagebtn,
+  .crmr-nextbar__acts .crm-btn {
+    height: 48px;
+  }
+  .crmr-nextbar__t,
+  .crmr-name button,
+  .crmr-stageline__go,
+  .crmr-check__move .crm-btn,
+  .crmr-ovsec > summary {
+    min-height: 48px;
   }
 }

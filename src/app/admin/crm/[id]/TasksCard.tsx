@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { TeamMember } from '@/lib/projects/server';
 import { plusDays } from '@/lib/projects/feed';
 import { Icon, Sheet } from '../CrmUi';
@@ -172,7 +173,15 @@ export function TasksCard({
           </>
         )}
       </div>
-      {snoozing && <SnoozeSheet task={snoozing} today={today} team={team} onClose={() => setSnoozing(null)} onPick={(d, who) => void snooze(snoozing, d, who)} />}
+      {snoozing &&
+        createPortal(
+          // Into <body>: inside the dock's panel (layer 26) the sheet would sit under the app header (30).
+          // The wrapper carries the card's CRM colours.
+          <div className="crm crmh">
+            <SnoozeSheet task={snoozing} today={today} team={team} onClose={() => setSnoozing(null)} onPick={(d, who) => void snooze(snoozing, d, who)} />
+          </div>,
+          document.body
+        )}
     </section>
   );
 }

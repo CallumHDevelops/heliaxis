@@ -65,11 +65,15 @@ const CALL_PROMPT_MS = 30 * 60_000;
 const seen = new Map<string, RecordData>();
 const SCROLL_KEY = (id: string) => `hx-rec-scroll:${id}`;
 
-/** Newer entries win; newest first. */
+/** Newer entries win; newest first. A poll re-reads the newest messages (for their ticks), so nothing new keeps the old list. */
 function mergeTimeline(old: Entry[], fresh: Entry[]): Entry[] {
-  if (!fresh.length) return old;
   const byId = new Map(old.map((e) => [e.id, e]));
-  for (const e of fresh) byId.set(e.id, e);
+  const changed = fresh.filter((e) => {
+    const was = byId.get(e.id);
+    return !was || JSON.stringify(was) !== JSON.stringify(e);
+  });
+  if (!changed.length) return old;
+  for (const e of changed) byId.set(e.id, e);
   return [...byId.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
 
@@ -580,16 +584,9 @@ export function ProjectView({
             onSendWhatsApp={(text) => openWhatsApp(text)}
             onDelete={() => openSheet('delete')}
             onNewProject={() => openSheet('newproject')}
-            tasksElsewhere={
-              tasksInDockTab ? (
-                <p className="crmr-grey">
-                  <b>Tasks ({rec.tasks.filter((t) => t.status !== 'done').length})</b> are in the WhatsApp panel’s This job tab.{' '}
-                  <button type="button" className="crm-link" onClick={() => openDock({ tab: 'job' })}>
-                    Show them
-                  </button>
-                </p>
-              ) : null
-            }
+            // The dock is open on Chats, so there's no right-hand column and no Tasks space in the dock:
+            // the card itself comes here, so Tasks are never missing and the chat stays open.
+            tasksElsewhere={tasksInDockTab ? tasksCard('page') : null}
           />
         </aside>
 
@@ -610,7 +607,7 @@ export function ProjectView({
         )}
 
         <aside className="crmr-right" aria-label="Tasks">
-          {!slotEl && tasksCard('page')}
+          {!slotEl && !tasksInDockTab && tasksCard('page')}
           <p className="crmr-grey crmr-chathint">Chat with {first} is in the strip on the right, or press the green button.</p>
         </aside>
 

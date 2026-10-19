@@ -85,6 +85,7 @@ export function CrmBoard({
   const [searchOpen, setSearchOpen] = useState(false);
   const [boardStage, setBoardStage] = useState<{ key: string; n: number } | null>(null);
   const [workDue, setWorkDue] = useState(false);
+  const [dueAll, setDueAll] = useState(false);
   // The phone's + button: its menu, and the task and note sheets it opens.
   const [fab, setFab] = useState<null | 'menu' | 'task' | 'note' | 'call'>(null);
   const [homeTick, setHomeTick] = useState(0);
@@ -122,9 +123,11 @@ export function CrmBoard({
   const sales = all.filter((p) => isSales(p.stage));
   const atLead = sales.filter((p) => p.stage === 'lead').length;
 
-  function pickView(v: CrmView) {
+  /** save: only the person's own pick (the Home · Board · List switch) changes where the CRM opens next
+   * time. A count card, the strip or the search changes the view for this visit, in the address bar. */
+  function pickView(v: CrmView, save = true) {
     setView(v);
-    rememberView('view', v, VIEW_COOKIE);
+    rememberView('view', v, save ? VIEW_COOKIE : undefined);
   }
   /** List with a filter (the count cards, the nudge, the search box). */
   function openList(f: ListFilter, opts: { stage?: string; sort?: ListSort; q?: string } = {}) {
@@ -132,7 +135,7 @@ export function CrmBoard({
     setStage(opts.stage ?? '');
     setSort(opts.sort ?? (f === 'fresh' || f === 'nostep' ? 'oldest' : 'queue'));
     setQ(opts.q ?? '');
-    pickView('list');
+    pickView('list', false);
   }
   /** A stage in the strip: the Board at that column (List filtered to it below 1024px). */
   function openStage(key: string) {
@@ -140,18 +143,19 @@ export function CrmBoard({
       setFilter('live');
       setQ('');
       setBoardStage((b) => ({ key, n: (b?.n ?? 0) + 1 }));
-      pickView('board');
+      pickView('board', false);
     } else openList('live', { stage: key === 'won30' ? '' : key });
   }
   function onFollowUps() {
-    setWorkScope('all');
+    // Everyone's (that's what the card counts), for this visit only: Mine | Everyone keeps its own choice.
+    setDueAll(true);
     setWorkDue(true);
-    if (view !== 'home') pickView('home');
+    if (view !== 'home') pickView('home', false);
     if (!window.matchMedia('(min-width: 1024px)').matches) document.getElementById('crmh-tasks')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function onUnread() {
     if (openDock({ tab: 'chats', filter: 'unread' })) return;
-    if (view !== 'home') pickView('home');
+    if (view !== 'home') pickView('home', false);
     document.getElementById('crmh-needs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function onSurveys() {
@@ -391,13 +395,17 @@ export function CrmBoard({
           canTasks={canTasks}
           canInbox={canInbox}
           wa={wa}
-          scope={workScope}
+          scope={dueAll ? 'all' : workScope}
           onScope={(s) => {
             setWorkScope(s);
             setWorkDue(false);
+            setDueAll(false);
           }}
           dueOnly={workDue}
-          onDueOnly={setWorkDue}
+          onDueOnly={(d) => {
+            setWorkDue(d);
+            if (!d) setDueAll(false);
+          }}
           onNudge={() => openList('nostep')}
           onList={() => openList('live')}
           onChanged={reload}
