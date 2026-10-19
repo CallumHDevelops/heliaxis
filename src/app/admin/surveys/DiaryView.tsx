@@ -263,11 +263,18 @@ export function DiaryView({
     const r = await send('/api/crm/booking/outlook-backfill', 'POST', {
       project_ids: [...new Set(keep.filter((x) => x.kind !== 'entry').map((x) => x.id))],
       entry_ids: keep.filter((x) => x.kind === 'entry').map((x) => x.id),
+      // Unticked: already in Outlook by hand, so never copied (unless the date changes).
+      skip: bf.off,
     });
     setBusy('');
     if (!r.ok) return setError(r.data.error || 'Not copied. Try again.');
     setBf(null);
-    await reload(false, `${keep.length} date${keep.length === 1 ? '' : 's'} will appear in Outlook within a few minutes ✓`);
+    await reload(
+      false,
+      keep.length
+        ? `${keep.length} date${keep.length === 1 ? '' : 's'} will appear in Outlook within a few minutes ✓`
+        : 'Done ✓ None of those will be copied into Outlook.'
+    );
   }
 
   function openItem(i: Item) {
@@ -463,8 +470,8 @@ export function DiaryView({
                   );
                 })}
                 <div className="dy-row">
-                  <button type="button" className="dy-btn" disabled={busy === 'backfill' || bf.off.length === bf.items.length} onClick={copyBackfill}>
-                    {busy === 'backfill' ? 'Copying…' : `Copy ${bf.items.length - bf.off.length}`}
+                  <button type="button" className="dy-btn" disabled={busy === 'backfill'} onClick={copyBackfill}>
+                    {busy === 'backfill' ? 'Copying…' : bf.off.length === bf.items.length ? 'Don’t copy any' : `Copy ${bf.items.length - bf.off.length}`}
                   </button>
                   <button type="button" className="dy-btn dy-btn--ghost" onClick={() => setBf(null)}>
                     Not now

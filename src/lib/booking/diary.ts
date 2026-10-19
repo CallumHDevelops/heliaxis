@@ -656,6 +656,7 @@ export async function entryFromInput(raw: Record<string, unknown>, current: Entr
 export function entryView(e: EntryRow) {
   const s = e.starts_at ? Date.parse(e.starts_at) : null;
   const en = e.ends_at ? Date.parse(e.ends_at) : null;
+  const begins = e.all_day ? (e.day_from ? londonSlot(e.day_from, '00:00') : 0) : (s ?? 0);
   return {
     id: e.id,
     surveyorKey: e.surveyor_key,
@@ -674,7 +675,8 @@ export function entryView(e: EntryRow) {
     address: e.address,
     postcode: e.postcode,
     projectId: e.project_id,
-    inOutlook: !!e.outlook_event_id,
+    // A copy a delete would still reach (one that has started is history and stays in Outlook).
+    inOutlook: !!e.outlook_event_id && begins > Date.now(),
     outlookError: e.calendar_error,
   };
 }

@@ -14,7 +14,7 @@ import {
 } from '@/lib/ms365';
 import { logActivity, siteUrl } from '@/lib/crm/server';
 import { isSurveyType, productLabel, surveyTypeFor, surveyTypeLabel } from '@/lib/crm/stages';
-import { addDays } from './engine';
+import { addDays, londonSlot } from './engine';
 import { ENTRY_KIND_LABEL, surveyMinutesFor, type EntryRow, type ProjectRow } from './diary';
 import { getBookingSettings } from './settings-server';
 import type { BookingSettings } from './settings';
@@ -22,8 +22,10 @@ import type { BookingSettings } from './settings';
 /**
  * The Outlook copy. The database is the source of truth: survey dates, installs and his own diary
  * entries are written to Outlook by this sync (for dates set or changed after Microsoft 365 is
- * connected: the triggers mark them dirty), never read back as extra appointments. Past events are
- * history: never edited or deleted. A 2-minute claim stops two runs writing the same job.
+ * connected: the triggers mark them dirty), never read back as extra appointments. Anything marked
+ * before then goes in the one-off "Copy these dates into Outlook" list instead, and is copied only
+ * when ticked. Past events are history: never edited or deleted. A 2-minute claim stops two runs
+ * writing the same job.
  */
 
 const MIN = 60_000;
@@ -45,6 +47,20 @@ const where = (p: Pick<ProjectRow, 'address' | 'postcode'>): CalWrite['location'
   const text = [p.address, p.postcode].filter(Boolean).join(', ');
   return text ? { displayName: text, street: p.address || undefined, postalCode: p.postcode || undefined } : undefined;
 };
+
+/**
+ * "Leave it out of Outlook" (unticked in the Copy these dates list), kept in the copy's empty hash
+ * column. The sync makes no copy while it matches, so editing the job's title or address doesn't copy
+ * it after all; a change to the date itself does.
+ */
+const SKIP = 'skip:';
+const skipSurvey = (p: Pick<ProjectRow, 'survey_at'>) => (p.survey_at ? `${SKIP}${Date.parse(p.survey_at)}` : null);
+const skipInstall = (p: Pick<ProjectRow, 'install_at' | 'install_days'>) => (p.install_at ? `${SKIP}${Date.parse(p.install_at)}|${p.install_days ?? 1}` : null);
+const skipEntry = (e: Pick<EntryRow, 'all_day' | 'starts_at' | 'ends_at' | 'day_from' | 'day_to'>) =>
+  `${SKIP}${e.all_day ? `${e.day_from}|${e.day_to}` : `${Date.parse(e.starts_at || '')}|${Date.parse(e.ends_at || '')}`}`;
+const surveySkipped = (p: ProjectRow) => !p.survey_event_id && !!p.survey_event_hash && p.survey_event_hash === skipSurvey(p);
+const installSkipped = (p: ProjectRow) => !(p.install_event_ids ?? []).length && !!p.install_event_hash && p.install_event_hash === skipInstall(p);
+const entrySkipped = (e: EntryRow) => !e.outlook_event_id && !!e.outlook_hash && e.outlook_hash === skipEntry(e);
 
 /** A transaction id per change, so a retry after a timeout can't make a second copy. */
 const txn = (kind: 's' | 'i' | 'd', id: string, h: string, stamp: string | null | undefined, k?: number) =>
@@ -73,6 +89,7 @@ async function syncSurvey(p: ProjectRow, c: Customer, ctx: Ctx): Promise<Partial
     if (eventId) clear();
     return patch;
   }
+  if (!eventId && surveySkipped(p)) return patch; // left out of Outlook in the list
   const type = isSurveyType(p.survey_type) ? p.survey_type : (surveyTypeFor(p.products ?? []) ?? 'solar');
   const minutes = surveyMinutesFor(p, s);
   let how = 'Booked by staff';
@@ -121,6 +138,7 @@ async function syncInstall(p: ProjectRow, c: Customer, ctx: Ctx): Promise<Partia
   const { s, hols, now } = ctx;
   const today = ukDay(now);
   const oldIds = p.install_event_ids ?? [];
+  if (installSkipped(p)) return {}; // left out of Outlook in the list
   const oldMailbox = p.install_event_mailbox || '';
   const mailbox = (s.advanced.installMailbox || msMailbox()).toLowerCase();
   const days = p.install_at && p.stage !== 'lost' ? installDayList(ukDay(p.install_at), p.install_days ?? 1, hols) : [];
@@ -215,14 +233,18 @@ async function syncEntry(e: EntryRow, ctx: Ctx): Promise<void> {
   const { now } = ctx;
   const endMs = e.all_day ? Date.parse(`${e.day_to}T23:59:59Z`) : Date.parse(e.ends_at || '');
   const past = Number.isFinite(endMs) && endMs < now - PAST_MS;
+  // Like surveys: a copy that has started is history, never edited or deleted.
+  const startMs = e.all_day ? (e.day_from ? londonSlot(e.day_from, '00:00') : NaN) : Date.parse(e.starts_at || '');
+  const started = Number.isFinite(startMs) && startMs <= now;
   if (e.deleted_at) {
-    // Remove the Outlook copy first (unless it's history), then the row itself.
-    if (e.outlook_event_id && e.outlook_mailbox && !past) await deleteCalendarEvent(e.outlook_mailbox, e.outlook_event_id);
+    // Remove the Outlook copy first (unless it has started), then the row itself (with no copy, so no tombstone).
+    if (e.outlook_event_id && e.outlook_mailbox && !started) await deleteCalendarEvent(e.outlook_mailbox, e.outlook_event_id);
     await db.from('diary_entries').update({ outlook_event_id: null }).eq('id', e.id);
     await db.from('diary_entries').delete().eq('id', e.id);
     return;
   }
-  if (past) return; // past dates aren't copied, and past copies aren't touched
+  if (past || (started && e.outlook_event_id)) return; // past dates aren't copied, and a copy that has started isn't touched
+  if (entrySkipped(e)) return; // left out of Outlook in the list
   const mailbox = e.surveyor_key.toLowerCase();
   const kind = ENTRY_KIND_LABEL[e.kind] ?? 'Busy';
   const want: CalWrite = {
@@ -280,6 +302,32 @@ async function release(table: Table, id: string, dirtyAt: string | null | undefi
   await db.from(table).update({ calendar_claim_at: null }).eq('id', id);
 }
 
+/**
+ * When the sync first ran with Microsoft 365 connected. Anything marked before then (dated after the
+ * SQL ran but before Outlook was connected, much of it maybe already in Outlook by hand) isn't copied
+ * by itself: it goes in the "Copy these dates into Outlook" list, so those can be unticked.
+ */
+const SINCE_KEY = 'calendar-sync-since';
+async function connectedSince(): Promise<string> {
+  const db = createAdminClient();
+  const at = iso(Date.now());
+  try {
+    const { data } = await db.from('cms_kv').select('value').eq('key', SINCE_KEY).maybeSingle();
+    if (data?.value) return data.value as string;
+    if (!msConfigured()) return at;
+    await db.from('cms_kv').insert({ key: SINCE_KEY, value: at, updated_at: at }); // a run racing us loses on the key: fine
+    const again = await db.from('cms_kv').select('value').eq('key', SINCE_KEY).maybeSingle();
+    return (again.data?.value as string) || at;
+  } catch {
+    return at;
+  }
+}
+
+/** Marked before Outlook was connected and never copied: leave it for the list (unless it changes again). */
+async function holdForList(table: Table, id: string, dirtyAt: string) {
+  await createAdminClient().from(table).update({ calendar_dirty_at: null }).eq('id', id).eq('calendar_dirty_at', dirtyAt);
+}
+
 async function context(): Promise<Ctx> {
   const [s, hols] = await Promise.all([getBookingSettings(), ukBankHolidays()]);
   return { s, hols, now: Date.now() };
@@ -306,9 +354,15 @@ export async function runCalendarSync({ until }: { until: number }): Promise<{ s
   if (!msConfigured()) return out;
   const ctx = await context();
   const db = createAdminClient();
+  const since = Date.parse(await connectedSince());
+  const before = (at: string | null | undefined) => !!at && Date.parse(at) < since;
 
   for (const p of await dueRows<ProjectRow>('crm_projects', ctx.now)) {
     if (Date.now() >= until) return out;
+    if (before(p.calendar_dirty_at) && !p.survey_event_id && !(p.install_event_ids ?? []).length) {
+      await holdForList('crm_projects', p.id, p.calendar_dirty_at as string);
+      continue;
+    }
     if (!(await claim('crm_projects', p.id, Date.now()))) continue;
     let ok = false;
     try {
@@ -323,6 +377,10 @@ export async function runCalendarSync({ until }: { until: number }): Promise<{ s
 
   for (const e of await dueRows<EntryRow>('diary_entries', ctx.now)) {
     if (Date.now() >= until) return out;
+    if (before(e.calendar_dirty_at) && !e.deleted_at && !e.outlook_event_id) {
+      await holdForList('diary_entries', e.id, e.calendar_dirty_at as string);
+      continue;
+    }
     if (!(await claim('diary_entries', e.id, Date.now()))) continue;
     let ok = false;
     try {
@@ -383,22 +441,26 @@ export async function syncProjectCalendar(projectId: string): Promise<void> {
 
 export type BackfillItem = { kind: 'survey' | 'install' | 'entry'; id: string; label: string; when: string };
 
-/** Upcoming survey and install dates and diary entries that have no Outlook copy and aren't waiting to be copied. */
+/**
+ * Upcoming survey and install dates and diary entries that have no Outlook copy, aren't waiting to be
+ * copied (never marked, or marked before Outlook was connected) and weren't left out in this list.
+ */
 export async function backfillList(): Promise<BackfillItem[]> {
   const db = createAdminClient();
   const now = Date.now();
   const today = ukDay(now);
   const out: BackfillItem[] = [];
+  const waiting = `calendar_dirty_at.is.null,calendar_dirty_at.lt."${await connectedSince()}"`;
   const [{ data: surveys }, { data: installs }, { data: entries }] = await Promise.all([
-    db.from('crm_projects').select('*').gt('survey_at', iso(now)).neq('stage', 'lost').is('calendar_dirty_at', null).is('survey_event_id', null).limit(200),
+    db.from('crm_projects').select('*').gt('survey_at', iso(now)).neq('stage', 'lost').or(waiting).is('survey_event_id', null).limit(200),
     db
       .from('crm_projects')
       .select('*')
       .gte('install_at', iso(now - 45 * 24 * 60 * MIN))
       .neq('stage', 'lost')
-      .is('calendar_dirty_at', null)
+      .or(waiting)
       .limit(200),
-    db.from('diary_entries').select('*').is('deleted_at', null).is('outlook_event_id', null).is('calendar_dirty_at', null).limit(200),
+    db.from('diary_entries').select('*').is('deleted_at', null).is('outlook_event_id', null).or(waiting).limit(200),
   ]);
   const hols = await ukBankHolidays();
   const ids = [...new Set([...(surveys ?? []), ...(installs ?? [])].map((p) => p.enquiry_id as string))];
@@ -409,17 +471,18 @@ export async function backfillList(): Promise<BackfillItem[]> {
   }
   const fmt = (ms: number) => new Date(ms).toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   for (const p of (surveys ?? []) as ProjectRow[]) {
+    if (surveySkipped(p)) continue;
     out.push({ kind: 'survey', id: p.id, label: `Survey: ${names.get(p.enquiry_id) || p.title}`, when: fmt(Date.parse(p.survey_at as string)) });
   }
   for (const p of (installs ?? []) as ProjectRow[]) {
-    if (!p.install_at || (p.install_event_ids ?? []).length) continue;
+    if (!p.install_at || (p.install_event_ids ?? []).length || installSkipped(p)) continue;
     const days = installDayList(ukDay(p.install_at), p.install_days ?? 1, hols);
     if (days[days.length - 1] < today) continue;
     out.push({ kind: 'install', id: p.id, label: `Install: ${names.get(p.enquiry_id) || p.title}`, when: `${days[0]}${days.length > 1 ? ` (${days.length} days)` : ''}` });
   }
   for (const e of (entries ?? []) as EntryRow[]) {
     const end = e.all_day ? `${e.day_to}T23:59:59Z` : e.ends_at;
-    if (!end || Date.parse(end) < now) continue;
+    if (!end || Date.parse(end) < now || entrySkipped(e)) continue;
     out.push({
       kind: 'entry',
       id: e.id,
@@ -428,6 +491,42 @@ export async function backfillList(): Promise<BackfillItem[]> {
     });
   }
   return out;
+}
+
+/**
+ * The ones left unticked in the list: never copied, unless their date changes. Done before the ticked
+ * ones are marked, so ticking a job's survey doesn't also copy its unticked install. Returns how many.
+ */
+export async function skipBackfill(items: { kind: 'survey' | 'install' | 'entry'; id: string }[]): Promise<number> {
+  const db = createAdminClient();
+  let n = 0;
+  const ids = (k: string) => [...new Set(items.filter((x) => x.kind === k).map((x) => x.id))];
+  const read = async <T,>(table: 'crm_projects' | 'diary_entries', list: string[]): Promise<T[]> => {
+    const rows: T[] = [];
+    for (let i = 0; i < list.length; i += 100) {
+      const { data } = await db.from(table).select('*').in('id', list.slice(i, i + 100));
+      rows.push(...((data ?? []) as T[]));
+    }
+    return rows;
+  };
+  for (const p of await read<ProjectRow>('crm_projects', ids('survey'))) {
+    const mark = skipSurvey(p);
+    if (!mark || p.survey_event_id) continue;
+    const { data } = await db.from('crm_projects').update({ survey_event_hash: mark }).eq('id', p.id).is('survey_event_id', null).select('id');
+    n += data?.length ?? 0;
+  }
+  for (const p of await read<ProjectRow>('crm_projects', ids('install'))) {
+    const mark = skipInstall(p);
+    if (!mark || (p.install_event_ids ?? []).length) continue;
+    const { data } = await db.from('crm_projects').update({ install_event_hash: mark }).eq('id', p.id).select('id');
+    n += data?.length ?? 0;
+  }
+  for (const e of await read<EntryRow>('diary_entries', ids('entry'))) {
+    if (e.outlook_event_id) continue;
+    const { data } = await db.from('diary_entries').update({ outlook_hash: skipEntry(e) }).eq('id', e.id).is('outlook_event_id', null).select('id');
+    n += data?.length ?? 0;
+  }
+  return n;
 }
 
 /**
