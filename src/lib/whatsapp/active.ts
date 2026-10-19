@@ -285,6 +285,21 @@ export async function linkedToOpportunity(enquiryId: string): Promise<boolean> {
   }
 }
 
+/**
+ * The "Back to job" chip on a chat page opened from a job (?job={id}&tab={tab}): the job's stage, read
+ * here so the chip can say "Quote sent". null without CRM access or for an unknown job.
+ */
+export async function chatJob(
+  projectId: string | undefined,
+  tab: string | undefined,
+  canCrm: boolean
+): Promise<{ projectId: string; stage: string | null; tab: string | null } | null> {
+  if (!canCrm || !projectId || !/^[0-9a-f-]{36}$/i.test(projectId)) return null;
+  const { data } = await createAdminClient().from('crm_projects').select('id, stage').eq('id', projectId).maybeSingle();
+  if (!data) return null;
+  return { projectId: data.id as string, stage: (data.stage as string) ?? null, tab: tab && /^[a-z-]{1,20}$/.test(tab) ? tab : null };
+}
+
 /** The newest opportunity among these enquiries that isn't Complete or Lost. */
 export async function latestOpenOpportunity(enquiryIds: string[]): Promise<{ id: string; ref: string | null; stage: string; title: string } | null> {
   const db = createAdminClient();
