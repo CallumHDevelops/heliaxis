@@ -91,19 +91,6 @@ async function has(table: string, column = '*') {
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
   {
-    id: 'q-social-sso',
-    kind: 'question',
-    title: 'Can Claude change how the social studio signs you in?',
-    detail:
-      'So Social media studio opens already signed in, like RAMS. It needs a five-line change to the studio’s own sign-in page (the Social_Content_Creator branch), which Claude won’t make without your go-ahead.',
-    steps: [
-      'Type **yes** or **no** in the answer box below and tap **Send to Claude** (or reply in your Claude Code chat).',
-      'If Claude later says a safety check stopped it, allow it in Claude Code’s permission settings, or ask Claude for the change so you can paste it in yourself.',
-    ],
-    order: 1,
-    manual: true,
-  },
-  {
     id: 'q-cut-out-image',
     kind: 'question',
     title: 'What do you mean by the “cut out image” in a solar survey?',
@@ -358,7 +345,12 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
-  add(env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && !sso, sql('sso.sql', 'Lets people open RAMS without signing in again (each confirms their email once).', 13));
+  // Needed by one-tap sign-in to either app (one email check covers both).
+  const ssoApps = [
+    env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',
+    env('SOCIAL_SUPABASE_URL', 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY') && 'the social studio',
+  ].filter(Boolean);
+  add(!!ssoApps.length && !sso, sql('sso.sql', `Lets people open ${ssoApps.join(' and ')} without signing in again (each confirms their email once).`, 13));
   add(!fcmConfigured(), {
     id: 'env-firebase',
     title: 'Set up native Android notifications',
@@ -568,6 +560,28 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     href: 'https://supabase.com/dashboard',
     hrefLabel: 'Open Supabase',
     order: 40,
+    optional: true,
+  });
+  add(!env('SOCIAL_SUPABASE_URL', 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY'), {
+    id: 'env-social-sso',
+    title: 'Open the social studio without signing in again',
+    detail:
+      'Two keys from the social studio’s database let the Heliaxis menu open Social media studio already signed in. The first time each person taps it, they type in a code we email them, unless they’ve already done that for RAMS.',
+    steps: [
+      'Open [Supabase](https://supabase.com/dashboard) and pick the **social studio** project (not the Heliaxis one, and not RAMS).',
+      '**Project Settings** (cog, bottom left) → **Data API** (on some screens just **API**).',
+      'Copy the **Project URL**. That’s the value for `SOCIAL_SUPABASE_URL`.',
+      'Still in Project Settings, open **API Keys** (on older screens it’s further down the same page). Find the **service_role** key (if there’s a **Legacy API keys** tab, it’s on that tab), reveal it and copy it. That’s `SOCIAL_SUPABASE_SERVICE_ROLE_KEY`, and it’s a password: tick **Sensitive** in Vercel.',
+      ...VERCEL_STEPS,
+      'Then run sso.sql if it appears on this card. It works for anyone who already has a social studio account under the same email as their Heliaxis login. It never creates studio accounts, so anyone else still sees the studio’s own sign-in.',
+    ],
+    copies: [
+      { label: 'Key', value: 'SOCIAL_SUPABASE_URL' },
+      { label: 'Key', value: 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY' },
+    ],
+    href: 'https://supabase.com/dashboard',
+    hrefLabel: 'Open Supabase',
+    order: 41,
     optional: true,
   });
   add(!env('GITHUB_ANSWERS_TOKEN'), {

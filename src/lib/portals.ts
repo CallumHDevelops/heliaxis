@@ -75,7 +75,8 @@ export const PORTALS: Portal[] = [
     key: 'social',
     label: 'Social media studio',
     description: 'Create and schedule social posts and reels.',
-    href: 'https://social.heliaxis.co.uk',
+    // Through /api/sso/social so it opens signed in (src/lib/sso.ts).
+    href: '/api/sso/social',
     external: true,
     paths: [],
   },
@@ -107,7 +108,7 @@ export const HUB_PATH = '/admin';
 /** Also open to every approved user: the Android app download page. */
 export const APP_PATH = '/admin/app';
 
-/** Confirming your email before one-tap sign-in to RAMS (src/lib/sso.ts): open to any approved user. */
+/** Confirming your email before one-tap sign-in to RAMS or the social studio (src/lib/sso.ts): open to any approved user. */
 export const SSO_PATH = '/admin/sso';
 
 /**

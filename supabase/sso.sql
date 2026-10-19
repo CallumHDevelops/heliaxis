@@ -1,6 +1,6 @@
--- One-tap sign-in to RAMS (src/lib/sso.ts). Heliaxis sign-ups don't confirm email addresses,
--- so before the CRM vouches for someone to RAMS they prove the address once with a code
--- emailed to it and typed in while signed in. Server-only (service role); no RLS policies.
+-- One-tap sign-in to RAMS and the social studio (src/lib/sso.ts). Heliaxis sign-ups don't confirm
+-- email addresses, so before the CRM vouches for someone to either app they prove the address once
+-- with a code emailed to it and typed in while signed in. Server-only (service role); no RLS policies.
 -- Safe to run twice.
 create table if not exists public.sso_email_proofs (
   user_id    uuid primary key references auth.users(id) on delete cascade,

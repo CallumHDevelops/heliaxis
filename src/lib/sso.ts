@@ -1,48 +1,84 @@
 import 'server-only';
 import { createHmac, randomInt, timingSafeEqual } from 'crypto';
-import { createClient, type User } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { emailShell, esc, sendEmail } from '@/lib/subcontractors/server';
+import { canAccess, type AccessProfile } from '@/lib/portals';
 
 /**
- * One tap from the Heliaxis menu into RAMS, already signed in. RAMS is a separate app with its
- * own Supabase project, so it can't see our session. Instead we ask RAMS's Supabase for a
- * one-time sign-in link for the same person and send the browser to RAMS's own /auth/callback,
- * which accepts a token_hash and sets its session (no change to RAMS needed).
+ * One tap from the Heliaxis menu into RAMS or the social studio, already signed in. Each is a
+ * separate app with its own Supabase project, so it can't see our session. Instead we ask that
+ * app's Supabase for a one-time sign-in link for the same person and send the browser to the
+ * app's own /auth/callback, which accepts a token_hash and sets its session.
  *
  * Two guards. Heliaxis sign-ups don't confirm email addresses, so someone could register with
  * a colleague's address; one-tap sign-in therefore waits until the person has proved the address
- * is theirs, once, by typing in a code emailed to it (supabase/sso.sql). And only an APPROVED RAMS account whose sign-in email
- * matches gets a link; anyone else just lands on RAMS as before.
- * Needs RAMS_SUPABASE_URL and RAMS_SUPABASE_SERVICE_ROLE_KEY.
+ * is theirs, once, by typing in a code emailed to it (supabase/sso.sql; one proof covers both apps).
+ * And only an existing account in the other app whose sign-in email matches gets a link (for RAMS,
+ * an APPROVED one); anyone else just lands on that app as before. We never create accounts there.
+ * Needs RAMS_SUPABASE_URL + RAMS_SUPABASE_SERVICE_ROLE_KEY, and SOCIAL_SUPABASE_URL +
+ * SOCIAL_SUPABASE_SERVICE_ROLE_KEY for the studio.
  */
 
 export const RAMS_ORIGIN = 'https://rams.heliaxis.co.uk';
+export const SOCIAL_ORIGIN = 'https://social.heliaxis.co.uk';
 
 export function ramsSsoConfigured() {
   return !!(process.env.RAMS_SUPABASE_URL && process.env.RAMS_SUPABASE_SERVICE_ROLE_KEY);
 }
 
-/** Only paths inside RAMS: "/operatives?team=heliaxis" yes, "//evil.com" or "https://…" no. */
-export function safeRamsPath(next: string | null): string {
-  if (!next) return '/';
+export function socialSsoConfigured() {
+  return !!(process.env.SOCIAL_SUPABASE_URL && process.env.SOCIAL_SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** A path inside `origin`, or `fallback`. Never another site, and never the app's own /auth routes. */
+function safePathOn(origin: string, next: string | null, fallback: string): string {
+  if (!next) return fallback;
   try {
-    const u = new URL(next, RAMS_ORIGIN);
+    const u = new URL(next, origin);
     // Collapse "//" (a path like "/.//evil.com" normalises to "//evil.com", which reads as another site),
-    // and never point at RAMS's own sign-in routes (however they're spelt or encoded).
+    // and never point at the app's own sign-in routes (however they're spelt or encoded).
     const path = u.pathname.replace(/\/{2,}/g, '/');
     let plain = path;
     try {
       plain = decodeURIComponent(path);
     } catch {
-      return '/';
+      return fallback;
     }
-    if (u.origin !== RAMS_ORIGIN || /^\/+auth(\/|$)/i.test(plain.replace(/\/{2,}/g, '/'))) return '/';
+    if (u.origin !== origin || /^\/+auth(\/|$)/i.test(plain.replace(/\/{2,}/g, '/'))) return fallback;
     return `${path}${u.search}`;
   } catch {
-    return '/';
+    return fallback;
   }
 }
+
+/** Only paths inside RAMS: "/operatives?team=heliaxis" yes, "//evil.com" or "https://…" no. */
+export function safeRamsPath(next: string | null): string {
+  return safePathOn(RAMS_ORIGIN, next, '/');
+}
+
+/**
+ * Only paths inside the studio, defaulting to /studio. Stricter than RAMS: it must already be a
+ * plain path, before and after decoding ("/reel" yes; "reel", "//evil.com", "/\\evil.com",
+ * "/%2F%2Fevil.com" or "https://…" no).
+ */
+export function safeSocialPath(next: string | null): string {
+  const fallback = '/studio';
+  if (typeof next !== 'string' || !next) return fallback;
+  let plain: string;
+  try {
+    plain = decodeURIComponent(next);
+  } catch {
+    return fallback;
+  }
+  const plainPath = (s: string) => /^\/(?![/\\])/.test(s) && ![...s].some((c) => c <= '\u001f' || c === '\u007f');
+  if (!plainPath(next) || !plainPath(plain)) return fallback;
+  return safePathOn(SOCIAL_ORIGIN, next, fallback);
+}
+
+/** The apps one-tap sign-in can open. Anything but 'social' is RAMS (the original, and the default). */
+export type SsoApp = 'rams' | 'social';
+export const ssoApp = (v: unknown): SsoApp => (v === 'social' ? 'social' : 'rams');
 
 const norm = (email: string | null | undefined) => email?.trim().toLowerCase() || '';
 
@@ -76,7 +112,7 @@ const notSetUp = (e: { code?: string; message?: string }) =>
  * database decides atomically whether a new code may go out (sso.sql: 2 minutes apart, none
  * after 10 wrong codes in 24 hours).
  */
-export async function sendProofCode(user: User, name: string): Promise<CodeResult> {
+export async function sendProofCode(user: User, name: string, app: SsoApp = 'rams'): Promise<CodeResult> {
   const email = norm(user.email);
   if (!email) return 'failed';
   const db = createAdminClient();
@@ -95,15 +131,16 @@ export async function sendProofCode(user: User, name: string): Promise<CodeResul
   }
 
   const who = name ? `${name} (${email})` : email;
+  const what = SSO_APPS[app].name;
   const sent = await sendEmail({
     to: email,
     from: 'Heliaxis <noreply@heliaxis.co.uk>',
     subject: `${code} is your Heliaxis code`,
-    text: `Your code is ${code}\n\nSomeone signed in to Heliaxis as ${who} asked to open RAMS without signing in again. If that's you, type this code into the Heliaxis app. It works for 15 minutes.\n\nIf it isn't you, don't share the code with anyone, and tell Callum.`,
+    text: `Your code is ${code}\n\nSomeone signed in to Heliaxis as ${who} asked to open ${what} without signing in again. If that's you, type this code into the Heliaxis app. It works for 15 minutes.\n\nIf it isn't you, don't share the code with anyone, and tell Callum.`,
     html: emailShell(
       'Your code',
       `<p style="font-size:30px;font-weight:800;letter-spacing:.3em;margin:18px 0">${esc(code)}</p>
-       <p>Someone signed in to Heliaxis as <b>${esc(who)}</b> asked to open RAMS without signing in again. If that’s you, type this code into the Heliaxis app. It works for 15 minutes.</p>
+       <p>Someone signed in to Heliaxis as <b>${esc(who)}</b> asked to open ${esc(what)} without signing in again. If that’s you, type this code into the Heliaxis app. It works for 15 minutes.</p>
        <p style="font-size:13px;color:#6E6A5E">If it isn’t you, don’t share the code with anyone, and tell Callum.</p>`,
       undefined,
       'Account'
@@ -148,7 +185,28 @@ export async function checkProofCode(user: User, typed: string): Promise<CodeRes
   return 'ok';
 }
 
-/* ── The RAMS link ─────────────────────────────────────────────────────────────────────── */
+/* ── The sign-in links ─────────────────────────────────────────────────────────────────── */
+
+/** A server-only client for another app's Supabase project. */
+function serviceClient(url: string, key: string) {
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+/**
+ * A one-time link into `origin`'s /auth/callback, signed in as an account we've already found
+ * there, or null. magiclink for an existing account only (it would otherwise create one), so the
+ * link must come back for that same account.
+ */
+async function callbackLink(app: SupabaseClient, account: { id: string; email: string }, origin: string, next: string, label: string) {
+  const { data, error } = await app.auth.admin.generateLink({ type: 'magiclink', email: account.email });
+  const tokenHash = data?.properties?.hashed_token;
+  if (error || !tokenHash || data.properties.verification_type !== 'magiclink' || data.user?.id !== account.id) {
+    if (error) console.error(`[sso] ${label} link failed`, error.message);
+    return null;
+  }
+  const q = new URLSearchParams({ token_hash: tokenHash, type: 'magiclink', next });
+  return `${origin}/auth/callback?${q}`;
+}
 
 /** Where to send this person: a signed-in link when we can make one, else RAMS's normal door. */
 export async function ramsLink(email: string | null | undefined, next: string): Promise<string> {
@@ -156,9 +214,7 @@ export async function ramsLink(email: string | null | undefined, next: string): 
   const address = norm(email);
   if (!address || !ramsSsoConfigured()) return plain;
   try {
-    const rams = createClient(process.env.RAMS_SUPABASE_URL!, process.env.RAMS_SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const rams = serviceClient(process.env.RAMS_SUPABASE_URL!, process.env.RAMS_SUPABASE_SERVICE_ROLE_KEY!);
     // Narrow by the profile's copy of the email (LIKE wildcards escaped), then check the account itself.
     const like = address.replace(/[\\%_]/g, (c) => `\\${c}`);
     const { data: people } = await rams.from('profiles').select('id, email, status').ilike('email', like).limit(5);
@@ -167,20 +223,88 @@ export async function ramsLink(email: string | null | undefined, next: string): 
 
     // RAMS only copies the email onto profiles at sign-up; the auth record is the truth.
     const { data: found } = await rams.auth.admin.getUserById(approved[0].id);
-    const authEmail = found?.user?.email;
-    if (!authEmail || norm(authEmail) !== address) return plain;
+    const account = found?.user;
+    if (!account?.email || norm(account.email) !== address) return plain;
 
-    // magiclink for an existing account only (it would otherwise create one).
-    const { data, error } = await rams.auth.admin.generateLink({ type: 'magiclink', email: authEmail });
-    const tokenHash = data?.properties?.hashed_token;
-    if (error || !tokenHash || data.properties.verification_type !== 'magiclink') {
-      if (error) console.error('[sso] RAMS link failed', error.message);
-      return plain;
-    }
-    const q = new URLSearchParams({ token_hash: tokenHash, type: 'magiclink', next });
-    return `${RAMS_ORIGIN}/auth/callback?${q}`;
+    return (await callbackLink(rams, { id: account.id, email: account.email }, RAMS_ORIGIN, next, 'RAMS')) ?? plain;
   } catch (e) {
     console.error('[sso] RAMS link failed', e);
     return plain;
   }
 }
+
+/** The studio is a small invite-only team: look through up to 1,000 accounts. */
+const SOCIAL_PER_PAGE = 200;
+const SOCIAL_MAX_PAGES = 5;
+
+/**
+ * The studio account signed in with exactly this email (any capitals), if there's one and only
+ * one and it isn't blocked. The studio has no profiles table: any account there can use it.
+ */
+async function findSocialAccount(social: SupabaseClient, address: string): Promise<User | null> {
+  const matches: User[] = [];
+  for (let page = 1; page <= SOCIAL_MAX_PAGES; page++) {
+    const { data, error } = await social.auth.admin.listUsers({ page, perPage: SOCIAL_PER_PAGE });
+    if (error) {
+      console.error('[sso] social studio accounts unavailable', error.message);
+      return null;
+    }
+    matches.push(...data.users.filter((u) => norm(u.email) === address));
+    if (!data.nextPage || data.users.length < SOCIAL_PER_PAGE) break;
+  }
+  const account = matches.length === 1 ? matches[0] : null;
+  const blocked = !!account?.banned_until && new Date(account.banned_until).getTime() > Date.now();
+  return account && !blocked && !account.deleted_at ? account : null;
+}
+
+/**
+ * Where to send this person: a signed-in studio link when we can make one, else the studio's
+ * normal door (signed out, every studio page goes to its own sign-in). Never creates an account
+ * there: no existing studio account under this email, no link.
+ */
+export async function socialLink(email: string | null | undefined, next: string): Promise<string> {
+  const plain = `${SOCIAL_ORIGIN}${next}`;
+  const address = norm(email);
+  if (!address || !socialSsoConfigured()) return plain;
+  try {
+    const social = serviceClient(process.env.SOCIAL_SUPABASE_URL!, process.env.SOCIAL_SUPABASE_SERVICE_ROLE_KEY!);
+    const account = await findSocialAccount(social, address);
+    if (!account?.email || norm(account.email) !== address) return plain;
+    return (await callbackLink(social, { id: account.id, email: account.email }, SOCIAL_ORIGIN, next, 'social studio')) ?? plain;
+  } catch (e) {
+    console.error('[sso] social studio link failed', e instanceof Error ? e.message : e);
+    return plain;
+  }
+}
+
+/* ── Which app ─────────────────────────────────────────────────────────────────────────── */
+
+type SsoAppInfo = {
+  /** How it reads mid-sentence: "open RAMS", "open the social studio". */
+  name: string;
+  origin: string;
+  configured: () => boolean;
+  safePath: (next: string | null) => string;
+  /** Who here may be signed in to it. */
+  canUse: (profile: AccessProfile | null | undefined) => boolean;
+  link: (email: string | null | undefined, next: string) => Promise<string>;
+};
+
+export const SSO_APPS: Record<SsoApp, SsoAppInfo> = {
+  rams: {
+    name: 'RAMS',
+    origin: RAMS_ORIGIN,
+    configured: ramsSsoConfigured,
+    safePath: safeRamsPath,
+    canUse: (p) => canAccess(p, 'rams') || canAccess(p, 'team'),
+    link: ramsLink,
+  },
+  social: {
+    name: 'the social studio',
+    origin: SOCIAL_ORIGIN,
+    configured: socialSsoConfigured,
+    safePath: safeSocialPath,
+    canUse: (p) => canAccess(p, 'social'),
+    link: socialLink,
+  },
+};

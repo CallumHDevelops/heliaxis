@@ -1,12 +1,17 @@
 import type { Metadata } from 'next';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { getSessionProfile } from '@/lib/auth';
-import { RAMS_ORIGIN, safeRamsPath } from '@/lib/sso';
+import { SSO_APPS, ssoApp } from '@/lib/sso';
 import { sendSsoCode, verifySsoCode } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { title: 'Open RAMS · Heliaxis', robots: { index: false, follow: false } };
+type Search = { app?: string; next?: string; step?: string; e?: string };
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Search> }): Promise<Metadata> {
+  const { app } = await searchParams;
+  return { title: `Open ${SSO_APPS[ssoApp(app)].name} · Heliaxis`, robots: { index: false, follow: false } };
+}
 
 const ERRORS: Record<string, string> = {
   wrong: 'That code isn’t right. Check the email and try again.',
@@ -17,10 +22,15 @@ const ERRORS: Record<string, string> = {
   setup: 'This isn’t switched on yet: sso.sql needs running in Supabase (it’s on the From Claude card).',
 };
 
-/** One-off step before one-tap sign-in to RAMS: prove the email address is yours (src/lib/sso.ts). */
-export default async function SsoPage({ searchParams }: { searchParams: Promise<{ next?: string; step?: string; e?: string }> }) {
+/**
+ * One-off step before one-tap sign-in to RAMS or (?app=social) the social studio: prove the email
+ * address is yours (src/lib/sso.ts). One proof covers both.
+ */
+export default async function SsoPage({ searchParams }: { searchParams: Promise<Search> }) {
   const q = await searchParams;
-  const next = safeRamsPath(q.next ?? null);
+  const app = ssoApp(q.app);
+  const { name, origin, safePath } = SSO_APPS[app];
+  const next = safePath(q.next ?? null);
   const { user, profile } = await getSessionProfile();
   const email = user?.email ?? '';
   const error = q.e && Object.hasOwn(ERRORS, q.e) ? ERRORS[q.e] : null;
@@ -28,7 +38,7 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
   return (
     <AdminShell active="dashboard" isAdmin={profile?.role === 'admin'}>
       <div className="sso-page">
-        <h1>Open RAMS without signing in</h1>
+        <h1>Open {name} without signing in</h1>
         {error && <p className="sso-err">{error}</p>}
         {q.step === 'code' ? (
           <>
@@ -36,6 +46,7 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
               We’ve emailed a 6-digit code to <b>{email}</b>. Type it in here. It works for 15 minutes.
             </p>
             <form action={verifySsoCode} className="sso-row">
+              <input type="hidden" name="app" value={app} />
               <input type="hidden" name="next" value={next} />
               <label htmlFor="sso-code" className="sso-visually-hidden">
                 Code
@@ -56,6 +67,7 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
               </button>
             </form>
             <form action={sendSsoCode}>
+              <input type="hidden" name="app" value={app} />
               <input type="hidden" name="next" value={next} />
               <button type="submit" className="sso-link">
                 Send a new code
@@ -66,9 +78,10 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
           <>
             <p>
               First, confirm that <b>{email}</b> is your email address. You only do this once. It stops anyone else using your
-              address to open RAMS as you.
+              address to open {name} as you.
             </p>
             <form action={sendSsoCode}>
+              <input type="hidden" name="app" value={app} />
               <input type="hidden" name="next" value={next} />
               <button type="submit" className="sso-btn">
                 Email me a code
@@ -77,7 +90,7 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
           </>
         )}
         <p className="sso-alt">
-          Or <a href={`${RAMS_ORIGIN}${next}`}>open RAMS and sign in as usual</a>.
+          Or <a href={`${origin}${next}`}>open {name} and sign in as usual</a>.
         </p>
       </div>
       <style>{`

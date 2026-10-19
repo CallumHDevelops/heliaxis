@@ -2,32 +2,40 @@
 
 import { redirect } from 'next/navigation';
 import { getSessionProfile } from '@/lib/auth';
-import { canAccess } from '@/lib/portals';
-import { checkProofCode, ramsLink, ramsSsoConfigured, safeRamsPath, sendProofCode } from '@/lib/sso';
+import { checkProofCode, sendProofCode, SSO_APPS, ssoApp, type SsoApp } from '@/lib/sso';
 
-async function who() {
+async function who(app: SsoApp) {
   const { user, profile } = await getSessionProfile();
   if (!user?.email || profile?.status !== 'approved') redirect('/login');
-  if (!ramsSsoConfigured() || !(canAccess(profile, 'rams') || canAccess(profile, 'team'))) redirect('/admin');
+  if (!SSO_APPS[app].configured() || !SSO_APPS[app].canUse(profile)) redirect('/admin');
   return { user, name: profile?.full_name || '' };
 }
 
-const back = (q: Record<string, string>) => redirect(`/admin/sso?${new URLSearchParams(q)}`);
+/** Which app (RAMS unless it's exactly "social") and where in it. */
+function target(formData: FormData) {
+  const app = ssoApp(formData.get('app'));
+  const next = formData.get('next');
+  return { app, next: SSO_APPS[app].safePath(typeof next === 'string' ? next : null) };
+}
+
+// RAMS, the default, keeps its old addresses (no app=).
+const back = (app: SsoApp, q: Record<string, string>) =>
+  redirect(`/admin/sso?${new URLSearchParams(app === 'rams' ? q : { app, ...q })}`);
 
 /** Email the signed-in person a 6-digit code (src/lib/sso.ts). */
 export async function sendSsoCode(formData: FormData): Promise<void> {
-  const next = safeRamsPath(String(formData.get('next') || '/'));
-  const { user, name } = await who();
-  const r = await sendProofCode(user, name);
-  back(r === 'ok' ? { step: 'code', next } : r === 'wait' ? { step: 'code', e: 'wait', next } : { e: r, next });
+  const { app, next } = target(formData);
+  const { user, name } = await who(app);
+  const r = await sendProofCode(user, name, app);
+  back(app, r === 'ok' ? { step: 'code', next } : r === 'wait' ? { step: 'code', e: 'wait', next } : { e: r, next });
 }
 
-/** Check the typed code; once right, RAMS opens signed in. */
+/** Check the typed code; once right, the app opens signed in. */
 export async function verifySsoCode(formData: FormData): Promise<void> {
-  const next = safeRamsPath(String(formData.get('next') || '/'));
-  const { user } = await who();
+  const { app, next } = target(formData);
+  const { user } = await who(app);
   const r = await checkProofCode(user, String(formData.get('code') || ''));
-  // Straight to RAMS (an absolute URL, so Next doesn't fetch it server-side first).
-  if (r === 'ok') redirect(await ramsLink(user.email, next));
-  back(r === 'wrong' ? { step: 'code', e: r, next } : { e: r, next });
+  // Straight to the app (an absolute URL, so Next doesn't fetch it server-side first).
+  if (r === 'ok') redirect(await SSO_APPS[app].link(user.email, next));
+  back(app, r === 'wrong' ? { step: 'code', e: r, next } : { e: r, next });
 }
