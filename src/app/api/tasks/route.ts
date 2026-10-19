@@ -1,8 +1,10 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { cleanTaskInput, TASK_COLUMNS, type Task } from '@/lib/tasks';
+import { cleanTaskInput, TASK_COLUMNS, type Task, type TaskJob } from '@/lib/tasks';
 import { notify } from '@/lib/notify';
+import { rearmDueReminder } from '@/lib/tasks-server';
+import { canAccess } from '@/lib/portals';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -46,14 +48,45 @@ function actorOf(session: { user: { id: string; email?: string | null }; profile
 
 const fail = (error: string, status = 500) => NextResponse.json({ error }, { status, headers: NO_STORE });
 
+/** The jobs these tasks belong to: { [projectId]: { ref, name } }. Batched; empty if anything fails. */
+async function jobsFor(tasks: { crm_project_id?: string | null }[]): Promise<Record<string, TaskJob>> {
+  const ids = [...new Set(tasks.map((t) => t.crm_project_id).filter((x): x is string => !!x))];
+  const out: Record<string, TaskJob> = {};
+  if (!ids.length) return out;
+  try {
+    const db = createAdminClient();
+    const rows: { id: string; enquiry_id: string; title: string | null; project_ref?: string | null }[] = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      // project_ref arrives with crm-v3.sql: read without it if it isn't there yet.
+      let r = await db.from('crm_projects').select('id, enquiry_id, title, project_ref').in('id', batch);
+      if (r.error) r = (await db.from('crm_projects').select('id, enquiry_id, title').in('id', batch)) as typeof r;
+      rows.push(...((r.data ?? []) as typeof rows));
+    }
+    const enquiryIds = [...new Set(rows.map((p) => p.enquiry_id))];
+    const names = new Map<string, string>();
+    for (let i = 0; i < enquiryIds.length; i += 100) {
+      const { data } = await db.from('enquiries').select('id, name').in('id', enquiryIds.slice(i, i + 100));
+      for (const e of data ?? []) names.set(e.id as string, (e.name as string) || '');
+    }
+    for (const p of rows) out[p.id] = { ref: p.project_ref ?? null, name: names.get(p.enquiry_id) || p.title || 'Customer' };
+  } catch {
+    // The chip is a nicety: the list still loads.
+  }
+  return out;
+}
+
 export async function GET() {
-  if (!(await requirePortal('tasks'))) return unauthorized();
+  const session = await requirePortal('tasks');
+  if (!session) return unauthorized();
   const { data, error } = await createAdminClient()
     .from('tasks')
     .select(TASK_COLUMNS)
     .order('created_at', { ascending: false });
   if (error) return fail(error.message);
-  return NextResponse.json({ tasks: data ?? [] }, { headers: NO_STORE });
+  // Customer names are CRM data: only people who can open the CRM get the job chips.
+  const jobs = canAccess(session.profile, 'crm') ? await jobsFor(data ?? []) : {};
+  return NextResponse.json({ tasks: data ?? [], jobs }, { headers: NO_STORE });
 }
 
 export async function POST(req: NextRequest) {
@@ -104,6 +137,7 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle();
   if (error) return fail(error.message);
   if (!data) return fail('That task no longer exists', 404);
+  if ('due_date' in input && before && before.due_date !== data.due_date) await rearmDueReminder(id);
   after(() => notifyTaskChange(before as Task | null, data as Task, actorOf(session)));
   return NextResponse.json({ task: data }, { headers: NO_STORE });
 }

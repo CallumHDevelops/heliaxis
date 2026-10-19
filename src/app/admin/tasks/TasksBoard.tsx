@@ -10,6 +10,7 @@ import {
   todayISO,
   type Assignee,
   type Task,
+  type TaskJob,
   type TaskPriority,
   type TaskStatus,
 } from '@/lib/tasks';
@@ -258,6 +259,8 @@ export function TasksBoard({
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  // Which job each CRM task belongs to (from the server; not kept offline).
+  const [jobs, setJobs] = useState<Record<string, TaskJob>>({});
 
   // Local-first: the outbox holds changes not yet on the server (see tasks-offline.ts).
   const store = meId ?? 'anon';
@@ -295,7 +298,9 @@ export function TasksBoard({
         return;
       }
       if (res.ok) {
-        server.current = ((await res.json()).tasks ?? []) as Task[];
+        const body = await res.json();
+        server.current = (body.tasks ?? []) as Task[];
+        setJobs((body.jobs ?? {}) as Record<string, TaskJob>);
         setOnline(true);
       }
     } finally {
@@ -598,6 +603,7 @@ export function TasksBoard({
           {visible.map((t) => {
             const due = dueInfo(t, today);
             const name = nameOf(t);
+            const job = t.crm_project_id ? jobs[t.crm_project_id] : undefined;
             return (
               <li key={t.id} id={`task-${t.id}`} className={`tk-item${t.status === 'done' ? ' is-done' : ''}${editing === t.id ? ' is-editing' : ''}`}>
                 <button
@@ -618,6 +624,12 @@ export function TasksBoard({
                   <div className="tk-meta">
                     <span className={`tk-who${name ? '' : ' is-none'}`}>{name ?? 'Unassigned'}</span>
                     <span className={`tk-due ${due.cls}`}>{due.label}</span>
+                    {job && t.crm_project_id && (
+                      <a className="tk-who tk-job" href={`/admin/crm/${t.crm_project_id}`} style={{ textDecoration: 'none' }}>
+                        Job: {job.ref ? `${job.ref} / ` : ''}
+                        {job.name}
+                      </a>
+                    )}
                   </div>
                 </div>
                 <div className="tk-actions">

@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   crmSession,
@@ -5,18 +6,21 @@ import {
   DOC_MIME,
   DOCS_BUCKET,
   ensureDocsBucket,
+  fingerprintDocument,
   isUuid,
   json,
   logActivity,
   MAX_DOC_BYTES,
   safeName,
 } from '@/lib/crm/server';
+import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Opportunity paperwork. { action: 'prepare', name, mime, size } → a one-time upload URL (files go
- * straight to storage); { action: 'save', path, name, category, visible, needs_signature } → record it.
+ * straight to storage); { action: 'save', path, name, category, visible, needs_signature } → record it
+ * (needs_signature only on quotes and contracts).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const s = await crmSession();
@@ -54,12 +58,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         mime: String(b.mime || '') || null,
         size: Number(b.size) || null,
         visible: b.visible !== false,
-        needs_signature: !!b.needs_signature && category === 'quote',
+        needs_signature: !!b.needs_signature && SIGNABLE_CATEGORIES.includes(category),
         uploaded_by: s.user.id,
       })
       .select('*')
       .single();
     if (error) return json({ error: error.message }, 500);
+    // A fingerprint of the file, so a signed quote can be matched to exactly what they signed.
+    after(() => fingerprintDocument(doc.id as string));
     await logActivity({
       enquiryId: p.enquiry_id,
       projectId: id,

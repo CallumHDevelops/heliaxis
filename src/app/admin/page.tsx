@@ -5,7 +5,10 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import { PORTALS, portalsFor, type PortalKey } from '@/lib/portals';
 import { todayISO } from '@/lib/tasks';
 import { setupPeople, visibleSetupTodos } from '@/lib/setup-checks';
-import { HubView, type HubTask, type HubFollowUp } from './HubView';
+import { schemaReady } from '@/lib/schema-ready';
+import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
+import { DEFAULT_SURVEY_MINUTES, isSurveyType, SURVEY_TYPES, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
+import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem } from './HubView';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,15 +120,151 @@ async function myDay(userId: string, keys: PortalKey[]) {
   return { tasks, followUps };
 }
 
+type Row = Record<string, unknown>;
+
+const hhmm = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const timeOf = (iso: unknown) => hhmm.format(new Date(String(iso)));
+const directions = (...where: unknown[]) => {
+  const to = where.filter((x) => typeof x === 'string' && x.trim()).join(', ');
+  return to ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(to)}` : null;
+};
+const DIARY_KIND: Record<string, string> = { site_visit: 'Site visit', install: 'Install', meeting: 'Meeting', personal: 'Personal', other: 'Other' };
+
+/** Reads that may fail (a table not there yet) come back empty. */
+async function rows(q: PromiseLike<{ data: unknown }>): Promise<Row[]> {
+  try {
+    return (((await q).data as Row[] | null) ?? []) as Row[];
+  } catch {
+    return [];
+  }
+}
+
+/** Whose diary entries are mine: my email, and any booking surveyor row matched to it (cms_kv 'survey-booking'). */
+async function myDiaryKeys(email: string): Promise<string[]> {
+  const keys = new Set([email]);
+  try {
+    const { data } = await createAdminClient().from('cms_kv').select('value').eq('key', 'survey-booking').maybeSingle();
+    const v = data?.value ? JSON.parse(data.value as string) : null;
+    for (const sv of Array.isArray(v?.surveyors) ? v.surveyors : []) {
+      if (typeof sv?.key === 'string' && String(sv.profileEmail || '').toLowerCase() === email) keys.add(sv.key.toLowerCase());
+    }
+  } catch {
+    // Booking settings not saved yet: the default surveyor's key is their email.
+  }
+  return [...keys];
+}
+
+/**
+ * Home → Today, for people on the CRM once surveys.sql has run: today's surveys and installs (any
+ * of the job's working install days), and my own diary entries. Every read is defensive.
+ */
+async function todayList(email: string | null, keys: PortalKey[]): Promise<HubToday | null> {
+  if (!keys.includes('crm')) return null;
+  const ready = await schemaReady();
+  if (!ready.surveys) return null;
+  const db = createAdminClient();
+  const today = todayISO();
+  const now = Date.now();
+  const at = (hours: number) => new Date(now + hours * 3_600_000).toISOString();
+  // Wide windows, then the exact UK day in code (no time-zone maths in the query).
+  const [surveyJobs, installJobs] = await Promise.all([
+    rows(db.from('crm_projects').select('*').gte('survey_at', at(-36)).lte('survey_at', at(36)).neq('stage', 'lost').limit(100)),
+    rows(db.from('crm_projects').select('*').gte('install_at', at(-24 * 62)).lte('install_at', at(36)).neq('stage', 'lost').order('install_at', { ascending: false }).limit(300)),
+  ]);
+  const surveys = surveyJobs.filter((p) => ukDay(String(p.survey_at)) === today);
+  const longInstall = installJobs.some((p) => Number(p.install_days ?? 1) > 1);
+  const hols = longInstall ? await ukBankHolidays() : new Set<string>();
+  const installs = installJobs
+    .map((p) => ({ p, days: installDayList(ukDay(String(p.install_at)), Number(p.install_days ?? 1), hols) }))
+    .filter((x) => x.days.includes(today));
+
+  const projectIds = [...new Set([...surveys, ...installs.map((x) => x.p)].map((p) => String(p.id)))];
+  const enquiryIds = [...new Set([...surveys, ...installs.map((x) => x.p)].map((p) => String(p.enquiry_id)))];
+  const mine = email ? await myDiaryKeys(email.toLowerCase()) : [];
+  const [customers, surveyRows, timed, allDay] = await Promise.all([
+    enquiryIds.length ? rows(db.from('enquiries').select('id, name, postcode').in('id', enquiryIds)) : Promise.resolve([]),
+    projectIds.length
+      ? rows(db.from('crm_surveys').select('id, project_id, type, status, updated_at').in('project_id', projectIds).in('status', ['booked', 'draft', 'complete']))
+      : Promise.resolve([]),
+    ready.booking && mine.length
+      ? rows(db.from('diary_entries').select('*').is('deleted_at', null).in('surveyor_key', mine).eq('all_day', false).gte('starts_at', at(-36)).lte('starts_at', at(36)))
+      : Promise.resolve([]),
+    ready.booking && mine.length
+      ? rows(db.from('diary_entries').select('*').is('deleted_at', null).in('surveyor_key', mine).eq('all_day', true).lte('day_from', today).gte('day_to', today))
+      : Promise.resolve([]),
+  ]);
+  const customer = new Map(customers.map((c) => [String(c.id), c]));
+  const nameOf = (p: Row) => String(customer.get(String(p.enquiry_id))?.name || p.title || 'Customer');
+  const postcodeOf = (p: Row) => String(p.postcode || customer.get(String(p.enquiry_id))?.postcode || '');
+  const items: HubTodayItem[] = [];
+
+  for (const p of surveys) {
+    const type: SurveyTypeKey = isSurveyType(p.survey_type) ? p.survey_type : (surveyTypeFor((p.products as string[] | null) ?? []) ?? 'solar');
+    // Solar (and solar + heat pump) surveys are done in the app; heat pump only is the SimpliHeat record.
+    const appType = type === 'ashp' ? 'ashp' : 'solar';
+    const mineRows = surveyRows.filter((r) => r.project_id === p.id && r.type === appType);
+    const open = mineRows.find((r) => r.status === 'booked' || r.status === 'draft');
+    const done = mineRows.find((r) => r.status === 'complete');
+    const start = Date.parse(String(p.survey_at));
+    const minutes = Number(p.survey_minutes) || DEFAULT_SURVEY_MINUTES[type];
+    items.push({
+      key: `s-${p.id}`,
+      kind: 'survey',
+      sort: start,
+      time: `${timeOf(p.survey_at)}–${hhmm.format(new Date(start + minutes * 60_000))}`,
+      title: nameOf(p),
+      sub: [`${SURVEY_TYPES.find((t) => t.key === type)?.short ?? 'Solar'} survey`, postcodeOf(p)].filter(Boolean).join(' · '),
+      href: `/admin/crm/${p.id}`,
+      action: open
+        ? { href: `/admin/surveys/${open.id}`, label: open.status === 'draft' ? 'Continue' : 'Start survey' }
+        : done
+          ? { href: `/admin/surveys/${done.id}/report`, label: 'Report' }
+          : { href: `/admin/surveys/start?project=${p.id}&type=${appType}`, label: 'Start survey' },
+      directions: directions(p.address, postcodeOf(p)),
+    });
+  }
+  for (const { p, days } of installs) {
+    const n = days.indexOf(today) + 1;
+    items.push({
+      key: `i-${p.id}`,
+      kind: 'install',
+      sort: n === 1 ? Date.parse(String(p.install_at)) : 0,
+      time: n === 1 ? timeOf(p.install_at) : 'All day',
+      title: nameOf(p),
+      sub: [days.length > 1 ? `Install, day ${n} of ${days.length}` : 'Install', postcodeOf(p)].filter(Boolean).join(' · '),
+      href: `/admin/crm/${p.id}`,
+      action: null,
+      directions: directions(p.address, postcodeOf(p)),
+    });
+  }
+  for (const e of [...allDay, ...timed.filter((x) => ukDay(String(x.starts_at)) === today)]) {
+    const where = e.where_kind === 'home' ? 'At home' : e.where_kind === 'online' ? 'Online / phone' : String(e.postcode || '');
+    items.push({
+      key: `d-${e.id}`,
+      kind: 'diary',
+      sort: e.all_day ? 0 : Date.parse(String(e.starts_at)),
+      time: e.all_day ? 'All day' : `${timeOf(e.starts_at)}–${timeOf(e.ends_at)}`,
+      title: String(e.title || DIARY_KIND[String(e.kind)] || 'Diary'),
+      sub: [DIARY_KIND[String(e.kind)] || 'Diary', where].filter(Boolean).join(' · '),
+      href: e.project_id ? `/admin/crm/${e.project_id}` : '/admin/surveys',
+      action: null,
+      directions: e.where_kind === 'address' ? directions(e.address, e.postcode) : null,
+    });
+  }
+  items.sort((a, b) => a.sort - b.sort);
+  return { items, canAddDiary: ready.booking };
+}
+
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const { denied } = await searchParams;
   const { user, profile } = await getSessionProfile();
   const isAdmin = profile?.role === 'admin';
   const keys = portalsFor(profile);
   const portals = PORTALS.filter((p) => keys.includes(p.key));
-  const [counts, day, setup, people] = await Promise.all([
+  const [counts, day, today, setup, people] = await Promise.all([
     badges(keys, isAdmin),
     user ? myDay(user.id, keys) : null,
+    user ? todayList(profile?.email || user.email || null, keys).catch(() => null) : null,
     // Admins see the setup to-dos unless one's been passed to someone; members only theirs.
     user ? visibleSetupTodos(user.id, isAdmin) : null,
     isAdmin ? setupPeople() : [],
@@ -143,6 +282,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         tasks={day?.tasks ?? []}
         followUps={day?.followUps ?? []}
         today={todayISO()}
+        todayList={today}
         setup={{
           todos: setup?.mine ?? [],
           admin: isAdmin && user ? { others: setup?.others ?? [], people, meId: user.id } : undefined,

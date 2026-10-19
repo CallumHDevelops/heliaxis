@@ -6,10 +6,11 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fillText } from '@/lib/crm/settings-shared';
 import type { TrackerStep } from '@/lib/crm/tracker';
+import './extras.css';
 
 export type CrmDoc = {
   id: string;
@@ -20,6 +21,9 @@ export type CrmDoc = {
   visible: boolean;
   needs_signature: boolean;
   created_at: string;
+  /** crm-v3.sql: ticked as signed on paper or with another e-sign service. */
+  signed_outside_at?: string | null;
+  signed_outside_note?: string | null;
 };
 type LibDoc = { id: string; name: string; description: string | null };
 type Snippet = { id: string; title: string; body: string };
@@ -36,6 +40,9 @@ export const DOC_LABEL: Record<string, string> = {
   receipt: 'Receipt',
   other: 'Other',
 };
+
+/** Quotes and contracts can be signed by the customer (in the portal, or ticked as signed outside it). */
+const SIGNABLE = ['quote', 'contract'];
 
 const short = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
@@ -58,6 +65,81 @@ async function uploadFile(url: string, file: File, extra: Record<string, unknown
   if (!save.ok) throw new Error(s.error || 'Upload failed');
 }
 
+/* ── The customer link's state (GET /api/crm/projects/{id}/portal) ─────────── */
+
+type QuoteDoc = {
+  id: string;
+  name: string;
+  category: string;
+  needs_signature: boolean;
+  signed_outside_at: string | null;
+  signed_outside_by: string | null;
+  signed_outside_note: string | null;
+};
+type PortalState = {
+  url: string | null;
+  mode: 'quote' | 'full' | null;
+  stage: string;
+  messages: { whatsappText: string; emailSubject: string; emailText: string } | null;
+  accepted: { at: string; name: string; documentId: string | null; startEarly: boolean | null; hash: string | null } | null;
+  quoteDocs: QuoteDoc[];
+  customer: { first: string; email: string | null };
+  emailConnected: boolean;
+  crmV3: boolean;
+};
+
+/** Documents changed here (upload, signing marks, send for signing): the other cards reload. */
+const DOCS_CHANGED = 'hx:documents-changed';
+const docsChanged = () => window.dispatchEvent(new CustomEvent(DOCS_CHANGED));
+
+const fetchPortalState = (id: string): Promise<PortalState | null> =>
+  fetch(`/api/crm/projects/${id}/portal`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+
+function usePortalState(id: string, refreshKey: string) {
+  const [state, setState] = useState<PortalState | null>(null);
+  const load = useCallback(async () => {
+    const d = await fetchPortalState(id);
+    if (d) setState(d);
+  }, [id]);
+  useEffect(() => {
+    let live = true;
+    fetchPortalState(id).then((d) => {
+      if (live && d) setState(d);
+    });
+    return () => {
+      live = false;
+    };
+  }, [id, refreshKey]);
+  useEffect(() => {
+    const on = () => void load();
+    window.addEventListener(DOCS_CHANGED, on);
+    return () => window.removeEventListener(DOCS_CHANGED, on);
+  }, [load]);
+  return [state, load] as const;
+}
+
+/*
+ * "+ Add" elsewhere on the record page (runtime contract): window.dispatchEvent(new CustomEvent(
+ * 'hx:add-document', { detail: { category } })) opens the upload with that type set. The page may
+ * switch to the Docs tab in the same tap, before this tab exists, so the last request is kept for a
+ * few seconds and picked up when the tab mounts.
+ */
+const ADD_DOCUMENT = 'hx:add-document';
+let pendingAdd: { category: string; at: number } | null = null;
+const cleanCategory = (c: unknown) => (typeof c === 'string' && c in DOC_LABEL ? c : 'other');
+if (typeof window !== 'undefined') {
+  window.addEventListener(ADD_DOCUMENT, (e) => {
+    pendingAdd = { category: cleanCategory((e as CustomEvent<{ category?: unknown }>).detail?.category), at: Date.now() };
+  });
+}
+function takePendingAdd() {
+  const p = pendingAdd;
+  pendingAdd = null;
+  return p && Date.now() - p.at < 5000 ? p.category : null;
+}
+
 /* ── Documents tab ─────────────────────────────────────────────────────────── */
 
 export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc[]; onChanged: () => Promise<void> }) {
@@ -66,29 +148,85 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [sent, setSent] = useState('');
+  const [flash, setFlash] = useState(false);
+  const [marking, setMarking] = useState<string | null>(null);
+  const [note, setNote] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  // Reload the link state when the documents change (who signed, which one is the signed quote).
+  const docsKey = docs.map((d) => `${d.id}:${d.needs_signature}:${d.signed_outside_at ?? ''}`).join(',');
+  const [portal] = usePortalState(id, docsKey);
+  const signedQuoteId = portal?.accepted?.documentId ?? null;
+  const signedBy = new Map((portal?.quoteDocs ?? []).map((q) => [q.id, q]));
 
+  const openUpload = useCallback((category: string) => {
+    setCat(category);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1600);
+    box.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    input.current?.click();
+  }, []);
+  useEffect(() => {
+    // A request made just before this tab appeared.
+    const t = setTimeout(() => {
+      const c = takePendingAdd();
+      if (c) openUpload(c);
+    }, 0);
+    const on = (e: Event) => {
+      pendingAdd = null;
+      openUpload(cleanCategory((e as CustomEvent<{ category?: unknown }>).detail?.category));
+    };
+    window.addEventListener(ADD_DOCUMENT, on);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener(ADD_DOCUMENT, on);
+    };
+  }, [openUpload]);
+
+  async function refresh() {
+    await onChanged();
+    docsChanged();
+  }
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
     setErr('');
     try {
-      for (const f of Array.from(files)) await uploadFile(`/api/crm/projects/${id}/documents`, f, { category: cat, visible, needs_signature: cat === 'quote' });
+      // Uploading never marks a document for signing: that's Send quote for signing (or the "Needs signing" chip),
+      // so a new upload can't replace the quote the customer has been sent.
+      for (const f of Array.from(files)) await uploadFile(`/api/crm/projects/${id}/documents`, f, { category: cat, visible, needs_signature: false });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Upload failed');
     }
     setBusy(false);
     if (input.current) input.current.value = '';
-    await onChanged();
+    await refresh();
   }
   async function patch(docId: string, body: Record<string, unknown>) {
-    await fetch(`/api/crm/documents/${docId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    await onChanged();
+    setErr('');
+    const r = await fetch(`/api/crm/documents/${docId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) setErr(d.error || 'Not saved');
+    await refresh();
+    return r.ok;
   }
   async function remove(d: CrmDoc) {
-    if (!window.confirm(`Delete “${d.name}”?`)) return;
-    await fetch(`/api/crm/documents/${d.id}`, { method: 'DELETE' });
-    await onChanged();
+    const msg = d.signed_outside_at ? `“${d.name}” is marked as signed. Delete it anyway?` : `Delete “${d.name}”?`;
+    if (!window.confirm(msg)) return;
+    setErr('');
+    const r = await fetch(`/api/crm/documents/${d.id}`, { method: 'DELETE' });
+    if (!r.ok) setErr((await r.json().catch(() => ({}))).error || 'Not deleted');
+    await refresh();
+  }
+  async function markSigned(d: CrmDoc) {
+    if (await patch(d.id, { signed_outside: true, note })) {
+      setMarking(null);
+      setNote('');
+    }
+  }
+  async function unmarkSigned(d: CrmDoc) {
+    if (!window.confirm(`Untick “${d.name}” as signed? Only do this if it was ticked by mistake.`)) return;
+    await patch(d.id, { signed_outside: false });
   }
   async function whatsapp(d: CrmDoc) {
     setErr('');
@@ -108,7 +246,7 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
 
   return (
     <div className="crm-docs">
-      <div className="crm-doc-upload">
+      <div ref={box} className={`crm-doc-upload${flash ? ' qx-flash' : ''}`}>
         <select className="crm-input" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Document type">
           {Object.entries(DOC_LABEL).map(([k, l]) => (
             <option key={k} value={k}>
@@ -124,39 +262,99 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
         </button>
         <input ref={input} type="file" hidden multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" onChange={(e) => onFiles(e.target.files)} />
       </div>
-      {cat === 'quote' && <p className="crm-muted crm-small">Quotes in the portal get an “Accept & sign” button for the customer.</p>}
+      {cat === 'quote' && (
+        <p className="crm-muted crm-small">
+          To get a quote signed, use <b>Send quote for signing</b> on the customer portal card: they read and sign it on their phone.
+        </p>
+      )}
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {sent && <p className="crm-banner">{sent}</p>}
       {docs.length === 0 ? (
-        <p className="crm-muted crm-emptystate">No documents yet. Upload quotes, invoices, DNO letters and certificates — ones marked visible appear in the customer’s portal once the job starts.</p>
+        <p className="crm-muted crm-emptystate">
+          No documents yet. Upload quotes, invoices, DNO letters and certificates. Ones marked visible appear in the customer’s portal once the job is
+          Won.
+        </p>
       ) : (
         <ul className="crm-doclist">
-          {docs.map((d) => (
-            <li key={d.id}>
-              <a className="crm-doc-main" href={`/api/crm/documents/${d.id}`} target="_blank" rel="noreferrer">
-                <b>{d.name}</b>
-                <small>
-                  {DOC_LABEL[d.category] || 'Document'} · {short(d.created_at)}
-                </small>
-              </a>
-              <div className="crm-doc-actions">
-                <button type="button" className={`crm-chipbtn${d.visible ? ' on' : ''}`} onClick={() => patch(d.id, { visible: !d.visible })}>
-                  {d.visible ? '👁 In portal' : 'Private'}
-                </button>
-                {d.category === 'quote' && (
-                  <button type="button" className={`crm-chipbtn${d.needs_signature ? ' on' : ''}`} onClick={() => patch(d.id, { needs_signature: !d.needs_signature })}>
-                    {d.needs_signature ? '✍ Needs signing' : 'No signing'}
-                  </button>
+          {docs.map((d) => {
+            const signable = SIGNABLE.includes(d.category);
+            const isSignedQuote = d.id === signedQuoteId;
+            const outside = signedBy.get(d.id);
+            const outsideAt = d.signed_outside_at ?? outside?.signed_outside_at ?? null;
+            return (
+              <li key={d.id}>
+                <a className="crm-doc-main" href={`/api/crm/documents/${d.id}`} target="_blank" rel="noreferrer">
+                  <b>{d.name}</b>
+                  <small>
+                    {DOC_LABEL[d.category] || 'Document'} · {short(d.created_at)}
+                  </small>
+                </a>
+                {isSignedQuote && portal?.accepted && (
+                  <p className="qx-signed">
+                    ✍ Signed in the portal by {portal.accepted.name}, {short(portal.accepted.at)}. It’s the evidence of the contract, so it can’t be
+                    deleted or changed.
+                  </p>
                 )}
-                <button type="button" className="crm-chipbtn" onClick={() => whatsapp(d)}>
-                  💬 Send
-                </button>
-                <button type="button" className="crm-chipbtn" onClick={() => remove(d)} aria-label={`Delete ${d.name}`}>
-                  ✕
-                </button>
-              </div>
-            </li>
-          ))}
+                {!isSignedQuote && outsideAt && (
+                  <p className="qx-signed">
+                    ✓ Signed outside the portal ({[short(outsideAt), outside?.signed_outside_by ? `ticked by ${outside.signed_outside_by}` : null].filter(Boolean).join(', ')})
+                    {(outside?.signed_outside_note || d.signed_outside_note) && <small> · {outside?.signed_outside_note || d.signed_outside_note}</small>}
+                  </p>
+                )}
+                <div className="crm-doc-actions">
+                  <button type="button" className={`crm-chipbtn${d.visible ? ' on' : ''}`} onClick={() => patch(d.id, { visible: !d.visible })}>
+                    {d.visible ? '👁 In portal' : 'Private'}
+                  </button>
+                  {signable && !isSignedQuote && (
+                    <button type="button" className={`crm-chipbtn${d.needs_signature ? ' on' : ''}`} onClick={() => patch(d.id, { needs_signature: !d.needs_signature })}>
+                      {d.needs_signature ? '✍ Needs signing' : 'No signing'}
+                    </button>
+                  )}
+                  {signable && !isSignedQuote && portal?.crmV3 && (
+                    <button
+                      type="button"
+                      className={`crm-chipbtn${outsideAt ? ' on' : ''}`}
+                      aria-pressed={!!outsideAt}
+                      onClick={() => (outsideAt ? unmarkSigned(d) : setMarking(marking === d.id ? null : d.id))}
+                    >
+                      {outsideAt ? '✓ Signed' : 'Mark as signed'}
+                    </button>
+                  )}
+                  <button type="button" className="crm-chipbtn" onClick={() => whatsapp(d)}>
+                    💬 Send
+                  </button>
+                  {!isSignedQuote && (
+                    <button type="button" className="crm-chipbtn" onClick={() => remove(d)} aria-label={`Delete ${d.name}`}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {marking === d.id && (
+                  <div className="qx-markform">
+                    <p className="crm-small">
+                      <b>Signed on paper or with another e-sign service?</b> Tick it here so the job shows it’s signed.
+                    </p>
+                    <input
+                      className="crm-input"
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Optional note, e.g. Signed on paper at the survey"
+                      aria-label="Note"
+                      maxLength={300}
+                    />
+                    <div className="crm-actions" style={{ marginTop: 0 }}>
+                      <button type="button" className="crm-btn crm-btn--solar" onClick={() => markSigned(d)}>
+                        Mark as signed
+                      </button>
+                      <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setMarking(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -165,6 +363,21 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
 
 /* ── Customer portal card ──────────────────────────────────────────────────── */
 
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    window.prompt('Copy the link', text);
+    return false;
+  }
+}
+
+/**
+ * The customer's private link. Before it exists (a sales stage): Send quote for signing. At Quote
+ * sent: the quote-only page and how to send it. From Won: their full portal. Loads its own state, so
+ * the props stay as they were (`open` and `portal` are only used until it has loaded).
+ */
 export function PortalCard({
   id,
   portal,
@@ -174,34 +387,243 @@ export function PortalCard({
 }: {
   id: string;
   portal: string | null;
-  /** The job has started (Won onwards) — before that the customer has no portal. */
+  /** The job has started (Won onwards). */
   open: boolean;
   tracker: TrackerStep[];
   onSendWhatsApp: (text: string) => void;
 }) {
-  const [url, setUrl] = useState(portal);
+  // Reload when the stage moves (the tracker changes with it).
+  const [state, reload] = usePortalState(id, `${open}|${tracker.map((t) => `${t.key}:${t.state}`).join(',')}`);
+  const [made, setMade] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [pick, setPick] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
+  const url = state?.url ?? made ?? portal;
+  const mode = state ? state.mode : open ? 'full' : null;
+
   async function ensure() {
     if (url) return url;
     const r = await fetch(`/api/crm/projects/${id}/portal`, { method: 'POST' });
     const d = await r.json().catch(() => ({}));
-    if (d.url) setUrl(d.url);
+    if (d.url) setMade(d.url);
+    else setErr(d.error || 'No link yet.');
     return (d.url as string) || null;
   }
+  async function copy() {
+    const u = await ensure();
+    if (!u) return;
+    if (await copyText(u)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+  async function resetLink() {
+    if (!window.confirm('Make a new link? The current link will stop working, so send them the new one.')) return;
+    const r = await fetch(`/api/crm/projects/${id}/portal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reset: true }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (d.url) {
+      setMade(d.url);
+      await reload();
+    } else window.alert(d.error || 'Couldn’t reset the link.');
+  }
+  async function sendForSigning() {
+    const docId = pick || state?.quoteDocs.find((q) => q.needs_signature)?.id || state?.quoteDocs[0]?.id;
+    if (!docId) return;
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/crm/projects/${id}/send-quote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_id: docId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setErr(d.error || 'Not sent');
+    setMade(d.url);
+    setPicking(false);
+    setNote('Ready ✓ Now send them the link.');
+    docsChanged();
+    window.dispatchEvent(new CustomEvent('hx:project-changed', { detail: { id } }));
+    await reload();
+  }
+  async function emailIt() {
+    const m = state?.messages;
+    const to = state?.customer.email;
+    if (!m || !to) return;
+    if (!state?.emailConnected) {
+      window.location.href = `mailto:${to}?subject=${encodeURIComponent(m.emailSubject)}&body=${encodeURIComponent(m.emailText)}`;
+      return;
+    }
+    if (!window.confirm(`Email the link to ${to}?`)) return;
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/crm/projects/${id}/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: m.emailSubject, text: m.emailText }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) setErr(d.error || 'Email not sent');
+    else setNote(`Emailed to ${to} ✓`);
+  }
+
   const current = tracker.find((t) => t.state === 'current');
-  if (!open)
+  const quoteDocs = state?.quoteDocs ?? [];
+  const toSign = quoteDocs.find((q) => q.needs_signature);
+  const chosen = pick || toSign?.id || quoteDocs[0]?.id || '';
+
+  const picker = (
+    <div className="qx-pick">
+      {quoteDocs.length === 0 ? (
+        <p className="crm-small qx-dim">Upload the quote under Docs first (type: Quote or Contract), then send it from here.</p>
+      ) : (
+        <>
+          <div className="crm-docpick" role="radiogroup" aria-label="Which quote">
+            {quoteDocs.map((q) => (
+              <label key={q.id} className={chosen === q.id ? 'on' : ''}>
+                <input type="radio" name={`sendq-${id}`} checked={chosen === q.id} onChange={() => setPick(q.id)} />
+                <span>📄</span> {q.name}
+                <small className="qx-dim"> · {DOC_LABEL[q.category] || q.category}</small>
+              </label>
+            ))}
+          </div>
+          <div className="crm-actions" style={{ marginTop: 0 }}>
+            <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !chosen} onClick={sendForSigning}>
+              {busy ? 'Getting it ready…' : 'Send for signing'}
+            </button>
+            {mode === 'quote' && (
+              <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setPicking(false)}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const shareButtons = (whatsappText: string | null) => (
+    <div className="crm-actions" style={{ marginTop: 0 }}>
+      <button
+        type="button"
+        className="crm-btn crm-btn--wa"
+        onClick={async () => {
+          const u = await ensure();
+          if (!u) return;
+          onSendWhatsApp(
+            whatsappText ??
+              (mode === 'quote'
+                ? `Here's your Heliaxis quote page: ${u}`
+                : `Here's your Heliaxis project page. You can see your progress, documents and key dates any time: ${u}`)
+          );
+        }}
+      >
+        {whatsappText ? 'WhatsApp it' : 'Send on WhatsApp'}
+      </button>
+      <button type="button" className="crm-btn crm-btn--ghost" onClick={copy}>
+        {copied ? 'Copied ✓' : 'Copy link'}
+      </button>
+      {mode === 'quote' && state?.messages && (
+        <button
+          type="button"
+          className="crm-btn crm-btn--ghost"
+          disabled={busy || !state.customer.email}
+          title={state.customer.email ? undefined : 'No email address for this customer: add one under Details'}
+          onClick={emailIt}
+        >
+          Email it
+        </button>
+      )}
+      {url && (
+        <a className="crm-btn crm-btn--ghost" href={url} target="_blank" rel="noreferrer">
+          Open
+        </a>
+      )}
+    </div>
+  );
+
+  const resetButton = url && (
+    <button type="button" className="crm-link" style={{ marginTop: 6 }} onClick={resetLink}>
+      Reset link (if it’s been shared by mistake)
+    </button>
+  );
+
+  if (mode === 'quote') {
+    return (
+      <div className="crm-portal">
+        <div className="crm-portal-head">
+          <b>Customer portal</b>
+          <span className="crm-muted crm-small">✍ Waiting for their signature</span>
+        </div>
+        <p className="crm-muted crm-small">
+          {toSign ? (
+            <>
+              Their link opens <b className="qx-light">{toSign.name}</b> to read and sign, with the 14-day cancellation wording. Signing moves the job
+              to Won and the same link becomes their full portal.
+            </>
+          ) : (
+            'Their link shows their quote once one is marked “Needs signing” in Docs.'
+          )}
+        </p>
+        {note && <p className="qx-note">{note}</p>}
+        {err && <p className="crm-banner crm-banner--err">{err}</p>}
+        {picking ? (
+          picker
+        ) : (
+          <>
+            {shareButtons(state?.messages?.whatsappText ?? null)}
+            <button type="button" className="crm-link" style={{ marginTop: 6 }} onClick={() => setPicking(true)}>
+              Send a different quote
+            </button>
+          </>
+        )}
+        {resetButton}
+      </div>
+    );
+  }
+
+  if (mode !== 'full') {
+    const lost = (state?.stage ?? '') === 'lost';
     return (
       <div className="crm-portal">
         <div className="crm-portal-head">
           <b>Customer portal</b>
           <span className="crm-muted crm-small">🔒 Not yet</span>
         </div>
-        <p className="crm-muted crm-small">
-          Opens when the job starts. Move this opportunity to <b>Won</b> and you can send them their private link with progress, documents,
-          photos and deposit.
-        </p>
+        {!state ? (
+          <p className="crm-muted crm-small">Loading…</p>
+        ) : lost ? (
+          <p className="crm-muted crm-small">There’s no customer link for a Lost job.</p>
+        ) : (
+          <>
+            <p className="crm-muted crm-small">
+              <b className="qx-light">Send quote for signing</b>: they get a private link to read the quote and sign it on their phone, with the 14-day
+              cancellation wording. Signing moves the job to Won and opens their full portal (progress, documents, photos and deposit).
+            </p>
+            {err && <p className="crm-banner crm-banner--err">{err}</p>}
+            {picking || quoteDocs.length === 0 ? (
+              picker
+            ) : (
+              <div className="crm-actions" style={{ marginTop: 0 }}>
+                <button type="button" className="crm-btn crm-btn--solar" onClick={() => setPicking(true)}>
+                  Send quote for signing
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
+  }
+
   return (
     <div className="crm-portal">
       <div className="crm-portal-head">
@@ -213,61 +635,10 @@ export function PortalCard({
           <li key={t.key} className={t.state} title={t.label} />
         ))}
       </ol>
-      <p className="crm-muted crm-small">Their progress, dates, documents, photos and deposit — on one private link.</p>
-      <div className="crm-actions" style={{ marginTop: 0 }}>
-        <button
-          type="button"
-          className="crm-btn crm-btn--wa"
-          onClick={async () => {
-            const u = await ensure();
-            if (u) onSendWhatsApp(`Here's your Heliaxis project page — you can see your progress, documents and key dates any time: ${u}`);
-          }}
-        >
-          Send on WhatsApp
-        </button>
-        <button
-          type="button"
-          className="crm-btn crm-btn--ghost"
-          onClick={async () => {
-            const u = await ensure();
-            if (!u) return;
-            try {
-              await navigator.clipboard.writeText(u);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            } catch {
-              window.prompt('Copy the link', u);
-            }
-          }}
-        >
-          {copied ? 'Copied ✓' : 'Copy link'}
-        </button>
-        {url && (
-          <a className="crm-btn crm-btn--ghost" href={url} target="_blank" rel="noreferrer">
-            Open
-          </a>
-        )}
-      </div>
-      {url && (
-        <button
-          type="button"
-          className="crm-link"
-          style={{ marginTop: 6 }}
-          onClick={async () => {
-            if (!window.confirm('Make a new link? The current link will stop working, so send them the new one.')) return;
-            const r = await fetch(`/api/crm/projects/${id}/portal`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reset: true }),
-            });
-            const d = await r.json().catch(() => ({}));
-            if (d.url) setUrl(d.url);
-            else window.alert(d.error || 'Couldn’t reset the link.');
-          }}
-        >
-          Reset link (if it’s been shared by mistake)
-        </button>
-      )}
+      <p className="crm-muted crm-small">Their progress, dates, documents, photos and deposit, on one private link.</p>
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      {shareButtons(null)}
+      {resetButton}
     </div>
   );
 }
@@ -281,6 +652,9 @@ type DnoProject = {
   deposit_paid_at: string | null;
   accepted_at: string | null;
   accepted_name: string | null;
+  /** crm-v3.sql */
+  accepted_start_early?: boolean | null;
+  accepted_hash?: string | null;
 };
 
 export function DnoDeposit({ project, stripe, onSave }: { project: DnoProject; stripe: boolean; onSave: (b: Record<string, unknown>) => Promise<boolean> }) {
@@ -315,9 +689,18 @@ export function DnoDeposit({ project, stripe, onSave }: { project: DnoProject; s
       {project.accepted_at ? (
         <p className="crm-banner">
           ✍ Accepted and signed online by <b>{project.accepted_name}</b> on {short(project.accepted_at)}.
+          {project.accepted_start_early === true && ' They asked us to start within the 14 days.'}
+          {project.accepted_hash && (
+            <small className="qx-hash" title="A fingerprint of the exact file they signed">
+              {' '}
+              Fingerprint {project.accepted_hash.slice(0, 12)}
+            </small>
+          )}
         </p>
       ) : (
-        <p className="crm-muted crm-small">Once the job has started, quotes uploaded under Documents (type: Quote) can be accepted and signed in their portal.</p>
+        <p className="crm-muted crm-small">
+          Use <b>Send quote for signing</b> on the customer portal card. Once they sign, the job moves to Won and they can pay the deposit.
+        </p>
       )}
       <label className="crm-label" htmlFor="dep">
         Deposit £
@@ -332,8 +715,8 @@ export function DnoDeposit({ project, stripe, onSave }: { project: DnoProject; s
         {project.deposit_paid_at
           ? `💷 Paid ${short(project.deposit_paid_at)}.`
           : stripe
-            ? 'The customer can pay it by card from their portal once the job has started.'
-            : 'Card payments aren’t connected yet (Stripe) — the portal shows the amount due.'}
+            ? 'The customer can pay it by card from their link once they’ve signed the quote.'
+            : 'Card payments aren’t connected yet (Stripe). The portal shows the amount due.'}
       </p>
     </div>
   );
