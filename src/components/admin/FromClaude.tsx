@@ -109,7 +109,9 @@ export function FromClaude({ todos, admin }: FromClaudeProps) {
               {isTicked(t) && <small className="fc-waiting">Ticked. Waiting to confirm</small>}
               {shared && <small className="fc-shared">{shared}</small>}
             </span>
-            {t.optional && <span className="fc-tag">Optional</span>}
+            {t.kind === 'question' && <span className="fc-tag is-question">Question for you</span>}
+            {t.kind === 'tip' && <span className="fc-tag">Recommended</span>}
+            {t.optional && t.kind !== 'tip' && <span className="fc-tag">Optional</span>}
             <span className="fc-chev" aria-hidden="true">›</span>
           </button>
         </div>

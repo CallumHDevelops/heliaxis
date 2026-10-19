@@ -45,6 +45,7 @@
 .fc-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--fc-accent); }
 .fc-title { flex: 1; font-weight: 600; font-size: 0.93rem; }
 .fc-tag { font-size: 0.7rem; color: var(--fc-muted); border: 1px solid var(--fc-line); border-radius: 99px; padding: 0.1rem 0.45rem; }
+.fc-tag.is-question { color: #8a5d00; border-color: rgba(199, 127, 4, 0.5); background: rgba(248, 188, 30, 0.16); white-space: nowrap; }
 .fc-chev { color: var(--fc-muted); font-size: 1.2rem; transition: transform 0.15s; }
 .is-open .fc-chev { transform: rotate(90deg); }
 .fc-body { padding: 0 0.1rem 0.85rem 1.75rem; }

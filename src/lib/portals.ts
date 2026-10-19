@@ -107,6 +107,9 @@ export const HUB_PATH = '/admin';
 /** Also open to every approved user: the Android app download page. */
 export const APP_PATH = '/admin/app';
 
+/** Confirming your email before one-tap sign-in to RAMS (src/lib/sso.ts): open to any approved user. */
+export const SSO_PATH = '/admin/sso';
+
 /**
  * What members could reach before per-portal access existed. Used when a profile
  * has no `portals` column yet (migration not run) so nobody gets locked out.
@@ -137,7 +140,7 @@ export function canAccess(profile: AccessProfile | null | undefined, key: Portal
  */
 export function portalForPath(pathname: string): PortalKey | 'admin' | null {
   const p = pathname.replace(/\/$/, '') || '/';
-  if (p === HUB_PATH || p === APP_PATH) return null;
+  if (p === HUB_PATH || p === APP_PATH || p === SSO_PATH || p.startsWith(`${SSO_PATH}/`)) return null;
   if (OPEN_SETUP_PATHS.some((a) => p.startsWith(`${a}/`))) return null;
   if (ADMIN_ONLY_PATHS.some((a) => p === a || p.startsWith(`${a}/`))) return 'admin';
   for (const portal of PORTALS) {

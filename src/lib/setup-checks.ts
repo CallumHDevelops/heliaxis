@@ -42,6 +42,8 @@ export type SetupTodo = {
   manual?: boolean;
   /** Ticked as done, but the app can't see it yet (e.g. Vercel keys need a redeploy). */
   ticked?: boolean;
+  /** 'question': Claude needs an answer (given in the Claude chat). 'tip': a recommendation. */
+  kind?: 'question' | 'tip';
   /** Profile ids of the people picked to see it. Empty = every admin (the default). */
   assignees?: string[];
 };
@@ -85,6 +87,97 @@ async function has(table: string, column = '*') {
 
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
+  {
+    id: 'q-social-sso',
+    kind: 'question',
+    title: 'Can Claude change how the social studio signs you in?',
+    detail:
+      'So Social media studio opens already signed in, like RAMS. It needs a five-line change to the studio’s own sign-in page (the Social_Content_Creator branch), which Claude won’t make without your go-ahead.',
+    steps: [
+      'Reply **yes** (or no) to Claude in your Claude Code chat.',
+      'If Claude says a safety check stopped it, allow it in Claude Code’s permission settings, or ask Claude for the change so you can paste it in yourself.',
+      'Tick this once you’ve answered.',
+    ],
+    order: 1,
+    manual: true,
+  },
+  {
+    id: 'q-cut-out-image',
+    kind: 'question',
+    title: 'What do you mean by the “cut out image” in a solar survey?',
+    detail:
+      'Claude is building it as the aerial or roof photo with the panel area marked on it, using the drawing tool in the survey.',
+    steps: [
+      'If that’s right, just tick this.',
+      'If you meant something else (for example a cut-out of the house for the proposal), tell Claude in your Claude Code chat, then tick this.',
+    ],
+    order: 2,
+    manual: true,
+  },
+  {
+    id: 'meta-leadgen',
+    title: 'Connect Meta lead forms to the CRM',
+    detail:
+      'So new Facebook and Instagram lead-form leads arrive by themselves, and Enquiries → Import can bring in the last 90 days.',
+    steps: [
+      'Open the [Meta app](https://developers.facebook.com/apps) → **Heliaxis CRM** → **Webhooks** (left menu).',
+      'In the drop-down at the top choose **Page** → **Subscribe to this object**. Callback URL and verify token are the same as for WhatsApp (copy the URL below; the token is your `META_WEBHOOK_VERIFY_TOKEN`).',
+      'Find **leadgen** in the list → **Subscribe**.',
+      'In [Business Settings](https://business.facebook.com/settings) → **Integrations** → **Leads Access**: pick the Heliaxis Page and give **Heliaxis CRM** access.',
+      'In **Users → System users**, check the CRM’s system user has the Facebook Page as an asset, and that its token includes `leads_retrieval`, `pages_show_list`, `pages_read_engagement` and `pages_manage_metadata`. If not, generate a new token with them and paste it into Vercel as `META_PAGE_ACCESS_TOKEN`.',
+      'Test it with Meta’s [Lead Ads Testing Tool](https://developers.facebook.com/tools/lead-ads-testing): create a test lead, and it should show **success** under Track status. (Test leads aren’t imported.)',
+      'Then open **Enquiries → Import → Find lead forms** to bring in the last 90 days.',
+    ],
+    copies: [
+      { label: 'Callback URL', value: 'https://heliaxis.co.uk/api/meta/webhook' },
+      { label: 'Field', value: 'leadgen' },
+    ],
+    guide: 'whatsapp',
+    href: 'https://developers.facebook.com/apps',
+    hrefLabel: 'Open Meta app',
+    order: 12,
+    manual: true,
+  },
+  {
+    id: 'cron-check',
+    title: 'Check the every-minute job is switched on',
+    detail:
+      'Smart replies, chasers, reminders, follow-ups and alerts all run from a Supabase job that calls the CRM every minute. The app can’t check it for you.',
+    steps: [
+      'Tap **Open Supabase**, paste the check (first Copy button) and tap **Run**.',
+      'You should see **whatsapp-outbox** with `* * * * *` and **active** = true. If so, tick this. You’re done.',
+      'If there are no rows: in Supabase go to **Database → Extensions** and switch on **pg_cron** and **pg_net**.',
+      'Then copy the second block, replace `YOUR_CRON_SECRET` with your `CRON_SECRET` from Vercel (Settings → Environment Variables), paste it into a new query and **Run**. Run the check again to confirm.',
+    ],
+    copies: [
+      { label: 'Check', value: 'select jobname, schedule, active from cron.job;' },
+      {
+        label: 'Switch on',
+        value:
+          "select cron.schedule('whatsapp-outbox', '* * * * *', $$ select net.http_get(url := 'https://heliaxis.co.uk/api/cron/whatsapp-outbox', headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET')); $$);",
+      },
+    ],
+    href: sqlEditor(),
+    hrefLabel: 'Open Supabase',
+    order: 11,
+    manual: true,
+  },
+  {
+    id: 'tip-repo-private',
+    kind: 'tip',
+    title: 'Make the Heliaxis code private on GitHub',
+    detail:
+      'The website and CRM code is public, so anyone can read how it works. There are no passwords in it, but private is safer. Vercel keeps deploying as before.',
+    steps: [
+      'Tap **Open GitHub** (above).',
+      'Scroll to the bottom (**Danger Zone**) → **Change visibility** → **Change to private**, then confirm.',
+    ],
+    href: 'https://github.com/CallumHDevelops/heliaxis/settings',
+    hrefLabel: 'Open GitHub',
+    order: 70,
+    optional: true,
+    manual: true,
+  },
   {
     // Bumped from apk-icon-release: GitHub now builds the app, no Android Studio needed.
     id: 'apk-native-release',
@@ -440,7 +533,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       'Copy the **Project URL**. That’s the value for `RAMS_SUPABASE_URL`.',
       'Under **Project API keys**, reveal and copy the **service_role** key. That’s `RAMS_SUPABASE_SERVICE_ROLE_KEY`, and it’s a password: tick **Sensitive** in Vercel.',
       ...VERCEL_STEPS,
-      'It works for anyone with an approved RAMS account under the same email as their Heliaxis login. Anyone else still sees the RAMS sign-in.',
+      'It works for anyone with an approved RAMS account under the same email as their Heliaxis login. The first time each person taps RAMS, they confirm their email once by a link we email them. Anyone else still sees the RAMS sign-in.',
     ],
     copies: [
       { label: 'Key', value: 'RAMS_SUPABASE_URL' },
