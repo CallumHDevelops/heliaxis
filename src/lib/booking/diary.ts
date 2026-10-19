@@ -233,6 +233,8 @@ export async function loadDiary(
     hols: ReadonlySet<string>;
     fresh?: boolean;
     ignoreBookingId?: string | null;
+    /** A job being booked: its own survey date in the CRM doesn't count as busy (the new time replaces it). */
+    ignoreProjectId?: string | null;
     signal?: AbortSignal;
   }
 ): Promise<Diary> {
@@ -359,6 +361,7 @@ export async function loadDiary(
     if (!p.survey_at) continue;
     const mailbox = (p.survey_mailbox || '').toLowerCase();
     if (mailbox ? mailbox !== sv.key : !isFirst) continue;
+    if (o.ignoreProjectId && p.id === o.ignoreProjectId) continue;
     const start = Date.parse(p.survey_at);
     if (p.survey_booking_id && (p.survey_booking_id === o.ignoreBookingId || liveBookings.get(p.survey_booking_id) === start)) continue;
     const end = start + surveyMinutesFor(p, s) * 60_000;

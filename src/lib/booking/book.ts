@@ -32,7 +32,7 @@ import {
 import { sunsetMs } from './sun';
 import { getBookingSettings } from './settings-server';
 import { WEEKDAY_NAMES, type BookingSettings, type Surveyor } from './settings';
-import { firstName, itemsOnDay, loadDiary, parseRange, surveyorProfileId, type BookingRow, type ProjectRow } from './diary';
+import { firstName, itemsOnDay, loadDiary, parseRange, surveyMinutesFor, surveyorProfileId, type BookingRow, type ProjectRow } from './diary';
 import { isHit, lookupPostcode, normPostcode, outcodeOf, placeFromHit, spacedPostcode, type GeoHit } from './geo';
 import { buildDrive, estimateBetween } from './travel';
 import { syncProjectCalendar } from './calendar-sync';
@@ -91,6 +91,8 @@ export type FindOpts = {
   postcode: string;
   type: SurveyTypeKey;
   ignoreBookingId?: string | null;
+  /** Booking a time for this job: its own survey date in the CRM doesn't count as busy (the new time replaces it). */
+  ignoreProjectId?: string | null;
   fresh?: boolean;
   onlyDay?: string;
   onlySurveyorKey?: string;
@@ -225,6 +227,7 @@ export async function findSlots(o: FindOpts): Promise<FindResult> {
       hols: s.advanced.skipBankHolidays ? hols : new Set<string>(),
       fresh: o.fresh,
       ignoreBookingId: o.ignoreBookingId,
+      ignoreProjectId: o.ignoreProjectId,
       signal: o.signal,
     });
     if (!diary.outlookOk) {
@@ -389,6 +392,22 @@ export async function liveBookingFor(projectId: string): Promise<BookingRow | nu
   return ((data ?? [])[0] as BookingRow | undefined) ?? null;
 }
 
+/**
+ * A survey date on the job with no online booking behind it (set by staff in the CRM, or kept when its
+ * booking was cancelled) that isn't over yet. On the customer's link that's their survey: they see it,
+ * and changes go through us, so a second time can't be booked over it.
+ */
+export async function jobSurvey(p: BookingProject, s: BookingSettings): Promise<{ start: number; end: number; type: SurveyTypeKey; minutes: number } | null> {
+  const start = p.survey_at ? Date.parse(p.survey_at) : NaN;
+  if (!Number.isFinite(start)) return null;
+  const { data } = await createAdminClient().from('crm_projects').select('*').eq('id', p.id).maybeSingle();
+  const type: SurveyTypeKey = isSurveyType(p.survey_type) ? p.survey_type : (surveyTypeFor(p.products) ?? 'solar');
+  const minutes = surveyMinutesFor({ survey_minutes: (data?.survey_minutes as number | null | undefined) ?? null, survey_type: type, products: p.products }, s);
+  const end = start + minutes * MIN;
+  return end > Date.now() ? { start, end, type, minutes } : null;
+}
+const callToChange = { status: 409, body: { error: `You already have a survey booked. To change it, please call us on ${OFFICE_PHONE}.` } };
+
 const UNAVAILABLE: Outcome = { status: 503, body: { error: `Online booking isn’t available right now. Please call us on ${OFFICE_PHONE}.` } };
 
 /** When an unconfirmed request lapses: 48 h, or the cut-off on the working day before, whichever is first (at least 2 h). */
@@ -410,6 +429,7 @@ async function offersFor(x: {
   type: SurveyTypeKey;
   start: number;
   ignoreBookingId?: string | null;
+  ignoreProjectId?: string | null;
   staff?: boolean;
   surveyorKey?: string;
 }): Promise<Offer[] | FindFail> {
@@ -419,7 +439,16 @@ async function offersFor(x: {
   for (const sv of s.surveyors) {
     if (x.surveyorKey && sv.key !== x.surveyorKey) continue;
     const v = await dayVersion(day);
-    const r = await findSlots({ postcode: x.postcode, type: x.type, fresh: true, onlyDay: day, onlySurveyorKey: sv.key, ignoreBookingId: x.ignoreBookingId, staff: x.staff });
+    const r = await findSlots({
+      postcode: x.postcode,
+      type: x.type,
+      fresh: true,
+      onlyDay: day,
+      onlySurveyorKey: sv.key,
+      ignoreBookingId: x.ignoreBookingId,
+      ignoreProjectId: x.ignoreProjectId,
+      staff: x.staff,
+    });
     if (!r.ok) return r;
     const c = r.raw.find((k) => k.start === x.start);
     if (c) out.push({ sv, v, c, r });
@@ -427,9 +456,9 @@ async function offersFor(x: {
   return out.sort((a, b) => a.c.detour - b.c.detour);
 }
 
-/** Fresh times for a "That time has just gone" reply. */
-async function freshDays(postcode: string, type: SurveyTypeKey, staff = false) {
-  const r = await findSlots({ postcode, type, fresh: true, staff });
+/** Fresh times for a "That time has just gone" reply (the job's own time not counted as busy, as in its search). */
+async function freshDays(postcode: string, type: SurveyTypeKey, staff = false, ignore: { bookingId?: string | null; projectId?: string | null } = {}) {
+  const r = await findSlots({ postcode, type, fresh: true, staff, ignoreBookingId: ignore.bookingId, ignoreProjectId: ignore.projectId });
   return r.ok ? (staff ? r.days : publicDays(r.days)) : [];
 }
 
@@ -816,6 +845,7 @@ export async function hold(x: {
     project = await projectByBookingToken(x.token);
     if (!project) return { status: 404, body: { error: 'This link has expired. Message us on WhatsApp.' } };
     if (await liveBookingFor(project.id)) return { status: 409, body: { error: 'You already have a survey booked. Use “Change time” instead.' } };
+    if (await jobSurvey(project, s)) return callToChange;
   }
   const db = createAdminClient();
   const now = Date.now();
@@ -936,6 +966,11 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
     return reply(b.status, b.project_id, b.enquiry_id);
   }
   if (b.status !== 'held' && b.status !== 'expired') return { status: 409, body: { error: 'Your held time has gone. Please pick again.' } };
+  // Staff set a survey date on the job while they were filling in their details.
+  if (project && project.survey_booking_id !== b.id && (await jobSurvey(project, s))) {
+    await slotCancel(b.id, 'the job already has a survey date');
+    return callToChange;
+  }
   if (outcodeOf(x.details.postcode) !== outcodeOf(b.postcode)) return { status: 409, body: { error: 'Postcode changed: please search again.', code: 'postcode_changed' } };
   const geo = await lookupPostcode(x.details.postcode);
   if (!isHit(geo)) return { status: 400, body: { error: POSTCODE_ERRORS[geo.error] } };
@@ -1070,7 +1105,7 @@ export async function moveBooking(b: BookingRow, start: number, o: { by?: Staff 
   const old = parseRange(b.onsite);
   let moved: { id: string; status: 'requested' | 'confirmed'; c: RawCand } | null = null;
   for (let attempt = 0; attempt < 3 && !moved; attempt++) {
-    const offers = await offersFor({ postcode: b.postcode, type: b.survey_type, start, ignoreBookingId: b.id, staff: !!o.by });
+    const offers = await offersFor({ postcode: b.postcode, type: b.survey_type, start, ignoreBookingId: b.id, ignoreProjectId: b.project_id, staff: !!o.by });
     if (!Array.isArray(offers)) return findFailOutcome(offers);
     if (!offers.length) break;
     let changed = false;
@@ -1111,7 +1146,10 @@ export async function moveBooking(b: BookingRow, start: number, o: { by?: Staff 
     }
     if (!changed) break;
   }
-  if (!moved) return { status: 409, body: { error: 'That time has just gone. Here are the latest times.', days: await freshDays(b.postcode, b.survey_type, !!o.by) } };
+  if (!moved) {
+    const days = await freshDays(b.postcode, b.survey_type, !!o.by, { bookingId: b.id, projectId: b.project_id });
+    return { status: 409, body: { error: 'That time has just gone. Here are the latest times.', days } };
+  }
 
   const nb = (await bookingById(moved.id)) as BookingRow;
   const from = old ? whenText(old.start) : 'its old time';
@@ -1180,7 +1218,16 @@ export async function staffConfirm(id: string, by: Staff, force = false): Promis
   const range = parseRange(b.onsite);
   if (!range) return UNAVAILABLE;
   if (!force) {
-    const r = await findSlots({ postcode: b.postcode, type: b.survey_type, fresh: true, onlyDay: b.day, onlySurveyorKey: b.surveyor_key, ignoreBookingId: b.id, staff: true });
+    const r = await findSlots({
+      postcode: b.postcode,
+      type: b.survey_type,
+      fresh: true,
+      onlyDay: b.day,
+      onlySurveyorKey: b.surveyor_key,
+      ignoreBookingId: b.id,
+      ignoreProjectId: b.project_id,
+      staff: true,
+    });
     if (r.ok && !r.raw.some((c) => c.start === range.start)) {
       const s = await getBookingSettings();
       const who = s.surveyors.find((v) => v.key === b.surveyor_key)?.name ?? 'The surveyor';
@@ -1271,7 +1318,15 @@ export async function staffBook(x: {
 
   if (!x.override) {
     for (let attempt = 0; attempt < 3 && !made; attempt++) {
-      const offers = await offersFor({ postcode: geo.postcode, type, start: x.start, ignoreBookingId: existing?.id, staff: true, surveyorKey: x.surveyorKey || undefined });
+      const offers = await offersFor({
+        postcode: geo.postcode,
+        type,
+        start: x.start,
+        ignoreBookingId: existing?.id,
+        ignoreProjectId: p.id,
+        staff: true,
+        surveyorKey: x.surveyorKey || undefined,
+      });
       if (!Array.isArray(offers)) return findFailOutcome(offers);
       if (!offers.length) break;
       let changed = false;
@@ -1289,7 +1344,10 @@ export async function staffBook(x: {
       }
       if (!changed) break;
     }
-    if (!made) return { status: 409, body: { error: 'That time doesn’t fit any more. Here are the latest times.', days: await freshDays(geo.postcode, type, true) } };
+    if (!made) {
+      const days = await freshDays(geo.postcode, type, true, { bookingId: existing?.id, projectId: p.id });
+      return { status: 409, body: { error: 'That time doesn’t fit any more. Here are the latest times.', days } };
+    }
   } else {
     const sv = s.surveyors.find((v) => v.key === x.surveyorKey) ?? s.surveyors[0];
     if (!sv) return { status: 400, body: { error: 'No surveyors are set up in booking settings.' } };
@@ -1299,7 +1357,7 @@ export async function staffBook(x: {
     const end = x.start + minutes * MIN;
     for (let attempt = 0; attempt < 3 && !made; attempt++) {
       const v = await dayVersion(day);
-      const diary = await loadDiary(sv, day, day, { s, base, hols, fresh: true, ignoreBookingId: existing?.id });
+      const diary = await loadDiary(sv, day, day, { s, base, hols, fresh: true, ignoreBookingId: existing?.id, ignoreProjectId: p.id });
       const items = itemsOnDay(diary.items, day);
       const allDay = items.find((i) => i.allDayBlock);
       if (allDay && !x.allDayOk) return { status: 409, body: { error: 'all_day', message: `${sv.name}’s diary is blocked all day (${allDay.label}). Book anyway?` } };
@@ -1385,6 +1443,8 @@ export async function tokenView(token: string): Promise<TokenView | null> {
   const { data: e } = await createAdminClient().from('enquiries').select('name, email, phone').eq('id', p.enquiry_id).maybeSingle();
   const live = await liveBookingFor(p.id).catch(() => null);
   const r = live ? parseRange(live.onsite) : null;
+  // No booking, but a date on the job (set by staff): that's their survey, changed by calling us.
+  const own = live ? null : await jobSurvey(p, s).catch(() => null);
   return {
     projectId: p.id,
     enquiryId: p.enquiry_id,
@@ -1407,7 +1467,19 @@ export async function tokenView(token: string): Promise<TokenView | null> {
             postcode: live.postcode,
             minutes: live.minutes,
           }
-        : null,
+        : own
+          ? {
+              id: `job-${p.id}`,
+              status: 'confirmed',
+              start: new Date(own.start).toISOString(),
+              end: new Date(own.end).toISOString(),
+              label: `${longDayLabel(ukDate(own.start))}, around ${ukTime(own.start)}`,
+              type: own.type,
+              postcode: p.postcode ?? '',
+              minutes: own.minutes,
+            }
+          : null,
+    // A date on the job with no booking behind it is changed by calling us, never online.
     canChange: !!r && r.start - Date.now() > s.advanced.changeNoticeHours * HOUR,
     enabled: s.enabled && s.surveyors.length > 0,
   };

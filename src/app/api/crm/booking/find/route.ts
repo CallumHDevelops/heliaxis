@@ -130,14 +130,22 @@ export async function POST(req: Request) {
     if (!p) return json({ error: 'Not found' }, 404);
     postcode ||= p.postcode || '';
     type ??= isSurveyType(p.survey_type) ? p.survey_type : (surveyTypeFor(p.products ?? []) ?? 'solar');
-    // Moving their booking: their own time doesn't count as busy.
+    // Moving their booking (or the date on the job): their own time doesn't count as busy.
     ignore = (await liveBookingFor(p.id))?.id ?? null;
     const { data: e } = await db.from('enquiries').select('name').eq('id', p.enquiry_id).maybeSingle();
     project = { id: p.id, title: p.title, customer: (e?.name as string) || p.title, postcode: p.postcode, surveyAt: p.survey_at, stage: p.stage };
   }
   if (!postcode)
     return json({ project, type: type ?? 'solar', error: project ? 'This job has no postcode yet. Enter it below.' : 'Enter the customer’s postcode.' }, 400);
-  const r = await findSlots({ postcode, type: type ?? 'solar', staff: true, override: b.override === true, ignoreBookingId: ignore, fresh: b.fresh === true });
+  const r = await findSlots({
+    postcode,
+    type: type ?? 'solar',
+    staff: true,
+    override: b.override === true,
+    ignoreBookingId: ignore,
+    ignoreProjectId: project?.id ?? null,
+    fresh: b.fresh === true,
+  });
   if (!r.ok) return json({ project, type: type ?? 'solar', error: r.error || 'Please try again.', code: r.code }, r.code === 'unavailable' ? 503 : 400);
   return json({
     project,
