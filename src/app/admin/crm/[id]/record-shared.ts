@@ -4,6 +4,7 @@
  */
 import type { CheckView } from '@/lib/projects/checklist';
 import type { Deadline } from '@/lib/projects/deadlines';
+import type { EnaInfo } from '@/lib/projects/ena';
 import type { NextDate, TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
@@ -164,6 +165,8 @@ export type RecordData = {
   install: { dates: string[]; words: string } | null;
   next_date: NextDate | null;
   subcontracts: Subcontract[];
+  /** "For the ENA application" (the main cut-out and meter photos). Null before surveys.sql, and for jobs with no solar or battery. */
+  ena: EnaInfo | null;
   schema: SchemaReady;
 };
 

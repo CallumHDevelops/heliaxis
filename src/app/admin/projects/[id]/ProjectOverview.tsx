@@ -15,6 +15,7 @@ import {
   SURVEY_TYPES,
 } from '@/lib/crm/stages';
 import { checkGroupFor, type CheckView } from '@/lib/projects/checklist';
+import type { EnaInfo } from '@/lib/projects/ena';
 import type { TeamMember } from '@/lib/projects/server';
 import { DOC_LABEL } from '../../crm/[id]/ProjectExtras';
 import { londonIso, shortDate, ukDayOf, ukTime } from '../../crm/crm-shared';
@@ -70,6 +71,14 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
         </p>
       )}
       <DatesTeam key={p.id} rec={rec} team={team} actions={actions} />
+      {/* The DNO paperwork waits for crm-v3.sql, but the ENA photos only need surveys.sql. */}
+      {!v3 && rec.ena && (
+        <section className="crmh-card crmr-ovsec">
+          <div className="crmh-card__b">
+            <EnaPhotos ena={rec.ena} onStart={() => actions.startSurvey('solar')} />
+          </div>
+        </section>
+      )}
       {v3 && (
         <>
           <details className="crmh-card crmr-ovsec" open={wide && delivery} key={`sys-${wide}`}>
@@ -719,6 +728,7 @@ function Paperwork({ rec, today, actions }: { rec: RecordData; today: string; ac
           </option>
         ))}
       </select>
+      {rec.ena && <EnaPhotos ena={rec.ena} onStart={() => actions.startSurvey('solar')} />}
       {groups.map((g) => (
         <div key={g.title}>
           <h4 className="crmr-ovh4">{g.title}</h4>
@@ -745,6 +755,72 @@ function Paperwork({ rec, today, actions }: { rec: RecordData; today: string; ac
         </div>
       )}
     </form>
+  );
+}
+
+/**
+ * "For the ENA application", with the DNO paperwork: the main electric cut-out and meter photos from
+ * the job's latest finished solar survey, side by side, each with Download (the original photo, named
+ * after the job, e.g. HX-0042-main-cut-out.jpg). Before there's one: where to take them.
+ */
+function EnaPhotos({ ena, onStart }: { ena: EnaInfo; onStart: () => void }) {
+  return (
+    <div className="crmr-ena" role="group" aria-label="For the ENA application">
+      <h4 className="crmr-ovh4">For the ENA application</h4>
+      <p className="crm-muted crm-small">The photos to upload to ENA (Connect Direct) for the DNO application. Download saves the original photo, without any drawing.</p>
+      <div className="crmr-ena__grid">
+        {ena.photos.map((ph) => (
+          <div key={ph.slot} className="crmr-ena__item">
+            <b>{ph.label}</b>
+            {ph.items.length ? (
+              ph.items.map((it, i) => (
+                <figure key={it.id}>
+                  {/* Signed storage links: next/image can't optimise them. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {it.thumb ? <img src={it.thumb} alt={`${ph.label}${ph.items.length > 1 ? `, photo ${i + 1}` : ''}`} loading="lazy" /> : <span aria-hidden="true">📷</span>}
+                  <figcaption>
+                    {ph.items.length > 1 && <span>{`Photo ${i + 1} of ${ph.items.length}`}</span>}
+                    {it.download ? (
+                      <a className="crm-btn crm-btn--ghost crm-btn--small" href={it.download} download={it.name} title={it.name}>
+                        ⬇ Download
+                      </a>
+                    ) : (
+                      <span className="crm-muted crm-small">Can’t download right now. Reload the page to try again.</span>
+                    )}
+                  </figcaption>
+                </figure>
+              ))
+            ) : (
+              <p className="crm-muted crm-small">{ena.survey ? 'Not in the survey' : 'Not in a survey yet'}</p>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="crm-small crmr-ena__from">
+        {ena.survey ? (
+          <>
+            From the survey finished {ena.survey.completed_at ? shortDate(ukDayOf(ena.survey.completed_at)) : ''} ·{' '}
+            <a className="crmh-link" href={`/admin/surveys/${ena.survey.id}/report`}>
+              Open the report →
+            </a>
+          </>
+        ) : ena.open ? (
+          <>
+            They’re taken in the solar survey (Electrics) ·{' '}
+            <a className="crmh-link" href={`/admin/surveys/${ena.open.id}`}>
+              Open the survey →
+            </a>
+          </>
+        ) : (
+          <>
+            They’re taken in the solar survey (Electrics) ·{' '}
+            <button type="button" className="crm-link" onClick={onStart}>
+              Start solar survey
+            </button>
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 

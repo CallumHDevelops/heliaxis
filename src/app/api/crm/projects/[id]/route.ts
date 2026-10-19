@@ -20,6 +20,7 @@ import { checklistView, stageProgress } from '@/lib/projects/checklist';
 import { addMonths, deadlinesFor, shortDay } from '@/lib/projects/deadlines';
 import { deleteProject } from '@/lib/projects/delete';
 import { possibleDuplicates } from '@/lib/projects/duplicates';
+import { enaForJob } from '@/lib/projects/ena';
 import { calendarNow, checkCtxFor, ensureDeadlineTasks, jobLookups, nextDate, projectRow, withFallback, type DocRow } from '@/lib/projects/server';
 
 export const dynamic = 'force-dynamic';
@@ -354,6 +355,10 @@ export async function GET(req: Request, { params }: Ctx) {
     surveyor: sv.surveyor_id ? (nameOf.get(String(sv.surveyor_id)) ?? '') : '',
   }));
 
+  // The DNO paperwork's "For the ENA application": solar and battery jobs (and any with a solar survey), after surveys.sql.
+  const enaJob = p.products.some((k) => k === 'solar' || k === 'battery') || surveys.some((sv) => sv.type === 'solar');
+  const ena = schema.surveys && enaJob ? await enaForJob(db, surveys, String(p.project_ref || customer?.customer_ref || customer?.name || 'survey')) : null;
+
   const installAt = typeof p.install_at === 'string' ? p.install_at : null;
   const installDates = installAt ? installDayList(ukDay(installAt), Math.max(1, Number(p.install_days) || 1), cal.hols) : [];
   const token = typeof p.booking_token === 'string' ? p.booking_token : null;
@@ -411,6 +416,7 @@ export async function GET(req: Request, { params }: Ctx) {
     install: installDates.length ? { dates: installDates, words: dayListWords(installDates) } : null,
     next_date: nextDate(p, cal),
     subcontracts: lookups.subcontracts.get(id) ?? [],
+    ena,
     schema,
   });
 }

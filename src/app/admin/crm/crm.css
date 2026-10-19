@@ -4482,6 +4482,75 @@ button.crmb-rail {
 .crmr-deadlines li.done b {
   color: var(--ok);
 }
+/* "For the ENA application": the main cut-out and meter photos side by side, each to download. */
+.crmr-ena {
+  margin: 14px 0 4px;
+  padding: 12px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.crmr-ena > .crmr-ovh4 {
+  margin-top: 0;
+}
+.crmr-ena__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.crmr-ena__item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.crmr-ena__item > b {
+  overflow-wrap: anywhere;
+}
+.crmr-ena__item p {
+  margin: 0;
+}
+.crmr-ena figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.crmr-ena img,
+.crmr-ena figure > span[aria-hidden] {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #e9e3d4;
+  display: grid;
+  place-items: center;
+}
+.crmr-ena figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.crmr-ena figcaption .crm-btn {
+  min-height: 44px;
+}
+.crmr-ena__from {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+.crmr-ena__from .crm-link {
+  min-height: 44px;
+}
+@media (max-width: 760px) {
+  .crmr-ena figcaption .crm-btn {
+    flex: 1;
+    min-height: 48px;
+  }
+}
 .crmr-surveylist {
   display: flex;
   flex-direction: column;
