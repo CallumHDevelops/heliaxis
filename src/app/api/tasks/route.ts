@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { cleanTaskInput, TASK_COLUMNS, type Task, type TaskJob } from '@/lib/tasks';
 import { notify } from '@/lib/notify';
 import { rearmDueReminder } from '@/lib/tasks-server';
+import { canAccess } from '@/lib/portals';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -76,13 +77,16 @@ async function jobsFor(tasks: { crm_project_id?: string | null }[]): Promise<Rec
 }
 
 export async function GET() {
-  if (!(await requirePortal('tasks'))) return unauthorized();
+  const session = await requirePortal('tasks');
+  if (!session) return unauthorized();
   const { data, error } = await createAdminClient()
     .from('tasks')
     .select(TASK_COLUMNS)
     .order('created_at', { ascending: false });
   if (error) return fail(error.message);
-  return NextResponse.json({ tasks: data ?? [], jobs: await jobsFor(data ?? []) }, { headers: NO_STORE });
+  // Customer names are CRM data: only people who can open the CRM get the job chips.
+  const jobs = canAccess(session.profile, 'crm') ? await jobsFor(data ?? []) : {};
+  return NextResponse.json({ tasks: data ?? [], jobs }, { headers: NO_STORE });
 }
 
 export async function POST(req: NextRequest) {
