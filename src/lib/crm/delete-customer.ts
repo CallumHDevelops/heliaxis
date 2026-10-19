@@ -36,7 +36,7 @@ const LIST = 'crm_deleted_people';
 const PAGE = 1000; // Supabase hands back at most 1,000 rows at a time
 const IN_MAX = 100; // ids per filter, so the request URL stays short
 
-const chunks = <T>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
+export const chunks = <T>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
 const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Unknown error');
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -44,12 +44,12 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  * A table from a later SQL file isn't there yet (a missing column is a real error). Writes to a
  * missing table come back as a bare 404, with no message.
  */
-const notThere = (r: { error: DbError; status?: number }) =>
+export const notThere = (r: { error: DbError; status?: number }) =>
   !!r.error &&
   (r.status === 404 || ['42P01', 'PGRST205'].includes(r.error.code ?? '') || /relation .* does not exist|could not find the table/i.test(r.error.message ?? ''));
 
 /** Every row of `table` whose `col` is one of `values`. Optional tables that aren't there yet have none. */
-async function rowsIn<T>(db: Db, table: string, cols: string, col: string, values: string[], optional = false): Promise<T[]> {
+export async function rowsIn<T>(db: Db, table: string, cols: string, col: string, values: string[], optional = false): Promise<T[]> {
   const out: T[] = [];
   for (const part of chunks(values, IN_MAX)) {
     for (let from = 0; ; from += PAGE) {
@@ -285,7 +285,7 @@ export async function deleteCustomers(ids: string[], opts: { includeSigned?: boo
   return out;
 }
 
-type Files = { bucket: string; path: string }[];
+export type Files = { bucket: string; path: string }[];
 
 async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: DeleteOutcome) {
   const fail = (list: { id: string; name: string | null }[], e: unknown) =>
@@ -398,7 +398,7 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
  * names them (by customer or opportunity id) is replaced, and she can't quote their details back.
  * Only conversations since the earliest of them was added can mention them. Not fatal: logged.
  */
-async function forgetInMetis(db: Db, ids: string[], since: string) {
+export async function forgetInMetis(db: Db, ids: string[], since: string) {
   type Block = { type?: string; content?: unknown };
   type Message = { role: string; content: string | Block[] };
   const mentions = (b: Block) => b.type === 'tool_result' && ids.some((id) => JSON.stringify(b.content ?? '').includes(id));
@@ -422,7 +422,7 @@ async function forgetInMetis(db: Db, ids: string[], since: string) {
 }
 
 /** Delete notifications whose link mentions any of these ids (all uuids, so no false matches). */
-async function deleteNotifications(db: Db, ids: string[]) {
+export async function deleteNotifications(db: Db, ids: string[]) {
   for (const part of chunks(ids, 40)) {
     const r = await db
       .from('notifications')
@@ -479,7 +479,7 @@ async function folder(db: Db, bucket: string, prefix: string): Promise<[string, 
  * Files in their opportunities' folders that no row lists. Each bucket's top folders are read once
  * (not once per opportunity), then only the folders of opportunities being deleted.
  */
-async function leftoverFiles(db: Db, projectIds: Set<string>): Promise<Files> {
+export async function leftoverFiles(db: Db, projectIds: Set<string>): Promise<Files> {
   const out: Files = [];
   const walk = async (bucket: string, prefix: string, depth: number) => {
     for (const [name, isFolder] of await folder(db, bucket, prefix)) {
@@ -504,7 +504,7 @@ async function leftoverFiles(db: Db, projectIds: Set<string>): Promise<Files> {
   return out;
 }
 
-async function removeFiles(db: Db, files: Files, out: DeleteOutcome) {
+export async function removeFiles(db: Db, files: Files, out: DeleteOutcome) {
   const byBucket = new Map<string, Set<string>>();
   for (const f of files) byBucket.set(f.bucket, (byBucket.get(f.bucket) ?? new Set()).add(f.path));
   for (const [bucket, paths] of byBucket) {
