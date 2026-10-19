@@ -6,7 +6,7 @@ import path from 'node:path';
  * Setup files admins can open from the app (they live in the repo, not on GitHub's website for
  * them). Only these names can be read. Bundled into the deployment via next.config.ts.
  */
-export const SQL_FILES = ['whatsapp.sql', 'whatsapp-chasers.sql', 'crm.sql', 'crm-v2.sql', 'assistant.sql', 'notifications.sql', 'native-push.sql', 'sso.sql'] as const;
+export const SQL_FILES = ['whatsapp.sql', 'whatsapp-chasers.sql', 'crm.sql', 'crm-v2.sql', 'assistant.sql', 'notifications.sql', 'native-push.sql', 'sso.sql', 'crm-v3.sql', 'surveys.sql', 'survey-booking.sql'] as const;
 export type SqlFile = (typeof SQL_FILES)[number];
 
 export const GUIDES = {

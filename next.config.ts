@@ -35,6 +35,9 @@ const nextConfig: NextConfig = {
       { source: '/portal/:path*', headers: [...sensitiveHeaders, { key: 'X-Frame-Options', value: 'DENY' }] },
       { source: '/portal', headers: [...sensitiveHeaders, { key: 'X-Frame-Options', value: 'DENY' }] },
       { source: '/api/portal/:path*', headers: sensitiveHeaders },
+      // Survey booking links (/book/<token>) are personal. Not /book-a-survey, the public form.
+      { source: '/book/:path*', headers: sensitiveHeaders },
+      { source: '/api/book/:path*', headers: sensitiveHeaders },
       { source: '/api/rams/:path*', headers: sensitiveHeaders },
       { source: '/api/admin/:path*', headers: sensitiveHeaders },
       { source: '/reset-password', headers: sensitiveHeaders },
