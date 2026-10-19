@@ -114,8 +114,11 @@ people (or **Select all**) and **Delete selected**. Everything about them goes: 
 timeline, WhatsApp chat, emails, opportunities with their tasks, photos, documents and signatures,
 and the notifications about them. It can't be undone. Anyone with a signed quote or a paid deposit is
 kept unless you tick to include them, and deleting more than 5 at once asks you to type DELETE.
+Metis forgets what she looked up about them, but what you said to her about them, and her replies,
+stay in your past conversations.
 
 Deleted people aren't brought back by **Import** (Meta, CSV or WhatsApp chats): it lists them as
 "deleted before, skipped". Only a one-way fingerprint of their Meta lead id, mobile and email is
-kept for this, never the details. If they send a new lead or a WhatsApp, it still comes in as normal.
+kept for this, never the details. If they send a new lead or a WhatsApp after you delete them, it
+still comes in as normal, including through Import.
 This needs `supabase/deleted-customers.sql`; until it's run, deleting works but imports can't skip them.

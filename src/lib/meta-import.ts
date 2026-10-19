@@ -326,8 +326,9 @@ export async function importLead(
   if (existing && metaLeadId && existing.meta_lead_id === metaLeadId) return 'already';
   if (when && Date.now() - Date.parse(when) < LIVE_MS) return 'skipped';
   // Deleted on purpose: this lead never comes back. Nor do they, unless they're in the CRM again
-  // (a new lead or WhatsApp since), when it's matched as usual. Null: the deleted list isn't set up.
-  const gone = await deletedBefore({ metaLeadId, phone: who.phone, email: who.email });
+  // (a new lead or WhatsApp since), when it's matched as usual, or this lead is from after they
+  // were deleted. Null: the deleted list isn't set up.
+  const gone = await deletedBefore({ metaLeadId, phone: who.phone, email: who.email }, when);
   if (gone === 'meta_lead' || (gone && !existing)) return 'deleted';
 
   if (existing) {

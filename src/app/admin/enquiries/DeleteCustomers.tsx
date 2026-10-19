@@ -18,7 +18,7 @@ type Preview = {
   sameNumber: { name: string; other: string }[];
   importsSkip: boolean;
 };
-export type DeleteDone = { deleted: number; kept: number; errors: string[]; filesFailed: number };
+export type DeleteDone = { deleted: number; kept: number; errors: string[]; filesFailed: number; remembered: boolean };
 
 const API = '/api/enquiries/delete';
 const BATCH = 200;
@@ -131,10 +131,11 @@ export function DeleteCustomers({
     if (!going.length || (needType && !typedOk)) return;
     setBusy(true);
     setError([]);
-    const done: DeleteDone = { deleted: 0, kept: people.length - going.length, errors: [], filesFailed: 0 };
+    const done: DeleteDone = { deleted: 0, kept: people.length - going.length, errors: [], filesFailed: 0, remembered: true };
     const add = (d: Record<string, unknown>) => {
       done.deleted += Number(d.deleted) || 0;
       done.filesFailed += Number((d.files as { failed?: number } | undefined)?.failed) || 0;
+      if (d.remembered === false) done.remembered = false;
       for (const e of (d.errors as { name: string | null; error: string }[] | undefined) ?? []) {
         done.errors.push(e.name && !e.error.includes(e.name) ? `${e.name}: ${e.error}` : e.error);
       }
@@ -212,8 +213,8 @@ export function DeleteCustomers({
 
             {preview.sameNumber.map((s) => (
               <p key={`${s.name}-${s.other}`} className="enq-sub">
-                {s.name} has the same WhatsApp number as {s.other}, who isn’t being deleted. WhatsApp messages saved on{' '}
-                {s.name}’s record go with it; {s.other}’s stay.
+                {s.name} has the same WhatsApp number as {s.other}, who isn’t being deleted. WhatsApp messages and emails
+                saved on {s.name}’s record go with it; {s.other}’s stay.
               </p>
             ))}
 

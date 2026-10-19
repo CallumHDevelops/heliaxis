@@ -7,19 +7,21 @@ import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from './server';
 /**
  * Deleting a customer for good: the enquiry and everything about it. Their opportunities and
  * timeline, WhatsApp chat (and anything still waiting to send), emails, tasks on their
- * opportunities, Metis's drafts, the notifications that link to them, and their photos, documents
- * and signatures in storage. Admins only (the routes check).
+ * opportunities, Metis's drafts and what her lookups found about them, the notifications about
+ * them, and their photos, documents and signatures in storage. Admins only (the routes check).
  *
  * The database goes first, in one statement: deleting the enquiry rows takes every row that
  * references them or their opportunities with it (on delete cascade in crm.sql, crm-v2.sql,
  * whatsapp.sql and assistant.sql). Only the notifications, which link by text, are deleted by hand,
- * just before. Files go last, so a storage hiccup never leaves a half-deleted customer on screen;
- * a file that won't go is logged. Safe to run twice: someone already gone counts as gone.
+ * just before, and Metis's conversations are cleared just after. Files go last, so a storage
+ * hiccup never leaves a half-deleted customer on screen; a file that won't go is logged with its
+ * path. Safe to run twice: someone already gone counts as gone.
  *
  * Then a fingerprint of how an import would recognise them (Meta lead id, mobile, email) goes on
  * the deleted list (deleted-customers.sql), so Enquiries → Import skips them. Nothing else reads
- * it: a new live lead or WhatsApp message from them comes in as normal. Without the table,
- * deleting works the same and imports just can't skip them.
+ * it: a new live lead or WhatsApp message from them comes in as normal, and an import still brings
+ * in anything they sent after being deleted. Without the table, deleting works the same and
+ * imports just can't skip them.
  */
 
 type Db = ReturnType<typeof createAdminClient>;
@@ -75,7 +77,16 @@ async function countIn(db: Db, table: string, col: string, values: string[]): Pr
   return n;
 }
 
-type Customer = { id: string; name: string; email: string | null; phone: string | null; wa_id?: string | null; meta_lead_id?: string | null };
+type Customer = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  postcode: string | null;
+  created_at: string;
+  wa_id?: string | null;
+  meta_lead_id?: string | null;
+};
 type Project = {
   id: string;
   enquiry_id: string;
@@ -86,11 +97,11 @@ type Project = {
 
 async function customersIn(db: Db, ids: string[]): Promise<Customer[]> {
   try {
-    return await rowsIn<Customer>(db, 'enquiries', 'id, name, email, phone, wa_id, meta_lead_id', 'id', ids);
+    return await rowsIn<Customer>(db, 'enquiries', 'id, name, email, phone, postcode, created_at, wa_id, meta_lead_id', 'id', ids);
   } catch (e) {
     // Before whatsapp.sql there's no wa_id or meta_lead_id.
     if (!/wa_id|meta_lead_id/.test(errorText(e))) throw e;
-    return rowsIn<Customer>(db, 'enquiries', 'id, name, email, phone', 'id', ids);
+    return rowsIn<Customer>(db, 'enquiries', 'id, name, email, phone, postcode, created_at', 'id', ids);
   }
 }
 
@@ -134,13 +145,23 @@ export async function deletedListReady(db: Db = createAdminClient()): Promise<bo
 /**
  * Was someone like this deleted on purpose? Says how they were recognised (their Meta lead id
  * first), false if not, or null when the deleted list isn't set up yet, so nobody can be skipped.
+ * `at`: when what's being imported was sent. Their mobile or email only counts for things from
+ * before they were deleted: anything newer is new contact. (No date: it counts.) Throws if the list
+ * can't be read, so a hiccup fails the import rather than bringing back someone deleted.
  */
-export async function deletedBefore(p: { metaLeadId?: string | null; phone?: string | null; email?: string | null }): Promise<DeletedKind | false | null> {
+export async function deletedBefore(
+  p: { metaLeadId?: string | null; phone?: string | null; email?: string | null },
+  at?: string | null
+): Promise<DeletedKind | false | null> {
   const keys = fingerprints(p);
   if (!keys.length) return false;
-  const { data, error } = await createAdminClient().from(LIST).select('kind').in('hash', keys.map((k) => k.hash));
-  if (error) return null;
-  const kinds = new Set((data ?? []).map((d) => d.kind as DeletedKind));
+  const r = await createAdminClient().from(LIST).select('kind, deleted_at').in('hash', keys.map((k) => k.hash));
+  if (notThere(r)) return null;
+  if (r.error) throw new Error(`Couldn’t check the deleted list: ${r.error.message}`);
+  const sent = at ? Date.parse(at) : NaN;
+  const kinds = new Set(
+    (r.data ?? []).filter((d) => d.kind === 'meta_lead' || !(sent > Date.parse(d.deleted_at))).map((d) => d.kind as DeletedKind)
+  );
   return (['meta_lead', 'phone', 'email'] as const).find((k) => kinds.has(k)) ?? false;
 }
 
@@ -180,6 +201,28 @@ async function countsFor(db: Db, enquiryIds: string[], projects: Project[]): Pro
   return { opportunities: projects.length, tasks, photos, documents, signatures: projects.filter((p) => p.accepted_signature).length, messages, emails };
 }
 
+/**
+ * Everyone whose record shows the chat on one of these WhatsApp numbers: by their WhatsApp id, or,
+ * before they have one, their phone as typed (07…, +44 …), as the record page links them.
+ */
+async function onNumbers(db: Db, numbers: string[]) {
+  const out: { id: string; name: string; number: string }[] = [];
+  for (const part of chunks(numbers.filter((n) => /^\d+$/.test(n)), 20)) {
+    // Phones are stored as typed, so narrow by the last 9 digits, then compare properly.
+    const ors = part.flatMap((wa) => {
+      const tail = wa.slice(-9);
+      return [`wa_id.eq.${wa}`, `phone.ilike.%${tail.slice(0, 3)}%${tail.slice(3, 6)}%${tail.slice(6)}%`];
+    });
+    const { data, error } = await db.from('enquiries').select('id, name, phone, wa_id').or(ors.join(',')).limit(PAGE);
+    if (error) throw new Error(`enquiries: ${error.message}`);
+    for (const r of (data ?? []) as { id: string; name: string; phone: string | null; wa_id: string | null }[]) {
+      const number = r.wa_id || toWaId(r.phone);
+      if (number && part.includes(number)) out.push({ id: r.id, name: r.name, number });
+    }
+  }
+  return out;
+}
+
 /** What deleting these customers would remove, for the confirmation. Changes nothing. */
 export async function previewDelete(ids: string[]): Promise<DeletePreview> {
   const db = createAdminClient();
@@ -196,7 +239,7 @@ export async function previewDelete(ids: string[]): Promise<DeletePreview> {
   const numbers = [...new Set(found.map((c) => c.wa_id).filter((w): w is string => !!w))];
   const [all, sharing, importsSkip] = await Promise.all([
     countsFor(db, [...idSet], projects),
-    rowsIn<{ id: string; name: string; wa_id: string }>(db, 'enquiries', 'id, name, wa_id', 'wa_id', numbers),
+    onNumbers(db, numbers),
     deletedListReady(db),
   ]);
   const withoutSigned = held.size
@@ -208,7 +251,7 @@ export async function previewDelete(ids: string[]): Promise<DeletePreview> {
     customers,
     gone: unique.length - found.length,
     counts: { all, withoutSigned },
-    sameNumber: sharing.filter((o) => !idSet.has(o.id)).map((o) => ({ name: nameOf.get(o.wa_id) ?? '', other: o.name })),
+    sameNumber: sharing.filter((o) => !idSet.has(o.id)).map((o) => ({ name: nameOf.get(o.number) ?? '', other: o.name })),
     importsSkip,
   };
 }
@@ -290,10 +333,12 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
     return fail(going, e);
   }
 
-  // 2. Notifications that link to them, their opportunities or those tasks. Links are text, so
-  //    nothing cascades to these; a failure here stops before the customer goes, so it can be re-run.
+  // 2. Notifications that link to them, their opportunities or those tasks, and the new enquiry and
+  //    email alerts that name them. Links are text, so nothing cascades to these; a failure here
+  //    stops before the customer goes, so it can be re-run.
   try {
     await deleteNotifications(db, [...goingIds, ...projectIds, ...taskIds]);
+    await deleteListNotifications(db, going, goingIds);
   } catch (e) {
     return fail(going, e);
   }
@@ -331,8 +376,11 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
     }
   }
 
-  // 5. Their files, plus anything uploaded without being saved (an upload cut off part way).
   const gonePids = new Set(theirs.filter((p) => deleted.has(p.enquiry_id)).map((p) => p.id));
+  const added = going.filter((c) => deleted.has(c.id)).map((c) => Date.parse(c.created_at)).filter(Number.isFinite);
+  await forgetInMetis(db, [...deleted, ...gonePids], new Date(Math.min(Date.now(), ...added)).toISOString());
+
+  // 5. Their files, plus anything uploaded without being saved (an upload cut off part way).
   if (!gonePids.size) return;
   const mine = (f: { bucket: string; path: string }) => {
     // Only ever inside their own opportunities' folders, never anything shared (the library).
@@ -343,6 +391,34 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
   await removeFiles(db, [...files, ...extra].filter(mine), out);
 }
 
+/**
+ * Metis keeps what her lookups returned in each conversation (assistant_threads), so a lookup that
+ * names them (by customer or opportunity id) is replaced, and she can't quote their details back.
+ * Only conversations since the earliest of them was added can mention them. Not fatal: logged.
+ */
+async function forgetInMetis(db: Db, ids: string[], since: string) {
+  type Block = { type?: string; content?: unknown };
+  type Message = { role: string; content: string | Block[] };
+  const mentions = (b: Block) => b.type === 'tool_result' && ids.some((id) => JSON.stringify(b.content ?? '').includes(id));
+  for (let from = 0; ; from += 50) {
+    const { data, error, status } = await db.from('assistant_threads').select('id, messages').gte('updated_at', since).order('id').range(from, from + 49);
+    if (error) {
+      if (!notThere({ error, status })) console.error('[delete-customer] Metis conversations not cleared:', error.message);
+      return;
+    }
+    for (const t of data ?? []) {
+      const messages = t.messages as Message[];
+      if (!messages.some((m) => Array.isArray(m.content) && m.content.some(mentions))) continue;
+      const cleared = messages.map((m) =>
+        Array.isArray(m.content) ? { ...m, content: m.content.map((b) => (mentions(b) ? { ...b, content: '[Customer deleted]' } : b)) } : m
+      );
+      const r = await db.from('assistant_threads').update({ messages: cleared }).eq('id', t.id);
+      if (r.error) console.error('[delete-customer] Metis conversation not cleared:', r.error.message);
+    }
+    if ((data?.length ?? 0) < 50) return;
+  }
+}
+
 /** Delete notifications whose link mentions any of these ids (all uuids, so no false matches). */
 async function deleteNotifications(db: Db, ids: string[]) {
   for (const part of chunks(ids, 40)) {
@@ -350,6 +426,26 @@ async function deleteNotifications(db: Db, ids: string[]) {
       .from('notifications')
       .delete()
       .or(part.map((id) => `href.like.*${id}*`).join(','));
+    if (r.error && !notThere(r)) throw new Error(`notifications: ${r.error.message || r.status}`);
+    if (r.error) return;
+  }
+}
+
+/**
+ * New enquiry, Meta lead and email alerts link to a list, not to them (older ones, at least), so
+ * they're found by their exact title. Not a title someone being kept would have too (the same
+ * name): it could be theirs. A " or \ can't be matched safely in a filter, so those are left.
+ */
+async function deleteListNotifications(db: Db, going: Customer[], goingIds: Set<string>) {
+  const safe = (s: string) => !!s && !/["\\]/.test(s);
+  const titlesOf = (c: { name: string; postcode: string | null }) =>
+    [`New enquiry: ${c.name}`, c.postcode ? `New enquiry: ${c.name} (${c.postcode})` : '', `New Meta lead: ${c.name}`, `Email from ${c.name}`].filter(safe);
+  const names = [...new Set(going.map((c) => c.name).filter(safe))];
+  const sameName = await rowsIn<{ id: string; name: string; postcode: string | null }>(db, 'enquiries', 'id, name, postcode', 'name', names);
+  const keptTitles = new Set(sameName.filter((o) => !goingIds.has(o.id)).flatMap(titlesOf));
+  const titles = new Set(going.filter((c) => safe(c.name)).flatMap(titlesOf).filter((t) => !keptTitles.has(t)));
+  for (const part of chunks([...titles], 40)) {
+    const r = await db.from('notifications').delete().in('href', ['/admin/enquiries', '/admin/crm']).in('title', part);
     if (r.error && !notThere(r)) throw new Error(`notifications: ${r.error.message || r.status}`);
     if (r.error) return;
   }
@@ -407,7 +503,7 @@ async function removeFiles(db: Db, files: Files, out: DeleteOutcome) {
         .catch((e: unknown) => ({ data: null, error: { message: errorText(e) } }));
       if (error) {
         out.files.failed += part.length;
-        console.error(`[delete-customer] ${plural(part.length, 'file')} not removed from ${bucket}:`, error.message);
+        console.error(`[delete-customer] ${plural(part.length, 'file')} not removed from ${bucket} (${error.message}):`, part.join(' '));
       } else out.files.removed += data?.length ?? 0;
     }
   }

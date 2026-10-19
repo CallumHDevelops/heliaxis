@@ -120,6 +120,7 @@ export function EnquiriesCrm({
         `Deleted ${n(r.deleted, 'customer')}.`,
         r.kept ? `Kept ${n(r.kept, 'customer')} with a signed quote or paid deposit.` : '',
         r.filesFailed ? `${n(r.filesFailed, 'file')} couldn’t be removed from storage; they’re listed in the Vercel logs.` : '',
+        r.remembered ? '' : 'The deleted list couldn’t be updated, so importing from Meta or WhatsApp again could bring them back.',
       ]
         .filter(Boolean)
         .join(' '),

@@ -203,8 +203,10 @@ export async function POST(req: Request) {
     enquiry = wa ? await byNumber(wa) : null;
     if (!enquiry) {
       // Deleted from the CRM on purpose: an old chat doesn't bring them back unless asked to. (A new
-      // WhatsApp from them still does; the live inbox doesn't look at the deleted list.)
-      if (b.anyway !== true && (await deletedBefore({ phone }))) return json({ deletedBefore: true });
+      // WhatsApp from them still does; the live inbox doesn't look at the deleted list. So does a
+      // chat they've written in since: dated by their last message.)
+      const theirLast = keep.findLast((m) => m.author !== us)?.at;
+      if (b.anyway !== true && (await deletedBefore({ phone }, theirLast))) return json({ deletedBefore: true });
       const name = ((c.name as string | undefined) || '').trim() || customerAuthor || nameFromFileName(fileName) || `+${wa}`;
       try {
         const r = await createImportedEnquiry({
