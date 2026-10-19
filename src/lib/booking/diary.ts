@@ -321,6 +321,12 @@ export async function loadDiary(
     ...outlookPostcodes(cal.events),
   ]);
 
+  // Where a booking, job or entry is: its coordinates, else its postcode; no location counts as home (padded).
+  const stored = async (x: { lat: number | null | undefined; lng: number | null | undefined; postcode: string | null | undefined }) => {
+    const p = await placeFromStored(x);
+    return p ? { place: p as Place, approx: !!p.approx } : { place: { ...base, label: 'No location', unknown: true, home: false } as Place, approx: false };
+  };
+
   /* 2. Bookings and live holds. */
   const now = Date.now();
   const liveBookings = new Map<string, number>(); // id → start
@@ -329,7 +335,7 @@ export async function loadDiary(
     const r = parseRange(b.onsite);
     if (!r || r.end <= wideStart || r.start >= wideEnd) continue;
     liveBookings.set(b.id, r.start);
-    const place = (await placeFromStored({ lat: b.lat, lng: b.lng, postcode: b.postcode })) ?? { ...base, label: 'No location', unknown: true, home: false };
+    const { place, approx } = await stored({ lat: b.lat, lng: b.lng, postcode: b.postcode });
     const who = b.enquiry_id ? surname(names.get(b.enquiry_id)) : '';
     items.push({
       id: `booking:${b.id}`,
@@ -343,6 +349,7 @@ export async function loadDiary(
       projectId: b.project_id ?? undefined,
       status: b.status,
       postcode: b.postcode,
+      approx,
     });
   }
 
@@ -354,7 +361,7 @@ export async function loadDiary(
     const start = Date.parse(p.survey_at);
     if (p.survey_booking_id && (p.survey_booking_id === o.ignoreBookingId || liveBookings.get(p.survey_booking_id) === start)) continue;
     const end = start + surveyMinutesFor(p, s) * 60_000;
-    const place = (await placeFromStored({ lat: p.site_lat, lng: p.site_lng, postcode: p.postcode })) ?? { ...base, label: 'No location', unknown: true, home: false };
+    const { place, approx } = await stored({ lat: p.site_lat, lng: p.site_lng, postcode: p.postcode });
     items.push({
       id: `survey:${p.id}`,
       kind: 'crm_survey',
@@ -366,6 +373,7 @@ export async function loadDiary(
       projectId: p.id,
       postcode: p.postcode ?? undefined,
       noLocation: !!place.unknown,
+      approx,
     });
   }
 
@@ -389,9 +397,10 @@ export async function loadDiary(
   for (const e of timedEntries) {
     if (!e.starts_at || !e.ends_at) continue;
     let place: Place;
+    let approx = false;
     if (e.where_kind === 'home') place = base;
     else if (e.where_kind === 'online') place = { ll: null, label: 'Online', online: true };
-    else place = (await placeFromStored({ lat: e.lat, lng: e.lng, postcode: e.postcode })) ?? { ...base, label: 'No location', unknown: true, home: false };
+    else ({ place, approx } = await stored({ lat: e.lat, lng: e.lng, postcode: e.postcode }));
     items.push({
       id: `entry:${e.id}`,
       kind: 'entry',
@@ -403,6 +412,7 @@ export async function loadDiary(
       entryId: e.id,
       projectId: e.project_id ?? undefined,
       postcode: e.postcode ?? undefined,
+      approx,
     });
   }
   for (const e of allDayEntries) {

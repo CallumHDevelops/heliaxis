@@ -231,21 +231,27 @@ export function placeFromHit(hit: GeoHit, label?: string): Place {
 }
 
 /** A place from stored coordinates and a postcode (bookings, jobs, diary entries), geocoding the postcode if needed. */
-export async function placeFromStored(o: { lat?: number | null; lng?: number | null; postcode?: string | null; label?: string }): Promise<Place | null> {
+export async function placeFromStored(o: {
+  lat?: number | null;
+  lng?: number | null;
+  postcode?: string | null;
+  label?: string;
+}): Promise<(Place & { approx?: boolean }) | null> {
   const k = normPostcode(o.postcode);
   if (typeof o.lat === 'number' && typeof o.lng === 'number') {
     return { ll: { lat: o.lat, lng: o.lng }, label: o.label ?? (k ? k.slice(0, -3) : ''), outcode: k ? k.slice(0, -3) : undefined, pc: k ?? undefined };
   }
   if (k) {
     const hit = await lookupPostcode(k);
-    if (isHit(hit)) return placeFromHit(hit, o.label);
+    if (isHit(hit)) return { ...placeFromHit(hit, o.label), ...(hit.approx ? { approx: true } : {}) };
     const oc = await lookupOutcode(k.slice(0, -3));
-    if (oc) return { ll: oc.ll, label: o.label ?? k.slice(0, -3), outcode: k.slice(0, -3) };
+    if (oc) return { ll: oc.ll, label: o.label ?? k.slice(0, -3), outcode: k.slice(0, -3), approx: true };
   }
+  // Only an area (or a postcode we couldn't find): its centre, marked as approximate.
   const oc = outcodeOf(o.postcode);
   if (oc) {
     const c = await lookupOutcode(oc);
-    if (c) return { ll: c.ll, label: o.label ?? oc, outcode: oc };
+    if (c) return { ll: c.ll, label: o.label ?? oc, outcode: oc, approx: true };
   }
   return null;
 }
