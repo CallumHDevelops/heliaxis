@@ -211,3 +211,13 @@
 .fc-others-toggle[aria-expanded='true'] .fc-chev { transform: rotate(90deg); }
 .fc .fc-others-note { font-size: 0.82rem; color: var(--fc-muted); margin: 0 0 0.25rem; }
 .fc-others .fc-list { border-top: 1px solid var(--fc-line); }
+
+/* Answer box on Claude's questions. */
+.fc-answer { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.4rem 0 0.8rem; }
+.fc-answer-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fc-muted); }
+.fc-answer textarea { font: inherit; font-size: 0.95rem; padding: 0.6rem 0.7rem; border: 1px solid var(--fc-line); border-radius: 4px; background: #fff; color: inherit; resize: vertical; min-height: 4.5rem; width: 100%; box-sizing: border-box; }
+.fc-answer textarea:focus-visible { outline: 2px solid #f8bc1e; outline-offset: 1px; }
+.fc-answer-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.fc-answer-note { font-size: 0.82rem; color: var(--fc-muted); }
+.fc-answer-error { font-size: 0.82rem; color: #a3322a; }
+.fc-answer-confirm { display: flex; flex-direction: column; gap: 0.5rem; }

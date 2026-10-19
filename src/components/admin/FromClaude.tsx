@@ -116,7 +116,7 @@ export function FromClaude({ todos, admin }: FromClaudeProps) {
           </button>
         </div>
         {open === t.id && (
-          <Steps t={t} ticked={isTicked(t)} onTick={() => tick(t)} isAdmin={!!admin}>
+          <Steps t={t} ticked={isTicked(t)} onTick={() => tick(t)} onAnswered={() => setHidden((h) => new Set(h).add(t.id))} isAdmin={!!admin}>
             {admin && (
               <WhoSees
                 people={admin.people}
@@ -183,12 +183,15 @@ function Steps({
   t,
   ticked,
   onTick,
+  onAnswered,
   isAdmin,
   children,
 }: {
   t: SetupTodo;
   ticked: boolean;
   onTick: () => void;
+  /** A question's answer reached Claude: it leaves the list. */
+  onAnswered: () => void;
   isAdmin: boolean;
   /** Shown at the bottom (the admin's "Who sees this"). */
   children?: ReactNode;
@@ -268,11 +271,87 @@ function Steps({
         </ul>
       )}
 
+      {t.kind === 'question' && <AnswerBox t={t} onAnswered={onAnswered} />}
+
       <button type="button" className="fc-done" onClick={onTick}>
-        {ticked ? 'Untick' : '✓ I’ve done this'}
+        {ticked ? 'Untick' : t.kind === 'question' ? '✓ I’ve answered in the chat' : '✓ I’ve done this'}
       </button>
 
       {children}
+    </div>
+  );
+}
+
+/** Answer one of Claude's questions here; it's posted where Claude can read it (src/lib/claude-answers.ts). */
+function AnswerBox({ t, onAnswered }: { t: SetupTodo; onAnswered: () => void }) {
+  const [text, setText] = useState(t.answer?.text ?? '');
+  const [state, setState] = useState<'idle' | 'sending' | 'confirm' | 'saved' | 'error'>(t.answer && !t.answer.sent ? 'saved' : 'idle');
+  const [error, setError] = useState('');
+
+  async function send(confirmPublic = false) {
+    setState('sending');
+    setError('');
+    const r = await fetch('/api/setup', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer: { id: t.id, text, confirmPublic } }),
+    }).catch(() => null);
+    const d = await r?.json().catch(() => null);
+    if (d?.needsConfirm === 'public') return setState('confirm');
+    if (!r?.ok || !d?.ok) {
+      setError(d?.error || 'Couldn’t send that. Try again.');
+      return setState('error');
+    }
+    if (d.sent) onAnswered();
+    else setState('saved');
+  }
+
+  return (
+    <div className="fc-answer">
+      <label htmlFor={`fc-answer-${t.id}`} className="fc-answer-label">
+        Your answer
+      </label>
+      <textarea
+        id={`fc-answer-${t.id}`}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (state !== 'sending') setState('idle');
+        }}
+        rows={3}
+        maxLength={4000}
+        readOnly={state === 'sending'}
+        placeholder="Type your answer for Claude"
+      />
+      {state === 'confirm' ? (
+        <div className="fc-answer-confirm">
+          <p className="fc-warn">
+            The heliaxis code is public on GitHub, so this answer will be public too. Send it anyway, or make the code private
+            first (see the recommended to-do).
+          </p>
+          <div className="fc-answer-row">
+            <button type="button" className="fc-go" onClick={() => send(true)}>
+              Send anyway
+            </button>
+            <button type="button" className="fc-ghost" onClick={() => setState('idle')}>
+              Don’t send
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="fc-answer-row">
+          <button type="button" className="fc-go" disabled={!text.trim() || state === 'sending'} onClick={() => send()}>
+            {state === 'sending' ? 'Sending…' : 'Send to Claude'}
+          </button>
+          {state === 'saved' && (
+            <span className="fc-answer-note">
+              Saved here, but Claude can’t read it yet. Do “Let Claude read the answers you type here”, or paste it into the Claude
+              chat.
+            </span>
+          )}
+          {state === 'error' && <span className="fc-answer-error">{error}</span>}
+        </div>
+      )}
     </div>
   );
 }

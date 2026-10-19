@@ -42,6 +42,14 @@ export const ENV_GROUPS: EnvGroup[] = [
     ],
   },
   {
+    title: 'Answers for Claude',
+    what: 'Lets the answer boxes on Claude’s questions (From Claude card) post where Claude can read them.',
+    vars: [
+      { name: 'GITHUB_ANSWERS_TOKEN', secret: true, optional: true, hint: 'GitHub → fine-grained token, heliaxis repo only, Issues: read and write' },
+      { name: 'GITHUB_ANSWERS_REPO', secret: false, optional: true, hint: 'Defaults to CallumHDevelops/heliaxis' },
+    ],
+  },
+  {
     title: 'One-tap sign-in to RAMS',
     what: 'Opens RAMS from the Heliaxis menu already signed in, for anyone with an approved RAMS account under the same email.',
     vars: [

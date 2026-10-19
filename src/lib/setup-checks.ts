@@ -1,6 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { fcmConfigured } from '@/lib/fcm';
+import { savedAnswers, type SavedAnswer } from '@/lib/claude-answers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import type { GuideKey, SqlFile } from '@/lib/setup-files';
@@ -42,8 +43,10 @@ export type SetupTodo = {
   manual?: boolean;
   /** Ticked as done, but the app can't see it yet (e.g. Vercel keys need a redeploy). */
   ticked?: boolean;
-  /** 'question': Claude needs an answer (given in the Claude chat). 'tip': a recommendation. */
+  /** 'question': Claude needs an answer (typed into the card, or in the Claude chat). 'tip': a recommendation. */
   kind?: 'question' | 'tip';
+  /** A question's saved answer, if any. */
+  answer?: { text: string; name: string; at: string; sent: boolean };
   /** Profile ids of the people picked to see it. Empty = every admin (the default). */
   assignees?: string[];
 };
@@ -94,9 +97,8 @@ const MANUAL: SetupTodo[] = [
     detail:
       'So Social media studio opens already signed in, like RAMS. It needs a five-line change to the studio’s own sign-in page (the Social_Content_Creator branch), which Claude won’t make without your go-ahead.',
     steps: [
-      'Reply **yes** (or no) to Claude in your Claude Code chat.',
-      'If Claude says a safety check stopped it, allow it in Claude Code’s permission settings, or ask Claude for the change so you can paste it in yourself.',
-      'Tick this once you’ve answered.',
+      'Type **yes** or **no** in the answer box below and tap **Send to Claude** (or reply in your Claude Code chat).',
+      'If Claude later says a safety check stopped it, allow it in Claude Code’s permission settings, or ask Claude for the change so you can paste it in yourself.',
     ],
     order: 1,
     manual: true,
@@ -108,8 +110,8 @@ const MANUAL: SetupTodo[] = [
     detail:
       'Claude is building it as the aerial or roof photo with the panel area marked on it, using the drawing tool in the survey.',
     steps: [
-      'If that’s right, just tick this.',
-      'If you meant something else (for example a cut-out of the house for the proposal), tell Claude in your Claude Code chat, then tick this.',
+      'If that’s right, type **yes** below and tap **Send to Claude**.',
+      'If you meant something else (for example a cut-out of the house for the proposal), describe it below instead.',
     ],
     order: 2,
     manual: true,
@@ -546,6 +548,25 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 40,
     optional: true,
   });
+  add(!env('GITHUB_ANSWERS_TOKEN'), {
+    id: 'env-github-answers',
+    title: 'Let Claude read the answers you type here',
+    detail:
+      'Claude can’t see this app’s database, but it can read GitHub. One key lets the answer boxes on Claude’s questions post to an “Answers for Claude” issue that Claude reads.',
+    steps: [
+      'Tap **Open GitHub** (above). It opens a new fine-grained token (sign in if asked).',
+      '**Token name** `Heliaxis answers`, **Expiration** 1 year.',
+      '**Repository access** → **Only select repositories** → pick **heliaxis**.',
+      '**Permissions** → **Repository permissions** → **Issues** → **Read and write**. Leave everything else as it is.',
+      'Tap **Generate token** and copy it. It’s a password: in Vercel tick **Sensitive**.',
+      ...VERCEL_STEPS,
+      'While the heliaxis code is public on GitHub, answers will be public too, and the card asks before posting. Making it private (see the recommended to-do) fixes that.',
+    ],
+    copies: [{ label: 'Key', value: 'GITHUB_ANSWERS_TOKEN' }],
+    href: 'https://github.com/settings/personal-access-tokens/new',
+    hrefLabel: 'Open GitHub',
+    order: 3,
+  });
   add(!env('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'), {
     id: 'env-stripe',
     title: 'Connect Stripe for card deposits',
@@ -588,6 +609,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   for (const m of MANUAL) add(!done.includes(m.id), { ...m });
   // Ticked but not detected yet: keep it, greyed, at the bottom.
   for (const t of out) if (done.includes(t.id)) t.ticked = true;
+  const answers = out.some((t) => t.kind === 'question') ? await savedAnswers().catch(() => ({})) : {};
+  for (const t of out) {
+    const a = (answers as Record<string, SavedAnswer>)[t.id];
+    if (t.kind === 'question' && a) t.answer = { text: a.text, name: a.name, at: a.at, sent: a.sent };
+  }
   // Who sees it. Someone no longer approved drops off; with nobody left it goes back to admins.
   // (If the lookup fails, keep the picks as they are.)
   const approved = Object.keys(assign).length

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireApproved } from '@/lib/auth';
+import { answersVisibility, saveAnswer } from '@/lib/claude-answers';
 import { assignTodo, isAssigned, markDone, setupTodos, visibleSetupTodos } from '@/lib/setup-checks';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,26 @@ export async function PATCH(req: Request) {
   if (typeof b.undone === 'string') {
     if (!(await may(b.undone))) return json({ error: 'forbidden' }, 403);
     await markDone(b.undone, false);
+  }
+  if (b.answer !== undefined) {
+    // { answer: { id, text, confirmPublic? } }: an answer to one of Claude's questions.
+    const { id, text, confirmPublic } = b.answer ?? {};
+    if (typeof id !== 'string' || !/^q-[a-z0-9-]{1,57}$/.test(id) || typeof text !== 'string') return json({ error: 'bad request' }, 400);
+    const answer = text.trim().slice(0, 4000);
+    if (!answer) return json({ error: 'Type an answer first.' }, 400);
+    if (!(await may(id))) return json({ error: 'forbidden' }, 403);
+    const todo = (await setupTodos()).find((t) => t.id === id && t.kind === 'question');
+    if (!todo) return json({ error: 'That question has gone.' }, 404);
+    try {
+      if (confirmPublic !== true && (await answersVisibility()) === 'public') return json({ needsConfirm: 'public' });
+      // First name only: on a public repo the whole line is public.
+      const name = (s.profile.full_name || '').trim().split(/\s+/)[0] || 'A team member';
+      const saved = await saveAnswer({ id, question: todo.title, text: answer, name });
+      if (saved.sent) await markDone(id);
+      return json({ ok: true, sent: saved.sent });
+    } catch (e) {
+      return json({ error: e instanceof Error && e.message ? e.message : 'Couldn’t save that. Try again.' }, 502);
+    }
   }
   if (b.assign !== undefined) {
     if (!isAdmin) return json({ error: 'Only admins can choose who sees a to-do.' }, 403);
