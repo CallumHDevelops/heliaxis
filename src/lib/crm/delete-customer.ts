@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { chatRef, leadRef, replyRef } from '@/lib/notification-refs';
 import { toWaId } from '@/lib/whatsapp/shared';
+import { mediaFilesOf } from '@/lib/whatsapp/media';
 import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from './server';
 
 /**
@@ -381,6 +382,8 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
   const gonePids = new Set(theirs.filter((p) => deleted.has(p.enquiry_id)).map((p) => p.id));
   const added = going.filter((c) => deleted.has(c.id)).map((c) => Date.parse(c.created_at)).filter(Number.isFinite);
   await forgetInMetis(db, [...deleted, ...gonePids], new Date(Math.min(Date.now(), ...added)).toISOString());
+  // The photos, voice notes and files they sent on WhatsApp (a folder per customer, whatsapp/media.ts).
+  await removeFiles(db, await mediaFilesOf([...deleted]), out);
 
   // 5. Their files, plus anything uploaded without being saved (an upload cut off part way).
   if (!gonePids.size) return;

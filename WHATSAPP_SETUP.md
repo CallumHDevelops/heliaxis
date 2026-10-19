@@ -20,7 +20,7 @@ You in the app ──▶ /api/whatsapp/conversations/<id> ──▶ WhatsApp Clo
 
 ## 1. Database
 
-Run `supabase/whatsapp.sql`, then `supabase/whatsapp-chasers.sql`, in the Supabase SQL editor. Then turn on the **pg_cron** and **pg_net**
+Run `supabase/whatsapp.sql`, then `supabase/whatsapp-chasers.sql` and `supabase/whatsapp-media.sql`, in the Supabase SQL editor. Then turn on the **pg_cron** and **pg_net**
 extensions (Database → Extensions) and run the `cron.schedule(...)` block at the bottom of that file,
 with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody has the app open.
 (Vercel's Hobby plan only allows daily crons, so Supabase triggers this one.)
@@ -115,6 +115,14 @@ Redeploy after adding them.
     an hour before it closes (at least 4h after your message). Otherwise the chase template is sent
     (paid). The chat shows which it'll be;
   - can have an optional final nudge (off by default).
+- **Photos, videos, voice notes and files** customers send show in the chat (once
+  `whatsapp-media.sql` has been run). WhatsApp only keeps them for 7 days, so each one is downloaded
+  as it arrives and kept in a private storage bucket, `whatsapp-media` (the app creates it). Tap a
+  photo to see it full size; in a job's chat, **Save to job photos** copies it into the job's Site
+  photos. Voice notes play in Chrome, Edge, Firefox and Safari 18.4 or later (older iPhones and Macs
+  get a Download instead). Anything over 50 MB (16 MB for photos and voice notes) isn't kept: the
+  chat says so. Past 250 MB or 30 files in a day from one chat, the rest wait for someone to tap
+  **Try again**. Deleting a customer deletes their files too.
 - **Monitoring**: the inbox has *Needs reply* and *Waiting on them* filters, and the team gets a push
   when a customer has waited 30 min without an answer (outside quiet hours).
 - Website enquiries can be messaged too (template first). Only do that if they've agreed to
