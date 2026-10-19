@@ -90,6 +90,13 @@ const icons = {
     </svg>
   ),
   // The "More" sheet's tiles.
+  surveys: (
+    <svg {...ICON}>
+      <path d="M9 3.5h6v3H9z" />
+      <path d="M15 5h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3" />
+      <path d="m9 14 2 2 4-4" />
+    </svg>
+  ),
   replies: (
     <svg {...ICON}>
       <path d="M10 8.5 5 13l5 4.5" />
@@ -289,6 +296,7 @@ export async function AdminShell({
       label: 'CRM',
       items: [
         { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
+        { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },
         { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa' },
