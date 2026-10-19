@@ -11,7 +11,7 @@
   --err: #b3261e;
   --wa: #1f7a4d;
   color: var(--ink);
-  max-width: 1100px;
+  /* As wide as the page (AdminShell sets it: fluid for the board, record and reports). */
   margin: 0 auto;
 }
 .crm-project {
@@ -1007,6 +1007,8 @@ textarea.crm-input {
 }
 .crm-col {
   flex: 0 0 250px;
+  /* Long card lines shorten (they end in …) instead of widening the column. */
+  min-width: 0;
   background: rgba(33, 31, 24, 0.04);
   border-radius: 10px;
   padding: 0.5rem;
@@ -1139,7 +1141,7 @@ textarea.crm-input {
   padding: 0.8rem;
 }
 .crm-project:has(.crm-split) {
-  max-width: 1100px;
+  max-width: none;
 }
 @media (max-width: 640px) {
   .crm-head {
