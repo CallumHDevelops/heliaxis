@@ -67,10 +67,12 @@ export function useLiveRefresh(load: (full: boolean) => Promise<boolean | void>,
     };
     runNow.current = run;
 
-    // Back to the tab: focus and visibilitychange come together, so once is enough.
+    // Back to the tab: focus and visibilitychange come together, so once is enough. Too soon after
+    // the last one to run again, it still restarts the timer (hiding the tab cleared it).
     const onBack = () => {
       if (document.visibilityState !== 'visible') clearTimeout(timer);
       else if (Date.now() - lastDone > 1500) void run();
+      else if (!running) schedule();
     };
     void run();
     document.addEventListener('visibilitychange', onBack);

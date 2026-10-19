@@ -99,7 +99,6 @@ export function ChatThread({ id }: { id: string }) {
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [tpl, setTpl] = useState<{ name: string; lang: string; params: string[] } | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   /** The last full load's version: polls send it, and get { same: true } if nothing changed. */
   const version = useRef('');
   /** Cleared this chat's notifications since it opened (once, even with nothing unread). */
@@ -158,9 +157,10 @@ export function ChatThread({ id }: { id: string }) {
   }, []);
 
   // By the newest message, not the count: a long chat shows the latest 500, so the count stays put.
+  // To the very bottom (past the compose and tab bar), the same place the scroll check measures to.
   const newest = messages.at(-1)?.id;
   useEffect(() => {
-    if (newest && atBottom.current) endRef.current?.scrollIntoView({ block: 'end' });
+    if (newest && atBottom.current) window.scrollTo({ top: document.documentElement.scrollHeight });
   }, [newest]);
 
   const open = windowOpen(enquiry?.wa_last_inbound_at, now);
@@ -286,8 +286,8 @@ export function ChatThread({ id }: { id: string }) {
             {enquiry.wa_id ? `+${enquiry.wa_id}` : enquiry.phone || 'No number'} · {open ? left : 'window closed'}
           </span>
         </div>
-        <button type="button" className="wa-refresh" onClick={refresh} disabled={busy}>
-          {busy ? 'Refreshing…' : 'Refresh'}
+        <button type="button" className="wa-refresh" onClick={refresh} disabled={busy} aria-label="Refresh" title="Refresh">
+          ↻
         </button>
         <button type="button" className={`wa-auto${enquiry.wa_auto_off ? ' off' : ''}`} onClick={toggleAuto}>
           {enquiry.wa_auto_off ? 'Smart replies off' : 'Smart replies on'}
@@ -381,7 +381,6 @@ export function ChatThread({ id }: { id: string }) {
             )}
           </div>
         ))}
-        <div ref={endRef} />
       </div>
 
       {error && <p className="wa-banner wa-banner--err">{error}</p>}

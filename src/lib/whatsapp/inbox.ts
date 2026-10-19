@@ -433,8 +433,7 @@ export async function markChatRead(enquiryId: string) {
     .eq('direction', 'in')
     .eq('status', 'received')
     .order('created_at', { ascending: false });
-  await db.from('enquiries').update({ wa_unread: 0 }).eq('id', enquiryId);
-  await clearChatNotifications(enquiryId);
+  await Promise.all([db.from('enquiries').update({ wa_unread: 0 }).eq('id', enquiryId), clearChatNotifications(enquiryId)]);
   if (!unread?.length) return;
   await db.from('whatsapp_messages').update({ status: 'read' }).in('id', unread.map((u) => u.id));
   const latest = unread[0].wa_message_id;

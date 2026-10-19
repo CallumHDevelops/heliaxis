@@ -1,4 +1,5 @@
 import 'server-only';
+import { after } from 'next/server';
 import webpush from 'web-push';
 import { fcmConfigured, sendFcm } from '@/lib/fcm';
 import { PUSH_ACTIONS, signPushAction, type PushAction } from '@/lib/push-actions';
@@ -150,7 +151,8 @@ type Legacy = { href: string; kinds: string[]; title?: RegExp };
 /**
  * Mark everyone's unread notifications about `ref` read, and take them off their Android phones.
  * `legacy` finds the same ones from before notifications.ref (or while its SQL hasn't been run).
- * Best-effort, like notify(): never fails the caller.
+ * Best-effort, like notify(): never fails the caller. Only the indexed update by ref is waited for;
+ * the older rows and the Android dismiss pushes go after the response.
  *
  * Web Push can't do the same: browsers must show a notification for every push (Chrome shows its
  * own "updated in the background" one, Safari drops the subscription), so a browser closes them
@@ -159,39 +161,50 @@ type Legacy = { href: string; kinds: string[]; title?: RegExp };
 async function clearRef(ref: string, legacy: Legacy[], tag?: string) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
-  try {
-    const cleared: Cleared[] = [];
-    const byRef = await admin
-      .from('notifications')
-      .update({ read_at: now })
-      .eq('ref', ref)
-      .is('read_at', null)
-      .select('id, user_id, created_at');
-    cleared.push(...((byRef.data ?? []) as Cleared[]));
+  // Straight away, so the bell is right by the time the caller responds.
+  const byRef = await admin
+    .from('notifications')
+    .update({ read_at: now })
+    .eq('ref', ref)
+    .is('read_at', null)
+    .select('id, user_id, created_at')
+    .then(
+      (r) => r,
+      () => ({ data: null, error: true })
+    );
 
-    let q = admin
-      .from('notifications')
-      .select('id, kind, title, href')
-      .is('read_at', null)
-      .in('href', [...new Set(legacy.map((l) => l.href))]);
-    if (!byRef.error) q = q.is('ref', null);
-    const { data: old } = await q.limit(500);
-    const ids = (old ?? [])
-      .filter((r) => legacy.some((l) => l.href === r.href && l.kinds.includes(r.kind) && (!l.title || l.title.test(r.title))))
-      .map((r) => r.id);
-    if (ids.length) {
-      const { data } = await admin
+  const rest = async () => {
+    try {
+      const cleared: Cleared[] = [...((byRef.data ?? []) as Cleared[])];
+      let q = admin
         .from('notifications')
-        .update({ read_at: now })
-        .in('id', ids)
+        .select('id, kind, title, href')
         .is('read_at', null)
-        .select('id, user_id, created_at');
-      cleared.push(...((data ?? []) as Cleared[]));
-    }
+        .in('href', [...new Set(legacy.map((l) => l.href))]);
+      if (!byRef.error) q = q.is('ref', null);
+      const { data: old } = await q.limit(500);
+      const ids = (old ?? [])
+        .filter((r) => legacy.some((l) => l.href === r.href && l.kinds.includes(r.kind) && (!l.title || l.title.test(r.title))))
+        .map((r) => r.id);
+      if (ids.length) {
+        const { data } = await admin
+          .from('notifications')
+          .update({ read_at: now })
+          .in('id', ids)
+          .is('read_at', null)
+          .select('id, user_id, created_at');
+        cleared.push(...((data ?? []) as Cleared[]));
+      }
 
-    if (cleared.length && fcmConfigured()) await dismissNative(admin, cleared, tag);
+      if (cleared.length && fcmConfigured()) await dismissNative(admin, cleared, tag);
+    } catch {
+      // Tables not migrated yet — never block the caller.
+    }
+  };
+  try {
+    after(rest);
   } catch {
-    // Tables not migrated yet — never block the caller.
+    await rest(); // outside a request: just do it now
   }
 }
 
