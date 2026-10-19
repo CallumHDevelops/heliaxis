@@ -196,7 +196,8 @@ export async function loadSurvey(id: string): Promise<Loaded> {
       d = {
         id,
         answers: prefill ?? server.answers,
-        base: server.answers,
+        // The pre-fill is where every copy starts, so a merge treats roof area 1 as the same area on both.
+        base: prefill ?? server.answers,
         baseRev: server.rev,
         savedAt: server.answers_saved_at ?? new Date().toISOString(),
         // Pre-filled answers (address, scope) go up with the first real change, so just looking at a

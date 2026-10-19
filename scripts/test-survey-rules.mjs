@@ -296,6 +296,15 @@ eq('a flat → check', run({ ...full, A5: 'flat' }, fullPhotos).summary.planning
   eq('merge: …and the move is reported', r.renamedRoofs, { r2: 'r3' });
 }
 {
+  // A booked survey ({} on the server) opened on two phones: both start from the same pre-fill.
+  const pre = { A3: { address: '12 High St', postcode: 'NP20 4AB' }, A4: 'solar', roofs: [{ id: 'r1', R1: 'Roof area 1' }] };
+  const a = { ...pre, roofs: [{ id: 'r1', R1: 'Roof area 1', R2: 'gable', R3: 'tile' }] };
+  const b = { ...pre, roofs: [{ id: 'r1', R1: 'Roof area 1', L1: 'yes', L2: 'trussed' }] };
+  const r = mergeSurvey(pre, b, a);
+  eq('merge: two phones from the pre-fill share roof area 1', r.answers.roofs, [{ id: 'r1', R1: 'Roof area 1', R2: 'gable', R3: 'tile', L1: 'yes', L2: 'trussed' }]);
+  eq('merge: …and nothing is renumbered', r.renamedRoofs, {});
+}
+{
   const m = mergeAnswers({ skip: { E: 'Locked' } }, { skip: { E: 'Locked', F: 'No time' } }, { skip: { H: 'Rain' } });
   yes('merge: skip reasons merge per key (and a server removal sticks)', same(m.skip, { F: 'No time', H: 'Rain' }), m.skip);
 }
