@@ -249,10 +249,10 @@ export function slotsForDay(x: {
  * The few times shown for a day: the earliest in each gap (least idle time), best detour first,
  * then others at least an hour from every one already chosen. Sorted by start.
  */
-export function pickTimes(cands: Candidate[], perDay: number): (Candidate & { recommended: boolean })[] {
+export function pickTimes<T extends Candidate>(cands: T[], perDay: number): (T & { recommended: boolean })[] {
   const n = Math.max(0, Math.floor(perDay));
-  const byDetour = (a: Candidate, b: Candidate) => a.detour - b.detour || a.start - b.start;
-  const firstOf = new Map<number, Candidate>();
+  const byDetour = (a: T, b: T) => a.detour - b.detour || a.start - b.start;
+  const firstOf = new Map<number, T>();
   for (const c of cands) {
     const f = firstOf.get(c.gap);
     if (!f || c.start < f.start) firstOf.set(c.gap, c);
