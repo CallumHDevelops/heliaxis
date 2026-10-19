@@ -15,6 +15,7 @@ import {
 } from '@/lib/crm/stages';
 import { DnoDeposit, DocumentsTab, EmailComposerV2, PortalCard, SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import type { TrackerStep } from '@/lib/crm/tracker';
+import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
 import '../crm.css';
 
 type Project = {
@@ -468,8 +469,6 @@ function ActionMenu({ customer, wa, onPick }: { customer: Customer; wa: WaInfo |
   );
 }
 
-type Template = { name: string; language: string; body: string; params: number };
-
 function WhatsAppComposer({
   projectId,
   docs,
@@ -489,21 +488,9 @@ function WhatsAppComposer({
   const [chase, setChase] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [templates, setTemplates] = useState<Template[] | null>(null);
-  const [tpl, setTpl] = useState<{ name: string; lang: string; params: string[] } | null>(null);
-  const first = customer.name.split(/\s+/)[0] || '';
-
-  useEffect(() => {
-    if (!wa?.number || wa.windowOpen || !wa.configured) return;
-    fetch('/api/whatsapp/templates', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d) => {
-        const list: Template[] = d.items || [];
-        setTemplates(list);
-        if (list[0]) setTpl({ name: list[0].name, lang: list[0].language, params: Array.from({ length: list[0].params }, (_, i) => (i === 0 ? first : '')) });
-      })
-      .catch(() => setTemplates([]));
-  }, [wa?.number, wa?.windowOpen, wa?.configured, first]);
+  // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
+  const tplSend = useTemplateSend(customer.id, !!wa?.number && !wa.windowOpen && !!wa.configured);
+  const { templates, pick: tpl } = tplSend;
 
   if (!wa?.configured) return <ComposerNote title="WhatsApp" body="WhatsApp isn’t connected yet — finish the Meta setup (WHATSAPP_SETUP.md)." />;
   if (!wa.number || !wa.threadId) return <ComposerNote title="WhatsApp" body="Add the customer’s mobile in Details first — any WhatsApp chat on that number then links here." />;
@@ -557,42 +544,21 @@ function WhatsAppComposer({
       ) : templates === null ? (
         <p className="crm-muted">Loading templates…</p>
       ) : !templates.length || !tpl ? (
-        <p className="crm-muted">No approved templates yet — create one in WhatsApp Manager.</p>
+        <p className="crm-muted">
+          No approved templates yet.{' '}
+          <Link href="/admin/enquiries/templates" className="crm-link">
+            Send one to Meta from WhatsApp templates
+          </Link>
+        </p>
       ) : (
         <>
-          <select
-            className="crm-input"
-            value={`${tpl.name}|${tpl.lang}`}
-            onChange={(e) => {
-              const [name, lang] = e.target.value.split('|');
-              const t = templates.find((x) => x.name === name && x.language === lang);
-              setTpl({ name, lang, params: Array.from({ length: t?.params ?? 0 }, (_, i) => (i === 0 ? first : '')) });
-            }}
-          >
-            {templates.map((t) => (
-              <option key={`${t.name}|${t.language}`} value={`${t.name}|${t.language}`}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          {templates.find((t) => t.name === tpl.name)?.body && (
-            <p className="crm-tpl">{templates.find((t) => t.name === tpl.name)?.body}</p>
-          )}
-          {tpl.params.map((p, i) => (
-            <input
-              key={i}
-              className="crm-input"
-              placeholder={`{{${i + 1}}}`}
-              value={p}
-              onChange={(e) => setTpl({ ...tpl, params: tpl.params.map((x, j) => (j === i ? e.target.value : x)) })}
-            />
-          ))}
+          <TemplateSendFields send={tplSend} inputClass="crm-input" />
           {err && <p className="crm-banner crm-banner--err">{err}</p>}
           <div className="crm-actions">
             <button
               type="button"
               className="crm-btn crm-btn--wa"
-              disabled={busy || tpl.params.some((x) => !x.trim())}
+              disabled={busy || !tplSend.ready}
               onClick={() => send({ template: tpl.name, lang: tpl.lang, params: tpl.params })}
             >
               {busy ? 'Sending…' : 'Send template'}

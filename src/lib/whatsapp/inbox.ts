@@ -16,6 +16,7 @@ import {
 import { isQuiet, nextAwake, planChase } from './schedule';
 import { ensureOpportunity } from '@/lib/crm/server';
 import { getSettings } from './settings';
+import { autoParams } from './templates';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -265,10 +266,14 @@ async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo
   return { rule: rule.name, seconds: (at.getTime() - Date.now()) / 1000, outboxId: row?.id as string | undefined };
 }
 
-/** Opening message to a new Meta lead who opted in: the default template, a few minutes later. */
+/**
+ * Opening message to a new Meta lead who opted in, a few minutes later: the template picked in
+ * WhatsApp templates → Use for, else WHATSAPP_DEFAULT_TEMPLATE.
+ */
 export async function queueFirstContact(enquiryId: string, name: string) {
-  const t = defaultTemplate();
-  if (!t.name || process.env.WHATSAPP_AUTO_FIRST_MESSAGE !== 'true') return false;
+  if (process.env.WHATSAPP_AUTO_FIRST_MESSAGE !== 'true') return false;
+  const t = { ...defaultTemplate(), name: (await getSettings()).firstContactTemplate || defaultTemplate().name };
+  if (!t.name) return false;
   const db = createAdminClient();
   const seconds = pickDelaySeconds(180, 360);
   const { error } = await db.from('whatsapp_outbox').insert({
@@ -495,20 +500,33 @@ export async function processOutbox(limit = 8) {
       continue;
     }
     const e = enquiry as EnquiryWa;
+    const giveUp = async (title: string, error: string) => {
+      failed++;
+      await db.from('whatsapp_outbox').update({ status: 'failed', attempts: item.attempts + 1, last_error: error }).eq('id', item.id);
+      await notifyEnquiryTeam(title, error, inboxHref(item.enquiry_id));
+    };
     let input: SendInput;
     if (item.kind === 'chase' && !windowOpen(e.wa_last_inbound_at)) {
       // Past the free window: WhatsApp only allows a template now.
-      const name = settings.chaseTemplate || process.env.WHATSAPP_CHASE_TEMPLATE || defaultTemplate().name;
+      const name = settings.chaseTemplate || process.env.WHATSAPP_CHASE_TEMPLATE || settings.firstContactTemplate || defaultTemplate().name;
       if (!name) {
-        failed++;
-        const error = 'The free 24h window has closed and no chase template is set (Smart replies → Chasers).';
-        await db.from('whatsapp_outbox').update({ status: 'failed', attempts: item.attempts + 1, last_error: error }).eq('id', item.id);
-        await notifyEnquiryTeam(`Couldn’t chase ${e.name}`, error, inboxHref(item.enquiry_id));
+        await giveUp(`Couldn’t chase ${e.name}`, 'The free 24h window has closed and no chase template is set (Smart replies → Chasers).');
         continue;
       }
-      input = { template: name, lang: defaultTemplate().lang, params: [(e.name || '').trim().split(/\s+/)[0] || 'there'] };
+      const p = await autoParams(name, e.id, e.name);
+      if (!p.ok) {
+        await giveUp(`Couldn’t chase ${e.name}`, p.error);
+        continue;
+      }
+      input = { template: name, lang: defaultTemplate().lang, params: p.params ?? [(e.name || '').trim().split(/\s+/)[0] || 'there'] };
     } else if (item.template_name) {
-      input = { template: item.template_name, lang: item.template_lang || 'en_GB', params: item.body ? [item.body] : [] };
+      // Blanks by field when the template's are known (WhatsApp templates); else {{1}} = the first name queued with it.
+      const p = await autoParams(item.template_name, e.id, e.name);
+      if (!p.ok) {
+        await giveUp(`WhatsApp to ${e.name} not sent`, p.error);
+        continue;
+      }
+      input = { template: item.template_name, lang: item.template_lang || 'en_GB', params: p.params ?? (item.body ? [item.body] : []) };
     } else {
       input = { text: item.body || '' };
     }

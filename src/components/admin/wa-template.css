@@ -1,0 +1,115 @@
+/* A WhatsApp template as the customer sees it (WhatsApp templates page and the Send template pickers). */
+.wap {
+  background: #efeae2;
+  border-radius: 8px;
+  padding: 0.7rem;
+  min-width: 0;
+}
+.wap-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+}
+.wap-bubble {
+  background: #fff;
+  border-radius: 0 8px 8px 8px;
+  padding: 0.45rem 0.6rem 0.3rem;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.wap-header {
+  font-size: 0.92rem;
+  color: #111b21;
+}
+.wap-body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  line-height: 1.38;
+  color: #111b21;
+}
+.wap-blank {
+  background: rgba(248, 188, 30, 0.28);
+  color: #7a4f00;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+.wap-footer {
+  font-size: 0.78rem;
+  color: #667781;
+}
+.wap-time {
+  align-self: flex-end;
+  font-size: 0.66rem;
+  color: #667781;
+}
+.wap-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wap-button {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  color: #027eb5;
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-align: center;
+  padding: 0.5rem 0.6rem;
+  overflow-wrap: anywhere;
+}
+
+.wap--compact {
+  padding: 0.45rem;
+}
+.wap--compact .wap-msg {
+  width: auto;
+}
+.wap--compact .wap-body {
+  font-size: 0.85rem;
+}
+.wap--compact .wap-buttons {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.wap--compact .wap-button {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.55rem;
+}
+
+/* Send template: one labelled box per blank */
+.wts-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+}
+.wts-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6e6a5e;
+}
+.wts-label small {
+  font-weight: 500;
+  margin-left: 0.3rem;
+}
+.wts-preview {
+  margin: 0.5rem 0 0.25rem;
+}
+.wts-manage {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c77f04;
+  text-decoration: none;
+}

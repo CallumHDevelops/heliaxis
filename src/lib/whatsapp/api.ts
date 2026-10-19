@@ -35,7 +35,7 @@ export function validSignature(rawBody: string, header: string | null): boolean 
 }
 
 /** `code` is Meta's error code when it sent one (190 bad token, 10/200 permissions, 4/17/32 rate limits…). */
-export type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string; code?: number };
+export type GraphResult<T> = { ok: true; data: T } | { ok: false; error: string; code?: number; subcode?: number };
 
 export async function graph<T>(path: string, init: RequestInit & { token?: string } = {}): Promise<GraphResult<T>> {
   const token = init.token || process.env.WHATSAPP_TOKEN;
@@ -48,8 +48,8 @@ export async function graph<T>(path: string, init: RequestInit & { token?: strin
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const e = (d as { error?: { message?: string; error_user_msg?: string; code?: number } }).error;
-      return { ok: false, error: e?.error_user_msg || e?.message || `Meta returned ${r.status}`, code: e?.code };
+      const e = (d as { error?: { message?: string; error_user_msg?: string; code?: number; error_subcode?: number } }).error;
+      return { ok: false, error: e?.error_user_msg || e?.message || `Meta returned ${r.status}`, code: e?.code, subcode: e?.error_subcode };
     }
     return { ok: true, data: d as T };
   } catch (e) {
@@ -89,9 +89,22 @@ export async function sendDocument(to: string, link: string, filename: string, c
   });
 }
 
+/** Meta's template send errors, in plain words. */
+const TEMPLATE_ERRORS: Record<number, string> = {
+  132000: 'The number of blanks filled in doesn’t match the template.',
+  132001: 'That template isn’t approved in this language (or it was deleted). Check WhatsApp templates.',
+  132005: 'With the blanks filled in, the message is too long.',
+  132007: 'Meta blocked this message under its content rules.',
+  132012: 'One of the blanks isn’t in the format the template expects.',
+  132015: 'Meta has paused this template because people blocked or reported it. Try another one.',
+  132016: 'Meta has turned this template off. Try another one.',
+};
+
 /** A pre-approved template. `params` fill the body's {{1}}, {{2}}… in order. */
 export async function sendTemplate(to: string, name: string, lang: string, params: string[] = []): Promise<SendResult> {
-  return graph(messagesPath(), {
+  // Meta refuses a blank with line breaks, tabs or 4+ spaces in a row.
+  const values = params.map((p) => p.replace(/\s*[\r\n\t]+\s*/g, ' ').replace(/ {4,}/g, '   ').trim());
+  const r: SendResult = await graph(messagesPath(), {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -100,12 +113,13 @@ export async function sendTemplate(to: string, name: string, lang: string, param
       template: {
         name,
         language: { code: lang },
-        ...(params.length
-          ? { components: [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text })) }] }
+        ...(values.length
+          ? { components: [{ type: 'body', parameters: values.map((text) => ({ type: 'text', text })) }] }
           : {}),
       },
     }),
   });
+  return !r.ok && r.code && TEMPLATE_ERRORS[r.code] ? { ...r, error: TEMPLATE_ERRORS[r.code] } : r;
 }
 
 /** Blue ticks on the customer's message; with `typing`, also "typing…" (up to 25s or until we send). */
@@ -119,32 +133,6 @@ export async function markRead(waMessageId: string, typing = false) {
       ...(typing ? { typing_indicator: { type: 'text' } } : {}),
     }),
   });
-}
-
-export type TemplateInfo = { name: string; language: string; category: string; body: string; params: number };
-
-/** Approved templates (needs WHATSAPP_BUSINESS_ACCOUNT_ID); falls back to the default one. */
-export async function listTemplates(): Promise<TemplateInfo[]> {
-  const waba = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-  const def = defaultTemplate();
-  const fallback = def.name ? [{ name: def.name, language: def.lang, category: '', body: '', params: 1 }] : [];
-  if (!waba) return fallback;
-  const r = await graph<{
-    data: { name: string; language: string; category: string; status: string; components?: { type: string; text?: string }[] }[];
-  }>(`/${waba}/message_templates?fields=name,language,category,status,components&status=APPROVED&limit=100`);
-  if (!r.ok) return fallback;
-  return r.data.data
-    .filter((t) => t.status === 'APPROVED')
-    .map((t) => {
-      const body = t.components?.find((c) => c.type === 'BODY')?.text || '';
-      return {
-        name: t.name,
-        language: t.language,
-        category: t.category,
-        body,
-        params: new Set(body.match(/\{\{\d+\}\}/g) || []).size,
-      };
-    });
 }
 
 export type LeadField = { name: string; values: string[] };

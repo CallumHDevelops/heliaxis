@@ -10,6 +10,8 @@ export type WaSettings = {
   finalNudgeHours: number;
   /** Template used when a chase can't be a free message. {{1}} = first name. Blank = the default template. */
   chaseTemplate: string;
+  /** First message to a new Meta lead (WhatsApp templates → Use for). Blank = WHATSAPP_DEFAULT_TEMPLATE in Vercel. */
+  firstContactTemplate: string;
   /** No chasers between these hours (UK time). */
   quietFrom: number;
   quietTo: number;
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: WaSettings = {
   keepChasesFree: true,
   finalNudgeHours: 0,
   chaseTemplate: '',
+  firstContactTemplate: '',
   quietFrom: 21,
   quietTo: 8,
   smartRepliesQuietHours: false,
@@ -46,6 +49,7 @@ export function cleanSettings(b: Partial<Record<keyof WaSettings, unknown>>): Wa
     keepChasesFree: b.keepChasesFree === undefined ? d.keepChasesFree : !!b.keepChasesFree,
     finalNudgeHours: num(b.finalNudgeHours, 0, 14 * 24, d.finalNudgeHours),
     chaseTemplate: String(b.chaseTemplate ?? '').trim(),
+    firstContactTemplate: String(b.firstContactTemplate ?? '').trim().slice(0, 100),
     quietFrom: Math.round(num(b.quietFrom, 0, 23, d.quietFrom)),
     quietTo: Math.round(num(b.quietTo, 0, 23, d.quietTo)),
     smartRepliesQuietHours: !!b.smartRepliesQuietHours,

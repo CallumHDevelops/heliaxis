@@ -1,0 +1,262 @@
+/* WhatsApp templates page — phone-first, on top of whatsapp.css. */
+.wat-tabs {
+  margin: 0.9rem 0 0.25rem;
+}
+.wat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.wat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.wat-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wat-title b {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.wat-title code,
+.wat-meta code {
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.wat-badge {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  white-space: nowrap;
+}
+.wat-badge.ok {
+  background: rgba(31, 122, 77, 0.12);
+  color: var(--wa);
+}
+.wat-badge.wait {
+  background: rgba(248, 188, 30, 0.24);
+  color: var(--amber-2);
+}
+.wat-badge.bad {
+  background: rgba(179, 38, 30, 0.1);
+  color: var(--err);
+}
+.wat-badge.off {
+  background: rgba(33, 31, 24, 0.08);
+  color: var(--muted);
+}
+.wat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.wat-chip-job {
+  background: rgba(31, 122, 77, 0.12);
+  color: var(--wa);
+}
+.wat-note {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  margin: 0;
+}
+.wat-note.bad {
+  color: var(--err);
+}
+.wat-note.good {
+  color: var(--wa);
+  font-weight: 600;
+}
+.wat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.wat-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+  min-height: 40px;
+  border-radius: 4px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--solar);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.wat-btn.wa {
+  background: var(--wa);
+  border-color: var(--wa);
+  color: #fff;
+}
+.wat-btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+.wat-btn.danger {
+  background: transparent;
+  color: var(--err);
+  border-color: rgba(179, 38, 30, 0.35);
+}
+.wat-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.wat-panel {
+  border-top: 1px dashed var(--line);
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.wat-job {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.wat-job:last-child {
+  border-bottom: 0;
+}
+.wat-job > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.88rem;
+}
+.wat-job small {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.wat-job small.why {
+  color: var(--err);
+}
+.wat-job .wat-btn {
+  flex: 0 0 auto;
+}
+.wat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.2rem 0;
+}
+.wat-chips button {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px dashed rgba(199, 127, 4, 0.55);
+  background: rgba(248, 188, 30, 0.12);
+  color: var(--amber-2);
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  min-height: 36px;
+  cursor: pointer;
+}
+.wat-cats {
+  display: grid;
+  gap: 0.5rem;
+}
+.wat-cat {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.65rem;
+  background: var(--card);
+  cursor: pointer;
+}
+.wat-cat.on {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.wat-cat input {
+  margin-top: 0.2rem;
+}
+.wat-cat > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.wat-cat small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+.wat-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.wat-row .wa-input {
+  flex: 1;
+  min-width: 0;
+}
+.wat-count {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  min-width: 2.4rem;
+  text-align: right;
+}
+.wat-x {
+  flex: 0 0 auto;
+  font: inherit;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.wat-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0.25rem 0 0.2rem;
+}
+.wat-problems {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--err);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.wat-guide summary {
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.wat-guide h3 {
+  font-size: 0.9rem;
+  margin: 0.8rem 0 0.2rem;
+}
+.wat-guide p {
+  margin: 0.2rem 0;
+}
+@media (min-width: 720px) {
+  .wat-cats {
+    grid-template-columns: 1fr 1fr;
+  }
+}
