@@ -155,7 +155,8 @@ export function FindTimeSheet({
     if (!job || !pick) return;
     setBusy(true);
     setError('');
-    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, surveyor_key: pick.surveyorKey });
+    // The postcode these times were worked out for (typed here when the job has none, or it's elsewhere).
+    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, postcode: found?.postcode, surveyor_key: pick.surveyorKey });
     setBusy(false);
     if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(pick.start)} with ${String(r.data.surveyor || pick.surveyorName)}`);
     if (r.status === 409 && Array.isArray(r.data.days) && found) {
@@ -171,7 +172,15 @@ export function FindTimeSheet({
     const start = new Date(londonSlot(aDay, aTime)).toISOString();
     setBusy(true);
     setError('');
-    const r = await post('/api/crm/booking/book', { project_id: job.id, start, type, surveyor_key: aWho || undefined, override: true, all_day_ok: allDayOk });
+    const r = await post('/api/crm/booking/book', {
+      project_id: job.id,
+      start,
+      type,
+      postcode: postcode.trim() || undefined,
+      surveyor_key: aWho || undefined,
+      override: true,
+      all_day_ok: allDayOk,
+    });
     setBusy(false);
     if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(start)} (outside the usual rules)`);
     if (r.status === 409 && r.data.error === 'all_day') {

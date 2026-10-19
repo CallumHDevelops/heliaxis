@@ -7,8 +7,9 @@ import { readBody } from '@/lib/booking/rate-limit';
 export const dynamic = 'force-dynamic';
 
 /**
- * Book it (staff, confirmed straight away): { project_id, start, type, surveyor_key?, override?,
- * all_day_ok? }. "Book anyway" (override) takes any start that doesn't overlap the diary; on a day
+ * Book it (staff, confirmed straight away): { project_id, start, type, postcode?, surveyor_key?,
+ * override?, all_day_ok? }. postcode = the one Find a time searched with (saved to the job when it
+ * differs). "Book anyway" (override) takes any start that doesn't overlap the diary; on a day
  * blocked all day it answers 409 { error: 'all_day', message } and needs all_day_ok to go ahead.
  */
 export async function POST(req: Request) {
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
     projectId: b.project_id,
     start,
     type: isSurveyType(b.type) ? b.type : null,
+    postcode: typeof b.postcode === 'string' ? b.postcode.slice(0, 12) : null,
     surveyorKey: typeof b.surveyor_key === 'string' ? b.surveyor_key.toLowerCase() : null,
     override: b.override === true,
     allDayOk: b.all_day_ok === true,

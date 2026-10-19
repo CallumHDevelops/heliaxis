@@ -1270,11 +1270,14 @@ export async function staffDecline(id: string, by: Staff): Promise<Outcome> {
 /**
  * Staff book a time for a job (confirmed straight away). With `override` ("Book anyway") any start
  * is allowed unless it overlaps something in the diary; an all-day block asks again (`allDayOk`).
+ * `postcode` is the one Find a time searched with (typed there when the job had none, or the survey
+ * is somewhere else); it becomes the job's postcode once the time is taken.
  */
 export async function staffBook(x: {
   projectId: string;
   start: number;
   type?: SurveyTypeKey | null;
+  postcode?: string | null;
   surveyorKey?: string | null;
   override?: boolean;
   allDayOk?: boolean;
@@ -1286,8 +1289,9 @@ export async function staffBook(x: {
   const p = data as ProjectRow | null;
   if (!p) return { status: 404, body: { error: 'Not found' } };
   if (p.stage === 'lost') return { status: 409, body: { error: 'This job is Lost.' } };
-  if (!p.postcode) return { status: 400, body: { error: 'Add the job’s postcode first.' } };
-  const geo = await lookupPostcode(p.postcode);
+  const pc = x.postcode?.trim() || p.postcode;
+  if (!pc) return { status: 400, body: { error: 'Enter the customer’s postcode first.' } };
+  const geo = await lookupPostcode(pc);
   if (!isHit(geo)) return { status: 400, body: { error: POSTCODE_ERRORS[geo.error] } };
   const type: SurveyTypeKey = x.type && isSurveyType(x.type) ? x.type : isSurveyType(p.survey_type) ? p.survey_type : (surveyTypeFor(p.products ?? []) ?? 'solar');
   const minutes = s.durations[type];
@@ -1379,6 +1383,13 @@ export async function staffBook(x: {
     const far = estimateBetween(base, placeFromHit(geo), s);
     if (far != null) why.push(`about ${Math.ceil(far / 5) * 5} min from home`);
     note = `📅 Booked by ${x.by.name} outside the usual rules (${why.join(', ') || 'more driving than usual'}): ${whenText(x.start)}–${ukTime(end)} (${typeShort(type)}, ${hrs(minutes)}) with ${sv.name}`;
+  }
+  // A postcode typed in Find a time becomes the job's, with its coordinates in the same update (so
+  // the trigger keeps them; they need crm-v3.sql). Before the Outlook copy is made, so it has the place.
+  if (normPostcode(p.postcode) !== normPostcode(geo.postcode)) {
+    const where = { postcode: geo.postcode, updated_at: new Date().toISOString() };
+    const full = await db.from('crm_projects').update({ ...where, site_lat: geo.ll.lat, site_lng: geo.ll.lng }).eq('id', p.id);
+    if (full.error) await db.from('crm_projects').update(where).eq('id', p.id);
   }
   const b = await bookingById(made.id);
   if (!b) return UNAVAILABLE;
