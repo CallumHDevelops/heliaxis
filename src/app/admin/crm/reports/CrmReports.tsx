@@ -12,6 +12,7 @@ type Report = {
   bySource: Row[];
   byOwner: Row[];
   funnel: { key: string; n: number }[];
+  canExport?: boolean;
 };
 
 const pct = (v: number | null) => (v == null ? '—' : `${Math.round(v * 100)}%`);
@@ -141,6 +142,24 @@ export function CrmReports() {
 
           <h2 className="crm-h2">By person</h2>
           {table(r.byOwner, 'Owner')}
+
+          {r.canExport && (
+            <>
+              <h2 className="crm-h2">Export</h2>
+              <p className="crm-muted crm-small">
+                Spreadsheets of everything in the CRM (not just this period) that open in Excel. Customers has one row per customer; jobs has one
+                row per opportunity or project.
+              </p>
+              <div className="crm-actions">
+                <a className="crm-btn crm-btn--ghost" href="/api/crm/export?what=customers" download>
+                  Export customers (CSV)
+                </a>
+                <a className="crm-btn crm-btn--ghost" href="/api/crm/export?what=projects" download>
+                  Export jobs (CSV)
+                </a>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
