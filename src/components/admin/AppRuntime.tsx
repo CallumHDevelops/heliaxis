@@ -15,8 +15,9 @@ import { clearTaskStorage } from '@/lib/tasks-offline';
  *   then compare with /app/version.json to offer (or require) the new APK; it also hands
  *   over its Firebase token for native notifications (syncNativePush);
  * - offline pill;
- * - surveys: copies today's and tomorrow's to the phone (open, back to the front, back online) and
- *   keeps sending survey answers, photos and drawings that are waiting (src/lib/surveys/offline.ts);
+ * - surveys: copies today's and tomorrow's to the phone (open, back to the front, back online) for
+ *   people who can use the CRM (`surveys`), and keeps sending survey answers, photos and drawings
+ *   that are waiting (src/lib/surveys/offline.ts);
  * - clears cached pages, local task data and surveys on sign-out (warning first if survey changes
  *   or photos haven't uploaded yet).
  */
@@ -46,7 +47,7 @@ function subscribeOnline(cb: () => void) {
   };
 }
 
-export function AppRuntime() {
+export function AppRuntime({ surveys = false }: { /** Can use the CRM: keep the next two days' surveys on this phone. */ surveys?: boolean }) {
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [apkUpdate, setApkUpdate] = useState<{ release: Release; forced: boolean } | null>(null);
@@ -120,9 +121,10 @@ export function AppRuntime() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // Surveys on the phone: warm the offline pack and keep the outbox moving.
+  // Surveys on the phone: warm the offline pack (CRM people only; anyone else would be refused on
+  // every page) and keep the outbox moving.
   useEffect(() => {
-    const warm = () => void warmSurveys().catch(() => null);
+    const warm = () => void (surveys ? warmSurveys().catch(() => null) : null);
     const onVisible = () => document.visibilityState === 'visible' && warm();
     window.addEventListener('online', warm);
     document.addEventListener('visibilitychange', onVisible);
@@ -142,7 +144,7 @@ export function AppRuntime() {
       window.removeEventListener(SURVEYS_CHANGED, count);
       window.removeEventListener(QUEUE_CHANGED, count);
     };
-  }, []);
+  }, [surveys]);
 
   // Sign-out cleanup.
   useEffect(() => {

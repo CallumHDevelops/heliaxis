@@ -471,7 +471,7 @@ export async function AdminShell({
           </MoreMenu>
         )}
       </nav>
-      <AppRuntime />
+      <AppRuntime surveys={can('crm')} />
     </div>
   );
 }
