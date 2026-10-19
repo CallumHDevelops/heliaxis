@@ -31,7 +31,7 @@ export function plainMetaError(r: { error: string; code?: number }, what: 'leads
   if (/operation was aborted/i.test(m)) return 'Meta took too long to answer. Try again in a minute.';
   // 210 is "A page access token is required": the wrong kind of token, not an expired one.
   if (r.code === 190 || (r.code !== 210 && /access token|session has expired|has not authori[sz]ed application/i.test(m))) {
-    return `Meta didn’t accept the CRM’s access token (it may have expired or been removed). Make a new one with ${PERMISSIONS}, and update META_PAGE_ACCESS_TOKEN (or WHATSAPP_TOKEN) in Vercel.`;
+    return `Meta didn’t accept the CRM’s access token (it may have expired or been removed). Make a new one with ${PERMISSIONS}, update META_PAGE_ACCESS_TOKEN (or WHATSAPP_TOKEN) in Vercel, then redeploy.`;
   }
   if (what === 'live' && r.code === 100 && /subscribed_fields|leadgen/i.test(m)) {
     return (
@@ -45,8 +45,8 @@ export function plainMetaError(r: { error: string; code?: number }, what: 'leads
       'Meta won’t let the CRM check or switch on live leads for this Page. Its access token needs ' +
       'pages_manage_metadata (as well as leads_retrieval and pages_show_list), and the CRM’s system user needs ' +
       'full control of the Page: Business Settings → Users → System users → the CRM’s user → Assign assets. ' +
-      'If the token was made without pages_manage_metadata, make a new one with it and update ' +
-      `META_PAGE_ACCESS_TOKEN in Vercel. (Meta said: “${m}”)`
+      'If the token was made without pages_manage_metadata, make a new one with it, update ' +
+      `META_PAGE_ACCESS_TOKEN in Vercel and redeploy. (Meta said: “${m}”)`
     );
   }
   if (
