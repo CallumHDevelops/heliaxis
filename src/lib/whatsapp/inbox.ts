@@ -19,6 +19,7 @@ import { ensureOpportunity, markContacted } from '@/lib/crm/server';
 import { getSettings } from './settings';
 import { autoParams } from './templates';
 import { describeMessage as describe, type InboundMessage } from './describe';
+import { templateText } from './template-text';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -301,7 +302,11 @@ async function deliver(
   if (!r.ok) return r;
 
   const now = new Date().toISOString();
-  const body = isText ? input.text : `Template “${input.template}”${input.params?.length ? ` (${input.params.join(', ')})` : ''}`;
+  // Templates are saved as the customer saw them; the short note only if Meta can't say the wording.
+  const body = isText
+    ? input.text
+    : ((await templateText(input.template, input.lang, input.params ?? []).catch(() => null)) ??
+      `Template “${input.template}”${input.params?.length ? ` (${input.params.join(', ')})` : ''}`);
   const { data: row } = await db
     .from('whatsapp_messages')
     .insert({

@@ -4,6 +4,7 @@ import { defaultTemplate, whatsappConfigured } from '@/lib/whatsapp/api';
 import { markChatRead, processOutbox, sendManual } from '@/lib/whatsapp/inbox';
 import { getSettings } from '@/lib/whatsapp/settings';
 import { chatSession, json, mayOpenChat, version } from '@/lib/whatsapp/routes';
+import { wordingForNote } from '@/lib/whatsapp/template-text';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -68,6 +69,22 @@ export async function GET(req: Request, { params }: Ctx) {
   if (known === v) return json({ same: true, v, unread: enquiry.wa_unread });
 
   const [{ data: messages }, settings] = await (early ?? everything());
+
+  // Templates sent before the wording was saved: show it as the customer saw it, and save it.
+  const notes = (messages ?? []).filter((m) => m.kind === 'template' && m.body?.startsWith('Template “'));
+  if (notes.length) {
+    const fixed = await Promise.all(notes.map(async (m) => ({ m, wording: await wordingForNote(m.body).catch(() => null) })));
+    const done = fixed.filter((f): f is { m: (typeof notes)[number]; wording: string } => !!f.wording);
+    for (const { m, wording } of done) m.body = wording;
+    if (done.length) {
+      after(() =>
+        Promise.all(done.map(({ m, wording }) => db.from('whatsapp_messages').update({ body: wording }).eq('id', m.id))).then(
+          () => {},
+          () => {}
+        )
+      );
+    }
+  }
 
   const senders = [...new Set((messages ?? []).map((m) => m.sent_by).filter(Boolean))] as string[];
   const ruleIds = [...new Set([...(messages ?? []), ...(outbox ?? [])].map((m) => m.rule_id).filter(Boolean))] as string[];
