@@ -6,6 +6,13 @@ import { createAdminClient } from '@/lib/supabase/admin';
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' };
 
+/**
+ * The only document the page editor stores here. cms_kv also holds CRM settings and setup state,
+ * which CMS editors mustn't be able to read or overwrite through this route.
+ */
+const EDITOR_KEYS = ['heliaxis-cms-v1'];
+const badKey = () => NextResponse.json({ error: 'unknown key' }, { status: 400, headers: NO_STORE });
+
 // Load a CMS document by key (the page-builder calls this via window.storage.get).
 export async function GET(req: NextRequest) {
   const session = await requirePortal('cms');
@@ -13,6 +20,7 @@ export async function GET(req: NextRequest) {
 
   const key = req.nextUrl.searchParams.get('key');
   if (!key) return NextResponse.json({ error: 'key required' }, { status: 400 });
+  if (!EDITOR_KEYS.includes(key)) return badKey();
 
   const admin = createAdminClient();
   const { data, error } = await admin.from('cms_kv').select('value').eq('key', key).maybeSingle();
@@ -32,6 +40,7 @@ export async function POST(req: NextRequest) {
   if (!key || typeof value !== 'string') {
     return NextResponse.json({ error: 'key and string value required' }, { status: 400 });
   }
+  if (!EDITOR_KEYS.includes(key)) return badKey();
 
   const admin = createAdminClient();
   const { error } = await admin

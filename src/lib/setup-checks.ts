@@ -315,7 +315,7 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 }
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
-  const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, done, assign] = await Promise.all([
+  const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, sso, done, assign] = await Promise.all([
     has('crm_projects', 'next_step'),
     has('crm_documents'),
     has('assistant_drafts'),
@@ -323,6 +323,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     has('whatsapp_messages'),
     has('whatsapp_outbox', 'kind'),
     has('native_push_tokens'),
+    has('sso_email_proofs'),
     doneManual(),
     preloaded ?? setupAssignments(),
   ]);
@@ -355,6 +356,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
+  add(env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && !sso, sql('sso.sql', 'Lets people open RAMS without signing in again (each confirms their email once).', 13));
   add(!fcmConfigured(), {
     id: 'env-firebase',
     title: 'Set up native Android notifications',
@@ -533,7 +535,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       'Copy the **Project URL**. That’s the value for `RAMS_SUPABASE_URL`.',
       'Under **Project API keys**, reveal and copy the **service_role** key. That’s `RAMS_SUPABASE_SERVICE_ROLE_KEY`, and it’s a password: tick **Sensitive** in Vercel.',
       ...VERCEL_STEPS,
-      'It works for anyone with an approved RAMS account under the same email as their Heliaxis login. The first time each person taps RAMS, they confirm their email once by a link we email them. Anyone else still sees the RAMS sign-in.',
+      'It works for anyone with an approved RAMS account under the same email as their Heliaxis login. Then run sso.sql (it appears on this card). The first time each person taps RAMS, they confirm their email once with a code we email them. Anyone else still sees the RAMS sign-in.',
     ],
     copies: [
       { label: 'Key', value: 'RAMS_SUPABASE_URL' },
