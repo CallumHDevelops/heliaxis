@@ -53,7 +53,7 @@ export async function deleteProject(
   // 1. What it has. Nothing has changed yet, so a failure here leaves the job as it was.
   type Doc = { storage_path: string; signed_outside_at?: string | null };
   type Photo = { storage_path: string; markup_path?: string | null };
-  type Survey = { customer_signature?: string | null };
+  type Survey = { id: string; customer_signature?: string | null };
   let docs: Doc[];
   let photos: Photo[];
   let surveys: Survey[];
@@ -88,9 +88,9 @@ export async function deleteProject(
     ...surveys.flatMap((s) => (s.customer_signature ? [{ bucket: DOCS_BUCKET, path: s.customer_signature }] : [])),
   ];
 
-  // 2. Notifications that link to the job or its tasks (links are text, so nothing cascades to them).
+  // 2. Notifications that link to the job, its tasks or its surveys (links are text, so nothing cascades to them).
   try {
-    await deleteNotifications(db, [id, ...taskIds]);
+    await deleteNotifications(db, [id, ...taskIds, ...surveys.map((s) => s.id)]);
   } catch (e) {
     return { ok: false, status: 500, error: errorText(e) };
   }

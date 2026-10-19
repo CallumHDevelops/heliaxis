@@ -2,7 +2,18 @@
 
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
-import { DEFAULT_SURVEY_MINUTES, DELIVERY_STAGES, isProjectStage, isSurveyType, minutesWords, PHOTO_CATEGORIES, STAGES, stageLabel, SURVEY_TYPES } from '@/lib/crm/stages';
+import {
+  DEFAULT_SURVEY_MINUTES,
+  DELIVERY_STAGES,
+  isProjectStage,
+  isSurveyType,
+  minutesWords,
+  noSurveyNeeded,
+  PHOTO_CATEGORIES,
+  STAGES,
+  stageLabel,
+  SURVEY_TYPES,
+} from '@/lib/crm/stages';
 import { checkGroupFor, type CheckView } from '@/lib/projects/checklist';
 import type { TeamMember } from '@/lib/projects/server';
 import { DOC_LABEL } from '../../crm/[id]/ProjectExtras';
@@ -361,7 +372,9 @@ function DatesTeam({ rec, team, actions }: { rec: RecordData; team: TeamMember[]
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
   const type = isSurveyType(f.survey_type) ? f.survey_type : null;
-  const minutes = rec.booking?.minutes || (type ? DEFAULT_SURVEY_MINUTES[type] : null);
+  // Infrared, an EV charger or LEDs only: a home visit, never a survey slot.
+  const noSurvey = noSurveyNeeded(p);
+  const minutes = noSurvey ? null : rec.booking?.minutes || (type ? DEFAULT_SURVEY_MINUTES[type] : null);
   const b = rec.booking;
   const bookingWords = !b
     ? ''
@@ -414,11 +427,14 @@ function DatesTeam({ rec, team, actions }: { rec: RecordData; team: TeamMember[]
           void save();
         }}
       >
-        <h4 className="crmr-ovh4">Survey</h4>
+        <h4 className="crmr-ovh4">{noSurvey ? 'Home visit' : 'Survey'}</h4>
+        {noSurvey && (
+          <p className="crm-muted crm-small">No solar, battery or heat pump on this job, so it doesn’t need a survey. Put the date of the home visit here.</p>
+        )}
         <div className="crm-grid2">
           <div>
             <label className="crm-label" htmlFor="rec-survey-at">
-              Date and time
+              {noSurvey ? 'Visit date and time' : 'Date and time'}
             </label>
             <input id="rec-survey-at" className="crm-input" type="datetime-local" value={f.survey_at} onChange={set('survey_at')} />
           </div>
@@ -444,7 +460,7 @@ function DatesTeam({ rec, team, actions }: { rec: RecordData; team: TeamMember[]
           {bookingWords ? <span>{bookingWords}</span> : null}
           {(p.survey_at || b) && <span>{told}</span>}
         </p>
-        {rec.schema.booking && (
+        {rec.schema.booking && !noSurvey && (
           <div className="crm-actions crmr-actions--tight">
             <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={actions.bookingLink}>
               Send booking link

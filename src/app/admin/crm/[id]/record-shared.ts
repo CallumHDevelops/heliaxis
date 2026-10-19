@@ -73,6 +73,8 @@ export type Customer = {
   whatsapp_opt_in?: boolean | null;
   whatsapp_opt_in_at?: string | null;
   whatsapp_opt_in_source?: string | null;
+  /** The permission in words, from the server: "Agreed on 3 Oct via website form", "Replied STOP on 3 Oct: …". */
+  whatsapp_permission_words?: string;
   /** Present once customer-refs.sql has run. */
   customer_ref?: string | null;
 };

@@ -223,8 +223,9 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/** "Agreed 3 Oct via website form", "Linked · 42 messages", or how to link one. */
+/** "Agreed on 3 Oct via website form", "Replied STOP on 3 Oct: …" (the server's words), "Linked · 42 messages", or how to link one. */
 function waLine(customer: Customer, wa: WaInfo): string {
+  if (customer.whatsapp_permission_words) return customer.whatsapp_permission_words;
   if (customer.whatsapp_opt_in) {
     const when = customer.whatsapp_opt_in_at ? ` ${shortDate(ukDayOf(customer.whatsapp_opt_in_at)).replace(/^\w+ /, '')}` : '';
     return `Agreed${when}${customer.whatsapp_opt_in_source ? ` via ${customer.whatsapp_opt_in_source}` : ''}`;
@@ -292,7 +293,7 @@ function CustomerCard({
   async function permission(on: boolean) {
     const ask = on
       ? `Has ${customer.name} agreed to WhatsApp messages from us? Only switch this on if they have.`
-      : `Turn off WhatsApp permission for ${customer.name}? Messages that need permission stop until it’s back on.`;
+      : `Turn off WhatsApp permission for ${customer.name}? They’ll get no automatic WhatsApps from us (reminders, follow-ups, smart replies) until they reply START or someone here turns it back on. You can still message them yourself.`;
     if (!window.confirm(ask)) return;
     setErr('');
     const url = `/api/crm/customers/${customer.id}`;
@@ -379,7 +380,7 @@ function CustomerCard({
               </button>
             )}
           </Field>
-          <Field label="WhatsApp" extra={hasOptIn && customer.whatsapp_opt_in && wa.number ? (wa.messages ? `Linked · ${wa.messages} message${wa.messages === 1 ? '' : 's'}` : 'No chat yet') : undefined}>
+          <Field label="WhatsApp" extra={hasOptIn && wa.number ? (wa.messages ? `Linked · ${wa.messages} message${wa.messages === 1 ? '' : 's'}` : 'No chat yet') : undefined}>
             {hasOptIn && (
               <button
                 type="button"
@@ -390,7 +391,9 @@ function CustomerCard({
                 aria-label="WhatsApp permission"
               />
             )}
-            <span className="crmr-trunc">{hasOptIn && !customer.whatsapp_opt_in ? 'Not agreed yet' : waLine(customer, wa)}</span>
+            <span className={customer.whatsapp_permission_words ? 'crmr-wrap' : 'crmr-trunc'}>
+              {hasOptIn && !customer.whatsapp_opt_in && !customer.whatsapp_permission_words ? 'Not agreed yet' : waLine(customer, wa)}
+            </span>
           </Field>
           <Field label="Email">{customer.email ? <span className="crmr-trunc">{customer.email}</span> : <span className="crm-muted">No email</span>}</Field>
           <Field label="Site address">

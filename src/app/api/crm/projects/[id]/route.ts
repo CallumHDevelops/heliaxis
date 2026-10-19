@@ -13,6 +13,7 @@ import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
 import { getSettings } from '@/lib/whatsapp/settings';
 import { shownBody } from '@/lib/whatsapp/describe';
+import { isStopped, NOT_ASKED_PREFIX, permissionSourceLabel, STOP_SOURCE } from '@/lib/whatsapp/permission';
 import { checklistView, stageProgress } from '@/lib/projects/checklist';
 import { addMonths, deadlinesFor, shortDay } from '@/lib/projects/deadlines';
 import { deleteProject } from '@/lib/projects/delete';
@@ -44,6 +45,26 @@ const CUSTOMER_FIELDS = [
   'customer_ref',
 ] as const;
 const pick = (row: Row | null, keys: readonly string[]) => (row ? Object.fromEntries(keys.filter((k) => k in row).map((k) => [k, row[k]])) : null);
+
+/**
+ * The Customer card's WhatsApp permission line, from this enquiry's own record (src/lib/whatsapp/permission.ts):
+ * "Agreed on 3 Oct via website form", "Replied STOP on 3 Oct: no automatic WhatsApps", "Not agreed yet".
+ * Before crm-v3.sql there's no when or how, only on or off.
+ */
+function permissionWords(c: Row): string {
+  const source = typeof c.whatsapp_opt_in_source === 'string' ? c.whatsapp_opt_in_source : null;
+  const at = typeof c.whatsapp_opt_in_at === 'string' ? c.whatsapp_opt_in_at : null;
+  const when = at ? ` on ${new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Europe/London' })}` : '';
+  const row = { id: String(c.id), phone: null, wa_id: null, whatsapp_opt_in: (c.whatsapp_opt_in as boolean | null) ?? null, whatsapp_opt_in_source: source };
+  if (c.whatsapp_opt_in === true) {
+    if (source?.startsWith('staff:')) return `Agreed${when} (recorded by ${permissionSourceLabel(source)})`;
+    return source ? `Agreed${when} via ${permissionSourceLabel(source)}` : `Agreed${when}`;
+  }
+  if (isStopped(row)) {
+    return source === STOP_SOURCE ? `Replied STOP${when}: no automatic WhatsApps` : `${permissionSourceLabel(source).replace(/^t/, 'T')}${when}: no automatic WhatsApps`;
+  }
+  return source?.startsWith(NOT_ASKED_PREFIX) ? `Not agreed yet (${permissionSourceLabel(source)})` : 'Not agreed yet';
+}
 
 /** survey_bookings.onsite as Postgres prints it: ["2026-11-03 11:45:00+00","2026-11-03 12:45:00+00"). */
 function rangeOf(v: unknown): { start: string | null; end: string | null } {
@@ -80,6 +101,7 @@ export async function GET(req: Request, { params }: Ctx) {
   const customer = pick(customerRow as Row | null, CUSTOMER_FIELDS) as
     | ({ id: string; name: string; email: string | null; phone: string | null; wa_id?: string | null; whatsapp_opt_in?: boolean } & Row)
     | null;
+  if (customer && 'whatsapp_opt_in' in customer) customer.whatsapp_permission_words = permissionWords(customer);
 
   // WhatsApp is matched on the phone number, so a chat that started on another enquiry (a WhatsApp
   // message, a second web form) still shows here. Backfill the number's WhatsApp id if missing.

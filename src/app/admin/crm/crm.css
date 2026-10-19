@@ -304,6 +304,70 @@ textarea.crm-input {
   object-fit: cover;
   display: block;
 }
+/* Photos the server wouldn't take: each with Retry and Remove. */
+.crmr-failed {
+  list-style: none;
+  margin: 0.6rem 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.crmr-failed li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid rgba(179, 38, 30, 0.3);
+  border-radius: 8px;
+  background: rgba(179, 38, 30, 0.05);
+}
+.crmr-failed img,
+.crmr-failed li > span[aria-hidden] {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: #e9e3d4;
+}
+.crmr-failed p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.crmr-failed b {
+  color: var(--err);
+}
+.crmr-failed small {
+  color: var(--muted);
+}
+.crmr-failed__btns {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+.crmr-failed__btns .crm-btn {
+  min-height: 44px;
+}
+@media (max-width: 480px) {
+  .crmr-failed li {
+    flex-wrap: wrap;
+  }
+  .crmr-failed__btns {
+    width: 100%;
+  }
+  .crmr-failed__btns .crm-btn {
+    flex: 1;
+    min-height: 48px;
+  }
+}
 .crm-photo-tag {
   position: absolute;
   left: 4px;

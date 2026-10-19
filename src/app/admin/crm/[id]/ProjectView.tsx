@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { isProjectStage } from '@/lib/crm/stages';
+import { isProjectStage, noSurveyNeeded } from '@/lib/crm/stages';
 import { primaryActionFor, type ActionKey, type PrimaryAction } from '@/lib/projects/primary-action';
 import type { SchemaReady } from '@/lib/schema-ready';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
@@ -336,9 +336,11 @@ export function ProjectView({
   const site = siteOf(p, c);
   const delivery = isProjectStage(p.stage);
   const done = p.stage === 'complete' || p.stage === 'lost';
+  const noSurvey = noSurveyNeeded(p);
   const primary = adjustPrimary(
     primaryActionFor(p.stage, { surveyDay: p.survey_at ? ukDayOf(p.survey_at) : null, today, keyMissing: rec.progress.keyMissing }),
-    schema
+    schema,
+    noSurvey
   );
   const slotEl = dock.tasksSlot && typeof document !== 'undefined' ? document.getElementById(dock.tasksSlot) : null;
   const tasksInDockTab = wide1280 && dock.state === 'open' && dock.panel && !slotEl && dockAck;
@@ -422,7 +424,8 @@ export function ProjectView({
         else focusField('rec-survey-at');
         return;
       case 'find_time':
-        if (schema.booking) router.push(`/admin/surveys?project=${id}`);
+        // A home visit (no survey): its date goes in by hand.
+        if (schema.booking && !noSurvey) router.push(`/admin/surveys?project=${id}`);
         else focusField('rec-survey-at');
         return;
       case 'send_quote':
@@ -744,11 +747,20 @@ export function ProjectView({
   );
 }
 
+const SURVEY_ACTIONS: ActionKey[] = ['booking_link', 'find_time', 'start_survey'];
+
 /**
  * The stage's main button, for what's set up: before the booking diary (survey-booking.sql) a booking
- * link or "Find a time" becomes "Add survey date"; before surveys.sql there's no "Start survey".
+ * link or "Find a time" becomes "Add survey date"; before surveys.sql there's no "Start survey". A job
+ * with no solar, battery or heat pump (infrared, an EV charger or LEDs only) has no survey to book or
+ * do, so it gets "Add home visit date" instead.
  */
-function adjustPrimary(a: PrimaryAction, schema: SchemaReady): PrimaryAction {
+function adjustPrimary(a: PrimaryAction, schema: SchemaReady, noSurvey: boolean): PrimaryAction {
+  if (noSurvey) {
+    const visit = { action: 'find_time' as const, label: 'Add home visit date' };
+    const main = SURVEY_ACTIONS.includes(a.action) ? { ...a, ...visit } : a;
+    return { ...main, menu: main.menu.filter((m) => !SURVEY_ACTIONS.includes(m.action)), tile: a.tile && SURVEY_ACTIONS.includes(a.tile.action) ? visit : a.tile };
+  }
   const noBooking = !schema.booking && (a.action === 'booking_link' || a.action === 'find_time');
   const noSurveys = !schema.surveys && a.action === 'start_survey';
   const label = schema.booking ? 'Find a time' : a.action === 'booking_link' ? 'Add survey date' : 'Change survey date';

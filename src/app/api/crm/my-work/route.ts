@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
 import { crmSession, json } from '@/lib/crm/server';
-import { SALES_STAGES } from '@/lib/crm/stages';
+import { isSurveyType, noSurveyNeeded, SALES_STAGES, surveyTypeFor } from '@/lib/crm/stages';
 import { canAccess } from '@/lib/portals';
 import { schemaReady } from '@/lib/schema-ready';
 import { DUE_GROUPS, dueGroup, plusDays, ukDayStart, type DueGroup } from '@/lib/projects/feed';
@@ -36,6 +36,8 @@ type Job = {
   install_at?: string | null;
   install_days?: number | null;
   project_ref?: string | null;
+  products?: string[] | null;
+  survey_type?: string | null;
 };
 type JobChip = { id: string; title: string; stage: string; ref: string | null; customer: string; enquiryId: string; postcode: string | null };
 type Item = {
@@ -103,14 +105,20 @@ export async function GET(req: Request) {
       return q.order('at', { ascending: false }).limit(50);
     })(),
     db.from('crm_projects').select('id', { count: 'exact', head: true }).in('stage', SALES_STAGES).is('next_step', null),
-    db
-      .from('crm_projects')
-      .select(JOB_COLS)
-      .gte('survey_at', todayStart)
-      .lt('survey_at', tomorrowStart)
-      .neq('stage', 'lost')
-      .order('survey_at')
-      .limit(50),
+    // With the survey type (crm-v3.sql), so a home visit (no survey needed) isn't offered a survey form.
+    withFallback<Job>(
+      (cols) =>
+        db
+          .from('crm_projects')
+          .select(cols)
+          .gte('survey_at', todayStart)
+          .lt('survey_at', tomorrowStart)
+          .neq('stage', 'lost')
+          .order('survey_at')
+          .limit(50) as unknown as PromiseLike<Res<Job>>,
+      `${JOB_COLS}, products`,
+      'survey_type'
+    ),
     // Installs can run for up to 30 working days, so look back far enough to catch day 30 of one.
     withFallback<Job>(
       (cols) =>
@@ -213,7 +221,21 @@ export async function GET(req: Request) {
   }
 
   const visits = [
-    ...((surveysToday.data ?? []) as Job[]).map((j) => ({ kind: 'survey' as const, at: j.survey_at!, day: 1, days: 1, address: j.address ?? null, job: chip(j.id) })),
+    ...((surveysToday.data ?? []) as Job[]).map((j) => {
+      const type = isSurveyType(j.survey_type) ? j.survey_type : surveyTypeFor(j.products ?? []);
+      return {
+        kind: 'survey' as const,
+        at: j.survey_at!,
+        day: 1,
+        days: 1,
+        address: j.address ?? null,
+        job: chip(j.id),
+        // Infrared, an EV charger or LEDs only: a home visit, with no survey form.
+        visit: noSurveyNeeded(j),
+        // Solar (and solar + heat pump) surveys are done in the app; heat pump only is the SimpliHeat record.
+        surveyType: type === 'ashp' ? ('ashp' as const) : ('solar' as const),
+      };
+    }),
     ...installToday.map((j) => {
       const dates = installDayList(ukDay(j.install_at!), Math.max(1, Number(j.install_days) || 1), hols);
       return { kind: 'install' as const, at: j.install_at!, day: dates.indexOf(today) + 1, days: dates.length, address: j.address ?? null, job: chip(j.id) };

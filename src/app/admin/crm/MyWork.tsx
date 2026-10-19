@@ -23,7 +23,17 @@ type Item = {
   deadline: boolean;
   job: JobChip | null;
 };
-type Visit = { kind: 'survey' | 'install'; at: string; day: number; days: number; address: string | null; job: JobChip | null };
+type Visit = {
+  kind: 'survey' | 'install';
+  at: string;
+  day: number;
+  days: number;
+  address: string | null;
+  job: JobChip | null;
+  /** A survey date on a job that needs no survey (infrared, an EV charger or LEDs only): a home visit. */
+  visit?: boolean;
+  surveyType?: 'solar' | 'ashp';
+};
 type Work = {
   today: string;
   groups: Record<DueGroup, Item[]>;
@@ -198,7 +208,7 @@ export function MyWork({
           <span>Nothing booked today</span>
         ) : visits.length === 1 ? (
           <span>
-            <b>Today:</b> {ukTime(visits[0].at)} {visits[0].kind === 'survey' ? 'survey' : 'install'} · {visits[0].job?.customer}
+            <b>Today:</b> {ukTime(visits[0].at)} {visits[0].kind === 'install' ? 'install' : visits[0].visit ? 'home visit' : 'survey'} · {visits[0].job?.customer}
           </span>
         ) : (
           <span>
@@ -227,14 +237,14 @@ export function MyWork({
                 <time>{ukTime(v.at)}</time>
                 <div>
                   <b>
-                    {v.kind === 'survey' ? 'Survey' : v.days > 1 ? `Install day ${v.day} of ${v.days}` : 'Install'}
+                    {v.kind === 'survey' ? (v.visit ? 'Home visit' : 'Survey') : v.days > 1 ? `Install day ${v.day} of ${v.days}` : 'Install'}
                     {v.job ? ' · ' : ''}
                     {v.job && <Link href={`/admin/crm/${v.job.id}`}>{v.job.customer}</Link>}
                   </b>
                   <small>{[v.job?.ref, v.job?.postcode].filter(Boolean).join(' · ')}</small>
                 </div>
-                {v.kind === 'survey' && schema.surveys && v.job ? (
-                  <a className="crm-btn crm-btn--small" href={`/admin/surveys/start?project=${v.job.id}&type=solar`}>
+                {v.kind === 'survey' && !v.visit && schema.surveys && v.job ? (
+                  <a className="crm-btn crm-btn--small" href={`/admin/surveys/start?project=${v.job.id}&type=${v.surveyType ?? 'solar'}`}>
                     Start survey
                   </a>
                 ) : (
