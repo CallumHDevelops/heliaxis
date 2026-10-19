@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { MediaBubble } from '@/components/admin/whatsapp/MediaBubble';
 import { ACTIVITY_LABEL } from '@/lib/crm/stages';
 import { classifyActivity } from '@/lib/projects/feed';
+import { captionOf, type MediaFields } from '@/lib/whatsapp/media-shared';
 import { WaIcon } from '../CrmUi';
 import { dayLabel, firstName, initials, ukDayOf, ukTime } from '../crm-shared';
 import { openDock } from '../dock-link';
@@ -132,7 +134,7 @@ export function ActivityTab({
             <div className="crmr-day__h">{today ? dayLabel(g.day, today) : g.day}</div>
             {g.items.map((it) =>
               it.type === 'wa' ? (
-                <WaRun key={it.run[0].id} run={it.run} highlight={entry} />
+                <WaRun key={it.run[0].id} run={it.run} highlight={entry} projectId={projectId} onChanged={onChanged} />
               ) : (
                 <Act key={it.e.id} e={it.e} highlight={entry === it.e.id} other={it.e.other_project ? { id: it.e.other_project, title: titleOf(it.e.other_project), base } : null} />
               )
@@ -175,14 +177,21 @@ function Act({ e, highlight, other }: { e: Entry; highlight: boolean; other: { i
   );
 }
 
-/** A run of WhatsApp messages: one row from 1280px (with the panel), the bubbles below that. */
-function WaRun({ run, highlight }: { run: Entry[]; highlight: string | null }) {
+/** A message's photo, video, voice note or file (whatsapp-media.sql), kept in the entry's meta by the job's GET. */
+const mediaOf = (e: Entry): MediaFields | null => (e.meta?.media_status ? (e.meta as MediaFields) : null);
+
+/**
+ * A run of WhatsApp messages: one row from 1280px (with the panel), the bubbles below that. Photos,
+ * videos, voice notes and files show as they do in the chat (MediaBubble), and a photo they sent can
+ * be saved to this job's photos.
+ */
+function WaRun({ run, highlight, projectId, onChanged }: { run: Entry[]; highlight: string | null; projectId: string; onChanged: () => void }) {
   const newest = run[0];
   const kindOf = (e: Entry) => String(e.meta?.kind || 'text');
   const templates = run.every((e) => kindOf(e) === 'template');
   const quote = (e: Entry) => {
     const who = e.meta?.direction === 'in' ? firstName(e.by) || 'They' : 'You';
-    const text = (e.body || '').replace(/\s+/g, ' ').trim();
+    const text = (MEDIA[kindOf(e)] ? captionOf(kindOf(e), e.body, (mediaOf(e)?.media_name as string | null | undefined) ?? null) : e.body || '').replace(/\s+/g, ' ').trim();
     const short = text.length > 70 ? `${text.slice(0, 68)}…` : text;
     const media = MEDIA[kindOf(e)];
     return media ? `${who}: ${media}${short ? ` “${short}”` : ''}` : `${who}: “${short}”`;
@@ -217,10 +226,19 @@ function WaRun({ run, highlight }: { run: Entry[]; highlight: string | null }) {
         {[...run].reverse().map((e) => {
           const inbound = e.meta?.direction === 'in';
           const status = String(e.meta?.status || '');
+          const media = mediaOf(e);
           return (
-            <div key={e.id} id={`entry-${e.id}`} className={`crm-bubble ${inbound ? 'in' : 'out'}${highlight === e.id ? ' is-hl' : ''}`}>
+            <div key={e.id} id={`entry-${e.id}`} className={`crm-bubble ${inbound ? 'in' : 'out'}${media ? ' has-media' : ''}${highlight === e.id ? ' is-hl' : ''}`}>
               {!inbound && e.by && <span className="crm-bubble-by">{e.by}</span>}
-              <span className="crm-bubble-text">{e.body || (e.meta?.kind ? `(${String(e.meta.kind)})` : '')}</span>
+              {media ? (
+                <MediaBubble
+                  m={{ ...media, id: e.id.replace(/^wa-/, ''), kind: kindOf(e), body: e.body, created_at: e.at, direction: inbound ? 'in' : 'out' }}
+                  jobId={projectId}
+                  onChange={onChanged}
+                />
+              ) : (
+                <span className="crm-bubble-text">{e.body || (e.meta?.kind ? `(${String(e.meta.kind)})` : '')}</span>
+              )}
               <span className="crm-bubble-meta">
                 {ukTime(e.at)}
                 {!inbound && e.meta?.via !== 'import' && (

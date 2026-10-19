@@ -13,6 +13,8 @@ import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
 import { getSettings } from '@/lib/whatsapp/settings';
 import { shownBody } from '@/lib/whatsapp/describe';
+import { withChatMedia } from '@/lib/whatsapp/media';
+import type { MediaFields } from '@/lib/whatsapp/media-shared';
 import { isStopped, NOT_ASKED_PREFIX, permissionSourceLabel, STOP_SOURCE } from '@/lib/whatsapp/permission';
 import { checklistView, stageProgress } from '@/lib/projects/checklist';
 import { addMonths, deadlinesFor, shortDay } from '@/lib/projects/deadlines';
@@ -166,14 +168,16 @@ export async function GET(req: Request, { params }: Ctx) {
           ),
       ]);
 
-  type Wa = { id: string; direction: string; kind: string; body: string | null; status: string; created_at: string; sent_by: string | null; via: string | null; rule_id: string | null };
+  type Wa = { id: string; direction: string; kind: string; body: string | null; status: string; created_at: string; sent_by: string | null; via: string | null; rule_id: string | null } & MediaFields;
   type Email = { id: string; direction: string; subject: string | null; body: string | null; sent_by: string | null; attachments: string[]; at: string };
   // Polling (?since=): only the notes and calls newer than the last look. Emails carry the time they
   // arrived (the mailbox sync saves them up to a few minutes later), and WhatsApp ticks change on
   // messages already shown, so a poll reads the newest few of those again (ids weed out repeats).
   let actsQ = db.from('crm_activities').select('id, project_id, kind, body, meta, by_id, at').eq('enquiry_id', project.enquiry_id);
   if (since) actsQ = actsQ.gt('at', since);
-  const waQ = db.from('whatsapp_messages').select('id, direction, kind, body, status, created_at, sent_by, via, rule_id').in('enquiry_id', linkedIds);
+  // With whatsapp-media.sql, each message's photo, voice note or file too (the Activity tab shows it as in the chat).
+  const waCols = await withChatMedia('id, direction, kind, body, status, created_at, sent_by, via, rule_id');
+  const waQ = db.from('whatsapp_messages').select(waCols).in('enquiry_id', linkedIds);
   const emailQ = db
     .from('crm_emails')
     .select('id, direction, subject, body, sent_by, attachments, at, from_address')
@@ -244,7 +248,15 @@ export async function GET(req: Request, { params }: Ctx) {
       id: `wa-${m.id}`,
       kind: 'whatsapp',
       body: shownBody(m.body),
-      meta: { direction: m.direction, status: m.status, kind: m.kind, via: m.via },
+      meta: {
+        direction: m.direction,
+        status: m.status,
+        kind: m.kind,
+        via: m.via,
+        ...(m.media_status
+          ? { media_status: m.media_status, media_mime: m.media_mime ?? null, media_name: m.media_name ?? null, media_size: m.media_size ?? null, media_error: m.media_error ?? null }
+          : {}),
+      },
       by:
         m.direction === 'in'
           ? (customer?.name ?? 'Customer')

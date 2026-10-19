@@ -474,11 +474,19 @@ textarea.crm-input {
   font-weight: 700;
   color: var(--wa);
 }
-.crm-bubble-text {
+.crm-bubble-text,
+.crm-bubble .wa-text {
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 0.93rem;
   line-height: 1.4;
+}
+/* A photo, video, voice note or file they sent (MediaBubble, as in the chat). */
+.crm-bubble.has-media {
+  min-width: 0;
+}
+.crm-bubble .wa-media {
+  max-width: 100%;
 }
 .crm-bubble-meta {
   align-self: flex-end;
