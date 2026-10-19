@@ -11,7 +11,10 @@
 .wai-row-head { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
 .wai-row-head b { word-break: break-word; }
 .wai-file { display: block; color: var(--muted); font-size: 0.75rem; word-break: break-all; }
+.wai-saved { display: block; color: var(--ok); font-size: 0.75rem; }
+.wai-msg { margin: 8px 0 0; }
 .wai-x { flex: none; width: 2rem; height: 2rem; font-size: 1.2rem; line-height: 1; color: var(--muted); background: transparent; border: 0; cursor: pointer; }
+.wai-x:disabled { opacity: 0.4; cursor: default; }
 .wai-stats { color: var(--muted); font-size: 0.85rem; margin: 2px 0 6px; }
 .wai-lock { border: 0; margin: 0; padding: 0; min-width: 0; }
 .wai-warn { color: #8a5a00; font-size: 0.8rem; line-height: 1.4; margin: 0 0 6px; }
