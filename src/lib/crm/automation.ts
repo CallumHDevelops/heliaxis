@@ -10,6 +10,9 @@ import { getCrmSettings } from './crm-settings';
 import { fillText } from './settings-shared';
 import { daysWord } from './tracker';
 import { ensurePortalToken, logActivity, portalUrl } from './server';
+import { bookingUrl, ensureBookingToken } from './booking-link';
+import { applyStageEvent } from './move-stage';
+import { DEFAULT_SURVEY_MINUTES, isSurveyType } from './stages';
 
 /**
  * Everything the CRM does by itself, run every minute by the cron (Supabase pg_cron):
@@ -17,13 +20,18 @@ import { ensurePortalToken, logActivity, portalUrl } from './server';
  *  - Google review requests after Complete
  *  - "new lead not contacted" alerts
  *  - follow-up sequences for new leads (stop when they reply)
- * Each message is sent once (keys in crm_projects.reminders_sent) and never in quiet hours.
+ *  - on the install morning, Install booked → Installing; "Was the survey done?" to the owner
+ * Each message is sent once (keys in crm_projects.reminders_sent) and never in quiet hours. WhatsApp
+ * goes only where it's allowed (src/lib/whatsapp/permission.ts); otherwise, with Microsoft 365
+ * connected and an email address, the same message goes by email. Jobs on hold get no countdowns or
+ * follow-ups.
  */
 
 const TZ = 'Europe/London';
 const ymd = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: TZ });
 const dateLabel = (d: Date) => d.toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' });
 const timeLabel = (d: Date) => d.toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+const ukHour = (d: Date) => Number(d.toLocaleString('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' }));
 
 /** The UTC instant for a UK wall-clock date (YYYY-MM-DD) and hour. */
 function londonAt(date: string, hour: number) {
@@ -38,6 +46,9 @@ function minusDays(date: string, n: number) {
   t.setUTCDate(t.getUTCDate() - n);
   return t.toISOString().slice(0, 10);
 }
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** "No WhatsApp permission" → "no WhatsApp permission", for the middle of a sentence. */
+const inSentence = (s: string) => (/^(WhatsApp|STOP)/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
 
 type Proj = {
   id: string;
@@ -56,20 +67,119 @@ type Proj = {
   first_response_alerted_at: string | null;
 };
 
+const COLS =
+  'id, enquiry_id, title, stage, owner_id, survey_at, install_at, reminders_sent, stage_changed_at, created_at, sequence_step, sequence_stopped_at, first_contact_at, first_response_alerted_at';
+
 async function crmTeam() {
   const { data } = await createAdminClient().from('profiles').select('*').eq('status', 'approved');
   return (data ?? []).filter((p) => canAccess(p, 'crm')).map((p) => p.id as string);
 }
 
-async function markSent(p: Proj, key: string) {
-  const sent = [...(p.reminders_sent ?? []), key];
-  p.reminders_sent = sent;
-  await createAdminClient().from('crm_projects').update({ reminders_sent: sent }).eq('id', p.id);
+/**
+ * Mark a message as sent before sending it, so it goes once. crm_mark_sent (crm-v3.sql) adds the key
+ * in the database, so two automations marking different keys at once both keep theirs, and false
+ * means someone else got there first. Before crm-v3.sql: the whole list, as before.
+ */
+async function markSent(p: Proj, key: string): Promise<boolean> {
+  if (p.reminders_sent?.includes(key)) return false;
+  const db = createAdminClient();
+  const r = await db.rpc('crm_mark_sent', { p_project: p.id, p_key: key }).then(
+    (x) => x,
+    () => ({ data: null, error: { message: 'missing' } })
+  );
+  p.reminders_sent = [...(p.reminders_sent ?? []), key];
+  if (!r.error) return r.data === true;
+  await db.from('crm_projects').update({ reminders_sent: p.reminders_sent }).eq('id', p.id);
+  return true;
 }
 
-async function customer(enquiryId: string) {
+type Customer = { id: string; name: string | null; email: string | null };
+
+async function customer(enquiryId: string): Promise<Customer | null> {
   const { data } = await createAdminClient().from('enquiries').select('id, name, email').eq('id', enquiryId).maybeSingle();
-  return data;
+  return (data as Customer | null) ?? null;
+}
+
+/** Jobs on hold (crm-v3.sql). Empty before it's run. */
+async function onHold(ids: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await createAdminClient()
+      .from('crm_projects')
+      .select('id')
+      .in('id', ids.slice(i, i + 100))
+      .eq('on_hold', true)
+      .then(
+        (r) => r,
+        () => ({ data: null })
+      );
+    for (const r of (data ?? []) as { id: string }[]) out.add(r.id);
+  }
+  return out;
+}
+
+/** An email from the shared mailbox, filed on the customer's timeline like one sent by hand. */
+async function emailCustomer(p: Proj, to: string, subject: string, text: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const id = await sendMail({ to, subject, text });
+    await createAdminClient().from('crm_emails').insert({
+      enquiry_id: p.enquiry_id,
+      project_id: p.id,
+      graph_id: id,
+      direction: 'out',
+      subject,
+      body: text,
+      from_address: process.env.MS_MAILBOX,
+      to_address: to,
+      at: new Date().toISOString(),
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'email failed' };
+  }
+}
+
+/**
+ * An automatic message to the customer: WhatsApp, or, when WhatsApp isn't allowed (no permission,
+ * replied STOP) or possible (not connected, no mobile, no template outside the 24h window) and
+ * Microsoft 365 is connected, the same message by email. `what` names it on the timeline
+ * ("survey booking confirmation"). True if it went either way.
+ */
+async function sendToCustomer(
+  p: Proj,
+  c: Customer | null,
+  msg: { text: string; template?: string | null; params?: string[] },
+  via: string,
+  what: string,
+  subject: string
+): Promise<boolean> {
+  const log = (body: string) => logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'system', body });
+  const r = await sendSystem(p.enquiry_id, msg, via);
+  if (r.ok) {
+    await log(`WhatsApp: ${what} sent`);
+    return true;
+  }
+  if (msConfigured() && c?.email) {
+    const e = await emailCustomer(p, c.email, subject, msg.text);
+    if (e.ok) {
+      await log(`Email: ${what} sent (${inSentence(r.error)})`);
+      return true;
+    }
+    await log(`${capital(what)} not sent: ${r.error}. The email didn’t go either: ${e.error}`);
+    return false;
+  }
+  await log(`${capital(what)} not sent: ${r.error}`);
+  return false;
+}
+
+/** This UK day already has a "<kind>-booked:<ISO start>" key (the key used to be just the day). */
+function bookedAtTimeOn(sent: string[], kind: string, day: string) {
+  const prefix = `${kind}-booked:`;
+  return sent.some((k) => {
+    if (!k.startsWith(prefix) || !k.includes('T')) return false;
+    const t = new Date(k.slice(prefix.length));
+    return Number.isFinite(t.getTime()) && ymd(t) === day;
+  });
 }
 
 /** Confirmation when a date is booked, then countdowns. kind = install | survey. */
@@ -84,22 +194,31 @@ async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], h
   const first = (c.name || '').split(/\s+/)[0] || 'there';
   const token = await ensurePortalToken(p.id); // none before the job starts (e.g. survey reminders)
   const link = token ? portalUrl(token) : null;
+  // While the job is still bookable the customer can move their survey online.
+  const bookingToken = kind === 'survey' ? await ensureBookingToken(p.id) : null;
+  const change = bookingToken ? ` Need to change it? ${bookingUrl(bookingToken)}` : '';
   const what = kind === 'install' ? 'installation' : 'survey';
+  const subject = `Your Heliaxis ${what}`;
   let sent = 0;
 
-  // 1) Booking confirmation, as soon as the date is set.
-  const bookedKey = `${kind}-booked:${day}`;
-  if (!p.reminders_sent?.includes(bookedKey)) {
-    const text = `Hi ${first}, your Heliaxis ${what} is booked for ${dateLabel(when)} at ${timeLabel(when)}. We'll send you a reminder nearer the time.${link ? ` You can see all your details here: ${link}` : ''}`;
-    const r = await sendSystem(p.enquiry_id, { text, template, params: [first, `booked for ${dateLabel(when)}`, timeLabel(when)] }, 'reminder');
-    await markSent(p, bookedKey);
-    await logActivity({
-      enquiryId: p.enquiry_id,
-      projectId: p.id,
-      kind: 'system',
-      body: r.ok ? `WhatsApp: ${what} booking confirmation sent` : `${what[0].toUpperCase()}${what.slice(1)} confirmation not sent: ${r.error}`,
-    });
-    if (r.ok) sent++;
+  // 1) Booking confirmation, as soon as the date is set. One per start time, so moving it to another
+  //    time on the same day sends a new one. One sent under the old day-only key isn't sent again.
+  const bookedKey = `${kind}-booked:${when.toISOString()}`;
+  const list = p.reminders_sent ?? [];
+  if (!list.includes(bookedKey)) {
+    const legacy = list.includes(`${kind}-booked:${day}`) && !bookedAtTimeOn(list, kind, day);
+    if ((await markSent(p, bookedKey)) && !legacy) {
+      const text = `Hi ${first}, your Heliaxis ${what} is booked for ${dateLabel(when)} at ${timeLabel(when)}. We'll send you a reminder nearer the time.${change}${link ? ` You can see all your details here: ${link}` : ''}`;
+      const ok = await sendToCustomer(
+        p,
+        c,
+        { text, template, params: [first, `booked for ${dateLabel(when)}`, timeLabel(when)] },
+        'reminder',
+        `${what} booking confirmation`,
+        subject
+      );
+      if (ok) sent++;
+    }
   }
 
   // 2) "N days to go" at the reminder hour, N days before.
@@ -113,6 +232,7 @@ async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], h
       await markSent(p, key);
       continue;
     }
+    if (!(await markSent(p, key))) continue;
     const lead = n === 0 ? `your Heliaxis ${what} is today` : `just ${n} day${n === 1 ? '' : 's'} to go until your Heliaxis ${what}`;
     const extra =
       kind === 'install' && n <= 1
@@ -120,18 +240,100 @@ async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], h
         : kind === 'survey' && n <= 1
           ? ' It helps if we can see your fuse box, meter and loft.'
           : '';
-    const text = `Hi ${first}, ${lead} — ${dateLabel(when)} at ${timeLabel(when)}.${extra} Any questions, just reply here.${link ? ` ${link}` : ''}`;
-    const r = await sendSystem(p.enquiry_id, { text, template, params: [first, daysWord(n), `${dateLabel(when)}, ${timeLabel(when)}`] }, 'reminder');
-    await markSent(p, key);
-    await logActivity({
-      enquiryId: p.enquiry_id,
-      projectId: p.id,
-      kind: 'system',
-      body: r.ok ? `WhatsApp: “${daysWord(n)}” ${what} reminder sent` : `${what} reminder (${daysWord(n)}) not sent: ${r.error}`,
-    });
-    if (r.ok) sent++;
+    const text = `Hi ${first}, ${lead} — ${dateLabel(when)} at ${timeLabel(when)}.${extra} Any questions, just reply here.${n > 0 ? change : ''}${link ? ` ${link}` : ''}`;
+    const ok = await sendToCustomer(
+      p,
+      c,
+      { text, template, params: [first, daysWord(n), `${dateLabel(when)}, ${timeLabel(when)}`] },
+      'reminder',
+      `“${daysWord(n)}” ${what} reminder`,
+      subject
+    );
+    if (ok) sent++;
   }
   return sent;
+}
+
+/**
+ * The install morning: from 07:00 UK on the install date, Install booked → Installing, once per job
+ * and day. It sends nothing, so it runs in quiet hours too.
+ */
+async function startInstalls(now: Date) {
+  if (ukHour(now) < 7) return 0;
+  const today = ymd(now);
+  const { data } = await createAdminClient()
+    .from('crm_projects')
+    .select(COLS)
+    .eq('stage', 'install_booked')
+    .gte('install_at', londonAt(today, 0).toISOString())
+    .lt('install_at', londonAt(minusDays(today, -1), 0).toISOString())
+    .limit(50);
+  const jobs = (data ?? []) as Proj[];
+  const held = await onHold(jobs.map((p) => p.id));
+  let n = 0;
+  for (const p of jobs) {
+    if (held.has(p.id) || !(await markSent(p, `install-start:${today}`))) continue;
+    if ((await applyStageEvent(p.id, 'install_started', { note: 'install day' })).moved) n++;
+  }
+  return n;
+}
+
+/**
+ * Three hours after a survey should have finished, the job is still at Survey booked and no survey has
+ * been completed for it in the app: ask the owner (or the CRM team) once whether it happened.
+ */
+async function surveyDoneChecks(now: Date) {
+  const db = createAdminClient();
+  // select('*'): survey_minutes, survey_type and on_hold come with the newer SQL files.
+  const { data } = await db
+    .from('crm_projects')
+    .select('*')
+    .eq('stage', 'survey_booked')
+    .lte('survey_at', new Date(now.getTime() - 3 * 3_600_000).toISOString())
+    .gte('survey_at', new Date(now.getTime() - 3 * 86_400_000).toISOString())
+    .limit(50);
+  type Row = Proj & { survey_minutes?: number | null; survey_type?: string | null; on_hold?: boolean | null };
+  const due = ((data ?? []) as Row[]).filter((p) => {
+    if (!p.survey_at || p.on_hold) return false;
+    const minutes = p.survey_minutes || (isSurveyType(p.survey_type) ? DEFAULT_SURVEY_MINUTES[p.survey_type] : 60);
+    return new Date(p.survey_at).getTime() + (minutes + 180) * 60_000 <= now.getTime();
+  });
+  if (!due.length) return 0;
+  // A survey completed in the app (surveys.sql) means it happened and the stage is catching up.
+  const { data: done } = await db
+    .from('crm_surveys')
+    .select('project_id')
+    .in(
+      'project_id',
+      due.map((p) => p.id)
+    )
+    .eq('status', 'complete')
+    .then(
+      (r) => r,
+      () => ({ data: null })
+    );
+  const surveyed = new Set(((done ?? []) as { project_id: string }[]).map((r) => r.project_id));
+  const team = await crmTeam();
+  let n = 0;
+  for (const p of due) {
+    if (surveyed.has(p.id) || !(await markSent(p, `survey-done-check:${new Date(p.survey_at!).toISOString()}`))) continue;
+    const c = await customer(p.enquiry_id);
+    const to = p.owner_id && team.includes(p.owner_id) ? [p.owner_id] : team;
+    await Promise.all(
+      to.map((userId) =>
+        notify({
+          userId,
+          kind: 'crm_survey_check',
+          title: `Was ${c?.name || 'the customer'}’s survey done?`,
+          body: 'Mark the job as Surveyed, or set a new survey date.',
+          href: `/admin/crm/${p.id}`,
+          tag: `survey-check-${p.id}`,
+        })
+      )
+    );
+    n++;
+  }
+  return n;
 }
 
 export async function runCrmAutomations() {
@@ -139,20 +341,26 @@ export async function runCrmAutomations() {
   const [s, wa] = await Promise.all([getCrmSettings(), getWaSettings()]);
   const now = new Date();
   const quiet = isQuiet(now, wa.quietFrom, wa.quietTo);
-  const out = { reminders: 0, reviews: 0, alerts: 0, sequence: 0 };
+  const out = { reminders: 0, reviews: 0, alerts: 0, sequence: 0, installsStarted: 0, surveyChecks: 0 };
+  out.installsStarted = await startInstalls(now).catch(() => 0);
   if (quiet) return out;
 
-  const cols =
-    'id, enquiry_id, title, stage, owner_id, survey_at, install_at, reminders_sent, stage_changed_at, created_at, sequence_step, sequence_stopped_at, first_contact_at, first_response_alerted_at';
+  const cols = COLS;
   const horizon = new Date(now.getTime() + 31 * 86_400_000).toISOString();
 
-  // Countdowns: surveys and installs in the next month.
+  // Countdowns: surveys and installs in the next month (none for jobs on hold).
   const [{ data: surveys }, { data: installs }] = await Promise.all([
     db.from('crm_projects').select(cols).gte('survey_at', now.toISOString()).lte('survey_at', horizon).not('stage', 'in', '(lost,complete)'),
     db.from('crm_projects').select(cols).gte('install_at', now.toISOString()).lte('install_at', horizon).not('stage', 'in', '(lost,complete)'),
   ]);
-  for (const p of (surveys ?? []) as Proj[]) out.reminders += await countdowns(p, 'survey', s.surveyReminderDays, s.reminderHour, s.surveyTemplate, now);
-  for (const p of (installs ?? []) as Proj[]) out.reminders += await countdowns(p, 'install', s.installReminderDays, s.reminderHour, s.installTemplate, now);
+  const held = await onHold([...((surveys ?? []) as Proj[]), ...((installs ?? []) as Proj[])].map((p) => p.id));
+  for (const p of (surveys ?? []) as Proj[]) {
+    if (!held.has(p.id)) out.reminders += await countdowns(p, 'survey', s.surveyReminderDays, s.reminderHour, s.surveyTemplate, now);
+  }
+  for (const p of (installs ?? []) as Proj[]) {
+    if (!held.has(p.id)) out.reminders += await countdowns(p, 'install', s.installReminderDays, s.reminderHour, s.installTemplate, now);
+  }
+  out.surveyChecks = await surveyDoneChecks(now).catch(() => 0);
 
   // Review requests a few days after Complete, at the reminder hour.
   if (s.reviewUrl) {
@@ -165,14 +373,13 @@ export async function runCrmAutomations() {
       .gte('stage_changed_at', new Date(now.getTime() - (s.reviewDelayDays + 14) * 86_400_000).toISOString());
     for (const p of (done ?? []) as Proj[]) {
       if (p.reminders_sent?.includes('review')) continue;
-      if (Number(now.toLocaleString('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' })) < s.reminderHour) continue;
+      if (ukHour(now) < s.reminderHour) continue;
+      if (!(await markSent(p, 'review'))) continue;
       const c = await customer(p.enquiry_id);
       const first = (c?.name || '').split(/\s+/)[0] || 'there';
       const text = `Hi ${first}, thank you for choosing Heliaxis! If you're happy with your installation, would you mind leaving us a quick Google review? It really helps a small local business: ${s.reviewUrl}`;
-      const r = await sendSystem(p.enquiry_id, { text, template: s.reviewTemplate, params: [first, s.reviewUrl] }, 'review');
-      await markSent(p, 'review');
-      await logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'system', body: r.ok ? 'WhatsApp: review request sent' : `Review request not sent: ${r.error}` });
-      if (r.ok) out.reviews++;
+      const ok = await sendToCustomer(p, c, { text, template: s.reviewTemplate, params: [first, s.reviewUrl] }, 'review', 'review request', 'Thank you from Heliaxis');
+      if (ok) out.reviews++;
     }
   }
 
@@ -212,7 +419,7 @@ export async function runCrmAutomations() {
     }
   }
 
-  // Follow-up sequences for leads that haven't replied.
+  // Follow-up sequences for leads that haven't replied (not for jobs on hold).
   if (s.sequenceEnabled && s.sequence.length) {
     const { data: seq } = await db
       .from('crm_projects')
@@ -222,49 +429,44 @@ export async function runCrmAutomations() {
       .lt('sequence_step', s.sequence.length)
       .gte('created_at', new Date(now.getTime() - 45 * 86_400_000).toISOString())
       .limit(50);
+    const seqHeld = await onHold(((seq ?? []) as Proj[]).map((p) => p.id));
     for (const p of (seq ?? []) as Proj[]) {
       const step = s.sequence[p.sequence_step];
-      if (!step || now.getTime() < new Date(p.created_at).getTime() + step.afterHours * 3_600_000) continue;
+      if (!step || seqHeld.has(p.id) || now.getTime() < new Date(p.created_at).getTime() + step.afterHours * 3_600_000) continue;
       const c = await customer(p.enquiry_id);
       const token = step.text.includes('{portal_link}') ? await ensurePortalToken(p.id) : null;
       const link = token ? portalUrl(token) : null;
-      const text = fillText(step.text, { name: c?.name, portalLink: link });
+      const bookingToken = step.text.includes('{booking_link}') ? await ensureBookingToken(p.id) : null;
+      const text = fillText(step.text, { name: c?.name, portalLink: link, bookingLink: bookingToken ? bookingUrl(bookingToken) : null });
+      const subject = fillText(step.subject || 'Your Heliaxis enquiry', { name: c?.name });
       let ok = false;
       let why = '';
+      let by = step.channel === 'email' ? 'email' : 'WhatsApp';
       if (step.channel === 'email') {
         if (msConfigured() && c?.email) {
-          try {
-            const id = await sendMail({ to: c.email, subject: fillText(step.subject || 'Your Heliaxis enquiry', { name: c.name }), text });
-            await db.from('crm_emails').insert({
-              enquiry_id: p.enquiry_id,
-              project_id: p.id,
-              graph_id: id,
-              direction: 'out',
-              subject: step.subject || 'Your Heliaxis enquiry',
-              body: text,
-              from_address: process.env.MS_MAILBOX,
-              to_address: c.email,
-              at: now.toISOString(),
-            });
-            ok = true;
-          } catch (e) {
-            why = e instanceof Error ? e.message : 'email failed';
-          }
+          const e = await emailCustomer(p, c.email, subject, text);
+          ok = e.ok;
+          if (!e.ok) why = e.error;
         } else why = c?.email ? 'Microsoft 365 not connected' : 'no email address';
       } else {
         const first = (c?.name || '').split(/\s+/)[0] || 'there';
         const r = await sendSystem(p.enquiry_id, { text, template: step.template, params: [first] }, 'sequence');
         ok = r.ok;
-        if (!r.ok) why = r.error;
+        if (!r.ok) {
+          why = r.error;
+          // WhatsApp isn't allowed or possible: the same message by email instead.
+          if (msConfigured() && c?.email && (await emailCustomer(p, c.email, subject, text)).ok) {
+            ok = true;
+            by = `email, ${inSentence(r.error)}`;
+          }
+        }
       }
       await db.from('crm_projects').update({ sequence_step: p.sequence_step + 1 }).eq('id', p.id);
       await logActivity({
         enquiryId: p.enquiry_id,
         projectId: p.id,
         kind: 'system',
-        body: ok
-          ? `Follow-up ${p.sequence_step + 1} sent (${step.channel === 'email' ? 'email' : 'WhatsApp'})`
-          : `Follow-up ${p.sequence_step + 1} skipped: ${why}`,
+        body: ok ? `Follow-up ${p.sequence_step + 1} sent (${by})` : `Follow-up ${p.sequence_step + 1} skipped: ${why}`,
       });
       if (ok) out.sequence++;
     }
