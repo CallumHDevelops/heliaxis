@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         error:
           p.stage === 'lost'
             ? 'This job is marked Lost. Move it back to a sales stage first.'
-            : 'This job is already Won, so their link is the full portal. To ask them to sign something, tick “Needs signing” on it in Docs.',
+            : 'This job is already Won, so their link is the full portal. To ask them to sign something, set it to “In portal” and tick “Needs signing” on it in Docs.',
       },
       400
     );

@@ -46,6 +46,10 @@
 .crm-portal .crm-docpick label {
   color: var(--ink, #211f18);
 }
+/* Solid, so the chosen quote stays readable on the dark card (the see-through amber matches it on light). */
+.crm-portal .crm-docpick label.on {
+  background: #fef5de;
+}
 .crm-portal .qx-pick {
   display: flex;
   flex-direction: column;

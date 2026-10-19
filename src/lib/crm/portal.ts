@@ -64,8 +64,9 @@ export async function loadPortal(token: string) {
     for (const x of data ?? []) if (x.path && x.signedUrl) signed.set(x.path, x.signedUrl);
   }
   const docs = (docRows ?? []) as DocRow[];
-  // The newest quote or contract marked "needs signing" (Send quote for signing marks only one).
-  const toSign = docs.find((d) => d.needs_signature && SIGNABLE_CATEGORIES.includes(d.category));
+  // The newest quote or contract marked "needs signing" (Send quote for signing marks only one). Only the
+  // quote-only page shows one that isn't in their portal; the full portal keeps to visible documents.
+  const toSign = docs.find((d) => d.needs_signature && (!full || d.visible) && SIGNABLE_CATEGORIES.includes(d.category));
   const acceptedDoc = p.accepted_document_id ? docs.find((d) => d.id === p.accepted_document_id) : undefined;
   const visible = full ? docs.filter((d) => d.visible) : [];
   const ordered = [...visible.filter((d) => d.category === 'handover'), ...visible.filter((d) => d.category !== 'handover')];

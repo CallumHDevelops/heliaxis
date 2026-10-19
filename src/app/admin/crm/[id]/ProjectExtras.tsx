@@ -192,7 +192,9 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
     setBusy(true);
     setErr('');
     try {
-      for (const f of Array.from(files)) await uploadFile(`/api/crm/projects/${id}/documents`, f, { category: cat, visible, needs_signature: cat === 'quote' });
+      // Uploading never marks a document for signing: that's Send quote for signing (or the "Needs signing" chip),
+      // so a new upload can't replace the quote the customer has been sent.
+      for (const f of Array.from(files)) await uploadFile(`/api/crm/projects/${id}/documents`, f, { category: cat, visible, needs_signature: false });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Upload failed');
     }

@@ -29,14 +29,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!sig.startsWith('data:image/png;base64,') || sig.length > 600_000) return fail('Please sign in the box.', 400);
   const db = createAdminClient();
   if (!isUuid(docId)) return fail('Quote not found', 400);
-  const { data: doc } = await db
+  let lookup = db
     .from('crm_documents')
     .select('*')
     .eq('id', docId)
     .eq('project_id', p.id)
     .eq('needs_signature', true)
-    .in('category', SIGNABLE_CATEGORIES)
-    .maybeSingle();
+    .in('category', SIGNABLE_CATEGORIES);
+  // The full portal only offers documents marked visible; the quote-only page offers the quote that was sent.
+  if (p.mode === 'full') lookup = lookup.eq('visible', true);
+  const { data: doc } = await lookup.maybeSingle();
   if (!doc) return fail('Quote not found', 400);
 
   await ensureDocsBucket();
