@@ -28,9 +28,16 @@ export function safeRamsPath(next: string | null): string {
   if (!next) return '/';
   try {
     const u = new URL(next, RAMS_ORIGIN);
-    // Collapse "//" (a path like "/.//evil.com" normalises to "//evil.com", which reads as another site).
+    // Collapse "//" (a path like "/.//evil.com" normalises to "//evil.com", which reads as another site),
+    // and never point at RAMS's own sign-in routes (however they're spelt or encoded).
     const path = u.pathname.replace(/\/{2,}/g, '/');
-    if (u.origin !== RAMS_ORIGIN || path.replace(/\/+$/, '') === '/auth/callback') return '/';
+    let plain = path;
+    try {
+      plain = decodeURIComponent(path);
+    } catch {
+      return '/';
+    }
+    if (u.origin !== RAMS_ORIGIN || /^\/+auth(\/|$)/i.test(plain.replace(/\/{2,}/g, '/'))) return '/';
     return `${path}${u.search}`;
   } catch {
     return '/';
@@ -42,7 +49,6 @@ const norm = (email: string | null | undefined) => email?.trim().toLowerCase() |
 /* ── Proving the email address is theirs ──────────────────────────────────────────────── */
 
 const CODE_TTL_MS = 15 * 60_000;
-const RESEND_AFTER_MS = 2 * 60_000;
 
 function codeHash(userId: string, code: string) {
   const s = process.env.APP_LINK_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -107,7 +113,7 @@ export async function sendProofCode(user: User, name: string): Promise<CodeResul
     // Nobody received it: retire it and let them ask again straight away.
     await db
       .from('sso_email_codes')
-      .update({ expires_at: new Date().toISOString(), sent_at: new Date(Date.now() - RESEND_AFTER_MS).toISOString() })
+      .update({ expires_at: new Date().toISOString(), sent_at: new Date(0).toISOString() })
       .eq('user_id', user.id);
     return 'failed';
   }
@@ -122,13 +128,9 @@ export async function checkProofCode(user: User, typed: string): Promise<CodeRes
   // Uses up a try first (atomically), so parallel guesses can't get more than 5 between them.
   const { data, error } = await db.rpc('sso_take_attempt', { p_user: user.id });
   if (error) return notSetUp(error) ? 'setup' : 'failed';
-  const row = (Array.isArray(data) ? data[0] : data) as { code_hash: string; email: string } | null | undefined;
+  const row = (Array.isArray(data) ? data[0] : data) as { code_hash: string; email: string; attempts: number } | null | undefined;
   if (!row) {
-    const { data: state } = await db
-      .from('sso_email_codes')
-      .select('attempts, expires_at, failures, failures_since')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const { data: state } = await db.from('sso_email_codes').select('expires_at').eq('user_id', user.id).maybeSingle();
     if (!state || new Date(state.expires_at).getTime() < Date.now()) return 'expired';
     return 'locked';
   }
@@ -136,15 +138,13 @@ export async function checkProofCode(user: User, typed: string): Promise<CodeRes
 
   const expected = Buffer.from(row.code_hash);
   const given = Buffer.from(code.length === 6 ? codeHash(user.id, code) : '');
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
-    await db.rpc('sso_record_failure', { p_user: user.id });
-    return 'wrong';
-  }
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return row.attempts >= 5 ? 'locked' : 'wrong';
+
   const { error: saveErr } = await db
     .from('sso_email_proofs')
     .upsert({ user_id: user.id, email, proven_at: new Date().toISOString() });
   if (saveErr) return 'failed';
-  await db.from('sso_email_codes').update({ expires_at: new Date().toISOString() }).eq('user_id', user.id);
+  await db.rpc('sso_code_used', { p_user: user.id });
   return 'ok';
 }
 

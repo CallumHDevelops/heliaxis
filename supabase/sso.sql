@@ -44,26 +44,35 @@ returns boolean language sql security definer set search_path = public as $$
   select exists (select 1 from saved);
 $$;
 
--- Use up one try before comparing; nothing comes back once 5 tries are used, the code has
--- expired, or the person is locked out.
+-- Use up one try before comparing, and count it as a failure up front (given back on a correct
+-- code), so parallel guesses can't exceed 5 per code or 10 wrong codes per 24 hours. Nothing
+-- comes back once those are used, the code has expired, or the person is locked out.
+drop function if exists public.sso_take_attempt(uuid);
 create or replace function public.sso_take_attempt(p_user uuid)
-returns table (code_hash text, email text) language sql security definer set search_path = public as $$
-  update public.sso_email_codes
-     set attempts = attempts + 1
-   where user_id = p_user and attempts < 5 and expires_at > now()
-     and not (failures >= 10 and failures_since >= now() - interval '24 hours')
-  returning code_hash, email;
+returns table (code_hash text, email text, attempts int) language sql security definer set search_path = public as $$
+  update public.sso_email_codes c
+     set attempts = c.attempts + 1,
+         failures = case when c.failures_since < now() - interval '24 hours' then 1 else c.failures + 1 end,
+         failures_since = case when c.failures_since < now() - interval '24 hours' then now() else c.failures_since end
+   where c.user_id = p_user and c.attempts < 5 and c.expires_at > now()
+     and not (c.failures >= 10 and c.failures_since >= now() - interval '24 hours')
+  returning c.code_hash, c.email, c.attempts;
 $$;
 
-create or replace function public.sso_record_failure(p_user uuid)
+-- A correct code: give back the failure counted for it, and retire the code.
+create or replace function public.sso_code_used(p_user uuid)
 returns void language sql security definer set search_path = public as $$
-  update public.sso_email_codes set failures = failures + 1 where user_id = p_user;
+  update public.sso_email_codes
+     set failures = greatest(failures - 1, 0), expires_at = now()
+   where user_id = p_user;
 $$;
+
+drop function if exists public.sso_record_failure(uuid);
 
 -- Server only: not callable by signed-in users or the public API.
 revoke all on function public.sso_store_code(uuid, text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.sso_take_attempt(uuid) from public, anon, authenticated;
-revoke all on function public.sso_record_failure(uuid) from public, anon, authenticated;
+revoke all on function public.sso_code_used(uuid) from public, anon, authenticated;
 grant execute on function public.sso_store_code(uuid, text, text, timestamptz) to service_role;
 grant execute on function public.sso_take_attempt(uuid) to service_role;
-grant execute on function public.sso_record_failure(uuid) to service_role;
+grant execute on function public.sso_code_used(uuid) to service_role;
