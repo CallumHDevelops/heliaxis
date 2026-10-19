@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import type { PortalData } from '@/lib/crm/portal';
+import { isWonStage } from '@/lib/crm/stages';
 import './portal.css';
 
 const DOC_LABEL: Record<string, string> = {
@@ -62,7 +63,7 @@ export function PortalView({ data, paid = false }: { data: PortalData; paid?: bo
     return null;
   }, [data.installAt, data.quote, accepted, surveyAt]);
 
-  const depositDue = data.deposit && !data.deposit.paidAt && !paidFlag && (accepted || ['won', 'install_booked'].includes(data.stage));
+  const depositDue = data.deposit && !data.deposit.paidAt && !paidFlag && (accepted || isWonStage(data.stage));
 
   return (
     <div className="pt">

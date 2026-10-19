@@ -1,0 +1,45 @@
+/* Surveys tab bar (SurveysTabs.tsx). 48 px targets; on phones it sticks to the top while you scroll. */
+.hx-stabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--hx-line, rgba(33, 31, 24, 0.14));
+  margin-bottom: 1rem;
+  background: rgba(255, 253, 248, 0.97);
+}
+.hx-stabs__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 0.4rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--hx-muted, #6e6a5e);
+  border-bottom: 3px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.hx-stabs__tab.is-active {
+  color: var(--hx-ink, #211f18);
+  border-bottom-color: var(--hx-solar, #f8bc1e);
+}
+.hx-stabs__gear {
+  flex: 0 0 48px;
+  font-size: 1.15rem;
+}
+
+@media (max-width: 760px) {
+  /* Edge to edge under the header, staying put as the page scrolls. */
+  .hx-stabs {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    margin: -1.25rem -1rem 1rem;
+    backdrop-filter: blur(8px);
+  }
+  .hx-stabs__tab {
+    font-size: 0.88rem;
+  }
+}

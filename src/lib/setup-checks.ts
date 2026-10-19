@@ -4,6 +4,7 @@ import { fcmConfigured } from '@/lib/fcm';
 import { savedAnswers, type SavedAnswer } from '@/lib/claude-answers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
+import { msConfigured } from '@/lib/ms365';
 import type { GuideKey, SqlFile } from '@/lib/setup-files';
 
 /**
@@ -81,7 +82,7 @@ const VERCEL_STEPS = [
 /** True if the table (and optionally a column) exists. */
 async function has(table: string, column = '*') {
   try {
-    const { error } = await createAdminClient().from(table).select(column, { head: true, count: 'exact' }).limit(1);
+    const { error } = await createAdminClient().from(table).select(column).limit(1);
     return !error;
   } catch {
     return false;
@@ -110,6 +111,44 @@ async function socialSignupsOpen(): Promise<boolean | null> {
   }
 }
 
+/** A cms_kv setting (stored as JSON), or null if it's missing or unreadable. Never throws. */
+async function readKv<T>(key: string): Promise<T | null> {
+  try {
+    const { data, error } = await createAdminClient().from('cms_kv').select('value').eq('key', key).maybeSingle();
+    if (error || !data?.value) return null;
+    return JSON.parse(data.value) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A week of "Ask me to confirm" has gone cleanly: at least 5 requests that instant booking would
+ * have accepted, and none it wouldn't have or that were turned down.
+ */
+async function instantBookingReady() {
+  try {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await createAdminClient()
+      .from('survey_bookings')
+      .select('would_confirm, cancel_reason')
+      .gte('created_at', since)
+      .limit(1000);
+    if (error || !data) return false;
+    const rows = data as { would_confirm: boolean | null; cancel_reason: string | null }[];
+    return rows.filter((r) => r.would_confirm === true).length >= 5 && !rows.some((r) => r.would_confirm === false || r.cancel_reason === 'declined');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pages that arrive in later changes: Surveys → ⚙ booking settings and the Diary, and the WhatsApp
+ * permission list. Their to-dos wait for them, so nobody is sent to a missing page. Switch each on
+ * when its page is live (both are in by the final step that adds the Projects and Surveys menu links).
+ */
+const PAGE_LIVE = { surveySettings: false, waPermission: false };
+
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
   {
@@ -123,6 +162,35 @@ const MANUAL: SetupTodo[] = [
       'If you meant something else (for example a cut-out of the house for the proposal), describe it below instead.',
     ],
     order: 2,
+    manual: true,
+  },
+  {
+    id: 'q-home-by',
+    kind: 'question',
+    title: 'After your last survey, do you need to be home by 18:00, or just finished on site by 18:00?',
+    detail:
+      'We’ve set it as finished on site by 18:00, with the drive home counted towards the day’s driving. If you need to be home by 18:00, the last survey of the day moves earlier (about 16:00 for a customer 35 minutes away).',
+    steps: ['Type **on site** or **home** below and tap **Send to Claude**.'],
+    order: 2,
+    manual: true,
+  },
+  {
+    id: 'q-heatpump-label',
+    kind: 'question',
+    title: 'On your website form, does “Infrared Heating” mean infrared panels or heat pumps?',
+    detail:
+      'The website’s interest list has a heatpump option labelled “Infrared Heating”, and the CRM turns it into Infrared. If heat pump leads are labelled infrared, survey booking picks the wrong survey.',
+    steps: ['Type **infrared** or **heat pumps** below and tap **Send to Claude**.'],
+    order: 3,
+    manual: true,
+  },
+  {
+    id: 'q-website-phone',
+    kind: 'question',
+    title: 'Should the website’s phone number change to 01633 965439?',
+    detail: 'The site shows 01633 965205 for calls. We’re adding a WhatsApp button for 01633 965439 and keeping calls on 965205.',
+    steps: ['Type **keep** or **change** below and tap **Send to Claude**.'],
+    order: 3,
     manual: true,
   },
   {
@@ -328,6 +396,14 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 }
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
+  // Projects, surveys and survey booking (crm-v3.sql, surveys.sql, survey-booking.sql), checked alongside the rest.
+  const bookingChecks = Promise.all([
+    has('crm_projects', 'project_ref'),
+    has('crm_surveys'),
+    has('survey_bookings'),
+    readKv<{ enabled?: boolean; mode?: string }>('survey-booking'),
+    readKv<{ requireOptIn?: boolean }>('wa-permission'),
+  ]);
   const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, sso, socialSignups, done, assign] = await Promise.all([
     has('crm_projects', 'next_step'),
     has('crm_documents'),
@@ -341,6 +417,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     doneManual(),
     preloaded ?? setupAssignments(),
   ]);
+  const [crmV3, surveys, booking, bookingKv, waKv] = await bookingChecks;
   const settings = crmV2 ? await getCrmSettings() : null;
   const out: SetupTodo[] = [];
   const add = (cond: boolean, t: SetupTodo) => cond && out.push(t);
@@ -367,6 +444,20 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(whatsapp && !chasers, sql('whatsapp-chasers.sql', 'WhatsApp chasers and syncing with the WhatsApp Business app.', 2, 'whatsapp.sql'));
   add(!crm, sql('crm.sql', 'Switches the CRM on: opportunities, the timeline, site photos and tasks on opportunities.', 3));
   add(!crmV2, sql('crm-v2.sql', 'Customer portal, documents, email, reminders and deposits.', 4, 'crm.sql'));
+  add(
+    !crmV3,
+    sql(
+      'crm-v3.sql',
+      'Projects (job numbers, delivery checklists, paperwork), task reminders, WhatsApp permission records. Run all three of these now, in order: the new Projects, Surveys and Diary screens appear once they’re done.',
+      4,
+      'crm-v2.sql'
+    )
+  );
+  add(!surveys, sql('surveys.sql', 'The solar survey tool: survey records, survey photos and drawings.', 4, 'crm-v3.sql'));
+  add(
+    !booking,
+    sql('survey-booking.sql', 'Online survey booking, your diary, and the Outlook copy of surveys, installs and diary entries.', 5, 'surveys.sql')
+  );
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
@@ -648,7 +739,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!env('STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'), {
     id: 'env-stripe',
     title: 'Connect Stripe for card deposits',
-    detail: 'Customers whose job has started can pay their deposit by card from their portal.',
+    detail: 'Customers can pay their deposit by card straight after signing their quote.',
     steps: [
       'Open [Stripe](https://dashboard.stripe.com) → **Developers → API keys** → reveal and copy the **Secret key**.',
       '**Developers → Webhooks → Add endpoint**. Paste the URL below and choose the event `checkout.session.completed`. Then copy the **Signing secret**.',
@@ -681,6 +772,154 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     href: 'https://business.facebook.com/events_manager2',
     hrefLabel: 'Open Events Manager',
     order: 31,
+    optional: true,
+  });
+  add(booking && PAGE_LIVE.surveySettings && !bookingKv?.enabled, {
+    id: 'booking-setup',
+    title: 'Check your survey booking rules and switch it on',
+    detail:
+      'We’ve set it up from your answers: surveys start from 08:30 and finish by 18:00; Saturdays finish by 12:00 and only for customers within 30 minutes of home (NP26 5ST); drive + 15 min buffer + 15 min coffee between appointments; at most 4 a day; nothing for the next working day after 15:00; solar 1 hr, heat pump 1 hr, both 1½ hrs.',
+    steps: [
+      'Tap **Open booking settings**.',
+      'Check your hours, home postcode and the cut-off.',
+      'Put anything coming up that isn’t in the CRM into **Surveys → Diary → + Add to my diary** (site visits, meetings, time off), with a postcode.',
+      'Leave **Ask me to confirm** on for the first week.',
+      'Switch **Online booking** on and tap **Save**.',
+    ],
+    href: '/admin/surveys/settings',
+    hrefLabel: 'Open booking settings',
+    order: 14,
+  });
+  add(booking && !!bookingKv?.enabled && !done.includes('booking-website-link'), {
+    id: 'booking-website-link',
+    kind: 'tip',
+    title: 'Add “Book a survey” to your website',
+    detail: 'Customers can book themselves at heliaxis.co.uk/book-a-survey.',
+    steps: [
+      '**CMS → Menu**.',
+      'Add **Book a free survey** → `/book-a-survey`.',
+      '**Publish**.',
+      'Optional: add `{booking_link}` to your follow-up messages in CRM settings.',
+    ],
+    copies: [
+      { label: 'Menu link', value: '/book-a-survey' },
+      { label: 'Message tag', value: '{booking_link}' },
+    ],
+    href: '/admin/cms',
+    hrefLabel: 'Open the CMS',
+    order: 15,
+    manual: true,
+  });
+  add(booking && PAGE_LIVE.surveySettings && msConfigured() && !done.includes('booking-diary-review'), {
+    id: 'booking-diary-review',
+    kind: 'tip',
+    title: 'See what your Outlook diary says, and copy your dates into Outlook',
+    detail:
+      'Now Outlook is connected, the app can read your last 10 weeks and suggest settings, and put your upcoming surveys and installs into Outlook.',
+    steps: [
+      '**Surveys → ⚙ → What your diary says**; use any suggestion that looks right.',
+      '**Surveys → Diary → Copy these dates into Outlook**: untick any you already put in Outlook by hand, then tap **Copy**.',
+      'In Outlook, mark holidays and days off as **Away** (not Free), or bookings won’t avoid them.',
+    ],
+    href: '/admin/surveys/settings',
+    hrefLabel: 'Open booking settings',
+    order: 15,
+    manual: true,
+  });
+  add(booking && bookingKv?.mode === 'request' && (await instantBookingReady()), {
+    id: 'booking-go-instant',
+    title: 'Switch survey booking to instant?',
+    detail:
+      'Over the last week, every request would have been booked correctly without you. Instant booking confirms straight away and puts it in your Outlook.',
+    steps: ['**Surveys → ⚙ → Book instantly** → **Save**.'],
+    href: '/admin/surveys/settings',
+    hrefLabel: 'Open booking settings',
+    order: 15,
+  });
+  add(crmV3 && PAGE_LIVE.waPermission && !waKv?.requireOptIn, {
+    id: 'wa-permission-review',
+    title: 'Check who’s agreed to WhatsApp messages',
+    detail:
+      'Automatic WhatsApps (reminders, follow-ups) should only go to customers who’ve agreed. Some customers with open jobs have no permission recorded yet.',
+    steps: [
+      'Tap **Open the list**.',
+      'Tap **They agreed** for anyone who has (they messaged you first, ticked the box, or said yes on the phone).',
+      'Then switch on **Only send automatic WhatsApps to customers who’ve agreed**. Anyone who replies STOP is already never messaged.',
+    ],
+    href: '/admin/crm/whatsapp-permission',
+    hrefLabel: 'Open the list',
+    order: 16,
+  });
+  add(crmV3 && !done.includes('wa-optin-policy'), {
+    id: 'wa-optin-policy',
+    kind: 'tip',
+    title: 'Check your Meta lead forms ask for WhatsApp permission',
+    detail: 'Leads from Meta forms are marked as agreed only if the form asks.',
+    steps: [
+      'In Meta Ads Manager, open each lead form → **Privacy policy / Custom disclaimer** and check there’s a WhatsApp consent line.',
+      'If not, remove `META_LEADS_WHATSAPP_OPT_IN` from Vercel (or set it to `false`) until there is.',
+    ],
+    href: 'https://adsmanager.facebook.com',
+    hrefLabel: 'Open Ads Manager',
+    order: 17,
+    manual: true,
+  });
+  add(!env('GOOGLE_MAPS_API_KEY'), {
+    id: 'env-google-routes',
+    title: 'Better drive times for survey booking (Google Maps)',
+    detail:
+      'Optional. Without it the app estimates drive times itself, erring on the long side. The app never uses more than 300 lookups a day, inside Google’s free allowance.',
+    steps: [
+      'Open [Google Cloud console](https://console.cloud.google.com) with the business Google account.',
+      'Create a project called **Heliaxis**.',
+      '**APIs & Services → Library → Routes API → Enable** (it asks for a billing account; the free monthly allowance applies).',
+      '**Credentials → Create credentials → API key**, then **Edit API key → Restrict key → Routes API → Save**.',
+      '**IAM & Admin → Quotas → Routes API**: set a daily cap of **300 elements**, so it can never run up a bill.',
+      ...VERCEL_STEPS,
+    ],
+    copies: [{ label: 'Key', value: 'GOOGLE_MAPS_API_KEY' }],
+    href: 'https://console.cloud.google.com',
+    hrefLabel: 'Open Google Cloud',
+    order: 35,
+    optional: true,
+  });
+  add(booking && !!bookingKv?.enabled && !env('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'), {
+    id: 'env-turnstile',
+    title: 'Protect the website booking form from bots (free)',
+    detail: 'Adds Cloudflare’s “I’m not a robot” check to heliaxis.co.uk/book-a-survey. Without it the form still works, with limits.',
+    steps: [
+      'Sign up free at [dash.cloudflare.com](https://dash.cloudflare.com).',
+      '**Turnstile → Add widget**: name `Heliaxis booking`, hostname `heliaxis.co.uk`, mode **Managed** → **Create**.',
+      'Copy the **Site key** and **Secret key**.',
+      ...VERCEL_STEPS,
+    ],
+    copies: [
+      { label: 'Key', value: 'NEXT_PUBLIC_TURNSTILE_SITE_KEY' },
+      { label: 'Key', value: 'TURNSTILE_SECRET_KEY' },
+    ],
+    href: 'https://dash.cloudflare.com',
+    hrefLabel: 'Open Cloudflare',
+    order: 36,
+    optional: true,
+  });
+  add(!env('META_ADS_TOKEN', 'META_AD_ACCOUNT_ID'), {
+    id: 'env-meta-ads',
+    title: 'Show ad spend in your reports (cost per lead and per sale)',
+    detail: 'The report needs read-only access to your Meta ad account. It’s the only thing it waits on.',
+    steps: [
+      '[Meta Business settings](https://business.facebook.com/settings) → **Users → System users** → your system user (or **Add**, role Admin).',
+      '**Add assets → Ad accounts** → your ad account → **View performance**.',
+      '**Generate new token** → your app → tick **ads_read** → copy the token.',
+      'In Ads Manager, copy your ad account number (`act_…`).',
+      ...VERCEL_STEPS,
+    ],
+    copies: [
+      { label: 'Key', value: 'META_ADS_TOKEN' },
+      { label: 'Key', value: 'META_AD_ACCOUNT_ID' },
+    ],
+    href: 'https://business.facebook.com/settings',
+    hrefLabel: 'Open Business settings',
+    order: 37,
     optional: true,
   });
   // Copies: these are set per request below.

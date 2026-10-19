@@ -7,19 +7,39 @@ export const STAGES = [
   { key: 'surveyed', label: 'Surveyed', group: 'sales' },
   { key: 'quote_sent', label: 'Quote sent', group: 'sales' },
   { key: 'won', label: 'Won', group: 'delivery' },
+  { key: 'design', label: 'Design & approvals', group: 'delivery' },
+  { key: 'ready', label: 'Ready to book', group: 'delivery' },
   { key: 'install_booked', label: 'Install booked', group: 'delivery' },
   { key: 'installing', label: 'Installing', group: 'delivery' },
+  { key: 'commissioning', label: 'Commissioning', group: 'delivery' },
+  { key: 'handover', label: 'Paperwork & handover', group: 'delivery' },
   { key: 'complete', label: 'Complete', group: 'done' },
   { key: 'lost', label: 'Lost', group: 'done' },
 ] as const;
 
 export type StageKey = (typeof STAGES)[number]['key'];
 export const STAGE_KEYS = STAGES.map((s) => s.key) as StageKey[];
+/** Staff screens: one name per stage (Won, Lost). */
 export const stageLabel = (k: string) => STAGES.find((s) => s.key === k)?.label ?? k;
-/** The customer portal only exists once the job has started (Won onwards). */
-export const PORTAL_STAGES: readonly string[] = ['won', 'install_booked', 'installing', 'complete'];
-export const portalOpen = (stage: string | null | undefined) => !!stage && PORTAL_STAGES.includes(stage);
-export const PORTAL_CLOSED_MSG = 'The customer portal opens when the job starts — move the opportunity to Won first.';
+/** Position in the pipeline (-1 if unknown), for "has it got past …" checks. */
+export const stageIndex = (k: string): number => STAGE_KEYS.indexOf(k as StageKey);
+export const SALES_STAGES: StageKey[] = ['lead', 'contacted', 'survey_booked', 'surveyed', 'quote_sent'];
+export const DELIVERY_STAGES: StageKey[] = ['won', 'design', 'ready', 'install_booked', 'installing', 'commissioning', 'handover'];
+/** A project is the job from Won onwards. Keep in step with the trigger in supabase/crm-v3.sql. */
+export const PROJECT_STAGES: StageKey[] = [...DELIVERY_STAGES, 'complete'];
+/** Where a job can be started from the Projects page ("already in progress" jobs). Sales starts stay on CRM "+ New". */
+export const PROJECT_START_STAGES: StageKey[] = ['won', 'design', 'ready', 'install_booked', 'installing'];
+export const isProjectStage = (s?: string | null): boolean => !!s && (PROJECT_STAGES as string[]).includes(s);
+/** Counts as a sale in reports. */
+export const isWonStage = isProjectStage;
+/** Customer portal tracker only. Staff screens use stageLabel (Won / Lost). */
+export const portalStageLabel = (k: string): string => (k === 'won' ? 'Order confirmed' : stageLabel(k));
+/** The full customer portal exists once the job has started (Won onwards). */
+export const PORTAL_STAGES: readonly string[] = PROJECT_STAGES;
+export const portalOpen = (s?: string | null): boolean => isProjectStage(s);
+/** 'quote': the quote-only page while it's waiting to be signed; 'full': the portal from Won onwards. */
+export const portalMode = (s?: string | null): 'quote' | 'full' | null => (isProjectStage(s) ? 'full' : s === 'quote_sent' ? 'quote' : null);
+export const PORTAL_CLOSED_MSG = 'The customer’s link opens when you send the quote for signing, or when the job is Won.';
 export const isStage = (k: unknown): k is StageKey => typeof k === 'string' && (STAGE_KEYS as string[]).includes(k);
 
 export const PRODUCTS = [
@@ -33,6 +53,24 @@ export const PRODUCTS = [
 ] as const;
 export const PRODUCT_KEYS = PRODUCTS.map((p) => p.key) as string[];
 export const productLabel = (k: string) => PRODUCTS.find((p) => p.key === k)?.label ?? k;
+
+export const SURVEY_TYPES = [
+  { key: 'solar', label: 'Solar panels and battery', short: 'Solar' },
+  { key: 'ashp', label: 'Air source heat pump', short: 'Heat pump' },
+  { key: 'solar_ashp', label: 'Solar and heat pump', short: 'Solar + heat pump' },
+] as const;
+export type SurveyTypeKey = (typeof SURVEY_TYPES)[number]['key'];
+export const isSurveyType = (k: unknown): k is SurveyTypeKey => k === 'solar' || k === 'ashp' || k === 'solar_ashp';
+export const DEFAULT_SURVEY_MINUTES: Record<SurveyTypeKey, number> = { solar: 60, ashp: 60, solar_ashp: 90 };
+export const surveyTypeLabel = (k: string): string => SURVEY_TYPES.find((t) => t.key === k)?.label ?? k;
+/** "about an hour" / "about 1½ hours", for messages and the booking form. */
+export const minutesWords = (m: number): string => (m === 90 ? 'about 1½ hours' : m === 60 ? 'about an hour' : `about ${m} minutes`);
+/** Solar or battery → solar survey; heat pump → SimpliHeat; both → 90 min. EV-only, infrared, LED → null (no survey booked by default). */
+export function surveyTypeFor(products: string[]): SurveyTypeKey | null {
+  const solar = products.some((p) => p === 'solar' || p === 'battery');
+  const heat = products.includes('heatpump');
+  return solar && heat ? 'solar_ashp' : heat ? 'ashp' : solar ? 'solar' : null;
+}
 
 export const PHOTO_CATEGORIES = [
   { key: 'survey', label: 'Survey' },

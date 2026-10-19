@@ -1,10 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, json } from '@/lib/crm/server';
-import { STAGE_KEYS } from '@/lib/crm/stages';
+import { isWonStage, STAGE_KEYS } from '@/lib/crm/stages';
 
 export const dynamic = 'force-dynamic';
 
-const WON = ['won', 'install_booked', 'installing', 'complete'];
 const at = (s: string) => STAGE_KEYS.indexOf(s as (typeof STAGE_KEYS)[number]);
 
 /** Sales numbers for a period: by source / campaign, by person, the funnel and response times. */
@@ -37,7 +36,7 @@ export async function GET(req: Request) {
   for (const p of projects ?? []) {
     const source = src.get(p.enquiry_id) || 'unknown';
     const owner = p.owner_id ? name.get(p.owner_id) || 'Someone' : 'Unassigned';
-    const won = WON.includes(p.stage);
+    const won = isWonStage(p.stage);
     const surveyed = !!p.survey_at || at(p.stage) >= at('survey_booked');
     for (const [map, key] of [
       [bySource, source],
