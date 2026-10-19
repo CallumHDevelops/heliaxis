@@ -430,17 +430,29 @@ export async function backfillList(): Promise<BackfillItem[]> {
   return out;
 }
 
-/** Mark the ticked jobs and entries for the sync. Returns how many were marked. */
-export async function markForBackfill(projectIds: string[], entryIds: string[]): Promise<number> {
+/**
+ * Mark the ticked jobs and entries for the sync. Returns how many were marked. `rewrite` ("Put it
+ * back" after a copy was moved in Outlook) also forgets what was last written, so the sync writes
+ * the CRM's time over Outlook's even though nothing changed in the CRM.
+ */
+export async function markForBackfill(projectIds: string[], entryIds: string[], o: { rewrite?: boolean } = {}): Promise<number> {
   const db = createAdminClient();
   const now = iso(Date.now());
   let n = 0;
   for (let i = 0; i < projectIds.length; i += 100) {
-    const { data } = await db.from('crm_projects').update({ calendar_dirty_at: now }).in('id', projectIds.slice(i, i + 100)).select('id');
+    const { data } = await db
+      .from('crm_projects')
+      .update({ calendar_dirty_at: now, ...(o.rewrite ? { survey_event_hash: null } : {}) })
+      .in('id', projectIds.slice(i, i + 100))
+      .select('id');
     n += data?.length ?? 0;
   }
   for (let i = 0; i < entryIds.length; i += 100) {
-    const { data } = await db.from('diary_entries').update({ calendar_dirty_at: now }).in('id', entryIds.slice(i, i + 100)).select('id');
+    const { data } = await db
+      .from('diary_entries')
+      .update({ calendar_dirty_at: now, ...(o.rewrite ? { outlook_hash: null } : {}) })
+      .in('id', entryIds.slice(i, i + 100))
+      .select('id');
     n += data?.length ?? 0;
   }
   return n;

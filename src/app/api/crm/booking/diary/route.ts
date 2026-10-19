@@ -208,6 +208,8 @@ export async function GET(req: Request) {
       key: sv.key,
       name: sv.name,
       base: { label: sv.baseLabel, postcode: sv.basePostcode },
+      leaveHomeFrom: sv.leaveHomeFrom ?? null,
+      homeBy: sv.homeBy ?? null,
       outlookOk: diary.outlookOk,
       outlookError: diary.outlookError ?? null,
       days: days.map((d) => dayView(d, sv, base, diary.items, s, ctx)),
@@ -257,6 +259,7 @@ export async function GET(req: Request) {
 
   return json({
     ready: true,
+    today,
     from,
     to,
     enabled: s.enabled,
