@@ -20,6 +20,8 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
 7. `supabase/surveys.sql` — solar surveys, their photos and drawings (section 11).
 8. `supabase/survey-booking.sql` — online survey booking, your diary and the Outlook copy
    (sections 12 and 13).
+9. `supabase/crm-activities-index.sql` (optional, any time) — makes **Latest notes** on the CRM home
+   load faster once there are lots of notes (section 15). Nothing depends on it.
 
 Until 5 to 8 are run the CRM works as before; the new screens appear once their file is done.
 
@@ -286,3 +288,98 @@ answer yet, means neither. The website works the same either way, and **Cookie s
 bottom of every page lets them change their mind. The website's own visitor counts and click heatmap
 use no cookies, so they carry on either way. Customers' personal links (their portal and their
 booking link) never send anything to Google Analytics or the visitor counts.
+
+## 15. The CRM home and job pages
+
+**CRM** opens on **Home**. **Board** and **List** are under **View** next to it, and the CRM
+remembers which you used last. On a computer the WhatsApp panel is on the right (section 9).
+
+- **Across the top**: five counts (follow-ups due, unread WhatsApp, new enquiries, surveys this
+  week, quotes out), then one line with how many jobs are at each sales stage. Tap any of them to
+  see just those jobs.
+- **On the left, My work**: anything waiting for you (booking requests to confirm), **Today**
+  (today's surveys, home visits and install days, with **Start survey** or **Directions**), then your
+  tasks and next steps by day, overdue first. Switch between **Mine** and **Everyone**; tick, snooze
+  or add a task right there.
+- **In the middle, Latest notes**: notes, calls and site visits from every job, newest first. Tap
+  one to open that job at that note, or **+ Note** to add one.
+- **Search** finds a customer by name, postcode, phone number or reference (HX-0042, hx42 or
+  0042). Press **/** to jump to it.
+- **+ New** adds an opportunity, for a new customer or one already in the CRM (a second job for an
+  existing customer doesn't get the new-lead follow-ups).
+- On a phone the counts are a row of chips, then **Needs reply** (the people waiting for an answer
+  on WhatsApp), your tasks and the latest notes.
+
+**A job's page** (tap any customer or job):
+
+- **At the top**: the customer's name, the job's reference, products and postcode, the next date
+  ("Survey Tue 3 Nov, 11:45", "Install Fri 6 Nov · 3 days" or "Nothing booked"), the stage with one
+  button for the next move, and Call, Directions and Email.
+- **On the left, the customer**: mobile, WhatsApp permission (with its switch), email, site
+  address, where they came from and who looks after them. Then Job details, the customer's portal
+  card (from Surveyed), the DNO and deposit, and their other jobs. Each card has its own **Edit**.
+  At Surveyed, **Send quote for signing** (the main button, or on the portal card) sends the quote
+  that's under Docs; with no quote there yet, it opens Docs to upload one first.
+- **In the middle**: the next step, then the tabs **Overview** (everything for this job, the
+  checklist, dates and team, the system and the paperwork), **Activity** (notes, calls, WhatsApp
+  messages with their photos and voice notes, emails and stage changes, newest first), **Photos**,
+  **Docs** and **Surveys**.
+- **On the right, Tasks**: a column of their own when the WhatsApp panel is folded; inside the
+  panel when it's open (over the customer's chat on **This job**, under the list on **Chats**).
+- **The green WhatsApp button** sits just above the yellow **+**. It opens the customer's chat in
+  the panel (on a phone, full screen; Back brings you to the same spot). The **+** adds a note, a
+  call, a site visit, a task, photos or a document, plus the stage's next move.
+- On a phone the header, the next step and up to 3 tasks come first, then the tabs; the customer's
+  full details are under **Details**.
+- The page updates itself every 30 seconds while it's open. Opening it never marks WhatsApp
+  messages as read; the panel and the chat do that.
+
+## 16. Projects
+
+A **project** is the job once the customer says yes. It's the same record as the opportunity, so
+nothing is copied: the signed quote, deposit, survey, designs, photos, documents, WhatsApp and
+emails are already there. Every job from **Won** to **Complete** is a project.
+
+- **Where**: **Projects** in the CRM menu (on a phone: **More → Projects**), or the **Sales |
+  Projects** switch at the top of the CRM.
+- **List** (where it opens): jobs that need attention first (overdue paperwork, a deposit unpaid 7
+  days after the job started, the DNO quiet for 45 working days, a BUS voucher about to run out),
+  then the rest by their next date, then those not booked yet. Filters: Live, Needs attention, On
+  hold, Mine, Complete, Lost, products and search.
+- **Schedule**: the next 8 weeks of installs, on each working day with the team, plus scaffold up
+  and down, and the jobs ready to book that have no install date yet.
+- **Board** (on a computer): a column for each delivery stage. Drag a job to move it.
+- **New project** (on the Projects page, or **New project for Jane** on a job's page) starts a job
+  straight away for a new or existing customer, at the stage it's really at (Won, Design &
+  approvals, Ready to book, Install booked or Installing). Handy for an add-on battery or a
+  callback.
+- **Job references**: a customer's first job shares their reference (HX-0042); later jobs are
+  HX-0042-2, HX-0042-3 and so on (section 9).
+- **The checklist** (the job's Overview): each delivery stage (Won, Design & approvals, Ready to
+  book, Install booked, Installing, Commissioning, Paperwork & handover, Complete) has a short list.
+  Items the app can see tick themselves ("✓ from the app": a signed quote, a paid deposit, a
+  finished survey, the install date and so on). Tick the rest yourself, or mark them **Not needed**.
+  **Move to …** is always there; if a key item isn't done (the signed contract, the deposit, the DNO
+  route and approval, the BUS voucher, scaffold, install dates, commissioning, the MCS certificate)
+  it asks once first.
+- **Dates move the stage**: a survey date on a new enquiry moves it to Survey booked, and an
+  install date on Won, Design & approvals or Ready to book moves it to Install booked. Clearing a
+  date never moves it back.
+- **Paperwork and deadlines** (Overview → Paperwork): the DNO route (G98 or G99), MCS, EIC, the BUS
+  grant (heat pumps), Building Regs and guarantees. Each deadline shows how long is left: register
+  the MCS certificate within 10 working days of commissioning, tell the DNO about a G98 system
+  within 28 days, notify Building Regs within 30 days, chase a G99 application after 45 working
+  days, and redeem a BUS voucher before it runs out (3 months after it's issued). Each also becomes a
+  task 2 working days before it's due.
+- **For the ENA application** (under the DNO route): the main electric cut-out and meter photos
+  from the latest finished solar survey, side by side, each with **Download** (the original photo,
+  named with the job reference, e.g. `HX-0042-main-cut-out.jpg`). Until there's a finished survey it
+  says "Not in a survey yet", with a link to start or open the survey.
+- **On hold** (Job details, with a reason): the job leaves the Live list and gets no countdowns.
+- **Deleting a job** (admins: **⋯ → Delete this job** on its page) removes that job only: its
+  timeline, photos, documents, signatures, surveys, tasks and bookings. The customer, their WhatsApp
+  chat, emails and other jobs are kept. A job with a signed quote or a paid deposit is your evidence
+  of the contract, so it asks you to type its reference first (or mark it Lost instead). If it was
+  their last job, the customer stays in Enquiries; delete them there too if you want them gone.
+
+Needs `supabase/crm-v3.sql` (until then Projects shows a note and the CRM works as before).
