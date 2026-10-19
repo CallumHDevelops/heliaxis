@@ -320,6 +320,7 @@ function AnswerBox({ t, onAnswered }: { t: SetupTodo; onAnswered: () => void }) 
         }}
         rows={3}
         maxLength={4000}
+        readOnly={state === 'sending'}
         placeholder="Type your answer for Claude"
       />
       {state === 'confirm' ? (

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireApproved } from '@/lib/auth';
-import { answersArePublic, saveAnswer } from '@/lib/claude-answers';
+import { answersVisibility, saveAnswer } from '@/lib/claude-answers';
 import { assignTodo, isAssigned, markDone, setupTodos, visibleSetupTodos } from '@/lib/setup-checks';
 
 export const dynamic = 'force-dynamic';
@@ -43,13 +43,15 @@ export async function PATCH(req: Request) {
     if (!(await may(id))) return json({ error: 'forbidden' }, 403);
     const todo = (await setupTodos()).find((t) => t.id === id && t.kind === 'question');
     if (!todo) return json({ error: 'That question has gone.' }, 404);
-    if (confirmPublic !== true && (await answersArePublic())) return json({ needsConfirm: 'public' });
     try {
-      const saved = await saveAnswer({ id, question: todo.title, text: answer, name: s.profile.full_name || s.user.email || 'Someone' });
+      if (confirmPublic !== true && (await answersVisibility()) === 'public') return json({ needsConfirm: 'public' });
+      // First name only: on a public repo the whole line is public.
+      const name = (s.profile.full_name || '').trim().split(/\s+/)[0] || 'A team member';
+      const saved = await saveAnswer({ id, question: todo.title, text: answer, name });
       if (saved.sent) await markDone(id);
       return json({ ok: true, sent: saved.sent });
-    } catch {
-      return json({ error: 'Couldn’t save that. Try again.' }, 500);
+    } catch (e) {
+      return json({ error: e instanceof Error && e.message ? e.message : 'Couldn’t save that. Try again.' }, 502);
     }
   }
   if (b.assign !== undefined) {
