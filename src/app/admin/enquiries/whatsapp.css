@@ -344,6 +344,10 @@ textarea.wa-input {
 .wa-compose--tpl {
   flex-direction: column;
   align-items: stretch;
+  /* A template's preview and blanks never push the chat off a phone screen. */
+  max-height: 65vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .wa-send {
   font: inherit;
@@ -358,15 +362,6 @@ textarea.wa-input {
 .wa-send:disabled {
   opacity: 0.45;
   cursor: default;
-}
-.wa-tpl-preview {
-  white-space: pre-wrap;
-  font-size: 0.85rem;
-  background: var(--card);
-  border: 1px dashed var(--line);
-  border-radius: 4px;
-  padding: 0.5rem 0.7rem;
-  margin: 0;
 }
 
 /* Smart replies */

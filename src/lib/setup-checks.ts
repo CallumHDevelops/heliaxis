@@ -597,21 +597,12 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       title: 'Create the 3 WhatsApp reminder templates',
       detail: 'Needed for reminders when the customer hasn’t messaged in the last 24 hours (about 2p each).',
       steps: [
-        'Open **WhatsApp Manager → Message templates → Create template**.',
-        'Category **Utility**, language **English (UK)**. Paste the name, then paste the body below and tap **Submit**.',
-        'Do it three times, once for each template. Meta usually approves them within minutes to a few hours.',
-        'Then tap **Open CRM settings** and type the names into **Install template**, **Survey template** and the **Review requests** template. Save.',
+        'Tap **Open WhatsApp templates**, then the **Ready-made** tab.',
+        'On **Survey booked / reminder**, **Install booked / reminder** and **Google review request**, tap **Send to Meta for approval**. That’s one tap each; Meta usually approves them within minutes to a few hours.',
+        'Once each says **Approved ✓**, tap its **Use for** button (e.g. **Use for “Survey booked + reminders”**). This to-do goes once all three are in use.',
       ],
-      copies: [
-        { label: 'Name', value: 'install_reminder' },
-        { label: 'Body', value: 'Hi {{1}}, a reminder that your Heliaxis installation is {{2}} — {{3}}. Reply here with any questions.' },
-        { label: 'Name', value: 'survey_reminder' },
-        { label: 'Body', value: 'Hi {{1}}, a reminder that your Heliaxis survey is {{2}} — {{3}}. Reply here with any questions.' },
-        { label: 'Name', value: 'review_request' },
-        { label: 'Body', value: 'Hi {{1}}, thank you for choosing Heliaxis! If you’re happy with your installation, would you leave us a quick review? {{2}}' },
-      ],
-      href: 'https://business.facebook.com/wa/manage/message-templates/',
-      hrefLabel: 'Open WhatsApp Manager',
+      href: '/admin/enquiries/templates',
+      hrefLabel: 'Open WhatsApp templates',
       order: 12,
     });
     add(!settings.reviewUrl, {

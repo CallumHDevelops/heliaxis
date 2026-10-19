@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
+import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
 import '../../whatsapp.css';
 
 type Msg = {
@@ -41,7 +42,6 @@ type Enquiry = {
   wa_unread: number;
   wa_auto_off: boolean;
 };
-type Template = { name: string; language: string; category: string; body: string; params: number };
 
 const TICKS: Record<string, string> = { sent: '✓', delivered: '✓✓', read: '✓✓', failed: '!' };
 
@@ -94,8 +94,6 @@ export function ChatThread({ id }: { id: string }) {
   const [sending, setSending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
-  const [templates, setTemplates] = useState<Template[] | null>(null);
-  const [tpl, setTpl] = useState<{ name: string; lang: string; params: string[] } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -145,20 +143,9 @@ export function ChatThread({ id }: { id: string }) {
   const open = windowOpen(enquiry?.wa_last_inbound_at, now);
   const left = windowLeft(enquiry?.wa_last_inbound_at, now);
 
-  useEffect(() => {
-    if (!enquiry || open || templates) return;
-    fetch('/api/whatsapp/templates', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d) => setTemplates(d.items || []))
-      .catch(() => setTemplates([]));
-  }, [enquiry, open, templates]);
-
-  useEffect(() => {
-    if (tpl || !templates?.length || !enquiry) return;
-    const t = templates.find((x) => x.name === defaultTemplate) || templates[0];
-    const first = enquiry.name.split(/\s+/)[0] || '';
-    setTpl({ name: t.name, lang: t.language, params: Array.from({ length: t.params }, (_, i) => (i === 0 ? first : '')) });
-  }, [templates, tpl, enquiry, defaultTemplate]);
+  // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
+  const tplSend = useTemplateSend(id, !!enquiry && !open, defaultTemplate);
+  const { templates, pick: tpl } = tplSend;
 
   async function post(body: unknown) {
     setSending(true);
@@ -233,7 +220,6 @@ export function ChatThread({ id }: { id: string }) {
     );
   }
 
-  const selected = templates?.find((t) => t.name === tpl?.name && t.language === tpl?.lang);
   const windowCloses = enquiry.wa_last_inbound_at ? new Date(enquiry.wa_last_inbound_at).getTime() + SERVICE_WINDOW_MS : 0;
   const chasePicker = (message: string, isTemplate = false) => {
     const h = chaseHoursFor(message, isTemplate);
@@ -390,41 +376,18 @@ export function ChatThread({ id }: { id: string }) {
           {templates === null ? (
             <p className="wa-muted">Loading templates…</p>
           ) : templates.length === 0 ? (
-            <p className="wa-muted">No approved templates yet — create one in WhatsApp Manager (see WHATSAPP_SETUP.md).</p>
+            <p className="wa-muted">
+              No approved templates yet. <Link href="/admin/enquiries/templates" className="wts-manage">Send one to Meta from WhatsApp templates →</Link>
+            </p>
           ) : (
             tpl && (
               <>
-                <select
-                  className="wa-input"
-                  value={`${tpl.name}|${tpl.lang}`}
-                  onChange={(e) => {
-                    const [name, lang] = e.target.value.split('|');
-                    const t = templates.find((x) => x.name === name && x.language === lang);
-                    const first = enquiry.name.split(/\s+/)[0] || '';
-                    setTpl({ name, lang, params: Array.from({ length: t?.params ?? 0 }, (_, i) => (i === 0 ? first : '')) });
-                  }}
-                >
-                  {templates.map((t) => (
-                    <option key={`${t.name}|${t.language}`} value={`${t.name}|${t.language}`}>
-                      {t.name} ({t.language}{t.category ? ` · ${t.category.toLowerCase()}` : ''})
-                    </option>
-                  ))}
-                </select>
-                {selected?.body && <p className="wa-tpl-preview">{selected.body}</p>}
-                {tpl.params.map((p, i) => (
-                  <input
-                    key={i}
-                    className="wa-input"
-                    placeholder={`{{${i + 1}}}`}
-                    value={p}
-                    onChange={(e) => setTpl({ ...tpl, params: tpl.params.map((x, j) => (j === i ? e.target.value : x)) })}
-                  />
-                ))}
+                <TemplateSendFields send={tplSend} inputClass="wa-input" />
                 {chasePicker('', true)}
                 <button
                   type="button"
                   className="wa-send"
-                  disabled={!configured || sending || tpl.params.some((p) => !p.trim())}
+                  disabled={!configured || sending || !tplSend.ready}
                   onClick={() => post({ template: tpl.name, lang: tpl.lang, params: tpl.params, chaseHours: chaseHoursFor('', true) })}
                 >
                   {sending ? 'Sending…' : 'Send template'}

@@ -52,7 +52,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   }
   return json({
     configured: whatsappConfigured(),
-    defaultTemplate: defaultTemplate().name || null,
+    defaultTemplate: settings.firstContactTemplate || defaultTemplate().name || null,
     chase: { questions: settings.chaseQuestions, hours: settings.chaseAfterHours },
     enquiry,
     messages: (messages ?? []).map((m) => ({
