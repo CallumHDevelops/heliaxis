@@ -307,7 +307,7 @@ export async function importLead(
   if (isTestLead(lead.field_data ?? [])) return 'skipped';
   const metaLeadId = lead.id?.trim() || null;
   // Only their own answer counts: META_LEADS_WHATSAPP_OPT_IN is about what today's forms say, not old ones.
-  const { lead: who, interest, source, whatsappOptIn } = leadToEnquiry(lead.field_data ?? [], lead.ad_name, false);
+  const { lead: who, interest, source, whatsappOptIn } = leadToEnquiry(lead.field_data ?? [], lead.ad_name, false, lead.is_organic === true);
   if (!who.name && !who.email && !who.phone) throw new Error('no name, email or phone number');
   const name = (who.name || 'Meta lead').trim().slice(0, 200);
 
@@ -330,6 +330,8 @@ export async function importLead(
   if (existing && metaLeadId && existing.meta_lead_id === metaLeadId) {
     // In from before ad-spend.sql (by import or live): its ad ids now, for the ad spend in Reports.
     await saveAdIds(existing.id, lead, true);
+    // And an organic one saved before that was told apart, so it stays out of the ad maths.
+    if (lead.is_organic === true) await db.from('enquiries').update({ source: 'meta-organic' }).eq('id', existing.id).eq('source', 'meta-lead-ad');
     return 'already';
   }
   if (when && Date.now() - Date.parse(when) < LIVE_MS) return 'skipped';

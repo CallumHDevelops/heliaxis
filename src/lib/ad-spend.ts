@@ -154,7 +154,10 @@ export function periodDates(days: number, timeZone: string, now = Date.now()) {
 
 // ── Which leads came from which ad ──
 
-/** Leads from Meta: its lead forms ("meta: <ad>", "meta-lead-ad"), the website's ad links ("meta-ad…") and WhatsApp ads. */
+/**
+ * Leads from Meta: its lead forms ("meta: <ad>", "meta-lead-ad"), the website's ad links ("meta-ad…")
+ * and WhatsApp ads. Not "meta-organic" (a form not on an ad): no spend is behind it.
+ */
 export const isMetaSource = (source: string) => /^(?:meta(?:-ad|-lead-ad)?\s*(?::|$)|whatsapp-ad\s*$)/i.test(source.trim());
 
 /** One CRM opportunity from the period, with how far it got. */
@@ -241,7 +244,8 @@ function otherLabel(source: string): { label: string; note: string } {
  * one row, so the rows add up to the account's total. A lead goes with:
  *  1. the ad Meta said it came from (its ad id, saved since ad-spend.sql);
  *  2. otherwise its ad name ("meta: Video 4", from lead forms and the importer). When several ads
- *     share the name, they share one row, under the campaign that spent most on them;
+ *     share the name, the ones no lead was matched to (by 1 or 3) share one row: under their
+ *     campaign, or in "Other" when they're in several, so no campaign counts another's spend;
  *  3. otherwise, for the website's ad links ("meta-ad: <campaign> / <ad>"), the ad in that campaign,
  *     or just the campaign ("Website enquiries", no spend of its own: it counts in the campaign's total);
  *  4. otherwise "Other Meta leads and spend", with a note saying why.
@@ -285,13 +289,13 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
 
   const metaLeads = leads.filter((l) => isMetaSource(l.source));
   const targets = metaLeads.map(targetOf);
-  // A name some lead couldn't pin to one ad: every ad with that name shares one row.
+  // Ads a lead was put with (by id, or a link naming the campaign) keep their own rows and spend.
+  const pinned = new Set(targets.flatMap((t) => (t.kind === 'ad' ? [t.id] : [])));
+  // A name some lead couldn't pin to one ad: the other ads with that name share one row.
   const shared = new Set(targets.flatMap((t) => (t.kind === 'name' ? [t.name] : [])));
   const keyOf = (t: Target, source: string) =>
     t.kind === 'ad'
-      ? shared.has(norm(byId.get(t.id)!.name))
-        ? `name:${norm(byId.get(t.id)!.name)}`
-        : `ad:${t.id}`
+      ? `ad:${t.id}`
       : t.kind === 'name'
         ? `name:${t.name}`
         : t.kind === 'web'
@@ -311,11 +315,16 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
       return { ...blank(key, a.name), group: `c:${a.campaignId}`, groupLabel: a.campaignName };
     }
     if (key.startsWith('name:')) {
-      const same = named(key.slice(5));
-      const top = [...same].sort((a, b) => b.spend - a.spend)[0];
-      const elsewhere = [...new Set(same.filter((a) => a.campaignId !== top.campaignId).map((a) => `“${a.campaignName}”`))];
-      const note = `${same.length} ads with this name${elsewhere.length ? `, also in ${elsewhere.join(' and ')}` : ''}`;
-      return { ...blank(key, top.name, note), group: `c:${top.campaignId}`, groupLabel: top.campaignName };
+      const all = named(key.slice(5));
+      const same = all.filter((a) => !pinned.has(a.id));
+      const pool = same.length ? same : all;
+      const top = [...pool].sort((a, b) => b.spend - a.spend)[0];
+      const names = [...new Set(all.map((a) => `“${a.campaignName}”`))];
+      const note = `${all.length} ads with this name${names.length > 1 ? `, in ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : ''}`;
+      // Under a campaign only when the row's spend is all that campaign's: none ever lands in another's total.
+      return new Set(pool.map((a) => a.campaignId)).size > 1
+        ? { ...blank(key, top.name, note), group: OTHER_GROUP, groupLabel: 'Other Meta leads and spend' }
+        : { ...blank(key, top.name, note), group: `c:${top.campaignId}`, groupLabel: top.campaignName };
     }
     if (key.startsWith('web:')) {
       const id = key.slice(4);
@@ -328,7 +337,7 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
     const key = keyOf(targets[i], l.source);
     const r = row(key, () => {
       const r = make(key);
-      if (r.group === OTHER_GROUP) Object.assign(r, otherLabel(l.source));
+      if (key.startsWith('other:')) Object.assign(r, otherLabel(l.source));
       return r;
     });
     r.leads++;
@@ -342,7 +351,7 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
 
   // Each ad's spend goes to exactly one row.
   for (const a of ads) {
-    const key = shared.has(norm(a.name)) ? `name:${norm(a.name)}` : `ad:${a.id}`;
+    const key = shared.has(norm(a.name)) && !pinned.has(a.id) ? `name:${norm(a.name)}` : `ad:${a.id}`;
     const r = row(key, () => make(key));
     r.spend = (r.spend ?? 0) + a.spend;
     r.metaLeads = (r.metaLeads ?? 0) + a.metaLeads;
@@ -427,6 +436,9 @@ export type MetaError = { error: string; code?: number; subcode?: number };
 
 const RATE_LIMITS = new Set([4, 17, 32, 613, 80000, 80001, 80002, 80003, 80004, 80005, 80006, 80008, 80009, 80014]);
 
+/** Meta saying the CRM is asking too often. */
+export const isRateLimit = (r: MetaError) => RATE_LIMITS.has(r.code ?? 0) || /request limit|too many calls|rate limit/i.test(r.error || '');
+
 /** What went wrong and what to do about it. `account` is the ad account number (digits). */
 export function plainAdsError(r: MetaError, account = ''): string {
   const m = r.error || '';
@@ -434,7 +446,7 @@ export function plainAdsError(r: MetaError, account = ''): string {
   if (/aborted|timed? ?out/i.test(m) || (r.code === 100 && r.subcode === 1504018)) {
     return 'Meta took too long to send the ad figures. Try again in a minute.';
   }
-  if (RATE_LIMITS.has(r.code ?? 0) || /request limit|too many calls|rate limit/i.test(m)) {
+  if (isRateLimit(r)) {
     return 'Meta is limiting how often the CRM can ask for ad figures. They come back by themselves, usually within the hour.';
   }
   if (r.code === 2635 || /deprecated version/i.test(m)) {
@@ -458,5 +470,6 @@ export function plainAdsError(r: MetaError, account = ''): string {
       '“View performance” (Business settings → Users → System users → Assign assets → Ad accounts). If you add ads_read, generate a new token.'
     );
   }
-  return `Meta said: “${m || 'something went wrong'}”`;
+  // Only Meta's own words: an error raised before the request went (like a bad header) can hold the key.
+  return r.code != null ? `Meta said: “${m || 'something went wrong'}”` : 'The ad figures couldn’t be loaded just now. Try again in a minute.';
 }

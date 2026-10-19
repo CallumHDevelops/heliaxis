@@ -2,6 +2,7 @@
 // rounding, currency formatting, a period's dates in Europe/London (both sides of the clocks
 // changing), which CRM leads go with which ad, and Meta's errors in plain words.
 // Usage: node --experimental-strip-types scripts/test-meta-ads.mjs
+import { leadToEnquiry } from '../src/lib/whatsapp/leads.ts';
 import {
   adAccountNumber,
   addDays,
@@ -10,6 +11,7 @@ import {
   costPer,
   dayIn,
   isMetaSource,
+  isRateLimit,
   mergeAds,
   metaLeadCount,
   periodDates,
@@ -99,6 +101,12 @@ eq('7 days from 23:59 on the night the clocks go back', periodDates(7, 'Europe/L
 // ── Which sources are Meta's ──
 eq('Meta sources', ['meta: Video 4', 'Meta: x', 'meta-ad', 'meta-ad: Solar Oct / Video 4', 'meta-lead-ad', 'whatsapp-ad'].map(isMetaSource), [true, true, true, true, true, true]);
 eq('not Meta', ['metadata', 'whatsapp', 'cms-form', 'google-ads: Brand', 'meta-ads-thing', 'quote-form'].map(isMetaSource), [false, false, false, false, false, false]);
+eq('an organic form lead isn’t an ad’s', isMetaSource('meta-organic'), false);
+eq('lead forms: by ad, no ad name, organic', [leadToEnquiry([], 'Video 4', false).source, leadToEnquiry([], null, false).source, leadToEnquiry([], null, false, true).source], [
+  'meta: Video 4',
+  'meta-lead-ad',
+  'meta-organic',
+]);
 
 // ── Matching leads to ads ──
 const L = (source, o = {}) => ({ source, metaAdId: null, surveyed: false, won: false, lost: false, value: 0, ...o });
@@ -119,7 +127,7 @@ const leads = [
   L('meta-ad: Heat pumps'), // website, campaign only
   L('meta-ad: c3 / 301'), // ids in the link ({{campaign.id}} / {{ad.id}})
   L('meta: Video 4'), // two ads have this name
-  L('meta: Video 4', { metaAdId: '101' }), // pinned by id, but the name is shared: one row
+  L('meta: Video 4', { metaAdId: '101' }), // pinned by id: 101 keeps its own row
   L('meta: Gone ad'), // not in Meta's figures
   L('meta-lead-ad'),
   L('whatsapp-ad', { metaAdId: '102' }),
@@ -128,7 +136,7 @@ const leads = [
 const table = spendTable(leads, ads, { spend: 80000, metaLeads: 20 });
 const g = Object.fromEntries(table.groups.map((x) => [x.label, x]));
 const rowOf = (group, label) => g[group]?.rows.find((r) => r.label === label);
-eq('groups: by £ won, then leads; "Other" last', table.groups.map((x) => x.label), ['Solar Oct', 'Heat pumps', 'Other Meta leads and spend']);
+eq('groups: by £ won, then leads; "Other" last', table.groups.map((x) => x.label), ['Solar Oct', 'Heat pumps', 'Solar Oct – Copy', 'Other Meta leads and spend']);
 eq('Carousel 2 by name, plus the WhatsApp ad chat by id', (({ leads, surveys, won, value, spend, metaLeads }) => ({ leads, surveys, won, value, spend, metaLeads }))(rowOf('Solar Oct', 'Carousel 2')), {
   leads: 3,
   surveys: 2,
@@ -144,8 +152,9 @@ eq('campaign-only website lead: under the campaign, no spend of its own', [web.l
 eq('the campaign’s total counts the website lead against all its spend', [g['Heat pumps'].total.leads, g['Heat pumps'].total.spend], [5, 20000]);
 yes('an ad shown but never charged, with no leads, is left out', !rowOf('Heat pumps', 'Pump still'));
 const v4 = rowOf('Solar Oct', 'Video 4');
-eq('a shared name: one row with both ads’ spend, under the campaign that spent most', [v4.leads, v4.spend, v4.metaLeads, v4.note], [2, 38000, 11, '2 ads with this name, also in “Solar Oct – Copy”']);
-yes('…and the other campaign has no row of its own for it', !g['Solar Oct – Copy']);
+eq('the ad a lead was pinned to by id keeps its own row and spend', [v4.leads, v4.spend, v4.metaLeads, v4.note], [1, 30000, 9, undefined]);
+const copy = rowOf('Solar Oct – Copy', 'Video 4');
+eq('the name-only lead goes with the other ad of that name, in its own campaign', [copy.leads, copy.spend, copy.note], [1, 8000, '2 ads with this name, in “Solar Oct” and “Solar Oct – Copy”']);
 eq('an ad with spend and no leads gets its own row', [rowOf('Solar Oct', 'Static 1').leads, rowOf('Solar Oct', 'Static 1').spend], [0, 5000]);
 eq('ad rows in a campaign: by £ won, then leads, then spend', g['Solar Oct'].rows.map((r) => r.label), ['Carousel 2', 'Video 4', 'Static 1']);
 const other = g['Other Meta leads and spend'];
@@ -158,6 +167,29 @@ yes('…each with a note saying why', other.rows.every((r) => r.note));
 eq('total spend is the account’s, and the groups add up to it', [table.total.spend, table.groups.reduce((n, x) => n + x.total.spend, 0)], [80000, 80000]);
 eq('total leads: every Meta lead, nothing else', [table.total.leads, table.total.won, table.total.value], [12, 1, 12000]);
 eq('Meta’s own count is the account’s', table.total.metaLeads, 20);
+
+// Two ads called "Video 4" in different campaigns; two leads pinned to the second by id, one older lead by name only.
+const dup = [ad('101', 'Video 4', 'c1', 'Solar Oct', 30000), ad('201', 'Video 4', 'c2', 'Heat pumps', 25000)];
+const dupTable = spendTable([L('meta: Video 4', { metaAdId: '201' }), L('meta: Video 4', { metaAdId: '201', won: true, value: 8000 }), L('meta: Video 4')], dup, null);
+const dupG = Object.fromEntries(dupTable.groups.map((x) => [x.label, x.total]));
+eq('one name-only lead never moves leads pinned by id (or their spend) to another campaign', [dupG['Heat pumps']?.leads, dupG['Heat pumps']?.spend, dupG['Heat pumps']?.value, dupG['Solar Oct']?.leads, dupG['Solar Oct']?.spend], [
+  2,
+  25000,
+  8000,
+  1,
+  30000,
+]);
+// Three ads with one name: one pinned, the other two in different campaigns. Their shared row goes in "Other".
+const tri = spendTable([L('meta: Video 4', { metaAdId: '101' }), L('meta: Video 4')], [...dup, ad('301', 'Video 4', 'c3', 'Batteries', 5000)], null);
+const triOther = tri.groups.find((x) => x.label === 'Other Meta leads and spend');
+eq('ads of one name in several campaigns share a row in "Other", so no campaign counts another’s spend', [
+  tri.groups.map((x) => [x.label, x.total.leads, x.total.spend]),
+  triOther?.rows[0].label,
+  triOther?.rows[0].note,
+], [[['Solar Oct', 1, 30000], ['Other Meta leads and spend', 1, 30000]], 'Video 4', '3 ads with this name, in “Solar Oct”, “Heat pumps” and “Batteries”']);
+// Organic form leads beside paid ones: no ad spend is behind them, so they stay out of cost per lead and return.
+const org = spendTable([L('meta: Video A'), L('meta: Video A'), L('meta-organic', { won: true, value: 9000 })], [ad('9', 'Video A', 'c9', 'C', 1000)], null);
+eq('organic leads aren’t in the Meta leads or £ won', [org.total.leads, org.total.value, org.groups.length], [2, 0, 1]);
 
 // Website link where the campaign name itself has " / " in it.
 const slash = spendTable([L('meta-ad: Solar / Batteries / Video A')], [ad('9', 'Video A', 'c9', 'Solar / Batteries', 1000)], null);
@@ -198,6 +230,14 @@ says({ error: 'The operation was aborted due to timeout' }, 'took too long');
 says({ error: 'Please reduce the amount of data', code: 100, subcode: 1504018 }, 'took too long');
 says({ error: '(#2635) You are calling a deprecated version of the Ads API', code: 2635 }, 'META_ADS_GRAPH_VERSION');
 says({ error: 'Something odd', code: 1 }, 'Meta said: “Something odd”');
+const bad = plainAdsError({ error: 'Headers.append: "Bearer EAABsecret\nrest" is an invalid header value.' }, '1234567890');
+yes('an error with no Meta code never repeats its text (it can hold the key)', !bad.includes('EAAB') && bad.includes('couldn’t be loaded'));
+eq('rate limits, by code or by words', [isRateLimit({ error: 'x', code: 17 }), isRateLimit({ error: 'x', code: 80004 }), isRateLimit({ error: 'User request limit reached' }), isRateLimit({ error: 'x', code: 190 })], [
+  true,
+  true,
+  true,
+  false,
+]);
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

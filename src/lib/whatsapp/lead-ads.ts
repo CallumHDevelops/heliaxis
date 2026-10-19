@@ -36,7 +36,8 @@ export async function ingestLead(leadgenId: string) {
   const { lead, interest, source, whatsappOptIn: optIn, optInSource } = leadToEnquiry(
     r.data.field_data ?? [],
     r.data.ad_name,
-    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true'
+    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true',
+    r.data.is_organic === true
   );
 
   const { data: row, error } = await db

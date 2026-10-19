@@ -138,13 +138,13 @@ export async function markRead(waMessageId: string, typing = false) {
 
 export type LeadField = { name: string; values: string[] };
 
-/** The ad a lead came from (the ids need the same ads access as the name). */
-type LeadAd = { ad_name?: string; ad_id?: string; adset_id?: string; campaign_id?: string };
+/** The ad a lead came from (the ids need the same ads access as the name). Organic: not from an ad. */
+type LeadAd = { ad_name?: string; ad_id?: string; adset_id?: string; campaign_id?: string; is_organic?: boolean };
 
 /** A Lead Ads submission's answers. Needs a Page token with leads_retrieval. */
 export async function fetchLead(leadgenId: string) {
   return graph<{ id: string; created_time?: string; field_data?: LeadField[]; form_id?: string } & LeadAd>(
-    `/${encodeURIComponent(leadgenId)}?fields=id,created_time,field_data,ad_name,form_id,ad_id,adset_id,campaign_id`,
+    `/${encodeURIComponent(leadgenId)}?fields=id,created_time,field_data,ad_name,form_id,ad_id,adset_id,campaign_id,is_organic`,
     { token: process.env.META_PAGE_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN }
   );
 }
