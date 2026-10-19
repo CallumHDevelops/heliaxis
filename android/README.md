@@ -13,8 +13,11 @@ icon. Web changes reach the app on every deploy; you only need a new APK to chan
   phone. `src/lib/notify.ts` sends data messages (`src/lib/fcm.ts`) and `Notifications.java`
   shows them on per-type channels (WhatsApp, New leads, Tasks, Customers & jobs, Other), with
   "Send now"/"Cancel reply" buttons on queued smart replies (signed tokens,
-  `/api/push/native/action`). Built without `google-services.json`, the app falls back to Web
-  Push shown through the `DelegationService`.
+  `/api/push/native/action`). When someone reads the chat or contacts the lead, the site sends a
+  `type: dismiss` data message with the notification ids it marked read, and the app takes those
+  down (`Notifications.dismiss`). Only builds from versionCode 3 get it (`DISMISS_FROM_APP_VERSION`
+  in `src/lib/notify.ts`); older ones would show it as a blank notification. Built without
+  `google-services.json`, the app falls back to Web Push shown through the `DelegationService`.
 - **Updates**: the app opens `/admin?app=android-<versionCode>`; `AppRuntime` compares that with
   `public/app/version.json` and shows an Update banner (or a must-update screen).
 - **Download**: `/admin/app` (open to every approved user).

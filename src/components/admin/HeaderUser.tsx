@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { enablePush as subscribePush, PUSH_CHANGED, readNative, VAPID, type PushState } from '@/lib/push-client';
+import { isChatNotification, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
+import { enablePush as subscribePush, PUSH_CHANGED, readNative, shownNotifications, VAPID, type PushState } from '@/lib/push-client';
 
 /**
  * Top-right of the admin header: the notifications bell and the signed-in user's
@@ -18,6 +19,7 @@ type Notification = {
   href: string | null;
   read_at: string | null;
   created_at: string;
+  ref?: string | null;
 };
 
 function ago(iso: string) {
@@ -61,31 +63,46 @@ export function HeaderUser({
   const [bellOpen, setBellOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
+  const lastLoad = useRef(0);
 
   const load = useCallback(async () => {
+    lastLoad.current = Date.now();
     try {
-      const r = await fetch('/api/notifications', { cache: 'no-store' });
+      // Notifications on this screen that have been read since (elsewhere too) come off it.
+      const shown = await shownNotifications();
+      const ids = shown.map((n) => n.data?.id).filter((id): id is string => typeof id === 'string');
+      const r = await fetch(`/api/notifications${ids.length ? `?shown=${ids.join(',')}` : ''}`, { cache: 'no-store' });
       if (!r.ok) return;
       const d = await r.json();
       setItems(d.notifications ?? []);
       setUnread(d.unread ?? 0);
+      const gone = new Set<string>(d.gone ?? []);
+      for (const n of shown) if (gone.has(n.data?.id)) n.close();
     } catch {
       /* offline — keep what we have */
     }
   }, []);
 
-  // Initial load, then on focus, every minute while visible, and when a push lands.
+  // Initial load, then on focus, every minute while visible, when a push lands, and when this tab
+  // changed some (e.g. reading a chat clears its notifications).
   useEffect(() => {
     const first = setTimeout(load, 0);
     const tick = setInterval(() => document.visibilityState === 'visible' && load(), 60_000);
-    const onVisible = () => document.visibilityState === 'visible' && load();
+    // Focus and visibilitychange arrive together when switching back to the tab: load once.
+    const onVisible = () => document.visibilityState === 'visible' && Date.now() - lastLoad.current > 2000 && load();
     const onSw = (e: MessageEvent) => e.data?.type === 'NOTIFICATION' && load();
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    window.addEventListener('online', onVisible);
+    window.addEventListener(NOTIFICATIONS_CHANGED, load);
     navigator.serviceWorker?.addEventListener('message', onSw);
     return () => {
       clearTimeout(first);
       clearInterval(tick);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.removeEventListener('online', onVisible);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, load);
       navigator.serviceWorker?.removeEventListener('message', onSw);
     };
   }, [load]);
@@ -174,6 +191,8 @@ export function HeaderUser({
   const bellRef = useOutsideClose(bellOpen, closeBell);
   const menuRef = useOutsideClose(menuOpen, closeMenu);
   const nudge = push === 'off';
+  // Read WhatsApp chat notifications are noise: they go (the server leaves them out too).
+  const listed = items.filter((n) => !n.read_at || !isChatNotification(n));
 
   return (
     <div className="hu">
@@ -214,8 +233,8 @@ export function HeaderUser({
               </div>
             )}
             <ul className="hu-list">
-              {items.length === 0 && <li className="hu-empty">Nothing yet — you&apos;re all caught up.</li>}
-              {items.map((n) => (
+              {listed.length === 0 && <li className="hu-empty">Nothing yet — you&apos;re all caught up.</li>}
+              {listed.map((n) => (
                 <li key={n.id} className={n.read_at ? '' : 'is-unread'}>
                   <Link
                     href={n.href || '/admin'}

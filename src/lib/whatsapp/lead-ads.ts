@@ -5,6 +5,7 @@ import { inboxHref, notifyEnquiryTeam, queueFirstContact } from './inbox';
 import { leadToEnquiry } from './leads';
 import { toWaId } from './shared';
 import { ensureOpportunity } from '@/lib/crm/server';
+import { leadRef } from '@/lib/notification-refs';
 
 /** A Lead Ads webhook ping → fetch the answers → an enquiry (once, however often Meta retries). */
 export async function ingestLead(leadgenId: string) {
@@ -54,6 +55,7 @@ export async function ingestLead(leadgenId: string) {
   await notifyEnquiryTeam(
     `New Meta lead: ${lead.name || 'unnamed'}`,
     [lead.interest, lead.postcode, queued ? 'WhatsApp intro sends in a few minutes.' : ''].filter(Boolean).join(' · '),
-    optIn ? inboxHref(row.id) : '/admin/enquiries'
+    optIn ? inboxHref(row.id) : '/admin/enquiries',
+    { ref: leadRef(row.id) }
   );
 }

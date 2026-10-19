@@ -396,6 +396,7 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 }
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
+  const notificationRefs = has('notifications', 'ref');
   // Projects, surveys and survey booking (crm-v3.sql, surveys.sql, survey-booking.sql), checked alongside the rest.
   const bookingChecks = Promise.all([
     has('crm_projects', 'project_ref'),
@@ -461,6 +462,10 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
+  add(
+    notifications && !(await notificationRefs),
+    sql('notifications-ref.sql', 'Clears WhatsApp and new-lead notifications for everyone once the chat is read or the lead contacted.', 9, 'notifications.sql')
+  );
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

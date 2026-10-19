@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notify } from '@/lib/notify';
+import { leadRef } from '@/lib/notification-refs';
 import { canAccess } from '@/lib/portals';
 import { sendSystem } from '@/lib/whatsapp/inbox';
 import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
@@ -204,6 +205,7 @@ export async function runCrmAutomations() {
               body: `New enquiry ${mins >= 90 ? `${Math.round(mins / 60)}h` : `${mins} min`} ago — message them now.`,
               href: `/admin/crm/${p.id}`,
               tag: `crm-${p.id}`,
+              ref: leadRef(p.enquiry_id),
             })
           )
         );
@@ -273,7 +275,7 @@ export async function runCrmAutomations() {
 }
 
 /** Give a new lead to the next person in the rotation (CRM → Settings) and tell them. */
-export async function assignNewLead(projectId: string, customerName: string) {
+export async function assignNewLead(projectId: string, customerName: string, enquiryId?: string) {
   const s = await getCrmSettings();
   if (!s.leadRotation.length) return null;
   const owner = s.leadRotation[s.rotationIndex % s.leadRotation.length];
@@ -287,6 +289,7 @@ export async function assignNewLead(projectId: string, customerName: string) {
     body: 'Message them now — the quicker the reply, the better the chance.',
     href: `/admin/crm/${projectId}`,
     tag: `crm-${projectId}`,
+    ref: enquiryId ? leadRef(enquiryId) : undefined,
   });
   return owner;
 }

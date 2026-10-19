@@ -7,7 +7,8 @@ export default async function WhatsAppChatPage({ params }: { params: Promise<{ i
   const { id } = await params;
   return (
     <AdminShell active="whatsapp">
-      <ChatThread id={id} />
+      {/* key: a fresh thread (scroll, read state) when a notification opens another chat. */}
+      <ChatThread key={id} id={id} />
     </AdminShell>
   );
 }

@@ -60,16 +60,21 @@ async function accessToken(sa: ServiceAccount) {
 
 /**
  * Send a data message to one device. 'gone' means the token is dead (app uninstalled or
- * data cleared), so the caller should forget it.
+ * data cleared), so the caller should forget it. NORMAL priority for messages that show nothing
+ * (Android deprioritises apps whose high-priority messages don't end in a notification).
  */
-export async function sendFcm(token: string, data: Record<string, string>): Promise<'ok' | 'gone' | 'error'> {
+export async function sendFcm(
+  token: string,
+  data: Record<string, string>,
+  priority: 'HIGH' | 'NORMAL' = 'HIGH'
+): Promise<'ok' | 'gone' | 'error'> {
   const sa = serviceAccount();
   if (!sa) return 'error';
   try {
     const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await accessToken(sa)}` },
-      body: JSON.stringify({ message: { token, data, android: { priority: 'HIGH', ttl: '86400s' } } }),
+      body: JSON.stringify({ message: { token, data, android: { priority, ttl: '86400s' } } }),
     });
     if (res.ok) return 'ok';
     const body = (await res.json().catch(() => ({}))) as {

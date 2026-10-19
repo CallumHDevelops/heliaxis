@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { chatRef, chatTag, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
+import { closeShownNotifications } from '@/lib/push-client';
+import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
 import '../../whatsapp.css';
@@ -94,50 +97,68 @@ export function ChatThread({ id }: { id: string }) {
   const [sending, setSending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  /** The last full load's version: polls send it, and get { same: true } if nothing changed. */
+  const version = useRef('');
+  /** Cleared this chat's notifications since it opened (once, even with nothing unread). */
+  const readOnce = useRef(false);
+  /** At (or near) the bottom: new messages scroll into view. Scrolled up reading: left alone. */
+  const atBottom = useRef(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (full = true) => {
     try {
-      const r = await fetch(`/api/whatsapp/conversations/${id}`, { cache: 'no-store' });
+      const v = !full && version.current ? `?v=${version.current}` : '';
+      const r = await fetch(`/api/whatsapp/conversations/${id}${v}`, { cache: 'no-store' });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Could not load this chat');
-      setEnquiry(d.enquiry);
-      setMessages(d.messages);
-      setOutbox(d.outbox);
-      setConfigured(d.configured);
-      setDefaultTemplate(d.defaultTemplate);
-      if (d.chase) setChaseDefaults(d.chase);
+      if (!d.same) {
+        setEnquiry(d.enquiry);
+        setMessages(d.messages);
+        setOutbox(d.outbox);
+        setConfigured(d.configured);
+        setDefaultTemplate(d.defaultTemplate);
+        if (d.chase) setChaseDefaults(d.chase);
+        version.current = d.v || '';
+      }
       setError('');
-      // Blue ticks + clear the badge while the chat is on screen.
-      if (d.enquiry.wa_unread > 0 && document.visibilityState === 'visible') {
+      // Blue ticks, the badge and its notifications cleared, but only while the chat is on screen.
+      const unread = d.same ? d.unread : d.enquiry.wa_unread;
+      if ((unread > 0 || !readOnce.current) && document.visibilityState === 'visible') {
+        readOnce.current = true;
         fetch(`/api/whatsapp/conversations/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ read: true }),
-        }).catch(() => {});
+        })
+          .then(() => window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED)))
+          .catch(() => {});
+        void closeShownNotifications((n) => n.data?.ref === chatRef(id) || n.tag === chatTag(id));
       }
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load this chat');
+      return false;
     }
   }, [id]);
 
+  // New messages and ticks show up by themselves (every 4.5s while it's on screen).
+  const { refresh, busy, reload } = useLiveRefresh(load, 4_500);
   useEffect(() => {
-    load();
-    const poll = setInterval(load, 5_000);
     const tick = setInterval(() => setNow(Date.now()), 1_000);
-    const onVis = () => document.visibilityState === 'visible' && load();
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      clearInterval(poll);
-      clearInterval(tick);
-      document.removeEventListener('visibilitychange', onVis);
+    const onScroll = () => {
+      atBottom.current = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160;
     };
-  }, [load]);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      clearInterval(tick);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
 
   // By the newest message, not the count: a long chat shows the latest 500, so the count stays put.
+  // To the very bottom (past the compose and tab bar), the same place the scroll check measures to.
   const newest = messages.at(-1)?.id;
   useEffect(() => {
-    if (newest) endRef.current?.scrollIntoView({ block: 'end' });
+    if (newest && atBottom.current) window.scrollTo({ top: document.documentElement.scrollHeight });
   }, [newest]);
 
   const open = windowOpen(enquiry?.wa_last_inbound_at, now);
@@ -150,6 +171,7 @@ export function ChatThread({ id }: { id: string }) {
   async function post(body: unknown) {
     setSending(true);
     setError('');
+    atBottom.current = true; // show what you've just sent
     try {
       const r = await fetch(`/api/whatsapp/conversations/${id}`, {
         method: 'POST',
@@ -158,7 +180,7 @@ export function ChatThread({ id }: { id: string }) {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Not sent');
-      await load();
+      await reload();
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Not sent');
@@ -196,7 +218,7 @@ export function ChatThread({ id }: { id: string }) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) setError(d.error || 'That didn’t work');
     if (action === 'edit' && r.ok) setEditing(null);
-    await load();
+    await reload();
   }
 
   async function toggleAuto() {
@@ -208,7 +230,7 @@ export function ChatThread({ id }: { id: string }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ autoOff }),
     });
-    await load();
+    await reload();
   }
 
   if (!enquiry) {
@@ -250,6 +272,9 @@ export function ChatThread({ id }: { id: string }) {
             {enquiry.wa_id ? `+${enquiry.wa_id}` : enquiry.phone || 'No number'} · {open ? left : 'window closed'}
           </span>
         </div>
+        <button type="button" className="wa-refresh" onClick={refresh} disabled={busy} aria-label="Refresh" title="Refresh">
+          ↻
+        </button>
         <button type="button" className={`wa-auto${enquiry.wa_auto_off ? ' off' : ''}`} onClick={toggleAuto}>
           {enquiry.wa_auto_off ? 'Smart replies off' : 'Smart replies on'}
         </button>
@@ -342,7 +367,6 @@ export function ChatThread({ id }: { id: string }) {
             )}
           </div>
         ))}
-        <div ref={endRef} />
       </div>
 
       {error && <p className="wa-banner wa-banner--err">{error}</p>}
