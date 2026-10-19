@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
 import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS } from '@/lib/enquiries';
 import { osmEmbedUrl } from '@/lib/geocode-postcode';
+import { DeleteCustomers, type DeleteDone } from './DeleteCustomers';
 import './enquiries.css';
 
 const STATUSES = Object.values(ENQUIRY_STATUS_LABEL);
@@ -44,11 +45,14 @@ export function EnquiriesCrm({
   initialLeads,
   canCrm = false,
   canImport = false,
+  canDelete = false,
 }: {
   initialLeads: CrmLead[];
   canCrm?: boolean;
   /** Admins: link to Import (old Meta leads, WhatsApp chats). */
   canImport?: boolean;
+  /** Admins: Select mode and Delete customer (everything about them goes; see DeleteCustomers). */
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const [opening, setOpening] = useState(false);
@@ -68,6 +72,10 @@ export function EnquiriesCrm({
   const [leads, setLeads] = useState(initialLeads);
   const [active, setActive] = useState<CrmLead | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [deleting, setDeleting] = useState<{ ids: string[]; name?: string } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; errors: string[] } | null>(null);
 
   const refresh = useCallback(async () => {
     const r = await fetch('/api/enquiries', { cache: 'no-store' });
@@ -90,6 +98,36 @@ export function EnquiriesCrm({
     });
     return c;
   }, [leads]);
+
+  // Only people still on the list count (a refresh may have dropped some).
+  const pickedIds = leads.filter((l) => picked.has(l.id)).map((l) => l.id);
+  const allPicked = leads.length > 0 && pickedIds.length === leads.length;
+  const togglePick = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  async function deleted(r: DeleteDone) {
+    setDeleting(null);
+    setSelecting(false);
+    setPicked(new Set());
+    const n = (x: number, one: string, many = `${one}s`) => `${x.toLocaleString('en-GB')} ${x === 1 ? one : many}`;
+    setNotice({
+      text: [
+        `Deleted ${n(r.deleted, 'customer')}.`,
+        r.kept ? `Kept ${n(r.kept, 'customer')} with a signed quote or paid deposit.` : '',
+        r.filesFailed ? `${n(r.filesFailed, 'file')} couldn’t be removed from storage; they’re listed in the Vercel logs.` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+      errors: r.errors,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // the message is above the list
+    await refresh();
+  }
 
   async function setStatus(id: string, status: string) {
     setLeads((prev) =>
@@ -131,6 +169,19 @@ export function EnquiriesCrm({
               Import
             </Link>
           )}
+          {canDelete && (
+            <button
+              type="button"
+              className="enq-refresh"
+              aria-pressed={selecting}
+              onClick={() => {
+                setSelecting((v) => !v);
+                setPicked(new Set());
+              }}
+            >
+              {selecting ? 'Done' : 'Select'}
+            </button>
+          )}
           <button type="button" className="enq-refresh" onClick={() => refresh()}>
             Refresh
           </button>
@@ -148,6 +199,25 @@ export function EnquiriesCrm({
           </div>
         ))}
       </div>
+
+      {notice && (
+        <div className="enq-notice" role="status">
+          <div>
+            {notice.text}
+            {notice.errors.length > 0 && (
+              <ul>
+                {notice.errors.slice(0, 5).map((e) => (
+                  <li key={e}>{e}</li>
+                ))}
+                {notice.errors.length > 5 && <li>And {notice.errors.length - 5} more.</li>}
+              </ul>
+            )}
+          </div>
+          <button type="button" className="enq-close" aria-label="Dismiss" onClick={() => setNotice(null)}>
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="enq-panel">
         <table className="enq-tbl">
@@ -172,10 +242,22 @@ export function EnquiriesCrm({
               </tr>
             )}
             {leads.map((l) => (
-              <tr key={l.id}>
+              <tr key={l.id} className={selecting && picked.has(l.id) ? 'is-picked' : undefined}>
                 <td>
-                  <b>{l.name}</b>
-                  <div className="enq-email">{l.email}</div>
+                  {selecting ? (
+                    <label className="enq-pickname">
+                      <input type="checkbox" checked={picked.has(l.id)} onChange={() => togglePick(l.id)} />
+                      <span>
+                        <b>{l.name}</b>
+                        <span className="enq-email">{l.email}</span>
+                      </span>
+                    </label>
+                  ) : (
+                    <>
+                      <b>{l.name}</b>
+                      <div className="enq-email">{l.email}</div>
+                    </>
+                  )}
                 </td>
                 <td>
                   {l.town}
@@ -211,6 +293,29 @@ export function EnquiriesCrm({
           </tbody>
         </table>
       </div>
+
+      {selecting && (
+        <div className="enq-selbar">
+          <label className="enq-pickname">
+            <input
+              type="checkbox"
+              checked={allPicked}
+              disabled={!leads.length}
+              onChange={() => setPicked(allPicked ? new Set() : new Set(leads.map((l) => l.id)))}
+            />
+            Select all ({leads.length})
+          </label>
+          <span className="enq-selcount">{pickedIds.length} selected</span>
+          <button
+            type="button"
+            className="enq-btn enq-btn-danger"
+            disabled={!pickedIds.length}
+            onClick={() => setDeleting({ ids: pickedIds })}
+          >
+            Delete selected ({pickedIds.length})
+          </button>
+        </div>
+      )}
 
       {active && (
         <div className="enq-modal" role="dialog" aria-modal="true" onClick={() => setActive(null)}>
@@ -287,10 +392,24 @@ export function EnquiriesCrm({
                   WhatsApp
                 </Link>
               )}
+              {canDelete && (
+                <button
+                  type="button"
+                  className="enq-btn enq-btn-danger enq-btn-end"
+                  onClick={() => {
+                    setDeleting({ ids: [active.id], name: active.name });
+                    setActive(null);
+                  }}
+                >
+                  Delete customer
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {deleting && <DeleteCustomers ids={deleting.ids} name={deleting.name} onClose={() => setDeleting(null)} onDone={deleted} />}
     </div>
   );
 }

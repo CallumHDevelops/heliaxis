@@ -1,0 +1,414 @@
+import 'server-only';
+import { createHash } from 'node:crypto';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { toWaId } from '@/lib/whatsapp/shared';
+import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from './server';
+
+/**
+ * Deleting a customer for good: the enquiry and everything about it. Their opportunities and
+ * timeline, WhatsApp chat (and anything still waiting to send), emails, tasks on their
+ * opportunities, Metis's drafts, the notifications that link to them, and their photos, documents
+ * and signatures in storage. Admins only (the routes check).
+ *
+ * The database goes first, in one statement: deleting the enquiry rows takes every row that
+ * references them or their opportunities with it (on delete cascade in crm.sql, crm-v2.sql,
+ * whatsapp.sql and assistant.sql). Only the notifications, which link by text, are deleted by hand,
+ * just before. Files go last, so a storage hiccup never leaves a half-deleted customer on screen;
+ * a file that won't go is logged. Safe to run twice: someone already gone counts as gone.
+ *
+ * Then a fingerprint of how an import would recognise them (Meta lead id, mobile, email) goes on
+ * the deleted list (deleted-customers.sql), so Enquiries → Import skips them. Nothing else reads
+ * it: a new live lead or WhatsApp message from them comes in as normal. Without the table,
+ * deleting works the same and imports just can't skip them.
+ */
+
+type Db = ReturnType<typeof createAdminClient>;
+type DbError = { code?: string; message: string } | null;
+
+export const MAX_DELETE = 200;
+export const isCustomerId = (s: unknown): s is string =>
+  typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+const LIST = 'crm_deleted_people';
+const PAGE = 1000; // Supabase hands back at most 1,000 rows at a time
+const IN_MAX = 100; // ids per filter, so the request URL stays short
+
+const chunks = <T>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
+const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Unknown error');
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * A table from a later SQL file isn't there yet (a missing column is a real error). Writes to a
+ * missing table come back as a bare 404, with no message.
+ */
+const notThere = (r: { error: DbError; status?: number }) =>
+  !!r.error &&
+  (r.status === 404 || ['42P01', 'PGRST205'].includes(r.error.code ?? '') || /relation .* does not exist|could not find the table/i.test(r.error.message ?? ''));
+
+/** Every row of `table` whose `col` is one of `values`. Optional tables that aren't there yet have none. */
+async function rowsIn<T>(db: Db, table: string, cols: string, col: string, values: string[], optional = false): Promise<T[]> {
+  const out: T[] = [];
+  for (const part of chunks(values, IN_MAX)) {
+    for (let from = 0; ; from += PAGE) {
+      const { data, error, status } = await db.from(table).select(cols).in(col, part).order('id').range(from, from + PAGE - 1);
+      if (error) {
+        if (optional && notThere({ error, status })) return [];
+        throw new Error(`${table}: ${error.message}`);
+      }
+      out.push(...((data ?? []) as T[]));
+      if ((data?.length ?? 0) < PAGE) break;
+    }
+  }
+  return out;
+}
+
+async function countIn(db: Db, table: string, col: string, values: string[]): Promise<number> {
+  let n = 0;
+  for (const part of chunks(values, IN_MAX)) {
+    const { count, error, status } = await db.from(table).select('id', { count: 'exact' }).in(col, part).limit(1);
+    if (error) {
+      if (notThere({ error, status })) return 0;
+      throw new Error(`${table}: ${error.message}`);
+    }
+    n += count ?? 0;
+  }
+  return n;
+}
+
+type Customer = { id: string; name: string; email: string | null; phone: string | null; wa_id?: string | null; meta_lead_id?: string | null };
+type Project = {
+  id: string;
+  enquiry_id: string;
+  accepted_at?: string | null;
+  accepted_signature?: string | null;
+  deposit_paid_at?: string | null;
+};
+
+async function customersIn(db: Db, ids: string[]): Promise<Customer[]> {
+  try {
+    return await rowsIn<Customer>(db, 'enquiries', 'id, name, email, phone, wa_id, meta_lead_id', 'id', ids);
+  } catch (e) {
+    // Before whatsapp.sql there's no wa_id or meta_lead_id.
+    if (!/wa_id|meta_lead_id/.test(errorText(e))) throw e;
+    return rowsIn<Customer>(db, 'enquiries', 'id, name, email, phone', 'id', ids);
+  }
+}
+
+async function projectsOf(db: Db, enquiryIds: string[]): Promise<Project[]> {
+  try {
+    return await rowsIn<Project>(db, 'crm_projects', 'id, enquiry_id, accepted_at, accepted_signature, deposit_paid_at', 'enquiry_id', enquiryIds, true);
+  } catch (e) {
+    // Before crm-v2.sql nobody can sign or pay.
+    if (!/accepted_|deposit_/.test(errorText(e))) throw e;
+    return rowsIn<Project>(db, 'crm_projects', 'id, enquiry_id', 'enquiry_id', enquiryIds, true);
+  }
+}
+
+const signed = (p: Project) => !!(p.accepted_at || p.accepted_signature);
+const paid = (p: Project) => !!p.deposit_paid_at;
+
+/* ── The deleted list ────────────────────────────────────────────────────────── */
+
+export type DeletedKind = 'meta_lead' | 'phone' | 'email';
+
+/**
+ * How an import could recognise someone, as one-way fingerprints: their Meta lead id, mobile
+ * (WhatsApp form, so 07… and +44 … match) and email. Never the details themselves.
+ */
+export function fingerprints(p: { metaLeadId?: string | null; phone?: string | null; waId?: string | null; email?: string | null }) {
+  const keys: [DeletedKind, string][] = [];
+  const lead = p.metaLeadId?.trim();
+  if (lead) keys.push(['meta_lead', lead]);
+  for (const wa of new Set([toWaId(p.phone), toWaId(p.waId)])) if (wa) keys.push(['phone', wa]);
+  const email = p.email?.trim().toLowerCase();
+  if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) keys.push(['email', email]);
+  return keys.map(([kind, value]) => ({ kind, hash: createHash('sha256').update(`heliaxis-deleted:${kind}:${value}`).digest('hex') }));
+}
+
+/** Is the deleted list there (deleted-customers.sql)? */
+export async function deletedListReady(db: Db = createAdminClient()): Promise<boolean> {
+  const { error } = await db.from(LIST).select('hash').limit(1);
+  return !error;
+}
+
+/**
+ * Was someone like this deleted on purpose? Says how they were recognised (their Meta lead id
+ * first), false if not, or null when the deleted list isn't set up yet, so nobody can be skipped.
+ */
+export async function deletedBefore(p: { metaLeadId?: string | null; phone?: string | null; email?: string | null }): Promise<DeletedKind | false | null> {
+  const keys = fingerprints(p);
+  if (!keys.length) return false;
+  const { data, error } = await createAdminClient().from(LIST).select('kind').in('hash', keys.map((k) => k.hash));
+  if (error) return null;
+  const kinds = new Set((data ?? []).map((d) => d.kind as DeletedKind));
+  return (['meta_lead', 'phone', 'email'] as const).find((k) => kinds.has(k)) ?? false;
+}
+
+/* ── What would go ───────────────────────────────────────────────────────────── */
+
+export type DeleteCounts = {
+  opportunities: number;
+  tasks: number;
+  photos: number;
+  documents: number;
+  signatures: number;
+  messages: number;
+  emails: number;
+};
+
+export type DeletePreview = {
+  customers: { id: string; name: string; signed: boolean; paid: boolean }[];
+  /** Ids that aren't in the CRM (already deleted). */
+  gone: number;
+  /** What goes with everyone, and with everyone but those with a signed quote or paid deposit. */
+  counts: { all: DeleteCounts; withoutSigned: DeleteCounts };
+  /** Someone not being deleted has the same WhatsApp number (a duplicate): they stay. */
+  sameNumber: { name: string; other: string }[];
+  /** False until deleted-customers.sql has been run: imports can't skip deleted people yet. */
+  importsSkip: boolean;
+};
+
+async function countsFor(db: Db, enquiryIds: string[], projects: Project[]): Promise<DeleteCounts> {
+  const projectIds = projects.map((p) => p.id);
+  const [tasks, photos, documents, messages, emails] = await Promise.all([
+    countIn(db, 'tasks', 'crm_project_id', projectIds),
+    countIn(db, 'crm_photos', 'project_id', projectIds),
+    countIn(db, 'crm_documents', 'project_id', projectIds),
+    countIn(db, 'whatsapp_messages', 'enquiry_id', enquiryIds),
+    countIn(db, 'crm_emails', 'enquiry_id', enquiryIds),
+  ]);
+  return { opportunities: projects.length, tasks, photos, documents, signatures: projects.filter((p) => p.accepted_signature).length, messages, emails };
+}
+
+/** What deleting these customers would remove, for the confirmation. Changes nothing. */
+export async function previewDelete(ids: string[]): Promise<DeletePreview> {
+  const db = createAdminClient();
+  const unique = [...new Set(ids.filter(isCustomerId).map((s) => s.toLowerCase()))];
+  const found = await customersIn(db, unique);
+  const idSet = new Set(found.map((c) => c.id));
+  const projects = await projectsOf(db, [...idSet]);
+  const customers = found.map((c) => {
+    const mine = projects.filter((p) => p.enquiry_id === c.id);
+    return { id: c.id, name: c.name, signed: mine.some(signed), paid: mine.some(paid) };
+  });
+  const held = new Set(customers.filter((c) => c.signed || c.paid).map((c) => c.id));
+
+  const numbers = [...new Set(found.map((c) => c.wa_id).filter((w): w is string => !!w))];
+  const [all, sharing, importsSkip] = await Promise.all([
+    countsFor(db, [...idSet], projects),
+    rowsIn<{ id: string; name: string; wa_id: string }>(db, 'enquiries', 'id, name, wa_id', 'wa_id', numbers),
+    deletedListReady(db),
+  ]);
+  const withoutSigned = held.size
+    ? await countsFor(db, [...idSet].filter((id) => !held.has(id)), projects.filter((p) => !held.has(p.enquiry_id)))
+    : all;
+
+  const nameOf = new Map(found.map((c) => [c.wa_id, c.name]));
+  return {
+    customers,
+    gone: unique.length - found.length,
+    counts: { all, withoutSigned },
+    sameNumber: sharing.filter((o) => !idSet.has(o.id)).map((o) => ({ name: nameOf.get(o.wa_id) ?? '', other: o.name })),
+    importsSkip,
+  };
+}
+
+/* ── Deleting ────────────────────────────────────────────────────────────────── */
+
+export type DeleteOutcome = {
+  /** Customers deleted. */
+  deleted: number;
+  /** Already gone: deleted before (or meanwhile), or never in the CRM. */
+  gone: number;
+  /** Customers left as they were, and why. `held`: a signed quote or paid deposit, not ticked to include. */
+  errors: { id: string; name: string | null; error: string; held?: boolean }[];
+  /** Files taken out of storage, and ones that wouldn't go (logged). */
+  files: { removed: number; failed: number };
+  /** False when they couldn't go on the deleted list (deleted-customers.sql not run): imports can't skip them. */
+  remembered: boolean;
+};
+
+/**
+ * Delete these customers and everything about them (see the top of this file). Signed quotes and
+ * paid deposits are kept unless `includeSigned`: the business may need those records. Up to 50 at
+ * a time inside; one that fails doesn't stop the rest.
+ */
+export async function deleteCustomers(ids: string[], opts: { includeSigned?: boolean } = {}): Promise<DeleteOutcome> {
+  const db = createAdminClient();
+  const out: DeleteOutcome = { deleted: 0, gone: 0, errors: [], files: { removed: 0, failed: 0 }, remembered: true };
+  const unique = [...new Set(ids.filter(isCustomerId).map((s) => s.toLowerCase()))];
+  for (const part of chunks(unique, 50)) await deleteSome(db, part, !!opts.includeSigned, out);
+  return out;
+}
+
+type Files = { bucket: string; path: string }[];
+
+async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: DeleteOutcome) {
+  const fail = (list: { id: string; name: string | null }[], e: unknown) =>
+    list.forEach((c) => out.errors.push({ id: c.id, name: c.name, error: errorText(e) }));
+
+  // 1. Who they are and what they have. Nothing has changed yet, so any failure here leaves them as they were.
+  let found: Customer[];
+  let projects: Project[];
+  try {
+    found = await customersIn(db, ids);
+    projects = await projectsOf(db, found.map((c) => c.id));
+  } catch (e) {
+    return fail(ids.map((id) => ({ id, name: null })), e);
+  }
+  out.gone += ids.length - found.length;
+
+  const held = new Set(includeSigned ? [] : projects.filter((p) => signed(p) || paid(p)).map((p) => p.enquiry_id));
+  for (const c of found) {
+    if (!held.has(c.id)) continue;
+    const mine = projects.filter((p) => p.enquiry_id === c.id);
+    const what = [mine.some(signed) && 'a signed quote', mine.some(paid) && 'a paid deposit'].filter(Boolean).join(' and ');
+    out.errors.push({ id: c.id, name: c.name, held: true, error: `Kept: ${c.name} has ${what}. Tick to include them.` });
+  }
+  const going = found.filter((c) => !held.has(c.id));
+  if (!going.length) return;
+  const goingIds = new Set(going.map((c) => c.id));
+  const theirs = projects.filter((p) => goingIds.has(p.enquiry_id));
+  const projectIds = theirs.map((p) => p.id);
+
+  // Their files, read before the rows that list them go.
+  let files: Files;
+  let taskIds: string[];
+  try {
+    const [photos, docs, tasks] = await Promise.all([
+      rowsIn<{ project_id: string; storage_path: string }>(db, 'crm_photos', 'project_id, storage_path', 'project_id', projectIds, true),
+      rowsIn<{ project_id: string; storage_path: string }>(db, 'crm_documents', 'project_id, storage_path', 'project_id', projectIds, true),
+      rowsIn<{ id: string }>(db, 'tasks', 'id', 'crm_project_id', projectIds, true),
+    ]);
+    files = [
+      ...photos.flatMap((p) => [p.storage_path, thumbPath(p.storage_path)].map((path) => ({ bucket: CRM_BUCKET, path }))),
+      ...docs.map((d) => ({ bucket: DOCS_BUCKET, path: d.storage_path })),
+      ...theirs.flatMap((p) => (p.accepted_signature ? [{ bucket: DOCS_BUCKET, path: p.accepted_signature }] : [])),
+    ];
+    taskIds = tasks.map((t) => t.id);
+  } catch (e) {
+    return fail(going, e);
+  }
+
+  // 2. Notifications that link to them, their opportunities or those tasks. Links are text, so
+  //    nothing cascades to these; a failure here stops before the customer goes, so it can be re-run.
+  try {
+    await deleteNotifications(db, [...goingIds, ...projectIds, ...taskIds]);
+  } catch (e) {
+    return fail(going, e);
+  }
+
+  // 3. The customers. Everything that references them goes in the same statement.
+  const deleted = new Set<string>();
+  const { data, error } = await db.from('enquiries').delete().in('id', [...goingIds]).select('id');
+  if (!error) {
+    for (const r of data ?? []) deleted.add(r.id as string);
+  } else {
+    // All or nothing: one at a time, so one that can't go doesn't hold up the rest.
+    for (const c of going) {
+      const r = await db.from('enquiries').delete().eq('id', c.id).select('id');
+      if (r.error) out.errors.push({ id: c.id, name: c.name, error: r.error.message });
+      else if (r.data?.length) deleted.add(c.id);
+    }
+  }
+  out.deleted += deleted.size;
+  out.gone += going.filter((c) => !deleted.has(c.id) && !out.errors.some((x) => x.id === c.id)).length;
+  if (!deleted.size) return;
+
+  // 4. On the deleted list, so imports skip them.
+  const prints = new Map(
+    going
+      .filter((c) => deleted.has(c.id))
+      .flatMap((c) => fingerprints({ metaLeadId: c.meta_lead_id, phone: c.phone, waId: c.wa_id, email: c.email }))
+      .map((f) => [f.hash, f])
+  );
+  if (prints.size) {
+    const now = new Date().toISOString();
+    const saved = await db.from(LIST).upsert([...prints.values()].map((f) => ({ ...f, deleted_at: now })), { onConflict: 'hash' });
+    if (saved.error) {
+      out.remembered = false;
+      if (!notThere(saved)) console.error('[delete-customer] deleted list not updated:', saved.error.message || saved.status);
+    }
+  }
+
+  // 5. Their files, plus anything uploaded without being saved (an upload cut off part way).
+  const gonePids = new Set(theirs.filter((p) => deleted.has(p.enquiry_id)).map((p) => p.id));
+  if (!gonePids.size) return;
+  const mine = (f: { bucket: string; path: string }) => {
+    // Only ever inside their own opportunities' folders, never anything shared (the library).
+    const [a, b] = f.path.split('/');
+    return f.bucket === CRM_BUCKET ? gonePids.has(a) : (a === 'projects' || a === 'signatures') && gonePids.has(b);
+  };
+  const extra = await leftoverFiles(db, gonePids);
+  await removeFiles(db, [...files, ...extra].filter(mine), out);
+}
+
+/** Delete notifications whose link mentions any of these ids (all uuids, so no false matches). */
+async function deleteNotifications(db: Db, ids: string[]) {
+  for (const part of chunks(ids, 40)) {
+    const r = await db
+      .from('notifications')
+      .delete()
+      .or(part.map((id) => `href.like.*${id}*`).join(','));
+    if (r.error && !notThere(r)) throw new Error(`notifications: ${r.error.message || r.status}`);
+    if (r.error) return;
+  }
+}
+
+/** Names directly inside a storage folder: [name, isFolder]. Empty if the bucket isn't there yet. */
+async function folder(db: Db, bucket: string, prefix: string): Promise<[string, boolean][]> {
+  const out: [string, boolean][] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await db.storage.from(bucket).list(prefix, { limit: PAGE, offset, sortBy: { column: 'name', order: 'asc' } });
+    if (error || !data) return out;
+    out.push(...data.map((o): [string, boolean] => [o.name, !o.id]));
+    if (data.length < PAGE) return out;
+  }
+}
+
+/**
+ * Files in their opportunities' folders that no row lists. Each bucket's top folders are read once
+ * (not once per opportunity), then only the folders of opportunities being deleted.
+ */
+async function leftoverFiles(db: Db, projectIds: Set<string>): Promise<Files> {
+  const out: Files = [];
+  const walk = async (bucket: string, prefix: string, depth: number) => {
+    for (const [name, isFolder] of await folder(db, bucket, prefix)) {
+      if (!isFolder) out.push({ bucket, path: `${prefix}/${name}` });
+      else if (depth > 0) await walk(bucket, `${prefix}/${name}`, depth - 1);
+    }
+  };
+  const roots: [string, string, number][] = [
+    [CRM_BUCKET, '', 1], // <project>/<category>/<file>
+    [DOCS_BUCKET, 'projects', 0], // projects/<project>/<file>
+    [DOCS_BUCKET, 'signatures', 0], // signatures/<project>/<file>
+  ];
+  try {
+    for (const [bucket, root, depth] of roots) {
+      const here = (await folder(db, bucket, root)).filter(([name, isFolder]) => isFolder && projectIds.has(name));
+      // A few folders at a time: a big batch of customers with photos is a lot of small requests.
+      for (const part of chunks(here, 8)) await Promise.all(part.map(([name]) => walk(bucket, root ? `${root}/${name}` : name, depth)));
+    }
+  } catch (e) {
+    console.error('[delete-customer] could not look for leftover files:', errorText(e));
+  }
+  return out;
+}
+
+async function removeFiles(db: Db, files: Files, out: DeleteOutcome) {
+  const byBucket = new Map<string, Set<string>>();
+  for (const f of files) byBucket.set(f.bucket, (byBucket.get(f.bucket) ?? new Set()).add(f.path));
+  for (const [bucket, paths] of byBucket) {
+    for (const part of chunks([...paths], 100)) {
+      // A missing file (a photo without its thumbnail, say) isn't an error, just not in the list back.
+      const { data, error } = await db.storage
+        .from(bucket)
+        .remove(part)
+        .catch((e: unknown) => ({ data: null, error: { message: errorText(e) } }));
+      if (error) {
+        out.files.failed += part.length;
+        console.error(`[delete-customer] ${plural(part.length, 'file')} not removed from ${bucket}:`, error.message);
+      } else out.files.removed += data?.length ?? 0;
+    }
+  }
+}

@@ -396,3 +396,186 @@ a.enq-refresh {
     max-width: 160px;
   }
 }
+
+/* Admins: Select mode, and deleting customers (DeleteCustomers.tsx). */
+.enq-actions {
+  flex-wrap: wrap;
+}
+.enq-btn {
+  cursor: pointer;
+}
+.enq-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.enq-btn-danger {
+  background: #b4462f;
+  border-color: transparent;
+  color: #fff;
+}
+.enq-btn-end {
+  margin-left: auto;
+}
+.enq-close:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.enq-pickname {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  cursor: pointer;
+}
+.enq-pickname input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--ink);
+}
+.enq-pickname > span {
+  min-width: 0;
+}
+.enq-pickname .enq-email {
+  display: block;
+}
+.enq-tbl tr.is-picked {
+  background: rgba(248, 188, 30, 0.12);
+}
+/* Stays in view at the bottom of the screen (above the phone tab bar) while you tick down the list. */
+.enq-selbar {
+  position: sticky;
+  bottom: var(--hx-tabbar, 0px);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 -4px 14px rgba(33, 31, 24, 0.08);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.enq-selcount {
+  color: var(--muted);
+  font-weight: 400;
+  margin-right: auto;
+}
+.enq-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: rgba(63, 125, 78, 0.08);
+  border: 1px solid rgba(63, 125, 78, 0.35);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.enq-notice ul {
+  margin: 6px 0 0;
+  padding-left: 1.1rem;
+  color: #b4462f;
+  font-size: 0.85rem;
+}
+.enq-notice .enq-close {
+  position: static;
+  font-size: 1.2rem;
+}
+.enq-del-names {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.35rem 0 0.6rem;
+  word-break: break-word;
+}
+.enq-del-what {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0.6rem 0;
+}
+.enq-del-warn {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: rgba(180, 70, 47, 0.07);
+  border: 1px solid rgba(180, 70, 47, 0.35);
+  border-radius: 4px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.enq-del-warn p {
+  margin: 0 0 6px;
+}
+.enq-del-tick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.enq-del-tick input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #b4462f;
+}
+.enq-del-warn .enq-del-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 4px 0 0 26px;
+}
+.enq-del-note {
+  margin: 10px 0;
+  padding: 8px 10px;
+  background: var(--paper);
+  border-radius: 3px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.enq-del-type {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 0.88rem;
+}
+.enq-del-type input {
+  max-width: 220px;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: #fff;
+}
+.enq-del-err {
+  margin: 10px 0 0;
+  color: #b4462f;
+  font-size: 0.88rem;
+}
+ul.enq-del-err {
+  padding-left: 1.1rem;
+}
+@media (max-width: 640px) {
+  .enq-tbl tr.is-picked {
+    background: #fff6dc;
+    border-color: rgba(248, 188, 30, 0.6);
+  }
+  .enq-selbar .enq-btn-danger {
+    width: 100%;
+    justify-content: center;
+  }
+  .enq-btn-end {
+    margin-left: 0;
+  }
+}

@@ -370,6 +370,8 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
+  // Deleting customers works without it; until it's run, Enquiries → Import can bring deleted people back.
+  add(crm && !(await has('crm_deleted_people')), sql('deleted-customers.sql', 'Stops Enquiries → Import bringing back customers you’ve deleted.', 7, 'crm.sql'));
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

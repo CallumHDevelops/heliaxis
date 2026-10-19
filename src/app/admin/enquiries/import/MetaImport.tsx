@@ -25,12 +25,12 @@ type Source = {
   liveLeadsError: string | null;
 };
 type Note = { ok: boolean; text: string };
-type Counts = { imported: number; matched: number; already: number; skipped: number; failed: number };
+type Counts = { imported: number; matched: number; already: number; skipped: number; deleted: number; failed: number };
 type Progress = { done: boolean; counts: Counts; error: string | null };
 type Result = { counts: Counts; errors: string[]; stopped?: string };
 
 const API = '/api/crm/import/meta';
-const ZERO: Counts = { imported: 0, matched: 0, already: 0, skipped: 0, failed: 0 };
+const ZERO: Counts = { imported: 0, matched: 0, already: 0, skipped: 0, deleted: 0, failed: 0 };
 const BATCH = 100;
 const MAX_FILE = 20 * 1024 * 1024;
 
@@ -39,9 +39,10 @@ const add = (a: Counts, b?: Partial<Counts>): Counts => ({
   matched: a.matched + (b?.matched ?? 0),
   already: a.already + (b?.already ?? 0),
   skipped: a.skipped + (b?.skipped ?? 0),
+  deleted: a.deleted + (b?.deleted ?? 0),
   failed: a.failed + (b?.failed ?? 0),
 });
-const sum = (c: Counts) => c.imported + c.matched + c.already + c.skipped + c.failed;
+const sum = (c: Counts) => c.imported + c.matched + c.already + c.skipped + c.deleted + c.failed;
 const num = (n: number) => n.toLocaleString('en-GB');
 const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(ms);
 const formKey = (pageId: string, formId: string) => `${pageId}:${formId}`;
@@ -314,6 +315,7 @@ function FormProgress({ p }: { p: Progress }) {
     `${num(c.matched)} matched`,
     `${num(c.already)} already in`,
     c.skipped ? `${num(c.skipped)} left out` : '',
+    c.deleted ? `${num(c.deleted)} deleted before, skipped` : '',
     c.failed ? `${num(c.failed)} failed` : '',
   ].filter(Boolean);
   return (
@@ -489,12 +491,19 @@ function Summary({ r }: { r: Result }) {
         <Stat n={r.counts.matched} label="matched to someone already in the CRM" />
         <Stat n={r.counts.already} label="already imported" />
         {r.counts.skipped > 0 && <Stat n={r.counts.skipped} label="left out" />}
+        {r.counts.deleted > 0 && <Stat n={r.counts.deleted} label="deleted before, skipped" />}
         <Stat n={r.counts.failed} label="failed" bad />
       </div>
       {r.counts.skipped > 0 && (
         <p className="mi-muted">
           Left out: test leads made with Meta’s testing tool, and leads from the last hour, which reach Enquiries by
           themselves as new leads. If a recent one isn’t there, import again in an hour.
+        </p>
+      )}
+      {r.counts.deleted > 0 && (
+        <p className="mi-muted">
+          Deleted before, skipped: people you deleted from the CRM. If one of them sends a new lead or a WhatsApp, it
+          still comes in as normal.
         </p>
       )}
       {r.stopped && <p className="imp-err">{r.stopped}</p>}

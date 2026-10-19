@@ -12,6 +12,7 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
 2. `supabase/crm-v2.sql` — customer portal, documents, library, saved replies, email, reminders,
    lead routing, sequences, booking, quote acceptance, deposits.
 3. `supabase/assistant.sql` — Metis's (the assistant's) conversations and drafts.
+4. `supabase/deleted-customers.sql` — so Enquiries → Import skips customers you've deleted (see section 8).
 
 Admins see anything still to do as **From Claude** on the dashboard and the Tasks page. Each item
 ticks itself off once the app can see it's done. To pass one to someone else, open it and pick them
@@ -105,3 +106,16 @@ emails/WhatsApps as **drafts**. Nothing reaches a customer until someone checks 
 
 She runs on Claude Opus 5.5 (Anthropic). If Claude declines a request by mistake, the API automatically retries it on
 Anthropic's recommended fallback model.
+
+## 8. Deleting customers
+
+Admins only. On **Enquiries**, open someone and tap **Delete customer**, or tap **Select**, tick
+people (or **Select all**) and **Delete selected**. Everything about them goes: their details,
+timeline, WhatsApp chat, emails, opportunities with their tasks, photos, documents and signatures,
+and the notifications about them. It can't be undone. Anyone with a signed quote or a paid deposit is
+kept unless you tick to include them, and deleting more than 5 at once asks you to type DELETE.
+
+Deleted people aren't brought back by **Import** (Meta, CSV or WhatsApp chats): it lists them as
+"deleted before, skipped". Only a one-way fingerprint of their Meta lead id, mobile and email is
+kept for this, never the details. If they send a new lead or a WhatsApp, it still comes in as normal.
+This needs `supabase/deleted-customers.sql`; until it's run, deleting works but imports can't skip them.
