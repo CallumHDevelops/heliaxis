@@ -88,21 +88,30 @@ async function has(table: string, column = '*') {
   }
 }
 
+/**
+ * Can anyone still give themselves a social studio account? null when we can't tell (no studio
+ * keys, or its Supabase didn't answer), so the card doesn't nag on a guess.
+ */
+async function socialSignupsOpen(): Promise<boolean | null> {
+  const url = process.env.SOCIAL_SUPABASE_URL;
+  const key = process.env.SOCIAL_SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  try {
+    const res = await fetch(`${url.replace(/\/+$/, '')}/auth/v1/settings`, {
+      headers: { apikey: key },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const settings = (await res.json()) as { disable_signup?: boolean };
+    return settings.disable_signup === false;
+  } catch {
+    return null;
+  }
+}
+
 /** One-off jobs that can't be checked from here. Bump the id to ask again. */
 const MANUAL: SetupTodo[] = [
-  {
-    id: 'q-social-sso',
-    kind: 'question',
-    title: 'Can Claude change how the social studio signs you in?',
-    detail:
-      'So Social media studio opens already signed in, like RAMS. It needs a five-line change to the studio’s own sign-in page (the Social_Content_Creator branch), which Claude won’t make without your go-ahead.',
-    steps: [
-      'Type **yes** or **no** in the answer box below and tap **Send to Claude** (or reply in your Claude Code chat).',
-      'If Claude later says a safety check stopped it, allow it in Claude Code’s permission settings, or ask Claude for the change so you can paste it in yourself.',
-    ],
-    order: 1,
-    manual: true,
-  },
   {
     id: 'q-cut-out-image',
     kind: 'question',
@@ -319,7 +328,7 @@ export async function visibleSetupTodos(profileId: string, isAdmin: boolean): Pr
 }
 
 export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> {
-  const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, sso, done, assign] = await Promise.all([
+  const [crm, crmV2, assistant, notifications, whatsapp, chasers, nativePush, sso, socialSignups, done, assign] = await Promise.all([
     has('crm_projects', 'next_step'),
     has('crm_documents'),
     has('assistant_drafts'),
@@ -328,6 +337,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     has('whatsapp_outbox', 'kind'),
     has('native_push_tokens'),
     has('sso_email_proofs'),
+    socialSignupsOpen(),
     doneManual(),
     preloaded ?? setupAssignments(),
   ]);
@@ -360,7 +370,29 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
-  add(env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && !sso, sql('sso.sql', 'Lets people open RAMS without signing in again (each confirms their email once).', 13));
+  // Needed by one-tap sign-in to either app (one email check covers both).
+  const ssoApps = [
+    env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',
+    env('SOCIAL_SUPABASE_URL', 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY') && 'the social studio',
+  ].filter(Boolean);
+  add(!!ssoApps.length && !sso, sql('sso.sql', `Lets people open ${ssoApps.join(' and ')} without signing in again (each confirms their email once).`, 13));
+  const socialRef = (process.env.SOCIAL_SUPABASE_URL || '').match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
+  add(socialSignups === true, {
+    id: 'social-signups-off',
+    title: 'Make the social studio invite-only',
+    detail:
+      'Anyone can still give themselves a social studio account. Someone could set one up under a colleague’s email before the colleague does, and get into it once the colleague signs in.',
+    steps: [
+      'Tap **Open Supabase** and pick the **social studio** project if it asks (not the Heliaxis one, and not RAMS).',
+      '**Authentication** (left menu) → **Sign In / Providers** (on older screens, **Providers** or **Settings**).',
+      'Turn off **Allow new users to sign up** and tap **Save**. People who already have a studio account can still sign in.',
+      'From now on, give people **Social media studio** access in **Users** here. Their studio account is set up the first time they open it from the Heliaxis menu. Taking that access away, or rejecting someone, only removes the button. They can still sign in at the studio itself, so delete them there too (**Manage users** in the studio, or **Authentication** → **Users** in its Supabase).',
+      'Come back here and refresh. This item disappears once it’s worked.',
+    ],
+    href: socialRef ? `https://supabase.com/dashboard/project/${socialRef}/auth/providers` : 'https://supabase.com/dashboard',
+    hrefLabel: 'Open Supabase',
+    order: 14,
+  });
   add(!fcmConfigured(), {
     id: 'env-firebase',
     title: 'Set up native Android notifications',
@@ -570,6 +602,28 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     href: 'https://supabase.com/dashboard',
     hrefLabel: 'Open Supabase',
     order: 40,
+    optional: true,
+  });
+  add(!env('SOCIAL_SUPABASE_URL', 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY'), {
+    id: 'env-social-sso',
+    title: 'Open the social studio without signing in again',
+    detail:
+      'Two keys from the social studio’s database let the Heliaxis menu open Social media studio already signed in. The first time each person taps it, they type in a code we email them, unless they’ve already done that for RAMS.',
+    steps: [
+      'Open [Supabase](https://supabase.com/dashboard) and pick the **social studio** project (not the Heliaxis one, and not RAMS).',
+      '**Project Settings** (cog, bottom left) → **Data API** (on some screens just **API**).',
+      'Copy the **Project URL**. That’s the value for `SOCIAL_SUPABASE_URL`.',
+      'Still in Project Settings, open **API Keys** (on older screens it’s further down the same page). Find the **service_role** key (if there’s a **Legacy API keys** tab, it’s on that tab), reveal it and copy it. That’s `SOCIAL_SUPABASE_SERVICE_ROLE_KEY`, and it’s a password: tick **Sensitive** in Vercel.',
+      ...VERCEL_STEPS,
+      'Then run sso.sql if it appears on this card. From then on, staff with **Social media studio** access in **Users** get a studio account automatically the first time they open it, under the same email as their Heliaxis login. Anyone who already has a studio account under that email keeps it. If that account is blocked, or its email was never confirmed, they see the studio’s own sign-in instead. When someone leaves or loses Social media studio access, also delete them in the studio’s **Manage users**. Removing access here doesn’t sign them out of the studio.',
+    ],
+    copies: [
+      { label: 'Key', value: 'SOCIAL_SUPABASE_URL' },
+      { label: 'Key', value: 'SOCIAL_SUPABASE_SERVICE_ROLE_KEY' },
+    ],
+    href: 'https://supabase.com/dashboard',
+    hrefLabel: 'Open Supabase',
+    order: 41,
     optional: true,
   });
   add(!env('GITHUB_ANSWERS_TOKEN'), {
