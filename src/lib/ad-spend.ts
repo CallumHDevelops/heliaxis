@@ -122,7 +122,7 @@ export function adAccountNumber(raw: string | null | undefined): string | null {
 // ── Dates ──
 
 /** The date ('YYYY-MM-DD') of a moment in a time zone (Europe/London if Meta's name for it isn't known here). */
-export function dayIn(at: number | Date, timeZone: string): string {
+export function dayIn(at: number | string | Date, timeZone: string): string {
   const fmt = (tz: string) =>
     new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(at));
   let parts: Intl.DateTimeFormatPart[];
@@ -229,7 +229,7 @@ type Target = { kind: 'ad'; id: string } | { kind: 'name'; name: string } | { ki
 function otherLabel(source: string): { label: string; note: string } {
   const s = source.trim();
   const rest = s.replace(/^[^:]*:/, '').trim();
-  if (/^meta\s*:/i.test(s)) return { label: rest || 'Meta lead form', note: 'Not in Meta’s figures for this period: the ad may have been renamed or deleted' };
+  if (/^meta\s*:/i.test(s)) return { label: rest || 'Meta lead form', note: 'Not in Meta’s figures for this period: renamed or deleted?' };
   if (/^meta-ad\s*:/i.test(s)) return { label: `Website: ${rest}`, note: 'Campaign not in Meta’s figures for this period' };
   if (/^meta-ad\s*$/i.test(s)) return { label: 'Website, from a Meta ad', note: 'The ad link didn’t say which campaign' };
   if (/^whatsapp-ad\s*$/i.test(s)) return { label: 'WhatsApp ad chats', note: 'Which ad wasn’t recorded' };
@@ -319,7 +319,7 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
     }
     if (key.startsWith('web:')) {
       const id = key.slice(4);
-      return { ...blank(key, 'Website enquiries', 'From this campaign’s ad links; the ad wasn’t recorded'), group: `c:${id}`, groupLabel: campaignName(id) };
+      return { ...blank(key, 'Website enquiries', 'Ad links that didn’t say which ad'), group: `c:${id}`, groupLabel: campaignName(id) };
     }
     return { ...blank(key, ''), group: OTHER_GROUP, groupLabel: 'Other Meta leads and spend' };
   };
@@ -349,7 +349,7 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
   }
   const listed = ads.reduce((n, a) => n + a.spend, 0);
   if (account && account.spend > listed) {
-    const r = row('other:unlisted', () => ({ ...make('other:unlisted'), label: 'Ads Meta no longer lists', note: 'Deleted or archived ads: Meta only gives their total' }));
+    const r = row('other:unlisted', () => ({ ...make('other:unlisted'), label: 'Ads Meta no longer lists', note: 'Deleted or archived: Meta gives only their total' }));
     r.spend = account.spend - listed;
     r.metaLeads = Math.max(0, account.metaLeads - ads.reduce((n, a) => n + a.metaLeads, 0));
   }
@@ -405,17 +405,20 @@ export function adMoney(minor: number | null | undefined, currency = 'GBP'): str
 /** Spend ÷ how many (leads, surveys or sales), in pence; null when there's nothing to divide. */
 export const costPer = (spend: number | null | undefined, n: number): number | null => (spend == null || n <= 0 ? null : spend / n);
 
+/** One of the currency: "£1", "€1", "US$1". */
+export function currencyUnit(currency = 'GBP'): string {
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(1);
+  } catch {
+    return `${currency} 1`;
+  }
+}
+
 /** £ won for each 1 of spend: "£4.20 per £1" ("£4.20 per €1" for a euro account), or "—" with no spend. */
 export function returnOn(value: number, spend: number | null | undefined, currency = 'GBP'): string {
   if (spend == null || spend <= 0) return '—';
   const per = (Number(value) || 0) / (spend / 100);
-  let unit = `${currency} 1`;
-  try {
-    unit = new Intl.NumberFormat('en-GB', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(1);
-  } catch {
-    // An unknown currency code: "XYZ 1".
-  }
-  return `${per.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} per ${unit}`;
+  return `${per.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 })} per ${currencyUnit(currency)}`;
 }
 
 // ── Meta's errors, in plain words ──

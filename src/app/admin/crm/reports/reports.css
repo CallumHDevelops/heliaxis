@@ -1,0 +1,84 @@
+/* Reports: the source table with Meta ad spend (CrmReports.tsx). Builds on crm.css's .crm-table. */
+.rp-table {
+  --rp-tint: #fbf3dc;
+  min-width: 1000px;
+}
+/* The name stays in view while the numbers scroll sideways (phones). Solid backgrounds, so nothing shows through. */
+.rp-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card);
+  box-shadow: 1px 0 0 var(--line);
+}
+.rp-table tbody th small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: normal;
+}
+/* "All Meta ads" and "Other sources". */
+.rp-table tr.rp-section th,
+.rp-table tr.rp-section td {
+  background: var(--rp-tint);
+  font-weight: 700;
+}
+/* A campaign, then its ads indented beneath. */
+.rp-table tr.rp-group th {
+  font-weight: 700;
+  padding-left: 1rem;
+}
+.rp-table tr.rp-item th {
+  font-weight: 500;
+  padding-left: 2rem;
+}
+.rp-table tr.rp-item td {
+  color: #45423a;
+}
+.rp-table tr.rp-item td b {
+  font-weight: 600;
+}
+.rp-return {
+  white-space: nowrap;
+}
+.rp-note {
+  margin: 0.5rem 0 0;
+  max-width: 75ch;
+}
+.rp-note p {
+  margin: 0 0 0.35rem;
+}
+.rp-setup a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  /* The period buttons get a line of their own rather than being cut off. */
+  .crm-reports .crm-head {
+    flex-wrap: wrap;
+  }
+  .crm-reports .crm-viewtoggle button {
+    white-space: nowrap;
+  }
+  .crm-reports .crm-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .crm-reports .crm-kpis b {
+    font-size: 1.3rem;
+  }
+  /* Names wrap rather than push the numbers off the screen. */
+  .crm-table.rp-table tbody th {
+    white-space: normal;
+    min-width: 130px;
+    max-width: 150px;
+  }
+  .rp-table tr.rp-group th {
+    padding-left: 0.7rem;
+  }
+  .rp-table tr.rp-item th {
+    padding-left: 1.2rem;
+  }
+}
