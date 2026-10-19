@@ -159,9 +159,14 @@ export const START_REPLY = 'Thanks, automatic WhatsApp messages from us are back
 /**
  * A STOP or START reply from this number: every enquiry with it, including ones where the phone was
  * typed another way. STOP → not allowed, 'stop-reply'; START → allowed, 'inbound'. Returns the
- * enquiries that changed.
+ * enquiries that changed, and whether it could be recorded (before crm-v3.sql a STOP can't be told
+ * apart from "never asked", so it isn't enforced yet).
  */
-export async function applyStopReply(waId: string, word: 'stop' | 'start', at = new Date().toISOString()): Promise<{ changed: string[]; all: string[] }> {
+export async function applyStopReply(
+  waId: string,
+  word: 'stop' | 'start',
+  at = new Date().toISOString()
+): Promise<{ changed: string[]; all: string[]; recorded: boolean }> {
   const db = createAdminClient();
   const { data } = await db.from('enquiries').select('*').or(numberFilter(waId)).limit(200);
   const found = (data ?? []) as PermissionRow[];
@@ -169,8 +174,8 @@ export async function applyStopReply(waId: string, word: 'stop' | 'start', at = 
   const typed = found.filter((r) => !r.wa_id && toWaId(r.phone) === waId);
   const rows = [...byWa, ...typed];
   const target = rows.filter((r) => (word === 'stop' ? !isStopped(r) : r.whatsapp_opt_in !== true));
+  const record = rows.some(hasRecordColumns);
   if (target.length) {
-    const record = rows.some(hasRecordColumns);
     const { error } = await db
       .from('enquiries')
       .update({
@@ -178,9 +183,9 @@ export async function applyStopReply(waId: string, word: 'stop' | 'start', at = 
         ...(record ? { whatsapp_opt_in_at: at, whatsapp_opt_in_source: word === 'stop' ? STOP_SOURCE : 'inbound' } : {}),
       })
       .in('id', target.map((r) => r.id));
-    if (error) return { changed: [], all: rows.map((r) => r.id) };
+    if (error) return { changed: [], all: rows.map((r) => r.id), recorded: false };
   }
-  return { changed: target.map((r) => r.id), all: rows.map((r) => r.id) };
+  return { changed: target.map((r) => r.id), all: rows.map((r) => r.id), recorded: record };
 }
 
 /**

@@ -185,8 +185,8 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   // STOP / START change their WhatsApp permission; any other message from them counts as agreeing
   // (the first time; it never undoes a STOP).
   const word = kind === 'text' ? stopWord(body) : null;
-  if (word) await stopOrStart(db, { ...enquiry, wa_last_inbound_at: at }, m.from, word, at);
-  else await grantPermission(enquiry.id, 'inbound', { at });
+  const kept = word ? await stopOrStart(db, { ...enquiry, wa_last_inbound_at: at }, m.from, word, at) : false;
+  if (!word) await grantPermission(enquiry.id, 'inbound', { at });
 
   // They answered — stop any follow-up sequence on their opportunities.
   await db
@@ -211,8 +211,9 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
 
   const who = enquiry.name || `+${m.from}`;
   const lines = [body.slice(0, 140)];
-  if (word === 'stop') lines.push('Automatic WhatsApps to them are now off. You can still reply by hand.');
-  if (word === 'start') lines.push('Automatic WhatsApps to them are back on.');
+  if (word && !kept) lines.push('Run crm-v3.sql in Supabase (it’s on the to-do list) so the app can keep STOP replies.');
+  else if (word === 'stop') lines.push('Automatic WhatsApps to them are now off. You can still reply by hand.');
+  else if (word === 'start') lines.push('Automatic WhatsApps to them are back on.');
   if (queued) lines.push(`Smart reply “${queued.rule}” sends in ~${Math.max(1, Math.round(queued.seconds / 60))} min — tap to check, edit or cancel.`);
   await notifyEnquiryTeam(created ? `New WhatsApp lead: ${who}` : `WhatsApp from ${who}`, lines.join('\n'), inboxHref(enquiry.id), {
     tag: `wa-${enquiry.id}`,
@@ -231,9 +232,10 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
 /**
  * STOP: no more automatic WhatsApps to anyone with this number (whatever the permission rule says),
  * with one confirmation; nothing queued for them goes. START turns them back on. Logged on each.
+ * False if it couldn't be kept (crm-v3.sql not run yet), so nothing is promised.
  */
-async function stopOrStart(db: Db, enquiry: EnquiryWa, waId: string, word: 'stop' | 'start', at: string) {
-  const { changed, all } = await applyStopReply(waId, word, at);
+async function stopOrStart(db: Db, enquiry: EnquiryWa, waId: string, word: 'stop' | 'start', at: string): Promise<boolean> {
+  const { changed, all, recorded } = await applyStopReply(waId, word, at);
   if (!all.includes(enquiry.id)) all.push(enquiry.id);
   if (word === 'stop') {
     await db
@@ -242,13 +244,15 @@ async function stopOrStart(db: Db, enquiry: EnquiryWa, waId: string, word: 'stop
       .in('enquiry_id', all)
       .eq('status', 'pending');
   }
-  if (!changed.length) return; // already stopped (or started): they've had the confirmation
+  if (!recorded) return false;
+  if (!changed.length) return true; // already stopped (or started): they've had the confirmation
   if (whatsappConfigured()) await deliver(db, enquiry, { text: word === 'stop' ? STOP_REPLY : START_REPLY }, { via: 'stop-reply' });
   const body =
     word === 'stop'
       ? 'Replied STOP: no more automatic WhatsApp messages (reminders, follow-ups, smart replies)'
       : 'Replied START: automatic WhatsApp messages are back on';
   await Promise.all(changed.map((id) => logActivity({ enquiryId: id, kind: 'system', body }).catch(() => null)));
+  return true;
 }
 
 /** Queue the matching smart reply, unless a person is handling this chat. */
