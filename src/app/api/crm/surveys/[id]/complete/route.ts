@@ -176,19 +176,33 @@ export async function POST(req: Request, { params }: Ctx) {
   const who = personName(s.profile);
   const label = kindLabel(survey.type);
 
-  // The site address, if it was corrected on site.
-  const a3 = (answers.A3 && typeof answers.A3 === 'object' ? answers.A3 : {}) as { address?: unknown; postcode?: unknown };
-  const address = String(a3.address ?? '').trim();
-  const postcode = String(a3.postcode ?? '').trim().toUpperCase();
-  if (survey.type === 'solar' && address && postcode) {
-    const was = [project.address, project.postcode].map((x) => String(x ?? '').trim());
-    if (address !== was[0] || postcode !== was[1].toUpperCase()) {
+  // The site address, if the surveyor changed it on site. A3.was is what the form started with (the
+  // job's address then); surveys started before it was kept compare with the job's address now.
+  type Addr = { address?: unknown; postcode?: unknown };
+  const norm = (x: Addr) => [String(x.address ?? '').trim(), String(x.postcode ?? '').trim().toUpperCase()] as const;
+  const a3 = (answers.A3 && typeof answers.A3 === 'object' ? answers.A3 : {}) as Addr & { was?: unknown };
+  const [address, postcode] = norm(a3);
+  const job = norm(project);
+  const start = a3.was && typeof a3.was === 'object' ? norm(a3.was as Addr) : job;
+  const edited = address !== start[0] || postcode !== start[1];
+  if (survey.type === 'solar' && address && postcode && edited && (address !== job[0] || postcode !== job[1])) {
+    const jobWords = job.filter(Boolean).join(', ') || 'none';
+    if (start[0] !== job[0] || start[1] !== job[1]) {
+      // The office changed the job's address too while the survey was open: keep theirs and say so.
+      await logActivity({
+        enquiryId: survey.enquiry_id,
+        projectId: project.id,
+        kind: 'system',
+        body: `Site address at the survey: ${address}, ${postcode}. The job’s address was changed while the survey was open, so it was kept (${jobWords}). Check which is right.`,
+        byId: s.user.id,
+      }).catch(() => null);
+    } else {
       await db.from('crm_projects').update({ address, postcode, updated_at: now }).eq('id', project.id);
       await logActivity({
         enquiryId: survey.enquiry_id,
         projectId: project.id,
         kind: 'system',
-        body: `Site address changed at the survey: ${was.filter(Boolean).join(', ') || 'none'} → ${address}, ${postcode}`,
+        body: `Site address changed at the survey: ${jobWords} → ${address}, ${postcode}`,
         byId: s.user.id,
       }).catch(() => null);
     }

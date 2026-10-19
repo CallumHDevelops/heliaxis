@@ -198,10 +198,19 @@ export function scopeFor(products: string[]): string {
   return 'solar';
 }
 
-/** Pre-filled answers for a new solar survey: the site address, the scope and the first roof area. */
+/**
+ * Pre-filled answers for a new solar survey: the site address, the scope and the first roof area.
+ * A3.was is the job's own address at the time, so finishing only changes the job's address if the
+ * surveyor changed it (not because the office corrected the job meanwhile).
+ */
 export function defaultsFor(project: ProjectRow, customerPostcode?: string | null): Answers {
+  const address = String(project.address ?? '').trim();
   return {
-    A3: { address: String(project.address ?? '').trim(), postcode: String(project.postcode ?? customerPostcode ?? '').trim().toUpperCase() },
+    A3: {
+      address,
+      postcode: String(project.postcode ?? customerPostcode ?? '').trim().toUpperCase(),
+      was: { address, postcode: String(project.postcode ?? '').trim().toUpperCase() },
+    },
     A4: scopeFor(productsOf(project)),
     roofs: [{ id: 'r1', R1: 'Roof area 1' }],
   };

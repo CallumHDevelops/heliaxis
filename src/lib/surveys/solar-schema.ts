@@ -27,7 +27,7 @@ export type FieldType =
   | 'compass' // 0, 45 … 315 (or any degrees from the phone compass)
   | 'pitch' // degrees
   | 'signature' // { name, at } once the customer has signed; the image itself goes up with "Finish"
-  | 'address' // { address, postcode }
+  | 'address' // { address, postcode, was? } (was: the job's address it was pre-filled from)
   | 'system'; // Z1 suggested system { panels, kwp, faces, inverter, inverterKw, batteryKwh }
 
 export type Level = 'must' | 'should' | 'optional';
