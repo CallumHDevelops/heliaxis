@@ -123,6 +123,11 @@ export type FindResult = FindOk | FindFail;
 /** A route's reply. */
 export type Outcome = { status: number; body: Record<string, unknown> };
 export type Staff = { id: string; name: string };
+/** The signed-in staff member, by first name ("Booked by Esther"). */
+export const staffFrom = (s: { user: { id: string }; profile: { full_name: string | null; email: string | null } }): Staff => ({
+  id: s.user.id,
+  name: firstName(s.profile.full_name) || (s.profile.email || 'staff').split('@')[0],
+});
 
 /** Customers never see who, how far, or anyone else's details. */
 export function publicDays(days: SlotDay[]): SlotDay<SlotTime>[] {

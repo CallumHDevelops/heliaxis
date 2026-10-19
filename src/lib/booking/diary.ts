@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { installDayList } from '@/lib/bank-holidays';
 import { calendarView, msConfigured, type CalEvent } from '@/lib/ms365';
 import { surveyTypeFor, isSurveyType } from '@/lib/crm/stages';
-import { addDays, dayRange, londonSlot, ukDate, type Item, type Place } from './engine';
+import { addDays, dayRange, londonSlot, ukDate, ukTime, type Item, type Place } from './engine';
 import { isHit, lookupPostcode, normPostcode, placeFromHit, placeFromStored, prefetchPostcodes, resolvePlace, POSTCODE_IN_TEXT } from './geo';
 import type { BookingSettings, Surveyor } from './settings';
 
@@ -535,4 +535,132 @@ export async function placeForPostcode(pc: string): Promise<{ place: Place; appr
   const hit = await lookupPostcode(k);
   if (!isHit(hit)) return hit;
   return { place: placeFromHit(hit), approx: !!hit.approx };
+}
+
+/* ── His own diary entries: what the + Add to my diary sheet sends ───────────── */
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const UUID = /^[0-9a-f-]{36}$/i;
+
+export type EntryWrite = Pick<
+  EntryRow,
+  'surveyor_key' | 'kind' | 'title' | 'all_day' | 'starts_at' | 'ends_at' | 'day_from' | 'day_to' | 'where_kind' | 'address' | 'postcode' | 'lat' | 'lng' | 'project_id'
+>;
+
+/**
+ * A diary entry from the sheet (a new one, or changes on top of `current`). Timed entries take
+ * `day` + `start` + `end` ('HH:MM', UK time) or `starts_at` + `ends_at`; all-day entries take
+ * `day_from` + `day_to`. "At an address" needs a postcode, which is looked up here.
+ */
+export async function entryFromInput(raw: Record<string, unknown>, current: EntryRow | null, s: BookingSettings): Promise<{ row: EntryWrite } | { error: string }> {
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(raw, k);
+  const str = (k: string, max: number) => (typeof raw[k] === 'string' ? (raw[k] as string).trim().slice(0, max) : '');
+  const keys = s.surveyors.map((x) => x.key);
+  const surveyor = has('surveyor_key') ? str('surveyor_key', 200).toLowerCase() : (current?.surveyor_key ?? keys[0] ?? '');
+  if (!surveyor || (keys.length && !keys.includes(surveyor) && surveyor !== current?.surveyor_key)) return { error: 'Pick whose diary it goes in.' };
+  const kind = (has('kind') ? str('kind', 20) : current?.kind) as EntryKind;
+  if (!ENTRY_KINDS.includes(kind)) return { error: 'Pick what it is: site visit, install, meeting, personal or other.' };
+  const title = has('title') ? str('title', 120) : (current?.title ?? '');
+  const allDay = has('all_day') ? raw.all_day === true : (current?.all_day ?? false);
+
+  let starts: string | null = null;
+  let ends: string | null = null;
+  let from: string | null = null;
+  let to: string | null = null;
+  if (allDay) {
+    from = has('day_from') ? str('day_from', 10) : (current?.day_from ?? (has('day') ? str('day', 10) : ''));
+    to = has('day_to') ? str('day_to', 10) : (current?.day_to ?? from);
+    if (!from || !YMD.test(from) || !to || !YMD.test(to)) return { error: 'Pick the day (and the last day, if it’s more than one).' };
+    if (to < from) return { error: 'The last day is before the first.' };
+    if (Date.parse(to) - Date.parse(from) > 90 * 86_400_000) return { error: 'That’s more than 3 months. Add it in parts.' };
+  } else if (has('day') || has('start') || has('end')) {
+    const day = str('day', 10);
+    const a = str('start', 5);
+    const b = str('end', 5);
+    if (!YMD.test(day) || !HHMM.test(a) || !HHMM.test(b)) return { error: 'Pick the day, start and end.' };
+    starts = new Date(londonSlot(day, a)).toISOString();
+    ends = new Date(b > a ? londonSlot(day, b) : londonSlot(addDays(day, 1), b)).toISOString();
+  } else {
+    starts = has('starts_at') ? str('starts_at', 40) : (current?.starts_at ?? '');
+    ends = has('ends_at') ? str('ends_at', 40) : (current?.ends_at ?? '');
+    if (!Number.isFinite(Date.parse(starts || '')) || !Number.isFinite(Date.parse(ends || ''))) return { error: 'Pick the day, start and end.' };
+    starts = new Date(Date.parse(starts as string)).toISOString();
+    ends = new Date(Date.parse(ends as string)).toISOString();
+  }
+  if (!allDay) {
+    const len = Date.parse(ends as string) - Date.parse(starts as string);
+    if (len <= 0) return { error: 'The end is before the start.' };
+    if (len > 24 * 3_600_000) return { error: 'That’s longer than a day. Use “All day” instead.' };
+  }
+
+  const whereKind = (has('where_kind') ? str('where_kind', 10) : (current?.where_kind ?? 'address')) as EntryRow['where_kind'];
+  if (!['address', 'home', 'online'].includes(whereKind)) return { error: 'Pick where it is.' };
+  let address: string | null = has('address') ? str('address', 200) || null : (current?.address ?? null);
+  let postcode: string | null = has('postcode') ? str('postcode', 12) || null : (current?.postcode ?? null);
+  let lat: number | null = current?.lat ?? null;
+  let lng: number | null = current?.lng ?? null;
+  if (whereKind === 'address') {
+    const k = normPostcode(postcode);
+    if (!k) return { error: 'Add the postcode, so travel can be worked out.' };
+    if (!current || normPostcode(current.postcode) !== k || current.lat == null) {
+      const found = await placeForPostcode(k);
+      if ('error' in found) return { error: found.error === 'unavailable' ? 'We can’t look up postcodes right now. Try again in a minute.' : 'We couldn’t find that postcode.' };
+      lat = found.place.ll?.lat ?? null;
+      lng = found.place.ll?.lng ?? null;
+    }
+    postcode = `${k.slice(0, -3)} ${k.slice(-3)}`;
+  } else {
+    address = null;
+    postcode = null;
+    lat = null;
+    lng = null;
+  }
+  const projectRaw = has('project_id') ? raw.project_id : (current?.project_id ?? null);
+  const project = typeof projectRaw === 'string' && UUID.test(projectRaw) ? projectRaw : null;
+  return {
+    row: {
+      surveyor_key: surveyor,
+      kind,
+      title,
+      all_day: allDay,
+      starts_at: allDay ? null : starts,
+      ends_at: allDay ? null : ends,
+      day_from: allDay ? from : null,
+      day_to: allDay ? to : null,
+      where_kind: whereKind,
+      address,
+      postcode,
+      lat,
+      lng,
+      project_id: project,
+    },
+  };
+}
+
+/** An entry for the Diary and the sheet: plain fields plus UK day and times. */
+export function entryView(e: EntryRow) {
+  const s = e.starts_at ? Date.parse(e.starts_at) : null;
+  const en = e.ends_at ? Date.parse(e.ends_at) : null;
+  return {
+    id: e.id,
+    surveyorKey: e.surveyor_key,
+    kind: e.kind,
+    kindLabel: ENTRY_KIND_LABEL[e.kind] ?? 'Busy',
+    title: e.title,
+    allDay: e.all_day,
+    startsAt: e.starts_at,
+    endsAt: e.ends_at,
+    day: s != null ? ukDate(s) : e.day_from,
+    start: s != null ? ukTime(s) : null,
+    end: en != null ? ukTime(en) : null,
+    dayFrom: e.day_from,
+    dayTo: e.day_to,
+    whereKind: e.where_kind,
+    address: e.address,
+    postcode: e.postcode,
+    projectId: e.project_id,
+    inOutlook: !!e.outlook_event_id,
+    outlookError: e.calendar_error,
+  };
 }
