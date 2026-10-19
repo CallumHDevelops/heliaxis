@@ -26,6 +26,7 @@ import './dock.css';
  * - a 56px strip of chat heads from 1024px wide (the people waiting, with counts);
  * - the panel, docked open from 1280px or over the page below that: Chats (the list, or one chat) and,
  *   on a job page, This job (the record page's Tasks card, put here by the page, and the customer's chat).
+ *   Docked on a job page, Chats keeps the job's Tasks card under the list, so Tasks stay on the right.
  * Phones have no dock and make no requests.
  */
 
@@ -154,7 +155,9 @@ export function WhatsAppDock({
   // The live row for the open chat (fresh counts and window), or what was kept.
   const openRow = thread ? (rows?.find((r) => r.threadId === thread.threadId) ?? thread) : null;
   const jobRow = jobHere?.threadId ? (rows?.find((r) => isJobsChat(jobHere, r)) ?? rowFromJob(jobHere, canInbox)) : null;
-  const tasksSlot = docked && tab === 'job' && !!jobHere;
+  // The job's Tasks stay on the right whichever tab is showing: over its chat on This job, under the
+  // list or the other chat on Chats (the owner's "tasks on the right"). Where it is, for the page.
+  const tasksSlot: Tab | null = docked && jobHere ? tab : null;
 
   // A record page that never says which job it is: stop waiting.
   useEffect(() => {
@@ -171,7 +174,8 @@ export function WhatsAppDock({
     }
   }, [threadState, tabSel]);
 
-  // Tell the page (the record page's Tasks card, the CRM home) whenever anything here changes.
+  // Tell the page (the record page's Tasks card, the CRM home) whenever anything here changes, including
+  // the Tasks space moving between the tabs (the page puts its card in the new one).
   useEffect(() => {
     const detail: DockStateDetail = { state, panel, overlay, tasksSlot: tasksSlot ? SLOT : null };
     window.dispatchEvent(new CustomEvent(DOCK_EVENTS.state, { detail }));
@@ -478,7 +482,7 @@ export function WhatsAppDock({
 
         {tab === 'job' ? (
           <div className="hxd__body hxd__body--job" role="tabpanel">
-            {tasksSlot && <div id={SLOT} className="hxd__tasks" />}
+            {tasksSlot === 'job' && <div id={SLOT} data-where="job" className="hxd__tasks" />}
             {!jobHere ? (
               <p className="hxd-empty">Loading this job…</p>
             ) : jobHere.threadId ? (
@@ -593,6 +597,7 @@ export function WhatsAppDock({
             />
           </div>
         )}
+        {tasksSlot === 'chats' && <div id={SLOT} data-where="chats" className="hxd__tasks hxd__tasks--chats" />}
       </section>
     </aside>
   );

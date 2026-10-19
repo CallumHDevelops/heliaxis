@@ -86,8 +86,8 @@ const cursorFrom = (timeline: Entry[]) => {
 /**
  * The job record page (`/admin/crm/{id}` and `/admin/projects/{id}`): the header, then the customer on
  * the left, the job in the centre (next step and the tabs) and Tasks on the right. With the WhatsApp
- * dock open (from 1280px) the dock is the right-hand column and the Tasks card moves into its This job
- * tab; folded, Tasks is the page's third column. Tablets get a band of customer and tasks above the
+ * dock open (from 1280px) the dock is the right-hand column and the Tasks card moves into it (over the
+ * job's chat on This job, under the list on Chats); folded, Tasks is the page's third column. Tablets get a band of customer and tasks above the
  * tabs (plus a Details tab), phones the stacked layout of research 2.5. CSS does the layout from
  * `.hx-frame[data-dock]`, so the first paint is right.
  *
@@ -342,7 +342,9 @@ export function ProjectView({
     schema,
     noSurvey
   );
+  // The dock's Tasks space: on This job over the chat, or on Chats under the list (so Tasks stay on the right).
   const slotEl = dock.tasksSlot && typeof document !== 'undefined' ? document.getElementById(dock.tasksSlot) : null;
+  // Docked open but with no Tasks space (the dock hasn't taken this job yet): the left column keeps them meanwhile.
   const tasksInDockTab = wide1280 && dock.state === 'open' && dock.panel && !slotEl && dockAck;
   const counts = {
     photos: rec.photos.length,
@@ -483,8 +485,10 @@ export function ProjectView({
     bookingLink: () => openSheet('link'),
   };
 
-  const tasksCard = (where: 'page' | 'dock') => (
+  const tasksCard = (where: 'page' | 'dock' | 'dock-chats') => (
     <TasksCard
+      // Under another customer's chat, say whose job these are.
+      heading={where === 'dock-chats' ? `Tasks · ${first}’s job` : undefined}
       projectId={id}
       tasks={rec.tasks}
       team={rec.team}
@@ -492,7 +496,7 @@ export function ProjectView({
       today={today}
       defaultAssignee={p.owner_id}
       delivery={delivery}
-      where={where}
+      where={where === 'page' ? 'page' : 'dock'}
       onChanged={() => reload()}
     />
   );
@@ -587,8 +591,8 @@ export function ProjectView({
             onSendWhatsApp={(text) => openWhatsApp(text)}
             onDelete={() => openSheet('delete')}
             onNewProject={() => openSheet('newproject')}
-            // The dock is open on Chats, so there's no right-hand column and no Tasks space in the dock:
-            // the card itself comes here, so Tasks are never missing and the chat stays open.
+            // Docked open with no Tasks space in the dock yet: there's no right-hand column either, so the
+            // card comes here meanwhile and Tasks are never missing.
             tasksElsewhere={tasksInDockTab ? tasksCard('page') : null}
           />
         </aside>
@@ -647,7 +651,7 @@ export function ProjectView({
         </section>
       </div>
 
-      {slotEl && createPortal(tasksCard('dock'), slotEl)}
+      {slotEl && createPortal(tasksCard(dock.tasksWhere === 'chats' ? 'dock-chats' : 'dock'), slotEl, dock.tasksWhere ?? 'dock')}
 
       {sheet === 'menu' && (
         <ActionMenu

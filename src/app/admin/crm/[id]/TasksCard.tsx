@@ -11,9 +11,9 @@ import { send, type CrmTask } from './record-shared';
 /**
  * The job's Tasks card (research 2.3 "RIGHT" 1): quick-add, overdue first, then soonest, then
  * undated; 5 shown, the rest one tap away. It sits in the page's right-hand column, in the band on
- * tablets and phones, or (docked open from 1280px) in the WhatsApp panel's This job tab, where the
- * record page puts it with createPortal. Its own class carries the CRM colours, so it looks the same
- * inside the panel.
+ * tablets and phones, or (docked open from 1280px) in the WhatsApp panel, over the job's chat on This
+ * job or under the list on Chats, where the record page puts it with createPortal. Its own class
+ * carries the CRM colours, so it looks the same inside the panel.
  */
 export function TasksCard({
   projectId,
@@ -24,8 +24,11 @@ export function TasksCard({
   defaultAssignee,
   delivery,
   where,
+  heading = 'Tasks',
   onChanged,
 }: {
+  /** "Tasks", or "Tasks · Jane’s job" under another customer's chat in the dock. */
+  heading?: string;
   projectId: string;
   tasks: CrmTask[];
   team: TeamMember[];
@@ -79,7 +82,7 @@ export function TasksCard({
   return (
     <section className={`crm crmh crmh-card crmr-tasks crmr-tasks--${where}${all ? ' is-all' : ''}${delivery ? ' is-delivery' : ''}`} aria-label="Tasks">
       <div className="crmh-card__h">
-        <h3>Tasks</h3>
+        <h3>{heading}</h3>
         {open.length > 0 && <span className="crmh-n">{open.length}</span>}
         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small crmh-ml" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
           + Task

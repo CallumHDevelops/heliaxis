@@ -92,18 +92,23 @@ const onDockState = (cb: () => void) => {
   window.addEventListener(DOCK.state, cb);
   return () => window.removeEventListener(DOCK.state, cb);
 };
-/** One string, so useSyncExternalStore sees an unchanged snapshot as unchanged. */
+/**
+ * One string, so useSyncExternalStore sees an unchanged snapshot as unchanged. Which tab the Tasks
+ * space is on (data-where: 'job', over the job's chat; 'chats', under the list or another chat) is part
+ * of it, so the page puts its card in the new space when it moves.
+ */
 const dockSnapshot = () => {
   const el = document.getElementById('hx-dock');
-  if (!el) return 'none|0|';
-  return `${el.getAttribute('data-state') || 'none'}|${el.getAttribute('data-panel') === '1' ? 1 : 0}|${document.getElementById('hx-dock-tasks') ? 'hx-dock-tasks' : ''}`;
+  if (!el) return 'none|0||';
+  const slot = document.getElementById('hx-dock-tasks');
+  return `${el.getAttribute('data-state') || 'none'}|${el.getAttribute('data-panel') === '1' ? 1 : 0}|${slot ? 'hx-dock-tasks' : ''}|${slot?.getAttribute('data-where') || ''}`;
 };
 
-/** The dock as the page sees it: 'unknown' while rendering on the server. */
-export function useDockState(): { state: string; panel: boolean; tasksSlot: string | null } {
-  const snap = useSyncExternalStore(onDockState, dockSnapshot, () => 'unknown|0|');
-  const [state, panel, slot] = snap.split('|');
-  return { state, panel: panel === '1', tasksSlot: slot || null };
+/** The dock as the page sees it: 'unknown' while rendering on the server. `tasksWhere`: the dock tab the Tasks space is on. */
+export function useDockState(): { state: string; panel: boolean; tasksSlot: string | null; tasksWhere: string | null } {
+  const snap = useSyncExternalStore(onDockState, dockSnapshot, () => 'unknown|0||');
+  const [state, panel, slot, where] = snap.split('|');
+  return { state, panel: panel === '1', tasksSlot: slot || null, tasksWhere: where || null };
 }
 
 /* ── WhatsApp counts and the chats needing a reply ──────────────────────────── */
