@@ -14,8 +14,9 @@ import {
   type SmartRule,
 } from './shared';
 import { isQuiet, nextAwake, planChase } from './schedule';
-import { ensureOpportunity } from '@/lib/crm/server';
+import { ensureOpportunity, logActivity } from '@/lib/crm/server';
 import { getSettings } from './settings';
+import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waPermission } from './permission';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -178,9 +179,14 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
       wa_last_inbound_at: at,
       wa_last_message_at: at,
       wa_unread: (enquiry.wa_unread || 0) + 1,
-      whatsapp_opt_in: true,
     })
     .eq('id', enquiry.id);
+
+  // STOP / START change their WhatsApp permission; any other message from them counts as agreeing
+  // (the first time; it never undoes a STOP).
+  const word = kind === 'text' ? stopWord(body) : null;
+  if (word) await stopOrStart(db, { ...enquiry, wa_last_inbound_at: at }, m.from, word, at);
+  else await grantPermission(enquiry.id, 'inbound', { at });
 
   // They answered — stop any follow-up sequence on their opportunities.
   await db
@@ -201,10 +207,12 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
     .eq('status', 'pending')
     .eq('kind', 'chase');
 
-  const queued = kind === 'text' && m.type !== 'reaction' ? await queueSmartReply(db, enquiry, body, m.id) : null;
+  const queued = kind === 'text' && m.type !== 'reaction' && !word ? await queueSmartReply(db, enquiry, body, m.id) : null;
 
   const who = enquiry.name || `+${m.from}`;
   const lines = [body.slice(0, 140)];
+  if (word === 'stop') lines.push('Automatic WhatsApps to them are now off. You can still reply by hand.');
+  if (word === 'start') lines.push('Automatic WhatsApps to them are back on.');
   if (queued) lines.push(`Smart reply “${queued.rule}” sends in ~${Math.max(1, Math.round(queued.seconds / 60))} min — tap to check, edit or cancel.`);
   await notifyEnquiryTeam(created ? `New WhatsApp lead: ${who}` : `WhatsApp from ${who}`, lines.join('\n'), inboxHref(enquiry.id), {
     tag: `wa-${enquiry.id}`,
@@ -218,6 +226,29 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
         }
       : {}),
   });
+}
+
+/**
+ * STOP: no more automatic WhatsApps to anyone with this number (whatever the permission rule says),
+ * with one confirmation; nothing queued for them goes. START turns them back on. Logged on each.
+ */
+async function stopOrStart(db: Db, enquiry: EnquiryWa, waId: string, word: 'stop' | 'start', at: string) {
+  const { changed, all } = await applyStopReply(waId, word, at);
+  if (!all.includes(enquiry.id)) all.push(enquiry.id);
+  if (word === 'stop') {
+    await db
+      .from('whatsapp_outbox')
+      .update({ status: 'cancelled', last_error: 'They replied STOP' })
+      .in('enquiry_id', all)
+      .eq('status', 'pending');
+  }
+  if (!changed.length) return; // already stopped (or started): they've had the confirmation
+  if (whatsappConfigured()) await deliver(db, enquiry, { text: word === 'stop' ? STOP_REPLY : START_REPLY }, { via: 'stop-reply' });
+  const body =
+    word === 'stop'
+      ? 'Replied STOP: no more automatic WhatsApp messages (reminders, follow-ups, smart replies)'
+      : 'Replied START: automatic WhatsApp messages are back on';
+  await Promise.all(changed.map((id) => logActivity({ enquiryId: id, kind: 'system', body }).catch(() => null)));
 }
 
 /** Queue the matching smart reply, unless a person is handling this chat. */
@@ -495,6 +526,12 @@ export async function processOutbox(limit = 8) {
       continue;
     }
     const e = enquiry as EnquiryWa;
+    // Everything in the outbox is automatic: check permission again just before it goes.
+    const permission = await waPermission(e.id);
+    if (!permission.allowed) {
+      await db.from('whatsapp_outbox').update({ status: 'cancelled', last_error: `Not sent: ${permission.reason}` }).eq('id', item.id);
+      continue;
+    }
     let input: SendInput;
     if (item.kind === 'chase' && !windowOpen(e.wa_last_inbound_at)) {
       // Past the free window: WhatsApp only allows a template now.
@@ -659,6 +696,8 @@ export async function sendSystem(
   if (!enquiry) return { ok: false, error: 'Customer not found' };
   const e = enquiry as EnquiryWa;
   if (!e.wa_id && !toWaId(e.phone)) return { ok: false, error: 'No mobile number' };
+  const permission = await waPermission(enquiryId);
+  if (!permission.allowed) return { ok: false, error: permission.reason || 'No WhatsApp permission' };
   const input: SendInput = windowOpen(e.wa_last_inbound_at)
     ? { text: msg.text }
     : msg.template
