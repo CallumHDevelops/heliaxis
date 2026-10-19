@@ -91,8 +91,12 @@
   }
   /* Full-height pages (analytics embed): the bar takes its own row instead of floating. */
   .hx-tabs--static {
-    position: static;
+    position: relative;
     flex-shrink: 0;
+  }
+  /* While "More" is open: over the page's own floating buttons (e.g. the CRM's +), under its pop-ups. */
+  .hx-tabs:has(.hx-more[open]) {
+    z-index: 45;
   }
   .hx-tab,
   .hx-more {
@@ -154,35 +158,144 @@
     max-width: 100%;
   }
 
-  .hx-more {
-    position: relative;
+  /*
+   * "More": a sheet of tiles sitting on the tab bar, over a dimmed page. The sheet and the backdrop
+   * are placed against the bar itself (.hx-more is deliberately not positioned), so they line up
+   * whether the bar floats or has its own row.
+   */
+  .hx-more[open] .hx-more__shut,
+  .hx-more:not([open]) .hx-more__open {
+    display: none;
+  }
+  .hx-tab__icon > .hx-more__shut,
+  .hx-tab__icon > .hx-more__open {
+    display: grid;
+  }
+  .hx-more[open] > .hx-tab {
+    color: var(--hx-ink);
+  }
+  .hx-more[open] > .hx-tab:not(.is-active) .hx-tab__icon {
+    background: rgba(33, 31, 24, 0.07);
+  }
+  /* The backdrop is part of the "More" button, so a tap on it closes the sheet with no script. */
+  .hx-more[open] > summary::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 100vh;
+    background: rgba(20, 18, 12, 0.42);
+    cursor: default;
+    touch-action: none;
+    animation: hx-fade-in 0.18s ease-out;
   }
   .hx-more__sheet {
-    position: fixed;
-    left: 0.75rem;
-    right: 0.75rem;
-    bottom: calc(var(--hx-tabbar) + 0.5rem);
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    /* Scrolls inside itself; always leaves the tab bar, the iPhone status bar and a strip of page showing. */
+    max-height: calc(100vh - var(--hx-tabbar) - env(safe-area-inset-top) - 3rem);
+    max-height: calc(100dvh - var(--hx-tabbar) - env(safe-area-inset-top) - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.25rem max(0.75rem, env(safe-area-inset-right)) 0.75rem max(0.75rem, env(safe-area-inset-left));
     background: var(--hx-card);
-    border: 1px solid var(--hx-line);
-    border-radius: 12px;
-    box-shadow: 0 12px 32px rgba(33, 31, 24, 0.18);
-    padding: 0.4rem;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgba(20, 18, 12, 0.16);
+    animation: hx-sheet-up 0.2s ease-out;
+  }
+  .hx-more__title {
+    margin: 0.75rem 0.25rem 0.35rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--hx-muted);
+  }
+  .hx-more__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  /* No headings (only a few tiles). */
+  .hx-more__grid:first-child {
+    margin-top: 0.6rem;
+  }
+  .hx-tile {
     display: flex;
     flex-direction: column;
-  }
-  .hx-more__link {
-    padding: 0.85rem 1rem;
-    border-radius: 8px;
+    align-items: center;
+    gap: 4px;
+    min-height: 62px;
+    padding: 8px 4px 7px;
+    border-radius: 12px;
     color: var(--hx-ink);
     text-decoration: none;
+    font-size: 0.74rem;
     font-weight: 600;
-    font-size: 0.95rem;
+    line-height: 1.2;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
   }
-  .hx-more__link.is-active {
-    background: rgba(248, 188, 30, 0.22);
+  .hx-tile:active {
+    background: rgba(33, 31, 24, 0.06);
   }
-  .hx-more__link + .hx-more__link {
-    border-top: 1px solid var(--hx-line);
+  .hx-tile:focus-visible {
+    outline: 2px solid var(--hx-ink);
+    outline-offset: -2px;
+  }
+  .hx-tile.is-active {
+    background: rgba(248, 188, 30, 0.16);
+    font-weight: 700;
+  }
+  .hx-tile__icon {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 30px;
+    border-radius: 999px;
+    background: rgba(33, 31, 24, 0.05);
+  }
+  .hx-tile.is-active .hx-tile__icon {
+    background: var(--hx-solar);
+  }
+  .hx-tile__label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    max-width: 100%;
+  }
+}
+@media (max-width: 340px) {
+  .hx-more__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (hover: hover) and (max-width: 760px) {
+  .hx-tile:not(.is-active):hover {
+    background: rgba(33, 31, 24, 0.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-more[open] > summary::before,
+  .hx-more__sheet {
+    animation: none;
+  }
+}
+@keyframes hx-sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes hx-fade-in {
+  from {
+    opacity: 0;
   }
 }
 
