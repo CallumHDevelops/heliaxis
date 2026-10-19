@@ -26,23 +26,28 @@
   --hxd-avatar: #ebe3d1;
   --hxd-font: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
 }
+/* Also on the root, for things a page puts straight into <body> (pop-ups, the CMS's Report button). */
 @media (min-width: 1024px) {
   .hx-frame[data-dock='open'],
-  .hx-frame[data-dock='collapsed'] {
+  .hx-frame[data-dock='collapsed'],
+  :root:has(.hx-frame[data-dock='open'], .hx-frame[data-dock='collapsed']) {
     --hx-dock: 56px;
   }
 }
 @media (min-width: 1280px) {
-  .hx-frame[data-dock='open'] {
+  .hx-frame[data-dock='open'],
+  :root:has(.hx-frame[data-dock='open']) {
     --hx-dock: 360px;
   }
 }
 @media (min-width: 1600px) {
-  .hx-frame[data-dock='open'] {
+  .hx-frame[data-dock='open'],
+  :root:has(.hx-frame[data-dock='open']) {
     --hx-dock: 400px;
   }
 }
 @media print {
+  :root,
   .hx-frame {
     --hx-dock: 0px !important;
   }
@@ -54,6 +59,10 @@
 /* An older record page's + button (before its own WhatsApp button above it) stays clear of the strip. */
 .hx-frame .crm-fab:not(.crm-fabs *) {
   right: calc(var(--hx-dock, 0px) + 18px);
+}
+/* The CMS editor's "Report" button (cms-engine.ts puts it straight into <body>, styled inline) too. */
+body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999'] {
+  right: calc(var(--hx-dock, 0px) + 16px) !important;
 }
 
 /* ── The dock ─────────────────────────────────────────────────────────────────────────────────────── */
@@ -179,10 +188,6 @@
   align-items: center;
   gap: 8px;
 }
-/* The CMS editor's own "Report" button sits in the bottom-right corner: the strip's foot stays above it. */
-.hx-frame:has(#cmsAppRoot) .hxd__foot {
-  padding-bottom: 52px;
-}
 .hxd__total {
   font-size: 11px;
   font-weight: 800;
@@ -281,6 +286,10 @@
   padding: 0 12px 0 14px;
   border-bottom: 1px solid var(--hxd-line);
   background: var(--hxd-head);
+}
+/* The CMS editor's toolbar is 56px. */
+.hx-frame:has(#cmsAppRoot) .hxd__head {
+  height: 56px;
 }
 .hxd__waic {
   flex: none;
@@ -766,9 +775,8 @@
   margin: 14px 0 0;
   padding: 0 16px;
 }
-.hxd-list--page + *,
-.hxd-banner + .hxd-list--page {
-  margin-top: 10px;
+.hxd-list--page {
+  margin-top: 1.25rem;
 }
 @media (max-width: 760px) {
   .hxd-list--page .hxd-search {

@@ -298,6 +298,13 @@ export function ChatPane({
 
   // New messages and ticks show up by themselves (every 4.5s while it's on screen).
   const { refresh, busy, reload } = useLiveRefresh(load, 4_500);
+  // In the dock, coming back to this window is when what came in meanwhile gets read: look straight away.
+  useEffect(() => {
+    if (!dock) return;
+    const onFocus = () => void reload();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [dock, reload]);
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 1_000);
     if (dock) return () => clearInterval(tick);

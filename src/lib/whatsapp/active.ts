@@ -46,14 +46,25 @@ const missingColumn = (e: PgError) => !!e && (e.code === '42703' || /column .* d
 const hash = (parts: unknown) => createHash('sha1').update(JSON.stringify(parts)).digest('base64url').slice(0, 16);
 const latest = (xs: (string | null | undefined)[]) => xs.filter((x): x is string => !!x).sort().pop() ?? null;
 
+/** Columns found missing, and when: not asked for again for a few minutes (until the SQL is run). */
+const missingSince = new Map<string, number>();
+const RECHECK_MS = 5 * 60_000;
+
 /**
  * A read that asks for a column another branch adds (customer_ref, project_ref), and asks again without
  * it if the SQL hasn't been run yet. null if the table itself isn't there.
  */
 async function withFallback<T>(run: (cols: string) => PromiseLike<Rows<T>>, cols: string, extra: string): Promise<T[] | null> {
-  const first = await run(`${cols}, ${extra}`);
-  if (!first.error) return first.data ?? [];
-  if (!missingColumn(first.error)) return null;
+  const gone = missingSince.get(extra);
+  if (!gone || Date.now() - gone > RECHECK_MS) {
+    const first = await run(`${cols}, ${extra}`);
+    if (!first.error) {
+      missingSince.delete(extra);
+      return first.data ?? [];
+    }
+    if (!missingColumn(first.error)) return null;
+    missingSince.set(extra, Date.now());
+  }
   const second = await run(cols);
   return second.error ? null : (second.data ?? []);
 }
@@ -197,11 +208,20 @@ export async function activeChats(
   // No WhatsApp columns yet (the SQL hasn't been run): an empty list rather than an error.
   if (!recent?.length) return { v: hash([]), counts: ZERO, rows: [] };
 
-  const others = await sameNumbers(db, recent.map((e) => e.wa_id).filter((w): w is string => !!w));
-  const enquiries = [...recent, ...others.filter((o) => !recent.some((r) => r.id === o.id))];
-  const ids = enquiries.map((e) => e.id);
-  const [projects, pending] = await Promise.all([projectsFor(db, ids), pendingFor(db, ids)]);
-  const drafts = sortDrafts(buildDrafts(enquiries, projects, pending, scope));
+  // The rest of each person's enquiries (same number), alongside the jobs and queue for these ones.
+  const recentIds = recent.map((e) => e.id);
+  const [others, recentProjects, recentPending] = await Promise.all([
+    sameNumbers(db, recent.map((e) => e.wa_id).filter((w): w is string => !!w)),
+    projectsFor(db, recentIds),
+    pendingFor(db, recentIds),
+  ]);
+  const seen = new Set(recentIds);
+  const extra = others.filter((o) => !seen.has(o.id));
+  const [moreProjects, morePending] = extra.length
+    ? await Promise.all([projectsFor(db, extra.map((e) => e.id)), pendingFor(db, extra.map((e) => e.id))])
+    : [[], []];
+  const enquiries = [...recent, ...extra];
+  const drafts = sortDrafts(buildDrafts(enquiries, [...recentProjects, ...moreProjects], [...recentPending, ...morePending], scope));
 
   const v = hash(
     drafts.map((d) => [d.threadId, d.enquiryIds, d.unread, d.lastAt, d.queued, d.chasing, d.name, d.customerRef, d.project?.id, d.project?.stage, d.project?.ref, d.hasProject])
