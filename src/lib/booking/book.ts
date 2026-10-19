@@ -96,6 +96,8 @@ export type FindOpts = {
   staff?: boolean;
   /** Staff "Book anyway": 07:00–21:00, no distance, detour, driving or per-day limits (overlaps still count). */
   override?: boolean;
+  /** When the customer's hold was made: the cut-off is judged at that moment (held at 14:58, confirmed at 15:02 is fine). */
+  heldAt?: number;
   signal?: AbortSignal;
 };
 export type FindOk = {
@@ -181,8 +183,9 @@ export async function findSlots(o: FindOpts): Promise<FindResult> {
   const { hols, closed, isWorkingDay } = await calendarRules(s);
   const now = Date.now();
   const today = ukDate(now);
-  const firstDay = o.staff ? today : earliestBookableDay(now, s.cutoffTime, isWorkingDay);
-  const earliestAllowed = o.staff ? now : londonSlot(firstDay, '00:00');
+  const ref = o.heldAt && o.heldAt < now && now - o.heldAt < 30 * MIN ? o.heldAt : now;
+  const firstDay = o.staff ? today : earliestBookableDay(ref, s.cutoffTime, isWorkingDay);
+  const earliestAllowed = o.staff ? now : Math.max(now, londonSlot(firstDay, '00:00'));
   const lastDay = addDays(today, s.advanced.horizonDays);
   const daysList = o.onlyDay
     ? o.onlyDay >= firstDay && (o.staff || o.onlyDay <= lastDay)
@@ -901,7 +904,15 @@ export async function confirm(x: { holdId: string; token?: string | null; detail
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const v = await dayVersion(b.day);
-    const r = await findSlots({ postcode: geo.postcode, type: b.survey_type, fresh: true, onlyDay: b.day, onlySurveyorKey: b.surveyor_key, ignoreBookingId: b.id });
+    const r = await findSlots({
+      postcode: geo.postcode,
+      type: b.survey_type,
+      fresh: true,
+      onlyDay: b.day,
+      onlySurveyorKey: b.surveyor_key,
+      ignoreBookingId: b.id,
+      heldAt: Date.parse(b.created_at),
+    });
     if (!r.ok) {
       if (r.closed) return { status: 409, body: { error: `Online booking has just been switched off. Please call us on ${OFFICE_PHONE}.` } };
       return findFailOutcome(r);

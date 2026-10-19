@@ -101,8 +101,9 @@ async function syncSurvey(p: ProjectRow, c: Customer, ctx: Ctx): Promise<Partial
   const h = hash({ mailbox, ...want });
   if (eventId && h === p.survey_event_hash && evMailbox === mailbox) return patch;
 
+  // Only an event still to come is moved or replaced; one that has started stays as it is.
   let id: string | null = null;
-  if (eventId && evMailbox === mailbox) {
+  if (eventId && future && evMailbox === mailbox) {
     try {
       await updateCalendarEvent(mailbox, eventId, want);
       id = eventId;
