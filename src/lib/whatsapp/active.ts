@@ -192,9 +192,31 @@ async function withPreviews(db: Db, drafts: Draft[], canInbox: boolean): Promise
       return null;
     }
   );
+  // Not among the newest 1,000 (a long chat elsewhere in the batch, as imported ones are): their last
+  // message is the one at their last-message time.
+  const missing = drafts.filter((d) => d.lastAt && !lastBy.has(d.threadId));
+  await inBatches(
+    missing.map((d) => d.threadId),
+    async (batch) => {
+      const times = [...new Set(missing.filter((d) => batch.includes(d.threadId)).map((d) => d.lastAt!))];
+      const { data } = await db
+        .from('whatsapp_messages')
+        .select('enquiry_id, direction, kind, body, created_at')
+        .in('enquiry_id', batch)
+        .in('created_at', times)
+        .limit(1000);
+      const wanted = new Map(missing.map((d) => [d.threadId, Date.parse(d.lastAt!)]));
+      for (const m of (data ?? []) as { enquiry_id: string; direction: 'in' | 'out'; kind: string; body: string | null; created_at: string }[]) {
+        if (!lastBy.has(m.enquiry_id) && Date.parse(m.created_at) === wanted.get(m.enquiry_id)) {
+          lastBy.set(m.enquiry_id, { direction: m.direction, body: m.body, kind: m.kind, at: m.created_at });
+        }
+      }
+      return null;
+    }
+  );
   return drafts.map(({ lastAt, lastInbound, ...d }) => ({
     ...d,
-    // Not among the newest 1,000 (a very long chat elsewhere in the batch): who wrote last, from the times.
+    // Still not found (the times disagree): who wrote last, from the times.
     last: lastBy.get(d.threadId) ?? (lastAt ? { direction: lastInbound && lastInbound >= lastAt ? 'in' : 'out', body: null, kind: 'text', at: lastAt } : null),
     chatHref: canInbox ? `/admin/enquiries/inbox/${d.threadId}` : `/admin/crm/chats/${d.threadId}`,
   }));
