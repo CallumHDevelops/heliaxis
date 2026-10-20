@@ -1,3 +1,5 @@
+import { refMatches } from '@/lib/projects/refs';
+
 /**
  * Purchase orders as the API sends them (/api/crm/purchase-orders, /api/crm/suppliers). Types and
  * small helpers only, so they're safe in the browser. The money and the status rules are in
@@ -119,6 +121,16 @@ export type PoSuggestion = {
   office: Office | null;
   email: boolean;
 };
+
+/** A search: the PO number ("PO-12", "12"), the job's reference ("HX-0042-2", "hx42"), or the customer or supplier's name. */
+export function matchesOrder(o: Pick<PoListRow, 'po_number' | 'job' | 'supplier'>, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  const po = o.po_number.toLowerCase();
+  if (po.includes(s) || (/^\d+$/.test(s) && Number(po.replace(/\D/g, '')) === Number(s))) return true;
+  if (o.job?.ref && (refMatches(s, o.job.ref) || o.job.ref.toLowerCase().includes(s))) return true;
+  return [o.job?.customer, o.supplier?.name, o.job?.title].some((x) => !!x && x.toLowerCase().includes(s));
+}
 
 /** The summary from a job's orders (the server's and the Orders tab's, so they always agree). */
 export function summariseOrders(rows: { status: string; net_pence: number | string | null; required_by: string | null }[]): OrdersSummary {

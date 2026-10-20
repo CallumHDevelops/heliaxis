@@ -5,12 +5,11 @@ import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { logActivity } from '@/lib/crm/server';
 import { mailbox, msConfigured } from '@/lib/ms365';
 import { readAll, withFallback } from '@/lib/projects/server';
-import { refMatches } from '@/lib/projects/refs';
 import { schemaReady } from '@/lib/schema-ready';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { formatPence, isDay, totals, type CleanLine } from './money';
 import type { PoPdfInput } from './pdf';
-import { summariseOrders, type DeliverTo, type Office, type OrdersSummary, type PoFull, type PoJob, type PoLine, type PoListRow, type PoSuggestion, type PurchaseOrder, type Supplier } from './shared';
+import { matchesOrder, summariseOrders, type DeliverTo, type Office, type OrdersSummary, type PoFull, type PoJob, type PoLine, type PoListRow, type PoSuggestion, type PurchaseOrder, type Supplier } from './shared';
 
 /**
  * Purchase orders on the server: reading orders with their lines, supplier and job, the list and
@@ -175,16 +174,6 @@ export async function listOrders(db: Db, f: ListFilters = {}): Promise<PoListRow
   const list = orders.map((o) => ({ ...o, supplier: sup.get(o.supplier_id) ?? null, job: jobs.get(o.project_id) ?? null, lines: counts.get(o.id) ?? 0 }));
   const q = (f.q ?? '').trim().toLowerCase();
   return q ? list.filter((o) => matchesOrder(o, q)) : list;
-}
-
-/** A search: the PO number ("PO-12", "12"), the job's reference ("HX-0042-2", "hx42"), or the customer or supplier's name. */
-export function matchesOrder(o: Pick<PoListRow, 'po_number' | 'job' | 'supplier'>, q: string): boolean {
-  const s = q.trim().toLowerCase();
-  if (!s) return true;
-  const po = o.po_number.toLowerCase();
-  if (po.includes(s) || (/^\d+$/.test(s) && Number(po.replace(/\D/g, '')) === Number(s))) return true;
-  if (o.job?.ref && (refMatches(s, o.job.ref) || o.job.ref.toLowerCase().includes(s))) return true;
-  return [o.job?.customer, o.supplier?.name, o.job?.title].some((x) => !!x && x.toLowerCase().includes(s));
 }
 
 /** A job's orders at a glance, or null before purchase-orders.sql (or if the read fails). Never throws. */
