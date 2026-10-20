@@ -41,6 +41,9 @@ export type CrmSettings = {
   /** Follow-up sequence for new leads; stops when they reply or the stage moves past Contacted. */
   sequenceEnabled: boolean;
   sequence: SequenceStep[];
+  /** Where purchase orders can be delivered instead of the site (blank until set: "To the office" waits for it). */
+  officeAddress: string;
+  officePostcode: string;
 };
 
 export const DEFAULT_CRM_SETTINGS: CrmSettings = {
@@ -74,6 +77,8 @@ export const DEFAULT_CRM_SETTINGS: CrmSettings = {
       text: 'Hi {first_name},\n\nThanks again for your enquiry. If you’d like to book a free survey, just reply with a couple of days and times that suit you.\n\nAny questions, just reply to this email.\n\nThe Heliaxis team',
     },
   ],
+  officeAddress: '',
+  officePostcode: '',
 };
 
 const nums = (v: unknown, lo: number, hi: number) =>
@@ -124,6 +129,13 @@ export function cleanCrmSettings(b: Partial<Record<keyof CrmSettings, unknown>>)
     bookingHorizonDays: num(b.bookingHorizonDays, 1, 90, d.bookingHorizonDays),
     sequenceEnabled: !!b.sequenceEnabled,
     sequence: seq,
+    officeAddress: String(b.officeAddress ?? '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 300),
+    officePostcode: str(b.officePostcode, 10).toUpperCase(),
   };
 }
 
