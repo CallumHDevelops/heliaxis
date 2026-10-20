@@ -2,6 +2,7 @@ import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
+import { ukDay } from '@/lib/bank-holidays';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { formatPence, formatQty, lineNet, totals } from './money';
 import { addressLine, type PoLine, type PurchaseOrder, type Supplier } from './shared';
@@ -100,21 +101,27 @@ export const dayDate = (ymd: string) => `${DAYS[noon(ymd).getUTCDay()]} ${longDa
 
 /* ── The logo ────────────────────────────────────────────────────────────────── */
 
-let logoBytes: Uint8Array | null | undefined;
-/** public/assets/heliaxis-logo.png (bundled with the routes: next.config.ts), else the live site's copy, else none. */
+let logoBytes: Uint8Array | null = null;
+let logoMissedAt = 0;
+/**
+ * public/assets/heliaxis-logo.png (bundled with the routes: next.config.ts), else the live site's
+ * copy, else none (the name in type instead). A miss is tried again after 10 minutes.
+ */
 async function logo(): Promise<Uint8Array | null> {
-  if (logoBytes !== undefined) return logoBytes;
+  if (logoBytes) return logoBytes;
+  if (Date.now() - logoMissedAt < 10 * 60_000) return null;
   try {
     logoBytes = new Uint8Array(await readFile(path.join(process.cwd(), 'public', 'assets', 'heliaxis-logo.png')));
   } catch {
     try {
       const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
       const r = await fetch(`${site}/assets/heliaxis-logo.png`, { signal: AbortSignal.timeout(4000) });
-      logoBytes = r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
+      if (r.ok) logoBytes = new Uint8Array(await r.arrayBuffer());
     } catch {
-      logoBytes = null;
+      // No logo this time.
     }
   }
+  if (!logoBytes) logoMissedAt = Date.now();
   return logoBytes;
 }
 
@@ -199,7 +206,7 @@ export async function purchaseOrderPdf(input: PoPdfInput): Promise<Uint8Array> {
 
   if (o.status === 'cancelled') {
     page.drawRectangle({ x: M, y: y - 26, width: W, height: 26, color: rgb(1, 0.95, 0.94), borderColor: RED, borderWidth: 0.8 });
-    const when = o.cancelled_at ? ` on ${longDate(o.cancelled_at.slice(0, 10))}` : '';
+    const when = o.cancelled_at ? ` on ${longDate(ukDay(o.cancelled_at))}` : '';
     text(`CANCELLED${when}. Please don’t supply this order.`, M + 10, y - 17, 10, f.b, RED);
     y -= 46;
   }
