@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getSessionProfile } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/AdminShell';
+import { ContactedCatchUp } from '@/components/admin/ContactedCatchUp';
 import { MetaImport } from './MetaImport';
 import { WhatsAppImport } from './WhatsAppImport';
 import './import.css';
@@ -29,6 +30,10 @@ export default async function ImportPage() {
           from the CRM is skipped.
         </p>
         <MetaImport />
+        {/* Chats imported before imports moved people to Contacted. */}
+        <div className="imp-catchup">
+          <ContactedCatchUp />
+        </div>
         <WhatsAppImport />
       </div>
     </AdminShell>

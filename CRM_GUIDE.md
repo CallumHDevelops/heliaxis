@@ -176,6 +176,16 @@ The dock's chips (Needs reply, Unread, All active, Waiting on them) cover chats 
 days. **All chats** lists everyone you've ever WhatsApped, imported chats included, newest first,
 and the search box looks through every chat.
 
+**Chats imported from the WhatsApp Business app** (Enquiries → Import) show like any other: under
+**All chats** in the dock, in the WhatsApp inbox, on the job's Activity tab and in **Latest notes**
+(marked *Imported*). When a chat has messages from you, the customer moves from Lead to Contacted
+(or New to Contacted without a job), as a reply sent from here does, and their first contact is the
+first message you sent after they came in. An older conversation doesn't count for a newer enquiry.
+For chats imported before this, admins see *41 customers you've already messaged on WhatsApp are
+still at Lead* on the CRM home and the import page: **Move them all to Contacted** does it in one go,
+and each job's timeline says *Lead → Contacted (messaged on WhatsApp on 3 Sep)*. Nobody is moved
+back or past Contacted, and nobody is messaged.
+
 ## 10. WhatsApp permission and STOP
 
 Automatic WhatsApps (reminders, follow-ups, smart replies, chasers) should only go to customers who

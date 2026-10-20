@@ -33,6 +33,8 @@ type Result = {
   skipped: number;
   /** e.g. why the chat's number wasn't added to them. */
   note?: string | null;
+  /** The chat has messages from us, so they're at Contacted now (added there, or moved from Lead). */
+  contacted?: boolean;
 };
 
 type Row = {
@@ -670,7 +672,10 @@ export function WhatsAppImport() {
 
                 {r.result && (
                   <p className="imp-ok">
-                    {r.result.created ? `Added ${r.result.name} as a new lead` : `Matched ${r.result.name}`} ·{' '}
+                    {r.result.created
+                      ? `Added ${r.result.name} ${r.result.contacted ? 'to the CRM at Contacted' : 'as a new lead'}`
+                      : `Matched ${r.result.name}${r.result.contacted ? ', moved to Contacted' : ''}`}{' '}
+                    ·{' '}
                     {plural(r.result.imported, 'message')} imported
                     {r.result.duplicates ? ` · ${plural(r.result.duplicates, 'was', 'were')} already there` : ''}
                     {r.result.skipped ? ` · ${r.result.skipped.toLocaleString('en-GB')} left out (deleted, or from someone else)` : ''}

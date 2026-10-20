@@ -8,6 +8,7 @@ import type { Pipeline, TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { useNow } from '@/lib/use-now';
+import { ContactedCatchUp } from '@/components/admin/ContactedCatchUp';
 import { NewProjectSheet } from '../projects/NewProjectSheet';
 import { CrmBoardView } from './CrmBoardView';
 import { CrmHome } from './CrmHome';
@@ -381,6 +382,14 @@ export function CrmBoard({
           </button>
         </p>
       )}
+
+      {/* Imported WhatsApp chats with messages from us: move those customers on from Lead (admins). */}
+      <ContactedCatchUp
+        onMoved={() => {
+          void reload();
+          setHomeTick((n) => n + 1);
+        }}
+      />
 
       {data === null && !error ? (
         <p className="crm-muted">Loading…</p>

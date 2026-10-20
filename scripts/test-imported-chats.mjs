@@ -1,10 +1,12 @@
 // Imported WhatsApp chats in the CRM: Latest notes' chat rows (one per chat per UK day, merged with the
-// timeline page by page) and the dock's All chats list (src/lib/projects/feed.ts,
-// src/components/admin/whatsapp/dock-shared.ts).
+// timeline page by page), the dock's All chats list, and the contacted rule for chats with messages
+// from us, at import and as the catch-up (src/lib/projects/feed.ts,
+// src/components/admin/whatsapp/dock-shared.ts, src/lib/crm/contacted-rule.ts).
 // Usage: node --experimental-strip-types scripts/test-imported-chats.mjs
 import { byPerson, cursorOf, feedOrder, FIRST_AT, groupChatDays, mergeFeed, micros, parseCursor, readChatDays } from '../src/lib/projects/feed.ts';
 import { mergeChats, shortAgo } from '../src/components/admin/whatsapp/dock-shared.ts';
 import { ukDay } from '../src/lib/bank-holidays.ts';
+import { catchUpPick, contactNote, contactPlan, firstOursSince } from '../src/lib/crm/contacted-rule.ts';
 
 let failed = 0;
 function eq(name, got, want) {
@@ -236,6 +238,61 @@ const now = t('2026-10-20T12:00:00Z');
 eq('a chat this month', shortAgo('2026-10-01T12:00:00Z', now), '1 Oct');
 eq('a chat from last year shows the year', /^14 \w+ 2025$/.test(shortAgo('2025-09-14T12:00:00Z', now)), true);
 eq('ten months back is still this year’s format', shortAgo('2026-01-02T12:00:00Z', now), '2 Jan');
+
+/* ── The contacted rule ───────────────────────────────────────────────────── */
+
+const ours = ['2026-09-03T10:15:00Z', '2026-03-01T09:00:00Z', '2026-09-10T08:00:00Z'];
+eq('the first of ours since the job came in', firstOursSince(ours, '2026-09-01T12:00:00Z'), '2026-09-03T10:15:00Z');
+eq('a reply in the same minute as the enquiry counts', firstOursSince(['2026-09-01T12:00:00Z'], '2026-09-01T12:00:40Z'), '2026-09-01T12:00:00Z');
+eq('nothing since', firstOursSince(ours, '2026-10-01T00:00:00Z'), null);
+const job = (id, stage, created_at, first_contact_at = null) => ({ id, stage, created_at, first_contact_at });
+eq(
+  'import: each job not yet contacted, from our first message since it opened',
+  contactPlan(
+    [
+      job('j1', 'lead', '2026-09-01T12:00:00Z'),
+      job('j2', 'survey_booked', '2026-02-01T12:00:00Z'),
+      job('j3', 'lead', '2026-08-01T12:00:00Z', '2026-08-01T13:00:00Z'),
+      job('j4', 'lead', '2026-10-01T12:00:00Z'),
+    ],
+    { status: 'new', created_at: '2026-02-01T12:00:00Z' },
+    ours
+  ),
+  {
+    jobs: [
+      { id: 'j1', at: '2026-09-03T10:15:00Z' },
+      { id: 'j2', at: '2026-03-01T09:00:00Z' },
+    ],
+    enquiryAt: null,
+  }
+);
+eq('import: a customer without a job goes from New', contactPlan([], { status: 'new', created_at: '2026-09-01T00:00:00Z' }, ours).enquiryAt, '2026-09-03T10:15:00Z');
+eq('import: never from anything but New', contactPlan([], { status: 'qualified', created_at: '2026-09-01T00:00:00Z' }, ours).enquiryAt, null);
+eq('import: only the customer wrote', contactPlan([job('j1', 'lead', '2026-09-01T12:00:00Z')], null, []), { jobs: [], enquiryAt: null });
+
+const latest = new Map([
+  ['c1', '2026-09-10T08:00:00Z'],
+  ['c2', '2026-03-01T09:00:00Z'],
+  ['c4', '2026-09-10T08:00:00Z'],
+]);
+const picked = catchUpPick({
+  jobs: [
+    { id: 'j1', enquiry_id: 'c1', created_at: '2026-09-01T12:00:00Z' },
+    { id: 'j1b', enquiry_id: 'c1', created_at: '2026-09-05T12:00:00Z' },
+    { id: 'j2', enquiry_id: 'c2', created_at: '2026-09-01T12:00:00Z' },
+    { id: 'j3', enquiry_id: 'c3', created_at: '2026-09-01T12:00:00Z' },
+  ],
+  loose: [{ id: 'c4', created_at: '2026-09-01T00:00:00Z' }],
+  latest,
+});
+eq('catch-up: jobs messaged since they opened', picked.jobs.map((j) => j.id), ['j1', 'j1b']);
+eq('catch-up: an old chat doesn’t move a newer enquiry', picked.jobs.some((j) => j.id === 'j2'), false);
+eq('catch-up: never messaged, not moved', picked.jobs.some((j) => j.id === 'j3'), false);
+eq('catch-up: customers once each, jobless ones too', picked.customers, ['c1', 'c4']);
+
+eq('the timeline note', contactNote('2026-09-03T10:15:00Z', t('2026-10-20T12:00:00Z')), 'messaged on WhatsApp on 3 Sep');
+eq('a UK date: 23:30 UTC on 2 Sep is the 3rd', contactNote('2026-09-02T23:30:00Z', t('2026-10-20T12:00:00Z')), 'messaged on WhatsApp on 3 Sep');
+eq('the year when it isn’t this year', contactNote('2025-12-31T12:00:00Z', t('2026-10-20T12:00:00Z')), 'messaged on WhatsApp on 31 Dec 2025');
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

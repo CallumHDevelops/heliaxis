@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { requireApproved } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { contactedFromChat } from '@/lib/crm/chat-contacted';
 import { createImportedEnquiry, findExistingEnquiry, opportunityFor } from '@/lib/crm/import';
 import { deletedBefore } from '@/lib/crm/delete-customer';
 import { chatSides, dateRange, MAX_CHAT_CHARS, nameFromFileName, parseChatExport, type MediaType } from '@/lib/whatsapp/chat-export';
@@ -15,7 +16,9 @@ export const maxDuration = 60;
  * Chats exported from the WhatsApp Business app (01633 965205) into a customer's WhatsApp thread,
  * with their original dates. Admins only. Nothing here messages the customer, notifies the team,
  * opens the 24-hour reply window (wa_last_inbound_at), marks the chat unread or queues a smart
- * reply or chaser: the messages are history, not new arrivals.
+ * reply or chaser: the messages are history, not new arrivals. Messages from us in it count as
+ * getting in touch, as a reply sent live does: the customer moves from Lead (or New) to Contacted,
+ * from the first one we sent (src/lib/crm/chat-contacted.ts).
  */
 
 const BATCH = 500;
@@ -345,7 +348,15 @@ export async function POST(req: Request) {
     });
   }
 
-  const result = { enquiryId: id, name: enquiry.name, created, imported, duplicates: saved - imported, skipped, note };
+  // Messages from us: they've been contacted, from the first one we sent since they came in. (Run
+  // again for a chat that was already here, so one imported before this rule catches up too.)
+  let contacted = created && ours.length > 0;
+  if (!created) {
+    const sent = rows.slice(0, saved).filter((r) => r.direction === 'out').map((r) => r.created_at);
+    contacted = await contactedFromChat(id, sent, s.user.id).catch(() => false);
+  }
+
+  const result = { enquiryId: id, name: enquiry.name, created, imported, duplicates: saved - imported, skipped, note, contacted };
   if (failed) {
     return json({ ...result, error: `Saved ${saved.toLocaleString('en-GB')} of ${rows.length.toLocaleString('en-GB')} messages, then: ${failed}. Import it again to add the rest.` }, 500);
   }
