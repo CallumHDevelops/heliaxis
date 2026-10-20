@@ -1,5 +1,7 @@
+import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { dayListWords, installDayList, ukDay } from '@/lib/bank-holidays';
+import { notify } from '@/lib/notify';
 import { CRM_BUCKET, crmSession, isUuid, json, logActivity, portalUrl, thumbPath } from '@/lib/crm/server';
 import { BOOKABLE_STAGES, bookingUrl } from '@/lib/crm/booking-link';
 import { notifyChannel } from '@/lib/booking/book';
@@ -625,6 +627,20 @@ export async function PATCH(req: Request, { params }: Ctx) {
     await log(`DNO ${label[dnoMove]}`);
   }
   if (doneStep) await log(`✓ Done: ${doneStep}`);
+  // A WhatsApp chat's call-back reminder (`notify_owner`): whoever looks after the job hears now if someone
+  // else set it, as a task's assignee does. The cron tells them again when it's due.
+  if (b.notify_owner && u.next_step && u.next_step_at && before.owner_id && before.owner_id !== s.user.id) {
+    const ownerId = String(before.owner_id);
+    const [{ data: owner }, { data: c }] = await Promise.all([
+      db.from('profiles').select('*').eq('id', ownerId).maybeSingle(),
+      db.from('enquiries').select('name').eq('id', enquiryId).maybeSingle(),
+    ]);
+    if (owner?.status === 'approved' && canAccess(owner, 'crm')) {
+      const by = s.profile.full_name || s.profile.email || 'Someone';
+      const body = `${u.next_step} · ${when(String(u.next_step_at))} · ${c?.name || before.title}`;
+      after(() => notify({ userId: ownerId, kind: 'crm_next_step', title: `Call-back from ${by}`, body, href: `/admin/crm/${id}`, tag: `crm-${id}` }));
+    }
+  }
   const surveyBefore = (before.survey_at as string | null) ?? null;
   const surveyNow = 'survey_at' in u ? (u.survey_at as string | null) : surveyBefore;
   if (surveyNow !== surveyBefore && Date.parse(surveyNow ?? '') !== Date.parse(surveyBefore ?? '')) {
