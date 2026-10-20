@@ -10,6 +10,7 @@ import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
 import type { ChaseView } from '@/lib/whatsapp/schedule';
 import { isProjectStage } from '@/lib/crm/stages';
+import { ukPostcode } from '@/lib/crm/site-postcode';
 import type { CrmDoc } from './ProjectExtras';
 import { shortDate, ukDayOf, ukTime } from '../crm-shared';
 
@@ -226,11 +227,20 @@ export function phoneShown(c: Pick<Customer, 'phone'>, waNumber: string | null):
 /** Google Maps directions to the site (address and postcode). */
 export const directionsHref = (place: string) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`;
 
+/** The site's postcode: the job's own, else the customer's. */
+export const sitePostcodeOf = (p: Pick<Project, 'postcode'>, c: Pick<Customer, 'postcode'>) => p.postcode || c.postcode || '';
+
 /** The site, for Directions and Copy: the job's address, then its postcode, then the customer's. */
 export function siteOf(p: Pick<Project, 'address' | 'postcode'>, c: Pick<Customer, 'postcode'>): string {
-  const pc = p.postcode || c.postcode || '';
+  const pc = sitePostcodeOf(p, c);
   const addr = (p.address || '').trim();
   return addr ? (pc && !addr.toUpperCase().includes(pc.toUpperCase()) ? `${addr}, ${pc}` : addr) : pc;
+}
+
+/** "Check postcode" under the site when its postcode isn't UK-shaped (a lead form's "88888"). */
+export function postcodeHint(p: Pick<Project, 'postcode'>, c: Pick<Customer, 'postcode'>): string | undefined {
+  const pc = sitePostcodeOf(p, c);
+  return pc && !ukPostcode(pc) ? 'Check postcode: it doesn’t look like a UK one' : undefined;
 }
 
 /** POST/PATCH JSON, with the API's error message (or `fallback`) thrown on failure. */

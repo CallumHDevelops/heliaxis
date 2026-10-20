@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { money, portalOpen, PRODUCTS, productLabel, stageIndex, stageLabel } from '@/lib/crm/stages';
+import { isProjectStage, money, portalOpen, PRODUCTS, productLabel, stageIndex, stageLabel } from '@/lib/crm/stages';
 import type { TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
+import { followsCustomerPostcode, siteHasOtherPostcode } from '@/lib/crm/site-postcode';
 import { StageChip } from '../CrmUi';
 import { firstName, jobLabel, shortDate, ukDayOf } from '../crm-shared';
 import { DnoDeposit, PortalCard } from './ProjectExtras';
@@ -14,6 +15,7 @@ import {
   dayWord,
   daysSince,
   phoneShown,
+  postcodeHint,
   send,
   siteOf,
   ukWhen,
@@ -84,6 +86,8 @@ export function CustomerColumn({
   const portalShown = atQuote >= stageIndex('surveyed') || !!portal;
   const dnoShown = quoteOn || !!project.deposit_amount || !!project.accepted_at || (!!project.dno_status && project.dno_status !== 'not_started');
   const days = daysSince(project.stage_changed_at || project.created_at, now);
+  // After Customer → Edit: their other jobs whose site postcode changed with it (kept here, as the card starts afresh).
+  const [movedNote, setMovedNote] = useState('');
 
   return (
     <div className="crmr-col">
@@ -111,7 +115,17 @@ export function CustomerColumn({
         </section>
       )}
 
-      <CustomerCard key={`${customer.id}-${customer.phone}-${customer.name}-${customer.email}`} customer={customer} project={project} wa={wa} team={team} editKey={editCustomer} onSaved={onSaved} />
+      <CustomerCard
+        key={`${customer.id}-${customer.phone}-${customer.name}-${customer.email}-${customer.postcode}`}
+        customer={customer}
+        project={project}
+        wa={wa}
+        team={team}
+        editKey={editCustomer}
+        note={movedNote}
+        onMoved={setMovedNote}
+        onSaved={onSaved}
+      />
 
       {others.length > 0 && (
         <section className="crmh-card" aria-label="Other projects">
@@ -190,7 +204,9 @@ export function CompactCustomer({ project, customer, wa, onDetails }: { project:
       </div>
       <div className="crmh-card__b crmr-fields">
         <Field label="Mobile">{phone || <span className="crm-muted">No mobile yet</span>}</Field>
-        <Field label="Site">{site || <span className="crm-muted">No address yet</span>}</Field>
+        <Field label="Site" extra={postcodeHint(project, customer)}>
+          {site || <span className="crm-muted">No address yet</span>}
+        </Field>
         <Field label="WhatsApp">{waLine(customer, wa)}</Field>
       </div>
     </section>
@@ -242,6 +258,8 @@ function CustomerCard({
   wa,
   team,
   editKey,
+  note,
+  onMoved,
   onSaved,
 }: {
   customer: Customer;
@@ -249,6 +267,8 @@ function CustomerCard({
   wa: WaInfo;
   team: TeamMember[];
   editKey: number;
+  note: string;
+  onMoved: (note: string) => void;
   onSaved: () => Promise<void> | void;
 }) {
   const init = { name: customer.name, phone: customer.phone || '', email: customer.email || '', postcode: customer.postcode || '' };
@@ -278,12 +298,24 @@ function CustomerCard({
   const owner = team.find((t) => t.id === project.owner_id)?.name;
   const hasOptIn = 'whatsapp_opt_in' in customer;
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  // Under the postcode box: whether this job's site postcode changes with it (the save's own rule), or
+  // where to change it when it doesn't (a lead form's "88888" copied onto the job before this rule, or
+  // a job from Won onwards, whose checked site stays when the customer moves).
+  const siteLine = !f.postcode.trim()
+    ? ''
+    : !isProjectStage(project.stage) && followsCustomerPostcode(project, customer.postcode, f.postcode)
+      ? 'The site address on this job changes too.'
+      : siteHasOtherPostcode(project, f.postcode)
+        ? 'This job has its own site address: change it in Job details.'
+        : '';
 
   async function save() {
     setBusy(true);
     setErr('');
     try {
-      await send(`/api/crm/customers/${customer.id}`, 'PATCH', f);
+      const d = await send<{ movedJobs?: string[] }>(`/api/crm/customers/${customer.id}`, 'PATCH', f);
+      const others = (d.movedJobs ?? []).filter((j) => j !== project.id).length;
+      onMoved(others ? `The site postcode on ${others === 1 ? 'their other job' : `${others} of their other jobs`} changed too.` : '');
       setEditing(false);
       await onSaved();
     } catch (e) {
@@ -348,7 +380,12 @@ function CustomerCard({
           <label className="crm-label" htmlFor="rec-c-pc">
             Postcode
           </label>
-          <input id="rec-c-pc" className="crm-input" value={f.postcode} onChange={set('postcode')} />
+          <input id="rec-c-pc" className="crm-input" value={f.postcode} onChange={set('postcode')} aria-describedby={siteLine ? 'rec-c-pc-site' : undefined} />
+          {siteLine && (
+            <p id="rec-c-pc-site" className="crm-muted crm-small">
+              {siteLine}
+            </p>
+          )}
           <p className="crm-muted crm-small">Any WhatsApp chat on the mobile number links to this customer by itself.</p>
           {err && <p className="crm-banner crm-banner--err">{err}</p>}
           <div className="crmr-savebar">
@@ -398,7 +435,7 @@ function CustomerCard({
             </span>
           </Field>
           <Field label="Email">{customer.email ? <span className="crmr-trunc">{customer.email}</span> : <span className="crm-muted">No email</span>}</Field>
-          <Field label="Site address">
+          <Field label="Site address" extra={postcodeHint(project, customer)}>
             {site ? (
               <>
                 <span className="crmr-wrap">{site}</span>
@@ -412,6 +449,7 @@ function CustomerCard({
             <span className="crmr-wrap">{customer.source || 'Not known'}</span>
           </Field>
           <Field label="Owner">{owner || <span className="crm-muted">Nobody yet</span>}</Field>
+          {note && <p className="crm-muted crm-small">{note}</p>}
           {err && <p className="crm-banner crm-banner--err">{err}</p>}
         </div>
       )}
