@@ -190,7 +190,9 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
       </label>
       {variant === 'inline' && <p className="gs-tip">Name, postcode, phone, email or HX-ref</p>}
       {showList && (
-        <div className="gs-pop">
+        // Keeps the cursor in the box while a result is clicked: Safari doesn't focus links on click, so the
+        // box's blur would close the list before the click landed.
+        <div className="gs-pop" onMouseDown={(e) => e.preventDefault()}>
           {status && (
             <p className="gs-status" role="status">
               {status}
