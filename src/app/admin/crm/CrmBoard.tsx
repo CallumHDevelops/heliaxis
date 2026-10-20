@@ -547,7 +547,7 @@ export function CrmBoard({
               <li key={l.id}>
                 <span>
                   <b>{l.name}</b>
-                  <small>{[l.postcode, l.source, l.created_at ? agoShort(l.created_at, now) : ''].filter(Boolean).join(' · ')}</small>
+                  <small>{[l.postcode, l.source_label, l.created_at ? agoShort(l.created_at, now) : ''].filter(Boolean).join(' · ')}</small>
                 </span>
                 <button type="button" className="crm-btn crm-btn--small" disabled={busy === l.id} onClick={() => fromLead(l)}>
                   {busy === l.id ? '…' : 'Create opportunity'}

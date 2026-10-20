@@ -3,6 +3,7 @@ import { requireApproved } from '@/lib/auth';
 import { json } from '@/lib/crm/server';
 import { findCustomers } from '@/lib/customer-search';
 import { cleanSearch, groupResults, jobMatches, postcodePattern, type JobRow, type PersonRow } from '@/lib/global-search';
+import { sourcesNow } from '@/lib/lead-source-server';
 import { canAccess } from '@/lib/portals';
 import { looksLikeRef, refOnly, refPatterns } from '@/lib/projects/refs';
 import { missingColumn, type Db } from '@/lib/projects/server';
@@ -60,15 +61,17 @@ export async function GET(req: Request) {
   ]);
   if (people.error) return json({ q, error: 'Search isn’t working right now. Try again in a moment.', people: [] }, 500);
 
-  return json({
+  const rows = (people.data ?? []) as unknown as PersonRow[];
+  const results = groupResults({
     q,
-    people: groupResults({
-      q,
-      refs: found.refs,
-      people: (people.data ?? []) as unknown as PersonRow[],
-      jobs: jobs && !jobs.error ? ((jobs.data ?? []) as unknown as JobRow[]) : direct,
-      matched: new Set(direct.map((j) => j.id)),
-      enquiries,
-    }),
+    refs: found.refs,
+    people: rows,
+    jobs: jobs && !jobs.error ? ((jobs.data ?? []) as unknown as JobRow[]) : direct,
+    matched: new Set(direct.map((j) => j.id)),
+    enquiries,
   });
+  // Where the ones shown came from, with a Meta ad's name now (they keep the name it had when they came in).
+  const shown = new Set(results.map((p) => p.id));
+  const sources = await sourcesNow(rows.filter((r) => shown.has(r.id)));
+  return json({ q, people: results.map((p) => ({ ...p, source: sources.get(p.id)?.label ?? p.source })) });
 }

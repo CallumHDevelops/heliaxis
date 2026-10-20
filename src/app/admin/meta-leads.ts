@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { ukDay } from '@/lib/bank-holidays';
 import { isProjectStage } from '@/lib/crm/stages';
 import { relativeTime } from '@/lib/enquiries';
-import { isMetaLead, metaAdLabel } from '@/lib/lead-source';
+import { isMetaLead } from '@/lib/lead-source';
+import { sourcesNow } from '@/lib/lead-source-server';
 import { missingColumn } from '@/lib/projects/server';
 import type { PortalKey } from '@/lib/portals';
 
@@ -15,8 +16,10 @@ export type HubMetaLead = {
   ref: string | null;
   postcode: string | null;
   phone: string | null;
-  /** The ad's name, "Organic", "WhatsApp ad"… (metaAdLabel). */
+  /** The ad's name now, "Organic", "WhatsApp ad"… (src/lib/lead-source.ts sourceNow). */
   ad: string;
+  /** "was Video 1" when the ad has been renamed since they came in. */
+  note: string | null;
   at: string;
   /** "2h ago". */
   ago: string;
@@ -80,6 +83,8 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
   const all = ((r.data ?? []) as unknown as Row[]).filter((e) => isMetaLead(e.source));
   const today = ukDay(now);
   const top = all.slice(0, SHOWN);
+  // Each one's ad by its name now (they keep the name it had when they came in).
+  const shown = sourcesNow(top);
 
   // Each one's jobs, newest first, for Open (CRM staff). No CRM tables yet: none.
   const jobsOf = new Map<string, { id: string; stage: string }[]>();
@@ -105,6 +110,7 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
     const newest = ((data ?? []) as { source: string | null; created_at: string }[]).find((e) => isMetaLead(e.source));
     last = newest ? cameIn(newest.created_at, now) : null;
   }
+  const ads = await shown;
 
   return {
     count: all.length,
@@ -118,7 +124,8 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
         ref: e.customer_ref || null,
         postcode: e.postcode || null,
         phone: e.phone || null,
-        ad: metaAdLabel(e.source) ?? 'Meta',
+        ad: ads.get(e.id)?.ad ?? 'Meta',
+        note: ads.get(e.id)?.note ?? null,
         at: e.created_at,
         ago: relativeTime(e.created_at),
         href: job ? (isProjectStage(job.stage) ? `/admin/projects/${job.id}` : `/admin/crm/${job.id}`) : enquiries ? `/admin/enquiries?open=${e.id}` : null,

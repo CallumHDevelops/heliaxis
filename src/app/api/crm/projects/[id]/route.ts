@@ -27,6 +27,7 @@ import { possibleDuplicates } from '@/lib/projects/duplicates';
 import { enaForJob } from '@/lib/projects/ena';
 import { calendarNow, checkCtxFor, ensureDeadlineTasks, jobLookups, nextDate, projectRow, withFallback, type DocRow } from '@/lib/projects/server';
 import { ordersSummary } from '@/lib/purchase-orders/server';
+import { sourceNowOf } from '@/lib/lead-source-server';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -119,6 +120,10 @@ export async function GET(req: Request, { params }: Ctx) {
     | ({ id: string; name: string; email: string | null; phone: string | null; wa_id?: string | null; whatsapp_opt_in?: boolean } & Row)
     | null;
   if (customer && 'whatsapp_opt_in' in customer) customer.whatsapp_permission_words = permissionWords(customer);
+  // Where they came from in words, with their Meta ad's name now (enquiries.source keeps the name it had then).
+  const sourceShown = customer
+    ? sourceNowOf({ id: customer.id, source: String(customer.source ?? ''), meta_ad_id: typeof customerRow?.meta_ad_id === 'string' ? customerRow.meta_ad_id : null })
+    : null;
 
   // WhatsApp is matched on the phone number, so a chat that started on another enquiry (a WhatsApp
   // message, a second web form) still shows here. Backfill the number's WhatsApp id if missing.
@@ -136,6 +141,10 @@ export async function GET(req: Request, { params }: Ctx) {
   }
   if (customer && !linked.some((l) => l.id === customer.id)) {
     linked.push({ id: customer.id, wa_last_inbound_at: null, wa_last_message_at: null, wa_unread: 0 });
+  }
+  if (customer && sourceShown) {
+    const shown = await sourceShown;
+    Object.assign(customer, { source_label: shown.label, source_note: shown.note });
   }
   const linkedIds = linked.map((l) => l.id);
   // The enquiry the live chat is on: the one with the latest WhatsApp activity (replies go there).

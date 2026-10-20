@@ -1,4 +1,5 @@
 import { isMetaSource } from './ad-spend';
+import { adNameNow, type AdNameLookup } from './ad-names';
 
 /**
  * Where an enquiry came from (enquiries.source), in plain words, and the four groups the Enquiries
@@ -94,6 +95,38 @@ export function leadSourceLabel(source: string | null | undefined): string {
   const name = upFirst(head.trim()) || 'Other';
   const tail = rest.join(':').trim();
   return tail ? `${name} · ${tail}` : name;
+}
+
+/** A lead's source as the CRM shows it, with its Meta ad's name now (sourceNow). */
+export type SourceNow = {
+  /** "Meta ad · Tim Facts", "Meta (organic)", "Website"… (leadSourceLabel). */
+  label: string;
+  /** A Meta lead's tag: the ad's name now, "Organic", "WhatsApp ad"… (metaAdLabel). Null for other leads. */
+  ad: string | null;
+  /** "was Video 1" when the ad has been renamed since they came in. */
+  note: string | null;
+};
+
+/** Leads a Meta ad's name can be found for: its lead forms (named or not) and WhatsApp chats started from an ad. */
+const AD_LEAD = /^(?:meta\s*:|meta-lead-ad\s*$|whatsapp-ad\s*$)/i;
+export const isAdLead = (source: string | null | undefined) => AD_LEAD.test(tidy(source));
+
+/**
+ * leadSourceLabel and metaAdLabel with the ad's name now: enquiries.source keeps the name the ad had
+ * when they came in ("meta: Video 1"), which Ads Manager may have changed since ("Tim Facts"). By the
+ * lead's ad id when known (ad-spend.sql), else by the names the CRM has seen (src/lib/ad-names.ts
+ * adNameNow). `names` null (none kept yet, or they couldn't be read): the lead's own name.
+ */
+export function sourceNow(source: string | null | undefined, metaAdId: string | null | undefined, names: AdNameLookup | null): SourceNow {
+  const s = tidy(source);
+  const plain: SourceNow = { label: leadSourceLabel(s), ad: metaAdLabel(s), note: null };
+  if (!names || !isAdLead(s)) return plain;
+  const chat = /^whatsapp-ad/i.test(s);
+  // A WhatsApp ad chat only has its ad id: Meta doesn't send the ad's name with it.
+  const now = adNameNow(names, chat ? null : metaAdName(s), metaAdId);
+  if (!now) return plain;
+  if (chat) return { label: `Meta ad (WhatsApp) · ${now.name}`, ad: `WhatsApp ad · ${now.name}`, note: null };
+  return { label: `Meta ad · ${now.name}`, ad: now.name, note: now.note };
 }
 
 /** Leads from one group ('' = everyone), in the order given. */

@@ -165,9 +165,10 @@ export function withCurrentNames<T extends Pick<Ad, 'id' | 'name' | 'campaignId'
 /**
  * For putting a lead's ad's name now beside it on other pages: each ad's and campaign's name by
  * id, and `renamed`: an old ad name (lower case, single spaces) → the one name the ad(s) that had
- * it have now. A name two ads with different names now have had isn't in it (it can't say which).
+ * it have now. A name two ads with different names now have had isn't in it (it can't say which):
+ * it's in `shared`, with each of their names now.
  */
-export type AdNameLookup = { ads: Record<string, string>; campaigns: Record<string, string>; renamed: Record<string, string> };
+export type AdNameLookup = { ads: Record<string, string>; campaigns: Record<string, string>; renamed: Record<string, string>; shared: Record<string, string[]> };
 
 /** Meta's names now (null if not known) and the names seen → a lookup. Meta's list wins over the history's newest. */
 export function nameLookup(current: Record<string, CurrentAd> | null | undefined, h: NameHistory): AdNameLookup {
@@ -179,20 +180,24 @@ export function nameLookup(current: Record<string, CurrentAd> | null | undefined
     ads[id] = c.name;
     if (c.campaignId && c.campaignName) campaigns[c.campaignId] = c.campaignName;
   }
-  // Each name → the names the ads that have had it have now.
-  const now = new Map<string, Set<string>>();
+  // Each name → the names the ads that have had it have now (one of each, whatever its capitals).
+  const now = new Map<string, Map<string, string>>();
   const add = (name: string, id: string) => {
     const k = norm(name);
-    now.set(k, (now.get(k) ?? new Set()).add(ads[id]));
+    const to = now.get(k) ?? new Map<string, string>();
+    if (ads[id] && !to.has(norm(ads[id]))) to.set(norm(ads[id]), ads[id]);
+    now.set(k, to);
   };
   for (const [id, list] of Object.entries(h.ads)) for (const x of list) add(x.name, id);
   for (const id of Object.keys(ads)) add(ads[id], id);
   const renamed: Record<string, string> = {};
-  for (const [k, names] of now) {
-    const [to, ...more] = [...names];
-    if (!more.length && norm(to) !== k) renamed[k] = to;
+  const shared: Record<string, string[]> = {};
+  for (const [k, to] of now) {
+    const names = [...to.values()];
+    if (names.length > 1) shared[k] = names;
+    else if (names.length && norm(names[0]) !== k) renamed[k] = names[0];
   }
-  return { ads, campaigns, renamed };
+  return { ads, campaigns, renamed, shared };
 }
 
 /** A lead's ad's name now: by its ad id, else by the name it came in with. Null when the CRM knows no newer name than the lead's own. */
@@ -201,6 +206,28 @@ export function leadAdName(l: AdNameLookup, source: string, metaAdId?: string | 
   if (byId) return byId;
   const m = /^meta\s*:(.*)$/i.exec(source.trim());
   return m ? (own(l.renamed, norm(m[1])) ?? null) : null;
+}
+
+/**
+ * What to call a lead's ad on other pages, from the name it came in with (`cameAs`, null when Meta
+ * didn't name it) and its ad id when known: by the id; else the one name the ad(s) that had that
+ * name have now; else, when ads now named differently have had it, all their names ("Valley Vets
+ * Off Grid / Video 4") rather than a guess. `note` says what it came in as when that's not its
+ * name now ("was Video 1"). Null when there's nothing to go on.
+ */
+export function adNameNow(l: AdNameLookup, cameAs: string | null | undefined, metaAdId?: string | null): { name: string; note: string | null } | null {
+  const was = tidy(cameAs);
+  const byId = metaAdId ? own(l.ads, metaAdId) : undefined;
+  if (byId) return { name: byId, note: was && norm(was) !== norm(byId) ? `was ${was}` : null };
+  if (!was) return null;
+  const k = norm(was);
+  const to = own(l.renamed, k);
+  if (to) return { name: to, note: `was ${was}` };
+  const several = own(l.shared, k);
+  if (!several) return { name: was, note: null };
+  // The new names first (A to Z), then the old one if an ad still has it.
+  const names = [...several].sort((a, b) => Number(norm(a) === k) - Number(norm(b) === k) || a.localeCompare(b));
+  return { name: names.join(' / '), note: `was ${was} · ${names.length} ads have had this name` };
 }
 
 // ── Older leads' ads, from Meta's Lead API ──

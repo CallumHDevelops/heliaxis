@@ -70,6 +70,10 @@ export type Customer = {
   interest: string | null;
   property_type?: string | null;
   source: string;
+  /** `source` in words, with the Meta ad's name now ("Meta ad · Tim Facts"), from the server. */
+  source_label?: string;
+  /** "was Video 1" when the ad has been renamed since they came in. */
+  source_note?: string | null;
   created_at?: string;
   wa_id: string | null;
   wa_unread: number;

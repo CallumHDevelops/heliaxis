@@ -22,7 +22,7 @@ export type SearchPerson = {
   ref: string | null;
   postcode: string | null;
   phone: string | null;
-  /** Where they came from, in plain words ("Meta ad · Video 4"). */
+  /** Where they came from, in plain words ("Meta ad · Video 4"; /api/search gives a Meta ad's name now). */
   source: string;
   /** Their enquiry's status: New, Contacted, Quoted, Won or Lost. */
   status: string;

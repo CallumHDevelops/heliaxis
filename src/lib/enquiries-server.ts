@@ -1,6 +1,8 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { EnquiryRow } from '@/lib/enquiries';
+import { rowToCrmLead, type CrmLead, type EnquiryRow } from '@/lib/enquiries';
+import { sourceNow } from '@/lib/lead-source';
+import { sourcesNow } from '@/lib/lead-source-server';
 
 const COLUMNS = 'id, name, email, phone, postcode, interest, property_type, source, status, created_at';
 
@@ -14,6 +16,12 @@ export async function listEnquiryRows(): Promise<{ rows: EnquiryRow[]; error: st
   let r = await list(`${COLUMNS}, customer_ref`);
   if (r.error) r = await list(COLUMNS);
   return { rows: (r.data ?? []) as unknown as EnquiryRow[], error: r.error?.message ?? null };
+}
+
+/** The list's leads, each source in words with its Meta ad's name now ("Meta ad · Tim Facts", src/lib/lead-source-server.ts). */
+export async function crmLeads(rows: EnquiryRow[]): Promise<CrmLead[]> {
+  const shown = await sourcesNow(rows);
+  return rows.map((r) => rowToCrmLead(r, shown.get(r.id) ?? sourceNow(r.source, null, null)));
 }
 
 /**
