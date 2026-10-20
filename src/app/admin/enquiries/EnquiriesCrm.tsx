@@ -128,12 +128,14 @@ export function EnquiriesCrm({
   const filtered = Boolean(only || q.trim());
   // Only people still on the list count (a refresh may have dropped some). Ticks stay while you search or filter.
   const pickedIds = leads.filter((l) => picked.has(l.id)).map((l) => l.id);
-  // "Select all" means everyone the search and status card show.
-  const allPicked = shown.length > 0 && shown.every((l) => picked.has(l.id));
+  // "Select all" means everyone the search and status card show, but not leads only still on screen because
+  // you just moved them out of that status: "delete the rest of New" mustn't take the ones you just contacted.
+  const selectable = shownLeads(leads, q, only);
+  const allPicked = selectable.length > 0 && selectable.every((l) => picked.has(l.id));
   const pickAll = () =>
     setPicked((prev) => {
       const next = new Set(prev);
-      for (const l of shown) {
+      for (const l of selectable) {
         if (allPicked) next.delete(l.id);
         else next.add(l.id);
       }
@@ -169,6 +171,14 @@ export function EnquiriesCrm({
 
   async function setStatus(id: string, status: string) {
     if (only) setKept((k) => ({ status: only, ids: new Set(k.status === only ? k.ids : []).add(id) }));
+    // Moved off the picked card: untick it too, or "Select all" then marking the good ones would delete them.
+    if (only && status !== only && picked.has(id)) {
+      setPicked((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
     setLeads((prev) =>
       prev.map((l) => (l.id === id ? { ...l, status, isnew: status === 'New' } : l))
     );
@@ -225,6 +235,7 @@ export function EnquiriesCrm({
               onClick={() => {
                 setSelecting((v) => !v);
                 setPicked(new Set());
+                setKept({ status: '', ids: new Set() }); // the rows then match the card's count
               }}
             >
               {selecting ? 'Done' : 'Select'}
@@ -377,8 +388,8 @@ export function EnquiriesCrm({
       {selecting && (
         <div className="enq-selbar">
           <label className="enq-pickname">
-            <input type="checkbox" checked={allPicked} disabled={!shown.length} onChange={pickAll} />
-            Select all ({shown.length})
+            <input type="checkbox" checked={allPicked} disabled={!selectable.length} onChange={pickAll} />
+            Select all ({selectable.length})
           </label>
           <span className="enq-selcount">{pickedIds.length} selected</span>
           <button

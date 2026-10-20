@@ -54,6 +54,9 @@ eq('changed while filtered stays', ids(shownLeads(moved, '', 'New', new Set(['c'
 eq('...without keep it goes', ids(shownLeads(moved, '', 'New')), ['a', 'e']);
 eq('...but the search still applies to it', ids(shownLeads(moved, 'aisha', 'New', new Set(['c']))), ['e']);
 eq('keep means nothing without a status card', ids(shownLeads(moved, 'tom', '', new Set(['c']))), ['b']);
+// ...and Select all (the list without keep) leaves it out, so "delete the rest of New" can't take it.
+eq('Select all skips the kept lead', ids(shownLeads(moved, '', 'New')), ['a', 'e']);
+eq('Select all with a search skips it too', ids(shownLeads(moved, 'smith', 'New')), ['a']);
 
 // The search itself (moved here from the page unchanged).
 eq('phone digits', leadMatches(leads[0], '900100'), true);
