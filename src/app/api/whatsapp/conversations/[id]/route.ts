@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { defaultTemplate, whatsappConfigured } from '@/lib/whatsapp/api';
 import { markChatRead, processOutbox, sendManual } from '@/lib/whatsapp/inbox';
 import { getSettings } from '@/lib/whatsapp/settings';
+import { chaseView } from '@/lib/whatsapp/schedule';
 import { mediaVersion, withChatMedia } from '@/lib/whatsapp/media';
 import { chatSession, json, mayOpenChat, version } from '@/lib/whatsapp/routes';
 import { wordingForNote } from '@/lib/whatsapp/template-text';
@@ -104,7 +105,8 @@ export async function GET(req: Request, { params }: Ctx) {
     v,
     configured: whatsappConfigured(),
     defaultTemplate: settings.firstContactTemplate || defaultTemplate().name || null,
-    chase: { questions: settings.chaseQuestions, hours: settings.chaseAfterHours },
+    // `view`: so the reply box can say when a chaser would actually go (quiet hours, the evening rule).
+    chase: { questions: settings.chaseQuestions, hours: settings.chaseAfterHours, view: chaseView(settings) },
     enquiry,
     messages: (messages ?? []).map((m) => ({
       ...m,

@@ -13,6 +13,7 @@ import { schemaReady } from '@/lib/schema-ready';
 import { toWaId, windowOpen } from '@/lib/whatsapp/shared';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
 import { getSettings } from '@/lib/whatsapp/settings';
+import { chaseView } from '@/lib/whatsapp/schedule';
 import { shownBody } from '@/lib/whatsapp/describe';
 import { withChatMedia } from '@/lib/whatsapp/media';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
@@ -308,9 +309,9 @@ export async function GET(req: Request, { params }: Ctx) {
     unread: linked.reduce((n, l) => n + (l.wa_unread || 0), 0),
     unreadIds: linked.filter((l) => l.wa_unread > 0).map((l) => l.id),
     messages: waTotal ? await waTotal : (wa ?? []).length,
-    chaseHours: await getSettings()
-      .then((st) => (st.chaseQuestions ? st.chaseAfterHours : 0))
-      .catch(() => 0),
+    ...(await getSettings()
+      .then((st) => ({ chaseHours: st.chaseQuestions ? st.chaseAfterHours : 0, chaseView: chaseView(st) }))
+      .catch(() => ({ chaseHours: 0, chaseView: null }))),
   };
   const taskList = (tasks ?? []).map((t) => ({
     ...t,

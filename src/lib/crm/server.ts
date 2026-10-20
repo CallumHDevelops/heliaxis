@@ -112,7 +112,7 @@ export async function remindNextSteps() {
   const { notify } = await import('@/lib/notify');
   const { canAccess } = await import('@/lib/portals');
   const settings = await getSettings();
-  if (isQuiet(new Date(), settings.quietFrom, settings.quietTo)) return 0;
+  if (isQuiet(new Date(), settings)) return 0;
   const db = createAdminClient();
   const { data: due } = await db
     .from('crm_projects')

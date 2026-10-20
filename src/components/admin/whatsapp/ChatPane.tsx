@@ -10,6 +10,7 @@ import { stageLabel } from '@/lib/crm/stages';
 import { chatRef, chatTag, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { closeShownNotifications } from '@/lib/push-client';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
+import { chaseWhen, type ChaseView } from '@/lib/whatsapp/schedule';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
@@ -201,7 +202,7 @@ export function ChatPane({
   const [outbox, setOutbox] = useState<Queued[]>([]);
   const [configured, setConfigured] = useState(true);
   const [defaultTemplate, setDefaultTemplate] = useState<string | null>(null);
-  const [chaseDefaults, setChaseDefaults] = useState({ questions: true, hours: 12 });
+  const [chaseDefaults, setChaseDefaults] = useState<{ questions: boolean; hours: number; view?: ChaseView }>({ questions: true, hours: 12 });
   const [chaseChoice, setChaseChoice] = useState('auto');
   const [error, setError] = useState('');
   const key = draftKey(me, id);
@@ -484,6 +485,9 @@ export function ChatPane({
   const windowCloses = enquiry.wa_last_inbound_at ? new Date(enquiry.wa_last_inbound_at).getTime() + SERVICE_WINDOW_MS : 0;
   const chasePicker = (message: string, isTemplate = false) => {
     const h = chaseHoursFor(message, isTemplate);
+    // When it would really go: quiet hours and the evening rule can move it ("tomorrow about 10:00").
+    const view = chaseDefaults.view;
+    const when = h && view ? chaseWhen({ now: new Date(now), hours: h, lastInboundAt: enquiry.wa_last_inbound_at, view }) : null;
     return (
       <div className="wa-chase-pick">
         <span>Chase if no reply:</span>
@@ -494,6 +498,7 @@ export function ChatPane({
             </option>
           ))}
         </select>
+        {when && <span className="wa-chase-when">{when}</span>}
       </div>
     );
   };

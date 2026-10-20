@@ -8,6 +8,7 @@ import type { PrimaryAction } from '@/lib/projects/primary-action';
 import { plusDays } from '@/lib/projects/feed';
 import type { TeamMember } from '@/lib/projects/server';
 import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
+import { chaseWhen } from '@/lib/whatsapp/schedule';
 import { Sheet, StageChip } from '../CrmUi';
 import { firstName, londonIso, nextWeekday, ukDayOf, ukTime } from '../crm-shared';
 import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
@@ -340,6 +341,7 @@ export function WhatsAppComposer({
 }) {
   const [text, setText] = useState(initialText);
   const [chase, setChase] = useState(true);
+  const [openedAt] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
@@ -373,6 +375,8 @@ export function WhatsAppComposer({
     }
   }
   const asks = text.includes('?');
+  // When it would really go: quiet hours and the evening rule can move it ("tomorrow about 10:00").
+  const chaseAt = wa.chaseView ? chaseWhen({ now: new Date(openedAt), hours: wa.chaseHours, lastInboundAt: wa.lastInbound ?? null, view: wa.chaseView }) : null;
 
   return (
     <Sheet title={title} onClose={onClose}>
@@ -399,7 +403,7 @@ export function WhatsAppComposer({
           />
           {asks && wa.chaseHours > 0 && (
             <label className="crm-check">
-              <input type="checkbox" checked={chase} onChange={(e) => setChase(e.target.checked)} /> Chase if no reply in {wa.chaseHours}h
+              <input type="checkbox" checked={chase} onChange={(e) => setChase(e.target.checked)} /> Chase if no reply{chaseAt ? `: ${chaseAt}` : ` in ${wa.chaseHours}h`}
             </label>
           )}
           {err && <p className="crm-banner crm-banner--err">{err}</p>}
