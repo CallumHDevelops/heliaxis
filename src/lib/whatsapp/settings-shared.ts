@@ -47,8 +47,8 @@ export const DEFAULT_SETTINGS: WaSettings = {
   eveningRule: true,
   eveningFromMin: 18 * 60,
   eveningNotBeforeMin: 10 * 60,
-  smartRepliesQuietHours: false,
-  firstContactQuietHours: false,
+  smartRepliesQuietHours: true,
+  firstContactQuietHours: true,
   remindUnansweredMinutes: 30,
 };
 
@@ -67,7 +67,10 @@ function minuteOfDay(v: unknown, oldHour: unknown, d: number) {
   return d;
 }
 
-/** Quiet hours used to end at 08:00 by default; the owner asked for 08:45, so a saved 8 reads as that. */
+/**
+ * Quiet hours used to end at 08:00 by default; the owner asked for 08:45, so a saved 8 reads as that,
+ * unless quiet hours were switched off (8 → 8).
+ */
 const OLD_DEFAULT_QUIET_TO = 8;
 
 /** 525 → "08:45". */
@@ -94,12 +97,16 @@ export function cleanSettings(b: SavedSettings): WaSettings {
     chaseTemplate: String(b.chaseTemplate ?? '').trim(),
     firstContactTemplate: String(b.firstContactTemplate ?? '').trim().slice(0, 100),
     quietFromMin: minuteOfDay(b.quietFromMin, b.quietFrom, d.quietFromMin),
-    quietToMin: minuteOfDay(b.quietToMin, Number(b.quietTo) === OLD_DEFAULT_QUIET_TO ? undefined : b.quietTo, d.quietToMin),
+    quietToMin: minuteOfDay(
+      b.quietToMin,
+      Number(b.quietTo) === OLD_DEFAULT_QUIET_TO && Number(b.quietFrom) !== OLD_DEFAULT_QUIET_TO ? undefined : b.quietTo,
+      d.quietToMin
+    ),
     eveningRule: b.eveningRule === undefined ? d.eveningRule : !!b.eveningRule,
     eveningFromMin: minuteOfDay(b.eveningFromMin, undefined, d.eveningFromMin),
     eveningNotBeforeMin: minuteOfDay(b.eveningNotBeforeMin, undefined, d.eveningNotBeforeMin),
-    smartRepliesQuietHours: !!b.smartRepliesQuietHours,
-    firstContactQuietHours: !!b.firstContactQuietHours,
+    smartRepliesQuietHours: b.smartRepliesQuietHours === undefined ? d.smartRepliesQuietHours : !!b.smartRepliesQuietHours,
+    firstContactQuietHours: b.firstContactQuietHours === undefined ? d.firstContactQuietHours : !!b.firstContactQuietHours,
     remindUnansweredMinutes: Math.round(num(b.remindUnansweredMinutes, 0, 24 * 60, d.remindUnansweredMinutes)),
   };
 }

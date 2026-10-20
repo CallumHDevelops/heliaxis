@@ -598,11 +598,13 @@ export async function processOutbox(limit = 8) {
       const attempts = item.attempts + 1;
       const retry = attempts < 3 && !r.error.includes('window is closed');
       if (!retry) failed++;
+      // A "Send now" keeps its marker while it retries, so quiet hours don't hold it for the morning.
+      const note = item.last_error === SEND_NOW_NOTE ? SEND_NOW_NOTE : r.error;
       await db
         .from('whatsapp_outbox')
         .update(
           retry
-            ? { status: 'pending', attempts, last_error: r.error, send_after: new Date(Date.now() + 60_000).toISOString() }
+            ? { status: 'pending', attempts, last_error: note, send_after: new Date(Date.now() + 60_000).toISOString() }
             : { status: 'failed', attempts, last_error: r.error }
         )
         .eq('id', item.id);

@@ -69,21 +69,33 @@ export function nextClock(d: Date, minute: number): Date {
 }
 
 /**
- * The first time at or after `d` (and not before `floor`, when there is one) outside quiet hours,
- * plus a little jitter (0–20 min) if it had to move.
+ * The outbox runs once a minute, so a chaser planned for the last minute before quiet hours would be
+ * picked up in them and held overnight (missing the free window). Plans keep this far clear.
  */
-export function nextAwake(d: Date, q: QuietHours, opts: { floor?: Date | null; rand?: () => number } = {}): Date {
-  let t = Math.max(d.getTime(), opts.floor?.getTime() ?? 0);
-  if (isQuiet(new Date(t), q)) t = nextClock(new Date(t), q.quietToMin).getTime();
-  if (t === d.getTime()) return d;
-  const j = t + Math.round((opts.rand ?? Math.random)() * 20) * MIN;
-  return new Date(isQuiet(new Date(j), q) ? t : j);
+const RUN_GAP = 2 * MIN;
+
+/** Outside quiet hours at `t`, and still `lead` later. */
+function awake(t: number, q: QuietHours, lead = 0): boolean {
+  return !isQuiet(new Date(t), q) && !isQuiet(new Date(t + lead), q);
 }
 
-/** The last time at or before `d` outside quiet hours. */
-export function lastAwake(d: Date, q: QuietHours): Date {
+/**
+ * The first time at or after `d` (and not before `floor`, when there is one) outside quiet hours
+ * (and still outside them `lead` later), plus a little jitter (0–20 min) if it had to move.
+ */
+export function nextAwake(d: Date, q: QuietHours, opts: { floor?: Date | null; rand?: () => number; lead?: number } = {}): Date {
+  const lead = opts.lead ?? 0;
+  let t = Math.max(d.getTime(), opts.floor?.getTime() ?? 0);
+  if (!awake(t, q, lead)) t = nextClock(new Date(t), q.quietToMin).getTime();
+  if (t === d.getTime()) return d;
+  const j = t + Math.round((opts.rand ?? Math.random)() * 20) * MIN;
+  return new Date(awake(j, q, lead) ? j : t);
+}
+
+/** The last time at or before `d` outside quiet hours (and still outside them `lead` later). */
+export function lastAwake(d: Date, q: QuietHours, lead = 0): Date {
   let t = d.getTime();
-  for (let i = 0; i < 24 * 12 && isQuiet(new Date(t), q); i++) t -= STEP;
+  for (let i = 0; i < 24 * 12 && !awake(t, q, lead); i++) t -= STEP;
   return new Date(t);
 }
 
@@ -117,14 +129,18 @@ export function planChase(opts: {
 }): ChasePlan {
   const { sentAt, hours, settings: s, keepFree, rand } = opts;
   const floor = eveningFloor(sentAt, s);
-  const target = nextAwake(new Date(sentAt.getTime() + hours * HOUR), s, { floor, rand });
+  const due = new Date(sentAt.getTime() + hours * HOUR);
+  const target = nextAwake(due, s, { floor, rand, lead: RUN_GAP });
   const close = opts.lastInboundAt ? new Date(opts.lastInboundAt).getTime() + WINDOW_MS : null;
   const margin = 20 * MIN;
-  if (close && target.getTime() < close - margin) return { at: target, free: true };
+  // Free or not is decided without the jitter (as the chat's label works it out), so a few minutes'
+  // jitter can't send it into the free-window move below; if the jitter would miss, it goes unjittered.
+  const base = nextAwake(due, s, { floor, rand: () => 0, lead: RUN_GAP });
+  if (close && base.getTime() < close - margin) return { at: target.getTime() < close - margin ? target : base, free: true };
   if (keepFree && close) {
-    let cand = lastAwake(new Date(close - HOUR), s);
+    let cand = lastAwake(new Date(close - HOUR), s, RUN_GAP);
     // Too early for the evening rule: the earliest it allows, if that still beats the window.
-    if (floor && cand.getTime() < floor.getTime()) cand = nextAwake(floor, s, { rand: () => 0 });
+    if (floor && cand.getTime() < floor.getTime()) cand = nextAwake(floor, s, { rand: () => 0, lead: RUN_GAP });
     const minGap = Math.min(hours, 4) * HOUR;
     if (cand.getTime() >= sentAt.getTime() + minGap && cand.getTime() < close - margin) return { at: cand, free: true };
   }

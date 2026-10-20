@@ -2,8 +2,9 @@
 // (settings-shared.ts): quiet hours to the minute (nothing before 08:45), on both sides of the clocks
 // changing (Sunday 29 March and Sunday 25 October 2026), the evening rule (a message after 18:00
 // isn't chased before 10:00 the next morning), keeping chasers free, the final nudge, the outbox's
-// check just before it sends, what the "Chase if no reply" choices say, and settings saved before
-// quiet hours had minutes.
+// check just before it sends, chasers kept clear of the minute before quiet hours (the outbox runs
+// once a minute), jitter never changing free or paid, what the "Chase if no reply" choices say, and
+// settings saved before quiet hours had minutes.
 // Usage: node --experimental-strip-types scripts/test-wa-schedule.mjs
 import {
   chaseView,
@@ -107,6 +108,42 @@ eq('awake already: unchanged', uk(lastAwake(at('2026-10-20T19:00:00+01:00'), S))
   eq('never messaged us: paid, on time', [uk(p.at), p.free], ['Tue 20 Oct 18:00', false]);
 }
 
+// The outbox runs once a minute: a chaser planned for 20:59 would be picked up at 21:00, held for the
+// morning and miss the free window. Plans keep 2 minutes clear of quiet hours.
+eq('just before quiet hours, kept clear', uk(lastAwake(at('2026-10-20T22:34:30+01:00'), S, 2 * 60_000)), 'Tue 20 Oct 20:54');
+{
+  const sentAt = at('2026-10-20T09:00:00+01:00');
+  const p = planChase({ sentAt, hours: 12, lastInboundAt: '2026-10-19T23:34:30+01:00', settings: S, keepFree: true, rand: none });
+  eq('kept-free chaser clear of 21:00', [uk(p.at), p.free], ['Tue 20 Oct 20:54', true]);
+  const run = new Date(Math.ceil(p.at.getTime() / 60_000) * 60_000);
+  eq('the next run sends it', holdUntil({ kind: 'chase', now: run, settings: S, lastOutAt: sentAt }), null);
+  eq('…a minute late too', holdUntil({ kind: 'chase', now: new Date(run.getTime() + 60_000), settings: S, lastOutAt: sentAt }), null);
+}
+{
+  const p = planChase({ sentAt: at('2026-10-20T08:59:30+01:00'), hours: 12, lastInboundAt: null, settings: S, keepFree: true, rand: none });
+  eq('due 20:59:30: planned for the morning up front', [uk(p.at), p.free], ['Wed 21 Oct 08:45', false]);
+  const q = planChase({ sentAt: at('2026-10-20T08:57:30+01:00'), hours: 12, lastInboundAt: null, settings: S, keepFree: true, rand: none });
+  eq('due 20:57:30: goes that evening', uk(q.at), 'Tue 20 Oct 20:57');
+}
+eq('the send-time check itself has no gap: 20:58 goes', holdUntil({ kind: 'chase', now: at('2026-10-20T20:58:00+01:00'), settings: S, lastOutAt: at('2026-10-20T08:58:00+01:00') }), null);
+
+// Free or paid is decided without the jitter, so the chat's label and the real plan agree: window
+// closes Wed 09:15, question at 14:00, 12h → the morning, whatever the jitter (never 20:55 the night before).
+{
+  const ask = { sentAt: at('2026-10-20T14:00:00+01:00'), hours: 12, lastInboundAt: '2026-10-20T09:15:00+01:00', settings: S, keepFree: true };
+  const plans = [0, 0.25, 0.5, 0.75, 1].map((r) => {
+    const p = planChase({ ...ask, rand: () => r });
+    return [uk(p.at), p.free];
+  });
+  eq('jitter keeps it in the morning, free', plans, [
+    ['Wed 21 Oct 08:45', true],
+    ['Wed 21 Oct 08:50', true],
+    ['Wed 21 Oct 08:45', true],
+    ['Wed 21 Oct 08:45', true],
+    ['Wed 21 Oct 08:45', true],
+  ]);
+}
+
 // The owner's case: Nikki wrote at 20:01 ("in bed ill"), Callum replied at 20:34 asking about a call
 // tomorrow. The chaser went at 08:35. Now: not before 10:00 the next day, still free.
 {
@@ -199,11 +236,12 @@ eq('a chaser with no message found: quiet hours only', hold('chase', '2026-10-21
 eq('a final nudge at 08:00: 08:45', hold('chase', '2026-10-22T08:00:00+01:00', '2026-10-21T11:00:00+01:00'), 'Thu 22 Oct 08:45');
 eq('clocks go back: a chaser at 08:00 GMT waits for 10:00 GMT', holdUntil({ kind: 'chase', now: at('2026-10-25T08:00:00Z'), settings: S, lastOutAt: at('2026-10-24T20:34:00+01:00'), rand: none }).toISOString(), '2026-10-25T10:00:00.000Z');
 eq('"Send now" pressed in quiet hours: goes', hold('chase', '2026-10-21T08:35:00+01:00', '2026-10-20T20:34:00+01:00', { sendNow: true }), 'send');
-eq('smart reply in quiet hours, hold off: goes', hold('reply', '2026-10-21T03:00:00+01:00', null), 'send');
-eq('smart reply in quiet hours, hold on: 08:45', hold('reply', '2026-10-21T03:00:00+01:00', null, { settings: { ...S, smartRepliesQuietHours: true } }), 'Wed 21 Oct 08:45');
+eq('smart reply in quiet hours, hold off: goes', hold('reply', '2026-10-21T03:00:00+01:00', null, { settings: { ...S, smartRepliesQuietHours: false } }), 'send');
+eq('smart reply in quiet hours, by default: 08:45', hold('reply', '2026-10-21T03:00:00+01:00', null), 'Wed 21 Oct 08:45');
+eq('smart reply at 07:10, by default: 08:45', hold('reply', '2026-10-21T07:10:00+01:00', null), 'Wed 21 Oct 08:45');
 eq('smart replies never wait for the evening rule', hold('reply', '2026-10-21T09:00:00+01:00', '2026-10-20T20:34:00+01:00', { settings: { ...S, smartRepliesQuietHours: true } }), 'send');
-eq('intro to a new lead at 23:00, by default: goes (unchanged)', hold('intro', '2026-10-20T23:00:00+01:00', null), 'send');
-eq('intro at 23:00 with the hold on: 08:45', hold('intro', '2026-10-20T23:00:00+01:00', null, { settings: { ...S, firstContactQuietHours: true } }), 'Wed 21 Oct 08:45');
+eq('intro to a new lead at 06:33, by default: 08:45', hold('intro', '2026-10-21T06:33:00+01:00', null), 'Wed 21 Oct 08:45');
+eq('intro at 23:00 with the hold off: goes', hold('intro', '2026-10-20T23:00:00+01:00', null, { settings: { ...S, firstContactQuietHours: false } }), 'send');
 eq('intro at 11:00 with the hold on: goes', hold('intro', '2026-10-21T11:00:00+01:00', null, { settings: { ...S, firstContactQuietHours: true } }), 'send');
 eq('held times keep a little jitter', uk(holdUntil({ kind: 'chase', now: at('2026-10-21T08:35:00+01:00'), settings: S, lastOutAt: at('2026-10-20T20:34:00+01:00'), rand: most })), 'Wed 21 Oct 10:20');
 {
@@ -224,6 +262,8 @@ const box = (nowIso, hours, inbound, view = V) => chaseWhen({ now: at(nowIso), h
 eq('Nikki’s chat at 20:34, Auto (12h)', box('2026-10-20T20:34:00+01:00', 12, '2026-10-20T20:01:00+01:00'), 'tomorrow about 10:00');
 eq('at 20:34 with the evening rule off', box('2026-10-20T20:34:00+01:00', 12, '2026-10-20T20:01:00+01:00', { ...V, eveningRule: false }), 'tomorrow about 08:45');
 eq('at 14:00, 12h', box('2026-10-20T14:00:00+01:00', 12, '2026-10-20T13:30:00+01:00'), 'tomorrow about 08:45');
+eq('at 14:00, 12h, window closes 09:15 tomorrow', box('2026-10-20T14:00:00+01:00', 12, '2026-10-20T09:15:00+01:00'), 'tomorrow about 08:45');
+eq('at 09:00, 12h, window closes 23:34:30 tonight', box('2026-10-20T09:00:00+01:00', 12, '2026-10-19T23:34:30+01:00'), 'today about 20:54');
 eq('at 09:00, 4h', box('2026-10-20T09:00:00+01:00', 4, '2026-10-20T08:30:00+01:00'), 'today about 13:00');
 eq('at 14:00, 24h, kept free', box('2026-10-20T14:00:00+01:00', 24, '2026-10-20T13:30:00+01:00'), 'tomorrow about 12:30');
 eq('at 20:34, 3 days', box('2026-10-20T20:34:00+01:00', 72, null), 'Fri about 20:34');
@@ -234,11 +274,16 @@ eq('nothing saved: 21:00 → 08:45', both(cleanSettings({})), ['21:00', '08:45']
 const evening = (s) => [s.eveningRule, hhmm(s.eveningFromMin), hhmm(s.eveningNotBeforeMin)];
 eq('evening rule on by default: after 18:00 → not before 10:00', evening(cleanSettings({})), [true, '18:00', '10:00']);
 eq('evening rule on for settings saved before it', evening(cleanSettings({ quietFrom: 21, quietTo: 8, chaseAfterHours: 12 })), [true, '18:00', '10:00']);
-eq('quiet-hours holds off by default', [cleanSettings({}).smartRepliesQuietHours, cleanSettings({}).firstContactQuietHours], [false, false]);
-eq('intro hold kept on', cleanSettings({ firstContactQuietHours: true }).firstContactQuietHours, true);
+eq('quiet-hours holds on by default', [cleanSettings({}).smartRepliesQuietHours, cleanSettings({}).firstContactQuietHours], [true, true]);
+eq('holds on for settings saved before the intro hold', cleanSettings({ quietFrom: 21, quietTo: 8, smartRepliesQuietHours: true }).firstContactQuietHours, true);
+eq('smart-reply hold kept off', cleanSettings({ smartRepliesQuietHours: false }).smartRepliesQuietHours, false);
+eq('intro hold kept off', cleanSettings({ firstContactQuietHours: false }).firstContactQuietHours, false);
 eq('evening rule kept off once turned off', evening(cleanSettings({ eveningRule: false, eveningFromMin: 1140, eveningNotBeforeMin: 570 })), [false, '19:00', '09:30']);
 eq('saved with the old defaults (21, 8): 21:00 → 08:45', both(cleanSettings({ quietFrom: 21, quietTo: 8 })), ['21:00', '08:45']);
 eq('old 8 saved as text', both(cleanSettings({ quietFrom: '21', quietTo: '8' })), ['21:00', '08:45']);
+eq('old 8 → 8 (quiet hours off) stays off', both(cleanSettings({ quietFrom: 8, quietTo: 8 })), ['08:00', '08:00']);
+eq('…as text too', both(cleanSettings({ quietFrom: '8', quietTo: '8' })), ['08:00', '08:00']);
+eq('…and never quiet', isQuiet(at('2026-10-21T08:20:00+01:00'), cleanSettings({ quietFrom: 8, quietTo: 8 })), false);
 eq('old 22 → 7 keep their meaning', both(cleanSettings({ quietFrom: 22, quietTo: 7 })), ['22:00', '07:00']);
 eq('old 20 → 9 keep their meaning', both(cleanSettings({ quietFrom: 20, quietTo: 9 })), ['20:00', '09:00']);
 eq('minutes win over old hours', both(cleanSettings({ quietFrom: 21, quietTo: 8, quietFromMin: 1290, quietToMin: 480 })), ['21:30', '08:00']);

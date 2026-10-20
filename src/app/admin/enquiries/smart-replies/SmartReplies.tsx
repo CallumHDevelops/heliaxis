@@ -271,8 +271,9 @@ export function SmartReplies() {
             <input className="wa-input wa-time" type="time" step={60} aria-label="Quiet until" value={hhmm(settings.quietToMin)} onChange={(e) => setTime('quietToMin', e.target.value)} />
           </div>
           <p className="wa-muted">
-            Nothing automatic goes out in quiet hours. Chasers and final nudges wait until they end, then go a few minutes
-            after, at random, so they don’t look automated; reminders wait too. A message you type, or <b>Send now</b>, always goes.
+            Chasers, final nudges and reminders never go out in quiet hours: they wait until they end, then go a few
+            minutes after, at random, so they don’t look automated. Smart replies and the first message to new leads wait
+            too, while their boxes below are ticked. A message you type, or <b>Send now</b>, always goes.
           </p>
           <div className="wa-check wa-check--times">
             <input type="checkbox" aria-label="Evening rule" checked={settings.eveningRule} onChange={(e) => set('eveningRule', e.target.checked)} />
