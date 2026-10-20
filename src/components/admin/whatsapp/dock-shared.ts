@@ -37,7 +37,8 @@ export type DockPick = 'o' | 'c' | '-';
 /** a = pages that start open (CRM home, job pages); b = pages that start folded (everything else). */
 export type DockChoice = { a: DockPick; b: DockPick };
 export type CrmView = 'home' | 'board' | 'list';
-export type ChatFilter = 'needs_reply' | 'unread' | 'all' | 'waiting';
+/** 'all' is "All active" (the last 14 days); 'everyone' is "All chats" (any history, imported too). */
+export type ChatFilter = 'needs_reply' | 'unread' | 'all' | 'waiting' | 'everyone';
 
 /** The record page's customer, for the dock's This job tab. */
 export type DockJob = {
@@ -115,6 +116,8 @@ export type ActiveChat = {
 };
 
 export type ActiveList = { v: string; configured: boolean; canInbox: boolean; counts: ActiveCounts; rows: ActiveChat[] };
+/** A page of "All chats" (GET /api/whatsapp/active?all=1): `next` gives the page after, null at the end. */
+export type AllChatsPage = { rows: ActiveChat[]; next: string | null };
 
 export const NO_CHOICE: DockChoice = { a: '-', b: '-' };
 export const DOCK_COOKIE = 'hx-dock';
@@ -263,6 +266,22 @@ export function chatMatches(q: string, row: Pick<ActiveChat, 'name' | 'phone' | 
   return false;
 }
 
+/**
+ * Lists of chats as one, newest message first: the live list's row wins over an older copy of the
+ * same chat (All chats and search results aren't polled), and nobody is in it twice.
+ */
+export function mergeChats(...lists: ActiveChat[][]): ActiveChat[] {
+  const out: ActiveChat[] = [];
+  for (const list of lists) {
+    for (const r of list) {
+      const same = (x: ActiveChat) => x.threadId === r.threadId || (!!r.waId && x.waId === r.waId) || x.enquiryIds.some((e) => r.enquiryIds.includes(e));
+      if (!out.some(same)) out.push(r);
+    }
+  }
+  const at = (r: ActiveChat) => (r.last?.at ? Date.parse(r.last.at) : 0);
+  return out.sort((a, b) => at(b) - at(a));
+}
+
 /* ── Small display helpers ───────────────────────────────────────────────────────────────────────── */
 
 /** "Esther Smith" → "ES", "Esther" → "ES", "+44 7700…" → "+44". */
@@ -283,7 +302,7 @@ export function windowPill(closesAt: string | null, now: number): { open: boolea
   return { open: true, label: `Free reply · ${h >= 1 ? `${h}h` : `${Math.max(1, Math.round(left / 60_000))}m`} left` };
 }
 
-/** "2m", "3h", "Tue", "12 Oct": how long ago, as short as the list needs. */
+/** "2m", "3h", "Tue", "12 Oct", "12 Oct 2025": how long ago, as short as the list needs. */
 export function shortAgo(iso: string | null | undefined, now: number): string {
   if (!iso || !now) return '';
   const t = new Date(iso).getTime();
@@ -294,5 +313,7 @@ export function shortAgo(iso: string | null | undefined, now: number): string {
   if (hours < 24) return `${hours}h`;
   const d = new Date(t);
   if (hours < 24 * 6) return d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'Europe/London' });
+  // An imported chat can be from years back: the year once it's more than about ten months ago.
+  if (hours > 24 * 300) return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' });
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Europe/London' });
 }

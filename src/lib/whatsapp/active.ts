@@ -1,13 +1,15 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { looksLikeRef, refMatches, refOnly, refPatterns } from '@/lib/projects/refs';
 import { SERVICE_WINDOW_MS } from '@/lib/whatsapp/shared';
 import type { ActiveChat, ActiveCounts } from '@/components/admin/whatsapp/dock-shared';
 
 /**
  * The WhatsApp dock's chat list (GET /api/whatsapp/active): one row per WhatsApp number that's been
- * busy lately, with the person's latest open opportunity. Read-only: it never sends what's queued and
- * never clears anything as read (the chat itself does that, only while it's on screen).
+ * busy lately, with the person's latest open opportunity. "All chats" and the search box reach every
+ * chat with any history, imported ones too. Read-only: it never sends what's queued and never clears
+ * anything as read (the chat itself does that, only while it's on screen).
  *
  * Scopes: 'all' for Enquiries staff (every chat); 'linked' for CRM staff without Enquiries, who see
  * only numbers with an opportunity in the CRM.
@@ -147,6 +149,25 @@ function buildDrafts(enquiries: Enq[], projects: Proj[], pending: Pending[], sco
   return drafts;
 }
 
+/** These enquiries' chats: the rest of each person's enquiries (same number), with their jobs and queue. */
+async function draftsFor(db: Db, found: Enq[], scope: ChatScope): Promise<Draft[]> {
+  const ids = found.map((e) => e.id);
+  const [others, projects, pending] = await Promise.all([
+    sameNumbers(db, found.map((e) => e.wa_id).filter((w): w is string => !!w)),
+    projectsFor(db, ids),
+    pendingFor(db, ids),
+  ]);
+  const seen = new Set(ids);
+  const extra = others.filter((o) => !seen.has(o.id));
+  const [moreProjects, morePending] = extra.length
+    ? await Promise.all([projectsFor(db, extra.map((e) => e.id)), pendingFor(db, extra.map((e) => e.id))])
+    : [[], []];
+  return buildDrafts([...found, ...extra], [...projects, ...moreProjects], [...pending, ...morePending], scope);
+}
+
+/** Newest message first (chats never messaged last). */
+const byLatest = (a: Draft, b: Draft) => (b.lastAt || '').localeCompare(a.lastAt || '');
+
 /** Unread first (newest first), then waiting for our reply, then the most recent. */
 function sortDrafts(drafts: Draft[]) {
   const rank = (d: Draft) => (d.unread > 0 ? 0 : d.needsReply ? 1 : 2);
@@ -208,20 +229,7 @@ export async function activeChats(
   // No WhatsApp columns yet (the SQL hasn't been run): an empty list rather than an error.
   if (!recent?.length) return { v: hash([]), counts: ZERO, rows: [] };
 
-  // The rest of each person's enquiries (same number), alongside the jobs and queue for these ones.
-  const recentIds = recent.map((e) => e.id);
-  const [others, recentProjects, recentPending] = await Promise.all([
-    sameNumbers(db, recent.map((e) => e.wa_id).filter((w): w is string => !!w)),
-    projectsFor(db, recentIds),
-    pendingFor(db, recentIds),
-  ]);
-  const seen = new Set(recentIds);
-  const extra = others.filter((o) => !seen.has(o.id));
-  const [moreProjects, morePending] = extra.length
-    ? await Promise.all([projectsFor(db, extra.map((e) => e.id)), pendingFor(db, extra.map((e) => e.id))])
-    : [[], []];
-  const enquiries = [...recent, ...extra];
-  const drafts = sortDrafts(buildDrafts(enquiries, [...recentProjects, ...moreProjects], [...recentPending, ...morePending], scope));
+  const drafts = sortDrafts(await draftsFor(db, recent, scope));
 
   const v = hash(
     drafts.map((d) => [d.threadId, d.enquiryIds, d.unread, d.lastAt, d.queued, d.chasing, d.name, d.customerRef, d.project?.id, d.project?.stage, d.project?.ref, d.hasProject])
@@ -235,6 +243,109 @@ export async function activeChats(
     waiting: drafts.filter((d) => !!d.lastAt && !(d.lastInbound && d.lastInbound >= d.lastAt)).length,
   };
   return { v, counts, rows: await withPreviews(db, drafts.slice(0, opts.limit), opts.canInbox) };
+}
+
+/**
+ * "All chats": every chat with any WhatsApp history, imported ones too, newest message first, `limit`
+ * people at a time. `before` (the last page's `next`) gives the next page. Not polled: the dock lays
+ * the live list over it.
+ */
+export async function allChats(
+  scope: ChatScope,
+  opts: { limit: number; canInbox: boolean; before?: string | null }
+): Promise<{ rows: ActiveChat[]; next: string | null }> {
+  const db = createAdminClient();
+  const before = opts.before ?? null;
+  const page = await withFallback<Enq>((cols) => {
+    let q = db.from('enquiries').select(cols).not('wa_last_message_at', 'is', null);
+    // Up to and including `before`: two people last messaged in the same minute aren't split up (the
+    // dock drops the one it already has).
+    if (before) q = q.lte('wa_last_message_at', before);
+    return q.order('wa_last_message_at', { ascending: false }).order('id', { ascending: false }).limit(opts.limit) as unknown as PromiseLike<Rows<Enq>>;
+  }, ENQ_COLS, 'customer_ref');
+  if (!page?.length) return { rows: [], next: null };
+  // A chat whose newest message is after `before` was on an earlier page (another enquiry on its number).
+  const cut = before ? Date.parse(before) : null;
+  const drafts = (await draftsFor(db, page, scope)).filter((d) => cut === null || !d.lastAt || Date.parse(d.lastAt) <= cut).sort(byLatest);
+  const last = page[page.length - 1].wa_last_message_at;
+  const next = page.length === opts.limit && last && Date.parse(last) !== cut ? last : null;
+  return { rows: await withPreviews(db, drafts, opts.canInbox), next };
+}
+
+const SEARCH_LIMIT = 20;
+
+/**
+ * The dock's search box across every chat, not only the active ones: name, number (07700… or
+ * +44 7700…), postcode or HX-ref, as chatMatches in dock-shared.ts. Up to 20, newest message first;
+ * people never messaged are left out.
+ */
+export async function searchChats(scope: ChatScope, query: string, canInbox: boolean): Promise<ActiveChat[]> {
+  // Characters that would change the meaning of a filter come out.
+  const q = query.replace(/[,()%*\\"'`:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (q.length < 2) return [];
+  const db = createAdminClient();
+  const found = new Map<string, Enq>();
+  const keep = (rows: Enq[] | null | undefined) => {
+    for (const r of rows ?? []) if (!found.has(r.id)) found.set(r.id, r);
+  };
+  // Someone with a chat, or a number that may have one on another of their enquiries.
+  const chats = 'wa_last_message_at.not.is.null,wa_id.not.is.null';
+  const read = (filter: string) =>
+    withFallback<Enq>(
+      (cols) =>
+        db
+          .from('enquiries')
+          .select(cols)
+          .or(`and(or(${filter}),or(${chats}))`)
+          .order('wa_last_message_at', { ascending: false, nullsFirst: false })
+          .limit(40) as unknown as PromiseLike<Rows<Enq>>,
+      ENQ_COLS,
+      'customer_ref'
+    );
+
+  // References: the customer's own, and any of their jobs'. Nothing before customer-refs.sql.
+  const refs = looksLikeRef(q) ? refPatterns(q) : [];
+  if (refs.length) {
+    const [byCustomer, byJob] = await Promise.all([
+      read(refs.map((p) => `customer_ref.ilike.${p}`).join(',')),
+      db
+        .from('crm_projects')
+        .select('enquiry_id, project_ref')
+        .or(refs.map((p) => `project_ref.ilike.${p}`).join(','))
+        .limit(40),
+    ]);
+    keep(byCustomer);
+    const ids = byJob.error ? [] : [...new Set((byJob.data ?? []).filter((j) => refMatches(q, j.project_ref as string)).map((j) => j.enquiry_id as string))];
+    if (ids.length) {
+      keep(
+        await withFallback<Enq>(
+          (cols) => db.from('enquiries').select(cols).in('id', ids.slice(0, 100)).or(chats) as unknown as PromiseLike<Rows<Enq>>,
+          ENQ_COLS,
+          'customer_ref'
+        )
+      );
+    }
+  }
+  // Name, postcode and number. "HX…" is only ever a reference; "0042" could be part of a number too.
+  if (!refOnly(q)) {
+    const ors = [`name.ilike.%${q}%`, `postcode.ilike.%${q}%`];
+    const squashed = q.replace(/\s/g, '');
+    if (/^[a-z]{1,2}\d[a-z\d]?\d[a-z]{2}$/i.test(squashed)) ors.push(`postcode.ilike.%${squashed.slice(0, -3)}%${squashed.slice(-3)}%`);
+    const digits = q.replace(/\D/g, '');
+    if (digits.length >= 3 && /^[\d\s+-]+$/.test(q)) {
+      // Phones are kept as typed, WhatsApp ids as digits (447700…).
+      const intl = digits.startsWith('0') ? `44${digits.slice(1)}` : digits;
+      ors.push(`phone.ilike.%${digits}%`, `wa_id.like.*${intl}*`);
+      if (digits.length >= 6) ors.push(`phone.ilike.%${digits.slice(0, -6)}%${digits.slice(-6, -3)}%${digits.slice(-3)}%`);
+    }
+    keep(await read(ors.join(',')));
+  }
+  if (!found.size) return [];
+  const drafts = (await draftsFor(db, [...found.values()], scope))
+    .filter((d) => d.lastAt)
+    .sort(byLatest)
+    .slice(0, SEARCH_LIMIT);
+  return withPreviews(db, drafts, canInbox);
 }
 
 /** One customer's chat row (?enquiry=), whether or not it's active. null if they can't see it. */
@@ -274,6 +385,17 @@ async function linkedIds(db: Db, enquiries: { id: string; wa_id: string | null }
   );
   const numbersWithJob = new Set(all.filter((e) => e.wa_id && withJob.has(e.id)).map((e) => e.wa_id));
   return new Set(enquiries.filter((e) => withJob.has(e.id) || (e.wa_id && numbersWithJob.has(e.wa_id))).map((e) => e.id));
+}
+
+/** Which of these enquiries a CRM-only person may see the chat of (their number has an opportunity). */
+export async function linkedEnquiries(enquiryIds: string[]): Promise<Set<string>> {
+  if (!enquiryIds.length) return new Set();
+  const db = createAdminClient();
+  const rows = await inBatches(enquiryIds, async (batch) => {
+    const { data } = await db.from('enquiries').select('id, wa_id').in('id', batch);
+    return (data ?? []) as { id: string; wa_id: string | null }[];
+  });
+  return linkedIds(db, rows);
 }
 
 /** People with unread WhatsApp messages, counted once per number (the menu badge). 0 if the tables aren't there. */

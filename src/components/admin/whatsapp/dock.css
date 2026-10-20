@@ -751,6 +751,14 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   color: var(--hxd-ink);
   cursor: pointer;
 }
+.hxd-more:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* "Searching every chat…" under the matches already on screen. */
+.hxd-empty--more {
+  padding: 10px 16px 14px;
+}
 
 /* /admin/crm/chats: the same list as a page, the rows as cards across the width. */
 .hxd-list--page .hxd-list__tools {
