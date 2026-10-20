@@ -28,6 +28,8 @@ export type WaSettings = {
   eveningNotBeforeMin: number;
   /** Hold smart replies to messages that arrive in quiet hours until the morning. */
   smartRepliesQuietHours: boolean;
+  /** Hold the first message to new leads who enquire in quiet hours until the morning. */
+  firstContactQuietHours: boolean;
   /** Push the team if a customer's message has had no answer for this long (0 = off). */
   remindUnansweredMinutes: number;
 };
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: WaSettings = {
   eveningFromMin: 18 * 60,
   eveningNotBeforeMin: 10 * 60,
   smartRepliesQuietHours: false,
+  firstContactQuietHours: false,
   remindUnansweredMinutes: 30,
 };
 
@@ -96,6 +99,7 @@ export function cleanSettings(b: SavedSettings): WaSettings {
     eveningFromMin: minuteOfDay(b.eveningFromMin, undefined, d.eveningFromMin),
     eveningNotBeforeMin: minuteOfDay(b.eveningNotBeforeMin, undefined, d.eveningNotBeforeMin),
     smartRepliesQuietHours: !!b.smartRepliesQuietHours,
+    firstContactQuietHours: !!b.firstContactQuietHours,
     remindUnansweredMinutes: Math.round(num(b.remindUnansweredMinutes, 0, 24 * 60, d.remindUnansweredMinutes)),
   };
 }

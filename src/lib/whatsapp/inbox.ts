@@ -15,7 +15,7 @@ import {
   windowOpen,
   type SmartRule,
 } from './shared';
-import { isQuiet, nextAwake, planChase } from './schedule';
+import { holdUntil, isQuiet, nextAwake, planChase } from './schedule';
 import { ensureOpportunity, logActivity, markContacted } from '@/lib/crm/server';
 import { getSettings } from './settings';
 import { autoParams } from './templates';
@@ -280,17 +280,20 @@ async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo
  */
 export async function queueFirstContact(enquiryId: string, name: string) {
   if (process.env.WHATSAPP_AUTO_FIRST_MESSAGE !== 'true') return false;
-  const t = { ...defaultTemplate(), name: (await getSettings()).firstContactTemplate || defaultTemplate().name };
+  const settings = await getSettings();
+  const t = { ...defaultTemplate(), name: settings.firstContactTemplate || defaultTemplate().name };
   if (!t.name) return false;
   const db = createAdminClient();
-  const seconds = pickDelaySeconds(180, 360);
+  let at = new Date(Date.now() + pickDelaySeconds(180, 360) * 1000);
+  // Enquired in quiet hours: held until the morning, if that's switched on (Smart replies → Chasers).
+  if (settings.firstContactQuietHours) at = nextAwake(at, settings);
   const { error } = await db.from('whatsapp_outbox').insert({
     enquiry_id: enquiryId,
     kind: 'intro',
     template_name: t.name,
     template_lang: t.lang,
     body: (name || '').trim().split(/\s+/)[0] || 'there', // the template's {{1}}
-    send_after: new Date(Date.now() + seconds * 1000).toISOString(),
+    send_after: at.toISOString(),
   });
   return !error;
 }
@@ -452,6 +455,22 @@ export async function markChatRead(enquiryId: string) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** whatsapp_outbox.last_error on something a person pressed "Send now" on: it goes, quiet hours or not. */
+export const SEND_NOW_NOTE = 'Send now pressed';
+
+/** When we last messaged them (by hand, from the app or automatically), for the evening rule. */
+async function lastOutboundAt(db: Db, enquiryId: string): Promise<Date | null> {
+  const { data } = await db
+    .from('whatsapp_messages')
+    .select('created_at')
+    .eq('enquiry_id', enquiryId)
+    .eq('direction', 'out')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.created_at ? new Date(data.created_at) : null;
+}
+
 /**
  * Send whatever in the outbox is due. Run every minute (Supabase pg_cron) and opportunistically
  * from the webhook and the inbox. Each item is claimed first, so overlapping runs never double-send.
@@ -478,20 +497,43 @@ export async function processOutbox(limit = 8) {
     template_lang: string | null;
     reply_to: string | null;
     attempts: number;
+    last_error: string | null;
   };
-  const claimed: Item[] = [];
+  const picked: Item[] = [];
   for (const { id } of due ?? []) {
     const { data } = await db
       .from('whatsapp_outbox')
       .update({ status: 'sending' })
       .eq('id', id)
       .eq('status', 'pending')
-      .select('id, enquiry_id, kind, chase_step, rule_id, body, template_name, template_lang, reply_to, attempts')
+      .select('id, enquiry_id, kind, chase_step, rule_id, body, template_name, template_lang, reply_to, attempts, last_error')
       .maybeSingle();
-    if (data) claimed.push(data as Item);
+    if (data) picked.push(data as Item);
   }
-  if (!claimed.length) return { sent: 0, failed: 0 };
+  if (!picked.length) return { sent: 0, failed: 0 };
   const settings = await getSettings();
+
+  // The safety net: nothing goes on its own in quiet hours, and no chaser before the evening rule
+  // allows (from our last message in the chat). It waits for the right time instead, so chasers
+  // queued under older rules, or made due by a late run, follow today's settings too.
+  const claimed: Item[] = [];
+  let held = 0;
+  for (const item of picked) {
+    const wait = holdUntil({
+      kind: item.kind,
+      now: new Date(),
+      settings,
+      lastOutAt: item.kind === 'chase' ? await lastOutboundAt(db, item.enquiry_id) : null,
+      sendNow: item.last_error === SEND_NOW_NOTE,
+    });
+    if (!wait) {
+      claimed.push(item);
+      continue;
+    }
+    held++;
+    await db.from('whatsapp_outbox').update({ status: 'pending', send_after: wait.toISOString() }).eq('id', item.id);
+  }
+  if (!claimed.length) return { sent: 0, failed: 0, held };
 
   // Read receipt + "typing…" first, then a pause in proportion to the reply — like someone typing it.
   const typingFor = claimed.filter((i) => i.reply_to && !i.template_name);
@@ -567,7 +609,7 @@ export async function processOutbox(limit = 8) {
       if (!retry) await notifyEnquiryTeam(`WhatsApp reply to ${(enquiry as EnquiryWa).name} failed`, r.error, inboxHref(item.enquiry_id));
     }
   }
-  return { sent, failed };
+  return { sent, failed, held };
 }
 
 /** What follows an automatic message: a smart reply's chaser, or a chase's final nudge. */

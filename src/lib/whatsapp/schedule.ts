@@ -130,3 +130,30 @@ export function planChase(opts: {
   }
   return { at: target, free: false };
 }
+
+/** What the outbox's safety net needs from the settings. */
+export type HoldSettings = ChaseTimes & Pick<WaSettings, 'smartRepliesQuietHours' | 'firstContactQuietHours'>;
+
+/**
+ * The safety net just before the outbox sends something on its own: null = it can go now, else the
+ * time to wait for. Chasers and final nudges never go in quiet hours, nor before the evening rule's
+ * morning time worked out from our last message in the chat (`lastOutAt`), so chasers queued under
+ * older rules follow today's. Smart replies and intros wait only when their quiet-hours hold is on.
+ * Something a person pressed "Send now" on (`sendNow`) always goes.
+ */
+export function holdUntil(opts: {
+  kind: string;
+  now: Date;
+  settings: HoldSettings;
+  lastOutAt: Date | null;
+  sendNow?: boolean;
+  rand?: () => number;
+}): Date | null {
+  const { kind, now, settings: s } = opts;
+  if (opts.sendNow) return null;
+  const held = kind === 'chase' || (kind === 'reply' && s.smartRepliesQuietHours) || (kind === 'intro' && s.firstContactQuietHours);
+  if (!held) return null;
+  const floor = kind === 'chase' && opts.lastOutAt ? eveningFloor(opts.lastOutAt, s) : null;
+  const at = nextAwake(now, s, { floor, rand: opts.rand });
+  return at.getTime() > now.getTime() ? at : null;
+}

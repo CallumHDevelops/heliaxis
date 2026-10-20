@@ -85,7 +85,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
 | `META_PAGE_ACCESS_TOKEN` | Optional. A Page token for fetching leads, if the system-user token doesn't cover the Page |
 | `WHATSAPP_DEFAULT_TEMPLATE` | e.g. `enquiry_intro`. Its `{{1}}` is filled with the lead's first name. Optional: *Use for → First message to new Meta leads* on the templates page overrides it |
 | `WHATSAPP_TEMPLATE_LANG` | Default `en_GB` |
-| `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = send the default template to opted-in Meta leads 3–6 min after they submit |
+| `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = send the default template to opted-in Meta leads 3–6 min after they submit (any time of day, unless *Hold the first message to new leads who enquire in quiet hours* is ticked in Smart replies → Chasers) |
 | `META_LEADS_WHATSAPP_OPT_IN` | `true` = treat every Meta lead as opted in (only if the form itself says you'll contact them on WhatsApp) |
 | `META_GRAPH_VERSION` | Optional, default `v23.0` |
 | `CRON_SECRET` | Already used by the other crons; the pg_cron job sends it |
@@ -116,7 +116,9 @@ Redeploy after adding them.
   - stay **free** when they can: if 12h would land after the 24h window closes, the chaser goes about
     an hour before it closes (at least 4h after your message, and never earlier than the evening rule
     allows). Otherwise the chase template is sent (paid). The chat shows which it'll be;
-  - can have an optional final nudge (off by default).
+  - can have an optional final nudge (off by default), which keeps to the same hours;
+  - are checked again just before they go, so one queued under older settings still waits for the
+    morning. **Send now** in the chat always sends straight away.
 - **Photos, videos, voice notes and files** customers send show in the chat (once
   `whatsapp-media.sql` has been run). WhatsApp only keeps them for 7 days, so each one is downloaded
   as it arrives and kept in a private storage bucket, `whatsapp-media` (the app creates it). Tap a
