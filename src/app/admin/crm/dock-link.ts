@@ -20,7 +20,7 @@ export const DOCK = {
   counts: 'hx:wa-counts',
 } as const;
 
-export type ChatFilter = 'needs_reply' | 'unread' | 'all' | 'waiting';
+export type ChatFilter = 'needs_reply' | 'unread' | 'all' | 'waiting' | 'everyone';
 export type DockOpen = {
   tab?: 'job' | 'chats';
   threadId?: string;

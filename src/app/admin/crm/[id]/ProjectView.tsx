@@ -9,6 +9,7 @@ import type { SchemaReady } from '@/lib/schema-ready';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { useNow } from '@/lib/use-now';
 import { NewProjectSheet } from '../../projects/NewProjectSheet';
+import { OrdersTab } from '../../projects/orders/OrdersTab';
 import { ProjectOverview, SurveysPanel, type OverviewActions } from '../../projects/[id]/ProjectOverview';
 import { firstName, phaseOf, ukDayOf } from '../crm-shared';
 import { DOCK, openDock, sendDockJob, useDockState, type DockJob } from '../dock-link';
@@ -277,8 +278,10 @@ export function ProjectView({
   const schema = rec?.schema ?? serverSchema;
   const stage = rec?.project.stage ?? '';
   const fallbackTab = stage ? defaultTab(stage, area) : 'activity';
+  // Orders (purchase-orders.sql): for jobs from Won, and any job that already has some.
+  const ordersTab = !!schema.purchaseOrders && (isProjectStage(stage) || (rec?.orders?.count ?? 0) > 0);
   let tab: Tab = tabSel ?? fallbackTab;
-  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys)) tab = fallbackTab;
+  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys) || (tab === 'orders' && !ordersTab)) tab = fallbackTab;
 
   const pickTab = useCallback((t: Tab) => {
     setTabSel(t);
@@ -528,9 +531,10 @@ export function ProjectView({
     ),
     photos: <>Photos{counts.photos > 0 && <i>{counts.photos}</i>}</>,
     docs: <>Docs{counts.docs > 0 && <i>{counts.docs}</i>}</>,
+    orders: <>Orders{(rec.orders?.count ?? 0) > 0 && <i>{rec.orders?.count}</i>}</>,
     surveys: <>Surveys{counts.surveys > 0 && <i>{counts.surveys}</i>}</>,
   };
-  const shownTabs = (['overview', 'activity', 'photos', 'docs', ...(schema.surveys ? ['surveys'] : [])] as Exclude<Tab, 'details'>[]);
+  const shownTabs = (['overview', 'activity', 'photos', 'docs', ...(ordersTab ? ['orders'] : []), ...(schema.surveys ? ['surveys'] : [])] as Exclude<Tab, 'details'>[]);
 
   return (
     <div className="crm crmh crmr" data-tab={tab} data-phase={phaseOf(p.stage)}>
@@ -665,6 +669,7 @@ export function ProjectView({
             )}
             {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={refresh} />}
             {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} />}
+            {tab === 'orders' && <OrdersTab projectId={id} today={today} myName={rec.team.find((t) => t.id === me)?.name ?? null} onChanged={refresh} />}
             {tab === 'surveys' && <SurveysPanel surveys={rec.surveys} busy={starting} onStart={(type) => void startSurvey(type)} />}
           </div>
           <RecordFabs unread={wa.unread} name={c.name} onWhatsApp={() => openWhatsApp()} onAdd={() => openSheet('menu')} />

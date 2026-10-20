@@ -2,12 +2,26 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { FEED_CHIPS, type FeedChip, type FeedKind } from '@/lib/projects/feed';
+import { NOTE_CHIPS, type FeedKind, type NoteChip } from '@/lib/projects/feed';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { Icon, JobPicker, Sheet, StageChip, WaIcon } from './CrmUi';
 import { dayLabel, ukTime, type PipelineProject } from './crm-shared';
 import { openDock } from './dock-link';
 import { useStored } from './use-stored';
+
+/** A chat's busy day (kind 'whatsapp'): what the row shows and where it opens. */
+type ChatInfo = {
+  enquiryId: string;
+  count: number;
+  /** Every message that day came from an import. */
+  imported: boolean;
+  /** Counted from my messages only (Mine). */
+  mine: boolean;
+  lastId: string;
+  from: { side: 'them' | 'us'; name: string; me?: boolean };
+  /** The full chat: the inbox, or the CRM's chat page for staff without Enquiries. */
+  href: string;
+};
 
 type Note = {
   id: string;
@@ -21,15 +35,17 @@ type Note = {
   meta: Record<string, unknown> | null;
   project: { id: string; title: string; stage: string; ref: string | null } | null;
   customer: { id: string; name: string; ref: string | null; postcode: string | null } | null;
+  chat?: ChatInfo;
 };
 
-const CHIP_LABEL: Record<FeedChip, string> = {
+const CHIP_LABEL: Record<NoteChip, string> = {
   note: 'Notes',
   call: 'Calls',
   visit: 'Site visits',
   survey: 'Surveys',
   email: 'Emails',
   doc: 'Docs & signatures',
+  whatsapp: 'WhatsApp',
 };
 const KIND_LABEL: Record<FeedKind, string> = {
   note: 'Note',
@@ -40,15 +56,18 @@ const KIND_LABEL: Record<FeedKind, string> = {
   doc: 'Document',
   stage: '',
   update: 'Update',
+  whatsapp: 'WhatsApp',
 };
 const WHO = ['all', 'mine'] as const;
 const PAGE = 30;
 
 /**
  * Latest notes on the CRM home: notes, calls, site visits, surveys, emails and signed documents from
- * every job, newest first, in UK days (GET /api/crm/activity). Stage moves only with "Stage changes"
- * on (milestones always show). It refreshes when you come back to the tab and every minute while
- * it's on screen. Clicking a note opens the job at that entry.
+ * every job, and WhatsApp chats (a row per chat per day it was busy, imported chats too), newest
+ * first, in UK days (GET /api/crm/activity). Stage moves only with "Stage changes" on (milestones
+ * always show). It refreshes when you come back to the tab and every minute while it's on screen.
+ * Clicking a note opens the job at that entry; clicking a chat opens the chat (in the dock where
+ * there is one, otherwise its own page).
  */
 export function LatestNotes({
   me,
@@ -65,7 +84,7 @@ export function LatestNotes({
   refreshKey: number;
 }) {
   const [who, setWho] = useStored(`hx-crm-notes:${me.slice(0, 8)}`, 'all', WHO);
-  const [chip, setChip] = useState<FeedChip | 'all'>('all');
+  const [chip, setChip] = useState<NoteChip | 'all'>('all');
   const [stages, setStages] = useState(false);
   // `extra`: more pages loaded by hand, which a refresh keeps (new notes go on top).
   const [feed, setFeed] = useState<{ key: string; items: Note[]; next: string | null; extra: boolean } | null>(null);
@@ -160,7 +179,7 @@ export function LatestNotes({
           <button type="button" className={`crmh-chipf${chip === 'all' ? ' on' : ''}`} aria-pressed={chip === 'all'} onClick={() => setChip('all')}>
             All
           </button>
-          {FEED_CHIPS.map((c) => (
+          {NOTE_CHIPS.map((c) => (
             <button key={c} type="button" className={`crmh-chipf${chip === c ? ' on' : ''}`} aria-pressed={chip === c} onClick={() => setChip(c)}>
               {CHIP_LABEL[c]}
             </button>
@@ -177,15 +196,25 @@ export function LatestNotes({
       {!items ? (
         <p className="crm-muted crmh-pad">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="crm-muted crmh-pad crmh-empty">Notes, calls and site-visit notes from every job show here.</p>
+        <p className="crm-muted crmh-pad crmh-empty">
+          {chip === 'whatsapp'
+            ? who === 'mine'
+              ? 'WhatsApp chats you’ve sent messages in show here, a row for each day.'
+              : 'WhatsApp chats show here, a row for each day a chat was busy.'
+            : 'Notes, calls, site visits and WhatsApp chats from every job show here.'}
+        </p>
       ) : (
         <div className="crmh-feed">
           {days.map((d) => (
             <div key={d.day} className={`crmh-day${d.extra ? ' is-extra' : ''}`}>
               <div className="crmh-day__h">{dayLabel(d.day, today)}</div>
-              {d.items.map(({ n, extra }) => (
-                <NoteRow key={n.id} n={n} extra={extra} open={open.has(n.id)} onMore={() => setOpen((o) => new Set(o).add(n.id))} />
-              ))}
+              {d.items.map(({ n, extra }) =>
+                n.chat ? (
+                  <ChatRow key={n.id} n={n} chat={n.chat} extra={extra} />
+                ) : (
+                  <NoteRow key={n.id} n={n} extra={extra} open={open.has(n.id)} onMore={() => setOpen((o) => new Set(o).add(n.id))} />
+                )
+              )}
             </div>
           ))}
         </div>
@@ -287,6 +316,59 @@ function NoteRow({ n, extra, open, onMore }: { n: Note; extra: boolean; open: bo
         >
           <WaIcon size={15} />
         </button>
+      )}
+    </article>
+  );
+}
+
+/**
+ * A chat's busy day: "WhatsApp · 6 messages", who it's with and their job, and the last message. The
+ * row opens the chat at that message (the dock from 761px wide, the chat's own page on a phone); the
+ * button on the right opens the job.
+ */
+function ChatRow({ n, chat, extra }: { n: Note; chat: ChatInfo; extra: boolean }) {
+  const job = n.project;
+  const name = n.customer?.name || job?.title || 'Customer';
+  const ref = job?.ref || n.customer?.ref || n.customer?.postcode || null;
+  const count = `${chat.count.toLocaleString('en-GB')} message${chat.count === 1 ? '' : 's'}${chat.mine ? ' from you' : ''}`;
+  const who = chat.from.me ? 'You' : chat.from.name;
+  return (
+    <article className={`crmh-note crmh-note--wa${extra ? ' is-extra' : ''}`}>
+      <span className="crmh-av crmh-av--wa" aria-hidden="true">
+        <WaIcon size={15} />
+      </span>
+      <div className="crmh-note__b">
+        <div className="crmh-note__h">
+          <span className="crmh-kind crmh-kind--wa">WhatsApp · {count}</span>
+          <Link
+            href={chat.href}
+            className="crmh-cust"
+            onClick={(e) => {
+              if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+              if (openDock({ enquiryId: chat.enquiryId, messageId: chat.lastId, tab: 'chats' })) e.preventDefault();
+            }}
+          >
+            {name}
+          </Link>
+          {ref && <span className="crmh-ref">{ref}</span>}
+          {job && <StageChip stage={job.stage} />}
+          {chat.imported && (
+            <span className="crmh-imported" title="From a chat imported from the WhatsApp Business app">
+              Imported
+            </span>
+          )}
+          <time dateTime={n.at}>{ukTime(n.at)}</time>
+        </div>
+        {n.body && (
+          <p className="crmh-note__p crmh-note__p--wa">
+            <span className="crmh-from">{who}:</span> {n.body}
+          </p>
+        )}
+      </div>
+      {job && (
+        <Link href={`/admin/crm/${job.id}?tab=activity`} className="crmh-act crmh-note__wa" title={`Open ${name}’s job`} aria-label={`Open ${name}’s job`}>
+          <Icon k="open" size={15} />
+        </Link>
       )}
     </article>
   );

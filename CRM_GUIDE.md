@@ -22,6 +22,9 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
    (sections 12 and 13).
 9. `supabase/crm-activities-index.sql` (optional, any time) — makes **Latest notes** on the CRM home
    load faster once there are lots of notes (section 15). Nothing depends on it.
+10. `supabase/whatsapp-feed-index.sql` (optional, any time after `whatsapp.sql`) — makes the WhatsApp
+   rows in **Latest notes** load faster once there are lots of messages (section 15). Nothing depends
+   on it.
 
 Until 5 to 8 are run the CRM works as before; the new screens appear once their file is done.
 
@@ -169,6 +172,20 @@ stay put as you move between pages. **Ctrl+Enter** (Cmd+Enter on a Mac) sends. P
 access but not Enquiries can read and reply to the chats of customers with a job. There's no dock on
 phones: use the WhatsApp tab.
 
+The dock's chips (Needs reply, Unread, All active, Waiting on them) cover chats busy in the last 14
+days. **All chats** lists everyone you've ever WhatsApped, imported chats included, newest first,
+and the search box looks through every chat.
+
+**Chats imported from the WhatsApp Business app** (Enquiries → Import) show like any other: under
+**All chats** in the dock, in the WhatsApp inbox, on the job's Activity tab and in **Latest notes**
+(marked *Imported*). When a chat has messages from you, the customer moves from Lead to Contacted
+(or New to Contacted without a job), as a reply sent from here does, and their first contact is the
+first message you sent after they came in. An older conversation doesn't count for a newer enquiry.
+For chats imported before this, admins see *41 customers you've already messaged on WhatsApp are
+still at Lead* on the CRM home and the import page: **Move them all to Contacted** does it in one go,
+and each job's timeline says *Lead → Contacted (messaged on WhatsApp on 3 Sep)*. Nobody is moved
+back or past Contacted, and nobody is messaged.
+
 ## 10. WhatsApp permission and STOP
 
 Automatic WhatsApps (reminders, follow-ups, smart replies, chasers) should only go to customers who
@@ -301,8 +318,11 @@ remembers which you used last. On a computer the WhatsApp panel is on the right 
   (today's surveys, home visits and install days, with **Start survey** or **Directions**), then your
   tasks and next steps by day, overdue first. Switch between **Mine** and **Everyone**; tick, snooze
   or add a task right there.
-- **In the middle, Latest notes**: notes, calls and site visits from every job, newest first. Tap
-  one to open that job at that note, or **+ Note** to add one.
+- **In the middle, Latest notes**: notes, calls and site visits from every job, and WhatsApp chats
+  (one row for each day a chat was busy, with how many messages and the last one; imported chats are
+  marked **Imported**), newest first. Tap a note to open that job at that note, a chat to open it in
+  the WhatsApp panel, or **+ Note** to add one. The **WhatsApp** chip shows just the chats; **Mine**
+  shows the notes you wrote and the WhatsApps you sent.
 - **Search** finds a customer by name, postcode, phone number or reference (HX-0042, hx42 or
   0042). Press **/** to jump to it.
 - **+ New** adds an opportunity, for a new customer or one already in the CRM (a second job for an

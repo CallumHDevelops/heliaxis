@@ -450,6 +450,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     !booking,
     sql('survey-booking.sql', 'Online survey booking, your diary, and the Outlook copy of surveys, installs and diary entries.', 5, 'surveys.sql')
   );
+  // Purchase orders against jobs: every PO screen stays hidden until this has been run.
+  add(
+    crmV3 && !(await has('purchase_order_lines')),
+    sql('purchase-orders.sql', 'Purchase orders: order the kit for a job from your suppliers, email them the PO as a PDF, and track it to delivery.', 5, 'crm-v3.sql')
+  );
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
@@ -465,6 +470,21 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     ...notesIndex,
     title: 'Speed up Latest notes on the CRM home',
     steps: notesIndex.steps.map((s) =>
+      s.startsWith('Come back here') ? 'Then tick this (**✓ I’ve done this**): the app can’t check this one by itself, so it goes once ticked.' : s
+    ),
+    optional: true,
+    manual: true,
+  });
+  const chatsIndex = sql(
+    'whatsapp-feed-index.sql',
+    'Makes the WhatsApp rows in Latest notes on the CRM home load faster once there are lots of messages, imported chats included. Nothing depends on it.',
+    39,
+    'whatsapp.sql'
+  );
+  add(whatsapp && crm && !done.includes(chatsIndex.id), {
+    ...chatsIndex,
+    title: 'Speed up WhatsApp in Latest notes',
+    steps: chatsIndex.steps.map((s) =>
       s.startsWith('Come back here') ? 'Then tick this (**✓ I’ve done this**): the app can’t check this one by itself, so it goes once ticked.' : s
     ),
     optional: true,

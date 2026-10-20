@@ -1,0 +1,68 @@
+/* The "already messaged on WhatsApp, still at Lead" catch-up (ContactedCatchUp.tsx): a calm green
+   line on the CRM home and Enquiries → Import, in the CRM's colours wherever it is. */
+.hx-catchup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(31, 122, 77, 0.28);
+  border-radius: 6px;
+  background: rgba(31, 122, 77, 0.07);
+  color: #211f18;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.hx-catchup p {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.hx-catchup__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.hx-catchup__go {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #211f18;
+  border-radius: 6px;
+  background: #211f18;
+  color: #f8bc1e;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hx-catchup__later {
+  min-height: 34px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: #6e6a5e;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.hx-catchup :focus-visible {
+  outline: 2px solid #211f18;
+  outline-offset: 2px;
+}
+/* Phones: the buttons are thumb-sized and full width under the sentence. */
+@media (max-width: 760px) {
+  .hx-catchup__acts {
+    width: 100%;
+  }
+  .hx-catchup__go {
+    flex: 1;
+    min-height: 44px;
+  }
+  .hx-catchup__later {
+    min-height: 44px;
+  }
+}

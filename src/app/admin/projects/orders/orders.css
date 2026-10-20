@@ -1,0 +1,958 @@
+/*
+ * Purchase orders: the job's Orders tab, the order sheet and the Purchase orders page. Built on
+ * crm.css (.crm-*, .crmh-*: inputs, buttons, chips, cards and the header); this adds the po-* parts.
+ * Phones are under 761px, as the admin shell.
+ */
+
+/* Status chips: Draft grey, Sent amber, Confirmed blue, Delivered green, Cancelled red */
+.po-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(33, 31, 24, 0.07);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.po-chip--sent {
+  background: rgba(248, 188, 30, 0.22);
+  color: var(--amber-2);
+}
+.po-chip--confirmed {
+  background: rgba(44, 110, 180, 0.12);
+  color: var(--blue, #2c5f99);
+}
+.po-chip--delivered {
+  background: rgba(63, 125, 78, 0.15);
+  color: var(--ok);
+}
+.po-chip--cancelled {
+  background: rgba(179, 38, 30, 0.08);
+  color: var(--err);
+  text-decoration: line-through;
+}
+.po-chip.is-late,
+.po-chip--changed {
+  background: rgba(179, 38, 30, 0.1);
+  color: var(--err);
+}
+.po-late {
+  color: var(--err);
+  font-weight: 700;
+}
+.po-tbc {
+  color: var(--amber-2);
+  font-weight: 600;
+}
+.po-pre {
+  white-space: pre-line;
+}
+.crm-banner.po-ok {
+  background: rgba(63, 125, 78, 0.1);
+  border-color: rgba(63, 125, 78, 0.3);
+  color: var(--ok);
+}
+.po-danger {
+  color: var(--err) !important;
+}
+.po-btn--danger {
+  background: var(--err);
+  border-color: var(--err);
+  color: #fff;
+}
+.po-hint {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.po-narrow {
+  max-width: 220px;
+}
+
+/* "Kit ordered £4,210.00 ex VAT · 2 open · next delivery Tue 3 Nov" */
+.po-kit {
+  display: block;
+}
+.po-kit__sub {
+  display: block;
+  color: var(--muted);
+}
+
+/* ── The job's Orders tab ──────────────────────────────────────────────────── */
+.po-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.po-tab__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.po-tab__head > div {
+  min-width: 0;
+}
+.po-list {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.po-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1.3fr) 110px minmax(0, 1fr) 120px;
+  align-items: center;
+  gap: 4px 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 9px 14px;
+  border: 0;
+  border-top: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.po-row:first-child {
+  border-top: 0;
+}
+.po-row:hover {
+  background: rgba(248, 188, 30, 0.07);
+}
+.po-row:focus-visible {
+  outline: 2px solid var(--solar);
+  outline-offset: -2px;
+}
+.po-row.is-late {
+  box-shadow: inset 3px 0 0 var(--err);
+}
+.po-row--head {
+  min-height: 0;
+  padding: 7px 14px;
+  background: rgba(33, 31, 24, 0.03);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: default;
+}
+.po-row--head:hover {
+  background: rgba(33, 31, 24, 0.03);
+}
+.po-no {
+  font: 700 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+.po-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.po-who b,
+.po-who small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.po-who small,
+.po-when {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.po-when.po-late {
+  color: var(--err);
+}
+.po-amt {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+.po-amt small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.po-emptytab {
+  margin: 0;
+  padding: 18px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+/* The job's centre column is only about 536px wide at 1280px beside the open WhatsApp dock, so the
+   Orders tab lays its rows out by the list's own width (as on phones) below 640px. The container is
+   the list, not .po-tab, so the order sheet (rendered inside .po-tab) is never inside it. The "send it
+   again" warning wraps rather than being cut off. */
+.po-tab .po-list {
+  container-type: inline-size;
+}
+.po-tab .po-who small {
+  white-space: normal;
+}
+@container (max-width: 640px) {
+  .po-tab .po-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'no chip' 'who amt' 'when when';
+    padding: 12px 14px;
+  }
+  .po-tab .po-row--head {
+    display: none;
+  }
+  .po-tab .po-no {
+    grid-area: no;
+  }
+  .po-tab .po-chipcell {
+    grid-area: chip;
+    justify-self: end;
+  }
+  .po-tab .po-who {
+    grid-area: who;
+  }
+  .po-tab .po-amt {
+    grid-area: amt;
+  }
+  .po-tab .po-when {
+    grid-area: when;
+  }
+}
+
+/* ── The order sheet ───────────────────────────────────────────────────────── */
+.crm-sheet-box:has(.po-sheet) {
+  width: min(960px, 100%);
+}
+.po-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+.po-sheet__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.po-joblink {
+  color: var(--amber-2);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.po-sheet .crm-banner {
+  margin: 0;
+}
+.po-changed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.po-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.po-view__top {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.po-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.po-box h4,
+.po-note h4,
+.po-invoice h4 {
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.po-box h4 .crm-muted,
+.po-note h4 .crm-muted {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.po-note h4 .crmr-edit {
+  margin-left: auto;
+}
+.po-note p {
+  margin: 0;
+  font-size: 14px;
+}
+.po-note,
+.po-invoice {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+.po-note .crm-label {
+  margin-top: 0;
+}
+.po-invoice__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 10px;
+}
+.po-invoice__grid .crm-label {
+  margin-top: 0;
+}
+.po-invoice p {
+  margin: 6px 0 0;
+}
+
+/* The lines, read */
+.po-lines {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+.po-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 54px 96px 46px 96px;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+  font-size: 13.5px;
+}
+.po-lines--got .po-line {
+  grid-template-columns: minmax(0, 1fr) 120px 48px 60px 92px 42px 92px;
+}
+.po-line--head {
+  border-top: 0;
+  background: rgba(33, 31, 24, 0.03);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.po-line--head span:nth-child(n + 3) {
+  text-align: right;
+}
+.po-line__part {
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.po-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.po-line__net {
+  font-weight: 700;
+}
+.po-empty {
+  margin: 0;
+}
+
+/* Totals (read and while editing) */
+.po-totals {
+  align-self: flex-end;
+  width: min(340px, 100%);
+  margin: 0;
+  font-size: 13.5px;
+}
+.po-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 10px;
+}
+.po-totals dt {
+  color: var(--muted);
+}
+.po-totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.po-totals .po-totals__gross {
+  margin-top: 4px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--solar);
+  font-size: 15px;
+  font-weight: 800;
+}
+.po-totals__gross dt {
+  color: var(--ink);
+}
+.po-totals p {
+  margin: 6px 10px 0;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* The buttons under an order */
+.po-actions {
+  position: sticky;
+  bottom: -1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px -1rem -1.2rem;
+  padding: 10px 1rem 12px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+.po-actions__end {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-left: auto;
+}
+.po-actions .crm-link {
+  margin: 0;
+}
+
+/* Send, deliver, cancel */
+.po-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.po-panel h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.po-panel p {
+  margin: 4px 0;
+}
+.po-panel .crm-actions {
+  align-items: center;
+}
+.po-panel .po-actions__end {
+  margin-left: auto;
+}
+.po-back {
+  align-self: flex-start;
+  margin: 10px 0 0 !important;
+}
+.po-got {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.po-got li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+  font-size: 14px;
+}
+.po-got li > span {
+  min-width: 0;
+}
+.po-got small {
+  color: var(--muted);
+}
+.po-got label {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+.po-got input {
+  width: 80px;
+  text-align: right;
+}
+
+/* ── Making or changing an order ──────────────────────────────────────────── */
+.po-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.po-edit > .crm-banner {
+  margin: 0 0 6px;
+}
+.po-edit__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 0 12px;
+}
+.po-suppick {
+  display: flex;
+  gap: 8px;
+}
+.po-suppick .crm-btn {
+  flex: none;
+}
+.po-locked {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(33, 31, 24, 0.03);
+  font-size: 14px;
+}
+.po-supform {
+  margin-top: 8px;
+  padding: 2px 12px 12px;
+  border: 1px solid rgba(199, 127, 4, 0.35);
+  border-radius: 10px;
+  background: rgba(248, 188, 30, 0.08);
+}
+.po-supform .crm-grid2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.po-seg {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.po-seg button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.po-edit__addr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 0 12px;
+}
+.po-edit__lineshead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.po-edit__lineshead .crm-small {
+  margin-top: 0.8rem;
+}
+.po-elines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.po-eline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 64px 96px 70px 86px 104px;
+  align-items: center;
+  gap: 6px;
+}
+.po-eline .crm-input {
+  padding: 0.5rem 0.55rem;
+  font-size: 14px;
+}
+.po-eline .crm-input[aria-invalid='true'],
+.po-edit .crm-input[aria-invalid='true'] {
+  border-color: var(--err);
+  box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.12);
+}
+.po-eline > label {
+  display: block;
+  min-width: 0;
+}
+.po-cap {
+  display: none;
+}
+.po-eline__qty input,
+.po-eline__unit input {
+  text-align: right;
+}
+.po-eline--head {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.po-eline--head span:nth-child(3),
+.po-eline--head span:nth-child(4),
+.po-eline--head span:nth-child(6) {
+  text-align: right;
+}
+.po-eline__net {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 13.5px;
+  text-align: right;
+  white-space: nowrap;
+}
+.po-eline__acts {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.po-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.po-iconbtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.po-iconbtn--x {
+  color: var(--err);
+}
+.po-addline {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.po-edit .po-totals {
+  margin-top: 6px;
+}
+.po-savebar {
+  position: sticky;
+  bottom: -1.2rem;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px -1rem -1.2rem;
+  padding: 10px 1rem 12px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+.po-savebar__msg {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* ── The Purchase orders page ─────────────────────────────────────────────── */
+.po-page .crmh-head__l {
+  flex-wrap: wrap;
+}
+.po-page .po-row {
+  grid-template-columns: 82px minmax(0, 1.2fr) minmax(0, 1fr) 110px 150px 120px;
+}
+.po-page .po-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 14px 0 12px;
+}
+.po-page .po-supsel {
+  width: auto;
+  min-width: 180px;
+  max-width: 260px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+.po-sec {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px 6px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.po-sec.late {
+  color: var(--err);
+}
+.po-list > .po-sec:first-child {
+  border-top: 0;
+}
+.po-supplier {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The supplier under the job: only where its own column is hidden. */
+@media (min-width: 1101px) {
+  .po-page .po-who__sup {
+    display: none;
+  }
+}
+
+/* Suppliers */
+.po-sups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.po-sups__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.po-sup {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) 90px auto;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+}
+.po-sup:first-child {
+  border-top: 0;
+}
+.po-sup.is-archived {
+  opacity: 0.6;
+}
+.po-sup > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.po-sup small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.po-sup__acts {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.po-sup__acts .crm-link {
+  margin: 0;
+}
+
+/* Narrower pages */
+@media (max-width: 1100px) {
+  .po-page .po-row {
+    grid-template-columns: 82px minmax(0, 1fr) 110px 140px 110px;
+  }
+  .po-page .po-row .po-supplier {
+    display: none;
+  }
+  .po-page .po-row--head span:nth-child(3) {
+    display: none;
+  }
+}
+
+/* Phones */
+@media (max-width: 760px) {
+  .po-row,
+  .po-page .po-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'no chip' 'who amt' 'when when';
+    padding: 12px 14px;
+  }
+  .po-row--head {
+    display: none !important;
+  }
+  .po-row .po-no {
+    grid-area: no;
+  }
+  .po-row .po-chipcell {
+    grid-area: chip;
+    justify-self: end;
+  }
+  .po-row .po-who {
+    grid-area: who;
+  }
+  .po-row .po-amt {
+    grid-area: amt;
+  }
+  .po-row .po-when {
+    grid-area: when;
+  }
+  .po-page .po-row .po-supplier {
+    display: none;
+  }
+  .po-view__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .po-line,
+  .po-lines--got .po-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 10px;
+  }
+  .po-line--head {
+    display: none;
+  }
+  .po-line__desc {
+    grid-column: 1 / -1;
+    font-weight: 600;
+  }
+  .po-line__part {
+    grid-column: 1 / -1;
+  }
+  .po-line .po-num:not(.po-line__net) {
+    display: inline;
+    text-align: left;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .po-line .po-num::before {
+    content: attr(data-label) ' ';
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .po-line__net {
+    grid-column: 2;
+  }
+  .po-invoice__grid,
+  .po-edit__row,
+  .po-edit__addr,
+  .po-supform .crm-grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .po-suppick {
+    flex-direction: column;
+  }
+  .po-eline {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 76px;
+    grid-template-areas: 'desc desc desc' 'part qty qty' 'unit vat vat' 'net net acts';
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+  }
+  .po-eline--head {
+    display: none;
+  }
+  .po-eline__desc {
+    grid-area: desc;
+  }
+  .po-eline__part {
+    grid-area: part;
+  }
+  .po-eline__qty {
+    grid-area: qty;
+  }
+  .po-eline__unit {
+    grid-area: unit;
+  }
+  .po-eline__vat {
+    grid-area: vat;
+  }
+  .po-eline__net {
+    grid-area: net;
+    justify-self: start;
+    font-size: 15px;
+  }
+  .po-eline__acts {
+    grid-area: acts;
+  }
+  .po-eline .crm-input {
+    min-height: 44px;
+    font-size: 16px; /* no zoom on iPhone */
+  }
+  .po-cap {
+    display: block;
+    margin: 0 0 2px;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .po-edit .po-edit__notes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .po-seg {
+    align-self: stretch;
+    flex-wrap: nowrap;
+  }
+  .po-seg button {
+    flex: 1 1 0;
+    padding: 0 6px;
+    font-size: 13px;
+  }
+  .po-iconbtn {
+    width: 40px;
+    height: 44px;
+  }
+  .po-totals {
+    width: 100%;
+  }
+  .po-actions .crm-btn,
+  .po-savebar .crm-btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+  .po-actions__end {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  .po-page .crmh-head {
+    grid-template-areas: 'h h h' 'sum sum sum' 's s s' 'v v v';
+  }
+  .po-page .crmh-sum {
+    white-space: normal;
+  }
+  .po-page .crmh-search {
+    display: block;
+  }
+  .po-page .po-filters {
+    margin: 10px 0;
+  }
+  .po-page .po-supsel {
+    max-width: none;
+    flex: 1 1 100%;
+  }
+  .po-sup {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .po-sup > div:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .po-sup__n {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .po-sup__acts {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
