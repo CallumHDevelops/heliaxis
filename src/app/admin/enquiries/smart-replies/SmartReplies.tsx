@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { matchRule, type SmartRule } from '@/lib/whatsapp/shared';
+import { chaseView, chaseWhen } from '@/lib/whatsapp/schedule';
 import { DEFAULT_SETTINGS, fromHhmm, hhmm, type WaSettings } from '@/lib/whatsapp/settings-shared';
 import '../whatsapp.css';
 
@@ -22,6 +23,14 @@ const BLANK: Draft = {
 };
 
 const mins = (s: number) => Math.round((s / 60) * 10) / 10;
+
+/** Two worked examples of when a chaser goes with these settings, on a winter Tuesday (UK time = GMT). */
+function example(s: WaSettings) {
+  const h = s.chaseAfterHours;
+  const when = (iso: string) =>
+    chaseWhen({ now: new Date(iso), hours: h, lastInboundAt: new Date(Date.parse(iso) - 30 * 60_000).toISOString(), view: chaseView(s) });
+  return `So with chasers after ${h}h: ask at 14:00 and it goes ${when('2026-01-13T14:00:00Z')}; ask at 20:34 and it goes ${when('2026-01-13T20:34:00Z')}.`;
+}
 
 export function SmartReplies() {
   const [rules, setRules] = useState<Rule[] | null>(null);
@@ -53,7 +62,7 @@ export function SmartReplies() {
   }
   const set = <K extends keyof WaSettings>(k: K, v: WaSettings[K]) => settings && setSettings({ ...settings, [k]: v });
   /** A time box ("08:45"): kept as minutes after midnight; a half-typed time is left alone. */
-  const setTime = (k: 'quietFromMin' | 'quietToMin', v: string) => {
+  const setTime = (k: 'quietFromMin' | 'quietToMin' | 'eveningFromMin' | 'eveningNotBeforeMin', v: string) => {
     const m = fromHhmm(v);
     if (m !== null) set(k, m);
   };
@@ -240,7 +249,7 @@ export function SmartReplies() {
             <input type="checkbox" checked={settings.chaseQuestions} onChange={(e) => set('chaseQuestions', e.target.checked)} />
             <span>Chase automatically when a message asks a question (has a “?”) — from Heliaxis or the WhatsApp Business app</span>
           </label>
-          <label className="wa-label">Chase after (hours)</label>
+          <label className="wa-label">Chase after (hours — then moved out of quiet hours, and by the evening rule below)</label>
           <input className="wa-input" type="number" min={0.25} step={0.5} value={settings.chaseAfterHours} onChange={(e) => set('chaseAfterHours', Number(e.target.value))} />
           <label className="wa-label">Default chase message ({'{first_name}'} works)</label>
           <textarea className="wa-input" rows={3} value={settings.chaseText} onChange={(e) => set('chaseText', e.target.value)} />
@@ -255,24 +264,44 @@ export function SmartReplies() {
           <p className="wa-muted">
             <Link href="/admin/enquiries/templates" className="wa-link">WhatsApp templates →</Link> Send ready-made templates to Meta in one tap, and choose which one chasers and first messages to new leads use.
           </p>
-          <div className="wa-grid3">
-            <div>
-              <label className="wa-label">Quiet from (UK time)</label>
-              <input className="wa-input" type="time" step={60} value={hhmm(settings.quietFromMin)} onChange={(e) => setTime('quietFromMin', e.target.value)} />
-            </div>
-            <div>
-              <label className="wa-label">Quiet until</label>
-              <input className="wa-input" type="time" step={60} value={hhmm(settings.quietToMin)} onChange={(e) => setTime('quietToMin', e.target.value)} />
-            </div>
-            <div>
-              <label className="wa-label">Remind me after (min, 0 = off)</label>
-              <input className="wa-input" type="number" min={0} value={settings.remindUnansweredMinutes} onChange={(e) => set('remindUnansweredMinutes', Number(e.target.value))} />
-            </div>
+          <label className="wa-label">Quiet hours (UK time)</label>
+          <div className="wa-times">
+            <input className="wa-input wa-time" type="time" step={60} aria-label="Quiet from" value={hhmm(settings.quietFromMin)} onChange={(e) => setTime('quietFromMin', e.target.value)} />
+            <span>to</span>
+            <input className="wa-input wa-time" type="time" step={60} aria-label="Quiet until" value={hhmm(settings.quietToMin)} onChange={(e) => setTime('quietToMin', e.target.value)} />
           </div>
-          <p className="wa-muted">No chasers or reminders go out in quiet hours. “Remind me” pushes the team when a customer’s message has had no answer.</p>
+          <p className="wa-muted">
+            Nothing automatic goes out in quiet hours. Chasers and final nudges wait until they end, then go a few minutes
+            after, at random, so they don’t look automated; reminders wait too. A message you type, or <b>Send now</b>, always goes.
+          </p>
+          <div className="wa-check wa-check--times">
+            <input type="checkbox" aria-label="Evening rule" checked={settings.eveningRule} onChange={(e) => set('eveningRule', e.target.checked)} />
+            <span>
+              <span>
+                If we message after{' '}
+                <input className="wa-input wa-time" type="time" step={60} aria-label="If we message after" disabled={!settings.eveningRule} value={hhmm(settings.eveningFromMin)} onChange={(e) => setTime('eveningFromMin', e.target.value)} />,
+              </span>{' '}
+              <span>
+                don’t chase before{' '}
+                <input className="wa-input wa-time" type="time" step={60} aria-label="Don’t chase before" disabled={!settings.eveningRule} value={hhmm(settings.eveningNotBeforeMin)} onChange={(e) => setTime('eveningNotBeforeMin', e.target.value)} />
+              </span>{' '}
+              <span>the next morning</span>
+            </span>
+          </div>
+          <p className="wa-muted">
+            Gives them a chance to wake up. It counts any message we send after that time or in quiet hours, by hand or
+            automatically, and the chaser waits even if that means it’s no longer free. {example(settings)}
+          </p>
+          <label className="wa-label">Remind me after (min, 0 = off)</label>
+          <input className="wa-input" type="number" min={0} value={settings.remindUnansweredMinutes} onChange={(e) => set('remindUnansweredMinutes', Number(e.target.value))} />
+          <p className="wa-muted">“Remind me” pushes the team when a customer’s message has had no answer (not in quiet hours).</p>
           <label className="wa-check">
             <input type="checkbox" checked={settings.smartRepliesQuietHours} onChange={(e) => set('smartRepliesQuietHours', e.target.checked)} />
             <span>Hold smart replies to messages that arrive in quiet hours until the morning (a reply at 3am looks automated)</span>
+          </label>
+          <label className="wa-check">
+            <input type="checkbox" checked={settings.firstContactQuietHours} onChange={(e) => set('firstContactQuietHours', e.target.checked)} />
+            <span>Hold the first message to new leads who enquire in quiet hours until the morning (otherwise it goes 3–6 minutes after they enquire, whatever the time)</span>
           </label>
           <div className="wa-queued-actions">
             <button type="button" onClick={saveSettings}>Save chaser settings</button>

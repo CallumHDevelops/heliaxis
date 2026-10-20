@@ -108,7 +108,8 @@ Redeploy after adding them.
   - The *Smart replies on/off* button in a chat turns them off for that person.
 - **Chasers**: ask something ("can you send us a photo of the land?") and, if they don't answer, a
   chaser goes after 12h (or whatever you pick under the message box: Auto / Off / 4h / 12h / 24h / 3
-  days). Auto = chase anything with a "?". A smart reply can have its own chaser too. Chasers:
+  days; it says when that will actually be, e.g. "tomorrow about 10:00"). Auto = chase anything with
+  a "?". A smart reply can have its own chaser too. Chasers:
   - are cancelled the moment they reply, or when you send another message;
   - never go out in quiet hours (21:00–08:45 UK by default, set to the minute), and move to the morning instead;
   - after a message sent in the evening (18:00 or later, or in quiet hours), wait until at least

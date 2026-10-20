@@ -2,9 +2,23 @@
 // (settings-shared.ts): quiet hours to the minute (nothing before 08:45), on both sides of the clocks
 // changing (Sunday 29 March and Sunday 25 October 2026), the evening rule (a message after 18:00
 // isn't chased before 10:00 the next morning), keeping chasers free, the final nudge, the outbox's
-// check just before it sends, and settings saved before quiet hours had minutes.
+// check just before it sends, what the "Chase if no reply" choices say, and settings saved before
+// quiet hours had minutes.
 // Usage: node --experimental-strip-types scripts/test-wa-schedule.mjs
-import { eveningFloor, holdUntil, isQuiet, lastAwake, londonHour, londonMinute, nextAwake, nextClock, planChase } from '../src/lib/whatsapp/schedule.ts';
+import {
+  chaseView,
+  chaseWhen,
+  eveningFloor,
+  holdUntil,
+  isQuiet,
+  lastAwake,
+  londonHour,
+  londonMinute,
+  nextAwake,
+  nextClock,
+  planChase,
+  whenWords,
+} from '../src/lib/whatsapp/schedule.ts';
 import { cleanSettings, DEFAULT_SETTINGS, fromHhmm, hhmm } from '../src/lib/whatsapp/settings-shared.ts';
 
 let failed = 0;
@@ -197,6 +211,22 @@ eq('held times keep a little jitter', uk(holdUntil({ kind: 'chase', now: at('202
   const first = holdUntil({ kind: 'chase', now: at('2026-10-21T08:35:00+01:00'), settings: S, lastOutAt: at('2026-10-20T20:34:00+01:00'), rand: () => 0.4 });
   eq('held once, then it goes', holdUntil({ kind: 'chase', now: first, settings: S, lastOutAt: at('2026-10-20T20:34:00+01:00') }), null);
 }
+
+// What the reply box says ("Chase if no reply: tomorrow about 10:00").
+const V = chaseView(S);
+eq('the view the browser gets', V, { quietFromMin: 1260, quietToMin: 525, eveningRule: true, eveningFromMin: 1080, eveningNotBeforeMin: 600, keepFree: true });
+eq('in words: later today', whenWords(at('2026-10-20T15:30:00+01:00'), at('2026-10-20T09:00:00+01:00')), 'today about 15:30');
+eq('in words: tomorrow', whenWords(at('2026-10-21T10:00:00+01:00'), at('2026-10-20T20:34:00+01:00')), 'tomorrow about 10:00');
+eq('in words: a weekday', whenWords(at('2026-10-23T10:00:00+01:00'), at('2026-10-20T20:34:00+01:00')), 'Fri about 10:00');
+eq('in words: a date', whenWords(at('2026-10-29T10:00:00Z'), at('2026-10-20T20:34:00+01:00')), 'Thu 29 Oct about 10:00');
+eq('in words: over the clock change', whenWords(at('2026-10-25T10:00:00Z'), at('2026-10-24T23:30:00+01:00')), 'tomorrow about 10:00');
+const box = (nowIso, hours, inbound, view = V) => chaseWhen({ now: at(nowIso), hours, lastInboundAt: inbound, view });
+eq('Nikki’s chat at 20:34, Auto (12h)', box('2026-10-20T20:34:00+01:00', 12, '2026-10-20T20:01:00+01:00'), 'tomorrow about 10:00');
+eq('at 20:34 with the evening rule off', box('2026-10-20T20:34:00+01:00', 12, '2026-10-20T20:01:00+01:00', { ...V, eveningRule: false }), 'tomorrow about 08:45');
+eq('at 14:00, 12h', box('2026-10-20T14:00:00+01:00', 12, '2026-10-20T13:30:00+01:00'), 'tomorrow about 08:45');
+eq('at 09:00, 4h', box('2026-10-20T09:00:00+01:00', 4, '2026-10-20T08:30:00+01:00'), 'today about 13:00');
+eq('at 14:00, 24h, kept free', box('2026-10-20T14:00:00+01:00', 24, '2026-10-20T13:30:00+01:00'), 'tomorrow about 12:30');
+eq('at 20:34, 3 days', box('2026-10-20T20:34:00+01:00', 72, null), 'Fri about 20:34');
 
 // Settings: minutes now; whole hours saved before still read right, and the old 08:00 default is now 08:45.
 const both = (s) => [hhmm(s.quietFromMin), hhmm(s.quietToMin)];

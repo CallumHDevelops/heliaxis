@@ -157,3 +157,33 @@ export function holdUntil(opts: {
   const at = nextAwake(now, s, { floor, rand: opts.rand });
   return at.getTime() > now.getTime() ? at : null;
 }
+
+/** What a chat needs to say when a chaser would go: the chase times, and whether chasers stay free. */
+export type ChaseView = ChaseTimes & { keepFree: boolean };
+
+export function chaseView(s: WaSettings): ChaseView {
+  const { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepChasesFree } = s;
+  return { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepFree: keepChasesFree };
+}
+
+const weekdayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
+const dateFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short' });
+
+/** A UK time in words, seen from `now`: "today about 15:30", "tomorrow about 10:00", "Thu about 10:00". */
+export function whenWords(at: Date, now: Date): string {
+  const days = Math.floor(ukReading(at) / DAY) - Math.floor(ukReading(now) / DAY);
+  const m = londonMinute(at);
+  const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days < 7 ? weekdayFmt.format(at) : dateFmt.format(at);
+  return `${day} about ${time}`;
+}
+
+/**
+ * When a chaser set now would go, in words, worked out as the server will plan it (without the
+ * jitter, so it's the earliest): for the "Chase if no reply" choices.
+ */
+export function chaseWhen(opts: { now: Date; hours: number; lastInboundAt: string | null; view: ChaseView }): string {
+  const { now, hours, lastInboundAt, view } = opts;
+  const plan = planChase({ sentAt: now, hours, lastInboundAt, settings: view, keepFree: view.keepFree, rand: () => 0 });
+  return whenWords(plan.at, now);
+}
