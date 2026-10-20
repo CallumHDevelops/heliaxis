@@ -2,7 +2,8 @@
  * Meta ad spend beside the CRM's leads, surveys and sales (CRM → Reports). Pure, so it runs in the
  * browser and in scripts/test-meta-ads.mjs: Meta's insights rows → ads, a period's dates in the ad
  * account's time zone, which CRM leads came from which ad, the money maths and Meta's errors in
- * plain words. Fetching and caching are in src/lib/meta-ads.ts.
+ * plain words. Fetching and caching are in src/lib/meta-ads.ts; the names ads have had (they can be
+ * renamed in Ads Manager whenever) in src/lib/ad-names.ts.
  *
  * Meta sends spend as text in the account's currency ("5339.5" is £5,339.50). It's kept here in
  * hundredths (pence), so totals add up to the penny.
@@ -34,6 +35,8 @@ export type Ad = {
   clicks: number;
   /** Meta's own count of leads from the ad. */
   metaLeads: number;
+  /** When the ad was made (Meta's ad list), if known: no lead from before then can be its. */
+  createdAt?: string;
 };
 
 /** The whole ad account for a period, ads Meta no longer lists included. */
@@ -165,6 +168,8 @@ export type LeadOutcome = {
   source: string;
   /** The ad Meta said it came from (ad-spend.sql), when known. */
   metaAdId?: string | null;
+  /** When the lead came in, if known. */
+  at?: string | null;
   surveyed: boolean;
   won: boolean;
   lost: boolean;
@@ -190,6 +195,9 @@ export type SpendRow = {
 };
 export type SpendGroup = { key: string; label: string; rows: SpendRow[]; total: SpendRow };
 
+/** What a "Refresh from Meta" did (src/lib/meta-ads.ts). */
+export type Refresh = 'done' | 'wait' | 'paused';
+
 /** What GET /api/crm/reports says about ad spend. */
 export type AdSpendReport =
   | { state: 'off' }
@@ -201,6 +209,12 @@ export type AdSpendReport =
       until: string;
       /** When the oldest of the figures was fetched from Meta. */
       fetchedAt: string;
+      /** When today's figures, the earlier days' and the ad names were fetched (missing from an older server). */
+      todayAt?: string;
+      pastAt?: string;
+      namesAt?: string | null;
+      /** "Refresh from Meta": done, asked less than a minute ago, or Meta's being left alone for a while. */
+      refresh?: Refresh | null;
       /** Meta didn't answer, so these are the last figures it gave. */
       warning: string | null;
       /** Campaigns (their ads beneath), then "Other Meta leads and spend". */
@@ -226,7 +240,7 @@ const blank = (key: string, label: string, note?: string): SpendRow => ({
 });
 const plus = (a: number | null, b: number | null) => (a == null && b == null ? null : (a ?? 0) + (b ?? 0));
 
-type Target = { kind: 'ad'; id: string } | { kind: 'name'; name: string } | { kind: 'web'; campaignId: string } | { kind: 'other' };
+type Target = { kind: 'ad'; id: string } | { kind: 'name'; ids: string[]; name: string } | { kind: 'web'; campaignId: string } | { kind: 'other' };
 
 /** A Meta lead that couldn't be put with an ad: what to call its row. */
 function otherLabel(source: string): { label: string; note: string } {
@@ -240,32 +254,85 @@ function otherLabel(source: string): { label: string; note: string } {
 }
 
 /**
+ * Every name each ad and campaign has had, by Meta's id, newest first (src/lib/ad-names.ts keeps
+ * them): an ad renamed in Ads Manager keeps the leads that came in under its old name.
+ */
+export type PastNames = { ads?: Record<string, string[]>; campaigns?: Record<string, string[]> };
+
+/**
  * The period's Meta leads beside Meta's ads, grouped by campaign. Every ad's spend lands in exactly
- * one row, so the rows add up to the account's total. A lead goes with:
+ * one row, so the rows add up to the account's total. Ads and campaigns show the name they have now
+ * (the `ads`' names), with an earlier one beneath ("was Video 4"). A lead goes with:
  *  1. the ad Meta said it came from (its ad id, saved since ad-spend.sql);
- *  2. otherwise its ad name ("meta: Video 4", from lead forms and the importer). When several ads
- *     share the name, the ones no lead was matched to (by 1 or 3) share one row: under their
- *     campaign, or in "Other" when they're in several, so no campaign counts another's spend;
+ *  2. otherwise its ad name ("meta: Video 4", from lead forms and the importer): the ad with that
+ *     name now, or that had it before (`past`, and the names leads with an ad id came in with), so
+ *     a renamed ad keeps its older leads; not one made after the lead came in. When several ads
+ *     fit, they share one row with the leads if none of them has leads matched by 1 or 3, else the
+ *     leads get a row of their own with no spend. Either is under their campaign, or in "Other"
+ *     when they're in several, so no campaign counts another's spend;
  *  3. otherwise, for the website's ad links ("meta-ad: <campaign> / <ad>"), the ad in that campaign,
  *     or just the campaign ("Website enquiries", no spend of its own: it counts in the campaign's total);
  *  4. otherwise "Other Meta leads and spend", with a note saying why.
  * Ads with spend and no leads get their own rows. Spend Meta counts for the account but not under
  * any ad it lists (deleted or archived ads) goes in the last group too.
  */
-export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | null): { groups: SpendGroup[]; total: SpendRow } {
+export function spendTable(
+  leads: LeadOutcome[],
+  ads: Ad[],
+  account?: Totals | null,
+  past?: PastNames | null
+): { groups: SpendGroup[]; total: SpendRow } {
   const byId = new Map(ads.map((a) => [a.id, a]));
-  const named = (name: string) => ads.filter((a) => norm(a.name) === norm(name) || a.id === name.trim());
-  const campaignIds = (name: string) => new Set(ads.filter((a) => norm(a.campaignName) === norm(name) || a.campaignId === name.trim()).map((a) => a.campaignId));
+  const metaLeads = leads.filter((l) => isMetaSource(l.source));
+  /** The ad name a lead-form lead came in with ("meta: Video 4" → "Video 4"). */
+  const formName = (s: string) => (/^meta\s*:/i.test(s.trim()) ? s.trim().replace(/^meta\s*:/i, '').trim() : '');
+
+  // Every name each ad and campaign has had, its name now first: Meta's, then the CRM's history,
+  // then the names leads with its ad id came in with.
+  const adNames = new Map<string, string[]>();
+  const campaignNames = new Map<string, string[]>();
+  const addName = (m: Map<string, string[]>, id: string, name: unknown) => {
+    const n = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+    if (!id || !n) return;
+    const list = m.get(id) ?? [];
+    if (!list.some((x) => norm(x) === norm(n))) list.push(n);
+    m.set(id, list);
+  };
+  for (const a of ads) {
+    addName(adNames, a.id, a.name);
+    addName(campaignNames, a.campaignId, a.campaignName);
+  }
+  for (const [id, names] of Object.entries(past?.ads ?? {})) if (byId.has(id) && Array.isArray(names)) for (const n of names) addName(adNames, id, n);
+  for (const [id, names] of Object.entries(past?.campaigns ?? {})) if (campaignNames.has(id) && Array.isArray(names)) for (const n of names) addName(campaignNames, id, n);
+  for (const l of metaLeads) if (l.metaAdId && byId.has(l.metaAdId)) addName(adNames, l.metaAdId, formName(l.source));
+  /** Each name → the ads that have had it. */
+  const hadName = new Map<string, Set<string>>();
+  for (const [id, names] of adNames) for (const n of names) hadName.set(norm(n), (hadName.get(norm(n)) ?? new Set<string>()).add(id));
+  const before = (names: string[] | undefined, now: string) => (names ?? []).filter((n) => norm(n) !== norm(now)).slice(0, 2);
+
+  const named = (name: string, at?: string | null) => {
+    const hits = ads.filter((a) => hadName.get(norm(name))?.has(a.id) || a.id === name.trim());
+    // Not an ad made after the lead came in (a name used again for a new ad). An hour's grace for clocks.
+    const then = Date.parse(at ?? '');
+    const made = hits.filter((a) => !a.createdAt || !then || Date.parse(a.createdAt) <= then + 3_600_000);
+    return made.length ? made : hits;
+  };
+  const campaignIds = (name: string) =>
+    new Set(ads.filter((a) => campaignNames.get(a.campaignId)?.some((n) => norm(n) === norm(name)) || a.campaignId === name.trim()).map((a) => a.campaignId));
   const spendOn = (pick: (a: Ad) => boolean) => ads.filter(pick).reduce((n, a) => n + a.spend, 0);
   /** The one that spent most, when a name fits several. */
   const biggest = (ids: Iterable<string>, spend: (id: string) => number) => [...ids].sort((a, b) => spend(b) - spend(a))[0];
   const oneAd = (hits: Ad[], name: string): Target | null =>
-    hits.length === 1 ? { kind: 'ad', id: hits[0].id } : hits.length > 1 ? { kind: 'name', name: norm(name) } : null;
+    hits.length === 1
+      ? { kind: 'ad', id: hits[0].id }
+      : hits.length > 1
+        ? { kind: 'name', ids: hits.map((a) => a.id), name: name.trim().replace(/\s+/g, ' ') }
+        : null;
 
   const targetOf = (l: LeadOutcome): Target => {
     if (l.metaAdId && byId.has(l.metaAdId)) return { kind: 'ad', id: l.metaAdId };
     const s = l.source.trim();
-    if (/^meta\s*:/i.test(s)) return oneAd(named(s.replace(/^meta\s*:/i, '')), s.replace(/^meta\s*:/i, '')) ?? { kind: 'other' };
+    if (/^meta\s*:/i.test(s)) return oneAd(named(formName(s), l.at), formName(s)) ?? { kind: 'other' };
     if (/^meta-ad\s*:/i.test(s)) {
       // "<utm_campaign> / <utm_content>": names can have " / " in them too, so try each split.
       const rest = s.replace(/^meta-ad\s*:/i, '').trim();
@@ -273,7 +340,7 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
       for (let i = 1; i < parts.length; i++) {
         const inCampaign = campaignIds(parts.slice(0, i).join(' / '));
         const ad = parts.slice(i).join(' / ');
-        const hits = named(ad).filter((a) => inCampaign.has(a.campaignId));
+        const hits = named(ad, l.at).filter((a) => inCampaign.has(a.campaignId));
         if (hits.length === 1) return { kind: 'ad', id: hits[0].id };
         if (hits.length > 1) return { kind: 'web', campaignId: hits[0].campaignId };
       }
@@ -282,22 +349,51 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
         if (ids.size) return { kind: 'web', campaignId: biggest(ids, (id) => spendOn((a) => a.campaignId === id)) };
       }
       // Only the ad in the link (utm_content without utm_campaign).
-      return oneAd(named(rest), rest) ?? { kind: 'other' };
+      return oneAd(named(rest, l.at), rest) ?? { kind: 'other' };
     }
     return { kind: 'other' };
   };
 
-  const metaLeads = leads.filter((l) => isMetaSource(l.source));
   const targets = metaLeads.map(targetOf);
   // Ads a lead was put with (by id, or a link naming the campaign) keep their own rows and spend.
   const pinned = new Set(targets.flatMap((t) => (t.kind === 'ad' ? [t.id] : [])));
-  // A name some lead couldn't pin to one ad: the other ads with that name share one row.
-  const shared = new Set(targets.flatMap((t) => (t.kind === 'name' ? [t.name] : [])));
+  // A name some leads can't pin to one ad. When none of the ads that have had it has a lead known
+  // by id, the leads share one row with those ads' spend ("2 ads with this name"); ads in two such
+  // sets (a shared name, then another after a rename) make them one row, so each ad's spend is in
+  // one row only. When some do, each ad keeps its own row and spend, and the leads get a row of
+  // their own with none: which ad they came from isn't known (leads from before ad ids were kept
+  // could be from any of them), and a guess would put one ad's leads against another's spend.
+  type Share = { ids: Set<string>; said: Map<string, string>; spends: boolean };
+  const shareOf = new Map<string, Share>();
+  const unsure = new Map<string, Share>();
+  const looseKey = (t: Extract<Target, { kind: 'name' }>) => `name-only:${[...t.ids].sort().join(',')}`;
+  for (const t of targets) {
+    if (t.kind !== 'name') continue;
+    if (t.ids.some((id) => pinned.has(id))) {
+      const s = unsure.get(looseKey(t)) ?? { ids: new Set(t.ids), said: new Map(), spends: false };
+      s.said.set(norm(t.name), t.name);
+      unsure.set(looseKey(t), s);
+      continue;
+    }
+    const into = [...new Set(t.ids.flatMap((id) => shareOf.get(id) ?? []))];
+    const s: Share = into[0] ?? { ids: new Set(), said: new Map(), spends: true };
+    for (const o of into.slice(1)) {
+      o.ids.forEach((id) => s.ids.add(id));
+      o.said.forEach((n, k) => s.said.set(k, n));
+    }
+    t.ids.forEach((id) => s.ids.add(id));
+    s.said.set(norm(t.name), t.name);
+    s.ids.forEach((id) => shareOf.set(id, s));
+  }
+  const shareKey = (s: Share) => `name:${[...s.ids].sort().join(',')}`;
+  const shares = new Map([...[...shareOf.values()].map((s) => [shareKey(s), s] as const), ...unsure]);
   const keyOf = (t: Target, source: string) =>
     t.kind === 'ad'
       ? `ad:${t.id}`
       : t.kind === 'name'
-        ? `name:${t.name}`
+        ? t.ids.some((id) => pinned.has(id))
+          ? looseKey(t)
+          : shareKey(shareOf.get(t.ids[0])!)
         : t.kind === 'web'
           ? `web:${t.campaignId}`
           : `other:${source.trim().toLowerCase()}`;
@@ -312,19 +408,30 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
   const make = (key: string): SpendRow & { group: string; groupLabel: string } => {
     if (key.startsWith('ad:')) {
       const a = byId.get(key.slice(3))!;
-      return { ...blank(key, a.name), group: `c:${a.campaignId}`, groupLabel: a.campaignName };
+      const was = before(adNames.get(a.id), a.name);
+      return { ...blank(key, a.name, was.length ? `was ${was.join(', ')}` : undefined), group: `c:${a.campaignId}`, groupLabel: a.campaignName };
     }
-    if (key.startsWith('name:')) {
-      const all = named(key.slice(5));
-      const same = all.filter((a) => !pinned.has(a.id));
-      const pool = same.length ? same : all;
-      const top = [...pool].sort((a, b) => b.spend - a.spend)[0];
+    if (key.startsWith('name:') || key.startsWith('name-only:')) {
+      const s = shares.get(key)!;
+      const all = ads.filter((a) => s.ids.has(a.id));
+      const pool = [...all].sort((a, b) => b.spend - a.spend);
+      const top = pool[0];
+      // The names they have now, biggest spender first.
+      const now = [...new Map(pool.map((a) => [norm(a.name), a.name])).values()];
+      const label = now.length > 3 ? `${now.slice(0, 2).join(' + ')} + ${now.length - 2} more` : now.join(' + ');
+      const said = [...s.said.values()];
       const names = [...new Set(all.map((a) => `“${a.campaignName}”`))];
-      const note = `${all.length} ads with this name${names.length > 1 ? `, in ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : ''}`;
+      const where = names.length > 1 ? `, in ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : '';
+      const why = all.every((a) => s.said.has(norm(a.name)))
+        ? `${all.length} ads with this name${where}`
+        : new Set(all.map((a) => norm(a.name))).size === 1
+          ? `was ${said.join(', ')} · ${all.length} ads with this name${where}`
+          : `${all.length} ads have been called ${said.map((n) => `“${n}”`).join(' or ')}${where}`;
+      const note = s.spends ? why : `Leads that don’t say which ad: ${why}`;
       // Under a campaign only when the row's spend is all that campaign's: none ever lands in another's total.
       return new Set(pool.map((a) => a.campaignId)).size > 1
-        ? { ...blank(key, top.name, note), group: OTHER_GROUP, groupLabel: 'Other Meta leads and spend' }
-        : { ...blank(key, top.name, note), group: `c:${top.campaignId}`, groupLabel: top.campaignName };
+        ? { ...blank(key, label, note), group: OTHER_GROUP, groupLabel: 'Other Meta leads and spend' }
+        : { ...blank(key, label, note), group: `c:${top.campaignId}`, groupLabel: top.campaignName };
     }
     if (key.startsWith('web:')) {
       const id = key.slice(4);
@@ -351,7 +458,8 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
 
   // Each ad's spend goes to exactly one row.
   for (const a of ads) {
-    const key = shared.has(norm(a.name)) && !pinned.has(a.id) ? `name:${norm(a.name)}` : `ad:${a.id}`;
+    const s = pinned.has(a.id) ? undefined : shareOf.get(a.id);
+    const key = s ? shareKey(s) : `ad:${a.id}`;
     const r = row(key, () => make(key));
     r.spend = (r.spend ?? 0) + a.spend;
     r.metaLeads = (r.metaLeads ?? 0) + a.metaLeads;
@@ -389,7 +497,13 @@ export function spendTable(leads: LeadOutcome[], ads: Ad[], account?: Totals | n
     byGroup.set(group, g);
   }
   const groups = [...byGroup.entries()]
-    .map(([key, g]) => ({ key, label: g.label, rows: g.rows.sort(order), total: sum(key, g.label, g.rows) }))
+    .map(([key, g]) => {
+      const total = sum(key, g.label, g.rows);
+      // A renamed campaign: its earlier name beneath.
+      const was = key.startsWith('c:') ? before(campaignNames.get(key.slice(2)), g.label) : [];
+      if (was.length) total.note = `was ${was.join(', ')}`;
+      return { key, label: g.label, rows: g.rows.sort(order), total };
+    })
     .sort((a, b) => Number(a.key === OTHER_GROUP) - Number(b.key === OTHER_GROUP) || order(a.total, b.total));
   const total = sum('meta', 'All Meta ads', groups.map((g) => g.total));
   // Meta's own count for the whole account (deleted ads included), when it gave one.
