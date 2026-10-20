@@ -1,8 +1,10 @@
+import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, json } from '@/lib/crm/server';
 import { isWonStage, STAGE_KEYS } from '@/lib/crm/stages';
 import { spendTable, type AdSpendReport, type LeadOutcome } from '@/lib/ad-spend';
 import { adSpendConfigured, adSpendFigures } from '@/lib/meta-ads';
+import { afterReports } from '@/lib/meta-ad-ids';
 
 export const dynamic = 'force-dynamic';
 // Meta can be slow the first time a period is asked for (after that it's cached).
@@ -24,6 +26,8 @@ export async function GET(req: Request) {
   const db = createAdminClient();
   // Asked for alongside the CRM's own numbers; never throws.
   const spending = adSpendFigures(days, { refresh });
+  // Once this has answered: older leads' ads from Meta's Lead API, for the next load (never throws).
+  if (adSpendConfigured()) after(() => afterReports({ force: refresh }));
   const { data: projects, error } = await db
     .from('crm_projects')
     .select('id, enquiry_id, stage, value, owner_id, created_at, first_contact_at, survey_at, accepted_at')
