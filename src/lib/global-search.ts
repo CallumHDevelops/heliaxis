@@ -29,7 +29,7 @@ export type SearchPerson = {
   created_at: string;
   /** Where picking them goes: their job (the one that matched, else the latest open one), else their details on Enquiries; null when this person can open neither. */
   href: string | null;
-  /** Their jobs, for CRM staff (the one that matched first, then open ones, newest first). */
+  /** Their jobs, for CRM staff (the one that matched first, unless it was their name that was typed; then open ones, newest first). */
   jobs: SearchJob[];
   /** Jobs they have beyond those listed. */
   more: number;
@@ -96,16 +96,20 @@ export function jobMatches(j: JobRow, q: string): boolean {
  * The results: the people found (customers matching, and the owners of jobs that matched), each with
  * their jobs. References first, then names starting with what was typed, then the rest, newest first
  * within each; up to MAX_PEOPLE, with JOBS_EACH jobs each. `matched` are the ids of jobs that matched
- * themselves; they come first under their person. `enquiries`: this person can open Enquiries.
+ * themselves; they come first under their person, unless it's that person's name that was typed.
+ * `enquiries`: this person can open Enquiries.
  */
 export function groupResults(a: { q: string; refs: string[]; people: PersonRow[]; jobs: JobRow[]; matched: ReadonlySet<string>; enquiries: boolean }): SearchPerson[] {
   const jobsOf = new Map<string, JobRow[]>();
   for (const j of a.jobs) jobsOf.set(j.enquiry_id, [...(jobsOf.get(j.enquiry_id) ?? []), j]);
-  const order = (x: JobRow, y: JobRow) =>
-    Number(a.matched.has(y.id)) - Number(a.matched.has(x.id)) || Number(isOpen(y.stage)) - Number(isOpen(x.stage)) || y.created_at.localeCompare(x.created_at);
+  // When it's their name that was typed, a job only "matched" because its title carries the name ("Tom
+  // Hughes · NP20 4AB", the default), so an old Lost one doesn't jump ahead of the job they're on now.
+  const t = a.q.trim().toLowerCase();
+  const order = (byName: boolean) => (x: JobRow, y: JobRow) =>
+    (byName ? 0 : Number(a.matched.has(y.id)) - Number(a.matched.has(x.id))) || Number(isOpen(y.stage)) - Number(isOpen(x.stage)) || y.created_at.localeCompare(x.created_at);
   return a.people
     .map((p) => {
-      const theirs = [...(jobsOf.get(p.id) ?? [])].sort(order);
+      const theirs = [...(jobsOf.get(p.id) ?? [])].sort(order(p.name.toLowerCase().includes(t)));
       return { p, theirs, rank: customerRank(a.q, a.refs, { name: p.name, ref: p.customer_ref, jobRefs: theirs.map((j) => j.project_ref) }) };
     })
     .sort((x, y) => x.rank - y.rank || y.p.created_at.localeCompare(x.p.created_at))

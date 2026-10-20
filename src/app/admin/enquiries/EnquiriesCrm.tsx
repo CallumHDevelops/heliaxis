@@ -28,8 +28,9 @@ const ICONS: Record<string, string> = {
 };
 
 /**
- * The filters live in the address bar (?status=new&source=meta&q=smith, and ?open=<id> for the lead
- * that's open), so a refresh keeps them and the dashboard can link straight to them. null removes one.
+ * The filters live in the address bar (?status=new&source=meta, and ?open=<id> for the lead that's open),
+ * so a refresh keeps them and the dashboard can link straight to them. null removes one. What's typed in
+ * the search stays out of it: names and phone numbers don't belong in browser history or server logs.
  */
 function keepInUrl(changes: Record<string, string | null>) {
   const url = new URL(window.location.href);
@@ -115,7 +116,7 @@ export function EnquiriesCrm({
   const [deleting, setDeleting] = useState<{ ids: string[]; name?: string } | null>(null);
   const [notice, setNotice] = useState<{ text: string; errors: string[] } | null>(null);
   const params = useSearchParams();
-  const [q, setQ] = useState(() => params?.get('q') ?? '');
+  const [q, setQ] = useState('');
   // Click a status card, or a source, to see only those leads; the address bar holds both (unknown values mean everyone).
   const only = statusFromParam(params?.get('status'));
   const source = sourceFromParam(params?.get('source'));
@@ -137,14 +138,10 @@ export function EnquiriesCrm({
     setKept({ status: '', ids: new Set() });
     keepInUrl({ source: g && source !== g ? g : null });
   }
-  function search(v: string) {
-    setQ(v);
-    keepInUrl({ q: v.trim() ? v : null });
-  }
   function clearFilters() {
     setQ('');
     setKept({ status: '', ids: new Set() });
-    keepInUrl({ status: null, source: null, q: null });
+    keepInUrl({ status: null, source: null });
   }
 
   const refresh = useCallback(async () => {
@@ -364,7 +361,7 @@ export function EnquiriesCrm({
         placeholder={leads.some((l) => l.ref) ? 'Search name, phone or HX-0042' : 'Search name, email or phone'}
         aria-label="Search enquiries"
         value={q}
-        onChange={(e) => search(e.target.value)}
+        onChange={(e) => setQ(e.target.value)}
       />
 
       <div className="enq-panel">
@@ -496,7 +493,8 @@ export function EnquiriesCrm({
                   title="Map"
                   src={osmEmbedUrl(active.lat, active.lng)}
                   loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
+                  // OpenStreetMap sees only which site the map is on, never the page's address (who was searched for, whose details are open).
+                  referrerPolicy="strict-origin-when-cross-origin"
                 />
                 <div className="enq-map-label">
                   {[active.town, active.postcode].filter(Boolean).join(' · ')}

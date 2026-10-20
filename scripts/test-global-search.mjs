@@ -94,6 +94,21 @@ eq('ref match ranks first', byRef[0].id, 'a');
 eq('matched job first', byRef[0].jobs[0].id, 'a3');
 eq('...and picking the person opens it', byRef[0].href, '/admin/projects/a3');
 
+// Typing someone's name "matches" their first job by its default title ("Tom Hughes · NP20 4AB"): an old Lost one doesn't jump ahead of their live job.
+const hughes = [person('h', 'Tom Hughes', '2026-10-10T10:00:00Z')];
+const hJobs = [
+  job('old', 'h', 'lost', { title: 'Tom Hughes · NP20 4AB', address: '3 Mill Lane', created_at: '2025-03-01T10:00:00Z' }),
+  job('new', 'h', 'survey_booked', { title: 'Solar + battery · NP20 4AB', created_at: '2026-10-10T11:00:00Z' }),
+];
+const byName = groupResults({ q: 'Tom Hughes', refs: [], people: hughes, jobs: hJobs, matched: new Set(['old']), enquiries: true });
+eq('by name: the live job first', byName[0].jobs.map((j) => j.id), ['new', 'old']);
+eq('...and picking them opens it', byName[0].href, '/admin/crm/new');
+eq('by part of the name too', groupResults({ q: 'hughes', refs: [], people: hughes, jobs: hJobs, matched: new Set(['old']), enquiries: true })[0].href, '/admin/crm/new');
+// Found by something that isn't their name (the old job's address): that job still comes first.
+const byAddress = groupResults({ q: 'mill lane', refs: [], people: hughes, jobs: hJobs, matched: new Set(['old']), enquiries: true });
+eq('by address: the matched job first, even Lost', byAddress[0].jobs.map((j) => j.id), ['old', 'new']);
+eq('...and picking them opens it', byAddress[0].href, '/admin/crm/old');
+
 // Enquiries only: no jobs, so everyone opens on Enquiries.
 const enqOnly = groupResults({ q: 'smith', refs: [], people, jobs: [], matched: new Set(), enquiries: true });
 eq('enquiries only: details on Enquiries', enqOnly.map((p) => p.href), ['/admin/enquiries?open=b', '/admin/enquiries?open=c', '/admin/enquiries?open=a']);

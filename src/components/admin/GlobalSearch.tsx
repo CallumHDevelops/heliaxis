@@ -119,8 +119,11 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
       e.preventDefault();
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      if (variant === 'overlay') onDone?.();
-      else if (q) setQ('');
+      if (variant === 'overlay') {
+        // Only the pop-up closes: sheets underneath listen for Esc on window, and would close (losing what's typed) too.
+        e.stopPropagation();
+        onDone?.();
+      } else if (q) setQ('');
       else input.current?.blur();
       setOpen(false);
     }
