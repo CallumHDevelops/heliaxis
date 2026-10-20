@@ -4,6 +4,7 @@ import { findCustomers, type FoundCustomer } from '@/lib/customer-search';
 import { cleanSearch, customerRank } from '@/lib/global-search';
 import { possibleDuplicates } from '@/lib/projects/duplicates';
 import { readAll } from '@/lib/projects/server';
+import { nameRank } from '@/lib/search-words';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,9 +13,10 @@ const LIMIT = 20;
 type Job = { id: string; enquiry_id: string; address: string | null; postcode: string | null; products: string[]; created_at: string; project_ref?: string | null };
 
 /**
- * Customer search for the New project sheet and the CRM search: name, email, phone digits, postcode,
- * or a reference (HX-0042, hx42, 0042) once customer-refs.sql has been run (src/lib/customer-search.ts).
- * Up to 20, each with how many jobs they have, their latest site address and a possible-duplicate flag.
+ * Customer search for the New project sheet and the CRM search, word by word ("rob evans"): name, email,
+ * phone digits, postcode, or a reference (HX-0042, hx42, 0042) once customer-refs.sql has been run
+ * (src/lib/customer-search.ts). Names the words start come first. Up to 20, each with how many jobs
+ * they have, their latest site address and a possible-duplicate flag.
  */
 export async function GET(req: Request) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
@@ -52,8 +54,8 @@ export async function GET(req: Request) {
   const rank = (c: FoundCustomer) =>
     customerRank(q, refs, { name: c.name, ref: refOf.get(c.id) ?? null, jobRefs: (jobsOf.get(c.id) ?? []).map((j) => j.project_ref) });
   const customers = list
-    .map((c) => ({ c, rank: rank(c) }))
-    .sort((a, b) => a.rank - b.rank || b.c.created_at.localeCompare(a.c.created_at))
+    .map((c) => ({ c, name: nameRank(q, c.name), rank: rank(c) }))
+    .sort((a, b) => a.name - b.name || a.rank - b.rank || b.c.created_at.localeCompare(a.c.created_at))
     .map(({ c }) => {
       const theirs = (jobsOf.get(c.id) ?? []).sort((a, b) => b.created_at.localeCompare(a.created_at));
       const latest = theirs[0];

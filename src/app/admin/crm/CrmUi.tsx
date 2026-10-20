@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { stageLabel } from '@/lib/crm/stages';
 import { shownRef } from '@/lib/projects/refs';
+import { nameRank } from '@/lib/search-words';
 import { matchesSearch, phaseOf, type PipelineProject } from './crm-shared';
 
 /** Small pieces shared by the CRM home, Board, List and the Projects pages. */
@@ -126,8 +127,8 @@ export function Sheet({ title, onClose, children, wide }: { title: string; onClo
 }
 
 /**
- * Pick a job by typing a name, postcode, phone number or HX-ref (from the jobs already on the page).
- * Open jobs first.
+ * Pick a job by typing a name, postcode, phone number or HX-ref, word by word (from the jobs already
+ * on the page). Names the words start first, then open jobs.
  */
 export function JobPicker({
   projects,
@@ -159,7 +160,9 @@ export function JobPicker({
     );
   }
   const t = q.trim();
-  const hits = t.length < 2 ? [] : projects.filter((p) => matchesSearch(p, t)).sort((a, b) => Number(b.stage !== 'lost' && b.stage !== 'complete') - Number(a.stage !== 'lost' && a.stage !== 'complete')).slice(0, 8);
+  const open = (p: PipelineProject) => Number(p.stage !== 'lost' && p.stage !== 'complete');
+  const rank = (p: PipelineProject) => nameRank(t, p.customer || p.title);
+  const hits = t.length < 2 ? [] : projects.filter((p) => matchesSearch(p, t)).sort((a, b) => rank(a) - rank(b) || open(b) - open(a)).slice(0, 8);
   return (
     <div className="crmh-picker">
       <input
