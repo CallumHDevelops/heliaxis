@@ -18,6 +18,14 @@ export type WaSettings = {
    */
   quietFromMin: number;
   quietToMin: number;
+  /**
+   * The evening rule: when our message goes at or after `eveningFromMin` (18:00), or in quiet hours,
+   * its chaser waits until at least `eveningNotBeforeMin` (10:00) the next morning, so they've had a
+   * chance to wake up. Minutes after midnight, UK time.
+   */
+  eveningRule: boolean;
+  eveningFromMin: number;
+  eveningNotBeforeMin: number;
   /** Hold smart replies to messages that arrive in quiet hours until the morning. */
   smartRepliesQuietHours: boolean;
   /** Push the team if a customer's message has had no answer for this long (0 = off). */
@@ -34,6 +42,9 @@ export const DEFAULT_SETTINGS: WaSettings = {
   firstContactTemplate: '',
   quietFromMin: 21 * 60,
   quietToMin: 8 * 60 + 45,
+  eveningRule: true,
+  eveningFromMin: 18 * 60,
+  eveningNotBeforeMin: 10 * 60,
   smartRepliesQuietHours: false,
   remindUnansweredMinutes: 30,
 };
@@ -81,6 +92,9 @@ export function cleanSettings(b: SavedSettings): WaSettings {
     firstContactTemplate: String(b.firstContactTemplate ?? '').trim().slice(0, 100),
     quietFromMin: minuteOfDay(b.quietFromMin, b.quietFrom, d.quietFromMin),
     quietToMin: minuteOfDay(b.quietToMin, Number(b.quietTo) === OLD_DEFAULT_QUIET_TO ? undefined : b.quietTo, d.quietToMin),
+    eveningRule: b.eveningRule === undefined ? d.eveningRule : !!b.eveningRule,
+    eveningFromMin: minuteOfDay(b.eveningFromMin, undefined, d.eveningFromMin),
+    eveningNotBeforeMin: minuteOfDay(b.eveningNotBeforeMin, undefined, d.eveningNotBeforeMin),
     smartRepliesQuietHours: !!b.smartRepliesQuietHours,
     remindUnansweredMinutes: Math.round(num(b.remindUnansweredMinutes, 0, 24 * 60, d.remindUnansweredMinutes)),
   };

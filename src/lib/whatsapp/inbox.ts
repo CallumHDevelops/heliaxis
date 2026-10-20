@@ -402,22 +402,21 @@ async function cancelAutomatic(db: Db, enquiryId: string, reason: string) {
 }
 
 /**
- * Chase if they don't answer: `hours` from now, outside quiet hours, and — when it can be —
- * inside the free 24h window. Replaces any chaser already waiting on this chat.
+ * Chase if they don't answer: `hours` from now, outside quiet hours, after the evening rule (a
+ * message sent after 18:00 isn't chased before 10:00 the next morning) and — when it can be — inside
+ * the free 24h window. The final nudge (step 2) follows the same times but isn't moved to keep it
+ * free. Replaces any chaser already waiting on this chat.
  */
 export async function scheduleChase(db: Db, enquiry: EnquiryWa, opts: { hours: number; text?: string | null; step?: number }) {
   const settings = await getSettings();
   const step = opts.step ?? 1;
-  const plan =
-    step === 1
-      ? planChase({
-          sentAt: new Date(),
-          hours: opts.hours,
-          lastInboundAt: enquiry.wa_last_inbound_at,
-          settings,
-          keepFree: settings.keepChasesFree,
-        })
-      : { at: nextAwake(new Date(Date.now() + opts.hours * 3_600_000), settings), free: false };
+  const plan = planChase({
+    sentAt: new Date(),
+    hours: opts.hours,
+    lastInboundAt: step === 1 ? enquiry.wa_last_inbound_at : null,
+    settings,
+    keepFree: step === 1 && settings.keepChasesFree,
+  });
   await db
     .from('whatsapp_outbox')
     .update({ status: 'cancelled', last_error: 'Replaced by a newer chaser' })

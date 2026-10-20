@@ -1,9 +1,10 @@
 // When automatic WhatsApps go (src/lib/whatsapp/schedule.ts) and the chaser settings
 // (settings-shared.ts): quiet hours to the minute (nothing before 08:45), on both sides of the clocks
-// changing (Sunday 29 March and Sunday 25 October 2026), keeping chasers free, and settings saved
-// before quiet hours had minutes.
+// changing (Sunday 29 March and Sunday 25 October 2026), the evening rule (a message after 18:00
+// isn't chased before 10:00 the next morning), keeping chasers free, the final nudge, and settings
+// saved before quiet hours had minutes.
 // Usage: node --experimental-strip-types scripts/test-wa-schedule.mjs
-import { isQuiet, lastAwake, londonHour, londonMinute, nextAwake, nextClock, planChase } from '../src/lib/whatsapp/schedule.ts';
+import { eveningFloor, isQuiet, lastAwake, londonHour, londonMinute, nextAwake, nextClock, planChase } from '../src/lib/whatsapp/schedule.ts';
 import { cleanSettings, DEFAULT_SETTINGS, fromHhmm, hhmm } from '../src/lib/whatsapp/settings-shared.ts';
 
 let failed = 0;
@@ -92,9 +93,89 @@ eq('awake already: unchanged', uk(lastAwake(at('2026-10-20T19:00:00+01:00'), S))
   eq('never messaged us: paid, on time', [uk(p.at), p.free], ['Tue 20 Oct 18:00', false]);
 }
 
+// The owner's case: Nikki wrote at 20:01 ("in bed ill"), Callum replied at 20:34 asking about a call
+// tomorrow. The chaser went at 08:35. Now: not before 10:00 the next day, still free.
+{
+  const nikki = { sentAt: at('2026-10-20T20:34:00+01:00'), hours: 12, lastInboundAt: '2026-10-20T20:01:00+01:00', settings: S, keepFree: true };
+  const early = planChase({ ...nikki, rand: none });
+  const late = planChase({ ...nikki, rand: most });
+  eq('Nikki: 20:34 → chase at 10:00 the next day, free', [uk(early.at), early.free], ['Wed 21 Oct 10:00', true]);
+  eq('Nikki: with the most jitter, 10:20', [uk(late.at), late.free], ['Wed 21 Oct 10:20', true]);
+  const off = planChase({ ...nikki, settings: { ...S, eveningRule: false }, rand: none });
+  eq('Nikki, evening rule off: 08:45 (never 08:35)', uk(off.at), 'Wed 21 Oct 08:45');
+  const old = planChase({ ...nikki, settings: { ...S, quietToMin: 480, eveningRule: false }, rand: none });
+  eq('what used to happen (quiet until 08:00, no evening rule): 08:34', uk(old.at), 'Wed 21 Oct 08:34');
+}
+
+// When the evening rule applies, and the floor it sets.
+const floor = (iso, s = S) => {
+  const f = eveningFloor(at(iso), s);
+  return f ? uk(f) : null;
+};
+eq('17:59: no floor', floor('2026-10-20T17:59:00+01:00'), null);
+eq('18:00: 10:00 tomorrow', floor('2026-10-20T18:00:00+01:00'), 'Wed 21 Oct 10:00');
+eq('23:30: 10:00 tomorrow', floor('2026-10-20T23:30:00+01:00'), 'Wed 21 Oct 10:00');
+eq('02:00 (small hours): 10:00 that morning', floor('2026-10-21T02:00:00+01:00'), 'Wed 21 Oct 10:00');
+eq('08:44 (still quiet): 10:00 that morning', floor('2026-10-21T08:44:00+01:00'), 'Wed 21 Oct 10:00');
+eq('08:45: no floor', floor('2026-10-21T08:45:00+01:00'), null);
+eq('midday: no floor', floor('2026-10-21T12:00:00+01:00'), null);
+eq('rule off: no floor', floor('2026-10-20T20:34:00+01:00', { ...S, eveningRule: false }), null);
+eq('after 19:30 → not before 11:15', floor('2026-10-20T19:45:00+01:00', { ...S, eveningFromMin: 1170, eveningNotBeforeMin: 675 }), 'Wed 21 Oct 11:15');
+eq('after 19:30: 19:00 has no floor', floor('2026-10-20T19:00:00+01:00', { ...S, eveningFromMin: 1170 }), null);
+eq('clocks go back: 10:00 GMT on Sun 25 Oct', eveningFloor(at('2026-10-24T20:34:00+01:00'), S).toISOString(), '2026-10-25T10:00:00.000Z');
+eq('clocks go forward: 10:00 BST on Sun 29 Mar', eveningFloor(at('2026-03-28T20:34:00Z'), S).toISOString(), '2026-03-29T09:00:00.000Z');
+
+const plan = (iso, hours, inbound, extra = {}) => {
+  const p = planChase({ sentAt: at(iso), hours, lastInboundAt: inbound, settings: S, keepFree: true, rand: none, ...extra });
+  return [uk(p.at), p.free];
+};
+eq('18:30 + 1h: not 19:30, 10:00 tomorrow', plan('2026-10-20T18:30:00+01:00', 1, '2026-10-20T18:00:00+01:00'), ['Wed 21 Oct 10:00', true]);
+eq('17:00 + 1h: 18:00 as before', plan('2026-10-20T17:00:00+01:00', 1, '2026-10-20T16:50:00+01:00'), ['Tue 20 Oct 18:00', true]);
+eq('02:00 + 4h: 10:00 that morning', plan('2026-10-21T02:00:00+01:00', 4, '2026-10-21T01:50:00+01:00'), ['Wed 21 Oct 10:00', true]);
+eq('20:00 + 24h: 20:00 the next day, past the floor', plan('2026-10-20T20:00:00+01:00', 24, null), ['Wed 21 Oct 20:00', false]);
+eq('clocks go back: Sat 20:34 → Sun 10:00 GMT', plan('2026-10-24T20:34:00+01:00', 12, '2026-10-24T20:01:00+01:00'), ['Sun 25 Oct 10:00', true]);
+eq('clocks go forward: Sat 20:34 → Sun 10:00 BST', plan('2026-03-28T20:34:00Z', 12, '2026-03-28T20:01:00Z'), ['Sun 29 Mar 10:00', true]);
+
+// Keeping it free never beats the evening rule.
+eq(
+  '16h after 18:00, window closes 10:00: not 09:00 to keep it free; paid at 10:00',
+  plan('2026-10-19T18:00:00+01:00', 16, '2026-10-19T10:00:00+01:00'),
+  ['Tue 20 Oct 10:00', false]
+);
+eq(
+  '…the same without the evening rule: free at 09:00',
+  plan('2026-10-19T18:00:00+01:00', 16, '2026-10-19T10:00:00+01:00', { settings: { ...S, eveningRule: false } }),
+  ['Tue 20 Oct 09:00', true]
+);
+eq(
+  'window closes 10:30, jitter would miss it: free at 10:00 sharp',
+  plan('2026-10-19T18:00:00+01:00', 12, '2026-10-19T10:30:00+01:00', { rand: most }),
+  ['Tue 20 Oct 10:00', true]
+);
+eq(
+  'window closes 09:00: paid at 10:00, never earlier',
+  plan('2026-10-19T19:00:00+01:00', 12, '2026-10-19T09:00:00+01:00'),
+  ['Tue 20 Oct 10:00', false]
+);
+eq(
+  '24h chase after 20:30, window closes 20:00: free at 19:00',
+  plan('2026-10-19T20:30:00+01:00', 24, '2026-10-19T20:00:00+01:00'),
+  ['Tue 20 Oct 19:00', true]
+);
+
+// The final nudge (step 2): planned from the chaser, never moved to keep it free, never before 08:45.
+const nudge = (iso, hours, s = S) => uk(planChase({ sentAt: at(iso), hours, lastInboundAt: null, settings: s, keepFree: false, rand: none }).at);
+eq('nudge 20h after an 11:00 chaser: 07:00 → 08:45', nudge('2026-10-21T11:00:00+01:00', 20), 'Thu 22 Oct 08:45');
+eq('nudge 12h after a 20:30 chaser: 10:00', nudge('2026-10-21T20:30:00+01:00', 12), 'Thu 22 Oct 10:00');
+eq('nudge 24h after a 10:05 chaser: on time', nudge('2026-10-21T10:05:00+01:00', 24), 'Thu 22 Oct 10:05');
+
 // Settings: minutes now; whole hours saved before still read right, and the old 08:00 default is now 08:45.
 const both = (s) => [hhmm(s.quietFromMin), hhmm(s.quietToMin)];
 eq('nothing saved: 21:00 → 08:45', both(cleanSettings({})), ['21:00', '08:45']);
+const evening = (s) => [s.eveningRule, hhmm(s.eveningFromMin), hhmm(s.eveningNotBeforeMin)];
+eq('evening rule on by default: after 18:00 → not before 10:00', evening(cleanSettings({})), [true, '18:00', '10:00']);
+eq('evening rule on for settings saved before it', evening(cleanSettings({ quietFrom: 21, quietTo: 8, chaseAfterHours: 12 })), [true, '18:00', '10:00']);
+eq('evening rule kept off once turned off', evening(cleanSettings({ eveningRule: false, eveningFromMin: 1140, eveningNotBeforeMin: 570 })), [false, '19:00', '09:30']);
 eq('saved with the old defaults (21, 8): 21:00 → 08:45', both(cleanSettings({ quietFrom: 21, quietTo: 8 })), ['21:00', '08:45']);
 eq('old 8 saved as text', both(cleanSettings({ quietFrom: '21', quietTo: '8' })), ['21:00', '08:45']);
 eq('old 22 → 7 keep their meaning', both(cleanSettings({ quietFrom: 22, quietTo: 7 })), ['22:00', '07:00']);

@@ -111,9 +111,11 @@ Redeploy after adding them.
   days). Auto = chase anything with a "?". A smart reply can have its own chaser too. Chasers:
   - are cancelled the moment they reply, or when you send another message;
   - never go out in quiet hours (21:00–08:45 UK by default, set to the minute), and move to the morning instead;
+  - after a message sent in the evening (18:00 or later, or in quiet hours), wait until at least
+    10:00 the next morning, to give them a chance to wake up (the evening rule, on by default);
   - stay **free** when they can: if 12h would land after the 24h window closes, the chaser goes about
-    an hour before it closes (at least 4h after your message). Otherwise the chase template is sent
-    (paid). The chat shows which it'll be;
+    an hour before it closes (at least 4h after your message, and never earlier than the evening rule
+    allows). Otherwise the chase template is sent (paid). The chat shows which it'll be;
   - can have an optional final nudge (off by default).
 - **Photos, videos, voice notes and files** customers send show in the chat (once
   `whatsapp-media.sql` has been run). WhatsApp only keeps them for 7 days, so each one is downloaded
