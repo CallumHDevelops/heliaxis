@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
 import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS, shownLeads, statusFromParam } from '@/lib/enquiries';
+import { inSource, leadSourceLabel, metaAdLabel, SOURCE_GROUPS, sourceCounts, sourceFromParam, type SourceGroup } from '@/lib/lead-source';
 import { osmEmbedUrl } from '@/lib/geocode-postcode';
 import { DeleteCustomers, type DeleteDone } from './DeleteCustomers';
 import './enquiries.css';
@@ -26,13 +27,42 @@ const ICONS: Record<string, string> = {
     '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M12 7v10M9.5 9.5c.8-1 2-1.5 2.5-1.5s1.8.4 2.5 1.5M9.5 14.5c.8 1 2 1.5 2.5 1.5s1.8-.4 2.5-1.5"/></svg>',
 };
 
-/** The status card that's picked lives in the address bar (?status=new), so a refresh keeps it. */
-function keepStatusInUrl(status: string) {
+/**
+ * The filters live in the address bar (?status=new&source=meta&q=smith, and ?open=<id> for the lead
+ * that's open), so a refresh keeps them and the dashboard can link straight to them. null removes one.
+ */
+function keepInUrl(changes: Record<string, string | null>) {
   const url = new URL(window.location.href);
-  if (status) url.searchParams.set('status', status.toLowerCase());
-  else url.searchParams.delete('status');
+  for (const [k, v] of Object.entries(changes)) {
+    if (v) url.searchParams.set(k, v);
+    else url.searchParams.delete(k);
+  }
   // Next keeps useSearchParams in step with replaceState, so the list follows.
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+/** How a source reads in a sentence: "New Meta leads", "website leads", "leads from other places". */
+const SOURCE_WORD: Record<SourceGroup, string> = { meta: 'Meta', website: 'website', whatsapp: 'WhatsApp', other: '' };
+function whichLeads(status: string, source: SourceGroup | '') {
+  const kind = [status, source ? SOURCE_WORD[source] : ''].filter(Boolean).join(' ');
+  return `${kind ? `${kind} ` : ''}leads${source === 'other' ? ' from other places' : ''}`;
+}
+/** The subtitle's "(New, from Meta)". */
+function filterWords(status: string, source: SourceGroup | '') {
+  const from = source === 'other' ? 'from other places' : source === 'website' ? 'from the website' : source ? `from ${SOURCE_WORD[source]}` : '';
+  return [status, from].filter(Boolean).join(', ');
+}
+
+/** A Meta lead's ad (or "Organic") under the name: small, so the table gets no wider on phones. */
+function AdLine({ src }: { src: string }) {
+  const ad = metaAdLabel(src);
+  if (!ad) return null;
+  return (
+    <span className="enq-ad" title={leadSourceLabel(src)}>
+      <i>Meta</i>
+      <span>{ad}</span>
+    </span>
+  );
 }
 
 function IconRow({ keys }: { keys: string[] }) {
@@ -79,27 +109,42 @@ export function EnquiriesCrm({
     else alert(d.error || 'Could not open the CRM — has supabase/crm.sql been run?');
   }
   const [leads, setLeads] = useState(initialLeads);
-  const [active, setActive] = useState<CrmLead | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [deleting, setDeleting] = useState<{ ids: string[]; name?: string } | null>(null);
   const [notice, setNotice] = useState<{ text: string; errors: string[] } | null>(null);
-  const [q, setQ] = useState('');
-  // Click a status card to see only those leads; the address bar holds it (unknown values mean everyone).
-  const only = statusFromParam(useSearchParams()?.get('status'));
+  const params = useSearchParams();
+  const [q, setQ] = useState(() => params?.get('q') ?? '');
+  // Click a status card, or a source, to see only those leads; the address bar holds both (unknown values mean everyone).
+  const only = statusFromParam(params?.get('status'));
+  const source = sourceFromParam(params?.get('source'));
+  // The lead whose details are open (?open=<id>, so the dashboard can link to it); one not on the list is ignored.
+  const openId = params?.get('open') ?? '';
+  const active = openId ? (leads.find((l) => l.id === openId) ?? null) : null;
+  const openLead = (l: CrmLead) => keepInUrl({ open: l.id });
+  const closeLead = () => keepInUrl({ open: null });
   // Leads whose status you change while filtered stay on screen until you pick another card.
   const [kept, setKept] = useState<{ status: string; ids: ReadonlySet<string> }>({ status: '', ids: new Set() });
 
   /** One card at a time: clicking the lit one again shows everyone. */
   function pickStatus(s: string) {
     setKept({ status: '', ids: new Set() });
-    keepStatusInUrl(only === s ? '' : s);
+    keepInUrl({ status: only === s ? null : s.toLowerCase() });
+  }
+  /** One source at a time, like the cards: All, or the lit one again, is every source. */
+  function pickSource(g: SourceGroup | '') {
+    setKept({ status: '', ids: new Set() });
+    keepInUrl({ source: g && source !== g ? g : null });
+  }
+  function search(v: string) {
+    setQ(v);
+    keepInUrl({ q: v.trim() ? v : null });
   }
   function clearFilters() {
     setQ('');
     setKept({ status: '', ids: new Set() });
-    keepStatusInUrl('');
+    keepInUrl({ status: null, source: null, q: null });
   }
 
   const refresh = useCallback(async () => {
@@ -113,24 +158,30 @@ export function EnquiriesCrm({
     setLeads(initialLeads);
   }, [initialLeads]);
 
+  // The leads from the picked source. The status cards count these, so Meta + New is the new Meta leads...
+  const pool = useMemo(() => inSource(leads, source), [leads, source]);
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     STATUSES.forEach((s) => {
       c[s] = 0;
     });
-    leads.forEach((l) => {
+    pool.forEach((l) => {
       c[l.status] = (c[l.status] || 0) + 1;
     });
     return c;
-  }, [leads]);
+  }, [pool]);
+  // ...and the source buttons count the picked card's leads.
+  const forSources = only ? leads.filter((l) => l.status === only) : leads;
+  const bySource = sourceCounts(forSources);
 
-  const shown = shownLeads(leads, q, only, kept.status === only ? kept.ids : undefined);
-  const filtered = Boolean(only || q.trim());
+  const shown = shownLeads(pool, q, only, kept.status === only ? kept.ids : undefined);
+  const filtered = Boolean(only || source || q.trim());
+  const narrowed = Boolean(only || source);
   // Only people still on the list count (a refresh may have dropped some). Ticks stay while you search or filter.
   const pickedIds = leads.filter((l) => picked.has(l.id)).map((l) => l.id);
-  // "Select all" means everyone the search and status card show, but not leads only still on screen because
+  // "Select all" means everyone the search, source and status card show, but not leads only still on screen because
   // you just moved them out of that status: "delete the rest of New" mustn't take the ones you just contacted.
-  const selectable = shownLeads(leads, q, only);
+  const selectable = shownLeads(pool, q, only);
   const allPicked = selectable.length > 0 && selectable.every((l) => picked.has(l.id));
   const pickAll = () =>
     setPicked((prev) => {
@@ -205,7 +256,7 @@ export function EnquiriesCrm({
           <p>
             {filtered ? (
               <>
-                {shown.length} of {leads.length} leads ·{' '}
+                {shown.length} of {leads.length} leads{narrowed ? ` (${filterWords(only, source)})` : ''} ·{' '}
                 <button type="button" className="enq-showall" onClick={clearFilters}>
                   Show all
                 </button>
@@ -285,13 +336,35 @@ export function EnquiriesCrm({
         </div>
       )}
 
+      <div className={source ? 'enq-src-row has-pick' : 'enq-src-row'} role="group" aria-label="Show leads by where they came from">
+        <span className="enq-src-k" aria-hidden="true">
+          From
+        </span>
+        <button type="button" className="enq-src" aria-pressed={!source} onClick={() => pickSource('')}>
+          All <span className="c">{forSources.length}</span>
+        </button>
+        {/* Other only when there's someone in it (or it's picked). */}
+        {SOURCE_GROUPS.filter((g) => g.key !== 'other' || bySource.other > 0 || source === 'other').map((g) => (
+          <button
+            key={g.key}
+            type="button"
+            className={`enq-src src-${g.key}`}
+            aria-pressed={source === g.key}
+            title={source === g.key ? 'Show leads from everywhere' : `Show only ${whichLeads('', g.key)}`}
+            onClick={() => pickSource(g.key)}
+          >
+            {g.label} <span className="c">{bySource[g.key]}</span>
+          </button>
+        ))}
+      </div>
+
       <input
         className="enq-search"
         type="search"
         placeholder={leads.some((l) => l.ref) ? 'Search name, phone or HX-0042' : 'Search name, email or phone'}
         aria-label="Search enquiries"
         value={q}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={(e) => search(e.target.value)}
       />
 
       <div className="enq-panel">
@@ -319,13 +392,13 @@ export function EnquiriesCrm({
             {leads.length > 0 && shown.length === 0 && (
               <tr>
                 <td colSpan={7} className="enq-empty">
-                  {only && q.trim()
-                    ? `No ${only} leads match “${q.trim()}”.`
-                    : only
-                      ? `No ${only} leads at the moment.`
+                  {narrowed && q.trim()
+                    ? `No ${whichLeads(only, source)} match “${q.trim()}”.`
+                    : narrowed
+                      ? `No ${whichLeads(only, source)} at the moment.`
                       : `Nobody matches “${q.trim()}”.`}{' '}
                   <button type="button" className="enq-showall" onClick={clearFilters}>
-                    {only && q.trim() ? 'Clear filters' : only ? 'Show all leads' : 'Clear search'}
+                    {narrowed && q.trim() ? 'Clear filters' : narrowed ? 'Show all leads' : 'Clear search'}
                   </button>
                 </td>
               </tr>
@@ -340,6 +413,7 @@ export function EnquiriesCrm({
                         <b>{l.name}</b>
                         {l.ref && <span className="enq-ref">{l.ref}</span>}
                         <span className="enq-email">{l.email}</span>
+                        <AdLine src={l.src} />
                       </span>
                     </label>
                   ) : (
@@ -347,6 +421,7 @@ export function EnquiriesCrm({
                       <b>{l.name}</b>
                       {l.ref && <span className="enq-ref">{l.ref}</span>}
                       <div className="enq-email">{l.email}</div>
+                      <AdLine src={l.src} />
                     </>
                   )}
                 </td>
@@ -375,7 +450,7 @@ export function EnquiriesCrm({
                   </select>
                 </td>
                 <td>
-                  <button type="button" className="enq-view" onClick={() => setActive(l)}>
+                  <button type="button" className="enq-view" onClick={() => openLead(l)}>
                     View
                   </button>
                 </td>
@@ -404,16 +479,16 @@ export function EnquiriesCrm({
       )}
 
       {active && (
-        <div className="enq-modal" role="dialog" aria-modal="true" onClick={() => setActive(null)}>
+        <div className="enq-modal" role="dialog" aria-modal="true" onClick={closeLead}>
           <div className="enq-modalbox" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="enq-close" onClick={() => setActive(null)}>
+            <button type="button" className="enq-close" aria-label="Close" onClick={closeLead}>
               ×
             </button>
             <h2>{active.name}</h2>
             <p className="enq-sub">
               {active.ref ? `${active.ref} · ` : ''}
               {active.sector}
-              {active.org ? ` · ${active.org}` : ''} · via {active.src} · {active.time}
+              {active.org ? ` · ${active.org}` : ''} · via {leadSourceLabel(active.src)} · {active.time}
             </p>
             {typeof active.lat === 'number' && typeof active.lng === 'number' ? (
               <div className="enq-map">
@@ -443,7 +518,7 @@ export function EnquiriesCrm({
               </div>
               <div>
                 <span>Source</span>
-                {active.src}
+                {leadSourceLabel(active.src)}
               </div>
             </div>
             <div className="enq-label">Interested in</div>
@@ -485,7 +560,7 @@ export function EnquiriesCrm({
                   className="enq-btn enq-btn-danger enq-btn-end"
                   onClick={() => {
                     setDeleting({ ids: [active.id], name: active.name });
-                    setActive(null);
+                    closeLead();
                   }}
                 >
                   Delete customer

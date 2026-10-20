@@ -666,3 +666,96 @@ ul.enq-del-err {
     margin-left: 0;
   }
 }
+
+/* Where the leads came from: All · Meta · Website · WhatsApp · Other, above the search. One at a time. */
+.enq-src-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.enq-src-k {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 2px;
+}
+.enq-src {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.enq-src .c {
+  min-width: 1.4em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.07);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+.enq-src:hover {
+  border-color: var(--ink);
+}
+.enq-src:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.enq-src[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.enq-src[aria-pressed='true'] .c {
+  background: var(--solar);
+  color: var(--ink);
+}
+/* A Meta lead's ad under its name. */
+.enq-ad {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  max-width: 100%;
+  margin-top: 3px;
+  font-size: 0.72rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.enq-ad > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.enq-ad i {
+  flex: none;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(24, 119, 242, 0.1);
+  color: #1559b8;
+}
+@media (max-width: 640px) {
+  .enq-src {
+    min-height: 40px;
+  }
+}
