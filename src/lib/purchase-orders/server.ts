@@ -7,7 +7,7 @@ import { mailbox, msConfigured } from '@/lib/ms365';
 import { readAll, withFallback } from '@/lib/projects/server';
 import { schemaReady } from '@/lib/schema-ready';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
-import { formatPence, isDay, totals, type CleanLine } from './money';
+import { formatPence, isDay, stillChanged, totals, type CleanLine } from './money';
 import type { PoPdfInput } from './pdf';
 import { matchesOrder, summariseOrders, type DeliverTo, type Office, type OrdersSummary, type PoFull, type PoJob, type PoLine, type PoListRow, type PoSuggestion, type PurchaseOrder, type Supplier } from './shared';
 
@@ -36,7 +36,7 @@ function orderRow(r: Record<string, unknown>): PurchaseOrder {
     vat_pence: num(r.vat_pence),
     gross_pence: num(r.gross_pence),
     supplier_invoice_pence: numOrNull(r.supplier_invoice_pence),
-    changed_since_sent: !!r.changed_since_sent,
+    changed_since_sent: stillChanged(String(r.status ?? ''), r.changed_since_sent),
   };
 }
 
@@ -353,7 +353,7 @@ export const orderWords = (o: Pick<PurchaseOrder, 'po_number' | 'net_pence'>, su
 export function pdfInputFor(full: PoFull, by?: string | null): PoPdfInput {
   const o = full.order;
   const today = ukDay(Date.now());
-  const again = !!o.sent_at && o.changed_since_sent;
+  const again = !!o.sent_at && stillChanged(o.status, o.changed_since_sent);
   return {
     order: o,
     lines: full.lines,

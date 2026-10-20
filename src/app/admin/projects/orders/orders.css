@@ -191,6 +191,42 @@
   color: var(--muted);
   text-align: center;
 }
+/* The job's centre column is only about 536px wide at 1280px beside the open WhatsApp dock, so the
+   Orders tab lays its rows out by the list's own width (as on phones) below 640px. The container is
+   the list, not .po-tab, so the order sheet (rendered inside .po-tab) is never inside it. The "send it
+   again" warning wraps rather than being cut off. */
+.po-tab .po-list {
+  container-type: inline-size;
+}
+.po-tab .po-who small {
+  white-space: normal;
+}
+@container (max-width: 640px) {
+  .po-tab .po-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'no chip' 'who amt' 'when when';
+    padding: 12px 14px;
+  }
+  .po-tab .po-row--head {
+    display: none;
+  }
+  .po-tab .po-no {
+    grid-area: no;
+  }
+  .po-tab .po-chipcell {
+    grid-area: chip;
+    justify-self: end;
+  }
+  .po-tab .po-who {
+    grid-area: who;
+  }
+  .po-tab .po-amt {
+    grid-area: amt;
+  }
+  .po-tab .po-when {
+    grid-area: when;
+  }
+}
 
 /* ── The order sheet ───────────────────────────────────────────────────────── */
 .crm-sheet-box:has(.po-sheet) {
@@ -619,6 +655,10 @@
   padding: 10px 1rem 12px;
   border-top: 1px solid var(--line);
   background: var(--paper);
+}
+.po-savebar__msg {
+  flex-basis: 100%;
+  margin: 0;
 }
 
 /* ── The Purchase orders page ─────────────────────────────────────────────── */

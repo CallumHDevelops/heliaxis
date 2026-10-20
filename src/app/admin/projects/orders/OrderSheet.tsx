@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   canDo,
   editable,
@@ -137,6 +137,13 @@ export function OrderSheet({
   const [busy, setBusy] = useState(false);
   const [thenSend, setThenSend] = useState(false);
 
+  // The sheet scrolls, and you're usually at the save bar when something fails: bring the error into
+  // view (`run()` clears it first, so the same error twice still scrolls).
+  const errRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (err) errRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [err]);
+
   // An existing order, or what a new one on this job starts with (and the suppliers to pick from).
   const newProject = newFor?.projectId ?? null;
   useEffect(() => {
@@ -240,7 +247,11 @@ export function OrderSheet({
           </div>
         )}
         {notice && <p className="crm-banner po-ok">{notice}</p>}
-        {err && <p className="crm-banner crm-banner--err">{err}</p>}
+        {err && (
+          <p ref={errRef} role="alert" className="crm-banner crm-banner--err">
+            {err}
+          </p>
+        )}
 
         {mode === 'edit' && draft && (
           <OrderEditor
@@ -874,6 +885,7 @@ function OrderEditor({
   const [adding, setAdding] = useState(false);
   const [problem, setProblem] = useState('');
   const [tried, setTried] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft({ ...draft, [k]: v });
   const setLine = (i: number, patch: Partial<LineDraft>) => set('lines', draft.lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const moveLine = (i: number, by: number) => {
@@ -904,7 +916,11 @@ function OrderEditor({
     setTried(true);
     const p = check();
     setProblem(p ?? '');
-    if (p) return;
+    if (p) {
+      // Take them to the first field that's marked wrong (the supplier, or a line), once it's marked.
+      requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      return;
+    }
     const lines = draft.lines
       .filter((l) => !isBlank(l))
       .map((l) => ({ description: l.description, part_number: l.part_number, qty: l.qty, unit_cost_pence: (parsePounds(l.unit) as { pence: number | null }).pence, vat_rate: l.vat_rate }));
@@ -925,6 +941,7 @@ function OrderEditor({
 
   return (
     <form
+      ref={formRef}
       className="po-edit"
       onSubmit={(ev) => {
         ev.preventDefault();
@@ -1026,6 +1043,7 @@ function OrderEditor({
               className="crm-input"
               rows={Math.min(5, Math.max(2, draft.deliver_address.split('\n').length))}
               value={draft.deliver_address}
+              aria-invalid={tried && !draft.deliver_address.trim() && !draft.deliver_postcode.trim()}
               onChange={(ev) => set('deliver_address', ev.target.value)}
               placeholder="From the job"
             />
@@ -1158,8 +1176,13 @@ function OrderEditor({
         </div>
       </div>
 
-      {problem && <p className="crm-banner crm-banner--err">{problem}</p>}
       <div className="po-savebar">
+        {/* In the bar, so it's next to the button you just tapped wherever the sheet is scrolled. */}
+        {problem && (
+          <p role="alert" className="crm-banner crm-banner--err po-savebar__msg">
+            {problem}
+          </p>
+        )}
         <button type="submit" className="crm-btn crm-btn--ghost" disabled={busy}>
           {busy ? 'Saving…' : !o || status === 'draft' ? 'Save draft' : 'Save changes'}
         </button>

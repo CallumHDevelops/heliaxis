@@ -21,6 +21,7 @@ import {
   parseQty,
   penceToInput,
   sendBlocker,
+  stillChanged,
   totals,
 } from '../src/lib/purchase-orders/money.ts';
 
@@ -131,6 +132,8 @@ eq('editing a sent order marks it changed', marksChanged('sent', ['lines']), tru
 eq('editing a confirmed order marks it changed', marksChanged('confirmed', ['required_by']), true);
 eq('our own note doesn’t', marksChanged('sent', ['internal_note', 'supplier_invoice_ref']), false);
 eq('a draft is never "changed since sent"', marksChanged('draft', ['lines']), false);
+eq('changed since sent: still to send again while open', [stillChanged('sent', true), stillChanged('confirmed', true), stillChanged('sent', false)], [true, true, false]);
+eq('changed since sent: not once delivered or cancelled', [stillChanged('delivered', true), stillChanged('cancelled', true), stillChanged('draft', true)], [false, false, false]);
 eq('draft actions', actionsFor('draft'), ['send', 'mark_sent', 'delete']);
 eq('sent actions', actionsFor('sent'), ['send', 'mark_sent', 'confirm', 'deliver', 'cancel']);
 eq('only drafts can be deleted', ['draft', 'sent', 'confirmed', 'delivered', 'cancelled'].map((s) => canDo(s, 'delete')), [true, false, false, false, false]);

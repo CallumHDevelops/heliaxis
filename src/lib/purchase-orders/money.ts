@@ -210,6 +210,11 @@ export function checkChange(status: string, keys: string[]): string | null {
 
 /** An order that's gone to the supplier and is then changed on paper needs sending again. */
 export const marksChanged = (status: string, keys: string[]) => isOpen(status) && keys.some((k) => (SUPPLIER_FIELDS as readonly string[]).includes(k));
+/**
+ * Whether it still needs sending again: only while it's out with the supplier. A delivered or
+ * cancelled order isn't sent again (the flag stays stored, so "Not delivered after all" brings it back).
+ */
+export const stillChanged = (status: string, changedSinceSent: unknown) => isOpen(status) && !!changedSinceSent;
 
 export type PoAction = 'send' | 'mark_sent' | 'confirm' | 'deliver' | 'undeliver' | 'cancel' | 'delete';
 const ACTIONS: Record<PoStatus, PoAction[]> = {
