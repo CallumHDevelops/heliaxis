@@ -15,7 +15,8 @@ import {
   windowOpen,
   type SmartRule,
 } from './shared';
-import { holdUntil, isQuiet, nextAwake, planChase } from './schedule';
+import { atWords, freeAt, holdUntil, isQuiet, nextAwake, planChase, windowClosesAt, windowShutWords } from './schedule';
+import { LATER_COLS, LATER_SETUP, sendLaterReady } from './send-later';
 import { ensureOpportunity, logActivity, markContacted } from '@/lib/crm/server';
 import { getSettings } from './settings';
 import { autoParams } from './templates';
@@ -27,7 +28,8 @@ import { saveAdIds } from '@/lib/meta-ads';
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
  * (queued in whatsapp_outbox and sent after a human-looking delay), chasers when a customer
- * goes quiet, messages typed in the WhatsApp Business app (coexistence echoes), and sending by hand.
+ * goes quiet, messages typed in the WhatsApp Business app (coexistence echoes), and sending by hand,
+ * now or later (Send later and the late-night rule: queued as 'scheduled', sent as the person).
  */
 
 type Db = ReturnType<typeof createAdminClient>;
@@ -155,6 +157,8 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   // STOP / START change their WhatsApp permission; any other message from them counts as agreeing
   // (the first time; it never undoes a STOP).
   const word = kind === 'text' ? stopWord(body) : null;
+  // A message someone scheduled stays scheduled (STOP cancels it, below), and its author hears so once.
+  if (m.type !== 'reaction') await tellScheduledAuthors(db, enquiry, word === 'stop');
   const kept = word ? await stopOrStart(db, { ...enquiry, wa_last_inbound_at: at }, m.from, word, at) : false;
   if (!word) await grantPermission(enquiry.id, 'inbound', { at });
 
@@ -229,20 +233,70 @@ async function stopOrStart(db: Db, enquiry: EnquiryWa, waId: string, word: 'stop
   return true;
 }
 
+/**
+ * The customer has written while a message someone scheduled is still waiting to go. It stays
+ * scheduled (STOP cancels it), and its author hears once per message: Cancel on the notification, and
+ * the chat a tap away to edit it or send it now.
+ */
+async function tellScheduledAuthors(db: Db, enquiry: EnquiryWa, stop: boolean) {
+  if (!(await sendLaterReady())) return;
+  const { data } = await db
+    .from('whatsapp_outbox')
+    .select('id, sent_by, send_after')
+    .eq('enquiry_id', enquiry.id)
+    .eq('kind', 'scheduled')
+    .eq('status', 'pending')
+    .is('reply_noted_at', null);
+  const now = new Date();
+  const first = (enquiry.name || '').trim().split(/\s+/)[0] || 'They';
+  for (const item of data ?? []) {
+    // Marked first, so two webhooks at once still tell them once.
+    const { data: mine } = await db
+      .from('whatsapp_outbox')
+      .update({ reply_noted_at: now.toISOString() })
+      .eq('id', item.id)
+      .is('reply_noted_at', null)
+      .select('id');
+    if (!mine?.length || !item.sent_by) continue;
+    const when = atWords(new Date(item.send_after), now);
+    await notify({
+      userId: item.sent_by,
+      kind: 'whatsapp',
+      title: stop ? `${first} replied STOP: your message for ${when} won’t go` : `${first} replied — your message for ${when} is still scheduled`,
+      body: stop ? 'Nothing goes to them automatically now. You can still message them by hand.' : 'Cancel it here, or open the chat to edit it or send it now.',
+      href: inboxHref(enquiry.id),
+      tag: `wa-later-${item.id}`,
+      ...(stop
+        ? {}
+        : {
+            actions: [
+              { action: 'outbox-cancel', title: 'Cancel message' },
+              { action: 'open', title: 'Edit' },
+            ],
+            data: { outboxId: item.id as string },
+          }),
+    });
+  }
+}
+
 /** Queue the matching smart reply, unless a person is handling this chat. */
 async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo: string) {
   if (enquiry.wa_auto_off || !text.trim()) return null;
 
   const since = new Date(Date.now() - HUMAN_TAKEOVER_MS).toISOString();
-  const { data: human } = await db
-    .from('whatsapp_messages')
-    .select('id')
-    .eq('enquiry_id', enquiry.id)
-    .eq('direction', 'out')
-    .or('sent_by.not.is.null,via.eq.whatsapp-app')
-    .gte('created_at', since)
-    .limit(1);
-  if (human?.length) return null;
+  const [{ data: human }, { data: later }] = await Promise.all([
+    db
+      .from('whatsapp_messages')
+      .select('id')
+      .eq('enquiry_id', enquiry.id)
+      .eq('direction', 'out')
+      .or('sent_by.not.is.null,via.eq.whatsapp-app')
+      .gte('created_at', since)
+      .limit(1),
+    // Someone's written a reply that's waiting to go (Send later): that's the answer.
+    db.from('whatsapp_outbox').select('id').eq('enquiry_id', enquiry.id).eq('kind', 'scheduled').eq('status', 'pending').limit(1),
+  ]);
+  if (human?.length || later?.length) return null;
 
   const { data: rules } = await db.from('whatsapp_rules').select('*').eq('enabled', true);
   const rule = matchRule(text, (rules ?? []) as SmartRule[]);
@@ -322,7 +376,7 @@ export async function handleStatus(s: Status) {
   }
 }
 
-type SendInput =
+export type SendInput =
   | { text: string }
   | { template: string; lang: string; params?: string[] };
 
@@ -392,6 +446,56 @@ export async function sendManual(enquiryId: string, userId: string, input: SendI
     if (chaseHours && chaseHours > 0) await scheduleChase(db, enquiry as EnquiryWa, { hours: chaseHours });
   }
   return r;
+}
+
+type Scheduled = { ok: true; id: string; at: string } | { ok: false; error: string; windowClosesAt?: string };
+
+/**
+ * A message a person has written, to go at `at`: Send later, or the late-night rule. It waits in the
+ * outbox as 'scheduled' with its author, and goes at that time as them (quiet hours never hold it),
+ * chased from then if `chaseHours`. A typed message must still be inside the free 24h window then
+ * (`windowClosesAt` says when it closes, so the chat can offer another way); a template can go any
+ * time. Smart replies and chasers still waiting go now: a person is handling the chat.
+ */
+export async function scheduleManual(enquiryId: string, userId: string, input: SendInput, at: Date, chaseHours?: number | null): Promise<Scheduled> {
+  if (!whatsappConfigured()) return { ok: false, error: 'WhatsApp is not connected yet — see WHATSAPP_SETUP.md.' };
+  if (!(await sendLaterReady())) return { ok: false, error: LATER_SETUP };
+  const db = createAdminClient();
+  const { data: enquiry } = await db.from('enquiries').select(ENQ_COLS).eq('id', enquiryId).maybeSingle();
+  if (!enquiry) return { ok: false, error: 'Enquiry not found' };
+  const e = enquiry as EnquiryWa;
+  if (!e.wa_id && !toWaId(e.phone)) return { ok: false, error: 'This lead has no valid mobile number.' };
+  const isText = 'text' in input;
+  if (isText && !freeAt(at, e.wa_last_inbound_at)) {
+    const close = windowClosesAt(e.wa_last_inbound_at);
+    return {
+      ok: false,
+      error: windowShutWords(e.name, e.wa_last_inbound_at, at, new Date()),
+      ...(close ? { windowClosesAt: new Date(close).toISOString() } : {}),
+    };
+  }
+  // A template is shown in the chat as the customer will see it; its blanks are kept as they were filled in.
+  const body = isText
+    ? input.text
+    : ((await templateText(input.template, input.lang, input.params ?? []).catch(() => null)) ?? `Template “${input.template}”`);
+  const { data: row, error } = await db
+    .from('whatsapp_outbox')
+    .insert({
+      enquiry_id: e.id,
+      kind: 'scheduled',
+      sent_by: userId,
+      body,
+      template_name: isText ? null : input.template,
+      template_lang: isText ? null : input.lang,
+      template_params: isText ? null : (input.params ?? []),
+      chase_hours: chaseHours && chaseHours > 0 ? chaseHours : null,
+      send_after: at.toISOString(),
+    })
+    .select('id')
+    .single();
+  if (error || !row) return { ok: false, error: error?.message || 'Not scheduled' };
+  await cancelAutomatic(db, e.id, 'A message is scheduled');
+  return { ok: true, id: row.id as string, at: at.toISOString() };
 }
 
 /** A person has replied (here or in the WhatsApp app): pending smart replies and chasers go. */
@@ -484,12 +588,13 @@ export async function processOutbox(limit = 8) {
     .eq('status', 'pending')
     .lte('send_after', new Date().toISOString())
     .order('send_after')
+    .order('created_at')
     .limit(limit);
 
   type Item = {
     id: string;
     enquiry_id: string;
-    kind: 'reply' | 'intro' | 'chase';
+    kind: 'reply' | 'intro' | 'chase' | 'scheduled';
     chase_step: number;
     rule_id: string | null;
     body: string | null;
@@ -498,24 +603,28 @@ export async function processOutbox(limit = 8) {
     reply_to: string | null;
     attempts: number;
     last_error: string | null;
+    send_after: string;
+    /** A scheduled message's (whatsapp-scheduled.sql): who wrote it, a template's blanks, and its chaser. */
+    sent_by?: string | null;
+    template_params?: string[] | null;
+    chase_hours?: number | null;
   };
+  // Asking for columns that aren't there yet would fail every claim, so only once the SQL has been run.
+  const cols = `id, enquiry_id, kind, chase_step, rule_id, body, template_name, template_lang, reply_to, attempts, last_error, send_after${
+    (await sendLaterReady()) ? `, ${LATER_COLS}` : ''
+  }`;
   const picked: Item[] = [];
   for (const { id } of due ?? []) {
-    const { data } = await db
-      .from('whatsapp_outbox')
-      .update({ status: 'sending' })
-      .eq('id', id)
-      .eq('status', 'pending')
-      .select('id, enquiry_id, kind, chase_step, rule_id, body, template_name, template_lang, reply_to, attempts, last_error')
-      .maybeSingle();
-    if (data) picked.push(data as Item);
+    const { data } = await db.from('whatsapp_outbox').update({ status: 'sending' }).eq('id', id).eq('status', 'pending').select(cols).maybeSingle();
+    if (data) picked.push(data as unknown as Item);
   }
   if (!picked.length) return { sent: 0, failed: 0 };
   const settings = await getSettings();
 
   // The safety net: nothing goes on its own in quiet hours, and no chaser before the evening rule
   // allows (from our last message in the chat). It waits for the right time instead, so chasers
-  // queued under older rules, or made due by a late run, follow today's settings too.
+  // queued under older rules, or made due by a late run, follow today's settings too. A message a
+  // person scheduled is never held: its time was their choice.
   const claimed: Item[] = [];
   let held = 0;
   for (const item of picked) {
@@ -552,19 +661,38 @@ export async function processOutbox(limit = 8) {
       continue;
     }
     const e = enquiry as EnquiryWa;
+    const scheduled = item.kind === 'scheduled';
+    // When it goes wrong: a scheduled message's author hears; the team for everything else.
+    const tell = (title: string, body: string) =>
+      scheduled && item.sent_by
+        ? notify({ userId: item.sent_by, kind: 'whatsapp', title, body, href: inboxHref(item.enquiry_id), tag: `wa-later-${item.id}` })
+        : notifyEnquiryTeam(title, body, inboxHref(item.enquiry_id));
     const giveUp = async (title: string, error: string) => {
       failed++;
       await db.from('whatsapp_outbox').update({ status: 'failed', attempts: item.attempts + 1, last_error: error }).eq('id', item.id);
-      await notifyEnquiryTeam(title, error, inboxHref(item.enquiry_id));
+      await tell(title, error);
     };
-    // Everything in the outbox is automatic: check permission again just before it goes.
-    const permission = await waPermission(e.id);
+    // Automatic messages: check permission again just before they go. A scheduled message was written
+    // by a person, so it goes as if they'd pressed Send then (no permission check, as by hand).
+    const permission = scheduled ? { allowed: true, reason: '' } : await waPermission(e.id);
     if (!permission.allowed) {
       await db.from('whatsapp_outbox').update({ status: 'cancelled', last_error: `Not sent: ${permission.reason}` }).eq('id', item.id);
       continue;
     }
     let input: SendInput;
-    if (item.kind === 'chase' && !windowOpen(e.wa_last_inbound_at)) {
+    if (scheduled && !item.template_name && !windowOpen(e.wa_last_inbound_at)) {
+      // They've gone quiet since it was scheduled: past the free window WhatsApp only takes a template.
+      const first = (e.name || '').trim().split(/\s+/)[0];
+      await giveUp(
+        `Your WhatsApp to ${e.name} didn’t go`,
+        `Not sent: ${first || 'they'} ${first ? 'hasn’t' : 'haven’t'} messaged in the last 24 hours, so WhatsApp won’t take a typed message now. Open the chat to send it as a template instead.`
+      );
+      continue;
+    } else if (scheduled) {
+      input = item.template_name
+        ? { template: item.template_name, lang: item.template_lang || defaultTemplate().lang, params: item.template_params ?? [] }
+        : { text: item.body || '' };
+    } else if (item.kind === 'chase' && !windowOpen(e.wa_last_inbound_at)) {
       // Past the free window: WhatsApp only allows a template now.
       const name = settings.chaseTemplate || process.env.WHATSAPP_CHASE_TEMPLATE || settings.firstContactTemplate || defaultTemplate().name;
       if (!name) {
@@ -588,10 +716,17 @@ export async function processOutbox(limit = 8) {
     } else {
       input = { text: item.body || '' };
     }
-    const r = await deliver(db, e, input, { ruleId: item.rule_id, via: item.kind === 'chase' ? 'chase' : null });
+    // A scheduled message goes as its author (their name on it, counts as a person replying).
+    const r = await deliver(db, e, input, scheduled ? { sentBy: item.sent_by ?? null } : { ruleId: item.rule_id, via: item.kind === 'chase' ? 'chase' : null });
     if (r.ok) {
       sent++;
       await db.from('whatsapp_outbox').update({ status: 'sent', attempts: item.attempts + 1 }).eq('id', item.id);
+      if (scheduled) {
+        // As when a person presses Send: what's automatic stands down, and the chaser counts from now.
+        await cancelAutomatic(db, e.id, 'Replied by hand');
+        if (Number(item.chase_hours) > 0) await scheduleChase(db, e, { hours: Number(item.chase_hours) });
+        continue;
+      }
       if (item.kind === 'intro') await db.from('enquiries').update({ status: 'contacted' }).eq('id', item.enquiry_id).eq('status', 'new');
       await afterAutoSend(db, e, item, settings);
     } else {
@@ -608,7 +743,7 @@ export async function processOutbox(limit = 8) {
             : { status: 'failed', attempts, last_error: r.error }
         )
         .eq('id', item.id);
-      if (!retry) await notifyEnquiryTeam(`WhatsApp reply to ${(enquiry as EnquiryWa).name} failed`, r.error, inboxHref(item.enquiry_id));
+      if (!retry) await tell(scheduled ? `Your WhatsApp to ${e.name} didn’t go` : `WhatsApp reply to ${e.name} failed`, r.error);
     }
   }
   return { sent, failed, held };
@@ -696,7 +831,8 @@ export async function remindUnanswered() {
     if (e.wa_reminded_at && e.wa_reminded_at >= e.wa_last_inbound_at) continue;
     const [{ data: out }, { data: queued }] = await Promise.all([
       db.from('whatsapp_messages').select('id').eq('enquiry_id', e.id).eq('direction', 'out').gte('created_at', e.wa_last_inbound_at).limit(1),
-      db.from('whatsapp_outbox').select('id').eq('enquiry_id', e.id).eq('status', 'pending').eq('kind', 'reply').limit(1),
+      // A smart reply on its way, or a reply someone has scheduled: they're not waiting on us.
+      db.from('whatsapp_outbox').select('id').eq('enquiry_id', e.id).eq('status', 'pending').in('kind', ['reply', 'scheduled']).limit(1),
     ]);
     await db.from('enquiries').update({ wa_reminded_at: new Date().toISOString() }).eq('id', e.id);
     if (out?.length || queued?.length) continue;

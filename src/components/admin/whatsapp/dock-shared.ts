@@ -101,12 +101,14 @@ export type ActiveChat = {
   postcode: string | null;
   last: { direction: 'in' | 'out'; body: string | null; kind: string; at: string } | null;
   unread: number;
-  /** They wrote last and nothing is queued. */
+  /** They wrote last and nothing is queued or scheduled. */
   needsReply: boolean;
   /** The free 24-hour reply window: their last message plus 24h (null = never messaged us). */
   windowClosesAt: string | null;
   queued: boolean;
   chasing: boolean;
+  /** When the next message someone has scheduled goes (Send later), or null. */
+  scheduledAt: string | null;
   /** The latest open opportunity on this number (not Complete or Lost). */
   project: { id: string; ref: string | null; stage: string; title: string } | null;
   /** Any opportunity at all, open or not. */

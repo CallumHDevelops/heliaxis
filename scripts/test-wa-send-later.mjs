@@ -5,6 +5,7 @@
 // against when it goes; chasers counted from when it goes; and the outbox never holding a message a
 // person scheduled.
 // Usage: node --experimental-strip-types scripts/test-wa-send-later.mjs
+import { readFileSync } from 'node:fs';
 import {
   atWords,
   chaseView,
@@ -18,6 +19,7 @@ import {
   shortAt,
   ukInput,
   windowClosesAt,
+  windowShutWords,
 } from '../src/lib/whatsapp/schedule.ts';
 import { cleanSettings, DEFAULT_SETTINGS, hhmm } from '../src/lib/whatsapp/settings-shared.ts';
 
@@ -163,6 +165,24 @@ eq('the last time worth offering: 00:55', uk(lastFreeAt(inbound, now)), 'Wed 21 
 eq('…on a 5-minute mark (window closes 00:58)', uk(lastFreeAt('2026-10-20T00:58:00+01:00', now)), 'Wed 21 Oct 00:50');
 eq('…none when it has nearly gone', lastFreeAt('2026-10-19T23:55:00+01:00', now), null);
 eq('…none for someone who never wrote', lastFreeAt(null, now), null);
+const seven = at('2026-10-21T07:00:00+01:00');
+eq(
+  'said plainly',
+  windowShutWords('David Clement', inbound, seven, now),
+  'David’s free 24-hour window closes at 01:00 tonight, before 07:00 tomorrow. After that WhatsApp only takes an approved template, until David messages again.'
+);
+eq(
+  'without a name',
+  windowShutWords('', inbound, seven, now),
+  'Their free 24-hour window closes at 01:00 tonight, before 07:00 tomorrow. After that WhatsApp only takes an approved template, until they message again.'
+);
+eq('already closed', windowShutWords('David', '2026-10-19T09:00:00+01:00', seven, now), 'David’s free 24-hour window has closed, so WhatsApp only takes an approved template until David messages again.');
+eq('never messaged', windowShutWords('David', null, seven, now), 'David hasn’t messaged this number yet, so WhatsApp only takes an approved template.');
+
+// The database allows the new kind, and running whatsapp-chasers.sql again keeps it.
+const kinds = (file) => /whatsapp_outbox_kind_check check \(kind in \(([^)]*)\)\)/.exec(readFileSync(new URL(`../supabase/${file}`, import.meta.url), 'utf8'))?.[1];
+eq('whatsapp-scheduled.sql adds “scheduled”', kinds('whatsapp-scheduled.sql'), "'reply','intro','chase','scheduled'");
+eq('whatsapp-chasers.sql keeps it', kinds('whatsapp-chasers.sql'), "'reply','intro','chase','scheduled'");
 
 // A chaser picked with a message that goes later counts from when it goes.
 const V = chaseView(S);

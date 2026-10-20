@@ -314,6 +314,21 @@ export function freeAt(at: Date, lastInboundAt: string | null | undefined): bool
 }
 
 /**
+ * Why a typed message can't go at `at`, in plain words: "David’s free 24-hour window closes at 01:00
+ * tonight, before 07:00 tomorrow. After that WhatsApp only takes an approved template, until David
+ * messages again." For the chat, the job's WhatsApp sheet and the server's answer alike.
+ */
+export function windowShutWords(name: string | null | undefined, lastInboundAt: string | null | undefined, at: Date, now: Date): string {
+  const first = (name || '').trim().split(/\s+/)[0];
+  const whose = first ? `${first}’s` : 'Their';
+  const close = windowClosesAt(lastInboundAt);
+  const until = `until ${first || 'they'} ${first ? 'messages' : 'message'} again`;
+  if (close === null) return `${first || 'They'} ${first ? 'hasn’t' : 'haven’t'} messaged this number yet, so WhatsApp only takes an approved template.`;
+  if (close <= now.getTime()) return `${whose} free 24-hour window has closed, so WhatsApp only takes an approved template ${until}.`;
+  return `${whose} free 24-hour window closes at ${atWords(new Date(close), now)}, before ${atWords(at, now)}. After that WhatsApp only takes an approved template, ${until}.`;
+}
+
+/**
  * The latest time worth offering inside the window: 5 minutes before it closes, on a 5-minute mark.
  * Null when that has gone (or nearly: under 2 minutes away), or they've never messaged.
  */

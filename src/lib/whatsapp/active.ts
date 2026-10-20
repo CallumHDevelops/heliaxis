@@ -37,7 +37,7 @@ type Enq = {
   customer_ref?: string | null;
 };
 type Proj = { id: string; enquiry_id: string; title: string | null; stage: string; created_at: string; project_ref?: string | null };
-type Pending = { enquiry_id: string; kind: string };
+type Pending = { enquiry_id: string; kind: string; send_after: string };
 type PgError = { code?: string; message?: string } | null;
 type Rows<T> = { data: T[] | null; error: PgError };
 /** A row before its last-message preview is read. */
@@ -92,7 +92,7 @@ async function projectsFor(db: Db, enquiryIds: string[]): Promise<Proj[]> {
 
 async function pendingFor(db: Db, enquiryIds: string[]): Promise<Pending[]> {
   return inBatches(enquiryIds, async (batch) => {
-    const { data } = await db.from('whatsapp_outbox').select('enquiry_id, kind').in('enquiry_id', batch).eq('status', 'pending');
+    const { data } = await db.from('whatsapp_outbox').select('enquiry_id, kind, send_after').in('enquiry_id', batch).eq('status', 'pending');
     return (data ?? []) as Pending[];
   });
 }
@@ -110,6 +110,11 @@ function buildDrafts(enquiries: Enq[], projects: Proj[], pending: Pending[], sco
   for (const p of projects) projectsOf.set(p.enquiry_id, [...(projectsOf.get(p.enquiry_id) ?? []), p]);
   const kindsOf = new Map<string, Set<string>>();
   for (const p of pending) kindsOf.set(p.enquiry_id, (kindsOf.get(p.enquiry_id) ?? new Set()).add(p.kind));
+  // The next message someone has scheduled for each enquiry (Send later).
+  const laterOf = new Map<string, string>();
+  for (const p of pending) {
+    if (p.kind === 'scheduled' && (!laterOf.has(p.enquiry_id) || p.send_after < laterOf.get(p.enquiry_id)!)) laterOf.set(p.enquiry_id, p.send_after);
+  }
 
   const drafts: Draft[] = [];
   for (const group of groups.values()) {
@@ -121,6 +126,7 @@ function buildDrafts(enquiries: Enq[], projects: Proj[], pending: Pending[], sco
     const open = theirs.find((p) => !CLOSED.has(p.stage)) ?? null;
     const kinds = new Set(ids.flatMap((id) => [...(kindsOf.get(id) ?? [])]));
     const queued = kinds.has('reply') || kinds.has('intro');
+    const scheduledAt = ids.map((id) => laterOf.get(id)).filter((x): x is string => !!x).sort()[0] ?? null;
     const lastAt = latest(group.map((e) => e.wa_last_message_at));
     const lastInbound = latest(group.map((e) => e.wa_last_inbound_at));
     // Their message is the newest (an incoming message sets both times; ours only the last one).
@@ -136,10 +142,12 @@ function buildDrafts(enquiries: Enq[], projects: Proj[], pending: Pending[], sco
       customerRef: owner.customer_ref ?? group.find((e) => e.customer_ref)?.customer_ref ?? null,
       postcode: owner.postcode ?? group.find((e) => e.postcode)?.postcode ?? null,
       unread: group.reduce((n, e) => n + (e.wa_unread ?? 0), 0),
-      needsReply: theyWroteLast && !queued,
+      // A reply someone has scheduled answers them too.
+      needsReply: theyWroteLast && !queued && !scheduledAt,
       windowClosesAt: lastInbound ? new Date(new Date(lastInbound).getTime() + SERVICE_WINDOW_MS).toISOString() : null,
       queued,
       chasing: kinds.has('chase'),
+      scheduledAt,
       project: open ? { id: open.id, ref: open.project_ref ?? null, stage: open.stage, title: open.title ?? '' } : null,
       hasProject: theirs.length > 0,
       lastAt,
@@ -254,7 +262,7 @@ export async function activeChats(
   const drafts = sortDrafts(await draftsFor(db, recent, scope));
 
   const v = hash(
-    drafts.map((d) => [d.threadId, d.enquiryIds, d.unread, d.lastAt, d.queued, d.chasing, d.name, d.customerRef, d.project?.id, d.project?.stage, d.project?.ref, d.hasProject])
+    drafts.map((d) => [d.threadId, d.enquiryIds, d.unread, d.lastAt, d.queued, d.chasing, d.scheduledAt, d.name, d.customerRef, d.project?.id, d.project?.stage, d.project?.ref, d.hasProject])
   );
   if (opts.known && opts.known === v) return { same: true, v };
 

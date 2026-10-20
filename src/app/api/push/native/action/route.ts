@@ -17,9 +17,10 @@ export async function POST(req: Request) {
   if (!act) return NextResponse.json({ ok: false, message: 'That button has expired. Open the chat.' }, { status: 403, headers: NO_STORE });
 
   if (act.action === 'outbox-cancel') {
-    return (await cancelQueued(act.outboxId))
-      ? NextResponse.json({ ok: true, message: 'Smart reply cancelled' }, { headers: NO_STORE })
-      : NextResponse.json({ ok: false, message: 'Too late: that reply has already gone' }, { status: 409, headers: NO_STORE });
+    const kind = await cancelQueued(act.outboxId);
+    return kind
+      ? NextResponse.json({ ok: true, message: kind === 'scheduled' ? 'Cancelled: that message won’t go' : 'Smart reply cancelled' }, { headers: NO_STORE })
+      : NextResponse.json({ ok: false, message: 'Too late: that message has already gone' }, { status: 409, headers: NO_STORE });
   }
   if (!(await markSendNow(act.outboxId))) {
     return NextResponse.json({ ok: false, message: 'Already sent or cancelled' }, { status: 409, headers: NO_STORE });

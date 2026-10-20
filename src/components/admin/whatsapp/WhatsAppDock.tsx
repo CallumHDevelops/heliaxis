@@ -77,6 +77,7 @@ function rowFromJob(job: DockJob, canInbox: boolean): ActiveChat {
     windowClosesAt: null,
     queued: false,
     chasing: false,
+    scheduledAt: null,
     project: { id: job.projectId, ref: job.ref, stage: job.stage, title: job.name },
     hasProject: true,
     chatHref: canInbox ? `/admin/enquiries/inbox/${threadId}` : `/admin/crm/chats/${threadId}`,
