@@ -6,20 +6,24 @@ import { useState, type MouseEvent, type ReactNode } from 'react';
 import { stageLabel } from '@/lib/crm/stages';
 import { useNow } from '@/lib/use-now';
 import { shownBody } from '@/lib/whatsapp/describe';
-import { chatMatches, initialsOf, shortAgo, windowPill, type ActiveChat, type ActiveCounts, type ChatFilter } from './dock-shared';
+import { chatMatches, initialsOf, mergeChats, shortAgo, windowPill, type ActiveChat, type ActiveCounts, type ChatFilter } from './dock-shared';
 import { useActiveChats } from './use-active-chats';
+import { useAllChats, useChatSearch } from './use-all-chats';
 import './dock.css';
 
 /**
  * The WhatsApp chat list and the bar above an open chat, shared by the dock's Chats tab and the CRM's
- * own chats page (/admin/crm/chats, for CRM staff without the Enquiries inbox).
+ * own chats page (/admin/crm/chats, for CRM staff without the Enquiries inbox). The chips work on the
+ * live list (the last 14 days), except All chats: everyone with WhatsApp history, imported chats too.
+ * The search box looks through all of them.
  */
 
-const FILTERS: [ChatFilter, string, keyof ActiveCounts][] = [
+const FILTERS: [ChatFilter, string, keyof ActiveCounts | null][] = [
   ['needs_reply', 'Needs reply', 'needsReply'],
   ['unread', 'Unread', 'unread'],
   ['all', 'All active', 'active'],
   ['waiting', 'Waiting on them', 'waiting'],
+  ['everyone', 'All chats', null],
 ];
 const PAGE = 15;
 
@@ -28,6 +32,7 @@ const keep: Record<ChatFilter, (r: ActiveChat) => boolean> = {
   unread: (r) => r.unread > 0,
   all: () => true,
   waiting: (r) => r.last?.direction === 'out',
+  everyone: () => true,
 };
 
 /** Needs reply while anyone does, otherwise everyone. */
@@ -87,8 +92,22 @@ export function ChatList({ mode, rows, counts, error, canCrm, filter, onFilter, 
   const f = filter ?? defaultFilter(counts);
   const all = rows ?? [];
   const searching = query.trim().length > 0;
-  // A search looks through everyone; the chips narrow the list otherwise.
-  const list = searching ? all.filter((r) => chatMatches(query, r)) : all.filter(keep[f]);
+  const everyone = useAllChats(f === 'everyone' && !searching);
+  const found = useChatSearch(query);
+  // A search looks through every chat (what's loaded now, then the server's answer); the chips narrow
+  // the live list, and All chats lays it over everyone else.
+  const list = searching
+    ? mergeChats(mergeChats(all, everyone.rows ?? []).filter((r) => chatMatches(query, r)), found.rows)
+    : f === 'everyone'
+      ? mergeChats(all, everyone.rows ?? [])
+      : all.filter(keep[f]);
+  const pick = (key: ChatFilter) => {
+    onQuery('');
+    onFilter(key);
+    setShown(PAGE);
+    // All chats again: fresh from the server.
+    if (key === 'everyone') everyone.reload();
+  };
 
   /** "Not in the CRM": makes an opportunity for them (or opens the one they have) and goes there. */
   async function createOpportunity(r: ActiveChat) {
@@ -110,15 +129,41 @@ export function ChatList({ mode, rows, counts, error, canCrm, filter, onFilter, 
     }
   }
 
+  const olderChats = (text: string) => (
+    <button type="button" className="hxd-more" onClick={() => pick('everyone')}>
+      {text}
+    </button>
+  );
+
   let body: ReactNode;
   if (rows === null) body = <p className="hxd-empty">{error || 'Loading chats…'}</p>;
-  else if (!all.length) body = <p className="hxd-empty">No WhatsApp chats in the last 14 days.</p>;
-  else if (!list.length)
+  else if (!list.length && searching)
+    body = <p className="hxd-empty">{found.pending ? 'Searching every chat…' : `No chats match “${query.trim()}”.`}</p>;
+  else if (!list.length && f === 'everyone')
+    // A page can come back with nobody this person may see (CRM staff only see customers with a job),
+    // so older chats are still offered.
     body = (
-      <p className="hxd-empty">
-        {searching ? `No chats match “${query.trim()}”.` : f === 'needs_reply' ? 'All replied ✓' : f === 'unread' ? 'Nothing unread.' : 'Nobody here right now.'}
-      </p>
+      <>
+        <p className="hxd-empty">
+          {everyone.error || (everyone.rows === null ? 'Loading every chat…' : everyone.hasMore ? 'Nobody to show in the newest chats.' : 'No WhatsApp chats yet.')}
+        </p>
+        {everyone.hasMore && (
+          <button type="button" className="hxd-more" disabled={everyone.busy} onClick={() => void everyone.more()}>
+            {everyone.busy ? 'Loading…' : 'Show older chats'}
+          </button>
+        )}
+      </>
     );
+  // Only while the live list is what's showing: All chats and a search draw their own rows below.
+  else if (!all.length && !searching && f !== 'everyone')
+    body = (
+      <>
+        <p className="hxd-empty">No WhatsApp chats in the last 14 days.</p>
+        {olderChats('See all chats, imported ones too →')}
+      </>
+    );
+  else if (!list.length)
+    body = <p className="hxd-empty">{f === 'needs_reply' ? 'All replied ✓' : f === 'unread' ? 'Nothing unread.' : 'Nobody here right now.'}</p>;
   else
     body = (
       <>
@@ -173,10 +218,20 @@ export function ChatList({ mode, rows, counts, error, canCrm, filter, onFilter, 
             );
           })}
         </ul>
-        {list.length > shown && (
+        {list.length > shown ? (
           <button type="button" className="hxd-more" onClick={() => setShown((n) => n + PAGE)}>
             Show more ({list.length - shown})
           </button>
+        ) : searching ? (
+          found.pending && <p className="hxd-empty hxd-empty--more">Searching every chat…</p>
+        ) : f === 'everyone' ? (
+          everyone.hasMore && (
+            <button type="button" className="hxd-more" disabled={everyone.busy} onClick={() => void everyone.more().then(() => setShown((n) => n + PAGE))}>
+              {everyone.busy ? 'Loading…' : 'Show older chats'}
+            </button>
+          )
+        ) : (
+          f === 'all' && olderChats('Older chats, imported ones too: All chats →')
         )}
       </>
     );
@@ -191,22 +246,18 @@ export function ChatList({ mode, rows, counts, error, canCrm, filter, onFilter, 
               type="button"
               className={!searching && f === key ? 'on' : ''}
               aria-pressed={!searching && f === key}
-              onClick={() => {
-                onQuery('');
-                onFilter(key);
-                setShown(PAGE);
-              }}
+              onClick={() => pick(key)}
             >
               {label}
-              {counts && <span>{counts[count]}</span>}
+              {counts && count && <span>{counts[count]}</span>}
             </button>
           ))}
         </div>
         <input
           type="search"
           className="hxd-search"
-          placeholder="Name, number or HX-ref"
-          aria-label="Search chats by name, number or HX-ref"
+          placeholder="Search every chat: name, number or HX-ref"
+          aria-label="Search every chat by name, number or HX-ref"
           value={query}
           onChange={(e) => {
             onQuery(e.target.value);

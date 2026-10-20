@@ -56,9 +56,14 @@ export async function logActivity(a: {
 /**
  * Speed to lead: the first time anyone contacts the customer (WhatsApp, a logged call or visit, an
  * email). Their "new lead" and "hasn't been contacted" notifications go, for everyone. Ignores
- * missing CRM tables.
+ * missing CRM tables. `note` goes on the timeline's stage line ("we got in touch" unless given);
+ * returns how many jobs moved to Contacted.
  */
-export async function markContacted(where: { projectId: string } | { enquiryId: string }, at = new Date().toISOString()) {
+export async function markContacted(
+  where: { projectId: string } | { enquiryId: string },
+  at = new Date().toISOString(),
+  opts: { note?: string; byId?: string | null } = {}
+): Promise<number> {
   try {
     const update = createAdminClient().from('crm_projects').update({ first_contact_at: at }).is('first_contact_at', null);
     const q = 'projectId' in where ? update.eq('id', where.projectId) : update.eq('enquiry_id', where.enquiryId);
@@ -66,7 +71,7 @@ export async function markContacted(where: { projectId: string } | { enquiryId: 
     if (error) {
       // No CRM tables yet: a new lead's notifications can still go.
       if ('enquiryId' in where) await clearLeadNotifications(where.enquiryId, []);
-      return;
+      return 0;
     }
     const byEnquiry = new Map<string, string[]>();
     for (const p of data ?? []) byEnquiry.set(p.enquiry_id, [...(byEnquiry.get(p.enquiry_id) ?? []), p.id]);
@@ -75,12 +80,17 @@ export async function markContacted(where: { projectId: string } | { enquiryId: 
     // We've been in touch, so a job still at Lead moves to Contacted (never back from further on).
     const atLead = createAdminClient().from('crm_projects').select('id').eq('stage', 'lead');
     const { data: leads } = await ('projectId' in where ? atLead.eq('id', where.projectId) : atLead.eq('enquiry_id', where.enquiryId));
+    let moved = 0;
     if (leads?.length) {
       const { applyStageEvent } = await import('./move-stage');
-      for (const p of leads) await applyStageEvent(p.id, 'contacted', { note: 'we got in touch' });
+      for (const p of leads) {
+        if ((await applyStageEvent(p.id, 'contacted', { note: opts.note ?? 'we got in touch', byId: opts.byId ?? null })).moved) moved++;
+      }
     }
+    return moved;
   } catch {
     // never block the caller
+    return 0;
   }
 }
 

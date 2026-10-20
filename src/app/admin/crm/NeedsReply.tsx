@@ -66,10 +66,10 @@ export function NeedsReply({ rows, missing, now, canInbox }: { rows: ActiveChat[
         href={allHref}
         className="crmh-cardlink"
         onClick={(e) => {
-          if (openDock({ tab: 'chats' })) e.preventDefault();
+          if (openDock({ tab: 'chats', filter: 'everyone' })) e.preventDefault();
         }}
       >
-        All chats ({rows.length}) <span aria-hidden="true">→</span>
+        All chats <span aria-hidden="true">→</span>
       </Link>
     </section>
   );

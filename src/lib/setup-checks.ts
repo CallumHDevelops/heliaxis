@@ -470,6 +470,21 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     optional: true,
     manual: true,
   });
+  const chatsIndex = sql(
+    'whatsapp-feed-index.sql',
+    'Makes the WhatsApp rows in Latest notes on the CRM home load faster once there are lots of messages, imported chats included. Nothing depends on it.',
+    39,
+    'whatsapp.sql'
+  );
+  add(whatsapp && crm && !done.includes(chatsIndex.id), {
+    ...chatsIndex,
+    title: 'Speed up WhatsApp in Latest notes',
+    steps: chatsIndex.steps.map((s) =>
+      s.startsWith('Come back here') ? 'Then tick this (**✓ I’ve done this**): the app can’t check this one by itself, so it goes once ticked.' : s
+    ),
+    optional: true,
+    manual: true,
+  });
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

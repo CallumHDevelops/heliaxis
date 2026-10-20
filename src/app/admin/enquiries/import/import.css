@@ -22,3 +22,6 @@
 .imp-ok { color: var(--ok); font-size: 0.85rem; }
 .imp-err { color: var(--bad); font-size: 0.85rem; }
 .imp-steps { margin: 0 0 0.8rem; padding-left: 1.2rem; color: #4a473e; font-size: 0.88rem; line-height: 1.55; }
+/* The catch-up line sits on its own just above the WhatsApp card (and takes no room when it's hidden). */
+.imp-catchup:has(.hx-catchup) { margin: 0 0 16px; }
+.imp-catchup .hx-catchup { margin: 0; }
