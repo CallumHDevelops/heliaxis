@@ -4,6 +4,7 @@ import { HubMyDay } from './HubMyDay';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import { HubMetaLeads } from './HubMetaLeads';
+import { HubSearch } from '@/components/admin/GlobalSearch';
 import type { HubMetaLeads as MetaLeads } from './meta-leads';
 import './hub.css';
 
@@ -131,6 +132,7 @@ export function HubView({
   setup = { todos: [] },
   assistant = false,
   metaLeads = null,
+  search = false,
 }: {
   firstName: string;
   portals: HubPortal[];
@@ -149,6 +151,8 @@ export function HubView({
   assistant?: boolean;
   /** New Meta leads (Enquiries and CRM staff); null hides it. */
   metaLeads?: MetaLeads | null;
+  /** The search box under the greeting (Enquiries and CRM staff). */
+  search?: boolean;
 }) {
   const isAdmin = usersBadge !== undefined;
   const internal = portals.filter((p) => !p.external);
@@ -181,6 +185,8 @@ export function HubView({
         </div>
         <a className="hub-live" href="/" target="_blank" rel="noopener noreferrer">View live site ↗</a>
       </header>
+
+      {search && <HubSearch />}
 
       {denied && (
         <p className="hub-banner">You don&apos;t have access to that area. Ask an admin to add it to your account.</p>

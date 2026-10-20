@@ -1,0 +1,325 @@
+/* Search customers and projects (GlobalSearch.tsx): the dashboard's box, the header's button and its pop-up. */
+.gs {
+  position: relative;
+  color: #211f18;
+}
+.gs-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: 0 0.9rem;
+  background: #fff;
+  border: 1px solid rgba(33, 31, 24, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(33, 31, 24, 0.05);
+  color: #6e6a5e;
+  cursor: text;
+}
+.gs-field:focus-within {
+  border-color: #211f18;
+  box-shadow: 0 0 0 3px rgba(248, 188, 30, 0.35);
+}
+.gs-field svg {
+  flex: none;
+}
+.gs-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.8rem 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #211f18;
+  font: inherit;
+  font-size: 1rem; /* 16px: phones don't zoom in on it */
+  text-overflow: ellipsis;
+}
+.gs-field input::placeholder {
+  color: #858071;
+}
+/* Our own ×, in the brand's colours (the browser's is blue). */
+.gs-field input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.gs-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(33, 31, 24, 0.07);
+  color: #4a463b;
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.gs-clear:hover {
+  background: rgba(33, 31, 24, 0.13);
+  color: #211f18;
+}
+.gs-clear:focus-visible {
+  outline: 2px solid #211f18;
+  outline-offset: 1px;
+}
+/* What you can search by: the placeholder says it, but it's cut short on phones. */
+.gs-tip {
+  display: none;
+  margin: 6px 2px 0;
+  font-size: 0.78rem;
+  color: #6e6a5e;
+}
+/* Touch screens: no keyboard hints. */
+@media (pointer: coarse) {
+  .gs-field kbd,
+  .gs-keys {
+    display: none;
+  }
+}
+.gs-field kbd,
+.gs-keys kbd,
+.hx-search__kbd {
+  flex: none;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  padding: 0 6px;
+  border: 1px solid rgba(33, 31, 24, 0.2);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fffdf8;
+  color: #6e6a5e;
+}
+
+/* The list: drops under the dashboard's box, sits under the box in the pop-up. */
+.gs-pop {
+  background: #fffdf8;
+  border: 1px solid rgba(33, 31, 24, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(33, 31, 24, 0.16);
+  overflow: hidden;
+}
+.gs--inline .gs-pop {
+  position: absolute;
+  /* Just under the box (the tip under it on phones is covered). */
+  top: calc(52px + 6px);
+  left: 0;
+  right: 0;
+  z-index: 35;
+}
+.gs--overlay .gs-pop {
+  margin-top: 8px;
+}
+.gs-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gs-list:empty {
+  display: none;
+}
+.gs-list.is-stale {
+  opacity: 0.55;
+}
+.gs-opt.is-person + .gs-opt.is-person,
+.gs-opt.is-job + .gs-opt.is-person {
+  border-top: 1px solid rgba(33, 31, 24, 0.08);
+}
+.gs-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 50px;
+  box-sizing: border-box;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+.gs-opt.on .gs-row {
+  background: rgba(248, 188, 30, 0.2);
+}
+.gs-opt[aria-disabled] .gs-row {
+  cursor: default;
+}
+.gs-opt[aria-disabled] .gs-main b {
+  color: #6e6a5e;
+}
+/* A person's jobs, indented under them. */
+.gs-opt.is-job .gs-row {
+  position: relative;
+  min-height: 44px;
+  margin-left: 1.2rem;
+  padding-left: 0.95rem;
+}
+.gs-opt.is-job .gs-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  border-left: 2px solid rgba(33, 31, 24, 0.16);
+}
+.gs-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gs-main b,
+.gs-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gs-main b {
+  font-size: 0.95rem;
+}
+.gs-opt.is-job .gs-main b {
+  font-size: 0.88rem;
+}
+.gs-main small {
+  font-size: 0.8rem;
+  color: #6e6a5e;
+}
+.gs-ref {
+  margin-left: 0.45rem;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6e6a5e;
+}
+.gs-hint {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(33, 31, 24, 0.06);
+  color: #4a463b;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.gs-opt.on .gs-hint {
+  background: #211f18;
+  color: #f8bc1e;
+}
+.gs-morejobs {
+  display: block;
+  margin: 0 0 6px 2.15rem;
+  font-size: 0.75rem;
+  color: #6e6a5e;
+}
+.gs-status {
+  margin: 0;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.88rem;
+  color: #6e6a5e;
+}
+.gs-keys {
+  margin: 0;
+  padding: 0.5rem 0.95rem;
+  border-top: 1px solid rgba(33, 31, 24, 0.08);
+  font-size: 0.75rem;
+  color: #6e6a5e;
+}
+.gs-keys kbd {
+  margin-right: 2px;
+}
+
+/* The dashboard's box, under the greeting. */
+.hub-search {
+  margin: 0 0 1.5rem;
+}
+
+/* The header's Search button (desktop: the phone header has no room, and the dashboard has its box). */
+.hx-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 0.55rem 0 0.75rem;
+  border: 1px solid rgba(33, 31, 24, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: #6e6a5e;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hx-search:hover {
+  color: #211f18;
+  border-color: rgba(33, 31, 24, 0.35);
+}
+.hx-search:focus-visible {
+  outline: 2px solid #211f18;
+  outline-offset: 2px;
+}
+@media (max-width: 1180px) {
+  .hx-search {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .hx-search__label,
+  .hx-search__kbd {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .hx-search {
+    display: none;
+  }
+}
+
+/* The pop-up: over everything, the WhatsApp dock too. */
+.gs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: rgba(20, 18, 12, 0.38);
+  animation: gs-fade 0.14s ease-out;
+}
+.gs-dialog {
+  width: min(640px, 100%);
+}
+@keyframes gs-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gs-overlay {
+    animation: none;
+  }
+}
+@media (max-width: 560px) {
+  .hub-search {
+    margin-bottom: 1.1rem;
+  }
+  .gs-tip {
+    display: block;
+  }
+  .gs-overlay {
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+  .gs-hint {
+    max-width: 34%;
+  }
+}

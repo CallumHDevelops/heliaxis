@@ -297,6 +297,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         }}
         assistant={keys.includes('crm')}
         metaLeads={metaLeads}
+        search={keys.includes('enquiries') || keys.includes('crm')}
       />
     </AdminShell>
   );

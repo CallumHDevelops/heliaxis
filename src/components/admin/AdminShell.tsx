@@ -7,6 +7,7 @@ import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
 import { unreadPeople } from '@/lib/whatsapp/active';
 import { AppRuntime } from './AppRuntime';
+import { HeaderSearch } from './GlobalSearch';
 import { HeaderUser } from './HeaderUser';
 import { MoreMenu } from './MoreMenu';
 import { TopMenu } from './TopMenu';
@@ -385,6 +386,8 @@ export async function AdminShell({
         </Link>
         <nav className="hx-nav" aria-label="Main">
           <TopMenu groups={menu} fallback={active === 'dashboard' ? '/admin' : undefined} />
+          {/* Search customers and projects (and Ctrl/⌘+K) from any page; desktop only, CSS hides it on phones. */}
+          {(can('enquiries') || can('crm')) && <HeaderSearch />}
           {/* Tablets: opens the WhatsApp dock over the page (CSS shows it only there, on pages with the dock). */}
           {chats && <DockChip initial={waUnread} />}
           <HeaderUser initials={initials} name={displayName} email={profile?.email ?? ''} signOut={signOut} admin={admin} />
