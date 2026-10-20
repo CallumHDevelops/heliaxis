@@ -8,9 +8,9 @@ import { readAll, withFallback } from '@/lib/projects/server';
 import { refMatches } from '@/lib/projects/refs';
 import { schemaReady } from '@/lib/schema-ready';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
-import { formatPence, isDay, isOpen, isOrdered, totals, type CleanLine } from './money';
+import { formatPence, isDay, totals, type CleanLine } from './money';
 import type { PoPdfInput } from './pdf';
-import type { DeliverTo, Office, OrdersSummary, PoFull, PoJob, PoLine, PoListRow, PoSuggestion, PurchaseOrder, Supplier } from './shared';
+import { summariseOrders, type DeliverTo, type Office, type OrdersSummary, type PoFull, type PoJob, type PoLine, type PoListRow, type PoSuggestion, type PurchaseOrder, type Supplier } from './shared';
 
 /**
  * Purchase orders on the server: reading orders with their lines, supplier and job, the list and
@@ -191,17 +191,7 @@ export function matchesOrder(o: Pick<PoListRow, 'po_number' | 'job' | 'supplier'
 export async function ordersSummary(db: Db, projectId: string): Promise<OrdersSummary | null> {
   try {
     const { data, error } = await db.from('purchase_orders').select('status, net_pence, required_by').eq('project_id', projectId);
-    if (error) return null;
-    const rows = (data ?? []) as { status: string; net_pence: unknown; required_by: string | null }[];
-    const open = rows.filter((r) => isOpen(r.status));
-    const dates = open.map((r) => r.required_by).filter((d): d is string => !!d).sort();
-    return {
-      count: rows.length,
-      drafts: rows.filter((r) => r.status === 'draft').length,
-      open: open.length,
-      orderedNet: rows.filter((r) => isOrdered(r.status)).reduce((n, r) => n + num(r.net_pence), 0),
-      nextDelivery: dates[0] ?? null,
-    };
+    return error ? null : summariseOrders((data ?? []) as { status: string; net_pence: number | null; required_by: string | null }[]);
   } catch {
     return null;
   }

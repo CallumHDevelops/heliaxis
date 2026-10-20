@@ -23,6 +23,7 @@ import { deleteProject } from '@/lib/projects/delete';
 import { possibleDuplicates } from '@/lib/projects/duplicates';
 import { enaForJob } from '@/lib/projects/ena';
 import { calendarNow, checkCtxFor, ensureDeadlineTasks, jobLookups, nextDate, projectRow, withFallback, type DocRow } from '@/lib/projects/server';
+import { ordersSummary } from '@/lib/purchase-orders/server';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -179,6 +180,8 @@ export async function GET(req: Request, { params }: Ctx) {
           ),
         // How the customer will hear about a booking: the Diary's rule, so the two always agree. Never throws.
         notifyChannel(project.enquiry_id ? String(project.enquiry_id) : null),
+        // The Overview's "Kit ordered" and the Orders tab (null before purchase-orders.sql). Never throws.
+        ordersSummary(db, id),
       ]);
 
   type Wa = { id: string; direction: string; kind: string; body: string | null; status: string; created_at: string; sent_by: string | null; via: string | null; rule_id: string | null } & MediaFields;
@@ -342,7 +345,7 @@ export async function GET(req: Request, { params }: Ctx) {
     });
   }
 
-  const [{ data: photos }, { data: docs }, othersRes, dupes, cal, schema, booking, notify] = await fullReads!;
+  const [{ data: photos }, { data: docs }, othersRes, dupes, cal, schema, booking, notify, orders] = await fullReads!;
 
   // Signed links (1h) for each photo and its thumbnail.
   const paths = (photos ?? []).flatMap((p) => [p.storage_path, thumbPath(p.storage_path)]);
@@ -427,6 +430,7 @@ export async function GET(req: Request, { params }: Ctx) {
     subcontracts: lookups.subcontracts.get(id) ?? [],
     ena,
     schema,
+    orders,
   });
 }
 

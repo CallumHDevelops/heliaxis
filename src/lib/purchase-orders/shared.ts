@@ -120,6 +120,19 @@ export type PoSuggestion = {
   email: boolean;
 };
 
+/** The summary from a job's orders (the server's and the Orders tab's, so they always agree). */
+export function summariseOrders(rows: { status: string; net_pence: number | string | null; required_by: string | null }[]): OrdersSummary {
+  const open = rows.filter((r) => r.status === 'sent' || r.status === 'confirmed');
+  const dates = open.map((r) => r.required_by).filter((d): d is string => !!d).sort();
+  return {
+    count: rows.length,
+    drafts: rows.filter((r) => r.status === 'draft').length,
+    open: open.length,
+    orderedNet: rows.filter((r) => r.status === 'sent' || r.status === 'confirmed' || r.status === 'delivered').reduce((n, r) => n + (Number(r.net_pence) || 0), 0),
+    nextDelivery: dates[0] ?? null,
+  };
+}
+
 export const DELIVER_LABEL: Record<DeliverTo, string> = { site: 'To the site', office: 'To the office', collect: 'We’ll collect' };
 
 export const isEmail = (s: unknown): s is string => typeof s === 'string' && s.length <= 200 && /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(s);
