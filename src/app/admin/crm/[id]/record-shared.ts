@@ -8,6 +8,7 @@ import type { EnaInfo } from '@/lib/projects/ena';
 import type { NextDate, TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
+import type { ChaseView } from '@/lib/whatsapp/schedule';
 import { isProjectStage } from '@/lib/crm/stages';
 import type { CrmDoc } from './ProjectExtras';
 import { shortDate, ukDayOf, ukTime } from '../crm-shared';
@@ -117,6 +118,8 @@ export type WaInfo = {
   unreadIds: string[];
   messages: number;
   chaseHours: number;
+  /** Quiet hours and the evening rule, to say when a chaser would really go. */
+  chaseView?: ChaseView | null;
 };
 
 export type OtherJob = { id: string; title: string; stage: string; products: string[]; created_at: string; project_ref: string | null };

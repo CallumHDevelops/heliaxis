@@ -1,66 +1,205 @@
 /**
- * When automatic messages go out: quiet hours (UK time) and keeping chasers inside the free
- * 24-hour window. Pure (no I/O) so it's safe anywhere and easy to check.
+ * When automatic messages go out: quiet hours (UK time, to the minute: 21:00 → 08:45 by default)
+ * and keeping chasers inside the free 24-hour window. Pure (no I/O, nothing imported at run time)
+ * so it's safe anywhere and scripts/test-wa-schedule.mjs can check it directly.
  */
-import { SERVICE_WINDOW_MS } from './shared';
+import type { WaSettings } from './settings-shared';
 
-const STEP = 5 * 60_000;
-const hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: 'numeric', hourCycle: 'h23' });
+/** Meta's free reply window: SERVICE_WINDOW_MS in shared.ts, repeated so this file stands alone. */
+const WINDOW_MS = 24 * 3_600_000;
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
+const STEP = 5 * MIN;
+
+/** Quiet hours from the WhatsApp settings: minutes after midnight, UK time. */
+export type QuietHours = Pick<WaSettings, 'quietFromMin' | 'quietToMin'>;
+/** Everything that decides when a chaser may go: quiet hours and the evening rule. */
+export type ChaseTimes = QuietHours & Pick<WaSettings, 'eveningRule' | 'eveningFromMin' | 'eveningNotBeforeMin'>;
+
+const ukFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/London',
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+});
+
+/** What a UK clock and calendar show at `d`, as the UTC time that reads the same (whole minutes). */
+function ukReading(d: Date | number): number {
+  const p: Record<string, number> = {};
+  for (const x of ukFmt.formatToParts(new Date(d))) if (x.type !== 'literal') p[x.type] = Number(x.value);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute);
+}
+
+/** Minutes after midnight on a UK clock: 08:45 → 525. */
+export function londonMinute(d: Date): number {
+  return (ukReading(d) % DAY) / MIN;
+}
 
 export function londonHour(d: Date): number {
-  return Number(hourFmt.format(d)) % 24;
+  return Math.floor(londonMinute(d) / 60);
 }
 
-/** Quiet from `from`:00 to `to`:00 UK time, e.g. 21 → 8. Equal values = never quiet. */
-export function isQuiet(d: Date, from: number, to: number): boolean {
+/** Quiet from `quietFromMin` to `quietToMin` UK time, e.g. 21:00 → 08:45. Equal times = never quiet. */
+export function isQuiet(d: Date, q: QuietHours): boolean {
+  const { quietFromMin: from, quietToMin: to } = q;
   if (from === to) return false;
-  const h = londonHour(d);
-  return from > to ? h >= from || h < to : h >= from && h < to;
+  const m = londonMinute(d);
+  return from > to ? m >= from || m < to : m >= from && m < to;
 }
 
-/** The first time at or after `d` outside quiet hours, plus a little jitter if it had to move. */
-export function nextAwake(d: Date, from: number, to: number, rand = Math.random): Date {
-  let t = d.getTime();
-  let moved = false;
-  for (let i = 0; i < 24 * 12 && isQuiet(new Date(t), from, to); i++) {
-    t += STEP;
-    moved = true;
-  }
-  return new Date(moved ? t + Math.round(rand() * 20) * 60_000 : t);
+/**
+ * The first time at or after `d` when UK clocks show `minute` (after midnight). Right on the days the
+ * clocks change too; a time the clocks skip in March counts as just after the jump.
+ */
+export function nextClock(d: Date, minute: number): Date {
+  const now = ukReading(d);
+  let want = now - (now % DAY) + minute * MIN;
+  if (want < now) want += DAY;
+  // The UK offset now, and then (different if the clocks change in between): the earliest real time
+  // whose clock reads `want` or later.
+  const offNow = now - Math.floor(d.getTime() / MIN) * MIN;
+  const guess = want - offNow;
+  const offThen = ukReading(guess) - guess;
+  const fits = [guess, want - offThen].filter((t) => ukReading(t) >= want);
+  return new Date(Math.max(d.getTime(), Math.min(...(fits.length ? fits : [guess]))));
 }
 
-/** The last time at or before `d` outside quiet hours. */
-export function lastAwake(d: Date, from: number, to: number): Date {
+/**
+ * The outbox runs once a minute, so a chaser planned for the last minute before quiet hours would be
+ * picked up in them and held overnight (missing the free window). Plans keep this far clear.
+ */
+const RUN_GAP = 2 * MIN;
+
+/** Outside quiet hours at `t`, and still `lead` later. */
+function awake(t: number, q: QuietHours, lead = 0): boolean {
+  return !isQuiet(new Date(t), q) && !isQuiet(new Date(t + lead), q);
+}
+
+/**
+ * The first time at or after `d` (and not before `floor`, when there is one) outside quiet hours
+ * (and still outside them `lead` later), plus a little jitter (0–20 min) if it had to move.
+ */
+export function nextAwake(d: Date, q: QuietHours, opts: { floor?: Date | null; rand?: () => number; lead?: number } = {}): Date {
+  const lead = opts.lead ?? 0;
+  let t = Math.max(d.getTime(), opts.floor?.getTime() ?? 0);
+  if (!awake(t, q, lead)) t = nextClock(new Date(t), q.quietToMin).getTime();
+  if (t === d.getTime()) return d;
+  const j = t + Math.round((opts.rand ?? Math.random)() * 20) * MIN;
+  return new Date(awake(j, q, lead) ? j : t);
+}
+
+/** The last time at or before `d` outside quiet hours (and still outside them `lead` later). */
+export function lastAwake(d: Date, q: QuietHours, lead = 0): Date {
   let t = d.getTime();
-  for (let i = 0; i < 24 * 12 && isQuiet(new Date(t), from, to); i++) t -= STEP;
+  for (let i = 0; i < 24 * 12 && !awake(t, q, lead); i++) t -= STEP;
   return new Date(t);
+}
+
+/**
+ * The evening rule: when our message went at or after 18:00 (`eveningFromMin`), or in quiet hours
+ * (the small hours, say), its chaser goes no sooner than the next 10:00 (`eveningNotBeforeMin`).
+ * Null when the rule is off or doesn't apply.
+ */
+export function eveningFloor(sentAt: Date, s: ChaseTimes): Date | null {
+  if (!s.eveningRule) return null;
+  if (londonMinute(sentAt) < s.eveningFromMin && !isQuiet(sentAt, s)) return null;
+  return nextClock(sentAt, s.eveningNotBeforeMin);
 }
 
 export type ChasePlan = { at: Date; free: boolean };
 
 /**
- * When to chase: `hours` after our message, moved out of quiet hours. If that would miss the
- * free window and `keepFree` is on, chase shortly before the window closes instead, as long as
- * that's still a decent gap after our message (the smaller of `hours` and 4h).
+ * When to chase: `hours` after our message, moved out of quiet hours and, after an evening message,
+ * to no sooner than 10:00 the next morning (the evening rule). If that would miss the free window
+ * and `keepFree` is on, chase shortly before the window closes instead, as long as that's still a
+ * decent gap after our message (the smaller of `hours` and 4h) and the evening rule allows it;
+ * otherwise it goes at the planned time as a paid template.
  */
 export function planChase(opts: {
   sentAt: Date;
   hours: number;
   lastInboundAt: string | null;
-  quietFrom: number;
-  quietTo: number;
+  settings: ChaseTimes;
   keepFree: boolean;
   rand?: () => number;
 }): ChasePlan {
-  const { sentAt, hours, quietFrom, quietTo, keepFree, rand } = opts;
-  const target = nextAwake(new Date(sentAt.getTime() + hours * 3_600_000), quietFrom, quietTo, rand);
-  const close = opts.lastInboundAt ? new Date(opts.lastInboundAt).getTime() + SERVICE_WINDOW_MS : null;
-  const margin = 20 * 60_000;
-  if (close && target.getTime() < close - margin) return { at: target, free: true };
+  const { sentAt, hours, settings: s, keepFree, rand } = opts;
+  const floor = eveningFloor(sentAt, s);
+  const due = new Date(sentAt.getTime() + hours * HOUR);
+  const target = nextAwake(due, s, { floor, rand, lead: RUN_GAP });
+  const close = opts.lastInboundAt ? new Date(opts.lastInboundAt).getTime() + WINDOW_MS : null;
+  const margin = 20 * MIN;
+  // Free or not is decided without the jitter (as the chat's label works it out), so a few minutes'
+  // jitter can't send it into the free-window move below; if the jitter would miss, it goes unjittered.
+  const base = nextAwake(due, s, { floor, rand: () => 0, lead: RUN_GAP });
+  if (close && base.getTime() < close - margin) return { at: target.getTime() < close - margin ? target : base, free: true };
   if (keepFree && close) {
-    const cand = lastAwake(new Date(close - 60 * 60_000), quietFrom, quietTo);
-    const minGap = Math.min(hours, 4) * 3_600_000;
+    let cand = lastAwake(new Date(close - HOUR), s, RUN_GAP);
+    // Too early for the evening rule: the earliest it allows, if that still beats the window.
+    if (floor && cand.getTime() < floor.getTime()) cand = nextAwake(floor, s, { rand: () => 0, lead: RUN_GAP });
+    const minGap = Math.min(hours, 4) * HOUR;
     if (cand.getTime() >= sentAt.getTime() + minGap && cand.getTime() < close - margin) return { at: cand, free: true };
   }
   return { at: target, free: false };
+}
+
+/** What the outbox's safety net needs from the settings. */
+export type HoldSettings = ChaseTimes & Pick<WaSettings, 'smartRepliesQuietHours' | 'firstContactQuietHours'>;
+
+/**
+ * The safety net just before the outbox sends something on its own: null = it can go now, else the
+ * time to wait for. Chasers and final nudges never go in quiet hours, nor before the evening rule's
+ * morning time worked out from our last message in the chat (`lastOutAt`), so chasers queued under
+ * older rules follow today's. Smart replies and intros wait only when their quiet-hours hold is on.
+ * Something a person pressed "Send now" on (`sendNow`) always goes.
+ */
+export function holdUntil(opts: {
+  kind: string;
+  now: Date;
+  settings: HoldSettings;
+  lastOutAt: Date | null;
+  sendNow?: boolean;
+  rand?: () => number;
+}): Date | null {
+  const { kind, now, settings: s } = opts;
+  if (opts.sendNow) return null;
+  const held = kind === 'chase' || (kind === 'reply' && s.smartRepliesQuietHours) || (kind === 'intro' && s.firstContactQuietHours);
+  if (!held) return null;
+  const floor = kind === 'chase' && opts.lastOutAt ? eveningFloor(opts.lastOutAt, s) : null;
+  const at = nextAwake(now, s, { floor, rand: opts.rand });
+  return at.getTime() > now.getTime() ? at : null;
+}
+
+/** What a chat needs to say when a chaser would go: the chase times, and whether chasers stay free. */
+export type ChaseView = ChaseTimes & { keepFree: boolean };
+
+export function chaseView(s: WaSettings): ChaseView {
+  const { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepChasesFree } = s;
+  return { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepFree: keepChasesFree };
+}
+
+const weekdayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
+const dateFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short' });
+
+/** A UK time in words, seen from `now`: "today about 15:30", "tomorrow about 10:00", "Thu about 10:00". */
+export function whenWords(at: Date, now: Date): string {
+  const days = Math.floor(ukReading(at) / DAY) - Math.floor(ukReading(now) / DAY);
+  const m = londonMinute(at);
+  const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const day = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days < 7 ? weekdayFmt.format(at) : dateFmt.format(at);
+  return `${day} about ${time}`;
+}
+
+/**
+ * When a chaser set now would go, in words, worked out as the server will plan it (without the
+ * jitter, so it's the earliest): for the "Chase if no reply" choices.
+ */
+export function chaseWhen(opts: { now: Date; hours: number; lastInboundAt: string | null; view: ChaseView }): string {
+  const { now, hours, lastInboundAt, view } = opts;
+  const plan = planChase({ sentAt: now, hours, lastInboundAt, settings: view, keepFree: view.keepFree, rand: () => 0 });
+  return whenWords(plan.at, now);
 }

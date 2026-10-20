@@ -85,7 +85,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
 | `META_PAGE_ACCESS_TOKEN` | Optional. A Page token for fetching leads, if the system-user token doesn't cover the Page |
 | `WHATSAPP_DEFAULT_TEMPLATE` | e.g. `enquiry_intro`. Its `{{1}}` is filled with the lead's first name. Optional: *Use for → First message to new Meta leads* on the templates page overrides it |
 | `WHATSAPP_TEMPLATE_LANG` | Default `en_GB` |
-| `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = send the default template to opted-in Meta leads 3–6 min after they submit |
+| `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = send the default template to opted-in Meta leads 3–6 min after they submit. In quiet hours it waits for the morning while *Hold the first message to new leads who enquire in quiet hours* is ticked (the default; Smart replies → Chasers) |
 | `META_LEADS_WHATSAPP_OPT_IN` | `true` = treat every Meta lead as opted in (only if the form itself says you'll contact them on WhatsApp) |
 | `META_GRAPH_VERSION` | Optional, default `v23.0` |
 | `CRON_SECRET` | Already used by the other crons; the pg_cron job sends it |
@@ -106,15 +106,22 @@ Redeploy after adding them.
     cancels any that are waiting.
   - The same reply is never sent twice to someone within 24h.
   - The *Smart replies on/off* button in a chat turns them off for that person.
+  - A message that arrives in quiet hours gets its reply in the morning while *Hold smart replies to
+    messages that arrive in quiet hours* is ticked (Smart replies → Chasers).
 - **Chasers**: ask something ("can you send us a photo of the land?") and, if they don't answer, a
   chaser goes after 12h (or whatever you pick under the message box: Auto / Off / 4h / 12h / 24h / 3
-  days). Auto = chase anything with a "?". A smart reply can have its own chaser too. Chasers:
+  days; it says when that will actually be, e.g. "tomorrow about 10:00"). Auto = chase anything with
+  a "?". A smart reply can have its own chaser too. Chasers:
   - are cancelled the moment they reply, or when you send another message;
-  - never go out in quiet hours (21:00–08:00 UK by default), and move to the morning instead;
+  - never go out in quiet hours (21:00–08:45 UK by default, set to the minute), and move to the morning instead;
+  - after a message sent in the evening (18:00 or later, or in quiet hours), wait until at least
+    10:00 the next morning, to give them a chance to wake up (the evening rule, on by default);
   - stay **free** when they can: if 12h would land after the 24h window closes, the chaser goes about
-    an hour before it closes (at least 4h after your message). Otherwise the chase template is sent
-    (paid). The chat shows which it'll be;
-  - can have an optional final nudge (off by default).
+    an hour before it closes (at least 4h after your message, and never earlier than the evening rule
+    allows). Otherwise the chase template is sent (paid). The chat shows which it'll be;
+  - can have an optional final nudge (off by default), which keeps to the same hours;
+  - are checked again just before they go, so one queued under older settings still waits for the
+    morning. **Send now** in the chat always sends straight away.
 - **Photos, videos, voice notes and files** customers send show in the chat (once
   `whatsapp-media.sql` has been run). WhatsApp only keeps them for 7 days, so each one is downloaded
   as it arrives and kept in a private storage bucket, `whatsapp-media` (the app creates it). Tap a

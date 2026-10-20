@@ -341,7 +341,7 @@ export async function runCrmAutomations() {
   const db = createAdminClient();
   const [s, wa] = await Promise.all([getCrmSettings(), getWaSettings()]);
   const now = new Date();
-  const quiet = isQuiet(now, wa.quietFrom, wa.quietTo);
+  const quiet = isQuiet(now, wa);
   const out = { reminders: 0, reviews: 0, alerts: 0, sequence: 0, installsStarted: 0, surveyChecks: 0 };
   out.installsStarted = await startInstalls(now).catch(() => 0);
   if (quiet) return out;

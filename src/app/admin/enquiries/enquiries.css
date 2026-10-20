@@ -61,6 +61,72 @@
 .enq-so .k {
   margin-top: 2px;
 }
+/* The cards are filters: click New and it lights up in its own colour, the rest dim, the list shows only New. */
+.enq-so {
+  --so: var(--ink);
+  --so-tint: rgba(33, 31, 24, 0.05);
+  appearance: none;
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s, background-color 0.12s, opacity 0.12s;
+}
+.enq-so .n,
+.enq-so .k {
+  display: block;
+}
+.so-New {
+  --so: var(--amber-2);
+  --so-tint: rgba(248, 188, 30, 0.14);
+}
+.so-Contacted,
+.so-Won {
+  --so: var(--ok);
+  --so-tint: rgba(63, 125, 78, 0.09);
+}
+.so-Lost {
+  --so: #b4462f;
+  --so-tint: rgba(180, 70, 47, 0.08);
+}
+.enq-so:hover {
+  border-color: var(--so);
+}
+.enq-so:focus-visible {
+  outline: 2px solid var(--so);
+  outline-offset: 2px;
+}
+.enq-so[aria-pressed='true'] {
+  border-color: var(--so);
+  box-shadow: inset 0 0 0 1px var(--so);
+  background: var(--so-tint);
+}
+.enq-so[aria-pressed='true'] .n {
+  color: var(--so);
+}
+.has-pick .enq-so[aria-pressed='false'] {
+  opacity: 0.6;
+}
+.has-pick .enq-so[aria-pressed='false']:hover,
+.has-pick .enq-so[aria-pressed='false']:focus-visible {
+  opacity: 1;
+}
+/* "Show all" beside the count, and in the empty list. */
+.enq-showall {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  /* A bigger target for thumbs, without moving the text. */
+  margin: -8px 0;
+  padding: 8px 0;
+}
 
 .stpill {
   font-family: var(--mono);

@@ -41,7 +41,7 @@ const PRIORITY: Record<string, number> = { high: 0, normal: 1, low: 2 };
 export async function remindDueTasks(now = new Date()): Promise<number> {
   try {
     const [crm, wa] = await Promise.all([getCrmSettings(), getSettings()]);
-    if (londonHour(now) < crm.reminderHour || isQuiet(now, wa.quietFrom, wa.quietTo)) return 0;
+    if (londonHour(now) < crm.reminderHour || isQuiet(now, wa)) return 0;
     const today = ukDay(now);
     const notToday = `due_reminded_on.is.null,due_reminded_on.lt.${today}`;
     const db = createAdminClient();

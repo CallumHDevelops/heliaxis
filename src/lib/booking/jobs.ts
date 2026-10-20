@@ -126,7 +126,7 @@ export async function runBookingJobs({ until }: { until: number }): Promise<Book
     const { getSettings } = await import('@/lib/whatsapp/settings');
     const { isQuiet } = await import('@/lib/whatsapp/schedule');
     const wa = await getSettings();
-    if (!isQuiet(new Date(), wa.quietFrom, wa.quietTo)) {
+    if (!isQuiet(new Date(), wa)) {
       const { data: waiting } = await db
         .from('survey_bookings')
         .select('*')

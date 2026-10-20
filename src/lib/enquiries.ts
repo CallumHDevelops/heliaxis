@@ -165,6 +165,40 @@ export function refMatches(ref: string | null | undefined, query: string): boole
   return Number(have) === Number(want) || (want.startsWith('0') && have.startsWith(want));
 }
 
+/** Name, email, phone, postcode or customer reference (HX-0042, hx42, 0042). */
+export function leadMatches(l: CrmLead, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (`${l.name} ${l.org} ${l.email} ${l.postcode}`.toLowerCase().includes(q)) return true;
+  const squashed = q.replace(/\s+/g, '');
+  if (l.postcode.replace(/\s+/g, '').toLowerCase().includes(squashed)) return true;
+  const digits = q.replace(/\D/g, '');
+  if (digits.length >= 3 && /^[\d\s()+-]+$/.test(q)) {
+    const phone = l.phone.replace(/\D/g, '');
+    const national = (d: string) => d.replace(/^(?:44|0)/, ''); // 07700 900123 finds +44 7700 900123
+    if (phone.includes(digits) || (digits.length >= 6 && national(phone).includes(national(digits)))) return true;
+  }
+  return refMatches(l.ref, q);
+}
+
+/**
+ * ?status=new (contacted, quoted, won, lost) on the Enquiries page as a status label, so a refresh
+ * keeps the filter. Anything else, or nothing, is '' (everyone).
+ */
+export function statusFromParam(v: string | null | undefined): string {
+  const s = v ? labelToDbStatus(v) : null;
+  return s ? ENQUIRY_STATUS_LABEL[s] : '';
+}
+
+/**
+ * The Enquiries list as shown: the search, then the status card that's picked ('' = all). Leads in
+ * `keep` stay whatever their status: ones you changed while filtered, so the row doesn't vanish
+ * from under the dropdown you've just used. Keeps the order it's given (newest first).
+ */
+export function shownLeads(leads: CrmLead[], query: string, status: string, keep: ReadonlySet<string> = new Set()): CrmLead[] {
+  return leads.filter((l) => (!status || l.status === status || keep.has(l.id)) && leadMatches(l, query));
+}
+
 /** Attach lat/lng + town from postcodes.io onto CRM leads. */
 export async function enrichLeadsWithGeo(leads: CrmLead[]): Promise<CrmLead[]> {
   const { geocodePostcodes, geoKey } = await import('@/lib/geocode-postcode');

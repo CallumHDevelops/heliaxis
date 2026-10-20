@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { PushBanner } from '@/components/admin/PushBanner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
-import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS, refMatches } from '@/lib/enquiries';
+import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS, shownLeads, statusFromParam } from '@/lib/enquiries';
 import { osmEmbedUrl } from '@/lib/geocode-postcode';
 import { DeleteCustomers, type DeleteDone } from './DeleteCustomers';
 import './enquiries.css';
@@ -26,20 +26,13 @@ const ICONS: Record<string, string> = {
     '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M12 7v10M9.5 9.5c.8-1 2-1.5 2.5-1.5s1.8.4 2.5 1.5M9.5 14.5c.8 1 2 1.5 2.5 1.5s1.8-.4 2.5-1.5"/></svg>',
 };
 
-/** Name, email, phone, postcode or customer reference (HX-0042, hx42, 0042). */
-function matches(l: CrmLead, query: string) {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  if (`${l.name} ${l.org} ${l.email} ${l.postcode}`.toLowerCase().includes(q)) return true;
-  const squashed = q.replace(/\s+/g, '');
-  if (l.postcode.replace(/\s+/g, '').toLowerCase().includes(squashed)) return true;
-  const digits = q.replace(/\D/g, '');
-  if (digits.length >= 3 && /^[\d\s()+-]+$/.test(q)) {
-    const phone = l.phone.replace(/\D/g, '');
-    const national = (d: string) => d.replace(/^(?:44|0)/, ''); // 07700 900123 finds +44 7700 900123
-    if (phone.includes(digits) || (digits.length >= 6 && national(phone).includes(national(digits)))) return true;
-  }
-  return refMatches(l.ref, q);
+/** The status card that's picked lives in the address bar (?status=new), so a refresh keeps it. */
+function keepStatusInUrl(status: string) {
+  const url = new URL(window.location.href);
+  if (status) url.searchParams.set('status', status.toLowerCase());
+  else url.searchParams.delete('status');
+  // Next keeps useSearchParams in step with replaceState, so the list follows.
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 function IconRow({ keys }: { keys: string[] }) {
@@ -93,6 +86,21 @@ export function EnquiriesCrm({
   const [deleting, setDeleting] = useState<{ ids: string[]; name?: string } | null>(null);
   const [notice, setNotice] = useState<{ text: string; errors: string[] } | null>(null);
   const [q, setQ] = useState('');
+  // Click a status card to see only those leads; the address bar holds it (unknown values mean everyone).
+  const only = statusFromParam(useSearchParams()?.get('status'));
+  // Leads whose status you change while filtered stay on screen until you pick another card.
+  const [kept, setKept] = useState<{ status: string; ids: ReadonlySet<string> }>({ status: '', ids: new Set() });
+
+  /** One card at a time: clicking the lit one again shows everyone. */
+  function pickStatus(s: string) {
+    setKept({ status: '', ids: new Set() });
+    keepStatusInUrl(only === s ? '' : s);
+  }
+  function clearFilters() {
+    setQ('');
+    setKept({ status: '', ids: new Set() });
+    keepStatusInUrl('');
+  }
 
   const refresh = useCallback(async () => {
     const r = await fetch('/api/enquiries', { cache: 'no-store' });
@@ -116,15 +124,18 @@ export function EnquiriesCrm({
     return c;
   }, [leads]);
 
-  const shown = q.trim() ? leads.filter((l) => matches(l, q)) : leads;
-  // Only people still on the list count (a refresh may have dropped some). Ticks stay while you search.
+  const shown = shownLeads(leads, q, only, kept.status === only ? kept.ids : undefined);
+  const filtered = Boolean(only || q.trim());
+  // Only people still on the list count (a refresh may have dropped some). Ticks stay while you search or filter.
   const pickedIds = leads.filter((l) => picked.has(l.id)).map((l) => l.id);
-  // "Select all" means everyone the search shows.
-  const allPicked = shown.length > 0 && shown.every((l) => picked.has(l.id));
+  // "Select all" means everyone the search and status card show, but not leads only still on screen because
+  // you just moved them out of that status: "delete the rest of New" mustn't take the ones you just contacted.
+  const selectable = shownLeads(leads, q, only);
+  const allPicked = selectable.length > 0 && selectable.every((l) => picked.has(l.id));
   const pickAll = () =>
     setPicked((prev) => {
       const next = new Set(prev);
-      for (const l of shown) {
+      for (const l of selectable) {
         if (allPicked) next.delete(l.id);
         else next.add(l.id);
       }
@@ -159,6 +170,15 @@ export function EnquiriesCrm({
   }
 
   async function setStatus(id: string, status: string) {
+    if (only) setKept((k) => ({ status: only, ids: new Set(k.status === only ? k.ids : []).add(id) }));
+    // Moved off the picked card: untick it too, or "Select all" then marking the good ones would delete them.
+    if (only && status !== only && picked.has(id)) {
+      setPicked((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
     setLeads((prev) =>
       prev.map((l) => (l.id === id ? { ...l, status, isnew: status === 'New' } : l))
     );
@@ -183,7 +203,16 @@ export function EnquiriesCrm({
         <div>
           <h1>Enquiries</h1>
           <p>
-            {leads.length} leads · give each a status and track it through the pipeline.
+            {filtered ? (
+              <>
+                {shown.length} of {leads.length} leads ·{' '}
+                <button type="button" className="enq-showall" onClick={clearFilters}>
+                  Show all
+                </button>
+              </>
+            ) : (
+              `${leads.length} leads · give each a status and track it through the pipeline.`
+            )}
           </p>
         </div>
         <div className="enq-head-actions">
@@ -206,6 +235,7 @@ export function EnquiriesCrm({
               onClick={() => {
                 setSelecting((v) => !v);
                 setPicked(new Set());
+                setKept({ status: '', ids: new Set() }); // the rows then match the card's count
               }}
             >
               {selecting ? 'Done' : 'Select'}
@@ -218,14 +248,21 @@ export function EnquiriesCrm({
       </div>
 
       <PushBanner what="new enquiries and WhatsApp messages" />
-      <div className="enq-stat-ov">
+      <div className={only ? 'enq-stat-ov has-pick' : 'enq-stat-ov'} role="group" aria-label="Show leads by status">
         {STATUSES.map((s) => (
-          <div key={s} className="enq-so">
-            <div className="n">{counts[s] || 0}</div>
-            <div className="k">
+          <button
+            key={s}
+            type="button"
+            className={`enq-so so-${s}`}
+            aria-pressed={only === s}
+            title={only === s ? 'Show all leads' : `Show only ${s} leads`}
+            onClick={() => pickStatus(s)}
+          >
+            <span className="n">{counts[s] || 0}</span>
+            <span className="k">
               <span className={`stpill st-${s}`}>{s}</span>
-            </div>
-          </div>
+            </span>
+          </button>
         ))}
       </div>
 
@@ -282,7 +319,14 @@ export function EnquiriesCrm({
             {leads.length > 0 && shown.length === 0 && (
               <tr>
                 <td colSpan={7} className="enq-empty">
-                  Nobody matches “{q.trim()}”.
+                  {only && q.trim()
+                    ? `No ${only} leads match “${q.trim()}”.`
+                    : only
+                      ? `No ${only} leads at the moment.`
+                      : `Nobody matches “${q.trim()}”.`}{' '}
+                  <button type="button" className="enq-showall" onClick={clearFilters}>
+                    {only && q.trim() ? 'Clear filters' : only ? 'Show all leads' : 'Clear search'}
+                  </button>
                 </td>
               </tr>
             )}
@@ -344,8 +388,8 @@ export function EnquiriesCrm({
       {selecting && (
         <div className="enq-selbar">
           <label className="enq-pickname">
-            <input type="checkbox" checked={allPicked} disabled={!shown.length} onChange={pickAll} />
-            Select all ({shown.length})
+            <input type="checkbox" checked={allPicked} disabled={!selectable.length} onChange={pickAll} />
+            Select all ({selectable.length})
           </label>
           <span className="enq-selcount">{pickedIds.length} selected</span>
           <button

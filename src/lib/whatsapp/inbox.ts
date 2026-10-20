@@ -15,7 +15,7 @@ import {
   windowOpen,
   type SmartRule,
 } from './shared';
-import { isQuiet, nextAwake, planChase } from './schedule';
+import { holdUntil, isQuiet, nextAwake, planChase } from './schedule';
 import { ensureOpportunity, logActivity, markContacted } from '@/lib/crm/server';
 import { getSettings } from './settings';
 import { autoParams } from './templates';
@@ -258,7 +258,7 @@ async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo
 
   const settings = await getSettings();
   let at = new Date(Date.now() + pickDelaySeconds(rule.delay_min_seconds, rule.delay_max_seconds) * 1000);
-  if (settings.smartRepliesQuietHours) at = nextAwake(at, settings.quietFrom, settings.quietTo);
+  if (settings.smartRepliesQuietHours) at = nextAwake(at, settings);
   const { data: row } = await db
     .from('whatsapp_outbox')
     .insert({
@@ -280,17 +280,20 @@ async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo
  */
 export async function queueFirstContact(enquiryId: string, name: string) {
   if (process.env.WHATSAPP_AUTO_FIRST_MESSAGE !== 'true') return false;
-  const t = { ...defaultTemplate(), name: (await getSettings()).firstContactTemplate || defaultTemplate().name };
+  const settings = await getSettings();
+  const t = { ...defaultTemplate(), name: settings.firstContactTemplate || defaultTemplate().name };
   if (!t.name) return false;
   const db = createAdminClient();
-  const seconds = pickDelaySeconds(180, 360);
+  let at = new Date(Date.now() + pickDelaySeconds(180, 360) * 1000);
+  // Enquired in quiet hours: held until the morning, if that's switched on (Smart replies → Chasers).
+  if (settings.firstContactQuietHours) at = nextAwake(at, settings);
   const { error } = await db.from('whatsapp_outbox').insert({
     enquiry_id: enquiryId,
     kind: 'intro',
     template_name: t.name,
     template_lang: t.lang,
     body: (name || '').trim().split(/\s+/)[0] || 'there', // the template's {{1}}
-    send_after: new Date(Date.now() + seconds * 1000).toISOString(),
+    send_after: at.toISOString(),
   });
   return !error;
 }
@@ -402,23 +405,21 @@ async function cancelAutomatic(db: Db, enquiryId: string, reason: string) {
 }
 
 /**
- * Chase if they don't answer: `hours` from now, outside quiet hours, and — when it can be —
- * inside the free 24h window. Replaces any chaser already waiting on this chat.
+ * Chase if they don't answer: `hours` from now, outside quiet hours, after the evening rule (a
+ * message sent after 18:00 isn't chased before 10:00 the next morning) and — when it can be — inside
+ * the free 24h window. The final nudge (step 2) follows the same times but isn't moved to keep it
+ * free. Replaces any chaser already waiting on this chat.
  */
 export async function scheduleChase(db: Db, enquiry: EnquiryWa, opts: { hours: number; text?: string | null; step?: number }) {
   const settings = await getSettings();
   const step = opts.step ?? 1;
-  const plan =
-    step === 1
-      ? planChase({
-          sentAt: new Date(),
-          hours: opts.hours,
-          lastInboundAt: enquiry.wa_last_inbound_at,
-          quietFrom: settings.quietFrom,
-          quietTo: settings.quietTo,
-          keepFree: settings.keepChasesFree,
-        })
-      : { at: nextAwake(new Date(Date.now() + opts.hours * 3_600_000), settings.quietFrom, settings.quietTo), free: false };
+  const plan = planChase({
+    sentAt: new Date(),
+    hours: opts.hours,
+    lastInboundAt: step === 1 ? enquiry.wa_last_inbound_at : null,
+    settings,
+    keepFree: step === 1 && settings.keepChasesFree,
+  });
   await db
     .from('whatsapp_outbox')
     .update({ status: 'cancelled', last_error: 'Replaced by a newer chaser' })
@@ -454,6 +455,22 @@ export async function markChatRead(enquiryId: string) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** whatsapp_outbox.last_error on something a person pressed "Send now" on: it goes, quiet hours or not. */
+export const SEND_NOW_NOTE = 'Send now pressed';
+
+/** When we last messaged them (by hand, from the app or automatically), for the evening rule. */
+async function lastOutboundAt(db: Db, enquiryId: string): Promise<Date | null> {
+  const { data } = await db
+    .from('whatsapp_messages')
+    .select('created_at')
+    .eq('enquiry_id', enquiryId)
+    .eq('direction', 'out')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.created_at ? new Date(data.created_at) : null;
+}
+
 /**
  * Send whatever in the outbox is due. Run every minute (Supabase pg_cron) and opportunistically
  * from the webhook and the inbox. Each item is claimed first, so overlapping runs never double-send.
@@ -480,20 +497,43 @@ export async function processOutbox(limit = 8) {
     template_lang: string | null;
     reply_to: string | null;
     attempts: number;
+    last_error: string | null;
   };
-  const claimed: Item[] = [];
+  const picked: Item[] = [];
   for (const { id } of due ?? []) {
     const { data } = await db
       .from('whatsapp_outbox')
       .update({ status: 'sending' })
       .eq('id', id)
       .eq('status', 'pending')
-      .select('id, enquiry_id, kind, chase_step, rule_id, body, template_name, template_lang, reply_to, attempts')
+      .select('id, enquiry_id, kind, chase_step, rule_id, body, template_name, template_lang, reply_to, attempts, last_error')
       .maybeSingle();
-    if (data) claimed.push(data as Item);
+    if (data) picked.push(data as Item);
   }
-  if (!claimed.length) return { sent: 0, failed: 0 };
+  if (!picked.length) return { sent: 0, failed: 0 };
   const settings = await getSettings();
+
+  // The safety net: nothing goes on its own in quiet hours, and no chaser before the evening rule
+  // allows (from our last message in the chat). It waits for the right time instead, so chasers
+  // queued under older rules, or made due by a late run, follow today's settings too.
+  const claimed: Item[] = [];
+  let held = 0;
+  for (const item of picked) {
+    const wait = holdUntil({
+      kind: item.kind,
+      now: new Date(),
+      settings,
+      lastOutAt: item.kind === 'chase' ? await lastOutboundAt(db, item.enquiry_id) : null,
+      sendNow: item.last_error === SEND_NOW_NOTE,
+    });
+    if (!wait) {
+      claimed.push(item);
+      continue;
+    }
+    held++;
+    await db.from('whatsapp_outbox').update({ status: 'pending', send_after: wait.toISOString() }).eq('id', item.id);
+  }
+  if (!claimed.length) return { sent: 0, failed: 0, held };
 
   // Read receipt + "typing…" first, then a pause in proportion to the reply — like someone typing it.
   const typingFor = claimed.filter((i) => i.reply_to && !i.template_name);
@@ -558,18 +598,20 @@ export async function processOutbox(limit = 8) {
       const attempts = item.attempts + 1;
       const retry = attempts < 3 && !r.error.includes('window is closed');
       if (!retry) failed++;
+      // A "Send now" keeps its marker while it retries, so quiet hours don't hold it for the morning.
+      const note = item.last_error === SEND_NOW_NOTE ? SEND_NOW_NOTE : r.error;
       await db
         .from('whatsapp_outbox')
         .update(
           retry
-            ? { status: 'pending', attempts, last_error: r.error, send_after: new Date(Date.now() + 60_000).toISOString() }
+            ? { status: 'pending', attempts, last_error: note, send_after: new Date(Date.now() + 60_000).toISOString() }
             : { status: 'failed', attempts, last_error: r.error }
         )
         .eq('id', item.id);
       if (!retry) await notifyEnquiryTeam(`WhatsApp reply to ${(enquiry as EnquiryWa).name} failed`, r.error, inboxHref(item.enquiry_id));
     }
   }
-  return { sent, failed };
+  return { sent, failed, held };
 }
 
 /** What follows an automatic message: a smart reply's chaser, or a chase's final nudge. */
@@ -639,7 +681,7 @@ export async function handleEcho(m: MessageEcho) {
 export async function remindUnanswered() {
   const settings = await getSettings();
   // Not at night: overnight messages get their reminder when quiet hours end.
-  if (!settings.remindUnansweredMinutes || isQuiet(new Date(), settings.quietFrom, settings.quietTo)) return 0;
+  if (!settings.remindUnansweredMinutes || isQuiet(new Date(), settings)) return 0;
   const db = createAdminClient();
   const cutoff = new Date(Date.now() - settings.remindUnansweredMinutes * 60_000).toISOString();
   const dayAgo = new Date(Date.now() - SERVICE_WINDOW_MS).toISOString();
