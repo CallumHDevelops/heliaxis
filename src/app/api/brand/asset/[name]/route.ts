@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { hasBrandAccess } from '@/lib/brand-access';
+import { canViewBrand } from '@/lib/brand-access';
 import { BRAND_ASSET_MIME, BRAND_ASSET_NAMES } from '@/lib/brand-assets';
 
 type Params = { params: Promise<{ name: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
-  if (!(await hasBrandAccess())) {
+  if (!(await canViewBrand())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

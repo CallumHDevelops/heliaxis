@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { cookies } from 'next/headers';
+import { getSessionProfile } from './auth';
+import { canAccess } from './portals';
 
 export const BRAND_ACCESS_COOKIE = 'heliaxis_brand_access';
 
@@ -31,6 +33,17 @@ export async function hasBrandAccess(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Who may view the brand kit (page, inline images and downloads): external
+ * partners holding the shared-password cookie, OR signed-in staff granted the
+ * Branding portal (admins always).
+ */
+export async function canViewBrand(): Promise<boolean> {
+  if (await hasBrandAccess()) return true;
+  const { profile } = await getSessionProfile();
+  return canAccess(profile, 'branding');
 }
 
 export function verifyBrandPassword(input: string): boolean {
