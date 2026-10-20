@@ -27,7 +27,12 @@ export async function GET(req: Request) {
   // Asked for alongside the CRM's own numbers; never throws.
   const spending = adSpendFigures(days, { refresh });
   // Once this has answered: older leads' ads from Meta's Lead API, for the next load (never throws).
-  if (adSpendConfigured()) after(() => afterReports({ force: refresh }));
+  // A Refresh skips the 5-minute gap only when Meta was really asked (not 'wait' or 'paused').
+  if (adSpendConfigured())
+    after(async () => {
+      const f = await spending;
+      await afterReports({ force: f.state === 'ok' && f.refresh === 'done' });
+    });
   const { data: projects, error } = await db
     .from('crm_projects')
     .select('id, enquiry_id, stage, value, owner_id, created_at, first_contact_at, survey_at, accepted_at')

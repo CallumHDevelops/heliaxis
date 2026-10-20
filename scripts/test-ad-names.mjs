@@ -257,6 +257,9 @@ const misses = readMisses({ v: 1, ids: { 559: T - 7 * DAY, 5510: T - 31 * DAY } 
 eq('misses over 30 days old are forgotten', misses, { v: 1, ids: { 559: T - 7 * DAY } });
 eq('lead-form leads without an ad id, not missed lately, newest first, once each', leadsToBackfill(rows, misses, T, 50).map((r) => r.id), ['e1', 'e5', 'e6', 'e10', 'e11']);
 eq('at most `limit`', leadsToBackfill(rows, misses, T, 2).map((r) => r.id), ['e1', 'e5']);
+// Before ad-spend.sql (no meta_ad_id to read): only the names are kept, and leads whose names are kept already are skipped like misses.
+const noAdColumn = rows.filter((r) => !r.meta_ad_id).map((r) => ({ ...r, meta_ad_id: undefined }));
+eq('before ad-spend.sql: names kept already skipped, like misses', leadsToBackfill(noAdColumn, { v: 1, ids: { ...misses.ids, 551: T - DAY } }, T, 50).map((r) => r.id), ['e5', 'e6', 'e10', 'e11']);
 eq('misses: nonsense left out, newest kept when there are too many', [
   readMisses({ v: 1, ids: { abc: T, 1: 'x', 2: T } }, T),
   Object.keys(readMisses({ v: 1, ids: Object.fromEntries(Array.from({ length: 5003 }, (_, i) => [String(i + 1), T - i])) }, T).ids).length,
