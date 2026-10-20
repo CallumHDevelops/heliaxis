@@ -31,6 +31,7 @@ export type HubToday = { items: HubTodayItem[]; canAddDiary: boolean };
 const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   app: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
   cms: '<path d="M4 5h16v14H4z"/><path d="M4 9h16M8 13h5M8 16h8"/>',
+  branding: '<path d="M12 3.2a8.8 8.8 0 1 0 .9 17.5c1-.1 1.4-1.3.7-2a1.4 1.4 0 0 1 1-2.4H17a3.8 3.8 0 0 0 3.8-3.8C20.8 6.5 16.9 3.2 12 3.2Z"/><circle cx="7.6" cy="11.4" r="1.05" fill="currentColor" stroke="none"/><circle cx="9.7" cy="7.4" r="1.05" fill="currentColor" stroke="none"/><circle cx="14.4" cy="7.4" r="1.05" fill="currentColor" stroke="none"/>',
   tasks: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17"/>',
   enquiries: '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>',
   crm: '<path d="M3 7h18v12H3z"/><path d="M8 7V5h8v2"/><path d="M3 12h18"/><path d="M11 12v2h2v-2"/>',
