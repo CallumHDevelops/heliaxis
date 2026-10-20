@@ -335,6 +335,12 @@
 .enq-meta a {
   color: var(--ink);
 }
+/* A renamed Meta ad's name when they came in ("was Video 1"), under Source. */
+.enq-meta .enq-was {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 .enq-label {
   font-family: var(--mono);
   font-size: 0.6rem;

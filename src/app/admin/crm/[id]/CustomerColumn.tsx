@@ -445,8 +445,8 @@ function CustomerCard({
               <span className="crm-muted">No address yet</span>
             )}
           </Field>
-          <Field label="Source" extra={customer.created_at ? `Came in ${ukWhen(customer.created_at)}` : undefined}>
-            <span className="crmr-wrap">{customer.source || 'Not known'}</span>
+          <Field label="Source" extra={[customer.source_note, customer.created_at ? `Came in ${ukWhen(customer.created_at)}` : ''].filter(Boolean).join(' · ') || undefined}>
+            <span className="crmr-wrap">{customer.source_label || customer.source || 'Not known'}</span>
           </Field>
           <Field label="Owner">{owner || <span className="crm-muted">Nobody yet</span>}</Field>
           {note && <p className="crm-muted crm-small">{note}</p>}

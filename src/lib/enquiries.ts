@@ -1,4 +1,5 @@
 /** Shared enquiry CRM helpers (CMS + /admin/enquiries). */
+import type { SourceNow } from './lead-source';
 
 export const ENQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as const;
 export type EnquiryStatus = (typeof ENQUIRY_STATUSES)[number];
@@ -48,6 +49,12 @@ export type CrmLead = {
   interests: string[];
   msg: string;
   src: string;
+  /** `src` as shown, with a Meta ad's name now (src/lib/lead-source-server.ts): "Meta ad · Tim Facts". */
+  srcLabel: string;
+  /** The Meta tag under the name: the ad's name now, "Organic"…; null for other leads. */
+  srcAd: string | null;
+  /** "was Video 1" when the ad has been renamed since they came in. */
+  srcNote: string | null;
   time: string;
   isnew: boolean;
   status: string; // UI label: New | Contacted | Quoted | Won | Lost
@@ -127,7 +134,8 @@ export function interestIconKeys(interest: string | null): string[] {
   return keys;
 }
 
-export function rowToCrmLead(row: EnquiryRow): CrmLead {
+/** `src`: its source as shown, with the Meta ad's name now (src/lib/enquiries-server.ts crmLeads). */
+export function rowToCrmLead(row: EnquiryRow, src: SourceNow): CrmLead {
   const ui = dbToUiStatus(row.status);
   const postcode = row.postcode || '';
   return {
@@ -142,6 +150,9 @@ export function rowToCrmLead(row: EnquiryRow): CrmLead {
     interests: interestIconKeys(row.interest),
     msg: parseMessage(row.interest),
     src: row.source || 'website',
+    srcLabel: src.label,
+    srcAd: src.ad,
+    srcNote: src.note,
     time: relativeTime(row.created_at),
     isnew: ui === 'New',
     status: ui,

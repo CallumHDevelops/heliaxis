@@ -1,7 +1,7 @@
 import { getSessionProfile } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { enrichLeadsWithGeo, rowToCrmLead } from '@/lib/enquiries';
-import { listEnquiryRows } from '@/lib/enquiries-server';
+import { enrichLeadsWithGeo } from '@/lib/enquiries';
+import { crmLeads, listEnquiryRows } from '@/lib/enquiries-server';
 import { canAccess } from '@/lib/portals';
 import { EnquiriesCrm } from './EnquiriesCrm';
 
@@ -11,7 +11,7 @@ export default async function EnquiriesPage() {
   const { profile } = await getSessionProfile();
   const { rows } = await listEnquiryRows();
 
-  const leads = await enrichLeadsWithGeo(rows.map(rowToCrmLead));
+  const leads = await enrichLeadsWithGeo(await crmLeads(rows));
 
   return (
     <AdminShell active="enquiries" isAdmin={profile?.role === 'admin'} fluid>

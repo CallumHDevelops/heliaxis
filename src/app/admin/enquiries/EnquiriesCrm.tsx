@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrmLead } from '@/lib/enquiries';
 import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS, shownLeads, statusFromParam } from '@/lib/enquiries';
-import { inSource, leadSourceLabel, metaAdLabel, SOURCE_GROUPS, sourceCounts, sourceFromParam, type SourceGroup } from '@/lib/lead-source';
+import { inSource, SOURCE_GROUPS, sourceCounts, sourceFromParam, type SourceGroup } from '@/lib/lead-source';
 import { osmEmbedUrl } from '@/lib/geocode-postcode';
 import { DeleteCustomers, type DeleteDone } from './DeleteCustomers';
 import './enquiries.css';
@@ -54,14 +54,13 @@ function filterWords(status: string, source: SourceGroup | '') {
   return [status, from].filter(Boolean).join(', ');
 }
 
-/** A Meta lead's ad (or "Organic") under the name: small, so the table gets no wider on phones. */
-function AdLine({ src }: { src: string }) {
-  const ad = metaAdLabel(src);
-  if (!ad) return null;
+/** A Meta lead's ad by its name now (or "Organic") under the name: small, so the table gets no wider on phones. */
+function AdLine({ lead }: { lead: CrmLead }) {
+  if (!lead.srcAd) return null;
   return (
-    <span className="enq-ad" title={leadSourceLabel(src)}>
+    <span className="enq-ad" title={lead.srcNote ? `${lead.srcLabel} (${lead.srcNote})` : lead.srcLabel}>
       <i>Meta</i>
-      <span>{ad}</span>
+      <span>{lead.srcAd}</span>
     </span>
   );
 }
@@ -410,7 +409,7 @@ export function EnquiriesCrm({
                         <b>{l.name}</b>
                         {l.ref && <span className="enq-ref">{l.ref}</span>}
                         <span className="enq-email">{l.email}</span>
-                        <AdLine src={l.src} />
+                        <AdLine lead={l} />
                       </span>
                     </label>
                   ) : (
@@ -418,7 +417,7 @@ export function EnquiriesCrm({
                       <b>{l.name}</b>
                       {l.ref && <span className="enq-ref">{l.ref}</span>}
                       <div className="enq-email">{l.email}</div>
-                      <AdLine src={l.src} />
+                      <AdLine lead={l} />
                     </>
                   )}
                 </td>
@@ -485,7 +484,7 @@ export function EnquiriesCrm({
             <p className="enq-sub">
               {active.ref ? `${active.ref} · ` : ''}
               {active.sector}
-              {active.org ? ` · ${active.org}` : ''} · via {leadSourceLabel(active.src)} · {active.time}
+              {active.org ? ` · ${active.org}` : ''} · via {active.srcLabel} · {active.time}
             </p>
             {typeof active.lat === 'number' && typeof active.lng === 'number' ? (
               <div className="enq-map">
@@ -516,7 +515,8 @@ export function EnquiriesCrm({
               </div>
               <div>
                 <span>Source</span>
-                {leadSourceLabel(active.src)}
+                {active.srcLabel}
+                {active.srcNote && <small className="enq-was">{active.srcNote}</small>}
               </div>
             </div>
             <div className="enq-label">Interested in</div>
