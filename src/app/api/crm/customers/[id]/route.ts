@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
+import { followsCustomerPostcode, postcodeKey } from '@/lib/crm/site-postcode';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { permissionStop, setPermissionByStaff, STAFF_STOP_PREFIX, type StopRecord } from '@/lib/whatsapp/permission';
 
@@ -7,7 +8,8 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Edit the customer's contact details. Changing the mobile re-links WhatsApp: any chat on that
- * number (on any enquiry) then shows on their CRM timeline.
+ * number (on any enquiry) then shows on their CRM timeline. Correcting the postcode moves the site
+ * postcode on their jobs that only had a copy of the old one → `movedJobs`: those jobs' ids.
  * `whatsapp_opt_in: true | false` records WhatsApp permission given to staff ('staff:<name>') or
  * withdrawn ('staff-stop:<name>': no automatic WhatsApps, whatever the rule says) on every enquiry
  * with their number → { ok, liftedStop }. Switching it on when they replied STOP (or staff switched it
@@ -41,7 +43,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (stop) return stoppedResponse(stop);
   }
   const db = createAdminClient();
-  const { data: before } = await db.from('enquiries').select('phone').eq('id', id).maybeSingle();
+  const { data: before } = await db.from('enquiries').select('phone, postcode').eq('id', id).maybeSingle();
   if (!before) return json({ error: 'Not found' }, 404);
   if (Object.keys(u).length) {
     const { error } = await db.from('enquiries').update(u).eq('id', id);
@@ -50,6 +52,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ('phone' in u && u.phone !== before.phone) {
     await logActivity({ enquiryId: id, kind: 'system', body: `Mobile changed to ${u.phone || '—'}`, byId: s.user.id });
   }
+  // Customer → Edit sends the postcode every time: only a real change looks at their jobs.
+  const pcWas = (before.postcode as string | null) ?? null;
+  const pcNow = (u.postcode as string | null | undefined) ?? null;
+  const movedJobs = 'postcode' in u && pcNow && postcodeKey(pcNow) !== postcodeKey(pcWas) ? await moveSitePostcodes(id, pcWas, pcNow, s.user.id) : [];
 
   if (typeof b.whatsapp_opt_in === 'boolean') {
     const on = b.whatsapp_opt_in;
@@ -69,6 +75,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return json({
       ok: true,
       liftedStop: r.liftedStop || r.liftedStaffStop,
+      movedJobs,
       whatsapp_opt_in: on,
       whatsapp_opt_in_at: (after?.whatsapp_opt_in_at as string | null | undefined) ?? null,
       whatsapp_opt_in_source: (after?.whatsapp_opt_in_source as string | null | undefined) ?? null,
@@ -81,7 +88,37 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           }),
     });
   }
-  return json({ ok: true });
+  return json({ ok: true, movedJobs });
+}
+
+/**
+ * The customer's postcode went from `was` to `now`: their jobs that were only carrying a copy of the
+ * old one (or none) follow it, each with a note on its timeline; a job with a site of its own keeps
+ * its postcode (followsCustomerPostcode). Its map position clears with it (crm-v3.sql's trigger), so
+ * survey drive times come from the new postcode. → the ids of the jobs that moved; none before the
+ * CRM tables exist.
+ */
+async function moveSitePostcodes(enquiryId: string, was: string | null, now: string, byId: string): Promise<string[]> {
+  const db = createAdminClient();
+  const { data: jobs, error } = await db.from('crm_projects').select('id, address, postcode').eq('enquiry_id', enquiryId);
+  if (error) return [];
+  const moving = (jobs ?? []).filter((j) => followsCustomerPostcode(j, was, now));
+  if (!moving.length) return [];
+  const ids = moving.map((j) => String(j.id));
+  const { error: saveError } = await db.from('crm_projects').update({ postcode: now, updated_at: new Date().toISOString() }).in('id', ids);
+  if (saveError) return [];
+  await Promise.all(
+    moving.map((j) =>
+      logActivity({
+        enquiryId,
+        projectId: String(j.id),
+        kind: 'system',
+        body: j.postcode?.trim() ? `Site postcode changed from ${j.postcode.trim()} to ${now} with the customer’s` : `Site postcode set to ${now} with the customer’s`,
+        byId,
+      })
+    )
+  );
+  return ids;
 }
 
 /** Switching on was refused: they replied STOP, or staff switched it off. */
