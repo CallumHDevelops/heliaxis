@@ -154,15 +154,19 @@ yes('an ad shown but never charged, with no leads, is left out', !rowOf('Heat pu
 const v4 = rowOf('Solar Oct', 'Video 4');
 eq('the ad a lead was pinned to by id keeps its own row and spend', [v4.leads, v4.spend, v4.metaLeads, v4.note], [1, 30000, 9, undefined]);
 const copy = rowOf('Solar Oct – Copy', 'Video 4');
-eq('the name-only lead goes with the other ad of that name, in its own campaign', [copy.leads, copy.spend, copy.note], [1, 8000, '2 ads with this name, in “Solar Oct” and “Solar Oct – Copy”']);
+// Which of the two the name-only lead came from isn't known (one has a lead by id, so a guess would
+// put this lead against the other's spend): it gets a row of its own, with no spend.
+eq('the other ad of that name keeps its own row and spend', [copy.leads, copy.spend, copy.note], [0, 8000, undefined]);
 eq('an ad with spend and no leads gets its own row', [rowOf('Solar Oct', 'Static 1').leads, rowOf('Solar Oct', 'Static 1').spend], [0, 5000]);
 eq('ad rows in a campaign: by £ won, then leads, then spend', g['Solar Oct'].rows.map((r) => r.label), ['Carousel 2', 'Video 4', 'Static 1']);
 const other = g['Other Meta leads and spend'];
-eq('unmatched leads and unlisted spend go in "Other"', other.rows.map((r) => [r.label, r.leads, r.spend]), [
+eq('unmatched leads, the name-only lead and unlisted spend go in "Other"', other.rows.map((r) => [r.label, r.leads, r.spend]), [
   ['Gone ad', 1, null],
   ['Meta lead form', 1, null],
+  ['Video 4', 1, null],
   ['Ads Meta no longer lists', 0, 80000 - 75000],
 ]);
+eq('…the name-only one saying it could be either', rowOf('Other Meta leads and spend', 'Video 4').note, 'Leads that don’t say which ad: 2 ads with this name, in “Solar Oct” and “Solar Oct – Copy”');
 yes('…each with a note saying why', other.rows.every((r) => r.note));
 eq('total spend is the account’s, and the groups add up to it', [table.total.spend, table.groups.reduce((n, x) => n + x.total.spend, 0)], [80000, 80000]);
 eq('total leads: every Meta lead, nothing else', [table.total.leads, table.total.won, table.total.value], [12, 1, 12000]);
@@ -172,21 +176,32 @@ eq('Meta’s own count is the account’s', table.total.metaLeads, 20);
 const dup = [ad('101', 'Video 4', 'c1', 'Solar Oct', 30000), ad('201', 'Video 4', 'c2', 'Heat pumps', 25000)];
 const dupTable = spendTable([L('meta: Video 4', { metaAdId: '201' }), L('meta: Video 4', { metaAdId: '201', won: true, value: 8000 }), L('meta: Video 4')], dup, null);
 const dupG = Object.fromEntries(dupTable.groups.map((x) => [x.label, x.total]));
-eq('one name-only lead never moves leads pinned by id (or their spend) to another campaign', [dupG['Heat pumps']?.leads, dupG['Heat pumps']?.spend, dupG['Heat pumps']?.value, dupG['Solar Oct']?.leads, dupG['Solar Oct']?.spend], [
-  2,
-  25000,
-  8000,
-  1,
-  30000,
-]);
-// Three ads with one name: one pinned, the other two in different campaigns. Their shared row goes in "Other".
+eq('one name-only lead never moves leads pinned by id (or their spend) to another campaign, nor is guessed onto the other', [
+  dupG['Heat pumps']?.leads,
+  dupG['Heat pumps']?.spend,
+  dupG['Heat pumps']?.value,
+  dupG['Solar Oct']?.leads,
+  dupG['Solar Oct']?.spend,
+  dupG['Other Meta leads and spend']?.leads,
+  dupG['Other Meta leads and spend']?.spend,
+], [2, 25000, 8000, 0, 30000, 1, null]);
+// Two ads called "Video 4" and no lead known by id (as before ad-spend.sql): they share one row with their spend.
+const pair = spendTable([L('meta: Video 4'), L('meta: Video 4', { won: true, value: 8000 })], [ad('101', 'Video 4', 'c1', 'Solar Oct', 30000), ad('102', 'Video 4', 'c1', 'Solar Oct', 5000)], null);
+eq('ads sharing a name, no lead known by id: one row, both ads’ spend', pair.groups[0].rows.map((r) => [r.label, r.leads, r.spend, r.note]), [['Video 4', 2, 35000, '2 ads with this name']]);
+// Three ads with one name: one pinned, the other two in different campaigns. Each keeps its spend; the name-only lead goes in "Other".
 const tri = spendTable([L('meta: Video 4', { metaAdId: '101' }), L('meta: Video 4')], [...dup, ad('301', 'Video 4', 'c3', 'Batteries', 5000)], null);
 const triOther = tri.groups.find((x) => x.label === 'Other Meta leads and spend');
-eq('ads of one name in several campaigns share a row in "Other", so no campaign counts another’s spend', [
+eq('a name-only lead that fits ads in several campaigns goes in "Other", so no campaign counts another’s lead', [
   tri.groups.map((x) => [x.label, x.total.leads, x.total.spend]),
   triOther?.rows[0].label,
   triOther?.rows[0].note,
-], [[['Solar Oct', 1, 30000], ['Other Meta leads and spend', 1, 30000]], 'Video 4', '3 ads with this name, in “Solar Oct”, “Heat pumps” and “Batteries”']);
+], [
+  [['Solar Oct', 1, 30000], ['Heat pumps', 0, 25000], ['Batteries', 0, 5000], ['Other Meta leads and spend', 1, null]],
+  'Video 4',
+  'Leads that don’t say which ad: 3 ads with this name, in “Solar Oct”, “Heat pumps” and “Batteries”',
+]);
+const triFree = spendTable([L('meta: Video 4')], [...dup, ad('301', 'Video 4', 'c3', 'Batteries', 5000)], null);
+eq('…and with no lead known by id, the three share a row in "Other" with their spend', triFree.groups.map((x) => [x.label, x.total.leads, x.total.spend]), [['Other Meta leads and spend', 1, 60000]]);
 // Organic form leads beside paid ones: no ad spend is behind them, so they stay out of cost per lead and return.
 const org = spendTable([L('meta: Video A'), L('meta: Video A'), L('meta-organic', { won: true, value: 9000 })], [ad('9', 'Video A', 'c9', 'C', 1000)], null);
 eq('organic leads aren’t in the Meta leads or £ won', [org.total.leads, org.total.value, org.groups.length], [2, 0, 1]);
