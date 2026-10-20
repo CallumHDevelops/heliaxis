@@ -754,8 +754,29 @@ ul.enq-del-err {
   background: rgba(24, 119, 242, 0.1);
   color: #1559b8;
 }
+/* Phones: one row (it scrolls sideways if the counts get long), without the "From". */
 @media (max-width: 640px) {
+  .enq-src-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-left: -2px;
+    padding: 2px;
+  }
+  .enq-src-row::-webkit-scrollbar {
+    display: none;
+  }
+  .enq-src-k {
+    display: none;
+  }
   .enq-src {
+    flex: none;
     min-height: 40px;
+    gap: 5px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+  }
+  .enq-src .c {
+    padding: 1px 5px;
   }
 }
