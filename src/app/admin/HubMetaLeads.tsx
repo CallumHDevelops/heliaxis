@@ -66,7 +66,7 @@ export function HubMetaLeads({ data }: { data: Data }) {
                       </Link>
                     )}
                     {r.phone && (
-                      <a className="hub-meta-btn" href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}>
+                      <a className="hub-meta-btn is-call" href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}>
                         Call
                       </a>
                     )}
