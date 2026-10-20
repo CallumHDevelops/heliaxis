@@ -57,12 +57,15 @@ export function ProjectsBoard({
   initial,
   team,
   today: serverToday,
+  orders = false,
 }: {
   me: string;
   initialView: ProjectsView;
   initial: Data;
   team: TeamMember[];
   today: string;
+  /** purchase-orders.sql has been run: link to Purchase orders. */
+  orders?: boolean;
 }) {
   const router = useRouter();
   const now = useNow(60_000);
@@ -166,6 +169,11 @@ export function ProjectsBoard({
               </button>
             ))}
           </div>
+          {orders && (
+            <Link href="/admin/projects/orders" className="crm-btn crm-btn--ghost prj-orders">
+              Purchase orders
+            </Link>
+          )}
           <button type="button" className="crm-btn crm-btn--solar crmh-new prj-new" onClick={() => setAdding(true)}>
             + New project
           </button>

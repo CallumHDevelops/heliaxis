@@ -354,6 +354,10 @@
     grid-area: i;
     min-height: 48px; /* gloves */
   }
+  .prj .prj-orders {
+    grid-area: v;
+    justify-self: end;
+  }
   .prj-list {
     border-radius: 12px;
   }

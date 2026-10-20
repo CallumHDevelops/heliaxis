@@ -6,6 +6,7 @@ import type { CheckView } from '@/lib/projects/checklist';
 import type { Deadline } from '@/lib/projects/deadlines';
 import type { EnaInfo } from '@/lib/projects/ena';
 import type { NextDate, TeamMember } from '@/lib/projects/server';
+import type { OrdersSummary } from '@/lib/purchase-orders/shared';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
 import type { ChaseView } from '@/lib/whatsapp/schedule';
@@ -172,6 +173,8 @@ export type RecordData = {
   /** "For the ENA application" (the main cut-out and meter photos). Null before surveys.sql, and for jobs with no solar or battery. */
   ena: EnaInfo | null;
   schema: SchemaReady;
+  /** The job's purchase orders at a glance (null before purchase-orders.sql). */
+  orders?: OrdersSummary | null;
 };
 
 /** ?light=1&since=: what the page polls for. */
@@ -186,8 +189,8 @@ export type LightData = {
   timeline: Entry[];
 };
 
-export type Tab = 'overview' | 'activity' | 'photos' | 'docs' | 'surveys' | 'details';
-export const TABS: Tab[] = ['overview', 'activity', 'photos', 'docs', 'surveys', 'details'];
+export type Tab = 'overview' | 'activity' | 'photos' | 'docs' | 'orders' | 'surveys' | 'details';
+export const TABS: Tab[] = ['overview', 'activity', 'photos', 'docs', 'orders', 'surveys', 'details'];
 export type Area = 'crm' | 'projects';
 
 /** The tab a job opens on (spec 4.3): Overview for projects, Activity for opportunities (and Lost jobs). */

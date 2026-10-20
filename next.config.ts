@@ -51,6 +51,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/setup/file': ['./supabase/*.sql'],
     '/admin/setup/**': ['./supabase/*.sql', './*.md'],
+    // The logo on purchase order PDFs (src/lib/purchase-orders/pdf.ts).
+    '/api/crm/purchase-orders/**': ['./public/assets/heliaxis-logo.png'],
   },
   images: {
     remotePatterns: [

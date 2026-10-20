@@ -5,6 +5,7 @@ import { signOut } from '@/lib/auth-actions';
 import { brand } from '@/components/auth/authStyles';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
+import { schemaReady } from '@/lib/schema-ready';
 import { unreadPeople } from '@/lib/whatsapp/active';
 import { AppRuntime } from './AppRuntime';
 import { HeaderUser } from './HeaderUser';
@@ -94,6 +95,12 @@ const icons = {
     <svg {...ICON}>
       <path d="M4 4v16h16" />
       <path d="M8 8h6M10 12h7M8 16h5" />
+    </svg>
+  ),
+  orders: (
+    <svg {...ICON}>
+      <path d="M21 8 12 3 3 8v8l9 5 9-5z" />
+      <path d="m3 8 9 5 9-5M12 13v8" />
     </svg>
   ),
   surveys: (
@@ -286,6 +293,8 @@ export async function AdminShell({
   const chats = can('enquiries') || can('crm');
   const waUnread = chats ? await unreadPeople(can('enquiries') ? 'all' : 'linked') : 0;
   const waHref = can('enquiries') ? '/admin/enquiries/inbox' : '/admin/crm/chats';
+  // Purchase orders: once purchase-orders.sql has been run (checked once a minute).
+  const orders = can('crm') && (await schemaReady()).purchaseOrders;
 
   const tasksIsTab = !can('crm') && !can('enquiries') && can('tasks');
   const enquiriesIsTab = !can('crm') && can('enquiries');
@@ -304,6 +313,7 @@ export async function AdminShell({
         { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
         // Projects pages light up the CRM tab (they use active="crm"), so this tile never does.
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
+        { href: '/admin/projects/orders', label: 'Purchase orders', short: 'Orders', icon: icons.orders, show: orders },
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },

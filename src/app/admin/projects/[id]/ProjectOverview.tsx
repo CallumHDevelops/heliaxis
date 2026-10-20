@@ -8,6 +8,7 @@ import {
   isProjectStage,
   isSurveyType,
   minutesWords,
+  money,
   noSurveyNeeded,
   PHOTO_CATEGORIES,
   STAGES,
@@ -21,6 +22,8 @@ import { DOC_LABEL } from '../../crm/[id]/ProjectExtras';
 import { londonIso, shortDate, ukDayOf, ukTime } from '../../crm/crm-shared';
 import { useMedia } from '../../crm/use-stored';
 import type { RecordData, SurveyItem, Tab } from '../../crm/[id]/record-shared';
+import { askNewOrder } from '../orders/OrdersTab';
+import { KitOrdered } from '../orders/OrdersUi';
 
 /** Opens RAMS already signed in (src/lib/sso.ts). Not a page here: a plain link, so it's never prefetched. */
 const RAMS_URL = '/api/sso/rams';
@@ -62,7 +65,7 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
   const wide = useMedia('(min-width: 761px)');
   return (
     <div className="crmr-ov">
-      <JobFile rec={rec} actions={actions} />
+      <JobFile rec={rec} today={today} actions={actions} />
       {v3 ? (
         <Checklist rec={rec} actions={actions} />
       ) : (
@@ -156,7 +159,7 @@ function Tile({
   );
 }
 
-function JobFile({ rec, actions }: { rec: RecordData; actions: OverviewActions }) {
+function JobFile({ rec, today, actions }: { rec: RecordData; today: string; actions: OverviewActions }) {
   const p = rec.project as RecordData['project'] & { accepted_hash?: string | null };
   const docs = rec.documents as (RecordData['documents'][number] & { signed_outside_at?: string | null })[];
   const of = (cats: string[]) => docs.filter((d) => cats.includes(d.category));
@@ -237,6 +240,24 @@ function JobFile({ rec, actions }: { rec: RecordData; actions: OverviewActions }
               <span>{rec.surveys.map((s) => `${s.type === 'ashp' ? 'Heat pump' : 'Solar'}: ${surveyStatus(s.status)}${s.flags.length ? ` · ${s.flags.length} flagged` : ''}`).join(' · ')}</span>
             ) : (
               <span className="crm-muted">No survey yet</span>
+            )}
+          </Tile>
+        )}
+        {/* Purchase orders (purchase-orders.sql): the kit ordered beside the job's value. */}
+        {rec.orders && (isProjectStage(p.stage) || rec.orders.count > 0) && (
+          <Tile
+            title="Purchase orders"
+            count={rec.orders.count}
+            onOpen={() => actions.openTab('orders')}
+            onAdd={() => {
+              askNewOrder(p.id);
+              actions.openTab('orders');
+            }}
+          >
+            {rec.orders.count ? (
+              <KitOrdered s={rec.orders} today={today} value={p.value} />
+            ) : (
+              <span className="crm-muted">No orders yet{p.value ? ` · job value ${money(p.value)} inc VAT` : ''}</span>
             )}
           </Tile>
         )}
