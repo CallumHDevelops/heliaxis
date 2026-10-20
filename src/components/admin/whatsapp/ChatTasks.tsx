@@ -11,9 +11,9 @@ import './chat-tasks.css';
 /**
  * "+ Add task" in a WhatsApp chat (ChatPane, both looks): a call-back reminder (the job's next step at a
  * time, which the every-minute cron pushes when it's due), a task (who and which day) or a note, for this
- * customer's job, without leaving the chat. The time and the words come from their latest message (or the
- * one picked with a long press, or the ⋯ beside it on a computer) and can all be changed; nothing is saved
- * until Save. Afterwards a line in the chat says what was set and who hears.
+ * customer's job (the one the chat was opened from, if any), without leaving the chat. The time and the
+ * words come from their latest message (or the one picked with the ⋯ beside it) and can all be changed;
+ * nothing is saved until Save. Afterwards a line in the chat says what was set and who hears.
  *
  * CRM access only. The sheets are the record page's (RecordSheets), loaded the first time they're needed.
  */
@@ -38,12 +38,15 @@ const MENU: [TaskKind, string, string, string][] = [
 
 export function useChatTasks({
   threadId,
+  projectId = null,
   me,
   name,
   messages,
   enabled,
 }: {
   threadId: string;
+  /** The job the chat was opened from (the dock's job tab, a job's WhatsApp button): it goes on that one. */
+  projectId?: string | null;
   /** The signed-in user (the task's default "Who"). */
   me: string;
   /** The customer's name, once the chat has loaded. */
@@ -58,7 +61,7 @@ export function useChatTasks({
   notice: ReactNode;
   /** Both in a strip, for the top of the dock's chat. */
   bar: ReactNode;
-  /** A message's ⋯ (and long press): "Make a reminder from this". */
+  /** A message's ⋯: "Make a reminder from this". */
   actionsFor: (m: ChatMsg) => ReactNode;
   /** The open sheet (portalled to the page). */
   sheet: ReactNode;
@@ -68,8 +71,8 @@ export function useChatTasks({
   const [lookup, setLookup] = useState<Lookup>({ info: null, error: '' });
   const [done, setDone] = useState<Done | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  /** The last read of their job: `at` is when it came back (0 while it's on its way). */
-  const reading = useRef<{ p: Promise<ChatJobInfo>; at: number } | null>(null);
+  /** The last read of their job: `at` is when it came back (0 while it's on its way), `url` what it asked. */
+  const reading = useRef<{ p: Promise<ChatJobInfo>; at: number; url: string } | null>(null);
   const who = name ? firstName(name) : '';
 
   /**
@@ -78,26 +81,32 @@ export function useChatTasks({
    */
   const readJob = useCallback(
     (fresh = false) => {
+      const url = `/api/crm/chat-job?enquiry=${encodeURIComponent(threadId)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`;
       const last = reading.current;
-      if (last && !fresh && (!last.at || Date.now() - last.at < 30_000)) return last.p;
-      const read = { at: 0 } as { p: Promise<ChatJobInfo>; at: number };
-      read.p = fetch(`/api/crm/chat-job?enquiry=${encodeURIComponent(threadId)}`, { cache: 'no-store' })
+      if (last && !fresh && last.url === url && (!last.at || Date.now() - last.at < 30_000)) return last.p;
+      // Another job's page now (the same chat): what was read for the last one no longer says where it goes.
+      if (last && last.url !== url) setLookup({ info: null, error: '' });
+      const read = { at: 0, url } as { p: Promise<ChatJobInfo>; at: number; url: string };
+      read.p = fetch(url, { cache: 'no-store' })
         .then(async (r) => {
           const d = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(d.error || 'Couldn’t look up their job');
           read.at = Date.now();
-          setLookup({ info: d as ChatJobInfo, error: '' });
+          // Only the latest read shows (an older one landing late would undo a save's).
+          if (reading.current === read) setLookup({ info: d as ChatJobInfo, error: '' });
           return d as ChatJobInfo;
         })
         .catch((e: unknown) => {
-          if (reading.current === read) reading.current = null;
-          setLookup((l) => ({ ...l, error: e instanceof Error ? e.message : 'Couldn’t look up their job' }));
+          if (reading.current === read) {
+            reading.current = null;
+            setLookup((l) => ({ ...l, error: e instanceof Error ? e.message : 'Couldn’t look up their job' }));
+          }
           throw e;
         });
       reading.current = read;
       return read.p;
     },
-    [threadId]
+    [threadId, projectId]
   );
   /** Started as soon as there's a sign of wanting one (the menu opening), so the sheet rarely waits. */
   const warm = useCallback(() => {
@@ -230,6 +239,8 @@ export function useChatTasks({
       onDone={(d) => {
         setDone(d);
         close();
+        // What the save changed (the job's next step, or a job it opened), so the next sheet warns before replacing it.
+        readJob(true).catch(() => {});
         // The job's page, if it's open behind the dock, shows the new next step or task now.
         window.dispatchEvent(new CustomEvent('hx:project-changed', { detail: { id: d.jobId } }));
       }}
@@ -252,9 +263,9 @@ export function useChatTasks({
 }
 
 /**
- * A message's own menu: "Make a reminder from this", "Make a task from this", "Copy text". The ⋯ shows
- * beside the message on hover (computers); on phones a long press on the message opens it (and, as the
- * long press no longer selects text, "Copy text" stands in for that).
+ * A message's own menu: "Make a reminder from this", "Make a task from this". The ⋯ shows beside the
+ * message on hover (computers), and always on phones, where a long press stays the phone's own text
+ * selection (to copy an email address or a postcode).
  */
 const MessageMenu = memo(function MessageMenu({
   m,
@@ -265,7 +276,6 @@ const MessageMenu = memo(function MessageMenu({
   onStart: (kind: TaskKind, from: ChatMsg, back: HTMLElement | null) => void;
   onOpen: () => void;
 }) {
-  const text = textOf(m);
   const [open, setOpen] = useState<'up' | 'down' | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -281,49 +291,6 @@ const MessageMenu = memo(function MessageMenu({
     setOpen(r.top + r.height / 2 > (top + bottom) / 2 ? 'up' : 'down');
     onOpen();
   }, [onOpen]);
-
-  // Long press on the message (touch and pen; a mouse has the ⋯).
-  useEffect(() => {
-    const bubble = ref.current?.parentElement;
-    if (!bubble) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let from: { x: number; y: number } | null = null;
-    let pressed = false;
-    const down = (e: PointerEvent) => {
-      if (e.pointerType === 'mouse' || (e.target as Element).closest?.('.wa-msgmenu')) return;
-      from = { x: e.clientX, y: e.clientY };
-      pressed = false;
-      timer = setTimeout(() => {
-        pressed = true;
-        navigator.vibrate?.(12);
-        show();
-      }, 480);
-    };
-    const move = (e: PointerEvent) => {
-      if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 10) clearTimeout(timer);
-    };
-    const up = () => {
-      clearTimeout(timer);
-      from = null;
-    };
-    // Android's own long-press menu (and text selection) gives way to this one.
-    const context = (e: Event) => {
-      if (pressed || from) e.preventDefault();
-    };
-    bubble.addEventListener('pointerdown', down);
-    bubble.addEventListener('pointermove', move);
-    bubble.addEventListener('pointerup', up);
-    bubble.addEventListener('pointercancel', up);
-    bubble.addEventListener('contextmenu', context);
-    return () => {
-      clearTimeout(timer);
-      bubble.removeEventListener('pointerdown', down);
-      bubble.removeEventListener('pointermove', move);
-      bubble.removeEventListener('pointerup', up);
-      bubble.removeEventListener('pointercancel', up);
-      bubble.removeEventListener('contextmenu', context);
-    };
-  }, [show]);
 
   // Closes on a tap anywhere else.
   useEffect(() => {
@@ -375,16 +342,6 @@ const MessageMenu = memo(function MessageMenu({
           </button>
           <button type="button" role="menuitem" onClick={() => pick('task')}>
             ✓ Make a task from this
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(null);
-              void navigator.clipboard?.writeText(text).catch(() => {});
-            }}
-          >
-            Copy text
           </button>
         </span>
       )}

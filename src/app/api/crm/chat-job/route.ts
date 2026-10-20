@@ -21,15 +21,20 @@ const CLOSED = new Set(['complete', 'lost']);
 
 /**
  * Which job a WhatsApp chat's call-back reminder, task or note goes on (GET ?enquiry={the chat's
- * enquiry}): the customer's latest open job on any of their enquiries with that WhatsApp number (the
- * dock's rule), or else their latest job of any kind (`last`), and the team for the task's "Who" and
- * whoever looks after the job (who the cron tells when a next step falls due). Read-only: with no open
- * job the chat opens one with POST /api/crm/projects as it saves, so nothing is made just by looking.
+ * enquiry}&project={the job it was opened from, if any}): that job when it's this customer's (as `job`
+ * while it's open; once it's closed as `last`, with their latest open job as `live` for a call-back,
+ * which only goes off on an open one); with none, the customer's latest open job on any of their
+ * enquiries with that WhatsApp number (the dock's rule), or else their latest job of any kind (`last`).
+ * And the team for the task's "Who" and whoever looks after the job (who the cron tells when a next step
+ * falls due). Read-only: with no open job the chat opens one with POST /api/crm/projects as it saves, so
+ * nothing is made just by looking.
  */
 export async function GET(req: Request) {
   const s = await crmSession();
   if (!s) return json({ error: 'unauthorized' }, 401);
-  const id = new URL(req.url).searchParams.get('enquiry') ?? '';
+  const q = new URL(req.url).searchParams;
+  const id = q.get('enquiry') ?? '';
+  const pid = q.get('project') ?? '';
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const db = createAdminClient();
   const { data: e } = await db.from('enquiries').select('id, phone, wa_id').eq('id', id).maybeSingle();
@@ -51,7 +56,10 @@ export async function GET(req: Request) {
     crmTeam(),
   ]);
   const list = jobs ?? [];
-  const open = list.find((p) => !CLOSED.has(p.stage)) ?? null;
+  // The job the chat was opened from, only if it's one of theirs (another customer's id is ignored).
+  const here = isUuid(pid) ? (list.find((p) => p.id === pid) ?? null) : null;
+  const latestOpen = list.find((p) => !CLOSED.has(p.stage)) ?? null;
+  const open = here ? (CLOSED.has(here.stage) ? null : here) : latestOpen;
   // The cron only tells the owner if they can open the CRM; otherwise everyone on it.
   const crmPeople = new Map(team.filter((t) => t.crm).map((t) => [t.id, t.name]));
   const shape = (p: Job | null) =>
@@ -65,5 +73,5 @@ export async function GET(req: Request) {
       nextStep: p.next_step,
       nextStepAt: p.next_step_at,
     };
-  return json({ job: shape(open), last: open ? null : shape(list[0] ?? null), team, me: s.user.id });
+  return json({ job: shape(open), last: open ? null : shape(here ?? list[0] ?? null), live: open ? null : shape(latestOpen), team, me: s.user.id });
 }

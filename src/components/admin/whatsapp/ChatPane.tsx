@@ -384,8 +384,8 @@ export function ChatPane({
   // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
   const tplSend = useTemplateSend(id, !!enquiry && !open, defaultTemplate);
   const { templates, pick: tpl } = tplSend;
-  // "+ Add task", each message's ⋯ and the sheets (ChatTasks.tsx).
-  const tasks = useChatTasks({ threadId: id, me, name: enquiry?.name ?? null, messages, enabled: canCrm });
+  // "+ Add task", each message's ⋯ and the sheets (ChatTasks.tsx), on the job the chat was opened from.
+  const tasks = useChatTasks({ threadId: id, projectId: projectId ?? job?.projectId ?? null, me, name: enquiry?.name ?? null, messages, enabled: canCrm });
 
   async function post(body: unknown) {
     setSending(true);

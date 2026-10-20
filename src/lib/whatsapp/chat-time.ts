@@ -189,7 +189,9 @@ function timeHits(t: string): TimeHit[] {
     if (mer && (h === 0 || h > 12)) return;
     // "busy until 2", "out at 3": when they can't talk, not when to call.
     const tie = /\b(until|till|til|busy|out|away|working|tied up|at work|in work)\s*$/.test(t.slice(Math.max(0, m.index - 18), m.index));
-    hits.push({ start: m.index, end: m.index + m[0].trimEnd().length, mins: h * 60 + min, meridiem: mer, cue: cue ?? '', tie });
+    // "not before 6", "don't ring before 5": the earliest they can talk, not a time to beat.
+    const notBefore = cue === 'before' && /\b(not|don't|dont|never|no|can't|cannot|won't)\s+(?:[a-z']+\s+){0,2}$/.test(t.slice(Math.max(0, m.index - 24), m.index));
+    hits.push({ start: m.index, end: m.index + m[0].trimEnd().length, mins: h * 60 + min, meridiem: mer, cue: notBefore ? 'from' : (cue ?? ''), tie });
   };
   const each = (re: string, on: (m: RegExpExecArray) => void) => {
     const g = new RegExp(re, 'g');
@@ -202,8 +204,12 @@ function timeHits(t: string): TimeHit[] {
     if (m[3] === '.' && !m[1] && !m[5]) return;
     add(m, Number(m[2]), Number(m[4]), m[5], m[1]);
   });
-  // 1-2pm, between 2 and 3pm (the first, with the end's am/pm).
-  each(`${CUE}(?<![£$\\d.:])\\b${NUM}\\s*(?:-|–|to|and)\\s*${NUM}\\s*${MERIDIEM}`, (m) => add(m, numOf(m[2]), 0, m[4], m[1]));
+  // 1-2pm, between 2 and 3pm (the first, with the end's am/pm). An earlier hour on the clock is the
+  // morning before: "11-1pm" and "10-12pm" start at 11am and 10am (12 counts as 0, so "12-2pm" is noon).
+  each(`${CUE}(?<![£$\\d.:])\\b${NUM}\\s*(?:-|–|to|and)\\s*${NUM}\\s*${MERIDIEM}`, (m) => {
+    const from = numOf(m[2]);
+    add(m, from, 0, m[4].startsWith('p') && from % 12 > numOf(m[3]) % 12 ? 'am' : m[4], m[1]);
+  });
   // 1pm, 10 am, 3 o'clock, 2ish.
   each(`${CUE}(?<![£$\\d.:])\\b${NUM}\\s*(${MERIDIEM}|o'?clock|ish)(?![a-z])`, (m) => add(m, numOf(m[2]), 0, /^[ap]/.test(m[3]) ? m[3] : undefined, m[1]));
   // half 2, half past two (the UK "half 2" is 2:30).
@@ -245,16 +251,27 @@ function dayHit(t: string): DayHit | null {
     if ((m = new RegExp(`\\b(next\\s+|on\\s+|this\\s+)?${word}\\b`).exec(t))) found.push({ ...at(m), kind: 'weekday', weekday, next: !!m[1]?.startsWith('next') });
   }
   found.sort((a, b) => a.start - b.start);
-  // "I'm in work today but tomorrow's fine": the day they can't do isn't the one.
-  const busy = (d: DayHit) => /\b(busy|working|in work|at work|out|away|can't do|cannot do)\s*$/.test(t.slice(Math.max(0, d.start - 18), d.start));
-  return found.find((d) => !busy(d)) ?? found[0] ?? null;
+  return found.find((d) => !ruledOut(t, d)) ?? found[0] ?? null;
+}
+
+/**
+ * "I'm in work today but tomorrow's fine", "Not today, tomorrow at 2", "today's no good": the day (or
+ * part of it) they can't do isn't the one.
+ */
+function ruledOut(t: string, d: Span): boolean {
+  return (
+    /\b(busy|working|in work|at work|out|away|not|no|can't|cannot|won't)(?:\s+(?:do|make|make it|manage|be free|free))?\s*$/.test(t.slice(Math.max(0, d.start - 18), d.start)) ||
+    /^(?:'s|\s+is)?\s+(?:bad|no good|not good|out|(?:won't|doesn't|isn't|is not|wouldn't)\s+(?:work|suit|good))\b/.test(t.slice(d.end, d.end + 24))
+  );
 }
 
 function partHit(t: string): (Span & { part: Part }) | null {
   let best: (Span & { part: Part }) | null = null;
   for (const [re, part] of PARTS_OF_DAY) {
     const m = re.exec(t);
-    if (m && (!best || m.index < best.start)) best = { start: m.index, end: m.index + m[0].length, part };
+    const hit = m && { start: m.index, end: m.index + m[0].length, part };
+    // "Not this morning, this afternoon at 2": the afternoon.
+    if (hit && !ruledOut(t, hit) && (!best || hit.start < best.start)) best = hit;
   }
   return best;
 }

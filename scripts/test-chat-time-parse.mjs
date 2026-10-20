@@ -50,6 +50,13 @@ eq('10am', when('10am tomorrow', tue0900), { day: '2026-10-21', time: '10:00' })
 eq('3 o’clock', when('3 o’clock?', tue0900), { day: '2026-10-20', time: '15:00' });
 eq('2ish', when('2ish today', tue0900), { day: '2026-10-20', time: '14:00' });
 eq('1-2pm', when('Between 1-2pm is best', tue0900), { day: '2026-10-20', time: '13:00' });
+eq('11-1pm → 11:00', when('11-1pm', tue0900), { day: '2026-10-20', time: '11:00' });
+eq('between 11 and 1pm → 11:00', when('Can you ring between 11 and 1pm?', tue0900), { day: '2026-10-20', time: '11:00' });
+eq('11 to 1pm → 11:00', when('11 to 1pm', tue0900), { day: '2026-10-20', time: '11:00' });
+eq('between 11 and 12pm → 11:00', when('between 11 and 12pm', tue0900), { day: '2026-10-20', time: '11:00' });
+eq('10-12pm → 10:00', when('10-12pm', tue0900), { day: '2026-10-20', time: '10:00' });
+eq('12-2pm → 12:00', when('12-2pm', tue0900), { day: '2026-10-20', time: '12:00' });
+eq('between 2 and 3pm → 14:00', when('between 2 and 3pm', tue0900), { day: '2026-10-20', time: '14:00' });
 eq('between 2 and 3', when('between 2 and 3 tomorrow', tue0900), { day: '2026-10-21', time: '14:00' });
 eq('midday', when('Call at midday', tue0900), { day: '2026-10-20', time: '12:00' });
 eq('lunchtime tomorrow', when('lunchtime tomorrow works', tue0900), { day: '2026-10-21', time: '12:30' });
@@ -70,6 +77,26 @@ eq('in half an hour', when("I'll be free in half an hour", tue0900), { day: '202
 eq('in an hour, read 2 hours later: gone', when('ring in an hour', tue0900, at('2026-10-20', '11:00')), { day: '2026-10-20', time: '10:00', past: true });
 eq('in work today but tomorrow’s fine → tomorrow', when('I’m in work today but tomorrow should be ok', at('2026-10-19', '18:40'), at('2026-10-20', '09:15')), { day: '2026-10-20', time: '09:30' });
 eq('today, no time → an hour on', when('Can you call me today?', tue0900), { day: '2026-10-20', time: '10:00' });
+
+// What they can't do isn't the time: "not today", "today's no good", "not before 6".
+eq('Not today, tomorrow at 2', when('Not today, tomorrow at 2', tue0900), { day: '2026-10-21', time: '14:00' });
+eq('… and the words it came from', parseCallTime('Not today, tomorrow at 2', tue0900, tue0900).phrase, 'tomorrow at 2');
+eq('Can’t today, tomorrow at 2?', when('Can’t today, tomorrow at 2?', tue0900), { day: '2026-10-21', time: '14:00' });
+eq('can’t today but tomorrow at 2', when("can't today but tomorrow at 2", tue0900), { day: '2026-10-21', time: '14:00' });
+eq('Sorry not today. Tomorrow after 3?', when('Sorry not today. Tomorrow after 3?', tue0900), { day: '2026-10-21', time: '15:00' });
+eq('today’s no good, tomorrow at 2', when('today’s no good, tomorrow at 2', tue0900), { day: '2026-10-21', time: '14:00' });
+eq('Today is bad, Thursday at 11?', when('Today is bad, Thursday at 11?', tue0900), { day: '2026-10-22', time: '11:00' });
+eq('Not this morning, this afternoon at 2', when('Not this morning, this afternoon at 2', tue0900), { day: '2026-10-20', time: '14:00' });
+eq('Not before 6 please → 18:00', when('Not before 6 please', tue0900), { day: '2026-10-20', time: '18:00' });
+eq('please don’t ring before 5 → 17:00', when('please don’t ring before 5', tue0900), { day: '2026-10-20', time: '17:00' });
+eq('no calls before 6 → 18:00', when('no calls before 6', tue0900), { day: '2026-10-20', time: '18:00' });
+// … and what they can do stays as it was.
+eq('tomorrow’s fine at 2', when('tomorrow’s fine at 2', tue0900), { day: '2026-10-21', time: '14:00' });
+eq('Today is fine, at 2', when('Today is fine, at 2', tue0900), { day: '2026-10-20', time: '14:00' });
+eq('Not until tomorrow at 2', when('Not until tomorrow at 2', tue0900), { day: '2026-10-21', time: '14:00' });
+eq('no rush, today at 3', when('no rush, today at 3', tue0900), { day: '2026-10-20', time: '15:00' });
+eq('call before 3 please → 14:30', when('call before 3 please', tue0900), { day: '2026-10-20', time: '14:30' });
+eq('by 4 → 15:30', when('Can you ring by 4', tue0900), { day: '2026-10-20', time: '15:30' });
 
 // Past times: moved on only when that's what they'd mean.
 const tue1500 = at('2026-10-20', '15:00');

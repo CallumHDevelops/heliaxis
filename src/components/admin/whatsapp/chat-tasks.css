@@ -165,7 +165,7 @@
   text-decoration: underline;
 }
 
-/* A message's ⋯: beside it on hover (inside its edge for ours on the right), a long press on phones. */
+/* A message's ⋯: beside it on hover (inside its edge for ours on the right), always on phones. */
 .wa-bubble:has(> .wa-msgacts) {
   position: relative;
 }
@@ -218,15 +218,10 @@
   display: block;
   font-weight: 600;
 }
-/* Phones: no hover, so no ⋯; a long press opens the menu instead of selecting the text. */
+/* Phones: no hover, so the ⋯ always shows, faintly; a long press stays the phone's own text selection. */
 @media (hover: none) {
   .wa-msgacts__btn {
-    display: none;
-  }
-  .wa-bubble:has(> .wa-msgacts) {
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
+    opacity: 0.75;
   }
 }
 

@@ -32,8 +32,11 @@ export type ChatJob = {
   nextStep: string | null;
   nextStepAt: string | null;
 };
-/** GET /api/crm/chat-job: their open job, else their latest one (`last`), and the team. */
-export type ChatJobInfo = { job: ChatJob | null; last: ChatJob | null; team: TeamMember[]; me: string };
+/**
+ * GET /api/crm/chat-job: the chat's job while it's open (the one it was opened from, else their latest
+ * open one), else that one or their latest (`last`) and, for a call-back, their latest open one (`live`).
+ */
+export type ChatJobInfo = { job: ChatJob | null; last: ChatJob | null; live?: ChatJob | null; team: TeamMember[]; me: string };
 /** What was set, for the line in the chat. */
 export type Done = { text: string; jobId: string };
 
@@ -79,12 +82,12 @@ export function ChatTaskSheet({
   }, [kind]);
 
   /**
-   * Their open job; else, for a task or note, their last one; else one opened now. A call-back always
-   * needs a live job: a closed job's reminder never goes off.
+   * Their open job; else, for a task or note, their last one (or the closed one the chat was opened
+   * from); else one opened now. A call-back always needs a live job: a closed job's reminder never goes off.
    */
   async function ensureJob(): Promise<string> {
     const found = await readJob();
-    let id = found.job?.id ?? (kind === 'callback' ? undefined : found.last?.id);
+    let id = found.job?.id ?? (kind === 'callback' ? found.live?.id : found.last?.id);
     if (!id) {
       const d = await send<{ id: string }>(
         '/api/crm/projects',
@@ -100,7 +103,8 @@ export function ChatTaskSheet({
   }
 
   // Who the cron tells when a call-back is due: whoever looks after the job (a new one is yours), else everyone on the CRM.
-  const owner = job ? job.owner : { id: me, name: '' };
+  const onJob = job ?? (kind === 'callback' ? (info?.live ?? null) : null);
+  const owner = onJob ? onJob.owner : { id: me, name: '' };
   const hearer = !owner ? 'everyone on the CRM' : owner.id === me ? 'you' : firstName(owner.name);
   const lead = <JobLine info={info} error={lookupError} kind={kind} first={first} />;
   let sheet: ReactNode;
@@ -128,10 +132,10 @@ export function ChatTaskSheet({
         }
         extra={
           <>
-            {job?.nextStep && (
+            {onJob?.nextStep && (
               <p className="crm-banner">
-                This replaces the job’s next step: <b>{job.nextStep}</b>
-                {job.nextStepAt ? ` (${ukWhen(job.nextStepAt)})` : ''}.
+                This replaces the job’s next step: <b>{onJob.nextStep}</b>
+                {onJob.nextStepAt ? ` (${ukWhen(onJob.nextStepAt)})` : ''}.
               </p>
             )}
             <label className="crm-label" htmlFor="wa-cb-note">
@@ -144,7 +148,7 @@ export function ChatTaskSheet({
         onSave={async (text, at) => {
           if (!text) return;
           const id = await ensureJob();
-          const was = job?.id === id && job.nextStep ? ` It replaces “${job.nextStep}”${job.nextStepAt ? ` (${ukWhen(job.nextStepAt)})` : ''}.` : '';
+          const was = onJob?.id === id && onJob.nextStep ? ` It replaces “${onJob.nextStep}”${onJob.nextStepAt ? ` (${ukWhen(onJob.nextStepAt)})` : ''}.` : '';
           await send(`/api/crm/projects/${id}`, 'PATCH', { next_step: text, next_step_at: at, notify_owner: true });
           // On the job's timeline too (the reminder is set even if this doesn't save).
           const body = [`⏰ Call-back reminder: ${text}${at ? `, ${ukWhen(at)}` : ''}.${was}`, note.trim()].filter(Boolean).join('\n\n');
@@ -227,14 +231,23 @@ function JobLine({ info, error, kind, first }: { info: ChatJobInfo | null; error
   if (l && kind !== 'callback') {
     return (
       <p className="wa-tasksheet__job">
-        Goes on {first}’s last job <b>{l.ref || l.title}</b> ({stageLabel(l.stage)})
+        Goes on {first}’s job <b>{l.ref || l.title}</b> ({stageLabel(l.stage)})
+      </p>
+    );
+  }
+  // A call-back from a closed job's chat: on their open one (a closed job's reminder never goes off).
+  const o = info.live;
+  if (l && o) {
+    return (
+      <p className="wa-tasksheet__job">
+        {first}’s job {l.ref || l.title} is {stageLabel(l.stage)}, so this goes on their open job <b>{o.ref || o.title}</b> · {stageLabel(o.stage)}
       </p>
     );
   }
   return (
     <p className="wa-tasksheet__job is-new">
       {l
-        ? `${first}’s last job (${l.ref || l.title}) is ${stageLabel(l.stage)}, so this also opens a new CRM record for ${first}.`
+        ? `${first}’s job ${l.ref || l.title} is ${stageLabel(l.stage)}, so this also opens a new CRM record for ${first}.`
         : `This also opens a CRM record for ${first}.`}
     </p>
   );
