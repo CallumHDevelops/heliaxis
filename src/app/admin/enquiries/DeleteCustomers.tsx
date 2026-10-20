@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react';
 
 /**
  * Admins: the "Delete customers" confirmation on Enquiries. Asks the server what would go
- * (/api/enquiries/delete with preview), lists it, keeps anyone with a signed quote or paid deposit
- * unless ticked, and wants DELETE typed for more than 5 at once. One customer is deleted with
+ * (/api/enquiries/delete with preview), lists it, keeps anyone with a signed quote, paid deposit or
+ * purchase order sent to a supplier unless ticked, and wants DELETE typed for more than 5 at once. One customer is deleted with
  * DELETE /api/enquiries/[id], more with the bulk POST, 200 at a time (src/lib/crm/delete-customer.ts).
  */
 
 type Counts = { opportunities: number; tasks: number; photos: number; documents: number; signatures: number; messages: number; emails: number };
-type Person = { id: string; name: string; signed: boolean; paid: boolean };
+type Person = { id: string; name: string; signed: boolean; paid: boolean; ordered?: boolean };
 type Preview = {
   customers: Person[];
   gone: number;
@@ -28,7 +28,9 @@ const SHOW = 8; // names listed before "and n more"
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 const first = (name: string) => name.trim().split(/\s+/)[0] || name;
 const list = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`);
-const what = (p: Person) => list([p.signed && 'a signed quote', p.paid && 'a paid deposit'].filter((x): x is string => !!x));
+const what = (p: Person) => list([p.signed && 'a signed quote', p.paid && 'a paid deposit', p.ordered && 'a purchase order sent to a supplier'].filter((x): x is string => !!x));
+/** Kept unless ticked: a signed quote, a paid deposit or kit ordered for them. */
+const isHeld = (p: Person) => p.signed || p.paid || !!p.ordered;
 
 async function send(url: string, init: RequestInit): Promise<{ ok: boolean; d: Record<string, unknown> }> {
   try {
@@ -117,8 +119,8 @@ export function DeleteCustomers({
 
   const one = ids.length === 1;
   const people = preview?.customers ?? [];
-  const held = people.filter((p) => p.signed || p.paid);
-  const going = include ? people : people.filter((p) => !p.signed && !p.paid);
+  const held = people.filter(isHeld);
+  const going = include ? people : people.filter((p) => !isHeld(p));
   // One customer: what goes with them, even before the tick. Several: only those that will go.
   const counts = preview ? (include || one ? preview.counts.all : preview.counts.withoutSigned) : null;
   const needType = going.length > TYPE_OVER;

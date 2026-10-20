@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { chatRef, leadRef, replyRef } from '@/lib/notification-refs';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { mediaFilesOf } from '@/lib/whatsapp/media';
+import { isOrdered } from '@/lib/purchase-orders/money';
 import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from './server';
 
 /**
@@ -97,6 +98,8 @@ type Project = {
   deposit_paid_at?: string | null;
   /** A quote or contract on it ticked as signed on paper or with another e-sign service (crm-v3.sql). */
   signed_outside?: boolean;
+  /** A purchase order on it has gone to a supplier (purchase-orders.sql): kit's been bought for it. */
+  ordered?: boolean;
 };
 
 async function customersIn(db: Db, ids: string[]): Promise<Customer[]> {
@@ -131,11 +134,22 @@ async function projectsOf(db: Db, enquiryIds: string[]): Promise<Project[]> {
     return [];
   });
   const ticked = new Set(docs.filter((d) => d.signed_outside_at).map((d) => d.project_id));
-  return projects.map((p) => ({ ...p, signed_outside: ticked.has(p.id) }));
+  // Purchase orders sent, confirmed or delivered (drafts don't count: they go with the job). None before purchase-orders.sql.
+  const orders = await rowsIn<{ project_id: string; status: string }>(
+    db,
+    'purchase_orders',
+    'project_id, status',
+    'project_id',
+    projects.map((p) => p.id),
+    true
+  );
+  const ordered = new Set(orders.filter((o) => isOrdered(o.status)).map((o) => o.project_id));
+  return projects.map((p) => ({ ...p, signed_outside: ticked.has(p.id), ordered: ordered.has(p.id) }));
 }
 
 const signed = (p: Project) => !!(p.accepted_at || p.accepted_signature || p.signed_outside);
 const paid = (p: Project) => !!p.deposit_paid_at;
+const hasOrders = (p: Project) => !!p.ordered;
 
 /* ── The deleted list ────────────────────────────────────────────────────────── */
 
@@ -197,10 +211,10 @@ export type DeleteCounts = {
 };
 
 export type DeletePreview = {
-  customers: { id: string; name: string; signed: boolean; paid: boolean }[];
+  customers: { id: string; name: string; signed: boolean; paid: boolean; ordered: boolean }[];
   /** Ids that aren't in the CRM (already deleted). */
   gone: number;
-  /** What goes with everyone, and with everyone but those with a signed quote or paid deposit. */
+  /** What goes with everyone, and with everyone but those with a signed quote, paid deposit or purchase order. */
   counts: { all: DeleteCounts; withoutSigned: DeleteCounts };
   /** Someone not being deleted has the same WhatsApp number (a duplicate): they stay. */
   sameNumber: { name: string; other: string }[];
@@ -251,9 +265,9 @@ export async function previewDelete(ids: string[]): Promise<DeletePreview> {
   const projects = await projectsOf(db, [...idSet]);
   const customers = found.map((c) => {
     const mine = projects.filter((p) => p.enquiry_id === c.id);
-    return { id: c.id, name: c.name, signed: mine.some(signed), paid: mine.some(paid) };
+    return { id: c.id, name: c.name, signed: mine.some(signed), paid: mine.some(paid), ordered: mine.some(hasOrders) };
   });
-  const held = new Set(customers.filter((c) => c.signed || c.paid).map((c) => c.id));
+  const held = new Set(customers.filter((c) => c.signed || c.paid || c.ordered).map((c) => c.id));
 
   const numbers = [...new Set(found.map((c) => c.wa_id).filter((w): w is string => !!w))];
   const [all, sharing, importsSkip] = await Promise.all([
@@ -282,7 +296,7 @@ export type DeleteOutcome = {
   deleted: number;
   /** Already gone: deleted before (or meanwhile), or never in the CRM. */
   gone: number;
-  /** Customers left as they were, and why. `held`: a signed quote or paid deposit, not ticked to include. */
+  /** Customers left as they were, and why. `held`: a signed quote, paid deposit or purchase order sent, not ticked to include. */
   errors: { id: string; name: string | null; error: string; held?: boolean }[];
   /** Files taken out of storage, and ones that wouldn't go (logged). */
   files: { removed: number; failed: number };
@@ -291,9 +305,10 @@ export type DeleteOutcome = {
 };
 
 /**
- * Delete these customers and everything about them (see the top of this file). Signed quotes and
- * paid deposits are kept unless `includeSigned`: the business may need those records. Up to 50 at
- * a time inside; one that fails doesn't stop the rest.
+ * Delete these customers and everything about them (see the top of this file). Signed quotes, paid
+ * deposits and purchase orders that have gone to a supplier are kept unless `includeSigned`: the
+ * business may need those records (draft orders just go with them). Up to 50 at a time inside; one
+ * that fails doesn't stop the rest.
  */
 export async function deleteCustomers(ids: string[], opts: { includeSigned?: boolean } = {}): Promise<DeleteOutcome> {
   const db = createAdminClient();
@@ -320,11 +335,14 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
   }
   out.gone += ids.length - found.length;
 
-  const held = new Set(includeSigned ? [] : projects.filter((p) => signed(p) || paid(p)).map((p) => p.enquiry_id));
+  const held = new Set(includeSigned ? [] : projects.filter((p) => signed(p) || paid(p) || hasOrders(p)).map((p) => p.enquiry_id));
   for (const c of found) {
     if (!held.has(c.id)) continue;
     const mine = projects.filter((p) => p.enquiry_id === c.id);
-    const what = [mine.some(signed) && 'a signed quote', mine.some(paid) && 'a paid deposit'].filter(Boolean).join(' and ');
+    const reasons = [mine.some(signed) && 'a signed quote', mine.some(paid) && 'a paid deposit', mine.some(hasOrders) && 'a purchase order sent to a supplier'].filter(
+      (x): x is string => !!x
+    );
+    const what = reasons.length > 1 ? `${reasons.slice(0, -1).join(', ')} and ${reasons.at(-1)}` : reasons[0];
     out.errors.push({ id: c.id, name: c.name, held: true, error: `Kept: ${c.name} has ${what}. Tick to include them.` });
   }
   const going = found.filter((c) => !held.has(c.id));
