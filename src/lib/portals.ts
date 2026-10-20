@@ -6,7 +6,7 @@
  * (profiles.portals). Safe to import from middleware, server and client code.
  */
 
-export type PortalKey = 'cms' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'team' | 'social' | 'rams';
+export type PortalKey = 'cms' | 'branding' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'team' | 'social' | 'rams';
 
 export type Portal = {
   key: PortalKey;
@@ -25,6 +25,14 @@ export const PORTALS: Portal[] = [
     description: 'Edit pages, menus, images and AI blogs on heliaxis.co.uk.',
     href: '/admin/cms',
     paths: ['/admin/cms', '/admin/blog', '/admin/preview'],
+  },
+  {
+    key: 'branding',
+    label: 'Brand guidelines',
+    description: 'Logos, colours, fonts and usage rules — for workwear, print and partners.',
+    href: '/branding',
+    // Standalone, self-gated page (not under /admin) — no middleware paths.
+    paths: [],
   },
   {
     key: 'tasks',
