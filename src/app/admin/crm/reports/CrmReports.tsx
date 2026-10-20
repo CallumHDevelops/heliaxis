@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Fragment, useEffect, useState } from 'react';
 import { money, stageLabel } from '@/lib/crm/stages';
-import { adMoney, costPer, currencyUnit, dayIn, isMetaSource, returnOn, type AdSpendReport } from '@/lib/ad-spend';
+import { adMoney, costPer, currencyUnit, dayIn, isMetaSource, returnOn, type AdSpendReport, type Refresh } from '@/lib/ad-spend';
 import '../crm.css';
 import './reports.css';
 
@@ -111,14 +111,39 @@ function SpendTable({ rows, ad }: { rows: Row[]; ad: Spend }) {
   );
 }
 
+const and = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]);
+
+/** When Meta's figures and names came: "Updated from Meta: today’s figures and ad names at 10:58, earlier days at 10:12." */
+function freshness(ad: Spend): string {
+  const when = (iso: string) => (dayIn(iso, 'Europe/London') === ad.until ? `at ${time(iso)}` : `on ${date(dayIn(iso, 'Europe/London'))} at ${time(iso)}`);
+  const parts: [string, string | null | undefined][] = [
+    ['today’s figures', ad.todayAt ?? ad.fetchedAt],
+    ['ad names', ad.namesAt],
+    ['earlier days', ad.pastAt ?? ad.fetchedAt],
+  ];
+  // The same minute said once.
+  const at = new Map<string, string[]>();
+  for (const [what, iso] of parts) if (iso) at.set(when(iso), [...(at.get(when(iso)) ?? []), what]);
+  return at.size === 1
+    ? `Updated from Meta ${[...at.keys()][0]}.`
+    : `Updated from Meta: ${[...at].map(([w, whats]) => `${and(whats)} ${w}`).join(', ')}.`;
+}
+
+/** What a "Refresh from Meta" that didn't ask Meta says. */
+const REFRESH_SAID: Record<Refresh, string> = {
+  done: '',
+  wait: 'Meta was asked less than a minute ago, so these are its latest.',
+  paused: 'Meta was busy a moment ago, so the CRM is giving it a few minutes. These are the last figures it gave.',
+};
+
 /** When Meta's figures are from, and Meta's lead count beside the CRM's. */
 function SpendNote({ ad }: { ad: Spend }) {
-  const when = dayIn(ad.fetchedAt, 'Europe/London') === ad.until ? `at ${time(ad.fetchedAt)}` : `on ${date(dayIn(ad.fetchedAt, 'Europe/London'))} at ${time(ad.fetchedAt)}`;
   return (
     <div className="crm-muted crm-small rp-note">
       <p>
-        Spend is Meta’s, for {date(ad.since)} to {date(ad.until)}, fetched {when} (today’s figures every 15 minutes, earlier days every hour).
-        Recent leads may still turn into sales, so cost per sale comes down as they do.
+        Spend is Meta’s, for {date(ad.since)} to {date(ad.until)} (today’s figures every 15 minutes, earlier days every hour). Ads and campaigns
+        have the names they have in Ads Manager now (checked every 10 minutes), with an older one beneath (“was …”): leads that came in under
+        an old name stay with their ad. Recent leads may still turn into sales, so cost per sale comes down as they do.
       </p>
       {ad.total.metaLeads != null && (
         <p>
@@ -133,29 +158,39 @@ function SpendNote({ ad }: { ad: Spend }) {
 
 /** Where the sales come from: £ won by ad / campaign / source, by person, the funnel and reply speed. */
 export function CrmReports() {
-  const [days, setDays] = useState(90);
+  // Each load: the period, and whether it's "Refresh from Meta" (Meta asked now, not the CRM's copy).
+  const [ask, setAsk] = useState({ days: 90, refresh: false, n: 0 });
+  const [got, setGot] = useState(-1);
   const [r, setR] = useState<Report | null>(null);
   const [err, setErr] = useState('');
+  const days = ask.days;
   useEffect(() => {
     let live = true;
-    fetch(`/api/crm/reports?days=${days}`, { cache: 'no-store' })
+    fetch(`/api/crm/reports?days=${ask.days}${ask.refresh ? '&refresh=1' : ''}`, { cache: 'no-store' })
       .then(async (res) => ({ ok: res.ok, d: await res.json() }))
       .then(({ ok, d }) => {
         if (!live) return;
+        setGot(ask.n);
         if (!ok) setErr(d.error || 'Could not load the report');
         else {
           setErr('');
           setR(d);
         }
       })
-      .catch(() => live && setErr('Could not load the report'));
+      .catch(() => {
+        if (!live) return;
+        setGot(ask.n);
+        setErr('Could not load the report');
+      });
     return () => {
       live = false;
     };
-  }, [days]);
+  }, [ask]);
 
   const top = r?.funnel[0]?.n || 0;
   const ad = r?.adSpend?.state === 'ok' ? r.adSpend : null;
+  const refreshing = ask.refresh && got !== ask.n;
+  const said = ask.refresh && !refreshing && ad?.refresh ? REFRESH_SAID[ad.refresh] : '';
   const table = (rows: Row[], label: string) => (
     <div className="crm-tablebox">
       <table className="crm-table">
@@ -206,7 +241,7 @@ export function CrmReports() {
         </div>
         <div className="crm-viewtoggle" role="group" aria-label="Period" style={{ display: 'inline-flex' }}>
           {[30, 90, 365].map((d) => (
-            <button key={d} type="button" className={days === d ? 'on' : ''} onClick={() => setDays(d)}>
+            <button key={d} type="button" className={days === d ? 'on' : ''} onClick={() => d !== days && setAsk((a) => ({ days: d, refresh: false, n: a.n + 1 }))}>
               {d === 365 ? '1 year' : `${d} days`}
             </button>
           ))}
@@ -253,6 +288,18 @@ export function CrmReports() {
             <>
               <p className="crm-muted crm-small">
                 Meta campaigns with their ads beneath, then your other sources. Sorted by £ won. Return is £ won for each {currencyUnit(ad.currency)} spent.
+              </p>
+              <p className="crm-muted crm-small rp-fresh" aria-live="polite">
+                {freshness(ad)}{' '}
+                <button
+                  type="button"
+                  className="crm-link"
+                  disabled={refreshing}
+                  onClick={() => setAsk((a) => ({ ...a, refresh: true, n: a.n + 1 }))}
+                >
+                  {refreshing ? 'Refreshing…' : 'Refresh from Meta'}
+                </button>
+                {said && <span className="rp-said">{said}</span>}
               </p>
               {ad.warning && (
                 <p className="crm-banner">{r.canExport ? ad.warning : 'Meta didn’t send new figures just now, so these are the last ones it gave.'}</p>

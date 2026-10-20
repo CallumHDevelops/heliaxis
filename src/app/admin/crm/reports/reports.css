@@ -49,6 +49,19 @@
 .rp-note p {
   margin: 0 0 0.35rem;
 }
+/* "Updated from Meta at …" and Refresh from Meta (a .crm-link button), above the table. */
+.rp-fresh {
+  margin: -0.2rem 0 0.6rem;
+}
+.rp-fresh .crm-link:disabled {
+  cursor: default;
+  color: var(--muted);
+  text-decoration: none;
+}
+.rp-said {
+  display: block;
+  margin-top: 0.2rem;
+}
 .rp-setup a {
   color: var(--ink);
   font-weight: 700;

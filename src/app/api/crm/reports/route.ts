@@ -10,15 +10,20 @@ export const maxDuration = 60;
 
 const at = (s: string) => STAGE_KEYS.indexOf(s as (typeof STAGE_KEYS)[number]);
 
-/** Sales numbers for a period: by source / campaign, by person, the funnel, response times and Meta ad spend. */
+/**
+ * Sales numbers for a period: by source / campaign, by person, the funnel, response times and Meta
+ * ad spend. ?refresh=1 ("Refresh from Meta"): Meta's ad names and today's figures asked for now.
+ */
 export async function GET(req: Request) {
   const s = await crmSession();
   if (!s) return json({ error: 'unauthorized' }, 401);
-  const days = Math.min(730, Math.max(7, Number(new URL(req.url).searchParams.get('days')) || 90));
+  const url = new URL(req.url);
+  const days = Math.min(730, Math.max(7, Number(url.searchParams.get('days')) || 90));
+  const refresh = url.searchParams.get('refresh') === '1';
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const db = createAdminClient();
   // Asked for alongside the CRM's own numbers; never throws.
-  const spending = adSpendFigures(days);
+  const spending = adSpendFigures(days, { refresh });
   const { data: projects, error } = await db
     .from('crm_projects')
     .select('id, enquiry_id, stage, value, owner_id, created_at, first_contact_at, survey_at, accepted_at')
@@ -26,20 +31,21 @@ export async function GET(req: Request) {
     .limit(5000);
   if (error) return json({ error: error.message }, 500);
   const ids = [...new Set((projects ?? []).map((p) => p.enquiry_id))];
-  type Enq = { id: string; source: string | null; meta_ad_id?: string | null };
+  type Enq = { id: string; source: string | null; created_at?: string | null; meta_ad_id?: string | null };
   const enquiries = async (): Promise<Enq[]> => {
     if (!ids.length) return [];
     // The ad each lead came from (ad-spend.sql), only needed beside the ad spend.
     if (adSpendConfigured()) {
-      const withAd = await db.from('enquiries').select('id, source, meta_ad_id').in('id', ids);
+      const withAd = await db.from('enquiries').select('id, source, created_at, meta_ad_id').in('id', ids);
       if (!withAd.error) return withAd.data ?? [];
     }
-    const { data } = await db.from('enquiries').select('id, source').in('id', ids);
+    const { data } = await db.from('enquiries').select('id, source, created_at').in('id', ids);
     return data ?? [];
   };
   const [enq, { data: people }] = await Promise.all([enquiries(), db.from('profiles').select('id, full_name, email')]);
   const src = new Map(enq.map((e) => [e.id, (e.source || 'unknown').trim()]));
   const adOf = new Map(enq.map((e) => [e.id, e.meta_ad_id ?? null]));
+  const cameIn = new Map(enq.map((e) => [e.id, e.created_at ?? null]));
   const name = new Map((people ?? []).map((p) => [p.id, p.full_name || p.email || 'Someone']));
 
   type Row = { key: string; leads: number; surveys: number; won: number; lost: number; value: number };
@@ -69,7 +75,15 @@ export async function GET(req: Request) {
       if (p.stage === 'lost') r.lost++;
       map.set(key, r);
     }
-    outcomes.push({ source, metaAdId: adOf.get(p.enquiry_id), surveyed, won, lost: p.stage === 'lost', value: won ? Number(p.value) || 0 : 0 });
+    outcomes.push({
+      source,
+      metaAdId: adOf.get(p.enquiry_id),
+      at: cameIn.get(p.enquiry_id),
+      surveyed,
+      won,
+      lost: p.stage === 'lost',
+      value: won ? Number(p.value) || 0 : 0,
+    });
     if (p.stage !== 'lost') for (const f of funnel) if (at(p.stage) >= at(f.key)) f.n++;
     if (p.first_contact_at) responses.push((new Date(p.first_contact_at).getTime() - new Date(p.created_at).getTime()) / 60_000);
   }
@@ -88,8 +102,12 @@ export async function GET(req: Request) {
           since: figures.since,
           until: figures.until,
           fetchedAt: figures.fetchedAt,
+          todayAt: figures.todayAt,
+          pastAt: figures.pastAt,
+          namesAt: figures.namesAt,
+          refresh: figures.refresh,
           warning: figures.warning,
-          ...spendTable(outcomes, figures.ads, figures.account),
+          ...spendTable(outcomes, figures.ads, figures.account, figures.pastNames),
         }
       : figures;
   return json({
