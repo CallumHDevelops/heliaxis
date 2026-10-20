@@ -104,15 +104,13 @@ export function enquiryStatusFor(stage: StageKey): string {
 
 /**
  * Push the project's owner (or everyone on the CRM if it has none) when a next step falls due.
- * Once per step; not in quiet hours (they go out in the morning). Runs with the every-minute cron.
+ * Once per step, at the time staff picked, quiet hours included: they're for messages to customers,
+ * not our own reminders (a 9pm call-back from a chat goes off at 9pm, not 8am the next day). Runs
+ * with the every-minute cron.
  */
 export async function remindNextSteps() {
-  const { getSettings } = await import('@/lib/whatsapp/settings');
-  const { isQuiet } = await import('@/lib/whatsapp/schedule');
   const { notify } = await import('@/lib/notify');
   const { canAccess } = await import('@/lib/portals');
-  const settings = await getSettings();
-  if (isQuiet(new Date(), settings)) return 0;
   const db = createAdminClient();
   const { data: due } = await db
     .from('crm_projects')
