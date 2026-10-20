@@ -430,3 +430,142 @@ a.hub-row:hover {
   display: grid;
   place-items: center;
 }
+
+/* New Meta leads: the count and "3 today" beside the heading; each lead with Open, WhatsApp and Call. */
+.hub-meta-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.7rem;
+}
+.hub-meta-head .hub-h2 {
+  margin: 0;
+}
+.hub-meta-n {
+  min-width: 1.7em;
+  box-sizing: border-box;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: #211f18;
+  color: #f8bc1e;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+}
+.hub-meta-today {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--amber);
+}
+.hub-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  min-height: 60px;
+  box-sizing: border-box;
+}
+.hub-meta-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: inherit;
+  text-decoration: none;
+}
+.hub-meta-main b {
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.hub-meta-main:hover b {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hub-meta-ref {
+  margin-left: 0.45rem;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.hub-meta-main small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.hub-meta-main small > * + *::before {
+  content: '·';
+  margin-right: 0.4rem;
+}
+.hub-meta-ad {
+  color: var(--ink);
+  font-weight: 600;
+}
+.hub-meta-actions {
+  flex: none;
+  display: flex;
+  gap: 0.4rem;
+}
+.hub-meta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 0.85rem;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(33, 31, 24, 0.18);
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hub-meta-btn:hover {
+  border-color: var(--ink);
+}
+.hub-meta-btn:focus-visible,
+.hub-meta-main:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.hub-meta-btn.is-primary {
+  background: #211f18;
+  border-color: #211f18;
+  color: #f8bc1e;
+}
+.hub-meta-btn.is-wa {
+  color: #1f7a4d;
+  border-color: rgba(31, 122, 77, 0.35);
+}
+.hub-meta-btn.is-wa:hover {
+  border-color: #1f7a4d;
+}
+.hub-meta-empty {
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+/* Phones: the buttons share a row under the name, big enough for a thumb. */
+@media (max-width: 560px) {
+  .hub-meta-row {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.7rem 0.8rem;
+  }
+  .hub-meta-actions {
+    flex: 1 0 100%;
+  }
+  .hub-meta-btn {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
+}

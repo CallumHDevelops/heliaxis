@@ -9,6 +9,7 @@ import { schemaReady } from '@/lib/schema-ready';
 import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
 import { DEFAULT_SURVEY_MINUTES, isSurveyType, noSurveyNeeded, SURVEY_TYPES, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
 import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem } from './HubView';
+import { newMetaLeads } from './meta-leads';
 
 export const dynamic = 'force-dynamic';
 
@@ -266,13 +267,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const isAdmin = profile?.role === 'admin';
   const keys = portalsFor(profile);
   const portals = PORTALS.filter((p) => keys.includes(p.key));
-  const [counts, day, today, setup, people] = await Promise.all([
+  const [counts, day, today, setup, people, metaLeads] = await Promise.all([
     badges(keys, isAdmin),
     user ? myDay(user.id, keys) : null,
     user ? todayList(profile?.email || user.email || null, keys).catch(() => null) : null,
     // Admins see the setup to-dos unless one's been passed to someone; members only theirs.
     user ? visibleSetupTodos(user.id, isAdmin) : null,
     isAdmin ? setupPeople() : [],
+    // New Meta leads (Enquiries and CRM staff): a failure just hides the panel.
+    user ? newMetaLeads(keys).catch(() => null) : null,
   ]);
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
 
@@ -293,6 +296,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           admin: isAdmin && user ? { others: setup?.others ?? [], people, meId: user.id } : undefined,
         }}
         assistant={keys.includes('crm')}
+        metaLeads={metaLeads}
       />
     </AdminShell>
   );

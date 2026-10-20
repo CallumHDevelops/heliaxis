@@ -3,6 +3,8 @@ import type { Portal, PortalKey } from '@/lib/portals';
 import { HubMyDay } from './HubMyDay';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
+import { HubMetaLeads } from './HubMetaLeads';
+import type { HubMetaLeads as MetaLeads } from './meta-leads';
 import './hub.css';
 
 export type HubTask = { id: string; title: string; due_date: string | null; priority: string };
@@ -128,6 +130,7 @@ export function HubView({
   todayList = null,
   setup = { todos: [] },
   assistant = false,
+  metaLeads = null,
 }: {
   firstName: string;
   portals: HubPortal[];
@@ -144,6 +147,8 @@ export function HubView({
   setup?: FromClaudeProps;
   /** Show the "Talk to Metis" bar. */
   assistant?: boolean;
+  /** New Meta leads (Enquiries and CRM staff); null hides it. */
+  metaLeads?: MetaLeads | null;
 }) {
   const isAdmin = usersBadge !== undefined;
   const internal = portals.filter((p) => !p.external);
@@ -202,6 +207,8 @@ export function HubView({
           </ul>
         </section>
       )}
+
+      {metaLeads && <HubMetaLeads data={metaLeads} />}
 
       {assistant && (
         <Link href="/admin/assistant" className="hub-claude">
