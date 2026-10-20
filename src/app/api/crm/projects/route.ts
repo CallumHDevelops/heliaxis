@@ -51,10 +51,11 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(50);
     latest = theirs?.[0] ?? null;
-    // From an enquiry's "Open in CRM": reuse their latest live job rather than making a duplicate.
+    // From an enquiry's "Open in CRM": reuse their latest live job rather than making a duplicate. A
+    // chat's call-back reminder asks for a live one only (`live_only`): a closed job's reminder never goes off.
     if (b.open_existing && latest) {
-      const live = theirs!.find((p) => p.stage !== 'complete' && p.stage !== 'lost') ?? latest;
-      return json({ id: live.id, existing: true });
+      const live = theirs!.find((p) => p.stage !== 'complete' && p.stage !== 'lost');
+      if (live || !b.live_only) return json({ id: (live ?? latest).id, existing: true });
     }
   } else {
     const name = String(b.name || '').trim();
@@ -100,9 +101,10 @@ export async function POST(req: Request) {
     .single();
   if (error || !project) return json({ error: error?.message || 'Could not create the opportunity' }, 500);
 
-  // A second opportunity for someone already in the CRM isn't a new lead: no new-lead follow-ups and
-  // no "hasn't been contacted" alert. (crm-v2.sql columns, in their own update.)
-  if (!delivery && latest) {
+  // A second opportunity for someone already in the CRM isn't a new lead, and nor is one opened from a
+  // WhatsApp chat that's under way (`from_chat`): no new-lead follow-ups and no "hasn't been contacted"
+  // alert. (crm-v2.sql columns, in their own update.)
+  if (!delivery && (latest || b.from_chat)) {
     const now = new Date().toISOString();
     await db
       .from('crm_projects')

@@ -13,6 +13,7 @@ export function ChatThread({
   job = null,
   back = { href: '/admin/enquiries/inbox', label: 'Back to inbox', short: 'Inbox' },
   canInbox = true,
+  canCrm = false,
   customerRef = null,
 }: {
   id: string;
@@ -20,8 +21,10 @@ export function ChatThread({
   job?: ChatPaneProps['job'];
   back?: ChatPaneProps['back'];
   canInbox?: boolean;
+  /** CRM access: "+ Add task" for a call-back reminder, task or note on their job. */
+  canCrm?: boolean;
   /** Their HX-0042 for the header (customer-refs.sql), null until it's been run. */
   customerRef?: string | null;
 }) {
-  return <ChatPane threadId={id} me={me} variant="page" active back={back} job={job} canInbox={canInbox} customerRef={customerRef} />;
+  return <ChatPane threadId={id} me={me} variant="page" active back={back} job={job} canInbox={canInbox} canCrm={canCrm} customerRef={customerRef} />;
 }
