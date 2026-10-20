@@ -8,7 +8,9 @@ import type { PrimaryAction } from '@/lib/projects/primary-action';
 import { plusDays } from '@/lib/projects/feed';
 import type { TeamMember } from '@/lib/projects/server';
 import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
-import { chaseWhen } from '@/lib/whatsapp/schedule';
+import { useSendLater } from '@/components/admin/whatsapp/SendLater';
+import { useNow } from '@/lib/use-now';
+import { atWords, chaseWhen } from '@/lib/whatsapp/schedule';
 import { Sheet, StageChip } from '../CrmUi';
 import { firstName, londonIso, nextWeekday, ukDayOf, ukTime } from '../crm-shared';
 import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
@@ -408,7 +410,8 @@ export function NextStepEditor({
 
 /**
  * The WhatsApp sheet: only where there's no WhatsApp panel (before it was built, or for staff it
- * doesn't show for). Free replies inside 24 hours, an approved template outside them.
+ * doesn't show for). Free replies inside 24 hours, an approved template outside them. Both can go
+ * later (the clock beside Send), and late at night Send waits for the morning (the late-night rule).
  */
 export function WhatsAppComposer({
   projectId,
@@ -430,12 +433,45 @@ export function WhatsAppComposer({
   const [text, setText] = useState(initialText);
   const [chase, setChase] = useState(true);
   const [openedAt] = useState(() => Date.now());
+  const now = useNow(15_000) || openedAt;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  /** A template to go at this time instead of a typed message that would miss the free window. */
+  const [tplAt, setTplAt] = useState<Date | null>(null);
+  /** Scheduled rather than sent: when it goes, said before the sheet closes. */
+  const [scheduledFor, setScheduledFor] = useState<string | null>(null);
   // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
-  const tplSend = useTemplateSend(customer.id, !!wa?.number && !wa.windowOpen && !!wa.configured);
+  const tplSend = useTemplateSend(customer.id, !!wa?.number && (!wa.windowOpen || !!tplAt) && !!wa.configured);
   const { templates, pick: tpl } = tplSend;
   const title = `WhatsApp ${customer.name}`;
+
+  async function go(body: Record<string, unknown>) {
+    setBusy(true);
+    setErr('');
+    try {
+      const d = await send<{ scheduled?: { at: string } }>(`/api/whatsapp/conversations/${wa!.threadId}`, 'POST', body, 'Not sent');
+      if (d.scheduled?.at) setScheduledFor(d.scheduled.at);
+      else onSent();
+      return true;
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Not sent');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  const asks = text.includes('?');
+  const chaseHours = asks && chase ? (wa?.chaseHours ?? 0) : 0;
+  /** When: { now: true } straight away, or { sendAt } (Send later, the late-night rule). */
+  const when = (at: Date | null) => (at ? { sendAt: at.toISOString() } : { now: true });
+  const later = { now, view: wa?.chaseView, ready: true, lastInboundAt: wa?.lastInbound ?? null, name: customer.name };
+  const typed = useSendLater({ ...later, disabled: busy || !text.trim(), submit: (at) => go({ text: text.trim(), chaseHours, ...when(at) }), onTemplate: setTplAt });
+  const tplLater = useSendLater({
+    ...later,
+    template: true,
+    disabled: busy || !tplSend.ready,
+    submit: (at) => (tpl ? go({ template: tpl.name, lang: tpl.lang, params: tpl.params, ...when(tplAt ?? at) }) : Promise.resolve(false)),
+  });
 
   if (!wa?.configured)
     return (
@@ -450,28 +486,33 @@ export function WhatsAppComposer({
       </Sheet>
     );
 
-  async function go(body: Record<string, unknown>) {
-    setBusy(true);
-    setErr('');
-    try {
-      await send(`/api/whatsapp/conversations/${wa!.threadId}`, 'POST', body, 'Not sent');
-      onSent();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Not sent');
-    } finally {
-      setBusy(false);
-    }
-  }
-  const asks = text.includes('?');
-  // When it would really go: quiet hours and the evening rule can move it ("tomorrow about 10:00").
-  const chaseAt = wa.chaseView ? chaseWhen({ now: new Date(openedAt), hours: wa.chaseHours, lastInboundAt: wa.lastInbound ?? null, view: wa.chaseView }) : null;
+  if (scheduledFor)
+    return (
+      <Sheet title={title} onClose={onSent}>
+        <p className="crm-muted">
+          🕐 Scheduled for <b>{atWords(new Date(scheduledFor), new Date(now))}</b>. It waits in {firstName(customer.name)}’s WhatsApp chat until then: edit it,
+          send it now or cancel it there.
+        </p>
+        <div className="crm-actions">
+          <button type="button" className="crm-btn" onClick={onSent}>
+            Done
+          </button>
+        </div>
+      </Sheet>
+    );
+
+  // When it would really go: quiet hours and the evening rule can move it ("tomorrow about 10:00"),
+  // counted from when the message goes (the late-night rule).
+  const chaseAt = wa.chaseView
+    ? chaseWhen({ now: new Date(now), hours: wa.chaseHours, lastInboundAt: wa.lastInbound ?? null, view: wa.chaseView, sendAt: typed.lateAt })
+    : null;
 
   return (
     <Sheet title={title} onClose={onClose}>
       <p className="crm-muted crm-small">
         +{wa.number} · {wa.windowOpen ? 'free to reply (inside 24 hours)' : 'outside 24 hours: an approved template is needed (about 2–5p)'}
       </p>
-      {wa.windowOpen ? (
+      {wa.windowOpen && !tplAt ? (
         <>
           <SnippetPicker projectId={projectId} name={customer.name} onPick={(t) => setText((cur) => (cur.trim() ? `${cur}\n${t}` : t))} />
           <WhatsAppDocSend id={projectId} docs={docs} onSent={async () => onSent()} />
@@ -483,9 +524,10 @@ export function WhatsAppComposer({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
+              // Ctrl/⌘ + Enter does what the Send button says.
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && text.trim() && !busy) {
                 e.preventDefault();
-                void go({ text: text.trim(), chaseHours: asks && chase ? wa.chaseHours : 0 });
+                typed.main();
               }
             }}
           />
@@ -495,17 +537,16 @@ export function WhatsAppComposer({
             </label>
           )}
           {err && <p className="crm-banner crm-banner--err">{err}</p>}
+          {typed.panel}
           <div className="crm-actions">
-            <button
-              type="button"
-              className="crm-btn crm-btn--wa"
-              disabled={busy || !text.trim()}
-              title="Ctrl/⌘ + Enter"
-              onClick={() => go({ text: text.trim(), chaseHours: asks && chase ? wa.chaseHours : 0 })}
-            >
-              {busy ? 'Sending…' : 'Send WhatsApp'}
-            </button>
+            <span className="wsl-sendgroup">
+              <button type="button" className="crm-btn crm-btn--wa" disabled={busy || !text.trim()} title="Ctrl/⌘ + Enter" onClick={typed.main}>
+                {busy ? 'Sending…' : typed.lateTime ? `Send at ${typed.lateTime}` : 'Send WhatsApp'}
+              </button>
+              {typed.clock()}
+            </span>
           </div>
+          {typed.lateNote}
         </>
       ) : templates === null ? (
         <p className="crm-muted">Loading templates…</p>
@@ -518,13 +559,37 @@ export function WhatsAppComposer({
         </p>
       ) : (
         <>
+          {tplAt && (
+            <p className="crm-muted crm-small">
+              A template to go at <b>{atWords(tplAt, new Date(now))}</b>: {firstName(customer.name)}’s free window will have closed by then.{' '}
+              <button type="button" className="wsl-link" onClick={() => setTplAt(null)}>
+                Back to typing
+              </button>
+            </p>
+          )}
           <TemplateSendFields send={tplSend} inputClass="crm-input" />
           {err && <p className="crm-banner crm-banner--err">{err}</p>}
+          {!tplAt && tplLater.panel}
           <div className="crm-actions">
-            <button type="button" className="crm-btn crm-btn--wa" disabled={busy || !tplSend.ready} onClick={() => go({ template: tpl.name, lang: tpl.lang, params: tpl.params })}>
-              {busy ? 'Sending…' : 'Send template'}
-            </button>
+            <span className="wsl-sendgroup">
+              <button
+                type="button"
+                className="crm-btn crm-btn--wa"
+                disabled={busy || !tplSend.ready}
+                onClick={() => (tplAt ? void go({ template: tpl.name, lang: tpl.lang, params: tpl.params, ...when(tplAt) }) : tplLater.main())}
+              >
+                {busy
+                  ? 'Sending…'
+                  : tplAt
+                    ? `Send template at ${atWords(tplAt, new Date(now)).replace(/ (today|tomorrow|tonight)$/, '')}`
+                    : tplLater.lateTime
+                      ? `Send template at ${tplLater.lateTime}`
+                      : 'Send template'}
+              </button>
+              {!tplAt && tplLater.clock()}
+            </span>
           </div>
+          {!tplAt && tplLater.lateNote}
         </>
       )}
     </Sheet>

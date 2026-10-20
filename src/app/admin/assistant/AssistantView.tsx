@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantAction } from '@/lib/assistant/tools';
+import { atWords } from '@/lib/whatsapp/schedule';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import './assistant.css';
 
@@ -279,6 +280,8 @@ function DraftCard({ d, open, onToggle, onDone }: { d: Draft; open: boolean; onT
   const [subject, setSubject] = useState(d.subject || '');
   const [body, setBody] = useState(d.body);
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  /** A WhatsApp sent late at night waits for the morning (the late-night rule): when it goes. */
+  const [later, setLater] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const patch = (b: Record<string, unknown>) =>
@@ -310,8 +313,9 @@ function DraftCard({ d, open, onToggle, onDone }: { d: Draft; open: boolean; onT
       return;
     }
     await patch({ status: 'sent', subject, body });
+    if (res?.scheduled?.at) setLater(atWords(new Date(res.scheduled.at), new Date()));
     setState('sent');
-    setTimeout(onDone, 900);
+    setTimeout(onDone, res?.scheduled?.at ? 2500 : 900);
   }
 
   async function discard() {
@@ -352,7 +356,7 @@ function DraftCard({ d, open, onToggle, onDone }: { d: Draft; open: boolean; onT
           )}
           <div className="as-draft-actions">
             <button type="button" className="as-btn is-primary" onClick={send} disabled={state !== 'idle' || !body.trim()}>
-              {state === 'sending' ? 'Sending…' : state === 'sent' ? 'Sent ✓' : 'Send'}
+              {state === 'sending' ? 'Sending…' : state === 'sent' ? (later ? `Scheduled for ${later} ✓` : 'Sent ✓') : 'Send'}
             </button>
             {d.project_id && (
               <Link href={`/admin/crm/${d.project_id}`} className="as-btn">
