@@ -249,7 +249,8 @@ function OrdersList({ rows, filter, today, onOpen, empty }: { rows: PoListRow[];
                 <span className="po-who">
                   <b>{o.job?.customer || o.job?.title || 'Job'}</b>
                   <small>
-                    {[o.job?.ref, o.supplier?.name].filter(Boolean).join(' · ')}
+                    {o.job?.ref}
+                    {o.supplier && <span className="po-who__sup">{o.job?.ref ? ' · ' : ''}{o.supplier.name}</span>}
                     {o.changed_since_sent ? ' · changed since sent' : ''}
                   </small>
                 </span>

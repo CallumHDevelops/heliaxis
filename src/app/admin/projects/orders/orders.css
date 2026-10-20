@@ -51,7 +51,7 @@
 .po-pre {
   white-space: pre-line;
 }
-.po-ok {
+.crm-banner.po-ok {
   background: rgba(63, 125, 78, 0.1);
   border-color: rgba(63, 125, 78, 0.3);
   color: var(--ok);
@@ -249,6 +249,7 @@
 .po-box h4,
 .po-note h4,
 .po-invoice h4 {
+  font-family: inherit;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -544,8 +545,15 @@
   border-color: var(--err);
   box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.12);
 }
-.po-eline__qty,
-.po-eline__unit {
+.po-eline > label {
+  display: block;
+  min-width: 0;
+}
+.po-cap {
+  display: none;
+}
+.po-eline__qty input,
+.po-eline__unit input {
   text-align: right;
 }
 .po-eline--head {
@@ -657,6 +665,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* The supplier under the job: only where its own column is hidden. */
+@media (min-width: 1101px) {
+  .po-page .po-who__sup {
+    display: none;
+  }
 }
 
 /* Suppliers */
@@ -832,6 +846,28 @@
     min-height: 44px;
     font-size: 16px; /* no zoom on iPhone */
   }
+  .po-cap {
+    display: block;
+    margin: 0 0 2px;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .po-edit .po-edit__notes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .po-seg {
+    align-self: stretch;
+    flex-wrap: nowrap;
+  }
+  .po-seg button {
+    flex: 1 1 0;
+    padding: 0 6px;
+    font-size: 13px;
+  }
   .po-iconbtn {
     width: 40px;
     height: 44px;
@@ -847,6 +883,15 @@
   .po-actions__end {
     flex-basis: 100%;
     justify-content: flex-end;
+  }
+  .po-page .crmh-head {
+    grid-template-areas: 'h h h' 'sum sum sum' 's s s' 'v v v';
+  }
+  .po-page .crmh-sum {
+    white-space: normal;
+  }
+  .po-page .crmh-search {
+    display: block;
   }
   .po-page .po-filters {
     margin: 10px 0;

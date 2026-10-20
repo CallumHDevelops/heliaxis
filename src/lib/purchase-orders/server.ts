@@ -235,7 +235,8 @@ export async function suggestFor(db: Db, projectId: string): Promise<PoSuggestio
   const panels = count(sys.panel_count) ?? count(z1.panels);
   if (panelModel || panels) {
     const kwp = fmt(sys.kwp) || fmt(z1.kwp);
-    add(`Solar panel${panelModel ? `: ${panelModel}` : ''}${kwp ? ` (${kwp} kWp system)` : ''}`, panels, panelModel || count(sys.panel_count) ? 'job' : 'survey');
+    // The system's size helps only when there's no model to go on.
+    add(`Solar panel${panelModel ? `: ${panelModel}` : kwp ? ` (${kwp} kWp system)` : ''}`, panels, panelModel || count(sys.panel_count) ? 'job' : 'survey');
   }
   const inverter = fmt(sys.inverter_model) || fmt(z1.inverter);
   const inverterKw = fmt(sys.inverter_kw) || fmt(z1.inverterKw);

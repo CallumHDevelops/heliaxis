@@ -418,7 +418,11 @@ function OrderView({
         </section>
         <section className="po-box" aria-label="Delivery">
           <h4>{DELIVER_LABEL[o.deliver_to]}</h4>
-          {o.deliver_to === 'collect' ? <span>From the supplier</span> : <span className="po-pre">{addressLine(o.deliver_address, o.deliver_postcode)}</span>}
+          {o.deliver_to === 'collect' ? (
+            <span>From the supplier</span>
+          ) : (
+            <span className="po-pre">{[o.deliver_address, o.deliver_postcode && !(o.deliver_address ?? '').toUpperCase().includes(o.deliver_postcode.toUpperCase()) ? o.deliver_postcode : ''].filter(Boolean).join('\n')}</span>
+          )}
           <span className={o.required_by && o.required_by < today && (s === 'sent' || s === 'confirmed') ? 'po-late' : ''}>{neededWords(o, today)}</span>
         </section>
         <section className="po-box" aria-label="History">
@@ -628,7 +632,7 @@ function InvoiceForm({ full, busy, onSave }: { full: PoFull; busy: boolean; onSa
           <label className="crm-label" htmlFor="po-inv-total">
             Total inc VAT £
           </label>
-          <input id="po-inv-total" className="crm-input" inputMode="decimal" value={f.total} onChange={(e) => setF({ ...f, total: e.target.value })} placeholder={penceToInput(o.gross_pence)} />
+          <input id="po-inv-total" className="crm-input" inputMode="decimal" value={f.total} onChange={(e) => setF({ ...f, total: e.target.value })} />
         </div>
         <div>
           <label className="crm-label" htmlFor="po-inv-paid">
@@ -696,7 +700,7 @@ function SendPanel({
   const pdf = `/api/crm/purchase-orders/${o.id}/pdf`;
   return (
     <section className="po-panel" aria-label="Send to the supplier">
-      {justSaved && <p className="crm-banner po-ok">Saved ✓ Now check the email and send it.</p>}
+      {justSaved && <p className="crm-banner po-ok">{full.email && !block ? 'Saved ✓ Now check the email and send it.' : 'Saved ✓'}</p>}
       <h3>{again ? `Send ${o.po_number} again` : `Send ${o.po_number} to ${full.supplier?.name ?? 'the supplier'}`}</h3>
       {block ? (
         <p className="crm-banner crm-banner--err">{block}</p>
@@ -728,7 +732,7 @@ function SendPanel({
           <label className="crm-label" htmlFor="po-send-msg">
             Message
           </label>
-          <textarea id="po-send-msg" className="crm-input" rows={10} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <textarea id="po-send-msg" className="crm-input" rows={13} value={message} onChange={(e) => setMessage(e.target.value)} />
           <p className="crm-muted crm-small">
             Goes from the shared mailbox with {o.po_number}.pdf attached. Their reply comes to you.{' '}
             <a className="crmh-link" href={`${pdf}?inline=1`} target="_blank" rel="noreferrer">
@@ -1017,7 +1021,14 @@ function OrderEditor({
             <label className="crm-label" htmlFor="po-addr">
               Site address
             </label>
-            <textarea id="po-addr" className="crm-input" rows={2} value={draft.deliver_address} onChange={(ev) => set('deliver_address', ev.target.value)} placeholder="From the job" />
+            <textarea
+              id="po-addr"
+              className="crm-input"
+              rows={Math.min(5, Math.max(2, draft.deliver_address.split('\n').length))}
+              value={draft.deliver_address}
+              onChange={(ev) => set('deliver_address', ev.target.value)}
+              placeholder="From the job"
+            />
           </div>
           <div>
             <label className="crm-label" htmlFor="po-pc">
@@ -1062,32 +1073,48 @@ function OrderEditor({
           const net = q.ok && u.ok && u.pence != null ? formatPence(lineNet({ qty: q.qty, unit_cost_pence: u.pence, vat_rate: l.vat_rate })) : '–';
           return (
             <div key={l.key} className="po-eline" role="group" aria-label={`Line ${i + 1}`}>
-              <input
-                className="crm-input po-eline__desc"
-                value={l.description}
-                aria-label={`Line ${i + 1}: description`}
-                aria-invalid={!!p.description}
-                placeholder="What it is"
-                onChange={(ev) => setLine(i, { description: ev.target.value })}
-              />
-              <input className="crm-input po-eline__part" value={l.part_number} aria-label={`Line ${i + 1}: part number`} placeholder="Part no." onChange={(ev) => setLine(i, { part_number: ev.target.value })} />
-              <input className="crm-input po-eline__qty" inputMode="decimal" value={l.qty} aria-label={`Line ${i + 1}: quantity`} aria-invalid={!!p.qty} placeholder="Qty" onChange={(ev) => setLine(i, { qty: ev.target.value })} />
-              <input
-                className="crm-input po-eline__unit"
-                inputMode="decimal"
-                value={l.unit}
-                aria-label={`Line ${i + 1}: unit cost in pounds, ex VAT`}
-                aria-invalid={!!p.unit}
-                placeholder="£ each"
-                onChange={(ev) => setLine(i, { unit: ev.target.value })}
-              />
-              <select className="crm-input po-eline__vat" value={l.vat_rate} aria-label={`Line ${i + 1}: VAT rate`} onChange={(ev) => setLine(i, { vat_rate: Number(ev.target.value) })}>
-                {VAT_RATES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}%
-                  </option>
-                ))}
-              </select>
+              {/* Each field has its own caption on phones, where the column headings are hidden. */}
+              <label className="po-eline__desc">
+                <span className="po-cap">What it is</span>
+                <input
+                  className="crm-input"
+                  value={l.description}
+                  aria-label={`Line ${i + 1}: description`}
+                  aria-invalid={!!p.description}
+                  placeholder="What it is"
+                  onChange={(ev) => setLine(i, { description: ev.target.value })}
+                />
+              </label>
+              <label className="po-eline__part">
+                <span className="po-cap">Part no.</span>
+                <input className="crm-input" value={l.part_number} aria-label={`Line ${i + 1}: part number`} placeholder="Part no." onChange={(ev) => setLine(i, { part_number: ev.target.value })} />
+              </label>
+              <label className="po-eline__qty">
+                <span className="po-cap">Qty</span>
+                <input className="crm-input" inputMode="decimal" value={l.qty} aria-label={`Line ${i + 1}: quantity`} aria-invalid={!!p.qty} placeholder="Qty" onChange={(ev) => setLine(i, { qty: ev.target.value })} />
+              </label>
+              <label className="po-eline__unit">
+                <span className="po-cap">Unit £ ex VAT</span>
+                <input
+                  className="crm-input"
+                  inputMode="decimal"
+                  value={l.unit}
+                  aria-label={`Line ${i + 1}: unit cost in pounds, ex VAT`}
+                  aria-invalid={!!p.unit}
+                  placeholder="£ each"
+                  onChange={(ev) => setLine(i, { unit: ev.target.value })}
+                />
+              </label>
+              <label className="po-eline__vat">
+                <span className="po-cap">VAT</span>
+                <select className="crm-input" value={l.vat_rate} aria-label={`Line ${i + 1}: VAT rate`} onChange={(ev) => setLine(i, { vat_rate: Number(ev.target.value) })}>
+                  {VAT_RATES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}%
+                    </option>
+                  ))}
+                </select>
+              </label>
               <span className="po-eline__net" aria-label={`Line ${i + 1}: net`}>
                 {net}
               </span>
