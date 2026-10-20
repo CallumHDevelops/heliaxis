@@ -1,0 +1,248 @@
+/*
+ * "+ Add task" in a WhatsApp chat (ChatTasks.tsx): the button under Smart replies (the page's header) or
+ * at the top of the dock's chat, its menu, a message's ⋯ menu, the "Reminder set" line, and the sheet's
+ * job line. The colours are the chat's own (.wa-page) and, in the sheets, the CRM's (.crm).
+ */
+
+/* The page's header: Smart replies with + Add task under it, both as wide as the wider one. */
+.wa-chat-tools {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.wa-addtask {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+/* The Smart replies pill's shape and size, in the CRM's amber (dark enough to read on cream). */
+.wa-addtask__btn {
+  font-size: 0.7rem;
+  font-weight: 700;
+  border: 1px solid rgba(199, 127, 4, 0.42);
+  color: #85570a;
+  background: rgba(248, 188, 30, 0.14);
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wa-addtask__btn:hover,
+.wa-addtask__btn[aria-expanded='true'] {
+  background: rgba(248, 188, 30, 0.26);
+}
+.wa-addtask__btn:focus-visible,
+.wa-addtask__menu button:focus-visible,
+.wa-msgacts__btn:focus-visible,
+.wa-msgmenu button:focus-visible,
+.wa-tasknote :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* The menu: under the button, right-aligned, over the messages. */
+.wa-addtask__menu,
+.wa-msgmenu {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  min-width: 230px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 30px -14px rgba(33, 31, 24, 0.38);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.wa-addtask__menu {
+  top: calc(100% + 6px);
+  right: 0;
+}
+.wa-addtask__menu button,
+.wa-msgmenu button {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr;
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  font-size: 0.88rem;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.wa-addtask__menu button > span {
+  grid-row: span 2;
+  font-size: 1.05rem;
+  text-align: center;
+}
+.wa-addtask__menu button small {
+  grid-column: 2;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.wa-addtask__menu button:hover,
+.wa-msgmenu button:hover {
+  background: rgba(248, 188, 30, 0.16);
+}
+
+/* The dock: a slim strip at the top of the chat, the button on the right. */
+.wa-pane__tasks {
+  flex: none;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px 12px 0;
+}
+.wa-pane__tasks .wa-addtask__btn {
+  font-size: 0.72rem;
+}
+.wa-pane__tasks {
+  flex-wrap: wrap;
+}
+.wa-pane__tasks .wa-tasknote {
+  order: 1;
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+/* "Reminder set: …": its own row under the page's name, or under the button in the dock. */
+.wa-chat-head:has(> .wa-tasknote) {
+  flex-wrap: wrap;
+}
+.wa-chat-head > .wa-tasknote {
+  flex-basis: 100%;
+}
+.wa-tasknote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid rgba(31, 122, 77, 0.28);
+  border-radius: 8px;
+  background: rgba(31, 122, 77, 0.09);
+  color: #175c3b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.wa-tasknote > span:first-child {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.wa-tasknote__acts {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.wa-tasknote a,
+.wa-tasknote button {
+  flex: none;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.wa-tasknote a {
+  text-decoration: underline;
+}
+
+/* A message's ⋯: beside it on hover (inside its edge for ours on the right), a long press on phones. */
+.wa-bubble:has(> .wa-msgacts) {
+  position: relative;
+}
+.wa-msgacts {
+  display: contents;
+}
+.wa-msgacts__btn {
+  position: absolute;
+  top: 2px;
+  left: calc(100% + 4px);
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.wa-bubble.out > .wa-msgacts > .wa-msgacts__btn {
+  left: auto;
+  right: calc(100% + 4px);
+}
+.wa-bubble:hover .wa-msgacts__btn,
+.wa-msgacts__btn:focus-visible,
+.wa-msgacts.is-open .wa-msgacts__btn {
+  opacity: 1;
+}
+.wa-msgmenu {
+  left: 0;
+  min-width: 220px;
+}
+.wa-bubble.out .wa-msgmenu {
+  left: auto;
+  right: 0;
+}
+.wa-msgmenu--down {
+  top: calc(100% + 4px);
+}
+.wa-msgmenu--up {
+  bottom: calc(100% + 4px);
+}
+.wa-msgmenu button {
+  display: block;
+  font-weight: 600;
+}
+/* Phones: no hover, so no ⋯; a long press opens the menu instead of selecting the text. */
+@media (hover: none) {
+  .wa-msgacts__btn {
+    display: none;
+  }
+  .wa-bubble:has(> .wa-msgacts) {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
+/* In the sheet: which job it goes on. */
+.wa-tasksheet__job {
+  margin: 0 0 0.7rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(33, 31, 24, 0.05);
+  color: var(--ink);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.wa-tasksheet__job.is-new {
+  background: rgba(248, 188, 30, 0.18);
+}
+.wa-tasksheet q {
+  font-style: italic;
+}

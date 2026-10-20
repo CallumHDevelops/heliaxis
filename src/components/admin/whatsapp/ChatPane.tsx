@@ -13,6 +13,7 @@ import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
+import { useChatTasks } from './ChatTasks';
 import { MediaBubble } from './MediaBubble';
 import '@/app/admin/enquiries/whatsapp.css';
 
@@ -86,6 +87,8 @@ export type ChatPaneProps = {
   docs?: CrmDoc[];
   /** Shows the Smart replies on/off switch and the templates link (Enquiries access). */
   canInbox?: boolean;
+  /** Shows "+ Add task" (a call-back reminder, task or note on their job) and each message's ⋯ (CRM access). */
+  canCrm?: boolean;
   /** A new number puts the cursor in the reply box and scrolls to the newest. */
   focusKey?: number;
   /** whatsapp_messages.id to scroll to and highlight. */
@@ -187,6 +190,7 @@ export function ChatPane({
   projectId,
   docs,
   canInbox = false,
+  canCrm = false,
   focusKey,
   scrollToMessage,
   alsoRead,
@@ -380,6 +384,8 @@ export function ChatPane({
   // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
   const tplSend = useTemplateSend(id, !!enquiry && !open, defaultTemplate);
   const { templates, pick: tpl } = tplSend;
+  // "+ Add task", each message's ⋯ and the sheets (ChatTasks.tsx).
+  const tasks = useChatTasks({ threadId: id, me, name: enquiry?.name ?? null, messages, enabled: canCrm });
 
   async function post(body: unknown) {
     setSending(true);
@@ -538,6 +544,7 @@ export function ChatPane({
                 {m.direction === 'out' && !imported && <span className={`wa-tick ${m.status}`}>{TICKS[m.status] || ''}</span>}
               </span>
               {m.error && <span className="wa-err">{m.error}</span>}
+              {tasks.actionsFor(m)}
             </div>
           </div>
         );
@@ -652,6 +659,8 @@ export function ChatPane({
     const number = enquiry.phone || (enquiry.wa_id ? `+${enquiry.wa_id}` : '');
     return (
       <div className="wa-page wa-pane--dock">
+        {tasks.bar}
+        {tasks.sheet}
         <div className="wa-pane__scroll" ref={boxRef} onScroll={(e) => {
           const b = e.currentTarget;
           atBottom.current = b.scrollTop + b.clientHeight >= b.scrollHeight - 80;
@@ -716,12 +725,19 @@ export function ChatPane({
         <button type="button" className="wa-refresh" onClick={refresh} disabled={busy} aria-label="Refresh" title="Refresh">
           ↻
         </button>
-        {canInbox && (
-          <button type="button" className={`wa-auto${enquiry.wa_auto_off ? ' off' : ''}`} onClick={toggleAuto}>
-            {enquiry.wa_auto_off ? 'Smart replies off' : 'Smart replies on'}
-          </button>
+        {(canInbox || tasks.button) && (
+          <div className="wa-chat-tools">
+            {canInbox && (
+              <button type="button" className={`wa-auto${enquiry.wa_auto_off ? ' off' : ''}`} onClick={toggleAuto}>
+                {enquiry.wa_auto_off ? 'Smart replies off' : 'Smart replies on'}
+              </button>
+            )}
+            {tasks.button}
+          </div>
         )}
+        {tasks.notice}
       </div>
+      {tasks.sheet}
       {jobLink}
 
       {banners}

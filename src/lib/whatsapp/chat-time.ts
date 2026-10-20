@@ -84,14 +84,20 @@ export function ukIso(day: string, time: string): string {
   return new Date(guess - offset).toISOString();
 }
 const msOf = (t: CallTime) => Date.parse(ukIso(t.day, t.time));
-
-/** "today 13:00", "tomorrow 09:30", "Mon 26 Oct 09:30", for the confirmation. */
-export function whenWords(t: CallTime, now: number): string {
-  const today = uk(now).day;
-  const d = noon(t.day);
-  const day = t.day === today ? 'today' : t.day === plusDays(today, 1) ? 'tomorrow' : `${WEEKDAY[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH[d.getUTCMonth()]}`;
-  return `${day} ${t.time}`;
+/** The UK day and time of a moment. */
+export function callTimeOf(at: string | number): CallTime {
+  const { day, mins } = uk(typeof at === 'number' ? at : Date.parse(at));
+  return { day, time: hm(mins) };
 }
+
+/** "today", "tomorrow", "Mon 26 Oct". */
+export function dayWords(day: string, now: number): string {
+  const today = uk(now).day;
+  const d = noon(day);
+  return day === today ? 'today' : day === plusDays(today, 1) ? 'tomorrow' : `${WEEKDAY[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH[d.getUTCMonth()]}`;
+}
+/** "today 13:00", "tomorrow 09:30", "Mon 26 Oct 09:30", for the confirmation. */
+export const whenWords = (t: CallTime, now: number) => `${dayWords(t.day, now)} ${t.time}`;
 
 /** "Tue 20 Oct 08:47", for the quote. */
 function stamp(ms: number): string {
@@ -239,7 +245,9 @@ function dayHit(t: string): DayHit | null {
     if ((m = new RegExp(`\\b(next\\s+|on\\s+|this\\s+)?${word}\\b`).exec(t))) found.push({ ...at(m), kind: 'weekday', weekday, next: !!m[1]?.startsWith('next') });
   }
   found.sort((a, b) => a.start - b.start);
-  return found[0] ?? null;
+  // "I'm in work today but tomorrow's fine": the day they can't do isn't the one.
+  const busy = (d: DayHit) => /\b(busy|working|in work|at work|out|away|can't do|cannot do)\s*$/.test(t.slice(Math.max(0, d.start - 18), d.start));
+  return found.find((d) => !busy(d)) ?? found[0] ?? null;
 }
 
 function partHit(t: string): (Span & { part: Part }) | null {
@@ -370,12 +378,16 @@ export function quoteMessage(m: { body: string; direction: 'in' | 'out'; sentAt:
 /**
  * What the chat's reminder sheets start with, from a message (the customer's latest, or the one picked):
  * the titles, the time it asks for (or the default), and the quote. Everything can be changed before saving.
+ * `asked` is our message just before theirs: "tomorrow's fine" to "when's good for a call?" is a call too.
  */
-export function suggestReminder(m: { body: string; direction: 'in' | 'out'; sentAt: number } | null, name: string, now: number): Suggestion {
+export function suggestReminder(m: { body: string; direction: 'in' | 'out'; sentAt: number } | null, name: string, now: number, asked = ''): Suggestion {
   const first = firstOf(name);
   const full = name.trim() || first;
-  const asks = !!m && asksForCall(m.body);
-  const parsed = m ? parseCallTime(m.body, m.sentAt, now) : null;
+  const asks = !!m && (asksForCall(m.body) || (m.direction === 'in' && asksForCall(asked)));
+  const read = m ? parseCallTime(m.body, m.sentAt, now) : null;
+  // A time that's gone, from a message sent before today, is no use: the default instead. (Today's, like
+  // "1pm today" opened at 2pm, stays, with the sheet saying it's gone.)
+  const parsed = read && (!read.past || uk(m!.sentAt).day === uk(now).day) ? read : null;
   const when: CallTime = parsed ?? defaultCallTime(now);
   return {
     day: when.day,

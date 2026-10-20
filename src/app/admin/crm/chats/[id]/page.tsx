@@ -32,6 +32,7 @@ export default async function CrmChatPage({
         job={from}
         back={{ href: '/admin/crm/chats', label: 'Back to all chats', short: 'All chats' }}
         canInbox={canAccess(s.profile, 'enquiries')}
+        canCrm
       />
     </AdminShell>
   );

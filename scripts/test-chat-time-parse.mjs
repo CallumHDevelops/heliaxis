@@ -68,6 +68,7 @@ eq('sat morning → Saturday', when('sat morning?', tue0900), { day: '2026-10-24
 eq('in 20 minutes', when('Call me in 20 minutes', at('2026-10-20', '09:02')), { day: '2026-10-20', time: '09:25' });
 eq('in half an hour', when("I'll be free in half an hour", tue0900), { day: '2026-10-20', time: '09:30' });
 eq('in an hour, read 2 hours later: gone', when('ring in an hour', tue0900, at('2026-10-20', '11:00')), { day: '2026-10-20', time: '10:00', past: true });
+eq('in work today but tomorrow’s fine → tomorrow', when('I’m in work today but tomorrow should be ok', at('2026-10-19', '18:40'), at('2026-10-20', '09:15')), { day: '2026-10-20', time: '09:30' });
 eq('today, no time → an hour on', when('Can you call me today?', tue0900), { day: '2026-10-20', time: '10:00' });
 
 // Past times: moved on only when that's what they'd mean.
@@ -124,6 +125,11 @@ eq('Sat 21:00 → Mon 09:30', defaultCallTime(at('2026-10-24', '21:00')), { day:
 eq('06:40 → 09:30 today', defaultCallTime(at('2026-10-20', '06:40')), { day: '2026-10-20', time: '09:30' });
 const none = suggestReminder({ body: 'Thanks for the quote', direction: 'in', sentAt: tue0900 }, 'Jane Smith', at('2026-10-20', '09:12'));
 eq('no time, no call: follow up, an hour on', [none.callTitle, none.taskTitle, none.day, none.time, none.phrase], ['Follow up with Jane', 'Follow up with Jane Smith', '2026-10-20', '10:15', '']);
+const stale = suggestReminder({ body: 'Can you ring tomorrow at 10?', direction: 'in', sentAt: at('2026-10-13', '10:00') }, 'Jane Smith', at('2026-10-20', '09:12'));
+eq('a gone time from last week’s message: the default instead', [stale.day, stale.time, stale.phrase, stale.past, stale.callTitle], ['2026-10-20', '10:15', '', false, 'Call Jane']);
+eq('… but today’s gone time stays, flagged', suggestReminder({ body: DAI, direction: 'in', sentAt: tue0847 }, 'David Clement', at('2026-10-20', '14:05')).past, true);
+const reply = suggestReminder({ body: 'tomorrow should be ok', direction: 'in', sentAt: at('2026-10-19', '18:40') }, 'David Clement', at('2026-10-20', '09:15'), 'When’s a good time for a quick call?');
+eq('a reply to our "when’s good for a call?" is a call', [reply.callTitle, reply.day, reply.time], ['Call David', '2026-10-20', '09:30']);
 eq('no message at all', suggestReminder(null, 'Jane Smith', at('2026-10-20', '17:30')).time, '09:30');
 
 // Quotes.

@@ -498,6 +498,7 @@ export function WhatsAppDock({
                     projectId={access.crm ? jobHere.projectId : null}
                     docs={access.crm ? jobHere.docs : undefined}
                     canInbox={canInbox}
+                    canCrm={access.crm}
                     focusKey={paneFocus(jobHere.threadId)}
                     scrollToMessage={paneScroll(jobHere.threadId)}
                     alsoRead={jobRow?.unreadIds}
@@ -558,6 +559,7 @@ export function WhatsAppDock({
                 active={panel && tab === 'chats'}
                 projectId={access.crm ? (openRow.project?.id ?? null) : null}
                 canInbox={canInbox}
+                canCrm={access.crm}
                 focusKey={paneFocus(openRow.threadId)}
                 scrollToMessage={paneScroll(openRow.threadId)}
                 alsoRead={openRow.unreadIds}
