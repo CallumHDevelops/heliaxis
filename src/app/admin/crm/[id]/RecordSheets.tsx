@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { addPhotos } from '@/lib/crm/photo-queue';
 import { PHOTO_CATEGORIES, photoLabel, STAGES } from '@/lib/crm/stages';
 import type { PrimaryAction } from '@/lib/projects/primary-action';
@@ -96,18 +96,44 @@ export function StageSheet({
   );
 }
 
-export function LogComposer({ id, kind, phone, onSaved, onClose }: { id: string; kind: 'note' | 'call' | 'visit'; phone: string | null; onSaved: () => void; onClose: () => void }) {
-  const [body, setBody] = useState('');
+/** The job a sheet saves to, or (from a WhatsApp chat) how to find or open it when Save is pressed. */
+export type JobId = string | (() => Promise<string>);
+const jobIdOf = (id: JobId) => (typeof id === 'string' ? Promise.resolve(id) : id());
+
+export function LogComposer({
+  id,
+  kind,
+  phone,
+  initial = '',
+  children,
+  onSaved,
+  onClose,
+}: {
+  id: JobId;
+  kind: 'note' | 'call' | 'visit';
+  phone: string | null;
+  /** What the box starts with (a chat's quoted message), the cursor after it. */
+  initial?: string;
+  /** Above the box (a chat says which job it goes on). */
+  children?: ReactNode;
+  onSaved: (body: string) => void;
+  onClose: () => void;
+}) {
+  const [body, setBody] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (initial) box.current?.setSelectionRange(initial.length, initial.length);
+  }, [initial]);
   const title = { note: 'Add a note', call: 'Log a call', visit: 'Log a site visit' }[kind];
   const placeholder = { note: 'Anything worth remembering…', call: 'What was said?', visit: 'How did the visit go?' }[kind];
   async function save() {
     setBusy(true);
     setErr('');
     try {
-      await send(`/api/crm/projects/${id}/activities`, 'POST', { kind, body });
-      onSaved();
+      await send(`/api/crm/projects/${await jobIdOf(id)}/activities`, 'POST', { kind, body });
+      onSaved(body.trim());
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved');
     } finally {
@@ -116,12 +142,13 @@ export function LogComposer({ id, kind, phone, onSaved, onClose }: { id: string;
   }
   return (
     <Sheet title={title} onClose={onClose}>
+      {children}
       {kind === 'call' && phone && (
         <a className="crm-btn crm-btn--ghost crm-callbtn" href={`tel:${phone.replace(/[^\d+]/g, '')}`}>
           ☎ Call {phone}
         </a>
       )}
-      <textarea className="crm-input" rows={5} autoFocus placeholder={placeholder} value={body} onChange={(e) => setBody(e.target.value)} />
+      <textarea ref={box} className="crm-input" rows={5} autoFocus placeholder={placeholder} value={body} onChange={(e) => setBody(e.target.value)} />
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       <div className="crm-actions">
         <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={save}>
@@ -168,23 +195,34 @@ export function PhotoQuick({ id, initialCat, onDone, onClose }: { id: string; in
   );
 }
 
+/** A task as saved, for whoever opened the sheet ("Task added for Esther, due today"). */
+export type SavedTask = { title: string; due_date: string | null; assignee_id: string | null };
+
 export function TaskEditor({
   id,
   team,
   today,
   defaultAssignee,
+  initial,
+  children,
   onSaved,
   onClose,
 }: {
-  id: string;
+  id: JobId;
   team: TeamMember[];
   today: string;
   defaultAssignee: string | null;
-  onSaved: () => void;
+  /** What it starts with (a WhatsApp chat's suggestion); with `notes` there's a Notes box too. */
+  initial?: { title?: string; due?: string; notes?: string };
+  /** Above the fields (a chat says which job it goes on). */
+  children?: ReactNode;
+  onSaved: (task: SavedTask) => void;
   onClose: () => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [due, setDue] = useState('');
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [due, setDue] = useState(initial?.due ?? '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const withNotes = initial?.notes !== undefined;
   const [assignee, setAssignee] = useState(defaultAssignee || '');
   const [high, setHigh] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -193,8 +231,9 @@ export function TaskEditor({
     setBusy(true);
     setErr('');
     try {
-      await send(`/api/crm/projects/${id}/tasks`, 'POST', { title, due_date: due || null, assignee_id: assignee || null, priority: high ? 'high' : 'normal' });
-      onSaved();
+      const body = { title, due_date: due || null, assignee_id: assignee || null, priority: high ? 'high' : 'normal', ...(withNotes ? { notes } : {}) };
+      const d = await send<{ task?: SavedTask }>(`/api/crm/projects/${await jobIdOf(id)}/tasks`, 'POST', body);
+      onSaved(d.task ?? { title, due_date: body.due_date, assignee_id: body.assignee_id });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved');
     } finally {
@@ -204,7 +243,8 @@ export function TaskEditor({
   const ideas = ['Send quote', 'Send invoice', 'Send EV guide', 'Chase for photos', 'Book survey', 'Check funding', 'Order kit'];
   return (
     <Sheet title="New task" onClose={onClose}>
-      <input className="crm-input" autoFocus placeholder="What needs doing?" value={title} onChange={(e) => setTitle(e.target.value)} />
+      {children}
+      <input className="crm-input" autoFocus placeholder="What needs doing?" aria-label="What needs doing?" value={title} onChange={(e) => setTitle(e.target.value)} />
       <div className="crm-quickpicks">
         {ideas.map((i) => (
           <button key={i} type="button" onClick={() => setTitle(i)}>
@@ -249,6 +289,14 @@ export function TaskEditor({
           </label>
         </div>
       )}
+      {withNotes && (
+        <>
+          <label className="crm-label" htmlFor="rec-t-notes">
+            Notes
+          </label>
+          <textarea id="rec-t-notes" className="crm-input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </>
+      )}
       <p className="crm-muted crm-small">They get a notification, and it shows in their My work and on the Tasks page. Anyone with CRM or Tasks access can be picked.</p>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       <div className="crm-actions">
@@ -274,13 +322,55 @@ export function nextStepTimes(now: number): [string, string][] {
   ];
 }
 
-export function NextStepEditor({ project, now, onSave, onClose }: { project: Project; now: number; onSave: (text: string | null, at: string | null) => void; onClose: () => void }) {
-  const [text, setText] = useState(project.next_step || '');
-  const [at, setAt] = useState(project.next_step_at ? `${ukDayOf(project.next_step_at)}T${ukTime(project.next_step_at)}` : '');
+export function NextStepEditor({
+  project,
+  initial,
+  now,
+  title = 'Next step',
+  hint = 'You’ll get a notification when it’s due.',
+  children,
+  extra,
+  onSave,
+  onClose,
+}: {
+  /** The job's next step as it is (Clear shows when it has one); null when the sheet starts from `initial`. */
+  project: Pick<Project, 'next_step' | 'next_step_at'> | null;
+  /** What it starts with instead (a WhatsApp chat's call-back reminder). */
+  initial?: { text: string; at: string | null };
+  now: number;
+  title?: string;
+  /** Who hears when it's due. */
+  hint?: ReactNode;
+  /** Above the fields (a chat says which job it goes on). */
+  children?: ReactNode;
+  /** Under the time (a chat's note for the timeline). */
+  extra?: ReactNode;
+  /** A promise (the chat's save) shows "Saving…", and its error in the sheet. */
+  onSave: (text: string | null, at: string | null) => void | Promise<unknown>;
+  onClose: () => void;
+}) {
+  const startAt = initial ? initial.at : (project?.next_step_at ?? null);
+  const [text, setText] = useState(initial ? initial.text : project?.next_step || '');
+  const [at, setAt] = useState(startAt ? `${ukDayOf(startAt)}T${ukTime(startAt)}` : '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
   const ideas = ['Call back', 'Chase survey photos', 'Book survey', 'Send quote', 'Chase quote', 'Book install'];
+  const atIso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(at) ? londonIso(at.slice(0, 10), at.slice(11, 16)) : null;
+  async function save(t: string | null, a: string | null) {
+    setBusy(true);
+    setErr('');
+    try {
+      await onSave(t, a);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Not saved');
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <Sheet title="Next step" onClose={onClose}>
-      <input className="crm-input" autoFocus placeholder="e.g. Chase quote" value={text} onChange={(e) => setText(e.target.value)} />
+    <Sheet title={title} onClose={onClose}>
+      {children}
+      <input className="crm-input" autoFocus placeholder="e.g. Chase quote" aria-label="What’s next" value={text} onChange={(e) => setText(e.target.value)} />
       <div className="crm-quickpicks">
         {ideas.map((i) => (
           <button key={i} type="button" onClick={() => setText(i)}>
@@ -297,18 +387,16 @@ export function NextStepEditor({ project, now, onSave, onClose }: { project: Pro
         ))}
       </div>
       <input className="crm-input" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} aria-label="When" />
-      <p className="crm-muted crm-small">You’ll get a notification when it’s due.</p>
+      {atIso && now > 0 && Date.parse(atIso) < now && <p className="crm-banner">That time has gone, so the reminder will go off straight away. Pick a later time if you meant another day.</p>}
+      <p className="crm-muted crm-small">{hint}</p>
+      {extra}
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
       <div className="crm-actions">
-        <button
-          type="button"
-          className="crm-btn crm-btn--solar"
-          disabled={!text.trim()}
-          onClick={() => onSave(text.trim(), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(at) ? londonIso(at.slice(0, 10), at.slice(11, 16)) : null)}
-        >
-          Save
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !text.trim()} onClick={() => void save(text.trim(), atIso)}>
+          {busy ? 'Saving…' : 'Save'}
         </button>
-        {project.next_step && (
-          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => onSave(null, null)}>
+        {project?.next_step && (
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={busy} onClick={() => void save(null, null)}>
             Clear
           </button>
         )}
