@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
-import { followsCustomerPostcode, postcodeKey } from '@/lib/crm/site-postcode';
+import { followsCustomerPostcode, postcodeKey, retitled } from '@/lib/crm/site-postcode';
+import { isProjectStage } from '@/lib/crm/stages';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { permissionStop, setPermissionByStaff, STAFF_STOP_PREFIX, type StopRecord } from '@/lib/whatsapp/permission';
 
@@ -94,21 +95,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 /**
  * The customer's postcode went from `was` to `now`: their jobs that were only carrying a copy of the
  * old one (or none) follow it, each with a note on its timeline; a job with a site of its own keeps
- * its postcode (followsCustomerPostcode). Its map position clears with it (crm-v3.sql's trigger), so
- * survey drive times come from the new postcode. → the ids of the jobs that moved; none before the
- * CRM tables exist.
+ * its postcode (followsCustomerPostcode). From Won onwards a survey or booking has checked the site,
+ * so a later change is a house move and the job keeps its postcode. A name made as "Jane Smith ·
+ * 88888" takes the new postcode too (retitled). Its map position clears with it (crm-v3.sql's
+ * trigger), so survey drive times come from the new postcode. → the ids of the jobs that moved; none
+ * before the CRM tables exist.
  */
 async function moveSitePostcodes(enquiryId: string, was: string | null, now: string, byId: string): Promise<string[]> {
   const db = createAdminClient();
-  const { data: jobs, error } = await db.from('crm_projects').select('id, address, postcode').eq('enquiry_id', enquiryId);
+  const { data: jobs, error } = await db.from('crm_projects').select('id, stage, title, address, postcode').eq('enquiry_id', enquiryId);
   if (error) return [];
-  const moving = (jobs ?? []).filter((j) => followsCustomerPostcode(j, was, now));
+  const moving = (jobs ?? []).filter((j) => !isProjectStage(j.stage) && followsCustomerPostcode(j, was, now));
   if (!moving.length) return [];
-  const ids = moving.map((j) => String(j.id));
-  const { error: saveError } = await db.from('crm_projects').update({ postcode: now, updated_at: new Date().toISOString() }).in('id', ids);
-  if (saveError) return [];
+  // One save per job, as each has its own name.
+  const at = new Date().toISOString();
+  const saved = await Promise.all(
+    moving.map(async (j) => {
+      const title = retitled(j.title, j.postcode?.trim() || was, now);
+      const { error: saveError } = await db.from('crm_projects').update({ postcode: now, updated_at: at, ...(title ? { title } : {}) }).eq('id', j.id);
+      return saveError ? null : j;
+    })
+  );
+  const done = saved.filter((j): j is NonNullable<typeof j> => !!j);
   await Promise.all(
-    moving.map((j) =>
+    done.map((j) =>
       logActivity({
         enquiryId,
         projectId: String(j.id),
@@ -118,7 +128,7 @@ async function moveSitePostcodes(enquiryId: string, was: string | null, now: str
       })
     )
   );
-  return ids;
+  return done.map((j) => String(j.id));
 }
 
 /** Switching on was refused: they replied STOP, or staff switched it off. */

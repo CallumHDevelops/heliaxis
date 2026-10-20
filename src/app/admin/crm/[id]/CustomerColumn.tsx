@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { money, portalOpen, PRODUCTS, productLabel, stageIndex, stageLabel } from '@/lib/crm/stages';
+import { isProjectStage, money, portalOpen, PRODUCTS, productLabel, stageIndex, stageLabel } from '@/lib/crm/stages';
 import type { TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
@@ -299,10 +299,11 @@ function CustomerCard({
   const hasOptIn = 'whatsapp_opt_in' in customer;
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   // Under the postcode box: whether this job's site postcode changes with it (the save's own rule), or
-  // where to change it when it doesn't (a lead form's "88888" copied onto the job before this rule).
+  // where to change it when it doesn't (a lead form's "88888" copied onto the job before this rule, or
+  // a job from Won onwards, whose checked site stays when the customer moves).
   const siteLine = !f.postcode.trim()
     ? ''
-    : followsCustomerPostcode(project, customer.postcode, f.postcode)
+    : !isProjectStage(project.stage) && followsCustomerPostcode(project, customer.postcode, f.postcode)
       ? 'The site address on this job changes too.'
       : siteHasOtherPostcode(project, f.postcode)
         ? 'This job has its own site address: change it in Job details.'

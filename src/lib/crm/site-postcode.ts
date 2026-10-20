@@ -1,7 +1,7 @@
 /**
  * A job's site postcode (crm_projects.postcode) and the customer's (enquiries.postcode): whether a
- * postcode is UK-shaped, which jobs follow when the customer's is corrected, and which have a site
- * postcode of their own.
+ * postcode is UK-shaped, which jobs follow when the customer's is corrected, which have a site
+ * postcode of their own, and the postcode on the end of a job's name.
  *
  * Pure (no imports), so scripts/test-postcode-follows.mjs loads it straight into node and the record
  * page can use it in the browser. The shapes are booking/geo.ts's (normPostcode, POSTCODE_IN_TEXT),
@@ -30,6 +30,8 @@ function postcodesIn(address: string | null | undefined): string[] {
  * with a different postcode (another property) keeps it, and so does one whose address has another
  * postcode written in it: address text is never rewritten, so a person changes that in Job details.
  * Nothing follows a postcode that's been cleared or hasn't really changed ("cf39 8yy" → "CF39 8YY").
+ * Callers also leave jobs from Won onwards alone (isProjectStage): by then a survey or booking has
+ * checked the site, so a later change is a house move, not a correction.
  */
 export function followsCustomerPostcode(
   job: { address?: string | null; postcode?: string | null },
@@ -49,4 +51,10 @@ export function siteHasOtherPostcode(job: { address?: string | null; postcode?: 
   const k = postcodeKey(pc);
   const own = postcodeKey(job.postcode);
   return (!!own && own !== k) || postcodesIn(job.address).some((x) => x !== k);
+}
+
+/** A job named "Jane Smith · 88888" when it was made: the name's postcode ending follows the site's (null: no change). */
+export function retitled(title: string | null | undefined, old: string | null | undefined, now: string): string | null {
+  const m = /^(.*\S)\s*·\s*([^·]+)$/.exec(String(title || '').trim());
+  return m && postcodeKey(old) && postcodeKey(m[2]) === postcodeKey(old) ? `${m[1]} · ${now}` : null;
 }
