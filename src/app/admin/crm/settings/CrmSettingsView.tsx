@@ -214,6 +214,26 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
             </button>
           </section>
 
+          <section className="crm-set">
+            <h2>Purchase orders</h2>
+            <label className="crm-label" htmlFor="set-office-addr">
+              Office / warehouse delivery address
+            </label>
+            <textarea
+              id="set-office-addr"
+              className="crm-input"
+              rows={3}
+              value={s.officeAddress ?? ''}
+              onChange={(e) => set('officeAddress', e.target.value)}
+              placeholder={'Unit and street\nTown'}
+            />
+            <label className="crm-label" htmlFor="set-office-pc">
+              Postcode
+            </label>
+            <input id="set-office-pc" className="crm-input crm-narrow" value={s.officePostcode ?? ''} onChange={(e) => set('officePostcode', e.target.value)} />
+            <p className="crm-muted crm-small">Where kit can be delivered instead of the job’s site. Until it’s set, “To the office” can’t be picked on an order.</p>
+          </section>
+
           <div className="crm-savebar">
             <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={save}>
               {busy ? 'Saving…' : 'Save settings'}
