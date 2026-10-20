@@ -119,5 +119,27 @@ eq('nothing to go on', [adNameNow(names, null, null), adNameNow(names, '', '999'
 eq('an id with no name to compare', adNameNow(names, null, '603'), { name: 'Martyn GoodWe Top 5', note: null });
 eq('ids are looked up as their own keys only', adNameNow(names, 'Video 1', '__proto__'), { name: 'Tim Facts', note: 'was Video 1' });
 
+// ── Meta's list as Reports last kept it, renamed since: a lead from the ad brought the newer name ──
+{
+  const h = emptyHistory();
+  const listedAt = Date.parse('2026-10-10T10:00:00Z');
+  noteName(h, 'ads', '601', 'Video 1', Date.parse('2026-09-01T10:00:00Z'));
+  noteName(h, 'ads', '601', 'Tim Facts', listedAt);
+  noteName(h, 'ads', '601', 'Tim Facts Autumn', Date.parse('2026-10-22T09:00:00Z'));
+  const stale = nameLookup({ 601: ad('Tim Facts') }, h, listedAt);
+  eq('old list: by id, the name the newer lead brought', sourceNow('meta: Tim Facts Autumn', '601', stale), { label: 'Meta ad · Tim Facts Autumn', ad: 'Tim Facts Autumn', note: null });
+  eq('old list: no id, the newer name', sourceNow('meta: Tim Facts Autumn', null, stale), { label: 'Meta ad · Tim Facts Autumn', ad: 'Tim Facts Autumn', note: null });
+  eq('old list: an older lead follows to the newer name', sourceNow('meta: Video 1', null, stale), { label: 'Meta ad · Tim Facts Autumn', ad: 'Tim Facts Autumn', note: 'was Video 1' });
+  eq('old list: the name it had then is old now', sourceNow('meta: Tim Facts', null, stale), { label: 'Meta ad · Tim Facts Autumn', ad: 'Tim Facts Autumn', note: 'was Tim Facts' });
+  // A lead from before the list, read from Meta's Lead API after a rename, brings today's name at its old date.
+  const h2 = emptyHistory();
+  noteName(h2, 'ads', '601', 'Video 1', Date.parse('2026-09-01T10:00:00Z'));
+  noteName(h2, 'ads', '601', 'Tim Facts', Date.parse('2026-09-05T10:00:00Z'));
+  eq('list newer than every lead: the list', sourceNow('meta: Video 1', null, nameLookup({ 601: ad('Tim Facts') }, h2, listedAt)), { label: 'Meta ad · Tim Facts', ad: 'Tim Facts', note: 'was Video 1' });
+  noteName(h2, 'ads', '601', 'Tim Facts Autumn', Date.parse('2026-09-03T10:00:00Z'));
+  eq('...over any name dated before the list', sourceNow('meta: Video 1', '601', nameLookup({ 601: ad('Tim Facts') }, h2, listedAt)).ad, 'Tim Facts');
+  eq('list time unreadable: the list, as before', sourceNow('meta: Tim Facts Autumn', '601', nameLookup({ 601: ad('Tim Facts') }, h, NaN)).ad, 'Tim Facts');
+}
+
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

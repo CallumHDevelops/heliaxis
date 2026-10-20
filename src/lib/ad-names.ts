@@ -170,14 +170,18 @@ export function withCurrentNames<T extends Pick<Ad, 'id' | 'name' | 'campaignId'
  */
 export type AdNameLookup = { ads: Record<string, string>; campaigns: Record<string, string>; renamed: Record<string, string>; shared: Record<string, string[]> };
 
-/** Meta's names now (null if not known) and the names seen → a lookup. Meta's list wins over the history's newest. */
-export function nameLookup(current: Record<string, CurrentAd> | null | undefined, h: NameHistory): AdNameLookup {
+/**
+ * Meta's names now (null if not known) and the names seen → a lookup. Meta's list wins over the
+ * history's newest, unless the CRM has seen the ad since Meta gave the list (`listedAt`, ms; a
+ * lead from it, say): then the ad may have been renamed since, and the history's newest is newer.
+ */
+export function nameLookup(current: Record<string, CurrentAd> | null | undefined, h: NameHistory, listedAt = Infinity): AdNameLookup {
   const ads: Record<string, string> = {};
   const campaigns: Record<string, string> = {};
   for (const [id, names] of Object.entries(namesById(h, 'ads'))) ads[id] = names[0];
   for (const [id, names] of Object.entries(namesById(h, 'campaigns'))) campaigns[id] = names[0];
   for (const [id, c] of Object.entries(current ?? {})) {
-    ads[id] = c.name;
+    if (!(own(h.ads, id) ?? []).some((x) => x.at > listedAt)) ads[id] = c.name;
     if (c.campaignId && c.campaignName) campaigns[c.campaignId] = c.campaignName;
   }
   // Each name → the names the ads that have had it have now (one of each, whatever its capitals).

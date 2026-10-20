@@ -396,7 +396,8 @@ export async function cachedAdNames(): Promise<AdNameLookup | null> {
     // Another ad account's names (META_AD_ACCOUNT_ID changed) aren't these leads' ads.
     const account = configuredAccount();
     const listed = names?.v === 1 && names.ads && (!account || names.account === account) ? names.ads : null;
-    return nameLookup(listed, readHistory(value(SEEN_KEY)));
+    // Only Reports asks Meta for the list again, so it may be old: a newer name a lead brought wins.
+    return nameLookup(listed, readHistory(value(SEEN_KEY)), listed ? Date.parse(names?.at ?? '') : undefined);
   } catch {
     return null;
   }
