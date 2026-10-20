@@ -78,10 +78,13 @@ export function ChatTaskSheet({
     if (kind !== 'note' && window.matchMedia('(hover: none)').matches) document.querySelector<HTMLElement>('.wa-tasksheet .crm-sheet-box')?.focus({ preventScroll: true });
   }, [kind]);
 
-  /** Their open job, or one opened now (a call-back needs a live one: a closed job's reminder never goes off). */
+  /**
+   * Their open job; else, for a task or note, their last one; else one opened now. A call-back always
+   * needs a live job: a closed job's reminder never goes off.
+   */
   async function ensureJob(): Promise<string> {
     const found = await readJob();
-    let id = found.job?.id;
+    let id = found.job?.id ?? (kind === 'callback' ? undefined : found.last?.id);
     if (!id) {
       const d = await send<{ id: string }>(
         '/api/crm/projects',
