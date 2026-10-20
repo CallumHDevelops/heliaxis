@@ -140,8 +140,22 @@ export function ChatList({ mode, rows, counts, error, canCrm, filter, onFilter, 
   else if (!list.length && searching)
     body = <p className="hxd-empty">{found.pending ? 'Searching every chat…' : `No chats match “${query.trim()}”.`}</p>;
   else if (!list.length && f === 'everyone')
-    body = <p className="hxd-empty">{everyone.error || (everyone.rows === null ? 'Loading every chat…' : 'No WhatsApp chats yet.')}</p>;
-  else if (!all.length)
+    // A page can come back with nobody this person may see (CRM staff only see customers with a job),
+    // so older chats are still offered.
+    body = (
+      <>
+        <p className="hxd-empty">
+          {everyone.error || (everyone.rows === null ? 'Loading every chat…' : everyone.hasMore ? 'Nobody to show in the newest chats.' : 'No WhatsApp chats yet.')}
+        </p>
+        {everyone.hasMore && (
+          <button type="button" className="hxd-more" disabled={everyone.busy} onClick={() => void everyone.more()}>
+            {everyone.busy ? 'Loading…' : 'Show older chats'}
+          </button>
+        )}
+      </>
+    );
+  // Only while the live list is what's showing: All chats and a search draw their own rows below.
+  else if (!all.length && !searching && f !== 'everyone')
     body = (
       <>
         <p className="hxd-empty">No WhatsApp chats in the last 14 days.</p>
