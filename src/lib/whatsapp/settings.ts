@@ -1,13 +1,14 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { DEFAULT_SETTINGS, type WaSettings } from './settings-shared';
+import { cleanSettings, DEFAULT_SETTINGS, type WaSettings } from './settings-shared';
 
 const KEY = 'whatsapp-settings';
 
 export async function getSettings(): Promise<WaSettings> {
   try {
     const { data } = await createAdminClient().from('cms_kv').select('value').eq('key', KEY).maybeSingle();
-    return { ...DEFAULT_SETTINGS, ...(data?.value ? JSON.parse(data.value) : {}) };
+    // Through cleanSettings, so settings saved before a change (quiet hours in whole hours) read right.
+    return cleanSettings(data?.value ? JSON.parse(data.value) : {});
   } catch {
     return DEFAULT_SETTINGS;
   }

@@ -258,7 +258,7 @@ async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo
 
   const settings = await getSettings();
   let at = new Date(Date.now() + pickDelaySeconds(rule.delay_min_seconds, rule.delay_max_seconds) * 1000);
-  if (settings.smartRepliesQuietHours) at = nextAwake(at, settings.quietFrom, settings.quietTo);
+  if (settings.smartRepliesQuietHours) at = nextAwake(at, settings);
   const { data: row } = await db
     .from('whatsapp_outbox')
     .insert({
@@ -414,11 +414,10 @@ export async function scheduleChase(db: Db, enquiry: EnquiryWa, opts: { hours: n
           sentAt: new Date(),
           hours: opts.hours,
           lastInboundAt: enquiry.wa_last_inbound_at,
-          quietFrom: settings.quietFrom,
-          quietTo: settings.quietTo,
+          settings,
           keepFree: settings.keepChasesFree,
         })
-      : { at: nextAwake(new Date(Date.now() + opts.hours * 3_600_000), settings.quietFrom, settings.quietTo), free: false };
+      : { at: nextAwake(new Date(Date.now() + opts.hours * 3_600_000), settings), free: false };
   await db
     .from('whatsapp_outbox')
     .update({ status: 'cancelled', last_error: 'Replaced by a newer chaser' })
@@ -639,7 +638,7 @@ export async function handleEcho(m: MessageEcho) {
 export async function remindUnanswered() {
   const settings = await getSettings();
   // Not at night: overnight messages get their reminder when quiet hours end.
-  if (!settings.remindUnansweredMinutes || isQuiet(new Date(), settings.quietFrom, settings.quietTo)) return 0;
+  if (!settings.remindUnansweredMinutes || isQuiet(new Date(), settings)) return 0;
   const db = createAdminClient();
   const cutoff = new Date(Date.now() - settings.remindUnansweredMinutes * 60_000).toISOString();
   const dayAgo = new Date(Date.now() - SERVICE_WINDOW_MS).toISOString();

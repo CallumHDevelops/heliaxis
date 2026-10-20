@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { matchRule, type SmartRule } from '@/lib/whatsapp/shared';
-import { DEFAULT_SETTINGS, type WaSettings } from '@/lib/whatsapp/settings-shared';
+import { DEFAULT_SETTINGS, fromHhmm, hhmm, type WaSettings } from '@/lib/whatsapp/settings-shared';
 import '../whatsapp.css';
 
 type Rule = SmartRule & { id: string; follow_up_hours: number | null; follow_up_text: string | null };
@@ -52,6 +52,11 @@ export function SmartReplies() {
     setSavedNote('Saved');
   }
   const set = <K extends keyof WaSettings>(k: K, v: WaSettings[K]) => settings && setSettings({ ...settings, [k]: v });
+  /** A time box ("08:45"): kept as minutes after midnight; a half-typed time is left alone. */
+  const setTime = (k: 'quietFromMin' | 'quietToMin', v: string) => {
+    const m = fromHhmm(v);
+    if (m !== null) set(k, m);
+  };
 
   const load = useCallback(
     () =>
@@ -252,12 +257,12 @@ export function SmartReplies() {
           </p>
           <div className="wa-grid3">
             <div>
-              <label className="wa-label">Quiet from (UK hour)</label>
-              <input className="wa-input" type="number" min={0} max={23} value={settings.quietFrom} onChange={(e) => set('quietFrom', Number(e.target.value))} />
+              <label className="wa-label">Quiet from (UK time)</label>
+              <input className="wa-input" type="time" step={60} value={hhmm(settings.quietFromMin)} onChange={(e) => setTime('quietFromMin', e.target.value)} />
             </div>
             <div>
               <label className="wa-label">Quiet until</label>
-              <input className="wa-input" type="number" min={0} max={23} value={settings.quietTo} onChange={(e) => set('quietTo', Number(e.target.value))} />
+              <input className="wa-input" type="time" step={60} value={hhmm(settings.quietToMin)} onChange={(e) => setTime('quietToMin', e.target.value)} />
             </div>
             <div>
               <label className="wa-label">Remind me after (min, 0 = off)</label>
