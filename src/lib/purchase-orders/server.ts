@@ -1,12 +1,15 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { ukDay } from '@/lib/bank-holidays';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { logActivity } from '@/lib/crm/server';
-import { msConfigured } from '@/lib/ms365';
+import { mailbox, msConfigured } from '@/lib/ms365';
 import { readAll, withFallback } from '@/lib/projects/server';
 import { refMatches } from '@/lib/projects/refs';
 import { schemaReady } from '@/lib/schema-ready';
+import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { formatPence, isDay, isOpen, isOrdered, totals, type CleanLine } from './money';
+import type { PoPdfInput } from './pdf';
 import type { DeliverTo, Office, OrdersSummary, PoFull, PoJob, PoLine, PoListRow, PoSuggestion, PurchaseOrder, Supplier } from './shared';
 
 /**
@@ -360,3 +363,25 @@ export async function logOrder(db: Db, o: Pick<PurchaseOrder, 'id' | 'po_number'
 export const orderWords = (o: Pick<PurchaseOrder, 'po_number' | 'net_pence'>, supplier: string | null | undefined) =>
   `${o.po_number} (${[supplier, o.net_pence ? `${formatPence(o.net_pence)} ex VAT` : ''].filter(Boolean).join(', ')})`;
 
+/* ── The PDF ─────────────────────────────────────────────────────────────────── */
+
+/**
+ * What the PDF shows for this order as it stands: dated the day it was sent (today for a draft, or a
+ * changed order about to go again, which then says which one it replaces). `by`: who's sending it
+ * now; else whoever sent it last, or made it.
+ */
+export function pdfInputFor(full: PoFull, by?: string | null): PoPdfInput {
+  const o = full.order;
+  const today = ukDay(Date.now());
+  const again = !!o.sent_at && o.changed_since_sent;
+  return {
+    order: o,
+    lines: full.lines,
+    supplier: full.supplier,
+    jobRef: full.job?.ref ?? null,
+    issued: o.sent_at && !again ? ukDay(o.sent_at) : today,
+    replaces: again ? ukDay(o.sent_at!) : null,
+    orderedBy: by ?? full.people.sent_by ?? full.people.created_by,
+    contactEmail: mailbox() || HELIAXIS_PARTY.noticesEmail,
+  };
+}
