@@ -48,15 +48,20 @@ function importsOf(file) {
   return out;
 }
 
-const isClient = (file) => /^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*['"]use client['"]/.test(readFileSync(file, 'utf8'));
+const directive = (word) => new RegExp(`^\\s*(?:\\/\\/[^\\n]*\\n|\\/\\*[\\s\\S]*?\\*\\/\\s*)*['"]use ${word}['"]`);
+const isClient = (file) => directive('client').test(readFileSync(file, 'utf8'));
+/** A 'use server' file (server actions): imported from the browser it's a reference to the server, and the bundler sends none of its code. */
+const isServerActions = (file) => directive('server').test(readFileSync(file, 'utf8'));
 
-function walk(starts) {
+function walk(starts, { serverRefs = false } = {}) {
   const seen = new Set();
   const stack = [...starts];
   while (stack.length) {
     const f = stack.pop();
     if (seen.has(f) || !/\.(tsx?|mjs|js)$/.test(f)) continue;
     seen.add(f);
+    // From the browser, server actions are references: what they import stays on the server.
+    if (serverRefs && isServerActions(f)) continue;
     for (const spec of importsOf(f)) {
       const r = resolveFile(f, spec);
       if (r) stack.push(r);
@@ -68,7 +73,7 @@ function walk(starts) {
 /** What the browser loads for a page: everything reachable from the client files the page (and the admin layout) reaches. */
 function clientGraph(page) {
   const all = walk([join(SRC, page), join(SRC, 'app/admin/layout.tsx')]);
-  return walk([...all].filter(isClient));
+  return walk([...all].filter(isClient), { serverRefs: true });
 }
 
 const FORM_CODE = [/src\/lib\/site\/forms\//, /src\/lib\/site\/fixed\//, /src\/lib\/site\/eic\//, /src\/lib\/site\/rules\.ts$/];
@@ -84,6 +89,11 @@ for (const [name, page] of [
   if (page.includes('projects')) eq(`${name}: the trades block is still there (New project)`, [...g].some((f) => f.endsWith('NewProjectTrades.tsx')) && [...g].some((f) => f.endsWith('src/lib/site/trades.ts')), true);
   if (page.includes('subcontractors')) eq(`${name}: the site contacts card is still there`, [...g].some((f) => f.endsWith('SiteContactsCard.tsx')) && [...g].some((f) => f.endsWith('src/lib/site/phone.ts')), true);
 }
+
+// A subcontractor's page calls its server actions (actions.ts, which works their held labour POs out
+// again after a CIS change): the browser gets references to them, not the PO code behind them.
+const subPage = clientGraph('app/admin/subcontractors/[id]/page.tsx');
+eq('a subcontractor’s page: its server actions are references (their imports stay on the server)', [[...subPage].some((f) => f.endsWith('app/admin/subcontractors/actions.ts')), [...subPage].some((f) => f.endsWith('src/lib/site/labour-po.ts'))], [true, false]);
 
 // The check would see it: the job's own page loads the forms (its Site tab).
 eq('the walk finds form code where it is meant to be (the job page’s Site tab)', formCode(clientGraph('app/admin/crm/[id]/page.tsx')).length > 0, true);
