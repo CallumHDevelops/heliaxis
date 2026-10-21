@@ -1,5 +1,5 @@
 /* The electrician's pack (P8, P9, P14, P15): group headings, evidence beside checklist rows, the
-   F43 string tabs and cards, N/A and "Same as string 1", certificate files, and the Finish list.
+   string tests' tabs and cards, N/A and "Same as string 1", certificate files, and the Finish list.
    Same tokens and scope as site.css; targets 48 px or more. */
 
 /* A group heading within a step ("Inverter"). Not .sa-group: that's the home list's job groups (site.css). */
@@ -37,7 +37,7 @@
 .sa-na.is-on { width: 100%; min-height: 56px; border-radius: 12px; background: var(--ink); color: #fff; text-align: left; }
 .sa-na.is-on .sa-muted { color: #d9d4c7; }
 
-/* F43: a tab per string, one card per group */
+/* String tests: a tab per string, one card per group */
 .sa-strtabs-wrap { margin-top: 14px; }
 .sa-strtabs {
   position: sticky;

@@ -34,7 +34,7 @@ export const DESIGN_FIELDS: DesignField[] = [
     kind: 'intlist',
     for: SOLAR,
     placeholder: '8 + 8',
-    hint: 'Panels on each string, e.g. 8 + 8. The roofer sees it, and it heads the F43 columns.',
+    hint: 'Panels on each string, e.g. 8 + 8. The roofer sees it, and it’s used for the string tests.',
   },
   { key: 'optimisers', label: 'Optimisers fitted', kind: 'bool', for: SOLAR },
   { key: 'optimiser_model', label: 'Optimiser model', kind: 'text', for: SOLAR },

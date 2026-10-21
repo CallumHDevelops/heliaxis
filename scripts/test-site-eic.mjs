@@ -172,7 +172,7 @@ eq('a board, three circuits, instruments and both signatures: nothing missing', 
 eq('and the certificate is complete', E.certComplete(c0), true);
 const form = F.schemaFor({ trade: 'electrician', forms: F.formsFor(['solar', 'battery']) })[0];
 const EIC_KEYS = ['eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-existing', 'eic-extent', 'eic-sign'];
-eq('the electrician’s pack holds the certificate, at its place (after F78, before their own upload and Finish)', [form.stage, form.steps.map((s) => s.key).slice(form.steps.findIndex((s) => s.key === 'f78') + 1)], ['main', [...EIC_KEYS, 'cert-own', 'cert', 'finish']]);
+eq('the electrician’s pack holds the certificate, at its place (after the system summary, before their own upload and Finish)', [form.stage, form.steps.map((s) => s.key).slice(form.steps.findIndex((s) => s.key === 'summary') + 1)], ['main', [...EIC_KEYS, 'cert-own', 'cert', 'finish']]);
 eq('so the sign-off gate has nothing left from the certificate', R.signCheck(form, c0).must.filter((m) => m.step.startsWith('eic-')), []);
 const pc = M.propCtx(c0);
 const reopened = [];
@@ -549,7 +549,7 @@ for (const [label, extra] of [
 /* ── For the rest of the pack ────────────────────────────────────────────── */
 
 const sum = E.eicSummary(ctxOf({ ...ans, eic_design: a({ ...design, png: undefined }) }));
-eq('F74 Part 2 and F78 read the EIC: reference, schedules, circuits, next inspection', [sum.refs, sum.circuits.length, sum.next, sum.complete], ['HX-0042-EIC: Schedule of inspections, Schedules of circuit details and test results', 3, '10 years', true]);
+eq('the battery inspection and the system summary read the EIC: reference, schedules, circuits, next inspection', [sum.refs, sum.circuits.length, sum.next, sum.complete], ['HX-0042-EIC: Schedule of inspections, Schedules of circuit details and test results', 3, '10 years', true]);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

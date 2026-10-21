@@ -11,7 +11,7 @@ import type { Db } from './server';
  * - site_signoffs.signature_path (the trade's sign-off) and extra (the customer's, on the electrician's phone);
  * - site_returns.fixed_signature_path (a trade's Put right after a return to site);
  * - site_assignments.answers (the EIC's design part, signed in the office);
- * - handover_slots.data (F78's design part, the customer's portal signatures).
+ * - handover_slots.data (the system summary's design part, the customer's portal signatures).
  *
  * crm_merge() has already moved these rows to the kept job, so only its rows are read. Safe to run
  * again: a value that no longer names the old folder is left alone. → how many rows couldn't be

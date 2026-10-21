@@ -5,22 +5,23 @@ import { moveStage } from '@/lib/crm/move-stage';
 import { addDays, shortDay } from '@/lib/projects/deadlines';
 import { docFileName } from '@/lib/documents/pdf-kit';
 import { inputsHash, saveGenerated } from '@/lib/documents/store';
-import { makeReceipt, RECEIPT_TITLE } from '@/lib/documents/handover/cc13-receipt';
-import { CC4_TITLE, makeSwitchOff } from '@/lib/documents/handover/cc4';
 import type { Loader } from '@/lib/documents/handover/common';
+import { COMPLETION_TITLE, makeCompletion } from '@/lib/documents/handover/completion';
 import { COVER_TITLE, makeCoverLetter } from '@/lib/documents/handover/cover-letter';
-import { F16E_TITLE, makeCompletion } from '@/lib/documents/handover/f16e';
-import { F19I_TITLE, makeWarranty } from '@/lib/documents/handover/f19i';
-import { F47_TITLE, makeG98Sheet } from '@/lib/documents/handover/f47';
-import { F48I_TITLE, makeShading } from '@/lib/documents/handover/f48i';
-import { F49_TITLE, makeSchedule } from '@/lib/documents/handover/f49';
-import { F49A_TITLE, makeAgreement } from '@/lib/documents/handover/f49a';
-import { F76_SHEET_TITLE, makeG99Sheet } from '@/lib/documents/handover/f76-sheet';
-import { F78_TITLE, makeF78 } from '@/lib/documents/handover/f78';
+import { ESTIMATE_TITLE, makeShading } from '@/lib/documents/handover/estimate';
+import { G98_SHEET_TITLE, makeG98Sheet } from '@/lib/documents/handover/g98-sheet';
+import { G99_SHEET_TITLE, makeG99Sheet } from '@/lib/documents/handover/g99-sheet';
+import { makeAgreement, PLAN_TITLE } from '@/lib/documents/handover/plan';
+import { makeReceipt, RECEIPT_TITLE } from '@/lib/documents/handover/receipt';
+import { makeSchedule, SCHEDULE_TITLE } from '@/lib/documents/handover/schedule';
+import { makeSummary, SUMMARY_TITLE } from '@/lib/documents/handover/summary';
+import { makeSwitchOff, SWITCH_OFF_TITLE } from '@/lib/documents/handover/switch-off';
+import { makeWarranty, WARRANTY_TITLE } from '@/lib/documents/handover/warranty';
 import { buildPack, type PackEntry, type PackPart } from '@/lib/documents/handover/pack';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { notify } from '@/lib/notify';
 import { schemaReady } from '@/lib/schema-ready';
+import { SUMMARY_DECLARATIONS, summaryStandards } from '@/lib/site/declaration';
 import { sendAfter, sendTimeWords } from '@/lib/site/messages';
 import type { Db } from '@/lib/site/server';
 import { emailShell, sendEmail } from '@/lib/subcontractors/server';
@@ -34,7 +35,6 @@ import {
   buildingControlFields,
   completionInput,
   coverInput,
-  f78Input,
   g98Input,
   g99Input,
   installedLines,
@@ -44,6 +44,8 @@ import {
   receiptInput,
   scheduleInput,
   shadingInput,
+  SUMMARY_FIELDS,
+  summaryInput,
   SWITCH_FIELDS,
   switchInput,
   warrantyInput,
@@ -71,10 +73,12 @@ export const handoverReady = async () => (await schemaReady()).handover;
 /* ── The pack's own generators ───────────────────────────────────────────── */
 
 type Gen = {
+  /** Its generated_key: the code it prints (HX-HO-02…), or the code with what it is (HX-HO-15-SHEET). */
   key: string;
   /** The pack item it fills (null: an office helper, kept out of the pack). */
   slot: SlotCode | null;
-  label: string;
+  /** The code printed on it (eyebrow, footer); file names carry the title only. */
+  code: string;
   title: string;
   category: string;
   input: (f: HandoverFacts, views: SlotView[]) => Made<unknown>;
@@ -84,23 +88,29 @@ type Gen = {
 };
 
 const GENS: Gen[] = [
-  { key: 'F78', slot: 'F78', label: 'F78', title: F78_TITLE, category: 'handover', input: (f) => f78Input(f), make: makeF78 as Gen['make'] },
-  { key: 'F19I', slot: 'F19I', label: 'F19I', title: F19I_TITLE, category: 'warranty', input: (f) => warrantyInput(f), make: makeWarranty as Gen['make'], live: true },
-  { key: 'F16E', slot: 'F16E', label: 'F16E', title: F16E_TITLE, category: 'handover', input: (f) => completionInput(f), make: makeCompletion as Gen['make'] },
-  { key: 'CC4', slot: 'CC4', label: 'CC4', title: CC4_TITLE, category: 'handover', input: (f) => switchInput(f), make: makeSwitchOff as Gen['make'] },
-  { key: 'F48I', slot: 'F48I', label: 'F48I', title: F48I_TITLE, category: 'handover', input: (f) => shadingInput(f), make: makeShading as Gen['make'] },
-  { key: 'F49', slot: 'F49', label: 'F49', title: F49_TITLE, category: 'handover', input: (f) => scheduleInput(f), make: makeSchedule as Gen['make'] },
-  { key: 'F49A', slot: 'F49A', label: 'F49A', title: F49A_TITLE, category: 'handover', input: (f) => agreementInput(f), make: makeAgreement as Gen['make'] },
-  { key: 'F47', slot: 'F47', label: 'F47', title: F47_TITLE, category: 'dno', input: (f) => g98Input(f), make: makeG98Sheet as Gen['make'] },
-  { key: 'F76_SHEET', slot: null, label: 'F76', title: F76_SHEET_TITLE, category: 'dno', input: (f) => g99Input(f), make: makeG99Sheet as Gen['make'] },
-  { key: 'CC13_RECEIPT', slot: 'CC13', label: 'CC13', title: RECEIPT_TITLE, category: 'receipt', input: (f) => receiptInput(f), make: makeReceipt as Gen['make'], live: true },
+  { key: 'HX-HO-02', slot: 'HX-HO-02', code: 'HX-HO-02', title: SUMMARY_TITLE, category: 'handover', input: (f) => summaryInput(f), make: makeSummary as Gen['make'] },
+  { key: 'HX-HO-06', slot: 'HX-HO-06', code: 'HX-HO-06', title: WARRANTY_TITLE, category: 'warranty', input: (f) => warrantyInput(f), make: makeWarranty as Gen['make'], live: true },
+  { key: 'HX-HO-08', slot: 'HX-HO-08', code: 'HX-HO-08', title: COMPLETION_TITLE, category: 'handover', input: (f) => completionInput(f), make: makeCompletion as Gen['make'] },
+  { key: 'HX-HO-09', slot: 'HX-HO-09', code: 'HX-HO-09', title: SWITCH_OFF_TITLE, category: 'handover', input: (f) => switchInput(f), make: makeSwitchOff as Gen['make'] },
+  { key: 'HX-HO-10', slot: 'HX-HO-10', code: 'HX-HO-10', title: ESTIMATE_TITLE, category: 'handover', input: (f) => shadingInput(f), make: makeShading as Gen['make'] },
+  { key: 'HX-HO-11', slot: 'HX-HO-11', code: 'HX-HO-11', title: SCHEDULE_TITLE, category: 'handover', input: (f) => scheduleInput(f), make: makeSchedule as Gen['make'] },
+  { key: 'HX-HO-12', slot: 'HX-HO-12', code: 'HX-HO-12', title: PLAN_TITLE, category: 'handover', input: (f) => agreementInput(f), make: makeAgreement as Gen['make'] },
+  // The G98 and G99 data sheets: office helpers beside HX-HO-15 and HX-HO-16, never in the pack.
+  { key: 'HX-HO-15-SHEET', slot: null, code: 'HX-HO-15', title: G98_SHEET_TITLE, category: 'dno', input: (f) => g98Input(f), make: makeG98Sheet as Gen['make'] },
+  { key: 'HX-HO-16-SHEET', slot: null, code: 'HX-HO-16', title: G99_SHEET_TITLE, category: 'dno', input: (f) => g99Input(f), make: makeG99Sheet as Gen['make'] },
+  { key: 'HX-HO-18-RECEIPT', slot: 'HX-HO-18', code: 'HX-HO-18', title: RECEIPT_TITLE, category: 'receipt', input: (f) => receiptInput(f), make: makeReceipt as Gen['make'], live: true },
   // Last: its contents list is every other item's state.
-  { key: 'F07BI', slot: 'F07BI', label: 'F07BI', title: COVER_TITLE, category: 'handover', input: (f, v) => coverInput(f, v), make: makeCoverLetter as Gen['make'], live: true },
+  { key: 'HX-HO-01', slot: 'HX-HO-01', code: 'HX-HO-01', title: COVER_TITLE, category: 'handover', input: (f, v) => coverInput(f, v), make: makeCoverLetter as Gen['make'], live: true },
 ];
 
-/** Does a generator apply to this job? (The catalogue's applies for its item; the G99 sheet on G99 jobs.) */
+/** Does a generator apply to this job? (The catalogue's applies for its item; the data sheets on their DNO route.) */
 function genApplies(g: Gen, l: Loaded, views: SlotView[]): boolean {
-  if (g.key === 'F76_SHEET') return l.facts.job.dno.route === 'g99' && l.facts.job.products.some((x) => x === 'solar' || x === 'battery');
+  const pvOrBattery = l.facts.job.products.some((x) => x === 'solar' || x === 'battery');
+  if (g.key === 'HX-HO-16-SHEET') return l.facts.job.dno.route === 'g99' && pvOrBattery;
+  if (g.key === 'HX-HO-15-SHEET') {
+    const v = views.find((x) => x.code === 'HX-HO-15');
+    return l.facts.job.dno.route === 'g98' && pvOrBattery && !!v && !v.office?.na;
+  }
   const v = views.find((x) => x.code === g.slot);
   return !!v && !(v.state === 'na' && !v.office) && !v.office?.na;
 }
@@ -113,23 +123,23 @@ export function statesOf(l: Loaded): { views: SlotView[]; made: Map<string, Made
   const gen: Partial<Record<SlotCode, GenNeed>> = {};
   const need = (g: Gen, m: Made<unknown>): GenNeed => (m.ok ? { ready: true, hash: hashOf(g, m.input) } : { ready: false, state: m.state, why: m.why, fix: m.fix, due: m.due ?? null });
   for (const g of GENS) {
-    if (g.key === 'F07BI') continue;
+    if (g.key === 'HX-HO-01') continue;
     const m = g.input(l.facts, []);
     made.set(g.key, m);
-    if (g.slot && g.slot !== 'CC13') gen[g.slot] = need(g, m);
+    if (g.slot && g.slot !== 'HX-HO-18') gen[g.slot] = need(g, m);
   }
   const ctx = stateCtx(l, gen);
   const first = slotStates(ctx);
-  const cover = GENS.find((g) => g.key === 'F07BI')!;
+  const cover = GENS.find((g) => g.key === 'HX-HO-01')!;
   const m = cover.input(l.facts, first);
-  made.set('F07BI', m);
-  gen.F07BI = need(cover, m);
+  made.set('HX-HO-01', m);
+  gen['HX-HO-01'] = need(cover, m);
   return { views: slotStates({ ...ctx, gen }), made };
 }
 
 function stateCtx(l: Loaded, gen: Partial<Record<SlotCode, GenNeed>>) {
   const f = l.facts;
-  const docs = slotDocs(l).filter((d) => !(d.slot === 'CC4' && d.source === 'library'));
+  const docs = slotDocs(l).filter((d) => !(d.slot === 'HX-HO-09' && d.source === 'library'));
   return {
     products: f.job.products,
     dnoRoute: f.job.dno.route,
@@ -155,7 +165,13 @@ function stateCtx(l: Loaded, gen: Partial<Record<SlotCode, GenNeed>>) {
   };
 }
 
-/** Models on the job with no manual or datasheet in the library (CC5's gaps). */
+/** Where a library file goes in the pack: the item it names, else by its kind (procedures to switching off, guides to other documents, the rest to product manuals). */
+function librarySlot(item: { slot: string | null; kind: string | null }): SlotCode {
+  if (item.slot === 'HX-HO-09' || item.slot === 'HX-HO-17' || item.slot === 'HX-HO-19') return item.slot;
+  return item.kind === 'procedure' ? 'HX-HO-09' : item.kind === 'guide' ? 'HX-HO-19' : 'HX-HO-17';
+}
+
+/** Models on the job with no manual or datasheet in the library (the product manuals' gaps). */
 const libraryGapsOf = (l: Loaded) => libraryGaps(l.libraryAll, modelsOf(l.facts));
 
 /* ── Reading and storing files ───────────────────────────────────────────── */
@@ -167,7 +183,7 @@ const loaderFor =
     return data ? new Uint8Array(await data.arrayBuffer()) : null;
   };
 
-/** The library's files for this job (CC4 procedures, CC5 manuals and datasheets, guides for every pack), copied into its folder once. */
+/** The library's files for this job (switching-off procedures, manuals and datasheets, guides for every pack), copied into its folder once. */
 async function attachLibrary(db: Db, l: Loaded, by: string | null): Promise<number> {
   const sent = !!l.pack?.sent_at;
   let n = 0;
@@ -175,7 +191,7 @@ async function attachLibrary(db: Db, l: Loaded, by: string | null): Promise<numb
     const key = `LIB-${item.id}`;
     // Once on the job (even archived by the office) it isn't added again.
     if (l.docs.some((d) => d.generated_key === key)) continue;
-    const slot = item.slot === 'CC4' || item.slot === 'CC5' || item.slot === 'CCMH' ? item.slot : item.kind === 'procedure' ? 'CC4' : item.kind === 'guide' ? 'CCMH' : 'CC5';
+    const slot = librarySlot(item);
     const from = item.compact_path || item.storage_path;
     const ext = from.split('.').pop() || 'pdf';
     const to = `projects/${l.facts.job.id}/handover/lib-${item.id}-${safeName(item.name)}.${ext}`;
@@ -235,7 +251,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
     const bytes = await g.make(m.input as never, load);
     const r = await saveGenerated(db, projectId, {
       key: g.key,
-      name: docFileName(at.facts.job.ref, g.label, g.title),
+      name: docFileName(at.facts.job.ref, '', g.title),
       bytes,
       inputs: { key: g.key, input: m.input },
       category: g.category,
@@ -247,10 +263,10 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
     });
     if (r.status === 'saved') out.made.push(g.key);
   };
-  for (const g of GENS) if (g.key !== 'F07BI') await make(g, l);
+  for (const g of GENS) if (g.key !== 'HX-HO-01') await make(g, l);
   // The cover letter lists every other item's state, so it's made from what's there now.
   if (out.made.length) l = (await loadHandover(db, projectId))!;
-  await make(GENS.find((g) => g.key === 'F07BI')!, l);
+  await make(GENS.find((g) => g.key === 'HX-HO-01')!, l);
   if (sent) {
     // After the pack has gone, anything new for it goes straight into the portal.
     const { data } = await db
@@ -298,14 +314,21 @@ export type HandoverView = {
   copy: { mid: CopyField[]; bc: CopyField[] };
   /** Values the office types per item, with what's there now. */
   forms: {
-    F49A: { key: string; label: string; hint?: string; value: string }[];
-    CC4: { key: string; label: string; hint: string; value: string; from?: string | null }[];
-    F78: { key: string; label: string; value: string }[];
-    F47: { key: string; label: string; value: string }[];
-    F16E: { text: string; by: string | null }[];
+    /** The maintenance plan, as agreed (HX-HO-12). */
+    plan: { key: string; label: string; hint?: string; value: string }[];
+    /** Where the switches are (HX-HO-09). */
+    switches: { key: string; label: string; hint: string; value: string; from?: string | null }[];
+    /** The system summary's details (HX-HO-02). */
+    summary: { key: string; label: string; hint?: string; value: string; options?: { key: string; label: string }[] }[];
+    /** The G98 notice's isolation switch (HX-HO-15). */
+    g98: { key: string; label: string; value: string }[];
+    /** Still to put right, on the completion sign-off (HX-HO-08). */
+    outstanding: { text: string; by: string | null }[];
   };
-  f78Design: { name: string; signed_at: string } | null;
-  /** Unresolved site flags, to copy onto F16E as still to put right. */
+  summaryDesign: { name: string; signed_at: string } | null;
+  /** The design part's declaration for this job (WORDING-SPEC 7.5 a), shown above the office's signature. */
+  summaryDeclaration: string;
+  /** Unresolved site flags, to copy onto the completion sign-off as still to put right. */
   flags: { text: string; trade: string }[];
   customer: { first: string; email: boolean; mobile: boolean; portal: string | null };
   payments: (Payment & { recorded_by?: string | null })[];
@@ -316,7 +339,7 @@ export type HandoverView = {
   gaps: string[];
   models: string[];
   designDocs: { id: string; name: string }[];
-  helpers: { f76Sheet: string | null };
+  helpers: { g99Sheet: string | null; g98Sheet: string | null };
   invoice: { prompted: boolean; uploaded: boolean; paid: boolean };
   approvals: Record<DraftKey, boolean>;
   /** When a message sent now would go ("now", or "07:00"). */
@@ -364,7 +387,7 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
   const value = Number(l.project.value) || 0;
   const dep = f.job.deposit;
   const v = (slot: SlotCode, k: string) => f.data[slot]?.values?.[k] ?? '';
-  const dcSite = Array.isArray(f.electrician?.values.f43_iso_loc) ? String((f.electrician!.values.f43_iso_loc as unknown[])[0] ?? '') : '';
+  const dcSite = Array.isArray(f.electrician?.values.pvt_iso_where) ? String((f.electrician!.values.pvt_iso_where as unknown[])[0] ?? '') : '';
   const portalToken = (l.project.portal_token as string | null) ?? null;
   const queued = (Array.isArray(l.pack?.queued) ? l.pack.queued : []).map((q) => q.at).filter(Boolean).sort()[0];
   return {
@@ -390,21 +413,14 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
       : 'Target: the morning after the electrician signs off · MCS Customer Duty: within 30 days of completion',
     copy: { mid: midFields(f), bc: buildingControlFields(f) },
     forms: {
-      F49A: AGREEMENT_FIELDS.map((x) => ({ ...x, value: v('F49A', x.key) })),
-      CC4: SWITCH_FIELDS.filter((x) => !x.for || f.job.products.includes(x.for)).map((x) => ({ key: x.key, label: x.label, hint: x.hint, value: v('CC4', x.key), from: x.key === 'dc' && dcSite ? dcSite : null })),
-      F78: [
-        { key: 'kind', label: 'Initial or periodic verification (initial / periodic)', value: v('F78', 'kind') },
-        { key: 'cert_ref', label: 'Electrical certificate number', value: v('F78', 'cert_ref') },
-        { key: 'p_loc', label: 'PV location (roof faces)', value: v('F78', 'p_loc') },
-        { key: 'p_desc', label: 'PV description (leave empty to use the job’s products)', value: v('F78', 'p_desc') },
-        { key: 'e_desc', label: 'Battery description (leave empty to use the job’s products)', value: v('F78', 'e_desc') },
-        { key: 'circuits', label: 'Circuits tested', value: v('F78', 'circuits') },
-        { key: 'comments', label: 'Comments', value: v('F78', 'comments') },
-      ],
-      F47: [{ key: 'isolator', label: 'Lockable isolation switch: where it is', value: v('F47', 'isolator') }],
-      F16E: f.data.F16E?.outstanding ?? [],
+      plan: AGREEMENT_FIELDS.map((x) => ({ ...x, value: v('HX-HO-12', x.key) })),
+      switches: SWITCH_FIELDS.filter((x) => !x.for || f.job.products.includes(x.for)).map((x) => ({ key: x.key, label: x.label, hint: x.hint, value: v('HX-HO-09', x.key), from: x.key === 'dc' && dcSite ? dcSite : null })),
+      summary: SUMMARY_FIELDS.map((x) => ({ ...x, value: v('HX-HO-02', x.key) })),
+      g98: [{ key: 'isolator', label: 'Lockable isolation switch: where it is', value: v('HX-HO-15', 'isolator') }],
+      outstanding: f.data['HX-HO-08']?.outstanding ?? [],
     },
-    f78Design: f.data.F78?.design ? { name: f.data.F78.design.name, signed_at: f.data.F78.design.signed_at } : null,
+    summaryDeclaration: SUMMARY_DECLARATIONS.design(summaryStandards(f.job.products)),
+    summaryDesign: f.data['HX-HO-02']?.design ? { name: f.data['HX-HO-02'].design.name, signed_at: f.data['HX-HO-02'].design.signed_at } : null,
     flags,
     customer: {
       first: f.customer.first,
@@ -422,8 +438,8 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
     gaps: libraryGapsOf(l),
     models: modelsOf(f),
     designDocs: l.docs.filter((d) => d.category === 'design' && !d.archived_at && !d.handover_slot).map((d) => ({ id: d.id, name: d.name })),
-    helpers: { f76Sheet: l.docs.find((d) => d.generated_key === 'F76_SHEET' && !d.archived_at)?.id ?? null },
-    invoice: { prompted: !!l.pack?.invoice_prompted_at, uploaded: l.docs.some((d) => d.handover_slot === 'CC13' && !d.archived_at && d.generated_key !== 'CC13_RECEIPT'), paid: l.invoicePaid },
+    helpers: { g99Sheet: l.docs.find((d) => d.generated_key === 'HX-HO-16-SHEET' && !d.archived_at)?.id ?? null, g98Sheet: l.docs.find((d) => d.generated_key === 'HX-HO-15-SHEET' && !d.archived_at)?.id ?? null },
+    invoice: { prompted: !!l.pack?.invoice_prompted_at, uploaded: l.docs.some((d) => d.handover_slot === 'HX-HO-18' && !d.archived_at && d.generated_key !== 'HX-HO-18-RECEIPT'), paid: l.invoicePaid },
     approvals: { cover: approved(f.settings, 'cover'), completion: approved(f.settings, 'completion'), shutdown: approved(f.settings, 'shutdown') },
     sendsAt: at.getTime() <= Date.now() + 60_000 ? 'now' : sendTimeWords(at),
     prep: prepList(l, views),
@@ -463,13 +479,13 @@ function prepList(l: Loaded, views: SlotView[]): { label: string; done: boolean 
   const figures = [solar && f.design.est_kwh_year === null, solar && f.design.shade_factor === null, solar && !f.system.kwp, battery && f.design.eess_class === null, battery && f.design.battery_kw === null].some(Boolean);
   const out = [
     { label: 'Design figures on the job (estimate, shade factor, system class, battery power)', done: !figures },
-    { label: 'F48I made and F49 drafted', done: ok('F48I') && l.docs.some((d) => d.generated_key === 'F49' && !d.archived_at) },
+    { label: 'Estimate page made and maintenance schedule drafted', done: ok('HX-HO-10') && l.docs.some((d) => d.generated_key === 'HX-HO-11' && !d.archived_at) },
     { label: 'Manuals and datasheets in the library for every product', done: !libraryGapsOf(l).length && modelsOf(f).length > 0 },
-    { label: 'Schematic and design calculations uploaded', done: ok('CC10') && ok('CC15') },
+    { label: 'Wiring diagram and design calculations uploaded', done: ok('HX-HO-13') && ok('HX-HO-14') },
   ];
-  if (f.job.dno.route === 'g99') out.push({ label: 'G99 paperwork uploaded', done: ok('F76') });
-  out.push({ label: 'Warranty and cover letter drafted', done: ['F19I', 'F07BI'].every((k) => l.docs.some((d) => d.handover_slot === k && !d.archived_at)) });
-  if (f.design.maintenance_plan) out.push({ label: 'Maintenance agreement made', done: ok('F49A') });
+  if (f.job.dno.route === 'g99') out.push({ label: 'G99 papers uploaded', done: ok('HX-HO-16') });
+  out.push({ label: 'Warranty and covering letter drafted', done: ['HX-HO-06', 'HX-HO-01'].every((k) => l.docs.some((d) => d.handover_slot === k && !d.archived_at)) });
+  if (f.design.maintenance_plan) out.push({ label: 'Maintenance plan made', done: ok('HX-HO-12') });
   return out;
 }
 
@@ -481,13 +497,13 @@ export async function handoverSummary(db: Db, projectId: string): Promise<{ word
   const h = headline(views);
   const check = sendCheck(views);
   const sent = !!l.pack?.sent_at;
-  const cc13 = views.find((v) => v.code === 'CC13');
+  const invoice = views.find((v) => v.code === 'HX-HO-18');
   const prep = prepList(l, views);
   const early = !sent && ['won', 'design', 'ready', 'install_booked'].includes(l.facts.job.stage);
   const next = early
     ? `Before the install day: ${prep.filter((x) => x.done).length} of ${prep.length} ready`
     : sent
-    ? cc13 && cc13.state !== 'complete' && cc13.state !== 'na'
+    ? invoice && invoice.state !== 'complete' && invoice.state !== 'na'
       ? 'Send the final invoice'
       : check.following.length
         ? `${check.following.length} on ${check.following.length === 1 ? 'its' : 'their'} way to the customer`
@@ -521,9 +537,9 @@ export async function buildHandover(db: Db, projectId: string, opts: { by: strin
   const docs = slotDocs(l);
   const rowOf = new Map(l.docs.map((d) => [d.id, d]));
   const parts: PackPart[] = [];
-  const multi: SlotCode[] = ['CC5', 'CCMH', 'CC21', 'F76', 'CC13'];
+  const multi: SlotCode[] = ['HX-HO-17', 'HX-HO-19', 'HX-HO-04', 'HX-HO-16', 'HX-HO-18'];
   for (const v of views) {
-    if (v.code === 'F07BI' || (v.state === 'na' && !v.docs.length)) continue;
+    if (v.code === 'HX-HO-01' || (v.state === 'na' && !v.docs.length)) continue;
     const def = slotDef(v.code)!;
     for (const d of docs.filter((x) => x.slot === v.code)) {
       const row = rowOf.get(d.id)!;
@@ -531,19 +547,19 @@ export async function buildHandover(db: Db, projectId: string, opts: { by: strin
         slot: v.code,
         title: multi.includes(v.code) && v.docs.length > 1 ? `${def.title}: ${d.name.replace(/\.[a-z0-9]+$/i, '')}` : def.title,
         group: def.group === 'cover' ? 'other' : def.group,
-        order: def.order + (d.key === 'CC13_RECEIPT' ? 0.5 : 0),
+        order: def.order + (d.key === 'HX-HO-18-RECEIPT' ? 0.5 : 0),
         docId: d.id,
         name: d.name,
         mime: d.mime,
-        manual: d.source === 'library' && (v.code === 'CC5' || v.code === 'CC4'),
+        manual: d.source === 'library' && (v.code === 'HX-HO-17' || v.code === 'HX-HO-09'),
         bytes: await load('docs', row.storage_path),
       });
     }
   }
-  const coverRow = l.docs.find((d) => d.generated_key === 'F07BI' && !d.archived_at);
+  const coverRow = l.docs.find((d) => d.generated_key === 'HX-HO-01' && !d.archived_at);
   const cover = coverRow ? await load('docs', coverRow.storage_path) : null;
   const follow = views
-    .filter((v) => customerState(v) === 'coming' && !docs.some((d) => d.slot === v.code) && v.code !== 'F07BI')
+    .filter((v) => customerState(v) === 'coming' && !docs.some((d) => d.slot === v.code) && v.code !== 'HX-HO-01')
     .map((v) => ({ slot: v.code, title: v.title, group: (v.group === 'cover' ? 'other' : v.group) as Exclude<typeof v.group, 'cover'>, order: v.order }));
   const f = l.facts;
   const version = (l.pack?.version ?? 0) + 1;
@@ -757,20 +773,20 @@ async function storeSignature(db: Db, path: string, png: string) {
   if (up.error) throw new Error('The signature didn’t save. Try again.');
 }
 
-/** F78's design part, signed in the office (SPEC 4.5). */
-export async function signF78Design(db: Db, projectId: string, s: { name: string; signature: string; by: string | null }) {
+/** The system summary's design part (HX-HO-02), signed in the office (SPEC 4.5). */
+export async function signSummaryDesign(db: Db, projectId: string, s: { name: string; signature: string; by: string | null }) {
   const at = new Date().toISOString();
-  const path = `signatures/${projectId}/f78-design-${Date.now()}.png`;
+  const path = `signatures/${projectId}/summary-design-${Date.now()}.png`;
   await storeSignature(db, path, s.signature);
-  await patchSlotData(db, projectId, 'F78', { design: { name: s.name, signed_at: at, path, by: s.by } }, s.by);
+  await patchSlotData(db, projectId, 'HX-HO-02', { design: { name: s.name, signed_at: at, path, by: s.by } }, s.by);
 }
 
 /**
- * The customer signs in their portal (C2): the completion record (F16E) or, on G98 jobs, Form B.
- * Each its own signature (D15), kept on the item; the document follows at once.
+ * The customer signs in their portal (C2): the completion sign-off (HX-HO-08) or, on G98 jobs, Form B
+ * (kept on HX-HO-15). Each its own signature (D15), kept on the item; the document follows at once.
  */
-export async function customerSign(db: Db, projectId: string, s: { kind: 'f16e' | 'g98'; name: string; signature: string; declaration: string; ip: string | null }): Promise<{ again: boolean }> {
-  const slot = s.kind === 'f16e' ? 'F16E' : 'F47';
+export async function customerSign(db: Db, projectId: string, s: { kind: 'completion' | 'g98'; name: string; signature: string; declaration: string; ip: string | null }): Promise<{ again: boolean }> {
+  const slot = s.kind === 'completion' ? 'HX-HO-08' : 'HX-HO-15';
   const { data } = await db.from('handover_slots').select('data').eq('project_id', projectId).eq('slot', slot).maybeSingle();
   if ((data?.data as SlotData | null)?.customer) return { again: true };
   const at = new Date().toISOString();
@@ -779,7 +795,7 @@ export async function customerSign(db: Db, projectId: string, s: { kind: 'f16e' 
   await patchSlotData(db, projectId, slot, { customer: { name: s.name, signed_at: at, path, via: 'portal', declaration: s.declaration } }, null);
   const { data: p } = await db.from('crm_projects').select('enquiry_id, owner_id, title').eq('id', projectId).maybeSingle();
   if (p) {
-    const what = s.kind === 'f16e' ? 'the completion record' : 'the G98 form';
+    const what = s.kind === 'completion' ? 'the completion sign-off' : 'the G98 form';
     await logActivity({ enquiryId: String(p.enquiry_id), projectId, kind: 'system', body: `${s.name} signed ${what} in their portal`, meta: { ip: s.ip }, byId: null }).catch(() => null);
     if (p.owner_id) await notify({ userId: String(p.owner_id), kind: 'crm_handover', title: `${s.name} signed ${what}`, body: String(p.title ?? ''), href: `/admin/projects/${projectId}?tab=handover`, tag: `handover-${projectId}` }).catch(() => null);
   }

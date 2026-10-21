@@ -98,11 +98,11 @@ async function electricianJob(db: Db, a: AssignmentRow, s: SignoffRow): Promise<
     });
   }
   // Their instruments, offered on their next job (the EIC keeps its own entries alongside: eic/plugin.ts).
-  if (typeof v.f43_instruments === 'string' && v.f43_instruments.trim()) {
+  if (typeof v.pvt_tester === 'string' && v.pvt_tester.trim()) {
     const { data: c } = await db.from('site_contacts').select('instruments').eq('id', a.contact_id).maybeSingle();
     const was = (c as { instruments?: unknown } | null)?.instruments;
     const keep = (Array.isArray(was) ? (was as { text?: unknown }[]) : []).filter((x) => typeof x?.text !== 'string');
-    await db.from('site_contacts').update({ instruments: [{ text: v.f43_instruments.trim().slice(0, 300), at: s.signed_at }, ...keep], updated_at: new Date().toISOString() }).eq('id', a.contact_id);
+    await db.from('site_contacts').update({ instruments: [{ text: v.pvt_tester.trim().slice(0, 300), at: s.signed_at }, ...keep], updated_at: new Date().toISOString() }).eq('id', a.contact_id);
   }
 }
 

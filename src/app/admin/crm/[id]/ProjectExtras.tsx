@@ -55,8 +55,8 @@ export const DOC_LABEL: Record<string, string> = {
 const SITE_KINDS = ['commissioning', 'certificate', 'po'];
 
 /** Uploading one of these asks "Add it to the handover pack?" (handover.sql), with its item chosen. */
-const PACK_FOR: Record<string, string> = { mcs: 'CC17', warranty: 'CC16', invoice: 'CC13', receipt: 'CC13' };
-const PACK_CHOICES = PACK_ITEMS.filter((p) => p.code !== 'F07BI');
+const PACK_FOR: Record<string, string> = { mcs: 'HX-HO-03', warranty: 'HX-HO-07', invoice: 'HX-HO-18', receipt: 'HX-HO-18' };
+const PACK_CHOICES = PACK_ITEMS.filter((p) => p.code !== 'HX-HO-01');
 
 /** Quotes and contracts can be signed by the customer (in the portal, or ticked as signed outside it). */
 const SIGNABLE = ['quote', 'contract'];

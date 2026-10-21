@@ -719,7 +719,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     await ensureDeadlineTasks(id, s.user.id);
   }
   // 6. The handover pack follows (references into the cover letter and warranty, design figures into
-  // F78 and F48I, its reminders), after the reply.
+  // the system summary and the estimate page, its reminders), after the reply.
   if (saved('paperwork') || saved('system') || saved('commissioned_at') || 'dno_ref' in u || dnoMove) {
     const by = s.user.id;
     after(async () => {

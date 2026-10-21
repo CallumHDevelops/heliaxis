@@ -19,7 +19,7 @@ const STATE: Record<CertStatus['state'], { text: string; tone: 'ok' | 'wait' | '
   in_progress: { text: 'The electrician is filling it in', tone: 'wait' },
   to_sign_off: { text: 'Filled in: waiting for their sign-off', tone: 'wait' },
   to_design: { text: 'Sign the design part to finish it', tone: 'todo' },
-  complete: { text: 'Complete: in the handover pack (CC21)', tone: 'ok' },
+  complete: { text: 'Complete: in the handover pack (Electrical certificate)', tone: 'ok' },
   data_sheet: { text: 'Minor Works data sheets made: their signed Minor Works goes in the pack', tone: 'wait' },
 };
 

@@ -572,7 +572,7 @@ function siteJobs(extra) {
     enquiries: [w, m],
     crm_projects: [jw, jm],
     site_assignments: [{ id: uuid(), project_id: jm.id, trade: 'roofer', status: 'sent' }],
-    handover_slots: [{ project_id: jm.id, slot: 'CC17', na: false }],
+    handover_slots: [{ project_id: jm.id, slot: 'HX-HO-03', na: false }],
     crm_payments: [{ id: uuid(), project_id: jm.id, kind: 'deposit', amount_pence: 50000 }],
     crm_aliases: [],
     crm_lead_origins: [],

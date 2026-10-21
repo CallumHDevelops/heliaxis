@@ -58,7 +58,7 @@ export async function downloadPack(id: string, onStep?: (s: ReadyStep) => void):
   step.missing += drawings.length - got;
   onStep?.({ ...step });
   for (const p of pack.photos) if (p.thumb) await keepFile(id, `thumb:${p.id}`, `${p.slot}.jpg`, 'image/jpeg', p.thumb);
-  // An electrician's: the roofer's evidence photos (F44), and the certificate files already sent.
+  // An electrician's: the roofer's evidence photos (the PV inspection), and the certificate files already sent.
   for (const p of pack.electrician?.roofer_photos ?? []) if (p.thumb) await keepFile(id, `thumb:${p.id}`, `${p.slot}.jpg`, 'image/jpeg', p.thumb);
   for (const f of pack.electrician?.uploads ?? []) if (f.url) await keepFile(id, `upload:${f.id}`, f.name, f.mime, f.url);
 

@@ -1,15 +1,16 @@
 import 'server-only';
 import { newDocument, type Kit, type Row } from '@/lib/documents/pdf-kit';
-import { EV_FIELDS, EV_REVISION, EV_TITLE } from '@/lib/site/forms/electrician/ev';
-import { HP_FIELDS, HP_REVISION, HP_TITLE } from '@/lib/site/forms/electrician/heatpump';
+import { ISSUE } from '@/lib/documents/issue';
+import { EV_FIELDS, EV_TITLE } from '@/lib/site/forms/electrician/ev';
+import { HP_FIELDS, HP_TITLE } from '@/lib/site/forms/electrician/heatpump';
 import { captures } from '@/lib/site/forms/electrician/shared';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { visibleFields } from '@/lib/site/rules';
 import { signature, siteBox, words, type ElectricianDocInput } from './common';
 
 /**
- * The EV Charge Point Installation Record (SPEC 2.10) and the Heat Pump Electrical Supply Record
- * (2.11): Heliaxis's own records, not regulated forms, so they print the questions as asked, in
+ * HX-EV-01, the EV Charge Point Installation Record (SPEC 2.10), and HX-HP-01, the Heat Pump
+ * Electrical Supply Record (2.11): Heliaxis's own records, not regulated forms, so they print the questions as asked, in
  * their groups, with the answers. Only questions asked on the job print; nothing empty.
  */
 
@@ -53,8 +54,8 @@ function serialRow(label: string, v: unknown): Row[] {
 }
 
 export async function makeEvRecord(d: ElectricianDocInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'EV', label: 'EV record', title: EV_TITLE, revision: EV_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
-  kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
+  const kit = await newDocument({ code: 'HX-EV-01', title: EV_TITLE, revision: ISSUE['HX-EV-01'], jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  kit.header({ meta: [['Job reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Installed by');
   const top = [...(d.ctx.el?.ev_model ? [{ label: 'Charger', value: d.ctx.el.ev_model }] : []), ...serialRow('Charger serial number', d.ctx.values.SN_EV)];
   if (top.length) kit.rows(top);
@@ -64,8 +65,8 @@ export async function makeEvRecord(d: ElectricianDocInput): Promise<Uint8Array> 
 }
 
 export async function makeHpRecord(d: ElectricianDocInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'HP', label: 'Heat pump supply', title: HP_TITLE, revision: HP_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
-  kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
+  const kit = await newDocument({ code: 'HX-HP-01', title: HP_TITLE, revision: ISSUE['HX-HP-01'], jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  kit.header({ meta: [['Job reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Installed by');
   const top = [
     ...(d.ctx.el?.heat_pump_model ? [{ label: 'Heat pump', value: d.ctx.el.heat_pump_model }] : []),

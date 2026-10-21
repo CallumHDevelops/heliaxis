@@ -11,7 +11,6 @@ import { certRef } from './cert';
 import { el, has, is } from './shared';
 
 export const HP_TITLE = 'Heat Pump Electrical Supply Record';
-export const HP_REVISION = 'Rev 1';
 
 const three = (c: FormCtx) => is(c, 'hp_phase', 'three');
 const volts = (key: string, label: string, extra: Partial<Field> = {}): Field => ({ key, type: 'NUM', label, level: 'must', unit: 'V', dp: 1, min: 0, max: 500, ...extra });

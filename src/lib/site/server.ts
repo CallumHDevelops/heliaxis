@@ -6,6 +6,7 @@ import { DEFAULT_RATES } from '@/lib/subcontractors/agreement';
 import { cleanAssignment, mobileProblem, moneyLine, vatFor, waIdOf, isEmail, type MoneyLine } from './assign';
 import { designOf } from './design';
 import { formsFor, isElectricianForm, suggestedTrades } from './forms';
+import { legacySections } from './forms/legacy';
 import { defaultCertRoute } from './forms/electrician/cert';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
 import { getSiteSettings } from './settings';
@@ -311,7 +312,7 @@ export function assignmentRow(r: Record<string, unknown>): AssignmentRow {
     days: n(r.days),
     rev: Number(r.rev ?? 0),
     link_generation: Number(r.link_generation ?? 0),
-    forms: Array.isArray(r.forms) ? (r.forms as string[]) : [],
+    forms: Array.isArray(r.forms) ? legacySections(r.forms as string[]) : [],
     answers: (r.answers && typeof r.answers === 'object' ? r.answers : {}) as Answers,
     flags: Array.isArray(r.flags) ? (r.flags as Flag[]) : [],
   };

@@ -24,7 +24,7 @@ export const facts = (over = {}) => ({
     status: 'done',
     values: ROOFER,
     reads: [{ key: 'RF12', status: 'read', result: { readable: true, problem: null, kind: 'panel', make: 'Aiko', model: 'AIKO-A450', serials: [], panel: { pmax_w: 450, voc_v: 49.4, isc_a: 13.92, vmp_v: 41.2, imp_a: 13.1, max_system_v: 1500 }, battery: null, inverter: null, meter: null } }],
-    photos: { RF2: 2, RX4p: 1 },
+    photos: { RF2: 2, RF3: 3, RX4p: 1 },
   },
   voc_tolerance: 10,
   instruments: 'Megger MFT1741+ s/n 1234567',
@@ -34,45 +34,49 @@ export const facts = (over = {}) => ({
   ...over,
 });
 
-/** Per-string answers (F43), by string. */
+/** Per-string answers (the string tests), by string. */
 export const PER = {
-  f43_module: () => 'Aiko Neostar 2P 450W',
-  f43_qty: () => 8,
-  f43_spec_voc: () => 395.2,
-  f43_spec_isc: () => 13.92,
-  f43_ocpd_type: () => 'None fitted',
-  f43_ocpd_a: () => 'na',
-  f43_ocpd_v: () => 'na',
-  f43_ocpd_ka: () => 'na',
-  f43_wire_type: (i) => (i ? null : 'H1Z2Z2-K'),
-  f43_wire_phase: () => 6,
-  f43_wire_earth: () => 'na',
-  f43_test_voc: (i) => [394.8, 396.1, 395.5][i] ?? 395,
-  f43_test_isc: (i) => [12.71, 12.69, 12.7][i] ?? 12.7,
-  f43_irr: (i) => (i ? null : 820),
-  f43_polarity: () => 'pass',
-  f43_ir_v: (i) => (i ? null : 500),
-  f43_ir_pos: () => '>999',
-  f43_ir_neg: () => '>999',
-  f43_earth_cont: () => 'na',
-  f43_iso_a: (i) => (i ? null : 25),
-  f43_iso_v: (i) => (i ? null : 1000),
-  f43_iso_loc: (i) => (i ? null : 'Built into inverter'),
-  f43_iso_func: () => 'pass',
-  f43_inv_model: (i) => (i ? null : 'Sigenergy SigenStor EC 6.0 SP'),
-  f43_inv_serial: (i) => (i ? null : '110B6002SP0001'),
-  f43_inv_func: () => 'pass',
+  pvt_panel: () => 'Aiko Neostar 2P 450W',
+  pvt_panels: () => 8,
+  pvt_voc_stc: () => 395.2,
+  pvt_isc_stc: () => 13.92,
+  pvt_fuse: () => 'None fitted',
+  pvt_fuse_a: () => 'na',
+  pvt_fuse_v: () => 'na',
+  pvt_fuse_ka: () => 'na',
+  pvt_cable: (i) => (i ? null : 'H1Z2Z2-K'),
+  pvt_cable_mm2: () => 6,
+  pvt_earth_mm2: () => 'na',
+  pvt_voc: (i) => [394.8, 396.1, 395.5][i] ?? 395,
+  pvt_isc: (i) => [12.71, 12.69, 12.7][i] ?? 12.7,
+  pvt_irr: (i) => (i ? null : 820),
+  pvt_polarity: () => 'pass',
+  pvt_ir_v: (i) => (i ? null : 500),
+  pvt_ir_pos: () => '>999',
+  pvt_ir_neg: () => '>999',
+  pvt_frame_earth: () => 'na',
+  pvt_iso_a: (i) => (i ? null : 25),
+  pvt_iso_v: (i) => (i ? null : 1000),
+  pvt_iso_where: (i) => (i ? null : 'Built into inverter'),
+  pvt_iso_ok: () => 'pass',
+  pvt_inv: (i) => (i ? null : 'Sigenergy SigenStor EC 6.0 SP'),
+  pvt_inv_serial: (i) => (i ? null : '110B6002SP0001'),
+  pvt_inv_ok: () => 'pass',
 };
 /** Answers where the first choice isn't the careful one. */
 export const ONE = {
-  f43_kind: 'initial',
-  f43_strings: 2,
-  f43_instruments: 'Megger MFT1741+ s/n 1234567',
-  f44_20_kind: 'pitched',
-  f44_t2: ['d'],
+  pvt_kind: 'initial',
+  pvt_strings: 2,
+  pvt_tester: 'Megger MFT1741+ s/n 1234567',
+  pvi_mount: 'on_roof',
+  // Connected metal rails, but none of the three conditions: a functional earth only where asked.
+  pvi_frame_metal: 'yes',
+  pvi_frame_ext: 'no',
+  pvi_frame_exp: 'no',
+  pvi_frame_lp: 'no',
   eess_backup: 'no',
   // No back-up on this battery: its back-up rows are N/A (one tap on the phone).
-  ...Object.fromEntries(['f74_1_17', 'f74_1_18', 'f74_1_19', 'f74_1_20', 'f74_1_21'].map((k) => [k, 'na'])),
+  ...Object.fromEntries(['bat_bu_isolate', 'bat_bu_electrode', 'bat_bu_rcd', 'bat_bu_spd', 'bat_bu_load'].map((k) => [k, 'na'])),
   bat_inv_sep: 'no',
   SN_METER: 'yes',
   EF2: 'yes',
@@ -135,6 +139,7 @@ export function makeFixtures({ R, F, designOf }) {
     for (let round = 0; round < 8; round++) {
       const c = ctxOf(products, values, photos, el, design);
       let changed = false;
+      const later = [];
       for (const { f } of R.allVisible(form, c)) {
         if (f.level === 'optional' || f.type === 'SIG' || f.type === 'AUTO') continue;
         if (f.type === 'PHOTOS') {
@@ -147,10 +152,21 @@ export function makeFixtures({ R, F, designOf }) {
           }
           continue;
         }
-        if (values[f.key] !== undefined || f.auto) continue;
+        if (values[f.key] !== undefined) continue;
+        // Worked out (or waiting to be): left to the form.
+        if (f.auto) {
+          if (!f.autoWaits?.(c) && f.auto(c) === undefined) later.push(f);
+          continue;
+        }
         values[f.key] = valueFor(f, c);
         changed = true;
       }
+      // A row worked out only sometimes (the roof's fire performance, on a roof): answered once the rest is.
+      if (!changed)
+        for (const f of later) {
+          values[f.key] = valueFor(f, c);
+          changed = true;
+        }
       if (!changed) break;
     }
     return { values, photos };

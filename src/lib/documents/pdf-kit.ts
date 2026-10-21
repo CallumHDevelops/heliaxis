@@ -10,7 +10,7 @@ import { HELIAXIS_COMPANY, HELIAXIS_PARTY } from '@/lib/subcontractors/agreement
  * Helvetica can draw, wrapping, UK dates and the logo (purchase orders use these). Then the document
  * kit for site paperwork, certificates and reports (newDocument): SimpliHeat's certificate look in
  * Heliaxis colours, Noto Sans so Ω, ², ≥ and ° print as themselves, ticks drawn as lines, and the
- * legal line and "F43 · Rev 2 · Page x of y" on every page.
+ * legal line and "HX-PV-02 · Issue 1 · Page x of y" on every page.
  */
 
 export const A4: [number, number] = [595.28, 841.89];
@@ -192,10 +192,10 @@ const MARGIN = { l: 20 * MM, r: 15 * MM, t: 20 * MM, b: 20 * MM };
 export type Margins = typeof MARGIN;
 
 export type DocOptions = {
-  /** F43, F44… or RF_REPORT; with the title it makes the eyebrow, the footer and the metadata. */
+  /** HX-PV-02, HX-HO-01… or RF_REPORT; with the title it makes the eyebrow, the footer and the metadata. */
   code: string;
   title: string;
-  /** "Rev 2", one constant per form. */
+  /** "Issue 1", from the one map of issues (documents/issue.ts). */
   revision?: string | null;
   jobRef: string | null;
   /** YYYY-MM-DD (UK). */
@@ -240,7 +240,7 @@ export type TextOpt = { bold?: boolean; color?: RGB; italic?: boolean; rotate?: 
 
 /** `strong`: the figure the document is for ("What you'll be paid"), on a paper band and larger. */
 export type Row = { label: string; value: string | null | undefined; must?: boolean; note?: string | null; strong?: boolean };
-/** A drawn tick, a cross, N/A, or 'empty' (a box left blank on purpose: a Table 2 condition that doesn't apply). */
+/** A drawn tick, a cross, N/A, or 'empty' (a box left blank on purpose: a condition that doesn't apply). */
 export type Mark = 'tick' | 'cross' | 'na' | 'empty' | null;
 export type CheckItem = { label: string; mark: Mark; note?: string | null; must?: boolean };
 /** results(): a bold title, the wording, sub-lines, italic guidance, and a result in words or a mark. */
@@ -438,7 +438,7 @@ export async function newDocument(o: DocOptions) {
       const b = pngFrom(bytes);
       return (b[0] === 0xff && b[1] === 0xd8 ? doc.embedJpg(b) : doc.embedPng(b)).catch(() => null);
     },
-    /** Logo and meta pairs, the eyebrow ("F43 · PROJECT HX-0042") in amber, the title, then the gold bar (and the draft banner). */
+    /** Logo and meta pairs, the eyebrow ("HX-PV-02 · PROJECT HX-0042") in amber, the title, then the gold bar (and the draft banner). */
     header(h: { meta?: [string, string][] } = {}) {
       const logoW = 118;
       const logoH = image ? (image.height / image.width) * logoW : 0;
@@ -557,7 +557,7 @@ export async function newDocument(o: DocOptions) {
       y -= 4;
     },
     /**
-     * Test and inspection rows as the owner's forms lay them out (F74, F75): a bold title, the
+     * Test and inspection rows (the battery switch-on and test record): a bold title, the
      * wording (italic where the form has it), sub-lines, guidance in italics, and on the right the
      * result in words (Pass, N/A) or a drawn tick or cross.
      */
@@ -712,7 +712,7 @@ export async function newDocument(o: DocOptions) {
     gap(h: number) {
       y -= h;
     },
-    /** The footer on every page (the legal line, then "F43 · Rev 2 · Page x of y"), then the bytes. */
+    /** The footer on every page (the legal line, then "HX-PV-02 · Issue 1 · Page x of y"), then the bytes. */
     async save(): Promise<Uint8Array> {
       const pages = doc.getPages();
       const legal = `${HELIAXIS_PARTY.name} · Registered in England and Wales No. ${HELIAXIS_PARTY.companyNumber} · Registered address: ${HELIAXIS_COMPANY.addressLines.join(', ')} · VAT ${HELIAXIS_PARTY.vatNumber} · MCS ${HELIAXIS_COMPANY.mcsNumber}`;
@@ -734,6 +734,6 @@ export async function newDocument(o: DocOptions) {
   };
 }
 
-/** A generated document's file name, starting with the job ref: "HX-0042 F43 PV array test report v2.pdf". */
+/** A generated document's file name, starting with the job ref: "HX-0042 Solar PV string test results v2.pdf" (no code: WORDING-SPEC 0.2). */
 export const docFileName = (jobRef: string | null, label: string, title: string, version = 1) =>
   `${[jobRef, label, title].filter(Boolean).join(' ')}${version > 1 ? ` v${version}` : ''}.pdf`.replace(/[\\/:*?"<>|]+/g, '-');

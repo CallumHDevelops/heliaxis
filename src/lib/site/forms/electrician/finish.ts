@@ -5,7 +5,7 @@
  * the customer told the team will call tomorrow) and the sign-off. Nothing here is answered for them.
  * Type-only imports.
  */
-import { tradeDeclaration } from '../../declaration';
+import { electricianDeclaration } from '../../declaration';
 import type { Field, FlagRule, FormCtx, Step } from '../types';
 import { appWords, el, has, is, text } from './shared';
 
@@ -44,13 +44,18 @@ export const FINISH_FIELDS: Field[] = [
   },
 ];
 
-export const EF_SIG: Field = {
+/**
+ * The sign-off, with the trade's declaration and a line for each record made from these sections
+ * (WORDING-SPEC 0.7): what each record says, kept with the signature and printed from it.
+ */
+export const finishSig = (sections: readonly string[]): Field => ({
   key: 'EF_SIG',
   type: 'SIG',
   label: 'Sign off: everything is done',
   level: 'must',
-  declaration: (c) => tradeDeclaration('electrician', c.address),
-};
+  declaration: (c) => electricianDeclaration(c.address, sections, c.products),
+});
+export const EF_SIG: Field = finishSig([]);
 
 export const FINISH_FLAGS: FlagRule[] = [
   {

@@ -2,7 +2,8 @@ import 'server-only';
 import { GROUPS, type Group } from '@/lib/handover/slots';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { longDate, newDocument } from '../pdf-kit';
-import { MCS_CONTACT, REVISION } from './common';
+import { issueOf } from '../issue';
+import { MCS_CONTACT } from './common';
 
 /**
  * The combined pack's contents page (SPEC 4.7): the groups in pack order, each document with the pack
@@ -27,7 +28,7 @@ export type ContentsInput = {
 export const CONTENTS_TITLE = 'Your handover pack';
 
 export async function makeContents(c: ContentsInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'PACK', label: 'Contents', title: CONTENTS_TITLE, revision: REVISION.PACK, jobRef: c.ref, issued: c.issued });
+  const kit = await newDocument({ code: 'PACK', label: 'Contents', title: CONTENTS_TITLE, revision: issueOf('PACK'), jobRef: c.ref, issued: c.issued });
   kit.header({ meta: [['Project', c.ref ?? '–'], ['Version', String(c.version)], ['Date', longDate(c.issued)]] });
   kit.idGrid([
     ['Installation address', c.address.join(', ')],
@@ -50,7 +51,7 @@ export async function makeContents(c: ContentsInput): Promise<Uint8Array> {
   kit.section('Who to call');
   kit.rows([
     { label: 'Heliaxis', value: `${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}` },
-    { label: 'MCS', value: MCS_CONTACT.replace('Telephone: ', '').replace(' · Email: ', ' · ') },
+    { label: 'MCS', value: MCS_CONTACT.replace('Telephone ', '').replace(' · Email ', ' · ') },
   ]);
   return kit.save();
 }

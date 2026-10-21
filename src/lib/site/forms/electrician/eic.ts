@@ -604,7 +604,7 @@ export const EIC_FLAGS: FlagRule[] = [
   },
 ];
 
-/* ── For the rest of the pack (F44 item 38, F74 Part 2, F78) and the office ──── */
+/* ── For the rest of the pack (the PV inspection, the battery inspection, the system summary) and the office ── */
 
 /** The certificate's screens as a form of their own, for the gate's missing() (the sign-off is the pack's, finish.ts EF_SIG). */
 const CERT_SIG: Field = { key: 'EF_SIG', type: 'SIG', label: 'Sign off', level: 'must' };
@@ -614,7 +614,7 @@ const certForm = (steps: Step[]): SiteForm => ({ id: 'cert', stage: 'main', titl
 export const certMissing = (c: FormCtx) => missing(certForm(EIC_STEPS), c).must;
 export const certComplete = (c: FormCtx) => routeOf(c) !== 'own' && certMissing(c).length === 0;
 
-/** The EIC's references for other documents: "HX-0042-EIC: Schedule of inspections…" (F74 Part 2), the circuits tested and the next inspection (F78). */
+/** The EIC's references for other documents: "HX-0042-EIC: Schedule of inspections…" (the battery inspection), the circuits tested and the next inspection (the system summary). */
 export function eicSummary(c: FormCtx): { route: CertRoute; ref: string | null; refs: string | null; circuits: string[]; next: string | null; complete: boolean } {
   const r = routeOf(c);
   const { boards, circuits } = boardsOf(c.values);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { Field, Step } from '@/lib/site/forms/types';
 import { setAnswer, type PackRecord } from '@/lib/site/offline';
 import { perStringValues, stringsOf, visibleFields } from '@/lib/site/rules';
@@ -9,10 +9,10 @@ import type { JobForms } from './form-state';
 import { NumberBox, SourceTag, SuggestChip, TextBox, Tiles } from './widgets';
 
 /**
- * P8, the F43 screen: the rows asked once (certificate kind, strings, description, instruments), then
- * a tab per string (1, 2, 3…) and that string's rows in the form's groups, each its own card. "Same
- * as string 1" is on by default where F43 allows it (wiring type, irradiance, test voltage, isolator,
- * inverter) and never offered for a measurement. Expected Voc sits beside the measured box. What the
+ * P8, the string tests screen: the rows asked once (new install or re-test, what's tested, the tester,
+ * strings), then a tab per string (1, 2, 3…) and that string's rows in their groups, each its own
+ * card. "Same as string 1" is on by default where the field says so (cable type, irradiance, test
+ * voltage, isolator, inverter) and never offered for a measurement. Expected Voc sits beside the measured box. What the
  * roofer gave is offered with one tap, for every string at once.
  */
 export function StringsStep({ step, rec, answers, jf, locked, row }: { step: Step; rec: PackRecord; answers: Answers; jf: JobForms; locked: boolean; row: (f: Field) => React.ReactNode }) {
@@ -27,19 +27,30 @@ export function StringsStep({ step, rec, answers, jf, locked, row }: { step: Ste
   const at = Math.min(tab, Math.max(0, n - 1));
 
   const stringDone = (i: number) => per.every((f) => f.level !== 'must' || answered(f, perStringValues(f, ctx)[i]));
-  const groups: { title: string; fields: Field[] }[] = [];
+  const groups: { title: string; note: string | null; fields: Field[] }[] = [];
+  const groupOf = new Map<string, string>();
   let group = '';
+  let note: string | null = null;
   for (const f of step.fields) {
-    if (f.group) group = f.group;
+    if (f.group) [group, note] = [f.group, f.groupNote ?? null];
+    groupOf.set(f.key, group);
     if (!f.perString || !per.includes(f)) continue;
     const last = groups.at(-1);
     if (last && last.title === group) last.fields.push(f);
-    else groups.push({ title: group, fields: [f] });
+    else groups.push({ title: group, note, fields: [f] });
   }
+  // The rows asked once, under their group's heading ("About this test", "Wrapping up").
+  const once = (list: Field[]) =>
+    list.map((f, i) => (
+      <Fragment key={f.key}>
+        {groupOf.get(f.key) && groupOf.get(f.key) !== groupOf.get(list[i - 1]?.key ?? '') && <h3 className="sa-qgroup">{groupOf.get(f.key)}</h3>}
+        {row(f)}
+      </Fragment>
+    ));
 
   return (
     <>
-      {before.map(row)}
+      {once(before)}
       {n > 0 && (
         <div className="sa-strtabs-wrap">
           <div className="sa-strtabs" role="tablist" aria-label="Strings">
@@ -53,6 +64,7 @@ export function StringsStep({ step, rec, answers, jf, locked, row }: { step: Ste
           {groups.map((g) => (
             <section key={g.title} className="sa-strcard">
               <h3 className="sa-strcard-title">{g.title}</h3>
+              {g.note && <p className="sa-intro">{g.note}</p>}
               {g.fields.map((f) => (
                 <StringRow key={`${f.key}:${at}`} f={f} i={at} rec={rec} answers={answers} jf={jf} locked={locked} />
               ))}
@@ -65,7 +77,7 @@ export function StringsStep({ step, rec, answers, jf, locked, row }: { step: Ste
           )}
         </div>
       )}
-      {after.map(row)}
+      {once(after)}
     </>
   );
 }

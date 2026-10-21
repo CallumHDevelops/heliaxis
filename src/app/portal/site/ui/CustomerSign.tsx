@@ -23,8 +23,8 @@ export function whatWeDid(pack: SitePack): string {
   return `${list[0].toUpperCase()}${list.slice(1)}.`;
 }
 
-/** The signatures this job asks the customer for, in order: the completion record, then G98 Form B on G98 jobs. */
-export const kindsFor = (pack: SitePack): CustomerSignKind[] => (pack.electrician?.g98 ? ['f16e', 'g98'] : ['f16e']);
+/** The signatures this job asks the customer for, in order: the completion sign-off, then G98 Form B on G98 jobs. */
+export const kindsFor = (pack: SitePack): CustomerSignKind[] => (pack.electrician?.g98 ? ['completion', 'g98'] : ['completion']);
 
 /**
  * P15: after the electrician's sign-off, "Hand the phone to Jane": what was done in plain words, the
@@ -65,7 +65,7 @@ export function CustomerSign({ rec }: { rec: PackRecord }) {
                 {CUSTOMER_SIGN_TITLE[next]}
                 {kinds.length > 1 ? ` · ${kinds.indexOf(next) + 1} of ${kinds.length}` : ''}
               </p>
-              {next === 'f16e' && (
+              {next === 'completion' && (
                 <>
                   <h3>What we did</h3>
                   <p>{whatWeDid(pack)}</p>

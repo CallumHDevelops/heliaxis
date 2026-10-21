@@ -72,7 +72,7 @@ export type Loaded = {
 };
 
 /** What Units 2 and 3 can tell the pack about the electrician's work (only the fields they know). */
-export type FactsPlugin = (db: Db, projectId: string, f: HandoverFacts) => Promise<Partial<Pick<ElectricianFacts, 'certRef' | 'nextInspection' | 'certWaits' | 'values'>> | null>;
+export type FactsPlugin = (db: Db, projectId: string, f: HandoverFacts) => Promise<Partial<Pick<ElectricianFacts, 'certRef' | 'nextInspection' | 'certWaits' | 'certRoute' | 'values'>> | null>;
 const PLUGINS: FactsPlugin[] = [
   // The electrician's certificate (site/handover-facts.ts), loaded when needed.
   async (db, projectId, f) => (await import('@/lib/site/handover-facts')).siteHandoverFacts(db, projectId, f),
@@ -104,7 +104,7 @@ export function libraryFor(all: LibraryItem[], models: string[], products: strin
   });
 }
 
-/** Models with no manual or datasheet in the library yet (CC5's gaps). */
+/** Models with no manual or datasheet in the library yet (the product manuals' gaps). */
 export function libraryGaps(all: LibraryItem[], models: string[]): string[] {
   return models.filter((m) => !all.some((l) => (l.kind === 'manual' || l.kind === 'datasheet') && libraryFor([{ ...l, every_pack: false }], [m], []).length));
 }
@@ -138,8 +138,9 @@ async function electricianOf(db: Db, projectId: string): Promise<{ facts: Electr
   const values = valuesOf((a.answers ?? {}) as Answers);
   const extra = ((so?.extra ?? {}) as { customer?: Record<string, { name?: string; signed_at?: string; path?: string; declaration?: string | null }> }).customer ?? {};
   const customer: ElectricianFacts['customer'] = {};
-  for (const k of ['f16e', 'g98'] as const) {
-    const c = extra[k];
+  for (const k of ['completion', 'g98'] as const) {
+    // A preview job's completion signature, kept under its old kind.
+    const c = extra[k] ?? (k === 'completion' ? extra.f16e : undefined);
     if (c?.name && c.signed_at && c.path) customer[k] = { name: c.name, signed_at: c.signed_at, path: c.path, via: 'phone', declaration: c.declaration ?? null } satisfies CustomerSig;
   }
   const signed = !!so && (a.status === 'signed' || a.status === 'done');
@@ -210,7 +211,7 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
   const current = docs.filter((d) => d.handover_slot && !d.archived_at);
   const name = String(c?.name ?? '');
 
-  // The survey's shading notes and sun-path photo, for F48I.
+  // The survey's shading notes and sun-path photo, for the solar estimate page (HX-HO-10).
   const shading = Array.isArray((survey?.answers as Record<string, unknown> | undefined)?.R12) ? ((survey!.answers as Record<string, unknown>).R12 as string[]).filter((k) => k !== 'none').map((k) => SHADING[k] ?? k) : [];
   const { data: sun } = survey ? await db.from('crm_photos').select('storage_path').eq('survey_id', String(survey.id)).eq('slot', 'R14').order('created_at').limit(1).maybeSingle() : { data: null };
 
@@ -274,7 +275,7 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
   };
 }
 
-/** The pack's documents as the catalogue reads them (current ones, with the store's Out of date marks and F76's parts). */
+/** The pack's documents as the catalogue reads them (current ones, with the store's Out of date marks and the G99 papers' parts). */
 export function slotDocs(l: Loaded): SlotDoc[] {
   return l.docs
     .filter((d) => d.handover_slot && isSlot(d.handover_slot) && d.handover_slot !== 'PACK' && !d.archived_at)

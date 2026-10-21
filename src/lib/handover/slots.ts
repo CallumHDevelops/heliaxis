@@ -1,7 +1,7 @@
 /**
- * The customer handover pack's catalogue (SPEC 4.1, HANDOVER 1): every document in the owner's list
- * (the 26 rows of his compliance system) plus the combined PACK, each with the customer's one plain
- * line, its contents group, the technologies it belongs to, who makes it, its place in the pack and
+ * The customer handover pack's catalogue (SPEC 4.1, HANDOVER 1; codes and titles: CODE-MAP): every
+ * document in the pack, by Heliaxis's own code (HX-HO-01 … HX-HO-19, HX-PV-01 … HX-PV-03, HX-BAT-01 …
+ * HX-BAT-04), plus the combined PACK, each with the customer's one plain line, its contents group, the technologies it belongs to, who makes it, its place in the pack and
  * when it isn't needed. Then each item's state on a job (D7: Complete, Missing, Waiting, Not needed,
  * Out of date), the headline ("18 of 23 complete · 3 waiting · 2 missing · 2 not needed"), whether
  * the pack can go to the customer yet (D23) and the contents in customer order (HANDOVER 2.6).
@@ -34,32 +34,32 @@ export const GROUPS: { key: Exclude<Group, 'cover'>; title: string }[] = [
 ];
 
 export type SlotCode =
-  | 'F07BI'
-  | 'F19I'
-  | 'F43'
-  | 'F44'
-  | 'F44A'
-  | 'F74'
-  | 'F75'
-  | 'F74A'
-  | 'F74B'
-  | 'F78'
-  | 'F16E'
-  | 'F47'
-  | 'F76'
-  | 'F48I'
-  | 'F49'
-  | 'F49A'
-  | 'CC4'
-  | 'CC5'
-  | 'CC10'
-  | 'CC13'
-  | 'CC14'
-  | 'CC15'
-  | 'CC16'
-  | 'CC17'
-  | 'CC21'
-  | 'CCMH'
+  | 'HX-HO-01'
+  | 'HX-HO-02'
+  | 'HX-HO-03'
+  | 'HX-HO-04'
+  | 'HX-HO-05'
+  | 'HX-HO-06'
+  | 'HX-HO-07'
+  | 'HX-HO-08'
+  | 'HX-HO-09'
+  | 'HX-HO-10'
+  | 'HX-HO-11'
+  | 'HX-HO-12'
+  | 'HX-HO-13'
+  | 'HX-HO-14'
+  | 'HX-HO-15'
+  | 'HX-HO-16'
+  | 'HX-HO-17'
+  | 'HX-HO-18'
+  | 'HX-HO-19'
+  | 'HX-PV-01'
+  | 'HX-PV-02'
+  | 'HX-PV-03'
+  | 'HX-BAT-01'
+  | 'HX-BAT-02'
+  | 'HX-BAT-03'
+  | 'HX-BAT-04'
   | 'PACK';
 
 /** What applies() looks at: the job's technologies, its DNO route and two design details. */
@@ -75,7 +75,7 @@ export type AppliesCtx = {
 
 export type SlotDef = {
   code: SlotCode;
-  /** As in the owner's compliance system. */
+  /** Heliaxis's title (CODE-MAP). */
   title: string;
   /** One plain line for the customer's portal. */
   customer: string;
@@ -115,15 +115,15 @@ const ROUTE_WORDS: Record<string, string> = {
   demand: 'Demand only: no generation paperwork',
   not_needed: 'No DNO paperwork needed on this job',
 };
-/** F47 for G98 jobs, F76 for G99 ones. No route chosen yet: it applies (and asks for the route). */
+/** The G98 notice for G98 jobs, the G99 papers for G99 ones. No route chosen yet: it applies (and asks for the route). */
 const route = (want: 'g98' | 'g99') => (c: AppliesCtx) => pvOrBattery(c) ?? (c.dnoRoute && c.dnoRoute !== want ? (ROUTE_WORDS[c.dnoRoute] ?? 'Not this job’s DNO route') : null);
 const EXISTING = 'Battery added to an existing system: the existing one still applies';
 const PAS_SCOPE = ['Not a dwelling', 'Dwelling over 200 m²', 'Battery connected before the meter', 'Second-life battery'];
 
 export const SLOTS: SlotDef[] = [
   {
-    code: 'F07BI',
-    title: 'Handover Cover Letter',
+    code: 'HX-HO-01',
+    title: 'Covering letter',
     customer: 'Our letter to you: what we installed, what’s in this pack and what to do next.',
     group: 'cover',
     tech: [],
@@ -134,9 +134,9 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'F78',
-    title: 'Solar PV & Battery Handover Document',
-    customer: 'The handover certificate for your system: what was installed, its ratings and who signed it off.',
+    code: 'HX-HO-02',
+    title: 'System summary and sign-off',
+    customer: 'What we installed and its ratings, the records behind it, and who signed it off.',
     group: 'certificates',
     tech: ['solar', 'battery'],
     kind: 'G',
@@ -146,8 +146,8 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'CC17',
-    title: 'MCS Certificate',
+    code: 'HX-HO-03',
+    title: 'MCS certificate',
     customer: 'Shows your system was installed to MCS standards. You’ll need it to apply for the Smart Export Guarantee.',
     group: 'certificates',
     tech: ['solar', 'battery', 'heatpump'],
@@ -160,8 +160,8 @@ export const SLOTS: SlotDef[] = [
     pick: 'MCS certificate',
   },
   {
-    code: 'CC21',
-    title: 'Electrical Testing Certificates',
+    code: 'HX-HO-04',
+    title: 'Electrical certificate',
     customer: 'Your electrical installation certificate: the safety tests on the new wiring.',
     group: 'certificates',
     tech: [],
@@ -174,9 +174,9 @@ export const SLOTS: SlotDef[] = [
     pick: 'Electrical certificate (EIC)',
   },
   {
-    code: 'F74B',
-    title: 'PAS 63100 Statement of Conformity (Battery)',
-    customer: 'Confirms where your battery is fitted follows PAS 63100, the guidance for batteries in homes.',
+    code: 'HX-BAT-04',
+    title: 'Battery location statement (PAS 63100)',
+    customer: 'Our signed statement that your battery’s location and installation follow PAS 63100.',
     group: 'certificates',
     tech: ['battery'],
     kind: 'C',
@@ -187,8 +187,8 @@ export const SLOTS: SlotDef[] = [
     category: 'certificate',
   },
   {
-    code: 'CC14',
-    title: 'Building Control Notifications',
+    code: 'HX-HO-05',
+    title: 'Building Regulations certificate',
     customer: 'Shows the electrical work was notified to Building Control, as the Building Regulations ask.',
     group: 'certificates',
     tech: [],
@@ -198,12 +198,12 @@ export const SLOTS: SlotDef[] = [
     applies: any,
     reasons: [EXISTING],
     category: 'certificate',
-    pick: 'Building Control certificate',
+    pick: 'Building Regulations certificate',
   },
   {
-    code: 'F19I',
-    title: 'Workmanship Warranty',
-    customer: 'Our workmanship warranty.',
+    code: 'HX-HO-06',
+    title: 'Heliaxis workmanship warranty',
+    customer: 'Our warranty on the work we did.',
     group: 'warranties',
     tech: [],
     kind: 'G',
@@ -213,8 +213,8 @@ export const SLOTS: SlotDef[] = [
     category: 'warranty',
   },
   {
-    code: 'CC16',
-    title: 'Insurance Backed Guarantee / MCS Financial Protection Product',
+    code: 'HX-HO-07',
+    title: 'Warranty insurance',
     customer: 'The insurance that backs our warranty if we ever stopped trading.',
     group: 'warranties',
     tech: ['solar', 'battery', 'heatpump'],
@@ -223,11 +223,11 @@ export const SLOTS: SlotDef[] = [
     order: 70,
     applies: mcs,
     category: 'warranty',
-    pick: 'Insurance-backed guarantee',
+    pick: 'Warranty insurance policy',
   },
   {
-    code: 'F16E',
-    title: 'Completion of Works Record',
+    code: 'HX-HO-08',
+    title: 'Completion sign-off',
     customer: 'Your record that the work was finished and you were shown how it all works.',
     group: 'using',
     tech: [],
@@ -238,8 +238,8 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'CC4',
-    title: 'Start Up and Shutdown Procedures',
+    code: 'HX-HO-09',
+    title: 'Switching your system off and on',
     customer: 'How to switch your system off safely, and back on.',
     group: 'using',
     tech: [],
@@ -250,8 +250,8 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'F48I',
-    title: 'Solar PV Shading and Maintenance',
+    code: 'HX-HO-10',
+    title: 'Solar estimate, shading and care',
     customer: 'Your yearly generation estimate, the shading on your roof and the simple checks you can do.',
     group: 'using',
     tech: ['solar'],
@@ -262,8 +262,8 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'F49',
-    title: 'Solar PV Maintenance Schedule',
+    code: 'HX-HO-11',
+    title: 'Maintenance schedule',
     customer: 'What needs checking, by whom and how often.',
     group: 'using',
     tech: ['solar', 'battery'],
@@ -274,8 +274,8 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'F49A',
-    title: 'Solar PV Maintenance Agreement',
+    code: 'HX-HO-12',
+    title: 'Your maintenance plan',
     customer: 'Your maintenance plan, as agreed.',
     group: 'using',
     tech: ['solar', 'battery'],
@@ -286,8 +286,8 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'CC10',
-    title: 'Schematic Diagram(s)',
+    code: 'HX-HO-13',
+    title: 'Wiring diagram',
     customer: 'A drawing of how your system is wired.',
     group: 'design',
     tech: ['solar', 'battery'],
@@ -297,11 +297,11 @@ export const SLOTS: SlotDef[] = [
     applies: pvOrBattery,
     reasons: [EXISTING],
     category: 'design',
-    pick: 'Schematic',
+    pick: 'Wiring diagram (schematic)',
   },
   {
-    code: 'CC15',
-    title: 'Design Calculations',
+    code: 'HX-HO-14',
+    title: 'System design calculations',
     customer: 'The calculations behind your system’s design.',
     group: 'design',
     tech: ['solar', 'battery'],
@@ -314,9 +314,9 @@ export const SLOTS: SlotDef[] = [
     pick: 'Design calculations',
   },
   {
-    code: 'F43',
-    title: 'Solar PV Array Test Form',
-    customer: 'The test results for your solar panels’ wiring.',
+    code: 'HX-PV-02',
+    title: 'Solar PV string test results',
+    customer: 'The readings taken on each string of your solar panels before the system was switched on.',
     group: 'tests',
     tech: ['solar'],
     kind: 'G',
@@ -326,9 +326,9 @@ export const SLOTS: SlotDef[] = [
     category: 'commissioning',
   },
   {
-    code: 'F44',
-    title: 'Solar PV Installation Checklist',
-    customer: 'The installer’s checklist for your solar installation.',
+    code: 'HX-PV-01',
+    title: 'Solar PV inspection record',
+    customer: 'Our electrician’s inspection of your solar installation.',
     group: 'tests',
     tech: ['solar'],
     kind: 'G',
@@ -338,9 +338,9 @@ export const SLOTS: SlotDef[] = [
     category: 'commissioning',
   },
   {
-    code: 'F44A',
-    title: 'Solar PV Commissioning Checklist',
-    customer: 'The checks made when your solar system was switched on.',
+    code: 'HX-PV-03',
+    title: 'Solar PV switch-on record',
+    customer: 'The checks made when your solar system was first switched on.',
     group: 'tests',
     tech: ['solar'],
     kind: 'G',
@@ -350,9 +350,9 @@ export const SLOTS: SlotDef[] = [
     category: 'commissioning',
   },
   {
-    code: 'F74',
-    title: 'Battery Testing Checklist',
-    customer: 'The installer’s checks and tests on your battery.',
+    code: 'HX-BAT-01',
+    title: 'Battery inspection record',
+    customer: 'Our electrician’s checks on your battery installation before it was switched on.',
     group: 'tests',
     tech: ['battery'],
     kind: 'G',
@@ -362,9 +362,9 @@ export const SLOTS: SlotDef[] = [
     category: 'commissioning',
   },
   {
-    code: 'F75',
-    title: 'Battery Commissioning Checklist',
-    customer: 'The checks made when your battery was switched on.',
+    code: 'HX-BAT-02',
+    title: 'Battery switch-on and test record',
+    customer: 'The tests made when your battery was switched on.',
     group: 'tests',
     tech: ['battery'],
     kind: 'G',
@@ -374,9 +374,9 @@ export const SLOTS: SlotDef[] = [
     category: 'commissioning',
   },
   {
-    code: 'F74A',
-    title: 'PAS 63100 Verification Checklist (Battery)',
-    customer: 'The checks on where your battery is fitted (PAS 63100).',
+    code: 'HX-BAT-03',
+    title: 'Battery location check (PAS 63100)',
+    customer: 'Our checks on where your battery is fitted, against PAS 63100, the fire safety specification for home batteries.',
     group: 'tests',
     tech: ['battery'],
     kind: 'C',
@@ -387,20 +387,21 @@ export const SLOTS: SlotDef[] = [
     category: 'commissioning',
   },
   {
-    code: 'F47',
-    title: 'G98 Form B',
+    code: 'HX-HO-15',
+    title: 'Grid notice (G98)',
     customer: 'The notice that tells your electricity network (DNO) about your new system.',
     group: 'grid',
     tech: ['solar', 'battery'],
-    kind: 'G',
-    maker: 'pack',
+    kind: 'C',
+    maker: 'office',
     order: 210,
     applies: route('g98'),
     category: 'dno',
+    pick: 'G98 notice as sent',
   },
   {
-    code: 'F76',
-    title: 'G99 A1.2 Issue 1.9',
+    code: 'HX-HO-16',
+    title: 'Grid connection papers (G99)',
     customer: 'Your electricity network’s (DNO’s) approval for your system, and what was sent to them.',
     group: 'grid',
     tech: ['solar', 'battery'],
@@ -409,11 +410,11 @@ export const SLOTS: SlotDef[] = [
     order: 220,
     applies: route('g99'),
     category: 'dno',
-    pick: 'G99 paperwork',
+    pick: 'G99 papers',
   },
   {
-    code: 'CC5',
-    title: 'Manufacturer Information',
+    code: 'HX-HO-17',
+    title: 'Product manuals and warranties',
     customer: 'Manuals, datasheets and warranties for the products we fitted.',
     group: 'manufacturer',
     tech: [],
@@ -424,8 +425,8 @@ export const SLOTS: SlotDef[] = [
     category: 'handover',
   },
   {
-    code: 'CC13',
-    title: 'Paid Invoice',
+    code: 'HX-HO-18',
+    title: 'Invoice and receipt',
     customer: 'Your paid invoice and receipt.',
     group: 'invoices',
     tech: [],
@@ -434,11 +435,11 @@ export const SLOTS: SlotDef[] = [
     order: 240,
     applies: any,
     category: 'invoice',
-    pick: 'Paid invoice',
+    pick: 'Final invoice',
   },
   {
-    code: 'CCMH',
-    title: 'Miscellaneous Handover Documents',
+    code: 'HX-HO-19',
+    title: 'Other useful documents',
     customer: 'Anything else that’s useful to keep.',
     group: 'other',
     tech: [],
@@ -452,7 +453,7 @@ export const SLOTS: SlotDef[] = [
   },
   {
     code: 'PACK',
-    title: 'Handover pack (one PDF)',
+    title: 'Your handover pack (one PDF)',
     customer: 'Everything above in one PDF.',
     group: 'other',
     tech: [],
@@ -468,15 +469,15 @@ export const SLOTS: SlotDef[] = [
 const BY_CODE = new Map(SLOTS.map((s) => [s.code, s]));
 export const slotDef = (code: string) => BY_CODE.get(code as SlotCode);
 export const isSlot = (code: unknown): code is SlotCode => typeof code === 'string' && BY_CODE.has(code as SlotCode);
-/** The owner's list (every row of his compliance system), without the combined PACK. */
+/** Every item of the pack, without the combined PACK. */
 export const PACK_ITEMS = SLOTS.filter((s) => s.code !== 'PACK');
 /** "Which is it?" for + Add a document, ending with Something else. */
-export const UPLOAD_PICKS = PACK_ITEMS.filter((s) => s.pick).sort((a, b) => (a.code === 'CCMH' ? 1 : b.code === 'CCMH' ? -1 : 0));
+export const UPLOAD_PICKS = PACK_ITEMS.filter((s) => s.pick).sort((a, b) => (a.code === 'HX-HO-19' ? 1 : b.code === 'HX-HO-19' ? -1 : 0));
 
 /** The documents the electrician's sign-off and certificate make: all of them Complete before Send (D23). */
-export const SITE_SLOTS: SlotCode[] = ['F43', 'F44', 'F44A', 'F74', 'F75', 'F74A', 'F74B', 'F78', 'CC21'];
+export const SITE_SLOTS: SlotCode[] = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-BAT-04', 'HX-HO-02', 'HX-HO-04'];
 /** Chased by the office after the pack goes ("On its way"). */
-export const FOLLOW_SLOTS: SlotCode[] = ['CC13', 'CC14', 'CC16', 'CC17'];
+export const FOLLOW_SLOTS: SlotCode[] = ['HX-HO-18', 'HX-HO-05', 'HX-HO-07', 'HX-HO-03'];
 
 /* ── States ──────────────────────────────────────────────────────────────── */
 
@@ -490,7 +491,7 @@ export type SlotDoc = {
   name: string;
   /** upload · generated · library · site */
   source: string | null;
-  /** generated_key: versions of one generated document share it (F78, CC13_RECEIPT…). */
+  /** generated_key: versions of one generated document share it (HX-HO-02, HX-HO-18-RECEIPT…). */
   key: string | null;
   visible: boolean;
   release: string;
@@ -501,7 +502,7 @@ export type SlotDoc = {
   hash: string | null;
   /** Its inputs changed after it went to the customer (the store's Out of date mark, for other units' documents). */
   stale?: boolean;
-  /** F76: which G99 paper it is (application · acceptance · installation · g100). */
+  /** HX-HO-16: which G99 paper it is (application · acceptance · installation · g100). */
   part?: string | null;
   /** Who uploaded it ("Uploaded by Sarah"). */
   by?: string | null;
@@ -624,70 +625,68 @@ function siteState(docs: SlotDoc[], c: StateCtx, made = true): Partial0 {
   if (c.electrician === 'signed')
     return made
       ? { state: 'missing', why: 'The electrician has signed off but it isn’t here. Upload it, or open the Site tab.', fix: 'upload' }
-      : { state: 'missing', why: 'Upload it: the PAS 63100 wording isn’t in the app yet.', fix: 'upload' };
+      : { state: 'missing', why: 'Upload it for now: the app’s PAS 63100 checks haven’t been matched to the PAS yet.', fix: 'upload' };
   return { state: 'missing', why: 'Add the electrician on the Site tab, or upload it.', fix: 'site' };
 }
 
 function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
   const p = c.paperwork;
   switch (d.code) {
-    case 'F43':
-    case 'F44':
-    case 'F44A':
-    case 'F74':
-    case 'F75':
+    case 'HX-PV-01':
+    case 'HX-PV-02':
+    case 'HX-PV-03':
+    case 'HX-BAT-01':
+    case 'HX-BAT-02':
       return siteState(docs, c);
-    case 'F74A':
-    case 'F74B':
+    case 'HX-BAT-03':
+    case 'HX-BAT-04':
       return siteState(docs, c, false);
-    case 'CC21':
+    case 'HX-HO-04':
       if (docs.length) return docsState(docs);
       if (c.electrician === 'working') return { state: 'waiting', why: ELECTRICIAN(c) };
       if (c.electrician === 'signed' && c.certWaits) return { state: 'missing', why: c.certWaits, fix: 'site' };
       return { state: 'missing', why: c.electrician === 'signed' ? 'Upload the electrical certificate.' : 'Upload the EIC, or add the electrician on the Site tab.', fix: 'upload' };
-    case 'CC17':
+    case 'HX-HO-03':
       if (docs.length) return docsState(docs);
       if (p.mcs_cert_no) return { state: 'missing', why: `Upload the MCS certificate (${p.mcs_cert_no}).`, fix: 'upload' };
       if (c.commissioned) return { state: 'waiting', why: dueWords(c.due.mcs, '10 working days') ?? 'Register it in the MCS database.', due: c.due.mcs ?? null, fix: 'mid' };
       return { state: 'waiting', why: 'After the system is switched on.' };
-    case 'CC16':
+    case 'HX-HO-07':
       if (docs.length) return docsState(docs);
-      if (p.mcs_registered_on) return { state: 'missing', why: `Buy the guarantee and upload the policy.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
+      if (p.mcs_registered_on) return { state: 'missing', why: `Buy the warranty insurance and upload the policy.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
       return { state: 'waiting', why: 'After the MCS certificate.' };
-    case 'CC14':
+    case 'HX-HO-05':
       if (docs.length) return docsState(docs);
       if (p.building_regs_ref) return { state: 'waiting', why: `Notified${p.building_regs_on ? ` on ${shortDay(p.building_regs_on)}` : ''}, certificate to follow.` };
       if (!c.commissioned && c.electrician !== 'signed') return { state: 'waiting', why: 'After the electrician signs off.' };
       if (c.partPBy === 'self') return { state: 'waiting', why: `Waiting for ${c.electricianName?.split(/\s+/)[0] || 'the electrician'} to notify their scheme and send the reference.`, due: c.due.regs ?? null, fix: 'notify-bc' };
       return { state: 'missing', why: `Notify building control.${c.due.regs ? ` ${dueWords(c.due.regs, '30 days')}.` : ''}`, due: c.due.regs ?? null, fix: 'notify-bc' };
-    case 'CC10':
+    case 'HX-HO-13':
       if (docs.length) return docsState(docs);
-      return { state: 'missing', why: c.designDoc ? 'Upload the schematic, or use the design document on the job.' : 'Upload the schematic.', fix: 'upload' };
-    case 'CC15':
+      return { state: 'missing', why: c.designDoc ? 'Upload the wiring diagram, or use the design document on the job.' : 'Upload the wiring diagram.', fix: 'upload' };
+    case 'HX-HO-14':
       if (docs.length) return docsState(docs);
       return { state: 'missing', why: c.designDoc ? 'Upload the design calculations (or use the design document), or mark them not needed.' : 'Upload the design calculations, or mark them not needed.', fix: 'upload' };
-    case 'CC5':
+    case 'HX-HO-17':
       if (!c.models.length) return { state: 'missing', why: 'Add the product models on Job details.', fix: 'job' };
       if (c.libraryGaps.length)
         return { state: 'missing', why: `No manual or datasheet for ${c.libraryGaps.join(', ')}: upload it once and every job with that model gets it.`, fix: 'library' };
       if (!docs.length) return { state: 'missing', why: 'Add the manuals from the library.', fix: 'library' };
       return docsState(docs);
-    case 'CC13': {
-      const invoices = docs.filter((x) => x.key !== 'CC13_RECEIPT');
+    case 'HX-HO-18': {
+      const invoices = docs.filter((x) => x.key !== 'HX-HO-18-RECEIPT');
       if (invoices.length && c.invoicePaid) return docsState(docs);
       if (invoices.length) return { state: 'waiting', why: 'Final invoice not paid yet.', fix: 'invoice' };
       return c.sent ? { state: 'missing', why: 'Upload the final invoice and send it.', fix: 'invoice' } : { state: 'waiting', why: 'After the handover pack goes.', fix: 'invoice' };
     }
-    case 'F47': {
+    case 'HX-HO-15': {
+      // An office upload (OWNER-DECISIONS 9): the notice as it went to the DNO. The G98 data sheet helps fill it in.
       if (!c.dnoRoute) return { state: 'missing', why: 'Choose the DNO route on Paperwork.', fix: 'paperwork' };
-      const uploaded = docs.filter((x) => x.source !== 'generated');
-      if (uploaded.length) return docsState(uploaded);
-      const g = genState('F47', docs, c);
-      if (g.state !== 'complete') return g;
-      if (!c.dnoNotified) return { state: 'missing', why: `Send it to the DNO, then mark it sent.${c.due.g98 ? ` ${dueWords(c.due.g98, '28 days')}.` : ''}`, due: c.due.g98 ?? null, fix: 'dno-sent' };
-      return g;
+      if (docs.length) return docsState(docs);
+      if (!c.dnoNotified) return { state: 'missing', why: `Send the G98 notice to the DNO and mark it sent, then upload it as sent.${c.due.g98 ? ` ${dueWords(c.due.g98, '28 days')}.` : ''}`, due: c.due.g98 ?? null, fix: 'dno-sent' };
+      return { state: 'missing', why: 'Upload the G98 notice as it was sent to the DNO.', fix: 'upload' };
     }
-    case 'F76': {
+    case 'HX-HO-16': {
       if (!c.dnoRoute) return { state: 'missing', why: 'Choose the DNO route on Paperwork.', fix: 'paperwork' };
       const parts = new Set(docs.map((x) => x.part).filter(Boolean));
       const need = [!parts.has('acceptance') && 'the DNO’s acceptance', !parts.has('installation') && 'the installation document'].filter(Boolean) as string[];
@@ -695,7 +694,7 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       if (!docs.length && c.dnoSubmitted) return { state: 'waiting', why: 'Application sent, waiting for the DNO.', fix: 'upload' };
       return { state: 'missing', why: docs.length ? `Still to upload: ${need.join(' and ')}.` : 'Upload the G99 application, the DNO’s acceptance and the installation document.', fix: 'upload' };
     }
-    case 'CCMH':
+    case 'HX-HO-19':
       return docs.length ? docsState(docs) : { state: 'na', why: 'Optional: nothing extra added.' };
     default:
       return genState(d.code, docs, c);
@@ -704,7 +703,7 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
 
 const techFits = (d: SlotDef, c: AppliesCtx) => !d.tech.length || d.tech.some((t) => c.products.includes(t));
 
-/** Every item of the owner's list on this job, in pack order. */
+/** Every item of the pack on this job, in pack order. */
 export function slotStates(c: StateCtx): SlotView[] {
   return PACK_ITEMS.map((d) => {
     const docs = c.docs.filter((x) => x.slot === d.code);
@@ -749,7 +748,7 @@ export function headline(views: SlotView[]): Headline {
 
 /**
  * Can the pack go to the customer (D23)? Every site document for the job's technologies Complete;
- * the office's own (MCS certificate, guarantee, Building Control, paid invoice) and the rest can
+ * the office's own (MCS certificate, warranty insurance, Building Regulations, invoice) and the rest can
  * follow, shown as "On its way". `blocking` lists what stops it, `following` what will follow.
  */
 export function sendCheck(views: SlotView[]): { ok: boolean; blocking: SlotView[]; following: SlotView[] } {
@@ -770,7 +769,7 @@ export function contentsGroups<T extends { group: Group; order: number }>(items:
   return GROUPS.map((g) => ({ ...g, items: items.filter((i) => i.group === g.key).sort((a, b) => a.order - b.order) })).filter((g) => g.items.length);
 }
 
-/* ── Product models and the library (CC4, CC5) ───────────────────────────── */
+/* ── Product models and the library (switching off, product manuals) ───────── */
 
 /** Model names compared ignoring case, spaces and dashes ("GIV-AIO 13.5" = "giv aio13.5"). */
 export const modelKey = (s: string | null | undefined) => String(s ?? '').toLowerCase().replace(/[\s\-_–—]+/g, '');

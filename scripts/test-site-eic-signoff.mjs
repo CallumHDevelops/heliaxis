@@ -3,10 +3,10 @@
 // EIC as a draft (the design part still to sign), sets paperwork.eic_on and remembers their test
 // instruments; the handover pack is told the EIC's reference and that it waits for the design part,
 // and nothing of the roofer's panel serials (owner, 21 Oct: no scanning) (site/handover-facts.ts); the office signs the design part (the next
-// inspection reaches the pack) and the EIC is final, in handover slot CC21 and held
+// inspection reaches the pack) and the EIC is final, in handover slot HX-HO-04 and held
 // for the pack, the draft archived; making it again changes nothing; a reading or a signature that
 // never reached the server stops the sign-off; a single-signature EIC is final at once; Minor Works
-// makes one sheet per circuit, kept out of CC21 while its wording is unverified.
+// makes one sheet per circuit, kept out of HX-HO-04 while its wording is unverified.
 // Usage: node --experimental-strip-types scripts/test-site-eic-signoff.mjs   (PDF_OUT=/dir keeps the PDFs)
 import { createHash, randomUUID } from 'node:crypto';
 import { registerHooks } from 'node:module';
@@ -241,7 +241,7 @@ const contact = {
   vat_number: null,
   cis_rate: 'net',
   cis_verified_on: '2026-01-10',
-  instruments: [{ k: 'f43_tester', v: 'Kept by another part of the pack' }],
+  instruments: [{ k: 'pvt_tester', v: 'Kept by another part of the pack' }],
   part_p_by: 'self',
   scheme: 'NAPIT',
   scheme_number: '12345',
@@ -299,7 +299,7 @@ await afterReply();
 eq('the documents step made the EIC as a draft: not in the pack, not visible', docs('EIC_DRAFT').map((d) => [d.category, d.handover_slot, d.visible]), [['certificate', null, false]]);
 eq('…and no final EIC yet', docs('EIC').length, 0);
 eq('the instruments are remembered on the contact (anything else kept there stays)', db.rows('site_contacts')[0].instruments, [
-  { k: 'f43_tester', v: 'Kept by another part of the pack' },
+  { k: 'pvt_tester', v: 'Kept by another part of the pack' },
   { k: 'eic_mft', v: 'Megger MFT1741 · 101234567' },
 ]);
 const so = db.rows('site_signoffs').find((s) => s.assignment_id === one.id);
@@ -323,7 +323,7 @@ eq('handover facts once the design part is signed: the next inspection from it, 
 const design = read(one.id).answers.eic_design?.v;
 eq('kept on the assignment, its signature in crm-docs', [design?.name, design?.next_n, design?.next_unit, db.files.has(`crm-docs/${design?.path}`)], ['Sarah Jones', 10, 'years', true]);
 const fin = current('EIC');
-eq('the EIC is final: handover slot CC21, held for the pack, not visible yet', [fin?.handover_slot, fin?.release, fin?.visible, fin?.category, fin?.version], ['CC21', 'with_pack', false, 'certificate', 1]);
+eq('the EIC is final: handover slot HX-HO-04, held for the pack, not visible yet', [fin?.handover_slot, fin?.release, fin?.visible, fin?.category, fin?.version], ['HX-HO-04', 'with_pack', false, 'certificate', 1]);
 eq('the draft is archived (kept)', [docs('EIC_DRAFT').length, !!docs('EIC_DRAFT')[0].archived_at], [1, true]);
 eq('its file name starts with the job ref', fin.name, 'HX-0042 EIC Electrical Installation Certificate.pdf');
 const finText = await textOf(fileOf(fin));
@@ -371,7 +371,7 @@ await afterReply();
 const sref = (await EICS.certificateStatus(db, read(single.id))).ref;
 const skey = EICS.certKey(sref);
 eq('single signature: its own reference and key (the fourth electrician on the job)', [sref, skey], ['HX-0042-EIC4', 'EIC4']);
-eq('…final at once, in CC21', [r3.status, current(skey)?.handover_slot, docs(`${skey}_DRAFT`).length], [200, 'CC21', 0]);
+eq('…final at once, in HX-HO-04', [r3.status, current(skey)?.handover_slot, docs(`${skey}_DRAFT`).length], [200, 'HX-HO-04', 0]);
 const sText = await textOf(fileOf(current(skey)));
 // The A4 form has no single-signature declaration: the one person signs in each of the three places (Note 3).
 eq('one signatory in each place, the next inspection from the electrician', [
@@ -383,7 +383,7 @@ eq('one signatory in each place, the next inspection from the electrician', [
 ], [3, true, 3, false, true]);
 eq('its file name has no “(single signature)”', current(skey).name, 'HX-0042 EIC4 Electrical Installation Certificate.pdf');
 
-/* ── Minor Works: a sheet per circuit, kept out of CC21 while unverified ─────── */
+/* ── Minor Works: a sheet per circuit, kept out of HX-HO-04 while unverified ─────── */
 const minor = electrician(
   {
     ...values,
@@ -397,7 +397,7 @@ const minor = electrician(
 const r4 = await sign(minor);
 await afterReply();
 const sheets = db.rows('crm_documents').filter((d) => /^MEIWC5-/.test(d.generated_key ?? ''));
-eq('Minor Works: three sheets, one per circuit, kept out of CC21', [r4.status, sheets.map((d) => d.generated_key).sort(), sheets.every((d) => d.handover_slot === null && d.category === 'certificate')], [
+eq('Minor Works: three sheets, one per circuit, kept out of HX-HO-04', [r4.status, sheets.map((d) => d.generated_key).sort(), sheets.every((d) => d.handover_slot === null && d.category === 'certificate')], [
   200,
   ['MEIWC5-1', 'MEIWC5-2', 'MEIWC5-3'],
   true,

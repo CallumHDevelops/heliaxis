@@ -257,7 +257,7 @@ eq('BUS expiry as saved', busExpiry({ bus_issued_on: '2026-08-15', bus_expires_o
   eq('G99 chase after 45 working days', g99.map((x) => [x.key, x.due]), [['g99', addWorkingDays('2026-09-01', 45, new Set())]]);
   eq('45 working days from Tue 1 Sep', g99[0].due, '2026-11-03');
   const ibg = deadlinesFor(job({ commissioned_at: '2026-10-23T10:00:00Z', paperwork: { mcs_cert_no: 'MCS-1', mcs_registered_on: '2026-10-28' } }), cal('2026-10-29'));
-  eq('the guarantee within 7 days of the MCS certificate (handover CC16)', ibg.filter((x) => x.key === 'cc16').map((x) => [x.label, x.due, x.done]), [['Buy the insurance-backed guarantee', '2026-11-04', false]]);
+  eq('the guarantee within 7 days of the MCS certificate (handover HX-HO-07)', ibg.filter((x) => x.key === 'cc16').map((x) => [x.label, x.due, x.done]), [['Buy the insurance-backed guarantee', '2026-11-04', false]]);
   eq('done once its reference is saved', deadlinesFor(job({ paperwork: { mcs_registered_on: '2026-10-28', ibg_ref: 'HIES-1' } }), cal('2026-10-29')).find((x) => x.key === 'cc16')?.done, true);
 }
 

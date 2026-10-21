@@ -28,7 +28,7 @@ type Sheet =
   | { kind: 'upload'; slot: SlotCode | null; replace?: ViewDoc | null }
   | { kind: 'na'; code: SlotCode }
   | { kind: 'sign' }
-  | { kind: 'values'; slot: 'F49A' | 'CC4' | 'F78' | 'F47' }
+  | { kind: 'values'; form: ValuesForm }
   | { kind: 'outstanding' }
   | { kind: 'mid' }
   | { kind: 'bc' }
@@ -65,7 +65,18 @@ const FIX_LABEL: Record<Fix, string> = {
   invoice: 'Final invoice',
   'dno-sent': 'Mark it sent to the DNO',
 };
-const SITE_KEYS = ['F43', 'F44', 'F44A', 'F74', 'F75', 'EIC', 'CERT_OWN', 'EV_REC', 'HP_REC'];
+const SITE_KEYS = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'EIC', 'CERT_OWN', 'HX-EV-01', 'HX-HP-01'];
+
+/** The sheets of values the office types, and the pack item each is kept on. */
+type ValuesForm = 'plan' | 'switches' | 'summary' | 'g98';
+const FORM_SLOT: Record<ValuesForm, SlotCode> = { plan: 'HX-HO-12', switches: 'HX-HO-09', summary: 'HX-HO-02', g98: 'HX-HO-15' };
+const FORM_TITLE: Record<ValuesForm, string> = { plan: 'The maintenance plan, as agreed', switches: 'Where the switches are', summary: 'Summary details', g98: 'G98: where the isolation switch is' };
+const FORM_INTRO: Record<ValuesForm, string> = {
+  plan: 'Type each exactly as it was quoted. It prints with your plan wording.',
+  switches: 'For the “How to switch your system off” page. From what the electrician told you, or their photos.',
+  summary: 'Only what the job doesn’t already say. Empty boxes use the job’s own details.',
+  g98: 'Where the lockable isolation switch is, as Form B asks.',
+};
 
 const when = (iso: string) => `${shortDate(ukDayOf(iso))} ${ukTime(iso)}`;
 /** "From the electrician, 3 Nov 17:42" / "Uploaded by Sarah, 3 Nov" / "From the library" / "Made 3 Nov 17:42". */
@@ -167,9 +178,9 @@ export function HandoverTab({
       case 'sign-design':
         return setSheet({ kind: 'sign' });
       case 'switches':
-        return setSheet({ kind: 'values', slot: 'CC4' });
+        return setSheet({ kind: 'values', form: 'switches' });
       case 'values':
-        return setSheet({ kind: 'values', slot: s.code === 'F49A' ? 'F49A' : 'F78' });
+        return setSheet({ kind: 'values', form: s.code === 'HX-HO-12' ? 'plan' : 'summary' });
       case 'outstanding':
         return setSheet({ kind: 'outstanding' });
       case 'library':
@@ -194,19 +205,19 @@ export function HandoverTab({
     // A helper that does what the item's fix button does is left out while that button shows.
     const shownFix = s.fix && s.state !== 'complete' ? s.fix : null;
     const helpers: { label: string; run: () => void; fix?: Fix }[] = [];
-    if (s.code === 'CC17') helpers.push({ label: 'Copy for MID', run: () => setSheet({ kind: 'mid' }), fix: 'mid' });
-    if (s.code === 'CC14') helpers.push({ label: 'Notify building control', run: () => setSheet({ kind: 'bc' }), fix: 'notify-bc' });
-    if ((s.code === 'CC10' || s.code === 'CC15') && v.designDocs.length && s.state !== 'complete')
+    if (s.code === 'HX-HO-03') helpers.push({ label: 'Copy for MID', run: () => setSheet({ kind: 'mid' }), fix: 'mid' });
+    if (s.code === 'HX-HO-05') helpers.push({ label: 'Notify building control', run: () => setSheet({ kind: 'bc' }), fix: 'notify-bc' });
+    if ((s.code === 'HX-HO-13' || s.code === 'HX-HO-14') && v.designDocs.length && s.state !== 'complete')
       for (const d of v.designDocs) helpers.push({ label: `Use “${d.name}”`, run: () => void post({ action: 'move', doc: d.id, slot: s.code }, `“${d.name}” is now in the pack.`) });
-    if (s.code === 'F16E') helpers.push({ label: 'Still to put right', run: () => setSheet({ kind: 'outstanding' }), fix: 'outstanding' });
-    if (s.code === 'F78') {
-      if (!v.f78Design) helpers.push({ label: 'Sign the design part', run: () => setSheet({ kind: 'sign' }), fix: 'sign-design' });
-      helpers.push({ label: 'F78 details', run: () => setSheet({ kind: 'values', slot: 'F78' }), fix: 'values' });
+    if (s.code === 'HX-HO-08') helpers.push({ label: 'Still to put right', run: () => setSheet({ kind: 'outstanding' }), fix: 'outstanding' });
+    if (s.code === 'HX-HO-02') {
+      if (!v.summaryDesign) helpers.push({ label: 'Sign the design part', run: () => setSheet({ kind: 'sign' }), fix: 'sign-design' });
+      helpers.push({ label: 'Summary details', run: () => setSheet({ kind: 'values', form: 'summary' }), fix: 'values' });
     }
-    if (s.code === 'CC4') helpers.push({ label: 'Where the switches are', run: () => setSheet({ kind: 'values', slot: 'CC4' }), fix: 'switches' });
-    if (s.code === 'F49A' && s.state !== 'na') helpers.push({ label: 'The plan as agreed', run: () => setSheet({ kind: 'values', slot: 'F49A' }), fix: 'values' });
-    if (s.code === 'F47' && s.state !== 'na') helpers.push({ label: 'Isolation switch location', run: () => setSheet({ kind: 'values', slot: 'F47' }) });
-    if (s.code === 'CC13') helpers.push({ label: 'Final invoice and payments', run: () => setSheet({ kind: 'invoice' }), fix: 'invoice' });
+    if (s.code === 'HX-HO-09') helpers.push({ label: 'Where the switches are', run: () => setSheet({ kind: 'values', form: 'switches' }), fix: 'switches' });
+    if (s.code === 'HX-HO-12' && s.state !== 'na') helpers.push({ label: 'The plan as agreed', run: () => setSheet({ kind: 'values', form: 'plan' }), fix: 'values' });
+    if (s.code === 'HX-HO-15' && s.state !== 'na') helpers.push({ label: 'Isolation switch location', run: () => setSheet({ kind: 'values', form: 'g98' }) });
+    if (s.code === 'HX-HO-18') helpers.push({ label: 'Final invoice and payments', run: () => setSheet({ kind: 'invoice' }), fix: 'invoice' });
     const regen = s.maker === 'pack' && s.kind !== 'C' && s.docs.some((d) => d.source === 'generated');
     return (
       <div className={inSheet ? 'hv-acts hv-acts--sheet' : 'hv-acts'}>
@@ -230,7 +241,7 @@ export function HandoverTab({
                   Replace
                 </button>
               )}
-              {s.code === 'F76' && (
+              {s.code === 'HX-HO-16' && (
                 <select className="crm-chipbtn" value={d.part ?? ''} onChange={(e) => void post({ action: 'part', doc: d.id, part: e.target.value })} aria-label="Which G99 paper">
                   <option value="">Which paper?</option>
                   <option value="application">Application</option>
@@ -272,7 +283,7 @@ export function HandoverTab({
               {h.label}
             </button>
           ))}
-          {s.code !== 'CCMH' &&
+          {s.code !== 'HX-HO-19' &&
             (s.office ? (
               <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => void post({ action: 'restore', slot: s.code })}>
                 Needed after all
@@ -431,7 +442,7 @@ export function HandoverTab({
           </p>
           <div className="hv-acts__row">
             {!v.invoice.uploaded && (
-              <button type="button" className="crm-btn crm-btn--solar crm-btn--small" onClick={() => setSheet({ kind: 'upload', slot: 'CC13' })}>
+              <button type="button" className="crm-btn crm-btn--solar crm-btn--small" onClick={() => setSheet({ kind: 'upload', slot: 'HX-HO-18' })}>
                 Upload the final invoice
               </button>
             )}
@@ -509,26 +520,19 @@ export function HandoverTab({
         />
       )}
       {sheet?.kind === 'na' && <NotNeededSheet projectId={projectId} slot={sheet.code} reasons={rowOf(sheet.code).reasons} onClose={() => setSheet(null)} onDone={(x) => done(x, 'Marked not needed.')} />}
-      {sheet?.kind === 'sign' && <SignDesignSheet projectId={projectId} me={me} onClose={() => setSheet(null)} onDone={(x) => done(x, 'Design part signed.')} />}
+      {sheet?.kind === 'sign' && <SignDesignSheet projectId={projectId} me={me} declaration={v.summaryDeclaration} onClose={() => setSheet(null)} onDone={(x) => done(x, 'Design part signed.')} />}
       {sheet?.kind === 'values' && (
         <ValuesSheet
           projectId={projectId}
-          slot={sheet.slot}
-          title={{ F49A: 'The maintenance plan, as agreed', CC4: 'Where the switches are', F78: 'F78 details', F47: 'G98: where the isolation switch is' }[sheet.slot]}
-          intro={
-            {
-              F49A: 'Type each exactly as it was quoted. It prints with your agreement wording.',
-              CC4: 'For the “How to switch your system off” page. From what the electrician told you, or their photos.',
-              F78: 'Only what the job doesn’t already say. Empty boxes use the job’s own details.',
-              F47: 'Where the lockable isolation switch is, as Form B asks.',
-            }[sheet.slot]
-          }
-          fields={sheet.slot === 'F49A' ? v.forms.F49A : sheet.slot === 'CC4' ? v.forms.CC4 : sheet.slot === 'F78' ? v.forms.F78 : v.forms.F47}
+          slot={FORM_SLOT[sheet.form]}
+          title={FORM_TITLE[sheet.form]}
+          intro={FORM_INTRO[sheet.form]}
+          fields={v.forms[sheet.form]}
           onClose={() => setSheet(null)}
           onDone={(x) => done(x, 'Saved.')}
         />
       )}
-      {sheet?.kind === 'outstanding' && <OutstandingSheet projectId={projectId} items={v.forms.F16E} flags={v.flags} onClose={() => setSheet(null)} onDone={(x) => done(x, 'Saved.')} />}
+      {sheet?.kind === 'outstanding' && <OutstandingSheet projectId={projectId} items={v.forms.outstanding} flags={v.flags} onClose={() => setSheet(null)} onDone={(x) => done(x, 'Saved.')} />}
       {sheet?.kind === 'mid' && (
         <CopySheet
           title="Copy for the MCS database"
@@ -543,7 +547,7 @@ export function HandoverTab({
           intro="The values the scheme’s form asks for. When it’s done, save the date and reference: the to-do closes and the certificate shows as on its way."
           fields={v.copy.bc}
           download={(() => {
-            const d = rowOf('CC21').docs[0];
+            const d = rowOf('HX-HO-04').docs[0];
             return d ? { href: `/api/crm/documents/${d.id}`, label: 'Download the electrical certificate' } : null;
           })()}
           record={{
@@ -565,7 +569,7 @@ export function HandoverTab({
           view={v}
           isAdmin={isAdmin}
           today={today}
-          onUpload={() => setSheet({ kind: 'upload', slot: 'CC13' })}
+          onUpload={() => setSheet({ kind: 'upload', slot: 'HX-HO-18' })}
           onClose={() => setSheet(null)}
           onDone={(x) => done(x, 'Payment recorded.')}
         />

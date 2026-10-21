@@ -6,13 +6,13 @@ import { logJob, logSiteEvent } from '@/lib/site/server';
 
 export const dynamic = 'force-dynamic';
 
-const KINDS: CustomerSignKind[] = ['f16e', 'g98'];
+const KINDS: CustomerSignKind[] = ['completion', 'g98'];
 /** A phone's clock more than this far out is replaced by the server's (as at sign-off). */
 const CLOCK_SLACK_MS = 72 * 3_600_000;
 
 /**
  * The customer's signature taken on the electrician's phone after their sign-off (P15, D15): one per
- * document, the completion record (F16E) and on G98 jobs Form B, never the same image twice. Kept
+ * document, the completion sign-off (HX-HO-08) and on G98 jobs Form B, never the same image twice. Kept
  * with the electrician's sign-off (site_signoffs.extra.customer), the image in crm-docs beside theirs.
  * A retry returns what's there. Before the sign-off has reached the server: try again later.
  */

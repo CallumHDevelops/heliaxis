@@ -4,10 +4,11 @@ import { ukDay } from '@/lib/bank-holidays';
 import { CRM_BUCKET, DOCS_BUCKET } from '@/lib/crm/server';
 import { A4, docFileName, stampWords } from '@/lib/documents/pdf-kit';
 import type { ElectricianDocInput } from '@/lib/documents/site/common';
-import { F43_TITLE, makeF43 } from '@/lib/documents/site/f43';
-import { F44_TITLE, makeF44, makeF44A } from '@/lib/documents/site/f44';
-import { F74_TITLE, F75_TITLE, makeF74, makeF75 } from '@/lib/documents/site/f74';
+import { BAT_INSPECT_TITLE, BAT_TESTS_TITLE, makeBatteryInspection, makeBatteryTests } from '@/lib/documents/site/battery';
 import { makePhotoRecord, type RecordDeclaration, type RecordSlot } from '@/lib/documents/site/photo-record';
+import { PV_INSPECT_TITLE, makePvInspect } from '@/lib/documents/site/pv-inspect';
+import { PV_SWITCHON_TITLE, makePvSwitchOn } from '@/lib/documents/site/pv-switch-on';
+import { PV_TEST_TITLE, makePvTests } from '@/lib/documents/site/pv-tests';
 import { makeEvRecord, makeHpRecord } from '@/lib/documents/site/records';
 import { saveGenerated, type SaveResult } from '@/lib/documents/store';
 import { tradeFiles } from './electrician';
@@ -15,7 +16,6 @@ import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
 import { routeOf as certRouteOf } from './forms/electrician/cert';
 import { EV_TITLE } from './forms/electrician/ev';
-import { F44A_TITLE } from './forms/electrician/f44a';
 import { HP_TITLE } from './forms/electrician/heatpump';
 import { SCAN_KEYS } from './forms/electrician/serials';
 import { captures } from './forms/electrician/shared';
@@ -25,17 +25,18 @@ import { readAssignment, type AssignmentRow, type Db } from './server';
 
 /**
  * The electrician's paperwork (SPEC 2.13 item 6, 2.14), made after the sign-off's reply and stored
- * against the job with saveGenerated: F43, F44, F44A (solar), F74 and F75 (battery), the EV and heat
- * pump records, each in its handover pack item, held back until the pack goes (release with_pack).
- * A certificate uploaded as photos of its pages becomes one PDF in CC21. The photo record is made
+ * against the job with saveGenerated: HX-PV-01 to HX-PV-03 (solar), HX-BAT-01 and HX-BAT-02
+ * (battery), the EV and heat pump records (HX-EV-01, HX-HP-01), each in its handover pack item, held
+ * back until the pack goes (release with_pack). File names carry the title, not the code. A
+ * certificate uploaded as photos of its pages becomes one PDF in HX-HO-04. The photo record is made
  * only when the office asks. Each is a new version only when what it's made from changed.
  */
 
 type DocDef = {
+  /** The generated document's key, its code (HX-PV-01…). */
   key: string;
-  label: string;
   title: string;
-  /** The handover pack item (Unit 4's catalogue): F43… or CCMH for the records. */
+  /** The handover pack item (handover/slots.ts): its own code, or HX-HO-19 for the EV and heat pump records. */
   slot: string;
   section: string;
   products: string[];
@@ -43,13 +44,13 @@ type DocDef = {
 };
 
 export const ELECTRICIAN_DOCS: DocDef[] = [
-  { key: 'F43', label: 'F43', title: F43_TITLE, slot: 'F43', section: 'f43', products: ['solar'], make: makeF43 },
-  { key: 'F44', label: 'F44', title: F44_TITLE, slot: 'F44', section: 'f44', products: ['solar'], make: makeF44 },
-  { key: 'F44A', label: 'F44A', title: F44A_TITLE, slot: 'F44A', section: 'f44a', products: ['solar'], make: makeF44A },
-  { key: 'F74', label: 'F74', title: F74_TITLE, slot: 'F74', section: 'f74', products: ['battery'], make: makeF74 },
-  { key: 'F75', label: 'F75', title: F75_TITLE, slot: 'F75', section: 'f74', products: ['battery'], make: makeF75 },
-  { key: 'EV_REC', label: '', title: EV_TITLE, slot: 'CCMH', section: 'ev', products: ['ev'], make: makeEvRecord },
-  { key: 'HP_REC', label: '', title: HP_TITLE, slot: 'CCMH', section: 'heatpump', products: ['heatpump'], make: makeHpRecord },
+  { key: 'HX-PV-01', title: PV_INSPECT_TITLE, slot: 'HX-PV-01', section: 'pvinspect', products: ['solar'], make: makePvInspect },
+  { key: 'HX-PV-02', title: PV_TEST_TITLE, slot: 'HX-PV-02', section: 'pvtests', products: ['solar'], make: makePvTests },
+  { key: 'HX-PV-03', title: PV_SWITCHON_TITLE, slot: 'HX-PV-03', section: 'pvswitchon', products: ['solar'], make: makePvSwitchOn },
+  { key: 'HX-BAT-01', title: BAT_INSPECT_TITLE, slot: 'HX-BAT-01', section: 'battery', products: ['battery'], make: makeBatteryInspection },
+  { key: 'HX-BAT-02', title: BAT_TESTS_TITLE, slot: 'HX-BAT-02', section: 'battery', products: ['battery'], make: makeBatteryTests },
+  { key: 'HX-EV-01', title: EV_TITLE, slot: 'HX-HO-19', section: 'ev', products: ['ev'], make: makeEvRecord },
+  { key: 'HX-HP-01', title: HP_TITLE, slot: 'HX-HO-19', section: 'heatpump', products: ['heatpump'], make: makeHpRecord },
 ];
 /** Every generated document key an electrician's sign-off can make (the review drawer lists them). */
 export const ELECTRICIAN_DOC_KEYS = [...ELECTRICIAN_DOCS.map((d) => d.key), 'CERT_OWN', 'EP_RECORD'];
@@ -69,9 +70,10 @@ export async function electricianInput(db: Db, a: AssignmentRow, opts: { draft?:
   if (!p) return null;
   if (!so && !opts.draft) return null;
   const project = p as Record<string, unknown>;
+  const paper = (project.paperwork ?? {}) as Record<string, unknown>;
   const { data: cust } = await db.from('enquiries').select('name').eq('id', String(project.enquiry_id ?? '')).maybeSingle();
   const ctx = await serverCtx(db, a);
-  const signoff = so as { id: string; signed_name: string; signed_at: string; signature_path: string } | null;
+  const signoff = so as { id: string; signed_name: string; signed_at: string; signature_path: string; declaration?: string | null } | null;
   const person = contact as { name?: string; company?: string | null } | null;
   const address = [...String(project.address ?? '').split(/\n/).map((l) => l.trim()).filter(Boolean), String(project.postcode ?? '').trim()].filter(Boolean);
   const signedAt = signoff?.signed_at ?? new Date().toISOString();
@@ -86,9 +88,11 @@ export async function electricianInput(db: Db, a: AssignmentRow, opts: { draft?:
     signature: signoff ? await download(db, DOCS_BUCKET, signoff.signature_path) : null,
     ctx,
     draft: opts.draft || !signoff,
+    declaration: signoff?.declaration ?? null,
+    buildingRef: typeof paper.building_regs_ref === 'string' && paper.building_regs_ref.trim() ? paper.building_regs_ref.trim() : null,
   };
   // The hash: what the documents print from (not the signature image's bytes, which never change).
-  const inputs = { values: ctx.values, design: ctx.design, system: ctx.system, products: ctx.products, el: ctx.el ?? null, jobRef: input.jobRef, address, customer: input.customer, engineer: input.engineer, company: input.company, date: input.date, signoff: signoff?.id ?? null };
+  const inputs = { values: ctx.values, design: ctx.design, system: ctx.system, products: ctx.products, el: ctx.el ?? null, jobRef: input.jobRef, address, customer: input.customer, engineer: input.engineer, company: input.company, date: input.date, signoff: signoff?.id ?? null, buildingRef: input.buildingRef };
   return { input, inputs, signoffId: signoff?.id ?? null };
 }
 
@@ -123,7 +127,7 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
     out.push(
       await saveGenerated(db, a.project_id, {
         key: d.key,
-        name: docFileName(input.jobRef, d.label, d.title),
+        name: docFileName(input.jobRef, '', d.title),
         bytes,
         inputs: { doc: d.key, ...inputs },
         category: 'commissioning',
@@ -153,7 +157,7 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
           bytes: await pagesPdf(images, title),
           inputs: { photos: photos.map((x) => x.id), no },
           category: 'certificate',
-          slot: 'CC21',
+          slot: 'HX-HO-04',
           release: 'with_pack',
           visible: false,
         })

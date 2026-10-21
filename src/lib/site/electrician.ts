@@ -47,8 +47,11 @@ export async function tradeFiles(db: Db, a: Pick<AssignmentRow, 'id' | 'project_
 /** The customer's signatures taken after the electrician's sign-off (site_signoffs.extra.customer). */
 export async function customerSigns(db: Db, assignmentId: string): Promise<Partial<Record<CustomerSignKind, CustomerSigned & { path: string }>>> {
   const { data } = await db.from('site_signoffs').select('extra').eq('assignment_id', assignmentId).eq('stage', 'main').maybeSingle();
-  const c = ((data?.extra as Record<string, unknown> | null)?.customer ?? {}) as Partial<Record<CustomerSignKind, CustomerSigned & { path: string }>>;
-  return c && typeof c === 'object' ? c : {};
+  const c = ((data?.extra as Record<string, unknown> | null)?.customer ?? {}) as Partial<Record<CustomerSignKind | 'f16e', CustomerSigned & { path: string }>>;
+  if (!c || typeof c !== 'object') return {};
+  // A preview job's completion signature, kept under its old kind.
+  const { f16e, ...rest } = c;
+  return { ...(f16e && !rest.completion ? { completion: f16e } : {}), ...rest };
 }
 
 export async function electricianPack(db: Db, a: AssignmentRow, project: Record<string, unknown>, survey: Record<string, unknown> | null, opts: { links?: boolean } = {}): Promise<ElectricianPack> {

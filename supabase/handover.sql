@@ -8,10 +8,12 @@ do $$ begin
   end if;
 end $$;
 
--- Per job: an item marked Not needed (with why), or a note, and the office's data for it: the
--- customer's signature from their portal (F16E, F47), the F78 design signature, values typed exactly
--- as agreed (F49A, CC4's switch locations), what's still to put right (F16E), which G99 paper each
--- upload is (F76), and the store's Out of date mark (src/lib/handover/inputs.ts SlotData).
+-- Per job: an item marked Not needed (with why), or a note, and the office's data for it, keyed by
+-- the item's code (HX-HO-02 …, src/lib/handover/slots.ts): the customer's signature from their portal
+-- (HX-HO-08, HX-HO-15), the system summary's design signature (HX-HO-02), values typed exactly as
+-- agreed (the maintenance plan HX-HO-12, the switch locations HX-HO-09), what's still to put right
+-- (HX-HO-08), which G99 paper each upload is (HX-HO-16), and the store's Out of date mark
+-- (src/lib/handover/inputs.ts SlotData).
 create table if not exists public.handover_slots (
   project_id uuid not null references public.crm_projects(id) on delete cascade,
   slot       text not null,

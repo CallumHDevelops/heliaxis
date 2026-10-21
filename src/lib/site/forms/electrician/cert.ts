@@ -5,13 +5,13 @@
  *   first screen asks which certificate (the office's choice offered), so its screens come first and
  *   say for themselves which routes they show on.
  * - 'own' (here): they upload the certificate from their scheme's software (NAPIT, NICEIC…) with its
- *   number; it's filed for the handover pack (CC21) and the other forms read its number.
+ *   number; it's filed for the handover pack (HX-HO-04, the electrical certificate) and the other forms read its number.
  *
  * A route nothing has registered (an unknown value on an old assignment) shows the waiting step: the
  * certificate stays a required item, and the gate (EF0, and the server's at sign-off) can't pass.
  *
- * certDone() is "the certificate is complete" for F44 item 38 and the Finish list; certRef() is its
- * reference for F74 Part 2 and the heat pump record. Type-only imports, plus the rules and the EIC's form.
+ * certDone() is "the certificate is complete" for the PV inspection's certificate row and the Finish
+ * list; certRef() is its reference for the battery inspection's BS 7671 tests and the heat pump record. Type-only imports, plus the rules and the EIC's form.
  */
 import type { FlagRule, FormCtx, Step } from '../types';
 import { certComplete, EIC_FLAGS, EIC_STEPS, eicSummary } from './eic';
@@ -122,7 +122,7 @@ export function certFlags(): FlagRule[] {
   return defs().flatMap(({ def, routes }) => (def.flags ?? []).map((f) => (def.ownShow ? f : { ...f, when: (c: FormCtx) => routes.includes(routeOf(c)) && f.when(c) })));
 }
 
-/** Is the certificate complete (F44 item 38, the Finish list)? Steps hidden on its route don't count. */
+/** Is the certificate complete (the PV inspection's certificate row, the Finish list)? Steps hidden on its route don't count. */
 export function certDone(c: FormCtx): boolean {
   const def = ROUTES.get(routeOf(c));
   if (!def) return false;

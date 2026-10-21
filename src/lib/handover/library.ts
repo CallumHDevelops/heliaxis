@@ -13,7 +13,8 @@ import type { LibraryItem, LibraryKind, ModelDetails } from './inputs';
  */
 
 const KINDS: LibraryKind[] = ['datasheet', 'manual', 'warranty', 'procedure', 'guide'];
-const SLOTS = ['CC4', 'CC5', 'CCMH'];
+/** The pack items a library file can go in: switching off (HX-HO-09), product manuals (HX-HO-17), other documents (HX-HO-19). */
+export const LIBRARY_SLOTS = ['HX-HO-09', 'HX-HO-17', 'HX-HO-19'];
 const TECH = ['solar', 'battery', 'ev', 'heatpump'];
 const text = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
@@ -21,7 +22,7 @@ const text = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').t
 export function libraryFields(b: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if ('kind' in b) out.kind = KINDS.includes(b.kind as LibraryKind) ? b.kind : null;
-  if ('handover_slot' in b) out.handover_slot = SLOTS.includes(String(b.handover_slot)) ? String(b.handover_slot) : null;
+  if ('handover_slot' in b) out.handover_slot = LIBRARY_SLOTS.includes(String(b.handover_slot)) ? String(b.handover_slot) : null;
   if ('technologies' in b) out.technologies = (Array.isArray(b.technologies) ? b.technologies : []).map(String).filter((t) => TECH.includes(t));
   if ('models' in b) {
     const list = Array.isArray(b.models) ? b.models : String(b.models ?? '').split(/\n|;/);
@@ -37,7 +38,7 @@ export function libraryFields(b: Record<string, unknown>): Record<string, unknow
       const source = text((d.interval as Record<string, unknown> | undefined)?.source, 160);
       details[m] = {
         ...(text(d.ena_id, 60) ? { ena_id: text(d.ena_id, 60) } : {}),
-        // An interval prints on F49 with where it came from, so both are needed.
+        // An interval prints on the maintenance schedule with where it came from, so both are needed.
         ...(every && source ? { interval: { every, source } } : {}),
         ...(Array.isArray(d.aliases) ? { aliases: d.aliases.map((a) => text(a, 120)).filter(Boolean).slice(0, 10) } : {}),
       };

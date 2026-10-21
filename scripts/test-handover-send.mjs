@@ -249,11 +249,11 @@ db.t.cms_kv = [
 ];
 const contact = { id: randomUUID(), name: 'Dave Price', company: 'Price Electrical', part_p_by: 'heliaxis' };
 db.rows('site_contacts').push(contact);
-const ea = { id: randomUUID(), project_id: pid, contact_id: contact.id, trade: 'electrician', status: 'done', created_at: '2026-11-01T00:00:00Z', flags: [], answers: { f78_kind: { v: 'initial' }, eess_backup: { v: 'yes' }, CERT_NO: { v: 'HX-0042-EIC' }, f43_iso_loc: { v: ['Built into the inverter'] } } };
+const ea = { id: randomUUID(), project_id: pid, contact_id: contact.id, trade: 'electrician', status: 'done', created_at: '2026-11-01T00:00:00Z', flags: [], answers: { hos_kind: { v: 'initial' }, eess_backup: { v: 'yes' }, CERT_NO: { v: 'HX-0042-EIC' }, pvt_iso_where: { v: ['Built into the inverter'] } } };
 db.rows('site_assignments').push(ea);
 db.files.set('crm-docs/signatures/p/site-s1.png', SIG);
 db.files.set('crm-docs/signatures/p/cust.png', SIG);
-db.rows('site_signoffs').push({ id: 's1', assignment_id: ea.id, stage: 'main', signed_name: 'Dave Price', signed_at: '2026-11-03T17:41:00Z', signature_path: 'signatures/p/site-s1.png', extra: { customer: { f16e: { name: 'Jane Smith', signed_at: '2026-11-03T17:50:00Z', path: 'signatures/p/cust.png' } } } });
+db.rows('site_signoffs').push({ id: 's1', assignment_id: ea.id, stage: 'main', signed_name: 'Dave Price', signed_at: '2026-11-03T17:41:00Z', signature_path: 'signatures/p/site-s1.png', extra: { customer: { completion: { name: 'Jane Smith', signed_at: '2026-11-03T17:50:00Z', path: 'signatures/p/cust.png' } } } });
 // Unit 2 and 3's documents, as they arrive through the registry (held until the pack goes).
 async function simplePdf(title) {
   const k = await K.newDocument({ code: 'X', title, jobRef: 'HX-0042', issued: '2026-11-03' });
@@ -261,24 +261,24 @@ async function simplePdf(title) {
   return k.save();
 }
 for (const [slot, key, title] of [
-  ['F43', 'F43', 'PV Array Test Report'],
-  ['F44', 'F44', 'Solar PV Installation Checklist'],
-  ['F44A', 'F44A', 'Solar PV Commissioning Checklist'],
-  ['F74', 'F74', 'Battery Testing Checklist'],
-  ['F75', 'F75', 'Battery Commissioning Checklist'],
-  ['CC21', 'EIC', 'Electrical Installation Certificate'],
+  ['HX-PV-02', 'HX-PV-02', 'Solar PV string test results'],
+  ['HX-PV-01', 'HX-PV-01', 'Solar PV inspection record'],
+  ['HX-PV-03', 'HX-PV-03', 'Solar PV switch-on record'],
+  ['HX-BAT-01', 'HX-BAT-01', 'Battery inspection record'],
+  ['HX-BAT-02', 'HX-BAT-02', 'Battery switch-on and test record'],
+  ['HX-HO-04', 'EIC', 'Electrical Installation Certificate'],
 ]) {
   const path = `projects/${pid}/generated/${key}-v1.pdf`;
   db.files.set(`crm-docs/${path}`, await simplePdf(title));
-  db.rows('crm_documents').push({ id: randomUUID(), project_id: pid, category: 'commissioning', name: `HX-0042 ${key} ${title}.pdf`, storage_path: path, mime: 'application/pdf', size: 1, visible: false, created_at: '2026-11-03T17:45:00Z', handover_slot: slot, release: 'with_pack', source: 'generated', generated_key: key, version: 1, inputs_hash: 'u2', archived_at: null });
+  db.rows('crm_documents').push({ id: randomUUID(), project_id: pid, category: 'commissioning', name: `HX-0042 ${title}.pdf`, storage_path: path, mime: 'application/pdf', size: 1, visible: false, created_at: '2026-11-03T17:45:00Z', handover_slot: slot, release: 'with_pack', source: 'generated', generated_key: key, version: 1, inputs_hash: 'u2', archived_at: null });
 }
-// The product library: a 30 MB battery manual, and a switch the CC4 page needs (typed by the office).
+// The product library: a 30 MB battery manual, and a switch the switching-off page needs (typed by the office).
 const bigDoc = await PDFDocument.create();
 bigDoc.addPage(K.A4).drawText('Battery manual', { x: 60, y: 760, size: 14 });
 bigDoc.context.register(bigDoc.context.stream(new Uint8Array(30 * 1024 * 1024).fill(7), {}));
 db.files.set('crm-docs/library/manual.pdf', await bigDoc.save({ useObjectStreams: false }));
-db.rows('crm_library').push({ id: randomUUID(), name: 'GivEnergy battery manual', kind: 'manual', models: ['GivEnergy 9.5 kWh'], handover_slot: 'CC5', technologies: ['battery'], every_pack: false, details: {}, storage_path: 'library/manual.pdf', compact_path: null, mime: 'application/pdf', size: 31457280, archived_at: null });
-db.rows('handover_slots').push({ project_id: pid, slot: 'CC4', na: false, data: { values: { cu: 'Under the stairs, labelled Solar PV', ac: 'Loft, next to the inverter', battery: 'Side of the battery' } } });
+db.rows('crm_library').push({ id: randomUUID(), name: 'GivEnergy battery manual', kind: 'manual', models: ['GivEnergy 9.5 kWh'], handover_slot: 'HX-HO-17', technologies: ['battery'], every_pack: false, details: {}, storage_path: 'library/manual.pdf', compact_path: null, mime: 'application/pdf', size: 31457280, archived_at: null });
+db.rows('handover_slots').push({ project_id: pid, slot: 'HX-HO-09', na: false, data: { values: { cu: 'Under the stairs, labelled Solar PV', ac: 'Loft, next to the inverter', battery: 'Side of the battery' } } });
 
 const post = async (body) => {
   const res = await route.POST(new Request('http://x', { method: 'POST', body: JSON.stringify(body) }), { params: Promise.resolve({ id: pid }) });
@@ -289,16 +289,18 @@ const cur = (key) => docs().find((d) => d.generated_key === key && !d.archived_a
 
 /* ── 1. The pack's own documents, made as their data lands ─────────────────── */
 const r1 = await H.refreshHandover(db, pid, { by: 'staff-1' });
-eq('made from the job: F19I, F16E, CC4, F49, F47, the receipt, the cover letter', r1.made.sort(), ['CC13_RECEIPT', 'CC4', 'F07BI', 'F16E', 'F19I', 'F47', 'F49'].sort());
-eq('F78 not made yet', !!cur('F78'), false);
-eq('F78 not made until the design part is signed (Missing: sign the design part)', (await H.handoverView(db, pid)).slots.find((s) => s.code === 'F78').fix, 'sign-design');
-eq('the manual attached from the library into CC5', docs().filter((d) => d.source === 'library').map((d) => d.handover_slot), ['CC5']);
+eq('made from the job: the warranty, completion, switching off, schedule, the G98 data sheet, the receipt, the covering letter', r1.made.sort(), ['HX-HO-18-RECEIPT', 'HX-HO-09', 'HX-HO-01', 'HX-HO-08', 'HX-HO-06', 'HX-HO-15-SHEET', 'HX-HO-11'].sort());
+eq('the G98 data sheet is an office helper: in no pack item', cur('HX-HO-15-SHEET')?.handover_slot ?? null, null);
+eq('file names carry the title, not the code', [cur('HX-HO-06').name, cur('HX-HO-08').name], ['HX-0042 Heliaxis workmanship warranty.pdf', 'HX-0042 Completion sign-off.pdf']);
+eq('system summary not made yet', !!cur('HX-HO-02'), false);
+eq('system summary not made until the design part is signed (Missing: sign the design part)', (await H.handoverView(db, pid)).slots.find((s) => s.code === 'HX-HO-02').fix, 'sign-design');
+eq('the manual attached from the library into Product manuals and warranties', docs().filter((d) => d.source === 'library').map((d) => d.handover_slot), ['HX-HO-17']);
 eq('all held until the pack goes (with_pack, not visible)', docs().filter((d) => d.source === 'generated' && d.handover_slot).every((d) => d.release === 'with_pack' && !d.visible), true);
 const r1b = await H.refreshHandover(db, pid, { by: 'staff-1' });
 eq('nothing new the second time (same inputs)', r1b.made, []);
-// The office signs the design part: F78 follows.
-const signed = await post({ action: 'sign-f78-design', name: 'Callum Hughes', signature: `data:image/png;base64,${Buffer.from(SIG).toString('base64')}` });
-eq('design signed → F78 made', [signed.status, !!cur('F78'), signed.body.slots.find((s) => s.code === 'F78').state], [200, true, 'complete']);
+// The office signs the design part: the system summary follows.
+const signed = await post({ action: 'sign-summary-design', name: 'Callum Hughes', signature: `data:image/png;base64,${Buffer.from(SIG).toString('base64')}` });
+eq('design signed → system summary made', [signed.status, !!cur('HX-HO-02'), signed.body.slots.find((s) => s.code === 'HX-HO-02').state], [200, true, 'complete']);
 
 /* ── 2. Upload straight into the customer's portal (owner's ask [8]) ───────── */
 const upload = async (name, bytes, extra) => {
@@ -312,17 +314,17 @@ const upload = async (name, bytes, extra) => {
 const signedDoc = await PDFDocument.create();
 signedDoc.addPage(K.A4).drawText('MCS certificate', { x: 60, y: 760, size: 14 });
 signedDoc.context.register(signedDoc.context.obj({ Type: 'Sig', ByteRange: [0, 10, 20, 30], Contents: PDFName.of('X') }));
-const mcs = await upload('MCS certificate', await signedDoc.save(), { handover_slot: 'CC17', category: 'mcs' });
-eq('MCS certificate in the pack, in their portal at once, its number offered', [mcs.document.handover_slot, mcs.document.visible, mcs.document.release, mcs.read?.mcs_cert_no], ['CC17', true, 'now', 'MCS-00998877']);
+const mcs = await upload('MCS certificate', await signedDoc.save(), { handover_slot: 'HX-HO-03', category: 'mcs' });
+eq('MCS certificate in the pack, in their portal at once, its number offered', [mcs.document.handover_slot, mcs.document.visible, mcs.document.release, mcs.read?.mcs_cert_no], ['HX-HO-03', true, 'now', 'MCS-00998877']);
 let portal = await P.portalHandover(pid);
 const shownIds = portal.groups.flatMap((g) => g.items.flatMap((i) => i.docs.map((d) => d.id)));
 eq('the portal shows it straight away, and nothing that’s held', [shownIds.includes(mcs.document.id), shownIds.length], [true, 1]);
-const held = await upload('Guarantee', await simplePdf('Guarantee'), { handover_slot: 'CC16', hold: true });
+const held = await upload('Guarantee', await simplePdf('Guarantee'), { handover_slot: 'HX-HO-07', hold: true });
 portal = await P.portalHandover(pid);
 eq('"Hold it until the pack is sent": hidden', portal.groups.flatMap((g) => g.items.flatMap((i) => i.docs.map((d) => d.id))).includes(held.document.id), false);
 // A Docs-tab upload with a pack item (whatever its category) lands the same way.
-const viaDocs = await upload('Building control certificate', await simplePdf('BC'), { handover_slot: 'CC14', category: 'other', visible: true });
-eq('from the Docs tab, any category: in the pack and the portal', [viaDocs.document.handover_slot, viaDocs.document.visible], ['CC14', true]);
+const viaDocs = await upload('Building control certificate', await simplePdf('BC'), { handover_slot: 'HX-HO-05', category: 'other', visible: true });
+eq('from the Docs tab, any category: in the pack and the portal', [viaDocs.document.handover_slot, viaDocs.document.visible], ['HX-HO-05', true]);
 
 /* ── 3. Build ──────────────────────────────────────────────────────────────── */
 const b1 = await post({ action: 'build' });
@@ -330,9 +332,9 @@ const pack1 = cur('PACK');
 eq('one PDF, stored as the pack (v1, held until sent)', [b1.status, b1.body.built.version, pack1.storage_path, pack1.release, pack1.visible], [200, 1, `projects/${pid}/handover/pack-v1.pdf`, 'with_pack', false]);
 const packRow = db.rows('handover_packs').find((x) => x.project_id === pid);
 const sep = Object.fromEntries(packRow.contents.filter((c) => c.separate).map((c) => [c.slot, c.separate]));
-eq('the signed certificate and the 30 MB manual left as separate files', sep, { CC17: 'signed', CC5: 'size' });
+eq('the signed certificate and the 30 MB manual left as separate files', sep, { 'HX-HO-03': 'signed', 'HX-HO-17': 'size' });
 const packPdf = await PDFDocument.load(db.files.get(`crm-docs/${pack1.storage_path}`));
-const coverPages = (await PDFDocument.load(db.files.get(`crm-docs/${cur('F07BI').storage_path}`))).getPageCount();
+const coverPages = (await PDFDocument.load(db.files.get(`crm-docs/${cur('HX-HO-01').storage_path}`))).getPageCount();
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 const pageText = async (bytes, n) => (await (await (await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true }).promise).getPage(n)).getTextContent()).items.map((x) => x.str).join(' ');
 eq('the contents page straight after the cover letter', (await pageText(db.files.get(`crm-docs/${pack1.storage_path}`), coverPages + 1)).includes('Your handover pack'), true);
@@ -361,13 +363,13 @@ eq('the guarantee is in their portal now (released at Send)', portal.groups.flat
 
 /* ── 5. After sending, an upload rebuilds the pack ─────────────────────────── */
 const v = cur('PACK').version;
-await upload('Schematic', await simplePdf('Schematic'), { handover_slot: 'CC10' });
+await upload('Schematic', await simplePdf('Schematic'), { handover_slot: 'HX-HO-13' });
 eq('an upload after Send: the pack rebuilt by itself, released at once', [cur('PACK').version, cur('PACK').visible], [v + 1, true]);
 
 /* ── 6. Payments and the receipt ───────────────────────────────────────────── */
 const pay = await post({ action: 'record-payment', amount_pence: 900000, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042', kind: 'final' });
 eq('payment recorded, Final invoice paid ticked', [pay.status, globalThis.__rec.rpc.some(([n, k]) => n === 'crm_checklist_set' && k === 'x_paid')], [200, true]);
-const receipt = cur('CC13_RECEIPT');
+const receipt = cur('HX-HO-18-RECEIPT');
 const rText = await pageText(db.files.get(`crm-docs/${receipt.storage_path}`), 1);
 eq('the receipt lists exactly the recorded payments, nothing worked out', [rText.includes('£500.00'), rText.includes('£9,000.00'), /balance|total/i.test(rText)], [true, true, false]);
 eq('the receipt follows its data even after Send (v2, visible)', [receipt.version, receipt.visible], [2, true]);

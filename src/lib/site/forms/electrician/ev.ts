@@ -9,7 +9,6 @@ import type { Field, FlagRule, FormCtx, Step } from '../types';
 import { has, is, num, text, yn } from './shared';
 
 export const EV_TITLE = 'EV Charge Point Installation Record';
-export const EV_REVISION = 'Rev 1';
 
 export const EARTHING = [
   { key: 'tn_s', label: 'TN-S' },

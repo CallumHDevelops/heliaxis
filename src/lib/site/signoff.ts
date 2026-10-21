@@ -137,7 +137,7 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
   const phoneAt = typeof b.signed_at === 'string' ? Date.parse(b.signed_at) : NaN;
   const signedAt = Number.isFinite(phoneAt) && Math.abs(phoneAt - Date.now()) <= CLOCK_SLACK_MS ? new Date(phoneAt).toISOString() : new Date().toISOString();
   const shown = forms[0].sig.declaration?.(ctx) ?? '';
-  const declaration = typeof b.declaration === 'string' && b.declaration.trim() ? b.declaration.trim().slice(0, 2000) : shown;
+  const declaration = typeof b.declaration === 'string' && b.declaration.trim() ? b.declaration.trim().slice(0, 6000) : shown;
 
   await ensureDocsBucket();
   const path = `signatures/${a.project_id}/site-${id}.png`;

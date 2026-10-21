@@ -15,8 +15,11 @@ import type { SiteForm } from './types';
 /**
  * Bumped when fields are added. Stored on each assignment when it's made, and an assignment is
  * always shown with the forms of its own version (keys never change once used; new ones are added).
+ * Version 4: the electrician's records in Heliaxis's own words and keys (WORDING-SPEC 12); answers
+ * saved under the old keys are read through LEGACY_KEYS (forms/legacy.ts).
  */
-export const SITE_SCHEMA_VERSION = 3;
+export const SITE_SCHEMA_VERSION = 4;
+export { LEGACY_KEYS, withLegacy } from './legacy';
 
 /**
  * The forms for each trade, stage by stage (the scaffolder's erection, then the strike). The
@@ -37,21 +40,21 @@ export function schemaFor(a: { trade: Trade; forms?: string[] | null; schema_ver
 }
 
 /** The electrician's sections in the order they appear on the phone (SPEC 2.1). */
-export const ELECTRICIAN_FORMS = ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'pas63100', 'ev', 'heatpump', 'f78', 'cert', 'finish'] as const;
+export const ELECTRICIAN_FORMS = ['photos', 'serials', 'pvinspect', 'pvtests', 'pvswitchon', 'battery', 'pas63100', 'ev', 'heatpump', 'summary', 'cert', 'finish'] as const;
 export type ElectricianForm = (typeof ELECTRICIAN_FORMS)[number];
 export const isElectricianForm = (v: unknown): v is ElectricianForm => ELECTRICIAN_FORMS.includes(v as ElectricianForm);
 
 export const FORM_LABEL: Record<ElectricianForm, string> = {
   photos: 'Photos as you go',
   serials: 'Serials',
-  f43: 'PV tests (F43)',
-  f44: 'PV checklist (F44)',
-  f44a: 'PV commissioning (F44A)',
-  f74: 'Battery checks (F74/F75)',
+  pvinspect: 'PV inspection',
+  pvtests: 'String tests',
+  pvswitchon: 'Switch-on',
+  battery: 'Battery',
   pas63100: 'Battery location (PAS 63100)',
   ev: 'EV charger record',
   heatpump: 'Heat pump supply',
-  f78: 'Handover document data (F78)',
+  summary: 'System summary',
   cert: 'Certificate',
   finish: 'Finish',
 };
@@ -65,14 +68,14 @@ const has = (products: string[], ...keys: string[]) => products.some((p) => keys
 export function formsFor(products: string[], design: Pick<Design, 'pas63100'> | null = null): ElectricianForm[] {
   const out = new Set<ElectricianForm>(['photos']);
   if (has(products, 'solar', 'battery', 'ev', 'heatpump')) out.add('serials');
-  if (has(products, 'solar')) ['f43', 'f44', 'f44a'].forEach((f) => out.add(f as ElectricianForm));
+  if (has(products, 'solar')) ['pvinspect', 'pvtests', 'pvswitchon'].forEach((f) => out.add(f as ElectricianForm));
   if (has(products, 'battery')) {
-    out.add('f74');
+    out.add('battery');
     if (design?.pas63100) out.add('pas63100');
   }
   if (has(products, 'ev')) out.add('ev');
   if (has(products, 'heatpump')) out.add('heatpump');
-  if (has(products, 'solar', 'battery')) out.add('f78');
+  if (has(products, 'solar', 'battery')) out.add('summary');
   out.add('cert');
   out.add('finish');
   return ELECTRICIAN_FORMS.filter((f) => out.has(f));

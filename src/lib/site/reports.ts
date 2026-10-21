@@ -31,7 +31,7 @@ const WORD: Record<string, string> = { yes: 'Yes', no: 'No', na: 'N/A', pass: 'P
 export function answerWords(f: Field, v: unknown, c: FormCtx): string | null {
   if (f.type === 'CUSTOM') return f.words?.(c) ?? null;
   if (v === undefined || v === null || v === '') return null;
-  // One answer per PV string (the electrician's F43): "String 1: 395.2 V · String 2: …".
+  // One answer per PV string (the electrician's string tests): "String 1: 395.2 V · String 2: …".
   if (f.perString) {
     const list = perStringValues(f, c);
     const one = { ...f, perString: false };

@@ -195,7 +195,7 @@ function System({ pack }: { pack: SitePack }) {
   if (s.battery_model) rows.push(['Battery', s.battery_model]);
   if (pack.design.strings_design?.length) rows.push(['Strings', pack.design.strings_design.map((n, i) => `${i + 1}: ${n} panels`).join(' · ')]);
   if (pack.design.mounting) rows.push(['Mounting', { on_roof: 'On roof', in_roof: 'In roof', flat: 'Flat roof', ground: 'Ground' }[pack.design.mounting]]);
-  // An electrician's pack: what the roofer has given so far (it's offered on F43 with one tap).
+  // An electrician's pack: what the roofer has given so far (it's offered on the string tests with one tap).
   const r = pack.electrician?.facts.roofer;
   if (r) {
     const v = r.values;

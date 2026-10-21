@@ -16,7 +16,8 @@ registerHooks({
   },
 });
 const { cleanDesign, designInput, designOf, intListWords, parseIntList } = await import('../src/lib/site/design.ts');
-const { allForms, formsFor, formsMissing, rooferApplies, SITE_SCHEMA_VERSION, suggestedTrades } = await import('../src/lib/site/forms/index.ts');
+const { allForms, formsFor, formsMissing, LEGACY_KEYS, rooferApplies, SITE_SCHEMA_VERSION, suggestedTrades, withLegacy } = await import('../src/lib/site/forms/index.ts');
+const { legacySections } = await import('../src/lib/site/forms/legacy.ts');
 const KEYS = JSON.parse((await import('node:fs')).readFileSync(new URL('./site-form-keys.json', import.meta.url), 'utf8'));
 const { jobStrip } = await import('../src/lib/site/strip.ts');
 
@@ -59,10 +60,10 @@ eq('the box shows a list as typed', [designInput('strings_design', [8, 8]), desi
 
 /* ── Technologies → paperwork (SPEC 5.1) ──────────────────────────────────── */
 
-eq('solar only', formsFor(['solar']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f78', 'cert', 'finish']);
-eq('battery only: F74, no F43', formsFor(['battery']), ['photos', 'serials', 'f74', 'f78', 'cert', 'finish']);
-eq('battery with PAS 63100', formsFor(['battery'], { pas63100: true }), ['photos', 'serials', 'f74', 'pas63100', 'f78', 'cert', 'finish']);
-eq('solar + battery: both', formsFor(['solar', 'battery']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'f78', 'cert', 'finish']);
+eq('solar only: inspection, string tests, switch-on, summary', formsFor(['solar']), ['photos', 'serials', 'pvinspect', 'pvtests', 'pvswitchon', 'summary', 'cert', 'finish']);
+eq('battery only: the battery records, no string tests', formsFor(['battery']), ['photos', 'serials', 'battery', 'summary', 'cert', 'finish']);
+eq('battery with PAS 63100', formsFor(['battery'], { pas63100: true }), ['photos', 'serials', 'battery', 'pas63100', 'summary', 'cert', 'finish']);
+eq('solar + battery: both', formsFor(['solar', 'battery']), ['photos', 'serials', 'pvinspect', 'pvtests', 'pvswitchon', 'battery', 'summary', 'cert', 'finish']);
 eq('EV only: the EV record and the certificate', formsFor(['ev']), ['photos', 'serials', 'ev', 'cert', 'finish']);
 eq('heat pump only: the supply record and the certificate', formsFor(['heatpump']), ['photos', 'serials', 'heatpump', 'cert', 'finish']);
 eq('infrared / LED / other: certificate and common photos only', [formsFor(['infrared']), formsFor(['led']), formsFor(['other'])], [
@@ -70,8 +71,9 @@ eq('infrared / LED / other: certificate and common photos only', [formsFor(['inf
   ['photos', 'cert', 'finish'],
   ['photos', 'cert', 'finish'],
 ]);
-eq('order is always the phone’s order', formsFor(['heatpump', 'ev', 'battery', 'solar']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'ev', 'heatpump', 'f78', 'cert', 'finish']);
-eq('a battery added later: what’s missing', formsMissing(formsFor(['solar']), ['solar', 'battery']), ['f74']);
+eq('order is always the phone’s order (inspect, then test, then switch on)', formsFor(['heatpump', 'ev', 'battery', 'solar']), ['photos', 'serials', 'pvinspect', 'pvtests', 'pvswitchon', 'battery', 'ev', 'heatpump', 'summary', 'cert', 'finish']);
+eq('a battery added later: what’s missing', formsMissing(formsFor(['solar']), ['solar', 'battery']), ['battery']);
+eq('an assignment saved with the old section ids reads them as the new ones', legacySections(['photos', 'f43', 'f44', 'f44a', 'f74', 'pas63100', 'f78', 'cert']), ['photos', 'pvtests', 'pvinspect', 'pvswitchon', 'battery', 'pas63100', 'summary', 'cert']);
 eq('the roofer is for solar jobs', [rooferApplies(['solar']), rooferApplies(['battery']), rooferApplies(['solar', 'battery'])], [true, false, true]);
 eq('suggested trades: solar', suggestedTrades(['solar']), ['scaffolder', 'roofer', 'electrician']);
 eq('suggested trades: battery / EV / heat pump', [suggestedTrades(['battery']), suggestedTrades(['ev']), suggestedTrades(['heatpump'])], [['electrician'], ['electrician'], ['electrician']]);
@@ -108,7 +110,13 @@ eq('every key is used once, across every trade’s forms', twice, []);
 eq('keys are short and plain (they are stored on every answer)', keys.filter((k) => !/^[A-Za-z][A-Za-z0-9_]{0,30}$/.test(k)), []);
 // scripts/site-form-keys.json: the keys of each SITE_SCHEMA_VERSION as it shipped. A version's keys
 // can only grow; a new field means a new entry (and SITE_SCHEMA_VERSION bumped) once it has shipped.
+// `--write` records the current version's keys (never an older version's) before the checks run.
 const now = new Set(keys);
+if (process.argv.includes('--write')) {
+  KEYS[String(SITE_SCHEMA_VERSION)] = [...now].sort();
+  (await import('node:fs')).writeFileSync(new URL('./site-form-keys.json', import.meta.url), `${JSON.stringify(KEYS, null, 2)}\n`);
+  console.log(`wrote version ${SITE_SCHEMA_VERSION}: ${now.size} keys`);
+}
 for (const [v, list] of Object.entries(KEYS)) eq(`no key from version ${v} has gone`, list.filter((k) => !now.has(k)), []);
 eq(`version ${SITE_SCHEMA_VERSION} is in the snapshot, as it is now`, [...(KEYS[String(SITE_SCHEMA_VERSION)] ?? [])].sort(), [...now].sort());
 // Version 2 is the electrician's pack and certificate; version 3 adds the IET A4:2026 form's new blanks on the EIC, nothing else.
@@ -126,6 +134,36 @@ eq('version 3 adds only the EIC’s new questions to version 2', (KEYS['3'] ?? [
   'eic_sup_ka',
 ]);
 eq('the roofer’s panel serials are in no version (owner, 21 Oct: no scanning)', Object.entries(KEYS).filter(([, list]) => list.includes('SN_PANEL')).map(([v]) => v), []);
+// Version 4: the electrician's records in Heliaxis's own words and keys (WORDING-SPEC 12). The history
+// was rewritten through the key map (nothing had shipped), so no key named after another company's
+// form codes or row numbers is in any version.
+eq('no key numbered after the old forms in any version', Object.entries(KEYS).flatMap(([v, list]) => list.filter((k) => /^(f43|f44a?|f74|f78)_|^eess_[ta]_/.test(k)).map((k) => `${v}:${k}`)), []);
+eq('version 4 adds only the records’ new checks to version 3', (KEYS['4'] ?? []).filter((k) => !KEYS['3'].includes(k)).sort(), [
+  'hos_decl',
+  'pvi_frame_earthed',
+  'pvi_frame_earthedn',
+  'pvi_frame_earthedp',
+  'pvi_frame_func',
+  'pvi_frame_funcn',
+  'pvi_frame_funcp',
+  'pvi_watertight',
+  'pvi_watertightn',
+  'pvi_watertightp',
+]);
+eq('the key counts per record (WORDING-SPEC 12.2)', ['pvi_', 'pvt_', 'pvc_', 'hos_'].map((p) => keys.filter((k) => k.startsWith(p)).length), [129, 33, 25, 6]);
+eq('the battery records: 112 keys', keys.filter((k) => /^(bat_|bl_|eess_backup$)/.test(k) && k !== 'bat_inv_sep').length, 112);
+eq('every alias reads an old key into one that exists now', Object.keys(LEGACY_KEYS).filter((k) => !now.has(k)), []);
+
+/* ── Answers saved under the old keys (preview jobs) ──────────────────────── */
+
+const old = withLegacy({ f43_strings: 2, f44_13: 'problem', f44_13n: 'Rail loose', f44_20_kind: 'pitched', f44_t2: ['b'], f74_1_03: 'done', f74_1_23: 'done', f74_1_09: 'problem', f74_1_notes: 'One', f74_2_notes: 'Two', bl_vent: 'no', bl_notice: 'yes', eess_a_06_ra: 12.5, eess_backup: 'yes' });
+eq('old answers read under their new keys', [old.pvt_strings, old.pvi_fixed, old.pvi_fixedn, old.pvi_mount, old.bat_bu_ra, old.eess_backup], [2, 'problem', 'Rail loose', 'on_roof', 12.5, 'yes']);
+eq('the frame table becomes the four questions (b: exposed, so not extraneous)', [old.pvi_frame_metal, old.pvi_frame_ext, old.pvi_frame_exp, old.pvi_frame_lp], ['yes', 'no', 'yes', undefined]);
+eq('a merged row fills only what is still unanswered', [old.bat_standards, old.bat_manual, old.bat_conditions], ['done', 'done', 'done']);
+eq('the notes are joined, and the location rows become the inspection’s', [old.bat_inspect_notes, old.bat_space_vent, old.bat_space_ventn, old.bat_notices], ['One\nTwo', 'problem', 'Not ventilated as the maker asks', 'done']);
+eq('the old keys are gone from what the forms read', Object.keys(old).filter((k) => /^(f43|f44a?|f74|f78)_|^eess_[ta]_|^bl_vent$|^bl_notice$/.test(k)), []);
+eq('the watertight check starts unanswered', old.pvi_watertight, undefined);
+eq('a+b on the old table can’t say which: left for the electrician', withLegacy({ f44_t2: ['a', 'b'] }).pvi_frame_metal, undefined);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

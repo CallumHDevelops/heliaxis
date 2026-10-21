@@ -21,12 +21,12 @@ const READY_ON = ['ready', 'install_booked', 'installing', 'commissioning', 'han
 const before = (l: Loaded, hols: ReadonlySet<string>) => (l.facts.job.installDays[0] ? addWorkingDays(l.facts.job.installDays[0], -1, hols) : null);
 
 const RULES: Partial<Record<SlotCode, Rule>> = {
-  CC17: { title: () => 'Upload the MCS certificate into the handover pack', when: (_v, l) => !!l.facts.paperwork.mcs_cert_no },
-  CC16: { title: () => 'Upload the guarantee policy into the handover pack', when: (_v, l) => !!l.facts.paperwork.ibg_ref },
-  CC14: { title: () => 'Upload the Building Control certificate into the handover pack', when: (_v, l) => !!l.facts.paperwork.building_regs_ref },
-  CC10: { title: () => 'Upload the schematic for the handover pack', when: (_v, l) => READY_ON.includes(l.facts.job.stage), due: before },
-  CC15: { title: () => 'Upload the design calculations for the handover pack (or mark them not needed)', when: (_v, l) => READY_ON.includes(l.facts.job.stage), due: before },
-  F76: { title: () => 'Upload the G99 application, the DNO’s acceptance and the installation document', when: (_v, l) => l.facts.job.dno.route === 'g99' },
+  'HX-HO-03': { title: () => 'Upload the MCS certificate into the handover pack', when: (_v, l) => !!l.facts.paperwork.mcs_cert_no },
+  'HX-HO-07': { title: () => 'Upload the warranty insurance policy into the handover pack', when: (_v, l) => !!l.facts.paperwork.ibg_ref },
+  'HX-HO-05': { title: () => 'Upload the Building Regulations certificate into the handover pack', when: (_v, l) => !!l.facts.paperwork.building_regs_ref },
+  'HX-HO-13': { title: () => 'Upload the wiring diagram for the handover pack', when: (_v, l) => READY_ON.includes(l.facts.job.stage), due: before },
+  'HX-HO-14': { title: () => 'Upload the design calculations for the handover pack (or mark them not needed)', when: (_v, l) => READY_ON.includes(l.facts.job.stage), due: before },
+  'HX-HO-16': { title: () => 'Upload the G99 application, the DNO’s acceptance and the installation document', when: (_v, l) => l.facts.job.dno.route === 'g99' },
 };
 
 export async function ensureHandoverTasks(db: Db, l: Loaded, views: SlotView[]): Promise<number> {
@@ -47,7 +47,7 @@ export async function ensureHandoverTasks(db: Db, l: Loaded, views: SlotView[]):
       if (await addSourceTask(db, { projectId, key, title: rule.title(v, l), notes: v.why, assigneeId: owner, dueDate: rule.due?.(l, hols) ?? v.due ?? null })) added++;
     }
     // The final invoice task (made when the pack goes) closes once an invoice is in the pack.
-    if (l.docs.some((d) => d.handover_slot === 'CC13' && !d.archived_at && d.generated_key !== 'CC13_RECEIPT')) await closeSourceTask(db, projectId, 'final-invoice');
+    if (l.docs.some((d) => d.handover_slot === 'HX-HO-18' && !d.archived_at && d.generated_key !== 'HX-HO-18-RECEIPT')) await closeSourceTask(db, projectId, 'final-invoice');
   } catch {
     // Reminders never block the pack.
   }

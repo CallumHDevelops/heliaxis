@@ -1,8 +1,10 @@
 /**
  * The site app's shared shapes: trades, assignment statuses, answers with where each came from,
  * flags, and what the staff screens and the phone are sent. Types and small pure helpers only (type
- * imports at most), so they're safe in the browser, on the server and in scripts/test-site-*.mjs.
+ * imports at most, and the old keys' aliases), so they're safe in the browser, on the server and in
+ * scripts/test-site-*.mjs.
  */
+import { withLegacy } from './forms/legacy';
 
 export type Trade = 'roofer' | 'scaffolder' | 'electrician' | 'other';
 export const TRADES: Trade[] = ['scaffolder', 'roofer', 'electrician', 'other'];
@@ -51,11 +53,11 @@ export const SOURCE_LABEL: Record<Source, string> = {
 export type Answer = { v: unknown; src?: Source; at?: string; dev?: string };
 export type Answers = Record<string, Answer>;
 
-/** Answers as plain values (what the rules read). */
+/** Answers as plain values (what the rules read), any saved under a key from before version 4 read under its new one. */
 export function valuesOf(a: Answers | null | undefined): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, x] of Object.entries(a ?? {})) if (x && typeof x === 'object' && 'v' in x) out[k] = x.v;
-  return out;
+  return withLegacy(out);
 }
 
 export type Severity = 'stop' | 'urgent' | 'review';
