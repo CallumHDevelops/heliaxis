@@ -274,10 +274,14 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
   };
 }
 
-/** The pack's documents as the catalogue reads them (current ones, with the store's Out of date marks and F76's parts). */
+/**
+ * The pack's documents as the catalogue reads them (current ones, with the store's Out of date marks
+ * and F76's parts). Never the G98 data sheet (generated_key F47): it's the office's helper now, and
+ * one filed in F47 before that isn't the form the DNO was sent.
+ */
 export function slotDocs(l: Loaded): SlotDoc[] {
   return l.docs
-    .filter((d) => d.handover_slot && isSlot(d.handover_slot) && d.handover_slot !== 'PACK' && !d.archived_at)
+    .filter((d) => d.handover_slot && isSlot(d.handover_slot) && d.handover_slot !== 'PACK' && !d.archived_at && d.generated_key !== 'F47')
     .map((d) => {
       const data = l.slots.get(String(d.handover_slot))?.data;
       return {

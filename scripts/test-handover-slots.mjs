@@ -42,7 +42,7 @@ eq(
   [...S.PACK_ITEMS].sort((a, b) => a.order - b.order).map((s) => s.code),
   ['F07BI', 'F78', 'CC17', 'CC21', 'F74B', 'CC14', 'F19I', 'CC16', 'F16E', 'CC4', 'F48I', 'F49', 'F49A', 'CC10', 'CC15', 'F43', 'F44', 'F44A', 'F74', 'F75', 'F74A', 'F47', 'F76', 'CC5', 'CC13', 'CCMH']
 );
-eq('"Which is it?" ends with Something else', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Building Control certificate', 'Insurance-backed guarantee', 'Schematic', 'Design calculations', 'G99 paperwork', 'Paid invoice', 'Something else']);
+eq('"Which is it?" ends with Something else', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Building Control certificate', 'Insurance-backed guarantee', 'Schematic', 'Design calculations', 'G98 Form B (as sent)', 'G99 paperwork', 'Paid invoice', 'Something else']);
 
 /* ── Applies: technologies and the DNO route ──────────────────────────────── */
 
@@ -98,8 +98,8 @@ const byCode = (views) => Object.fromEntries(views.map((v) => [v.code, v]));
 
 // Part-complete: the electrician has signed; their documents are in; the office's are to come.
 const partDocs = ['F43', 'F44', 'F44A', 'F74', 'F75', 'CC21'].map((c) => doc(c, { source: c === 'CC21' ? 'generated' : 'generated' }));
-const partGen = { F07BI: ready('F07BI'), F78: { ready: false, state: 'missing', why: 'Sign the design part.', fix: 'sign-design' }, F16E: { ready: false, state: 'waiting', why: 'Waiting for Jane to sign.' }, F49: ready('F49'), F48I: { ready: false, state: 'missing', why: 'MIS 3002…', fix: 'upload' }, F47: ready('F47'), CC4: ready('CC4'), F19I: { ready: false, state: 'missing', why: 'Set the warranty…', fix: 'settings' } };
-const part = byCode(S.slotStates(ctx({ docs: [...partDocs, doc('F07BI'), doc('F49'), doc('F47'), doc('CC4')], gen: partGen })));
+const partGen = { F07BI: ready('F07BI'), F78: { ready: false, state: 'missing', why: 'Sign the design part.', fix: 'sign-design' }, F16E: { ready: false, state: 'waiting', why: 'Waiting for Jane to sign.' }, F49: ready('F49'), F48I: { ready: false, state: 'missing', why: 'MIS 3002…', fix: 'upload' }, CC4: ready('CC4'), F19I: { ready: false, state: 'missing', why: 'Set the warranty…', fix: 'settings' } };
+const part = byCode(S.slotStates(ctx({ docs: [...partDocs, doc('F07BI'), doc('F49'), doc('CC4')], gen: partGen })));
 eq('site documents in: Complete', ['F43', 'F44', 'F44A', 'F74', 'F75', 'CC21'].map((c) => part[c].state), ['complete', 'complete', 'complete', 'complete', 'complete', 'complete']);
 const waitsDesign = byCode(S.slotStates(ctx({ certWaits: 'Sign the EIC’s design part (Site tab, the electrician’s card): the certificate and the next inspection come from it.' }))).CC21;
 eq('the EIC made in the app, signed off but its design part not signed: Missing, open the Site tab (it blocks Send)', [waitsDesign.state, waitsDesign.fix, waitsDesign.why.startsWith('Sign the EIC’s design part'), S.SITE_SLOTS.includes('CC21')], ['missing', 'site', true, true]);
@@ -109,8 +109,11 @@ eq('Building Control: Missing (Heliaxis notifies), due in 30 days', [part.CC14.s
 eq('Building Control by the electrician’s scheme: Waiting for them', byCode(S.slotStates(ctx({ partPBy: 'self' }))).CC14.why, 'Waiting for Dave to notify their scheme and send the reference.');
 eq('F78: Missing until the design part is signed', [part.F78.state, part.F78.fix], ['missing', 'sign-design']);
 eq('F16E: Waiting for the customer', part.F16E.state, 'waiting');
-eq('F47 made but not sent: Missing, mark it sent', [part.F47.state, part.F47.fix], ['missing', 'dno-sent']);
-eq('F47 marked sent: Complete', byCode(S.slotStates(ctx({ docs: [doc('F47')], gen: { F47: ready('F47') }, dnoNotified: true }))).F47.state, 'complete');
+// G98 Form B is done in the office (owner decision 9): an upload of the form as sent, never the app's data sheet.
+eq('F47 is the office’s upload, offered on + Add a document', [S.slotDef('F47').kind, S.slotDef('F47').maker, S.UPLOAD_PICKS.some((p) => p.code === 'F47')], ['C', 'office', true]);
+eq('F47 switched on, nothing uploaded: Missing, upload the form as sent, due in 28 days', [part.F47.state, part.F47.fix, part.F47.due, part.F47.why], ['missing', 'upload', '2026-12-01', 'Upload the G98 Form B as sent to the DNO. Due Tue 1 Dec (28 days).']);
+eq('F47 marked sent but not uploaded: still Missing (the form as sent goes in the pack)', byCode(S.slotStates(ctx({ dnoNotified: true }))).F47.fix, 'upload');
+eq('F47 before switching on: Waiting', byCode(S.slotStates(ctx({ commissioned: null }))).F47.state, 'waiting');
 eq('F47 with the form as sent uploaded: Complete', byCode(S.slotStates(ctx({ docs: [doc('F47', { source: 'upload', key: null })] }))).F47.state, 'complete');
 eq('not needed: F76 (G98 job), F49A (no plan), F74A/B (PAS not ticked)', ['F76', 'F49A', 'F74A', 'F74B'].map((c) => part[c].state), ['na', 'na', 'na', 'na']);
 eq('CCMH is never Missing and never counted', [part.CCMH.state, part.CCMH.counted], ['na', false]);

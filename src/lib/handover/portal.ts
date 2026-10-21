@@ -58,8 +58,8 @@ export async function portalHandover(projectId: string): Promise<PortalHandover 
   if (f16e && f16e.state !== 'na' && switchedOn && approved(f.settings, 'completion') && !f.data.F16E?.customer && !f.electrician?.customer.f16e)
     signs.push({ kind: 'f16e', title: 'Sign to say the work’s finished', line: 'It goes into your handover pack as your completion record.', declaration: DRAFTS.completion.text.replace('{address}', siteAddress(f) || 'my home') });
   const f47 = views.find((v) => v.code === 'F47');
-  // Not asked for once the form has gone to the DNO.
-  if (f47 && f47.state !== 'na' && f.job.dno.route === 'g98' && switchedOn && !f.job.dno.notified && !f.data.F47?.customer && !f.electrician?.customer.g98)
+  // Not asked for once the form has gone to the DNO (marked sent, or uploaded as sent).
+  if (f47 && f47.state !== 'na' && !f47.docs.length && f.job.dno.route === 'g98' && switchedOn && !f.job.dno.notified && !f.data.F47?.customer && !f.electrician?.customer.g98)
     signs.push({ kind: 'g98', title: 'Sign the G98 form', line: 'Your signature for the form that tells the electricity network (DNO) about your system.', declaration: 'Your signature for the G98 Form B, which tells the electricity network (DNO) about your system.' });
 
   const next: string[] = [];

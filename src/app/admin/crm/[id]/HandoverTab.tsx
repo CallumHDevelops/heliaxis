@@ -207,6 +207,9 @@ export function HandoverTab({
     if (s.code === 'CC4') helpers.push({ label: 'Where the switches are', run: () => setSheet({ kind: 'values', slot: 'CC4' }), fix: 'switches' });
     if (s.code === 'F49A' && s.state !== 'na') helpers.push({ label: 'The plan as agreed', run: () => setSheet({ kind: 'values', slot: 'F49A' }), fix: 'values' });
     if (s.code === 'F47' && s.state !== 'na') helpers.push({ label: 'Isolation switch location', run: () => setSheet({ kind: 'values', slot: 'F47' }) });
+    // The office's data sheets for filling in the DNO's forms (never in the pack).
+    const sheetId = s.code === 'F47' ? v.helpers.f47Sheet : s.code === 'F76' ? v.helpers.f76Sheet : null;
+    if (sheetId && s.state !== 'na') helpers.push({ label: s.code === 'F47' ? 'G98 data sheet' : 'G99 data sheet', run: () => void window.open(`/api/crm/documents/${sheetId}`, '_blank', 'noopener') });
     if (s.code === 'CC13') helpers.push({ label: 'Final invoice and payments', run: () => setSheet({ kind: 'invoice' }), fix: 'invoice' });
     const regen = s.maker === 'pack' && s.kind !== 'C' && s.docs.some((d) => d.source === 'generated');
     return (

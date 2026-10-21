@@ -15,7 +15,7 @@ import {
 } from '@/lib/crm/server';
 import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 import { readMcsNumber } from '@/lib/handover/read';
-import { handoverReady, patchSlotData, refreshHandover, tellCustomer, type Via } from '@/lib/handover/server';
+import { handoverReady, markDnoSent, patchSlotData, refreshHandover, tellCustomer, type Via } from '@/lib/handover/server';
 import { isSlot, slotDef } from '@/lib/handover/slots';
 import { buildPdf } from '@/lib/subcontractors/pdf-engine';
 
@@ -42,7 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const b = await req.json().catch(() => ({}));
   const db = createAdminClient();
-  const { data: p } = await db.from('crm_projects').select('id, enquiry_id').eq('id', id).maybeSingle();
+  const { data: p } = await db.from('crm_projects').select('id, enquiry_id, checklist').eq('id', id).maybeSingle();
   if (!p) return json({ error: 'Not found' }, 404);
 
   if (b.action === 'prepare') {
@@ -104,6 +104,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: s.user.id, visible: false }).eq('id', String(b.replace)).eq('project_id', id).eq('handover_slot', slot);
       }
       if (slot === 'F76' && PARTS.includes(String(b.part))) await patchSlotData(db, id, 'F76', { parts: { [doc.id]: String(b.part) } }, s.user.id);
+      // G98 Form B as it was sent to the DNO: the G98 notice is sent (the checklist item, its deadline, the portal's sign card).
+      const dno = ((p.checklist ?? {}) as Record<string, { done_at?: string; na?: boolean } | null>).c_dno_notified;
+      if (slot === 'F47' && !dno?.done_at && !dno?.na) await markDnoSent(db, id, s.user.id, s.profile.full_name || s.profile.email || 'Someone').catch(() => null);
       if (slot === 'CC17' && mime && (mime === 'application/pdf' || IMAGE.test(mime))) {
         const { data: file } = await db.storage.from(DOCS_BUCKET).download(path);
         const n = file ? await readMcsNumber(new Uint8Array(await file.arrayBuffer()), mime) : null;

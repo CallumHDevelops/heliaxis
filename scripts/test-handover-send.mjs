@@ -324,6 +324,16 @@ eq('"Hold it until the pack is sent": hidden', portal.groups.flatMap((g) => g.it
 // A Docs-tab upload with a pack item (whatever its category) lands the same way.
 const viaDocs = await upload('Building control certificate', await simplePdf('BC'), { handover_slot: 'CC14', category: 'other', visible: true });
 eq('from the Docs tab, any category: in the pack and the portal', [viaDocs.document.handover_slot, viaDocs.document.visible], ['CC14', true]);
+// G98 Form B is done in the office (owner decision 9): the app's data sheet is the office's helper, the form as sent is uploaded.
+let hv = await H.handoverView(db, pid);
+const sheet = cur('F47');
+eq('the G98 data sheet: made for the office, in no pack item, never shown to the customer', [sheet.handover_slot, sheet.release, sheet.visible, hv.helpers.f47Sheet === sheet.id], [null, 'now', false, true]);
+eq('G98 Form B: Missing until the form as sent is uploaded', [hv.slots.find((s) => s.code === 'F47').state, hv.slots.find((s) => s.code === 'F47').fix, hv.slots.find((s) => s.code === 'F47').docs.length], ['missing', 'upload', 0]);
+eq('the portal asks the customer to sign the G98 form until then', (await P.portalHandover(pid)).signs.map((x) => x.kind), ['g98']);
+const g98 = await upload('G98 Form B as sent', await simplePdf('G98 Form B'), { handover_slot: 'F47', hold: true });
+hv = await H.handoverView(db, pid);
+eq('the form as sent uploaded: Complete, the G98 notice ticked as sent', [hv.slots.find((s) => s.code === 'F47').state, hv.slots.find((s) => s.code === 'F47').docs.map((d) => d.id), globalThis.__rec.rpc.some(([n, k]) => n === 'crm_checklist_set' && k === 'c_dno_notified')], ['complete', [g98.document.id], true]);
+eq('…and the portal stops asking for a G98 signature', (await P.portalHandover(pid)).signs.map((x) => x.kind), []);
 
 /* ── 3. Build ──────────────────────────────────────────────────────────────── */
 const b1 = await post({ action: 'build' });
@@ -332,6 +342,7 @@ eq('one PDF, stored as the pack (v1, held until sent)', [b1.status, b1.body.buil
 const packRow = db.rows('handover_packs').find((x) => x.project_id === pid);
 const sep = Object.fromEntries(packRow.contents.filter((c) => c.separate).map((c) => [c.slot, c.separate]));
 eq('the signed certificate and the 30 MB manual left as separate files', sep, { CC17: 'signed', CC5: 'size' });
+eq('under Grid connection: only the G98 Form B as sent, never the data sheet', [packRow.contents.filter((c) => c.slot === 'F47').map((c) => c.document_id), packRow.contents.some((c) => c.document_id === sheet.id)], [[g98.document.id], false]);
 const packPdf = await PDFDocument.load(db.files.get(`crm-docs/${pack1.storage_path}`));
 const coverPages = (await PDFDocument.load(db.files.get(`crm-docs/${cur('F07BI').storage_path}`))).getPageCount();
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');

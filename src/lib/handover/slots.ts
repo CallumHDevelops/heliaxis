@@ -392,11 +392,14 @@ export const SLOTS: SlotDef[] = [
     customer: 'The notice that tells your electricity network (DNO) about your new system.',
     group: 'grid',
     tech: ['solar', 'battery'],
-    kind: 'G',
-    maker: 'pack',
+    // Done in the office (owner decision 9): the form as it went to the DNO, uploaded. The G98 data
+    // sheet the app makes is the office's helper for filling it in, never in the pack.
+    kind: 'C',
+    maker: 'office',
     order: 210,
     applies: route('g98'),
     category: 'dno',
+    pick: 'G98 Form B (as sent)',
   },
   {
     code: 'F76',
@@ -679,13 +682,11 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       return c.sent ? { state: 'missing', why: 'Upload the final invoice and send it.', fix: 'invoice' } : { state: 'waiting', why: 'After the handover pack goes.', fix: 'invoice' };
     }
     case 'F47': {
+      // An office upload: the form as it was sent to the DNO (uploading it ticks the G98 notice as sent).
       if (!c.dnoRoute) return { state: 'missing', why: 'Choose the DNO route on Paperwork.', fix: 'paperwork' };
-      const uploaded = docs.filter((x) => x.source !== 'generated');
-      if (uploaded.length) return docsState(uploaded);
-      const g = genState('F47', docs, c);
-      if (g.state !== 'complete') return g;
-      if (!c.dnoNotified) return { state: 'missing', why: `Send it to the DNO, then mark it sent.${c.due.g98 ? ` ${dueWords(c.due.g98, '28 days')}.` : ''}`, due: c.due.g98 ?? null, fix: 'dno-sent' };
-      return g;
+      if (docs.length) return docsState(docs);
+      if (!c.commissioned) return { state: 'waiting', why: 'After the system is switched on.' };
+      return { state: 'missing', why: `Upload the G98 Form B as sent to the DNO.${c.due.g98 ? ` ${dueWords(c.due.g98, '28 days')}.` : ''}`, due: c.due.g98 ?? null, fix: 'upload' };
     }
     case 'F76': {
       if (!c.dnoRoute) return { state: 'missing', why: 'Choose the DNO route on Paperwork.', fix: 'paperwork' };

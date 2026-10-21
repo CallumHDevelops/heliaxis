@@ -91,16 +91,19 @@ const GENS: Gen[] = [
   { key: 'F48I', slot: 'F48I', label: 'F48I', title: F48I_TITLE, category: 'handover', input: (f) => shadingInput(f), make: makeShading as Gen['make'] },
   { key: 'F49', slot: 'F49', label: 'F49', title: F49_TITLE, category: 'handover', input: (f) => scheduleInput(f), make: makeSchedule as Gen['make'] },
   { key: 'F49A', slot: 'F49A', label: 'F49A', title: F49A_TITLE, category: 'handover', input: (f) => agreementInput(f), make: makeAgreement as Gen['make'] },
-  { key: 'F47', slot: 'F47', label: 'F47', title: F47_TITLE, category: 'dno', input: (f) => g98Input(f), make: makeG98Sheet as Gen['make'] },
+  // The G98 and G99 data sheets: office helpers for the DNO's forms (F47, F76), never in the pack.
+  { key: 'F47', slot: null, label: 'F47', title: F47_TITLE, category: 'dno', input: (f) => g98Input(f), make: makeG98Sheet as Gen['make'] },
   { key: 'F76_SHEET', slot: null, label: 'F76', title: F76_SHEET_TITLE, category: 'dno', input: (f) => g99Input(f), make: makeG99Sheet as Gen['make'] },
   { key: 'CC13_RECEIPT', slot: 'CC13', label: 'CC13', title: RECEIPT_TITLE, category: 'receipt', input: (f) => receiptInput(f), make: makeReceipt as Gen['make'], live: true },
   // Last: its contents list is every other item's state.
   { key: 'F07BI', slot: 'F07BI', label: 'F07BI', title: COVER_TITLE, category: 'handover', input: (f, v) => coverInput(f, v), make: makeCoverLetter as Gen['make'], live: true },
 ];
 
-/** Does a generator apply to this job? (The catalogue's applies for its item; the G99 sheet on G99 jobs.) */
+/** Does a generator apply to this job? (The catalogue's applies for its item; the data sheets on their DNO route.) */
 function genApplies(g: Gen, l: Loaded, views: SlotView[]): boolean {
-  if (g.key === 'F76_SHEET') return l.facts.job.dno.route === 'g99' && l.facts.job.products.some((x) => x === 'solar' || x === 'battery');
+  const pvOrBattery = l.facts.job.products.some((x) => x === 'solar' || x === 'battery');
+  if (g.key === 'F76_SHEET') return l.facts.job.dno.route === 'g99' && pvOrBattery;
+  if (g.key === 'F47') return l.facts.job.dno.route === 'g98' && pvOrBattery && !views.find((x) => x.code === 'F47')?.office?.na;
   const v = views.find((x) => x.code === g.slot);
   return !!v && !(v.state === 'na' && !v.office) && !v.office?.na;
 }
@@ -322,7 +325,8 @@ export type HandoverView = {
   gaps: string[];
   models: string[];
   designDocs: { id: string; name: string }[];
-  helpers: { f76Sheet: string | null };
+  /** The office's data sheets for the DNO's forms (not in the pack). */
+  helpers: { f76Sheet: string | null; f47Sheet: string | null };
   invoice: { prompted: boolean; uploaded: boolean; paid: boolean };
   approvals: Record<DraftKey, boolean>;
   /** When a message sent now would go ("now", or "07:00"). */
@@ -428,7 +432,7 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
     gaps: libraryGapsOf(l),
     models: modelsOf(f),
     designDocs: l.docs.filter((d) => d.category === 'design' && !d.archived_at && !d.handover_slot).map((d) => ({ id: d.id, name: d.name })),
-    helpers: { f76Sheet: l.docs.find((d) => d.generated_key === 'F76_SHEET' && !d.archived_at)?.id ?? null },
+    helpers: { f76Sheet: l.docs.find((d) => d.generated_key === 'F76_SHEET' && !d.archived_at)?.id ?? null, f47Sheet: l.docs.find((d) => d.generated_key === 'F47' && !d.archived_at)?.id ?? null },
     invoice: { prompted: !!l.pack?.invoice_prompted_at, uploaded: l.docs.some((d) => d.handover_slot === 'CC13' && !d.archived_at && d.generated_key !== 'CC13_RECEIPT'), paid: l.invoicePaid },
     approvals: { cover: approved(f.settings, 'cover'), completion: approved(f.settings, 'completion'), shutdown: approved(f.settings, 'shutdown') },
     sendsAt: at.getTime() <= Date.now() + 60_000 ? 'now' : sendTimeWords(at),
