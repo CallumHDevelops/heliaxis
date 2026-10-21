@@ -93,7 +93,8 @@ export async function certificateData(db: Db, a: AssignmentRow): Promise<Certifi
     signoff,
     photos,
     attached,
-    design: designOf(ctx),
+    // Only a design part the office signed (sign-design writes it as office:<staff>): one a phone wrote counts as unsigned.
+    design: String((a.answers.eic_design as { dev?: unknown } | undefined)?.dev ?? '').startsWith('office:') ? designOf(ctx) : null,
   };
 }
 

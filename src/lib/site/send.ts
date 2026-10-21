@@ -70,6 +70,27 @@ export async function ensureLink(db: Db, a: AssignmentRow, rotate = false): Prom
   return { token: linkTokenFor(a.id, generation), generation, rotated: fresh && rotate };
 }
 
+/**
+ * A new link was made: every phone that opened one of this assignment's earlier links (open() logs
+ * each as site_events 'opened' with its device and the link's generation) is signed out, so a
+ * forwarded or mis-sent link stops working on the phones that have it. The trade opens the new link
+ * and gets a new session. Returns how many phones were signed out.
+ */
+export async function signOutOldLinks(db: Db, assignmentId: string, generation: number): Promise<number> {
+  const { data: ev } = await db.from('site_events').select('detail').eq('assignment_id', assignmentId).eq('type', 'opened');
+  const ids = [
+    ...new Set(
+      ((ev ?? []) as { detail: { device?: unknown; generation?: unknown } | null }[])
+        .map((e) => e.detail)
+        .filter((d): d is { device: string; generation?: unknown } => typeof d?.device === 'string' && (Number(d.generation) || 0) < generation)
+        .map((d) => d.device)
+    ),
+  ];
+  if (!ids.length) return 0;
+  const { data } = await db.from('site_devices').update({ revoked_at: new Date().toISOString() }).in('id', ids).is('revoked_at', null).select('id');
+  return data?.length ?? 0;
+}
+
 /* ── What a message is about ─────────────────────────────────────────────────── */
 
 export type Job = { ref: string | null; address: string | null; postcode: string | null };
@@ -330,7 +351,11 @@ export async function sendToTrade(
     a.status = 'sent';
     a.sent_at = at;
   }
-  if (opts.rotate) await logSiteEvent(db, a.id, opts.actor, 'link_rotated', { generation });
+  if (opts.rotate) {
+    await logSiteEvent(db, a.id, opts.actor, 'link_rotated', { generation });
+    const out = await signOutOldLinks(db, a.id, generation);
+    if (out) await logSiteEvent(db, a.id, opts.actor, 'phones_signed_out', { phones: out, generation });
+  }
   if (opts.via === 'link') {
     await logSiteEvent(db, a.id, opts.actor, 'link_copied', { generation });
     return out;

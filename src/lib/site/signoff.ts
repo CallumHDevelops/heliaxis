@@ -63,6 +63,15 @@ export type SignoffOutcome = { ok: true; reply: SignoffReply; signoff: SignoffRo
 
 const isUuid = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f-]{36}$/i.test(s);
 const STAGES: Stage[] = ['main', 'erection', 'strike'];
+/** Declarations compared as words (line breaks and spacing don't count). */
+const sameWords = (t: string) => t.replace(/\s+/g, ' ').trim();
+/** The phone sent other words than the declaration: the declaration was recorded as worded, and the office is told. */
+const DECLARATION_FLAG: Flag = {
+  code: 'declaration_changed',
+  severity: 'review',
+  key: 'declaration',
+  text: 'The declaration sent from the phone didn’t match the wording: the wording was recorded, and what the phone sent is kept with the sign-off',
+};
 const signoffRow = (r: Record<string, unknown>): SignoffRow => ({ ...(r as unknown as SignoffRow), flags: Array.isArray(r.flags) ? (r.flags as Flag[]) : [], extra: (r.extra ?? {}) as Record<string, unknown> });
 
 /** The forms a stage signs (one for the roofer and scaffold; the electrician's sections share 'main'). */
@@ -136,8 +145,11 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
   const hash = createHash('sha256').update(canonicalJson({ answers, photos: photoIds })).digest('hex');
   const phoneAt = typeof b.signed_at === 'string' ? Date.parse(b.signed_at) : NaN;
   const signedAt = Number.isFinite(phoneAt) && Math.abs(phoneAt - Date.now()) <= CLOCK_SLACK_MS ? new Date(phoneAt).toISOString() : new Date().toISOString();
-  const shown = forms[0].sig.declaration?.(ctx) ?? '';
-  const declaration = typeof b.declaration === 'string' && b.declaration.trim() ? b.declaration.trim().slice(0, 2000) : shown;
+  // What was signed is the declaration worded here from its constant, never the text the phone sends;
+  // a phone that sent other words is kept beside it and flagged for the office.
+  const declaration = forms[0].sig.declaration?.(ctx) ?? '';
+  const phoneText = typeof b.declaration === 'string' ? b.declaration.trim().slice(0, 2000) : '';
+  const changed = !!phoneText && sameWords(phoneText) !== sameWords(declaration);
 
   await ensureDocsBucket();
   const path = `signatures/${a.project_id}/site-${id}.png`;
@@ -159,13 +171,13 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
       user_agent: meta.userAgent?.slice(0, 400) ?? null,
       declaration,
       answers_hash: hash,
-      flags: forms.flatMap((f) => flagsFor(f, ctx)),
+      flags: [...forms.flatMap((f) => flagsFor(f, ctx)), ...(changed ? [DECLARATION_FLAG] : [])],
       extra: {
         phone_signed_at: typeof b.signed_at === 'string' ? b.signed_at : null,
         phone_rev: typeof b.rev === 'number' ? b.rev : null,
         server_rev: a.rev,
         photos: photoIds,
-        ...(declaration !== shown ? { declaration_now: shown } : {}),
+        ...(changed ? { declaration_phone: phoneText } : {}),
       },
     })
     .select('*')
@@ -192,6 +204,7 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
     .eq('id', a.id)
     .in('status', FROM[stage]);
   await logSiteEvent(db, a.id, 'trade', 'signed_off', { stage, signoff: id, name, device: meta.deviceId, answers_hash: hash }, meta.ip);
+  if (changed) await logSiteEvent(db, a.id, 'system', 'declaration_changed', { signoff: id, phone: phoneText }, meta.ip);
   const now = (await readAssignment(db, a.id)) ?? a;
   // Job updates are made only where empty, so a failure here is left for the documents step to try again.
   await pluginJob(db, now, s).catch((e) => console.error('[site/signoff] job', e));
@@ -282,7 +295,7 @@ async function tellOwner(db: Db, a: AssignmentRow, s: SignoffRow) {
   if (job.owner_id) {
     await notify({ userId: job.owner_id, kind: 'site_signoff', title, body, href: `/admin/projects/${a.project_id}?tab=site`, tag: `site-signoff-${s.id}` }).catch(() => {});
   }
-  await addReviewTask(db, a, s, job, a.flags);
+  await addReviewTask(db, a, s, job, [...a.flags, ...s.flags.filter((f) => f.code === DECLARATION_FLAG.code)]);
 }
 
 /** /api/cron/site: sign-offs whose steps after the reply didn't all run (two minutes' grace first). */

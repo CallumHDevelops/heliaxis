@@ -63,9 +63,10 @@ registerSender('file', {
     const p = op.payload as FilePayload;
     const job = op.assignmentId;
     const meta = { client_id: p.client_id, slot: p.slot, name: p.name, mime: p.mime, size: p.size };
-    const prep = await siteFetch<{ url: string }>(`/api/site/jobs/${job}/files`, { body: { action: 'prepare', ...meta }, job });
+    // The link is null when the file has arrived already (the server never overwrites one).
+    const prep = await siteFetch<{ url: string | null }>(`/api/site/jobs/${job}/files`, { body: { action: 'prepare', ...meta }, job });
     if (!prep.ok) return prep;
-    const up = await put(prep.data.url, p.blob, p.mime);
+    const up = prep.data.url ? await put(prep.data.url, p.blob, p.mime) : 'ok';
     if (up !== 'ok') return up === 'offline' ? { ok: false, kind: 'offline' } : { ok: false, kind: 'error', status: 502, message: 'The file didn’t upload. It will try again.', data: {}, retry: true };
     const save = await siteFetch<{ file: TradeFile }>(`/api/site/jobs/${job}/files`, { body: { action: 'save', ...meta }, job });
     if (save.ok) {

@@ -6,6 +6,9 @@ import type { Answer } from '@/lib/site/types';
 export const dynamic = 'force-dynamic';
 
 const KEY = /^[A-Za-z][A-Za-z0-9_]{0,30}(?::[A-Za-z0-9_-]{1,30})?$/;
+/** Keys only the office writes (the EIC's design part, signed in the office by sign-design): never set or cleared from a phone. */
+const OFFICE_KEYS = new Set(['eic_design']);
+const phoneKey = (k: string) => KEY.test(k) && !OFFICE_KEYS.has(k.split(':')[0]);
 const SOURCES = ['typed', 'scan', 'photo', 'roofer', 'design', 'job', 'calc', 'last'];
 const isUuid = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f-]{36}$/i.test(s);
 
@@ -41,10 +44,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!isUuid(op.op_id)) continue;
     const set: Record<string, Answer> = {};
     for (const [k, v] of Object.entries(op.set && typeof op.set === 'object' ? (op.set as Record<string, unknown>) : {})) {
-      const clean = KEY.test(k) ? cleanAnswer(v, s.device.id) : null;
+      const clean = phoneKey(k) ? cleanAnswer(v, s.device.id) : null;
       if (clean) set[k] = clean;
     }
-    const unset = (Array.isArray(op.unset) ? op.unset : []).filter((k): k is string => typeof k === 'string' && KEY.test(k));
+    const unset = (Array.isArray(op.unset) ? op.unset : []).filter((k): k is string => typeof k === 'string' && phoneKey(k));
     const keys = [...Object.keys(set), ...unset];
     if (!keys.length) continue;
     const signed = a.status === 'signed' || a.status === 'done';

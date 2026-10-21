@@ -46,6 +46,8 @@ export type ReviewSignoff = {
   ip: string | null;
   user_agent: string | null;
   declaration: string;
+  /** Other words the phone sent (the declaration as worded was recorded). */
+  declaration_phone: string | null;
   answers_hash: string;
   signature: string | null;
   steps_done: { po: boolean; docs: boolean; notified: boolean };
@@ -165,6 +167,7 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
     ip: (s.ip as string | null) ?? null,
     user_agent: (s.user_agent as string | null) ?? null,
     declaration: String(s.declaration),
+    declaration_phone: ((s.extra as { declaration_phone?: string } | null)?.declaration_phone ?? null) || null,
     answers_hash: String(s.answers_hash),
     signature: sigs.get(String(s.signature_path)) ?? null,
     steps_done: { po: !!s.po_done_at, docs: !!s.docs_done_at, notified: !!s.notified_at },

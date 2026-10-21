@@ -176,6 +176,7 @@ function fakeDb() {
       },
       download: async (path) => ({ data: files.has(`${bucket}/${path}`) ? new Blob([files.get(`${bucket}/${path}`)]) : null }),
       remove: async (paths) => (paths.forEach((p) => files.delete(`${bucket}/${p}`)), { error: null }),
+      exists: async (path) => ({ data: files.has(`${bucket}/${path}`), error: null }),
       createSignedUrl: async (path) => ({ data: { signedUrl: `https://storage.test/${bucket}/${path}` } }),
       createSignedUploadUrl: async (path) => ({ data: { signedUrl: `https://storage.test/upload/${bucket}/${path}`, path, token: 't' }, error: null }),
     }),
@@ -393,7 +394,7 @@ const putOp = randomUUID();
 const put = await phone(putRoute, 'put-right', { op_id: putOp, n: 1, note: 'Dressed both tiles back flat.', name: 'Dave Price', signature: SIG, declaration: putDecl, signed_at: new Date().toISOString() });
 await afterReply();
 const r1now = () => db.rows('site_returns').find((r) => r.n === 1);
-eq('put right: 200, waiting for review, the declaration kept as signed', [put.status, put.body.return.status, r1now().fixed_declaration === putDecl, r1now().fixed_signature_path, db.files.has(`crm-docs/${r1now().fixed_signature_path}`)], [200, 'fixed', true, `signatures/${project.id}/site-putright-${r1now().id}.png`, true]);
+eq('put right: 200, waiting for review, the declaration kept as signed', [put.status, put.body.return.status, r1now().fixed_declaration === putDecl, r1now().fixed_signature_path.startsWith(`signatures/${project.id}/site-putright-${r1now().id}-`), db.files.has(`crm-docs/${r1now().fixed_signature_path}`)], [200, 'fixed', true, true, true]);
 eq('its hash covers the note and the photo', r1now().fixed_hash?.length, 64);
 const t2 = task(`site-check:${r1now().id}`);
 eq('the put right’s review task, due the next working day', [t2?.title, t2?.dueDate, t2?.assigneeId], ['Review Dave Price’s put right photos, HX-0042', nextWorkingDay, 'owner-1']);

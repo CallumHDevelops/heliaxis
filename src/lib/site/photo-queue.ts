@@ -132,14 +132,15 @@ export async function sendPhoto(rec: PhotoRecord): Promise<SendResult> {
     changed();
   };
   await mark({ tries: rec.tries + 1 });
-  const prep = await siteFetch<{ url: string; thumbUrl: string }>(`/api/site/jobs/${job}/photos`, {
+  // A link is null when that file has arrived already (the server never overwrites one).
+  const prep = await siteFetch<{ url: string | null; thumbUrl: string | null }>(`/api/site/jobs/${job}/photos`, {
     body: { action: 'prepare', client_id: rec.client_id, slot: rec.slot, mime: rec.mime, size: rec.full.size },
     job,
   });
   if (!prep.ok) return settle(prep, mark);
-  const main = await put(prep.data.url, rec.full, rec.mime);
+  const main = prep.data.url ? await put(prep.data.url, rec.full, rec.mime) : 'ok';
   if (main !== 'ok') return main === 'offline' ? 'offline' : 'later';
-  const thumb = await put(prep.data.thumbUrl, rec.thumb, 'image/jpeg');
+  const thumb = prep.data.thumbUrl ? await put(prep.data.thumbUrl, rec.thumb, 'image/jpeg') : 'ok';
   if (thumb !== 'ok') return thumb === 'offline' ? 'offline' : 'later';
   const save = await siteFetch<{ id: string }>(`/api/site/jobs/${job}/photos`, {
     body: {

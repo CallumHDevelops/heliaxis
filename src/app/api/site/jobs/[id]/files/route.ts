@@ -45,13 +45,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const path = tradeFilePath(a.project_id, a.id, slot, clientId, name);
     if (b.action === 'prepare') {
       await ensureDocsBucket();
-      const up = await s.db.storage.from(DOCS_BUCKET).createSignedUploadUrl(path, { upsert: true });
+      // A link that can't overwrite: none once the file is there (null: the phone skips the upload).
+      if ((await s.db.storage.from(DOCS_BUCKET).exists(path)).data) return siteJson({ path, url: null });
+      const up = await s.db.storage.from(DOCS_BUCKET).createSignedUploadUrl(path);
       if (up.error || !up.data) return siteJson({ error: 'busy', message: 'Couldn’t get ready to send. It will try again.' }, 503);
       return siteJson({ path, url: up.data.signedUrl });
     }
     const kind = SLOTS[slot];
     const { data: have } = await s.db.from('crm_documents').select('id').eq('storage_path', path).maybeSingle();
+    let size = Number(b.size);
     if (!have) {
+      // No row without its file, and the file is what was said: a PDF, no bigger than allowed.
+      const { data: info } = await s.db.storage.from(DOCS_BUCKET).info(path);
+      if (!info) return siteJson({ error: 'busy', message: 'That file hasn’t arrived yet. It will try again.' }, 503);
+      if ((info.contentType && !MIME.includes(info.contentType)) || Number(info.size) > MAX_BYTES) {
+        await s.db.storage.from(DOCS_BUCKET).remove([path]);
+        return siteJson({ error: 'bad', message: 'That file can’t be sent. A PDF only, up to 15 MB.' }, 400);
+      }
+      if (Number(info.size) > 0) size = Number(info.size);
       const { data: ref } = await s.db.from('crm_projects').select('project_ref').eq('id', a.project_id).maybeSingle();
       const { error } = await s.db.from('crm_documents').insert({
         project_id: a.project_id,
@@ -59,7 +70,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         name: `${[(ref as { project_ref?: string } | null)?.project_ref, kind.title].filter(Boolean).join(' ')} (${name})`.slice(0, 200),
         storage_path: path,
         mime,
-        size: Number(b.size),
+        size,
         visible: false,
         source: 'site',
         handover_slot: kind.handover,

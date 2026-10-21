@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic';
 
 /** Wrong links from one address in 10 minutes before it has to wait. */
 const MAX_FAILED = 10;
+/** How long a job's link keeps opening after it's done (for the strike photos, a put right, the PO). */
+const LINK_DAYS_AFTER_DONE = 30;
 
 /**
  * The link in a trade's message → a session on this phone: { token, device?, standalone? }. Called
@@ -37,6 +39,12 @@ export async function POST(req: Request) {
   if (!data) return fail(404, PROBLEM.link);
   const a = assignmentRow(data);
   if (a.status === 'cancelled') return fail(410, PROBLEM.cancelled, a.id);
+  // A link is good while the job is open and for 30 days after it's done (ARCH 4.3), not for ever;
+  // longer only while a return to site is with them (their put right is done from it).
+  if (a.status === 'done' && a.done_at && Date.now() - Date.parse(a.done_at) > LINK_DAYS_AFTER_DONE * 86_400_000) {
+    const { data: open } = await db.from('site_returns').select('id').eq('assignment_id', a.id).eq('status', 'open').limit(1);
+    if (!open?.length) return fail(410, PROBLEM.link, a.id);
+  }
   const { data: c } = await db.from('site_contacts').select('*').eq('id', a.contact_id).maybeSingle();
   if (!c || c.archived_at) return fail(404, PROBLEM.gone, a.id);
 
@@ -73,7 +81,7 @@ export async function POST(req: Request) {
   const { data: p } = await db.from('crm_projects').select('address, postcode').eq('id', a.project_id).maybeSingle();
   return siteJson({
     ...(deviceToken ? { deviceToken } : {}),
-    contact: { name: c.name as string, first: firstNameOf(c.name as string) },
+    contact: { id: c.id as string, name: c.name as string, first: firstNameOf(c.name as string) },
     assignment: { id: a.id, trade: a.trade, title: a.trade === 'other' ? a.trade_label || TRADE_LABEL.other : TRADE_LABEL[a.trade], site: siteShort(p?.address, p?.postcode) },
   });
 }

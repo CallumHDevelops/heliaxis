@@ -90,9 +90,22 @@ export async function readLabel(bytes: Buffer, mime: string, key: string): Promi
 type ReadRow = { id: string; assignment_id: string; photo_id: string; key: string; status: string; attempts: number; result: LabelReadResult | null };
 const MAX_TRIES = 3;
 
-/** Queue a read for a photo (once). */
-export async function queueRead(db: Db, assignmentId: string, photoId: string, key: string) {
+/** Reads one assignment can queue (each at most MAX_TRIES calls): a leaked link can't run up the bill. */
+export const MAX_READS_PER_ASSIGNMENT = 150;
+
+/**
+ * Queue a read for a photo (once), only for a label slot (WHAT; hasOwn, so 'constructor' and the like
+ * don't pass) and while the assignment is under its cap. Every read goes through here (the upload's,
+ * /read, and the cron only retries rows that exist). False when it wasn't queued.
+ */
+export async function queueRead(db: Db, assignmentId: string, photoId: string, key: string): Promise<boolean> {
+  if (!Object.hasOwn(WHAT, key.split(':')[0])) return false;
+  const { data: had } = await db.from('site_reads').select('id').eq('photo_id', photoId).maybeSingle();
+  if (had) return true;
+  const { count } = await db.from('site_reads').select('id', { count: 'exact', head: true }).eq('assignment_id', assignmentId);
+  if ((count ?? 0) >= MAX_READS_PER_ASSIGNMENT) return false;
   await db.from('site_reads').upsert({ assignment_id: assignmentId, photo_id: photoId, key, status: 'queued' }, { onConflict: 'photo_id', ignoreDuplicates: true });
+  return true;
 }
 
 /**

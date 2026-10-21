@@ -290,15 +290,19 @@ export async function putRight(db: Db, a: AssignmentRow, b: PutRightInput, meta:
   const { data: p } = await db.from('crm_projects').select('address, postcode').eq('id', a.project_id).maybeSingle();
   const project = (p ?? {}) as { address?: string | null; postcode?: string | null };
   const address = [...String(project.address ?? '').split(/\n/).map((l) => l.trim()).filter(Boolean), (project.postcode ?? '').trim()].filter(Boolean).join(', ');
-  const shown = putRightDeclaration(ret.what, address);
-  const declaration = typeof b.declaration === 'string' && b.declaration.trim() ? b.declaration.trim().slice(0, 3000) : shown;
+  // What was signed is the declaration worded here, never the phone's text (that's kept on the history if it differs).
+  const declaration = putRightDeclaration(ret.what, address);
+  const phoneText = typeof b.declaration === 'string' ? b.declaration.trim().slice(0, 3000) : '';
+  const changed = !!phoneText && phoneText.replace(/\s+/g, ' ') !== declaration.replace(/\s+/g, ' ');
   const phoneAt = typeof b.signed_at === 'string' ? Date.parse(b.signed_at) : NaN;
   const signedAt = Number.isFinite(phoneAt) && Math.abs(phoneAt - Date.now()) <= CLOCK_SLACK_MS ? new Date(phoneAt).toISOString() : new Date().toISOString();
 
   await ensureDocsBucket();
-  const path = `signatures/${a.project_id}/site-putright-${ret.id}.png`;
+  // Its own file per attempt (never overwritten): two sends of the same put right at once can't leave
+  // one's signature on the other's record. The one that loses removes its file.
+  const path = `signatures/${a.project_id}/site-putright-${ret.id}-${randomUUID()}.png`;
   const png = Buffer.from(String(b.signature).split(',')[1] ?? '', 'base64');
-  const up = await db.storage.from(DOCS_BUCKET).upload(path, png, { contentType: 'image/png', upsert: true });
+  const up = await db.storage.from(DOCS_BUCKET).upload(path, png, { contentType: 'image/png', upsert: false });
   if (up.error) return { ok: false, status: 503, body: { error: 'busy', message: 'The signature didn’t save. It will try again.' } };
   const now = new Date().toISOString();
   const { data: done } = await db
@@ -321,12 +325,13 @@ export async function putRight(db: Db, a: AssignmentRow, b: PutRightInput, meta:
     .select('*');
   const fresh = ((done ?? []) as Record<string, unknown>[])[0];
   if (!fresh) {
+    await db.storage.from(DOCS_BUCKET).remove([path]).catch(() => null);
     // Another request sent it a moment ago: that's the one.
     const { data: again } = await db.from('site_returns').select('*').eq('id', ret.id).maybeSingle();
     return again ? { ok: true, ret: returnView(again as Record<string, unknown>), fresh: false } : { ok: false, status: 503, body: { error: 'busy', message: 'That didn’t save. It will try again.' } };
   }
   if (b.op_id && typeof b.op_id === 'string' && /^[0-9a-f-]{36}$/i.test(b.op_id)) await db.from('site_ops').insert({ assignment_id: a.id, op_id: b.op_id, kind: 'put-right' }).then(() => null, () => null);
-  await logSiteEvent(db, a.id, 'trade', 'put_right_signed', { return: n, name, photos: photos.length, device: meta.deviceId }, meta.ip);
+  await logSiteEvent(db, a.id, 'trade', 'put_right_signed', { return: n, name, photos: photos.length, device: meta.deviceId, ...(changed ? { declaration_phone: phoneText } : {}) }, meta.ip);
   const job = await jobOf(db, a.project_id);
   const where = siteShort(job.address, job.postcode) || job.ref || 'the job';
   const title = `${name} sent the put right at ${where}`;

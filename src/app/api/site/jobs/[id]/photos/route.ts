@@ -14,8 +14,8 @@ const isUuid = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f-]
 const MIME = ['image/jpeg', 'image/png', 'image/webp'];
 
 /**
- * <job>/site/<assignment>/<slot>/<phone's queue id>.jpg: named by the phone, so a retried upload overwrites
- * itself. In the job's own folder of crm-photos, so merging jobs moves them and deleting the customer
+ * <job>/site/<assignment>/<slot>/<phone's queue id>.jpg: named by the phone, so a retried upload finds
+ * itself (and is never overwritten). In the job's own folder of crm-photos, so merging jobs moves them and deleting the customer
  * removes them (crm/merge.ts, crm/delete-customer.ts).
  */
 const pathFor = (projectId: string, assignmentId: string, slot: string, clientId: string, mime: string) =>
@@ -53,9 +53,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await ensureCrmBucket();
     const path = pathFor(a.project_id, a.id, slot, clientId, mime);
     const store = s.db.storage.from(CRM_BUCKET);
-    const [main, thumb] = await Promise.all([store.createSignedUploadUrl(path, { upsert: true }), store.createSignedUploadUrl(thumbPath(path), { upsert: true })]);
-    if (main.error || thumb.error || !main.data || !thumb.data) return siteJson({ error: 'busy', message: 'Couldn’t get ready to send. It will try again.' }, 503);
-    return siteJson({ path, url: main.data.signedUrl, thumbPath: thumbPath(path), thumbUrl: thumb.data.signedUrl });
+    // Upload links that can't overwrite: a photo that's there (a retry after the upload landed) gets
+    // no link (null: the phone skips it), so a link kept back can't swap the photo after it's signed.
+    const link = async (p: string): Promise<string | null | undefined> => {
+      if ((await store.exists(p)).data) return null;
+      const r = await store.createSignedUploadUrl(p);
+      return r.error || !r.data ? undefined : r.data.signedUrl;
+    };
+    const [url, thumbUrl] = await Promise.all([link(path), link(thumbPath(path))]);
+    if (url === undefined || thumbUrl === undefined) return siteJson({ error: 'busy', message: 'Couldn’t get ready to send. It will try again.' }, 503);
+    return siteJson({ path, url, thumbPath: thumbPath(path), thumbUrl });
   }
 
   if (b.action === 'save') {
@@ -63,6 +70,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!SLOT.test(slot) || !MIME.includes(mime)) return siteJson({ error: 'bad', message: 'That photo can’t be sent.' }, 400);
     if (!open(slot)) return siteJson({ error: 'signed', message: 'This form is signed off. Ask the office to reopen it.' }, 409);
     const path = pathFor(a.project_id, a.id, slot, clientId, mime);
+    // No row without its photo: the photo and its thumbnail must have arrived (else the phone sends them again).
+    const { data: saved } = await s.db.from('crm_photos').select('id').eq('storage_path', path).maybeSingle();
+    if (!saved) {
+      const store = s.db.storage.from(CRM_BUCKET);
+      const [m, t] = await Promise.all([store.exists(path), store.exists(thumbPath(path))]);
+      if (!m.data || !t.data) return siteJson({ error: 'busy', message: 'That photo hasn’t arrived yet. It will try again.' }, 503);
+    }
     const takenAt = typeof b.taken_at === 'string' && !Number.isNaN(Date.parse(b.taken_at)) ? new Date(b.taken_at).toISOString() : null;
     const { error } = await s.db.from('crm_photos').upsert(
       {

@@ -313,7 +313,10 @@ export function ReviewDrawer({
                       </div>
                       <div>
                         <dt>Declaration</dt>
-                        <dd>{s.declaration}</dd>
+                        <dd>
+                          {s.declaration}
+                          {s.declaration_phone && <p className="sx-warnline">The phone sent other words, kept here but not recorded as signed: “{s.declaration_phone}”</p>}
+                        </dd>
                       </div>
                       <div>
                         <dt>Answers and photos signed</dt>

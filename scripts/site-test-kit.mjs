@@ -52,7 +52,7 @@ export const STUBS = {
   '@/lib/subcontractors/server': `
     import { createHash, randomBytes } from 'node:crypto';
     export const sha256 = (s) => createHash('sha256').update(s).digest('hex');
-    export const newToken = () => randomBytes(24).toString('base64url');
+    export function newToken() { const token = randomBytes(32).toString('base64url'); return { token, hash: sha256(token) }; }
     export const portalBaseUrl = (o) => (o || 'http://localhost:3000').replace(/\\/$/, '');
     export const clientIp = () => '203.0.113.7';
     export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -106,6 +106,8 @@ export function fakeDb() {
   const t = {};
   const rows = (name) => (t[name] ??= []);
   const files = new Map();
+  /** The content type each file was stored with (as the PUT said). */
+  const types = new Map();
   /** Every signed upload URL handed out: { bucket, path, upsert }. */
   const uploads = [];
   let poNo = 0;
@@ -225,13 +227,14 @@ export function fakeDb() {
         const k = `${bucket}/${path}`;
         if (files.has(k) && !o?.upsert) return { error: { message: 'The resource already exists', statusCode: '409' } };
         files.set(k, new Uint8Array(bytes));
+        if (o?.contentType) types.set(k, o.contentType);
         return { error: null };
       },
       download: async (path) => ({ data: files.has(`${bucket}/${path}`) ? new Blob([files.get(`${bucket}/${path}`)]) : null }),
       remove: async (paths) => (paths.forEach((p) => files.delete(`${bucket}/${p}`)), { error: null }),
       copy: async (a, b2) => (files.has(`${bucket}/${a}`) ? (files.set(`${bucket}/${b2}`, files.get(`${bucket}/${a}`)), { error: null }) : { error: { message: 'not found' } }),
       exists: async (path) => ({ data: files.has(`${bucket}/${path}`), error: null }),
-      info: async (path) => (files.has(`${bucket}/${path}`) ? { data: { size: files.get(`${bucket}/${path}`).length, contentType: 'application/pdf' }, error: null } : { data: null, error: { message: 'Object not found' } }),
+      info: async (path) => (files.has(`${bucket}/${path}`) ? { data: { size: files.get(`${bucket}/${path}`).length, contentType: types.get(`${bucket}/${path}`) ?? 'application/pdf' }, error: null } : { data: null, error: { message: 'Object not found' } }),
       list: async (prefix) => {
         const names = new Map();
         const pre = prefix ? `${bucket}/${prefix.replace(/\/$/, '')}/` : `${bucket}/`;
@@ -259,9 +262,18 @@ export function fakeDb() {
       p.checklist = c;
       return { data: c, error: null };
     }
+    if (name === 'site_answers_patch') {
+      // As site-commissioning.sql: the keys set and unset, the rev on, only while it's open (or late keys once signed).
+      const a = rows('site_assignments').find((x) => x.id === args.p_assignment && (['sent', 'opened', 'started'].includes(x.status) || (args.p_late && x.status === 'signed')));
+      if (!a) return { data: null, error: null };
+      const answers = { ...(a.answers ?? {}) };
+      for (const k of args.p_unset ?? []) delete answers[k];
+      Object.assign(a, { answers: { ...answers, ...structuredClone(args.p_set ?? {}) }, rev: Number(a.rev ?? 0) + 1, status: ['sent', 'opened'].includes(a.status) ? 'started' : a.status });
+      return { data: a.rev, error: null };
+    }
     return { data: null, error: { message: 'no rpc' } };
   };
-  return { t, rows, files, uploads, from, storage, rpc };
+  return { t, rows, files, types, uploads, from, storage, rpc };
 }
 
 let failed = 0;

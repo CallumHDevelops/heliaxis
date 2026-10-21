@@ -1,12 +1,21 @@
 import { DOCS_BUCKET, ensureDocsBucket } from '@/lib/crm/server';
 import { clientIp, validSignature } from '@/lib/subcontractors/server';
 import { deviceSession, isResponse, siteJson, theirAssignment } from '@/lib/site/device';
-import { CUSTOMER_SIGN_TITLE, type CustomerSignKind } from '@/lib/site/electrician-shared';
-import { logJob, logSiteEvent } from '@/lib/site/server';
+import { CUSTOMER_DECLARATION, CUSTOMER_SIGN_TITLE, type CustomerSignKind } from '@/lib/site/electrician-shared';
+import { logJob, logSiteEvent, type Db } from '@/lib/site/server';
 
 export const dynamic = 'force-dynamic';
 
 const KINDS: CustomerSignKind[] = ['f16e', 'g98'];
+
+/** The site's address as the trade's job pack shows it: the job's lines and its postcode (or the customer's). */
+async function siteAddress(db: Db, projectId: string): Promise<string> {
+  const { data: p } = await db.from('crm_projects').select('address, postcode, enquiry_id').eq('id', projectId).maybeSingle();
+  const { data: c } = p?.enquiry_id && !p.postcode ? await db.from('enquiries').select('postcode').eq('id', p.enquiry_id).maybeSingle() : { data: null };
+  const lines = String(p?.address ?? '').split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const postcode = String(p?.postcode || c?.postcode || '').trim();
+  return [...lines, postcode].filter(Boolean).join(', ');
+}
 /** A phone's clock more than this far out is replaced by the server's (as at sign-off). */
 const CLOCK_SLACK_MS = 72 * 3_600_000;
 
@@ -50,12 +59,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const up = await s.db.storage.from(DOCS_BUCKET).upload(path, Buffer.from(String(b.signature).split(',')[1] ?? '', 'base64'), { contentType: 'image/png', upsert: true });
   if (up.error) return siteJson({ error: 'busy', message: 'The signature didn’t save. It will try again.' }, 503);
   const ip = clientIp(req.headers);
+  // What the customer agreed to is worded here, as the phone shows it (CUSTOMER_DECLARATION, the site's
+  // address as the job pack gives it), never taken from the request; other words the phone sent are kept beside it.
+  const declaration = CUSTOMER_DECLARATION[kind](await siteAddress(s.db, a.project_id));
+  const phoneText = typeof b.declaration === 'string' ? b.declaration.trim().slice(0, 2000) : '';
   const entry = {
     name,
     signed_at: signedAt,
     received_at: new Date().toISOString(),
     path,
-    declaration: typeof b.declaration === 'string' ? b.declaration.trim().slice(0, 2000) : null,
+    declaration,
+    ...(phoneText && phoneText.replace(/\s+/g, ' ') !== declaration.replace(/\s+/g, ' ') ? { declaration_phone: phoneText } : {}),
     device: s.device.id,
     ip,
   };
