@@ -162,7 +162,24 @@ export function esc(s: unknown) {
 
 export const ADMIN_EMAIL = () => process.env.ADMIN_EMAIL || 'callum@heliaxis.co.uk';
 
-export async function sendEmail(opts: { to: string; subject: string; html: string; replyTo?: string; from?: string; text?: string }) {
+/** A file sent with an email: its name and bytes (sent to Resend as base64). */
+export type EmailAttachment = { filename: string; content: Uint8Array | Buffer; contentType?: string };
+
+/**
+ * Send through Resend. `attachments`: files to go with it (a PO's PDF). `idempotencyKey`: the same
+ * key within 24 hours sends once, however often it's retried (Resend's Idempotency-Key header), so a
+ * sign-off retried from a phone with flaky signal never emails twice. Replies with Resend's id.
+ */
+export async function sendEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+  from?: string;
+  text?: string;
+  attachments?: EmailAttachment[];
+  idempotencyKey?: string;
+}): Promise<{ ok: true; id: string | null } | { ok: false; error: string }> {
   const key = getResendApiKey();
   if (!key) {
     console.warn('[subcontractors] RESEND_API_KEY missing — email not sent:', opts.subject);
@@ -170,7 +187,11 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   }
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+      ...(opts.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey.slice(0, 256) } : {}),
+    },
     body: JSON.stringify({
       from: opts.from || 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
       to: [opts.to],
@@ -178,6 +199,15 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
       html: opts.html,
       text: opts.text,
       reply_to: opts.replyTo,
+      ...(opts.attachments?.length
+        ? {
+            attachments: opts.attachments.map((a) => ({
+              filename: a.filename,
+              content: Buffer.from(a.content).toString('base64'),
+              ...(a.contentType ? { content_type: a.contentType } : {}),
+            })),
+          }
+        : {}),
     }),
   });
   if (!res.ok) {
@@ -185,7 +215,8 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
     console.error('[subcontractors] email failed', body);
     return { ok: false, error: (body as { message?: string }).message || `Resend error ${res.status}` };
   }
-  return { ok: true as const };
+  const body = (await res.json().catch(() => ({}))) as { id?: string };
+  return { ok: true as const, id: body.id ?? null };
 }
 
 /** Brand-styled transactional email shell (inline styles only — email clients). */

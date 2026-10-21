@@ -1,6 +1,7 @@
 {
   "regions": ["lhr1"],
   "crons": [
-    { "path": "/api/cron/subcontractor-expiry", "schedule": "0 7 * * *" }
+    { "path": "/api/cron/subcontractor-expiry", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/site", "schedule": "5 7 * * *" }
   ]
 }

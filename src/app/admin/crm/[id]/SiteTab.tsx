@@ -1,14 +1,16 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { KIND_LABEL, sendTimeWords, type MessageKind } from '@/lib/site/messages';
 import { formatPence } from '@/lib/site/money';
-import type { AssignmentView, SiteTabData } from '@/lib/site/server';
+import type { SendResult } from '@/lib/site/send';
+import type { AssignmentView, SiteMessageView, SiteTabData } from '@/lib/site/server';
 import type { StripStep } from '@/lib/site/strip';
 import { TRADE_LABEL, type Trade } from '@/lib/site/types';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { agoShort, shortDate } from '../crm-shared';
 import { AssignmentSheet } from './AssignmentSheet';
-import { send } from './record-shared';
+import { copyText, send } from './record-shared';
 import './site.css';
 
 /**
@@ -22,6 +24,7 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
   const [error, setError] = useState('');
   const [sheet, setSheet] = useState<{ edit: AssignmentView | null; trade: Trade | null } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -43,6 +46,43 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
     onChanged();
   };
 
+  /** Send (by email, WhatsApp or both), copy the link, or open WhatsApp on this phone with the words. */
+  async function message(a: AssignmentView, opts: { via: 'email' | 'whatsapp' | 'both' | 'link'; kind?: MessageKind; rotate?: boolean; chat?: boolean }) {
+    // A window opened straight from the tap (a phone blocks one opened after the network round trip).
+    const win = opts.chat ? window.open('about:blank', '_blank') : null;
+    setBusy(a.id);
+    setError('');
+    try {
+      const r = await send<SendResult & { data: SiteTabData }>(`/api/crm/site-assignments/${a.id}/send`, 'POST', { via: opts.via, kind: opts.kind ?? 'job_pack', rotate: !!opts.rotate });
+      changed(r.data);
+      if (opts.chat) {
+        if (r.waHref && win) win.location.href = r.waHref;
+        else win?.close();
+        if (!r.waHref) setNotice(`${a.contact.name} has no mobile to WhatsApp.`);
+      } else if (opts.via === 'link') {
+        await copyText(r.link);
+        setNotice(opts.rotate ? 'New link copied. The old one has stopped working.' : 'Link copied.');
+      } else {
+        const queued = r.messages.filter((m) => m.status === 'queued');
+        const sent = r.messages.filter((m) => m.status === 'sent');
+        setNotice(
+          [
+            sent.length ? `Sent by ${[...new Set(sent.map((m) => (m.channel === 'email' ? 'email' : 'WhatsApp')))].join(' and ')}.` : '',
+            queued.length ? `Waiting to send at ${sendTimeWords(queued[0].send_after)}.` : '',
+            !r.messages.length ? 'Nothing new to send: it went already.' : '',
+            ...r.notes,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        );
+      }
+    } catch (e) {
+      win?.close();
+      setError(e instanceof Error ? e.message : 'Not sent. Try again.');
+    }
+    setBusy(null);
+  }
+
   async function cancel(a: AssignmentView) {
     if (!window.confirm(`Take ${a.contact.name} (${a.title.toLowerCase()}) off this job? Their link stops working straight away.`)) return;
     setBusy(a.id);
@@ -59,11 +99,22 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
   const gone = data.assignments.filter((a) => a.status === 'cancelled');
   const flags = live.flatMap((a) => a.flags.filter((f) => !f.resolved_at).map((f) => ({ a, f })));
   const pos = live.filter((a) => a.po);
+  // The scaffold once it's up: tagged (the roofer and electrician can be told to start) or not.
+  const up = live.find((a) => a.trade === 'scaffolder' && (a.status === 'signed' || a.status === 'done'));
+  const scaffold: 'tagged' | 'untagged' | null = up ? (up.tagged === false ? 'untagged' : 'tagged') : null;
 
   return (
     <div className="sx">
       <JobStrip steps={data.strip} />
       {error && <p className="crm-banner crm-banner--err">{error}</p>}
+      {notice && (
+        <p className="crm-banner" role="status">
+          {notice}{' '}
+          <button type="button" className="crm-link" onClick={() => setNotice('')}>
+            OK
+          </button>
+        </p>
+      )}
       <div className="sx-cols">
         <div className="sx-main">
           {live.length === 0 && (
@@ -75,7 +126,19 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
             </div>
           )}
           {live.map((a) => (
-            <AssignmentCard key={a.id} a={a} now={now} busy={busy === a.id} onEdit={() => setSheet({ edit: a, trade: null })} onCancel={() => void cancel(a)} />
+            <AssignmentCard
+              key={a.id}
+              a={a}
+              now={now}
+              busy={busy === a.id}
+              scaffold={scaffold}
+              onEdit={() => setSheet({ edit: a, trade: null })}
+              onCancel={() => void cancel(a)}
+              onMessage={(o) => void message(a, o)}
+              onHoldAll={() => {
+                for (const t of live.filter((x) => (x.trade === 'roofer' || x.trade === 'electrician') && x.status !== 'signed' && x.status !== 'done')) void message(t, { via: 'both', kind: 'scaffold_hold' });
+              }}
+            />
           ))}
           {gone.length > 0 && (
             <details className="sx-gone">
@@ -170,9 +233,47 @@ export function JobStrip({ steps }: { steps: StripStep[] }) {
   );
 }
 
-function AssignmentCard({ a, now, busy, onEdit, onCancel }: { a: AssignmentView; now: number; busy: boolean; onEdit: () => void; onCancel: () => void }) {
+/** "Emailed 10:42", "WhatsApp waiting to send at 07:00", "Email didn't go: …" for the latest of each. */
+function messageWords(list: SiteMessageView[]): { text: string; bad: boolean }[] {
+  const seen = new Set<string>();
+  const out: { text: string; bad: boolean }[] = [];
+  for (const m of list) {
+    const k = `${m.kind}:${m.channel}`;
+    if (seen.has(k) || m.status === 'cancelled') continue;
+    seen.add(k);
+    const how = m.channel === 'email' ? 'email' : 'WhatsApp';
+    const what = KIND_LABEL[m.kind as MessageKind] ?? m.kind;
+    if (m.status === 'queued') out.push({ text: `${what} by ${how}: waiting to send at ${sendTimeWords(m.send_after)}`, bad: false });
+    else if (m.status === 'sent') out.push({ text: `${what} sent by ${how} ${m.sent_at ? sendTimeWords(m.sent_at) : ''}`.trim(), bad: false });
+    else if (m.status === 'failed') out.push({ text: `${what} by ${how} didn’t go: ${m.error ?? 'try again'}`, bad: true });
+  }
+  return out.slice(0, 4);
+}
+
+function AssignmentCard({
+  a,
+  now,
+  busy,
+  scaffold,
+  onEdit,
+  onCancel,
+  onMessage,
+  onHoldAll,
+}: {
+  a: AssignmentView;
+  now: number;
+  busy: boolean;
+  scaffold: 'tagged' | 'untagged' | null;
+  onEdit: () => void;
+  onCancel: () => void;
+  onMessage: (o: { via: 'email' | 'whatsapp' | 'both' | 'link'; kind?: MessageKind; rotate?: boolean; chat?: boolean }) => void;
+  onHoldAll: () => void;
+}) {
   const open = a.flags.filter((f) => !f.resolved_at);
   const signed = a.status === 'signed' || a.status === 'done';
+  const msgs = messageWords(a.messages);
+  const working = !signed && (a.trade === 'roofer' || a.trade === 'electrician');
+  const first = a.contact.name.split(/\s+/)[0];
   return (
     <article className={`sx-card sx-card--${a.status}`} aria-label={`${a.title}: ${a.contact.name}`}>
       <header>
@@ -201,7 +302,7 @@ function AssignmentCard({ a, now, busy, onEdit, onCancel }: { a: AssignmentView;
         <dt>VAT</dt>
         <dd>{a.money.vat}</dd>
         <dt>CIS</dt>
-        <dd>{a.money.cis}</dd>
+        <dd>{a.money.cis.replace(/^CIS: /, '')}</dd>
       </dl>
       {a.money.preview && <p className="sx-preview">{a.money.preview}</p>}
       {a.forms_missing.length > 0 && (
@@ -228,10 +329,55 @@ function AssignmentCard({ a, now, busy, onEdit, onCancel }: { a: AssignmentView;
           ))}
         </ul>
       )}
+      {msgs.length > 0 && (
+        <ul className="sx-msgs">
+          {msgs.map((m) => (
+            <li key={m.text} className={m.bad ? 'is-bad' : undefined}>
+              {m.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {a.link.phones > 0 && <p className="sx-meta">{a.link.phones === 1 ? '1 phone has opened this link' : `${a.link.phones} phones opened this link`}</p>}
+      {working && scaffold === 'tagged' && (
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small sx-tell" disabled={busy} onClick={() => onMessage({ via: 'both', kind: 'clear_to_start' })}>
+          Tell {first} ({a.title.toLowerCase()}) they’re clear to start
+        </button>
+      )}
+      {a.trade === 'scaffolder' && scaffold === 'untagged' && (
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small sx-tell" disabled={busy} onClick={onHoldAll}>
+          Tell the roofer and electrician not to use it
+        </button>
+      )}
       <div className="sx-actions">
+        {!signed && (
+          <>
+            <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={busy} onClick={() => onMessage({ via: 'both' })}>
+              {a.sent_at ? 'Send the job pack again' : 'Send the job pack'}
+            </button>
+            <button type="button" className="crm-chipbtn" disabled={busy} onClick={() => onMessage({ via: 'link' })}>
+              Copy link
+            </button>
+            <button type="button" className="crm-chipbtn" disabled={busy || !a.contact.wa_id} onClick={() => onMessage({ via: 'link', chat: true })}>
+              WhatsApp from my phone
+            </button>
+          </>
+        )}
         <button type="button" className="crm-chipbtn" onClick={onEdit} disabled={busy}>
           {signed ? 'Details' : 'Edit'}
         </button>
+        {!signed && a.link.generation > 0 && (
+          <button
+            type="button"
+            className="crm-chipbtn"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm('Make a new link? The old one stops working straight away, on every phone that has it.')) onMessage({ via: 'link', rotate: true });
+            }}
+          >
+            New link
+          </button>
+        )}
         {!signed && (
           <button type="button" className="crm-chipbtn" onClick={onCancel} disabled={busy}>
             Take off the job

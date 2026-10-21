@@ -8,8 +8,8 @@ export type Trade = 'roofer' | 'scaffolder' | 'electrician' | 'other';
 export const TRADES: Trade[] = ['scaffolder', 'roofer', 'electrician', 'other'];
 export const isTrade = (v: unknown): v is Trade => TRADES.includes(v as Trade);
 export const TRADE_LABEL: Record<Trade, string> = { roofer: 'Roofer', scaffolder: 'Scaffolder', electrician: 'Electrician', other: 'Other trade' };
-/** The work in words, for messages: "the roofing at 12 High Street". */
-export const TRADE_WORK: Record<Trade, string> = { roofer: 'roofing', scaffolder: 'scaffolding', electrician: 'electrical work', other: 'work' };
+/** The work in words, for messages and job packs: "the roofing work at 12 High Street". */
+export const TRADE_WORK: Record<Trade, string> = { roofer: 'roofing work', scaffolder: 'scaffolding', electrician: 'electrical work', other: 'work' };
 
 /** draft → sent → opened (pack downloaded) → started (first answer or photo) → signed → done · cancelled. */
 export type AssignmentStatus = 'draft' | 'sent' | 'opened' | 'started' | 'signed' | 'done' | 'cancelled';

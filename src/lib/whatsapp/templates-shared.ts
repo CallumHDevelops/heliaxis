@@ -35,9 +35,14 @@ export type FieldKey =
   | 'quote_link'
   | 'when_words'
   | 'date_time'
-  | 'review_link';
+  | 'review_link'
+  | 'work_words'
+  | 'site_short'
+  | 'job_link'
+  | 'po_number'
+  | 'portal_link';
 
-export const FIELDS: Record<FieldKey, { label: string; example: string; help: string; token?: string }> = {
+export const FIELDS: Record<FieldKey, { label: string; example: string; help: string; token?: string; /** Filled by the app for its own templates: not offered for others. */ auto?: true }> = {
   first_name: { label: 'Customer’s first name', example: 'Sarah', help: 'From the customer’s name', token: 'first_name' },
   my_first_name: { label: 'Your first name', example: 'Callum', help: 'Whoever sends it', token: 'your_name' },
   interest: {
@@ -50,6 +55,12 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
   when_words: { label: 'When (“tomorrow”, “in 3 days”)', example: 'tomorrow', help: 'Filled in by the reminder' },
   date_time: { label: 'Date and time', example: 'Monday 3 November, 10:00', help: 'Filled in by the reminder' },
   review_link: { label: 'Google review link', example: 'https://g.page/r/CQx8HeliaxisReview/review', help: 'From CRM settings → Review requests' },
+  // Filled in by the site app (trades' job packs and POs) and the handover pack, never typed.
+  work_words: { label: 'The work and day', example: 'roofing work on Tuesday 3 November', help: 'Filled in by the site app', auto: true },
+  site_short: { label: 'Short site address', example: '12 High Street, NP20 4AB', help: 'Filled in by the site app', auto: true },
+  job_link: { label: 'Job pack link', example: 'https://subcontractor.heliaxis.co.uk/portal/site/j/Xk2pQ7mN', help: 'Filled in by the site app', auto: true },
+  po_number: { label: 'PO number', example: 'PO-0123', help: 'Filled in when a trade signs off', auto: true },
+  portal_link: { label: 'Customer portal link', example: 'https://heliaxis.co.uk/my/Xk2pQ7', help: 'Their customer portal link', auto: true },
 };
 
 /** The fields the "New template" form offers as insert chips, typed into the message as {token}. */
@@ -107,6 +118,8 @@ export type ReadyTemplate = {
   buttons: string[];
   /** The automatic job it's made for, if any. */
   job?: JobKey;
+  /** Examples Meta checks, when the fields' own (FIELDS) don't read well in this one. */
+  examples?: string[];
 };
 
 /**
@@ -181,7 +194,76 @@ export const READY_MADE: ReadyTemplate[] = [
     buttons: [],
     job: 'review',
   },
+  // The site app (to trades, never in a customer's chat picker: sendableTemplates leaves site_* out).
+  // No quick replies until trade replies are kept out of the leads (D20): the messages say "call us".
+  {
+    name: 'site_job_pack',
+    title: 'Trade: your job pack',
+    category: 'UTILITY',
+    use: 'Sent by the site app when a scaffolder, roofer or electrician is sent their job pack.',
+    body: 'Hi {{1}}, Heliaxis has booked you for the {{2}} at {{3}}. Your job pack, with everything you need on site, is here: {{4}} Please open it before you set off and add it to your home screen so it works with no signal. Any questions, call us on 01633 965205.',
+    fields: ['first_name', 'work_words', 'site_short', 'job_link'],
+    buttons: [],
+    examples: ['Dave', 'roofing work on Tuesday 3 November', '12 High Street, NP20 4AB', 'https://subcontractor.heliaxis.co.uk/portal/site/j/Xk2pQ7mN'],
+  },
+  {
+    name: 'site_po_raised',
+    title: 'Trade: PO raised',
+    category: 'UTILITY',
+    use: 'Sent by the site app when a trade signs off and their purchase order is raised.',
+    body: 'Hi {{1}}, thanks for signing off the {{2}} at {{3}}. Your purchase order number is {{4}}. Please quote it on your invoice. The full PO, with the CIS deduction and what you’ll be paid, is in your email and your job pack.',
+    fields: ['first_name', 'work_words', 'site_short', 'po_number'],
+    buttons: [],
+    examples: ['Dave', 'roofing work', '12 High Street, NP20 4AB', 'PO-0123'],
+  },
+  {
+    name: 'site_strike_photos',
+    title: 'Trade: scaffold strike photos',
+    category: 'UTILITY',
+    use: 'Sent by the site app the day after the scaffold’s down date, asking for the photos once it’s down.',
+    body: 'Hi {{1}}, when the scaffold at {{2}} comes down, please take the photos in your job pack so we both have a record: {{3}} Thanks, the Heliaxis team.',
+    fields: ['first_name', 'site_short', 'job_link'],
+    buttons: [],
+    examples: ['Dave', '12 High Street, NP20 4AB', 'https://subcontractor.heliaxis.co.uk/portal/site/j/Xk2pQ7mN'],
+  },
+  {
+    name: 'site_clear_to_start',
+    title: 'Trade: clear to start',
+    category: 'UTILITY',
+    use: 'From the Site tab, once the scaffold is up and tagged: tells the roofer or electrician they can start.',
+    body: 'Hi {{1}}, the scaffold at {{2}} is up and tagged, so you’re clear to start. Your job pack is here: {{3}} Any questions, call us on 01633 965205.',
+    fields: ['first_name', 'site_short', 'job_link'],
+    buttons: [],
+    examples: ['Dave', '12 High Street, NP20 4AB', 'https://subcontractor.heliaxis.co.uk/portal/site/j/Xk2pQ7mN'],
+  },
+  {
+    name: 'site_scaffold_hold',
+    title: 'Trade: don’t use the scaffold yet',
+    category: 'UTILITY',
+    use: 'From the Site tab, when the scaffold went up without a tag: tells the roofer and electrician not to use it yet.',
+    body: 'Hi {{1}}, please don’t use the scaffold at {{2}} yet: it hasn’t been tagged. We’ll message you as soon as it’s safe. Any questions, call us on 01633 965205.',
+    fields: ['first_name', 'site_short'],
+    buttons: [],
+    examples: ['Dave', '12 High Street, NP20 4AB'],
+  },
+  {
+    name: 'handover_pack_ready',
+    title: 'Handover pack ready',
+    category: 'UTILITY',
+    use: 'Sent when the customer’s handover pack goes into their portal.',
+    body: 'Hi {{1}}, your Heliaxis handover pack is ready. Your certificates, warranties and guides are all in one place here: {{2}} Any questions, just reply here.',
+    fields: ['first_name', 'portal_link'],
+    buttons: [],
+    examples: ['Sarah', 'https://heliaxis.co.uk/my/Xk2pQ7'],
+  },
 ];
+
+/** Templates the site app sends to trades: never offered in a customer's chat. */
+export const isSiteTemplate = (name: string) => name.startsWith('site_');
+
+/** The templates a customer's chat can offer: approved, sendable, and none of the site app's trade ones. */
+export const customerSendable = <T extends Pick<WaTemplate, 'name' | 'status' | 'sendable'>>(items: T[]) =>
+  items.filter((t) => t.status === 'APPROVED' && t.sendable && !isSiteTemplate(t.name));
 
 export const readyMade = (name: string) => READY_MADE.find((t) => t.name === name);
 
