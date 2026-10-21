@@ -1,15 +1,35 @@
+/* Colours: the theme's tokens (src/app/theme.css), light and dark; the page's own names point at them
+   (--muted and --ok are the tokens themselves). */
 .enq-page {
-  --ink: #211f18;
-  --muted: #6e6a5e;
-  --line: rgba(33, 31, 24, 0.14);
-  --card: #fffdf8;
-  --paper: #f7f2e7;
-  --amber-2: #c77f04;
-  --ok: #3f7d4e;
-  --solar: #f8bc1e;
+  --ink: var(--text);
+  --line: var(--border);
+  --card: var(--surface);
+  --paper: var(--bg);
+  --amber-2: var(--accent-text);
+  --solar: var(--accent);
+  /* Tuned on purpose, with dark values below: Lost's brick red, the Meta ad chip's blue, the map's
+     placeholder, a ticked row on phones and the selection bar's shadow. */
+  --enq-lost: #b4462f;
+  --enq-lost-rgb: 180 70 47;
+  --enq-meta: #1559b8;
+  --enq-meta-tint: rgba(24, 119, 242, 0.1);
+  --enq-map: #dfe7e2;
+  --enq-picked: #fff6dc;
+  --enq-shadow: rgb(var(--fg-rgb) / 0.08);
   --display: 'Segoe UI', system-ui, sans-serif;
   --mono: ui-monospace, 'Cascadia Code', Menlo, monospace;
   color: var(--ink);
+}
+@media screen {
+  :root[data-theme='dark'] .enq-page {
+    --enq-lost: var(--danger);
+    --enq-lost-rgb: var(--danger-rgb);
+    --enq-meta: var(--info);
+    --enq-meta-tint: rgb(var(--info-rgb) / 0.16);
+    --enq-map: var(--surface-2);
+    --enq-picked: rgb(var(--accent-rgb) / 0.14);
+    --enq-shadow: rgba(0, 0, 0, 0.45);
+  }
 }
 
 .enq-head {
@@ -64,7 +84,7 @@
 /* The cards are filters: click New and it lights up in its own colour, the rest dim, the list shows only New. */
 .enq-so {
   --so: var(--ink);
-  --so-tint: rgba(33, 31, 24, 0.05);
+  --so-tint: rgb(var(--fg-rgb) / 0.05);
   appearance: none;
   display: block;
   width: 100%;
@@ -79,16 +99,16 @@
 }
 .so-New {
   --so: var(--amber-2);
-  --so-tint: rgba(248, 188, 30, 0.14);
+  --so-tint: rgb(var(--accent-rgb) / 0.14);
 }
 .so-Contacted,
 .so-Won {
   --so: var(--ok);
-  --so-tint: rgba(63, 125, 78, 0.09);
+  --so-tint: rgb(var(--ok-rgb) / 0.09);
 }
 .so-Lost {
-  --so: #b4462f;
-  --so-tint: rgba(180, 70, 47, 0.08);
+  --so: var(--enq-lost);
+  --so-tint: rgb(var(--enq-lost-rgb) / 0.08);
 }
 .enq-so:hover {
   border-color: var(--so);
@@ -139,24 +159,25 @@
   display: inline-block;
 }
 .st-New {
-  background: rgba(248, 188, 30, 0.18);
+  background: rgb(var(--accent-rgb) / 0.18);
   color: var(--amber-2);
 }
 .st-Contacted {
-  background: rgba(63, 125, 78, 0.14);
+  background: rgb(var(--ok-rgb) / 0.14);
   color: var(--ok);
 }
 .st-Quoted {
-  background: rgba(33, 31, 24, 0.08);
+  background: rgb(var(--fg-rgb) / 0.08);
   color: var(--ink);
 }
 .st-Won {
   background: var(--ok);
-  color: #fff;
+  color: var(--on-solid);
 }
 .st-Lost {
-  background: rgba(180, 70, 47, 0.14);
-  color: #b4462f;
+  background: rgb(var(--enq-lost-rgb) / 0.14);
+  /* The theme red: brick red on its tint fell just short of AA (4.4:1). */
+  color: var(--danger);
 }
 
 .enq-panel {
@@ -212,9 +233,9 @@
   box-sizing: border-box;
   margin-bottom: 12px;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
-  background: var(--card);
+  background: var(--field);
   color: var(--ink);
   font: inherit;
   font-size: 1rem; /* 16px: phones don't zoom in on it */
@@ -224,7 +245,7 @@
   font-size: 0.6rem;
   text-transform: uppercase;
   padding: 4px 6px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 2px;
   background: var(--paper);
 }
@@ -232,8 +253,8 @@
   padding: 5px 10px;
   font-size: 0.78rem;
   font-weight: 700;
-  background: var(--ink);
-  color: #fff;
+  background: var(--inverse);
+  color: var(--inverse-text);
   border: none;
   border-radius: 2px;
   cursor: pointer;
@@ -255,7 +276,7 @@
   border-radius: 4px;
   overflow: hidden;
   position: relative;
-  background: #dfe7e2;
+  background: var(--enq-map);
   margin: 14px 0;
 }
 .enq-map iframe {
@@ -272,7 +293,8 @@
   z-index: 2;
   font-family: var(--mono);
   font-size: 0.62rem;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgb(var(--surface-rgb) / 0.9);
+  color: var(--text);
   padding: 3px 7px;
   border-radius: 2px;
   pointer-events: none;
@@ -281,7 +303,7 @@
 .enq-modal {
   position: fixed;
   inset: 0;
-  background: rgba(33, 31, 24, 0.45);
+  background: var(--scrim);
   display: grid;
   place-items: center;
   z-index: 80;
@@ -364,8 +386,8 @@
   font-size: 0.8rem;
 }
 .enq-int.on {
-  background: rgba(248, 188, 30, 0.12);
-  border-color: rgba(248, 188, 30, 0.45);
+  background: rgb(var(--accent-rgb) / 0.12);
+  border-color: rgb(var(--accent-rgb) / 0.45);
 }
 .enq-int.off {
   opacity: 0.4;
@@ -396,6 +418,7 @@
 .enq-btn.solar {
   background: var(--solar);
   border-color: transparent;
+  color: var(--accent-ink);
 }
 
 .enq-head-actions {
@@ -502,9 +525,9 @@ a.enq-refresh {
   cursor: default;
 }
 .enq-btn-danger {
-  background: #b4462f;
+  background: var(--enq-lost);
   border-color: transparent;
-  color: #fff;
+  color: var(--on-solid);
 }
 .enq-btn-end {
   margin-left: auto;
@@ -535,7 +558,7 @@ a.enq-refresh {
   display: block;
 }
 .enq-tbl tr.is-picked {
-  background: rgba(248, 188, 30, 0.12);
+  background: rgb(var(--accent-rgb) / 0.12);
 }
 /* Stays in view at the bottom of the screen (above the phone tab bar) while you tick down the list. */
 .enq-selbar {
@@ -551,7 +574,7 @@ a.enq-refresh {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 4px;
-  box-shadow: 0 -4px 14px rgba(33, 31, 24, 0.08);
+  box-shadow: 0 -4px 14px var(--enq-shadow);
   font-size: 0.88rem;
   font-weight: 600;
 }
@@ -567,8 +590,8 @@ a.enq-refresh {
   gap: 10px;
   margin-bottom: 14px;
   padding: 10px 12px;
-  background: rgba(63, 125, 78, 0.08);
-  border: 1px solid rgba(63, 125, 78, 0.35);
+  background: rgb(var(--ok-rgb) / 0.08);
+  border: 1px solid rgb(var(--ok-rgb) / 0.35);
   border-radius: 4px;
   font-size: 0.9rem;
   line-height: 1.45;
@@ -576,7 +599,7 @@ a.enq-refresh {
 .enq-notice ul {
   margin: 6px 0 0;
   padding-left: 1.1rem;
-  color: #b4462f;
+  color: var(--enq-lost);
   font-size: 0.85rem;
 }
 .enq-notice .enq-close {
@@ -597,8 +620,8 @@ a.enq-refresh {
 .enq-del-warn {
   margin: 12px 0;
   padding: 10px 12px;
-  background: rgba(180, 70, 47, 0.07);
-  border: 1px solid rgba(180, 70, 47, 0.35);
+  background: rgb(var(--enq-lost-rgb) / 0.07);
+  border: 1px solid rgb(var(--enq-lost-rgb) / 0.35);
   border-radius: 4px;
   font-size: 0.88rem;
   line-height: 1.45;
@@ -619,7 +642,7 @@ a.enq-refresh {
   width: 18px;
   height: 18px;
   margin: 0;
-  accent-color: #b4462f;
+  accent-color: var(--enq-lost);
 }
 .enq-del-warn .enq-del-hint {
   color: var(--muted);
@@ -647,13 +670,13 @@ a.enq-refresh {
   font: inherit;
   font-size: 16px;
   letter-spacing: 0.08em;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 2px;
-  background: #fff;
+  background: var(--field);
 }
 .enq-del-err {
   margin: 10px 0 0;
-  color: #b4462f;
+  color: var(--enq-lost);
   font-size: 0.88rem;
 }
 ul.enq-del-err {
@@ -661,8 +684,8 @@ ul.enq-del-err {
 }
 @media (max-width: 640px) {
   .enq-tbl tr.is-picked {
-    background: #fff6dc;
-    border-color: rgba(248, 188, 30, 0.6);
+    background: var(--enq-picked);
+    border-color: rgb(var(--accent-rgb) / 0.6);
   }
   .enq-selbar .enq-btn-danger {
     width: 100%;
@@ -710,7 +733,7 @@ ul.enq-del-err {
   min-width: 1.4em;
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   font-size: 0.74rem;
   font-weight: 700;
   text-align: center;
@@ -723,13 +746,13 @@ ul.enq-del-err {
   outline-offset: 2px;
 }
 .enq-src[aria-pressed='true'] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #fff;
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-text);
 }
 .enq-src[aria-pressed='true'] .c {
   background: var(--solar);
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 /* A Meta lead's ad under its name. */
 .enq-ad {
@@ -757,8 +780,8 @@ ul.enq-del-err {
   text-transform: uppercase;
   padding: 1px 5px;
   border-radius: 2px;
-  background: rgba(24, 119, 242, 0.1);
-  color: #1559b8;
+  background: var(--enq-meta-tint);
+  color: var(--enq-meta);
 }
 /* Phones: one row (it scrolls sideways if the counts get long), without the "From". */
 @media (max-width: 640px) {

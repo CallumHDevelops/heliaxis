@@ -44,6 +44,35 @@ const ALLOWED_LITERALS = {
   // Metis's tile is brand artwork: ink with a gold glyph in both themes.
   'src/components/admin/MetisIcon.tsx': ['#ffd35c', '#e3a014', '#211f18'],
 };
+/** Area A, the CRM: home, board and list, the job record (all its tabs, sheets, fabs and the merge sheet),
+    customers, projects, purchase orders, reports and the surveys tool. */
+const CONVERTED_CRM = [
+  'src/app/admin/crm/crm.css',
+  'src/app/admin/crm/merge.css',
+  'src/app/admin/crm/[id]/extras.css',
+  'src/app/admin/crm/[id]/handover.css',
+  'src/app/admin/crm/[id]/site.css',
+  'src/app/admin/crm/[id]/site-eic.css',
+  'src/app/admin/crm/reports/reports.css',
+  'src/app/admin/crm/settings/handover-settings.css',
+  'src/app/admin/enquiries/enquiries.css',
+  'src/app/admin/projects/projects.css',
+  'src/app/admin/projects/orders/orders.css',
+  'src/app/admin/surveys/diary.css',
+  'src/app/admin/surveys/surveys.css',
+  ...['CrmBoard', 'CrmBoardView', 'CrmCard', 'CrmHome', 'CrmListView', 'CrmSearch', 'CrmUi', 'LatestNotes', 'MergeSheet', 'MyWork', 'NeedsReply', 'page'].map((f) => `src/app/admin/crm/${f}.tsx`),
+  ...['ActivityTab', 'AssignmentSheet', 'CustomerColumn', 'HandoverCard', 'HandoverSheets', 'HandoverTab', 'PhotosTab', 'ProjectExtras', 'ProjectView', 'RecordFabs', 'RecordHeader', 'RecordSheets', 'ReviewDrawer', 'SiteEic', 'SiteElectrician', 'SitePeople', 'SiteReviewPanel', 'SiteTab', 'TasksCard', 'page', 'record-page'].map((f) => `src/app/admin/crm/[id]/${f}.tsx`),
+  ...['reports/CrmReports', 'reports/page', 'settings/CrmSettingsView', 'settings/HandoverSettings', 'settings/page'].map((f) => `src/app/admin/crm/${f}.tsx`),
+  ...['DeleteCustomers', 'EnquiriesCrm', 'page'].map((f) => `src/app/admin/enquiries/${f}.tsx`),
+  ...['NewProjectSheet', 'NewProjectTrades', 'ProjectsBoard', 'page', '[id]/ProjectOverview', '[id]/page'].map((f) => `src/app/admin/projects/${f}.tsx`),
+  ...['OrderSheet', 'OrdersPage', 'OrdersTab', 'OrdersUi', 'SupplierForm', 'page'].map((f) => `src/app/admin/projects/orders/${f}.tsx`),
+  ...['DiaryEntrySheet', 'DiaryView', 'FindTimeSheet', 'NewSurveySheet', 'SurveysList', 'page', 'done/page', 'drafts/page', 'settings/BookingSettingsView', 'settings/page', 'shell/page', 'start/page', 'todo/page'].map((f) => `src/app/admin/surveys/${f}.tsx`),
+  ...['AshpSurvey', 'MarkupEditor', 'PhotoRun', 'PhotoSlot', 'SurveyForm', 'page', 'report/SurveyReport', 'report/page'].map((f) => `src/app/admin/surveys/[id]/${f}.tsx`),
+];
+CONVERTED.push(...CONVERTED_CRM);
+// Mark-up drawn onto survey photos (saved into the image and the report): the same in both themes.
+ALLOWED_LITERALS['src/app/admin/surveys/[id]/MarkupEditor.tsx'] = ['#F8BC1E', '#E02424', '#111'];
+ALLOWED_LITERALS['src/app/admin/surveys/[id]/PhotoSlot.tsx'] = ['rgba(0'];
 /** Still keyed on the phone's setting; their areas convert them to html[data-theme]. */
 const LEFTOVERS = ['src/app/portal/(onboarding)/portal.css', 'src/components/subcontractors/doc-viewer.css'];
 /** Not themed: the public website, the CMS editor (pinned light), the brand page. */

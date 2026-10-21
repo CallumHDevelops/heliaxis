@@ -11,8 +11,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   align-items: start;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1rem 1.1rem;
 }
@@ -22,7 +22,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--amber-2);
+  color: var(--accent-text);
 }
 .hv-head {
   margin: 0.3rem 0 0.5rem;
@@ -33,7 +33,7 @@
 .hv-bar {
   height: 8px;
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--bg);
   overflow: hidden;
   max-width: 420px;
 }
@@ -68,15 +68,15 @@
   margin: 0;
   padding: 0.65rem 0.9rem;
   border-radius: 10px;
-  background: rgba(248, 188, 30, 0.14);
-  border: 1px solid rgba(199, 127, 4, 0.35);
+  background: rgb(var(--accent-rgb) / 0.14);
+  border: 1px solid var(--accent-line);
   font-size: 0.9rem;
 }
 .hv-next,
 .hv-prep {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--solar);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
   border-radius: 10px;
   padding: 0.8rem 1rem;
 }
@@ -112,23 +112,23 @@
   color: inherit;
   cursor: pointer;
   padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--solar);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
   border-radius: 10px;
-  background: var(--card);
+  background: var(--surface);
 }
 .hv-card__lab {
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--amber-2);
+  color: var(--accent-text);
 }
 .hv-card__bar {
   display: block;
   height: 6px;
   border-radius: 999px;
-  background: var(--paper);
+  background: var(--bg);
   overflow: hidden;
 }
 .hv-card__bar span {
@@ -158,14 +158,14 @@
   gap: 0.45rem;
 }
 .hv-row {
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.7rem 0.9rem;
 }
 .hv-row--missing,
 .hv-row--stale {
-  border-left: 4px solid var(--amber-2);
+  border-left: 4px solid var(--accent-text);
 }
 .hv-row--complete {
   border-left: 4px solid var(--ok);
@@ -205,7 +205,7 @@
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--muted);
-  background: var(--paper);
+  background: var(--bg);
   border-radius: 4px;
   padding: 1px 5px;
 }
@@ -215,10 +215,10 @@
 }
 .hv-row__why {
   font-size: 0.86rem;
-  color: var(--ink);
+  color: var(--text);
 }
 .hv-row__why.is-act {
-  color: #8a5300;
+  color: var(--accent-text);
   font-weight: 700;
 }
 .hv-tech {
@@ -240,25 +240,25 @@
   width: fit-content;
 }
 .hv-state--complete {
-  background: rgba(63, 125, 78, 0.12);
+  background: rgb(var(--ok-rgb) / 0.12);
   color: var(--ok);
 }
 .hv-state--missing {
-  background: rgba(248, 188, 30, 0.22);
-  color: #7a4a00;
+  background: rgb(var(--accent-rgb) / 0.22);
+  color: var(--accent-text);
 }
 .hv-state--stale {
-  background: rgba(248, 188, 30, 0.22);
-  color: #7a4a00;
+  background: rgb(var(--accent-rgb) / 0.22);
+  color: var(--accent-text);
 }
 .hv-state--waiting {
-  background: var(--paper);
+  background: var(--bg);
   color: var(--muted);
 }
 .hv-state--na {
   background: transparent;
   color: var(--muted);
-  border: 1px dashed var(--line);
+  border: 1px dashed var(--border);
 }
 .hv-state--inline {
   margin: 0.2rem 0 0.4rem;
@@ -287,11 +287,11 @@
   gap: 0.15rem;
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
-  background: var(--paper);
+  background: var(--bg);
 }
 .hv-doc__name {
   font-weight: 700;
-  color: var(--ink);
+  color: var(--text);
   word-break: break-word;
 }
 .hv-doc small {
@@ -329,14 +329,14 @@
   padding: 0.7rem 0.75rem;
   min-height: 48px;
   box-sizing: border-box;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 9px;
-  background: var(--card);
+  background: var(--surface);
   cursor: pointer;
 }
 .hv-pick.on {
-  border-color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--ink);
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text);
 }
 .hv-pick small {
   color: var(--muted);
@@ -354,13 +354,13 @@
   padding: 0.6rem 0.75rem;
   min-height: 46px;
   box-sizing: border-box;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 9px;
-  background: var(--card);
+  background: var(--surface);
   cursor: pointer;
 }
 .hv-radio label.on {
-  border-color: var(--ink);
+  border-color: var(--text);
 }
 .hv-tell {
   margin: 0.4rem 0;
@@ -372,8 +372,8 @@
 }
 .hv-decl {
   font-size: 0.86rem;
-  background: var(--card);
-  border-left: 3px solid var(--solar);
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
   padding: 0.55rem 0.7rem;
   margin: 0.4rem 0;
 }
@@ -382,8 +382,8 @@
   margin: 0.35rem 0.35rem 0 0;
   padding: 0.45rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid rgba(199, 127, 4, 0.45);
-  background: rgba(248, 188, 30, 0.14);
+  border: 1px solid var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.14);
   font: inherit;
   font-size: 0.84rem;
   cursor: pointer;
@@ -412,8 +412,8 @@
   gap: 0.6rem;
   align-items: center;
   padding: 0.55rem 0.7rem;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
 .hv-copy span {
@@ -432,8 +432,8 @@
 .hv-block {
   padding: 0.6rem 0.8rem;
   border-radius: 9px;
-  background: rgba(248, 188, 30, 0.14);
-  border: 1px solid rgba(199, 127, 4, 0.35);
+  background: rgb(var(--accent-rgb) / 0.14);
+  border: 1px solid var(--accent-line);
   margin: 0.4rem 0;
 }
 .hv-block ul {
@@ -445,13 +445,22 @@
   gap: 0.2rem;
   margin: 0.4rem 0;
 }
+/* The message as WhatsApp shows it: its own bubble green on light, the theme's green bubble on dark. */
 .hv-preview {
+  --hv-bubble: #dcf8c6;
+  --hv-bubble-text: #1c2a12;
   margin: 0.5rem 0;
   padding: 0.6rem 0.8rem;
   border-radius: 10px;
-  background: #dcf8c6;
-  color: #1c2a12;
+  background: var(--hv-bubble);
+  color: var(--hv-bubble-text);
   font-size: 0.88rem;
+}
+@media screen {
+  :root[data-theme='dark'] .hv-preview {
+    --hv-bubble: var(--wa-soft);
+    --hv-bubble-text: var(--text);
+  }
 }
 .hv-when {
   font-weight: 700;

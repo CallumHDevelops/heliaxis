@@ -9,7 +9,7 @@
   display: inline-block;
   padding: 2px 7px;
   border-radius: 3px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 800;
@@ -19,44 +19,44 @@
   white-space: nowrap;
 }
 .po-chip--sent {
-  background: rgba(248, 188, 30, 0.22);
-  color: var(--amber-2);
+  background: rgb(var(--accent-rgb) / 0.22);
+  color: var(--accent-text);
 }
 .po-chip--confirmed {
-  background: rgba(44, 110, 180, 0.12);
-  color: var(--blue, #2c5f99);
+  background: rgb(var(--info-rgb) / 0.12);
+  color: var(--info);
 }
 .po-chip--delivered {
-  background: rgba(63, 125, 78, 0.15);
+  background: rgb(var(--ok-rgb) / 0.15);
   color: var(--ok);
 }
 .po-chip--cancelled {
-  background: rgba(179, 38, 30, 0.08);
-  color: var(--err);
+  background: rgb(var(--danger-rgb) / 0.08);
+  color: var(--danger);
   text-decoration: line-through;
 }
 /* A trade's labour PO (raised by their sign-off), beside the name where a supplier would be. */
 .po-chip--labour {
-  background: rgba(33, 31, 24, 0.82);
-  color: #fff;
+  background: rgb(var(--fg-rgb) / 0.82);
+  color: var(--inverse-text);
   vertical-align: 1px;
 }
 .po-chip.is-late,
 .po-chip--changed {
-  background: rgba(179, 38, 30, 0.1);
-  color: var(--err);
+  background: rgb(var(--danger-rgb) / 0.1);
+  color: var(--danger);
 }
 /* A labour PO's review of the work (the office's Green light / Return to site required). */
 .po-chip--review-waiting {
-  background: rgba(33, 31, 24, 0.05);
+  background: rgb(var(--fg-rgb) / 0.05);
   color: var(--muted);
 }
 .po-chip--review-hold {
-  background: rgba(179, 38, 30, 0.12);
-  color: var(--err);
+  background: rgb(var(--danger-rgb) / 0.12);
+  color: var(--danger);
 }
 .po-chip--review-green {
-  background: rgba(63, 125, 78, 0.15);
+  background: rgb(var(--ok-rgb) / 0.15);
   color: var(--ok);
 }
 /* A labour PO's review of the work, as a line under who it's for (OrdersUi ReviewLine). */
@@ -64,7 +64,7 @@
   font-weight: 700;
 }
 .po-who .po-review--hold {
-  color: var(--err);
+  color: var(--danger);
 }
 .po-who .po-review--green {
   color: var(--ok);
@@ -86,28 +86,28 @@
   color: var(--muted);
 }
 .po-late {
-  color: var(--err);
+  color: var(--danger);
   font-weight: 700;
 }
 .po-tbc {
-  color: var(--amber-2);
+  color: var(--accent-text);
   font-weight: 600;
 }
 .po-pre {
   white-space: pre-line;
 }
 .crm-banner.po-ok {
-  background: rgba(63, 125, 78, 0.1);
-  border-color: rgba(63, 125, 78, 0.3);
+  background: rgb(var(--ok-rgb) / 0.1);
+  border-color: rgb(var(--ok-rgb) / 0.3);
   color: var(--ok);
 }
 .po-danger {
-  color: var(--err) !important;
+  color: var(--danger) !important;
 }
 .po-btn--danger {
-  background: var(--err);
-  border-color: var(--err);
-  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-solid);
 }
 .po-hint {
   font-weight: 600;
@@ -145,9 +145,9 @@
 }
 .po-list {
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--card);
+  background: var(--surface);
 }
 .po-row {
   display: grid;
@@ -158,9 +158,9 @@
   min-height: 52px;
   padding: 9px 14px;
   border: 0;
-  border-top: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+  border-top: 1px solid var(--border-soft);
   background: none;
-  color: var(--ink);
+  color: var(--text);
   font: inherit;
   text-align: left;
   text-decoration: none;
@@ -170,19 +170,19 @@
   border-top: 0;
 }
 .po-row:hover {
-  background: rgba(248, 188, 30, 0.07);
+  background: rgb(var(--accent-rgb) / 0.07);
 }
 .po-row:focus-visible {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 .po-row.is-late {
-  box-shadow: inset 3px 0 0 var(--err);
+  box-shadow: inset 3px 0 0 var(--danger);
 }
 .po-row--head {
   min-height: 0;
   padding: 7px 14px;
-  background: rgba(33, 31, 24, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
@@ -191,7 +191,7 @@
   cursor: default;
 }
 .po-row--head:hover {
-  background: rgba(33, 31, 24, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
 }
 .po-no {
   font: 700 12.5px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -214,7 +214,7 @@
   font-size: 12.5px;
 }
 .po-when.po-late {
-  color: var(--err);
+  color: var(--danger);
 }
 .po-amt {
   font-variant-numeric: tabular-nums;
@@ -231,7 +231,7 @@
 .po-emptytab {
   margin: 0;
   padding: 18px 16px;
-  border: 1px dashed var(--line);
+  border: 1px dashed var(--border);
   border-radius: 12px;
   color: var(--muted);
   text-align: center;
@@ -290,7 +290,7 @@
   gap: 6px 10px;
 }
 .po-joblink {
-  color: var(--amber-2);
+  color: var(--accent-text);
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
@@ -321,9 +321,9 @@
   gap: 2px;
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--card);
+  background: var(--surface);
   font-size: 13.5px;
   overflow-wrap: anywhere;
 }
@@ -357,9 +357,9 @@
 .po-note,
 .po-invoice {
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--card);
+  background: var(--surface);
 }
 .po-note .crm-label {
   margin-top: 0;
@@ -379,9 +379,9 @@
 /* The lines, read */
 .po-lines {
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--card);
+  background: var(--surface);
 }
 .po-line {
   display: grid;
@@ -389,7 +389,7 @@
   align-items: baseline;
   gap: 10px;
   padding: 8px 12px;
-  border-top: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+  border-top: 1px solid var(--border-soft);
   font-size: 13.5px;
 }
 .po-lines--got .po-line {
@@ -397,7 +397,7 @@
 }
 .po-line--head {
   border-top: 0;
-  background: rgba(33, 31, 24, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 800;
@@ -448,12 +448,13 @@
   margin-top: 4px;
   padding: 7px 10px;
   border-radius: 6px;
-  background: var(--solar);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 15px;
   font-weight: 800;
 }
 .po-totals__gross dt {
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 .po-totals p {
   margin: 6px 10px 0;
@@ -471,8 +472,8 @@
   gap: 8px;
   margin: 4px -1rem -1.2rem;
   padding: 10px 1rem 12px;
-  border-top: 1px solid var(--line);
-  background: var(--paper);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 .po-actions__end {
   display: inline-flex;
@@ -490,9 +491,9 @@
   flex-direction: column;
   gap: 2px;
   padding: 12px 14px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--card);
+  background: var(--surface);
 }
 .po-panel h3 {
   margin: 0 0 4px;
@@ -525,7 +526,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+  border-bottom: 1px solid var(--border-soft);
   font-size: 14px;
 }
 .po-got li > span {
@@ -569,17 +570,17 @@
 .po-locked {
   margin: 0;
   padding: 9px 11px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(33, 31, 24, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
   font-size: 14px;
 }
 .po-supform {
   margin-top: 8px;
   padding: 2px 12px 12px;
-  border: 1px solid rgba(199, 127, 4, 0.35);
+  border: 1px solid var(--accent-line);
   border-radius: 10px;
-  background: rgba(248, 188, 30, 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
 }
 .po-supform .crm-grid2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -623,8 +624,8 @@
 }
 .po-eline .crm-input[aria-invalid='true'],
 .po-edit .crm-input[aria-invalid='true'] {
-  border-color: var(--err);
-  box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.12);
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgb(var(--danger-rgb) / 0.12);
 }
 .po-eline > label {
   display: block;
@@ -666,10 +667,10 @@
   place-items: center;
   width: 32px;
   height: 36px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--card);
-  color: var(--ink);
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
   font-size: 14px;
   cursor: pointer;
@@ -679,7 +680,7 @@
   cursor: default;
 }
 .po-iconbtn--x {
-  color: var(--err);
+  color: var(--danger);
 }
 .po-addline {
   align-self: flex-start;
@@ -698,8 +699,8 @@
   gap: 8px;
   margin: 8px -1rem -1.2rem;
   padding: 10px 1rem 12px;
-  border-top: 1px solid var(--line);
-  background: var(--paper);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 .po-savebar__msg {
   flex-basis: 100%;
@@ -733,7 +734,7 @@
   gap: 8px;
   margin: 0;
   padding: 10px 14px 6px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 11.5px;
   font-weight: 800;
@@ -741,7 +742,7 @@
   text-transform: uppercase;
 }
 .po-sec.late {
-  color: var(--err);
+  color: var(--danger);
 }
 .po-list > .po-sec:first-child {
   border-top: 0;
@@ -778,7 +779,7 @@
   align-items: center;
   gap: 4px 14px;
   padding: 10px 14px;
-  border-top: 1px solid var(--line2, rgba(33, 31, 24, 0.08));
+  border-top: 1px solid var(--border-soft);
 }
 .po-sup:first-child {
   border-top: 0;
@@ -897,9 +898,9 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 76px;
     grid-template-areas: 'desc desc desc' 'part qty qty' 'unit vat vat' 'net net acts';
     padding: 10px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--border);
     border-radius: 10px;
-    background: var(--card);
+    background: var(--surface);
   }
   .po-eline--head {
     display: none;

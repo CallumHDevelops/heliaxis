@@ -9,10 +9,10 @@
 }
 .hs-draft {
   margin: 0.5rem 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.55rem 0.75rem;
-  background: var(--card);
+  background: var(--surface);
 }
 .hs-draft summary {
   cursor: pointer;
@@ -21,7 +21,7 @@
   white-space: pre-wrap;
   font: inherit;
   font-size: 0.88rem;
-  background: var(--paper);
+  background: var(--bg);
   border-radius: 6px;
   padding: 0.6rem;
 }
@@ -31,13 +31,13 @@
   font-weight: 700;
 }
 .hs-todo {
-  color: var(--amber-2);
+  color: var(--accent-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 .hs-gaps {
-  border-left: 4px solid var(--solar);
-  background: var(--card);
+  border-left: 4px solid var(--accent);
+  background: var(--surface);
   border-radius: 8px;
   padding: 0.6rem 0.8rem;
   margin: 0.5rem 0;

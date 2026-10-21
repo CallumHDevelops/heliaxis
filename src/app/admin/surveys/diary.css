@@ -1,22 +1,30 @@
 /* The Diary, Find a time, + Add to my diary and booking settings. Phone first: 48 px targets,
    one column at 360 px, no sideways scrolling, nothing that needs a swipe. */
+/* Colours: the theme's tokens (src/app/theme.css), light and dark. The diary's own names point at them
+   (--muted, --ok, --wa and --warn-line are the tokens themselves); "moved" keeps its own orange. */
 .dy {
-  --ink: #211f18;
-  --muted: #6e6a5e;
-  --line: rgba(33, 31, 24, 0.14);
-  --card: #fffdf8;
-  --paper: #f7f2e7;
-  --solar: #f8bc1e;
-  --amber: #c77f04;
-  --ok: #3f7d4e;
-  --err: #b3261e;
-  --wa: #1f7a4d;
-  --warn-bg: rgba(248, 188, 30, 0.16);
-  --warn-line: rgba(199, 127, 4, 0.35);
+  --ink: var(--text);
+  --line: var(--border);
+  --card: var(--surface);
+  --paper: var(--bg);
+  --solar: var(--accent);
+  --amber: var(--accent-text);
+  --err: var(--danger);
+  --warn-bg: rgb(var(--accent-rgb) / 0.16);
+  --dy-moved: rgba(227, 120, 12, 0.12);
+  --dy-moved-line: rgba(199, 90, 4, 0.4);
+  --dy-shade: rgba(20, 18, 14, 0.7);
   color: var(--ink);
   max-width: 860px;
   margin: 0 auto;
   min-width: 0;
+}
+@media screen {
+  :root[data-theme='dark'] .dy {
+    --dy-moved: rgba(242, 150, 60, 0.16);
+    --dy-moved-line: rgba(242, 150, 60, 0.5);
+    --dy-shade: rgba(0, 0, 0, 0.72);
+  }
 }
 .dy *,
 .dy *::before,
@@ -66,9 +74,9 @@
   min-height: 48px;
   border-radius: 8px;
   padding: 10px 14px;
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: var(--solar);
+  border: 1px solid var(--inverse);
+  background: var(--inverse);
+  color: var(--inverse-accent);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -85,7 +93,7 @@
 .dy-btn--solar {
   background: var(--solar);
   border-color: var(--solar);
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 .dy-btn--ghost {
   background: var(--card);
@@ -94,7 +102,7 @@
 }
 .dy-btn--danger {
   background: var(--card);
-  border-color: rgba(179, 38, 30, 0.45);
+  border-color: rgb(var(--danger-rgb) / 0.45);
   color: var(--err);
 }
 .dy-btn--small {
@@ -121,13 +129,13 @@
   margin: 0 0 12px;
 }
 .dy-banner--err {
-  background: rgba(179, 38, 30, 0.07);
-  border-color: rgba(179, 38, 30, 0.3);
+  background: rgb(var(--danger-rgb) / 0.07);
+  border-color: rgb(var(--danger-rgb) / 0.3);
   color: var(--err);
 }
 .dy-banner--ok {
-  background: rgba(63, 125, 78, 0.09);
-  border-color: rgba(63, 125, 78, 0.35);
+  background: rgb(var(--ok-rgb) / 0.09);
+  border-color: rgb(var(--ok-rgb) / 0.35);
   color: var(--ok);
 }
 .dy-section {
@@ -141,8 +149,8 @@
   gap: 8px;
 }
 .dy-count {
-  background: var(--ink);
-  color: var(--solar);
+  background: var(--inverse);
+  color: var(--inverse-accent);
   border-radius: 999px;
   font-size: 0.78rem;
   padding: 2px 9px;
@@ -177,7 +185,7 @@
   font-weight: 700;
   border-radius: 4px;
   padding: 2px 6px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   color: var(--muted);
   vertical-align: middle;
 }
@@ -186,11 +194,11 @@
   color: var(--amber);
 }
 .dy-tag--ok {
-  background: rgba(63, 125, 78, 0.12);
+  background: rgb(var(--ok-rgb) / 0.12);
   color: var(--ok);
 }
 .dy-tag--err {
-  background: rgba(179, 38, 30, 0.1);
+  background: rgb(var(--danger-rgb) / 0.1);
   color: var(--err);
 }
 .dy-yes {
@@ -202,7 +210,7 @@
   font-weight: 600;
 }
 .dy-msg {
-  background: #fff;
+  background: var(--field);
   border: 1px dashed var(--line);
   border-radius: 8px;
   padding: 10px;
@@ -224,7 +232,7 @@
   box-shadow: inset 4px 0 0 var(--solar);
 }
 .dy-day--off {
-  background: rgba(255, 253, 248, 0.6);
+  background: rgb(var(--surface-rgb) / 0.6);
 }
 .dy-dayhead {
   display: flex;
@@ -288,7 +296,7 @@
   font-size: 0.85rem;
 }
 .dy-line--allday {
-  background: rgba(33, 31, 24, 0.05);
+  background: rgb(var(--fg-rgb) / 0.05);
 }
 .dy-item {
   font: inherit;
@@ -320,13 +328,13 @@ button.dy-item:hover {
   border: 1px solid var(--warn-line);
 }
 .dy-flag--grey {
-  background: rgba(33, 31, 24, 0.05);
+  background: rgb(var(--fg-rgb) / 0.05);
   border: 1px solid var(--line);
   color: var(--muted);
 }
 .dy-flag--moved {
-  background: rgba(227, 120, 12, 0.12);
-  border: 1px solid rgba(199, 90, 4, 0.4);
+  background: var(--dy-moved);
+  border: 1px solid var(--dy-moved-line);
 }
 .dy-flag .dy-row {
   margin-top: 6px;
@@ -353,7 +361,7 @@ button.dy-item:hover {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(20, 18, 14, 0.7);
+  background: var(--dy-shade);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -409,9 +417,9 @@ button.dy-item:hover {
 .dy-input {
   width: 100%;
   min-height: 48px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: #fff;
+  background: var(--field);
   padding: 10px 12px;
   font: inherit;
   font-size: 1rem;
@@ -445,15 +453,15 @@ textarea.dy-input {
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--field);
   color: var(--ink);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .dy-chip.is-on {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--solar);
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-accent);
 }
 .dy-stepper {
   display: flex;
@@ -469,7 +477,7 @@ textarea.dy-input {
   flex: none;
   border-radius: 8px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--field);
   cursor: pointer;
   color: var(--ink);
 }
@@ -516,7 +524,7 @@ textarea.dy-input {
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--field);
   overflow: hidden;
 }
 .dy-results button {
@@ -543,7 +551,7 @@ textarea.dy-input {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background: #fff;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 12px;
@@ -561,7 +569,7 @@ textarea.dy-input {
   min-height: 56px;
   border-radius: 8px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--field);
   padding: 6px 10px;
   cursor: pointer;
   color: var(--ink);
@@ -581,7 +589,7 @@ textarea.dy-input {
 .dy-time.is-on {
   border-color: var(--ink);
   box-shadow: inset 0 0 0 1.5px var(--ink);
-  background: rgba(248, 188, 30, 0.18);
+  background: rgb(var(--accent-rgb) / 0.18);
 }
 .dy-dayname {
   font-weight: 700;
@@ -647,7 +655,7 @@ textarea.dy-input {
   border-radius: 10px;
   padding: 10px 12px;
   margin-top: 8px;
-  background: #fff;
+  background: var(--field);
 }
 .dy-dates {
   display: flex;
@@ -659,7 +667,7 @@ textarea.dy-input {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #fff;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 2px 4px 2px 12px;
