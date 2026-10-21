@@ -1,7 +1,8 @@
 // Uploads from the site app straight to storage (photos, thumbnails, certificate PDFs: client.ts
 // putToStorage): a stalled upload gives up after its time limit and counts as no signal, so it
 // can't hold up everything queued behind it; the limit is slow enough (a minute plus about 10 KB/s)
-// that a photo crawling up on weak signal still finishes; and storage's answers are sorted.
+// that a photo crawling up on weak signal still finishes; storage's answers are sorted; and the job
+// pack's downloads (packs.ts fetchBlob) give up on a stalled file the same way.
 // Usage: node --experimental-strip-types scripts/test-site-upload.mjs
 import { registerHooks } from 'node:module';
 
@@ -78,6 +79,37 @@ globalThis.fetch = async () => {
   throw new TypeError('Failed to fetch');
 };
 eq('no signal at all', await C.putToStorage('https://storage.example/u', blob, {}), 'offline');
+
+/* ── Downloads for the job pack (packs.ts fetchBlob) ───────────────────────── */
+
+// A drawing whose download stalls mustn't hold the pack (and "Open the job") for ever.
+const P = await import('../src/lib/site/packs.ts');
+let signal = null;
+const hang = (_, init) => {
+  signal = init.signal;
+  return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+};
+globalThis.fetch = hang;
+eq('storage never answers: given up, counted as missing', [await P.fetchBlob('https://storage.example/d.pdf', 50), signal.aborted], [null, true]);
+let bodySize = null;
+globalThis.fetch = async (_, init) => ({
+  ok: true,
+  headers: new Headers({ 'content-length': '3500000' }),
+  blob: () => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))),
+});
+eq(
+  'the file starts, then stalls: given up after the time its size allows',
+  await P.fetchBlob('https://storage.example/d.pdf', 1000, (n) => {
+    bodySize = n;
+    return 50;
+  }),
+  null
+);
+eq('… which is worked out from its size (3.5 MB → about 7 minutes by default)', [bodySize, Math.round(C.uploadTimeoutMs(bodySize) / 60_000)], [3_500_000, 7]);
+globalThis.fetch = async () => ({ ok: true, headers: new Headers(), blob: async () => new Blob(['%PDF-1.4']) });
+eq('a file that arrives is kept', (await P.fetchBlob('https://storage.example/d.pdf'))?.size, 8);
+globalThis.fetch = async () => ({ ok: false, status: 403, headers: new Headers() });
+eq('a link that has run out: missing', await P.fetchBlob('https://storage.example/d.pdf'), null);
 // A quick answer leaves no timer behind (the test would hang on a live one).
 globalThis.fetch = realFetch;
 

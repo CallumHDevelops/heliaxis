@@ -1,6 +1,6 @@
 'use client';
 
-import { siteFetch, type Outcome } from './client';
+import { siteFetch, uploadTimeoutMs, type Outcome } from './client';
 import { byJob, changed, delRec, getDevice, getPack, getRec, mergeServer, putRec, updateDevice, updatePack, type DraftRecord, type FileRecord, type PackRecord, type PhotoRecord } from './offline';
 import { packChanges, type SiteJobRow, type SitePack } from './pack-shared';
 
@@ -13,12 +13,32 @@ import { packChanges, type SiteJobRow, type SitePack } from './pack-shared';
 
 export type ReadyStep = { details: boolean; design: number | null; drawings: number | null; offline: boolean | null; missing: number };
 
+/**
+ * One file from its signed link, or null. A stalled download gives up (two minutes for storage to
+ * answer, then a minute plus about 10 KB/s for its size, as an upload), so one slow drawing can't
+ * hold up the rest of the pack; it counts as missing and comes with the next refresh.
+ */
+export async function fetchBlob(url: string, firstMs = 120_000, bodyMs: (bytes: number) => number = uploadTimeoutMs): Promise<Blob | null> {
+  const ctl = new AbortController();
+  let timer = setTimeout(() => ctl.abort(), firstMs);
+  try {
+    const r = await fetch(url, { credentials: 'omit', signal: ctl.signal });
+    if (!r.ok) return null;
+    clearTimeout(timer);
+    timer = setTimeout(() => ctl.abort(), bodyMs(Number(r.headers.get('content-length')) || 0));
+    return await r.blob();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function keepFile(assignmentId: string, id: string, name: string, mime: string, url: string): Promise<boolean> {
   if (await getRec<FileRecord>('files', id)) return true;
+  const blob = await fetchBlob(url);
+  if (!blob) return false;
   try {
-    const r = await fetch(url, { credentials: 'omit' });
-    if (!r.ok) return false;
-    const blob = await r.blob();
     await putRec('files', { id, assignmentId, name, mime: mime || blob.type, blob, storedAt: new Date().toISOString() } satisfies FileRecord);
     return true;
   } catch {
