@@ -138,7 +138,8 @@ export function statesOf(l: Loaded): { views: SlotView[]; made: Map<string, Made
 
 function stateCtx(l: Loaded, gen: Partial<Record<SlotCode, GenNeed>>) {
   const f = l.facts;
-  const docs = slotDocs(l).filter((d) => !(d.slot === 'CC4' && d.source === 'library'));
+  // Every document on its item, the library's procedures on CC4 too (listed on the tab and in the portal; CC4's state reads only its own page).
+  const docs = slotDocs(l);
   return {
     products: f.job.products,
     dnoRoute: f.job.dno.route,
@@ -604,7 +605,7 @@ async function packSources(db: Db, l: Loaded) {
   const docs = slotDocs(l);
   const rowOf = new Map(l.docs.map((d) => [d.id, d]));
   const parts: PackPart[] = [];
-  const multi: SlotCode[] = ['CC5', 'CCMH', 'CC21', 'F76', 'CC13'];
+  const multi: SlotCode[] = ['CC4', 'CC5', 'CCMH', 'CC21', 'F76', 'CC13'];
   for (const v of views) {
     if (v.code === 'F07BI' || (v.state === 'na' && !v.docs.length)) continue;
     const def = slotDef(v.code)!;

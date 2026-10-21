@@ -698,6 +698,9 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
     }
     case 'CCMH':
       return docs.length ? docsState(docs) : { state: 'na', why: 'Optional: nothing extra added.' };
+    case 'CC4':
+      // The switching-off page makes it Complete; the manufacturers' procedures from the library go with it.
+      return genState('CC4', docs.filter((x) => x.source !== 'library'), c);
     default:
       return genState(d.code, docs, c);
   }

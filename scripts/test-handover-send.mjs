@@ -291,6 +291,9 @@ bigDoc.context.register(bigDoc.context.stream(new Uint8Array(30 * 1024 * 1024).f
 db.files.set('crm-docs/library/manual.pdf', await bigDoc.save({ useObjectStreams: false }));
 db.rows('crm_library').push({ id: randomUUID(), name: 'GivEnergy battery manual', kind: 'manual', models: ['GivEnergy 9.5 kWh'], handover_slot: 'CC5', technologies: ['battery'], every_pack: false, details: {}, storage_path: 'library/manual.pdf', compact_path: null, mime: 'application/pdf', size: 31457280, archived_at: null });
 db.rows('handover_slots').push({ project_id: pid, slot: 'CC4', na: false, data: { values: { cu: 'Under the stairs, labelled Solar PV', ac: 'Loft, next to the inverter', battery: 'Side of the battery' } } });
+// …and the inverter maker's start-up and shutdown procedure, which goes with the CC4 page.
+db.files.set('crm-docs/library/procedure.pdf', await simplePdf('Inverter start-up and shutdown'));
+db.rows('crm_library').push({ id: randomUUID(), name: 'GivEnergy inverter start-up and shutdown', kind: 'procedure', models: ['GivEnergy Gen 3 5 kW'], handover_slot: 'CC4', technologies: ['solar'], every_pack: false, details: {}, storage_path: 'library/procedure.pdf', compact_path: null, mime: 'application/pdf', size: 2048, archived_at: null });
 
 const post = async (body) => {
   const res = await route.POST(new Request('http://x', { method: 'POST', body: JSON.stringify(body) }), { params: Promise.resolve({ id: pid }) });
@@ -304,7 +307,9 @@ const r1 = await H.refreshHandover(db, pid, { by: 'staff-1' });
 eq('made from the job: F19I, F16E, CC4, F49, F47, the receipt, the cover letter', r1.made.sort(), ['CC13_RECEIPT', 'CC4', 'F07BI', 'F16E', 'F19I', 'F47', 'F49'].sort());
 eq('F78 not made yet', !!cur('F78'), false);
 eq('F78 not made until the design part is signed (Missing: sign the design part)', (await H.handoverView(db, pid)).slots.find((s) => s.code === 'F78').fix, 'sign-design');
-eq('the manual attached from the library into CC5', docs().filter((d) => d.source === 'library').map((d) => d.handover_slot), ['CC5']);
+eq('the manual attached from the library into CC5, the procedure into CC4', docs().filter((d) => d.source === 'library').map((d) => d.handover_slot), ['CC5', 'CC4']);
+const cc4 = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'CC4');
+eq('CC4 lists the procedure beside its own page (Complete from the page)', [cc4.state, cc4.docs.map((d) => d.source).sort()], ['complete', ['generated', 'library']]);
 eq('all held until the pack goes (with_pack, not visible)', docs().filter((d) => d.source === 'generated' && d.handover_slot).every((d) => d.release === 'with_pack' && !d.visible), true);
 const r1b = await H.refreshHandover(db, pid, { by: 'staff-1' });
 eq('nothing new the second time (same inputs)', r1b.made, []);
@@ -361,12 +366,15 @@ eq('one PDF, stored as the pack (v1, held until sent)', [b1.status, b1.body.buil
 const packRow = db.rows('handover_packs').find((x) => x.project_id === pid);
 const sep = Object.fromEntries(packRow.contents.filter((c) => c.separate).map((c) => [c.slot, c.separate]));
 eq('the signed certificate and the 30 MB manual left as separate files', sep, { CC17: 'signed', CC5: 'size' });
+eq('CC4: the page and the procedure both in the pack', packRow.contents.filter((c) => c.slot === 'CC4').length, 2);
 eq('under Grid connection: only the G98 Form B as sent, never the data sheet', [packRow.contents.filter((c) => c.slot === 'F47').map((c) => c.document_id), packRow.contents.some((c) => c.document_id === sheet.id)], [[g98.document.id], false]);
 const packPdf = await PDFDocument.load(db.files.get(`crm-docs/${pack1.storage_path}`));
 const coverPages = (await PDFDocument.load(db.files.get(`crm-docs/${cur('F07BI').storage_path}`))).getPageCount();
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 const pageText = async (bytes, n) => (await (await (await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true }).promise).getPage(n)).getTextContent()).items.map((x) => x.str).join(' ');
-eq('the contents page straight after the cover letter', (await pageText(db.files.get(`crm-docs/${pack1.storage_path}`), coverPages + 1)).includes('Your handover pack'), true);
+const contentsText = (await pageText(db.files.get(`crm-docs/${pack1.storage_path}`), coverPages + 1)).replace(/\s+/g, ' ');
+eq('the contents page straight after the cover letter', contentsText.includes('Your handover pack'), true);
+eq('…with the procedure on its own line under CC4', contentsText.includes('GivEnergy inverter start-up and shutdown'), true);
 eq('under 20 MB', db.files.get(`crm-docs/${pack1.storage_path}`).length < 20 * 1024 * 1024, true);
 eq('pages add up', packPdf.getPageCount() > coverPages + 1, true);
 const b2 = await post({ action: 'build' });
@@ -388,6 +396,7 @@ eq('at 07:00: sent once (WhatsApp template and email)', [await H.sendQueuedHando
 eq('and not again', await H.sendQueuedHandover(db, seven), 0);
 portal = await P.portalHandover(pid);
 eq('the portal: Download everything first, the cover letter to start', [!!portal.pack, portal.groups[0].title], [true, 'Start here']);
+eq('the portal’s CC4 item has the procedure too', portal.groups.flatMap((g) => g.items).find((i) => i.code === 'CC4')?.docs.length, 2);
 eq('the guarantee is in their portal now (released at Send)', portal.groups.flatMap((g) => g.items.flatMap((i) => i.docs.map((d) => d.id))).includes(held.document.id), true);
 
 /* ── 5. After sending, an upload rebuilds the pack ─────────────────────────── */
