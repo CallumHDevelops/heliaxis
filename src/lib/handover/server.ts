@@ -54,7 +54,7 @@ import {
   type SlotData,
 } from './inputs';
 import { approved, type DraftKey } from './settings-shared';
-import { customerState, headline, sendCheck, slotDef, slotStates, type GenNeed, type Headline, type SlotCode, type SlotView } from './slots';
+import { customerState, headline, sendCheck, slotDef, slotStates, waitsOn, type Fix, type GenNeed, type Headline, type SlotCode, type SlotView } from './slots';
 import { ensureHandoverTasks } from './tasks';
 
 /**
@@ -300,7 +300,8 @@ export type ViewDoc = SlotView['docs'][number];
 export type HandoverView = {
   slots: SlotView[];
   headline: Headline;
-  send: { ok: boolean; blocking: { code: string; title: string; why: string | null }[]; following: { code: string; title: string }[] };
+  /** What holds Send up, each from the site (Waiting on the electrician) or the office (with its fix), and what will follow. */
+  send: { ok: boolean; blocking: { code: string; title: string; why: string | null; from: 'site' | 'office'; fix: Fix | null }[]; following: { code: string; title: string }[] };
   pack: {
     version: number;
     built_at: string | null;
@@ -393,7 +394,7 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
   return {
     slots: views,
     headline: headline(views),
-    send: { ok: check.ok, blocking: check.blocking.map((x) => ({ code: x.code, title: x.title, why: x.why })), following: check.following.map((x) => ({ code: x.code, title: x.title })) },
+    send: { ok: check.ok, blocking: check.blocking.map((x) => ({ code: x.code, title: x.title, why: x.why, from: waitsOn(x), fix: x.fix })), following: check.following.map((x) => ({ code: x.code, title: x.title })) },
     pack: l.pack
       ? {
           version: l.pack.version,
@@ -811,7 +812,7 @@ export async function sendHandover(db: Db, projectId: string, opts: { via: Via[]
   let l = await loadHandover(db, projectId);
   if (!l) return { ok: false, error: 'Not found' };
   const check = sendCheck(statesOf(l).views);
-  if (!check.ok && !opts.override) return { ok: false, error: `Still to come from site: ${check.blocking.map((b) => b.title).join(', ')}.`, blocking: check.blocking.map((b) => b.code) };
+  if (!check.ok && !opts.override) return { ok: false, error: `Still needed before it can go: ${check.blocking.map((b) => b.title).join(', ')}.`, blocking: check.blocking.map((b) => b.code) };
   // Handed over now, before the pack is built: a warranty dated from the handover (and the cover
   // letter that lists it) is made in time to go in this pack, not slipped into a later one.
   const now = (opts.now ?? new Date()).toISOString();

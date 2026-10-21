@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
-import { isSlot, slotDef, type SlotCode } from '@/lib/handover/slots';
+import { isSlot, SITE_SLOTS, slotDef, type SlotCode } from '@/lib/handover/slots';
 import {
   buildHandover,
   handoverReady,
@@ -97,6 +97,8 @@ export async function POST(req: Request, { params }: Ctx) {
         if (!slot) return json({ error: 'Which item?' }, 400);
         const reason = String(b.reason ?? '').trim().slice(0, 200);
         if (b.action === 'na' && !reason) return json({ error: 'Say why it isn’t needed.' }, 400);
+        // One of the documents Send waits for: only an admin can take it off, as only an admin can send without it.
+        if (b.action === 'na' && SITE_SLOTS.includes(slot) && s.profile.role !== 'admin') return json({ error: 'Only an admin can mark this not needed: the pack waits for it before it can go.' }, 403);
         await markNotNeeded(db, id, slot, b.action === 'na', reason || null, by, byName);
         await refreshHandover(db, id, { by });
         break;

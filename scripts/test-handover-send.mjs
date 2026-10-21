@@ -35,7 +35,7 @@ const STUBS = {
     export async function ensurePortalToken() { return 'portal-token-0123456789'; }
     export const portalUrl = (t) => 'https://heliaxis.test/my/' + t;
     export const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-    export async function crmSession() { return { user: { id: 'staff-1' }, profile: { full_name: 'Sarah Office', role: 'admin' } }; }`,
+    export async function crmSession() { return { user: { id: 'staff-1' }, profile: { full_name: 'Sarah Office', role: globalThis.__role ?? 'admin' } }; }`,
   '@/lib/crm/portal': `export const SIGNABLE_CATEGORIES = ['quote', 'contract'];`,
   '@/lib/crm/move-stage': `export async function moveStage(id, to, o) { globalThis.__rec.moves.push(to); const p = globalThis.__db.rows('crm_projects').find((x) => x.id === id); if (p && (!o?.onlyFrom || o.onlyFrom.includes(p.stage))) { p.stage = to; return { moved: true }; } return { moved: false }; }`,
   '@/lib/projects/server': `
@@ -312,6 +312,16 @@ const f78q = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'F78')
 eq('F78 with no circuits tested anywhere: Missing, fill it in on F78 details', [f78q.state, f78q.fix, f78q.why], ['missing', 'values', 'Say which circuits were tested (F78 details): the electrician didn’t, and the EIC doesn’t list them.']);
 await post({ action: 'values', slot: 'F78', values: { circuits: '2 PV strings; 1 AC circuit' } });
 eq('F78 not made until the design part is signed (Missing: sign the design part)', (await H.handoverView(db, pid)).slots.find((s) => s.code === 'F78').fix, 'sign-design');
+eq('Send waits on it from the office, with its own button (not "from site")', (await H.handoverView(db, pid)).send.blocking.map((b) => [b.code, b.from, b.fix]), [['F78', 'office', 'sign-design']]);
+const sheetsSrc = fs.readFileSync(new URL('../src/app/admin/crm/[id]/HandoverSheets.tsx', import.meta.url), 'utf8');
+const tabSrc = fs.readFileSync(new URL('../src/app/admin/crm/[id]/HandoverTab.tsx', import.meta.url), 'utf8');
+eq('the Send sheet lists the office’s items apart, each with its button', [/Still needed from the office:/.test(sheetsSrc), /actions\[b\.code\]\.run/.test(sheetsSrc), /label: FIX_LABEL\[f\], run: \(\) => fix\(rowOf\(b\.code as SlotCode\), f\)/.test(tabSrc)], [true, true, true]);
+// Not needed on an item Send waits for is an admin's call, like sending without it.
+globalThis.__role = 'office';
+const naF43 = await post({ action: 'na', slot: 'F43', reason: 'Other: not needed' });
+globalThis.__role = undefined;
+eq('Not needed on F43 by someone who isn’t an admin: refused, F43 still waited for', [naF43.status, db.rows('handover_slots').some((x) => x.project_id === pid && x.slot === 'F43' && x.na)], [403, false]);
+eq('…and the tab offers it only to an admin', /\(isAdmin \|\| !SITE_SLOTS\.includes\(s\.code\)\)/.test(tabSrc), true);
 eq('the manual attached from the library into CC5, the procedure into CC4', docs().filter((d) => d.source === 'library').map((d) => d.handover_slot), ['CC5', 'CC4']);
 const cc4 = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'CC4');
 eq('CC4 lists the procedure beside its own page (Complete from the page)', [cc4.state, cc4.docs.map((d) => d.source).sort()], ['complete', ['generated', 'library']]);

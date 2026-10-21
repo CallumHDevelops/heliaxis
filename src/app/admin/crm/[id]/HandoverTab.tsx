@@ -3,7 +3,7 @@
 import { Battery, Check, CircleAlert, Clock, Fan, Minus, Plug, RefreshCw, Sun } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import type { HandoverView, ViewDoc } from '@/lib/handover/server';
-import { GROUPS, STATE_LABEL, TECH_LABEL, type Fix, type SlotCode, type SlotView, type State, type Tech } from '@/lib/handover/slots';
+import { GROUPS, SITE_SLOTS, STATE_LABEL, TECH_LABEL, type Fix, type SlotCode, type SlotView, type State, type Tech } from '@/lib/handover/slots';
 import { hasPrintVersion, PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { shortDate, ukDayOf, ukTime } from '../crm-shared';
@@ -289,7 +289,9 @@ export function HandoverTab({
                 Needed after all
               </button>
             ) : (
-              s.state !== 'na' && (
+              // One Send waits for: an admin's call, like sending without it.
+              s.state !== 'na' &&
+              (isAdmin || !SITE_SLOTS.includes(s.code)) && (
                 <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setSheet({ kind: 'na', code: s.code })}>
                   Not needed
                 </button>
@@ -573,7 +575,23 @@ export function HandoverTab({
           onClose={() => setSheet(null)}
         />
       )}
-      {sheet?.kind === 'send' && <SendSheet projectId={projectId} view={v} isAdmin={isAdmin} onClose={() => setSheet(null)} onDone={(x) => done(x, 'Handover pack sent: it’s in their portal.')} />}
+      {sheet?.kind === 'send' && (
+        <SendSheet
+          projectId={projectId}
+          view={v}
+          isAdmin={isAdmin}
+          actions={Object.fromEntries(
+            v.send.blocking
+              .filter((b) => b.from === 'office')
+              .map((b) => {
+                const f = b.fix ?? 'upload';
+                return [b.code, { label: FIX_LABEL[f], run: () => fix(rowOf(b.code as SlotCode), f) }];
+              })
+          )}
+          onClose={() => setSheet(null)}
+          onDone={(x) => done(x, 'Handover pack sent: it’s in their portal.')}
+        />
+      )}
       {sheet?.kind === 'invoice' && (
         <InvoiceSheet
           projectId={projectId}

@@ -10,6 +10,7 @@
  * scripts/test-handover-slots.mjs all read the same rules.
  */
 import { shortDay } from '../projects/deadlines';
+import { PAS63100 } from '../site/fixed/pas63100';
 
 export type Tech = 'solar' | 'battery' | 'ev' | 'heatpump';
 export const TECH_LABEL: Record<Tech, string> = { solar: 'Solar PV', battery: 'Battery', ev: 'EV charger', heatpump: 'Heat pump' };
@@ -185,6 +186,7 @@ export const SLOTS: SlotDef[] = [
     applies: pas,
     reasons: PAS_SCOPE,
     category: 'certificate',
+    pick: 'PAS 63100 statement of conformity',
   },
   {
     code: 'CC14',
@@ -260,6 +262,7 @@ export const SLOTS: SlotDef[] = [
     order: 100,
     applies: solar,
     category: 'handover',
+    pick: 'Shading and maintenance',
   },
   {
     code: 'F49',
@@ -385,6 +388,7 @@ export const SLOTS: SlotDef[] = [
     applies: pas,
     reasons: PAS_SCOPE,
     category: 'commissioning',
+    pick: 'PAS 63100 verification checklist',
   },
   {
     code: 'F47',
@@ -621,13 +625,10 @@ function genState(code: SlotCode, docs: SlotDoc[], c: StateCtx): Partial0 {
 }
 
 /** Made by the electrician's sign-off (Unit 2), or uploaded. */
-function siteState(docs: SlotDoc[], c: StateCtx, made = true): Partial0 {
+function siteState(docs: SlotDoc[], c: StateCtx): Partial0 {
   if (docs.length) return docsState(docs);
   if (c.electrician === 'working') return { state: 'waiting', why: ELECTRICIAN(c) };
-  if (c.electrician === 'signed')
-    return made
-      ? { state: 'missing', why: 'The electrician has signed off but it isn’t here. Upload it, or open the Site tab.', fix: 'upload' }
-      : { state: 'missing', why: 'Upload it: the PAS 63100 wording isn’t in the app yet.', fix: 'upload' };
+  if (c.electrician === 'signed') return { state: 'missing', why: 'The electrician has signed off but it isn’t here. Upload it, or open the Site tab.', fix: 'upload' };
   return { state: 'missing', why: 'Add the electrician on the Site tab, or upload it.', fix: 'site' };
 }
 
@@ -642,7 +643,9 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       return siteState(docs, c);
     case 'F74A':
     case 'F74B':
-      return siteState(docs, c, false);
+      // The app can't make them until PAS 63100's own wording is in (fixed/pas63100.ts): the office uploads them, nothing waits for site.
+      if (PAS63100.verified) return siteState(docs, c);
+      return docs.length ? docsState(docs) : { state: 'missing', why: 'Upload it: the PAS 63100 wording isn’t in the app yet.', fix: 'upload' };
     case 'CC21':
       if (docs.length) return docsState(docs);
       if (c.electrician === 'working') return { state: 'waiting', why: ELECTRICIAN(c) };
@@ -762,6 +765,12 @@ export function sendCheck(views: SlotView[]): { ok: boolean; blocking: SlotView[
   const blocking = open.filter((v) => SITE_SLOTS.includes(v.code));
   return { ok: blocking.length === 0, blocking, following: open.filter((v) => !SITE_SLOTS.includes(v.code)) };
 }
+
+/**
+ * Who an item that holds Send up is waiting on: the site (the electrician hasn't finished: Waiting),
+ * or the office (an upload, the design signature, a detail to fill in, the Site tab's design part).
+ */
+export const waitsOn = (v: SlotView): 'site' | 'office' => (v.state === 'waiting' ? 'site' : 'office');
 
 /** What the customer sees for an item: its documents, "On its way", or nothing (not needed). */
 export function customerState(v: SlotView): 'ready' | 'coming' | null {

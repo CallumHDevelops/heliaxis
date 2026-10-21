@@ -42,7 +42,7 @@ eq(
   [...S.PACK_ITEMS].sort((a, b) => a.order - b.order).map((s) => s.code),
   ['F07BI', 'F78', 'CC17', 'CC21', 'F74B', 'CC14', 'F19I', 'CC16', 'F16E', 'CC4', 'F48I', 'F49', 'F49A', 'CC10', 'CC15', 'F43', 'F44', 'F44A', 'F74', 'F75', 'F74A', 'F47', 'F76', 'CC5', 'CC13', 'CCMH']
 );
-eq('"Which is it?" ends with Something else', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Building Control certificate', 'Insurance-backed guarantee', 'Schematic', 'Design calculations', 'G98 Form B (as sent)', 'G99 paperwork', 'Paid invoice', 'Something else']);
+eq('"Which is it?" ends with Something else; the office’s uploads (G98 Form B, F48I, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'PAS 63100 statement of conformity', 'Building Control certificate', 'Insurance-backed guarantee', 'Shading and maintenance', 'Schematic', 'Design calculations', 'PAS 63100 verification checklist', 'G98 Form B (as sent)', 'G99 paperwork', 'Paid invoice', 'Something else']);
 
 /* ── Applies: technologies and the DNO route ──────────────────────────────── */
 
@@ -158,6 +158,11 @@ eq('all five states seen', [...new Set(Object.values(part).concat(sentF78).map((
 
 // The send gate (D23): every site document Complete; the office's can follow.
 eq('Send is held while F78 is missing', [S.sendCheck(Object.values(part)).ok, S.sendCheck(Object.values(part)).blocking.map((v) => v.code)], [false, ['F78']]);
+eq('…by the office (its design signature), not by site', S.sendCheck(Object.values(part)).blocking.map((v) => [v.code, S.waitsOn(v), v.fix]), [['F78', 'office', 'sign-design']]);
+// PAS 63100 ticked, the electrician still on site: their documents come from site, the PAS 63100 papers from the office (the app can't make them yet).
+const pasJob = S.sendCheck(S.slotStates(ctx({ pas63100: true, electrician: 'working' }))).blocking;
+eq('PAS 63100 papers: office uploads, never "waiting for the electrician"', pasJob.filter((v) => v.code === 'F74A' || v.code === 'F74B').map((v) => [v.code, v.state, v.fix, S.waitsOn(v)]), [['F74B', 'missing', 'upload', 'office'], ['F74A', 'missing', 'upload', 'office']]);
+eq('…while the electrician’s own wait for site', pasJob.filter((v) => ['F43', 'F74'].includes(v.code)).map((v) => [v.code, S.waitsOn(v)]), [['F43', 'site'], ['F74', 'site']]);
 const done = byCode(S.slotStates(ctx({ docs: [...partDocs, doc('F78')], gen: { ...partGen, F78: ready('F78') } })));
 const sc = S.sendCheck(Object.values(done));
 eq('Send allowed once the site documents are in; the rest follow', [sc.ok, sc.following.map((v) => v.code).includes('CC17')], [true, true]);
