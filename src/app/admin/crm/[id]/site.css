@@ -221,6 +221,39 @@
   background: rgba(248, 188, 30, 0.16);
   border-left-color: var(--amber-2);
 }
+/* The office's review after the PO: on hold while a return to site is open, green once it's had the green light. */
+.sx-po.is-onhold {
+  background: rgba(179, 38, 30, 0.07);
+  border-left-color: var(--err);
+}
+.sx-po.is-green {
+  border-left-color: var(--ok);
+}
+.sx-reviews {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.sx-review {
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(248, 188, 30, 0.14);
+  border-left: 3px solid var(--amber-2);
+}
+.sx-review--open {
+  background: rgba(179, 38, 30, 0.07);
+  border-left-color: var(--err);
+  color: var(--err);
+}
+.sx-review--green {
+  background: rgba(63, 125, 78, 0.1);
+  border-left-color: var(--ok);
+  color: var(--ok);
+}
 .sx-flags {
   list-style: none;
   margin: 0.55rem 0 0;
@@ -638,4 +671,181 @@
   .sxr-read .crm-btn {
     grid-column: 1 / -1;
   }
+}
+
+/* Your review (SiteReviewPanel): each signed submission with Green light / Return to site required,
+   the Return to site form, and every return to site with its notice and put right. */
+.sxr-review {
+  margin: 0 0 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.sxr-review > h4 {
+  margin: 0 0 0.2rem;
+}
+.sxr-review > p {
+  margin: 0 0 0.5rem;
+}
+.sxr-sub {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  background: var(--card);
+  border-left: 4px solid var(--amber-2);
+}
+.sxr-sub--bad {
+  border-left-color: var(--err);
+}
+.sxr-sub--ok {
+  border-left-color: var(--ok);
+}
+.sxr-sub__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+.sxr-sub__head > div:first-child {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+.sxr-sub__head .sx-actions {
+  margin-top: 0;
+}
+.sxr-state {
+  justify-self: start;
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(248, 188, 30, 0.2);
+  color: var(--ink);
+}
+.sxr-sub__head .sxr-state {
+  margin-left: 0;
+}
+.sxr-state--bad {
+  background: rgba(179, 38, 30, 0.1);
+  color: var(--err);
+}
+.sxr-state--ok {
+  background: rgba(63, 125, 78, 0.12);
+  color: var(--ok);
+}
+.crm-btn.sxr-green {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+}
+.crm-btn.sxr-return {
+  background: var(--err);
+  border-color: var(--err);
+  color: #fff;
+}
+.sxr-putright {
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+}
+.sxr-putright p {
+  margin: 0.2rem 0;
+}
+.sxr-grid--small {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  margin-top: 0.4rem;
+}
+.sxr-returnform {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.4rem;
+}
+.sxr-returnform textarea {
+  width: 100%;
+  resize: vertical;
+}
+.sxr-returnform__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem 1.2rem;
+}
+.sxr-returnform__row .crm-label {
+  display: grid;
+  gap: 0.25rem;
+}
+.sxr-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  min-height: 2.5rem;
+}
+.sxr-pick {
+  position: relative;
+  cursor: pointer;
+  border-radius: 8px;
+  outline: 2px solid transparent;
+}
+.sxr-pick.is-on {
+  outline-color: var(--err);
+}
+.sxr-pick.is-on::after {
+  content: '✓';
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--err);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.sxr-pick small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sxr-history {
+  margin-top: 0.7rem;
+}
+.sxr-history > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.sxr-hist {
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 0.86rem;
+}
+.sxr-hist p {
+  margin: 0.15rem 0;
+}
+.sxr-hist__state {
+  font-weight: 700;
+}
+.sxr-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sxr-notice {
+  margin-top: 0.3rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--line);
+  font-size: 0.84rem;
 }

@@ -1,5 +1,6 @@
 import 'server-only';
 import type { FormCtx } from './forms/types';
+import type { ReviewStatus } from './review-shared';
 import type { Missing } from './rules';
 import type { AssignmentRow, Db } from './server';
 import type { Flag, Stage, Trade } from './types';
@@ -30,6 +31,10 @@ export type SignoffRow = {
   po_done_at: string | null;
   docs_done_at: string | null;
   notified_at: string | null;
+  /** The office's review after it (review-shared.ts): waiting, green, or return to site. */
+  review_status?: ReviewStatus;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
 };
 
 export type SignoffPlugin = {

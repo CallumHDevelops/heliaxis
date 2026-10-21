@@ -1,6 +1,7 @@
 -- 32. Site commissioning: the trades on a job (roofer, scaffolder, electrician, other), their no-login
---     job packs, answers, photos and sign-offs, one labour purchase order per sign-off, and the job
---     document registry the handover pack is built from.
+--     job packs, answers, photos and sign-offs, one labour purchase order per sign-off, the office's
+--     review after it (green light, or return to site), and the job document registry the handover
+--     pack is built from.
 --     Run after purchase-orders.sql and portal-v2.sql. Safe to run twice. Server-only tables (RLS on,
 --     no policies): the site app reaches them through the server with its own device tokens.
 do $$ begin
@@ -196,6 +197,50 @@ create table if not exists public.site_messages (
 );
 create index if not exists site_messages_due_idx on public.site_messages (send_after) where status = 'queued';
 
+-- The office's review of each signed submission, after the PO (owner, 21 Oct): Waiting for review,
+-- then Green light or Return to site required (src/lib/site/review-shared.ts).
+alter table public.site_signoffs add column if not exists review_status text not null default 'waiting';
+alter table public.site_signoffs add column if not exists reviewed_at   timestamptz;
+alter table public.site_signoffs add column if not exists reviewed_by   text;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'site_signoffs_review_chk') then
+    alter table public.site_signoffs add constraint site_signoffs_review_chk check (review_status in ('waiting','green','return'));
+  end if;
+end $$;
+
+-- A return to site: the written notice (Framework Agreement cl. 12.3), the trade's Put right from
+-- their phone (its photos are crm_photos in slot PR:<n>), and the office's review of that.
+create table if not exists public.site_returns (
+  id                   uuid primary key default gen_random_uuid(),
+  assignment_id        uuid not null references public.site_assignments(id) on delete cascade,
+  signoff_id           uuid references public.site_signoffs(id) on delete set null,
+  stage                text not null check (stage in ('main','erection','strike')),
+  n                    int not null check (n > 0),        -- 1, 2… on the assignment
+  what                 text not null,                     -- what needs putting right, as the office wrote it
+  photo_ids            uuid[] not null default '{}',      -- their photos the office pointed to
+  fix_by               date not null,
+  safety               boolean not null default false,    -- affects safety or the home
+  status               text not null default 'open' check (status in ('open','fixed','green','again','withdrawn')),
+  notice               jsonb,                             -- the written notice as it went (subject, paragraphs, to)
+  notice_sent_at       timestamptz,                       -- when it first reached them
+  created_by           uuid references public.profiles(id) on delete set null,
+  created_by_name      text,
+  created_at           timestamptz not null default now(),
+  fixed_note           text,
+  fixed_name           text,
+  fixed_signature_path text,                              -- crm-docs: signatures/{project}/site-putright-{id}.png
+  fixed_declaration    text,
+  fixed_at             timestamptz,                       -- the phone's time
+  fixed_received_at    timestamptz,
+  fixed_device_id      uuid references public.site_devices(id) on delete set null,
+  fixed_ip             text,
+  fixed_user_agent     text,
+  fixed_hash           text,                              -- sha256 of canonical JSON of the note and photo ids signed
+  reviewed_at          timestamptz,
+  reviewed_by          text,
+  unique (assignment_id, n)
+);
+
 -- Trade photos are ordinary job photos (category 'site'), tied to the assignment and the form's slot.
 alter table public.crm_photos add column if not exists assignment_id uuid references public.site_assignments(id) on delete set null;
 alter table public.crm_photos add column if not exists taken_at      timestamptz;
@@ -218,6 +263,8 @@ do $$ begin
   end if;
 end $$;
 alter table public.purchase_order_lines add column if not exists cis boolean not null default true;  -- labour lines; false = materials
+-- A labour PO's review, for the PO lists: waiting, hold (a return to site is open), green.
+alter table public.purchase_orders add column if not exists review_status text check (review_status in ('waiting','hold','green'));
 
 -- Answers from a phone, applied per key without touching the others. Returns the new rev (null: locked
 -- or gone). p_late: keys still open after a sign-off (the scaffold strike SS*, and SC3/SC3p "tagged
@@ -247,6 +294,7 @@ alter table public.site_ops         enable row level security;
 alter table public.site_reads       enable row level security;
 alter table public.site_events      enable row level security;
 alter table public.site_messages    enable row level security;
+alter table public.site_returns     enable row level security;
 
 -- Optional: send messages held overnight and chase scaffold strikes every 5 minutes, like whatsapp.sql.
 -- select cron.schedule('heliaxis-site', '*/5 * * * *', $$ select net.http_get(

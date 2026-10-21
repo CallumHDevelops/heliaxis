@@ -168,7 +168,8 @@ export function equipmentOf(f: HandoverFacts): Equipment[] {
   const v = f.electrician?.values;
   const out: Equipment[] = [];
   if (has(f, 'solar')) {
-    out.push({ what: 'Solar panels', tech: 'solar', model: s.panel_model, count: s.panel_count, rating: s.kwp ? `${num(s.kwp, 3)} kWp` : null, serials: serialsOf(v, 'SN_PANEL') });
+    // No panel serials: the roofer doesn't scan them (owner, 21 Oct).
+    out.push({ what: 'Solar panels', tech: 'solar', model: s.panel_model, count: s.panel_count, rating: s.kwp ? `${num(s.kwp, 3)} kWp` : null, serials: [] });
     out.push({ what: 'Inverter', tech: 'solar', model: s.inverter_model, count: null, rating: s.inverter_kw ? `${num(s.inverter_kw)} kW` : null, serials: serialsOf(v, 'SN_INV') });
     if (f.design.optimisers) out.push({ what: 'Optimisers', tech: 'solar', model: f.design.optimiser_model, count: serialsOf(v, 'SN_OPT').length || null, rating: null, serials: serialsOf(v, 'SN_OPT') });
   }

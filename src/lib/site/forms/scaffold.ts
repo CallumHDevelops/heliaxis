@@ -2,8 +2,9 @@
  * The scaffolder's two forms on the same link (FORMS 3): putting it up (signed off, and the PO), and
  * taking it down (photos once it's all down, no second PO), with the flags they raise (FORMS 5.2).
  * After the erection sign-off the tag (SC3, SC3p) stays open: "Tagged now? Add the tag photo."
- * Keys never change once used. Type-only imports.
+ * Keys never change once used. Type-only imports, and the declaration's words.
  */
+import { tradeDeclaration } from '../declaration';
 import type { Field, FlagRule, FormCtx, SiteForm } from './types';
 
 const is = (c: FormCtx, k: string, v: unknown) => c.values[k] === v;
@@ -81,7 +82,7 @@ export const SCAFFOLD_UP: SiteForm = {
     type: 'SIG',
     label: 'Signed off as complete',
     level: 'must',
-    declaration: (c) => `I confirm the scaffold at ${c.address || 'this address'} is up, complete and safe to use.`,
+    declaration: (c) => tradeDeclaration('scaffolder', c.address),
   },
   flags: upFlags,
 };
@@ -98,7 +99,7 @@ export const SCAFFOLD_DOWN: SiteForm = {
     type: 'SIG',
     label: 'Signed off as down',
     level: 'must',
-    declaration: (c) => `I confirm the scaffold at ${c.address || 'this address'} is down and taken away, and these answers and photos are true.`,
+    declaration: (c) => tradeDeclaration('scaffolder', c.address),
   },
   flags: downFlags,
 };

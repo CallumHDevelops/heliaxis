@@ -10,7 +10,7 @@ import { useNow } from '@/lib/use-now';
 import { Icon, Sheet } from '../../crm/CrmUi';
 import { rememberView, shortDate, ukDayOf } from '../../crm/crm-shared';
 import { OrderSheet } from './OrderSheet';
-import { api, labourWhen, neededWords, StatusChip } from './OrdersUi';
+import { api, labourWhen, neededWords, ReviewLine, StatusChip } from './OrdersUi';
 import { SupplierForm } from './SupplierForm';
 import '../../crm/crm.css';
 import '../projects.css';
@@ -259,6 +259,7 @@ function OrdersList({ rows, filter, today, onOpen, empty }: { rows: PoListRow[];
                     )}
                     {o.changed_since_sent ? ' · changed since sent' : ''}
                   </small>
+                  <ReviewLine o={o} />
                 </span>
                 <span className="po-supplier">
                   {labour ? (

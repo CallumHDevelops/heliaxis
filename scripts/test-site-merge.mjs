@@ -1,8 +1,8 @@
 // The site app and the handover pack when two jobs are joined (src/lib/site/merge-paths.ts): once
 // crm/merge.ts has moved the merged-away job's signatures folder, the signatures named inside the
 // site app's and the handover pack's own rows point at the kept job's folder (the trade's sign-off,
-// the customer's on the electrician's phone, the EIC's design part, F78's design part and the
-// customer's portal signature), nothing else changes, running it again changes nothing, and other
+// a put right after a return to site, the customer's on the electrician's phone, the EIC's design
+// part, F78's design part and the customer's portal signature), nothing else changes, running it again changes nothing, and other
 // buckets and folders are left alone. Plus the merge's table list covers the new tables.
 // Usage: node --experimental-strip-types scripts/test-site-merge.mjs
 import { registerHooks } from 'node:module';
@@ -71,6 +71,11 @@ const tables = () => ({
     { id: 's1', assignment_id: A, signature_path: old('site-s1.png'), extra: { customer: { f16e: { name: 'Jane Smith', path: old('site-s1-cust-f16e.png') }, g98: { name: 'Jane Smith', path: old('site-s1-cust-g98.png') } } } },
     { id: 's2', assignment_id: OTHER, signature_path: `signatures/${KEPT}/site-s2.png`, extra: {} },
   ],
+  // A trade's Put right after a return to site, and one not signed yet.
+  site_returns: [
+    { id: 'r1', assignment_id: A, fixed_signature_path: old('site-putright-r1.png') },
+    { id: 'r2', assignment_id: A, fixed_signature_path: null },
+  ],
   handover_slots: [
     { project_id: KEPT, slot: 'F78', data: { design: { name: 'Sarah Jones', path: old('f78-design-1.png') } } },
     { project_id: KEPT, slot: 'F16E', data: { customer: { name: 'Jane Smith', path: old('portal-f16e-1.png'), via: 'portal' } } },
@@ -83,6 +88,7 @@ const stuck = await moveSitePaths(fakeDb(t), { bucket: 'crm-docs', from: `signat
 eq('nothing stuck', stuck, 0);
 eq('the trade’s sign-off signature', t.site_signoffs[0].signature_path, now('site-s1.png'));
 eq('the customer’s signatures on the electrician’s phone (F16E and G98)', [t.site_signoffs[0].extra.customer.f16e.path, t.site_signoffs[0].extra.customer.g98.path], [now('site-s1-cust-f16e.png'), now('site-s1-cust-g98.png')]);
+eq('a put right’s signature (one not signed yet left alone)', [t.site_returns[0].fixed_signature_path, t.site_returns[1].fixed_signature_path], [now('site-putright-r1.png'), null]);
 eq('the EIC’s design part (the rest of the answer as it was)', t.site_assignments[0].answers.eic_design, { v: { name: 'Sarah Jones', path: now('eic-design-x.png'), next_n: 10 }, src: 'typed' });
 eq('F78’s design part and the customer’s portal signature', [t.handover_slots[0].data.design.path, t.handover_slots[1].data.customer.path], [now('f78-design-1.png'), now('portal-f16e-1.png')]);
 eq('rows that named nothing in the old folder are as they were', [t.site_signoffs[1], t.site_assignments[1].answers, t.handover_slots[2].data], [tables().site_signoffs[1], { RF1: { v: 'yes' } }, {}]);

@@ -49,7 +49,7 @@ export function StepScreen({ rec, answers, jf, form, step }: { rec: PackRecord; 
       const head = groupOf.get(f.key);
       return (
         <Fragment key={f.key}>
-          {head && head !== groupOf.get(list[i - 1]?.key ?? '') && <h3 className="sa-group">{head}</h3>}
+          {head && head !== groupOf.get(list[i - 1]?.key ?? '') && <h3 className="sa-qgroup">{head}</h3>}
           {row(f)}
         </Fragment>
       );

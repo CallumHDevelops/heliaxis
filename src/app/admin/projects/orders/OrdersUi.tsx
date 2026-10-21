@@ -3,6 +3,7 @@
 import { money } from '@/lib/crm/stages';
 import { formatPence, isLate, STATUS_LABEL, type PoStatus } from '@/lib/purchase-orders/money';
 import type { OrdersSummary, PurchaseOrder } from '@/lib/purchase-orders/shared';
+import { PO_REVIEW_LABEL } from '@/lib/site/review-shared';
 import { shortDate } from '../../crm/crm-shared';
 
 /** Small pieces shared by the job's Orders tab, the order sheet and the Purchase orders page. */
@@ -34,6 +35,24 @@ export function StatusChip({ status, late = false, labour = false }: { status: s
       {late ? ' · late' : ''}
     </span>
   );
+}
+
+const showsReview = (o: Pick<PurchaseOrder, 'kind' | 'status' | 'review_status'>) => o.kind === 'labour' && !!o.review_status && o.status !== 'cancelled' && o.status !== 'draft';
+
+/**
+ * A labour PO's review of the work, beside its status on the PO sheet: "On hold: return to site
+ * required" in red, "Green light" in green, "Waiting for review" quiet. Nothing for supply orders,
+ * held drafts or cancelled POs.
+ */
+export function ReviewChip({ o }: { o: Pick<PurchaseOrder, 'kind' | 'status' | 'review_status'> }) {
+  if (!showsReview(o)) return null;
+  return <span className={`po-chip po-chip--review-${o.review_status}`}>{PO_REVIEW_LABEL[o.review_status!]}</span>;
+}
+
+/** The same in a list row, as a line under who it's for (the status column is too narrow for the words). */
+export function ReviewLine({ o }: { o: Pick<PurchaseOrder, 'kind' | 'status' | 'review_status'> }) {
+  if (!showsReview(o)) return null;
+  return <small className={`po-review po-review--${o.review_status}`}>{PO_REVIEW_LABEL[o.review_status!]}</small>;
 }
 
 /** Kit orders and labour POs together (the tab's count). */

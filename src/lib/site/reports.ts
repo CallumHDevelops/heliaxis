@@ -6,6 +6,8 @@ import { saveGenerated, type SaveResult } from '@/lib/documents/store';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
 import type { Field, FormCtx, SiteForm } from './forms/types';
+import { dayWords } from './messages';
+import { isPutRightSlot, returnView, REVIEW_STATE_LABEL, reviewState, liveReturnFor, type ReviewStatus } from './review-shared';
 import { perStringValues, slotsOf, stepShown, stringsOf, visibleFields } from './rules';
 import { readAssignment, type ContactRow, type Db } from './server';
 import { SEVERITY_LABEL, type Flag, type Stage } from './types';
@@ -13,12 +15,13 @@ import { SEVERITY_LABEL, type Flag, type Stage } from './types';
 /**
  * The trades' own reports (internal: never visible to the customer): the roofer report (answers by
  * step, flags, the declaration and signature, every photo with its slot) and the scaffold report
- * (putting it up, then taking it down once signed, each side's photos up and down together). Made
- * with the PDF kit and stored as generated documents RF_REPORT / SC_REPORT, a new version only
- * when something in them changed.
+ * (putting it up, then taking it down once signed, each side's photos up and down together), each
+ * with the office's review: every return to site, its put right (the declaration and signature as
+ * signed) and the green light. Made with the PDF kit and stored as generated documents RF_REPORT /
+ * SC_REPORT, a new version only when something in them changed.
  */
 
-type Signoff = { id: string; stage: Stage; signed_name: string; signed_at: string; signature_path: string; declaration: string };
+type Signoff = { id: string; stage: Stage; signed_name: string; signed_at: string; signature_path: string; declaration: string; review_status?: ReviewStatus | null; reviewed_at?: string | null; reviewed_by?: string | null };
 type Photo = { id: string; slot: string | null; storage_path: string; taken_at: string | null; created_at: string };
 
 const SIDE: Record<string, string> = { front: 'Front', rear: 'Rear', left: 'Left side', right: 'Right side' };
@@ -101,26 +104,29 @@ async function photoItems(db: Db, list: Photo[], caption: (p: Photo) => string):
   return out;
 }
 
-/** Where a photo slot's field is, for its caption ("Before you start", "Front: up"). */
+/** Where a photo slot's field is, for its caption ("Before you start", "Front: up", "Put right 1: photos of the fix"). */
 export function labelOf(forms: SiteForm[], slot: string): string {
+  if (isPutRightSlot(slot)) return `Put right ${slot.slice(3)}: photos of the fix`;
   const [key, side] = slot.split(':');
   for (const form of forms) for (const s of form.steps) for (const f of s.fields) if (f.key === key) return `${f.label}${side ? ` (${SIDE[side] ?? side})` : ''}`;
   return slot;
 }
 
-export type ReportInputs = { a: string; answers: unknown; flags: Flag[]; photos: string[]; signoffs: string[] };
+export type ReportInputs = { a: string; answers: unknown; flags: Flag[]; photos: string[]; signoffs: string[]; review?: unknown };
 
 /** Build and store the trade report for an assignment (roofer or scaffolder); null for trades without one. */
 export async function saveTradeReport(db: Db, assignmentId: string): Promise<SaveResult | null> {
   const a = await readAssignment(db, assignmentId);
   if (!a || (a.trade !== 'roofer' && a.trade !== 'scaffolder')) return null;
   const forms = schemaFor(a);
-  const [{ data: p }, { data: contact }, { data: so }, { data: ph }] = await Promise.all([
+  const [{ data: p }, { data: contact }, { data: so }, { data: ph }, { data: rt }] = await Promise.all([
     db.from('crm_projects').select('*').eq('id', a.project_id).maybeSingle(),
     db.from('site_contacts').select('*').eq('id', a.contact_id).maybeSingle(),
     db.from('site_signoffs').select('*').eq('assignment_id', a.id).order('signed_at'),
     db.from('crm_photos').select('id, slot, storage_path, taken_at, created_at').eq('assignment_id', a.id).order('created_at'),
+    db.from('site_returns').select('*').eq('assignment_id', a.id).order('n'),
   ]);
+  const returnRows = ((rt ?? []) as Record<string, unknown>[]).filter((r) => r.status !== 'withdrawn');
   const project = (p ?? {}) as Record<string, unknown>;
   const person = contact as ContactRow | null;
   const signoffs = (so ?? []) as Signoff[];
@@ -168,18 +174,46 @@ export async function saveTradeReport(db: Db, assignmentId: string): Promise<Sav
     await kit.photos(await photoItems(db, photos.filter((x) => !paired.has(x.id)), (x) => labelOf(forms, x.slot ?? '')));
   }
 
-  // The declarations and signatures.
+  // The declarations and signatures, as signed, and where the office's review is up to.
   const sigs: SignatureItem[] = [];
+  const returns = returnRows.map(returnView);
   for (const form of forms) {
     const s = signed(form.stage);
     if (!s) continue;
     kit.section(`${form.title}: declaration`);
     kit.paragraph(s.declaration);
+    const state = reviewState(s.review_status ?? 'waiting', liveReturnFor(returns, form.stage));
+    kit.rows([{ label: 'Heliaxis review', value: `${REVIEW_STATE_LABEL[state]}${state === 'green' && s.reviewed_at ? `, ${stampWords(s.reviewed_at)}${s.reviewed_by ? ` (${s.reviewed_by})` : ''}` : ''}` }]);
     sigs.push({ title: form.sig.label, png: await download(db, DOCS_BUCKET, s.signature_path), name: s.signed_name, at: s.signed_at });
   }
   if (sigs.length) await kit.signatures(sigs);
 
+  // Each return to site: the notice, the put right and how it was reviewed.
+  for (const [i, r] of returns.entries()) {
+    const row = returnRows[i];
+    kit.section(`Return to site ${r.n}`, { intro: `Asked ${stampWords(r.created_at)}${r.created_by_name ? ` by ${r.created_by_name}` : ''}` });
+    kit.rows([
+      { label: 'What needs putting right', value: r.what },
+      { label: 'Put right by', value: `${dayWords(r.fix_by)}${r.safety ? ' (affects safety or the home)' : ''}` },
+      { label: 'Notice reached them', value: r.notice_sent_at ? stampWords(r.notice_sent_at) : 'Not recorded' },
+      { label: 'Put right', value: r.fixed_at ? `${r.fixed_name ?? ''}, ${stampWords(r.fixed_at)}` : 'Not yet' },
+      ...(r.fixed_note ? [{ label: 'What they did', value: r.fixed_note }] : []),
+      { label: 'Review', value: r.status === 'green' ? `Green light${r.reviewed_at ? `, ${stampWords(r.reviewed_at)}` : ''}${r.reviewed_by ? ` (${r.reviewed_by})` : ''}` : r.status === 'again' ? 'Returned to site again' : r.status === 'fixed' ? 'Waiting for review' : 'With them' },
+    ]);
+    if (typeof row.fixed_declaration === 'string' && row.fixed_declaration) {
+      kit.paragraph(row.fixed_declaration);
+      await kit.signatures([{ title: `Put right ${r.n}`, png: row.fixed_signature_path ? await download(db, DOCS_BUCKET, String(row.fixed_signature_path)) : null, name: r.fixed_name ?? '', at: r.fixed_at }]);
+    }
+  }
+
   const bytes = await kit.save();
-  const inputs: ReportInputs = { a: a.id, answers: a.answers, flags, photos: photos.map((x) => x.id), signoffs: signoffs.map((x) => x.id) };
+  const inputs: ReportInputs = {
+    a: a.id,
+    answers: a.answers,
+    flags,
+    photos: photos.map((x) => x.id),
+    signoffs: signoffs.map((x) => x.id),
+    review: { signoffs: signoffs.map((x) => [x.id, x.review_status ?? 'waiting', x.reviewed_at ?? null]), returns: returns.map((r) => [r.id, r.status, r.fixed_at, r.reviewed_at, r.notice_sent_at]) },
+  };
   return saveGenerated(db, a.project_id, { key: roofer ? 'RF_REPORT' : 'SC_REPORT', name: docFileName(jobRef, '', title), bytes, inputs, category: 'commissioning', visible: false });
 }

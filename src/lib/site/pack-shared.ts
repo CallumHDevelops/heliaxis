@@ -6,6 +6,7 @@ import type { Design } from './design';
 import type { ElectricianPack } from './electrician-shared';
 import type { EicFacts } from './forms/types';
 import type { PoNext } from './po-shared';
+import type { PoReview, ReturnView, ReviewStatus } from './review-shared';
 import type { StripStep } from './strip';
 import type { Answers, Flag, Stage, Trade } from './types';
 
@@ -24,6 +25,8 @@ export type PackPo = {
   /** Gone, then changed: the office issues it again. */
   changed_since_sent: boolean;
   labour: Record<string, unknown> | null;
+  /** The office's review of the work it's for: waiting, on hold (return to site), green light. */
+  review_status?: PoReview | null;
 };
 
 export type SitePack = {
@@ -44,7 +47,8 @@ export type SitePack = {
     rev: number;
     answers: Answers;
     flags: Flag[];
-    signoffs: { stage: Stage; signed_at: string; signed_name: string }[];
+    /** Each with the office's review of it (review-shared.ts); missing on a sign-off made on this phone a moment ago. */
+    signoffs: { stage: Stage; signed_at: string; signed_name: string; review?: ReviewStatus }[];
   };
   job: {
     ref: string | null;
@@ -80,6 +84,8 @@ export type SitePack = {
   reads: { photo_id: string; key: string; status: string; result: unknown }[];
   /** The owner's choices the phone needs (location on photos only when turned on, D18). */
   settings: { locationStamps: boolean };
+  /** Returns to site the office has asked for (not withdrawn), oldest first: the Put right form reads them. */
+  returns?: ReturnView[];
   /** Electricians: what their forms read from the roofer, the job and the office, and their uploads (electrician-shared.ts). */
   electrician?: ElectricianPack;
   /** Electricians: what the certificate's questions are offered from (site/eic/facts.ts). */
@@ -91,10 +97,8 @@ export type SignoffReply = {
   signoff: { id: string; stage: Stage; signed_at: string; signed_name: string };
   status: string;
   po: PackPo | null;
-  /** What happens to the PO next (po-shared.ts poNext). */
+  /** What happens to the PO next (po-shared.ts poNext). It goes at once when it's on its way: POs aren't held for the evening. */
   po_next: PoNext;
-  /** The evening rule holds the PO's messages until then (07:00). */
-  goes_at: string | null;
   /** A retry: the first sign-off's result. */
   again: boolean;
 };
@@ -112,7 +116,9 @@ export type SiteJobRow = {
   rev: number;
   signed_at: string | null;
   done_at: string | null;
-  po: { po_number: string; status: string; payable_pence: number | null; sent_at: string | null; paid_on: string | null } | null;
+  po: { po_number: string; status: string; payable_pence: number | null; sent_at: string | null; paid_on: string | null; review_status?: PoReview | null } | null;
+  /** A return to site waiting for their put right: the newest one's number and fix-by date. */
+  put_right?: { n: number; fix_by: string } | null;
 };
 
 /** The office's changes between two packs, in words, for "Updated by the office: start date, access notes". */
@@ -129,13 +135,18 @@ export function packChanges(was: Pick<SitePack, 'assignment' | 'job' | 'access' 
   return out;
 }
 
-/** A labour PO's state for the trade: "Issued", "Paid 14 Nov", or "Being checked" while the office holds it. */
-export function poState(po: { status: string; paid_on: string | null }): string {
+/**
+ * A labour PO's state for the trade: "Issued", "Paid 14 Nov", "Being checked" while the office holds
+ * it, then the office's review of the work: "On hold: return to site", "Green light".
+ */
+export function poState(po: { status: string; paid_on: string | null; review_status?: PoReview | null }): string {
   if (po.paid_on) {
     const d = new Date(`${po.paid_on.slice(0, 10)}T12:00:00Z`);
     return `Paid ${d.toLocaleDateString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short' })}`;
   }
   if (po.status === 'draft') return 'Being checked';
   if (po.status === 'cancelled') return 'Cancelled';
+  if (po.review_status === 'hold') return 'On hold: return to site';
+  if (po.review_status === 'green') return 'Issued · green light';
   return 'Issued';
 }

@@ -5,13 +5,11 @@ import { DOCS_BUCKET, ensureDocsBucket } from '@/lib/crm/server';
 import { notify } from '@/lib/notify';
 import { canonicalJson } from '@/lib/subcontractors/hashing';
 import { validSignature } from '@/lib/subcontractors/server';
-import { addSourceTask } from '@/lib/surveys/server';
-import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
 import type { SiteForm } from './forms/types';
 import { issueLabourPo, livePo, raiseLabourPo, sendPoMessages } from './labour-po';
-import { sendAfter, siteShort } from './messages';
+import { siteShort } from './messages';
 import { packPo } from './pack';
 import type { SignoffReply } from './pack-shared';
 import { HELD_WORDS, poNext, type HeldReason } from './po-shared';
@@ -21,6 +19,7 @@ import './electrician-signoff';
 import { saveTradeReport } from './reports';
 import { EIC_SIGNOFF } from './eic/plugin';
 import { flagsFor, openForms, recordAnswers, signCheck } from './rules';
+import { addReviewTask, syncPoReview, withdrawReturns } from './returns';
 import { pluginDocs, pluginGate, pluginJob, registerSignoff, type SignoffRow } from './signoff-plugins';
 import { jobOf } from './send';
 import { logJob, logSiteEvent, readAssignment, type AssignmentRow, type Db } from './server';
@@ -73,18 +72,11 @@ const formsOf = (a: AssignmentRow, stage: Stage, signed: Stage[]): SiteForm[] =>
 async function replyFor(db: Db, a: AssignmentRow, s: SignoffRow, again: boolean): Promise<SignoffReply> {
   const now = (await readAssignment(db, a.id)) ?? a;
   const po = await livePo(db, a.id);
-  const next = poNext(po, s.stage);
-  let goesAt: string | null = null;
-  if (next === 'sending') {
-    const at = sendAfter(new Date(), await getWaSettings());
-    if (at.getTime() > Date.now() + 60_000) goesAt = at.toISOString();
-  }
   return {
     signoff: { id: s.id, stage: s.stage, signed_at: s.signed_at, signed_name: s.signed_name },
     status: now.status,
     po: po ? packPo(po as unknown as Record<string, unknown>) : null,
-    po_next: next,
-    goes_at: goesAt,
+    po_next: poNext(po, s.stage),
     again,
   };
 }
@@ -204,8 +196,10 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
   // Job updates are made only where empty, so a failure here is left for the documents step to try again.
   await pluginJob(db, now, s).catch((e) => console.error('[site/signoff] job', e));
 
-  // The PO, now, so the phone can show its number (none for the strike: the erection raised it).
+  // The PO, now, so the phone can show its number (none for the strike: the erection raised it). It
+  // goes out as it is; the office reviews the photos and results after it (returns.ts).
   if (stage !== 'strike') await raiseLabourPo(db, now, { id: s.id, signed_name: s.signed_name, signed_at: s.signed_at, stage });
+  await syncPoReview(db, now).catch((e) => console.error('[site/signoff] review', e));
   return { ok: true, reply: await replyFor(db, now, s, false), signoff: s, fresh: true };
 }
 
@@ -265,8 +259,8 @@ const STAGE_WORDS: Record<Stage, string> = { main: 'signed off', erection: 'sign
 
 /**
  * The job owner told: "Roofer signed off at 12 High St · PO-0123 · £384.00 to pay" on the job's
- * activity and as a push; Urgent flags in the same push; open Review flags as one task for the
- * assignment (site-review:<id>, closed once they're all resolved).
+ * activity and as a push, Urgent flags in the same push; and the review task ("Review Dave Price's
+ * roofing photos, HX-0042", due the next working day) with any open Review flags listed in it.
  */
 async function tellOwner(db: Db, a: AssignmentRow, s: SignoffRow) {
   const job = await jobOf(db, a.project_id);
@@ -288,18 +282,7 @@ async function tellOwner(db: Db, a: AssignmentRow, s: SignoffRow) {
   if (job.owner_id) {
     await notify({ userId: job.owner_id, kind: 'site_signoff', title, body, href: `/admin/projects/${a.project_id}?tab=site`, tag: `site-signoff-${s.id}` }).catch(() => {});
   }
-  if (review.length) await reviewTask(db, a, review, job.owner_id, where, who);
-}
-
-/** One task per assignment listing its Review flags (made once; 1K closes it when they're resolved). */
-export async function reviewTask(db: Db, a: AssignmentRow, review: Flag[], ownerId: string | null, where: string, who: string) {
-  await addSourceTask(db, {
-    projectId: a.project_id,
-    key: `site-review:${a.id}`,
-    title: `Check the ${who.toLowerCase()}’s ${review.length === 1 ? 'flag' : `${review.length} flags`} · ${where}`,
-    notes: review.map((f) => `• ${f.text}`).join('\n'),
-    assigneeId: ownerId,
-  });
+  await addReviewTask(db, a, s, job, a.flags);
 }
 
 /** /api/cron/site: sign-offs whose steps after the reply didn't all run (two minutes' grace first). */
@@ -331,6 +314,8 @@ export async function reopenSignoff(db: Db, a: AssignmentRow, by: string | null,
   await logSiteEvent(db, a.id, by ?? 'staff', 'signoff_reopened', { ...last, by_name: byName });
   const { error } = await db.from('site_signoffs').delete().eq('id', last.id);
   if (error) return { ok: false, error: 'Couldn’t reopen it. Try again.' };
+  // A return to site on it is withdrawn: they change their answers and sign again instead.
+  await withdrawReturns(db, a, last.id, last.stage, byName);
   const status: AssignmentStatus = last.stage === 'strike' ? 'signed' : 'started';
   await db
     .from('site_assignments')

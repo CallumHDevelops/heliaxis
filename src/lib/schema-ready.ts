@@ -35,7 +35,7 @@ async function has(table: string, column = 'id') {
 }
 
 async function check(): Promise<SchemaReady> {
-  const [crmV3, surveys, bookings, diary, purchaseOrders, siteMessages, docSlots, handover] = await Promise.all([
+  const [crmV3, surveys, bookings, diary, purchaseOrders, siteMessages, docSlots, siteReview, handover] = await Promise.all([
     has('crm_projects', 'project_ref'), // crm-v3.sql
     has('crm_surveys'), // surveys.sql
     has('survey_bookings'), // survey-booking.sql
@@ -43,9 +43,10 @@ async function check(): Promise<SchemaReady> {
     has('purchase_order_lines'), // purchase-orders.sql (its last table)
     has('site_messages'), // site-commissioning.sql (its last table)
     has('crm_documents', 'handover_slot'), // and its document columns
+    has('purchase_orders', 'review_status'), // and the office's review (site_returns, the PO's review)
     has('handover_packs', 'project_id'), // handover.sql
   ]);
-  const site = siteMessages && docSlots;
+  const site = siteMessages && docSlots && siteReview;
   return { crmV3, surveys, booking: bookings && diary, purchaseOrders, site, handover: site && handover };
 }
 

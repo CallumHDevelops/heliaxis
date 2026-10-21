@@ -11,6 +11,7 @@ import { shortDate } from '@/lib/site/client';
 import { SyncLine, TopBar } from './bits';
 import type { JobForms } from './form-state';
 import { go, useLive } from './nav';
+import { DeclarationText } from './Review';
 
 /**
  * P10: check and sign. Flags first (Stop in red with "Fix this"; Urgent and For the office in amber),
@@ -110,7 +111,7 @@ export function CheckSign({ rec, jf, form }: { rec: PackRecord; jf: JobForms; fo
             )}
             <section className="sa-card">
               <h3>Declaration</h3>
-              <p className="sa-declaration">{declaration}</p>
+              <DeclarationText text={declaration} />
               <label className="sa-label" htmlFor="sa-sign-name">
                 Your name
               </label>

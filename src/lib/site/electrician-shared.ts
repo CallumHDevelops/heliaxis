@@ -38,7 +38,7 @@ export function withFiles(photos: Record<string, number>, files: { slot: string 
 }
 
 /** What the roofer has given that the electrician's forms read (FORMS 1.6), and nothing else. */
-export const ROOFER_KEYS = ['RF7', 'RF7a', 'RF10', 'RF11', 'RF13', 'RF14', 'RX1', 'RX2', 'RX4', 'RX5', 'SN_PANEL'];
+export const ROOFER_KEYS = ['RF7', 'RF7a', 'RF10', 'RF11', 'RF13', 'RF14', 'RX1', 'RX2', 'RX4', 'RX5'];
 /** The roofer's photo slots shown beside F44 rows. */
 export const ROOFER_EVIDENCE = ['RF2', 'RX4p'];
 
@@ -49,12 +49,6 @@ export function rooferValues(a: Answers | null | undefined): Record<string, unkn
     if (x && typeof x === 'object' && 'v' in x) out[k] = x.v;
   }
   return out;
-}
-
-/** The roofer's panel serials, for "no serial twice on the job". */
-export function rooferSerials(values: Record<string, unknown>): string[] {
-  const list = Array.isArray(values.SN_PANEL) ? (values.SN_PANEL as { s?: unknown; unread?: boolean }[]) : [];
-  return list.filter((x) => x && !x.unread && typeof x.s === 'string').map((x) => String(x.s));
 }
 
 /**

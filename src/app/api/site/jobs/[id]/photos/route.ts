@@ -2,6 +2,8 @@ import { after } from 'next/server';
 import { CRM_BUCKET, ensureCrmBucket, MAX_PHOTO_BYTES, thumbPath } from '@/lib/crm/server';
 import { deviceSession, isResponse, siteJson, theirAssignment } from '@/lib/site/device';
 import { afterAnswers, afterPhoto, lateKeysFor } from '@/lib/site/hooks';
+import { openPutRightSlots } from '@/lib/site/returns';
+import { isPutRightSlot } from '@/lib/site/review-shared';
 import { logSiteEvent, readAssignment } from '@/lib/site/server';
 import { getSiteSettings } from '@/lib/site/settings';
 
@@ -25,7 +27,8 @@ const pathFor = (projectId: string, assignmentId: string, slot: string, clientId
  * - { action: 'save', client_id, slot, mime, taken_at, width, height, lat?, lng?, read? }: record it as a
  *   job photo (category 'site', so the customer doesn't see it), once however often it's retried.
  * - { action: 'delete', client_id }: before sign-off only.
- * Photos for a signed-off form are refused, apart from the slots still open (the scaffold's tag and strike).
+ * Photos for a signed-off form are refused, apart from the slots still open (the scaffold's tag and
+ * strike, and PR:<n> while a return to site waits for their put right).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const s = await deviceSession(req);
@@ -38,7 +41,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!isUuid(clientId)) return siteJson({ error: 'bad', message: 'That photo can’t be sent.' }, 400);
   const signed = a.status === 'signed' || a.status === 'done';
   const late = signed ? new Set(await lateKeysFor(s.db, a)) : null;
-  const open = (sl: string) => !late || late.has(sl) || late.has(sl.split(':')[0]);
+  const putRight = isPutRightSlot(slot) || b.action === 'delete' ? await openPutRightSlots(s.db, a.id) : new Set<string>();
+  // A put right's photos only while its return to site is open; the form's own slots as before.
+  const open = (sl: string) => (isPutRightSlot(sl) ? putRight.has(sl) : !late || late.has(sl) || late.has(sl.split(':')[0]));
 
   if (b.action === 'prepare') {
     const mime = String(b.mime || 'image/jpeg');

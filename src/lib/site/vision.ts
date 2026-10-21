@@ -33,7 +33,6 @@ export const LabelRead = z.object({
 const WHAT: Record<string, string> = {
   RF12: 'the data label on the back of a solar panel',
   RF7b: 'an optimiser layout plan with the optimisers’ serial stickers stuck on it (read every sticker)',
-  SN_PANEL: 'a solar panel’s serial label',
   // The electrician's label photos (FORMS 4.3).
   EP21: 'the data label of a solar or hybrid inverter',
   EP26: 'a generation meter: copy the reading (kWh) into meter.reading_kwh and its serial number',

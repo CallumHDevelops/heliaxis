@@ -211,7 +211,7 @@ eq('F74 Part 1 ✗: Urgent', flagsWith({ f74_1_23: 'problem' }).filter(([c]) => 
 eq('F74 Part 2 tests not carried out: Urgent', flagsWith({ f74_2_tests: 'no' }).filter(([c]) => c === 'F74_2_TESTS'), [['F74_2_TESTS', 'urgent']]);
 eq('a battery test failed: Urgent', flagsWith({ eess_t_05: 'fail' }).filter(([c]) => c === 'EESS_t_05'), [['EESS_t_05', 'urgent']]);
 eq('battery not communicating: Review', flagsWith({ eess_t_02: 'na' }).filter(([c]) => c === 'EESS_NET'), [['EESS_NET', 'review']]);
-eq('a duplicate serial on the job: Review', flagsWith({}, ['solar', 'battery'], { serials_elsewhere: [full.values.SN_INV[0].s] }).filter(([c]) => c === 'SN_DUP'), [['SN_DUP', 'review']]);
+eq('a duplicate serial in the pack: Review', flagsWith({ SN_BINV: [{ ...full.values.SN_INV[0] }] }).filter(([c]) => c === 'SN_DUP'), [['SN_DUP', 'review']]);
 const read = (key, model) => ({ key, status: 'read', result: { readable: true, problem: null, kind: 'inverter', make: null, model, serials: [], panel: null, battery: null, inverter: null, meter: null } });
 const withRead = (r) => R.flagsFor(sb, { ...cFull, reads: [r] }).map((f) => [f.code, f.severity]);
 eq('the inverter label isn’t the design’s model: Urgent', withRead(read('EP21', 'GivEnergy GIV-HY5.0')).filter(([c]) => c === 'SN_INV_MODEL'), [['SN_INV_MODEL', 'urgent']]);

@@ -40,6 +40,8 @@ export type FieldKey =
   | 'site_short'
   | 'job_link'
   | 'po_number'
+  | 'fix_what'
+  | 'fix_by'
   | 'portal_link';
 
 export const FIELDS: Record<FieldKey, { label: string; example: string; help: string; token?: string; /** Filled by the app for its own templates: not offered for others. */ auto?: true }> = {
@@ -60,6 +62,8 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
   site_short: { label: 'Short site address', example: '12 High Street, NP20 4AB', help: 'Filled in by the site app', auto: true },
   job_link: { label: 'Job pack link', example: 'https://subcontractor.heliaxis.co.uk/portal/site/j/Xk2pQ7mN', help: 'Filled in by the site app', auto: true },
   po_number: { label: 'PO number', example: 'PO-0123', help: 'Filled in when a trade signs off', auto: true },
+  fix_what: { label: 'What needs putting right', example: 'two tiles left lifted above the left of the array', help: 'Filled in by the office’s Return to site', auto: true },
+  fix_by: { label: 'Put right by', example: 'Thursday 12 November', help: 'Filled in by the office’s Return to site', auto: true },
   portal_link: { label: 'Customer portal link', example: 'https://heliaxis.co.uk/my/Xk2pQ7', help: 'Their customer portal link', auto: true },
 };
 
@@ -211,7 +215,7 @@ export const READY_MADE: ReadyTemplate[] = [
     title: 'Trade: PO raised',
     category: 'UTILITY',
     use: 'Sent by the site app when a trade signs off and their purchase order is raised.',
-    body: 'Hi {{1}}, thanks for signing off the {{2}} at {{3}}. Your purchase order number is {{4}}. Please quote it on your invoice. The full PO, with the CIS deduction and what you’ll be paid, is in your email and your job pack.',
+    body: 'Hi {{1}}, thanks for signing off the {{2}} at {{3}}. Your purchase order number is {{4}}. Please quote it on your invoice. The full PO, with the CIS deduction, what you’ll be paid and its terms, is in your email and your job pack. We’ll review your photos and results and let you know: green light, or return to site if anything needs putting right.',
     fields: ['first_name', 'work_words', 'site_short', 'po_number'],
     buttons: [],
     examples: ['Dave', 'roofing work', '12 High Street, NP20 4AB', 'PO-0123'],
@@ -245,6 +249,26 @@ export const READY_MADE: ReadyTemplate[] = [
     fields: ['first_name', 'site_short'],
     buttons: [],
     examples: ['Dave', '12 High Street, NP20 4AB'],
+  },
+  {
+    name: 'site_return_to_site',
+    title: 'Trade: return to site required',
+    category: 'UTILITY',
+    use: 'Sent by the site app when the office reviews a trade’s photos and results and asks them to return to site to put something right.',
+    body: 'Hi {{1}}, we’ve reviewed the photos and results for the {{2}} at {{3}}, and something needs putting right: {{4}}. Please return to site and fix it by {{5}}, then send us photos of the fix from your job pack: {{6}} The full notice is in your email. Any questions, call us on 01633 965205.',
+    fields: ['first_name', 'work_words', 'site_short', 'fix_what', 'fix_by', 'job_link'],
+    buttons: [],
+    examples: ['Dave', 'roofing work', '12 High Street, NP20 4AB', 'two tiles left lifted above the left of the array', 'Thursday 12 November', 'https://subcontractor.heliaxis.co.uk/portal/site/j/Xk2pQ7mN'],
+  },
+  {
+    name: 'site_green_light',
+    title: 'Trade: green light',
+    category: 'UTILITY',
+    use: 'Sent by the site app when the office reviews a trade’s photos and results and nothing needs putting right.',
+    body: 'Hi {{1}}, good news: we’ve reviewed the photos and results for the {{2}} at {{3}} and given it the green light. Nothing needs putting right. Thanks, the Heliaxis team.',
+    fields: ['first_name', 'work_words', 'site_short'],
+    buttons: [],
+    examples: ['Dave', 'roofing work', '12 High Street, NP20 4AB'],
   },
   {
     name: 'handover_pack_ready',

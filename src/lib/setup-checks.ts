@@ -468,10 +468,10 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   );
   // The site app (trades' job packs, sign-offs, labour POs) and then the handover pack: their tabs and
   // the /portal/site app stay hidden until each has been run (src/lib/schema-ready.ts).
-  const site = purchaseOrders && (await has('site_messages')) && (await has('crm_documents', 'handover_slot'));
+  const site = purchaseOrders && (await has('site_messages')) && (await has('crm_documents', 'handover_slot')) && (await has('purchase_orders', 'review_status'));
   add(
     purchaseOrders && !site,
-    sql('site-commissioning.sql', 'Site app: send trades a job pack, collect their sign-offs and raise their POs.', 5, 'purchase-orders.sql')
+    sql('site-commissioning.sql', 'Site app: send trades a job pack, collect their sign-offs, raise their POs and review their work.', 5, 'purchase-orders.sql')
   );
   add(
     site && !(await has('handover_packs', 'project_id')),

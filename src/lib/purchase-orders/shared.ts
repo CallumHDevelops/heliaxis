@@ -1,5 +1,6 @@
 import { refMatches } from '@/lib/projects/refs';
 import type { LabourSnapshot } from '@/lib/site/po-shared';
+import type { PoReview } from '@/lib/site/review-shared';
 import type { PoKind } from './money';
 
 /**
@@ -74,6 +75,8 @@ export type PurchaseOrder = {
   cis_pence?: number | null;
   payable_pence?: number | null;
   labour?: LabourSnapshot | null;
+  /** The office's review of the work (site/review-shared.ts): waiting, hold (return to site required), green. */
+  review_status?: PoReview | null;
 };
 
 /** The job an order is for: its reference (HX-0042-2, or the customer's before customer-refs.sql), customer and site. */

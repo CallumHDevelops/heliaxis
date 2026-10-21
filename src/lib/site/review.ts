@@ -1,5 +1,4 @@
 import 'server-only';
-import { closeSourceTask } from '@/lib/surveys/server';
 import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from '@/lib/crm/server';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
@@ -8,6 +7,8 @@ import { ELECTRICIAN_DOC_KEYS } from './electrician-docs';
 import { livePo } from './labour-po';
 import type { LabourSnapshot } from './po-shared';
 import { answerWords, labelOf } from './reports';
+import { fixByDefault, reviewOf as submissionsOf, type Submission } from './returns';
+import type { ReturnView } from './review-shared';
 import { openForms, slotsOf, stepShown, valueOf, visibleFields } from './rules';
 import { logJob, logSiteEvent, readAssignment, type AssignmentRow, type Db } from './server';
 import { SOURCE_LABEL, TRADE_LABEL, type Answer, type Flag, type Stage } from './types';
@@ -15,8 +16,9 @@ import { SOURCE_LABEL, TRADE_LABEL, type Answer, type Flag, type Stage } from '.
 /**
  * The office's review of one trade (the Site tab's review drawer, screen D4): the answers by step with
  * where each came from and the flags beside them, the photos by slot, Claude's label reads to
- * confirm, the sign-off evidence, the PO and documents, and the history. Plus what the office does
- * there: resolve a flag (the Review task closes when none are left) and confirm a read.
+ * confirm, the sign-off evidence, each submission's review (Green light or Return to site, and every
+ * return with its notice and put right: returns.ts), the PO and documents, and the history. Plus what
+ * the office does there: resolve a flag and confirm a read.
  */
 
 export type ReviewRow = { key: string; label: string; value: string | null; src: string | null; at: string | null; flags: Flag[] };
@@ -49,6 +51,13 @@ export type ReviewSignoff = {
   steps_done: { po: boolean; docs: boolean; notified: boolean };
 };
 export type ReviewDoc = { id: string; name: string; key: string | null; version: number | null; url: string | null };
+/** A return to site with its written notice as it went, the messages that carried it, and the put right's signature. */
+export type ReviewReturn = ReturnView & {
+  notice: { subject: string; paragraphs: string[] } | null;
+  messages: { channel: string; kind: string; status: string; sent_at: string | null; error: string | null }[];
+  fixed_declaration: string | null;
+  fixed_signature: string | null;
+};
 export type ReviewEvent = { at: string; actor: string; type: string; detail: Record<string, unknown> | null };
 export type SiteReview = {
   id: string;
@@ -59,6 +68,8 @@ export type SiteReview = {
   reads: ReviewRead[];
   signoffs: ReviewSignoff[];
   po: { id: string; po_number: string; status: string; sent_at: string | null; changed_since_sent: boolean; labour: LabourSnapshot | null } | null;
+  /** Each signed submission's review, and every return to site (oldest first). */
+  review: { submissions: Submission[]; returns: ReviewReturn[]; fix_by_default: string };
   documents: ReviewDoc[];
   events: ReviewEvent[];
 };
@@ -78,13 +89,17 @@ async function signedMany(db: Db, bucket: string, paths: string[], download?: (p
 
 export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> {
   const forms = schemaFor(a);
-  const [ctx, { data: ph }, { data: rd }, { data: so }, { data: ev }, po] = await Promise.all([
+  const [ctx, { data: ph }, { data: rd }, { data: so }, { data: ev }, po, rv, { data: rt }, { data: msgs }, fixBy] = await Promise.all([
     serverCtx(db, a),
     db.from('crm_photos').select('id, slot, storage_path, taken_at, created_at').eq('assignment_id', a.id).order('created_at'),
     db.from('site_reads').select('*').eq('assignment_id', a.id),
     db.from('site_signoffs').select('*').eq('assignment_id', a.id).order('signed_at'),
     db.from('site_events').select('at, actor, type, detail').eq('assignment_id', a.id).order('at', { ascending: false }).limit(200),
     livePo(db, a.id),
+    submissionsOf(db, a.id),
+    db.from('site_returns').select('id, notice, fixed_declaration, fixed_signature_path').eq('assignment_id', a.id),
+    db.from('site_messages').select('channel, kind, status, sent_at, error, dedupe_key').eq('assignment_id', a.id).in('kind', ['return_to_site']),
+    fixByDefault(),
   ]);
   const signed = ((so ?? []) as { stage: Stage }[]).map((s) => s.stage);
 
@@ -155,6 +170,22 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
     steps_done: { po: !!s.po_done_at, docs: !!s.docs_done_at, notified: !!s.notified_at },
   }));
 
+  // Each return to site: its notice as it went, the messages that carried it, the put right's signature.
+  const extra = new Map(((rt ?? []) as { id: string; notice: ReviewReturn['notice']; fixed_declaration: string | null; fixed_signature_path: string | null }[]).map((r) => [r.id, r]));
+  const putRightSigs = await signedMany(db, DOCS_BUCKET, [...extra.values()].map((r) => r.fixed_signature_path).filter((p): p is string => !!p));
+  const returns: ReviewReturn[] = rv.returns.map((r) => {
+    const x = extra.get(r.id);
+    return {
+      ...r,
+      notice: x?.notice ?? null,
+      messages: ((msgs ?? []) as { channel: string; kind: string; status: string; sent_at: string | null; error: string | null; dedupe_key: string }[])
+        .filter((m) => m.dedupe_key.startsWith(`return:${r.id}:`))
+        .map(({ channel, kind, status, sent_at, error }) => ({ channel, kind, status, sent_at, error })),
+      fixed_declaration: x?.fixed_declaration ?? null,
+      fixed_signature: x?.fixed_signature_path ? (putRightSigs.get(x.fixed_signature_path) ?? null) : null,
+    };
+  });
+
   // The trade's documents: their report (the electrician's paperwork), and the PO that went.
   const keys = [
     ...(a.trade === 'roofer' ? ['RF_REPORT'] : a.trade === 'scaffolder' ? ['SC_REPORT'] : a.trade === 'electrician' ? ELECTRICIAN_DOC_KEYS : []),
@@ -176,14 +207,15 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
     reads,
     signoffs,
     po: po ? { id: po.id, po_number: po.po_number, status: po.status, sent_at: po.sent_at, changed_since_sent: po.changed_since_sent, labour: po.labour } : null,
+    review: { submissions: rv.submissions, returns, fix_by_default: fixBy },
     documents,
     events: ((ev ?? []) as ReviewEvent[]).map((e) => ({ at: e.at, actor: e.actor, type: e.type, detail: e.detail ?? null })),
   };
 }
 
 /**
- * Resolve a flag with a note. When no Review flag is left open, the assignment's Review task closes
- * (site-review:<id>). A flag that comes back (the answer changes again) is raised again by the rules.
+ * Resolve a flag with a note. A flag that comes back (the answer changes again) is raised again by the
+ * rules. (Review flags are listed in the review task, which closes with Green light or Return to site.)
  */
 export async function resolveFlag(db: Db, a: AssignmentRow, code: string, note: string, by: { id: string; name: string }): Promise<{ ok: true; flags: Flag[] } | { ok: false; error: string }> {
   const i = a.flags.findIndex((f) => f.code === code && !f.resolved_at);
@@ -195,7 +227,6 @@ export async function resolveFlag(db: Db, a: AssignmentRow, code: string, note: 
   const f = flags[i];
   await logSiteEvent(db, a.id, by.name, 'flag_resolved', { code, note: note || null });
   await logJob(db, a.project_id, `${TRADE_LABEL[a.trade]}’s flag resolved: ${f.text}${note ? ` (${note})` : ''}`, { assignment: a.id, flag: code }, by.id);
-  if (!flags.some((x) => x.severity === 'review' && !x.resolved_at)) await closeSourceTask(db, a.project_id, `site-review:${a.id}`);
   return { ok: true, flags };
 }
 

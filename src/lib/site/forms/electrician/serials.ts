@@ -97,11 +97,10 @@ export const SCAN_KEYS: { key: string; what: string; photo: string; design?: (c:
 
 const norm = (s: string) => s.trim().toUpperCase();
 
-/** Every serial on the job: this pack's captures and the roofer's (their panels, the optimiser plan). */
+/** Every serial in this pack's captures (the roofer scans none: the owner doesn't need panel serials). */
 function allSerials(c: FormCtx): { s: string; where: string }[] {
   const out: { s: string; where: string }[] = [];
   for (const k of SCAN_KEYS) for (const x of captures(c.values[k.key])) if (!x.unread && x.s.trim()) out.push({ s: norm(x.s), where: k.what });
-  for (const s of el(c).serials_elsewhere) if (s.trim()) out.push({ s: norm(s), where: 'roofer' });
   return out;
 }
 

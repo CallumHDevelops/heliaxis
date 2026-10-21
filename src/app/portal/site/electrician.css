@@ -2,7 +2,8 @@
    F43 string tabs and cards, N/A and "Same as string 1", certificate files, and the Finish list.
    Same tokens and scope as site.css; targets 48 px or more. */
 
-.sa-group {
+/* A group heading within a step ("Inverter"). Not .sa-group: that's the home list's job groups (site.css). */
+.sa-qgroup {
   margin: 22px 0 2px;
   padding: 8px 12px;
   border-radius: 10px;
@@ -12,7 +13,7 @@
   font-weight: 700;
   letter-spacing: 0.01em;
 }
-.sa-step > .sa-group:first-of-type { margin-top: 6px; }
+.sa-step > .sa-qgroup:first-of-type { margin-top: 6px; }
 .sa-pre { white-space: pre-line; }
 .sa-auto { white-space: pre-line; }
 

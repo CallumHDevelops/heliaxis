@@ -2,12 +2,14 @@
 
 import type { PackRecord } from '@/lib/site/offline';
 import { formProgress, missing, openForms, stepProgress, stepShown, summaryLine } from '@/lib/site/rules';
+import { REVIEW_STATE_LABEL } from '@/lib/site/review-shared';
 import { STAGES_FOR, type Answers } from '@/lib/site/types';
 import { shortDate } from '@/lib/site/client';
 import { CheckSign } from './CheckSign';
 import { CustomerSign, CustomerSignCard } from './CustomerSign';
 import { DoneScreen } from './DoneScreen';
 import { useJobForms } from './form-state';
+import { PutRightScreen, REVIEW_PILL, reviewOf } from './Review';
 import { go } from './nav';
 import { StepScreen } from './StepScreen';
 
@@ -15,7 +17,8 @@ import { StepScreen } from './StepScreen';
  * The job's forms. On the job screen (no `rest`): "16 questions, 9 photos, about 10 minutes", the
  * step list with progress and ticks, What's left, and Start / Carry on / Check and sign. With `rest`
  * (/portal/site/job/<id>/<step>): that step (P5), its Check and sign (sign-<stage>, P10) or the
- * signed screen (done-<stage>, P11); for an electrician, "Hand the phone to Jane" (customer, P15).
+ * signed screen (done-<stage>, P11); for an electrician, "Hand the phone to Jane" (customer, P15);
+ * after a return to site, its Put right (put-right-<n>, Review.tsx).
  */
 export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Answers; rest: string[] }) {
   const jf = useJobForms(rec, answers);
@@ -26,6 +29,7 @@ export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Ans
 
   if (key) {
     if (key === 'customer' && rec.pack.assignment.trade === 'electrician') return <CustomerSign rec={rec} />;
+    if (/^put-right-\d+$/.test(key)) return <PutRightScreen rec={rec} jf={jf} n={Number(key.slice(10))} />;
     if (key.startsWith('sign-') || key.startsWith('done-')) {
       const form = forms.find((f) => f.stage === key.slice(5));
       if (form && key.startsWith('sign-')) return <CheckSign rec={rec} jf={jf} form={form} />;
@@ -41,6 +45,12 @@ export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Ans
   if (!forms.length) return null;
   const open = openForms(forms, jf.signed);
   const waiting = forms.filter((f) => !open.includes(f));
+  // Where the office's review of each signed form is up to ("Waiting for review", "Green light"…).
+  const reviews = reviewOf(rec);
+  const pillFor = (stage: string) => {
+    const r = reviews.find((x) => x.stage === stage);
+    return r ? { text: REVIEW_STATE_LABEL[r.state], tone: REVIEW_PILL[r.state].tone } : null;
+  };
   return (
     <div className="sa-forms">
       {open.map((form) => {
@@ -69,6 +79,7 @@ export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Ans
             {signedOn ? (
               <p className="sa-muted">
                 Signed by {signedOn.signed_name} on {shortDate(signedOn.signed_at)}.
+                {pillFor(form.stage) && <span className={`sa-review-pill is-${pillFor(form.stage)!.tone}`}>{pillFor(form.stage)!.text}</span>}
               </p>
             ) : signedHere ? (
               <p className="sa-muted">Signed on this phone. It will send when you have signal.</p>

@@ -78,8 +78,6 @@ export type ElectricianFacts = {
   survey_battery_spot: string | null;
   /** What the roofer has synced: their answers (values), what Claude read from their photos, their photo counts. */
   roofer: { status: string; values: Record<string, unknown>; reads: { key: string; status: string; result: LabelReadResult | null }[]; photos: Record<string, number> } | null;
-  /** Serials captured elsewhere on the job (the roofer's panels and optimisers), for "no serial twice". */
-  serials_elsewhere: string[];
   /** F43: how far a measured string Voc may be from the expected before it's flagged (percent, a setting). */
   voc_tolerance: number;
   /** The test instruments this person gave on their last job, offered for F43. */

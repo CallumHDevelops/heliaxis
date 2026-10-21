@@ -5,6 +5,7 @@ import { KIND_LABEL, sendTimeWords, type MessageKind } from '@/lib/site/messages
 import { formatPence } from '@/lib/site/money';
 import type { SendResult } from '@/lib/site/send';
 import { HELD_WORDS, OVERRIDABLE } from '@/lib/site/po-shared';
+import { PO_REVIEW_LABEL, REVIEW_STATE_LABEL, STAGE_WORDS } from '@/lib/site/review-shared';
 import type { AssignmentView, PoView, SiteMessageView, SiteTabData } from '@/lib/site/server';
 import type { StripStep } from '@/lib/site/strip';
 import { TRADE_LABEL, type Trade } from '@/lib/site/types';
@@ -275,11 +276,15 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
   );
 }
 
-/** A labour PO's state for the office: "Held: Add the agreed rate…", "Issued 3 Nov", "Changed since it was sent". */
+/**
+ * A labour PO's state for the office: "Held: Add the agreed rate…", "Issued 3 Nov", "Changed since it
+ * was sent", then your review of the work: "On hold: return to site required", "Green light".
+ */
 function poWords(po: PoView): string {
   if (po.status === 'draft') return po.held.length ? `Held: ${po.held.map((h) => HELD_WORDS[h]).join('. ')}` : po.version ? 'Issued, waiting to send' : 'Being issued';
   if (po.changed_since_sent) return 'Changed since it was sent: issue it again';
-  return `${po.status === 'sent' ? 'Issued' : po.status[0].toUpperCase() + po.status.slice(1)}${po.issued ? ` ${shortDate(po.issued)}` : ''}${po.sent_at ? '' : ' (not delivered yet)'}`;
+  const issued = `${po.status === 'sent' ? 'Issued' : po.status[0].toUpperCase() + po.status.slice(1)}${po.issued ? ` ${shortDate(po.issued)}` : ''}${po.sent_at ? '' : ' (not delivered yet)'}`;
+  return po.review && po.status !== 'cancelled' ? `${issued} · ${PO_REVIEW_LABEL[po.review]}` : issued;
 }
 
 /** Scaffold up ✓ → Roof ✓ → Electrics in progress → Handover. */
@@ -344,6 +349,8 @@ function AssignmentCard({
   const signed = a.status === 'signed' || a.status === 'done';
   const msgs = messageWords(a.messages);
   const working = !signed && (a.trade === 'roofer' || a.trade === 'electrician');
+  // Signed work waiting for the office: their first submission, or a put right they've sent back.
+  const toReview = a.review.some((r) => r.state === 'waiting' || r.state === 'fixed');
   const first = a.contact.name.split(/\s+/)[0];
   return (
     <article className={`sx-card sx-card--${a.status}`} aria-label={`${a.title}: ${a.contact.name}`}>
@@ -392,6 +399,17 @@ function AssignmentCard({
           .join(' · ')}
       </p>
       {a.po && <PoLine po={a.po} busy={busy} onIssue={onIssue} />}
+      {a.review.length > 0 && (
+        <ul className="sx-reviews">
+          {a.review.map((r) => (
+            <li key={r.signoff_id} className={`sx-review sx-review--${r.state}`}>
+              {a.review.length > 1 ? `${STAGE_WORDS[r.stage]}: ` : ''}
+              {REVIEW_STATE_LABEL[r.state]}
+              {r.state === 'open' && r.live ? ` · put right by ${shortDate(r.live.fix_by)}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
       {children}
       {open.length > 0 && (
         <ul className="sx-flags">
@@ -438,8 +456,9 @@ function AssignmentCard({
           </>
         )}
         {(a.sent_at || a.photos > 0 || signed) && (
-          <button type="button" className={signed || open.length ? 'crm-btn crm-btn--small' : 'crm-chipbtn'} onClick={onReview} disabled={busy}>
-            Review{open.length ? ` (${open.length} flag${open.length === 1 ? '' : 's'})` : ''}
+          <button type="button" className={toReview || open.length ? 'crm-btn crm-btn--solar crm-btn--small' : signed ? 'crm-btn crm-btn--small' : 'crm-chipbtn'} onClick={onReview} disabled={busy}>
+            {toReview ? 'Review their work' : 'Review'}
+            {open.length ? ` (${open.length} flag${open.length === 1 ? '' : 's'})` : ''}
           </button>
         )}
         <button type="button" className="crm-chipbtn" onClick={onEdit} disabled={busy}>
@@ -481,7 +500,7 @@ function PoLine({ po, busy, onIssue }: { po: PoView; busy: boolean; onIssue: (ov
   const own = po.held.filter((h) => OVERRIDABLE.includes(h));
   const draft = po.status === 'draft';
   return (
-    <div className={`sx-po${draft && po.held.length ? ' is-held' : ''}`}>
+    <div className={`sx-po${draft && po.held.length ? ' is-held' : ''}${!draft && po.review === 'hold' ? ' is-onhold' : ''}${!draft && po.review === 'green' ? ' is-green' : ''}`}>
       <p>
         <b>{po.po_number}</b> · {poWords(po)}
       </p>

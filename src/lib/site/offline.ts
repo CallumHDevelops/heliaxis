@@ -50,8 +50,8 @@ export type PackRecord = {
   problem?: { kind: string; message: string; at: string };
   /** The server turned a sign-off down: what it still needs (P11). Cleared when they sign again. */
   gate?: { stage: Stage; message: string; missing: { label: string; key: string; step: string }[]; at: string };
-  /** From the sign-off's reply: the evening rule holds the PO's messages until then. */
-  poGoesAt?: string | null;
+  /** The server turned a Put right down (no photo of the fix yet, or withdrawn). Cleared when they sign again. */
+  putRightGate?: { n: number; message: string; at: string };
 };
 export type FileRecord = { id: string; assignmentId: string; name: string; mime: string; blob: Blob; storedAt: string };
 export type DraftRecord = { id: string; answers: Answers; base: Answers; baseRev: number; dirty: string[]; savedAt: string };

@@ -9,6 +9,7 @@ import { designOf } from './design';
 import { electricianPack } from './electrician';
 import { eicFacts } from './eic/facts';
 import { siteShort } from './messages';
+import { returnView, type ReviewStatus } from './review-shared';
 import type { PackFile, PackPhoto, PackPo, SitePack } from './pack-shared';
 import { assignmentRow, type AssignmentRow, type Db } from './server';
 import { getSiteSettings } from './settings';
@@ -60,22 +61,24 @@ export function packPo(po: Record<string, unknown>): PackPo {
     paid_on: (po.paid_on as string | null) ?? null,
     changed_since_sent: po.changed_since_sent === true,
     labour: (po.labour as Record<string, unknown> | null) ?? null,
+    review_status: po.review_status === 'waiting' || po.review_status === 'hold' || po.review_status === 'green' ? po.review_status : null,
   };
 }
 
 export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
   const { data: p } = await db.from('crm_projects').select('*').eq('id', a.project_id).maybeSingle();
   const project = (p ?? {}) as Record<string, unknown>;
-  const [{ data: cust }, { data: owner }, { data: others }, { data: surveys }, { data: photos }, { data: docs }, { data: signoffs }, { data: orders }, hols] = await Promise.all([
+  const [{ data: cust }, { data: owner }, { data: others }, { data: surveys }, { data: photos }, { data: docs }, { data: signoffs }, { data: orders }, hols, { data: returns }] = await Promise.all([
     db.from('enquiries').select('*').eq('id', String(project.enquiry_id ?? '')).maybeSingle(),
     project.owner_id ? db.from('profiles').select('full_name').eq('id', String(project.owner_id)).maybeSingle() : Promise.resolve({ data: null }),
     db.from('site_assignments').select('*').eq('project_id', a.project_id).neq('status', 'cancelled').order('created_at'),
     db.from('crm_surveys').select('*').eq('project_id', a.project_id).eq('type', 'solar').neq('status', 'cancelled').order('updated_at', { ascending: false }).limit(1),
     db.from('crm_photos').select('*').eq('assignment_id', a.id).order('created_at'),
     db.from('crm_documents').select('*').eq('project_id', a.project_id).eq('category', 'design').is('archived_at', null).order('created_at'),
-    db.from('site_signoffs').select('stage, signed_at, signed_name').eq('assignment_id', a.id).order('signed_at'),
+    db.from('site_signoffs').select('*').eq('assignment_id', a.id).order('signed_at'),
     db.from('purchase_orders').select('*').eq('assignment_id', a.id).neq('status', 'cancelled').order('created_at', { ascending: false }).limit(1),
     ukBankHolidays(),
+    db.from('site_returns').select('*').eq('assignment_id', a.id).neq('status', 'withdrawn').order('n'),
   ]);
   const c = (cust ?? {}) as Record<string, unknown>;
   const team = (others ?? []).map(assignmentRow);
@@ -208,13 +211,19 @@ export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
       rev: a.rev,
       answers: a.answers,
       flags: a.flags,
-      signoffs: ((signoffs ?? []) as { stage: Stage; signed_at: string; signed_name: string }[]).map((s) => ({ stage: s.stage, signed_at: s.signed_at, signed_name: s.signed_name })),
+      signoffs: ((signoffs ?? []) as { stage: Stage; signed_at: string; signed_name: string; review_status?: ReviewStatus }[]).map((s) => ({
+        stage: s.stage,
+        signed_at: s.signed_at,
+        signed_name: s.signed_name,
+        review: s.review_status ?? 'waiting',
+      })),
     },
     strip,
     files,
     skipped,
     photos: held,
     po: po ? packPo(po) : null,
+    returns: ((returns ?? []) as Record<string, unknown>[]).map(returnView),
     reads: (reads ?? []) as SitePack['reads'],
     settings: { locationStamps: (await getSiteSettings()).locationStamps },
     ...(a.trade === 'electrician' ? { electrician: await electricianPack(db, a, project, sa, { links: true }) } : {}),

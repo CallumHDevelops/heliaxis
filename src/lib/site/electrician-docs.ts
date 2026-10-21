@@ -7,7 +7,7 @@ import type { ElectricianDocInput } from '@/lib/documents/site/common';
 import { F43_TITLE, makeF43 } from '@/lib/documents/site/f43';
 import { F44_TITLE, makeF44, makeF44A } from '@/lib/documents/site/f44';
 import { F74_TITLE, F75_TITLE, makeF74, makeF75 } from '@/lib/documents/site/f74';
-import { makePhotoRecord, type RecordSlot } from '@/lib/documents/site/photo-record';
+import { makePhotoRecord, type RecordDeclaration, type RecordSlot } from '@/lib/documents/site/photo-record';
 import { makeEvRecord, makeHpRecord } from '@/lib/documents/site/records';
 import { saveGenerated, type SaveResult } from '@/lib/documents/store';
 import { tradeFiles } from './electrician';
@@ -20,6 +20,7 @@ import { HP_TITLE } from './forms/electrician/heatpump';
 import { SCAN_KEYS } from './forms/electrician/serials';
 import { captures } from './forms/electrician/shared';
 import type { Field } from './forms/types';
+import { isPutRightSlot } from './review-shared';
 import { readAssignment, type AssignmentRow, type Db } from './server';
 
 /**
@@ -183,16 +184,36 @@ export async function savePhotoRecord(db: Db, assignmentId: string, by: string |
     }
     slots.push({ title: f.label, instruction: f.hint ?? null, photos: items });
   }
+  // A put right's photos after a return to site (PR:<n>), each return its own section.
+  for (const slot of [...new Set(photos.map((x) => x.slot ?? '').filter(isPutRightSlot))].sort()) {
+    const items = [];
+    for (const x of photos.filter((p) => p.slot === slot)) {
+      const bytes = await download(db, CRM_BUCKET, x.storage_path);
+      if (bytes) items.push({ bytes, mime: /\.png$/i.test(x.storage_path) ? 'image/png' : 'image/jpeg', caption: 'Photos of the fix', sub: x.taken_at ? `Taken ${stampWords(x.taken_at)}` : null });
+    }
+    slots.push({ title: `Put right ${slot.slice(3)}`, instruction: null, photos: items });
+  }
   const serials = SCAN_KEYS.map((k) => {
     const list = captures(input.ctx.values[k.key]);
     return { what: `${k.what[0].toUpperCase()}${k.what.slice(1)} serial${list.length === 1 ? '' : 's'}`, serials: list.filter((x) => !x.unread).map((x) => x.s), unread: list.filter((x) => x.unread).length };
   }).filter((s) => s.serials.length || s.unread);
-  const bytes = await makePhotoRecord(input, slots, serials);
+  // The declarations as signed: the sign-off's, then each put right's.
+  const [{ data: so }, { data: rt }] = await Promise.all([
+    db.from('site_signoffs').select('signed_name, signed_at, declaration, signature_path').eq('assignment_id', a.id).eq('stage', 'main').maybeSingle(),
+    db.from('site_returns').select('n, fixed_name, fixed_at, fixed_declaration, fixed_signature_path').eq('assignment_id', a.id).order('n'),
+  ]);
+  const declarations: RecordDeclaration[] = [];
+  const signed = so as { signed_name: string; signed_at: string; declaration: string; signature_path: string } | null;
+  if (signed) declarations.push({ title: 'Sign-off', text: signed.declaration, name: signed.signed_name, at: signed.signed_at, signature: await download(db, DOCS_BUCKET, signed.signature_path) });
+  for (const r of (rt ?? []) as { n: number; fixed_name: string | null; fixed_at: string | null; fixed_declaration: string | null; fixed_signature_path: string | null }[]) {
+    if (r.fixed_declaration) declarations.push({ title: `Put right ${r.n}`, text: r.fixed_declaration, name: r.fixed_name ?? '', at: r.fixed_at, signature: r.fixed_signature_path ? await download(db, DOCS_BUCKET, r.fixed_signature_path) : null });
+  }
+  const bytes = await makePhotoRecord(input, slots, serials, declarations);
   return saveGenerated(db, a.project_id, {
     key: 'EP_RECORD',
     name: docFileName(input.jobRef, '', 'Electrician photo record'),
     bytes,
-    inputs: { photos: photos.map((x) => x.id), serials },
+    inputs: { photos: photos.map((x) => x.id), serials, declarations: declarations.map((x) => [x.title, x.text, x.at]) },
     category: 'commissioning',
     visible: false,
     by,

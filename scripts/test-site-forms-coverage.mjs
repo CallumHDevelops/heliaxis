@@ -214,14 +214,26 @@ prove('REGS 3.4: the four OZEV grant photos', ['EPG1', 'EPG2', 'EPG3', 'EPG4'].e
 // 4.3 Serials: each capture, with the label photo it's read from.
 const SERIALS = { SN_OPT: null, SN_INV: 'EP21', SN_BAT: 'EP31', SN_BINV: 'EP32', SN_EV: 'EP41', SN_HP: 'EP53', SN_HP2: 'EP54', SN_GENMETER: 'EP26' };
 for (const [k, photo] of Object.entries(SERIALS)) prove(`FORMS serial ${k}`, isField(k, 'SCAN') && (!photo || field(k).photo === photo));
-prove('FORMS serial SN_PANEL: the roofer’s, before lifting', roofer.steps.some((s) => s.fields.some((f) => f.key === 'SN_PANEL' && f.type === 'SCAN')));
+// The owner (21 Oct): "We don't need them to scan panel serial numbers": the roofer has no SCAN.
+prove('no panel serial scanning for the roofer (owner, 21 Oct)', !roofer.steps.some((s) => s.fields.some((f) => f.type === 'SCAN')));
 prove('FORMS serial SN_METER: shown for confirmation, a photo if it changed', isField('SN_METER', 'YN') && isField('SN_METERp', 'PHOTOS'));
 
 // 4.4 The final sign-off.
 prove('FORMS EF0: everything provided (the list)', field('EF0')?.panel === 'missing');
 keys(['EF1', 'EF3'], 'CONFIRM');
 prove('FORMS EF2: Yes / Not possible, and why', JSON.stringify(field('EF2').options.map((o) => o.label)) === JSON.stringify(['Yes', 'Not possible']) && field('EF2n')?.level === 'must');
-prove('FORMS EF_SIG: the declaration', field('EF_SIG').declaration(c) === 'I confirm the electrical work at 12 High Street, Maindee, Newport, NP20 4AB is complete, tested and commissioned, and the information in this pack is true.');
+// The owner's declaration (21 Oct, OWNER-DECISIONS 5), with the electrical work's words.
+prove(
+  'FORMS EF_SIG: the owner’s declaration',
+  field('EF_SIG').declaration(c) ===
+    [
+      'I confirm that:',
+      '• the electrical work at 12 High Street, Maindee, Newport, NP20 4AB is complete and was carried out to the design, the manufacturer’s instructions and the standards required by my Subcontractor Agreement with Heliaxis Limited;',
+      '• the answers, photos and readings I have given are true and accurate; and',
+      '• I have told Heliaxis about any defect, damage or problem I found or caused.',
+      'I understand Heliaxis will rely on this declaration to raise my purchase order and complete the customer’s certification and handover, and will review my photos and results. If anything needs putting right, I will return to site to fix it under my Subcontractor Agreement.',
+    ].join('\n')
+);
 
 // 5.3 The electrician's flags.
 const FLAGS = {

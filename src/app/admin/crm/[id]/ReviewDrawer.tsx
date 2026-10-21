@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import { formatPence } from '@/lib/site/money';
 import { HELD_WORDS } from '@/lib/site/po-shared';
+import { PO_REVIEW_LABEL, poReviewOf } from '@/lib/site/review-shared';
 import type { ReviewEvent, ReviewPhoto, ReviewRead, SiteReview } from '@/lib/site/review';
 import type { AssignmentView, SiteTabData } from '@/lib/site/server';
 import { SEVERITY_LABEL, type Flag } from '@/lib/site/types';
 import { Sheet } from '../CrmUi';
 import { send } from './record-shared';
+import { SiteReviewPanel } from './SiteReviewPanel';
 
 type Tab = 'answers' | 'photos' | 'reads' | 'signoff' | 'po' | 'events';
 const TABS: { key: Tab; label: string }[] = [
@@ -40,6 +42,9 @@ const EVENT_WORDS: Record<string, string> = {
   signed_off: 'Signed off',
   signoff_reopened: 'Sign-off reopened',
   po_issued: 'PO issued',
+  review_green: 'Green light',
+  review_return: 'Return to site required',
+  put_right_signed: 'Put right signed',
   cancelled: 'Taken off the job',
 };
 
@@ -60,6 +65,12 @@ function eventDetail(e: ReviewEvent): string {
       return `${v('po_number')} v${v('version')}${d.payable != null ? ` · ${formatPence(Number(d.payable))} to pay` : ''}`;
     case 'signed_off':
       return `${v('stage')} · ${v('name')}`;
+    case 'review_return':
+      return [v('what'), d.fix_by ? `by ${v('fix_by')}` : '', d.safety ? 'affects safety' : ''].filter(Boolean).join(' · ');
+    case 'review_green':
+      return [v('stage'), d.return ? `put right ${v('return')}` : '', v('po')].filter(Boolean).join(' · ');
+    case 'put_right_signed':
+      return `${v('name')} · ${v('photos')} photo${d.photos === 1 ? '' : 's'}`;
     case 'two_phones':
       return `${v('key')}: ${JSON.stringify(d.was)} → ${JSON.stringify(d.now)}`;
     case 'edited':
@@ -88,10 +99,11 @@ function readWords(r: ReviewRead): string {
 }
 
 /**
- * The review drawer for one trade (screen D4): what they answered (by step, where each came from,
- * flags beside them with Resolve), their photos by slot (full screen, download), Claude's label reads
- * to confirm, the sign-off evidence, the PO and documents, and the history. Reopen and Issue PO are
- * here too.
+ * The review drawer for one trade (screen D4): your review first once they've signed (Green light or
+ * Return to site required, and every return to site: SiteReviewPanel), then what they answered (by
+ * step, where each came from, flags beside them with Resolve), their photos by slot (full screen,
+ * download), Claude's label reads to confirm, the sign-off evidence, the PO and documents, and the
+ * history. Reopen and Issue PO are here too.
  */
 export function ReviewDrawer({
   a,
@@ -156,10 +168,12 @@ export function ReviewDrawer({
     : {};
   const open = review?.flags.filter((f) => !f.resolved_at) ?? [];
   const signed = a.status === 'signed' || a.status === 'done';
+  const poReview = review ? poReviewOf(review.review.submissions.map((s) => s.state)) : null;
 
   return (
     <Sheet title={`${a.title}: ${a.contact.name}`} onClose={onClose} wide>
       <div className="sxr">
+        {review && <SiteReviewPanel assignmentId={a.id} review={review} onReview={setReview} onChanged={onChanged} onViewPhoto={setViewing} />}
         <div className="sxr-tabs" role="tablist" aria-label="Review">
           {TABS.map((t) => (
             <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={tab === t.key ? 'on' : undefined} onClick={() => setTab(t.key)}>
@@ -334,6 +348,7 @@ export function ReviewDrawer({
                   <>
                     <h4>
                       {review.po.po_number} · {review.po.status === 'draft' ? (review.po.labour?.held.length ? 'Held' : 'Being issued') : review.po.changed_since_sent ? 'Changed since it was sent' : 'Issued'}
+                      {poReview && <span className={`sxr-state sxr-state--${poReview === 'hold' ? 'bad' : poReview === 'green' ? 'ok' : 'wait'}`}>{PO_REVIEW_LABEL[poReview]}</span>}
                     </h4>
                     {review.po.status === 'draft' && !!review.po.labour?.held.length && <p className="sx-warnline">{review.po.labour.held.map((h) => HELD_WORDS[h]).join('. ')}.</p>}
                     {review.po.labour && (

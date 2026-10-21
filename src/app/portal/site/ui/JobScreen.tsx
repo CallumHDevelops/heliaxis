@@ -8,6 +8,7 @@ import { downloadPack, seenChanges } from '@/lib/site/packs';
 import { Splash, SyncLine, TopBar } from './bits';
 import { JobSteps } from './JobSteps';
 import { PoCard } from './PoCard';
+import { ReturnBanners } from './Review';
 import { useLive } from './nav';
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`;
@@ -71,6 +72,7 @@ export function JobScreen({ id, rest }: { id: string; rest: string[] }) {
             </button>
           </div>
         )}
+        <ReturnBanners rec={rec} />
         <Strip pack={pack} />
         <div className="sa-job-head">
           <p className="sa-kicker">

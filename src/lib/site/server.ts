@@ -11,7 +11,8 @@ import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type Ra
 import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
 import { snapshotOf, type HeldReason } from './po-shared';
-import { STATUS_LABEL, TRADE_LABEL, valuesOf, yesNo, type Answers, type AssignmentStatus, type Flag, type Trade } from './types';
+import { returnView, stageStates, type PoReview, type ReturnView, type ReviewState, type ReviewStatus } from './review-shared';
+import { STATUS_LABEL, TRADE_LABEL, valuesOf, yesNo, type Answers, type AssignmentStatus, type Flag, type Stage, type Trade } from './types';
 
 /**
  * The site app on the server: whether its SQL has run, the people who go to site (a firm's contact or
@@ -502,6 +503,8 @@ export type AssignmentView = {
   flags: Flag[];
   open_flags: number;
   po: PoView | null;
+  /** The office's review of each signed submission: waiting, return to site (open or put right), green light. */
+  review: { signoff_id: string; stage: Stage; state: ReviewState; live: ReturnView | null }[];
   messages: SiteMessageView[];
   link: { generation: number; created_at: string | null; phones: number };
   /** The scaffold: was it tagged at erection (SC3)? */
@@ -520,6 +523,8 @@ export type PoView = {
   sent_at: string | null;
   held: HeldReason[];
   changed_since_sent: boolean;
+  /** The office's review of the work: waiting, hold (return to site), green. Null before anything's signed. */
+  review: PoReview | null;
 };
 
 export type SiteTabData = {
@@ -549,13 +554,23 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
   const list = (rows ?? []).map(assignmentRow);
   const ids = list.map((a) => a.id);
   const contactIds = [...new Set(list.map((a) => a.contact_id))];
-  const [{ data: contactRows }, { data: photos }, { data: orders }, { data: messages }, { data: devices }] = await Promise.all([
+  const [{ data: contactRows }, { data: photos }, { data: orders }, { data: messages }, { data: devices }, { data: signoffRows }, { data: returnRows }] = await Promise.all([
     contactIds.length ? db.from('site_contacts').select('*').in('id', contactIds) : Promise.resolve({ data: [] as unknown[] }),
     ids.length ? db.from('crm_photos').select('assignment_id').in('assignment_id', ids) : Promise.resolve({ data: [] as unknown[] }),
     ids.length ? db.from('purchase_orders').select('*').in('assignment_id', ids).order('created_at', { ascending: false }) : Promise.resolve({ data: [] as unknown[] }),
     ids.length ? db.from('site_messages').select('id, assignment_id, channel, kind, status, send_after, sent_at, error, created_at').in('assignment_id', ids).order('created_at', { ascending: false }).limit(200) : Promise.resolve({ data: [] as unknown[] }),
     contactIds.length ? db.from('site_devices').select('contact_id, revoked_at').in('contact_id', contactIds) : Promise.resolve({ data: [] as unknown[] }),
+    ids.length ? db.from('site_signoffs').select('id, assignment_id, stage, signed_at, review_status').in('assignment_id', ids).order('signed_at') : Promise.resolve({ data: [] as unknown[] }),
+    ids.length ? db.from('site_returns').select('*').in('assignment_id', ids).neq('status', 'withdrawn').order('n') : Promise.resolve({ data: [] as unknown[] }),
   ]);
+  // The office's review of each assignment's signed submissions.
+  const reviewOf = new Map<string, AssignmentView['review']>();
+  for (const id of ids) {
+    const so = ((signoffRows ?? []) as { id: string; assignment_id: string; stage: Stage; review_status: ReviewStatus | null }[]).filter((s) => s.assignment_id === id);
+    const rt = ((returnRows ?? []) as Record<string, unknown>[]).filter((r) => r.assignment_id === id).map(returnView);
+    const states = stageStates(so.map((s) => ({ stage: s.stage, review: s.review_status })), rt);
+    reviewOf.set(id, states.map((x, i) => ({ signoff_id: so[i].id, stage: x.stage, state: x.state, live: x.live })));
+  }
   const contacts = new Map(((contactRows ?? []) as ContactRow[]).map((c) => [c.id, c]));
   const firms = await firmsById(db, [...contacts.values()].map((c) => c.subcontractor_id));
   const photoCount = new Map<string, number>();
@@ -575,6 +590,7 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
       sent_at: (o.sent_at as string | null) ?? null,
       held: o.status === 'draft' ? (snap?.held ?? []) : [],
       changed_since_sent: o.changed_since_sent === true,
+      review: o.review_status === 'waiting' || o.review_status === 'hold' || o.review_status === 'green' ? o.review_status : null,
     });
   }
   const msgOf = new Map<string, SiteMessageView[]>();
@@ -643,6 +659,7 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
       flags: a.flags,
       open_flags: a.flags.filter((f) => !f.resolved_at).length,
       po: poOf.get(a.id) ?? null,
+      review: reviewOf.get(a.id) ?? [],
       messages: msgOf.get(a.id) ?? [],
       link: { generation: a.link_generation, created_at: a.link_created_at, phones: phones.get(c.id) ?? 0 },
       tagged: yesNo(answers.SC3),

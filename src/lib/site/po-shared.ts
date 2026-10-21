@@ -19,6 +19,25 @@ export const HELD_WORDS: Record<HeldReason, string> = {
 /** Holds the office can issue past (its own settings); the others need the missing detail first. */
 export const OVERRIDABLE: HeldReason[] = ['urgent', 'scaffold'];
 
+/**
+ * The terms on every labour PO (the owner's final wording, 21 Oct), one constant for the PO's PDF,
+ * the trade's phone and the PO email. {address} and {po} are filled per PO (poTerms); the filled
+ * list is frozen in the snapshot when it's issued.
+ */
+export const PO_TERMS: readonly string[] = [
+  'This purchase order was raised automatically after you declared that the work at {address} is complete and correct and that your answers, photos and readings are true.',
+  'Heliaxis will review your photos and results. If anything needs putting right, we will tell you in writing and you will need to return to site to fix it at your own cost (clause 12.3). We may hold or dispute payment on this purchase order until it is put right (clauses 4.7 and 12.4).',
+  'It is issued under your Subcontractor Agreement with Heliaxis Limited and does not change or override any of its terms. If anything here differs from the Agreement, the Agreement applies.',
+  'Please quote {po} on your invoice and include the supporting documents the Agreement asks for (clause 4.2).',
+  'Heliaxis may dispute or reject all or part of an invoice by telling you in writing within 7 working days of receiving it (clause 4.7). Undisputed invoices are paid within 14 days of the accepted invoice date (clause 4.3).',
+  'CIS is deducted from the labour element only, at the rate shown (clause 5).',
+];
+export const PO_TERMS_TITLE = 'Terms';
+
+/** The terms for one PO, numbered as printed ("1. This purchase order was raised…"). */
+export const poTerms = (address: string, poNumber: string): string[] =>
+  PO_TERMS.map((t, i) => `${i + 1}. ${t.replace('{address}', address.trim() || 'the site').replace('{po}', poNumber || 'the PO number')}`);
+
 export type LabourSnapshot = {
   po_number: string;
   /** The day it was issued (YYYY-MM-DD, UK); null while it's held. */
@@ -46,7 +65,10 @@ export type LabourSnapshot = {
   vat: number;
   cis: { words: string; percent: number; pence: number };
   payable: number;
+  /** Before the owner's terms: his payment terms sentence from Site settings (older snapshots only). */
   payment_terms: string | null;
+  /** The PO's terms as issued, numbered (poTerms). Missing on snapshots from before them. */
+  terms?: string[];
   signed: { by: string; at: string; stage: Stage } | null;
   quote_line: string;
   held: HeldReason[];

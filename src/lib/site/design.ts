@@ -54,7 +54,6 @@ export const DESIGN_FIELDS: DesignField[] = [
   { key: 'est_kwh_year', label: 'Estimated generation (kWh a year)', kind: 'number', for: SOLAR, max: 1_000_000, hint: 'The MCS estimate from the design.' },
   { key: 'shade_factor', label: 'Shade factor', kind: 'number', for: SOLAR, max: 1, hint: 'From the design (0 to 1).' },
   { key: 'bird_mesh', label: 'Bird mesh sold', kind: 'bool', for: SOLAR },
-  { key: 'scan_panel_serials', label: 'Roofer scans the panel serial numbers', kind: 'bool', for: SOLAR },
   { key: 'battery_backup', label: 'Battery gives back-up power in a power cut', kind: 'bool', for: BATTERY },
   {
     key: 'eess_class',
@@ -138,7 +137,6 @@ export type Design = {
   est_kwh_year: number | null;
   shade_factor: number | null;
   bird_mesh: boolean | null;
-  scan_panel_serials: boolean | null;
   battery_backup: boolean | null;
   eess_class: number | null;
   battery_kw: number | null;
@@ -165,7 +163,6 @@ export function designOf(system: Record<string, unknown> | null | undefined): De
     est_kwh_year: num('est_kwh_year'),
     shade_factor: num('shade_factor'),
     bird_mesh: bool('bird_mesh'),
-    scan_panel_serials: bool('scan_panel_serials'),
     battery_backup: bool('battery_backup'),
     eess_class: num('eess_class'),
     battery_kw: num('battery_kw'),

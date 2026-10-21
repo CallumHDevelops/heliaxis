@@ -30,7 +30,11 @@ function cardsOf(rows: SiteJobRow[], packs: PackRecord[]): Card[] {
       rev: a.rev,
       signed_at: a.signoffs.at(-1)?.signed_at ?? null,
       done_at: null,
-      po: p.pack.po ? { po_number: p.pack.po.po_number, status: p.pack.po.status, payable_pence: p.pack.po.payable_pence, sent_at: p.pack.po.sent_at, paid_on: p.pack.po.paid_on } : null,
+      po: p.pack.po ? { po_number: p.pack.po.po_number, status: p.pack.po.status, payable_pence: p.pack.po.payable_pence, sent_at: p.pack.po.sent_at, paid_on: p.pack.po.paid_on, review_status: p.pack.po.review_status } : null,
+      put_right: (() => {
+        const open = (p.pack.returns ?? []).filter((r) => r.status === 'open').sort((x, y) => y.n - x.n)[0];
+        return open ? { n: open.n, fix_by: open.fix_by } : null;
+      })(),
       pack: p,
       problem: p.problem?.message ?? null,
     });
@@ -39,9 +43,11 @@ function cardsOf(rows: SiteJobRow[], packs: PackRecord[]): Card[] {
 }
 
 const GROUPS: { key: string; title: string; has: (c: Card) => boolean }[] = [
-  { key: 'now', title: 'In progress', has: (c) => !c.problem && c.status === 'started' },
-  { key: 'next', title: 'To start', has: (c) => !c.problem && ['draft', 'sent', 'opened'].includes(c.status) },
-  { key: 'signed', title: 'Signed off', has: (c) => !c.problem && (c.status === 'signed' || c.status === 'done') },
+  // The office has asked them to put something right: first, so it's never missed.
+  { key: 'fix', title: 'Return to site required', has: (c) => !c.problem && !!c.put_right },
+  { key: 'now', title: 'In progress', has: (c) => !c.problem && !c.put_right && c.status === 'started' },
+  { key: 'next', title: 'To start', has: (c) => !c.problem && !c.put_right && ['draft', 'sent', 'opened'].includes(c.status) },
+  { key: 'signed', title: 'Signed off', has: (c) => !c.problem && !c.put_right && (c.status === 'signed' || c.status === 'done') },
   { key: 'off', title: 'Cancelled or taken off your list', has: (c) => !!c.problem || c.status === 'cancelled' },
 ];
 
@@ -72,7 +78,7 @@ export function Home() {
           const list = cards.filter(g.has);
           if (!list.length) return null;
           return (
-            <section key={g.key} className="sa-group">
+            <section key={g.key} className={`sa-group sa-group-${g.key}`}>
               <h2>{g.title}</h2>
               {list.map((c) => {
                 const progress = c.pack ? jobProgress(c.pack.pack, drafts?.find((d) => d.id === c.id)?.answers ?? c.pack.pack.assignment.answers) : null;
@@ -86,6 +92,8 @@ export function Home() {
                     </span>
                     {c.problem ? (
                       <span className="sa-jobcard-bad">{c.problem}</span>
+                    ) : c.put_right ? (
+                      <span className="sa-jobcard-bad">Put it right by {shortDate(c.put_right.fix_by)}</span>
                     ) : c.po ? (
                       <span className="sa-jobcard-po">
                         {c.po.po_number}

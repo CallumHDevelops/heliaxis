@@ -5,6 +5,7 @@
  * the customer told the team will call tomorrow) and the sign-off. Nothing here is answered for them.
  * Type-only imports.
  */
+import { tradeDeclaration } from '../../declaration';
 import type { Field, FlagRule, FormCtx, Step } from '../types';
 import { appWords, el, has, is, text } from './shared';
 
@@ -48,7 +49,7 @@ export const EF_SIG: Field = {
   type: 'SIG',
   label: 'Sign off: everything is done',
   level: 'must',
-  declaration: (c) => `I confirm the electrical work at ${c.address || 'this address'} is complete, tested and commissioned, and the information in this pack is true.`,
+  declaration: (c) => tradeDeclaration('electrician', c.address),
 };
 
 export const FINISH_FLAGS: FlagRule[] = [

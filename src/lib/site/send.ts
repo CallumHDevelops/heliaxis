@@ -228,6 +228,9 @@ export async function deliver(db: Db, m: MessageRow): Promise<MessageRow | null>
         .eq('id', po)
         .in('status', ['draft', 'sent']);
     }
+    // A return to site's written notice (return:<id>:<channel>): when it first reached them is kept with it.
+    const ret = m.kind === 'return_to_site' ? /^return:([0-9a-f-]{36}):/i.exec(m.dedupe_key)?.[1] : null;
+    if (result.ok && ret) await db.from('site_returns').update({ notice_sent_at: now }).eq('id', ret).is('notice_sent_at', null);
     return (done as MessageRow | null) ?? null;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Not sent';

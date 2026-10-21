@@ -40,14 +40,13 @@ async function applyReply(id: string, r: SignoffReply) {
   await updatePack(id, (p) => ({
     ...p,
     gate: undefined,
-    poGoesAt: r.goes_at,
     pack: {
       ...p.pack,
       po: r.po ?? p.pack.po,
       assignment: {
         ...p.pack.assignment,
         status: r.status,
-        signoffs: [...p.pack.assignment.signoffs.filter((s) => s.stage !== r.signoff.stage), { stage: r.signoff.stage, signed_at: r.signoff.signed_at, signed_name: r.signoff.signed_name }],
+        signoffs: [...p.pack.assignment.signoffs.filter((s) => s.stage !== r.signoff.stage), { stage: r.signoff.stage, signed_at: r.signoff.signed_at, signed_name: r.signoff.signed_name, review: 'waiting' }],
       },
     },
   }));

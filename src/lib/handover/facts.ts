@@ -17,7 +17,7 @@ import { isSlot, modelKey, type SlotCode, type SlotDoc } from './slots';
  *
  * The electrician's facts come from their pack's answers by the FORMS keys; the site app adds what
  * only it knows (site/handover-facts.ts: the certificate's reference, the EIC's next inspection and
- * what it waits for, the roofer's panel serials), and more can be added with registerHandoverFacts.
+ * what it waits for), and more can be added with registerHandoverFacts.
  */
 
 /** A crm_documents row as the pack reads it (select('*')). */
@@ -74,7 +74,7 @@ export type Loaded = {
 /** What Units 2 and 3 can tell the pack about the electrician's work (only the fields they know). */
 export type FactsPlugin = (db: Db, projectId: string, f: HandoverFacts) => Promise<Partial<Pick<ElectricianFacts, 'certRef' | 'nextInspection' | 'certWaits' | 'values'>> | null>;
 const PLUGINS: FactsPlugin[] = [
-  // The electrician's certificate and the roofer's panel serials (site/handover-facts.ts), loaded when needed.
+  // The electrician's certificate (site/handover-facts.ts), loaded when needed.
   async (db, projectId, f) => (await import('@/lib/site/handover-facts')).siteHandoverFacts(db, projectId, f),
 ];
 export const registerHandoverFacts = (p: FactsPlugin) => void PLUGINS.push(p);

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatPence, isLate } from '@/lib/purchase-orders/money';
 import { labourWho, summariseOrders, type PoListRow } from '@/lib/purchase-orders/shared';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
-import { api, KitOrdered, labourWhen, neededWords, ordersCount, StatusChip } from './OrdersUi';
+import { api, KitOrdered, labourWhen, neededWords, ordersCount, ReviewLine, StatusChip } from './OrdersUi';
 import { OrderSheet } from './OrderSheet';
 import './orders.css';
 
@@ -90,6 +90,7 @@ export function OrdersTab({ projectId, today, myName, onChanged }: { projectId: 
                     {labour && <span className="po-chip po-chip--labour">Labour</span>} {labour ? labourWho(o) : (o.supplier?.name ?? 'Supplier')}
                   </b>
                   {o.changed_since_sent && <small className="po-late">Changed since sent: {labour ? 'issue it again' : 'send it again'}</small>}
+                  <ReviewLine o={o} />
                 </span>
                 <span className="po-chipcell">
                   <StatusChip status={o.status} late={late} labour={labour} />

@@ -9,6 +9,7 @@ import type { Db } from './server';
  * folder here, once every file is across:
  *
  * - site_signoffs.signature_path (the trade's sign-off) and extra (the customer's, on the electrician's phone);
+ * - site_returns.fixed_signature_path (a trade's Put right after a return to site);
  * - site_assignments.answers (the EIC's design part, signed in the office);
  * - handover_slots.data (F78's design part, the customer's portal signatures).
  *
@@ -46,6 +47,10 @@ export async function moveSitePaths(db: Db, m: { bucket: string; from: string; t
       const path = s.signature_path?.startsWith(m.from) ? m.to + s.signature_path.slice(m.from.length) : null;
       const extra = moved(s.extra);
       if (path || extra !== undefined) done(await db.from('site_signoffs').update({ ...(path ? { signature_path: path } : {}), ...(extra !== undefined ? { extra } : {}) }).eq('id', s.id));
+    }
+    const { data: rt } = await db.from('site_returns').select('id, fixed_signature_path').in('assignment_id', assignments.map((a) => a.id));
+    for (const r of (rt ?? []) as { id: string; fixed_signature_path: string | null }[]) {
+      if (r.fixed_signature_path?.startsWith(m.from)) done(await db.from('site_returns').update({ fixed_signature_path: m.to + r.fixed_signature_path.slice(m.from.length) }).eq('id', r.id));
     }
   }
   // The handover pack (handover.sql may not have been run).

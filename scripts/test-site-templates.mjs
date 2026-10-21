@@ -27,7 +27,7 @@ function eq(name, got, want) {
 
 /* ── The new templates pass Meta's rules ───────────────────────────────────── */
 
-const NEW = ['site_job_pack', 'site_po_raised', 'site_strike_photos', 'site_clear_to_start', 'site_scaffold_hold', 'handover_pack_ready'];
+const NEW = ['site_job_pack', 'site_po_raised', 'site_strike_photos', 'site_clear_to_start', 'site_scaffold_hold', 'site_return_to_site', 'site_green_light', 'handover_pack_ready'];
 for (const name of NEW) {
   const t = T.readyMade(name);
   eq(`${name} is a ready-made template`, !!t, true);
@@ -38,7 +38,9 @@ for (const name of NEW) {
   eq(`${name}: Utility`, t.category, 'UTILITY');
   eq(`${name}: no quick replies until trade replies stay out of the leads (D20)`, t.buttons, []);
 }
-eq('the new fields are filled by the app, not typed into others', ['work_words', 'site_short', 'job_link', 'po_number', 'portal_link'].map((k) => [!!T.FIELDS[k]?.auto, T.INSERTABLE.includes(k)]), [
+eq('the new fields are filled by the app, not typed into others', ['work_words', 'site_short', 'job_link', 'po_number', 'portal_link', 'fix_what', 'fix_by'].map((k) => [!!T.FIELDS[k]?.auto, T.INSERTABLE.includes(k)]), [
+  [true, false],
+  [true, false],
   [true, false],
   [true, false],
   [true, false],
@@ -92,6 +94,28 @@ eq('midday: goes now', M.sendAfter(at('2026-10-21T11:00:00Z'), late).toISOString
 // After the clocks go back (Sunday 25 October), 07:00 UK is 07:00 UTC.
 eq('22:10 on Monday 26 October: 07:00 GMT', M.sendAfter(at('2026-10-26T22:10:00Z'), late).toISOString(), '2026-10-27T07:00:00.000Z');
 eq('"Waiting to send at 07:00"', M.sendTimeWords('2026-10-22T06:00:00.000Z'), '07:00');
+
+/* ── The office's review (owner, 21 Oct) ──────────────────────────────────── */
+
+eq('the PO WhatsApp says the work will be reviewed', T.readyMade('site_po_raised').body.includes('We’ll review your photos and results and let you know: green light, or return to site if anything needs putting right.'), true);
+const ret = { ...about, trade: 'roofer', what: 'Two tiles left lifted.\nDress them back flat.', fixBy: '2026-11-12', safety: false, poNumber: 'PO-0123' };
+eq('return to site blanks: what on one line, the day in words', M.returnParams(ret), ['Dave', 'roofing work', '12 High Street, NP20 4AB', 'Two tiles left lifted. Dress them back flat', 'Thursday 12 November', 'https://subcontractor.heliaxis.co.uk/portal/site/j/abc']);
+eq('…a long one is cut short with "…"', M.whatLine('x'.repeat(400)).length, 300);
+eq('the notice’s subject', M.returnEmail(ret).subject, 'Return to site required: roofing at 12 High Street, NP20 4AB (HX-0042)');
+eq('the notice says own cost, the hold and that it is the written notice', [
+  M.returnEmail(ret).paragraphs.includes('Please return to site and put it right by Thursday 12 November, at your own cost (clause 12.3).'),
+  M.returnEmail(ret).paragraphs.includes('We may hold payment on purchase order PO-0123 until it’s put right (clauses 4.7 and 12.4).'),
+  M.returnEmail(ret).paragraphs.includes('This email is our written notice under clause 12.3 of your Subcontractor Agreement with Heliaxis Limited.'),
+], [true, true, true]);
+eq('…safety in its words', M.returnEmail({ ...ret, safety: true }).paragraphs[3], 'This affects safety or the home, so please return to site and put it right by Thursday 12 November, at your own cost (clause 12.3).');
+eq('…no PO, no hold line', M.returnEmail({ ...ret, poNumber: null }).paragraphs.some((p) => p.includes('hold payment')), false);
+eq('green light blanks', M.greenParams(about), ['Dave', 'roofing work', '12 High Street, NP20 4AB']);
+eq('the green light email, short', [M.greenEmail({ ...about, putRight: false }).subject, M.greenEmail({ ...about, putRight: true }).paragraphs[1]], [
+  'Green light: roofing at 12 High Street, NP20 4AB (HX-0042)',
+  'Good news: we’ve reviewed the photos of your put right for the roofing work at 12 High Street, NP20 4AB and given it the green light. Nothing needs putting right.',
+]);
+eq('the WhatsApp templates’ kinds', [M.KIND_TEMPLATE.return_to_site, M.KIND_TEMPLATE.green_light], ['site_return_to_site', 'site_green_light']);
+eq('POs and return-to-site notices go at any hour; the rest wait for the morning', [...M.ANY_TIME], ['po', 'return_to_site']);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

@@ -33,9 +33,10 @@ export async function downloadPack(id: string, onStep?: (s: ReadyStep) => void):
   const pack = r.data;
   const was = await getPack(id);
   const changes = was && was.version !== pack.version ? [...new Set([...(was.changes ?? []), ...packChanges(was.pack, pack)])] : (was?.changes ?? []);
-  // What a sign-off left on the phone stays: the gate's list until that stage is signed, the PO's time.
+  // What a sign-off left on the phone stays: the gate's list until that stage is signed, a put right's until it's sent.
   const gate = was?.gate && !pack.assignment.signoffs.some((x) => x.stage === was.gate?.stage) ? was.gate : undefined;
-  const rec: PackRecord = { id, pack, version: pack.version, storedAt: new Date().toISOString(), changes, ...(gate ? { gate } : {}), ...(was?.poGoesAt ? { poGoesAt: was.poGoesAt } : {}) };
+  const putRightGate = was?.putRightGate && pack.returns?.some((r) => r.n === was.putRightGate?.n && r.status === 'open') ? was.putRightGate : undefined;
+  const rec: PackRecord = { id, pack, version: pack.version, storedAt: new Date().toISOString(), changes, ...(gate ? { gate } : {}), ...(putRightGate ? { putRightGate } : {}) };
   await putRec('packs', rec);
   const step: ReadyStep = { details: true, design: null, drawings: null, offline: null, missing: 0 };
   onStep?.({ ...step });
@@ -139,7 +140,10 @@ export async function refreshJobs(force = false): Promise<Outcome<SiteJobRow[]>>
     // New, or changed on the server since this phone's copy (rev counts answers from other phones too).
     // The PO issued or paid since (its PDF comes with the pack).
     const poMoved = !!p && ((p.pack.po?.status ?? null) !== (j.po?.status ?? null) || (p.pack.po?.sent_at ?? null) !== (j.po?.sent_at ?? null) || (p.pack.po?.paid_on ?? null) !== (j.po?.paid_on ?? null));
-    if (!p || unread || poMoved || p.pack.assignment.rev !== j.rev || p.pack.assignment.status !== j.status || force || Date.now() - Date.parse(p.storedAt) > 30 * 60_000) await downloadPack(j.id);
+    // The office's review since: a return to site to put right, or the green light (its words come with the pack).
+    const openHere = p ? Math.max(0, ...(p.pack.returns ?? []).filter((x) => x.status === 'open').map((x) => x.n)) : 0;
+    const reviewMoved = !!p && ((p.pack.po?.review_status ?? null) !== (j.po?.review_status ?? null) || openHere !== (j.put_right?.n ?? 0));
+    if (!p || unread || poMoved || reviewMoved || p.pack.assignment.rev !== j.rev || p.pack.assignment.status !== j.status || force || Date.now() - Date.parse(p.storedAt) > 30 * 60_000) await downloadPack(j.id);
   }
   for (const id of d?.jobs ?? []) {
     if (listed.has(id)) continue;

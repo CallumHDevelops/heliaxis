@@ -26,7 +26,6 @@ export const facts = (over = {}) => ({
     reads: [{ key: 'RF12', status: 'read', result: { readable: true, problem: null, kind: 'panel', make: 'Aiko', model: 'AIKO-A450', serials: [], panel: { pmax_w: 450, voc_v: 49.4, isc_a: 13.92, vmp_v: 41.2, imp_a: 13.1, max_system_v: 1500 }, battery: null, inverter: null, meter: null } }],
     photos: { RF2: 2, RX4p: 1 },
   },
-  serials_elsewhere: [],
   voc_tolerance: 10,
   instruments: 'Megger MFT1741+ s/n 1234567',
   name: 'Sam Sparks',

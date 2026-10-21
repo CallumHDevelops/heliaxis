@@ -35,7 +35,6 @@ const design = {
   est_kwh_year: null,
   shade_factor: null,
   bird_mesh: null,
-  scan_panel_serials: null,
   battery_backup: null,
   eess_class: null,
   battery_kw: null,
@@ -154,7 +153,7 @@ eq('strike damage with marks before: Review', R.flagsFor(SCAFFOLD_DOWN, sc({ ...
 const all = [ROOFER, SCAFFOLD_UP, SCAFFOLD_DOWN].flatMap((form) => [...form.steps.flatMap((x) => x.fields), form.sig]).map((x) => x.key);
 eq('every key is unique across the forms', all.length === new Set(all).size, true);
 eq('roofer keys (a change here means a key was renamed: add a new one instead)', [...ROOFER.steps.flatMap((x) => x.fields), ROOFER.sig].map((x) => x.key).join(' '),
-  'RF1 RF5 RF5p RF5n RF12 RF13 RF14 SN_PANEL RF2 RX1 RX1n RX1p RF10 RF11 RX5 RF6 RF6n RF6p RF7 RF7a RF7b RF8 RF8n RF9 RF9n RX4 RX4p RX7 RX7p RF3 RF4 RF4n RF4p RX2 RX2n RX2p RX3 RX3c RX3r RX3p RX6 RX6n RX6p RX8 RX8n RX9 RX9n RF_SIG');
+  'RF1 RF5 RF5p RF5n RF12 RF13 RF14 RF2 RX1 RX1n RX1p RF10 RF11 RX5 RF6 RF6n RF6p RF7 RF7a RF7b RF8 RF8n RF9 RF9n RX4 RX4p RX7 RX7p RF3 RF4 RF4n RF4p RX2 RX2n RX2p RX3 RX3c RX3r RX3p RX6 RX6n RX6p RX8 RX8n RX9 RX9n RF_SIG');
 eq('scaffold keys', [SCAFFOLD_UP, SCAFFOLD_DOWN].flatMap((form) => [...form.steps.flatMap((x) => x.fields), form.sig]).map((x) => x.key).join(' '),
   'SC1 SC1p SC1n SC2 SC2n SCX1 SC3 SC3p SC4 SCX2 SCX2p SCX2n SCX3 SCX3a SCX4 SC5 SC_SIG SS1 SS1n SS2 SS3 SS3p SS3n SS4 SS4n SS5 SS_SIG');
 eq('schemaFor: the roofer gets the roof checks; the scaffolder up then down', [F.schemaFor({ trade: 'roofer' }).map((x) => x.id), F.schemaFor({ trade: 'scaffolder' }).map((x) => x.id)], [['roofer'], ['scaffold-erection', 'scaffold-strike']]);

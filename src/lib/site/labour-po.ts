@@ -7,9 +7,9 @@ import { addressLine } from '@/lib/purchase-orders/shared';
 import { logOrder } from '@/lib/purchase-orders/server';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
-import { KIND_TEMPLATE, poParams, sendAfter, siteShort } from './messages';
+import { KIND_TEMPLATE, poParams, sendAfterFor, siteShort } from './messages';
 import { cisPercent, cisWords, formatPence, labourMoney, qtyWords, rateWords, STANDARD_VAT, VAT_WORDS, type LabourLine } from './money';
-import { OVERRIDABLE, snapshotOf, type HeldReason, type LabourSnapshot } from './po-shared';
+import { OVERRIDABLE, poTerms, PO_TERMS_TITLE, snapshotOf, type HeldReason, type LabourSnapshot } from './po-shared';
 import { aboutOf, emailHtml, jobOf, queueMessage, whatsappProblem, type MessageRow } from './send';
 import { firmsById, logSiteEvent, moneyFacts, readAssignment, type AssignmentRow, type ContactRow, type Db } from './server';
 import { getSiteSettings } from './settings';
@@ -22,8 +22,8 @@ import { TRADE_LABEL, TRADE_WORK, valuesOf, type Stage } from './types';
  * subcontractor's registration, CIS by their verification, and what they'll be paid. One per
  * sign-off (purchase_orders.signoff_id is unique), held as a draft when something's missing or the
  * owner's settings say so, otherwise issued: the PDF (the document kit), stored as a document, and
- * sent by email with the PDF and by WhatsApp, both through the evening rule. Everything printed is
- * frozen in purchase_orders.labour when it's issued.
+ * sent by email with the PDF and by WhatsApp, both at once whatever the hour (the owner: "Trade POs
+ * can be sent at any time"). Everything printed is frozen in purchase_orders.labour when it's issued.
  */
 
 export type PoRow = {
@@ -94,12 +94,12 @@ async function snapshotFor(db: Db, a: AssignmentRow, signoff: SignoffLite | null
   if (settings.holdPoOnUrgent && a.flags.some((f) => f.severity === 'urgent' && !f.resolved_at)) held.push('urgent');
   // Until the strike is signed (the assignment is done then).
   if (a.trade === 'scaffolder' && settings.holdScaffoldPoUntilStrike && a.status !== 'done') held.push('scaffold');
-  const terms = [settings.paymentTerms.trim(), settings.paymentDays ? `Paid within ${settings.paymentDays} days of a correct invoice.` : ''].filter(Boolean).join(' ');
+  const address = addressLine(job.address, job.postcode);
   const snap: LabourSnapshot = {
     po_number: poNumber,
     issued: null,
     version: 0,
-    job: { ref: job.ref, address: addressLine(job.address, job.postcode) },
+    job: { ref: job.ref, address },
     sub: {
       company: firm?.details?.legalName || firm?.company_name || contact?.company || null,
       contact: contact?.name ?? '',
@@ -124,14 +124,20 @@ async function snapshotFor(db: Db, a: AssignmentRow, signoff: SignoffLite | null
     vat: m.vat,
     cis: { words: cisWords({ ...facts.cis, override: a.cis_override }), percent: pct, pence: m.cis },
     payable: m.payable,
-    payment_terms: terms || null,
+    // The owner's terms say when undisputed invoices are paid (clause 4.3), so nothing else is printed.
+    payment_terms: null,
+    terms: poTerms(address, poNumber),
     signed: signoff ? { by: signoff.signed_name, at: signoff.signed_at, stage: signoff.stage } : null,
-    quote_line: `Please quote ${poNumber} on your invoice and send it to ${HELIAXIS_PARTY.accountsEmail}`,
+    quote_line: quoteLine(poNumber),
     held,
     replaces: null,
   };
   return { snap, contact };
 }
+
+const quoteLine = (poNumber: string) => `Please quote ${poNumber} on your invoice and send it to ${HELIAXIS_PARTY.accountsEmail}`;
+/** The snapshot once its number is known (a new PO is numbered by the database). */
+const numbered = (s: LabourSnapshot, poNumber: string): LabourSnapshot => ({ ...s, po_number: poNumber, quote_line: quoteLine(poNumber), terms: poTerms(s.job.address, poNumber) });
 
 async function saveLabourLines(db: Db, poId: string, s: LabourSnapshot) {
   await db.from('purchase_order_lines').delete().eq('purchase_order_id', poId);
@@ -188,7 +194,7 @@ export async function raiseLabourPo(db: Db, a: AssignmentRow, signoff: SignoffLi
     throw new Error(`The labour PO couldn’t be saved: ${error?.message ?? 'no row'}`);
   }
   const poNumber = String(ins.po_number);
-  const full: LabourSnapshot = { ...snap, po_number: poNumber, quote_line: `Please quote ${poNumber} on your invoice and send it to ${HELIAXIS_PARTY.accountsEmail}` };
+  const full = numbered(snap, poNumber);
   await db.from('purchase_orders').update({ labour: full }).eq('id', ins.id);
   await saveLabourLines(db, String(ins.id), full);
   await logOrder(db, { id: String(ins.id), po_number: poNumber, project_id: a.project_id }, 'created', `Labour PO ${poNumber} raised for ${contact?.name ?? 'the trade'} (${full.trade_title.toLowerCase()})${full.net ? ` · ${formatPence(full.net)} ex VAT` : ''}`, null);
@@ -255,6 +261,12 @@ export async function labourPoPdf(s: LabourSnapshot): Promise<Uint8Array> {
   }
   kit.gap(6);
   kit.paragraph(s.quote_line, { bold: true });
+  // The owner's terms (po-shared.ts PO_TERMS), as they were when it was issued.
+  const terms = s.terms ?? [];
+  if (terms.length) {
+    kit.section(PO_TERMS_TITLE, { keep: 60 });
+    for (const t of terms) kit.paragraph(t);
+  }
   return kit.save();
 }
 
@@ -265,7 +277,7 @@ export type IssueResult = { ok: true; po: PoRow; messages: MessageRow[] } | { ok
 /**
  * Issue (or issue again) a labour PO: the PO frozen as it is now, its PDF stored as a document
  * (category po, not visible, a new version each time), and sent by email (the PDF attached) and
- * WhatsApp through the evening rule. It counts as sent once a message reaches them (send.ts).
+ * WhatsApp straight away. It counts as sent once a message reaches them (send.ts).
  * `override`: the office issues past its own holds (Urgent, scaffold); missing details still stop it.
  */
 export async function issueLabourPo(db: Db, poId: string, opts: { by?: string | null; override?: boolean; origin?: string | null } = {}): Promise<IssueResult> {
@@ -305,9 +317,9 @@ export async function issueLabourPo(db: Db, poId: string, opts: { by?: string | 
 }
 
 /**
- * The issued PO's email (its PDF attached) and WhatsApp for the version that went, through the
- * evening rule, each once (its dedupe key). Run again after anything failed part-way (the sign-off's
- * cron step), it queues only what's missing.
+ * The issued PO's email (its PDF attached) and WhatsApp for the version that went, each once (its
+ * dedupe key), sent now: POs aren't held for the evening. Run again after anything failed part-way
+ * (the sign-off's cron step), it queues only what's missing.
  */
 export async function sendPoMessages(db: Db, poId: string, opts: { by?: string | null; origin?: string | null; attachPath?: string | null } = {}): Promise<MessageRow[]> {
   const po = await readPo(db, poId);
@@ -321,7 +333,8 @@ export async function sendPoMessages(db: Db, poId: string, opts: { by?: string |
   const version = issued.version;
   const messages: MessageRow[] = [];
   const job = await jobOf(db, a.project_id);
-  const after = sendAfter(new Date(), await getWaSettings());
+  // Now, whatever the hour (messages.ts ANY_TIME).
+  const after = sendAfterFor('po', new Date(), await getWaSettings());
   const about = aboutOf(a, contact, job, siteLink(linkTokenFor(a.id, Math.max(1, a.link_generation)), opts.origin));
   const site = siteShort(job.address, job.postcode);
   if (contact.email) {
@@ -337,6 +350,8 @@ export async function sendPoMessages(db: Db, poId: string, opts: { by?: string |
         `What you’ll be paid: ${formatPence(issued.payable)}.`,
         ...(issued.payment_terms ? [issued.payment_terms] : []),
         issued.quote_line + '.',
+        'We’ll review your photos and results and let you know: green light, or return to site if anything needs putting right.',
+        ...((issued.terms ?? []).length ? [PO_TERMS_TITLE, ...(issued.terms ?? [])] : []),
       ],
     });
     const m = await queueMessage(

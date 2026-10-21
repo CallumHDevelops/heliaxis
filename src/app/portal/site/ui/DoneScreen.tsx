@@ -7,11 +7,14 @@ import { SyncLine, TopBar } from './bits';
 import { CustomerSignCard } from './CustomerSign';
 import { go } from './nav';
 import { PoCard } from './PoCard';
+import { ReviewNote, reviewNextWords, stageReview } from './Review';
 
 /**
- * P11: after signing. Sent and taken: "Signed ✓" and the PO (PoCard). Still on the phone: "Signed
- * on this phone…", and the PO number arrives once it sends. Turned down by the server (something
- * hasn't reached it): what it still needs, each opening its step, and Check and sign again.
+ * P11: after signing. Sent and taken: "Signed ✓", "Your PO is below. We'll review your photos and
+ * results and let you know: green light, or return to site…" (the owner's words), then the office's
+ * answer once it's in (Review.tsx) and the PO (PoCard). Still on the phone: "Signed on this phone…",
+ * and the PO number arrives once it sends. Turned down by the server (something hasn't reached it):
+ * what it still needs, each opening its step, and Check and sign again.
  */
 export function DoneScreen({ rec, form, pending }: { rec: PackRecord; form: SiteForm; pending: boolean }) {
   const job = rec.id;
@@ -19,6 +22,7 @@ export function DoneScreen({ rec, form, pending }: { rec: PackRecord; form: Site
   const gate = !signed && !pending && rec.gate?.stage === form.stage ? rec.gate : null;
   const stepOf = (m: { key: string; step: string }) => m.step || form.steps.find((s) => s.fields.some((f) => f.key === m.key))?.key || '';
   const strike = form.stage === 'strike';
+  const review = stageReview(rec, form.stage);
 
   return (
     <>
@@ -53,10 +57,12 @@ export function DoneScreen({ rec, form, pending }: { rec: PackRecord; form: Site
           <>
             <div className="sa-card sa-signed">
               <h2>Signed ✓</h2>
-              <p>
+              {review.state === 'waiting' && <p>{reviewNextWords(!!rec.pack.po)}</p>}
+              <p className="sa-muted">
                 By {signed.signed_name} on {shortDate(signed.signed_at)}.{strike ? ' Thanks for taking the scaffold down.' : ''}
               </p>
             </div>
+            <ReviewNote rec={rec} stage={form.stage} />
             <PoCard rec={rec} stage={form.stage} />
             <CustomerSignCard rec={rec} />
           </>

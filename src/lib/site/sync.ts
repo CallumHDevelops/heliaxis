@@ -112,7 +112,7 @@ export async function workByJob(): Promise<Map<string, JobWork>> {
     else if (op.kind === 'answers') w.answers++;
     else {
       w.other++;
-      if (op.kind === 'signoff') w.signoffs++;
+      if (op.kind === 'signoff' || op.kind === 'put-right') w.signoffs++;
     }
   }
   for (const p of await allRec<PhotoRecord>('photos')) {

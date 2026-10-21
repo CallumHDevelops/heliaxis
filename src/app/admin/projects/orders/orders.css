@@ -46,6 +46,45 @@
   background: rgba(179, 38, 30, 0.1);
   color: var(--err);
 }
+/* A labour PO's review of the work (the office's Green light / Return to site required). */
+.po-chip--review-waiting {
+  background: rgba(33, 31, 24, 0.05);
+  color: var(--muted);
+}
+.po-chip--review-hold {
+  background: rgba(179, 38, 30, 0.12);
+  color: var(--err);
+}
+.po-chip--review-green {
+  background: rgba(63, 125, 78, 0.15);
+  color: var(--ok);
+}
+/* A labour PO's review of the work, as a line under who it's for (OrdersUi ReviewLine). */
+.po-who .po-review {
+  font-weight: 700;
+}
+.po-who .po-review--hold {
+  color: var(--err);
+}
+.po-who .po-review--green {
+  color: var(--ok);
+}
+.po-terms {
+  margin: 0.75rem 0 0;
+  font-size: 0.86rem;
+}
+.po-terms summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.po-terms ol {
+  margin: 0.4rem 0 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+}
 .po-late {
   color: var(--err);
   font-weight: 700;

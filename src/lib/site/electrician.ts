@@ -1,6 +1,6 @@
 import 'server-only';
 import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from '@/lib/crm/server';
-import { ROOFER_EVIDENCE, rooferSerials, rooferValues, type CustomerSigned, type CustomerSignKind, type ElectricianPack, type TradeFile } from './electrician-shared';
+import { ROOFER_EVIDENCE, rooferValues, type CustomerSigned, type CustomerSignKind, type ElectricianPack, type TradeFile } from './electrician-shared';
 import type { LabelReadResult } from './forms/types';
 import { assignmentRow, type AssignmentRow, type Db } from './server';
 import { getSiteSettings } from './settings';
@@ -102,7 +102,6 @@ export async function electricianPack(db: Db, a: AssignmentRow, project: Record<
       heat_pump_model: str(sys.heat_pump_model),
       survey_battery_spot: str(survey?.F5),
       roofer: rooferPart,
-      serials_elsewhere: rooferPart ? rooferSerials(rooferPart.values) : [],
       voc_tolerance: settings.vocTolerancePct,
       instruments: last ? String(last.text) : null,
       name: str(person?.name),

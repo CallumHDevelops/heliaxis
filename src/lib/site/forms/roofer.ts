@@ -1,8 +1,10 @@
 /**
- * The roofer's form (FORMS 2): the owner's questions in his order, the recommended extras RX1–RX9
- * and the panel serials, laid out by time on site (FORMS 2.3), and the flags they raise (FORMS 5.1).
- * Solar jobs only. Keys never change once used. Type-only imports.
+ * The roofer's form (FORMS 2): the owner's questions in his order and the recommended extras RX1–RX9,
+ * laid out by time on site (FORMS 2.3), and the flags they raise (FORMS 5.1). No panel serials: the
+ * owner doesn't need the roofer to scan them (21 Oct); the data badge photo, model and Voc stay.
+ * Solar jobs only. Keys never change once used. Type-only imports, and the declaration's words.
  */
+import { tradeDeclaration } from '../declaration';
 import type { Field, FlagRule, FormCtx, LabelReadResult, SiteForm } from './types';
 
 const is = (c: FormCtx, k: string, v: unknown) => c.values[k] === v;
@@ -74,15 +76,6 @@ const fields = {
         const v = readOf(c, 'RF12')?.panel?.voc_v;
         return typeof v === 'number' ? { v, src: 'photo', text: `${v} V` } : null;
       },
-    },
-    {
-      key: 'SN_PANEL',
-      type: 'SCAN',
-      label: 'Scan the panel serial numbers',
-      hint: 'One per panel, before they go up. Far easier on the ground than on the roof.',
-      level: 'should',
-      need: (c) => panelsFitted(c) ?? 0,
-      show: (c) => c.design.scan_panel_serials === true,
     },
   ],
   fixings: [
@@ -301,7 +294,7 @@ export const ROOFER: SiteForm = {
     type: 'SIG',
     label: 'Sign off the roofing work',
     level: 'must',
-    declaration: (c) => `I confirm the roofing work at ${c.address || 'this address'} is finished and these answers and photos are true.`,
+    declaration: (c) => tradeDeclaration('roofer', c.address),
   },
   flags,
 };

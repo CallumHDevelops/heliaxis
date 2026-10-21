@@ -23,7 +23,7 @@ import { addressLine, DELIVER_LABEL, defaultPoMessage, labourWho, type DeliverTo
 import { HELD_WORDS, OVERRIDABLE } from '@/lib/site/po-shared';
 import { Sheet } from '../../crm/CrmUi';
 import { shortDate, ukDayOf } from '../../crm/crm-shared';
-import { api, neededWords, StatusChip } from './OrdersUi';
+import { api, neededWords, ReviewChip, StatusChip } from './OrdersUi';
 import { SupplierForm } from './SupplierForm';
 import './orders.css';
 
@@ -238,6 +238,7 @@ export function OrderSheet({
         {o && (
           <div className="po-sheet__chips">
             <StatusChip status={o.status} labour={o.kind === 'labour'} />
+            <ReviewChip o={o} />
             {o.changed_since_sent && <span className="po-chip po-chip--changed">Changed since sent</span>}
             {showJob && full?.job && (
               <Link className="po-joblink" href={`/admin/projects/${full.job.id}?tab=orders`}>
@@ -738,6 +739,13 @@ function LabourView({
   ].filter(Boolean);
   return (
     <div className="po-view">
+      {o.review_status === 'hold' && s !== 'cancelled' && (
+        <div className="crm-banner crm-banner--err po-changed">
+          <span>
+            On hold: return to site required. {l?.sub.contact || 'The trade'} has been asked to put something right; hold payment until it’s had the green light (the job’s Site tab, Review).
+          </span>
+        </div>
+      )}
       {s === 'draft' && !!l?.held.length && (
         <div className="crm-banner po-changed">
           <span>Held: {l.held.map((h) => HELD_WORDS[h]).join('. ')}.</span>
@@ -800,6 +808,16 @@ function LabourView({
       ) : (
         <p className="crm-muted">Nothing frozen on this PO yet.</p>
       )}
+      {l?.terms?.length ? (
+        <details className="po-terms">
+          <summary>Terms on the PO</summary>
+          <ol>
+            {l.terms.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
       <NoteForm key={`n-${o.updated_at}`} value={o.internal_note ?? ''} busy={busy} onSave={(v) => onSave({ internal_note: v }, 'Saved ✓')} />
       {editable(s, 'labour').invoice && <InvoiceForm key={`i-${o.updated_at}`} full={full} busy={busy} onSave={(b) => onSave(b, 'Saved ✓')} />}
       <div className="po-actions">

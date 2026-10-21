@@ -6,6 +6,8 @@ import { getDevice } from '@/lib/site/offline';
 import '@/lib/site/signoff-client';
 // The electrician's: certificate files and the customer's signatures.
 import '@/lib/site/electrician-client';
+// A Put right after a return to site.
+import '@/lib/site/putright-client';
 import { refreshJobs } from '@/lib/site/packs';
 import { isDraining, startSync } from '@/lib/site/sync';
 import { ProblemScreen, Splash } from './bits';
