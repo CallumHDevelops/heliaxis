@@ -455,6 +455,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     crmV3 && !(await has('purchase_order_lines')),
     sql('purchase-orders.sql', 'Purchase orders: order the kit for a job from your suppliers, email them the PO as a PDF, and track it to delivery.', 5, 'crm-v3.sql')
   );
+  // Merging duplicate customers and jobs: the Merge buttons say this is needed until it's run.
+  add(
+    (await customerRefs) && !(await has('crm_merges')),
+    sql('merge.sql', 'Merge duplicate customers (someone who came in twice, say from the website and a Meta ad) and their jobs for the same work.', 6, 'customer-refs.sql')
+  );
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
