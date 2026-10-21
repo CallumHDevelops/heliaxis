@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantAction } from '@/lib/assistant/tools';
 import { atWords } from '@/lib/whatsapp/schedule';
 import { MetisIcon } from '@/components/admin/MetisIcon';
+import { fixName, heard, joinSaid } from '@/lib/assistant/dictation';
 import './assistant.css';
 
 type Line = { role: 'user' | 'assistant'; text: string; actions?: AssistantAction[]; error?: boolean };
@@ -35,10 +36,21 @@ type Recognition = {
   interimResults: boolean;
   start(): void;
   stop(): void;
-  onresult: ((e: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
+  abort(): void;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: { error: string }) => void) | null;
 };
+/** A dictation in progress: `keep` — carry on to the next sentence; `live` — its words still go in the box. */
+type Mic = { r: Recognition; keep: boolean; live: boolean };
+function hush(m: Mic | null) {
+  if (!m) return;
+  m.keep = false;
+  m.live = false;
+  try {
+    m.r.abort();
+  } catch {}
+}
 function makeRecognition(): Recognition | null {
   if (typeof window === 'undefined') return null;
   const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
@@ -55,8 +67,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [listening, setListening] = useState(false);
   const [canListen] = useState(() => !!makeRecognition());
-  const rec = useRef<Recognition | null>(null);
-  const base = useRef('');
+  const mic = useRef<Mic | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
   const loadDrafts = useCallback(
@@ -84,38 +95,67 @@ export function AssistantView({ firstName }: { firstName: string }) {
     end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [lines, busy]);
 
+  // Leaving the page mid-dictation switches the mic off.
+  useEffect(() => () => hush(mic.current), []);
+
   function listen() {
-    if (listening) {
-      rec.current?.stop();
+    if (mic.current) {
+      mic.current.keep = false;
+      mic.current.r.stop();
       return;
     }
-    const r = makeRecognition();
-    if (!r) return;
-    r.lang = 'en-GB';
-    r.continuous = true;
-    r.interimResults = true;
-    base.current = text ? `${text.trimEnd()} ` : '';
-    r.onresult = (e) => {
-      let finals = '';
-      let interim = '';
-      for (let i = 0; i < e.results.length; i++) {
-        const res = e.results[i];
-        if (res.isFinal) finals += res[0].transcript;
-        else interim += res[0].transcript;
-      }
-      setText(base.current + finals + interim);
+    // Chrome on Android can't listen continuously (see dictation.ts), so there it hears one sentence at a time.
+    // Big Android tablets ask for desktop sites and call themselves Linux; a touchscreen gives them away.
+    const ua = navigator.userAgent;
+    const oneSentence = /Android/i.test(ua) || (/\bLinux\b/.test(ua) && !/CrOS/.test(ua) && navigator.maxTouchPoints > 0);
+    let said = text;
+    const m: Mic = { r: null as unknown as Recognition, keep: true, live: true };
+    const done = () => {
+      if (mic.current !== m) return; // already sent, or a newer dictation has the mic
+      mic.current = null;
+      setListening(false);
     };
-    r.onend = () => setListening(false);
-    r.onerror = () => setListening(false);
-    rec.current = r;
-    r.start();
+    const begin = () => {
+      const r = makeRecognition();
+      if (!r) return done();
+      r.lang = 'en-GB';
+      r.continuous = !oneSentence;
+      r.interimResults = true;
+      let now = '';
+      r.onresult = (e) => {
+        if (!m.live) return;
+        now = heard(Array.from(e.results, (x) => x[0]?.transcript ?? ''), oneSentence);
+        setText(fixName(joinSaid(said, now)));
+      };
+      // Any error (no speech for a while, no permission, no signal) ends it; onend still runs.
+      r.onerror = () => {
+        m.keep = false;
+      };
+      r.onend = () => {
+        if (!m.live) return done();
+        said = joinSaid(said, now);
+        if (oneSentence && m.keep && now) begin();
+        else done();
+      };
+      m.r = r;
+      try {
+        r.start();
+      } catch {
+        done();
+      }
+    };
+    mic.current = m;
     setListening(true);
+    begin();
   }
 
   async function send(msg = text) {
     const t = msg.trim();
     if (!t || busy) return;
-    rec.current?.stop();
+    // Sent: anything the mic hears after this mustn't put the words back in the box.
+    hush(mic.current);
+    mic.current = null;
+    setListening(false);
     setText('');
     setLines((l) => [...l, { role: 'user', text: t }]);
     setBusy(true);
