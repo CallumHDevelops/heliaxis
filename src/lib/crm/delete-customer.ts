@@ -6,6 +6,7 @@ import { toWaId } from '@/lib/whatsapp/shared';
 import { mediaFilesOf } from '@/lib/whatsapp/media';
 import { isOrdered } from '@/lib/purchase-orders/money';
 import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from './server';
+import { aliasContacts } from './aliases';
 
 /**
  * Deleting a customer for good: the enquiry and everything about it. Their opportunities and
@@ -373,6 +374,10 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
     return fail(going, e);
   }
 
+  // Other numbers, emails and Meta lead ids a merge kept on them (crm_aliases goes with them below):
+  // on the deleted list too, or a merged-away Meta lead would come back with the next import.
+  const kept = await aliasContacts(db, [...goingIds]);
+
   // 2. Notifications that link to them, their opportunities, those tasks or their surveys, and the new
   //    enquiry and email alerts that name them. Links are text, so nothing cascades to these; a
   //    failure here stops before the customer goes, so it can be re-run.
@@ -405,7 +410,13 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
   const prints = new Map(
     going
       .filter((c) => deleted.has(c.id))
-      .flatMap((c) => fingerprints({ metaLeadId: c.meta_lead_id, phone: c.phone, waId: c.wa_id, email: c.email }))
+      .flatMap((c) => {
+        const more = kept.get(c.id);
+        return [
+          ...fingerprints({ metaLeadId: c.meta_lead_id, phone: c.phone, waId: c.wa_id, email: c.email }),
+          ...(more ? [...more.phones.map((phone) => ({ phone })), ...more.emails.map((email) => ({ email })), ...more.metaLeads.map((metaLeadId) => ({ metaLeadId }))].flatMap(fingerprints) : []),
+        ];
+      })
       .map((f) => [f.hash, f])
   );
   if (prints.size) {

@@ -29,6 +29,7 @@ import { enaForJob } from '@/lib/projects/ena';
 import { calendarNow, checkCtxFor, ensureDeadlineTasks, jobLookups, nextDate, projectRow, withFallback, type DocRow } from '@/lib/projects/server';
 import { ordersSummary } from '@/lib/purchase-orders/server';
 import { sourceNowOf } from '@/lib/lead-source-server';
+import { mergedInto, mergeExtras } from '@/lib/crm/aliases';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -114,7 +115,12 @@ export async function GET(req: Request, { params }: Ctx) {
 
   const db = createAdminClient();
   const { data: project } = await db.from('crm_projects').select('*').eq('id', id).maybeSingle();
-  if (!project) return json({ error: 'Not found' }, 404);
+  if (!project) {
+    // Joined into another job (src/lib/crm/merge.ts): the page offers to open that one.
+    const joined = await mergedInto('job', id, db);
+    const into = joined?.project_id ? (await db.from('crm_projects').select('id, project_ref').eq('id', joined.project_id).maybeSingle()).data : null;
+    return json(into ? { error: 'merged', into: { id: into.id, ref: into.project_ref ?? null } } : { error: 'Not found' }, 404);
+  }
 
   const { data: customerRow } = await db.from('enquiries').select('*').eq('id', project.enquiry_id).maybeSingle();
   const customer = pick(customerRow as Row | null, CUSTOMER_FIELDS) as
@@ -125,6 +131,8 @@ export async function GET(req: Request, { params }: Ctx) {
   const sourceShown = customer
     ? sourceNowOf({ id: customer.id, source: String(customer.source ?? ''), meta_ad_id: typeof customerRow?.meta_ad_id === 'string' ? customerRow.meta_ad_id : null })
     : null;
+  // Other leads and numbers of records merged into them (merge.sql; none before it's run).
+  if (customer) Object.assign(customer, await mergeExtras(db, customer));
 
   // WhatsApp is matched on the phone number, so a chat that started on another enquiry (a WhatsApp
   // message, a second web form) still shows here. Backfill the number's WhatsApp id if missing.

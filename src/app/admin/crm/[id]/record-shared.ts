@@ -85,6 +85,9 @@ export type Customer = {
   whatsapp_permission_words?: string;
   /** Present once customer-refs.sql has run. */
   customer_ref?: string | null;
+  /** Leads of records merged into them, and the other numbers and emails kept (merge.sql). */
+  alsoCameIn?: { label: string; at: string | null; ref: string | null }[];
+  otherNumbers?: { kind: 'phone' | 'email'; value: string; shown: string; from_ref: string | null }[];
 };
 
 export type Entry = {
@@ -131,7 +134,7 @@ export type WaInfo = {
 };
 
 export type OtherJob = { id: string; title: string; stage: string; products: string[]; created_at: string; project_ref: string | null };
-export type Duplicate = { enquiry_id: string; name: string; project_ref: string | null; project_id: string | null };
+export type Duplicate = { enquiry_id: string; name: string; project_ref: string | null; project_id: string | null; why?: 'email' | 'number' | 'booking' };
 export type SurveyItem = { id: string; type: string; status: string; completed_at: string | null; flags: string[]; surveyor: string };
 export type Booking = {
   id: string;

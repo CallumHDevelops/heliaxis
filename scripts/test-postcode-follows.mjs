@@ -87,11 +87,15 @@ eq('not UK postcodes', ['88888', 'CF39 8Y', 'CF39', '', null, '12345-678', 'CF39
 /* ── The route and the card use the same rule ─────────────────────────────── */
 
 const route = readFileSync(new URL('../src/app/api/crm/customers/[id]/route.ts', import.meta.url), 'utf8');
+// The jobs follow in one place, for Customer → Edit and for a merge that takes the other record's postcode.
+const moving = readFileSync(new URL('../src/lib/crm/move-site-postcodes.ts', import.meta.url), 'utf8');
+const merge = readFileSync(new URL('../src/lib/crm/merge.ts', import.meta.url), 'utf8');
 const card = readFileSync(new URL('../src/app/admin/crm/[id]/CustomerColumn.tsx', import.meta.url), 'utf8');
 const shared = readFileSync(new URL('../src/app/admin/crm/[id]/record-shared.ts', import.meta.url), 'utf8');
-eq('the customers route moves jobs before Won by followsCustomerPostcode', /!isProjectStage\(j\.stage\) && followsCustomerPostcode\(/.test(route), true);
-eq('the route reads each job’s stage and name', /select\('id, stage, title, address, postcode'\)/.test(route), true);
-eq('the route renames jobs by retitled', /retitled\(/.test(route), true);
+eq('the customers route and a merge both move jobs with moveSitePostcodes', [/moveSitePostcodes\(id, pcWas, pcNow/.test(route), /moveSitePostcodes\(/.test(merge)], [true, true]);
+eq('it moves jobs before Won by followsCustomerPostcode', /!isProjectStage\(j\.stage\) && followsCustomerPostcode\(/.test(moving), true);
+eq('it reads each job’s stage and name', /select\('id, stage, title, address, postcode'\)/.test(moving), true);
+eq('it renames jobs by retitled', /retitled\(/.test(moving), true);
 eq('the route reads the old postcode before saving', /select\('phone, postcode'\)/.test(route), true);
 eq('Customer → Edit says what happens with the same rule', /!isProjectStage\(project\.stage\) && followsCustomerPostcode\(/.test(card) && /siteHasOtherPostcode\(/.test(card), true);
 eq('the site and its Check postcode use the same postcode', /export const sitePostcodeOf/.test(shared) && /sitePostcodeOf\(p, c\)/.test(shared), true);
