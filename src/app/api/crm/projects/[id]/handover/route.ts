@@ -11,6 +11,7 @@ import {
   markNotNeeded,
   patchSlotData,
   recordPayment,
+  removePayment,
   refreshHandover,
   sendHandover,
   signF78Design,
@@ -107,6 +108,8 @@ export async function POST(req: Request, { params }: Ctx) {
         // Shown or hidden by hand: it stays as set (a held document isn't released over it later).
         await db.from('crm_documents').update({ visible: b.visible === true, release: 'now' }).eq('id', d.id);
         await log(`Handover pack: “${d.name}” ${b.visible === true ? 'shown in' : 'hidden from'} the customer’s portal`);
+        // The combined PDF follows: a pack that's gone is rebuilt without it (or with it again).
+        await refreshHandover(db, id, { by });
         break;
       }
       case 'move': {
@@ -166,8 +169,8 @@ export async function POST(req: Request, { params }: Ctx) {
       case 'delete-payment': {
         if (s.profile.role !== 'admin') return json({ error: 'Only an admin can remove a recorded payment.' }, 403);
         if (!isUuid(String(b.payment ?? ''))) return json({ error: 'Not found' }, 404);
-        await db.from('crm_payments').delete().eq('id', String(b.payment)).eq('project_id', id);
-        await log('A recorded payment was removed');
+        const r = await removePayment(db, id, String(b.payment));
+        if (r.removed) await log(r.unticked ? 'A recorded final payment was removed, so “Final invoice paid” is unticked' : 'A recorded payment was removed');
         await refreshHandover(db, id, { by });
         break;
       }

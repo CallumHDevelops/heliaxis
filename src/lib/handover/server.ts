@@ -54,7 +54,7 @@ import {
   type SlotData,
 } from './inputs';
 import { approved, type DraftKey } from './settings-shared';
-import { customerState, headline, sendCheck, slotDef, slotStates, type GenNeed, type Headline, type SlotCode, type SlotView } from './slots';
+import { customerState, headline, sendCheck, slotDef, slotStates, type GenNeed, type Headline, type SlotCode, type SlotDoc, type SlotView } from './slots';
 import { ensureHandoverTasks } from './tasks';
 
 /**
@@ -339,10 +339,17 @@ const SEPARATE_WORDS: Record<string, string> = {
 };
 
 const currentPack = (l: Loaded) => l.docs.find((d) => d.generated_key === 'PACK' && !d.archived_at) ?? null;
-/** What the combined PDF is made from: every current pack document and its version. */
+/**
+ * In the combined PDF: what the customer can see, or what's held to go with the pack. Never one
+ * hidden from them by hand (Hide from portal: visible false, release now), so a document hidden
+ * after the pack went leaves it at the next build.
+ */
+const inPack = (d: SlotDoc) => d.visible || d.release === 'with_pack';
+/** What the combined PDF is made from: every current pack document it takes, and its version. */
 const packKey = (l: Loaded) =>
   inputsHash(
     slotDocs(l)
+      .filter(inPack)
       .map((d) => `${d.id}:${d.version}`)
       .sort()
   );
@@ -518,7 +525,7 @@ export async function buildHandover(db: Db, projectId: string, opts: { by: strin
   if (!l) throw new Error('Not found');
   const { views } = statesOf(l);
   const load = loaderFor(db);
-  const docs = slotDocs(l);
+  const docs = slotDocs(l).filter(inPack);
   const rowOf = new Map(l.docs.map((d) => [d.id, d]));
   const parts: PackPart[] = [];
   const multi: SlotCode[] = ['CC5', 'CCMH', 'CC21', 'F76', 'CC13'];
@@ -792,10 +799,15 @@ export async function recordPayment(
   projectId: string,
   b: { kind: Payment['kind']; amount_pence: number; paid_on: string; method: Payment['method']; reference: string | null; by: string | null; byName: string }
 ) {
-  const { error } = await db.from('crm_payments').insert({ project_id: projectId, kind: b.kind, amount_pence: b.amount_pence, paid_on: b.paid_on, method: b.method, reference: b.reference, recorded_by: b.by });
+  const { data: row, error } = await db
+    .from('crm_payments')
+    .insert({ project_id: projectId, kind: b.kind, amount_pence: b.amount_pence, paid_on: b.paid_on, method: b.method, reference: b.reference, recorded_by: b.by })
+    .select('id')
+    .single();
   if (error) throw new Error(error.message);
   if (b.kind === 'final') {
-    const value = { done_at: new Date().toISOString(), by_id: b.by, by: b.byName };
+    // Which payment ticked it, so removing that payment can untick it (removePayment).
+    const value = { done_at: new Date().toISOString(), by_id: b.by, by: b.byName, payment: (row as { id?: string } | null)?.id ?? null };
     await db.rpc('crm_checklist_set', { p_project: projectId, p_key: 'x_paid', p_value: value }).then(
       () => null,
       () => null
@@ -810,6 +822,30 @@ export async function recordPayment(
       body: `Payment recorded: £${(b.amount_pence / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })} on ${longDay(b.paid_on)} (${b.kind === 'final' ? 'final' : b.kind === 'stage' ? 'stage' : 'other'}), ${b.byName}`,
       byId: b.by,
     }).catch(() => null);
+}
+
+/**
+ * A recorded payment removed (an admin; one typed in by mistake). A final payment takes "Final
+ * invoice paid" with it unless another final payment is left, so CC13 and the checklist don't stay
+ * ticked on nothing; a tick made by hand for a different payment, or "Not needed", is left alone.
+ */
+export async function removePayment(db: Db, projectId: string, paymentId: string): Promise<{ removed: boolean; unticked: boolean }> {
+  const { data } = await db.from('crm_payments').delete().eq('id', paymentId).eq('project_id', projectId).select('id, kind');
+  const gone = ((data ?? []) as { id: string; kind: string }[])[0];
+  if (!gone) return { removed: false, unticked: false };
+  if (gone.kind !== 'final') return { removed: true, unticked: false };
+  const [{ data: left }, { data: p }] = await Promise.all([
+    db.from('crm_payments').select('id').eq('project_id', projectId).eq('kind', 'final').limit(1),
+    db.from('crm_projects').select('checklist').eq('id', projectId).maybeSingle(),
+  ]);
+  if (left?.length) return { removed: true, unticked: false };
+  const mark = ((p?.checklist ?? {}) as Record<string, { na?: boolean; payment?: string | null } | undefined>).x_paid;
+  if (!mark || mark.na || (mark.payment && mark.payment !== gone.id)) return { removed: true, unticked: false };
+  const r = await db.rpc('crm_checklist_set', { p_project: projectId, p_key: 'x_paid', p_value: null }).then(
+    (x) => x,
+    () => ({ error: { message: 'missing' } })
+  );
+  return { removed: true, unticked: !r.error };
 }
 
 /** "Sent to DNO" for the G98 data sheet ticks the checklist's G98 item (c_dno_notified). */

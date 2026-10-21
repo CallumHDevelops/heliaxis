@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, docCategoryOf, DOCS_BUCKET, isUuid, json, logActivity, signedDoc } from '@/lib/crm/server';
 import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
+import { refreshHandover } from '@/lib/handover/server';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -46,7 +47,11 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const { d, p, signedQuote } = found;
   const b = await req.json().catch(() => ({}));
   const u: Record<string, unknown> = {};
-  if ('visible' in b) u.visible = !!b.visible;
+  if ('visible' in b) {
+    u.visible = !!b.visible;
+    // A handover item shown or hidden by hand stays as set (it isn't released over later), as on the Handover tab.
+    if (d.handover_slot && d.handover_slot !== 'PACK') u.release = 'now';
+  }
   if ('name' in b) u.name = String(b.name || '').trim().slice(0, 140) || 'Document';
   if ('category' in b) {
     const c = await docCategoryOf(b.category, '');
@@ -58,6 +63,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (Object.keys(u).length) {
     const { error } = await db.from('crm_documents').update(u).eq('id', id);
     if (error) return json({ error: error.message }, 500);
+    // The handover pack's combined PDF follows what the customer may see.
+    if ('visible' in u && d.handover_slot && d.project_id) await refreshHandover(db, String(d.project_id), { by: s.user.id }).catch((e) => console.error('[documents] handover', e));
   }
 
   if ('signed_outside' in b) {
