@@ -248,7 +248,8 @@ export async function returnToSite(db: Db, a: AssignmentRow, signoffId: string, 
     by.id
   );
   const sent = about && email ? await sendBoth(db, a, contact, { kind: 'return_to_site', key: `return:${id}`, email, params: returnParams({ ...about, what, fixBy, safety, poNumber: po?.po_number ?? null }) }, by.name) : { messages: [], notes: [] };
-  if (!sent.messages.length) sent.notes.push('Nothing could be sent, so call them and tell them: the agreement wants it in writing too.');
+  // Nothing went (none queued, or every one failed): they're to be told another way, and Send again is on the review.
+  if (!sent.messages.some((m) => m.status !== 'failed')) sent.notes.push('Nothing could be sent, so call them and tell them: the agreement wants it in writing too. You can send it again from the review.');
   await refreshReport(db, a);
   return { ok: true, ...sent, ret: returnView(ins as Record<string, unknown>) };
 }

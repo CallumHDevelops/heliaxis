@@ -65,6 +65,22 @@ export function SiteReviewPanel({
     setBusy(false);
   }
 
+  /** Send again a notice that didn't go: the same notice, as it was recorded. */
+  async function resend(messageId: string) {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const r = await send<{ ok: true; message: { status: string; error: string | null }; review: SiteReview; data: SiteTabData }>(`/api/crm/site-assignments/${assignmentId}/resend`, 'POST', { message_id: messageId });
+      onReview(r.review);
+      onChanged(r.data);
+      setNotice(r.message.status === 'sent' ? 'Sent again: it reached them.' : r.message.status === 'failed' ? `It didn’t go again (${r.message.error ?? 'error'}). Call them, and try later.` : 'Waiting to send.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Not sent. Try again.');
+    }
+    setBusy(false);
+  }
+
   return (
     <section className="sxr-review" aria-label="Your review">
       <h4>Your review</h4>
@@ -113,6 +129,18 @@ export function SiteReviewPanel({
                 )}
               </div>
             </div>
+            {s.state === 'open' && live && !live.notice_sent_at && live.messages.some((m) => m.status === 'failed') && (
+              <p className="sx-warnline">
+                The written notice hasn’t reached them: {live.messages.filter((m) => m.status === 'failed').map((m) => `${m.channel === 'email' ? 'email' : 'WhatsApp'} didn’t go (${m.error ?? 'error'})`).join(', ')}.{' '}
+                {live.messages
+                  .filter((m) => m.status === 'failed')
+                  .map((m) => (
+                    <button key={m.id} type="button" className="crm-link" disabled={busy} onClick={() => void resend(m.id)}>
+                      Send the {m.channel === 'email' ? 'email' : 'WhatsApp'} again
+                    </button>
+                  ))}
+              </p>
+            )}
             {s.state === 'fixed' && live && <PutRightLines r={live} photos={review.photos} onViewPhoto={onViewPhoto} />}
             {asking === s.id && (
               <ReturnForm
