@@ -469,13 +469,30 @@ export function CopySheet({
 
 /* ── Send to customer (D9) ────────────────────────────────────────────────── */
 
-export function SendSheet({ projectId, view, isAdmin, onClose, onDone }: { projectId: string; view: HandoverView; isAdmin: boolean; onClose: () => void; onDone: Done }) {
+export function SendSheet({
+  projectId,
+  view,
+  isAdmin,
+  actions,
+  onClose,
+  onDone,
+}: {
+  projectId: string;
+  view: HandoverView;
+  isAdmin: boolean;
+  /** The office's own button for each item it still has to do (Upload, Sign the design part…). */
+  actions: Record<string, { label: string; run: () => void }>;
+  onClose: () => void;
+  onDone: Done;
+}) {
   const [wa, setWa] = useState(view.customer.mobile);
   const [email, setEmail] = useState(view.customer.email);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const first = view.customer.first || 'the customer';
   const blocked = !view.send.ok;
+  const fromSite = view.send.blocking.filter((b) => b.from === 'site');
+  const fromOffice = view.send.blocking.filter((b) => b.from === 'office');
   const go = async (override: boolean) => {
     setBusy(true);
     setErr('');
@@ -489,14 +506,32 @@ export function SendSheet({ projectId, view, isAdmin, onClose, onDone }: { proje
   return (
     <PlainSheet label="Send to customer" onClose={onClose}>
       <h2>Send the handover pack to {first}</h2>
-      {blocked && (
+      {fromSite.length > 0 && (
         <div className="hv-block">
           <b>Still to come from site:</b>
           <ul>
-            {view.send.blocking.map((b) => (
+            {fromSite.map((b) => (
               <li key={b.code}>
                 {b.title}
                 {b.why ? <small> · {b.why}</small> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {fromOffice.length > 0 && (
+        <div className="hv-block">
+          <b>Still needed from the office:</b>
+          <ul>
+            {fromOffice.map((b) => (
+              <li key={b.code}>
+                {b.title}
+                {b.why ? <small> · {b.why}</small> : null}{' '}
+                {actions[b.code] && (
+                  <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={actions[b.code].run}>
+                    {actions[b.code].label}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -563,7 +598,8 @@ export function InvoiceSheet({
   const [on, setOn] = useState(today);
   const [method, setMethod] = useState('bank_transfer');
   const [ref, setRef] = useState('');
-  const [final, setFinal] = useState(true);
+  // Unticked on purpose: a stage or part payment recorded as final would tick "Final invoice paid".
+  const [final, setFinal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const pence = Math.round(Number(amount.replace(/[£,\s]/g, '')) * 100);

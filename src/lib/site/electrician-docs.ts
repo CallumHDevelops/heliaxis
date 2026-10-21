@@ -52,6 +52,16 @@ export const ELECTRICIAN_DOCS: DocDef[] = [
   { key: 'HX-EV-01', title: EV_TITLE, slot: 'HX-HO-19', section: 'ev', products: ['ev'], make: makeEvRecord },
   { key: 'HX-HP-01', title: HP_TITLE, slot: 'HX-HO-19', section: 'heatpump', products: ['heatpump'], make: makeHpRecord },
 ];
+/** Answers the office writes on the assignment (eic/design.ts), not the electrician: left out of what their documents are hashed on. */
+const OFFICE_KEYS = ['eic_design'];
+/** The one document that prints the job's Building Control reference (the PV inspection's Paperwork note). */
+const PRINTS_BUILDING_REF = new Set(['HX-PV-01']);
+/**
+ * What one document is hashed on: the shared inputs, with the Building Control reference only for the
+ * document that prints it. The office records that reference after the sign-off, so the others never
+ * go out of date for it, and their print versions still open.
+ */
+const docInputs = (key: string, inputs: Record<string, unknown>) => ({ doc: key, ...inputs, buildingRef: PRINTS_BUILDING_REF.has(key) ? (inputs.buildingRef ?? null) : null });
 /** Every generated document key an electrician's sign-off can make (the review drawer lists them). */
 export const ELECTRICIAN_DOC_KEYS = [...ELECTRICIAN_DOCS.map((d) => d.key), 'CERT_OWN', 'EP_RECORD'];
 
@@ -98,8 +108,11 @@ export async function electricianInput(
     declaration: signoff?.declaration ?? null,
     buildingRef: typeof paper.building_regs_ref === 'string' && paper.building_regs_ref.trim() ? paper.building_regs_ref.trim() : null,
   };
-  // The hash: what the documents print from (not the signature image's bytes, which never change).
-  const inputs = { values: ctx.values, design: ctx.design, system: ctx.system, products: ctx.products, el: ctx.el ?? null, jobRef: input.jobRef, address, customer: input.customer, engineer: input.engineer, company: input.company, date: input.date, signoff: signoff?.id ?? null, buildingRef: input.buildingRef };
+  // The hash: what the documents print from (not the signature image's bytes, which never change),
+  // and not the office's own answers kept beside the electrician's (the EIC's design part): none of
+  // these documents prints them, so signing the design part doesn't put them out of date.
+  const values = Object.fromEntries(Object.entries(ctx.values).filter(([k]) => !OFFICE_KEYS.includes(k)));
+  const inputs = { values, design: ctx.design, system: ctx.system, products: ctx.products, el: ctx.el ?? null, jobRef: input.jobRef, address, customer: input.customer, engineer: input.engineer, company: input.company, date: input.date, signoff: signoff?.id ?? null, buildingRef: input.buildingRef };
   return { input, inputs, signoffId: signoff?.id ?? null };
 }
 
@@ -125,7 +138,10 @@ export async function electricianDocPrint(db: Db, ref: StoredRef): Promise<Repri
   for (const a of await electriciansOn(db, ref.projectId)) {
     const built = await electricianInput(db, a);
     if (!built) continue;
-    if (inputsHash({ doc: d.key, ...built.inputs }) === ref.hash) return d.make({ ...built.input, variant: 'print' });
+    // As the job is now, or (the PV inspection) as it was made before the office recorded the
+    // Building Control reference: the stored copy says "Heliaxis will notify them", and so does its print version.
+    const tries = [built, ...(built.input.buildingRef ? [{ input: { ...built.input, buildingRef: null }, inputs: { ...built.inputs, buildingRef: null } }] : [])];
+    for (const t of tries) if (inputsHash(docInputs(d.key, t.inputs)) === ref.hash) return d.make({ ...t.input, variant: 'print' });
     changed = true;
   }
   return changed ? 'changed' : null;
@@ -147,8 +163,12 @@ async function pagesPdf(images: { bytes: Uint8Array; mime: string }[], title: st
   return doc.save();
 }
 
-/** Make and store the electrician's documents (after the sign-off, and again by the cron if it failed). */
-export async function saveElectricianDocs(db: Db, assignmentId: string): Promise<SaveResult[]> {
+/**
+ * Make and store the electrician's documents (after the sign-off, and again by the cron if it
+ * failed). `force`: the handover items the office pressed Regenerate on (HX-PV-02…), made again even
+ * though the customer has the old version (only those); `by`: who pressed it.
+ */
+export async function saveElectricianDocs(db: Db, assignmentId: string, opts: { force?: string[]; by?: string | null } = {}): Promise<SaveResult[]> {
   const a = await readAssignment(db, assignmentId);
   if (!a || a.trade !== 'electrician') return [];
   const built = await electricianInput(db, a);
@@ -158,22 +178,25 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
   const out: SaveResult[] = [];
   for (const d of ELECTRICIAN_DOCS) {
     if (!a.forms.includes(d.section) || !d.products.some((p) => products.includes(p))) continue;
+    if (opts.force && !opts.force.includes(d.slot)) continue;
     const bytes = await d.make(input);
     out.push(
       await saveGenerated(db, a.project_id, {
         key: d.key,
         name: docFileName(input.jobRef, '', d.title),
         bytes,
-        inputs: { doc: d.key, ...inputs },
+        inputs: docInputs(d.key, inputs),
         category: 'commissioning',
         slot: d.slot,
         release: 'with_pack',
         visible: false,
+        force: !!opts.force?.includes(d.slot),
+        by: opts.by ?? null,
       })
     );
   }
   // Their own certificate, as photos of its pages (a PDF they uploaded is filed already).
-  if (certRouteOf(input.ctx) === 'own') {
+  if (certRouteOf(input.ctx) === 'own' && (!opts.force || opts.force.includes('HX-HO-04'))) {
     const pdfs = (await tradeFiles(db, a)).filter((f) => f.slot === 'CERT_FILE');
     const { data: ph } = await db.from('crm_photos').select('id, storage_path').eq('assignment_id', a.id).eq('slot', 'CERT_FILE').order('created_at');
     const photos = (ph ?? []) as { id: string; storage_path: string }[];
@@ -195,6 +218,8 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
           slot: 'HX-HO-04',
           release: 'with_pack',
           visible: false,
+          force: !!opts.force?.includes('HX-HO-04'),
+          by: opts.by ?? null,
         })
       );
     }

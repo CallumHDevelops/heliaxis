@@ -45,7 +45,7 @@ eq(
   [...S.PACK_ITEMS].sort((a, b) => a.order - b.order).map((s) => s.code),
   ['HX-HO-01', 'HX-HO-02', 'HX-HO-03', 'HX-HO-04', 'HX-BAT-04', 'HX-HO-05', 'HX-HO-06', 'HX-HO-07', 'HX-HO-08', 'HX-HO-09', 'HX-HO-10', 'HX-HO-11', 'HX-HO-12', 'HX-HO-13', 'HX-HO-14', 'HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-HO-15', 'HX-HO-16', 'HX-HO-17', 'HX-HO-18', 'HX-HO-19']
 );
-eq('"Which is it?" ends with Something else', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Building Regulations certificate', 'Warranty insurance policy', 'Wiring diagram (schematic)', 'Design calculations', 'G98 notice as sent', 'G99 papers', 'Final invoice', 'Something else']);
+eq('"Which is it?" ends with Something else; the office’s uploads (the G98 notice, the estimate page, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Battery location statement (PAS 63100)', 'Building Regulations certificate', 'Warranty insurance policy', 'Solar estimate, shading and care', 'Wiring diagram (schematic)', 'Design calculations', 'Battery location check (PAS 63100)', 'G98 notice as sent', 'G99 papers', 'Final invoice', 'Something else']);
 
 /* ── Applies: technologies and the DNO route ──────────────────────────────── */
 
@@ -107,15 +107,19 @@ eq('site documents in: Complete', ['HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-0
 const waitsDesign = byCode(S.slotStates(ctx({ certWaits: 'Sign the EIC’s design part (Site tab, the electrician’s card): the certificate and the next inspection come from it.' })))['HX-HO-04'];
 eq('the EIC made in the app, signed off but its design part not signed: Missing, open the Site tab (it blocks Send)', [waitsDesign.state, waitsDesign.fix, waitsDesign.why.startsWith('Sign the EIC’s design part'), S.SITE_SLOTS.includes('HX-HO-04')], ['missing', 'site', true, true]);
 eq('MCS certificate: Waiting, due in 10 working days', [part['HX-HO-03'].state, part['HX-HO-03'].why, part['HX-HO-03'].due], ['waiting', 'Due Tue 17 Nov (10 working days)', '2026-11-17']);
-eq('guarantee: Waiting until the MCS certificate', [part['HX-HO-07'].state, part['HX-HO-07'].why], ['waiting', 'After the MCS certificate.']);
+eq('warranty insurance: Waiting until the MCS certificate', [part['HX-HO-07'].state, part['HX-HO-07'].why], ['waiting', 'After the MCS certificate.']);
+eq('warranty insurance: Missing once the MCS certificate’s number is saved, or the certificate is uploaded', [byCode(S.slotStates(ctx({ paperwork: { mcs_cert_no: 'MCS-123' } })))['HX-HO-07'].state, byCode(S.slotStates(ctx({ docs: [doc('HX-HO-03', { source: 'upload', key: null })] })))['HX-HO-07'].fix], ['missing', 'upload']);
+eq('…with its 7 days once they start', byCode(S.slotStates(ctx({ paperwork: { mcs_cert_no: 'MCS-123', mcs_registered_on: '2026-11-12' }, due: { ...ctx().due, cc16: '2026-11-19' } })))['HX-HO-07'].why, 'Buy the warranty insurance and upload the policy. Due Thu 19 Nov (7 days).');
 eq('Building Control: Missing (Heliaxis notifies), due in 30 days', [part['HX-HO-05'].state, part['HX-HO-05'].fix], ['missing', 'notify-bc']);
 eq('Building Control by the electrician’s scheme: Waiting for them', byCode(S.slotStates(ctx({ partPBy: 'self' })))['HX-HO-05'].why, 'Waiting for Dave to notify their scheme and send the reference.');
 eq('system summary: Missing until the design part is signed', [part['HX-HO-02'].state, part['HX-HO-02'].fix], ['missing', 'sign-design']);
 eq('completion sign-off: Waiting for the customer', part['HX-HO-08'].state, 'waiting');
-eq('G98 notice not sent: Missing, mark it sent', [part['HX-HO-15'].state, part['HX-HO-15'].fix], ['missing', 'dno-sent']);
-eq('G98 notice an office upload: no generated document of its own', [S.slotDef('HX-HO-15').kind, S.slotDef('HX-HO-15').maker], ['C', 'office']);
-eq('G98 notice marked sent, not uploaded: Missing, upload it as sent', [byCode(S.slotStates(ctx({ dnoNotified: true })))['HX-HO-15'].state, byCode(S.slotStates(ctx({ dnoNotified: true })))['HX-HO-15'].fix], ['missing', 'upload']);
-eq('G98 notice uploaded as sent: Complete', byCode(S.slotStates(ctx({ docs: [doc('HX-HO-15', { source: 'upload', key: null })], dnoNotified: true })))['HX-HO-15'].state, 'complete');
+// The G98 notice is done in the office (owner decision 9): an upload of the notice as sent, never the app's data sheet.
+eq('G98 notice an office upload, offered on + Add a document: no generated document of its own', [S.slotDef('HX-HO-15').kind, S.slotDef('HX-HO-15').maker, S.UPLOAD_PICKS.some((p) => p.code === 'HX-HO-15')], ['C', 'office', true]);
+eq('G98 notice switched on, nothing uploaded: Missing, upload it as sent, due in 28 days', [part['HX-HO-15'].state, part['HX-HO-15'].fix, part['HX-HO-15'].due, part['HX-HO-15'].why], ['missing', 'upload', '2026-12-01', 'Upload the G98 notice as it was sent to the DNO. Due Tue 1 Dec (28 days).']);
+eq('G98 notice marked sent, not uploaded: still Missing (the notice as sent goes in the pack)', [byCode(S.slotStates(ctx({ dnoNotified: true })))['HX-HO-15'].state, byCode(S.slotStates(ctx({ dnoNotified: true })))['HX-HO-15'].fix], ['missing', 'upload']);
+eq('G98 notice before switching on: Waiting', byCode(S.slotStates(ctx({ commissioned: null })))['HX-HO-15'].state, 'waiting');
+eq('G98 notice uploaded as sent: Complete', byCode(S.slotStates(ctx({ docs: [doc('HX-HO-15', { source: 'upload', key: null })] })))['HX-HO-15'].state, 'complete');
 eq('not needed: the G99 papers (G98 job), the plan (none sold), the PAS 63100 pair (not ticked)', ['HX-HO-16', 'HX-HO-12', 'HX-BAT-03', 'HX-BAT-04'].map((c) => part[c].state), ['na', 'na', 'na', 'na']);
 eq('other useful documents are never Missing and never counted', [part['HX-HO-19'].state, part['HX-HO-19'].counted], ['na', false]);
 eq('invoice before the pack goes: Waiting', [part['HX-HO-18'].state, part['HX-HO-18'].why], ['waiting', 'After the handover pack goes.']);
@@ -157,6 +161,11 @@ eq('all five states seen', [...new Set(Object.values(part).concat(sentF78).map((
 
 // The send gate (D23): every site document Complete; the office's can follow.
 eq('Send is held while the system summary is missing', [S.sendCheck(Object.values(part)).ok, S.sendCheck(Object.values(part)).blocking.map((v) => v.code)], [false, ['HX-HO-02']]);
+eq('…by the office (its design signature), not by site', S.sendCheck(Object.values(part)).blocking.map((v) => [v.code, S.waitsOn(v), v.fix]), [['HX-HO-02', 'office', 'sign-design']]);
+// PAS 63100 ticked, the electrician still on site: their documents come from site, the PAS 63100 papers from the office (the app can't make them yet).
+const pasJob = S.sendCheck(S.slotStates(ctx({ pas63100: true, electrician: 'working' }))).blocking;
+eq('PAS 63100 papers: office uploads, never "waiting for the electrician"', pasJob.filter((v) => v.code === 'HX-BAT-03' || v.code === 'HX-BAT-04').map((v) => [v.code, v.state, v.fix, S.waitsOn(v)]), [['HX-BAT-04', 'missing', 'upload', 'office'], ['HX-BAT-03', 'missing', 'upload', 'office']]);
+eq('…while the electrician’s own wait for site', pasJob.filter((v) => ['HX-PV-02', 'HX-BAT-01'].includes(v.code)).map((v) => [v.code, S.waitsOn(v)]), [['HX-PV-02', 'site'], ['HX-BAT-01', 'site']]);
 const done = byCode(S.slotStates(ctx({ docs: [...partDocs, doc('HX-HO-02')], gen: { ...partGen, 'HX-HO-02': ready('HX-HO-02') } })));
 const sc = S.sendCheck(Object.values(done));
 eq('Send allowed once the site documents are in; the rest follow', [sc.ok, sc.following.map((v) => v.code).includes('HX-HO-03')], [true, true]);
@@ -210,6 +219,13 @@ eq('system summary PV description and circuits from the job', [sumOk.input?.pv?.
 const noClass = I.summaryInput(facts({ design: designOf({ est_kwh_year: 4620, shade_factor: 0.95, battery_kw: 3.6, roof_faces: 'Rear roof' }), settings: { ...settings, nextInspectionYears: 10 } }));
 eq('system summary with no system class: Missing, named, nothing printed', [noClass.ok, noClass.why, 'input' in noClass], [false, 'Needs the battery system class on Job details.', false]);
 eq('system summary before the electrician signs: Waiting', I.summaryInput(facts({ electrician: { ...facts().electrician, signedAt: null, signaturePath: null } })).state, 'waiting');
+const noCircuits = I.summaryInput(facts({ electrician: { ...facts().electrician, values: { hos_kind: 'initial', eess_backup: 'yes' } }, settings: { ...settings, nextInspectionYears: 10 } }));
+eq('system summary with no circuits tested (not typed, not on the EIC): Missing, Summary details, never "Not answered"', [noCircuits.ok, noCircuits.fix], [false, 'values']);
+eq('system summary with the office’s circuits tested: ready, printed', I.summaryInput(facts({ electrician: { ...facts().electrician, values: { hos_kind: 'initial', eess_backup: 'yes' } }, data: { 'HX-HO-02': { ...facts().data['HX-HO-02'], values: { circuits: '2 PV strings; 1 AC circuit' } } }, settings: { ...settings, nextInspectionYears: 10 } })).input?.pv?.circuits, '2 PV strings; 1 AC circuit');
+const eicDesign = { name: 'Sarah Jones', signed_at: '2026-11-04T09:00:00Z', path: 'signatures/p1/eic-design.png', by: 'u2' };
+const viaEic = I.summaryInput(facts({ data: {}, electrician: { ...facts().electrician, design: eicDesign }, settings: { ...settings, nextInspectionYears: 10 } }));
+eq('system summary with the EIC’s design part signed in the office: one signature, made with it', [viaEic.ok, viaEic.input?.design], [true, eicDesign]);
+eq('the summary’s own design signature, if there is one, comes first', I.summaryInput(facts({ electrician: { ...facts().electrician, design: eicDesign }, settings: { ...settings, nextInspectionYears: 10 } })).input?.design?.name, 'Callum Hughes');
 eq('system summary without the design signature: Sign the design part', I.summaryInput(facts({ data: {}, settings: { ...settings, nextInspectionYears: 10 } })).fix, 'sign-design');
 
 const sched = I.scheduleInput(facts());
@@ -236,6 +252,16 @@ eq('G98 data sheet: no MPAN, Missing', I.g98Input(facts({ system: { ...facts().s
 eq('switching off: no switch locations, Missing and named', I.switchInput(facts()).why, 'Say where the switches are: consumer unit circuit, ac isolator, dc isolator and battery isolator.');
 const sw = I.switchInput(facts({ data: { 'HX-HO-09': { values: { cu: 'Hall, labelled Solar PV', ac: 'Loft, by the inverter', dc: 'Built into the inverter', battery: 'Side of the battery' } } } }));
 eq('switching off: back-up warning on a back-up job', [sw.ok, sw.input.steps.some((s) => s.includes('back-up power'))], [true, true]);
+// The steps the job has, numbered 1…n, and back on from n (a customer's safety instruction).
+const SWITCHES = { cu: 'Hall', ac: 'Loft', dc: 'Inverter', battery: 'Battery side' };
+const order = (products) => {
+  const s = I.switchInput(facts({ job: { ...facts().job, products }, data: { 'HX-HO-09': { values: SWITCHES } } })).input.steps;
+  return [s.filter((l) => /^\d\./.test(l)).map((l) => l.slice(0, 2)), s.find((l) => l.startsWith('To switch it back on'))];
+};
+eq('switching off, solar + battery: 1–4, back on 4, 3, 2, then 1', order(['solar', 'battery']), [['1.', '2.', '3.', '4.'], 'To switch it back on, go the other way: 4, 3, 2, then 1.']);
+eq('solar only: 1–3, back on from 3', order(['solar']), [['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.']);
+eq('battery only: its isolator is step 3, back on from 3', [order(['battery']), I.switchInput(facts({ job: { ...facts().job, products: ['battery'] }, data: { 'HX-HO-09': { values: SWITCHES } } })).input.steps[2]], [[['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.'], '3. Battery: switch it off at its own isolator, as its manual shows: Battery side.']);
+eq('EV only: 1 and 2, back on 2, then 1', order(['ev']), [['1.', '2.'], 'To switch it back on, go the other way: 2, then 1.']);
 
 const rec = I.receiptInput(facts({ payments: [{ id: 'x1', kind: 'final', amount_pence: 512345, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042' }] }));
 eq('receipt: exactly the recorded payments (the deposit, then the final), nothing worked out', rec.input.lines.map((l) => [l.what, l.pence]), [['Deposit', 50000], ['Final payment', 512345]]);

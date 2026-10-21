@@ -9,6 +9,7 @@ import { useNow } from '@/lib/use-now';
 import { HandoverSection } from './HandoverSection';
 import './portal.css';
 import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
+import { shortDate, ukDayOf, ukTime } from '@/app/admin/crm/crm-shared';
 
 const DOC_LABEL: Record<string, string> = {
   quote: 'Quote',
@@ -26,20 +27,16 @@ const DOC_LABEL: Record<string, string> = {
 type Quote = NonNullable<PortalData['quote']>;
 type Doc = PortalData['documents'][number];
 
-const fmtDate = (iso: string, withTime = false) =>
-  new Date(iso).toLocaleString('en-GB', {
-    timeZone: 'Europe/London',
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
-  });
-
-const ukYmd = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+/**
+ * "Sun 20 Sep", or "Tue 3 Nov, 08:00" with the time: spelt out by the UK date helpers, never by
+ * toLocaleString, because the server's Intl data and the browser's disagree ("Sept" or "Sep", a comma
+ * after the weekday) and the page rendered on the server then fails to hydrate (React #418).
+ */
+const fmtDate = (iso: string, withTime = false) => `${shortDate(ukDayOf(iso))}${withTime ? `, ${ukTime(iso)}` : ''}`;
 
 /** Whole UK days from now to the date of `iso` (0 = today). */
 function daysUntil(iso: string, now: number) {
-  return Math.round((Date.parse(`${ukYmd(Date.parse(iso))}T12:00:00Z`) - Date.parse(`${ukYmd(now)}T12:00:00Z`)) / 86_400_000);
+  return Math.round((Date.parse(`${ukDayOf(iso)}T12:00:00Z`) - Date.parse(`${ukDayOf(now)}T12:00:00Z`)) / 86_400_000);
 }
 
 const CANCEL_NOTE = 'You can change your mind and cancel within 14 days of signing, free of charge.';

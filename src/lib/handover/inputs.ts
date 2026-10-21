@@ -19,7 +19,7 @@ import { contentsGroups, type Fix, type SlotCode, type SlotView, type Tech } fro
 
 /** A customer's signature for one document: on the electrician's phone (P15) or in their portal (C2). */
 export type CustomerSig = { name: string; signed_at: string; path: string; via: 'phone' | 'portal'; declaration?: string | null };
-/** The office's design signature on the system summary (HX-HO-02). */
+/** The office's design signature on the system summary (HX-HO-02): signed for it, or the EIC's design part (the same person on the same job). */
 export type OfficeSig = { name: string; signed_at: string; path: string; by: string | null };
 /** A payment recorded against the job (crm_payments), typed from the invoice. */
 export type Payment = { id: string; kind: 'stage' | 'final' | 'other'; amount_pence: number; paid_on: string; method: 'card' | 'bank_transfer' | 'other'; reference: string | null };
@@ -97,6 +97,8 @@ export type ElectricianFacts = {
   certWaits?: string | null;
   /** The certificate's route ('eic', 'eic_single', 'meiwc', 'own'), from site/handover-facts.ts. */
   certRoute?: string | null;
+  /** The EIC's design part as the office signed it (site/handover-facts.ts): the system summary's design signature too. */
+  design?: OfficeSig | null;
 };
 
 export type HandoverFacts = {
@@ -539,11 +541,15 @@ export function summaryInput(f: HandoverFacts): Made<SummaryInput> {
   if (solar && !cert) return missing('Needs the electrical certificate’s number: it’s on the EIC.', 'values');
   const kindRaw = val(f, 'HX-HO-02', 'kind') ?? str(v.hos_kind);
   if (kindRaw !== 'initial' && kindRaw !== 'periodic') return missing('Say whether it’s a new installation or a re-test.', 'values');
+  // The electrician's, the office's, or the string tests' strings with the electrical certificate's circuits (site/handover-facts.ts): never printed "Not answered".
+  const circuits = val(f, 'HX-HO-02', 'circuits') ?? str(v.hos_circuits);
+  if (solar && !circuits) return missing('Say which circuits were tested (Summary details): the electrician didn’t, and the electrical certificate doesn’t list them.', 'values');
   // The EIC made in the app gives the next inspection once its design part is signed.
   if (e.certWaits && !e.nextInspection) return missing(e.certWaits, 'site');
   const next = e.nextInspection ? `${within(e.nextInspection)}, as recommended on the electrical certificate` : f.settings.nextInspectionYears ? `${within(`${f.settings.nextInspectionYears} years`)}, as Heliaxis recommends` : null;
   if (!next) return missing('Set the next inspection (years) in CRM settings: the electrical certificate doesn’t give one.', 'settings');
-  const design = f.data['HX-HO-02']?.design;
+  // One office signature for the design: the summary's own, or the EIC's design part (the same person, the same job).
+  const design = f.data['HX-HO-02']?.design ?? e.design ?? null;
   if (!design) return missing('Sign the design part.', 'sign-design');
   const optimisers = equipmentOf(f).find((x) => x.what === 'Optimisers');
   const panels = s.panel_model ? `${s.panel_count ? `${s.panel_count} × ` : ''}${s.panel_model}${s.kwp ? ` (${num(s.kwp, 3)} kWp)` : ''}` : null;
@@ -591,7 +597,7 @@ export function summaryInput(f: HandoverFacts): Made<SummaryInput> {
             kwp: s.kwp!,
             location: val(f, 'HX-HO-02', 'p_loc') ?? d.roof_faces!,
             est: d.est_kwh_year!,
-            circuits: val(f, 'HX-HO-02', 'circuits') ?? str(v.hos_circuits),
+            circuits,
           }
         : null,
       records,
@@ -623,9 +629,15 @@ export function switchInput(f: HandoverFacts): Made<SwitchInput> {
     return missing(`Say where the switches are: ${list(gaps.map((g) => g.label.toLowerCase()))}.`, 'switches');
   }
   const lines = DRAFTS.shutdown.text.split('\n');
-  const steps = lines
+  const kept = lines
     .filter((l) => (!/^3\./.test(l) || has(f, 'solar')) && (!/^4\./.test(l) || has(f, 'battery')))
-    .filter((l) => !/back-up power/.test(l) || f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes')
+    .filter((l) => !/back-up power/.test(l) || f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes');
+  // The steps this job has, numbered 1…n, and switched back on the other way from the last of them (n…1).
+  let n = 0;
+  const numbered = kept.map((l) => (/^\d+\./.test(l) ? l.replace(/^\d+\./, `${++n}.`) : l));
+  const back = n > 1 ? `${Array.from({ length: n - 1 }, (_, i) => n - i).join(', ')}, then 1` : '1';
+  const steps = numbered
+    .map((l) => (/^\d+\./.test(l) ? l : l.replace(/\d+(?:, \d+)*,? then \d+/, back)))
     .map((l) => l.replace('{cu}', where.cu ?? '').replace('{ac}', where.ac ?? '').replace('{dc}', where.dc ?? '').replace('{battery}', where.battery ?? ''));
   return {
     ok: true,

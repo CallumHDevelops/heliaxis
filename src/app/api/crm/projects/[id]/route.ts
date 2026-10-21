@@ -636,6 +636,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
       input.bus_expires_on = issued ? addMonths(issued, 3) : null;
     }
     const m = merge(before.paperwork, input, cleanPaper, (k) => k === 'dno_route' || PAPER_DATES.includes(k) || PAPER_TEXT.includes(k));
+    // The MCS certificate's number saved (typed, or read off the uploaded certificate): it's registered by
+    // now, so the warranty insurance's 7 days start today unless a registered date is given or already there.
+    if (m && input && 'mcs_cert_no' in input && !('mcs_registered_on' in input) && m.mcs_cert_no && !m.mcs_registered_on) m.mcs_registered_on = (await calendarNow()).today;
     if (m) v3.paperwork = m;
   }
   // survey-booking.sql adds survey_type: its own update again.

@@ -10,6 +10,7 @@
  * scripts/test-handover-slots.mjs all read the same rules.
  */
 import { shortDay } from '../projects/deadlines';
+import { PAS63100 } from '../site/fixed/pas63100';
 
 export type Tech = 'solar' | 'battery' | 'ev' | 'heatpump';
 export const TECH_LABEL: Record<Tech, string> = { solar: 'Solar PV', battery: 'Battery', ev: 'EV charger', heatpump: 'Heat pump' };
@@ -185,6 +186,7 @@ export const SLOTS: SlotDef[] = [
     applies: pas,
     reasons: PAS_SCOPE,
     category: 'certificate',
+    pick: 'Battery location statement (PAS 63100)',
   },
   {
     code: 'HX-HO-05',
@@ -260,6 +262,7 @@ export const SLOTS: SlotDef[] = [
     order: 100,
     applies: solar,
     category: 'handover',
+    pick: 'Solar estimate, shading and care',
   },
   {
     code: 'HX-HO-11',
@@ -385,6 +388,7 @@ export const SLOTS: SlotDef[] = [
     applies: pas,
     reasons: PAS_SCOPE,
     category: 'commissioning',
+    pick: 'Battery location check (PAS 63100)',
   },
   {
     code: 'HX-HO-15',
@@ -392,6 +396,8 @@ export const SLOTS: SlotDef[] = [
     customer: 'The notice that tells your electricity network (DNO) about your new system.',
     group: 'grid',
     tech: ['solar', 'battery'],
+    // Done in the office (owner decision 9): the form as it went to the DNO, uploaded. The G98 data
+    // sheet the app makes is the office's helper for filling it in, never in the pack.
     kind: 'C',
     maker: 'office',
     order: 210,
@@ -619,13 +625,10 @@ function genState(code: SlotCode, docs: SlotDoc[], c: StateCtx): Partial0 {
 }
 
 /** Made by the electrician's sign-off (Unit 2), or uploaded. */
-function siteState(docs: SlotDoc[], c: StateCtx, made = true): Partial0 {
+function siteState(docs: SlotDoc[], c: StateCtx): Partial0 {
   if (docs.length) return docsState(docs);
   if (c.electrician === 'working') return { state: 'waiting', why: ELECTRICIAN(c) };
-  if (c.electrician === 'signed')
-    return made
-      ? { state: 'missing', why: 'The electrician has signed off but it isn’t here. Upload it, or open the Site tab.', fix: 'upload' }
-      : { state: 'missing', why: 'Upload it for now: the app’s PAS 63100 checks haven’t been matched to the PAS yet.', fix: 'upload' };
+  if (c.electrician === 'signed') return { state: 'missing', why: 'The electrician has signed off but it isn’t here. Upload it, or open the Site tab.', fix: 'upload' };
   return { state: 'missing', why: 'Add the electrician on the Site tab, or upload it.', fix: 'site' };
 }
 
@@ -640,7 +643,9 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       return siteState(docs, c);
     case 'HX-BAT-03':
     case 'HX-BAT-04':
-      return siteState(docs, c, false);
+      // The app can't make them until PAS 63100's own wording is in (fixed/pas63100.ts): the office uploads them, nothing waits for site.
+      if (PAS63100.verified) return siteState(docs, c);
+      return docs.length ? docsState(docs) : { state: 'missing', why: 'Upload it for now: the app’s PAS 63100 checks haven’t been matched to the PAS yet.', fix: 'upload' };
     case 'HX-HO-04':
       if (docs.length) return docsState(docs);
       if (c.electrician === 'working') return { state: 'waiting', why: ELECTRICIAN(c) };
@@ -653,7 +658,9 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       return { state: 'waiting', why: 'After the system is switched on.' };
     case 'HX-HO-07':
       if (docs.length) return docsState(docs);
-      if (p.mcs_registered_on) return { state: 'missing', why: `Buy the warranty insurance and upload the policy.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
+      // Once the MCS certificate is in (registered, its number saved or the certificate uploaded).
+      if (p.mcs_registered_on || p.mcs_cert_no || c.docs.some((x) => x.slot === 'HX-HO-03'))
+        return { state: 'missing', why: `Buy the warranty insurance and upload the policy.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
       return { state: 'waiting', why: 'After the MCS certificate.' };
     case 'HX-HO-05':
       if (docs.length) return docsState(docs);
@@ -680,11 +687,11 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       return c.sent ? { state: 'missing', why: 'Upload the final invoice and send it.', fix: 'invoice' } : { state: 'waiting', why: 'After the handover pack goes.', fix: 'invoice' };
     }
     case 'HX-HO-15': {
-      // An office upload (OWNER-DECISIONS 9): the notice as it went to the DNO. The G98 data sheet helps fill it in.
+      // An office upload (OWNER-DECISIONS 9): the notice as it went to the DNO (uploading it ticks the G98 notice as sent). The G98 data sheet helps fill it in.
       if (!c.dnoRoute) return { state: 'missing', why: 'Choose the DNO route on Paperwork.', fix: 'paperwork' };
       if (docs.length) return docsState(docs);
-      if (!c.dnoNotified) return { state: 'missing', why: `Send the G98 notice to the DNO and mark it sent, then upload it as sent.${c.due.g98 ? ` ${dueWords(c.due.g98, '28 days')}.` : ''}`, due: c.due.g98 ?? null, fix: 'dno-sent' };
-      return { state: 'missing', why: 'Upload the G98 notice as it was sent to the DNO.', fix: 'upload' };
+      if (!c.commissioned) return { state: 'waiting', why: 'After the system is switched on.' };
+      return { state: 'missing', why: `Upload the G98 notice as it was sent to the DNO.${c.due.g98 ? ` ${dueWords(c.due.g98, '28 days')}.` : ''}`, due: c.due.g98 ?? null, fix: 'upload' };
     }
     case 'HX-HO-16': {
       if (!c.dnoRoute) return { state: 'missing', why: 'Choose the DNO route on Paperwork.', fix: 'paperwork' };
@@ -696,6 +703,9 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
     }
     case 'HX-HO-19':
       return docs.length ? docsState(docs) : { state: 'na', why: 'Optional: nothing extra added.' };
+    case 'HX-HO-09':
+      // The switching-off page makes it Complete; the manufacturers' procedures from the library go with it.
+      return genState('HX-HO-09', docs.filter((x) => x.source !== 'library'), c);
     default:
       return genState(d.code, docs, c);
   }
@@ -756,6 +766,12 @@ export function sendCheck(views: SlotView[]): { ok: boolean; blocking: SlotView[
   const blocking = open.filter((v) => SITE_SLOTS.includes(v.code));
   return { ok: blocking.length === 0, blocking, following: open.filter((v) => !SITE_SLOTS.includes(v.code)) };
 }
+
+/**
+ * Who an item that holds Send up is waiting on: the site (the electrician hasn't finished: Waiting),
+ * or the office (an upload, the design signature, a detail to fill in, the Site tab's design part).
+ */
+export const waitsOn = (v: SlotView): 'site' | 'office' => (v.state === 'waiting' ? 'site' : 'office');
 
 /** What the customer sees for an item: its documents, "On its way", or nothing (not needed). */
 export function customerState(v: SlotView): 'ready' | 'coming' | null {

@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
-import { isSlot, slotDef, type SlotCode } from '@/lib/handover/slots';
+import { isSlot, SITE_SLOTS, slotDef, type SlotCode } from '@/lib/handover/slots';
 import {
   buildHandover,
   handoverReady,
@@ -80,8 +80,24 @@ export async function POST(req: Request, { params }: Ctx) {
         break;
       case 'regenerate': {
         if (!slot) return json({ error: 'Which item?' }, 400);
+        // The electrician's own documents are made by the site app, from their sign-off: HX-PV-02…, the EV
+        // and heat pump records (HX-HO-19), their certificate (HX-HO-04: the EIC made in the app, or the pages
+        // of their own). The latest electrician last, so theirs is the current one (as the pack reads it).
+        let siteMade = false;
+        if (slotDef(slot)?.maker === 'site' || slot === 'HX-HO-19' || slot === 'HX-HO-04') {
+          const { saveElectricianDocs } = await import('@/lib/site/electrician-docs');
+          const { data: els } = await db.from('site_assignments').select('id').eq('project_id', id).eq('trade', 'electrician').neq('status', 'cancelled').order('created_at');
+          for (const e of (els ?? []) as { id: string }[]) {
+            siteMade = (await saveElectricianDocs(db, e.id, { force: [slot], by })).some((x) => x.status === 'saved') || siteMade;
+            if (slot === 'HX-HO-04') {
+              const { saveCertificate } = await import('@/lib/site/eic/server');
+              siteMade = !!(await saveCertificate(db, e.id, by, { force: true }))?.saved.some((x) => x.status === 'saved') || siteMade;
+            }
+          }
+        }
+        // Released into their portal once the pack has gone, and the pack rebuilt.
         const r = await refreshHandover(db, id, { by, force: [slot] });
-        if (r.made.length) await log(`Handover pack: ${slotDef(slot)?.title} made again`);
+        if (r.made.length || siteMade) await log(`Handover pack: ${slotDef(slot)?.title} made again`);
         else notes.push('Nothing to make: it’s up to date, or it still needs something (see the row).');
         break;
       }
@@ -90,6 +106,8 @@ export async function POST(req: Request, { params }: Ctx) {
         if (!slot) return json({ error: 'Which item?' }, 400);
         const reason = String(b.reason ?? '').trim().slice(0, 200);
         if (b.action === 'na' && !reason) return json({ error: 'Say why it isn’t needed.' }, 400);
+        // One of the documents Send waits for: only an admin can take it off, as only an admin can send without it.
+        if (b.action === 'na' && SITE_SLOTS.includes(slot) && s.profile.role !== 'admin') return json({ error: 'Only an admin can mark this not needed: the pack waits for it before it can go.' }, 403);
         await markNotNeeded(db, id, slot, b.action === 'na', reason || null, by, byName);
         await refreshHandover(db, id, { by });
         break;

@@ -15,7 +15,7 @@ import {
 } from '@/lib/crm/server';
 import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 import { readMcsNumber } from '@/lib/handover/read';
-import { handoverReady, patchSlotData, refreshHandover, tellCustomer, type Via } from '@/lib/handover/server';
+import { handoverReady, markDnoSent, mcsRegistered, patchSlotData, refreshHandover, tellCustomer, type Via } from '@/lib/handover/server';
 import { isSlot, slotDef } from '@/lib/handover/slots';
 import { buildPdf } from '@/lib/subcontractors/pdf-engine';
 
@@ -42,7 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const b = await req.json().catch(() => ({}));
   const db = createAdminClient();
-  const { data: p } = await db.from('crm_projects').select('id, enquiry_id').eq('id', id).maybeSingle();
+  const { data: p } = await db.from('crm_projects').select('id, enquiry_id, checklist').eq('id', id).maybeSingle();
   if (!p) return json({ error: 'Not found' }, 404);
 
   if (b.action === 'prepare') {
@@ -104,6 +104,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: s.user.id, visible: false }).eq('id', String(b.replace)).eq('project_id', id).eq('handover_slot', slot);
       }
       if (slot === 'HX-HO-16' && PARTS.includes(String(b.part))) await patchSlotData(db, id, 'HX-HO-16', { parts: { [doc.id]: String(b.part) } }, s.user.id);
+      // The G98 notice as it was sent to the DNO: it's sent (the checklist item, its deadline, the portal's sign card).
+      const dno = ((p.checklist ?? {}) as Record<string, { done_at?: string; na?: boolean } | null>).c_dno_notified;
+      if (slot === 'HX-HO-15' && !dno?.done_at && !dno?.na) await markDnoSent(db, id, s.user.id, s.profile.full_name || s.profile.email || 'Someone').catch(() => null);
+      // The MCS certificate is in: the warranty insurance's 7 days start (the day it's uploaded, unless a registered date is on the job).
+      if (slot === 'HX-HO-03') await mcsRegistered(db, id, s.user.id).catch(() => false);
       if (slot === 'HX-HO-03' && mime && (mime === 'application/pdf' || IMAGE.test(mime))) {
         const { data: file } = await db.storage.from(DOCS_BUCKET).download(path);
         const n = file ? await readMcsNumber(new Uint8Array(await file.arrayBuffer()), mime) : null;

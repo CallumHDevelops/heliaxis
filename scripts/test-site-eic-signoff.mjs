@@ -307,7 +307,7 @@ const so = db.rows('site_signoffs').find((s) => s.assignment_id === one.id);
 // A roofer's panel serials from old test data (SN_PANEL, before the owner dropped scanning) aren't passed on.
 db.rows('site_assignments').push({ id: randomUUID(), project_id: project.id, contact_id: contact.id, trade: 'roofer', status: 'signed', forms: [], answers: wrap({ SN_PANEL: [{ s: 'PNL0001', src: 'scan' }, { s: 'PNL0002', src: 'scan' }] }), flags: [], rev: 1, created_at: '2026-11-01T07:00:00Z' });
 let hf = await HF.siteHandoverFacts(db, project.id, {});
-eq('handover facts: the EIC’s reference, no next inspection yet, waiting for the design part, no panel serials', [hf.certRef, hf.nextInspection, /^Sign the EIC’s design part/.test(hf.certWaits ?? ''), 'SN_PANEL' in hf.values], ['HX-0042-EIC', null, true, false]);
+eq('handover facts: the EIC’s reference, no next inspection yet, waiting for the design part, no panel serials', [hf.certRef, hf.nextInspection, /^Sign the EIC’s design part/.test(hf.certWaits ?? ''), 'SN_PANEL' in hf.values, hf.design], ['HX-0042-EIC', null, true, false, null]);
 eq('every step after the reply stamped', [!!so.po_done_at, !!so.docs_done_at, !!so.notified_at], [true, true, true]);
 let st = await EICS.certificateStatus(db, read(one.id));
 eq('the Site tab: the design part to sign; their scheme notifies', [st.state, st.ref, st.notify.who, st.notify.scheme, st.notify.reference], ['to_design', 'HX-0042-EIC', 'self', 'NAPIT', 'HX-0042-EIC']);
@@ -320,7 +320,17 @@ const ok = await signDesign(db, read(one.id), DESIGN, STAFF);
 eq('signed by the office', ok.ok, true);
 hf = await HF.siteHandoverFacts(db, project.id, {});
 eq('handover facts once the design part is signed: the next inspection from it, nothing waiting', [hf.certRef, hf.nextInspection, hf.certWaits], ['HX-0042-EIC', '10 years', null]);
+// The summary's "Circuits tested", not typed on the phone: the string tests' strings and the EIC's circuits, as the phone suggests them.
+const ctxOne = await (await import('../src/lib/site/form-ctx.ts')).serverCtx(db, read(one.id));
+const circuitsNow = E.eicSummary(ctxOne).circuits;
+eq('handover facts: the summary’s circuits tested from the strings and the EIC’s circuits', [circuitsNow.length > 0, hf.values.hos_circuits, (await import('../src/lib/site/forms/electrician/summary.ts')).circuitsTested(ctxOne)], [true, `1 PV string; ${circuitsNow.join('; ')}`, `1 PV string; ${circuitsNow.join('; ')}`]);
 const design = read(one.id).answers.eic_design?.v;
+eq('handover facts: the EIC’s design signature, for the summary’s design part too (one signature)', hf.design, { name: 'Sarah Jones', signed_at: design.signed_at, path: design.path, by: 'staff-1' });
+// One a phone wrote (not office:<staff>) is never taken as the office's signature.
+const forged = { ...read(one.id).answers.eic_design, dev: 'phone-1' };
+db.rows('site_assignments').find((x) => x.id === one.id).answers.eic_design = forged;
+eq('…but never one the phone wrote', (await HF.siteHandoverFacts(db, project.id, {})).design, null);
+db.rows('site_assignments').find((x) => x.id === one.id).answers.eic_design = { ...forged, dev: 'office:staff-1' };
 eq('kept on the assignment, its signature in crm-docs', [design?.name, design?.next_n, design?.next_unit, db.files.has(`crm-docs/${design?.path}`)], ['Sarah Jones', 10, 'years', true]);
 const fin = current('EIC');
 eq('the EIC is final: handover slot HX-HO-04, held for the pack, not visible yet', [fin?.handover_slot, fin?.release, fin?.visible, fin?.category, fin?.version], ['HX-HO-04', 'with_pack', false, 'certificate', 1]);

@@ -560,6 +560,54 @@ eq('the stored battery test record carries the engineer and the signature line',
 const HF = await import('../src/lib/site/handover-facts.ts');
 const hf = await HF.siteHandoverFacts(db, p1.id, {});
 eq('the handover pack is told: their certificate’s reference, the summary’s "initial" (from the string tests), nothing waiting', [hf.certRef, hf.values.hos_kind, e1.answers.hos_kind, hf.certWaits, hf.nextInspection], ['NAPIT EIC 00123456', 'initial', undefined, null, null]);
+{
+  const ED = await import('../src/lib/site/electrician-docs.ts');
+  const ref = (d) => ({ projectId: d.project_id, key: d.generated_key, hash: d.inputs_hash, madeAt: d.created_at });
+  const RECORDS = ['HX-BAT-01', 'HX-BAT-02', 'HX-PV-01', 'HX-PV-02', 'HX-PV-03'];
+  // The office signs the EIC's design part (it's kept on the assignment's answers, beside the
+  // electrician's): none of their documents print it, so their print versions still work.
+  const { signDesign } = await import('../src/lib/site/eic/design.ts');
+  const { readAssignment } = await import('../src/lib/site/server.ts');
+  const designed = await signDesign(db, await readAssignment(db, e1.id), { name: 'Sarah Jones', company: 'Heliaxis Ltd', address: '9 Turner Street, Newport', postcode: 'NP19 7AZ', tel: '01633 965205', next_n: 10, next_unit: 'years', departures: null, signature: SIG }, { id: 'staff-1', name: 'Sarah Jones' });
+  eq('the office signs the EIC’s design part', [designed.ok, !!db.rows('site_assignments').find((x) => x.id === e1.id).answers.eic_design], [true, true]);
+  const afterDesign = [];
+  for (const d of made.filter((x) => !x.generated_key.startsWith('PO-'))) {
+    const bytes = await ED.electricianDocPrint(db, ref(d));
+    if (bytes instanceof Uint8Array && flat(await textOf(bytes)) === flat(await textOf(db.files.get(`crm-docs/${d.storage_path}`)))) afterDesign.push(d.generated_key);
+  }
+  eq('after the design part is signed: every print version still made, with the same words', afterDesign.sort(), RECORDS);
+  const again = await ED.saveElectricianDocs(db, e1.id);
+  eq('…and the documents aren’t made again for it (nothing they print changed)', again.map((r) => r.status), ['same', 'same', 'same', 'same', 'same']);
+  // The office records the Building Control reference after the sign-off: only the PV inspection prints
+  // it, so only that one is behind; every stored copy's print version still opens with its own words.
+  const proj = db.rows('crm_projects').find((x) => x.id === p1.id);
+  proj.paperwork = { ...(proj.paperwork ?? {}), building_regs_ref: 'BC-0042' };
+  const afterRef = [];
+  for (const d of made.filter((x) => !x.generated_key.startsWith('PO-'))) {
+    const bytes = await ED.electricianDocPrint(db, ref(d));
+    if (bytes instanceof Uint8Array && flat(await textOf(bytes)) === flat(await textOf(db.files.get(`crm-docs/${d.storage_path}`)))) afterRef.push(d.generated_key);
+  }
+  eq('after the office records the Building Control reference: every print version still made, with the same words', afterRef.sort(), RECORDS);
+  const withRef = await ED.saveElectricianDocs(db, e1.id);
+  eq('…only the PV inspection made again for it (it prints the reference), the others the same', withRef.map((r) => [r.doc.generated_key, r.status]), [['HX-PV-01', 'saved'], ['HX-PV-02', 'same'], ['HX-PV-03', 'same'], ['HX-BAT-01', 'same'], ['HX-BAT-02', 'same']]);
+  const inspect2 = withRef[0].doc;
+  eq('…the new copy says so, and its print version opens', [flat(await textOf(db.files.get(`crm-docs/${inspect2.storage_path}`))).includes('ref BC-0042'), (await ED.electricianDocPrint(db, ref(inspect2))) instanceof Uint8Array], [true, true]);
+
+  // After the pack has gone (the documents are the customer's), a reading is put right: each one is
+  // Out of date, never replaced by itself, and the office's Regenerate on the string tests makes just them again.
+  for (const d of db.rows('crm_documents').filter((x) => x.project_id === p1.id && RECORDS.includes(x.generated_key) && !x.archived_at)) Object.assign(d, { visible: true, release: 'now' });
+  const voc = [...e1.answers.pvt_voc.v];
+  voc[0] = 394.9;
+  e1.answers.pvt_voc = { v: voc, src: 'typed', at: '2026-11-07T09:00:00Z' };
+  const behind = await ED.saveElectricianDocs(db, e1.id);
+  const oldTests = db.rows('crm_documents').find((x) => x.project_id === p1.id && x.generated_key === 'HX-PV-02' && !x.archived_at);
+  eq('a correction after the customer has them: each Out of date, none replaced', [behind.map((r) => r.status), db.rows('handover_slots').some((s) => s.project_id === p1.id && s.slot === 'HX-PV-02' && s.data?.stale?.key === 'HX-PV-02')], [['out_of_date', 'out_of_date', 'out_of_date', 'out_of_date', 'out_of_date'], true]);
+  const regen = await ED.saveElectricianDocs(db, e1.id, { force: ['HX-PV-02'], by: 'staff-1' });
+  const newTests = db.rows('crm_documents').find((x) => x.project_id === p1.id && x.generated_key === 'HX-PV-02' && !x.archived_at);
+  eq('Regenerate on the string tests: only HX-PV-02 made again (v2, held to be released), the old one archived', [regen.map((r) => [r.doc.generated_key, r.status]), newTests.version, newTests.release, !!db.rows('crm_documents').find((x) => x.id === oldTests.id).archived_at], [[['HX-PV-02', 'saved']], 2, 'with_pack', true]);
+  eq('…from the corrected answers, so it isn’t Out of date any more', newTests.inputs_hash === db.rows('handover_slots').find((s) => s.project_id === p1.id && s.slot === 'HX-PV-02').data.stale.hash, true);
+  eq('…and its print version follows the new copy', (await ED.electricianDocPrint(db, ref(newTests))) instanceof Uint8Array, true);
+}
 
 // An EV job signed the day before Christmas: the call skips the bank holidays; the DNO to-do.
 fixed = Date.parse('2026-12-24T14:00:00Z');

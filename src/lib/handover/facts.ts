@@ -73,7 +73,7 @@ export type Loaded = {
 };
 
 /** What Units 2 and 3 can tell the pack about the electrician's work (only the fields they know). */
-export type FactsPlugin = (db: Db, projectId: string, f: HandoverFacts) => Promise<Partial<Pick<ElectricianFacts, 'certRef' | 'nextInspection' | 'certWaits' | 'certRoute' | 'values'>> | null>;
+export type FactsPlugin = (db: Db, projectId: string, f: HandoverFacts) => Promise<Partial<Pick<ElectricianFacts, 'certRef' | 'nextInspection' | 'certWaits' | 'certRoute' | 'design' | 'values'>> | null>;
 const PLUGINS: FactsPlugin[] = [
   // The electrician's certificate (site/handover-facts.ts), loaded when needed.
   async (db, projectId, f) => (await import('@/lib/site/handover-facts')).siteHandoverFacts(db, projectId, f),
@@ -277,10 +277,14 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
   };
 }
 
-/** The pack's documents as the catalogue reads them (current ones, with the store's Out of date marks and the G99 papers' parts). */
+/**
+ * The pack's documents as the catalogue reads them (current ones, with the store's Out of date marks
+ * and the G99 papers' parts). Never the G98 data sheet (generated_key HX-HO-15-SHEET): it's the
+ * office's helper, and one filed in HX-HO-15 before that isn't the notice the DNO was sent.
+ */
 export function slotDocs(l: Loaded): SlotDoc[] {
   return l.docs
-    .filter((d) => d.handover_slot && isSlot(d.handover_slot) && d.handover_slot !== 'PACK' && !d.archived_at)
+    .filter((d) => d.handover_slot && isSlot(d.handover_slot) && d.handover_slot !== 'PACK' && !d.archived_at && d.generated_key !== 'HX-HO-15-SHEET')
     .map((d) => {
       const data = l.slots.get(String(d.handover_slot))?.data;
       return {

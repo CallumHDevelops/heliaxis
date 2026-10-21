@@ -3,7 +3,7 @@
 import { Battery, Check, CircleAlert, Clock, Fan, Minus, Plug, RefreshCw, Sun } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import type { HandoverView, ViewDoc } from '@/lib/handover/server';
-import { GROUPS, STATE_LABEL, TECH_LABEL, type Fix, type SlotCode, type SlotView, type State, type Tech } from '@/lib/handover/slots';
+import { GROUPS, SITE_SLOTS, STATE_LABEL, TECH_LABEL, type Fix, type SlotCode, type SlotView, type State, type Tech } from '@/lib/handover/slots';
 import { hasPrintVersion, PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { shortDate, ukDayOf, ukTime } from '../crm-shared';
@@ -212,14 +212,20 @@ export function HandoverTab({
       for (const d of v.designDocs) helpers.push({ label: `Use “${d.name}”`, run: () => void post({ action: 'move', doc: d.id, slot: s.code }, `“${d.name}” is now in the pack.`) });
     if (s.code === 'HX-HO-08') helpers.push({ label: 'Still to put right', run: () => setSheet({ kind: 'outstanding' }), fix: 'outstanding' });
     if (s.code === 'HX-HO-02') {
-      if (!v.summaryDesign) helpers.push({ label: 'Sign the design part', run: () => setSheet({ kind: 'sign' }), fix: 'sign-design' });
+      // Not while the EIC's design part is to sign on the Site tab (fix 'site'): that one signature signs the summary's too.
+      if (!v.summaryDesign && s.fix !== 'site') helpers.push({ label: 'Sign the design part', run: () => setSheet({ kind: 'sign' }), fix: 'sign-design' });
       helpers.push({ label: 'Summary details', run: () => setSheet({ kind: 'values', form: 'summary' }), fix: 'values' });
     }
     if (s.code === 'HX-HO-09') helpers.push({ label: 'Where the switches are', run: () => setSheet({ kind: 'values', form: 'switches' }), fix: 'switches' });
     if (s.code === 'HX-HO-12' && s.state !== 'na') helpers.push({ label: 'The plan as agreed', run: () => setSheet({ kind: 'values', form: 'plan' }), fix: 'values' });
     if (s.code === 'HX-HO-15' && s.state !== 'na') helpers.push({ label: 'Isolation switch location', run: () => setSheet({ kind: 'values', form: 'g98' }) });
+    // The office's data sheets for filling in the DNO's forms (never in the pack).
+    const sheetId = s.code === 'HX-HO-15' ? v.helpers.g98Sheet : s.code === 'HX-HO-16' ? v.helpers.g99Sheet : null;
+    if (sheetId && s.state !== 'na') helpers.push({ label: s.code === 'HX-HO-15' ? 'G98 data sheet' : 'G99 data sheet', run: () => void window.open(`/api/crm/documents/${sheetId}`, '_blank', 'noopener') });
     if (s.code === 'HX-HO-18') helpers.push({ label: 'Final invoice and payments', run: () => setSheet({ kind: 'invoice' }), fix: 'invoice' });
-    const regen = s.maker === 'pack' && s.kind !== 'C' && s.docs.some((d) => d.source === 'generated');
+    // Ours, or the electrician's (HX-PV-02…: made again from their sign-off, after a correction once the customer
+    // has it), and any made document that's Out of date (their EV or heat pump record, their certificate).
+    const regen = ((s.maker === 'pack' || s.maker === 'site') && s.kind !== 'C' && s.docs.some((d) => d.source === 'generated')) || s.docs.some((d) => d.source === 'generated' && d.stale);
     return (
       <div className={inSheet ? 'hv-acts hv-acts--sheet' : 'hv-acts'}>
         {s.docs.map((d) => (
@@ -295,7 +301,9 @@ export function HandoverTab({
                 Needed after all
               </button>
             ) : (
-              s.state !== 'na' && (
+              // One Send waits for: an admin's call, like sending without it.
+              s.state !== 'na' &&
+              (isAdmin || !SITE_SLOTS.includes(s.code)) && (
                 <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setSheet({ kind: 'na', code: s.code })}>
                   Not needed
                 </button>
@@ -572,7 +580,23 @@ export function HandoverTab({
           onClose={() => setSheet(null)}
         />
       )}
-      {sheet?.kind === 'send' && <SendSheet projectId={projectId} view={v} isAdmin={isAdmin} onClose={() => setSheet(null)} onDone={(x) => done(x, 'Handover pack sent: it’s in their portal.')} />}
+      {sheet?.kind === 'send' && (
+        <SendSheet
+          projectId={projectId}
+          view={v}
+          isAdmin={isAdmin}
+          actions={Object.fromEntries(
+            v.send.blocking
+              .filter((b) => b.from === 'office')
+              .map((b) => {
+                const f = b.fix ?? 'upload';
+                return [b.code, { label: FIX_LABEL[f], run: () => fix(rowOf(b.code as SlotCode), f) }];
+              })
+          )}
+          onClose={() => setSheet(null)}
+          onDone={(x) => done(x, 'Handover pack sent: it’s in their portal.')}
+        />
+      )}
       {sheet?.kind === 'invoice' && (
         <InvoiceSheet
           projectId={projectId}

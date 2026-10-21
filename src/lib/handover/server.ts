@@ -56,7 +56,7 @@ import {
   type SlotData,
 } from './inputs';
 import { approved, type DraftKey } from './settings-shared';
-import { customerState, headline, sendCheck, slotDef, slotStates, type GenNeed, type Headline, type SlotCode, type SlotDoc, type SlotView } from './slots';
+import { customerState, headline, sendCheck, slotDef, slotStates, waitsOn, type Fix, type GenNeed, type Headline, type SlotCode, type SlotDoc, type SlotView } from './slots';
 import { ensureHandoverTasks } from './tasks';
 
 /**
@@ -115,7 +115,13 @@ function genApplies(g: Gen, l: Loaded, views: SlotView[]): boolean {
   return !!v && !(v.state === 'na' && !v.office) && !v.office?.na;
 }
 
-const hashOf = (g: Gen, input: unknown) => inputsHash({ key: g.key, input });
+/**
+ * What a document's inputs hash is taken over: everything it's made from except the day it's made
+ * (`issued`), so it's made again only when its data changes, not every morning. The PDF itself is
+ * still dated the day it's made (g.make gets the whole input), and its print version the same day.
+ */
+const hashed = (g: Gen, input: unknown) => ({ key: g.key, input: { ...(input as object), issued: undefined } });
+const hashOf = (g: Gen, input: unknown) => inputsHash(hashed(g, input));
 
 /** The states, with each generator's need (its inputs hashed, or what it's missing). */
 export function statesOf(l: Loaded): { views: SlotView[]; made: Map<string, Made<unknown>> } {
@@ -139,7 +145,8 @@ export function statesOf(l: Loaded): { views: SlotView[]; made: Map<string, Made
 
 function stateCtx(l: Loaded, gen: Partial<Record<SlotCode, GenNeed>>) {
   const f = l.facts;
-  const docs = slotDocs(l).filter((d) => !(d.slot === 'HX-HO-09' && d.source === 'library'));
+  // Every document on its item, the library's procedures on HX-HO-09 too (listed on the tab and in the portal; HX-HO-09's state reads only its own page).
+  const docs = slotDocs(l);
   return {
     products: f.job.products,
     dnoRoute: f.job.dno.route,
@@ -218,18 +225,22 @@ async function attachLibrary(db: Db, l: Loaded, by: string | null): Promise<numb
   return n;
 }
 
-export type RefreshResult = { made: string[]; stale: string[]; attached: number; released: number; rebuilt: boolean };
+export type RefreshResult = { made: string[]; stale: string[]; attached: number; released: number; rebuilt: boolean; archived: number };
+
+/** A generator's current (not archived) document on the job, the newest version. */
+const currentOf = (l: Loaded, key: string) => l.docs.filter((d) => d.generated_key === key && !d.archived_at).sort((a, b) => Number(b.version) - Number(a.version))[0];
 
 /**
  * Make what can be made now (SPEC 2.13 item 6, 4.5): each of the pack's own documents whose inputs
  * changed, as a new version (saveGenerated keeps the old one, archived). One the customer already
  * has is left alone and shows Out of date, unless the office pressed Regenerate (`force`) or it's
- * one that should follow its data (the cover letter, warranty and receipt). Then the library's files,
- * and once the pack has gone, anything new is released straight into the portal and the combined
- * PDF rebuilt.
+ * one that should follow its data (the cover letter, warranty and receipt). One made for an item that
+ * has stopped applying since (marked Not needed, the DNO route changed) is archived before the
+ * customer has it, so it never goes out with the pack. Then the library's files, and once the pack
+ * has gone, anything new is released straight into the portal and the combined PDF rebuilt.
  */
 export async function refreshHandover(db: Db, projectId: string, opts: { by?: string | null; force?: string[]; rebuild?: boolean } = {}): Promise<RefreshResult> {
-  const out: RefreshResult = { made: [], stale: [], attached: 0, released: 0, rebuilt: false };
+  const out: RefreshResult = { made: [], stale: [], attached: 0, released: 0, rebuilt: false, archived: 0 };
   let l = await loadHandover(db, projectId);
   if (!l) return out;
   out.attached = await attachLibrary(db, l, opts.by ?? null);
@@ -239,9 +250,16 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
   const make = async (g: Gen, at: Loaded) => {
     const { views, made } = statesOf(at);
     const m = made.get(g.key);
-    if (!m?.ok || !genApplies(g, at, views)) return;
+    const cur = currentOf(at, g.key);
+    const applies = genApplies(g, at, views);
+    if (g.slot && cur && !cur.visible && !applies) {
+      // It stopped applying before the customer had it: out of the pack (kept, archived). Needed after all: made again.
+      await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: opts.by ?? null }).eq('id', cur.id);
+      out.archived++;
+      return;
+    }
+    if (!m?.ok || !applies) return;
     const hash = hashOf(g, m.input);
-    const cur = at.docs.filter((d) => d.generated_key === g.key && !d.archived_at).sort((a, b) => Number(b.version) - Number(a.version))[0];
     if (cur?.inputs_hash === hash) return;
     const force = !!opts.force?.includes(g.key) || !!(g.slot && opts.force?.includes(g.slot)) || !!g.live;
     if (cur?.visible && !force) {
@@ -253,7 +271,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
       key: g.key,
       name: docFileName(at.facts.job.ref, '', g.title),
       bytes,
-      inputs: { key: g.key, input: m.input },
+      inputs: hashed(g, m.input),
       category: g.category,
       slot: g.slot,
       release: g.slot ? 'with_pack' : 'now',
@@ -265,7 +283,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
   };
   for (const g of GENS) if (g.key !== 'HX-HO-01') await make(g, l);
   // The cover letter lists every other item's state, so it's made from what's there now.
-  if (out.made.length) l = (await loadHandover(db, projectId))!;
+  if (out.made.length || out.archived) l = (await loadHandover(db, projectId))!;
   await make(GENS.find((g) => g.key === 'HX-HO-01')!, l);
   if (sent) {
     // After the pack has gone, anything new for it goes straight into the portal.
@@ -279,7 +297,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
       .select('id');
     out.released = data?.length ?? 0;
   }
-  if (out.made.length || out.attached || out.released) l = (await loadHandover(db, projectId))!;
+  if (out.made.length || out.attached || out.released || out.archived) l = (await loadHandover(db, projectId))!;
   if ((sent || opts.rebuild) && l.pack?.version && packKey(l) !== currentPack(l)?.inputs_hash) {
     await buildHandover(db, projectId, { by: opts.by ?? null, auto: true });
     out.rebuilt = true;
@@ -295,7 +313,8 @@ export type ViewDoc = SlotView['docs'][number];
 export type HandoverView = {
   slots: SlotView[];
   headline: Headline;
-  send: { ok: boolean; blocking: { code: string; title: string; why: string | null }[]; following: { code: string; title: string }[] };
+  /** What holds Send up, each from the site (Waiting on the electrician) or the office (with its fix), and what will follow. */
+  send: { ok: boolean; blocking: { code: string; title: string; why: string | null; from: 'site' | 'office'; fix: Fix | null }[]; following: { code: string; title: string }[] };
   pack: {
     version: number;
     built_at: string | null;
@@ -325,7 +344,8 @@ export type HandoverView = {
     /** Still to put right, on the completion sign-off (HX-HO-08). */
     outstanding: { text: string; by: string | null }[];
   };
-  summaryDesign: { name: string; signed_at: string } | null;
+  /** The system summary's design signature: its own, or the EIC's design part (`eic`). */
+  summaryDesign: { name: string; signed_at: string; eic: boolean } | null;
   /** The design part's declaration for this job (WORDING-SPEC 7.5 a), shown above the office's signature. */
   summaryDeclaration: string;
   /** Unresolved site flags, to copy onto the completion sign-off as still to put right. */
@@ -339,6 +359,7 @@ export type HandoverView = {
   gaps: string[];
   models: string[];
   designDocs: { id: string; name: string }[];
+  /** The office's data sheets for the DNO's forms (not in the pack). */
   helpers: { g99Sheet: string | null; g98Sheet: string | null };
   invoice: { prompted: boolean; uploaded: boolean; paid: boolean };
   approvals: Record<DraftKey, boolean>;
@@ -400,7 +421,7 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
   return {
     slots: views,
     headline: headline(views),
-    send: { ok: check.ok, blocking: check.blocking.map((x) => ({ code: x.code, title: x.title, why: x.why })), following: check.following.map((x) => ({ code: x.code, title: x.title })) },
+    send: { ok: check.ok, blocking: check.blocking.map((x) => ({ code: x.code, title: x.title, why: x.why, from: waitsOn(x), fix: x.fix })), following: check.following.map((x) => ({ code: x.code, title: x.title })) },
     pack: l.pack
       ? {
           version: l.pack.version,
@@ -427,7 +448,11 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
       outstanding: f.data['HX-HO-08']?.outstanding ?? [],
     },
     summaryDeclaration: SUMMARY_DECLARATIONS.design(summaryStandards(f.job.products)),
-    summaryDesign: f.data['HX-HO-02']?.design ? { name: f.data['HX-HO-02'].design.name, signed_at: f.data['HX-HO-02'].design.signed_at } : null,
+    summaryDesign: f.data['HX-HO-02']?.design
+      ? { name: f.data['HX-HO-02'].design.name, signed_at: f.data['HX-HO-02'].design.signed_at, eic: false }
+      : f.electrician?.design
+        ? { name: f.electrician.design.name, signed_at: f.electrician.design.signed_at, eic: true }
+        : null,
     flags,
     customer: {
       first: f.customer.first,
@@ -462,8 +487,11 @@ function isDirty(l: Loaded, views: SlotView[], made: Map<string, Made<unknown>>)
   const pack = currentPack(l);
   const behindGen = GENS.some((g) => {
     const m = made.get(g.key);
-    if (!m?.ok || !genApplies(g, l, views)) return false;
-    const cur = l.docs.filter((d) => d.generated_key === g.key && !d.archived_at).sort((a, b) => Number(b.version) - Number(a.version))[0];
+    const cur = currentOf(l, g.key);
+    const applies = genApplies(g, l, views);
+    // Made for an item that has stopped applying, not with the customer yet: to archive.
+    if (g.slot && cur && !cur.visible && !applies) return true;
+    if (!m?.ok || !applies) return false;
     return cur?.inputs_hash !== hashOf(g, m.input) && (!cur?.visible || !!g.live);
   });
   return (
@@ -505,13 +533,17 @@ export async function handoverSummary(db: Db, projectId: string): Promise<{ word
   const check = sendCheck(views);
   const sent = !!l.pack?.sent_at;
   const invoice = views.find((v) => v.code === 'HX-HO-18');
+  // The final invoice is in their pack (the receipt aside): what's left is their payment, not another send.
+  const invoiced = !!invoice?.docs.some((d) => d.key !== 'HX-HO-18-RECEIPT');
   const prep = prepList(l, views);
   const early = !sent && ['won', 'design', 'ready', 'install_booked'].includes(l.facts.job.stage);
   const next = early
     ? `Before the install day: ${prep.filter((x) => x.done).length} of ${prep.length} ready`
     : sent
     ? invoice && invoice.state !== 'complete' && invoice.state !== 'na'
-      ? 'Send the final invoice'
+      ? invoiced
+        ? 'Waiting for payment'
+        : 'Send the final invoice'
       : check.following.length
         ? `${check.following.length} on ${check.following.length === 1 ? 'its' : 'their'} way to the customer`
         : 'All in the customer’s portal'
@@ -603,7 +635,7 @@ async function packSources(db: Db, l: Loaded) {
   const docs = slotDocs(l).filter(inPack);
   const rowOf = new Map(l.docs.map((d) => [d.id, d]));
   const parts: PackPart[] = [];
-  const multi: SlotCode[] = ['HX-HO-17', 'HX-HO-19', 'HX-HO-04', 'HX-HO-16', 'HX-HO-18'];
+  const multi: SlotCode[] = ['HX-HO-09', 'HX-HO-17', 'HX-HO-19', 'HX-HO-04', 'HX-HO-16', 'HX-HO-18'];
   for (const v of views) {
     if (v.code === 'HX-HO-01' || (v.state === 'na' && !v.docs.length)) continue;
     const def = slotDef(v.code)!;
@@ -647,11 +679,9 @@ export async function handoverDocPrint(db: Db, ref: StoredRef): Promise<Reprint>
   if (!g) return null;
   const l = await loadHandover(db, ref.projectId);
   if (!l) return null;
-  // Dated as it was made (each document carries the day it was made), or today.
-  for (const today of new Set([ukDay(new Date(ref.madeAt)), l.facts.today])) {
-    const m = statesOf({ ...l, facts: { ...l.facts, today } }).made.get(g.key);
-    if (m?.ok && hashOf(g, m.input) === ref.hash) return g.make({ ...(m.input as object), variant: 'print' } as never, loaderFor(db));
-  }
+  // Dated as the stored copy was made (the day isn't part of what's hashed).
+  const m = statesOf({ ...l, facts: { ...l.facts, today: ukDay(new Date(ref.madeAt)) } }).made.get(g.key);
+  if (m?.ok && hashOf(g, m.input) === ref.hash) return g.make({ ...(m.input as object), variant: 'print' } as never, loaderFor(db));
   return 'changed';
 }
 
@@ -721,7 +751,9 @@ async function deliverMessage(db: Db, projectId: string, via: Via[], m: Message)
   const { data: owner } = p.owner_id ? await db.from('profiles').select('full_name').eq('id', p.owner_id).maybeSingle() : { data: null };
   if (via.includes('whatsapp')) {
     const text = m.kind === 'pack' ? packWords(first, link) : addedWords(first, m.what ?? 'document', link);
-    const r = await sendSystem(String(p.enquiry_id), { text, template: 'handover_pack_ready', params: [first || 'there', link] }, 'handover').catch((e) => ({ ok: false as const, error: String(e) }));
+    // The approved template says "your handover pack is ready": only for that. An added document goes as text in the 24-hour window (the email says what it is either way).
+    const msg = m.kind === 'pack' ? { text, template: 'handover_pack_ready', params: [first || 'there', link] } : { text, template: null };
+    const r = await sendSystem(String(p.enquiry_id), msg, 'handover').catch((e) => ({ ok: false as const, error: String(e) }));
     notes.push(r.ok ? 'Sent by WhatsApp.' : `WhatsApp didn’t go: ${r.error}.`);
   }
   if (via.includes('email')) {
@@ -800,19 +832,29 @@ export async function sendHandover(db: Db, projectId: string, opts: { via: Via[]
   let l = await loadHandover(db, projectId);
   if (!l) return { ok: false, error: 'Not found' };
   const check = sendCheck(statesOf(l).views);
-  if (!check.ok && !opts.override) return { ok: false, error: `Still to come from site: ${check.blocking.map((b) => b.title).join(', ')}.`, blocking: check.blocking.map((b) => b.code) };
-  if (!l.pack?.version || packKey(l) !== currentPack(l)?.inputs_hash) {
-    await buildHandover(db, projectId, { by: opts.by });
-    l = (await loadHandover(db, projectId))!;
-  }
+  if (!check.ok && !opts.override) return { ok: false, error: `Still needed before it can go: ${check.blocking.map((b) => b.title).join(', ')}.`, blocking: check.blocking.map((b) => b.code) };
+  // Handed over now, before the pack is built: a warranty dated from the handover (and the cover
+  // letter that lists it) is made in time to go in this pack, not slipped into a later one.
   const now = (opts.now ?? new Date()).toISOString();
+  const { data: stamped } = await db.from('crm_projects').update({ handover_at: now }).eq('id', projectId).is('handover_at', null).select('id');
+  try {
+    await refreshHandover(db, projectId, { by: opts.by });
+    l = (await loadHandover(db, projectId))!;
+    if (!l.pack?.version || packKey(l) !== currentPack(l)?.inputs_hash) {
+      await buildHandover(db, projectId, { by: opts.by });
+      l = (await loadHandover(db, projectId))!;
+    }
+  } catch (e) {
+    // The pack didn't build, so it hasn't been handed over: the date comes off again (the job's strip, the warranty).
+    if (stamped?.length) await db.from('crm_projects').update({ handover_at: null }).eq('id', projectId).eq('handover_at', now);
+    throw e;
+  }
   await db.from('crm_documents').update({ visible: true, release: 'now' }).eq('project_id', projectId).eq('release', 'with_pack').not('handover_slot', 'is', null).is('archived_at', null);
   const via = [...new Set([...(l.pack?.sent_via ?? []), ...opts.via])];
   await db
     .from('handover_packs')
     .update({ sent_at: l.pack?.sent_at ?? now, sent_by: opts.by, sent_via: via, invoice_prompted_at: l.pack?.invoice_prompted_at ?? now })
     .eq('project_id', projectId);
-  await db.from('crm_projects').update({ handover_at: now }).eq('id', projectId).is('handover_at', null);
   await moveStage(projectId, 'handover', { byId: opts.by, note: 'handover pack sent', onlyFrom: ['won', 'design', 'ready', 'install_booked', 'installing', 'commissioning'] });
   await logActivity({ enquiryId: String(l.project.enquiry_id), projectId, kind: 'system', body: `Handover pack sent to the customer by ${opts.byName}${opts.override && !check.ok ? ` (sent before ${check.blocking.map((b) => b.code).join(', ')} came in)` : ''}`, byId: opts.by }).catch(() => null);
   // The final invoice is the next thing (SPEC 4.9): a task due the next working day.
@@ -822,10 +864,13 @@ export async function sendHandover(db: Db, projectId: string, opts: { via: Via[]
   return { ok: true, notes: msg.notes, at: msg.at };
 }
 
-/** "We've added your MCS certificate to your handover pack" (the Tell the customer toggle on an upload). */
-export async function tellCustomer(db: Db, projectId: string, slot: string, via: Via[], by: string | null) {
-  const what = (slotDef(slot)?.pick ?? slotDef(slot)?.title ?? 'document').replace(/^Something else$/, 'document');
-  return sendOrHold(db, projectId, via, { kind: 'added', what: what.charAt(0).toLowerCase() + what.slice(1) }, by);
+/**
+ * "We've added your MCS certificate to your handover pack" (the Tell the customer toggle on an
+ * upload). The final invoice is told as just that: it isn't paid when it goes in.
+ */
+export async function tellCustomer(db: Db, projectId: string, slot: string, via: Via[], by: string | null, now = new Date()) {
+  const what = slot === 'HX-HO-18' ? 'final invoice' : (slotDef(slot)?.pick ?? slotDef(slot)?.title ?? 'document').replace(/^Something else$/, 'document');
+  return sendOrHold(db, projectId, via, { kind: 'added', what: what.charAt(0).toLowerCase() + what.slice(1) }, by, now);
 }
 
 /* ── The office's actions on an item ─────────────────────────────────────── */
@@ -937,6 +982,22 @@ export async function removePayment(db: Db, projectId: string, paymentId: string
     () => ({ error: { message: 'missing' } })
   );
   return { removed: true, unticked: !r.error };
+}
+
+/**
+ * The MCS certificate is in (uploaded into HX-HO-03): it was registered by today, so the warranty
+ * insurance's 7 days (deadlines.ts cc16, and its task) start today, unless the job already has a
+ * registered date (Job details shows it, to correct).
+ */
+export async function mcsRegistered(db: Db, projectId: string, by: string | null): Promise<boolean> {
+  const { data: p } = await db.from('crm_projects').select('paperwork').eq('id', projectId).maybeSingle();
+  const paperwork = (p?.paperwork ?? {}) as Record<string, unknown>;
+  if (!p || paperwork.mcs_registered_on) return false;
+  const { calendarNow, ensureDeadlineTasks } = await import('@/lib/projects/server');
+  const { error } = await db.from('crm_projects').update({ paperwork: { ...paperwork, mcs_registered_on: (await calendarNow()).today } }).eq('id', projectId);
+  if (error) return false;
+  await ensureDeadlineTasks(projectId, by);
+  return true;
 }
 
 /** "Sent to DNO" for the G98 data sheet ticks the checklist's G98 item (c_dno_notified). */
