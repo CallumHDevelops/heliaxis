@@ -13,7 +13,7 @@ import { REVISION } from './common';
 export const COVER_TITLE = 'Handover Cover Letter';
 
 export async function makeCoverLetter(c: CoverInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'F07BI', title: COVER_TITLE, revision: REVISION.F07BI, jobRef: c.ref, issued: c.issued });
+  const kit = await newDocument({ code: 'F07BI', title: COVER_TITLE, revision: REVISION.F07BI, jobRef: c.ref, issued: c.issued, variant: c.variant });
   kit.header({ meta: [['Project', c.ref ?? '–'], ['Date', longDate(c.issued)]] });
   kit.paragraph([c.customer, ...c.address].join('\n'), { bold: true });
   kit.gap(4);

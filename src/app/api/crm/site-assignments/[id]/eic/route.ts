@@ -23,11 +23,13 @@ export async function GET(req: Request, { params }: Ctx) {
   const db = createAdminClient();
   const a = await readAssignment(db, id);
   if (!a || a.trade !== 'electrician') return json({ error: 'That electrician isn’t on the job any more.' }, 404);
-  if (new URL(req.url).searchParams.get('pdf')) {
-    const pdf = await previewCertificate(db, a);
+  const q = new URL(req.url).searchParams;
+  if (q.get('pdf')) {
+    // &variant=print: the print version of it as it stands (the ink saver).
+    const pdf = await previewCertificate(db, a, { variant: q.get('variant') === 'print' ? 'print' : 'digital' });
     if (!pdf) return json({ error: 'They’re using their own certificate: it comes as an upload.' }, 404);
     return new Response(Buffer.from(pdf.bytes), {
-      headers: { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="${pdf.name.replace(/"/g, '')}"`, 'cache-control': 'no-store' },
+      headers: { 'content-type': 'application/pdf', 'content-disposition': `inline; filename="${pdf.name.replace(/[^\x20-\x7e]/g, '-').replace(/"/g, '')}"`, 'cache-control': 'no-store' },
     });
   }
   // The designer's particulars to start from when the office signs the design part.

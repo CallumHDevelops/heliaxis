@@ -32,7 +32,16 @@ const STUBS = {
     export async function ensureCrmBucket() {} export const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
     export async function logActivity(a) { globalThis.__rec.activity.push(a); }
     export const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-    export async function crmSession() { return { user: { id: 'staff-1', email: 'office@heliaxis.co.uk' }, profile: { full_name: 'Office' } }; }`,
+    export async function crmSession() { return { user: { id: 'staff-1', email: 'office@heliaxis.co.uk' }, profile: { full_name: 'Office' } }; }
+    export async function signedDoc(path) { return 'https://storage.test/' + path; } export async function docCategoryOf(v, f = 'other') { return v || f; }
+    export async function ensurePortalToken() { return 't'; } export const portalUrl = (t) => 'https://heliaxis.test/my/' + t; export const safeName = (n) => n;`,
+  // The documents route's and the handover's own imports, not what's tested here.
+  '@/lib/crm/portal': "export const SIGNABLE_CATEGORIES = ['quote', 'contract'];",
+  '@/lib/whatsapp/inbox': 'export async function sendSystem() { return { ok: true }; }',
+  '@/lib/ms365': 'export const msConfigured = () => false; export async function sendMail() {} export const mailbox = () => null;',
+  '@/lib/crm/move-stage': 'export async function moveStage() { return { moved: false }; }',
+  '@/lib/projects/server': `export const projectRow = (raw) => ({ ...raw, products: raw.products ?? [], checklist: raw.checklist ?? {}, paperwork: raw.paperwork ?? {}, system: raw.system ?? {}, reminders_sent: [] });
+    export async function calendarNow() { return { today: new Date().toISOString().slice(0, 10), hols: new Set() }; } export async function ensureDeadlineTasks() { return 0; }`,
   '@/lib/notify': 'export async function notify(n) { globalThis.__rec.notify.push(n); }',
   // The photos route's after-photo work (flags, Claude's label reads) isn't what's tested here.
   '@/lib/site/hooks': 'export async function lateKeysFor() { return []; } export async function afterAnswers(db, a) { return a.flags; } export async function afterPhoto() {}',
@@ -431,6 +440,26 @@ eq('the roofer report: both returns, the put rights’ declarations, the green l
   squash(finalReport).includes(squash('the work to put right “One tile is still lifted at the top left.” at')),
   finalReport.includes('Green light'),
 ], [true, true, true, true, true]);
+// The print versions (documents/print.ts) through the job's Docs link (?variant=print): the same words, made now, nothing stored.
+{
+  const docRoute = await import('../src/app/api/crm/documents/[id]/route.ts');
+  const before = [db.files.size, db.rows('crm_documents').length];
+  const printOf = async (d) => {
+    const r = await docRoute.GET(new Request(`http://localhost/api/crm/documents/${d.id}?variant=print`), { params: Promise.resolve({ id: d.id }) });
+    return { status: r.status, type: r.headers.get('content-type'), name: r.headers.get('content-disposition'), text: r.status === 200 ? await textOf(new Uint8Array(await r.arrayBuffer())) : await r.text() };
+  };
+  const report = await printOf(doc('RF_REPORT'));
+  const poPrint = await printOf(doc('PO-0001'));
+  eq('the roofer report’s print version: the same words as the stored copy', [report.status, report.type, report.text === finalReport, /print version/.test(report.name)], [200, 'application/pdf', true, true]);
+  eq('the PO’s print version: the same words as the PO that went (the terms too)', [poPrint.status, poPrint.text === (await textOf(fileOf(doc('PO-0001')))), poPrint.text.includes('Terms')], [200, true, true]);
+  eq('nothing stored for them', [db.files.size, db.rows('crm_documents').length], before);
+  const stale = { ...doc('RF_REPORT'), inputs_hash: 'something else' };
+  db.rows('crm_documents').push(stale);
+  stale.id = randomUUID();
+  const behind = await printOf(stale);
+  db.rows('crm_documents').splice(db.rows('crm_documents').indexOf(stale), 1);
+  eq('a stored copy behind its answers: no print version, and why', [behind.status, behind.text.startsWith('This document has changed since this copy was made')], [409, true]);
+}
 const review2 = await RV.reviewOf(db, roof.id);
 eq('the office’s review: green, with both returns in the history', [review2.review.submissions.map((s) => s.state), review2.review.returns.map((r) => r.status), review2.photos.filter((p) => p.slot.startsWith('PR:')).map((p) => p.label)], [['green'], ['again', 'green'], ['Put right 1: photos of the fix', 'Put right 2: photos of the fix']]);
 

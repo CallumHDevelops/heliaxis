@@ -1,8 +1,8 @@
 import 'server-only';
 import { ukDay } from '@/lib/bank-holidays';
 import { CRM_BUCKET, DOCS_BUCKET } from '@/lib/crm/server';
-import { docFileName, longDate, newDocument, stampWords, type Kit, type PhotoItem, type SignatureItem } from '@/lib/documents/pdf-kit';
-import { saveGenerated, type SaveResult } from '@/lib/documents/store';
+import { docFileName, longDate, newDocument, stampWords, type Kit, type PhotoItem, type SignatureItem, type Variant } from '@/lib/documents/pdf-kit';
+import { inputsHash, saveGenerated, type Reprint, type SaveResult, type StoredRef } from '@/lib/documents/store';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
 import type { Field, FormCtx, SiteForm } from './forms/types';
@@ -114,8 +114,42 @@ export function labelOf(forms: SiteForm[], slot: string): string {
 
 export type ReportInputs = { a: string; answers: unknown; flags: Flag[]; photos: string[]; signoffs: string[]; review?: unknown };
 
-/** Build and store the trade report for an assignment (roofer or scaffolder); null for trades without one. */
+/** Build and store the trade report for an assignment (roofer or scaffolder, the digital copy); null for trades without one. */
 export async function saveTradeReport(db: Db, assignmentId: string): Promise<SaveResult | null> {
+  const r = await tradeReport(db, assignmentId);
+  if (!r) return null;
+  return saveGenerated(db, r.projectId, { key: r.key, name: r.name, bytes: r.bytes, inputs: r.inputs, category: 'commissioning', visible: false });
+}
+
+/**
+ * The print version of a stored trade report (RF_REPORT, SC_REPORT): made again for the job's roofer
+ * or scaffolder whose report it is (what it's made from hashes to the stored copy's), dated as that was.
+ */
+export async function tradeReportPrint(db: Db, ref: StoredRef): Promise<Reprint> {
+  const trade = ref.key === 'RF_REPORT' ? 'roofer' : ref.key === 'SC_REPORT' ? 'scaffolder' : null;
+  if (!trade) return null;
+  const { data } = await db.from('site_assignments').select('id').eq('project_id', ref.projectId).eq('trade', trade);
+  let changed = false;
+  for (const row of (data ?? []) as { id: string }[]) {
+    const r = await tradeReport(db, row.id, { variant: 'print', asOf: new Date(ref.madeAt) });
+    if (!r) continue;
+    if (inputsHash(r.inputs) === ref.hash) return r.bytes;
+    changed = true;
+  }
+  return changed ? 'changed' : null;
+}
+
+/**
+ * The trade report for an assignment as it stands, as a PDF (roofer or scaffolder; null for trades
+ * without one), and what saveTradeReport stores it under. `variant`: 'digital' (the default, the
+ * stored copy) or 'print' (the ink saver, on request); `asOf`: the day a report not signed yet is
+ * dated (today unless said).
+ */
+export async function tradeReport(
+  db: Db,
+  assignmentId: string,
+  opts: { variant?: Variant; asOf?: Date } = {}
+): Promise<{ bytes: Uint8Array; projectId: string; key: string; name: string; inputs: ReportInputs } | null> {
   const a = await readAssignment(db, assignmentId);
   if (!a || (a.trade !== 'roofer' && a.trade !== 'scaffolder')) return null;
   const forms = schemaFor(a);
@@ -137,9 +171,9 @@ export async function saveTradeReport(db: Db, assignmentId: string): Promise<Sav
   const roofer = a.trade === 'roofer';
   const title = roofer ? 'Roofer report' : 'Scaffold report';
   const signed = (s: Stage) => signoffs.find((x) => x.stage === s);
-  const issued = ukDay(signoffs.at(-1)?.signed_at ?? new Date());
+  const issued = ukDay(signoffs.at(-1)?.signed_at ?? opts.asOf ?? new Date());
 
-  const kit = await newDocument({ code: roofer ? 'RF_REPORT' : 'SC_REPORT', label: title, title, jobRef, issued, draft: !signoffs.length });
+  const kit = await newDocument({ code: roofer ? 'RF_REPORT' : 'SC_REPORT', label: title, title, jobRef, issued, draft: !signoffs.length, variant: opts.variant });
   kit.header({ meta: [['Job', jobRef ?? '–'], ['Date', longDate(issued)]] });
   kit.idGrid([
     ['Site address', c.address],
@@ -161,7 +195,7 @@ export async function saveTradeReport(db: Db, assignmentId: string): Promise<Sav
   const bySlot = new Map<string, Photo[]>();
   for (const x of photos) if (x.slot) bySlot.set(x.slot, [...(bySlot.get(x.slot) ?? []), x]);
   if (photos.length) {
-    kit.section('Photos', { intro: `${photos.length} photo${photos.length === 1 ? '' : 's'}, each with the question it answers.` });
+    kit.section('Photos', { intro: `${photos.length} photo${photos.length === 1 ? '' : 's'}, each with the question it answers.`, keep: kit.photoKeep(Math.min(photos.length, 2)) });
     const paired = new Set<string>();
     if (!roofer) {
       const sides = [...new Set([...bySlot.keys()].filter((s) => /^(SCX1|SS2):/.test(s)).map((s) => s.split(':')[1]))];
@@ -215,5 +249,5 @@ export async function saveTradeReport(db: Db, assignmentId: string): Promise<Sav
     signoffs: signoffs.map((x) => x.id),
     review: { signoffs: signoffs.map((x) => [x.id, x.review_status ?? 'waiting', x.reviewed_at ?? null]), returns: returns.map((r) => [r.id, r.status, r.fixed_at, r.reviewed_at, r.notice_sent_at]) },
   };
-  return saveGenerated(db, a.project_id, { key: roofer ? 'RF_REPORT' : 'SC_REPORT', name: docFileName(jobRef, '', title), bytes, inputs, category: 'commissioning', visible: false });
+  return { bytes, projectId: a.project_id, key: roofer ? 'RF_REPORT' : 'SC_REPORT', name: docFileName(jobRef, '', title), inputs };
 }

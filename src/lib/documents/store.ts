@@ -56,6 +56,15 @@ export type SaveResult =
 
 export const inputsHash = (inputs: unknown) => createHash('sha256').update(canonicalJson(inputs)).digest('hex');
 
+/** A stored generated document a print version is asked for (documents/print.ts): its job, key, inputs hash and when it was made. */
+export type StoredRef = { projectId: string; key: string; hash: string | null; madeAt: string };
+/**
+ * A print version made again from what the stored copy was made from: its bytes; 'changed' when that
+ * isn't what it's made from any more (the stored copy is out of date: make it again first); null when
+ * it can't be made here.
+ */
+export type Reprint = Uint8Array | 'changed' | null;
+
 /** The current (not archived) version of a generated document, if any. */
 export async function currentGenerated(db: Db, projectId: string, key: string): Promise<GeneratedDoc | null> {
   const { data } = await db

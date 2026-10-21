@@ -327,6 +327,9 @@ eq('the EIC is final: handover slot CC21, held for the pack, not visible yet', [
 eq('the draft is archived (kept)', [docs('EIC_DRAFT').length, !!docs('EIC_DRAFT')[0].archived_at], [1, true]);
 eq('its file name starts with the job ref', fin.name, 'HX-0042 EIC Electrical Installation Certificate.pdf');
 const finText = await textOf(fileOf(fin));
+const certRef = (d) => ({ projectId: d.project_id, key: d.generated_key, hash: d.inputs_hash, madeAt: d.created_at });
+const finPrint = await EICS.certificatePrint(db, certRef(fin));
+eq('the final EIC’s print version: the same words as the filed copy, made now, not filed', [finPrint instanceof Uint8Array && (await textOf(finPrint)) === finText, docs('EIC').length], [true, 1]);
 eq('the final: the design signed, three declarations, the next inspection, no draft banner', [
   finText.includes('SARAH JONES'),
   finText.includes('Designer No 1'),
@@ -404,6 +407,8 @@ eq('Minor Works: three sheets, one per circuit, kept out of CC21', [r4.status, s
 ]);
 const mText = await textOf(fileOf(sheets.find((d) => d.generated_key === 'MEIWC5-1')));
 eq('each is a data sheet for its circuit', [mText.includes('Minor Works data sheet'), mText.includes('HX-0042-MW5.1'), mText.includes('Extended the circuit')], [true, true, true]);
+const mPrint = await EICS.certificatePrint(db, certRef(sheets.find((d) => d.generated_key === 'MEIWC5-1')));
+eq('a Minor Works sheet’s print version: the same words', mPrint instanceof Uint8Array && (await textOf(mPrint)) === mText, true);
 eq('the Site tab says their signed Minor Works goes in the pack', (await EICS.certificateStatus(db, read(minor.id))).state, 'data_sheet');
 
 if (process.env.PDF_OUT) {

@@ -26,6 +26,7 @@ import { shortDate, ukDayOf } from '../../crm/crm-shared';
 import { api, neededWords, ReviewChip, StatusChip } from './OrdersUi';
 import { SupplierForm } from './SupplierForm';
 import './orders.css';
+import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 
 /* ── The form's own copy of an order ─────────────────────────────────────────── */
 
@@ -483,6 +484,9 @@ function OrderView({
         <a className="crm-btn crm-btn--ghost" href={pdf} download>
           Download PDF
         </a>
+        <a className="crm-chipbtn" href={printHref(`${pdf}?inline=1`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+          {PRINT_LABEL}
+        </a>
         {canDo(s, 'send') && (
           <button type="button" className={`crm-btn${s === 'draft' ? ' crm-btn--solar' : ' crm-btn--ghost'}`} disabled={busy} onClick={onSend} title={block ?? undefined}>
             {full.email ? (sent ? 'Email again' : 'Email to supplier') : sent ? 'Send again' : 'Send to supplier'}
@@ -824,6 +828,11 @@ function LabourView({
         {issued && (
           <a className="crm-btn crm-btn--ghost" href={`/api/crm/purchase-orders/${o.id}/pdf`} download>
             Download PDF
+          </a>
+        )}
+        {issued && (
+          <a className="crm-chipbtn" href={printHref(`/api/crm/purchase-orders/${o.id}/pdf?inline=1`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+            {PRINT_LABEL}
           </a>
         )}
         {canDo(s, 'issue', 'labour') && (!o.labour?.held.some((h) => !OVERRIDABLE.includes(h)) || issued) && (

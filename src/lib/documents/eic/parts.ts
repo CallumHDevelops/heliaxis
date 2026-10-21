@@ -1,6 +1,6 @@
 import 'server-only';
 import type { PDFImage } from 'pdf-lib';
-import { INK, LINE, MissingAnswer, MUTED, PAPER, RED, stampWords, type Kit, type Mark } from '../pdf-kit';
+import { INK, LINE, MissingAnswer, MUTED, RED, stampWords, type Kit, type Mark } from '../pdf-kit';
 
 /**
  * Drawing pieces for the Minor Works data sheet: rows of bordered boxes, each a label over its value; a
@@ -57,7 +57,7 @@ export function cells(kit: Kit, row: Cell[], draft: boolean) {
     let x = d.x;
     row.forEach((c, i) => {
       const w = ws[i];
-      d.rect(x, d.top - h, w, h, { border: LINE, line: 0.6 });
+      d.rect(x, d.top - h, w, h, { fill: d.look.cell, border: LINE, line: 0.6 });
       laid[i].l.forEach((s, n) => d.text(s, x + 4, d.top - 8.5 - n * 7.8, 6.6, { bold: true, color: MUTED }));
       const vy = d.top - first;
       if (c.mark) strokeMark(d, x + 4, vy - 1, c.mark);
@@ -73,7 +73,8 @@ export function cells(kit: Kit, row: Cell[], draft: boolean) {
 /** A heading strip for a form section ("F. Supply characteristics and earthing arrangements"). */
 export function band(kit: Kit, title: string, note?: string | null) {
   kit.block(note ? 30 : 20, (d) => {
-    d.rect(d.x, d.top - 17, d.width, 17, { fill: PAPER });
+    // On the variant's table-heading band (a hairline box on a print).
+    d.rect(d.x, d.top - 17, d.width, 17, d.look.head ? { fill: d.look.head } : { border: LINE, line: 0.6 });
     d.text(title.toUpperCase(), d.x + 6, d.top - 12, 8.2, { bold: true });
     if (note) d.lines(note, 7.2, d.width - 8).slice(0, 1).forEach((s) => d.text(s, d.x + 6, d.top - 26, 7.2, { color: MUTED }));
   }, undefined);
@@ -90,7 +91,7 @@ export function signatureRow(kit: Kit, role: string, img: PDFImage | null, at: s
     let x = d.x;
     const heads = ['Signature', 'Date', 'Name (capitals)', ''];
     cols.forEach((w, i) => {
-      d.rect(x, d.top - h, w, h, { border: LINE, line: 0.6 });
+      d.rect(x, d.top - h, w, h, { fill: d.look.cell, border: LINE, line: 0.6 });
       if (heads[i]) d.text(heads[i], x + 4, d.top - 8.5, 6.6, { bold: true, color: MUTED });
       x += w;
     });

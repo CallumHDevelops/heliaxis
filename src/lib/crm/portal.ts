@@ -7,6 +7,7 @@ import { portalMode } from './stages';
 import { stripeConfigured } from '@/lib/stripe';
 import { portalHandover } from '@/lib/handover/portal';
 import { mergedInto } from './aliases';
+import { hasPrintVersion } from '@/lib/documents/print-shared';
 
 const TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -23,6 +24,9 @@ type DocRow = {
   needs_signature: boolean;
   /** crm-v3.sql: ticked as signed on paper or with another e-sign service. */
   signed_outside_at?: string | null;
+  /** site-commissioning.sql: made by the app (its key), or uploaded. */
+  source?: string | null;
+  generated_key?: string | null;
 };
 
 /** Signed in the portal, or a quote or contract ticked as signed outside it. */
@@ -100,7 +104,8 @@ export async function loadPortal(token: string) {
     surveyAt: full ? (p.survey_at as string | null) : null,
     installAt: full ? (p.install_at as string | null) : null,
     tracker: full ? buildTracker({ ...p, products: p.products ?? [] }, hols) : [],
-    documents: ordered.map((d) => ({ id: d.id, category: d.category, name: d.name, at: d.created_at })),
+    // `print`: one Heliaxis makes, with a print version (documents/print-shared.ts).
+    documents: ordered.map((d) => ({ id: d.id, category: d.category, name: d.name, at: d.created_at, print: d.source === 'generated' && hasPrintVersion(d.generated_key) })),
     handover,
     photos: (photos ?? []).map((ph) => ({
       id: ph.id as string,

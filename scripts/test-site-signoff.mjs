@@ -341,6 +341,29 @@ const sum = summariseOrders([
 eq('Kit ordered leaves labour out; Labour counts what it pays', [sum.count, sum.orderedNet, sum.open, sum.labour], [1, 120000, 1, { count: 2, held: 1, payable: 38400 }]);
 eq('rows from before the labour columns are all kit', summariseOrders([{ status: 'sent', net_pence: 100, required_by: null }]).labour, { count: 0, held: 0, payable: 0 });
 
+// The trade reports' and labour POs' print versions (documents/print.ts): the same words as the stored copies.
+{
+  const RP = await import('../src/lib/site/reports.ts');
+  const LP = await import('../src/lib/site/labour-po.ts');
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const ref = (d) => ({ projectId: d.project_id, key: d.generated_key, hash: d.inputs_hash, madeAt: d.created_at });
+  const flatText = async (b) => {
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(b), useSystemFonts: false, disableFontFace: true }).promise;
+    const out = [];
+    for (let i = 1; i <= doc.numPages; i++) out.push((await (await doc.getPage(i)).getTextContent()).items.map((x) => x.str).join(' '));
+    return out;
+  };
+  const stored = db.rows('crm_documents').filter((d) => !d.archived_at && /^(RF_REPORT|SC_REPORT|PO-\d+)$/.test(d.generated_key ?? ''));
+  const same = [];
+  for (const d of stored) {
+    const b = d.generated_key.startsWith('PO-') ? await LP.labourPoPrint(db, ref(d)) : await RP.tradeReportPrint(db, ref(d));
+    if (!(b instanceof Uint8Array)) continue;
+    if (JSON.stringify(await flatText(b)) === JSON.stringify(await flatText(db.files.get(`crm-docs/${d.storage_path}`)))) same.push(`${d.generated_key}:${d.project_id}`);
+    if (process.env.PDF_OUT) (await import('node:fs')).writeFileSync(`${process.env.PDF_OUT}/${d.storage_path.split('/').pop().replace(/\.pdf$/, '')} (print).pdf`, b);
+  }
+  eq('the reports and POs: print versions with the same words as the stored copies', [stored.length > 1, same.sort()], [true, stored.map((d) => `${d.generated_key}:${d.project_id}`).sort()]);
+}
+
 // PDF_OUT=/some/dir keeps the PDFs made (the POs and the trade reports) to look at.
 if (process.env.PDF_OUT) {
   const fs = await import('node:fs');

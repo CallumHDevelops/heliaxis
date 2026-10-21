@@ -1,8 +1,8 @@
 import 'server-only';
 import { ukDay } from '@/lib/bank-holidays';
 import { DOCS_BUCKET } from '@/lib/crm/server';
-import { docFileName, longDate, newDocument, stampWords } from '@/lib/documents/pdf-kit';
-import { currentGenerated, saveGenerated } from '@/lib/documents/store';
+import { docFileName, longDate, newDocument, stampWords, type Variant } from '@/lib/documents/pdf-kit';
+import { currentGenerated, inputsHash, saveGenerated, type Reprint, type StoredRef } from '@/lib/documents/store';
 import { addressLine } from '@/lib/purchase-orders/shared';
 import { logOrder } from '@/lib/purchase-orders/server';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
@@ -228,9 +228,10 @@ export async function readPo(db: Db, id: string): Promise<PoRow | null> {
 const upperFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const SIGNED_STAGE: Record<Stage, string> = { main: 'Signed off', erection: 'Scaffold signed off as up', strike: 'Scaffold signed off as down' };
 
-export async function labourPoPdf(s: LabourSnapshot): Promise<Uint8Array> {
+/** The labour PO as a PDF; `variant`: 'digital' (the default: what's stored and sent) or 'print' (the ink saver, on request). */
+export async function labourPoPdf(s: LabourSnapshot, opts: { variant?: Variant } = {}): Promise<Uint8Array> {
   const issued = s.issued ?? ukDay(new Date());
-  const kit = await newDocument({ code: s.po_number, label: s.po_number, title: 'Labour purchase order', jobRef: s.job.ref, issued });
+  const kit = await newDocument({ code: s.po_number, label: s.po_number, title: 'Labour purchase order', jobRef: s.job.ref, issued, variant: opts.variant });
   kit.header({ meta: [['PO number', s.po_number], ['Date', longDate(issued)], ['Job', s.job.ref ?? '–']] });
   if (s.replaces) kit.paragraph(`This replaces the purchase order sent on ${longDate(s.replaces)}.`, { bold: true });
   kit.idGrid([
@@ -264,10 +265,23 @@ export async function labourPoPdf(s: LabourSnapshot): Promise<Uint8Array> {
   // The owner's terms (po-shared.ts PO_TERMS), as they were when it was issued.
   const terms = s.terms ?? [];
   if (terms.length) {
+    // Numbered as issued ("1. This purchase order…"): the numbers in their own column.
     kit.section(PO_TERMS_TITLE, { keep: 60 });
-    for (const t of terms) kit.paragraph(t);
+    kit.list(terms);
   }
   return kit.save();
+}
+
+/**
+ * The print version of a stored labour PO (its key is the PO number): made from the PO as it went
+ * (purchase_orders.labour, frozen when it was issued), while that's the copy stored.
+ */
+export async function labourPoPrint(db: Db, ref: StoredRef): Promise<Reprint> {
+  const { data } = await db.from('purchase_orders').select('*').eq('project_id', ref.projectId).eq('po_number', ref.key).eq('kind', 'labour').limit(1);
+  const po = data?.[0] ? poRow(data[0]) : null;
+  if (!po?.labour || po.labour.version < 1) return null;
+  if (inputsHash({ ...po.labour, issued: null }) !== ref.hash) return 'changed';
+  return labourPoPdf(po.labour, { variant: 'print' });
 }
 
 /* ── Issuing ─────────────────────────────────────────────────────────────────── */

@@ -4,7 +4,7 @@ import { CRM_BUCKET, DOCS_BUCKET, ensureDocsBucket, ensurePortalToken, logActivi
 import { moveStage } from '@/lib/crm/move-stage';
 import { addDays, shortDay } from '@/lib/projects/deadlines';
 import { docFileName } from '@/lib/documents/pdf-kit';
-import { inputsHash, saveGenerated } from '@/lib/documents/store';
+import { inputsHash, saveGenerated, type Reprint, type StoredRef } from '@/lib/documents/store';
 import { makeReceipt, RECEIPT_TITLE } from '@/lib/documents/handover/cc13-receipt';
 import { CC4_TITLE, makeSwitchOff } from '@/lib/documents/handover/cc4';
 import type { Loader } from '@/lib/documents/handover/common';
@@ -17,7 +17,7 @@ import { F49_TITLE, makeSchedule } from '@/lib/documents/handover/f49';
 import { F49A_TITLE, makeAgreement } from '@/lib/documents/handover/f49a';
 import { F76_SHEET_TITLE, makeG99Sheet } from '@/lib/documents/handover/f76-sheet';
 import { F78_TITLE, makeF78 } from '@/lib/documents/handover/f78';
-import { buildPack, type PackEntry, type PackPart } from '@/lib/documents/handover/pack';
+import { buildPack, packChanges, type PackEntry, type PackPart } from '@/lib/documents/handover/pack';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { notify } from '@/lib/notify';
 import { schemaReady } from '@/lib/schema-ready';
@@ -516,44 +516,12 @@ export async function buildHandover(db: Db, projectId: string, opts: { by: strin
   if (!opts.auto) await refreshHandover(db, projectId, { by: opts.by });
   const l = await loadHandover(db, projectId);
   if (!l) throw new Error('Not found');
-  const { views } = statesOf(l);
   const load = loaderFor(db);
-  const docs = slotDocs(l);
-  const rowOf = new Map(l.docs.map((d) => [d.id, d]));
-  const parts: PackPart[] = [];
-  const multi: SlotCode[] = ['CC5', 'CCMH', 'CC21', 'F76', 'CC13'];
-  for (const v of views) {
-    if (v.code === 'F07BI' || (v.state === 'na' && !v.docs.length)) continue;
-    const def = slotDef(v.code)!;
-    for (const d of docs.filter((x) => x.slot === v.code)) {
-      const row = rowOf.get(d.id)!;
-      parts.push({
-        slot: v.code,
-        title: multi.includes(v.code) && v.docs.length > 1 ? `${def.title}: ${d.name.replace(/\.[a-z0-9]+$/i, '')}` : def.title,
-        group: def.group === 'cover' ? 'other' : def.group,
-        order: def.order + (d.key === 'CC13_RECEIPT' ? 0.5 : 0),
-        docId: d.id,
-        name: d.name,
-        mime: d.mime,
-        manual: d.source === 'library' && (v.code === 'CC5' || v.code === 'CC4'),
-        bytes: await load('docs', row.storage_path),
-      });
-    }
-  }
-  const coverRow = l.docs.find((d) => d.generated_key === 'F07BI' && !d.archived_at);
+  const { parts, coverRow, follow, system } = await packSources(db, l);
   const cover = coverRow ? await load('docs', coverRow.storage_path) : null;
-  const follow = views
-    .filter((v) => customerState(v) === 'coming' && !docs.some((d) => d.slot === v.code) && v.code !== 'F07BI')
-    .map((v) => ({ slot: v.code, title: v.title, group: (v.group === 'cover' ? 'other' : v.group) as Exclude<typeof v.group, 'cover'>, order: v.order }));
   const f = l.facts;
   const version = (l.pack?.version ?? 0) + 1;
   const prev = (Array.isArray(l.pack?.contents) ? l.pack!.contents : []) as PackEntry[];
-  const system: [string, string][] = [];
-  if (f.system.kwp) system.push(['System size', `${f.system.kwp} kWp`]);
-  if (f.system.battery_kwh) system.push(['Battery', `${f.system.battery_kwh} kWh usable`]);
-  if (f.system.inverter_model) system.push(['Inverter', f.system.inverter_model]);
-  if (f.job.commissionedOn) system.push(['Switched on', longDay(f.job.commissionedOn)]);
-  if (f.paperwork.mcs_cert_no) system.push(['MCS certificate', f.paperwork.mcs_cert_no]);
   const built = await buildPack({
     ref: f.job.ref,
     issued: f.today,
@@ -600,6 +568,113 @@ export async function buildHandover(db: Db, projectId: string, opts: { by: strin
   await db.from('handover_packs').upsert(pack, { onConflict: 'project_id' });
   if (opts.auto) await logActivity({ enquiryId: String(l.project.enquiry_id), projectId, kind: 'system', body: `Handover pack rebuilt (version ${version}): a new document went in`, byId: opts.by }).catch(() => null);
   return { version, pages: built.pages, separate: built.contents.filter((c) => c.separate).length };
+}
+
+/**
+ * What the combined PDF is built from now: every pack document in customer order (with its file), the
+ * cover letter's row, what's still to follow (the contents says so) and the "Your system" box.
+ */
+async function packSources(db: Db, l: Loaded) {
+  const { views } = statesOf(l);
+  const load = loaderFor(db);
+  const docs = slotDocs(l);
+  const rowOf = new Map(l.docs.map((d) => [d.id, d]));
+  const parts: PackPart[] = [];
+  const multi: SlotCode[] = ['CC5', 'CCMH', 'CC21', 'F76', 'CC13'];
+  for (const v of views) {
+    if (v.code === 'F07BI' || (v.state === 'na' && !v.docs.length)) continue;
+    const def = slotDef(v.code)!;
+    for (const d of docs.filter((x) => x.slot === v.code)) {
+      const row = rowOf.get(d.id)!;
+      parts.push({
+        slot: v.code,
+        title: multi.includes(v.code) && v.docs.length > 1 ? `${def.title}: ${d.name.replace(/\.[a-z0-9]+$/i, '')}` : def.title,
+        group: def.group === 'cover' ? 'other' : def.group,
+        order: def.order + (d.key === 'CC13_RECEIPT' ? 0.5 : 0),
+        docId: d.id,
+        name: d.name,
+        mime: d.mime,
+        manual: d.source === 'library' && (v.code === 'CC5' || v.code === 'CC4'),
+        bytes: await load('docs', row.storage_path),
+      });
+    }
+  }
+  const coverRow = l.docs.find((d) => d.generated_key === 'F07BI' && !d.archived_at) ?? null;
+  const follow = views
+    .filter((v) => customerState(v) === 'coming' && !docs.some((d) => d.slot === v.code) && v.code !== 'F07BI')
+    .map((v) => ({ slot: v.code, title: v.title, group: (v.group === 'cover' ? 'other' : v.group) as Exclude<typeof v.group, 'cover'>, order: v.order }));
+  const f = l.facts;
+  const system: [string, string][] = [];
+  if (f.system.kwp) system.push(['System size', `${f.system.kwp} kWp`]);
+  if (f.system.battery_kwh) system.push(['Battery', `${f.system.battery_kwh} kWh usable`]);
+  if (f.system.inverter_model) system.push(['Inverter', f.system.inverter_model]);
+  if (f.job.commissionedOn) system.push(['Switched on', longDay(f.job.commissionedOn)]);
+  if (f.paperwork.mcs_cert_no) system.push(['MCS certificate', f.paperwork.mcs_cert_no]);
+  return { parts, coverRow, follow, system, rowOf };
+}
+
+/* ── Print versions (documents/print.ts) ─────────────────────────────────── */
+
+/**
+ * The print version of one of the pack's own documents (F78, the warranty, the cover letter…): made
+ * again from the job as it was the day the stored copy was made, while that's what it's made from.
+ */
+export async function handoverDocPrint(db: Db, ref: StoredRef): Promise<Reprint> {
+  const g = GENS.find((x) => x.key === ref.key);
+  if (!g) return null;
+  const l = await loadHandover(db, ref.projectId);
+  if (!l) return null;
+  // Dated as it was made (each document carries the day it was made), or today.
+  for (const today of new Set([ukDay(new Date(ref.madeAt)), l.facts.today])) {
+    const m = statesOf({ ...l, facts: { ...l.facts, today } }).made.get(g.key);
+    if (m?.ok && hashOf(g, m.input) === ref.hash) return g.make({ ...(m.input as object), variant: 'print' } as never, loaderFor(db));
+  }
+  return 'changed';
+}
+
+/**
+ * The print version of the combined pack: built again as the stored one was (the same documents,
+ * version, day and what was left as separate files), with the cover letter, the contents page and
+ * each document Heliaxis makes in its print version (`printOf`, documents/print.ts); uploads,
+ * manuals and anything that can't be made again go in as they are. 'changed' once the pack is behind
+ * its documents (build it again first).
+ */
+export async function packPrint(db: Db, ref: StoredRef, printOf: (row: DocRow) => Promise<Reprint>): Promise<Reprint> {
+  const l = await loadHandover(db, ref.projectId);
+  if (!l?.pack?.version) return null;
+  if (packKey(l) !== ref.hash) return 'changed';
+  const { parts, coverRow, follow, system, rowOf } = await packSources(db, l);
+  const stored = (Array.isArray(l.pack.contents) ? l.pack.contents : []) as PackEntry[];
+  const separate = new Map(stored.filter((e) => e.separate).map((e) => [e.document_id, e.separate!]));
+  for (const p of parts) {
+    const row = rowOf.get(p.docId);
+    if (!row || separate.has(p.docId) || row.source !== 'generated') continue;
+    const b = await printOf(row).catch(() => null);
+    if (b instanceof Uint8Array) p.bytes = b;
+  }
+  const load = loaderFor(db);
+  const coverPrint = coverRow ? await printOf(coverRow).catch(() => null) : null;
+  const cover = coverPrint instanceof Uint8Array ? coverPrint : coverRow ? await load('docs', coverRow.storage_path) : null;
+  // "What's new in this version", as the stored pack has it.
+  const packRow = currentPack(l);
+  const storedBytes = packRow ? await load('docs', packRow.storage_path) : null;
+  const f = l.facts;
+  const built = await buildPack({
+    ref: f.job.ref,
+    issued: ukDay(new Date(l.pack.built_at ?? ref.madeAt)),
+    customer: f.customer.name,
+    address: f.job.addressLines,
+    version: l.pack.version,
+    changes: storedBytes ? await packChanges(storedBytes) : [],
+    system,
+    cover,
+    parts,
+    follow,
+    separate,
+    deadline: Date.now() + 40_000,
+    variant: 'print',
+  });
+  return built.bytes;
 }
 
 /* ── Send ────────────────────────────────────────────────────────────────── */

@@ -209,8 +209,12 @@ const electricianFirst = (f: HandoverFacts) => (f.electrician?.name ? f.electric
 const waitElectrician = (f: HandoverFacts) => waiting(electricianFirst(f) ? `Waiting for ${electricianFirst(f)} (electrician) to sign off.` : 'Waiting for the electrician to sign off.');
 const signed = (f: HandoverFacts) => !!f.electrician?.signedAt;
 
-/** Every document's header: the job, the customer, the site. */
-export type JobHead = { ref: string | null; issued: string; customer: string; address: string[]; postcode: string | null };
+/**
+ * Every document's header: the job, the customer, the site. `variant` 'print' makes the ink saver on
+ * request (the documents kit's Variant); it's never part of what's made and hashed here, so the stored
+ * copy is always the digital one.
+ */
+export type JobHead = { ref: string | null; issued: string; customer: string; address: string[]; postcode: string | null; variant?: 'digital' | 'print' };
 const head = (f: HandoverFacts): JobHead => ({ ref: f.job.ref, issued: f.today, customer: f.customer.name, address: f.job.addressLines, postcode: f.job.postcode });
 
 /** F07BI: the cover letter. */

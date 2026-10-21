@@ -4,6 +4,7 @@ import { Battery, Check, CircleAlert, Clock, Fan, Minus, Plug, RefreshCw, Sun } 
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import type { HandoverView, ViewDoc } from '@/lib/handover/server';
 import { GROUPS, STATE_LABEL, TECH_LABEL, type Fix, type SlotCode, type SlotView, type State, type Tech } from '@/lib/handover/slots';
+import { hasPrintVersion, PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { shortDate, ukDayOf, ukTime } from '../crm-shared';
 import { useMedia } from '../use-stored';
@@ -222,6 +223,11 @@ export function HandoverTab({
               <a className="crm-chipbtn" href={`/api/crm/documents/${d.id}?download=1`}>
                 Download
               </a>
+              {d.source === 'generated' && hasPrintVersion(d.key) && (
+                <a className="crm-chipbtn" href={printHref(`/api/crm/documents/${d.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+                  {PRINT_LABEL}
+                </a>
+              )}
               <button type="button" className={`crm-chipbtn${d.visible ? ' on' : ''}`} onClick={() => void post({ action: 'visible', doc: d.id, visible: !d.visible })}>
                 {d.visible ? 'Hide from portal' : 'Show in portal'}
               </button>
@@ -354,6 +360,10 @@ export function HandoverTab({
                 {' '}
                 <a className="crm-link" href={`/api/crm/documents/${v.pack.document_id}`} target="_blank" rel="noreferrer">
                   Download
+                </a>
+                {' · '}
+                <a className="crm-link" href={printHref(`/api/crm/documents/${v.pack.document_id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+                  {PRINT_LABEL}
                 </a>
               </>
             )}

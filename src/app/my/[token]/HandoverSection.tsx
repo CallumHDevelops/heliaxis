@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import type { PortalHandover } from '@/lib/handover/portal';
+import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 
 /**
  * "Your handover pack" in the customer's portal (screens C1, C2): Download everything first once it's
@@ -30,6 +31,11 @@ export function HandoverSection({ token, data }: { token: string; data: PortalHa
           Download everything (PDF{data.pack.size ? `, ${size(data.pack.size)}` : ''})
         </a>
       )}
+      {data.pack && (
+        <a className="pt-hv-print pt-hv-print--all" href={printHref(`/api/my/${token}/doc/${data.pack.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+          {PRINT_LABEL}: everything, without the colour, to save ink
+        </a>
+      )}
       {data.signs.map((s) => (
         <SignCard key={s.kind} token={token} sign={s} />
       ))}
@@ -48,9 +54,16 @@ export function HandoverSection({ token, data }: { token: string; data: PortalHa
                 ) : (
                   <span className="pt-hv-docs">
                     {i.docs.map((d) => (
-                      <a key={d.id} href={`/api/my/${token}/doc/${d.id}`} target="_blank" rel="noreferrer" title={`${d.name} · ${day(d.at)}`}>
-                        {i.docs.length > 1 ? d.name : 'View'}
-                      </a>
+                      <span key={d.id} className="pt-hv-doc">
+                        <a href={`/api/my/${token}/doc/${d.id}`} target="_blank" rel="noreferrer" title={`${d.name} · ${day(d.at)}`}>
+                          {i.docs.length > 1 ? d.name : 'View'}
+                        </a>
+                        {d.print && (
+                          <a className="pt-hv-print" href={printHref(`/api/my/${token}/doc/${d.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+                            {PRINT_LABEL}
+                          </a>
+                        )}
+                      </span>
                     ))}
                   </span>
                 )}

@@ -5,6 +5,7 @@ import { siteAddress } from './inputs';
 import { handoverReady, statesOf } from './server';
 import { approved, DRAFTS } from './settings-shared';
 import { contentsGroups, customerState } from './slots';
+import { hasPrintVersion } from '@/lib/documents/print-shared';
 
 /**
  * "Your handover pack" in the customer's portal (SPEC 4.10, screens C1 and C2): Download everything
@@ -14,7 +15,8 @@ import { contentsGroups, customerState } from './slots';
  * and held documents never show. Null before handover.sql, so the portal is exactly as it was.
  */
 
-export type PortalDoc = { id: string; name: string; at: string };
+/** `print`: one Heliaxis makes, with a print version (documents/print-shared.ts). */
+export type PortalDoc = { id: string; name: string; at: string; print: boolean };
 export type PortalHandover = {
   sent: boolean;
   pack: { id: string; size: number | null } | null;
@@ -33,7 +35,7 @@ export async function portalHandover(projectId: string): Promise<PortalHandover 
   const { views } = statesOf(l);
   const f = l.facts;
   const sent = !!l.pack?.sent_at;
-  const doc = (d: { id: string; name: string; at: string }) => ({ id: d.id, name: d.name.replace(/\.pdf$/i, ''), at: d.at });
+  const doc = (d: { id: string; name: string; at: string; key: string | null; source: string | null }) => ({ id: d.id, name: d.name.replace(/\.pdf$/i, ''), at: d.at, print: d.source === 'generated' && hasPrintVersion(d.key) });
   const shown = views.filter((v) => customerState(v) === 'ready' || (sent && customerState(v) === 'coming'));
   const item = (v: (typeof views)[number]) => ({
     code: v.code,
@@ -47,7 +49,7 @@ export async function portalHandover(projectId: string): Promise<PortalHandover 
   if (cover) groups.unshift({ title: 'Start here', items: [item(cover)] });
   // Old handover documents (before items existed) still belong here.
   const legacy = l.docs.filter((d) => d.category === 'handover' && !d.handover_slot && d.visible && !d.archived_at);
-  if (legacy.length) groups.push({ title: 'Other', items: legacy.map((d) => ({ code: 'CCMH', title: d.name, line: '', docs: [doc({ id: d.id, name: d.name, at: d.created_at })], coming: false })) });
+  if (legacy.length) groups.push({ title: 'Other', items: legacy.map((d) => ({ code: 'CCMH', title: d.name, line: '', docs: [doc({ id: d.id, name: d.name, at: d.created_at, key: d.generated_key, source: d.source })], coming: false })) });
   const pack = l.docs.find((d) => d.generated_key === 'PACK' && !d.archived_at && d.visible);
 
   const signs: PortalHandover['signs'] = [];

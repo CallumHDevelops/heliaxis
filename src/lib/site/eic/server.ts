@@ -4,8 +4,8 @@ import { ukDay } from '@/lib/bank-holidays';
 import { CRM_BUCKET, DOCS_BUCKET } from '@/lib/crm/server';
 import { EIC_REVISION, eicPdf, type Attachment, type SigImage } from '@/lib/documents/eic/eic';
 import { meiwcPdf } from '@/lib/documents/eic/meiwc';
-import { docFileName, MissingAnswer } from '@/lib/documents/pdf-kit';
-import { currentGenerated, isOutOfDate, saveGenerated, type GeneratedDoc } from '@/lib/documents/store';
+import { docFileName, MissingAnswer, type Variant } from '@/lib/documents/pdf-kit';
+import { currentGenerated, inputsHash, isOutOfDate, saveGenerated, type GeneratedDoc, type Reprint, type StoredRef } from '@/lib/documents/store';
 import { IET_GUIDANCE } from '../fixed/iet-guidance';
 import { IET_MEIWC } from '../fixed/iet-meiwc';
 import { EIC_CHECKED_AGAINST_A4 } from '../fixed/iet-eic';
@@ -126,8 +126,11 @@ async function sigOf(db: Db, x: Photo | undefined): Promise<SigImage> {
 
 export type Made = { key: string; name: string; bytes: Uint8Array; inputs: unknown; final: boolean; missing: string | null };
 
-/** The EIC as it stands (final when it can be; a draft otherwise, or when a must turns out empty). */
-export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | null = null): Promise<Made> {
+/**
+ * The EIC as it stands (final when it can be; a draft otherwise, or when a must turns out empty).
+ * `variant`: 'digital' (the default: what's filed) or 'print' (the ink saver, on request).
+ */
+export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | null = null, opts: { variant?: Variant } = {}): Promise<Made> {
   const [con, ins, one, designPng, attachments] = await Promise.all([
     sigOf(db, d.photos.eic_sig_con),
     sigOf(db, d.photos.eic_sig_ins),
@@ -146,6 +149,7 @@ export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | n
     sig: { con, ins, one },
     design: d.design ? { ...d.design, png: designPng } : null,
     attachments,
+    variant: opts.variant,
   };
   // One form for both routes: a single signatory signs in each place (the form's Note 3).
   const title = 'Electrical Installation Certificate';
@@ -165,12 +169,12 @@ export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | n
   return { key: final ? d.key : `${d.key}_DRAFT`, name: docFileName(d.jobRef, d.key, `${title}${final ? '' : ' (draft)'}`), bytes, inputs: inputsOf(d, { design: d.design, f74b: f74b?.inputs_hash ?? null }), final, missing };
 }
 
-/** The Minor Works sheets, one per circuit. */
-export async function makeMeiwcs(db: Db, d: CertificateData): Promise<Made[]> {
+/** The Minor Works sheets, one per circuit (`variant` as makeEic's). */
+export async function makeMeiwcs(db: Db, d: CertificateData, opts: { variant?: Variant } = {}): Promise<Made[]> {
   const sig = await sigOf(db, d.photos.eic_sig_one);
   const out: Made[] = [];
   for (const m of meiwcList(d.ctx)) {
-    const input = { ref: m.ref, jobRef: d.jobRef, issued: d.issued, edition: editionOf(d.ctx), values: d.ctx.values, address: d.address, circuit: m.circuit, name: m.name, sig };
+    const input = { ref: m.ref, jobRef: d.jobRef, issued: d.issued, edition: editionOf(d.ctx), values: d.ctx.values, address: d.address, circuit: m.circuit, name: m.name, sig, variant: opts.variant };
     let final = !!d.signoff && !certMissing(d.ctx).length;
     let missing: string | null = null;
     let bytes: Uint8Array;
@@ -270,6 +274,37 @@ export async function saveCertificate(
     if (draft) await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: by, visible: false }).eq('id', draft.id);
   }
   return { route: d.route, saved };
+}
+
+/**
+ * The print version of a stored certificate (EIC, EIC2, a draft, a Minor Works sheet): made again for
+ * the job's electrician whose certificate it is, from what the stored copy was made from (dated as it
+ * was, when it's a draft).
+ */
+export async function certificatePrint(db: Db, ref: StoredRef): Promise<Reprint> {
+  const eic = /^EIC\d*(_DRAFT)?$/.test(ref.key);
+  if (!eic && !/^MEIWC\d*-\d+$/.test(ref.key)) return null;
+  const { data } = await db.from('site_assignments').select('id').eq('project_id', ref.projectId).eq('trade', 'electrician');
+  let changed = false;
+  for (const row of (data ?? []) as { id: string }[]) {
+    const a = await readAssignment(db, row.id);
+    if (!a) continue;
+    const d = await certificateData(db, a);
+    if (!d.signoff) d.issued = ukDay(new Date(ref.madeAt));
+    const made = eic
+      ? d.route === 'eic' || d.route === 'eic_single'
+        ? [await makeEic(db, d, await currentGenerated(db, a.project_id, 'F74B'), { variant: 'print' })]
+        : []
+      : d.route === 'meiwc'
+        ? await makeMeiwcs(db, d, { variant: 'print' })
+        : [];
+    for (const m of made) {
+      if (m.key !== ref.key) continue;
+      if (inputsHash(m.inputs) === ref.hash) return m.bytes;
+      changed = true;
+    }
+  }
+  return changed ? 'changed' : null;
 }
 
 /* ── Where it stands (the Site tab, the handover pack's CC21, the gate) ─────── */
@@ -392,11 +427,11 @@ export async function certificateStatus(db: Db, a: AssignmentRow): Promise<CertS
 }
 
 /** The certificate as it would be made now, for the office to look at (not filed). */
-export async function previewCertificate(db: Db, a: AssignmentRow): Promise<{ name: string; bytes: Uint8Array } | null> {
+export async function previewCertificate(db: Db, a: AssignmentRow, opts: { variant?: Variant } = {}): Promise<{ name: string; bytes: Uint8Array } | null> {
   const d = await certificateData(db, a);
   if (d.route === 'own') return null;
   if (d.route === 'meiwc') {
-    const list = await makeMeiwcs(db, d);
+    const list = await makeMeiwcs(db, d, opts);
     if (!list.length) return null;
     if (list.length === 1) return { name: list[0].name, bytes: list[0].bytes };
     const all = await PDFDocument.create();
@@ -406,6 +441,6 @@ export async function previewCertificate(db: Db, a: AssignmentRow): Promise<{ na
     }
     return { name: docFileName(d.jobRef, '', 'Minor Works data sheets'), bytes: await all.save() };
   }
-  const m = await makeEic(db, d);
+  const m = await makeEic(db, d, null, opts);
   return { name: m.name, bytes: m.bytes };
 }

@@ -22,7 +22,7 @@ const text = (c: FormCtx, k: string) => (typeof c.values[k] === 'string' ? (c.va
 
 export async function makeF44(d: ElectricianDocInput): Promise<Uint8Array> {
   const c = d.ctx;
-  const kit = await newDocument({ code: 'F44', title: F44_TITLE, revision: F44_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'F44', title: F44_TITLE, revision: F44_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Inspection by');
   kit.note(`Installer: ${installerLines()}`);
@@ -55,7 +55,7 @@ export async function makeF44(d: ElectricianDocInput): Promise<Uint8Array> {
 
 export async function makeF44A(d: ElectricianDocInput): Promise<Uint8Array> {
   const c = d.ctx;
-  const kit = await newDocument({ code: 'F44A', title: F44A_TITLE, revision: F44A_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'F44A', title: F44A_TITLE, revision: F44A_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Commissioned by');
   const note = noter();

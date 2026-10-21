@@ -1,6 +1,7 @@
 // The PDF document kit (src/lib/documents/pdf-kit.ts) and the generated-document store
 // (src/lib/documents/store.ts): symbols print as themselves (Ω, ², ≥, °, no "?"), the footer is on
-// every page, no Easy MCS anywhere, a missing must stops a finished document, and saveGenerated's
+// every page, no Easy MCS anywhere, a missing must stops a finished document, the print variant
+// says the same on the same pages with no cream fills, a ruled form's slim title block, and saveGenerated's
 // versions (same inputs: nothing new; changed: v2 with v1 archived; visible: out of date).
 // Usage: node --experimental-strip-types scripts/test-pdf-kit.mjs
 import { registerHooks } from 'node:module';
@@ -39,27 +40,32 @@ async function textOf(bytes) {
 }
 
 /* ── A document with the symbols, long enough to run onto more pages ───────── */
-const kit = await K.newDocument({ code: 'F43', title: 'PV Array Test Report', revision: 'Rev 2', jobRef: 'HX-0042', issued: '2026-11-03' });
-kit.header({ meta: [['Reference', 'HX-0042'], ['Date', '3 November 2026']] });
-kit.idGrid([
-  ['Installation address', '12 High Street, Maindee, Newport, NP20 4AB'],
-  ['Customer', 'Jane Smith'],
-]);
-kit.section('String tests', { intro: 'Insulation resistance ≥ 1 MΩ at 500 V; cable 6 mm²; ambient 12 °C.' });
-kit.rows([
-  { label: 'Insulation resistance (+ to earth)', value: '>999 MΩ', must: true },
-  { label: 'Cable size', value: '6 mm²' },
-  { label: 'Module temperature', value: '24 °C ± 2' },
-  { label: 'Comments', value: null },
-]);
-kit.checklist([
-  { label: 'DC isolator fitted and labelled', mark: 'tick' },
-  { label: 'Array frame bonded', mark: 'na' },
-  { label: 'Cable entry weatherproof', mark: 'cross', note: 'Note 1: re-sealed on the day' },
-]);
-kit.grid({ columns: ['String', 'Voc (V)', 'Isc (A)', 'Polarity'], rows: Array.from({ length: 70 }, (_, i) => [String(i + 1), '396.8', '13.9', 'Pass']) });
-kit.note('NOTE 1: readings taken with the array in full sun; Voc within ±5% of expected.');
-const bytes = await kit.save();
+async function fixture(variant) {
+  const kit = await K.newDocument({ code: 'F43', title: 'PV Array Test Report', revision: 'Rev 2', jobRef: 'HX-0042', issued: '2026-11-03', variant });
+  kit.header({ meta: [['Reference', 'HX-0042'], ['Date', '3 November 2026']] });
+  kit.idGrid([
+    ['Installation address', '12 High Street, Maindee, Newport, NP20 4AB'],
+    ['Customer', 'Jane Smith'],
+  ]);
+  kit.section('String tests', { intro: 'Insulation resistance ≥ 1 MΩ at 500 V; cable 6 mm²; ambient 12 °C; RCD IΔn 30 mA.' });
+  kit.rows([
+    { label: 'Insulation resistance (+ to earth)', value: '>999 MΩ', must: true },
+    { label: 'Cable size', value: '6 mm²' },
+    { label: 'Module temperature', value: '24 °C ± 2' },
+    { label: 'Comments', value: null },
+  ]);
+  kit.checklist([
+    { label: 'DC isolator fitted and labelled', mark: 'tick' },
+    { label: 'Array frame bonded', mark: 'na' },
+    { label: 'Cable entry weatherproof', mark: 'cross', note: 'Note 1: re-sealed on the day' },
+  ]);
+  kit.grid({ columns: ['String', 'Voc (V)', 'Isc (A)', 'Polarity'], rows: Array.from({ length: 70 }, (_, i) => [String(i + 1), '396.8', '13.9', 'Pass']) });
+  kit.note('NOTE 1: readings taken with the array in full sun; Voc within ±5% of expected.');
+  kit.rows([{ label: 'What you’ll be paid', value: '£450.00', strong: true }]);
+  kit.list(['1. The first term, long enough to run onto a second line of the page so the words sit beside their number and not under it.', '2. The second.']);
+  return kit.save();
+}
+const bytes = await fixture();
 // PDF_OUT=/some/dir keeps the fixture to look at.
 if (process.env.PDF_OUT) (await import('node:fs')).writeFileSync(`${process.env.PDF_OUT}/kit-fixture.pdf`, bytes);
 const pages = await textOf(bytes);
@@ -78,6 +84,53 @@ eq('small: the fonts are cut down to what documents use', bytes.length < 250_000
 const { PDFDocument } = await import('pdf-lib');
 const meta = await PDFDocument.load(bytes);
 eq('metadata: title and author', [meta.getTitle(), meta.getAuthor()], ['F43 PV Array Test Report – HX-0042', 'Heliaxis Limited']);
+eq('Δ in IΔn as its look-alike (the brand face hasn’t a Greek capital delta), never "?"', /I ?[∆Δ] ?n 30 mA/.test(flat) && !/I ?\? ?n/.test(flat), true);
+eq('numbered terms: the number apart, the words beside it', flat.includes('1. The first term') && flat.includes('2. The second.'), true);
+
+/* ── The print variant (the ink saver): the same document, nothing filled in cream ─ */
+const printed = await fixture('print');
+eq('print: the same words on the same pages as digital', await textOf(printed), pages);
+/** The fill colours a document's pages set, as "#rrggbb" (pdf.js gives each as its three bytes). */
+async function fills(b) {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(b), useSystemFonts: false, disableFontFace: true }).promise;
+  const out = new Set();
+  for (let i = 1; i <= doc.numPages; i++) {
+    const ops = await (await doc.getPage(i)).getOperatorList();
+    ops.fnArray.forEach((fn, k) => fn === pdfjs.OPS.setFillRGBColor && out.add(`#${[...Object.values(ops.argsArray[k])].slice(0, 3).map((v) => Number(v).toString(16).padStart(2, '0')).join('')}`));
+  }
+  return out;
+}
+const CREAMS = ['#f7f2e7', '#fffdf8', '#efe8d8']; // paper, card, the table heading band
+const [dFills, pFills] = await Promise.all([fills(bytes), fills(printed)]);
+eq('digital (the default): the cream page, cards and table headings', CREAMS.every((c) => dFills.has(c)), true);
+eq('print: no cream, card or heading fill anywhere', CREAMS.filter((c) => pFills.has(c)), []);
+eq('digital is the default; ?variant= anything but print is digital', [K.lookOf().variant, K.variantOf('print'), K.variantOf('x'), K.variantOf(null)], ['digital', 'print', 'digital', 'digital']);
+eq('flagged words (TBC, the draft and revised notices): deep amber on digital, ink on print', [K.lookOf().flag, K.lookOf('print').flag], [K.AMBER_TEXT, K.INK]);
+
+/* ── A ruled form (the EIC): its own page head, the slim title block, the form's words ─ */
+async function form(variant) {
+  const f = await K.newDocument({
+    code: 'EIC',
+    title: 'Electrical Installation Certificate',
+    jobRef: 'HX-0042',
+    issued: '2026-11-03',
+    variant,
+    margins: { l: 28, r: 28, t: 16 },
+    pageHead: (d) => {
+      d.text('ELECTRICAL INSTALLATION CERTIFICATE', d.x, d.top - 11, 11.6, { bold: true });
+      d.logo(d.x + d.width - 72, d.top - 6, 72);
+      return 30;
+    },
+    footer: { lines: ['Heliaxis Ltd · 9 Turner Street, Newport, Gwent, NP19 7AZ'], ref: 'Certificate No. HX-0042-EIC', label: '', sub: 'IET model form, BS 7671:2018+A4:2026\n(15 April 2026)' },
+  });
+  let n = 0;
+  while (f.pageNumber < 2 && n < 200) f.block(12, (d) => d.text(`Row ${++n}`, d.x, d.top - 9, 8));
+  return f.save();
+}
+const formPages = await textOf(await form());
+eq('a form: its page head and "Certificate No. … · Page x of y" in the title block on every page', formPages.every((p, i) => p.includes('ELECTRICAL INSTALLATION CERTIFICATE') && p.includes(`Certificate No. HX-0042-EIC · Page ${i + 1} of ${formPages.length}`) && p.includes('IET model form, BS 7671:2018+A4:2026')), true);
+eq('a form: no "Document" label, the form keeps its own words', formPages.some((p) => p.includes('DOCUMENT')), false);
+eq('a form in print: the same words', await textOf(await form('print')), formPages);
 
 /* ── A finished document can't have a must unanswered; a draft says so in red ─ */
 const strict = await K.newDocument({ code: 'RF_REPORT', label: 'Roofer report', title: 'Roofer report', jobRef: 'HX-0042', issued: '2026-11-03' });

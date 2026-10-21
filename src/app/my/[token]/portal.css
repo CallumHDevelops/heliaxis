@@ -249,6 +249,16 @@
   font-size: 0.85rem;
   color: #a06c00;
 }
+/* "Print version" under a document: the same document without the colour, made when it's asked for. */
+.pt-docs a.pt-doc-print {
+  display: inline-block;
+  margin: -6px 0 10px calc(1.3rem + 12px);
+  padding: 4px 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: underline;
+}
 .pt-photos {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -414,6 +424,31 @@
   flex-direction: column;
   gap: 6px;
   align-items: flex-end;
+}
+.pt-hv-doc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+.pt-hv-items li.is-multi .pt-hv-doc {
+  align-items: flex-start;
+}
+.pt-hv-docs a.pt-hv-print,
+.pt-hv-print {
+  padding: 2px 4px;
+  background: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: underline;
+}
+.pt-hv-print--all {
+  display: block;
+  margin: -4px 0 12px;
+  text-align: center;
 }
 .pt-hv-docs a {
   font-weight: 800;

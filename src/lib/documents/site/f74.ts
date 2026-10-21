@@ -46,7 +46,7 @@ const backupWords = (c: FormCtx) => (c.values.eess_backup === 'yes' ? 'Yes' : c.
 
 export async function makeF74(d: ElectricianDocInput): Promise<Uint8Array> {
   const c = d.ctx;
-  const kit = await newDocument({ code: 'F74', title: F74_TITLE, revision: F74_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'F74', title: F74_TITLE, revision: F74_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Completed by');
   kit.paragraph(F74_INTRO);
@@ -106,7 +106,7 @@ export async function makeF74(d: ElectricianDocInput): Promise<Uint8Array> {
 
 export async function makeF75(d: ElectricianDocInput): Promise<Uint8Array> {
   const c = d.ctx;
-  const kit = await newDocument({ code: 'F75', title: F75_TITLE, revision: F75_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'F75', title: F75_TITLE, revision: F75_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Completed by');
   tests(kit, c, ['Equipment and systems test', 'Application tests']);

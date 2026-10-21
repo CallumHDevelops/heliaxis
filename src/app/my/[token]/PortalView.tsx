@@ -8,6 +8,7 @@ import { isWonStage } from '@/lib/crm/stages';
 import { useNow } from '@/lib/use-now';
 import { HandoverSection } from './HandoverSection';
 import './portal.css';
+import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 
 const DOC_LABEL: Record<string, string> = {
   quote: 'Quote',
@@ -321,6 +322,11 @@ function DocList({ token, docs }: { token: string; docs: Doc[] }) {
             </span>
             <span className="pt-doc-open">View</span>
           </a>
+          {d.print && (
+            <a className="pt-doc-print" href={printHref(`/api/my/${token}/doc/${d.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+              {PRINT_LABEL}
+            </a>
+          )}
         </li>
       ))}
     </ul>

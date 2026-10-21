@@ -3,7 +3,7 @@ import { editionWords } from '@/lib/site/fixed/iet-eic';
 import { IET_MEIWC } from '@/lib/site/fixed/iet-meiwc';
 import { COMMENTS, EARTHING } from '@/lib/site/forms/electrician/eic';
 import { isGt, readingOf, type Circuit } from '@/lib/site/forms/electrician/eic-model';
-import { longDate, newDocument } from '../pdf-kit';
+import { longDate, newDocument, type Variant } from '../pdf-kit';
 import { band, cells, signatureRow } from './parts';
 import type { SigImage } from './eic';
 
@@ -30,6 +30,8 @@ export type MeiwcInput = {
   sig: SigImage;
   draft: boolean;
   wording?: { verified: boolean; declaration: ((amended: string) => string) | null };
+  /** 'digital' (the default: what's filed) or 'print' (the ink saver, on request). */
+  variant?: Variant;
 };
 
 const reading = (v: unknown, unit?: string) => {
@@ -53,6 +55,7 @@ export async function meiwcPdf(x: MeiwcInput): Promise<Uint8Array> {
     jobRef: x.jobRef,
     issued: x.issued,
     draft,
+    variant: x.variant,
   });
   const sig = x.sig.png ? await kit.embed(x.sig.png) : null;
   kit.header({ meta: [['Reference', x.ref ?? '–'], ['Date', longDate(x.issued)], ['Circuit', x.name]] });

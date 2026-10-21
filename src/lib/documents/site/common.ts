@@ -1,6 +1,6 @@
 import 'server-only';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
-import { longDate, type Kit, type Mark, type SignatureItem } from '@/lib/documents/pdf-kit';
+import { longDate, type Kit, type Mark, type SignatureItem, type Variant } from '@/lib/documents/pdf-kit';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { valueOf } from '@/lib/site/rules';
 
@@ -28,6 +28,8 @@ export type ElectricianDocInput = {
   ctx: FormCtx;
   /** A draft for the office (not signed yet): "Not answered" shows instead of stopping. */
   draft?: boolean;
+  /** 'digital' (the default: stored, emailed, the portal, the handover pack) or 'print' (the ink saver, on request). */
+  variant?: Variant;
 };
 
 const WORD: Record<string, string> = { yes: 'Yes', no: 'No', na: 'N/A', pass: 'Pass', fail: 'Fail' };

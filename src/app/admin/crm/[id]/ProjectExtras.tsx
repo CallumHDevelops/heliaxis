@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fillText } from '@/lib/crm/settings-shared';
 import { PACK_ITEMS, slotDef } from '@/lib/handover/slots';
+import { hasPrintVersion, PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 import type { TrackerStep } from '@/lib/crm/tracker';
 import './extras.css';
 
@@ -373,6 +374,11 @@ export function DocumentsTab({
                   </p>
                 )}
                 <div className="crm-doc-actions">
+                  {d.source === 'generated' && !d.archived_at && hasPrintVersion(d.generated_key) && (
+                    <a className="crm-chipbtn" href={printHref(`/api/crm/documents/${d.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+                      {PRINT_LABEL}
+                    </a>
+                  )}
                   <button type="button" className={`crm-chipbtn${d.visible ? ' on' : ''}`} onClick={() => patch(d.id, { visible: !d.visible })}>
                     {d.visible ? '👁 In portal' : 'Private'}
                   </button>

@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, docCategoryOf, DOCS_BUCKET, isUuid, json, logActivity, signedDoc } from '@/lib/crm/server';
 import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
+import { printResponse, printVersion, type PrintDoc } from '@/lib/documents/print';
 
 export const dynamic = 'force-dynamic';
+// A print version of the combined handover pack is built again on request.
+export const maxDuration = 60;
 type Ctx = { params: Promise<{ id: string }> };
 
 const SIGNED_QUOTE = 'This is the signed quote. It’s the evidence of the contract, so it can’t be deleted or changed.';
@@ -19,14 +22,24 @@ async function docAndJob(id: string) {
   return { d, p, signedQuote: !!p && p.accepted_document_id === id };
 }
 
-/** Open the file (short-lived signed link). */
+/**
+ * Open the file (short-lived signed link). ?variant=print: the print version of a document the app
+ * makes (documents/print.ts), made now from what this copy was made from, never stored.
+ */
 export async function GET(req: Request, { params }: Ctx) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
-  const { data } = await createAdminClient().from('crm_documents').select('storage_path, name').eq('id', id).maybeSingle();
+  const q = new URL(req.url).searchParams;
+  const db = createAdminClient();
+  if (q.get('variant') === 'print') {
+    const { data: doc } = await db.from('crm_documents').select('*').eq('id', id).maybeSingle();
+    if (!doc) return json({ error: 'Not found' }, 404);
+    return printResponse(await printVersion(db, doc as PrintDoc), q.has('download'));
+  }
+  const { data } = await db.from('crm_documents').select('storage_path, name').eq('id', id).maybeSingle();
   if (!data) return json({ error: 'Not found' }, 404);
-  const dl = new URL(req.url).searchParams.has('download') ? data.name : undefined;
+  const dl = q.has('download') ? data.name : undefined;
   const url = await signedDoc(data.storage_path, 300, dl);
   return url ? NextResponse.redirect(url) : json({ error: 'File missing' }, 404);
 }

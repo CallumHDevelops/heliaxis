@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, DOCS_BUCKET, isUuid, json } from '@/lib/crm/server';
+import { printName } from '@/lib/documents/print-shared';
 import { currentGenerated } from '@/lib/documents/store';
 import { labourPoPdf } from '@/lib/site/labour-po';
 import { pdfName, purchaseOrderPdf } from '@/lib/purchase-orders/pdf';
@@ -7,7 +8,10 @@ import { NOT_READY, ordersReady, pdfInputFor, readOrder } from '@/lib/purchase-o
 
 export const dynamic = 'force-dynamic';
 
-/** The order as a PDF, to download (?inline=1 to open it in the browser). Made fresh each time from what's saved. */
+/**
+ * The order as a PDF, to download (?inline=1 to open it in the browser). Made fresh each time from what's
+ * saved. ?variant=print: the print version (the ink saver), made now and never stored or sent.
+ */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
   if (!(await ordersReady())) return json({ error: NOT_READY }, 409);
@@ -16,10 +20,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const db = createAdminClient();
   const full = await readOrder(db, id);
   if (!full) return json({ error: 'That order isn’t there any more.' }, 404);
-  const inline = new URL(req.url).searchParams.get('inline') === '1';
+  const q = new URL(req.url).searchParams;
+  const inline = q.get('inline') === '1';
+  const print = q.get('variant') === 'print';
   let bytes: Uint8Array;
   let name = pdfName(full.order);
-  if (full.order.kind === 'labour') {
+  if (print) {
+    // The labour PO from what went (frozen in the PO when it was issued); a supplier's as it's saved.
+    if (full.order.kind === 'labour' && !full.order.labour) return json({ error: 'Nothing on this PO yet.' }, 404);
+    bytes = full.order.kind === 'labour' ? await labourPoPdf(full.order.labour!, { variant: 'print' }) : await purchaseOrderPdf({ ...pdfInputFor(full), variant: 'print' });
+    name = printName(name);
+  } else if (full.order.kind === 'labour') {
     // The copy that went (frozen, stored when it was issued); a held one shows as it would go.
     const o = full.order;
     const doc = (o.labour?.version ?? 0) > 0 ? await currentGenerated(db, o.project_id, o.po_number) : null;
@@ -33,7 +44,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return new Response(Buffer.from(bytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${name.replace(/"/g, '')}"`,
+      'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${name.replace(/[^\x20-\x7e]/g, '-').replace(/"/g, '')}"`,
       'Cache-Control': 'no-store',
     },
   });

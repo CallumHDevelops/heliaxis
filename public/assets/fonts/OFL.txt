@@ -1,6 +1,11 @@
 NotoSans-Regular.ttf, NotoSans-Bold.ttf: Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
 NotoSansMath-Regular.ttf: Copyright 2022 The Noto Project Authors (https://github.com/notofonts/math)
-Heliaxis has cut these files down to the characters its documents use (fontTools subset); nothing else is changed.
+HankenGrotesk-Regular.ttf, HankenGrotesk-Bold.ttf: Copyright 2021 The Hanken Grotesk Project Authors (https://github.com/marcologous/hanken-grotesk)
+JetBrainsMono-Regular.ttf, JetBrainsMono-SemiBold.ttf: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+Heliaxis has cut these files down to the characters its documents use (fontTools subset); nothing else is
+changed, except that the JetBrains Mono word space is narrowed to 0.44 em (so copied text keeps single spaces).
+Ezra-Bold.ttf is not covered by this licence: it is Heliaxis's own brand face (public/fonts), cut down the same
+way and given TrueType outlines for PDFs.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

@@ -15,18 +15,21 @@ export type RecordSerial = { what: string; serials: string[]; unread: number };
 export type RecordDeclaration = { title: string; text: string; name: string; at: string | null; signature: Uint8Array | null };
 
 export async function makePhotoRecord(d: ElectricianDocInput, slots: RecordSlot[], serials: RecordSerial[], declarations: RecordDeclaration[] = []): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'EP_RECORD', label: 'Photo record', title: 'Electrician photo record', jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'EP_RECORD', label: 'Photo record', title: 'Electrician photo record', jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Electrician');
   if (serials.length) {
     kit.section('Serial numbers');
-    kit.rows(serials.map((s) => ({ label: s.what, value: [s.serials.join(', '), s.unread ? `${s.unread} label${s.unread === 1 ? '' : 's'} couldn’t be read (photo below)` : ''].filter(Boolean).join('; ') || null })));
+    kit.rows(
+      serials.map((s) => ({ label: s.what, value: [s.serials.join(', '), s.unread ? `${s.unread} label${s.unread === 1 ? '' : 's'} couldn’t be read (photo below)` : ''].filter(Boolean).join('; ') || null })),
+      { card: true }
+    );
   }
   for (const s of slots) {
     if (!s.photos.length) continue;
-    // Kept with its first row of photos, so a heading never ends a page on its own.
-    kit.section(s.title, { intro: s.instruction, keep: 170 });
-    await kit.photos(s.photos);
+    // Three cards to a row (a slot has a photo or two), the heading kept with its first row so it never ends a page on its own.
+    kit.section(s.title, { intro: s.instruction, keep: kit.photoKeep(s.photos, { perRow: 3 }) });
+    await kit.photos(s.photos, { perRow: 3 });
   }
   for (const x of declarations) {
     kit.section(`${x.title}: declaration`, { keep: 120 });

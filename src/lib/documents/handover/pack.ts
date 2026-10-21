@@ -43,8 +43,24 @@ export type PackInput = Omit<ContentsInput, 'lines'> & {
   /** Stop before this time (Date.now()). */
   deadline?: number;
   limit?: number;
+  /** Parts left as separate files whatever they are (the print version keeps the stored pack's), by docId. */
+  separate?: Map<string, NonNullable<PackEntry['separate']>>;
 };
 export type PackResult = { bytes: Uint8Array; pages: number; contents: PackEntry[]; contentsPages: number };
+
+/** The pack's subject when a version adds documents: "What's new in version 2: Adds your MCS certificate; …". */
+const CHANGES_LEAD = (version: number) => `What’s new in version ${version}: `;
+
+/** What a stored pack's version added, from its subject (none for a first version, or a pack from before this was kept). */
+export async function packChanges(bytes: Uint8Array): Promise<string[]> {
+  try {
+    const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+    const m = /^What’s new in version \d+: (.+)$/.exec(doc.getSubject() ?? '');
+    return m ? m[1].split('; ') : [];
+  } catch {
+    return [];
+  }
+}
 
 const JPEG = /^image\/jpe?g$/i;
 const PNG = /^image\/png$/i;
@@ -92,7 +108,8 @@ export async function buildPack(p: PackInput): Promise<PackResult> {
   const ready: Ready[] = [];
   for (const part of [...p.parts].sort((a, b) => a.order - b.order)) {
     if (Date.now() > deadline) throw new Error('Building the pack took too long. Try again.');
-    ready.push(await prepare(part));
+    const kept = p.separate?.get(part.docId);
+    ready.push(kept ? { part, separate: kept } : await prepare(part));
   }
 
   // Too big for a phone: the largest manuals stay separate first, then anything else that's huge.
@@ -139,6 +156,8 @@ export async function buildPack(p: PackInput): Promise<PackResult> {
 
   const pack = await PDFDocument.create();
   pack.setTitle(`${p.ref ? `${p.ref} ` : ''}Handover pack`);
+  // What's new in this version, kept with the file so its print version says the same (packChanges).
+  pack.setSubject(p.changes.length ? `${CHANGES_LEAD(p.version)}${p.changes.join('; ')}` : `Handover pack version ${p.version}`);
   pack.setAuthor('Heliaxis Limited');
   pack.setCreator('Heliaxis');
   pack.setProducer('Heliaxis');

@@ -7,7 +7,8 @@
 // archived; Send releases everything, sets the dates, moves the job and, at 22:00, holds the message
 // for 07:00 (sent once, by the cron); an upload after it rebuilds the pack; a payment makes the
 // receipt with exactly what was recorded; the portal never shows archived or held documents, and
-// shows nothing new before handover.sql.
+// shows nothing new before handover.sql; and every document it makes, and the pack, has a print
+// version with the same words on the same pages and no cream page, made on request, never stored.
 // Usage: node --experimental-strip-types scripts/test-handover-send.mjs
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -379,6 +380,53 @@ eq('an archived document never shows', portal.groups.flatMap((g) => g.items.flat
 globalThis.__handover = false;
 eq('before handover.sql: nothing new in the portal', await P.portalHandover(pid), null);
 globalThis.__handover = true;
+
+/* ── 8. Print versions (handoverDocPrint, packPrint): made on request, never stored ─── */
+// As in production, each stored document was made on the day the job's facts call today.
+for (const d of docs()) if (d.source === 'generated') d.created_at = `${globalThis.__today}T12:00:00.000Z`;
+db.rows('handover_packs').find((x) => x.project_id === pid).built_at = `${globalThis.__today}T12:00:00.000Z`;
+const PS = await import('../src/lib/documents/print-shared.ts');
+const allText = async (bytes) => {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true }).promise;
+  const out = [];
+  for (let i = 1; i <= doc.numPages; i++) out.push((await (await doc.getPage(i)).getTextContent()).items.map((x) => x.str).join(' '));
+  return out;
+};
+/** The fill colours a PDF's pages set, as "#rrggbb". */
+const fills = async (bytes) => {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true }).promise;
+  const out = new Set();
+  for (let i = 1; i <= doc.numPages; i++) {
+    const ops = await (await doc.getPage(i)).getOperatorList();
+    ops.fnArray.forEach((fn, k) => fn === pdfjs.OPS.setFillRGBColor && out.add(`#${[...Object.values(ops.argsArray[k])].slice(0, 3).map((v) => Number(v).toString(16).padStart(2, '0')).join('')}`));
+  }
+  return out;
+};
+const refOf = (d) => ({ projectId: d.project_id, key: d.generated_key, hash: d.inputs_hash, madeAt: d.created_at });
+const printOf = (d) => (d.generated_key === 'PACK' ? H.packPrint(db, refOf(d), (row) => (row.source === 'generated' && PS.hasPrintVersion(row.generated_key) ? H.handoverDocPrint(db, refOf(row)) : Promise.resolve(null))) : H.handoverDocPrint(db, refOf(d)));
+const filesBefore = db.files.size;
+const rowsBefore = docs().length;
+// The pack's own (the electrician's documents and the EIC here are stand-ins: test-site-eic-signoff has theirs).
+const OWN = ['F78', 'F19I', 'F16E', 'CC4', 'F48I', 'F49', 'F49A', 'F47', 'F76_SHEET', 'CC13_RECEIPT', 'F07BI', 'PACK'];
+const printable = docs().filter((d) => !d.archived_at && d.source === 'generated' && OWN.includes(d.generated_key));
+eq('the pack’s own documents and the pack have print versions; the library’s manual and their own certificate haven’t', [printable.map((d) => d.generated_key).includes('PACK'), PS.hasPrintVersion('LIB-1'), PS.hasPrintVersion('CERT_OWN')], [true, false, false]);
+const same = [];
+const cream = [];
+for (const d of printable) {
+  const bytes = await printOf(d);
+  if (!(bytes instanceof Uint8Array)) continue;
+  // The same words on the same pages as the stored (digital) copy.
+  const stored = db.files.get(`crm-docs/${d.storage_path}`);
+  if (JSON.stringify(await allText(bytes)) === JSON.stringify(await allText(stored))) same.push(d.generated_key);
+  if (d.generated_key !== 'PACK' && (await fills(bytes)).has('#f7f2e7')) cream.push(d.generated_key);
+}
+eq('every one: the same words on the same pages as the stored copy', same.sort(), printable.map((d) => d.generated_key).sort());
+eq('none on the cream page', cream, []);
+eq('nothing stored or added for a print version', [db.files.size, docs().length], [filesBefore, rowsBefore]);
+// What it's made from changes: the stored copy is behind, so no print version until it's made again.
+const receiptNow = cur('CC13_RECEIPT');
+eq('a copy behind what it’s made from has no print version', await H.handoverDocPrint(db, { ...refOf(receiptNow), hash: 'something else' }), 'changed');
+eq('nor a pack behind its documents', await H.packPrint(db, { ...refOf(cur('PACK')), hash: 'something else' }, async () => null), 'changed');
 
 if (process.env.PDF_OUT) fs.writeFileSync(`${process.env.PDF_OUT}/PACK-server.pdf`, db.files.get(`crm-docs/${cur('PACK').storage_path}`));
 console.log(failed ? `\n${failed} failed` : '\nAll passed');

@@ -35,7 +35,7 @@ export const MCS_CONTACT = 'Telephone: 0333 103 8130 · Email: hello@mcscertifie
 
 /** A pack document begun: the header (job and date) and the site box, then the caller's content. */
 export async function begin(code: string, title: string, h: JobHead, opts: { label?: string; pairs?: [string, string | null | undefined][]; meta?: [string, string][] } = {}): Promise<Kit> {
-  const kit = await newDocument({ code, label: opts.label ?? code, title, revision: REVISION[code] ?? 'Rev 1', jobRef: h.ref, issued: h.issued });
+  const kit = await newDocument({ code, label: opts.label ?? code, title, revision: REVISION[code] ?? 'Rev 1', jobRef: h.ref, issued: h.issued, variant: h.variant });
   kit.header({ meta: opts.meta ?? [['Project', h.ref ?? '–'], ['Date', longDate(h.issued)]] });
   kit.idGrid([['Installation address', h.address.join(', ')], ['Customer', h.customer], ...(opts.pairs ?? [])]);
   return kit;

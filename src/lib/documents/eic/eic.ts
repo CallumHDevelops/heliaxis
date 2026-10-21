@@ -40,7 +40,7 @@ import {
 import { BONDS, COMMENTS, EARTHING, INSPECTION_KEY, MATERIAL, MS_DEVICE, type DesignSign } from '@/lib/site/forms/electrician/eic';
 import { boardsOf, isGt, readingOf, type Board, type Circuit, type Rec } from '@/lib/site/forms/electrician/eic-model';
 import { HELIAXIS_COMPANY, HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
-import { AMBER, MissingAnswer, newDocument, type Drawing, type Kit } from '../pdf-kit';
+import { AMBER, MissingAnswer, newDocument, type Drawing, type Kit, type Variant } from '../pdf-kit';
 import { blank, crossMark, dots, fitText, formDate, frame, hline, INK, plain, RED, rich, richCentre, richWidth, strike, tickBox, tickMark, value, vline, type Val } from './form';
 
 /**
@@ -55,6 +55,12 @@ import { blank, crossMark, dots, fitText, formDate, frame, hline, INK, plain, RE
  * with the form's headings, column numbers, codes and footnotes; then the form's Notes for the person
  * producing the Certificate and its Guidance for recipients. "Certificate No." is at the top of every
  * page, and the footer carries Heliaxis's details, the certificate number and "Page x of y".
+ *
+ * Branded (the owner: "Are we not branding the EIC?") with the documents' chrome round the form's own
+ * body, which stays the IET's: the Heliaxis ® wordmark at the top of every page, the spark before
+ * "Certificate No.", and the kit's dark title block at the foot (slimmer than a document's, so the
+ * form keeps its size) with the reversed wordmark, the company line and "Certificate No. … · Page x
+ * of y". Both of the kit's variants: digital (cream, what's filed and sent) and print (on request).
  *
  * Drawn on the PDF kit (newDocument, block, save), so the kit's page chrome reaches it too. A finished
  * certificate can't be made with a must unanswered (MissingAnswer). A draft (the design part not signed
@@ -82,18 +88,22 @@ export type EicInput = {
   attachments?: Attachment[];
   /** The guidance page to print (tests pass their own). */
   wording?: { guidance?: { verified: boolean; heading?: string; title: string; paragraphs: string[] } };
+  /** 'digital' (the default: what's filed and sent) or 'print' (the ink saver, on request). */
+  variant?: Variant;
 };
 
 /** Where the design part's answers will come from, on a draft waiting for the office's signature. */
 const TO_FOLLOW = 'To follow: Heliaxis signs the design part';
 const NOT_SIGNED = 'Not signed yet';
-const MARGINS = { l: 28, r: 28, t: 22, b: 26 };
+// The ruled frame runs closer to the edge than a document's, as the model form's does; the foot is the kit's title block (FORM_BANNER_H).
+const MARGINS = { l: 28, r: 28, t: 16 };
 /** Rows per schedule sheet, as the form has them. */
 export const ROWS = 12;
 
+/** The company line in the title block: who issued it and how to reach them, then the company's registration. */
 const FOOTER_LINES = [
   `${HELIAXIS_COMPANY.tradingName} · ${HELIAXIS_COMPANY.addressLines.join(', ')} · ${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email} · MCS ${HELIAXIS_COMPANY.mcsNumber}`,
-  `${HELIAXIS_PARTY.name}, registered in England and Wales No. ${HELIAXIS_PARTY.companyNumber} · VAT ${HELIAXIS_PARTY.vatNumber}`,
+  `Registered in England and Wales No. ${HELIAXIS_PARTY.companyNumber} · VAT ${HELIAXIS_PARTY.vatNumber}`,
 ];
 /** The schedules are landscape: their width, for measuring remarks before those pages exist. */
 const LANDSCAPE_W = 841.89 - MARGINS.l - MARGINS.r;
@@ -140,7 +150,9 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     draft,
     margins: MARGINS,
     pageHead: (d) => pageHead(d, kind, certNo, draft),
-    footer: { lines: FOOTER_LINES, ref: `Certificate No. ${certNo}`, sub: EIC_FORM_BASIS },
+    // The title block: the company line, "Certificate No. … · Page x of y", and the form it's printed on under it.
+    footer: { lines: FOOTER_LINES, ref: `Certificate No. ${certNo}`, label: '', sub: EIC_FORM_BASIS.replace(' (', '\n(') },
+    variant: x.variant,
   });
   const img = async (b: Uint8Array | null | undefined): Promise<PDFImage | null> => (b ? kit.embed(b) : null);
   const [con, ins, one, des] = await Promise.all([img(x.sig.con?.png), img(x.sig.ins?.png), img(x.sig.one?.png), img(x.design?.png)]);
@@ -477,7 +489,7 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   type Person = { name: string | null; company: string | null; address: string | null; postcode: string | null; tel: string | null };
   const designer: Person | 'tofollow' | null = single ? me : x.design ? { name: x.design.name, company: x.design.company, address: x.design.address, postcode: x.design.postcode, tel: x.design.tel } : draft ? 'tofollow' : null;
   if (!designer) throw new MissingAnswer(`${E_LABELS.designer1}: particulars`);
-  const PH = 34;
+  const PH = 33;
   section([
     [17, (d) => {
       frame(d, d.x, d.top, d.width, 17);
@@ -903,28 +915,44 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   return { kit, numbers: { schedFrom, schedTo, total: kit.pageNumber } };
 }
 
-/* ── The page head: "Certificate No.:" on every page; the title on page 1 ──────── */
+/* ── The page head: "Certificate No.:" on every page; the title on page 1; the ® wordmark ── */
+
+/** The wordmark's letters (with the ®) at the top of a page, in points across. */
+const MARK_W = { first: 72, page: 60 };
 
 function pageHead(d: Drawing, kind: HeadKind, certNo: string, draft: boolean): number {
   const X = d.x;
   const R = d.x + d.width;
-  const no = (label: string, y: number, size: number) => {
+  /** "Certificate No.: HX-0042-EIC" ending at xr, the spark before it. */
+  const no = (label: string, xr: number, y: number, size: number) => {
     // The label first, so the page's text reads "Certificate No.: HX-0042-EIC".
     const w = d.widthOf(certNo, size + 0.4, true);
-    d.text(label, R - w - 4 - d.widthOf(label, size), y, size);
-    d.text(certNo, R - w, y, size + 0.4, { bold: true });
+    const lx = xr - w - 4 - d.widthOf(label, size);
+    d.text(label, lx, y, size);
+    d.text(certNo, xr - w, y, size + 0.4, { bold: true });
+    d.spark(lx - 7.5, y + size * 0.34, size * 0.92);
   };
   let h = 18;
   if (kind === 'cert1') {
+    // The form's title on the left; the wordmark at the top right, the certificate number under it.
     d.text(EIC_TITLE, X + 2, d.top - 11, 11.6, { bold: true });
     d.text(EIC_SUBTITLE, X + 2, d.top - 22, 8.6);
-    no(CERT_NO, d.top - 16, 8.8);
+    d.logo(R - MARK_W.first, d.top - 5.5, MARK_W.first);
+    no(CERT_NO, R, d.top - 24, 8.8);
     h = 30;
   } else if (kind === 'details' || kind === 'tests') {
+    // The schedule's title on the left; on the right its number, a gold rule, the wordmark.
     d.text(kind === 'details' ? CS.title : TS.title, X + 2, d.top - 13, 12, { bold: true });
-    no(REPORT_NO, d.top - 13, 9.4);
+    d.logo(R - MARK_W.first, d.top - 8.6, MARK_W.first);
+    const rx = R - MARK_W.first - 11;
+    d.line(rx, d.top - 2.5, rx, d.top - 15, { color: AMBER, t: 0.8 });
+    no(REPORT_NO, rx - 11, d.top - 13, 9.4);
     h = 24;
-  } else no(CERT_NO, d.top - 10, 8.8);
+  } else {
+    // The wordmark on the left, the certificate number on the right.
+    d.logo(X, d.top - 6.6, MARK_W.page);
+    no(CERT_NO, R, d.top - 10, 8.8);
+  }
   if (draft) {
     const t = 'Draft: not signed yet';
     const w = d.widthOf(t, 8.4, true) + 16;
@@ -962,7 +990,7 @@ const HEAD_H = 134;
 const G1 = 16;
 const G2 = 16;
 const HEAD_SIZE = 7.2;
-const ROW_H = 15;
+const ROW_H = 14.8;
 const BOX_H = 80;
 
 /* ── What fits where on the schedules (worked out before the certificate is drawn) ─ */

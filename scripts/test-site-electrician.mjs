@@ -472,6 +472,19 @@ eq('every step after the reply stamped', ['po_done_at', 'docs_done_at', 'notifie
 eq('their instruments remembered for next time', db.rows('site_contacts')[0].instruments.map((x) => x.text), ['Megger MFT1741+ s/n 1234567']);
 const storedF75 = flat(await textOf(db.files.get(`crm-docs/${made.find((d) => d.generated_key === 'F75').storage_path}`)));
 eq('the stored F75 carries the engineer and the signature line', [storedF75.includes('Sam Sparks'), storedF75.includes('Signed on the Heliaxis app')], [true, true]);
+// Each one's print version (documents/print.ts, the ink saver): made again from the same answers, the same words.
+{
+  const ED = await import('../src/lib/site/electrician-docs.ts');
+  const LP = await import('../src/lib/site/labour-po.ts');
+  const ref = (d) => ({ projectId: d.project_id, key: d.generated_key, hash: d.inputs_hash, madeAt: d.created_at });
+  const sameWords = [];
+  for (const d of made) {
+    const bytes = d.generated_key.startsWith('PO-') ? await LP.labourPoPrint(db, ref(d)) : await ED.electricianDocPrint(db, ref(d));
+    if (bytes instanceof Uint8Array && flat(await textOf(bytes)) === flat(await textOf(db.files.get(`crm-docs/${d.storage_path}`)))) sameWords.push(d.generated_key);
+  }
+  eq('every one has a print version with the same words as the stored copy', sameWords.sort(), made.map((d) => d.generated_key).sort());
+  eq('a stored copy behind the answers has none', await ED.electricianDocPrint(db, { ...ref(made.find((d) => d.generated_key === 'F43')), hash: 'something else' }), 'changed');
+}
 // What the handover pack is told (site/handover-facts.ts): their certificate's reference, and F78's
 // verification as the form works it out from F43's (it isn't stored unless they change it).
 const HF = await import('../src/lib/site/handover-facts.ts');

@@ -87,7 +87,7 @@ const PER_BLOCK = 6;
 
 export async function makeF43(d: ElectricianDocInput): Promise<Uint8Array> {
   const c = d.ctx;
-  const kit = await newDocument({ code: 'F43', title: F43_TITLE, revision: F43_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'F43', title: F43_TITLE, revision: F43_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Reference', d.jobRef ?? '–'], ['Date', d.date.split('-').reverse().join('/')]] });
   const kind = f43Field('f43_kind');
   kit.rows([{ label: 'PV System Verification Certificate', value: words(kind, answer(kind, c)), must: true }]);

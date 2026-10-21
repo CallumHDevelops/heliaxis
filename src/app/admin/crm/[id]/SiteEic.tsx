@@ -9,6 +9,7 @@ import { shortDate } from '../crm-shared';
 import { Sheet } from '../CrmUi';
 import { copyText, send } from './record-shared';
 import './site-eic.css';
+import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 
 type Office = { name: string; company: string; address: string; postcode: string; tel: string };
 type Status = CertStatus & { office: Office };
@@ -179,14 +180,29 @@ export function SiteEic({ assignmentId, projectId, onChanged }: { assignmentId: 
             Download the {st.route === 'meiwc' ? 'sheets' : st.doc.final ? 'EIC' : 'draft EIC'}
           </a>
         )}
-        {st.sheets.map((x) => (
-          <a key={x.id} className="crm-chipbtn" href={x.url ?? '#'}>
-            {x.name}
+        {st.doc && st.route !== 'meiwc' && (
+          <a className="crm-chipbtn" href={printHref(`/api/crm/documents/${st.doc.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+            {PRINT_LABEL}
           </a>
+        )}
+        {st.sheets.map((x) => (
+          <span key={x.id} className="sx-sheet">
+            <a className="crm-chipbtn" href={x.url ?? '#'}>
+              {x.name}
+            </a>
+            <a className="crm-link" href={printHref(`/api/crm/documents/${x.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+              {PRINT_LABEL}
+            </a>
+          </span>
         ))}
         {st.route !== 'own' && st.state !== 'not_started' && (
           <a className="crm-chipbtn" href={`/api/crm/site-assignments/${assignmentId}/eic?pdf=1`} target="_blank" rel="noreferrer">
             Look at it as it stands
+          </a>
+        )}
+        {st.route !== 'own' && st.state !== 'not_started' && (
+          <a className="crm-link" href={printHref(`/api/crm/site-assignments/${assignmentId}/eic?pdf=1`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+            {PRINT_LABEL} of it as it stands
           </a>
         )}
       </div>

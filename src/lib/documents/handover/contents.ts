@@ -1,7 +1,7 @@
 import 'server-only';
 import { GROUPS, type Group } from '@/lib/handover/slots';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
-import { longDate, newDocument } from '../pdf-kit';
+import { longDate, newDocument, type Variant } from '../pdf-kit';
 import { MCS_CONTACT, REVISION } from './common';
 
 /**
@@ -22,12 +22,14 @@ export type ContentsInput = {
   changes: string[];
   lines: ContentsLine[];
   system: [string, string][];
+  /** 'print': the ink saver, made on request (the pack's print version). */
+  variant?: Variant;
 };
 
 export const CONTENTS_TITLE = 'Your handover pack';
 
 export async function makeContents(c: ContentsInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'PACK', label: 'Contents', title: CONTENTS_TITLE, revision: REVISION.PACK, jobRef: c.ref, issued: c.issued });
+  const kit = await newDocument({ code: 'PACK', label: 'Contents', title: CONTENTS_TITLE, revision: REVISION.PACK, jobRef: c.ref, issued: c.issued, variant: c.variant });
   kit.header({ meta: [['Project', c.ref ?? '–'], ['Version', String(c.version)], ['Date', longDate(c.issued)]] });
   kit.idGrid([
     ['Installation address', c.address.join(', ')],

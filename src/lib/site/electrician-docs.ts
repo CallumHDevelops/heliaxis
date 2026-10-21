@@ -2,14 +2,14 @@ import 'server-only';
 import { PDFDocument } from 'pdf-lib';
 import { ukDay } from '@/lib/bank-holidays';
 import { CRM_BUCKET, DOCS_BUCKET } from '@/lib/crm/server';
-import { A4, docFileName, stampWords } from '@/lib/documents/pdf-kit';
+import { A4, docFileName, stampWords, type Variant } from '@/lib/documents/pdf-kit';
 import type { ElectricianDocInput } from '@/lib/documents/site/common';
 import { F43_TITLE, makeF43 } from '@/lib/documents/site/f43';
 import { F44_TITLE, makeF44, makeF44A } from '@/lib/documents/site/f44';
 import { F74_TITLE, F75_TITLE, makeF74, makeF75 } from '@/lib/documents/site/f74';
 import { makePhotoRecord, type RecordDeclaration, type RecordSlot } from '@/lib/documents/site/photo-record';
 import { makeEvRecord, makeHpRecord } from '@/lib/documents/site/records';
-import { saveGenerated, type SaveResult } from '@/lib/documents/store';
+import { inputsHash, saveGenerated, type Reprint, type SaveResult, type StoredRef } from '@/lib/documents/store';
 import { tradeFiles } from './electrician';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
@@ -59,8 +59,15 @@ async function download(db: Db, bucket: string, path: string): Promise<Uint8Arra
   return data ? new Uint8Array(await data.arrayBuffer()) : null;
 }
 
-/** What every document is made from: the job's merge fields, the sign-off, and the answers in their context. */
-export async function electricianInput(db: Db, a: AssignmentRow, opts: { draft?: boolean } = {}): Promise<{ input: ElectricianDocInput; inputs: Record<string, unknown>; signoffId: string | null } | null> {
+/**
+ * What every document is made from: the job's merge fields, the sign-off, and the answers in their
+ * context. `asOf`: when a draft (not signed yet) is dated, now unless said.
+ */
+export async function electricianInput(
+  db: Db,
+  a: AssignmentRow,
+  opts: { draft?: boolean; asOf?: Date } = {}
+): Promise<{ input: ElectricianDocInput; inputs: Record<string, unknown>; signoffId: string | null } | null> {
   const [{ data: p }, { data: contact }, { data: so }] = await Promise.all([
     db.from('crm_projects').select('*').eq('id', a.project_id).maybeSingle(),
     db.from('site_contacts').select('name, company').eq('id', a.contact_id).maybeSingle(),
@@ -74,7 +81,7 @@ export async function electricianInput(db: Db, a: AssignmentRow, opts: { draft?:
   const signoff = so as { id: string; signed_name: string; signed_at: string; signature_path: string } | null;
   const person = contact as { name?: string; company?: string | null } | null;
   const address = [...String(project.address ?? '').split(/\n/).map((l) => l.trim()).filter(Boolean), String(project.postcode ?? '').trim()].filter(Boolean);
-  const signedAt = signoff?.signed_at ?? new Date().toISOString();
+  const signedAt = signoff?.signed_at ?? (opts.asOf ?? new Date()).toISOString();
   const input: ElectricianDocInput = {
     jobRef: (project.project_ref as string | null) ?? null,
     address,
@@ -90,6 +97,34 @@ export async function electricianInput(db: Db, a: AssignmentRow, opts: { draft?:
   // The hash: what the documents print from (not the signature image's bytes, which never change).
   const inputs = { values: ctx.values, design: ctx.design, system: ctx.system, products: ctx.products, el: ctx.el ?? null, jobRef: input.jobRef, address, customer: input.customer, engineer: input.engineer, company: input.company, date: input.date, signoff: signoff?.id ?? null };
   return { input, inputs, signoffId: signoff?.id ?? null };
+}
+
+/** The job's electricians, for finding whose stored document a print version is asked for. */
+async function electriciansOn(db: Db, projectId: string): Promise<AssignmentRow[]> {
+  const { data } = await db.from('site_assignments').select('id').eq('project_id', projectId).eq('trade', 'electrician');
+  const out: AssignmentRow[] = [];
+  for (const row of (data ?? []) as { id: string }[]) {
+    const a = await readAssignment(db, row.id);
+    if (a) out.push(a);
+  }
+  return out;
+}
+
+/**
+ * The print version of a stored electrician's document (F43, F44, F44A, F74, F75, the EV and heat
+ * pump records): made again from the answers it was made from (they hash to the stored copy's).
+ */
+export async function electricianDocPrint(db: Db, ref: StoredRef): Promise<Reprint> {
+  const d = ELECTRICIAN_DOCS.find((x) => x.key === ref.key);
+  if (!d) return null;
+  let changed = false;
+  for (const a of await electriciansOn(db, ref.projectId)) {
+    const built = await electricianInput(db, a);
+    if (!built) continue;
+    if (inputsHash({ doc: d.key, ...built.inputs }) === ref.hash) return d.make({ ...built.input, variant: 'print' });
+    changed = true;
+  }
+  return changed ? 'changed' : null;
 }
 
 /** Pages of an uploaded certificate (photos) as one PDF, a page each, fitted to A4. */
@@ -167,8 +202,30 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
 export async function savePhotoRecord(db: Db, assignmentId: string, by: string | null): Promise<SaveResult | null> {
   const a = await readAssignment(db, assignmentId);
   if (!a || a.trade !== 'electrician') return null;
+  const r = await photoRecord(db, a);
+  if (!r) return null;
+  return saveGenerated(db, a.project_id, { key: 'EP_RECORD', name: r.name, bytes: r.bytes, inputs: r.inputs, category: 'commissioning', visible: false, by });
+}
+
+/** The print version of a stored photo record (EP_RECORD): made again from the photos and serials it was made from. */
+export async function photoRecordPrint(db: Db, ref: StoredRef): Promise<Reprint> {
+  let changed = false;
+  for (const a of await electriciansOn(db, ref.projectId)) {
+    const r = await photoRecord(db, a, { variant: 'print', asOf: new Date(ref.madeAt) });
+    if (!r) continue;
+    if (inputsHash(r.inputs) === ref.hash) return r.bytes;
+    changed = true;
+  }
+  return changed ? 'changed' : null;
+}
+
+/**
+ * The photo record as a PDF and what it's made from (savePhotoRecord stores it). `variant`: 'digital'
+ * (the default, the stored copy) or 'print'; `asOf`: when one not signed off yet is dated.
+ */
+async function photoRecord(db: Db, a: AssignmentRow, opts: { variant?: Variant; asOf?: Date } = {}): Promise<{ bytes: Uint8Array; name: string; inputs: unknown } | null> {
   const built = await electricianInput(db, a, { draft: false });
-  const input = built?.input ?? (await electricianInput(db, a, { draft: true }))?.input;
+  const input = built?.input ?? (await electricianInput(db, a, { draft: true, asOf: opts.asOf }))?.input;
   if (!input) return null;
   const { data: ph } = await db.from('crm_photos').select('id, slot, storage_path, taken_at').eq('assignment_id', a.id).order('created_at');
   const photos = (ph ?? []) as { id: string; slot: string | null; storage_path: string; taken_at: string | null }[];
@@ -208,14 +265,10 @@ export async function savePhotoRecord(db: Db, assignmentId: string, by: string |
   for (const r of (rt ?? []) as { n: number; fixed_name: string | null; fixed_at: string | null; fixed_declaration: string | null; fixed_signature_path: string | null }[]) {
     if (r.fixed_declaration) declarations.push({ title: `Put right ${r.n}`, text: r.fixed_declaration, name: r.fixed_name ?? '', at: r.fixed_at, signature: r.fixed_signature_path ? await download(db, DOCS_BUCKET, r.fixed_signature_path) : null });
   }
-  const bytes = await makePhotoRecord(input, slots, serials, declarations);
-  return saveGenerated(db, a.project_id, {
-    key: 'EP_RECORD',
-    name: docFileName(input.jobRef, '', 'Electrician photo record'),
+  const bytes = await makePhotoRecord({ ...input, variant: opts.variant }, slots, serials, declarations);
+  return {
     bytes,
+    name: docFileName(input.jobRef, '', 'Electrician photo record'),
     inputs: { photos: photos.map((x) => x.id), serials, declarations: declarations.map((x) => [x.title, x.text, x.at]) },
-    category: 'commissioning',
-    visible: false,
-    by,
-  });
+  };
 }

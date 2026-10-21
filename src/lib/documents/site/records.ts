@@ -53,7 +53,7 @@ function serialRow(label: string, v: unknown): Row[] {
 }
 
 export async function makeEvRecord(d: ElectricianDocInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'EV', label: 'EV record', title: EV_TITLE, revision: EV_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'EV', label: 'EV record', title: EV_TITLE, revision: EV_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Installed by');
   const top = [...(d.ctx.el?.ev_model ? [{ label: 'Charger', value: d.ctx.el.ev_model }] : []), ...serialRow('Charger serial number', d.ctx.values.SN_EV)];
@@ -64,7 +64,7 @@ export async function makeEvRecord(d: ElectricianDocInput): Promise<Uint8Array> 
 }
 
 export async function makeHpRecord(d: ElectricianDocInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'HP', label: 'Heat pump supply', title: HP_TITLE, revision: HP_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
+  const kit = await newDocument({ code: 'HP', label: 'Heat pump supply', title: HP_TITLE, revision: HP_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Installed by');
   const top = [

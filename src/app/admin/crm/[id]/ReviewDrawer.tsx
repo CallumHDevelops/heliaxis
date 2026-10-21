@@ -10,6 +10,7 @@ import { SEVERITY_LABEL, type Flag } from '@/lib/site/types';
 import { Sheet } from '../CrmUi';
 import { send } from './record-shared';
 import { SiteReviewPanel } from './SiteReviewPanel';
+import { hasPrintVersion, PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 
 type Tab = 'answers' | 'photos' | 'reads' | 'signoff' | 'po' | 'events';
 const TABS: { key: Tab; label: string }[] = [
@@ -398,6 +399,14 @@ export function ReviewDrawer({
                             d.name
                           )}
                           {d.version ? <small className="crm-muted"> · v{d.version}</small> : null}
+                          {hasPrintVersion(d.key) && (
+                            <>
+                              {' · '}
+                              <a className="crm-link" href={printHref(`/api/crm/documents/${d.id}`)} target="_blank" rel="noopener noreferrer" title={PRINT_TITLE}>
+                                {PRINT_LABEL}
+                              </a>
+                            </>
+                          )}
                         </li>
                       ))}
                     </ul>

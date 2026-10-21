@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+import { PRINT_LABEL } from '@/lib/documents/print-shared';
 import { pounds, shortDate } from '@/lib/site/client';
-import { getFile, type PackRecord } from '@/lib/site/offline';
+import { getDevice, getFile, type PackRecord } from '@/lib/site/offline';
 import type { PackPo } from '@/lib/site/pack-shared';
 import { PO_TERMS_TITLE, poNext, snapshotOf } from '@/lib/site/po-shared';
 import { poReviewOf, type ReviewState } from '@/lib/site/review-shared';
@@ -19,6 +21,41 @@ function poReviewState(rec: PackRecord): ReviewState | null {
   if (!po) return null;
   if (po === 'hold') return states.includes('open') ? 'open' : 'fixed';
   return po === 'green' ? 'green' : 'waiting';
+}
+
+/**
+ * The print version of the issued PO (the ink saver), made by the server when asked: it needs signal.
+ * Fetched with the phone's device token, then opened (or saved) like the PO itself.
+ */
+function PrintVersion({ assignmentId, poNumber }: { assignmentId: string; poNumber: string }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'offline'>('idle');
+  const open = async () => {
+    setState('busy');
+    try {
+      const token = (await getDevice().catch(() => undefined))?.token;
+      const r = await fetch(`/api/site/jobs/${assignmentId}/po/print`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store', credentials: 'omit' });
+      if (!r.ok || !r.headers.get('content-type')?.includes('pdf')) throw new Error('not a pdf');
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.download = `${poNumber} (print version).pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setState('idle');
+    } catch {
+      setState('offline');
+    }
+  };
+  return (
+    <>
+      <button type="button" className="sa-link" disabled={state === 'busy'} onClick={() => void open()}>
+        {state === 'busy' ? 'Getting the print version…' : PRINT_LABEL}
+      </button>
+      {state === 'offline' && <p className="sa-muted">You need signal for the print version. Try again when you have some.</p>}
+    </>
+  );
 }
 
 /**
@@ -90,6 +127,7 @@ export function PoCard({ rec, stage }: { rec: PackRecord; stage: Stage }) {
           Open the PO (PDF)
         </a>
       )}
+      {(snapshotOf(po.labour)?.version ?? 0) > 0 && <PrintVersion assignmentId={rec.pack.assignment.id} poNumber={po.po_number} />}
       {po.paid_on && <p className="sa-po-paid">Paid {shortDate(po.paid_on)} ✓</p>}
       {terms.length > 0 && (
         <details className="sa-po-terms">
