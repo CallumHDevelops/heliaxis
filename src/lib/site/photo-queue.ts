@@ -1,6 +1,6 @@
 'use client';
 
-import { siteFetch, type Outcome } from './client';
+import { putToStorage, siteFetch, type Outcome } from './client';
 import { byJob, changed, delRec, getRec, putRec, withJobLock, type OutboxRecord, type PhotoRecord } from './offline';
 
 /**
@@ -110,14 +110,8 @@ export async function retryPhoto(clientId: string) {
   queued();
 }
 
-async function put(url: string, blob: Blob, mime: string): Promise<'ok' | 'offline' | 'error'> {
-  try {
-    const r = await fetch(url, { method: 'PUT', body: blob, headers: { 'content-type': mime, 'x-upsert': 'true' }, credentials: 'omit' });
-    return r.ok ? 'ok' : 'error';
-  } catch {
-    return 'offline';
-  }
-}
+/** Straight to storage, with a time limit (a stalled upload counts as no signal and goes again later). */
+const put = (url: string, blob: Blob, mime: string) => putToStorage(url, blob, { 'content-type': mime, 'x-upsert': 'true' });
 
 export type SendResult = 'sent' | 'offline' | 'failed' | 'later' | Outcome<unknown>;
 

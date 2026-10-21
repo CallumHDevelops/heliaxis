@@ -28,7 +28,8 @@ import type { Answers, Flag } from './types';
  * tries again after 5 s, doubling to a minute. Then per job, in order: answers → photos (prepare →
  * storage → save) → photo deletes → confirmations → the sign-off last, once its photos are up.
  * Every operation carries an op_id (site_ops), so a retry never applies twice. "All sent ✓" shows
- * only after a real reply from the server with nothing left.
+ * only after a real reply from the server with nothing left. Uploads to storage have a time limit
+ * (client.ts uploadTimeoutMs), and answers typed while a slow one is going go alongside it.
  *
  * Units 2–4 add outbox kinds with registerSender (a customer's signature, the EIC's boards…).
  */
@@ -180,14 +181,13 @@ async function markFailed(op: OutboxRecord, message: string) {
   await putRec('outbox', { ...op, failed: message });
 }
 
-async function drainJob(id: string, tick: () => void): Promise<JobResult> {
-  const rec = await getPack(id);
-  // Cancelled or taken off the list: everything stays on the phone, nothing is sent.
-  if (rec?.problem) return 'stop';
-  const ops = (await byJob<OutboxRecord>('outbox', id)).filter((o) => !o.failed).sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+/** Answers being sent right now (by the send, or alongside it): never picked up twice. */
+const claimed = new Set<string>();
+/** Jobs whose answers the send has in hand: answers sent alongside wait, so a job's answers land in order. */
+const answering = new Set<string>();
 
-  // 1. Answers, up to 50 operations at a time.
-  const answers = ops.filter((o) => o.kind === 'answers');
+/** One job's answers, up to 50 operations at a time. Null when they're all dealt with. */
+async function sendAnswers(id: string, answers: OutboxRecord[], tick: () => void): Promise<JobResult | null> {
   for (let i = 0; i < answers.length; i += 50) {
     const chunk = answers.slice(i, i + 50);
     const r = await siteFetch<{ rev: number; answers: Answers; flags: Flag[]; status: string }>(`/api/site/jobs/${id}/answers`, {
@@ -211,6 +211,33 @@ async function drainJob(id: string, tick: () => void): Promise<JobResult> {
     for (const o of chunk) await putRec('outbox', { ...o, tries: o.tries + 1 });
     return 'stop';
   }
+  return null;
+}
+
+async function drainJob(id: string, tick: () => void): Promise<JobResult> {
+  const rec = await getPack(id);
+  // Cancelled or taken off the list: everything stays on the phone, nothing is sent.
+  if (rec?.problem) return 'stop';
+  // Answers on their way alongside a long upload (answersAlongside) land first: nothing of this
+  // job's (its sign-off least of all) overtakes them.
+  let ops: OutboxRecord[];
+  do {
+    if (side) await side;
+    ops = (await byJob<OutboxRecord>('outbox', id)).filter((o) => !o.failed).sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+  } while (ops.some((o) => claimed.has(o.op_id)));
+
+  // 1. Answers.
+  const answers = ops.filter((o) => o.kind === 'answers');
+  answering.add(id);
+  answers.forEach((o) => claimed.add(o.op_id));
+  let stopped: JobResult | null;
+  try {
+    stopped = await sendAnswers(id, answers, tick);
+  } finally {
+    answering.delete(id);
+    answers.forEach((o) => claimed.delete(o.op_id));
+  }
+  if (stopped) return stopped;
 
   // 2. Photos, oldest first.
   let photosLeft = false;
@@ -263,6 +290,8 @@ function later(ms: number) {
 export function drain(): Promise<boolean> {
   if (running) {
     again = true;
+    // A photo can take minutes to go up on a weak signal: answers typed meanwhile don't wait for it.
+    answersAlongside();
     return running;
   }
   if (timer) clearTimeout(timer);
@@ -316,6 +345,49 @@ export function drain(): Promise<boolean> {
     }
   });
   return running;
+}
+
+let side: Promise<void> | null = null;
+let sideAgain = false;
+
+/**
+ * While a send is going (held up by a slow photo, say), the answers queued since go straight away
+ * instead of after it. Only answers: photos and the sign-off keep their order in the send.
+ */
+function answersAlongside() {
+  if (side) {
+    sideAgain = true;
+    return;
+  }
+  side = (async () => {
+    if (state.revoked) return;
+    await flushAll().catch(() => {});
+    const ops = (await allRec<OutboxRecord>('outbox'))
+      .filter((o) => o.kind === 'answers' && !o.failed && !claimed.has(o.op_id) && !answering.has(o.assignmentId))
+      .sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+    if (!ops.length) return;
+    ops.forEach((o) => claimed.add(o.op_id));
+    try {
+      const jobs = new Map<string, OutboxRecord[]>();
+      for (const o of ops) jobs.set(o.assignmentId, [...(jobs.get(o.assignmentId) ?? []), o]);
+      for (const [id, list] of jobs) {
+        if ((await getPack(id))?.problem) continue;
+        const r = await sendAnswers(id, list, () => {});
+        if (r === 'offline' || r === 'device') break;
+      }
+    } finally {
+      ops.forEach((o) => claimed.delete(o.op_id));
+      changed();
+    }
+  })()
+    .catch(() => {})
+    .finally(() => {
+      side = null;
+      if (sideAgain) {
+        sideAgain = false;
+        if (running) answersAlongside();
+      }
+    });
 }
 
 /** Soon, not at once: a few taps in a row go as one. */

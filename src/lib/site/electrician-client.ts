@@ -1,6 +1,6 @@
 'use client';
 
-import { siteFetch, type Outcome } from './client';
+import { putToStorage, siteFetch, type Outcome } from './client';
 import type { CustomerSignKind, TradeFile } from './electrician-shared';
 import { byJob, changed, delRec, putRec, updatePack, type OutboxRecord } from './offline';
 import { drainSoon, registerSender } from './sync';
@@ -48,14 +48,8 @@ export async function removeFile(assignmentId: string, f: { op_id?: string; clie
   drainSoon(0);
 }
 
-async function put(url: string, blob: Blob, mime: string): Promise<'ok' | 'offline' | 'error'> {
-  try {
-    const r = await fetch(url, { method: 'PUT', body: blob, headers: { 'content-type': mime, 'x-upsert': 'true' }, credentials: 'omit' });
-    return r.ok ? 'ok' : 'error';
-  } catch {
-    return 'offline';
-  }
-}
+/** Straight to storage, with a time limit (a stalled upload counts as no signal and goes again later). */
+const put = (url: string, blob: Blob, mime: string) => putToStorage(url, blob, { 'content-type': mime, 'x-upsert': 'true' });
 
 registerSender('file', {
   rank: 15,
