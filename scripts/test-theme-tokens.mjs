@@ -51,6 +51,22 @@ const OUT_OF_SCOPE = [/^src\/app\/\(site\)\//, /^src\/app\/branding\//, /^src\/a
 /** Custom properties that come from elsewhere on purpose (layout, not colour). */
 const EXTERNAL_VARS = new Set(['--hx-tabbar', '--hx-dock', '--font-outfit']);
 
+/** The customers' pages (wf-theme-portal): their portal (/my), their booking link (/book; the website's
+    booking form shares booking.css and keeps its own values), the app download page and WhatsApp permission. */
+CONVERTED.push(
+  'src/app/my/[token]/portal.css',
+  'src/app/my/[token]/PortalView.tsx',
+  'src/app/my/[token]/HandoverSection.tsx',
+  'src/app/my/[token]/page.tsx',
+  'src/components/booking/booking.css',
+  'src/components/booking/BookingFlow.tsx',
+  'src/components/booking/Turnstile.tsx',
+  'src/app/book/[token]/page.tsx',
+  'src/app/get-app/page.tsx',
+  'src/app/admin/crm/whatsapp-permission/WaPermissionView.tsx',
+  'src/app/admin/crm/whatsapp-permission/page.tsx'
+);
+
 const files = [];
 (function walk(dir) {
   for (const name of readdirSync(join(ROOT, dir))) {
