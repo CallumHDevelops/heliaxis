@@ -54,6 +54,8 @@ const route = (c: FormCtx, ...r: CertRoute[]) => r.includes(routeOf(c));
 const eic = (c: FormCtx) => route(c, 'eic', 'eic_single');
 const notOwn = (c: FormCtx) => !route(c, 'own');
 const notMeiwc = (c: FormCtx) => eic(c);
+/** An installation earth electrode on this job (TT, or the installation's own electrode). */
+const electrodeShown = (c: FormCtx) => is(c, 'eic_means', 'electrode') || is(c, 'eic_earthing', 'tt');
 
 const must = (key: string, type: Field['type'], label: string, extra: Partial<Field> = {}): Field => ({ key, type, label, level: 'must', ...extra });
 const yn = (key: string, label: string, extra: Partial<Field> = {}) => must(key, 'YN', label, extra);
@@ -88,13 +90,14 @@ function extentFrom(c: FormCtx): string | null {
   return `${is(c, 'eic_work', 'new') ? 'The installation' : `New circuit${named.length === 1 ? '' : 's'}`}: ${list.join('; ')}.`;
 }
 
+/** Earthing arrangements, in the form's order (Section F). */
 export const EARTHING = [
+  { key: 'tn_c', label: 'TN-C' },
   { key: 'tn_s', label: 'TN-S' },
   { key: 'tn_c_s_pme', label: 'TN-C-S (PME)' },
   { key: 'tn_c_s_pnb', label: 'TN-C-S (PNB)' },
   { key: 'tt', label: 'TT' },
   { key: 'it', label: 'IT' },
-  { key: 'tn_c', label: 'TN-C' },
 ];
 export const LIVE = [
   { key: 'ac_1p2w', label: 'AC 1-phase, 2-wire' },
@@ -103,6 +106,21 @@ export const LIVE = [
   { key: 'ac_3p4w', label: 'AC 3-phase, 4-wire' },
   { key: 'dc_2w', label: 'DC 2-wire' },
   { key: 'dc_3w', label: 'DC 3-wire' },
+  { key: 'other', label: 'Other' },
+];
+export const MD_UNIT = [
+  { key: 'A', label: 'A' },
+  { key: 'kVA', label: 'kVA' },
+];
+export const RA_KIND = [
+  { key: 'RA', label: 'RA (earth electrode tester)' },
+  { key: 'Ze', label: 'Ze (loop tester)' },
+];
+/** "If overcurrent protective device: Device type MCCB / ACB / Fuse(s) / other" (Section G, main switch). */
+export const MS_DEVICE = [
+  { key: 'MCCB', label: 'MCCB' },
+  { key: 'ACB', label: 'ACB' },
+  { key: 'Fuse(s)', label: 'Fuse(s)' },
   { key: 'other', label: 'Other' },
 ];
 export const HOW = [
@@ -119,8 +137,8 @@ export const BONDS: { key: string; label: string }[] = [
   { key: 'eic_b_gas', label: 'Gas installation pipes' },
   { key: 'eic_b_oil', label: 'Oil installation pipes' },
   { key: 'eic_b_steel', label: 'Structural steel' },
-  { key: 'eic_b_lightning', label: 'Lightning protection' },
-  { key: 'eic_b_other', label: 'Anything else' },
+  { key: 'eic_b_lightning', label: 'Lightning protection system' },
+  { key: 'eic_b_other', label: 'Other' },
 ];
 export const COMMENTS = [
   { key: 'no_gas_bond', label: 'No main bonding to gas observed' },
@@ -131,7 +149,7 @@ export const COMMENTS = [
 ];
 export const WORK = [
   { key: 'new', label: 'New installation' },
-  { key: 'addition', label: 'Addition to an existing installation' },
+  { key: 'addition', label: 'Adding to an existing installation' },
   { key: 'alteration', label: 'Alteration to an existing installation' },
 ];
 export const INSPECTION_KEY = (i: number) => `eic_i${i + 1}`;
@@ -205,29 +223,32 @@ const certStep: Step = {
       parent: 'eic_route',
       show: (c) => isRoute(c.values.eic_route) && c.values.eic_route !== officeRoute(c),
     },
-    must('eic_work', 'SEL', 'What is it for?', { options: WORK, hint: 'New circuits on a home’s existing wiring are an addition.', show: eic }),
+    must('eic_work', 'SEL', 'New installation, or adding to or altering an existing one?', { options: WORK, hint: 'New circuits on a home’s existing wiring are adding to it.', show: eic }),
   ],
 };
 
 const supplyStep: Step = {
   key: 'eic-supply',
   title: 'Supply and earthing',
+  intro: 'Section F on the certificate: the supply, how it’s earthed and the supplier’s fuse.',
   show: notOwn,
   fields: [
-    must('eic_earthing', 'SEL', 'Earthing arrangement', { options: EARTHING }),
-    must('eic_live', 'SEL', 'Live conductors', { options: LIVE, show: notMeiwc }),
-    must('eic_polarity', 'CONFIRM', 'Supply polarity confirmed', { show: notMeiwc }),
-    must('eic_u0', 'NUM', 'Nominal voltage, U₀ (line to earth)', { unit: 'V', chips: [230], dp: 0, hint: 'By enquiry.', show: notMeiwc }),
-    must('eic_u', 'NUM', 'Nominal voltage, U (line to line)', { unit: 'V', chips: [400], dp: 0, hint: 'By enquiry.', show: (c) => notMeiwc(c) && threePhase(c) }),
+    must('eic_earthing', 'SEL', 'Earthing arrangements', { options: EARTHING, hint: 'How the supply is earthed.' }),
+    must('eic_live', 'SEL', 'Number and type of live conductors', { options: LIVE, hint: 'A single-phase house supply is AC 1-phase, 2-wire.', show: notMeiwc }),
+    must('eic_polarity', 'CONFIRM', 'Confirmation of supply polarity', { hint: 'You’ve checked the polarity of the incoming supply.', show: notMeiwc }),
+    must('eic_u0', 'NUM', 'Nominal voltage, U₀', { unit: 'V', chips: [230], dp: 0, hint: 'Line to earth. By enquiry.', show: notMeiwc }),
+    must('eic_u', 'NUM', 'Nominal voltage, U', { unit: 'V', chips: [400], dp: 0, hint: 'Line to line, on a three-phase supply. By enquiry.', show: (c) => notMeiwc(c) && threePhase(c) }),
     must('eic_f', 'NUM', 'Nominal frequency, f', { unit: 'Hz', chips: [50], dp: 0, hint: 'By enquiry.', show: notMeiwc }),
-    must('eic_ipf', 'NUM', 'Prospective fault current, Ipf', { unit: 'kA', dp: 2, hint: 'The greater of the short-circuit and earth fault current.', show: notMeiwc }),
-    must('eic_ipf_how', 'SEL', 'Ipf found', { options: HOW, show: notMeiwc }),
-    must('eic_ze', 'NUM', 'External earth fault loop impedance, Ze', { unit: 'Ω', dp: 2, show: notMeiwc }),
-    must('eic_ze_how', 'SEL', 'Ze found', { options: HOW, show: notMeiwc }),
-    must('eic_sup_bs', 'TEXT', 'Supply protective device: BS (EN)', { picks: ['88-3', '1361', '88-2'], show: notMeiwc }),
-    { key: 'eic_sup_type', type: 'TEXT', label: 'Its type', level: 'should', show: notMeiwc },
-    must('eic_sup_a', 'NUM', 'Its rated current', { unit: 'A', chips: [60, 80, 100], dp: 0, show: notMeiwc }),
-    yn('eic_other', 'Other sources of supply (solar PV, a battery…)?', {
+    must('eic_ipf', 'NUM', 'Prospective fault current, Ipf', { unit: 'kA', dp: 2, hint: 'The greater of the short-circuit and earth fault current. By enquiry or measured.', show: notMeiwc }),
+    must('eic_ipf_how', 'SEL', 'Ipf: by enquiry or measured?', { options: HOW, show: notMeiwc }),
+    must('eic_ze', 'NUM', 'External earth fault loop impedance, Ze', { unit: 'Ω', dp: 2, hint: 'By enquiry or measured.', show: notMeiwc }),
+    must('eic_ze_how', 'SEL', 'Ze: by enquiry or measured?', { options: HOW, show: notMeiwc }),
+    must('eic_sup_bs', 'TEXT', 'Supply protective device: BS (EN)', { picks: ['88-3', '1361', '88-2'], hint: 'The supplier’s cut-out fuse.', show: notMeiwc }),
+    { key: 'eic_sup_type', type: 'TEXT', label: 'Supply protective device: type', level: 'should', show: notMeiwc },
+    must('eic_sup_a', 'NUM', 'Supply protective device: rated current', { unit: 'A', chips: [60, 80, 100], dp: 0, show: notMeiwc }),
+    must('eic_sup_ka', 'NUM', 'Supply protective device: breaking capacity', { unit: 'kA', chips: [16, 25, 33], hint: 'From the fuse’s marking, or by enquiry.', show: notMeiwc }),
+    yn('eic_other', 'Other sources of supply?', {
+      hint: 'Solar PV, a battery, a generator… They’re listed on a continuation sheet.',
       show: notMeiwc,
       suggest: (c) => (has(c, 'solar', 'battery') ? job('yes', `Yes: this job has ${has(c, 'solar') ? 'solar PV' : 'a battery'}`) : null),
     }),
@@ -248,6 +269,7 @@ const supplyStep: Step = {
 const originStep: Step = {
   key: 'eic-origin',
   title: 'At the origin',
+  intro: 'Section G on the certificate: earthing, maximum demand, the main protective conductors and the main switch.',
   show: notMeiwc,
   fields: [
     must('eic_means', 'SEL', 'Means of earthing', {
@@ -256,31 +278,51 @@ const originStep: Step = {
         { key: 'electrode', label: 'Installation earth electrode' },
       ],
     }),
-    must('eic_rod_type', 'TEXT', 'Earth electrode type', { picks: ['Rod', 'Rods', 'Tape', 'Plate'], show: (c) => is(c, 'eic_means', 'electrode') || is(c, 'eic_earthing', 'tt') }),
-    must('eic_rod_loc', 'TEXT', 'Where is the electrode?', { show: (c) => is(c, 'eic_means', 'electrode') || is(c, 'eic_earthing', 'tt') }),
-    must('eic_ra', 'NUM', 'Electrode resistance to earth, RA', { unit: 'Ω', dp: 1, show: (c) => is(c, 'eic_means', 'electrode') || is(c, 'eic_earthing', 'tt') }),
-    must('eic_md', 'NUM', 'Maximum demand (load)', { unit: 'A', dp: 0 }),
+    must('eic_rod_type', 'TEXT', 'Earth electrode: type (rod(s), tape etc)', { picks: ['Rod', 'Rods', 'Tape', 'Plate'], show: electrodeShown }),
+    must('eic_rod_loc', 'TEXT', 'Earth electrode: location', { hint: 'Where it is.', show: electrodeShown }),
+    must('eic_ra', 'NUM', 'Electrode resistance/impedance, RA/Ze', { unit: 'Ω', dp: 1, hint: 'Measured.', show: electrodeShown }),
+    must('eic_ra_kind', 'SEL', 'Measured as RA or Ze?', { options: RA_KIND, hint: 'RA with an earth electrode tester, Ze with a loop tester. The other is struck out on the certificate.', show: electrodeShown }),
+    must('eic_md', 'NUM', 'Maximum demand (load)', { dp: 0, hint: 'In amps or kVA: say which next.' }),
+    must('eic_md_unit', 'SEL', 'Maximum demand: kVA or A?', { options: MD_UNIT, hint: 'The other is struck out on the certificate.' }),
     must('eic_ec_mat', 'SEL', 'Earthing conductor: material', { options: MATERIAL }),
-    must('eic_ec_csa', 'NUM', 'Earthing conductor: size', { unit: 'mm²', chips: [10, 16, 25] }),
-    must('eic_ec_ok', 'CONFIRM', 'Earthing conductor connection and continuity verified'),
+    must('eic_ec_mat_other', 'TEXT', 'Earthing conductor: what material?', { parent: 'eic_ec_mat', hint: 'It’s written on the certificate in place of “Other”.', show: (c) => is(c, 'eic_ec_mat', 'other') }),
+    must('eic_ec_csa', 'NUM', 'Earthing conductor: csa', { unit: 'mm²', chips: [10, 16, 25], hint: 'Its size.' }),
+    must('eic_ec_ok', 'CONFIRM', 'Earthing conductor: connection / continuity verified'),
     must('eic_mb_mat', 'SEL', 'Main protective bonding conductors: material', { options: MATERIAL }),
-    must('eic_mb_csa', 'NUM', 'Main protective bonding conductors: size', { unit: 'mm²', chips: [10, 16] }),
-    must('eic_mb_ok', 'CONFIRM', 'Main bonding connection and continuity verified'),
+    must('eic_mb_mat_other', 'TEXT', 'Main protective bonding conductors: what material?', { parent: 'eic_mb_mat', hint: 'It’s written on the certificate in place of “Other”.', show: (c) => is(c, 'eic_mb_mat', 'other') }),
+    must('eic_mb_csa', 'NUM', 'Main protective bonding conductors: csa', { unit: 'mm²', chips: [10, 16], hint: 'Their size.' }),
+    must('eic_mb_ok', 'CONFIRM', 'Main protective bonding conductors: connection / continuity verified'),
     ...BONDS.map((b, i) =>
       must(b.key, 'YNN', `Main bonding to ${b.label.toLowerCase()}`, i === 0 ? { hint: 'Yes: bonded. N/A: there isn’t one.' } : {})
     ),
-    must('eic_b_other_what', 'TEXT', 'What else is bonded?', { parent: 'eic_b_other', show: (c) => is(c, 'eic_b_other', 'yes') }),
-    must('eic_ms_loc', 'TEXT', 'Main switch (consumer’s means of isolation): where is it?', { picks: ['Consumer unit', 'Meter cupboard', 'Garage'] }),
+    must('eic_b_other_what', 'TEXT', 'To other: specify', { hint: 'What else is bonded.', parent: 'eic_b_other', show: (c) => is(c, 'eic_b_other', 'yes') }),
+    must('eic_ms_loc', 'TEXT', 'Main switch: location', { picks: ['Consumer unit', 'Meter cupboard', 'Garage'], hint: 'The isolation device, switch-fuse, circuit-breaker or RCD for the installation.' }),
     must('eic_ms_bs', 'TEXT', 'Main switch: BS (EN)', { picks: ['60947-3', '60898-1', '61008-1', '61009-1', '60947-2'] }),
-    must('eic_ms_poles', 'NUM', 'Number of poles', { chips: [1, 2, 3, 4], dp: 0 }),
-    must('eic_ms_a', 'NUM', 'Current rating', { unit: 'A', chips: [60, 80, 100], dp: 0 }),
-    { key: 'eic_ms_set', type: 'NUM', label: 'Fuse or device rating or setting', level: 'should', unit: 'A', dp: 0 },
-    must('eic_ms_v', 'NUM', 'Voltage rating', { unit: 'V', chips: [230, 400], dp: 0 }),
+    must('eic_ms_poles', 'NUM', 'Main switch: no of poles', { chips: [1, 2, 3, 4], dp: 0 }),
+    must('eic_ms_a', 'NUM', 'Main switch: current rating', { unit: 'A', chips: [60, 80, 100], dp: 0 }),
+    must('eic_ms_v', 'NUM', 'Main switch: voltage rating', { unit: 'V', chips: [230, 400], dp: 0 }),
+    yn('eic_ms_ocpd', 'Is the main switch an overcurrent protective device?', { hint: 'A switch-fuse or a circuit-breaker. A plain isolator isn’t.' }),
+    must('eic_ms_dev', 'SEL', 'Device type', { parent: 'eic_ms_ocpd', options: MS_DEVICE, show: (c) => is(c, 'eic_ms_ocpd', 'yes') }),
+    must('eic_ms_dev_other', 'TEXT', 'Device type: other', { parent: 'eic_ms_ocpd', hint: 'What it is.', show: (c) => is(c, 'eic_ms_ocpd', 'yes') && is(c, 'eic_ms_dev', 'other') }),
+    must('eic_ms_set', 'NUM', 'Device rating/setting', { parent: 'eic_ms_ocpd', unit: 'A', dp: 0, show: (c) => is(c, 'eic_ms_ocpd', 'yes') }),
+    must('eic_ms_ka', 'NUM', 'Breaking capacity', { parent: 'eic_ms_ocpd', unit: 'kA', chips: [6, 10, 16, 25], hint: 'Of the main switch’s overcurrent device.', show: (c) => is(c, 'eic_ms_ocpd', 'yes') }),
+    {
+      key: 'eic_ms_settings',
+      type: 'PHOTOS',
+      label: 'Protective device settings (photo)',
+      level: 'optional',
+      parent: 'eic_ms_ocpd',
+      need: 1,
+      label_photo: true,
+      hint: 'If it has adjustable settings. They go on a continuation sheet, as the form asks.',
+      show: (c) => is(c, 'eic_ms_ocpd', 'yes'),
+    },
     yn('eic_ms_rcd', 'Is the main switch an RCD?'),
-    must('eic_ms_rcd_type', 'TEXT', 'RCD type', { parent: 'eic_ms_rcd', picks: ['A', 'F', 'B', 'AC', 'S'], show: (c) => is(c, 'eic_ms_rcd', 'yes') }),
-    must('eic_ms_idn', 'NUM', 'Rated residual operating current, IΔn', { parent: 'eic_ms_rcd', unit: 'mA', chips: [30, 100, 300], dp: 0, show: (c) => is(c, 'eic_ms_rcd', 'yes') }),
-    { key: 'eic_ms_delay', type: 'NUM', label: 'Rated time delay', level: 'should', parent: 'eic_ms_rcd', unit: 'ms', dp: 0, show: (c) => is(c, 'eic_ms_rcd', 'yes') },
+    must('eic_ms_rcd_type', 'TEXT', 'RCD type', { parent: 'eic_ms_rcd', picks: ['AC', 'A', 'F', 'B'], hint: 'AC, A, F or B; type in anything else.', show: (c) => is(c, 'eic_ms_rcd', 'yes') }),
+    must('eic_ms_idn', 'NUM', 'Rated residual operating current (IΔn)', { parent: 'eic_ms_rcd', unit: 'mA', chips: [30, 100, 300], dp: 0, show: (c) => is(c, 'eic_ms_rcd', 'yes') }),
+    { key: 'eic_ms_delay', type: 'NUM', label: 'Rated time delay', hint: 'A time-delayed RCD’s delay. None: leave it empty.', level: 'should', parent: 'eic_ms_rcd', unit: 'ms', dp: 0, show: (c) => is(c, 'eic_ms_rcd', 'yes') },
     must('eic_ms_time', 'NUM', 'Measured operating time', { parent: 'eic_ms_rcd', unit: 'ms', show: (c) => is(c, 'eic_ms_rcd', 'yes') }),
+    must('eic_ms_rcd_ka', 'NUM', 'RCD breaking capacity', { parent: 'eic_ms_rcd', unit: 'kA', chips: [6, 10], show: (c) => is(c, 'eic_ms_rcd', 'yes') }),
   ],
 };
 
@@ -291,7 +333,7 @@ const INSPECT_HINT: Record<string, string> = {
 const inspectStep: Step = {
   key: 'eic-inspect',
   title: 'Schedule of inspections',
-  intro: '✓ when it’s inspected and right; N/A when it doesn’t apply here. A ✗ needs putting right before you sign.',
+  intro: 'Section H on the certificate. ✓ when it’s inspected and right; N/A when it doesn’t apply here. A ✗ needs putting right before you sign.',
   show: notMeiwc,
   fields: INSPECTIONS.map((it, i) => ({
     key: INSPECTION_KEY(i),
@@ -306,7 +348,7 @@ const inspectStep: Step = {
 const boardsStep: Step = {
   key: 'eic-boards',
   title: 'Boards and circuits',
-  intro: 'One card for each board. Add each circuit with its details, then its test results.',
+  intro: 'The Schedules of Circuit Details and Test Results. One card for each board. Add each circuit with its details, then its test results.',
   show: notOwn,
   fields: [
     {
@@ -325,7 +367,7 @@ const boardsStep: Step = {
 const instrumentsStep: Step = {
   key: 'eic-instruments',
   title: 'Test instruments',
-  intro: 'Serial or asset number of each tester used. Remembered for your next job.',
+  intro: 'Details of test instruments used, on the Schedule of Test Results: the serial or asset number of each tester. Remembered for your next job.',
   show: notOwn,
   fields: [
     {
@@ -346,7 +388,7 @@ const instrumentsStep: Step = {
 const existingStep: Step = {
   key: 'eic-existing',
   title: 'Existing installation',
-  intro: 'What you saw of the wiring that was already there, and whether its earthing and bonding are good enough for the new work (Reg 644.1.2).',
+  intro: 'Section I on the certificate: comments on the existing installation. What you saw of the wiring that was already there, and whether its earthing and bonding are good enough for the new work (Reg 644.1.2).',
   show: (c) => route(c, 'meiwc') || (eic(c) && (is(c, 'eic_work', 'addition') || is(c, 'eic_work', 'alteration'))),
   fields: [
     must('eic_cmt', 'MULTI', 'Anything to note?', { options: COMMENTS }),
@@ -357,37 +399,41 @@ const existingStep: Step = {
 const extentStep: Step = {
   key: 'eic-extent',
   title: 'Description and extent',
+  intro: 'Sections A, B and C on the certificate: the client, the installation, and any departures or permitted exceptions.',
   show: notOwn,
   fields: [
-    must('eic_client', 'TEXT', 'Client (the person who ordered the work)', { suggest: (c) => (c.eic?.client ? job(c.eic.client, c.eic.client) : null) }),
-    { key: 'eic_client_addr', type: 'TEXT', label: 'Client’s address', level: 'should', suggest: (c) => (c.address ? job(c.address, c.address) : null) },
-    must('eic_desc', 'LONG', 'Description of the installation', {
+    must('eic_client', 'TEXT', 'Details of the client: name', { hint: 'The person who ordered the work.', suggest: (c) => (c.eic?.client ? job(c.eic.client, c.eic.client) : null) }),
+    { key: 'eic_client_addr', type: 'TEXT', label: 'Details of the client: address', level: 'should', suggest: (c) => (c.address ? job(c.address, c.address) : null) },
+    must('eic_desc', 'LONG', 'Description of installation', {
       show: notMeiwc,
       suggest: (c) => {
         const d = describeJob(c);
         return d ? job(d, d) : null;
       },
     }),
-    must('eic_extent', 'LONG', 'Extent covered by this certificate', {
+    must('eic_extent', 'LONG', 'Extent of installation covered by this Certificate', {
       show: notMeiwc,
       suggest: (c) => {
         const d = extentFrom(c);
         return d ? { v: d, src: 'typed', text: d } : null;
       },
-      hint: 'Offered from the circuits you added.',
+      hint: 'What this certificate covers. Offered from the circuits you added; a long one goes on a continuation sheet.',
     }),
     must('eic_mw_fp', 'TEXT', 'Method of fault protection', { picks: ['ADS (automatic disconnection of supply)'], show: (c) => route(c, 'meiwc') }),
-    yn('eic_dep', 'Any departures from BS 7671?'),
-    must('eic_dep_what', 'LONG', 'What, and why?', { parent: 'eic_dep', show: (c) => is(c, 'eic_dep', 'yes') }),
-    yn('eic_exc', 'Any permitted exceptions (Regulation 411.3.3)?', { hint: 'For example, a socket without 30 mA RCD protection, backed by a risk assessment.' }),
-    must('eic_exc_what', 'LONG', 'What are they?', { parent: 'eic_exc', show: (c) => is(c, 'eic_exc', 'yes') }),
-    must('eic_exc_ra', 'PHOTOS', 'Photo of the risk assessment', { parent: 'eic_exc', need: 1, label_photo: true, show: (c) => is(c, 'eic_exc', 'yes') }),
+    yn('eic_dep', 'Any departures from BS 7671?', { hint: 'Regulations 120.3, 133.1.2, 133.1.3 and 133.5. They go in your parts of the certificate.' }),
+    must('eic_dep_what', 'LONG', 'Details of departures', { hint: 'What, and why.', parent: 'eic_dep', show: (c) => is(c, 'eic_dep', 'yes') }),
+    yn('eic_exc', 'Any permitted exceptions (Regulation 411.3.3)?', {
+      hint: 'For example, a socket without 30 mA RCD protection, backed by a risk assessment. They go in the design part, for the designer to check.',
+    }),
+    must('eic_exc_what', 'LONG', 'Details of permitted exceptions', { parent: 'eic_exc', show: (c) => is(c, 'eic_exc', 'yes') }),
+    must('eic_exc_ra', 'PHOTOS', 'Risk assessment attached (photo)', { hint: 'A photo of each page. It’s attached to the certificate.', parent: 'eic_exc', need: 1, label_photo: true, show: (c) => is(c, 'eic_exc', 'yes') }),
   ],
 };
 
 const signStep: Step = {
   key: 'eic-sign',
   title: 'Sign the certificate',
+  intro: 'Sections C, D and E on the certificate: your particulars and your signature.',
   show: notOwn,
   fields: [
     must('eic_sig_name', 'TEXT', 'Your name', { hint: 'It prints in capitals.', suggest: (c) => (c.eic?.contact.name ? job(c.eic.contact.name, c.eic.contact.name) : null) }),
@@ -395,10 +441,10 @@ const signStep: Step = {
     must('eic_sig_addr', 'TEXT', 'Company address', { suggest: (c) => (c.eic?.contact.address ? job(c.eic.contact.address, c.eic.contact.address) : null) }),
     must('eic_sig_pc', 'TEXT', 'Postcode', { suggest: (c) => (c.eic?.contact.postcode ? job(c.eic.contact.postcode, c.eic.contact.postcode) : null) }),
     must('eic_sig_tel', 'TEXT', 'Phone', { suggest: (c) => (c.eic?.contact.mobile ? job(c.eic.contact.mobile, c.eic.contact.mobile) : null) }),
-    must('eic_next', 'NUM', 'Next inspection recommended within', {
+    must('eic_next', 'NUM', 'Next inspection: an interval of not more than', {
       dp: 0,
       chips: [1, 3, 5, 10],
-      hint: 'You’re the designer on a single-signature certificate, so this is your call. There’s no default.',
+      hint: 'Section D. You’re the designer on a single-signature certificate, so this is your call: think about how well it will be looked after. There’s no default.',
       show: (c) => route(c, 'eic_single'),
     }),
     must('eic_next_unit', 'SEL', 'Years or months?', {
@@ -512,9 +558,21 @@ export const EIC_FLAGS: FlagRule[] = [
     when: (c) => {
       const md = num(c.values.eic_md);
       const fuse = num(c.values.eic_sup_a);
-      return md !== null && fuse !== null && md > fuse;
+      // Amps against amps only: a demand given in kVA isn't compared.
+      return c.values.eic_md_unit !== 'kVA' && md !== null && fuse !== null && md > fuse;
     },
     text: (c) => `Maximum demand ${num(c.values.eic_md)} A is more than the ${num(c.values.eic_sup_a)} A supply fuse`,
+  },
+  {
+    code: 'EIC_SUP_KA',
+    severity: 'review',
+    key: 'eic_sup_ka',
+    when: (c) => {
+      const ka = num(c.values.eic_sup_ka);
+      const ipf = num(c.values.eic_ipf);
+      return ka !== null && ipf !== null && ka < ipf;
+    },
+    text: (c) => `The supply fuse’s breaking capacity (${num(c.values.eic_sup_ka)} kA) is less than the prospective fault current (${num(c.values.eic_ipf)} kA)`,
   },
   {
     code: 'EIC_ZS',

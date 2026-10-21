@@ -111,6 +111,21 @@ eq('keys are short and plain (they are stored on every answer)', keys.filter((k)
 const now = new Set(keys);
 for (const [v, list] of Object.entries(KEYS)) eq(`no key from version ${v} has gone`, list.filter((k) => !now.has(k)), []);
 eq(`version ${SITE_SCHEMA_VERSION} is in the snapshot, as it is now`, [...(KEYS[String(SITE_SCHEMA_VERSION)] ?? [])].sort(), [...now].sort());
+// Version 2 is the electrician's pack and certificate; version 3 adds the IET A4:2026 form's new blanks on the EIC, nothing else.
+eq('version 3 adds only the EIC’s new questions to version 2', (KEYS['3'] ?? []).filter((k) => !KEYS['2'].includes(k)).sort(), [
+  'eic_ec_mat_other',
+  'eic_mb_mat_other',
+  'eic_md_unit',
+  'eic_ms_dev',
+  'eic_ms_dev_other',
+  'eic_ms_ka',
+  'eic_ms_ocpd',
+  'eic_ms_rcd_ka',
+  'eic_ms_settings',
+  'eic_ra_kind',
+  'eic_sup_ka',
+]);
+eq('the roofer’s panel serials are in no version (owner, 21 Oct: no scanning)', Object.entries(KEYS).filter(([, list]) => list.includes('SN_PANEL')).map(([v]) => v), []);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

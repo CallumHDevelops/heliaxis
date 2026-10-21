@@ -16,7 +16,7 @@ import type { SiteForm } from './types';
  * Bumped when fields are added. Stored on each assignment when it's made, and an assignment is
  * always shown with the forms of its own version (keys never change once used; new ones are added).
  */
-export const SITE_SCHEMA_VERSION = 2;
+export const SITE_SCHEMA_VERSION = 3;
 
 /**
  * The forms for each trade, stage by stage (the scaffolder's erection, then the strike). The

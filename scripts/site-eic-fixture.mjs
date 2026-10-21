@@ -1,11 +1,21 @@
-// Test data for the electrician's certificate (scripts/test-site-eic*.mjs): a job with one board, three
-// circuits, instruments and both signatures, as answers. Test data only, never shown to anyone.
+// Test data for the electrician's certificate (scripts/test-site-eic*.mjs): solar PV and a battery added
+// to a home's existing consumer unit (PME, 100 A cut-out): two new radial circuits on RCBOs for the
+// inverters and a garage ring with an AFDD, a T2 SPD at the board, instruments and both signatures, as
+// answers. The readings hang together (Zs = Ze + R1 + R2; a ring's R1 + R2 = (r1 + r2) ÷ 4), the max Zs
+// figures are the ones worked out for each device (its source in Remarks, as footnote § asks), and the
+// inverters were isolated for the insulation test (Remarks, as the form asks). Test data only, never
+// shown to anyone.
 import zlib from 'node:zlib';
 
 export const INSPECTIONS_NA = ['5.0', '12.0', '13.0'];
 
 export const a = (v, src = 'typed') => ({ v, src, at: '2026-11-03T15:00:00Z' });
-export const board = { o: 1, ref: 'DB1', loc: 'Hall cupboard', from: 'Origin', ocpd_bs: '88-3', ocpd_type: 'gG', ocpd_a: 100, spd: ['T2'], zdb: 0.21, ipf: 1.8, pol: true, spd_ok: 'yes' };
+export const board = { o: 1, ref: 'DB1', loc: 'Under the stairs', from: 'Origin', ocpd_bs: '88-3', ocpd_type: 'gG', ocpd_a: 100, spd: ['T2'], rcd: 'no', zdb: 0.23, ipf: 1.8, pol: true, spd_ok: 'yes' };
+/** What zsCalculated says for each device (scripts/test-site-eic.mjs checks they still agree). */
+export const ZS_SRC = {
+  B32: 'Max Zs calculated: U0 × Cmin ÷ Ia = 230 × 0.95 ÷ 160 = 1.37 Ω (type B: Ia = 5 × In)',
+  B20: 'Max Zs calculated: U0 × Cmin ÷ Ia = 230 × 0.95 ÷ 100 = 2.19 Ω (type B: Ia = 5 × In)',
+};
 export const details = (n, desc, extra = {}) => ({
   board: 'b1',
   o: n,
@@ -21,6 +31,7 @@ export const details = (n, desc, extra = {}) => ({
   ocpd_a: 32,
   ocpd_ka: 6,
   zs_max: 1.37,
+  zs_src: ZS_SRC.B32,
   rcd: 'yes',
   rcd_bs: '61009-1',
   rcd_type: 'A',
@@ -46,10 +57,12 @@ export function full(INSPECTIONS, KEY) {
     eic_sup_bs: a('88-3'),
     eic_sup_type: a('gG'),
     eic_sup_a: a(100),
+    eic_sup_ka: a(33),
     eic_other: a('yes'),
     eic_src: a(['Solar PV, 5.28 kWp, inverter GivEnergy Gen 3 5 kW', 'Battery storage, GivEnergy 9.5 kWh']),
     eic_means: a('distributor'),
     eic_md: a(60),
+    eic_md_unit: a('A'),
     eic_ec_mat: a('copper'),
     eic_ec_csa: a(16),
     eic_ec_ok: a(true),
@@ -62,23 +75,31 @@ export function full(INSPECTIONS, KEY) {
     eic_b_steel: a('na'),
     eic_b_lightning: a('na'),
     eic_b_other: a('na'),
-    eic_ms_loc: a('Consumer unit'),
+    eic_ms_loc: a('Consumer unit, under the stairs'),
     eic_ms_bs: a('60947-3'),
     eic_ms_poles: a(2),
     eic_ms_a: a(100),
     eic_ms_v: a(230),
+    eic_ms_ocpd: a('no'),
     eic_ms_rcd: a('no'),
     ...Object.fromEntries(INSPECTIONS.map((it, i) => [KEY(i), a(INSPECTIONS_NA.includes(it.n) ? 'na' : 'done')])),
     'eic_db:b-b1': a(board),
-    'eic_db:c-c1': a({ ...details(7, 'Solar PV inverter supply'), ...tests }),
-    'eic_db:c-c2': a({ ...details(8, 'Battery inverter supply'), ...tests, zs: 0.55 }),
-    'eic_db:c-c3': a({ ...details(9, 'Sockets: garage', { ocpd_a: 20, csa_live: 2.5, csa_cpc: 1.5, zs_max: 2.19, rcd_a: 20, afdd: 'yes' }), ...tests, ring: 'yes', r1: 0.42, rn: 0.42, r2: 0.7, r12: 0.28, afdd_btn: 'pass' }),
+    'eic_db:c-c1': a({ ...details(7, 'Solar PV inverter supply'), ...tests, remarks: 'Inverter isolated for the insulation resistance test' }),
+    'eic_db:c-c2': a({
+      ...details(8, 'Battery inverter supply', { ocpd_a: 20, csa_live: 4, csa_cpc: 1.5, zs_max: 2.19, zs_src: ZS_SRC.B20, rcd_a: 20 }),
+      ...tests,
+      r12: 0.34,
+      zs: 0.55,
+      rcd_ms: 19,
+      remarks: 'Battery inverter isolated for the insulation resistance test',
+    }),
+    'eic_db:c-c3': a({ ...details(9, 'Sockets: garage', { ref: 'C', points: 4, csa_live: 2.5, csa_cpc: 1.5, afdd: 'yes' }), ...tests, ring: 'yes', r1: 0.42, rn: 0.42, r2: 0.7, r12: 0.28, zs: 0.49, rcd_ms: 23, afdd_btn: 'pass' }),
     eic_inst: a({ mft: 'Megger MFT1741 · 101234567' }),
     eic_cmt: a(['no_rcd']),
     eic_client: a('Jane Smith', 'job'),
     eic_client_addr: a('12 High Street, Maindee, Newport, NP20 4AB', 'job'),
     eic_desc: a('Installation of solar PV (5.28 kWp) and battery storage', 'job'),
-    eic_extent: a('New circuits: Solar PV inverter supply (DB1 circuit 7); Battery inverter supply (DB1 circuit 8); Sockets: garage (DB1 circuit 9).'),
+    eic_extent: a('New circuits: Solar PV inverter supply (DB1 circuit 7); Battery inverter supply (DB1 circuit 8); Sockets: garage (DB1 circuit 9). A T2 surge protective device added to DB1.'),
     eic_dep: a('no'),
     eic_exc: a('no'),
     eic_sig_name: a('Dave Price', 'job'),
