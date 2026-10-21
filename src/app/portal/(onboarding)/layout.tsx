@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
+import { ThemeChoice } from '@/components/theme/ThemeChoice';
+import { themeContext } from '@/lib/theme/server';
 import './portal.css';
 
 export const metadata: Metadata = {
@@ -11,7 +13,9 @@ export const metadata: Metadata = {
 // color-scheme (which stops phones auto-darkening the page) and the status bar colour (the ink top bar)
 // come from the root layout, which follows the person's Light / Dark / Match phone choice (src/lib/theme).
 
-export default function PortalLayout({ children }: { children: ReactNode }) {
+export default async function PortalLayout({ children }: { children: ReactNode }) {
+  // Light / Dark / Match phone, kept on this device (src/lib/theme); rendered with the choice it was made with.
+  const { pref } = await themeContext();
   return (
     <div className="pt-shell">
       <header className="pt-top">
@@ -20,6 +24,9 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
       </header>
       <main className="pt-main">{children}</main>
       <footer className="pt-foot">
+        <div className="pt-appearance pt-noprint">
+          <ThemeChoice size="sm" serverPref={pref} />
+        </div>
         Heliaxis Limited · Company No. 16734783 · Registered in England &amp; Wales ·{' '}
         <a href="tel:01633965205">01633 965205</a>
       </footer>

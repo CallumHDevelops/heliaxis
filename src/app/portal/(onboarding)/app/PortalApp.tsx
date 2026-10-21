@@ -446,7 +446,7 @@ function AgreementStep({
           they&apos;re written into the agreement.
         </p>
       )}
-      <div className="pt-doc">{view}</div>
+      <div className="pt-doc hx-light">{view}</div>
 
       {agreement ? (
         <p className="pt-banner is-ok">
@@ -1370,7 +1370,7 @@ function NtpCard({ ntp, view, onChanged }: { ntp: PortalNtp; view?: ReactNode; o
         </p>
       ) : ntp.status === 'awaiting_signature' ? (
         <>
-          <div className="pt-doc">{view}</div>
+          <div className="pt-doc hx-light">{view}</div>
           <div className="pt-sign">
             <h3>Sign as the NTP, for yourself and your business</h3>
             <div className="pt-grid">

@@ -1,22 +1,23 @@
 /* The site app's forms (P5–P10): questions, answer widgets, photo slots, the scanner, check and
-   sign. Same tokens and scope as site.css; tiles 56 px, every other target 48 px or more. */
+   sign. Same palette and scope as site.css (its --sa-* names, light and dark); tiles 56 px, every
+   other target 48 px or more. */
 
 /* ── Steps (P5): questions, follow-ups, the bottom bar ─────────────────────── */
-.sa-progress { height: 4px; background: var(--soft); }
-.sa-progress span { display: block; height: 100%; background: var(--gold-rule); transition: width 0.2s; }
-.sa-progress-text { padding: 8px 16px 0; font-size: 15px; color: var(--muted); }
+.sa-progress { height: 4px; background: var(--sa-soft); }
+.sa-progress span { display: block; height: 100%; background: var(--sa-gold-rule); transition: width 0.2s; }
+.sa-progress-text { padding: 8px 16px 0; font-size: 15px; color: var(--sa-muted); }
 .sa-step { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
-.sa-intro { margin-bottom: 14px; color: var(--muted); }
-.sa-q { padding: 16px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 80px; scroll-margin-bottom: 110px; }
+.sa-intro { margin-bottom: 14px; color: var(--sa-muted); }
+.sa-q { padding: 16px 0; border-bottom: 1px solid var(--sa-line); scroll-margin-top: 80px; scroll-margin-bottom: 110px; }
 .sa-q:first-child { padding-top: 4px; }
-.sa-follow { margin-left: 2px; padding-left: 14px; border-left: 3px solid var(--gold); border-bottom: 0; }
+.sa-follow { margin-left: 2px; padding-left: 14px; border-left: 3px solid var(--accent); border-bottom: 0; }
 .sa-q-head { display: flex; align-items: flex-start; gap: 8px; justify-content: space-between; }
 .sa-q-label { font-size: 19px; font-weight: 600; line-height: 1.3; }
-.sa-q-hint { margin-top: 4px; font-size: 15px; color: var(--muted); }
-.sa-q-note { margin-top: 6px; font-size: 15px; font-weight: 600; color: #1f5fbf; }
-.sa-fix { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--amber-bg); color: var(--amber); font-weight: 600; font-size: 16px; }
+.sa-q-hint { margin-top: 4px; font-size: 15px; color: var(--sa-muted); }
+.sa-q-note { margin-top: 6px; font-size: 15px; font-weight: 600; color: var(--sa-link); }
+.sa-fix { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--sa-amber-bg); color: var(--sa-amber); font-weight: 600; font-size: 16px; }
 .sa-auto { margin-top: 8px; font-weight: 600; }
-.sa-src { flex: none; padding: 2px 8px; border-radius: 999px; background: #e8eefb; color: #1f4fa0; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.sa-src { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--sa-info-bg); color: var(--sa-info-text); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .sa-more { padding-top: 10px; }
 .sa-bottom {
   position: fixed;
@@ -29,25 +30,26 @@
   gap: 10px;
   min-height: 72px;
   padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
-  background: #fff;
-  border-top: 1px solid var(--line);
+  background: var(--sa-bar);
+  border-top: 1px solid var(--sa-line);
 }
 .sa-bottom .sa-btn { margin-top: 0; }
 
-/* Answer tiles: two or three across, 56 px tall; selected is ink with a tick, never colour alone. */
+/* Answer tiles: two or three across, 56 px tall; selected is ink with a tick, never colour alone
+   (on dark: the paper fill). */
 .sa-tiles { display: grid; gap: 12px; margin-top: 12px; }
 .sa-tiles-2 { grid-template-columns: 1fr 1fr; }
 .sa-tiles-3 { grid-template-columns: 1fr 1fr 1fr; }
 .sa-tile {
   min-height: 56px;
   padding: 8px 6px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--sa-edge);
   border-radius: 12px;
-  background: #fff;
+  background: var(--sa-tile);
   font-size: 18px;
   font-weight: 600;
 }
-.sa-tile.is-on { background: var(--ink); color: #fff; }
+.sa-tile.is-on { background: var(--sa-sel); border-color: var(--sa-sel); color: var(--sa-sel-text); }
 .sa-tile:disabled { opacity: 0.6; }
 
 .sa-confirm-wrap { margin-top: 12px; }
@@ -58,43 +60,43 @@
   width: 100%;
   min-height: 64px;
   padding: 10px 14px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--sa-edge);
   border-radius: 12px;
-  background: #fff;
+  background: var(--sa-tile);
   font-size: 18px;
   font-weight: 600;
   text-align: left;
 }
-.sa-confirm-box { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid var(--ink); border-radius: 8px; font-size: 22px; }
-.sa-confirm.is-on { background: var(--ink); color: #fff; }
-.sa-confirm.is-on .sa-confirm-box { border-color: #fff; }
+.sa-confirm-box { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid var(--sa-edge); border-radius: 8px; font-size: 22px; }
+.sa-confirm.is-on { background: var(--sa-sel); border-color: var(--sa-sel); color: var(--sa-sel-text); }
+.sa-confirm.is-on .sa-confirm-box { border-color: var(--sa-sel-text); }
 .sa-cant { display: block; margin-top: 4px; }
-.sa-cant.is-on { color: var(--amber); }
+.sa-cant.is-on { color: var(--sa-amber); }
 
 /* Number boxes: 56 px, 22 px digits, the unit inside on the right, decimal keypad. */
 .sa-numwrap { margin-top: 12px; }
-.sa-num { display: flex; align-items: stretch; min-height: 56px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; overflow: hidden; }
-.sa-num.is-bad { border-color: var(--bad); }
-.sa-num input { flex: 1; min-width: 0; padding: 8px 14px; border: 0; background: transparent; font-size: 22px; font-weight: 600; color: var(--ink); outline: none; }
-.sa-num:focus-within { outline: 3px solid #1f5fbf; outline-offset: 2px; }
-.sa-unit { display: grid; place-items: center; padding: 0 14px; color: var(--muted); font-size: 18px; font-weight: 600; background: var(--soft); }
-.sa-gt { width: 52px; border: 0; border-right: 2px solid var(--line); background: #fff; font-size: 22px; font-weight: 700; }
-.sa-gt.is-on { background: var(--ink); color: #fff; }
-.sa-err { margin-top: 6px; color: var(--bad); font-size: 15px; font-weight: 600; }
-.sa-hint-warn { margin-top: 8px; color: var(--amber); font-size: 15px; font-weight: 600; }
-.sa-hint-ok { margin-top: 8px; color: var(--ok); font-size: 15px; font-weight: 600; }
+.sa-num { display: flex; align-items: stretch; min-height: 56px; border: 2px solid var(--sa-edge); border-radius: 12px; background: var(--sa-field); overflow: hidden; }
+.sa-num.is-bad { border-color: var(--sa-bad); }
+.sa-num input { flex: 1; min-width: 0; padding: 8px 14px; border: 0; background: transparent; font-size: 22px; font-weight: 600; color: var(--sa-ink); outline: none; }
+.sa-num:focus-within { outline: 3px solid var(--sa-focus); outline-offset: 2px; }
+.sa-unit { display: grid; place-items: center; padding: 0 14px; color: var(--sa-muted); font-size: 18px; font-weight: 600; background: var(--sa-soft); }
+.sa-gt { width: 52px; border: 0; border-right: 2px solid var(--sa-line); background: var(--sa-field); font-size: 22px; font-weight: 700; }
+.sa-gt.is-on { background: var(--sa-sel); color: var(--sa-sel-text); }
+.sa-err { margin-top: 6px; color: var(--sa-bad); font-size: 15px; font-weight: 600; }
+.sa-hint-warn { margin-top: 8px; color: var(--sa-amber); font-size: 15px; font-weight: 600; }
+.sa-hint-ok { margin-top: 8px; color: var(--sa-ok); font-size: 15px; font-weight: 600; }
 .sa-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .sa-chip {
   min-height: 44px;
   min-width: 52px;
   padding: 6px 14px;
-  border: 1.5px solid var(--ink);
+  border: 1.5px solid var(--sa-edge);
   border-radius: 999px;
-  background: #fff;
+  background: var(--sa-tile);
   font-size: 17px;
   font-weight: 600;
 }
-.sa-chip.is-on { background: var(--ink); color: #fff; }
+.sa-chip.is-on { background: var(--sa-sel); border-color: var(--sa-sel); color: var(--sa-sel-text); }
 .sa-chips-big .sa-chip { min-height: 52px; }
 .sa-text {
   display: block;
@@ -102,20 +104,20 @@
   min-height: 52px;
   margin-top: 12px;
   padding: 10px 14px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--sa-edge);
   border-radius: 12px;
-  background: #fff;
+  background: var(--sa-field);
   font: inherit;
   font-size: 18px;
-  color: var(--ink);
+  color: var(--sa-ink);
 }
 .sa-long { min-height: 120px; resize: vertical; }
 
 .sa-strings { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
-.sa-string { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.sa-string { padding: 12px; border: 1px solid var(--sa-line); border-radius: 12px; background: var(--sa-soft); }
 .sa-string-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sa-string .sa-numwrap { margin-top: 8px; }
-.sa-small.is-on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.sa-small.is-on { background: var(--sa-sel); color: var(--sa-sel-text); border-color: var(--sa-sel); }
 
 .sa-suggest {
   display: flex;
@@ -125,24 +127,24 @@
   min-height: 52px;
   margin-top: 12px;
   padding: 8px 12px;
-  border: 2px dashed #1f5fbf;
+  border: 2px dashed var(--sa-link);
   border-radius: 12px;
-  background: #f1f5fd;
+  background: var(--sa-info-tint);
   text-align: left;
 }
-.sa-suggest-src { flex: none; font-size: 13px; font-weight: 700; color: #1f4fa0; text-transform: uppercase; letter-spacing: 0.03em; }
+.sa-suggest-src { flex: none; font-size: 13px; font-weight: 700; color: var(--sa-info-text); text-transform: uppercase; letter-spacing: 0.03em; }
 .sa-suggest-val { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
-.sa-suggest-tick { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #1f5fbf; color: #fff; font-weight: 700; }
+.sa-suggest-tick { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--sa-link); color: var(--sa-on-solid); font-weight: 700; }
 .sa-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* ── Photo slots (P6) ──────────────────────────────────────────────────────── */
 .sa-photos { margin-top: 12px; }
-.sa-photos + .sa-photos { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.sa-photos + .sa-photos { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--sa-line); }
 .sa-photos-title { font-weight: 700; }
-.sa-photos-count { font-size: 16px; color: var(--amber); font-weight: 600; }
-.sa-photos-count.is-done { color: var(--ok); }
+.sa-photos-count { font-size: 16px; color: var(--sa-amber); font-weight: 600; }
+.sa-photos-count.is-done { color: var(--sa-ok); }
 .sa-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
-.sa-thumb { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: var(--soft); }
+.sa-thumb { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: var(--sa-soft); }
 .sa-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .sa-thumb-none { display: block; width: 100%; height: 100%; }
 .sa-thumb-state {
@@ -157,28 +159,29 @@
   font-size: 14px;
   font-weight: 700;
 }
-.sa-thumb-state.is-sent { background: var(--ok); color: #fff; }
-.sa-thumb-state.is-failed { background: var(--bad); color: #fff; }
-.sa-thumb-state.is-waiting { background: rgba(255, 255, 255, 0.9); border: 2px solid var(--amber); }
+.sa-thumb-state.is-sent { background: var(--sa-ok); color: var(--sa-on-solid); }
+.sa-thumb-state.is-failed { background: var(--sa-bad); color: var(--sa-on-solid); }
+.sa-thumb-state.is-waiting { background: var(--sa-thumb-wait); border: 2px solid var(--sa-amber); }
 .sa-take { margin-top: 12px; }
 .sa-fromroll { display: block; margin: 4px auto 0; }
-.sa-reading { margin-top: 8px; color: #1f5fbf; font-weight: 600; }
+.sa-reading { margin-top: 8px; color: var(--sa-link); font-weight: 600; }
 .sa-viewer-bar { display: flex; justify-content: flex-end; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 8px 8px; }
 .sa-viewer-bar .sa-viewer-close { margin: 0; }
-.sa-viewer-bar .sa-viewer-delete { background: var(--bad); color: #fff; }
-.sa-viewer-note { padding: 0 12px 8px; color: #fff; font-size: 15px; }
+.sa-viewer-bar .sa-viewer-delete { background: var(--sa-bad); color: var(--sa-on-solid); }
+.sa-viewer-note { padding: 0 12px 8px; color: var(--sa-cam-text); font-size: 15px; }
 
 /* ── Serials and the scanner (P7) ──────────────────────────────────────────── */
 .sa-scan { margin-top: 12px; }
 .sa-serials { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-.sa-serial { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.sa-serial { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--sa-line); border-radius: 10px; }
 .sa-serial-s { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 700; overflow-wrap: anywhere; }
-.sa-x { margin-left: auto; width: 44px; height: 44px; border: 0; border-radius: 10px; background: var(--soft); font-size: 22px; }
+.sa-x { margin-left: auto; width: 44px; height: 44px; border: 0; border-radius: 10px; background: var(--sa-soft); font-size: 22px; }
 .sa-typeit { display: flex; gap: 8px; align-items: stretch; margin-top: 4px; }
 .sa-typeit .sa-text { flex: 1; min-width: 0; }
 .sa-typeit .sa-small { margin-top: 12px; min-height: 52px; }
 .sa-scan-more { display: flex; flex-direction: column; align-items: flex-start; margin-top: 4px; }
-.sa-scansheet { position: fixed; inset: 0; z-index: 60; background: #000; color: #fff; }
+/* The camera: black with white words in both themes, its buttons and chips white with ink words. */
+.sa-scansheet { position: fixed; inset: 0; z-index: 60; background: var(--sa-cam); color: var(--sa-cam-text); }
 .sa-scan-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .sa-scan-aim {
   position: absolute;
@@ -186,43 +189,43 @@
   right: 12%;
   top: 30%;
   height: 26%;
-  border: 3px solid var(--gold);
+  border: 3px solid var(--accent);
   border-radius: 14px;
-  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 100vmax var(--sa-cam-dim);
 }
 .sa-scan-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; }
-.sa-scan-top .sa-small { color: var(--ink); }
+.sa-scan-top .sa-small { background: var(--sa-cam-btn); color: var(--sa-cam-btn-text); }
 .sa-scan-count { flex: 1; font-size: 22px; font-weight: 700; }
-.sa-scan-top .sa-torch.is-on { background: var(--gold); }
-.sa-scan-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0, 0, 0, 0.75) 30%); }
+.sa-scan-top .sa-torch.is-on { background: var(--accent); }
+.sa-scan-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--sa-cam-fade) 30%); }
 .sa-scan-msg { font-weight: 600; margin-bottom: 6px; }
 .sa-scan-frame,
 .sa-scan-found { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .sa-scan-frame span:first-child { width: 100%; font-size: 15px; }
-.sa-scansheet .sa-chip { color: var(--ink); }
-.sa-scansheet .sa-chip.is-on { background: #fff; color: var(--ink); }
+.sa-scansheet .sa-chip { background: var(--sa-cam-btn); border-color: var(--sa-cam-btn-text); color: var(--sa-cam-btn-text); }
+.sa-scansheet .sa-chip.is-on { background: var(--sa-cam-btn); color: var(--sa-cam-btn-text); }
 
 /* ── Check and sign (P10), the job's forms ─────────────────────────────────── */
 .sa-sign { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
-.sa-signed h2 { font-size: 22px; color: var(--ok); margin-bottom: 4px; }
+.sa-signed h2 { font-size: 22px; color: var(--sa-ok); margin-bottom: 4px; }
 .sa-flags { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
 .sa-flag { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; font-size: 16px; }
-.sa-flag-stop { background: var(--bad-bg); color: var(--bad); border: 2px solid var(--bad); }
+.sa-flag-stop { background: var(--sa-bad-bg); color: var(--sa-bad); border: 2px solid var(--sa-bad); }
 .sa-flag-urgent,
-.sa-flag-review { background: var(--amber-bg); color: var(--amber); }
+.sa-flag-review { background: var(--sa-amber-bg); color: var(--sa-amber); }
 .sa-flag-sev { flex: none; font-weight: 700; text-transform: uppercase; font-size: 13px; letter-spacing: 0.04em; }
 .sa-flag-text { flex: 1 1 60%; min-width: 0; }
 .sa-todo { display: flex; flex-direction: column; }
-.sa-todo li + li { border-top: 1px solid var(--line); }
+.sa-todo li + li { border-top: 1px solid var(--sa-line); }
 .sa-todo-row { display: flex; flex-direction: column; align-items: flex-start; width: 100%; min-height: 52px; padding: 8px 0; border: 0; background: none; text-align: left; font-weight: 600; }
-.sa-declaration { padding: 12px; border-radius: 10px; background: var(--soft); font-weight: 600; margin-bottom: 10px; }
+.sa-declaration { padding: 12px; border-radius: 10px; background: var(--sa-soft); font-weight: 600; margin-bottom: 10px; }
 /* The owner's declaration (declaration.ts): "I confirm that:", three points, then what it means. */
 .sa-declaration > p + p,
 .sa-declaration > ul + p { margin-top: 8px; font-weight: 400; }
 .sa-decl-list { margin: 6px 0 0; padding-left: 0; }
 .sa-decl-list li { position: relative; padding-left: 18px; }
 .sa-decl-list li + li { margin-top: 6px; }
-.sa-decl-list li::before { content: ''; position: absolute; left: 4px; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--gold-rule); }
+.sa-decl-list li::before { content: ''; position: absolute; left: 4px; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--sa-gold-rule); }
 .sa-label { display: block; margin-top: 12px; font-weight: 600; font-size: 16px; }
 .sa-label + .sa-text { margin-top: 6px; }
 .sa-pad { margin-top: 6px; }
@@ -233,17 +236,17 @@
 .sa-signbtn { min-height: 60px; font-size: 20px; }
 .sa-form-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sa-form-head h3 { margin-bottom: 0; }
-.sa-form.is-waiting { background: var(--soft); }
+.sa-form.is-waiting { background: var(--sa-soft); }
 .sa-tag { padding: 2px 10px; border-radius: 999px; font-size: 14px; font-weight: 700; }
 .sa-steplist { margin-top: 10px; }
-.sa-steplist li + li { border-top: 1px solid var(--line); }
+.sa-steplist li + li { border-top: 1px solid var(--sa-line); }
 .sa-steprow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 6px 0; border: 0; background: none; text-align: left; }
-.sa-steprow-tick { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); font-weight: 700; font-size: 15px; }
-.sa-steprow.is-done .sa-steprow-tick { background: var(--ok); border-color: var(--ok); color: #fff; }
+.sa-steprow-tick { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--sa-line); font-weight: 700; font-size: 15px; }
+.sa-steprow.is-done .sa-steprow-tick { background: var(--sa-ok); border-color: var(--sa-ok); color: var(--sa-on-solid); }
 .sa-steprow-title { flex: 1; font-weight: 600; }
-.sa-steprow-count { flex: none; color: var(--muted); font-size: 15px; }
-.sa-left { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--amber-bg); }
-.sa-left h4 { margin: 0; font-size: 16px; color: var(--amber); }
+.sa-steprow-count { flex: none; color: var(--sa-muted); font-size: 15px; }
+.sa-left { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--sa-amber-bg); }
+.sa-left h4 { margin: 0; font-size: 16px; color: var(--sa-amber); }
 .sa-left .sa-todo-row { min-height: 48px; }
 
 /* ── Signed (P11) and the PO ───────────────────────────────────────────────── */
@@ -251,37 +254,37 @@
 .sa-done .sa-alert { margin-bottom: 12px; }
 .sa-po-head h3 { font-size: 24px; margin-top: 2px; }
 .sa-po-lines { margin-top: 10px; }
-.sa-po-lines > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 16px; }
+.sa-po-lines > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--sa-line); font-size: 16px; }
 .sa-po-lines dt { flex: 1; min-width: 0; }
 .sa-po-lines dd { flex: none; font-weight: 600; text-align: right; }
-.sa-po-pay { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 4px; padding: 12px; border-radius: 10px; background: var(--ok-bg); color: var(--ok); }
+.sa-po-pay { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 4px; padding: 12px; border-radius: 10px; background: var(--sa-ok-bg); color: var(--sa-ok); }
 .sa-po-pay span { font-weight: 600; }
 .sa-po-pay b { font-size: 26px; }
 .sa-po .sa-muted { margin-top: 10px; }
 .sa-po-where { margin-top: 10px; font-size: 16px; }
-.sa-po-paid { margin-top: 8px; font-weight: 700; color: var(--ok); }
+.sa-po-paid { margin-top: 8px; font-weight: 700; color: var(--sa-ok); }
 
 /* ── The office's review (Review.tsx): waiting, green light, return to site, put right ── */
-.sa-review-next { margin: 4px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--soft); font-size: 16px; }
+.sa-review-next { margin: 4px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--sa-soft); font-size: 16px; }
 .sa-review h3 { margin-bottom: 6px; }
 .sa-review .sa-kicker { margin-bottom: 2px; }
-.sa-review-green { border-color: var(--ok); background: var(--ok-bg); color: var(--ok); }
-.sa-review-fixed { border-color: var(--amber); background: var(--amber-bg); color: var(--amber); }
-.sa-review-open { border: 2px solid var(--bad); background: var(--bad-bg); }
-.sa-review-open h3 { color: var(--bad); font-size: 19px; }
+.sa-review-green { border-color: var(--sa-ok); background: var(--sa-ok-bg); color: var(--sa-ok); }
+.sa-review-fixed { border-color: var(--sa-amber); background: var(--sa-amber-bg); color: var(--sa-amber); }
+.sa-review-open { border: 2px solid var(--sa-bad); background: var(--sa-bad-bg); }
+.sa-review-open h3 { color: var(--sa-bad); font-size: 19px; }
 .sa-review-open .sa-pre { font-weight: 600; }
 .sa-review-by { margin-top: 8px; font-size: 16px; }
 .sa-review-open .sa-thumbs { grid-template-columns: repeat(4, 1fr); }
 .sa-review-pill { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 999px; font-size: 15px; font-weight: 700; }
-.sa-review-pill.is-wait { background: var(--amber-bg); color: var(--amber); }
-.sa-review-pill.is-bad { background: var(--bad-bg); color: var(--bad); }
-.sa-review-pill.is-ok { background: var(--ok-bg); color: var(--ok); }
-.sa-po-terms { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+.sa-review-pill.is-wait { background: var(--sa-amber-bg); color: var(--sa-amber); }
+.sa-review-pill.is-bad { background: var(--sa-bad-bg); color: var(--sa-bad); }
+.sa-review-pill.is-ok { background: var(--sa-ok-bg); color: var(--sa-ok); }
+.sa-po-terms { margin-top: 12px; border-top: 1px solid var(--sa-line); padding-top: 4px; }
 .sa-po-terms summary { min-height: 48px; display: flex; align-items: center; justify-content: space-between; font-weight: 700; cursor: pointer; list-style: none; }
 .sa-po-terms summary::-webkit-details-marker { display: none; }
-.sa-po-terms summary::after { content: 'Show'; color: #1f5fbf; font-size: 16px; font-weight: 600; text-decoration: underline; }
+.sa-po-terms summary::after { content: 'Show'; color: var(--sa-link); font-size: 16px; font-weight: 600; text-decoration: underline; }
 .sa-po-terms[open] summary::after { content: 'Hide'; }
-.sa-po-terms ol { display: flex; flex-direction: column; gap: 8px; font-size: 15px; color: var(--muted); }
+.sa-po-terms ol { display: flex; flex-direction: column; gap: 8px; font-size: 15px; color: var(--sa-muted); }
 /* The home list: a job the office has asked them to put right comes first, in red. */
-.sa-group-fix > h2 { color: var(--bad); }
-.sa-group-fix .sa-jobcard { border: 2px solid var(--bad); }
+.sa-group-fix > h2 { color: var(--sa-bad); }
+.sa-group-fix .sa-jobcard { border: 2px solid var(--sa-bad); }

@@ -40,7 +40,7 @@ export function NtpDocument({
   ];
 
   return (
-    <article className="agr">
+    <article className="agr hx-light">
       <header className="agr-cover">
         <p className="agr-kicker">Heliaxis Limited</p>
         <h1>{NTP_TITLE}</h1>

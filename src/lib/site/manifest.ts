@@ -13,7 +13,8 @@ export function siteManifest(startUrl: string) {
     scope: '/portal/site',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#FFFFFF',
+    // The launch screen is the ink of the top bar (the same in light and dark), not a white flash on a dark phone.
+    background_color: '#211F18',
     theme_color: '#211F18',
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
