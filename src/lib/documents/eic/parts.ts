@@ -3,11 +3,10 @@ import type { PDFImage } from 'pdf-lib';
 import { INK, LINE, MissingAnswer, MUTED, PAPER, RED, stampWords, type Kit, type Mark } from '../pdf-kit';
 
 /**
- * Drawing pieces the BS 7671 certificates share (the EIC, the Minor Works sheet): rows of bordered
- * boxes, each a label over its value, as the model forms are laid out; tick-box choices; a signature
- * line (signature, date, name in capitals, role); and a schedule table with grouped headings and the
- * form's column numbers, repeated on every page it runs onto. Ticks and crosses are strokes, never a
- * font's glyph (SPEC D6).
+ * Drawing pieces for the Minor Works data sheet: rows of bordered boxes, each a label over its value; a
+ * section band; and a signature line (signature, date, name in capitals, role). Ticks and crosses are
+ * strokes, never a font's glyph (SPEC D6). The EIC itself is drawn to the IET form's own layout
+ * (eic.ts, form.ts).
  */
 
 export type Cell = {
@@ -81,25 +80,6 @@ export function band(kit: Kit, title: string, note?: string | null) {
   kit.gap(3);
 }
 
-/** Choices as the model form shows them: every option with a box, the chosen one ticked. */
-export function choices(kit: Kit, title: string, options: { label: string; on: boolean }[], perRow = 3) {
-  const W = kit.width;
-  const colW = W / perRow;
-  const rows = Math.ceil(options.length / perRow);
-  const h = 14 + rows * 15 + 4;
-  kit.block(h, (d) => {
-    d.rect(d.x, d.top - h, W, h, { border: LINE, line: 0.6 });
-    d.text(title, d.x + 4, d.top - 9, 6.6, { bold: true, color: MUTED });
-    options.forEach((o, i) => {
-      const cx = d.x + 6 + (i % perRow) * colW;
-      const cy = d.top - 14 - Math.floor(i / perRow) * 15 - 11;
-      d.rect(cx, cy, 9, 9, { border: INK, line: 0.7 });
-      if (o.on) strokeMark(d, cx, cy, 'tick');
-      d.text(o.label, cx + 14, cy + 1.5, 8.4, o.on ? { bold: true } : { color: MUTED });
-    });
-  });
-}
-
 /** A signature line: the signature (or "Not signed yet"), the date, the name in capitals, and who signed as what. */
 export function signatureRow(kit: Kit, role: string, img: PDFImage | null, at: string | null, name: string | null, draft: boolean) {
   if (!draft && (!img || !name)) throw new MissingAnswer(`${role}: signature`);
@@ -125,65 +105,5 @@ export function signatureRow(kit: Kit, role: string, img: PDFImage | null, at: s
     x += cols[2];
     d.lines(role, 7.6, cols[3] - 8, true).forEach((s, n) => d.text(s, x + 4, d.top - 22 - n * 9, 7.6, { bold: true }));
   });
-  kit.gap(6);
-}
-
-/* ── Schedules ──────────────────────────────────────────────────────────────── */
-
-export type ColCell = string | null | { mark: Mark };
-export type Col = { n: number; head: string; share: number };
-export type Group = { from: number; to: number; label: string };
-
-/**
- * A schedule: a row of group headings, the column headings, the column numbers (as the model form
- * has them), then one row per circuit. The three heading rows repeat on every page it runs onto.
- */
-export function schedule(kit: Kit, cols: Col[], groups: Group[], rows: ColCell[][]) {
-  const W = kit.width;
-  const sum = cols.reduce((a, c) => a + c.share, 0);
-  const ws = cols.map((c) => (c.share / sum) * W);
-  const xs = ws.map((_, i) => ws.slice(0, i).reduce((a, b) => a + b, 0));
-  const headH = 12 + Math.max(...cols.map((c, i) => kit.lines(c.head, 6.1, ws[i] - 4, true).length)) * 7.2 + 6 + 11;
-  const head = () =>
-    kit.block(headH, (d) => {
-      const top = d.top;
-      d.rect(d.x, top - headH, W, headH, { fill: PAPER });
-      // Group headings over the columns they span.
-      for (const g of groups) {
-        const a = cols.findIndex((c) => c.n === g.from);
-        const b = cols.findIndex((c) => c.n === g.to);
-        if (a < 0 || b < 0) continue;
-        const gx = d.x + xs[a];
-        const gw = xs[b] + ws[b] - xs[a];
-        d.lines(g.label.toUpperCase(), 6, gw - 4, true).slice(0, 1).forEach((s) => d.text(s, gx + (gw - d.widthOf(s, 6, true)) / 2, top - 8.5, 6, { bold: true, color: MUTED }));
-        d.line(gx + 2, top - 11, gx + gw - 2, top - 11, { color: MUTED, t: 0.4 });
-      }
-      cols.forEach((c, i) => {
-        const x = d.x + xs[i];
-        d.lines(c.head, 6.1, ws[i] - 4, true).forEach((s, n) => d.text(s, x + 2, top - 19 - n * 7.2, 6.1, { bold: true }));
-        const num = String(c.n);
-        d.text(num, x + (ws[i] - d.widthOf(num, 6.5, true)) / 2, top - headH + 3.5, 6.5, { bold: true, color: MUTED });
-        // Column rules stop under the group headings, so a group's label reads across its columns.
-        if (i > 0) d.line(x, top - 12, x, top - headH, { color: LINE, t: 0.4 });
-      });
-      d.line(d.x, top - headH + 11, d.x + W, top - headH + 11, { color: LINE, t: 0.5 });
-    });
-  head();
-  for (const row of rows) {
-    const h = Math.max(16, ...row.map((v, i) => (v && typeof v === 'object' ? 1 : kit.lines(v ?? '–', 7.4, ws[i] - 5).length) * 8.8 + 6));
-    kit.block(
-      h,
-      (d) => {
-        row.forEach((v, i) => {
-          const x = d.x + xs[i];
-          if (i > 0) d.line(x, d.top, x, d.top - h, { color: LINE, t: 0.4 });
-          if (v && typeof v === 'object') strokeMark(d, x + Math.max(2, (ws[i] - 9) / 2), d.top - 13, v.mark, 8);
-          else d.lines(v ?? '–', 7.4, ws[i] - 5).forEach((s, n) => d.text(s, x + 2.5, d.top - 9.5 - n * 8.8, 7.4, v ? {} : { color: MUTED }));
-        });
-        d.line(d.x, d.top - h, d.x + W, d.top - h, { color: LINE, t: 0.5 });
-      },
-      head
-    );
-  }
   kit.gap(6);
 }

@@ -316,7 +316,7 @@ eq('its file name starts with the job ref', fin.name, 'HX-0042 EIC Electrical In
 const finText = await textOf(fileOf(fin));
 eq('the final: the design signed, three declarations, the next inspection, no draft banner', [
   finText.includes('SARAH JONES'),
-  finText.includes('Designer No. 1'),
+  finText.includes('Designer No 1'),
   finText.split('hereby CERTIFY').length - 1,
   finText.includes('Draft: not signed yet'),
   finText.includes('not more than 10 years'),
@@ -360,7 +360,15 @@ const skey = EICS.certKey(sref);
 eq('single signature: its own reference and key (the fourth electrician on the job)', [sref, skey], ['HX-0042-EIC4', 'EIC4']);
 eq('…final at once, in CC21', [r3.status, current(skey)?.handover_slot, docs(`${skey}_DRAFT`).length], [200, 'CC21', 0]);
 const sText = await textOf(fileOf(current(skey)));
-eq('one signatory, the next inspection from the electrician', [sText.includes('Designer, constructor and inspector'), sText.includes('Designer No. 1'), sText.includes('not more than 5 years')], [true, false, true]);
+// The A4 form has no single-signature declaration: the one person signs in each of the three places (Note 3).
+eq('one signatory in each place, the next inspection from the electrician', [
+  sText.split('hereby CERTIFY').length - 1,
+  ['Designer No 1', 'Constructor', 'Inspector'].every((r) => sText.includes(r)),
+  (sText.match(/Name \(IN BLOCK CAPITALS\): DAVE PRICE/g) ?? []).length,
+  sText.includes('single signature)'),
+  sText.includes('not more than 5 years'),
+], [3, true, 3, false, true]);
+eq('its file name has no “(single signature)”', current(skey).name, 'HX-0042 EIC4 Electrical Installation Certificate.pdf');
 
 /* ── Minor Works: a sheet per circuit, kept out of CC21 while unverified ─────── */
 const minor = electrician(

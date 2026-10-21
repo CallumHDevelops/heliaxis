@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
-import { DECLARATION, editionWords } from '@/lib/site/fixed/iet-eic';
+import { DECLARATION, DEPARTURES, editionWords, EXCEPTIONS } from '@/lib/site/fixed/iet-eic';
 import { ROUTE_LABEL } from '@/lib/site/forms/electrician/eic-model';
 import type { CertStatus } from '@/lib/site/eic/server';
 import { shortDate } from '../crm-shared';
@@ -278,6 +278,7 @@ export function SiteEic({ assignmentId, projectId, onChanged }: { assignmentId: 
           assignmentId={assignmentId}
           office={st.office}
           edition={st.edition}
+          exceptions={st.exceptions}
           onClose={() => setSigning(false)}
           onDone={(next) => {
             setSt({ ...next, office: st.office });
@@ -292,7 +293,21 @@ export function SiteEic({ assignmentId, projectId, onChanged }: { assignmentId: 
 }
 
 /** Sign the design part: the designer's particulars, the next inspection (no default), design departures, the declaration and the signature. */
-function DesignSheet({ assignmentId, office, edition, onClose, onDone }: { assignmentId: string; office: Office; edition: string | null; onClose: () => void; onDone: (s: CertStatus) => void }) {
+function DesignSheet({
+  assignmentId,
+  office,
+  edition,
+  exceptions,
+  onClose,
+  onDone,
+}: {
+  assignmentId: string;
+  office: Office;
+  edition: string | null;
+  exceptions: CertStatus['exceptions'];
+  onClose: () => void;
+  onDone: (s: CertStatus) => void;
+}) {
   const [d, setD] = useState({ ...office, next_n: '', next_unit: '', dep: '' as '' | 'none' | 'yes', departures: '' });
   const [signature, setSignature] = useState<string | null>(null);
   const [err, setErr] = useState('');
@@ -380,8 +395,9 @@ function DesignSheet({ assignmentId, office, edition, onClose, onDone }: { assig
           ))}
         </div>
       </div>
-      <p className="crm-muted crm-small">The designer’s call: there’s no default.</p>
+      <p className="crm-muted crm-small">The designer’s call: there’s no default. Agree it with the installer, and think about how well the installation will be looked after.</p>
       <label className="crm-label">Departures from BS 7671 in the design</label>
+      <p className="crm-muted crm-small">{DEPARTURES}</p>
       <div className="crm-checks" role="radiogroup" aria-label="Departures">
         <label className={d.dep === 'none' ? 'on' : ''}>
           <input type="radio" name="dz-dep" checked={d.dep === 'none'} onChange={() => set({ dep: 'none' })} />
@@ -392,7 +408,21 @@ function DesignSheet({ assignmentId, office, edition, onClose, onDone }: { assig
           Yes
         </label>
       </div>
-      {d.dep === 'yes' && <textarea className="crm-input" rows={3} value={d.departures} onChange={(e) => set({ departures: e.target.value })} placeholder="What, and why (Regs 120.3, 133.1.3, 133.5)" aria-label="The departures" />}
+      {d.dep === 'yes' && <textarea className="crm-input" rows={3} value={d.departures} onChange={(e) => set({ departures: e.target.value })} placeholder="What, and why (Regulations 120.3, 133.1.2, 133.1.3 and 133.5)" aria-label="The departures" />}
+      <label className="crm-label">Permitted exceptions (Regulation 411.3.3)</label>
+      {exceptions ? (
+        <div className="crm-small">
+          <p className="crm-muted">{EXCEPTIONS}</p>
+          <p>
+            <b>From the electrician:</b> {exceptions.text || 'Not described yet.'}
+          </p>
+          <p className="crm-muted">
+            {exceptions.photos ? `Risk assessment: ${exceptions.photos} photo${exceptions.photos === 1 ? '' : 's'}, attached to the certificate.` : 'No risk assessment photo yet.'} These go in your design part. Check them before you sign.
+          </p>
+        </div>
+      ) : (
+        <p className="crm-muted crm-small">None from the electrician (N/A on the certificate).</p>
+      )}
       <label className="crm-label">Signature</label>
       <SignaturePad onChange={setSignature} height={150} />
       {err && <p className="crm-banner crm-banner--err">{err}</p>}

@@ -26,7 +26,7 @@ import {
   type PropCtx,
 } from '@/lib/site/forms/electrician/eic-model';
 import { IR_TABLE_64, irMinimumAt } from '@/lib/site/fixed/bs7671-ir';
-import { maxZsFor } from '@/lib/site/fixed/bs7671-zs';
+import { isCalculatedSource, maxZsFor, zsCalculated } from '@/lib/site/fixed/bs7671-zs';
 import type { CustomProps } from '../custom';
 import { TopBar } from '../bits';
 import { back, go, usePath } from '../nav';
@@ -147,7 +147,7 @@ function CircuitRow({ x, pc, onOpen }: { x: Circuit; pc: PropCtx; onOpen: () => 
 }
 
 /** The limit beside a reading and a warning when it's outside (never a reading itself). */
-function limits(p: Prop, x: Circuit): { note: string | null; warn: string | null } {
+function limits(p: Prop, x: Circuit, pc: PropCtx): { note: string | null; warn: string | null } {
   if (p.k === 'zs') {
     const max = zsLimit(x);
     const zs = readingOf(x.zs);
@@ -168,7 +168,13 @@ function limits(p: Prop, x: Circuit): { note: string | null; warn: string | null
   if (p.k === 'zs_max') {
     // Once the Chapter 41 tables are copied in (fixed/bs7671-zs.ts), the figure for this device.
     const t = maxZsFor(String(x.ocpd_bs ?? ''), String(x.ocpd_type ?? ''), readingOf(x.ocpd_a));
-    return { note: t !== null ? `BS 7671 Chapter 41 gives ${t} Ω for this device.` : null, warn: null };
+    const calc = zsCalculated(x, { tt: pc.tt });
+    const typed = readingOf(x.zs_max);
+    const stale = isCalculatedSource(x.zs_src) && typed !== null && (!calc || calc.ohms !== typed);
+    return {
+      note: t !== null ? `BS 7671 Chapter 41 gives ${t} Ω for this device.` : calc ? null : 'Type it from BS 7671 Chapter 41 (a fuse’s figure isn’t worked out here).',
+      warn: stale ? 'This was worked out for a different device. Take the new figure, or type yours and say where it’s from.' : null,
+    };
   }
   if ((p.k === 'rcd_btn' || p.k === 'afdd_btn') && x[p.k] === 'fail') return { note: null, warn: 'Put it right before you sign: a certificate can’t show a failed test button.' };
   return { note: null, warn: null };
@@ -202,8 +208,21 @@ function CircuitEditor({ job, x, boards, circuits, pc, locked, base }: { job: st
       <main className="sa-main sa-step">
         {tab === 'tests' && <p className="sa-intro">Type each reading as your tester shows it. Nothing here is filled in for you.</p>}
         {list.map((p) => {
-          const l = limits(p, x);
-          return <PropRow key={p.k} p={p} id={`${key}.${p.k}`} value={x[p.k]} onChange={(v) => void setProp(job, key, p.k, v)} disabled={locked} note={l.note} warn={l.warn} />;
+          const l = limits(p, x, pc);
+          // A worked-out figure (max Zs) is offered until a value is there; taking it records its source for Remarks.
+          const sug = x[p.k] === undefined ? (p.suggest?.(x, pc) ?? null) : null;
+          const take = sug
+            ? async () => {
+                await setProp(job, key, p.k, sug.v);
+                for (const [k, val] of Object.entries(sug.also ?? {})) await setProp(job, key, k, val);
+              }
+            : undefined;
+          const change = (v: unknown) => {
+            void setProp(job, key, p.k, v);
+            // Typed over the worked-out figure: its "calculated" note no longer says where the figure came from.
+            if (p.k === 'zs_max' && isCalculatedSource(x.zs_src) && readingOf(v) !== readingOf(x.zs_max)) void setProp(job, key, 'zs_src', undefined);
+          };
+          return <PropRow key={p.k} p={p} id={`${key}.${p.k}`} value={x[p.k]} onChange={change} disabled={locked} note={l.note} warn={l.warn} suggest={sug} onTake={take} />;
         })}
         {!locked && tab === 'details' && (
           <div className="sa-eic-more">

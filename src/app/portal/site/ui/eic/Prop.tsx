@@ -1,6 +1,6 @@
 'use client';
 
-import type { Prop } from '@/lib/site/forms/electrician/eic-model';
+import type { Prop, PropSuggestion } from '@/lib/site/forms/electrician/eic-model';
 import type { Field, FieldType } from '@/lib/site/forms/types';
 import { Chips, Confirm, NumberBox, TextBox, Tiles, type SetValue } from '../widgets';
 
@@ -35,6 +35,8 @@ export function PropRow({
   disabled,
   note,
   warn,
+  suggest,
+  onTake,
 }: {
   p: Prop;
   id: string;
@@ -43,6 +45,9 @@ export function PropRow({
   disabled: boolean;
   note?: string | null;
   warn?: string | null;
+  /** A worked-out figure offered above the box (never filled in): one tap takes it. */
+  suggest?: PropSuggestion | null;
+  onTake?: () => void;
 }) {
   const f = asField(p, id);
   let widget: React.ReactNode;
@@ -74,6 +79,16 @@ export function PropRow({
       </div>
       {p.hint && <p className="sa-q-hint">{p.hint}</p>}
       {note && <p className="sa-q-note">{note}</p>}
+      {suggest && onTake && !disabled && (
+        <button type="button" className="sa-suggest" onClick={onTake}>
+          <span className="sa-suggest-src">Worked out</span>
+          <span className="sa-suggest-val">{suggest.text}</span>
+          <span className="sa-suggest-tick" aria-hidden="true">
+            ✓
+          </span>
+          <span className="sa-sr">Use this</span>
+        </button>
+      )}
       {widget}
       {warn && <p className="sa-fix">{warn}</p>}
     </div>

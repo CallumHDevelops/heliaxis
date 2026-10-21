@@ -2,7 +2,7 @@ import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import fontkit from '@pdf-lib/fontkit';
-import { degrees, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFImage, type PDFPage, type RGB } from 'pdf-lib';
+import { degrees, LineCapStyle, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFImage, type PDFPage, type RGB } from 'pdf-lib';
 import { HELIAXIS_COMPANY, HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 
 /**
@@ -189,7 +189,7 @@ function runs(f: Faces, text: string, bold: boolean): { face: Face; s: string }[
 const MM = 72 / 25.4;
 /** FORMS 0.6: A4, margins left 20 mm, right 15 mm, top 20 mm, bottom 20 mm. */
 const MARGIN = { l: 20 * MM, r: 15 * MM, t: 20 * MM, b: 20 * MM };
-const FOOT_TOP = MARGIN.b + 6;
+export type Margins = typeof MARGIN;
 
 export type DocOptions = {
   /** F43, F44… or RF_REPORT; with the title it makes the eyebrow, the footer and the metadata. */
@@ -205,7 +205,38 @@ export type DocOptions = {
   landscape?: boolean;
   /** Shown instead of the code in the eyebrow and footer ("Roofer report"). */
   label?: string;
+  /** Narrower margins than FORMS 0.6's, in points (the EIC's ruled frame runs closer to the edge, as the model form's does). */
+  margins?: Partial<Margins>;
+  /**
+   * Drawn at the top of every page instead of the "(continued)" line (the EIC's "Certificate No.:"):
+   * given what a block draws with and the page's number (from 1), it returns the points it took.
+   */
+  pageHead?: (d: Drawing, page: { n: number; landscape: boolean }) => number;
+  /**
+   * The footer's own words: `lines` in place of the legal line, `ref` in place of the code and
+   * revision before "Page x of y" ("Certificate No. HX-0042-EIC · Page 2 of 7"), and `sub` a small
+   * line under it.
+   */
+  footer?: { lines?: string[]; ref?: string; sub?: string };
 };
+
+/** What a page head or a block() draws with. */
+export type Drawing = {
+  page: PDFPage;
+  x: number;
+  top: number;
+  width: number;
+  text: (s: string, x: number, y: number, sz: number, opt?: TextOpt) => void;
+  right: (s: string, xr: number, y: number, sz: number, opt?: TextOpt) => void;
+  lines: (s: string, sz: number, max: number, bold?: boolean) => string[];
+  widthOf: (s: string, sz: number, bold?: boolean) => number;
+  mark: (bx: number, by: number, m: Mark, s?: number) => void;
+  rect: (rx: number, ry: number, rw: number, rh: number, opt?: { fill?: RGB; border?: RGB; line?: number }) => void;
+  line: (x1: number, y1: number, x2: number, y2: number, opt?: { color?: RGB; t?: number; dash?: number[]; round?: boolean }) => void;
+  image: (img: PDFImage, ix: number, iy: number, maxW: number, maxH: number) => void;
+};
+/** Text options: `rotate` 90 runs the text up the page (a schedule's column headings), from (x, y). */
+export type TextOpt = { bold?: boolean; color?: RGB; italic?: boolean; rotate?: 90 };
 
 /** `strong`: the figure the document is for ("What you'll be paid"), on a paper band and larger. */
 export type Row = { label: string; value: string | null | undefined; must?: boolean; note?: string | null; strong?: boolean };
@@ -242,10 +273,12 @@ export type Kit = Awaited<ReturnType<typeof newDocument>>;
 export async function newDocument(o: DocOptions) {
   const doc = await PDFDocument.create();
   const f = await facesFor(doc);
+  const M: Margins = { ...MARGIN, ...o.margins };
+  const FOOT_TOP = M.b + 6;
   // A document can turn between portrait and landscape page by page (the EIC's schedules): newPage().
   let size: [number, number] = o.landscape ? [A4[1], A4[0]] : A4;
-  let W = size[0] - MARGIN.l - MARGIN.r;
-  const X = MARGIN.l;
+  let W = size[0] - M.l - M.r;
+  const X = M.l;
   const label = o.label ?? o.code;
   doc.setTitle(`${label} ${o.title}${o.jobRef ? ` – ${o.jobRef}` : ''}`);
   doc.setAuthor(HELIAXIS_PARTY.name);
@@ -255,17 +288,19 @@ export async function newDocument(o: DocOptions) {
   const image: PDFImage | null = logoPng ? await doc.embedPng(logoPng).catch(() => null) : null;
 
   let page: PDFPage = doc.addPage(size);
-  let y = size[1] - MARGIN.t;
+  let y = size[1] - M.t;
 
   const width = (s: string, sz: number, bold = false) => runs(f, s, bold).reduce((w, r) => w + r.face.font.widthOfTextAtSize(r.s, sz), 0);
-  const text = (s: string, x: number, yy: number, sz: number, opt: { bold?: boolean; color?: RGB; italic?: boolean } = {}) => {
+  const text = (s: string, x: number, yy: number, sz: number, opt: TextOpt = {}) => {
     let cx = x;
+    let cy = yy;
     for (const r of runs(f, s, !!opt.bold)) {
-      page.drawText(r.s, { x: cx, y: yy, size: sz, font: r.face.font, color: opt.color ?? INK, ...(opt.italic ? { ySkew: degrees(12) } : {}) });
-      cx += r.face.font.widthOfTextAtSize(r.s, sz);
+      page.drawText(r.s, { x: cx, y: cy, size: sz, font: r.face.font, color: opt.color ?? INK, ...(opt.italic ? { ySkew: degrees(12) } : {}), ...(opt.rotate ? { rotate: degrees(opt.rotate) } : {}) });
+      if (opt.rotate) cy += r.face.font.widthOfTextAtSize(r.s, sz);
+      else cx += r.face.font.widthOfTextAtSize(r.s, sz);
     }
   };
-  const right = (s: string, xr: number, yy: number, sz: number, opt: { bold?: boolean; color?: RGB } = {}) => text(s, xr - width(s, sz, opt.bold), yy, sz, opt);
+  const right = (s: string, xr: number, yy: number, sz: number, opt: TextOpt = {}) => text(s, xr - width(s, sz, opt.bold), yy, sz, opt);
   /** Lines no wider than max, measured in the document's own fonts. */
   const lines = (s: string, sz: number, max: number, bold = false): string[] => {
     const out: string[] = [];
@@ -293,9 +328,14 @@ export async function newDocument(o: DocOptions) {
   };
   const hairline = (yy: number, color: RGB = LINE, t = 0.6) => page.drawLine({ start: { x: X, y: yy }, end: { x: X + W, y: yy }, thickness: t, color });
 
+  /** The page head (pageHead), on a page just begun. */
+  const head = () => {
+    if (o.pageHead) y -= o.pageHead(drawing(), { n: doc.getPageCount(), landscape: size[0] > size[1] });
+  };
   const continued = () => {
     page = doc.addPage(size);
-    y = size[1] - MARGIN.t;
+    y = size[1] - M.t;
+    if (o.pageHead) return head();
     text(`${label === o.title ? label : `${label} · ${o.title}`}${o.jobRef ? ` · ${o.jobRef}` : ''} (continued)`, X, y - 9, 8.5, { bold: true, color: MUTED });
     y -= 24;
   };
@@ -307,7 +347,7 @@ export async function newDocument(o: DocOptions) {
   };
 
   /** What a block() draws with: the page, where it starts, and the kit's own text in its fonts. */
-  const drawing = () => ({
+  const drawing = (): Drawing => ({
     page,
     x: X,
     top: y,
@@ -330,8 +370,16 @@ export async function newDocument(o: DocOptions) {
     rect(rx: number, ry: number, rw: number, rh: number, opt: { fill?: RGB; border?: RGB; line?: number } = {}) {
       page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, ...(opt.fill ? { color: opt.fill } : {}), ...(opt.border ? { borderColor: opt.border, borderWidth: opt.line ?? 0.5 } : {}) });
     },
-    line(x1: number, y1: number, x2: number, y2: number, opt: { color?: RGB; t?: number } = {}) {
-      page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: opt.t ?? 0.5, color: opt.color ?? LINE });
+    /** A rule; `dash` [on, off] and `round` caps make a dotted leader ([0, 2] with round caps: dots). */
+    line(x1: number, y1: number, x2: number, y2: number, opt: { color?: RGB; t?: number; dash?: number[]; round?: boolean } = {}) {
+      page.drawLine({
+        start: { x: x1, y: y1 },
+        end: { x: x2, y: y2 },
+        thickness: opt.t ?? 0.5,
+        color: opt.color ?? LINE,
+        ...(opt.dash ? { dashArray: opt.dash } : {}),
+        ...(opt.round ? { lineCap: LineCapStyle.Round } : {}),
+      });
     },
     /** An image embedded first (kit.embed), fitted whole into maxW × maxH with its bottom left at (ix, iy). */
     image(img: PDFImage, ix: number, iy: number, maxW: number, maxH: number) {
@@ -340,11 +388,17 @@ export async function newDocument(o: DocOptions) {
     },
   });
 
+  head();
+
   return {
     doc,
     /** The width content has (on the page in hand: landscape pages are wider). */
     get width() {
       return W;
+    },
+    /** The page in hand, numbered from 1. */
+    get pageNumber() {
+      return doc.getPageCount();
     },
     /** Points left on this page above the footer. */
     room: () => y - FOOT_TOP - 10,
@@ -357,11 +411,12 @@ export async function newDocument(o: DocOptions) {
      */
     newPage(opt: { landscape?: boolean; continued?: boolean } = {}) {
       size = opt.landscape ? [A4[1], A4[0]] : A4;
-      W = size[0] - MARGIN.l - MARGIN.r;
+      W = size[0] - M.l - M.r;
       if (opt.continued) continued();
       else {
         page = doc.addPage(size);
-        y = size[1] - MARGIN.t;
+        y = size[1] - M.t;
+        head();
       }
     },
     /**
@@ -369,7 +424,7 @@ export async function newDocument(o: DocOptions) {
      * points (a new page if not, then `again` for its headings), drawn by `draw`, then below it.
      * Synchronous, so a table's headings can be drawn again from `again`; embed images first.
      */
-    block(h: number, draw: (d: ReturnType<typeof drawing>) => void, again?: () => void) {
+    block(h: number, draw: (d: Drawing) => void, again?: () => void) {
       need(h, again);
       draw(drawing());
       y -= h;
@@ -598,12 +653,18 @@ export async function newDocument(o: DocOptions) {
     async save(): Promise<Uint8Array> {
       const pages = doc.getPages();
       const legal = `${HELIAXIS_PARTY.name} · Registered in England and Wales No. ${HELIAXIS_PARTY.companyNumber} · Registered address: ${HELIAXIS_COMPANY.addressLines.join(', ')} · VAT ${HELIAXIS_PARTY.vatNumber} · MCS ${HELIAXIS_COMPANY.mcsNumber}`;
+      const ref = o.footer?.ref ?? `${label}${o.revision ? ` · ${o.revision}` : ''}`;
       pages.forEach((p, i) => {
         page = p;
-        const fw = p.getWidth() - MARGIN.l - MARGIN.r;
-        p.drawLine({ start: { x: MARGIN.l, y: FOOT_TOP }, end: { x: MARGIN.l + fw, y: FOOT_TOP }, thickness: 0.5, color: LINE });
-        lines(legal, 6.6, fw - 150).forEach((l, n) => text(l, MARGIN.l, FOOT_TOP - 10 - n * 8.2, 6.6, { color: MUTED }));
-        right(`${label}${o.revision ? ` · ${o.revision}` : ''} · Page ${i + 1} of ${pages.length}`, MARGIN.l + fw, FOOT_TOP - 10, 7, { bold: true, color: MUTED });
+        const fw = p.getWidth() - M.l - M.r;
+        p.drawLine({ start: { x: M.l, y: FOOT_TOP }, end: { x: M.l + fw, y: FOOT_TOP }, thickness: 0.5, color: LINE });
+        const words = `${ref} · Page ${i + 1} of ${pages.length}`;
+        const left = o.footer?.lines ?? [legal];
+        const sub = o.footer?.sub;
+        const room = o.footer ? fw - Math.max(width(words, 7, true), sub ? width(sub, 6.2) : 0) - 16 : fw - 150;
+        left.flatMap((s) => lines(s, 6.6, room)).forEach((l, n) => text(l, M.l, FOOT_TOP - 10 - n * 8.2, 6.6, { color: MUTED }));
+        right(words, M.l + fw, FOOT_TOP - 10, 7, { bold: true, color: MUTED });
+        if (sub) right(sub, M.l + fw, FOOT_TOP - 18.2, 6.2, { color: MUTED });
       });
       return doc.save();
     },

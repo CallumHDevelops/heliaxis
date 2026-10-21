@@ -2,13 +2,13 @@ import 'server-only';
 import { PDFDocument } from 'pdf-lib';
 import { ukDay } from '@/lib/bank-holidays';
 import { CRM_BUCKET, DOCS_BUCKET } from '@/lib/crm/server';
-import { eicPdf, type SigImage } from '@/lib/documents/eic/eic';
+import { EIC_REVISION, eicPdf, type Attachment, type SigImage } from '@/lib/documents/eic/eic';
 import { meiwcPdf } from '@/lib/documents/eic/meiwc';
 import { docFileName, MissingAnswer } from '@/lib/documents/pdf-kit';
 import { currentGenerated, isOutOfDate, saveGenerated, type GeneratedDoc } from '@/lib/documents/store';
 import { IET_GUIDANCE } from '../fixed/iet-guidance';
 import { IET_MEIWC } from '../fixed/iet-meiwc';
-import { DECLARATION } from '../fixed/iet-eic';
+import { EIC_CHECKED_AGAINST_A4 } from '../fixed/iet-eic';
 import { serverCtx } from '../form-ctx';
 import { certMissing, designOf, type DesignSign } from '../forms/electrician/eic';
 import { editionOf, officeRoute, routeOf, type CertRoute } from '../forms/electrician/eic-model';
@@ -32,6 +32,8 @@ import { readAssignment, type AssignmentRow, type Db } from '../server';
  */
 
 export const SIG_SLOTS = ['eic_sig_con', 'eic_sig_ins', 'eic_sig_one'] as const;
+/** Photos the form asks to be attached, printed on continuation sheets: the risk assessment (C), the main switch's settings (G). */
+export const ATTACH_SLOTS = ['eic_exc_ra', 'eic_ms_settings'] as const;
 const SIGNED_URL_SECONDS = 600;
 
 type Photo = { id: string; slot: string; storage_path: string; taken_at: string | null; created_at: string };
@@ -57,6 +59,8 @@ export type CertificateData = {
   issued: string;
   signoff: { id: string; signed_at: string; signed_name: string } | null;
   photos: Partial<Record<(typeof SIG_SLOTS)[number], Photo>>;
+  /** Every photo in each attachment slot, oldest first. */
+  attached: Partial<Record<(typeof ATTACH_SLOTS)[number], Photo[]>>;
   design: DesignSign | null;
 };
 
@@ -66,11 +70,15 @@ export async function certificateData(db: Db, a: AssignmentRow): Promise<Certifi
     serverCtx(db, a),
     db.from('crm_projects').select('project_ref, address, postcode').eq('id', a.project_id).maybeSingle(),
     db.from('site_signoffs').select('id, signed_at, signed_name').eq('assignment_id', a.id).eq('stage', 'main').maybeSingle(),
-    db.from('crm_photos').select('id, slot, storage_path, taken_at, created_at').eq('assignment_id', a.id).in('slot', [...SIG_SLOTS]).order('created_at'),
+    db.from('crm_photos').select('id, slot, storage_path, taken_at, created_at').eq('assignment_id', a.id).in('slot', [...SIG_SLOTS, ...ATTACH_SLOTS]).order('created_at'),
   ]);
   const photos: CertificateData['photos'] = {};
-  // The latest signature in each place (an earlier one taken off and signed again is gone already).
-  for (const x of (ph ?? []) as Photo[]) photos[x.slot as (typeof SIG_SLOTS)[number]] = x;
+  const attached: CertificateData['attached'] = {};
+  for (const x of (ph ?? []) as Photo[]) {
+    if ((ATTACH_SLOTS as readonly string[]).includes(x.slot)) (attached[x.slot as (typeof ATTACH_SLOTS)[number]] ??= []).push(x);
+    // The latest signature in each place (an earlier one taken off and signed again is gone already).
+    else photos[x.slot as (typeof SIG_SLOTS)[number]] = x;
+  }
   const project = (p ?? {}) as { project_ref?: string | null };
   const signoff = (so as CertificateData['signoff']) ?? null;
   return {
@@ -84,6 +92,7 @@ export async function certificateData(db: Db, a: AssignmentRow): Promise<Certifi
     issued: ukDay(signoff?.signed_at ?? new Date()),
     signoff,
     photos,
+    attached,
     design: designOf(ctx),
   };
 }
@@ -102,8 +111,10 @@ function inputsOf(d: CertificateData, extra: Record<string, unknown> = {}) {
     edition: editionOf(d.ctx),
     answers,
     photos: Object.fromEntries(Object.entries(d.photos).map(([k, x]) => [k, x?.id ?? null])),
+    attached: Object.fromEntries(Object.entries(d.attached).map(([k, xs]) => [k, (xs ?? []).map((x) => x.id)])),
     signoff: d.signoff?.id ?? null,
-    wording: { single: !!DECLARATION.single, guidance: IET_GUIDANCE.verified, meiwc: IET_MEIWC.verified },
+    // The form it's printed on: a change of wording or layout makes it out of date (Make it again).
+    wording: { a4: EIC_CHECKED_AGAINST_A4, layout: EIC_REVISION, guidance: IET_GUIDANCE.verified, meiwc: IET_MEIWC.verified },
     ...extra,
   };
 }
@@ -117,11 +128,12 @@ export type Made = { key: string; name: string; bytes: Uint8Array; inputs: unkno
 
 /** The EIC as it stands (final when it can be; a draft otherwise, or when a must turns out empty). */
 export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | null = null): Promise<Made> {
-  const [con, ins, one, designPng] = await Promise.all([
+  const [con, ins, one, designPng, attachments] = await Promise.all([
     sigOf(db, d.photos.eic_sig_con),
     sigOf(db, d.photos.eic_sig_ins),
     sigOf(db, d.photos.eic_sig_one),
     d.design ? download(db, DOCS_BUCKET, d.design.path) : Promise.resolve(null),
+    attachmentsOf(db, d),
   ]);
   const input = {
     route: d.route === 'eic_single' ? ('eic_single' as const) : ('eic' as const),
@@ -133,8 +145,10 @@ export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | n
     address: d.address,
     sig: { con, ins, one },
     design: d.design ? { ...d.design, png: designPng } : null,
+    attachments,
   };
-  const title = d.route === 'eic_single' ? 'Electrical Installation Certificate (single signature)' : 'Electrical Installation Certificate';
+  // One form for both routes: a single signatory signs in each place (the form's Note 3).
+  const title = 'Electrical Installation Certificate';
   let final = isFinal(d);
   let missing: string | null = null;
   let bytes: Uint8Array;
@@ -171,6 +185,18 @@ export async function makeMeiwcs(db: Db, d: CertificateData): Promise<Made[]> {
     const key = d.key === 'EIC' ? m.key : m.key.replace('MEIWC', `MEIWC${d.key.slice(3)}`);
     const title = IET_MEIWC.verified ? `Minor Works ${m.name}` : `Minor Works data sheet ${m.name}`;
     out.push({ key, name: docFileName(d.jobRef, '', title), bytes, inputs: inputsOf(d, { circuit: m.circuit.id }), final, missing });
+  }
+  return out;
+}
+
+/** The attached photos as the server holds them (a photo that can't be read is left out). */
+async function attachmentsOf(db: Db, d: CertificateData): Promise<Attachment[]> {
+  const out: Attachment[] = [];
+  for (const slot of ATTACH_SLOTS) {
+    for (const x of d.attached[slot] ?? []) {
+      const bytes = await download(db, CRM_BUCKET, x.storage_path);
+      if (bytes) out.push({ slot, bytes });
+    }
   }
   return out;
 }
@@ -260,6 +286,8 @@ export type CertStatus = {
   missing: Missing[];
   signed: { at: string; name: string } | null;
   design: { name: string; signed_at: string; next: string } | null;
+  /** The electrician's permitted exceptions (Reg 411.3.3): they print in the design part, so the designer checks them before signing. */
+  exceptions: { text: string; photos: number } | null;
   /** The filed certificate; `stale`: what it's made from has changed since (Make it again). */
   doc: { id: string; name: string; version: number; final: boolean; url: string | null; stale: boolean; visible: boolean } | null;
   /** The Minor Works sheets. */
@@ -343,6 +371,8 @@ export async function certificateStatus(db: Db, a: AssignmentRow): Promise<CertS
     missing,
     signed: d.signoff ? { at: d.signoff.signed_at, name: d.signoff.signed_name } : null,
     design: d.design ? { name: d.design.name, signed_at: d.design.signed_at, next: `${d.design.next_n} ${d.design.next_unit}` } : null,
+    exceptions:
+      d.ctx.values.eic_exc === 'yes' ? { text: typeof d.ctx.values.eic_exc_what === 'string' ? d.ctx.values.eic_exc_what : '', photos: d.attached.eic_exc_ra?.length ?? 0 } : null,
     doc: doc ? { id: doc.id, name: doc.name, version: doc.version, final: !!final, url: await linkOf(db, doc), stale: await staleness(db, d, doc), visible: doc.visible } : null,
     sheets,
     notify: {

@@ -12,12 +12,19 @@ import type { CustomProps } from '../custom';
 import type { SlotPhoto } from '../form-state';
 import { useBlobUrl, useLive } from '../nav';
 
-/** The declaration this signature is under, from the model form's wording (fixed/iet-eic.ts). */
-function declarationFor(slot: string, route: string, amended: string): string[] {
-  if (slot === 'eic_sig_con') return [DECLARATION.construction(amended)];
-  if (slot === 'eic_sig_ins') return [DECLARATION.inspection(amended)];
-  if (route === 'meiwc') return ['This signature goes on the Minor Works data sheet for each circuit you worked on.'];
-  return DECLARATION.single ? [DECLARATION.single(amended)] : [DECLARATION.design(amended), DECLARATION.construction(amended), DECLARATION.inspection(amended)];
+/**
+ * What this signature is under, from the model form's wording (fixed/iet-eic.ts). A single signature
+ * has no declaration of its own on the A4:2026 form: the one person signs in each of the three places
+ * (its Note 3), under each part's declaration.
+ */
+function declarationFor(slot: string, route: string, amended: string): { lead: string | null; words: string[] } {
+  if (slot === 'eic_sig_con') return { lead: null, words: [DECLARATION.construction(amended)] };
+  if (slot === 'eic_sig_ins') return { lead: null, words: [DECLARATION.inspection(amended)] };
+  if (route === 'meiwc') return { lead: null, words: ['This signature goes on the Minor Works data sheet for each circuit you worked on.'] };
+  return {
+    lead: 'You’re signing all three parts: design, building it, and inspection and testing. Your signature goes in each place on the certificate.',
+    words: [DECLARATION.design(amended), DECLARATION.construction(amended), DECLARATION.inspection(amended)],
+  };
 }
 
 /**
@@ -32,11 +39,12 @@ export function EicSign({ f, rec, jf, locked }: CustomProps) {
   const [drawn, setDrawn] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const name = typeof jf.ctx.values.eic_sig_name === 'string' ? (jf.ctx.values.eic_sig_name as string) : '';
-  const words = declarationFor(slot, routeOf(jf.ctx), editionWords(editionOf(jf.ctx)));
+  const { lead, words } = declarationFor(slot, routeOf(jf.ctx), editionWords(editionOf(jf.ctx)));
   const current = have.at(-1);
 
   return (
     <div className="sa-eic-sign">
+      {lead && <p className="sa-q-hint">{lead}</p>}
       {words.map((w) => (
         <p key={w.slice(0, 40)} className="sa-declaration sa-eic-decl">
           {w}
