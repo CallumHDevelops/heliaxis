@@ -3,14 +3,14 @@
 import Image from 'next/image';
 import { useEffect, useEffectEvent, useState } from 'react';
 import { siteFetch } from '@/lib/site/client';
-import { getDevice, getPack, linkKey, saveDevice, updateDevice } from '@/lib/site/offline';
+import { getDevice, getPack, linkKey, otherPerson, saveDevice, updateDevice } from '@/lib/site/offline';
 import { downloadPack, type ReadyStep } from '@/lib/site/packs';
 import { drain } from '@/lib/site/sync';
 import { ProblemScreen, Splash, Tick } from './bits';
 import { chromeIntent, installEnv, installLater, promptInstall, safariLink, setInstallLater, useInstallPrompt, type InstallEnv } from './install';
 import { go } from './nav';
 
-type OpenReply = { deviceToken?: string; contact: { name: string; first: string }; assignment: { id: string; trade: string; title: string; site: string } };
+type OpenReply = { deviceToken?: string; contact: { id?: string; name: string; first: string }; assignment: { id: string; trade: string; title: string; site: string } };
 type Phase =
   | { kind: 'opening' }
   | { kind: 'install' }
@@ -60,6 +60,9 @@ export function Landing({ token }: { token: string }) {
     const r = await siteFetch<OpenReply>('/api/site/open', { body: { token, device: dev?.token ?? null, standalone: env === 'standalone' }, token: null });
     if (r.ok) {
       const a = r.data.assignment;
+      // Someone else's link on this phone: the last person's waiting work gets one try with their own
+      // session first, then nothing of theirs stays (saveDevice).
+      if (dev && !dev.revoked && otherPerson(dev, r.data.contact)) await drain().catch(() => false);
       await saveDevice({ token: r.data.deviceToken ?? dev?.token ?? '', contact: r.data.contact, job: a.id });
       if (key) {
         const d = await getDevice();

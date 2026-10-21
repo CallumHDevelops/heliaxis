@@ -26,7 +26,8 @@ type Store = 'device' | 'packs' | 'files' | 'drafts' | 'outbox' | 'photos';
 export type DeviceRecord = {
   id: 'me';
   token: string;
-  contact: { name: string; first: string };
+  /** Who the session is for (id from the server since round 1's review; older records have only the name). */
+  contact: { id?: string; name: string; first: string };
   /** Jobs this phone knows about (from links opened and the home list). */
   jobs: string[];
   /** The home list as the server last sent it, for opening with no signal. */
@@ -126,11 +127,21 @@ export const changed = () => {
 /* ── The device ──────────────────────────────────────────────────────────────── */
 
 export const getDevice = () => getRec<DeviceRecord>('device', 'me');
-/** A session from an opened link: the jobs already known stay, and a revoked session is replaced. */
+/** Another person's link on this phone (a shared van phone, the boss's link on an operative's phone). */
+export const otherPerson = (was: Pick<DeviceRecord, 'contact'> | null | undefined, now: DeviceRecord['contact']) =>
+  !!was && (was.contact.id && now.id ? was.contact.id !== now.id : was.contact.name !== now.name);
+const clearStore = (s: Store) => tx(s, 'readwrite', (x) => x.clear());
+/**
+ * A session from an opened link: the jobs already known stay, and a revoked session is replaced.
+ * Someone else's link: nothing of the last person's stays on the phone (their jobs, customers'
+ * details, drawings, photos, drafts, POs and anything still waiting to send).
+ */
 export async function saveDevice(d: Pick<DeviceRecord, 'token' | 'contact'> & { job?: string }) {
   const was = await getDevice();
-  const jobs = [...new Set([...(was?.jobs ?? []), ...(d.job ? [d.job] : [])])];
-  const keep = was && was.token === d.token ? was : { remember: was?.remember, home: was?.home, links: was?.links };
+  const other = otherPerson(was, d.contact);
+  if (other) for (const s of ['packs', 'files', 'drafts', 'outbox', 'photos'] as const) await clearStore(s);
+  const jobs = [...new Set([...(other ? [] : (was?.jobs ?? [])), ...(d.job ? [d.job] : [])])];
+  const keep = was && was.token === d.token ? was : other ? {} : { remember: was?.remember, home: was?.home, links: was?.links };
   await putRec('device', { ...keep, token: d.token, contact: d.contact, jobs, id: 'me', revoked: undefined, savedAt: new Date().toISOString() } satisfies DeviceRecord);
   changed();
 }
