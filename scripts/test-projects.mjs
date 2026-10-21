@@ -259,6 +259,17 @@ eq('BUS expiry as saved', busExpiry({ bus_issued_on: '2026-08-15', bus_expires_o
   const ibg = deadlinesFor(job({ commissioned_at: '2026-10-23T10:00:00Z', paperwork: { mcs_cert_no: 'MCS-1', mcs_registered_on: '2026-10-28' } }), cal('2026-10-29'));
   eq('the guarantee within 7 days of the MCS certificate (handover CC16)', ibg.filter((x) => x.key === 'cc16').map((x) => [x.label, x.due, x.done]), [['Buy the insurance-backed guarantee', '2026-11-04', false]]);
   eq('done once its reference is saved', deadlinesFor(job({ paperwork: { mcs_registered_on: '2026-10-28', ibg_ref: 'HIES-1' } }), cal('2026-10-29')).find((x) => x.key === 'cc16')?.done, true);
+  eq('done once "Guarantee registered" is saved, with no reference', deadlinesFor(job({ paperwork: { mcs_registered_on: '2026-05-08', ibg_registered_on: '2026-05-09' } }), cal('2026-10-21')).find((x) => x.key === 'cc16')?.done, true);
+  // A job finished before the guarantee deadline existed: its paperwork already ticks "Warranties and
+  // insurance-backed guarantee registered", so it mustn't show up as 159 days late (or raise a task).
+  const finished = job({
+    stage: 'complete',
+    products: ['solar', 'battery'],
+    commissioned_at: '2026-05-01T10:00:00Z',
+    paperwork: { mcs_cert_no: 'MCS-9', mcs_registered_on: '2026-05-08', ibg_registered_on: '2026-05-09', warranties_registered_on: '2026-05-09', building_regs_ref: 'N9' },
+  });
+  eq('a finished job with its guarantee registered: nothing late', deadlinesFor(finished, cal('2026-10-21')).filter((x) => !x.done).map((x) => x.key), []);
+  eq('a bad date is not a registration', deadlinesFor(job({ paperwork: { mcs_registered_on: '2026-10-28', ibg_registered_on: 'soon' } }), cal('2026-10-29')).find((x) => x.key === 'cc16')?.done, false);
 }
 
 /* ── Feeds ────────────────────────────────────────────────────────────────── */
