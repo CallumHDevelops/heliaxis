@@ -203,6 +203,10 @@ eq('F78 before the electrician signs: Waiting', I.f78Input(facts({ electrician: 
 const noCircuits = I.f78Input(facts({ electrician: { ...facts().electrician, values: { f78_kind: 'initial', eess_backup: 'yes' } }, settings: { ...settings, nextInspectionYears: 10 } }));
 eq('F78 with no circuits tested (not typed, not on the EIC): Missing, F78 details, never "Not answered"', [noCircuits.ok, noCircuits.fix], [false, 'values']);
 eq('F78 with the office’s circuits tested: ready, printed', I.f78Input(facts({ electrician: { ...facts().electrician, values: { f78_kind: 'initial', eess_backup: 'yes' } }, data: { F78: { ...facts().data.F78, values: { circuits: '2 PV strings; 1 AC circuit' } } }, settings: { ...settings, nextInspectionYears: 10 } })).input?.pv?.circuits, '2 PV strings; 1 AC circuit');
+const eicDesign = { name: 'Sarah Jones', signed_at: '2026-11-04T09:00:00Z', path: 'signatures/p1/eic-design.png', by: 'u2' };
+const viaEic = I.f78Input(facts({ data: {}, electrician: { ...facts().electrician, design: eicDesign }, settings: { ...settings, nextInspectionYears: 10 } }));
+eq('F78 with the EIC’s design part signed in the office: one signature, made with it', [viaEic.ok, viaEic.input?.design], [true, eicDesign]);
+eq('F78’s own design signature, if there is one, comes first', I.f78Input(facts({ electrician: { ...facts().electrician, design: eicDesign }, settings: { ...settings, nextInspectionYears: 10 } })).input?.design?.name, 'Callum Hughes');
 eq('F78 without the design signature: Sign the design part', I.f78Input(facts({ data: {}, settings: { ...settings, nextInspectionYears: 10 } })).fix, 'sign-design');
 
 const sched = I.scheduleInput(facts());

@@ -325,7 +325,8 @@ export type HandoverView = {
     F47: { key: string; label: string; value: string }[];
     F16E: { text: string; by: string | null }[];
   };
-  f78Design: { name: string; signed_at: string } | null;
+  /** F78's design signature: its own, or the EIC's design part (`eic`). */
+  f78Design: { name: string; signed_at: string; eic: boolean } | null;
   /** Unresolved site flags, to copy onto F16E as still to put right. */
   flags: { text: string; trade: string }[];
   customer: { first: string; email: boolean; mobile: boolean; portal: string | null };
@@ -426,7 +427,11 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
       F47: [{ key: 'isolator', label: 'Lockable isolation switch: where it is', value: v('F47', 'isolator') }],
       F16E: f.data.F16E?.outstanding ?? [],
     },
-    f78Design: f.data.F78?.design ? { name: f.data.F78.design.name, signed_at: f.data.F78.design.signed_at } : null,
+    f78Design: f.data.F78?.design
+      ? { name: f.data.F78.design.name, signed_at: f.data.F78.design.signed_at, eic: false }
+      : f.electrician?.design
+        ? { name: f.electrician.design.name, signed_at: f.electrician.design.signed_at, eic: true }
+        : null,
     flags,
     customer: {
       first: f.customer.first,

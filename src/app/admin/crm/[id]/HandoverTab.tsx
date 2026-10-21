@@ -201,7 +201,8 @@ export function HandoverTab({
       for (const d of v.designDocs) helpers.push({ label: `Use “${d.name}”`, run: () => void post({ action: 'move', doc: d.id, slot: s.code }, `“${d.name}” is now in the pack.`) });
     if (s.code === 'F16E') helpers.push({ label: 'Still to put right', run: () => setSheet({ kind: 'outstanding' }), fix: 'outstanding' });
     if (s.code === 'F78') {
-      if (!v.f78Design) helpers.push({ label: 'Sign the design part', run: () => setSheet({ kind: 'sign' }), fix: 'sign-design' });
+      // Not while the EIC's design part is to sign on the Site tab (fix 'site'): that one signature signs F78's too.
+      if (!v.f78Design && s.fix !== 'site') helpers.push({ label: 'Sign the design part', run: () => setSheet({ kind: 'sign' }), fix: 'sign-design' });
       helpers.push({ label: 'F78 details', run: () => setSheet({ kind: 'values', slot: 'F78' }), fix: 'values' });
     }
     if (s.code === 'CC4') helpers.push({ label: 'Where the switches are', run: () => setSheet({ kind: 'values', slot: 'CC4' }), fix: 'switches' });

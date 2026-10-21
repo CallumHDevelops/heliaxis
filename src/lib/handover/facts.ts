@@ -72,7 +72,7 @@ export type Loaded = {
 };
 
 /** What Units 2 and 3 can tell the pack about the electrician's work (only the fields they know). */
-export type FactsPlugin = (db: Db, projectId: string, f: HandoverFacts) => Promise<Partial<Pick<ElectricianFacts, 'certRef' | 'nextInspection' | 'certWaits' | 'values'>> | null>;
+export type FactsPlugin = (db: Db, projectId: string, f: HandoverFacts) => Promise<Partial<Pick<ElectricianFacts, 'certRef' | 'nextInspection' | 'certWaits' | 'design' | 'values'>> | null>;
 const PLUGINS: FactsPlugin[] = [
   // The electrician's certificate (site/handover-facts.ts), loaded when needed.
   async (db, projectId, f) => (await import('@/lib/site/handover-facts')).siteHandoverFacts(db, projectId, f),

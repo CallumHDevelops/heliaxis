@@ -12,8 +12,9 @@ import { assignmentRow, type Db } from './server';
  * What the site app tells the handover pack beyond the electrician's answers (handover/facts.ts runs
  * it for every job): the certificate's reference as the other forms print it ("HX-0042-EIC", or
  * "NAPIT EIC 123456" for their own), the next inspection from the EIC (the office's design part, or
- * the electrician's on a single signature), what the certificate still waits for from the office, and
- * the answers the forms work out for them (F78's initial or periodic verification follows F43's).
+ * the electrician's on a single signature), what the certificate still waits for from the office, the
+ * EIC's design signature (F78's design part is the same signature), and the answers the forms work
+ * out for them (F78's initial or periodic verification follows F43's, its circuits tested).
  * Read the same way as the gate reads them (serverCtx), for the job's latest live electrician.
  */
 export const siteHandoverFacts: FactsPlugin = async (db: Db, projectId: string) => {
@@ -35,10 +36,14 @@ export const siteHandoverFacts: FactsPlugin = async (db: Db, projectId: string) 
     const circuits = circuitsTested(ctx);
     if (circuits) worked.f78_p_circuits = circuits;
   }
+  // The EIC's design part, signed in the office (sign-design writes it as office:<staff>): F78's design signature too.
+  const d = designOf(ctx);
+  const byOffice = String((assignmentRow(row).answers.eic_design as { dev?: unknown } | undefined)?.dev ?? '').startsWith('office:');
   return {
     certRef: certRef(ctx),
     nextInspection: eicSummary(ctx).next,
-    certWaits: signed && route === 'eic' && !designOf(ctx) ? 'Sign the EIC’s design part (Site tab, the electrician’s card): the certificate and the next inspection come from it.' : null,
+    certWaits: signed && route === 'eic' && !d ? 'Sign the EIC’s design part (Site tab, the electrician’s card): the certificate and the next inspection come from it.' : null,
+    design: d && byOffice ? { name: d.name, signed_at: d.signed_at, path: d.path, by: d.by } : null,
     values: worked,
   };
 };

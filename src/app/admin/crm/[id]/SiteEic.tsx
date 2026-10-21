@@ -440,6 +440,7 @@ function DesignSheet({
         <p className="crm-muted crm-small">None from the electrician (N/A on the certificate).</p>
       )}
       <label className="crm-label">Signature</label>
+      <p className="crm-muted crm-small">On a solar or battery job it’s also the design signature on the customer’s handover certificate: you sign once.</p>
       <SignaturePad onChange={setSignature} height={150} />
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {missing.length > 0 && <p className="crm-muted crm-small">To sign: {missing.join(', ')}.</p>}

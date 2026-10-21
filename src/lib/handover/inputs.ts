@@ -18,7 +18,7 @@ import { contentsGroups, type Fix, type SlotCode, type SlotView, type Tech } fro
 
 /** A customer's signature for one document: on the electrician's phone (P15) or in their portal (C2). */
 export type CustomerSig = { name: string; signed_at: string; path: string; via: 'phone' | 'portal'; declaration?: string | null };
-/** The office's design signature on F78. */
+/** The office's design signature on F78 (signed for F78, or the EIC's design part: the same person on the same job). */
 export type OfficeSig = { name: string; signed_at: string; path: string; by: string | null };
 /** A payment recorded against the job (crm_payments), typed from the invoice. */
 export type Payment = { id: string; kind: 'stage' | 'final' | 'other'; amount_pence: number; paid_on: string; method: 'card' | 'bank_transfer' | 'other'; reference: string | null };
@@ -92,6 +92,8 @@ export type ElectricianFacts = {
   nextInspection: string | null;
   /** What the certificate still waits for from the office ("Sign the EIC’s design part…"), from site/handover-facts.ts. */
   certWaits?: string | null;
+  /** The EIC's design part as the office signed it (site/handover-facts.ts): F78's design signature too. */
+  design?: OfficeSig | null;
 };
 
 export type HandoverFacts = {
@@ -512,7 +514,8 @@ export function f78Input(f: HandoverFacts): Made<F78Input> {
   if (e.certWaits && !e.nextInspection) return missing(e.certWaits, 'site');
   const next = e.nextInspection ?? (f.settings.nextInspectionYears ? `${f.settings.nextInspectionYears} years` : null);
   if (!next) return missing('Set the next inspection (years) in CRM settings: the EIC doesn’t give one.', 'settings');
-  const design = f.data.F78?.design;
+  // One office signature for the design: F78's own, or the EIC's design part (the same person, the same job).
+  const design = f.data.F78?.design ?? e.design ?? null;
   if (!design) return missing('Sign the design part.', 'sign-design');
   const optimisers = equipmentOf(f).find((x) => x.what === 'Optimisers');
   const panels = s.panel_model ? `${s.panel_count ? `${s.panel_count} × ` : ''}${s.panel_model}${s.kwp ? ` (${num(s.kwp, 3)} kWp)` : ''}` : null;
