@@ -502,6 +502,27 @@ const coverPrint = await H.handoverDocPrint(db, refOf(cur('F07BI')));
 eq('a print version asked for days later: the same words as the stored copy (dated the day it was made)', coverPrint instanceof Uint8Array && JSON.stringify(await allText(coverPrint)) === JSON.stringify(coverWords), true);
 globalThis.__today = '2026-11-03';
 
+/* ── 10. A warranty dated from the handover goes in the pack that's sent ───────── */
+const settingsRow = db.t.cms_kv.find((x) => x.key === 'handover-settings');
+const settingsWas = settingsRow.value;
+settingsRow.value = JSON.stringify({ ...JSON.parse(settingsWas), warrantyStart: 'handover' });
+const pid2 = randomUUID();
+const enq2 = randomUUID();
+db.rows('crm_projects').push({ id: pid2, enquiry_id: enq2, owner_id: 'owner-1', title: 'EV charger', stage: 'installing', project_ref: 'HX-0043', address: '3 Mill Lane, Newport', postcode: 'NP20 5CD', products: ['ev'], install_at: '2026-11-04T08:00:00Z', install_days: 1, commissioned_at: '2026-11-04T15:00:00Z', handover_at: null, value: 1200, portal_token: 'portal-token-2', checklist: {}, system: { ev_charger_model: 'Zappi 2' }, paperwork: {} });
+db.rows('enquiries').push({ id: enq2, name: 'Tom Jones', email: 'tom@example.test', phone: null, postcode: 'NP20 5CD' });
+await H.refreshHandover(db, pid2, {});
+const w0 = (await H.handoverView(db, pid2)).slots.find((s) => s.code === 'F19I');
+eq('warranty dated from the handover: Waiting until the pack goes', [w0.state, w0.why], ['waiting', 'Dated when the pack goes to the customer.']);
+const sent2 = await H.sendHandover(db, pid2, { via: [], by: 'staff-1', byName: 'Sarah Office', override: true, now: new Date('2026-11-05T10:00:00Z') });
+const pack2 = db.rows('handover_packs').find((x) => x.project_id === pid2);
+const docs2 = db.rows('crm_documents').filter((d) => d.project_id === pid2 && !d.archived_at);
+const f19 = docs2.find((d) => d.generated_key === 'F19I');
+eq('Send: the warranty made and in the very pack that was sent (v1), in their portal', [sent2.ok, !!f19, pack2.version, pack2.contents.some((c) => c.slot === 'F19I' && c.document_id === f19?.id), f19?.visible], [true, true, 1, true, true]);
+eq('…dated the day the pack went', !!f19 && (await allText(db.files.get(`crm-docs/${f19.storage_path}`))).join(' ').includes('5 November 2026'), true);
+const cover2 = (await allText(db.files.get(`crm-docs/${docs2.find((d) => d.generated_key === 'F07BI').storage_path}`))).join(' ').replace(/\s+/g, ' ');
+eq('…and the cover letter sent with it says it’s enclosed', /Workmanship Warranty Enclosed/.test(cover2), true);
+settingsRow.value = settingsWas;
+
 if (process.env.PDF_OUT) fs.writeFileSync(`${process.env.PDF_OUT}/PACK-server.pdf`, db.files.get(`crm-docs/${cur('PACK').storage_path}`));
 console.log(failed ? `\n${failed} failed` : '\nAll passed');
 process.exit(failed ? 1 : 0);

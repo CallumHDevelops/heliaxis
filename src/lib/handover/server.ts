@@ -801,18 +801,22 @@ export async function sendHandover(db: Db, projectId: string, opts: { via: Via[]
   if (!l) return { ok: false, error: 'Not found' };
   const check = sendCheck(statesOf(l).views);
   if (!check.ok && !opts.override) return { ok: false, error: `Still to come from site: ${check.blocking.map((b) => b.title).join(', ')}.`, blocking: check.blocking.map((b) => b.code) };
+  // Handed over now, before the pack is built: a warranty dated from the handover (and the cover
+  // letter that lists it) is made in time to go in this pack, not slipped into a later one.
+  const now = (opts.now ?? new Date()).toISOString();
+  await db.from('crm_projects').update({ handover_at: now }).eq('id', projectId).is('handover_at', null);
+  await refreshHandover(db, projectId, { by: opts.by });
+  l = (await loadHandover(db, projectId))!;
   if (!l.pack?.version || packKey(l) !== currentPack(l)?.inputs_hash) {
     await buildHandover(db, projectId, { by: opts.by });
     l = (await loadHandover(db, projectId))!;
   }
-  const now = (opts.now ?? new Date()).toISOString();
   await db.from('crm_documents').update({ visible: true, release: 'now' }).eq('project_id', projectId).eq('release', 'with_pack').not('handover_slot', 'is', null).is('archived_at', null);
   const via = [...new Set([...(l.pack?.sent_via ?? []), ...opts.via])];
   await db
     .from('handover_packs')
     .update({ sent_at: l.pack?.sent_at ?? now, sent_by: opts.by, sent_via: via, invoice_prompted_at: l.pack?.invoice_prompted_at ?? now })
     .eq('project_id', projectId);
-  await db.from('crm_projects').update({ handover_at: now }).eq('id', projectId).is('handover_at', null);
   await moveStage(projectId, 'handover', { byId: opts.by, note: 'handover pack sent', onlyFrom: ['won', 'design', 'ready', 'install_booked', 'installing', 'commissioning'] });
   await logActivity({ enquiryId: String(l.project.enquiry_id), projectId, kind: 'system', body: `Handover pack sent to the customer by ${opts.byName}${opts.override && !check.ok ? ` (sent before ${check.blocking.map((b) => b.code).join(', ')} came in)` : ''}`, byId: opts.by }).catch(() => null);
   // The final invoice is the next thing (SPEC 4.9): a task due the next working day.
