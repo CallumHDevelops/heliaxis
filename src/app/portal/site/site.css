@@ -358,9 +358,9 @@
 .sa-tone-ok { color: var(--ok); }
 .sa-tone-wait { color: var(--amber); }
 .sa-tone-bad { color: var(--bad); }
-.sa-counts > div { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); }
-.sa-counts dt { color: var(--muted); }
-.sa-counts dd { font-weight: 600; }
+.sa-counts > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.sa-counts dt { flex: none; color: var(--muted); }
+.sa-counts dd { font-weight: 600; text-align: right; }
 .sa-failed { margin-top: 14px; padding: 12px; border-radius: 12px; background: var(--bad-bg); }
 .sa-failed h3 { font-size: 17px; color: var(--bad); margin-bottom: 6px; }
 .sa-failed-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 16px; }
