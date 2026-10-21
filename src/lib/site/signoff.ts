@@ -12,7 +12,7 @@ import { issueLabourPo, livePo, raiseLabourPo, sendPoMessages } from './labour-p
 import { siteShort } from './messages';
 import { packPo } from './pack';
 import type { SignoffReply } from './pack-shared';
-import { HELD_WORDS, poNext, type HeldReason } from './po-shared';
+import { heldWords, poNext, type HeldReason } from './po-shared';
 import { formatPence } from './money';
 // The electrician's sign-off steps register themselves (commissioning, tasks, the paperwork).
 import './electrician-signoff';
@@ -271,7 +271,7 @@ async function tellOwner(db: Db, a: AssignmentRow, s: SignoffRow) {
   const poWords = !po
     ? ''
     : po.status === 'draft' && held.length
-      ? ` · ${po.po_number} held: ${HELD_WORDS[held[0]]}`
+      ? ` · ${po.po_number} held: ${heldWords({ held: held.slice(0, 1), held_notes: po.labour?.held_notes })[0]}`
       : ` · ${po.po_number}${po.payable_pence != null ? ` · ${formatPence(po.payable_pence)} to pay` : ''}`;
   const open = a.flags.filter((f) => !f.resolved_at);
   const urgent = open.filter((f) => f.severity === 'urgent');

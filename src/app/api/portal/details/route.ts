@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { refreshHeldPos } from '@/lib/site/labour-po';
 import { clientIp, logEvent } from '@/lib/subcontractors/server';
 import { jsonError, portalRequest, str } from '@/lib/subcontractors/portal-request';
 import { missingDetails, type SubDetails } from '@/lib/subcontractors/types';
@@ -59,5 +60,7 @@ export async function POST(req: Request) {
   if (error) return jsonError('Could not save your details — please try again.', 500);
 
   await logEvent(sub.id, 'subcontractor', 'details_saved', { complete }, clientIp(req.headers));
+  // A VAT number added or taken away changes the VAT on their labour POs still waiting to go.
+  await refreshHeldPos(admin, { firmId: sub.id }).catch((e) => console.error('[portal/details] held POs', e));
   return NextResponse.json({ ok: true, complete, missing: missingDetails(details) });
 }

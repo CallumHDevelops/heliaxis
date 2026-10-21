@@ -43,6 +43,8 @@ export type RateBasis = 'fixed' | 'per_panel' | 'per_day' | 'per_hour';
 export const RATE_BASES: RateBasis[] = ['fixed', 'per_panel', 'per_day', 'per_hour'];
 export const isRateBasis = (v: unknown): v is RateBasis => RATE_BASES.includes(v as RateBasis);
 export const BASIS_LABEL: Record<RateBasis, string> = { fixed: 'Fixed price', per_panel: 'Per panel', per_day: 'Per day', per_hour: 'Per hour' };
+/** The ways a trade can be paid: per panel only for the roofer (it pays the panels they sign for). */
+export const basesFor = (trade: string): RateBasis[] => RATE_BASES.filter((b) => b !== 'per_panel' || trade === 'roofer');
 const UNIT: Record<RateBasis, [string, string]> = { fixed: ['job', 'jobs'], per_panel: ['panel', 'panels'], per_day: ['day', 'days'], per_hour: ['hour', 'hours'] };
 /** "16 panels", "1 day", "2.5 hours". */
 export const qtyWords = (basis: RateBasis, qty: number) => `${formatQty(qty)} ${UNIT[basis][qty === 1 ? 0 : 1]}`;

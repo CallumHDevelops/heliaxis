@@ -1,7 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
 import { issueLabourPo, refreshDraftPo } from '@/lib/site/labour-po';
-import { HELD_WORDS } from '@/lib/site/po-shared';
 import { notReady, readAssignment, siteReady, siteTabData } from '@/lib/site/server';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +27,6 @@ export async function POST(req: Request, { params }: Ctx) {
   const po = await refreshDraftPo(db, a);
   if (!po) return json({ error: 'There’s no PO to issue yet.' }, 409);
   const r = await issueLabourPo(db, po.id, { by: s.user.id, override: b.override === true, origin: new URL(req.url).origin });
-  if (!r.ok) return json({ error: r.held?.length ? r.held.map((h) => HELD_WORDS[h]).join('. ') : r.error, held: r.held ?? [] }, 409);
-  return json({ ok: true, po: { id: r.po.id, po_number: r.po.po_number }, data: await siteTabData(db, a.project_id) });
+  if (!r.ok) return json({ error: r.words?.length ? r.words.join('. ') : r.error, held: r.held ?? [], data: await siteTabData(db, a.project_id) }, 409);
+  return json({ ok: true, po: { id: r.po.id, po_number: r.po.po_number }, notes: r.notes, data: await siteTabData(db, a.project_id) });
 }

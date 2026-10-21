@@ -7,7 +7,7 @@ import type { RateBasis, VatTreatment } from './money';
 import type { Stage, Trade } from './types';
 
 /** Why a PO waits for the office (status draft) instead of going straight out. */
-export type HeldReason = 'rate' | 'qty' | 'vat' | 'contact' | 'urgent' | 'scaffold';
+export type HeldReason = 'rate' | 'qty' | 'vat' | 'contact' | 'urgent' | 'scaffold' | 'panels';
 export const HELD_WORDS: Record<HeldReason, string> = {
   rate: 'Add the agreed rate to issue the PO',
   qty: 'No quantity to charge yet: add it on the Site tab',
@@ -15,9 +15,31 @@ export const HELD_WORDS: Record<HeldReason, string> = {
   contact: 'No email or WhatsApp for them: add one to send the PO',
   urgent: 'An Urgent problem is flagged, and your setting holds the PO for it',
   scaffold: 'The scaffold isn’t down yet, and your setting holds the PO until it is',
+  panels: 'The roofer’s panel count doesn’t match the design: check it before issuing',
 };
-/** Holds the office can issue past (its own settings); the others need the missing detail first. */
-export const OVERRIDABLE: HeldReason[] = ['urgent', 'scaffold'];
+/**
+ * Holds the office can issue past (its own settings, and a panel count it has checked); the others
+ * need the missing detail first.
+ */
+export const OVERRIDABLE: HeldReason[] = ['urgent', 'scaffold', 'panels'];
+
+/** What each hold says for this PO: its own words where it has them (the panel count names both numbers). */
+export const heldWords = (s: { held: HeldReason[]; held_notes?: Partial<Record<HeldReason, string>> | null } | null | undefined): string[] =>
+  (s?.held ?? []).map((h) => s?.held_notes?.[h] || HELD_WORDS[h]);
+
+const count = (n: number) => `${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 3 }).format(n)} panel${n === 1 ? '' : 's'}`;
+/**
+ * A per-panel PO pays the panels the roofer signed for, so a count the design (or, with no count in
+ * the design, the strings they signed) doesn't back up waits for the office, naming both numbers.
+ * Not a whole number, or more than the form allows (200), is held too. Null: nothing to check.
+ */
+export function panelsHold(signed: number, design: number | null | undefined, strings: number | null | undefined): string | null {
+  const odd = !Number.isInteger(signed) || signed > 200;
+  if (design && signed !== design) return `The roofer signed for ${count(signed)} but the design has ${count(design)}: check the count before issuing`;
+  if (!design && strings && signed !== strings) return `The roofer signed for ${count(signed)} but their strings add up to ${count(strings)}: check the count before issuing`;
+  if (odd) return `The roofer signed for ${count(signed)}: check the count before issuing`;
+  return null;
+}
 
 /**
  * The terms on every labour PO (the owner's final wording, 21 Oct), one constant for the PO's PDF,
@@ -72,6 +94,8 @@ export type LabourSnapshot = {
   signed: { by: string; at: string; stage: Stage } | null;
   quote_line: string;
   held: HeldReason[];
+  /** A hold's own words for this PO ("The roofer signed for 61 panels but the design has 16…"). */
+  held_notes?: Partial<Record<HeldReason, string>>;
   /** Issued again after a change: the day the version it replaces went. */
   replaces: string | null;
 };

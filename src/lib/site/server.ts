@@ -3,14 +3,14 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { json, logActivity } from '@/lib/crm/server';
 import { schemaReady } from '@/lib/schema-ready';
 import { DEFAULT_RATES } from '@/lib/subcontractors/agreement';
-import { cleanAssignment, mobileProblem, moneyLine, vatFor, waIdOf, isEmail, type MoneyLine } from './assign';
+import { cleanAssignment, mobileProblem, moneyLine, vatFor, vatNow, waIdOf, isEmail, type MoneyLine } from './assign';
 import { designOf } from './design';
 import { formsFor, isElectricianForm, suggestedTrades } from './forms';
 import { defaultCertRoute } from './forms/electrician/cert';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
 import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
-import { snapshotOf, type HeldReason } from './po-shared';
+import { heldWords, snapshotOf, type HeldReason } from './po-shared';
 import { returnView, stageStates, type PoReview, type ReturnView, type ReviewState, type ReviewStatus } from './review-shared';
 import { STATUS_LABEL, TRADE_LABEL, valuesOf, yesNo, type Answers, type AssignmentStatus, type Flag, type Stage, type Trade } from './types';
 
@@ -103,6 +103,8 @@ export function agreedRate(firm: FirmRow | null, trade: Trade): { pence: number;
   const mine = rows.filter((r) => tradeKeyOf(r.trade) === trade);
   if (mine.length !== 1) return null;
   const parsed = parseAgreedRate(mine[0].rate);
+  // Per panel pays the roofer's signed count: no other trade signs one.
+  if (parsed?.basis === 'per_panel' && trade !== 'roofer') return null;
   return parsed ? { ...parsed, text: mine[0].rate } : null;
 }
 
@@ -522,6 +524,8 @@ export type PoView = {
   issued: string | null;
   sent_at: string | null;
   held: HeldReason[];
+  /** What each hold says for this PO (the panel count names both numbers). */
+  held_words: string[];
   changed_since_sent: boolean;
   /** The office's review of the work: waiting, hold (return to site), green. Null before anything's signed. */
   review: PoReview | null;
@@ -589,6 +593,7 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
       issued: snap?.issued ?? null,
       sent_at: (o.sent_at as string | null) ?? null,
       held: o.status === 'draft' ? (snap?.held ?? []) : [],
+      held_words: o.status === 'draft' ? heldWords(snap) : [],
       changed_since_sent: o.changed_since_sent === true,
       review: o.review_status === 'waiting' || o.review_status === 'hold' || o.review_status === 'green' ? o.review_status : null,
     });
@@ -611,7 +616,9 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
     const facts = moneyFacts(c, firm);
     const answers = valuesOf(a.answers);
     const panels = typeof answers.RX5 === 'number' ? answers.RX5 : null;
-    const money = moneyLine({ ...a, cis: { ...facts.cis, override: a.cis_override }, panels: a.status === 'signed' || a.status === 'done' ? panels : null });
+    // The VAT as the PO will work it out: from their registration now (assign.ts vatNow).
+    const vat = vatNow(facts.vatRegistered, a.vat_treatment);
+    const money = moneyLine({ ...a, vat_treatment: vat, cis: { ...facts.cis, override: a.cis_override }, panels: a.status === 'signed' || a.status === 'done' ? panels : null });
     views.push({
       id: a.id,
       trade: a.trade,
@@ -640,7 +647,7 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
       rate_basis: a.rate_basis,
       rate_qty: a.rate_qty,
       raise_po: a.raise_po,
-      vat_treatment: a.vat_treatment,
+      vat_treatment: vat,
       vat_note: a.vat_note,
       vat_locked: !facts.vatRegistered,
       cis_override: a.cis_override,

@@ -7,11 +7,12 @@ import { addressLine } from '@/lib/purchase-orders/shared';
 import { logOrder } from '@/lib/purchase-orders/server';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
+import { vatNow } from './assign';
 import { KIND_TEMPLATE, poParams, sendAfterFor, siteShort } from './messages';
 import { cisPercent, cisWords, formatPence, labourMoney, qtyWords, rateWords, STANDARD_VAT, VAT_WORDS, type LabourLine } from './money';
-import { OVERRIDABLE, poTerms, PO_TERMS_TITLE, snapshotOf, type HeldReason, type LabourSnapshot } from './po-shared';
+import { heldWords, OVERRIDABLE, panelsHold, poTerms, PO_TERMS_TITLE, snapshotOf, type HeldReason, type LabourSnapshot } from './po-shared';
 import { aboutOf, emailHtml, jobOf, queueMessage, whatsappProblem, type MessageRow } from './send';
-import { firmsById, logSiteEvent, moneyFacts, readAssignment, type AssignmentRow, type ContactRow, type Db } from './server';
+import { assignmentRow, firmsById, logSiteEvent, moneyFacts, readAssignment, type AssignmentRow, type ContactRow, type Db } from './server';
 import { getSiteSettings } from './settings';
 import { siteLink, linkTokenFor } from './tokens';
 import { TRADE_LABEL, TRADE_WORK, valuesOf, type Stage } from './types';
@@ -63,10 +64,17 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 
 
 /** Everything the PO says, from the assignment, the person, the job and the sign-off as they are now. */
 async function snapshotFor(db: Db, a: AssignmentRow, signoff: SignoffLite | null, poNumber: string): Promise<{ snap: LabourSnapshot; contact: ContactRow | null }> {
-  const [{ data: c }, job, settings] = await Promise.all([db.from('site_contacts').select('*').eq('id', a.contact_id).maybeSingle(), jobOf(db, a.project_id), getSiteSettings()]);
+  const [{ data: c }, job, settings, { data: p }] = await Promise.all([
+    db.from('site_contacts').select('*').eq('id', a.contact_id).maybeSingle(),
+    jobOf(db, a.project_id),
+    getSiteSettings(),
+    db.from('crm_projects').select('system').eq('id', a.project_id).maybeSingle(),
+  ]);
   const contact = c as ContactRow | null;
   const firm = contact?.subcontractor_id ? ((await firmsById(db, [contact.subcontractor_id])).get(contact.subcontractor_id) ?? null) : null;
-  const facts = contact ? moneyFacts(contact, firm) : { cis: { verifiedOn: null, rate: null } };
+  const facts = contact ? moneyFacts(contact, firm) : { vatRegistered: false, cis: { verifiedOn: null, rate: null } };
+  // The VAT from their registration now, not as it was when they were put on the job.
+  const vt = vatNow(facts.vatRegistered, a.vat_treatment);
   const values = valuesOf(a.answers);
   const basis = a.rate_basis;
   // The quantity: the roofer's signed count for per-panel work, 1 for a fixed price, else as agreed.
@@ -85,12 +93,32 @@ async function snapshotFor(db: Db, a: AssignmentRow, signoff: SignoffLite | null
   const title = a.trade === 'other' ? a.trade_label || TRADE_LABEL.other : TRADE_LABEL[a.trade];
   const lines: LabourLine[] = a.rate_pence != null && qty ? [{ description: `${title}: ${a.scope || TRADE_WORK[a.trade]}`, qty, unit_pence: a.rate_pence, cis: true }] : [];
   const pct = cisPercent({ ...facts.cis, override: a.cis_override });
-  const m = labourMoney(lines, a.vat_treatment ?? 'none', pct);
+  const m = labourMoney(lines, vt ?? 'none', pct);
   const held: HeldReason[] = [];
+  const notes: Partial<Record<HeldReason, string>> = {};
   if (a.rate_pence == null || !basis) held.push('rate');
   else if (!qty) held.push('qty');
-  if (!a.vat_treatment) held.push('vat');
-  if (!contact?.email && !(contact?.wa_id && contact.whatsapp_ok)) held.push('contact');
+  // A per-panel PO pays the count signed: one the design doesn't back up waits for the office.
+  if (basis === 'per_panel' && a.trade === 'roofer' && qty) {
+    const system = ((p as { system?: unknown } | null)?.system ?? {}) as Record<string, unknown>;
+    const design = Number(system.panel_count) > 0 ? Number(system.panel_count) : null;
+    const strings = Array.isArray(values.RF11) ? (values.RF11 as unknown[]).reduce((n: number, x) => n + (num(x) ?? 0), 0) : 0;
+    const words = panelsHold(qty, design, strings || null);
+    if (words) {
+      held.push('panels');
+      notes.panels = words;
+    }
+  }
+  if (!vt) held.push('vat');
+  // Someone to send it to: an email, or WhatsApp that can actually go (agreed, connected, the template approved).
+  if (!contact) held.push('contact');
+  else if (!contact.email) {
+    const problem = await whatsappProblem(contact, 'po');
+    if (problem) {
+      held.push('contact');
+      notes.contact = `No email for them, and WhatsApp can’t go (${problem.replace(/, so it went by email\.$/, '')}): add an email to send the PO`;
+    }
+  }
   if (settings.holdPoOnUrgent && a.flags.some((f) => f.severity === 'urgent' && !f.resolved_at)) held.push('urgent');
   // Until the strike is signed (the assignment is done then).
   if (a.trade === 'scaffolder' && settings.holdScaffoldPoUntilStrike && a.status !== 'done') held.push('scaffold');
@@ -119,8 +147,8 @@ async function snapshotFor(db: Db, a: AssignmentRow, signoff: SignoffLite | null
     labour_net: m.labourNet,
     materials_net: m.materialsNet,
     net: m.net,
-    vat_treatment: a.vat_treatment,
-    vat_words: a.vat_treatment ? VAT_WORDS[a.vat_treatment] : 'VAT not chosen yet',
+    vat_treatment: vt,
+    vat_words: vt ? VAT_WORDS[vt] : 'VAT not chosen yet',
     vat: m.vat,
     cis: { words: cisWords({ ...facts.cis, override: a.cis_override }), percent: pct, pence: m.cis },
     payable: m.payable,
@@ -130,6 +158,7 @@ async function snapshotFor(db: Db, a: AssignmentRow, signoff: SignoffLite | null
     signed: signoff ? { by: signoff.signed_name, at: signoff.signed_at, stage: signoff.stage } : null,
     quote_line: quoteLine(poNumber),
     held,
+    ...(Object.keys(notes).length ? { held_notes: notes } : {}),
     replaces: null,
   };
   return { snap, contact };
@@ -158,7 +187,10 @@ const moneyCols = (s: LabourSnapshot) => ({ net_pence: s.net, vat_pence: s.vat, 
 export async function raiseLabourPo(db: Db, a: AssignmentRow, signoff: SignoffLite): Promise<{ po: PoRow | null; held: HeldReason[] }> {
   if (!a.raise_po) return { po: null, held: [] };
   const { data: same } = await db.from('purchase_orders').select('*').eq('signoff_id', signoff.id).maybeSingle();
-  if (same) {
+  if (same && same.status === 'cancelled') {
+    // Cancelled in Orders (a wrong rate, say): it lets go of the sign-off, so a new PO can be raised for it.
+    await db.from('purchase_orders').update({ signoff_id: null, updated_at: new Date().toISOString() }).eq('id', same.id).eq('status', 'cancelled');
+  } else if (same) {
     const po = poRow(same);
     return { po, held: po.labour?.held ?? [] };
   }
@@ -218,6 +250,30 @@ export async function refreshDraftPo(db: Db, a: AssignmentRow): Promise<PoRow | 
   return readPo(db, live.id);
 }
 
+/**
+ * After a person's details change (an email or WhatsApp added, a VAT number, the firm they're
+ * linked to, their CIS verification): each held PO of theirs that hasn't gone is worked out again,
+ * so what it's held for is current and the office can issue it. Nothing is raised or sent here.
+ */
+export async function refreshHeldPos(db: Db, by: { contactIds?: string[]; firmId?: string }): Promise<number> {
+  let ids = by.contactIds ?? [];
+  if (by.firmId) {
+    const { data } = await db.from('site_contacts').select('id').eq('subcontractor_id', by.firmId);
+    ids = [...ids, ...((data ?? []) as { id: string }[]).map((c) => c.id)];
+  }
+  if (!ids.length) return 0;
+  const { data: rows } = await db.from('site_assignments').select('*').in('contact_id', [...new Set(ids)]).in('status', ['signed', 'done']);
+  let n = 0;
+  for (const r of (rows ?? []) as Record<string, unknown>[]) {
+    const a = assignmentRow(r);
+    const live = await livePo(db, a.id);
+    if (!live || live.status !== 'draft' || (live.labour?.version ?? 0) > 0) continue;
+    await refreshDraftPo(db, a);
+    n++;
+  }
+  return n;
+}
+
 export async function readPo(db: Db, id: string): Promise<PoRow | null> {
   const { data } = await db.from('purchase_orders').select('*').eq('id', id).maybeSingle();
   return data ? poRow(data) : null;
@@ -272,7 +328,7 @@ export async function labourPoPdf(s: LabourSnapshot): Promise<Uint8Array> {
 
 /* ── Issuing ─────────────────────────────────────────────────────────────────── */
 
-export type IssueResult = { ok: true; po: PoRow; messages: MessageRow[] } | { ok: false; error: string; held?: HeldReason[] };
+export type IssueResult = { ok: true; po: PoRow; messages: MessageRow[]; notes: string[] } | { ok: false; error: string; held?: HeldReason[]; words?: string[] };
 
 /**
  * Issue (or issue again) a labour PO: the PO frozen as it is now, its PDF stored as a document
@@ -289,10 +345,10 @@ export async function issueLabourPo(db: Db, poId: string, opts: { by?: string | 
   const { data: so } = po.signoff_id ? await db.from('site_signoffs').select('id, signed_name, signed_at, stage').eq('id', po.signoff_id).maybeSingle() : { data: null };
   const { snap, contact } = await snapshotFor(db, a, (so as SignoffLite | null) ?? null, po.po_number);
   const blocking = snap.held.filter((h) => !(opts.override && OVERRIDABLE.includes(h)));
-  if (blocking.length) return { ok: false, error: 'Not ready to issue yet.', held: blocking };
+  if (blocking.length) return { ok: false, error: 'Not ready to issue yet.', held: blocking, words: heldWords({ held: blocking, held_notes: snap.held_notes }) };
   const prev = po.labour;
   const version = (prev?.version ?? 0) + 1;
-  const issued: LabourSnapshot = { ...snap, held: [], issued: ukDay(new Date()), version, replaces: prev?.issued && version > 1 ? prev.issued : null };
+  const issued: LabourSnapshot = { ...snap, held: [], held_notes: undefined, issued: ukDay(new Date()), version, replaces: prev?.issued && version > 1 ? prev.issued : null };
   const bytes = await labourPoPdf(issued);
   const saved = await saveGenerated(db, a.project_id, {
     key: po.po_number,
@@ -313,7 +369,9 @@ export async function issueLabourPo(db: Db, poId: string, opts: { by?: string | 
   const messages = await sendPoMessages(db, po.id, { by: opts.by, origin: opts.origin, attachPath: saved.doc.storage_path });
   await logSiteEvent(db, a.id, opts.by ?? 'system', 'po_issued', { po: po.id, po_number: po.po_number, version, payable: issued.payable });
   await logOrder(db, { id: po.id, po_number: po.po_number, project_id: a.project_id }, 'sent', `Labour PO ${po.po_number} ${version > 1 ? 'issued again' : 'issued'} to ${contact?.name ?? 'the trade'} · ${formatPence(issued.payable)} to pay`, opts.by ?? null);
-  return { ok: true, po: (await readPo(db, po.id))!, messages };
+  // Nothing could go (WhatsApp stopped working since it was checked, say): the office is told to send it themselves.
+  const notes = messages.some((m) => m.status !== 'failed') ? [] : [`Nothing could be sent to ${contact?.name ?? 'them'}: download the PDF from Orders and send it yourself, or add an email and issue it again.`];
+  return { ok: true, po: (await readPo(db, po.id))!, messages, notes };
 }
 
 /**

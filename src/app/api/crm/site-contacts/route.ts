@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePortal } from '@/lib/auth';
 import { isUuid, json } from '@/lib/crm/server';
+import { refreshHeldPos } from '@/lib/site/labour-po';
 import { isCisRate } from '@/lib/site/money';
 import { cleanContact, ensureFirmContact, firmsById, notReady, searchPeople, siteReady, type ContactRow } from '@/lib/site/server';
 import { getSiteSettings } from '@/lib/site/settings';
@@ -124,5 +125,12 @@ export async function PATCH(req: Request) {
   }
   if ('archived' in b) u.archived_at = b.archived ? new Date().toISOString() : null;
   const { data, error } = await db.from('site_contacts').update(u).eq('id', id).select('*').single();
-  return error ? json({ error: error.message }, 500) : json({ contact: data });
+  if (error) return json({ error: error.message }, 500);
+  // Their held POs are worked out again (an email added, WhatsApp agreed, a VAT number, the firm), so
+  // what they're held for is current and the office can issue them.
+  if (Object.keys(u).some((k) => PO_FACTS.includes(k))) await refreshHeldPos(db, { contactIds: [id] }).catch((e) => console.error('[site-contacts] held POs', e));
+  return json({ contact: data });
 }
+
+/** What a labour PO reads from the person. */
+const PO_FACTS = ['name', 'company', 'email', 'mobile', 'wa_id', 'whatsapp_ok', 'vat_number', 'cis_verified_on', 'cis_rate', 'subcontractor_id'];

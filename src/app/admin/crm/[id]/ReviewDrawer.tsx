@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatPence } from '@/lib/site/money';
-import { HELD_WORDS } from '@/lib/site/po-shared';
+import { heldWords } from '@/lib/site/po-shared';
 import { PO_REVIEW_LABEL, poReviewOf } from '@/lib/site/review-shared';
 import type { ReviewEvent, ReviewPhoto, ReviewRead, SiteReview } from '@/lib/site/review';
 import type { AssignmentView, SiteTabData } from '@/lib/site/server';
@@ -350,7 +350,7 @@ export function ReviewDrawer({
                       {review.po.po_number} · {review.po.status === 'draft' ? (review.po.labour?.held.length ? 'Held' : 'Being issued') : review.po.changed_since_sent ? 'Changed since it was sent' : 'Issued'}
                       {poReview && <span className={`sxr-state sxr-state--${poReview === 'hold' ? 'bad' : poReview === 'green' ? 'ok' : 'wait'}`}>{PO_REVIEW_LABEL[poReview]}</span>}
                     </h4>
-                    {review.po.status === 'draft' && !!review.po.labour?.held.length && <p className="sx-warnline">{review.po.labour.held.map((h) => HELD_WORDS[h]).join('. ')}.</p>}
+                    {review.po.status === 'draft' && !!review.po.labour?.held.length && <p className="sx-warnline">{heldWords(review.po.labour).join('. ')}.</p>}
                     {review.po.labour && (
                       <dl className="sxr-rows">
                         <div>

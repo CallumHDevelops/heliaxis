@@ -20,7 +20,6 @@ import {
 import { deliveryFor, logOrder, NOT_READY, orderWords, ordersReady, readOrder, sameLines, saveLines } from '@/lib/purchase-orders/server';
 import { labourWho } from '@/lib/purchase-orders/shared';
 import { issueLabourPo } from '@/lib/site/labour-po';
-import { HELD_WORDS } from '@/lib/site/po-shared';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -96,7 +95,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     // A labour PO is issued (or issued again) as the trade's sign-off says: frozen, PDF, email and WhatsApp.
     if (action === 'issue') {
       const r = await issueLabourPo(db, id, { by: s.user.id, override: true, origin: new URL(req.url).origin });
-      if (!r.ok) return json({ error: r.held?.length ? r.held.map((h) => HELD_WORDS[h]).join('. ') : r.error }, 409);
+      if (!r.ok) return json({ error: r.words?.length ? r.words.join('. ') : r.error }, 409);
       return json(await readOrder(db, id));
     }
     let u: Record<string, unknown> = {};
