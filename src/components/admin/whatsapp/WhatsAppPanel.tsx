@@ -7,6 +7,7 @@ import { stageLabel } from '@/lib/crm/stages';
 import { nameRank } from '@/lib/search-words';
 import { useNow } from '@/lib/use-now';
 import { shownBody } from '@/lib/whatsapp/describe';
+import { shortAt } from '@/lib/whatsapp/schedule';
 import { chatMatches, initialsOf, mergeChats, shortAgo, windowPill, type ActiveChat, type ActiveCounts, type ChatFilter } from './dock-shared';
 import { useActiveChats } from './use-active-chats';
 import { useAllChats, useChatSearch } from './use-all-chats';
@@ -200,6 +201,7 @@ export function ChatList({ mode, rows, counts, error, canCrm, filter, onFilter, 
                     <span className="hxd-row__f">
                       <WindowPill closesAt={r.windowClosesAt} now={now} />
                       {r.queued && <span className="hxd-chip">Reply queued</span>}
+                      {r.scheduledAt && <span className="hxd-chip hxd-chip--later">Scheduled {shortAt(new Date(r.scheduledAt), new Date(now))}</span>}
                       {r.chasing && <span className="hxd-chip hxd-chip--chase">Chasing</span>}
                       {canCrm && !r.hasProject && <span className="hxd-nocrm">Not in the CRM</span>}
                     </span>

@@ -32,6 +32,14 @@ export type WaSettings = {
   firstContactQuietHours: boolean;
   /** Push the team if a customer's message has had no answer for this long (0 = off). */
   remindUnansweredMinutes: number;
+  /**
+   * The late-night rule, for messages we type: Send pressed at or after `lateFromMin` (20:30), or in
+   * the small hours before `lateSendAtMin` (07:00), sends at `lateSendAtMin` instead, with "Send now"
+   * beside it. Minutes after midnight, UK time.
+   */
+  lateRule: boolean;
+  lateFromMin: number;
+  lateSendAtMin: number;
 };
 
 export const DEFAULT_SETTINGS: WaSettings = {
@@ -50,6 +58,9 @@ export const DEFAULT_SETTINGS: WaSettings = {
   smartRepliesQuietHours: true,
   firstContactQuietHours: true,
   remindUnansweredMinutes: 30,
+  lateRule: true,
+  lateFromMin: 20 * 60 + 30,
+  lateSendAtMin: 7 * 60,
 };
 
 const num = (v: unknown, lo: number, hi: number, d: number) => {
@@ -108,5 +119,8 @@ export function cleanSettings(b: SavedSettings): WaSettings {
     smartRepliesQuietHours: b.smartRepliesQuietHours === undefined ? d.smartRepliesQuietHours : !!b.smartRepliesQuietHours,
     firstContactQuietHours: b.firstContactQuietHours === undefined ? d.firstContactQuietHours : !!b.firstContactQuietHours,
     remindUnansweredMinutes: Math.round(num(b.remindUnansweredMinutes, 0, 24 * 60, d.remindUnansweredMinutes)),
+    lateRule: b.lateRule === undefined ? d.lateRule : !!b.lateRule,
+    lateFromMin: minuteOfDay(b.lateFromMin, undefined, d.lateFromMin),
+    lateSendAtMin: minuteOfDay(b.lateSendAtMin, undefined, d.lateSendAtMin),
   };
 }

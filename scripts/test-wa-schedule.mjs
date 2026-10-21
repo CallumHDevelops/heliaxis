@@ -252,7 +252,7 @@ eq('held times keep a little jitter', uk(holdUntil({ kind: 'chase', now: at('202
 
 // What the reply box says ("Chase if no reply: tomorrow about 10:00").
 const V = chaseView(S);
-eq('the view the browser gets', V, { quietFromMin: 1260, quietToMin: 525, eveningRule: true, eveningFromMin: 1080, eveningNotBeforeMin: 600, keepFree: true });
+eq('the view the browser gets', V, { quietFromMin: 1260, quietToMin: 525, eveningRule: true, eveningFromMin: 1080, eveningNotBeforeMin: 600, keepFree: true, lateRule: true, lateFromMin: 1230, lateSendAtMin: 420 });
 eq('in words: later today', whenWords(at('2026-10-20T15:30:00+01:00'), at('2026-10-20T09:00:00+01:00')), 'today about 15:30');
 eq('in words: tomorrow', whenWords(at('2026-10-21T10:00:00+01:00'), at('2026-10-20T20:34:00+01:00')), 'tomorrow about 10:00');
 eq('in words: a weekday', whenWords(at('2026-10-23T10:00:00+01:00'), at('2026-10-20T20:34:00+01:00')), 'Fri about 10:00');
