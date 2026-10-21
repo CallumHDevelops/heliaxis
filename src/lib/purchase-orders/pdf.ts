@@ -1,8 +1,7 @@
 import 'server-only';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
 import { ukDay } from '@/lib/bank-holidays';
+import { A4, AMBER, dayDate, INK, LINE, logo, longDate, MUTED, PAPER, pdfText, RED, SOLAR, wrap } from '@/lib/documents/pdf-kit';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { formatPence, formatQty, lineNet, totals } from './money';
 import { addressLine, type PoLine, type PurchaseOrder, type Supplier } from './shared';
@@ -14,7 +13,8 @@ import { addressLine, type PoLine, type PurchaseOrder, type Supplier } from './s
  * and the legal line on every page. Long orders run onto more pages, the table's headings repeated.
  *
  * Helvetica (built into every PDF reader) is used, so text is kept to the characters it has:
- * anything else (an emoji in a note) becomes "?".
+ * anything else (an emoji in a note) becomes "?". The shared pieces (colours, text, dates, the logo)
+ * are in src/lib/documents/pdf-kit.ts.
  */
 
 export type PoPdfInput = {
@@ -33,97 +33,9 @@ export type PoPdfInput = {
   contactEmail: string;
 };
 
-const A4: [number, number] = [595.28, 841.89];
 const M = 42; // page margin
 const W = A4[0] - 2 * M;
 const FOOT = 64; // room kept for the footer
-
-const INK = rgb(33 / 255, 31 / 255, 24 / 255);
-const MUTED = rgb(110 / 255, 106 / 255, 94 / 255);
-const AMBER = rgb(199 / 255, 127 / 255, 4 / 255);
-const SOLAR = rgb(248 / 255, 188 / 255, 30 / 255);
-const PAPER = rgb(247 / 255, 242 / 255, 231 / 255);
-const LINE = rgb(0.86, 0.85, 0.82);
-const RED = rgb(179 / 255, 38 / 255, 30 / 255);
-
-/* ── Text ────────────────────────────────────────────────────────────────────── */
-
-// What Helvetica can show (WinAnsi): printable ASCII, Latin-1 and the extra punctuation in 0x80–0x9F.
-const EXTRA = new Set('€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ');
-const showable = (ch: string) => {
-  const c = ch.codePointAt(0) ?? 0;
-  return (c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || EXTRA.has(ch);
-};
-/** Text Helvetica can draw: tabs to spaces, anything it hasn't got to "?". */
-export function pdfText(s: string | null | undefined): string {
-  return [...String(s ?? '').replace(/\t/g, ' ').replace(/ /g, ' ')].map((ch) => (ch === '\n' || showable(ch) ? ch : '?')).join('');
-}
-
-/** Lines no wider than `max`, breaking at spaces (and inside a word too long for a line). Keeps the text's own line breaks. */
-function wrap(text: string, font: PDFFont, size: number, max: number): string[] {
-  const out: string[] = [];
-  for (const para of pdfText(text).split('\n')) {
-    let line = '';
-    for (const word of para.split(/ +/)) {
-      const tryLine = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(tryLine, size) <= max) {
-        line = tryLine;
-        continue;
-      }
-      if (line) out.push(line);
-      // A word wider than the line on its own (a long part number): split it, after a "-" or "/" where one fits.
-      let rest = word;
-      while (font.widthOfTextAtSize(rest, size) > max) {
-        let n = rest.length - 1;
-        while (n > 1 && font.widthOfTextAtSize(rest.slice(0, n), size) > max) n--;
-        const soft = Math.max(rest.lastIndexOf('-', n - 1), rest.lastIndexOf('/', n - 1));
-        if (soft >= Math.floor(n / 2)) n = soft + 1;
-        out.push(rest.slice(0, n));
-        rest = rest.slice(n);
-      }
-      line = rest;
-    }
-    out.push(line);
-  }
-  return out;
-}
-
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const noon = (ymd: string) => new Date(`${ymd}T12:00:00Z`);
-/** "20 October 2026". */
-export const longDate = (ymd: string) => {
-  const d = noon(ymd);
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-};
-/** "Tuesday 3 November 2026". */
-export const dayDate = (ymd: string) => `${DAYS[noon(ymd).getUTCDay()]} ${longDate(ymd)}`;
-
-/* ── The logo ────────────────────────────────────────────────────────────────── */
-
-let logoBytes: Uint8Array | null = null;
-let logoMissedAt = 0;
-/**
- * public/assets/heliaxis-logo.png (bundled with the routes: next.config.ts), else the live site's
- * copy, else none (the name in type instead). A miss is tried again after 10 minutes.
- */
-async function logo(): Promise<Uint8Array | null> {
-  if (logoBytes) return logoBytes;
-  if (Date.now() - logoMissedAt < 10 * 60_000) return null;
-  try {
-    logoBytes = new Uint8Array(await readFile(path.join(process.cwd(), 'public', 'assets', 'heliaxis-logo.png')));
-  } catch {
-    try {
-      const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
-      const r = await fetch(`${site}/assets/heliaxis-logo.png`, { signal: AbortSignal.timeout(4000) });
-      if (r.ok) logoBytes = new Uint8Array(await r.arrayBuffer());
-    } catch {
-      // No logo this time.
-    }
-  }
-  if (!logoBytes) logoMissedAt = Date.now();
-  return logoBytes;
-}
 
 /* ── The document ────────────────────────────────────────────────────────────── */
 
