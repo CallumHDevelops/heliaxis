@@ -55,7 +55,16 @@ export type PackRecord = {
   putRightGate?: { n: number; message: string; at: string };
 };
 export type FileRecord = { id: string; assignmentId: string; name: string; mime: string; blob: Blob; storedAt: string };
-export type DraftRecord = { id: string; answers: Answers; base: Answers; baseRev: number; dirty: string[]; savedAt: string };
+export type DraftRecord = {
+  id: string;
+  answers: Answers;
+  base: Answers;
+  baseRev: number;
+  dirty: string[];
+  savedAt: string;
+  /** Words typed that aren't answers (the Put right's "What did you do?"): kept here, never sent as answers. */
+  notes?: Record<string, string>;
+};
 /** Units 2–4 add their own kinds (and a sender for each, sync.ts registerSender). */
 export type OutboxKind = 'answers' | 'photo-delete' | 'capture-confirm' | 'signoff' | (string & {});
 export type OutboxRecord = { op_id: string; assignmentId: string; kind: OutboxKind; payload: Record<string, unknown>; createdAt: string; tries: number; failed?: string };
@@ -240,6 +249,32 @@ export async function flushDraft(assignmentId: string) {
 /** Every job's unsent keys onto the outbox now (Send now, the app going to the background). */
 export async function flushAll() {
   for (const d of await allRec<DraftRecord>('drafts')) if (d.dirty.length) await flushDraft(d.id);
+}
+
+/**
+ * Keep words typed on a screen that aren't answers (the Put right's note and name) in the job's
+ * draft, as they're typed, so a reload, Back, or Android closing the tab while the camera is open
+ * doesn't lose them. '' takes one off.
+ */
+export async function setDraftNote(assignmentId: string, key: string, text: string) {
+  await withJobLock(assignmentId, async () => {
+    const d = await getDraft(assignmentId);
+    const notes = { ...(d.notes ?? {}) };
+    if (text) notes[key] = text;
+    else delete notes[key];
+    await putRec('drafts', { ...d, notes });
+  });
+  changed();
+}
+
+/** Take off the notes whose keys start with this (once what they were for has reached the server). */
+export async function clearDraftNotes(assignmentId: string, prefix: string) {
+  await withJobLock(assignmentId, async () => {
+    const d = await getRec<DraftRecord>('drafts', assignmentId);
+    if (!d?.notes || !Object.keys(d.notes).some((k) => k.startsWith(prefix))) return;
+    await putRec('drafts', { ...d, notes: Object.fromEntries(Object.entries(d.notes).filter(([k]) => !k.startsWith(prefix))) });
+  });
+  changed();
 }
 
 /** The server's answers after a send: kept as the base; any answer not changed here since takes the server's value (another phone's). */

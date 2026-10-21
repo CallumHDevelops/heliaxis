@@ -64,6 +64,33 @@ export async function siteFetch<T = Body>(path: string, opts: Opts = {}): Promis
   return { ok: false, kind: 'error', status: res.status, message, data, retry: res.status >= 500 || res.status === 408 };
 }
 
+/**
+ * How long one upload straight to storage may take before it counts as no signal: a minute, plus
+ * about 10 KB a second (about 160 s for 1 MB, 260 s for 2 MB). Slow enough that a photo crawling up
+ * on weak 3G still finishes (a retry starts again from nothing); a connection that has simply hung
+ * no longer holds up everything queued behind it.
+ */
+export const uploadTimeoutMs = (bytes: number) => 60_000 + Math.ceil(Math.max(0, bytes) / 10);
+
+/**
+ * A PUT to a signed storage link (a photo, its thumbnail, a certificate PDF), with that time limit.
+ * 'offline' when it couldn't get through or ran out of time (sent again later, from the start: the
+ * upload overwrites), 'error' when storage said no.
+ */
+export async function putToStorage(url: string, blob: Blob, headers: Record<string, string>, timeoutMs = uploadTimeoutMs(blob.size)): Promise<'ok' | 'offline' | 'error'> {
+  // AbortController and a timer, as siteFetch (older iPhones have no AbortSignal.timeout).
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { method: 'PUT', body: blob, headers, credentials: 'omit', signal: ctl.signal });
+    return r.ok ? 'ok' : 'error';
+  } catch {
+    return 'offline';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** A real answer from the server within 4 seconds (navigator.onLine can't be trusted on a roof). */
 export async function ping(): Promise<boolean> {
   const r = await siteFetch<{ ok: boolean }>('/api/site/ping', { token: null, timeoutMs: 4000 });

@@ -85,10 +85,5 @@ export const formsMissing = (current: string[], products: string[], design: Pick
 /** The roofer's form is for solar jobs only; the scaffold forms for any job with a scaffolder. */
 export const rooferApplies = (products: string[]) => has(products, 'solar');
 
-/** The trades New project suggests (SPEC 1D): solar → scaffolder, roofer, electrician; battery, EV or heat pump → electrician. */
-export function suggestedTrades(products: string[]): Trade[] {
-  const out: Trade[] = [];
-  if (has(products, 'solar')) out.push('scaffolder', 'roofer');
-  if (has(products, 'solar', 'battery', 'ev', 'heatpump')) out.push('electrician');
-  return out;
-}
+/** The trades New project suggests: in ../trades.ts, which imports no forms (the admin pages load it). */
+export { suggestedTrades } from '../trades';

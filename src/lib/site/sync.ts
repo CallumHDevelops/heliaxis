@@ -18,6 +18,7 @@ import {
   whenQueued,
   type DraftRecord,
   type OutboxRecord,
+  type PackRecord,
   type PhotoRecord,
 } from './offline';
 import { sendPhoto, whenPhotoQueued } from './photo-queue';
@@ -28,7 +29,8 @@ import type { Answers, Flag } from './types';
  * tries again after 5 s, doubling to a minute. Then per job, in order: answers → photos (prepare →
  * storage → save) → photo deletes → confirmations → the sign-off last, once its photos are up.
  * Every operation carries an op_id (site_ops), so a retry never applies twice. "All sent ✓" shows
- * only after a real reply from the server with nothing left.
+ * only after a real reply from the server with nothing left. Uploads to storage have a time limit
+ * (client.ts uploadTimeoutMs), and answers typed while a slow one is going go alongside it.
  *
  * Units 2–4 add outbox kinds with registerSender (a customer's signature, the EIC's boards…).
  */
@@ -39,8 +41,13 @@ export type SyncState = {
   phase: 'idle' | 'checking' | 'sending' | 'offline';
   done: number;
   total: number;
-  /** `signoffs` are among `other`: a sign-off waiting is named as one. */
-  waiting: { answers: number; photos: number; other: number; total: number; signoffs?: number };
+  /**
+   * Things waiting, as a person counts them: each photo; a job's answers as one, however many
+   * batches they went on the outbox in; each other item (`kinds` says what, so each is named: a
+   * sign-off, a put right, the customer's signature…). `total` is their sum. `signoffs` (among
+   * `other`) is the sign-offs.
+   */
+  waiting: { answers: number; photos: number; other: number; total: number; signoffs?: number; kinds?: Record<string, number> };
   failed: { photos: number; other: number; total: number };
   /** The last real round trip that left nothing waiting. */
   lastOkAt: string | null;
@@ -49,6 +56,8 @@ export type SyncState = {
   nearlyFull: boolean;
   /** The office turned this phone's session off (or it ran out): open the link again. */
   revoked: boolean;
+  /** Jobs whose sign-off the server turned down (P11): what's waiting behind it needs them to sign again. */
+  gated?: number;
 };
 
 let state: SyncState = {
@@ -95,24 +104,48 @@ registerSender('photo-delete', {
 
 /* ── Counting ────────────────────────────────────────────────────────────────── */
 
-export type JobWork = { answers: number; photos: number; other: number; failed: number; failedPhotos: number; signoffs: number };
+/**
+ * What's waiting for one job. `answers` is the answer batches (and a draft with unsent keys): they
+ * count as one thing however many there are (thingsOf). `kinds` counts the other items by kind.
+ */
+export type JobWork = { answers: number; photos: number; other: number; failed: number; failedPhotos: number; signoffs: number; kinds: Record<string, number> };
+
+/** Each outbox kind in words, for the sending sheet and anything that couldn't be sent. */
+export const OUTBOX_LABEL: Record<string, string> = {
+  answers: 'Answers',
+  'photo-delete': 'Taking a photo off',
+  signoff: 'Sign-off',
+  'put-right': 'Put right',
+  'customer-sign': 'Customer’s signature',
+  file: 'Certificate file',
+  'file-delete': 'Taking a file off',
+};
+export const outboxLabel = (kind: string) => OUTBOX_LABEL[kind] ?? 'Something else';
+
+/** Things waiting for a job, as a person counts them: each photo and item, and its answers as one. */
+export const thingsOf = (w: Pick<JobWork, 'answers' | 'photos' | 'other'>) => w.photos + w.other + (w.answers ? 1 : 0);
 
 /** What's waiting for each job (drafts with unsent keys count as answers). */
 export async function workByJob(): Promise<Map<string, JobWork>> {
   const out = new Map<string, JobWork>();
   const of = (id: string) => {
     let w = out.get(id);
-    if (!w) out.set(id, (w = { answers: 0, photos: 0, other: 0, failed: 0, failedPhotos: 0, signoffs: 0 }));
+    if (!w) out.set(id, (w = { answers: 0, photos: 0, other: 0, failed: 0, failedPhotos: 0, signoffs: 0, kinds: {} }));
     return w;
   };
   for (const d of await allRec<DraftRecord>('drafts')) if (d.dirty.length) of(d.id).answers++;
+  const failedAnswers = new Set<string>();
   for (const op of await allRec<OutboxRecord>('outbox')) {
     const w = of(op.assignmentId);
-    if (op.failed) w.failed++;
-    else if (op.kind === 'answers') w.answers++;
+    // A job's answers that couldn't be sent are one thing too.
+    if (op.failed) {
+      if (op.kind !== 'answers' || !failedAnswers.has(op.assignmentId)) w.failed++;
+      if (op.kind === 'answers') failedAnswers.add(op.assignmentId);
+    } else if (op.kind === 'answers') w.answers++;
     else {
       w.other++;
-      if (op.kind === 'signoff' || op.kind === 'put-right') w.signoffs++;
+      w.kinds[op.kind] = (w.kinds[op.kind] ?? 0) + 1;
+      if (op.kind === 'signoff') w.signoffs++;
     }
   }
   for (const p of await allRec<PhotoRecord>('photos')) {
@@ -124,25 +157,36 @@ export async function workByJob(): Promise<Map<string, JobWork>> {
   return out;
 }
 
-async function recount() {
-  const work = await workByJob();
-  const waiting = { answers: 0, photos: 0, other: 0, total: 0, signoffs: 0 };
+/** Every job's work added up for the pill (pure: scripts/test-site-app.mjs). */
+export function countWaiting(work: Iterable<JobWork>) {
+  const waiting = { answers: 0, photos: 0, other: 0, total: 0, signoffs: 0, kinds: {} as Record<string, number> };
   const failed = { photos: 0, other: 0, total: 0 };
-  for (const w of work.values()) {
-    waiting.answers += w.answers;
+  for (const w of work) {
+    if (w.answers) waiting.answers++;
     waiting.photos += w.photos;
     waiting.other += w.other;
     waiting.signoffs += w.signoffs;
+    waiting.total += thingsOf(w);
+    for (const [k, v] of Object.entries(w.kinds)) waiting.kinds[k] = (waiting.kinds[k] ?? 0) + v;
     failed.photos += w.failedPhotos;
     failed.other += w.failed;
   }
-  waiting.total = waiting.answers + waiting.photos + waiting.other;
   failed.total = failed.photos + failed.other;
+  return { waiting, failed };
+}
+
+async function recount() {
+  const work = await workByJob();
+  const { waiting, failed } = countWaiting(work.values());
   const storage = await storageUse();
   const device = await getDevice().catch(() => undefined);
-  set({ waiting, failed, storage, nearlyFull: !!storage && storage.used / storage.quota > 0.8, revoked: !!device?.revoked });
+  const gated = (await allRec<PackRecord>('packs').catch(() => [] as PackRecord[])).filter((p) => p.gate).length;
+  set({ waiting, failed, storage, nearlyFull: !!storage && storage.used / storage.quota > 0.8, revoked: !!device?.revoked, gated });
   return { waiting, failed, work };
 }
+
+/** "a", "a and b", "a, b and c". */
+const listOf = (parts: string[]) => (parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`);
 
 /** The pill and the line under it (P12), in words. */
 export function syncWords(s: SyncState): { pill: string; line: string; tone: 'ok' | 'wait' | 'bad' } {
@@ -154,10 +198,28 @@ export function syncWords(s: SyncState): { pill: string; line: string; tone: 'ok
     return { pill: `${s.failed.total} not sent`, line: `Couldn’t send ${what}. Tap to retry.`, tone: 'bad' };
   }
   if (s.waiting.total) {
-    const signoffs = s.waiting.signoffs ?? 0;
-    const others = s.waiting.other - signoffs;
-    const parts = [s.waiting.photos ? n(s.waiting.photos, 'photo') : '', s.waiting.answers ? 'your answers' : '', others ? n(others, 'other item') : '', signoffs ? 'your sign-off' : ''].filter(Boolean);
-    const line = `${parts.join(' and ')} waiting. ${s.waiting.photos + s.waiting.other > 1 || s.waiting.answers ? 'They’ll' : 'It’ll'} send when you have signal.`;
+    // Each kind by name (an older state without `kinds` still names its sign-offs).
+    const k = s.waiting.kinds ?? (s.waiting.signoffs ? { signoff: s.waiting.signoffs } : {});
+    const named: [string, (c: number) => string][] = [
+      ['photo-delete', (c) => n(c, 'photo to take off', 'photos to take off')],
+      ['file', (c) => n(c, 'certificate file')],
+      ['file-delete', (c) => n(c, 'file to take off', 'files to take off')],
+      ['customer-sign', (c) => (c === 1 ? 'the customer’s signature' : 'the customer’s signatures')],
+      ['signoff', () => 'your sign-off'],
+      ['put-right', () => 'your put right'],
+    ];
+    const known = named.reduce((t, [kind]) => t + (k[kind] ?? 0), 0);
+    const others = Math.max(0, s.waiting.other - known);
+    const parts = [
+      s.waiting.photos ? n(s.waiting.photos, 'photo') : '',
+      s.waiting.answers ? 'your answers' : '',
+      others ? n(others, 'other item') : '',
+      ...named.map(([kind, words]) => (k[kind] ? words(k[kind]) : '')),
+    ].filter(Boolean);
+    const many = s.waiting.photos + s.waiting.other > 1 || s.waiting.answers;
+    // A sign-off the server turned down: what's behind it waits for them, not for signal.
+    const after = s.gated ? 'Not signed off yet: open the job to see what Heliaxis still needs, then sign again.' : `${many ? 'They’ll' : 'It’ll'} send when you have signal.`;
+    const line = `${listOf(parts)} waiting. ${after}`;
     return { pill: `${s.waiting.total} waiting`, line: line[0].toUpperCase() + line.slice(1), tone: 'wait' };
   }
   if (s.lastOkAt) return { pill: 'All sent ✓', line: 'Everything on this phone has reached Heliaxis.', tone: 'ok' };
@@ -180,14 +242,13 @@ async function markFailed(op: OutboxRecord, message: string) {
   await putRec('outbox', { ...op, failed: message });
 }
 
-async function drainJob(id: string, tick: () => void): Promise<JobResult> {
-  const rec = await getPack(id);
-  // Cancelled or taken off the list: everything stays on the phone, nothing is sent.
-  if (rec?.problem) return 'stop';
-  const ops = (await byJob<OutboxRecord>('outbox', id)).filter((o) => !o.failed).sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+/** Answers being sent right now (by the send, or alongside it): never picked up twice. */
+const claimed = new Set<string>();
+/** Jobs whose answers the send has in hand: answers sent alongside wait, so a job's answers land in order. */
+const answering = new Set<string>();
 
-  // 1. Answers, up to 50 operations at a time.
-  const answers = ops.filter((o) => o.kind === 'answers');
+/** One job's answers, up to 50 operations at a time. Null when they're all dealt with. */
+async function sendAnswers(id: string, answers: OutboxRecord[], tick: () => void): Promise<JobResult | null> {
   for (let i = 0; i < answers.length; i += 50) {
     const chunk = answers.slice(i, i + 50);
     const r = await siteFetch<{ rev: number; answers: Answers; flags: Flag[]; status: string }>(`/api/site/jobs/${id}/answers`, {
@@ -211,6 +272,38 @@ async function drainJob(id: string, tick: () => void): Promise<JobResult> {
     for (const o of chunk) await putRec('outbox', { ...o, tries: o.tries + 1 });
     return 'stop';
   }
+  return null;
+}
+
+async function drainJob(id: string, tick: () => void): Promise<JobResult> {
+  const rec = await getPack(id);
+  // Cancelled or taken off the list: everything stays on the phone, nothing is sent.
+  if (rec?.problem) return 'stop';
+  // Answers on their way alongside a long upload (answersAlongside) land first: nothing of this
+  // job's (its sign-off least of all) overtakes them.
+  let ops: OutboxRecord[];
+  do {
+    if (side) await side;
+    ops = (await byJob<OutboxRecord>('outbox', id)).filter((o) => !o.failed).sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+  } while (ops.some((o) => claimed.has(o.op_id)));
+
+  // 1. Answers.
+  const answers = ops.filter((o) => o.kind === 'answers');
+  answering.add(id);
+  answers.forEach((o) => claimed.add(o.op_id));
+  let stopped: JobResult | null;
+  // A job's answers are one thing on the pill ("Sending 2 of 3…"), however many batches.
+  let ticked = false;
+  try {
+    stopped = await sendAnswers(id, answers, () => {
+      if (!ticked) tick();
+      ticked = true;
+    });
+  } finally {
+    answering.delete(id);
+    answers.forEach((o) => claimed.delete(o.op_id));
+  }
+  if (stopped) return stopped;
 
   // 2. Photos, oldest first.
   let photosLeft = false;
@@ -263,6 +356,8 @@ function later(ms: number) {
 export function drain(): Promise<boolean> {
   if (running) {
     again = true;
+    // A photo can take minutes to go up on a weak signal: answers typed meanwhile don't wait for it.
+    answersAlongside();
     return running;
   }
   if (timer) clearTimeout(timer);
@@ -316,6 +411,49 @@ export function drain(): Promise<boolean> {
     }
   });
   return running;
+}
+
+let side: Promise<void> | null = null;
+let sideAgain = false;
+
+/**
+ * While a send is going (held up by a slow photo, say), the answers queued since go straight away
+ * instead of after it. Only answers: photos and the sign-off keep their order in the send.
+ */
+function answersAlongside() {
+  if (side) {
+    sideAgain = true;
+    return;
+  }
+  side = (async () => {
+    if (state.revoked) return;
+    await flushAll().catch(() => {});
+    const ops = (await allRec<OutboxRecord>('outbox'))
+      .filter((o) => o.kind === 'answers' && !o.failed && !claimed.has(o.op_id) && !answering.has(o.assignmentId))
+      .sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+    if (!ops.length) return;
+    ops.forEach((o) => claimed.add(o.op_id));
+    try {
+      const jobs = new Map<string, OutboxRecord[]>();
+      for (const o of ops) jobs.set(o.assignmentId, [...(jobs.get(o.assignmentId) ?? []), o]);
+      for (const [id, list] of jobs) {
+        if ((await getPack(id))?.problem) continue;
+        const r = await sendAnswers(id, list, () => {});
+        if (r === 'offline' || r === 'device') break;
+      }
+    } finally {
+      ops.forEach((o) => claimed.delete(o.op_id));
+      changed();
+    }
+  })()
+    .catch(() => {})
+    .finally(() => {
+      side = null;
+      if (sideAgain) {
+        sideAgain = false;
+        if (running) answersAlongside();
+      }
+    });
 }
 
 /** Soon, not at once: a few taps in a row go as one. */

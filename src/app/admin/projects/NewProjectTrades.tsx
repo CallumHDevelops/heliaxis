@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { suggestedTrades } from '@/lib/site/forms';
+import { suggestedTrades } from '@/lib/site/trades';
 import { basesFor, BASIS_LABEL, penceToInput, poundsToPence, VAT_WORDS, type RateBasis, type VatTreatment } from '@/lib/site/money';
 import { TRADE_LABEL, TRADES, type Trade } from '@/lib/site/types';
 import { newPersonProblem, PersonPicker, personBody, type Picked } from '../crm/[id]/SitePeople';

@@ -5,8 +5,8 @@ import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { shortDate } from '@/lib/site/client';
 import { putRightDeclaration } from '@/lib/site/declaration';
 import type { Field } from '@/lib/site/forms/types';
-import { byJob, getDevice, getFile, type OutboxRecord, type PackRecord } from '@/lib/site/offline';
-import { queuePutRight } from '@/lib/site/putright-client';
+import { byJob, getDevice, getDraft, getFile, setDraftNote, type OutboxRecord, type PackRecord } from '@/lib/site/offline';
+import { putRightNoteKeys, queuePutRight } from '@/lib/site/putright-client';
 import { putRightSlot, REVIEW_STATE_LABEL, stageStates, type ReturnView, type ReviewState } from '@/lib/site/review-shared';
 import type { Stage } from '@/lib/site/types';
 import { SyncLine, TopBar } from './bits';
@@ -131,8 +131,14 @@ export function PutRightScreen({ rec, jf, n }: { rec: PackRecord; jf: JobForms; 
   const job = rec.id;
   const device = useLive(getDevice, 'device');
   const outbox = useLive(() => byJob<OutboxRecord>('outbox', job), `outbox:${job}`);
-  const [note, setNote] = useState('');
-  const [name, setName] = useState<string | null>(null);
+  // What they did and their name are kept in the job's draft as they type (a reload, Back, or the
+  // camera closing the tab doesn't lose them); taken off once the put right has reached Heliaxis.
+  const draft = useLive(() => getDraft(job), `draft:${job}`);
+  const keys = putRightNoteKeys(n);
+  const [typedNote, setTypedNote] = useState<string | null>(null);
+  const [typedName, setTypedName] = useState<string | null>(null);
+  const note = typedNote ?? draft?.notes?.[keys.note] ?? '';
+  const name = typedName ?? draft?.notes?.[keys.name] ?? null;
   const [signature, setSignature] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const ret = (rec.pack.returns ?? []).find((r) => r.n === n);
@@ -193,7 +199,17 @@ export function PutRightScreen({ rec, jf, n }: { rec: PackRecord; jf: JobForms; 
               <label className="sa-label" htmlFor="sa-pr-note">
                 What did you do?
               </label>
-              <textarea id="sa-pr-note" className="sa-text sa-long" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="In a few words" />
+              <textarea
+                id="sa-pr-note"
+                className="sa-text sa-long"
+                rows={3}
+                value={note}
+                onChange={(e) => {
+                  setTypedNote(e.target.value);
+                  void setDraftNote(job, keys.note, e.target.value);
+                }}
+                placeholder="In a few words"
+              />
             </section>
             <section className="sa-card">
               <h3>Declaration</h3>
@@ -201,7 +217,17 @@ export function PutRightScreen({ rec, jf, n }: { rec: PackRecord; jf: JobForms; 
               <label className="sa-label" htmlFor="sa-pr-name">
                 Your name
               </label>
-              <input id="sa-pr-name" className="sa-text" type="text" autoComplete="name" value={who} onChange={(e) => setName(e.target.value)} />
+              <input
+                id="sa-pr-name"
+                className="sa-text"
+                type="text"
+                autoComplete="name"
+                value={who}
+                onChange={(e) => {
+                  setTypedName(e.target.value);
+                  void setDraftNote(job, keys.name, e.target.value);
+                }}
+              />
               <p className="sa-label">Sign here</p>
               <div className="sa-pad">
                 <SignaturePad onChange={setSignature} height={180} />
