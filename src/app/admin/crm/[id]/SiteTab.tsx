@@ -12,6 +12,7 @@ import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { agoShort, shortDate } from '../crm-shared';
 import { AssignmentSheet } from './AssignmentSheet';
 import { ReviewDrawer } from './ReviewDrawer';
+import { SiteEic } from './SiteEic';
 import { copyText, send } from './record-shared';
 import './site.css';
 
@@ -178,7 +179,9 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
               onHoldAll={() => {
                 for (const t of live.filter((x) => (x.trade === 'roofer' || x.trade === 'electrician') && x.status !== 'signed' && x.status !== 'done')) void message(t, { via: 'both', kind: 'scaffold_hold' });
               }}
-            />
+            >
+              {a.trade === 'electrician' && a.status !== 'draft' && <SiteEic assignmentId={a.id} projectId={projectId} onChanged={onChanged} />}
+            </AssignmentCard>
           ))}
           {gone.length > 0 && (
             <details className="sx-gone">
@@ -320,6 +323,7 @@ function AssignmentCard({
   onIssue,
   onReopen,
   onReview,
+  children,
 }: {
   a: AssignmentView;
   now: number;
@@ -332,6 +336,8 @@ function AssignmentCard({
   onIssue: (override: boolean) => void;
   onReopen: () => void;
   onReview: () => void;
+  /** More for this trade (the electrician's certificate). */
+  children?: React.ReactNode;
 }) {
   const open = a.flags.filter((f) => !f.resolved_at);
   const signed = a.status === 'signed' || a.status === 'done';
@@ -385,6 +391,7 @@ function AssignmentCard({
           .join(' · ')}
       </p>
       {a.po && <PoLine po={a.po} busy={busy} onIssue={onIssue} />}
+      {children}
       {open.length > 0 && (
         <ul className="sx-flags">
           {open.map((f) => (

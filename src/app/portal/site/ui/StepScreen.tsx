@@ -9,6 +9,7 @@ import { SyncLine, TopBar } from './bits';
 import type { JobForms } from './form-state';
 import { go } from './nav';
 import { PhotoSlot } from './PhotoSlot';
+import { CustomField } from './custom';
 import { ScanField } from './ScanSheet';
 import { Chips, Confirm, NumberBox, PerString, SourceTag, SuggestChip, TextBox, Tiles } from './widgets';
 
@@ -119,6 +120,9 @@ function FieldRow({ f, rec, answers, jf, locked }: { f: Field; rec: PackRecord; 
       break;
     case 'AUTO':
       widget = <p className="sa-auto">{s ? s.text : '–'}</p>;
+      break;
+    case 'CUSTOM':
+      widget = <CustomField f={f} rec={rec} jf={jf} locked={locked} />;
       break;
     case 'PHOTOS': {
       const need = needOf(f, ctx);

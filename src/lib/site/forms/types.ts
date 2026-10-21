@@ -24,7 +24,8 @@ export type FieldType =
   | 'SCAN'
   | 'SIG'
   | 'AUTO'
-  | 'PER_STRING';
+  | 'PER_STRING'
+  | 'CUSTOM';
 
 /** must blocks sign-off; should is listed as "Not filled"; optional sits behind More detail. */
 export type Level = 'must' | 'should' | 'optional';
@@ -49,7 +50,23 @@ export type FormCtx = {
   address: string;
   /** Stages already signed off on this assignment. */
   signed: Stage[];
+  /** The electrician's certificate (Unit 3): the office's route and what's remembered for it (site/eic/facts.ts). */
+  eic?: EicFacts;
 };
+
+/** What the EIC's questions are offered from: the route the office chose, the client, the person signing and their test instruments. */
+export type EicFacts = {
+  route: 'eic' | 'eic_single' | 'meiwc' | 'own';
+  /** HX-0042-EIC (a second electrician on the job: HX-0042-EIC2). */
+  ref: string | null;
+  client: string | null;
+  contact: { name: string; company: string | null; mobile: string | null; email: string | null; address: string | null; postcode: string | null; scheme: string | null; scheme_number: string | null };
+  /** Serial or asset numbers from their last job, by instrument. */
+  instruments: Record<string, string>;
+};
+
+/** One thing a CUSTOM field still needs ("DB1 circuit 2: test results"). Must unless it says should. */
+export type Part = { label: string; why: string; level?: 'must' | 'should' };
 
 /** What a label photo was read as (src/lib/site/vision.ts LabelRead). */
 export type LabelReadResult = {
@@ -112,6 +129,17 @@ export type Field = {
   declaration?: (c: FormCtx) => string;
   /** Still takes answers after its stage is signed off (the scaffold's tag photo). */
   late?: boolean;
+  /** TEXT: common answers offered as chips under the box ("BS EN 60898"). */
+  picks?: string[];
+  /**
+   * CUSTOM: a field drawn by its own widget (the EIC's boards and circuits, a signature). It owns the
+   * answers keyed KEY:anything as well as KEY; `parts` says what it still needs (the gate), `progress`
+   * how far it's got, and `words` what it says on a document or the office's review.
+   */
+  widget?: string;
+  parts?: (c: FormCtx) => Part[];
+  progress?: (c: FormCtx) => { done: number; total: number };
+  words?: (c: FormCtx) => string | null;
 };
 
 export type Step = {

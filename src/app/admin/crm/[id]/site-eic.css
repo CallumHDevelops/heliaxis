@@ -1,0 +1,159 @@
+/* The electrician's certificate on their Site tab card (SiteEic.tsx): where it stands, the design part,
+   the PDF, and Notify building control with its copy fields. Same tokens as site.css. */
+
+.sx-eic {
+  margin: 0.75rem 0 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.sx-eic-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.4rem 0.75rem;
+}
+.sx-eic h5 {
+  margin: 0.1rem 0 0;
+  font-size: 0.95rem;
+}
+.sx-eic-head small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.sx-eic-state {
+  flex: none;
+  max-width: 100%;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.sx-eic-state.is-ok {
+  color: var(--ok);
+  border-color: currentColor;
+}
+.sx-eic-state.is-wait {
+  color: var(--muted);
+}
+.sx-eic-state.is-todo {
+  color: var(--amber-2);
+  border-color: currentColor;
+  background: rgba(248, 188, 30, 0.16);
+}
+.sx-eic-line {
+  margin: 0.55rem 0 0;
+  font-size: 0.86rem;
+}
+.sx-eic-missing {
+  margin: 0.55rem 0 0;
+  font-size: 0.85rem;
+}
+.sx-eic-missing summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.sx-eic-missing ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+.sx-eic-missing small {
+  color: var(--muted);
+}
+.sx-eic-notify {
+  margin: 0.8rem 0 0;
+  padding: 0.65rem 0 0;
+  border-top: 1px solid var(--line);
+}
+.sx-eic-notify h5 {
+  margin: 0 0 0.25rem;
+}
+.sx-eic-copy {
+  margin: 0.45rem 0 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.sx-eic-copy > div {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: var(--card);
+}
+.sx-eic-copy dt {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.sx-eic-copy dd {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sx-eic-notified {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 1fr) minmax(10rem, 1.5fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0;
+}
+.sx-eic-notified .crm-label {
+  margin: 0 0 0.2rem;
+}
+.sx-eic-notified .crm-input {
+  width: 100%;
+}
+.sx-eic-done {
+  margin: 0.45rem 0 0;
+  color: var(--ok);
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+.sx-eic-decl {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--paper);
+  line-height: 1.45;
+}
+.sx-eic-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.sx-eic-next .crm-input {
+  width: 6rem;
+}
+
+@media (max-width: 760px) {
+  .sx-eic-copy > div {
+    grid-template-columns: 1fr auto;
+  }
+  .sx-eic-copy dt {
+    grid-column: 1 / -1;
+  }
+  .sx-eic-notified {
+    grid-template-columns: 1fr;
+  }
+}
+.sx-eic-who {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.45rem 0 0;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  background: var(--card);
+}
+.sx-eic-stale {
+  color: var(--amber-2);
+  font-weight: 600;
+}

@@ -58,6 +58,7 @@ export function useJobForms(rec: PackRecord, answers: Answers): JobForms | null 
       reads: pack.reads.map((r) => ({ key: r.key, status: r.status, result: r.result as LabelReadResult | null })),
       address: [...pack.job.address, pack.job.postcode].filter(Boolean).join(', '),
       signed,
+      eic: pack.eic,
     });
     return { ctx, forms: schemaFor(pack.assignment), signed, pendingSign, photos };
   }, [rec, answers, local, outbox]);

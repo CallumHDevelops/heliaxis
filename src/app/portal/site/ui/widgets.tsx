@@ -173,7 +173,21 @@ export function TextBox({ field, value, onChange, disabled }: { field: Field; va
       onChange(e.target.value.trim() ? e.target.value : undefined);
     },
   };
-  return field.type === 'LONG' ? <textarea className="sa-text sa-long" rows={4} {...props} /> : <input className="sa-text" type="text" autoComplete="off" {...props} />;
+  const box = field.type === 'LONG' ? <textarea className="sa-text sa-long" rows={4} {...props} /> : <input className="sa-text" type="text" autoComplete="off" {...props} />;
+  if (!field.picks?.length) return box;
+  // Common answers as chips under the box: one tap fills it, and it can still be typed over.
+  return (
+    <>
+      {box}
+      <div className="sa-chips">
+        {field.picks.map((p) => (
+          <button key={p} type="button" className={`sa-chip${value === p ? ' is-on' : ''}`} disabled={disabled} onClick={() => onChange(value === p ? undefined : p)}>
+            {p}
+          </button>
+        ))}
+      </div>
+    </>
+  );
 }
 
 /** One choice (SEL) or several (MULTI) from chips. */

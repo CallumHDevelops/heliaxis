@@ -242,8 +242,9 @@ export type Kit = Awaited<ReturnType<typeof newDocument>>;
 export async function newDocument(o: DocOptions) {
   const doc = await PDFDocument.create();
   const f = await facesFor(doc);
-  const size: [number, number] = o.landscape ? [A4[1], A4[0]] : A4;
-  const W = size[0] - MARGIN.l - MARGIN.r;
+  // A document can turn between portrait and landscape page by page (the EIC's schedules): newPage().
+  let size: [number, number] = o.landscape ? [A4[1], A4[0]] : A4;
+  let W = size[0] - MARGIN.l - MARGIN.r;
   const X = MARGIN.l;
   const label = o.label ?? o.code;
   doc.setTitle(`${label} ${o.title}${o.jobRef ? ` – ${o.jobRef}` : ''}`);
@@ -305,10 +306,80 @@ export async function newDocument(o: DocOptions) {
     again?.();
   };
 
+  /** What a block() draws with: the page, where it starts, and the kit's own text in its fonts. */
+  const drawing = () => ({
+    page,
+    x: X,
+    top: y,
+    width: W,
+    text,
+    right,
+    lines,
+    widthOf: width,
+    /** A tick, a cross or N/A in a box at (bx, by) (bottom left), drawn as strokes. */
+    mark(bx: number, by: number, m: Mark, s = 10) {
+      page.drawRectangle({ x: bx, y: by, width: s, height: s, borderColor: INK, borderWidth: 0.7 });
+      if (m === 'tick') {
+        page.drawLine({ start: { x: bx + s * 0.2, y: by + s * 0.5 }, end: { x: bx + s * 0.42, y: by + s * 0.25 }, thickness: 1.3, color: INK });
+        page.drawLine({ start: { x: bx + s * 0.42, y: by + s * 0.25 }, end: { x: bx + s * 0.82, y: by + s * 0.8 }, thickness: 1.3, color: INK });
+      } else if (m === 'cross') {
+        page.drawLine({ start: { x: bx + s * 0.25, y: by + s * 0.25 }, end: { x: bx + s * 0.75, y: by + s * 0.75 }, thickness: 1.3, color: RED });
+        page.drawLine({ start: { x: bx + s * 0.25, y: by + s * 0.75 }, end: { x: bx + s * 0.75, y: by + s * 0.25 }, thickness: 1.3, color: RED });
+      } else if (m === 'na') text('N/A', bx + s + 3, by + s * 0.2, Math.max(6, s * 0.7), { bold: true, color: MUTED });
+    },
+    rect(rx: number, ry: number, rw: number, rh: number, opt: { fill?: RGB; border?: RGB; line?: number } = {}) {
+      page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, ...(opt.fill ? { color: opt.fill } : {}), ...(opt.border ? { borderColor: opt.border, borderWidth: opt.line ?? 0.5 } : {}) });
+    },
+    line(x1: number, y1: number, x2: number, y2: number, opt: { color?: RGB; t?: number } = {}) {
+      page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: opt.t ?? 0.5, color: opt.color ?? LINE });
+    },
+    /** An image embedded first (kit.embed), fitted whole into maxW × maxH with its bottom left at (ix, iy). */
+    image(img: PDFImage, ix: number, iy: number, maxW: number, maxH: number) {
+      const sc = Math.min(maxW / img.width, maxH / img.height);
+      page.drawImage(img, { x: ix, y: iy, width: img.width * sc, height: img.height * sc });
+    },
+  });
+
   return {
     doc,
-    /** The width content has. */
-    width: W,
+    /** The width content has (on the page in hand: landscape pages are wider). */
+    get width() {
+      return W;
+    },
+    /** Points left on this page above the footer. */
+    room: () => y - FOOT_TOP - 10,
+    /** Text measured in the document's own fonts (for laying out a block before drawing it). */
+    lines,
+    widthOf: width,
+    /**
+     * A new page, portrait or landscape (the EIC's schedules are landscape, as the model forms are).
+     * `continued`: the "(continued)" line at the top, as content running over does.
+     */
+    newPage(opt: { landscape?: boolean; continued?: boolean } = {}) {
+      size = opt.landscape ? [A4[1], A4[0]] : A4;
+      W = size[0] - MARGIN.l - MARGIN.r;
+      if (opt.continued) continued();
+      else {
+        page = doc.addPage(size);
+        y = size[1] - MARGIN.t;
+      }
+    },
+    /**
+     * A layout the other parts don't cover (boxes of tick boxes, a schedule's columns): room for h
+     * points (a new page if not, then `again` for its headings), drawn by `draw`, then below it.
+     * Synchronous, so a table's headings can be drawn again from `again`; embed images first.
+     */
+    block(h: number, draw: (d: ReturnType<typeof drawing>) => void, again?: () => void) {
+      need(h, again);
+      draw(drawing());
+      y -= h;
+    },
+    /** A PNG or JPEG ready for block()'s image(); null when it can't be read. */
+    async embed(bytes: Uint8Array | string | null | undefined): Promise<PDFImage | null> {
+      if (!bytes) return null;
+      const b = pngFrom(bytes);
+      return (b[0] === 0xff && b[1] === 0xd8 ? doc.embedJpg(b) : doc.embedPng(b)).catch(() => null);
+    },
     /** Logo and meta pairs, the eyebrow ("F43 · PROJECT HX-0042") in amber, the title, then the gold bar (and the draft banner). */
     header(h: { meta?: [string, string][] } = {}) {
       const logoW = 118;

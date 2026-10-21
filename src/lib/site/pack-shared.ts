@@ -3,6 +3,7 @@
  * changed between two of them. Types and pure helpers only: safe in the browser.
  */
 import type { Design } from './design';
+import type { EicFacts } from './forms/types';
 import type { PoNext } from './po-shared';
 import type { StripStep } from './strip';
 import type { Answers, Flag, Stage, Trade } from './types';
@@ -78,6 +79,8 @@ export type SitePack = {
   reads: { photo_id: string; key: string; status: string; result: unknown }[];
   /** The owner's choices the phone needs (location on photos only when turned on, D18). */
   settings: { locationStamps: boolean };
+  /** Electricians: what the certificate's questions are offered from (site/eic/facts.ts). */
+  eic?: EicFacts;
 };
 
 /** The reply to a sign-off (POST /api/site/jobs/<id>/signoff): what the done screen shows (P11). */

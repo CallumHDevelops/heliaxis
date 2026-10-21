@@ -17,6 +17,7 @@ import type { SignoffReply } from './pack-shared';
 import { HELD_WORDS, poNext, type HeldReason } from './po-shared';
 import { formatPence } from './money';
 import { saveTradeReport } from './reports';
+import { EIC_SIGNOFF } from './eic/plugin';
 import { flagsFor, openForms, recordAnswers, signCheck, type Missing } from './rules';
 import { jobOf } from './send';
 import { logJob, logSiteEvent, readAssignment, type AssignmentRow, type Db } from './server';
@@ -61,8 +62,10 @@ export type SignoffPlugin = {
   /** The documents a sign-off makes (after the reply; docs_done_at). */
   docs?: (db: Db, a: AssignmentRow, s: SignoffRow) => Promise<unknown>;
 };
-const PLUGINS = new Map<Trade, SignoffPlugin>();
-export const registerSignoff = (trade: Trade, p: SignoffPlugin) => void PLUGINS.set(trade, { ...PLUGINS.get(trade), ...p });
+/** Each trade's plugins, in the order they were registered: every gate is asked, every job and docs step runs. */
+const PLUGINS = new Map<Trade, SignoffPlugin[]>();
+export const registerSignoff = (trade: Trade, p: SignoffPlugin) => void PLUGINS.set(trade, [...(PLUGINS.get(trade) ?? []), p]);
+const pluginsOf = (trade: Trade) => PLUGINS.get(trade) ?? [];
 
 /** The scaffold's dates on the job, only where they're empty: up at erection, down at the strike. */
 async function scaffoldDates(db: Db, a: AssignmentRow, s: SignoffRow) {
@@ -74,6 +77,8 @@ async function scaffoldDates(db: Db, a: AssignmentRow, s: SignoffRow) {
 }
 registerSignoff('roofer', { docs: (db, a) => saveTradeReport(db, a.id) });
 registerSignoff('scaffolder', { job: scaffoldDates, docs: (db, a) => saveTradeReport(db, a.id) });
+// The certificate (Unit 3): the EIC or Minor Works made after the reply, paperwork.eic_on, the instruments remembered.
+registerSignoff('electrician', EIC_SIGNOFF);
 
 /** Where each stage can be signed from, and where it goes (SPEC 5.2). */
 const FROM: Record<Stage, AssignmentStatus[]> = { main: ['sent', 'opened', 'started'], erection: ['sent', 'opened', 'started'], strike: ['signed'] };
@@ -147,7 +152,8 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
   if (!forms.length) return { ok: false, status: 409, body: { error: 'status', message: 'There’s nothing to sign for this job yet.' } };
   const ctx = await serverCtx(db, a);
   const checks = forms.map((f) => signCheck(f, ctx));
-  const extra = (await PLUGINS.get(a.trade)?.gate?.(db, a, stage, ctx)) ?? [];
+  const extra: Missing[] = [];
+  for (const p of pluginsOf(a.trade)) extra.push(...((await p.gate?.(db, a, stage, ctx)) ?? []));
   const missing = [...checks.flatMap((c) => c.must), ...extra];
   const stops = checks.flatMap((c) => c.stops);
   if (missing.length || stops.length) {
@@ -224,7 +230,7 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
     .in('status', FROM[stage]);
   await logSiteEvent(db, a.id, 'trade', 'signed_off', { stage, signoff: id, name, device: meta.deviceId, answers_hash: hash }, meta.ip);
   const now = (await readAssignment(db, a.id)) ?? a;
-  await PLUGINS.get(a.trade)?.job?.(db, now, s);
+  for (const p of pluginsOf(a.trade)) await p.job?.(db, now, s);
 
   // The PO, now, so the phone can show its number (none for the strike: the erection raised it).
   if (stage !== 'strike') await raiseLabourPo(db, now, { id: s.id, signed_name: s.signed_name, signed_at: s.signed_at, stage });
@@ -264,7 +270,7 @@ export async function finishSignoff(db: Db, signoffId: string): Promise<{ po: bo
   }
   if (!s.docs_done_at) {
     try {
-      await PLUGINS.get(a.trade)?.docs?.(db, a, s);
+      for (const p of pluginsOf(a.trade)) await p.docs?.(db, a, s);
       await stamp(db, s.id, 'docs_done_at');
       out.docs = true;
     } catch (e) {

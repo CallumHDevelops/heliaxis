@@ -26,6 +26,7 @@ const WORD: Record<string, string> = { yes: 'Yes', no: 'No', na: 'N/A', pass: 'P
 
 /** An answer as words for a document. */
 export function answerWords(f: Field, v: unknown, c: FormCtx): string | null {
+  if (f.type === 'CUSTOM') return f.words?.(c) ?? null;
   if (v === undefined || v === null || v === '') return null;
   switch (f.type) {
     case 'CONFIRM':

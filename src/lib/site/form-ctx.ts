@@ -1,5 +1,6 @@
 import 'server-only';
 import { designOf } from './design';
+import { eicFacts } from './eic/facts';
 import type { FormCtx, LabelReadResult } from './forms/types';
 import { makeCtx } from './rules';
 import type { AssignmentRow, Db } from './server';
@@ -38,5 +39,6 @@ export async function serverCtx(db: Db, a: AssignmentRow): Promise<FormCtx> {
     reads: ((reads ?? []) as { key: string; status: string; result: LabelReadResult | null }[]).map((r) => ({ key: r.key, status: r.status, result: r.result })),
     address,
     signed: ((signoffs ?? []) as { stage: Stage }[]).map((x) => x.stage),
+    eic: await eicFacts(db, a, project),
   });
 }
