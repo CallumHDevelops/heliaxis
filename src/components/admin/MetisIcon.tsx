@@ -2,12 +2,13 @@ import { useId } from 'react';
 
 /**
  * Metis, the assistant: an M woven from gold ribbon inside a circle, with a halo arc and a point of
- * insight (Metis was the Greek goddess of wisdom and counsel). Heliaxis solar gold on ink.
+ * insight (Metis was the Greek goddess of wisdom and counsel). Heliaxis solar gold on ink, in both
+ * themes: on dark it takes a hairline ring (.hx-metis in src/app/theme.css) so the tile keeps its edge.
  */
 export function MetisIcon({ size = 32, className }: { size?: number; className?: string }) {
   const g = `metis-${useId().replace(/:/g, '')}`;
   return (
-    <svg viewBox="0 0 48 48" width={size} height={size} className={className} aria-hidden="true" style={{ display: 'block', flex: 'none' }}>
+    <svg viewBox="0 0 48 48" width={size} height={size} className={className ? `hx-metis ${className}` : 'hx-metis'} aria-hidden="true" style={{ display: 'block', flex: 'none' }}>
       <defs>
         <linearGradient id={g} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffd35c" />

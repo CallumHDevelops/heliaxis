@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { INK_BAR } from '@/lib/theme/routes';
 import './site.css';
 import './form.css';
 import './electrician.css';
@@ -12,10 +13,11 @@ export const metadata: Metadata = {
   icons: { apple: '/apple-touch-icon.png' },
 };
 
-// Light only: it's read in sunlight.
+// color-scheme comes from the root layout, which follows the person's Light / Dark / Match phone
+// choice (src/lib/theme). The status bar is the ink top bar in both themes; said here too because the
+// home and offline shell are built ahead of time, with no request for the root to read.
 export const viewport: Viewport = {
-  colorScheme: 'light',
-  themeColor: '#211F18',
+  themeColor: INK_BAR[0],
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',

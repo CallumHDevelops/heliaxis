@@ -10,6 +10,9 @@ export type Profile = {
   email: string | null;
   /** Portals a member may open (admins get all). Absent until the migration runs. */
   portals?: string[] | null;
+  /** Light / Dark / Match phone, saved to the account (src/lib/theme). Absent until supabase/theme.sql runs. */
+  theme?: 'light' | 'dark' | 'system' | null;
+  theme_at?: string | null;
 };
 
 // Current signed-in user + their profile (or nulls). For use in admin pages.

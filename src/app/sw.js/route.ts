@@ -37,8 +37,13 @@ const SURVEY_SHELL = '/admin/surveys/shell';
 const STATIC_IN_HTML = new RegExp(${JSON.stringify(STATIC_IN_HTML)}, 'g');
 const OFFLINE_URL = '/offline.html';
 
+// Both wordmarks (light and dark theme), so the offline page and kept pages show a logo either way.
+const LOGOS = ['/assets/heliaxis-logo.png', '/assets/heliaxis-logo-light.png'];
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(STATIC).then((c) => c.add(OFFLINE_URL)));
+  event.waitUntil(
+    caches.open(STATIC).then((c) => Promise.all([c.add(OFFLINE_URL), ...LOGOS.map((u) => c.add(u).catch(() => {}))]))
+  );
 });
 
 self.addEventListener('activate', (event) => {

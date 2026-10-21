@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from 'next';
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
 import './portal.css';
@@ -8,11 +8,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Declaring both schemes stops mobile browsers auto-darkening the page; portal.css supplies the dark theme.
-export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: '#211F18',
-};
+// color-scheme (which stops phones auto-darkening the page) and the status bar colour (the ink top bar)
+// come from the root layout, which follows the person's Light / Dark / Match phone choice (src/lib/theme).
 
 export default function PortalLayout({ children }: { children: ReactNode }) {
   return (

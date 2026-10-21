@@ -65,17 +65,18 @@ export function SendToPhone({ qrSvg, email, days }: { qrSvg: string; email: stri
       <style>{`
         .stp-h { margin-top: 0 !important; }
         .stp-grid { display: grid; grid-template-columns: 170px 1fr; gap: 22px; align-items: start; }
-        .stp-qr { text-align: center; font-size: .78rem; color: #6e6a5e; }
-        .stp-qr-img svg { width: 170px; height: 170px; display: block; border: 1px solid rgba(33,31,24,.14); border-radius: 4px; }
+        .stp-qr { text-align: center; font-size: .78rem; color: var(--muted); }
+        /* The code itself stays dark on light in both themes, so phones can scan it. */
+        .stp-qr-img svg { width: 170px; height: 170px; display: block; border: 1px solid var(--border); border-radius: 4px; }
         .stp-qr span { display: block; margin-top: 6px; }
         .stp-form { display: flex; flex-direction: column; gap: 8px; }
         .stp-form label { font-weight: 700; font-size: .92rem; }
-        .stp-form input { font: inherit; font-size: .95rem; padding: .6rem .7rem; border: 1px solid rgba(33,31,24,.2);
-          border-radius: 2px; background: #fff; color: #211f18; min-width: 0; }
+        .stp-form input { font: inherit; font-size: .95rem; padding: .6rem .7rem; border: 1px solid var(--border-strong);
+          border-radius: 2px; background: var(--field); color: var(--text); min-width: 0; }
         .stp-btn { border: 0; cursor: pointer; font: inherit; font-weight: 800; }
         .stp-btn:disabled { opacity: .6; cursor: default; }
-        .stp-msg { margin: 0; font-size: .85rem; color: #3f7d4e; font-weight: 600; }
-        .stp-msg.is-error { color: #b3412e; }
+        .stp-msg { margin: 0; font-size: .85rem; color: var(--ok); font-weight: 600; }
+        .stp-msg.is-error { color: var(--danger); }
         @media (max-width: 560px) {
           .stp-grid { grid-template-columns: 1fr; }
           .stp-qr { display: none; }

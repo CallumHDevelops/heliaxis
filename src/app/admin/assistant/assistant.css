@@ -1,17 +1,20 @@
+/* Metis (AssistantView.tsx). Colours: src/app/theme.css. */
 .as {
-  --ink: #211f18;
-  --muted: #6e6a5e;
-  --line: rgba(33, 31, 24, 0.13);
-  --card: #fffdf8;
-  --claude: #c96442;
-  --wa: #1f7a4d;
-  --err: #b3261e;
-  color: var(--ink);
+  /* Your own messages: an ink bubble on light, a warm raised one on dark (ink would sink into the page). */
+  --as-me: var(--moment);
+  --as-me-text: var(--moment-text);
+  color: var(--text);
   max-width: 720px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 160px);
+}
+@media screen {
+  :root[data-theme='dark'] .as {
+    --as-me: #3a3428;
+    --as-me-text: var(--text);
+  }
 }
 .as-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
 .as-head h1 { font-size: 1.8rem; font-weight: 800; margin: 0; }
@@ -20,16 +23,17 @@
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 99px;
   padding: 0.45rem 0.9rem;
+  color: var(--text);
   cursor: pointer;
   white-space: nowrap;
 }
 .as-banner {
-  background: #fff4e5;
-  border: 1px solid #f0d4a8;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
   border-radius: 8px;
   padding: 0.75rem 0.9rem;
   font-size: 0.9rem;
@@ -46,7 +50,7 @@
   color: var(--muted);
   margin: 0 0 0.5rem;
 }
-.as-draft { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 0.5rem; overflow: hidden; }
+.as-draft { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0.5rem; overflow: hidden; }
 .as-draft-head {
   width: 100%;
   display: flex;
@@ -60,8 +64,8 @@
   text-align: left;
   cursor: pointer;
 }
-.as-kind { flex: none; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 99px; color: #fff; background: var(--ink); }
-.as-kind.is-whatsapp { background: var(--wa); }
+.as-kind { flex: none; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 99px; color: var(--inverse-text); background: var(--inverse); }
+.as-kind.is-whatsapp { background: var(--wa); color: var(--on-solid); }
 .as-draft-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .as-draft-who b { font-size: 0.95rem; }
 .as-draft-who small { color: var(--muted); font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -75,14 +79,15 @@
   font-size: 0.95rem;
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.6rem 0.7rem;
-  background: #fff;
-  color: var(--ink);
+  background: var(--field);
+  color: var(--text);
 }
 .as-draft-body textarea { resize: vertical; line-height: 1.45; }
-.as-err { margin: 0; color: var(--err); font-size: 0.85rem; }
+.as-err { margin: 0; color: var(--danger); font-size: 0.85rem; }
+.as-err a { color: inherit; }
 .as-draft-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .as-btn {
   font: inherit;
@@ -90,13 +95,13 @@
   font-weight: 600;
   padding: 0.55rem 1rem;
   border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--ink);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
   cursor: pointer;
 }
-.as-btn.is-primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+.as-btn.is-primary { background: var(--inverse); border-color: var(--inverse); color: var(--inverse-text); }
 .as-btn.is-quiet { border-color: transparent; background: none; color: var(--muted); margin-left: auto; }
 .as-btn:disabled { opacity: 0.6; }
 
@@ -107,26 +112,26 @@
 .as-starters button {
   font: inherit;
   font-size: 0.88rem;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 99px;
   padding: 0.5rem 0.85rem;
   cursor: pointer;
-  color: var(--ink);
+  color: var(--text);
 }
 .as-msg { max-width: 88%; padding: 0.65rem 0.85rem; border-radius: 14px; line-height: 1.45; font-size: 0.95rem; }
 .as-msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.as-msg.is-user { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 4px; }
-.as-msg.is-assistant { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-.as-msg.is-error { border-color: #f0b8b3; color: var(--err); }
+.as-msg.is-user { align-self: flex-end; background: var(--as-me); color: var(--as-me-text); border-bottom-right-radius: 4px; }
+.as-msg.is-assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.as-msg.is-error { border-color: var(--danger-line); color: var(--danger); }
 .as-actions { list-style: none; margin: 0.55rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 .as-chip {
   display: inline-block;
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
-  color: var(--ink);
-  background: #f3eee2;
+  color: var(--text);
+  background: var(--surface-2);
   border-radius: 6px;
   padding: 0.35rem 0.6rem;
   border-left: 3px solid var(--claude);
@@ -138,19 +143,20 @@
 .as-msg.is-busy span:nth-child(3) { animation-delay: 0.3s; }
 @keyframes as-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 
-/* Composer: stays above the phone tab bar */
+/* Composer: stays above the phone tab bar. Its edge is the text box's, so it's drawn at 3:1. */
 .as-compose {
   position: sticky;
   bottom: calc(var(--hx-tabbar, 0px) + 0.5rem);
   display: flex;
   align-items: flex-end;
   gap: 0.45rem;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: 18px;
   padding: 0.4rem;
-  box-shadow: 0 6px 24px rgba(33, 31, 24, 0.1);
+  box-shadow: var(--shadow);
 }
+.as-compose:focus-within { border-color: var(--text); }
 .as-compose textarea {
   flex: 1;
   min-width: 0;
@@ -160,7 +166,7 @@
   resize: none;
   background: none;
   padding: 0.6rem 0.5rem;
-  color: var(--ink);
+  color: var(--text);
   outline: none;
   max-height: 40vh;
 }
@@ -175,11 +181,14 @@
   border: 0;
   cursor: pointer;
 }
-.as-mic { background: #f3eee2; color: var(--ink); }
-.as-mic.is-on { background: var(--claude); color: #fff; animation: as-pulse 1.4s infinite; }
-.as-send { background: var(--ink); color: #fff; }
+.as-mic { background: var(--surface-2); color: var(--text); }
+.as-mic.is-on { background: var(--claude); color: var(--on-solid); animation: as-pulse 1.4s infinite; }
+.as-send { background: var(--inverse); color: var(--inverse-text); }
 .as-send:disabled { opacity: 0.35; cursor: default; }
-@keyframes as-pulse { 0% { box-shadow: 0 0 0 0 rgba(201, 100, 66, 0.45); } 100% { box-shadow: 0 0 0 12px rgba(201, 100, 66, 0); } }
+@keyframes as-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--claude) 45%, transparent); }
+  100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--claude) 0%, transparent); }
+}
 
 /* Metis */
 .as-head h1 { display: flex; align-items: center; gap: 0.55rem; }

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from '@/lib/auth-actions';
 import { brand } from '@/components/auth/authStyles';
+import { BrandLogo } from '@/components/theme/BrandLogo';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
 import { schemaReady } from '@/lib/schema-ready';
@@ -392,15 +392,16 @@ export async function AdminShell({
         overflow: flush ? 'hidden' : undefined,
         display: 'flex',
         flexDirection: 'column',
-        // The soft glow on top is in admin-shell.css.
-        backgroundColor: flush ? '#111' : brand.paper,
+        // The page colour (light or dark) and the soft glow on top are in admin-shell.css; full-height
+        // embeds (flush) sit on near-black in both themes.
+        backgroundColor: flush ? '#111' : undefined,
         fontFamily: brand.body,
-        color: brand.ink,
+        color: 'var(--text)',
       }}
     >
       <header className="hx-header">
         <Link href="/admin" className="hx-header__logo">
-          <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={140} height={32} style={{ width: '100%', height: 'auto' }} />
+          <BrandLogo width="100%" />
         </Link>
         <nav className="hx-nav" aria-label="Main">
           <TopMenu groups={menu} fallback={active === 'dashboard' ? '/admin' : undefined} />

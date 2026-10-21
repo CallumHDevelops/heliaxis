@@ -1,7 +1,7 @@
 /* Search customers and projects (GlobalSearch.tsx): the dashboard's box, the header's button and its pop-up. */
 .gs {
   position: relative;
-  color: #211f18;
+  color: var(--text);
 }
 .gs-field {
   display: flex;
@@ -10,16 +10,16 @@
   min-height: 52px;
   box-sizing: border-box;
   padding: 0 0.9rem;
-  background: #fff;
-  border: 1px solid rgba(33, 31, 24, 0.18);
+  background: var(--field);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(33, 31, 24, 0.05);
-  color: #6e6a5e;
+  box-shadow: var(--shadow-sm);
+  color: var(--muted);
   cursor: text;
 }
 .gs-field:focus-within {
-  border-color: #211f18;
-  box-shadow: 0 0 0 3px rgba(248, 188, 30, 0.35);
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.35);
 }
 .gs-field svg {
   flex: none;
@@ -31,13 +31,13 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #211f18;
+  color: var(--text);
   font: inherit;
   font-size: 1rem; /* 16px: phones don't zoom in on it */
   text-overflow: ellipsis;
 }
 .gs-field input::placeholder {
-  color: #858071;
+  color: var(--muted);
 }
 /* Our own ×, in the brand's colours (the browser's is blue). */
 .gs-field input::-webkit-search-cancel-button {
@@ -52,19 +52,19 @@
   margin-right: -6px;
   border: 0;
   border-radius: 50%;
-  background: rgba(33, 31, 24, 0.07);
-  color: #4a463b;
+  background: rgb(var(--fg-rgb) / 0.07);
+  color: var(--text-2);
   font: inherit;
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
 }
 .gs-clear:hover {
-  background: rgba(33, 31, 24, 0.13);
-  color: #211f18;
+  background: rgb(var(--fg-rgb) / 0.13);
+  color: var(--text);
 }
 .gs-clear:focus-visible {
-  outline: 2px solid #211f18;
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 /* What you can search by: the placeholder says it, but it's cut short on phones. */
@@ -72,7 +72,7 @@
   display: none;
   margin: 6px 2px 0;
   font-size: 0.78rem;
-  color: #6e6a5e;
+  color: var(--muted);
 }
 /* Touch screens: no keyboard hints. */
 @media (pointer: coarse) {
@@ -89,19 +89,19 @@
   font-size: 0.7rem;
   line-height: 1.5;
   padding: 0 6px;
-  border: 1px solid rgba(33, 31, 24, 0.2);
+  border: 1px solid var(--border-strong);
   border-bottom-width: 2px;
   border-radius: 4px;
-  background: #fffdf8;
-  color: #6e6a5e;
+  background: var(--surface);
+  color: var(--muted);
 }
 
 /* The list: drops under the dashboard's box, sits under the box in the pop-up. */
 .gs-pop {
-  background: #fffdf8;
-  border: 1px solid rgba(33, 31, 24, 0.14);
+  background: var(--raised);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(33, 31, 24, 0.16);
+  box-shadow: var(--shadow);
   overflow: hidden;
 }
 .gs--inline .gs-pop {
@@ -131,7 +131,7 @@
 }
 .gs-opt.is-person + .gs-opt.is-person,
 .gs-opt.is-job + .gs-opt.is-person {
-  border-top: 1px solid rgba(33, 31, 24, 0.08);
+  border-top: 1px solid var(--border-soft);
 }
 .gs-row {
   display: flex;
@@ -145,13 +145,13 @@
   text-decoration: none;
 }
 .gs-opt.on .gs-row {
-  background: rgba(248, 188, 30, 0.2);
+  background: rgb(var(--accent-rgb) / 0.2);
 }
 .gs-opt[aria-disabled] .gs-row {
   cursor: default;
 }
 .gs-opt[aria-disabled] .gs-main b {
-  color: #6e6a5e;
+  color: var(--muted);
 }
 /* A person's jobs, indented under them. */
 .gs-opt.is-job .gs-row {
@@ -166,7 +166,7 @@
   left: 0;
   top: 8px;
   bottom: 8px;
-  border-left: 2px solid rgba(33, 31, 24, 0.16);
+  border-left: 2px solid var(--border);
 }
 .gs-main {
   flex: 1;
@@ -188,14 +188,14 @@
 }
 .gs-main small {
   font-size: 0.8rem;
-  color: #6e6a5e;
+  color: var(--muted);
 }
 .gs-ref {
   margin-left: 0.45rem;
   font-family: ui-monospace, Menlo, monospace;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #6e6a5e;
+  color: var(--muted);
 }
 .gs-hint {
   flex: none;
@@ -205,33 +205,33 @@
   white-space: nowrap;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.06);
-  color: #4a463b;
+  background: rgb(var(--fg-rgb) / 0.06);
+  color: var(--text-2);
   font-size: 0.74rem;
   font-weight: 700;
 }
 .gs-opt.on .gs-hint {
-  background: #211f18;
-  color: #f8bc1e;
+  background: var(--moment);
+  color: var(--accent);
 }
 .gs-morejobs {
   display: block;
   margin: 0 0 6px 2.15rem;
   font-size: 0.75rem;
-  color: #6e6a5e;
+  color: var(--muted);
 }
 .gs-status {
   margin: 0;
   padding: 0.8rem 0.95rem;
   font-size: 0.88rem;
-  color: #6e6a5e;
+  color: var(--muted);
 }
 .gs-keys {
   margin: 0;
   padding: 0.5rem 0.95rem;
-  border-top: 1px solid rgba(33, 31, 24, 0.08);
+  border-top: 1px solid var(--border-soft);
   font-size: 0.75rem;
-  color: #6e6a5e;
+  color: var(--muted);
 }
 .gs-keys kbd {
   margin-right: 2px;
@@ -250,21 +250,21 @@
   height: 36px;
   box-sizing: border-box;
   padding: 0 0.55rem 0 0.75rem;
-  border: 1px solid rgba(33, 31, 24, 0.14);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fff;
-  color: #6e6a5e;
+  background: var(--field);
+  color: var(--muted);
   font: inherit;
   font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
 }
 .hx-search:hover {
-  color: #211f18;
-  border-color: rgba(33, 31, 24, 0.35);
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 .hx-search:focus-visible {
-  outline: 2px solid #211f18;
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 @media (max-width: 1180px) {
@@ -293,7 +293,7 @@
   justify-content: center;
   align-items: flex-start;
   padding: 12vh 16px 16px;
-  background: rgba(20, 18, 12, 0.38);
+  background: var(--scrim);
   animation: gs-fade 0.14s ease-out;
 }
 .gs-dialog {

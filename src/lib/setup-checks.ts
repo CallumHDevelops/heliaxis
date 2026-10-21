@@ -517,6 +517,14 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     optional: true,
     manual: true,
   });
+  // Light / dark: optional. Without it each device remembers its own choice (src/lib/theme).
+  add(
+    !(await has('profiles', 'theme_at')),
+    {
+      ...sql('theme.sql', 'Light and dark mode: each person’s choice (Light, Dark or Match phone) follows them to all their devices. Until it’s run, each device remembers its own.', 40),
+      optional: true,
+    }
+  );
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

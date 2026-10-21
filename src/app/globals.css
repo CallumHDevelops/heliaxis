@@ -49,12 +49,12 @@
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
-  --color-border: var(--border);
+  --color-border: var(--sc-border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
+  --color-accent: var(--sc-accent);
   --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
+  --color-muted: var(--sc-muted);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
@@ -93,12 +93,13 @@
   --primary-foreground: #FFFFFF;
   --secondary: #F8F9FA;
   --secondary-foreground: #16222F;
-  --muted: #F1F3F5;
+  /* sc-: shadcn's names, kept apart from the light/dark theme's --muted, --accent and --border (theme.css). */
+  --sc-muted: #F1F3F5;
   --muted-foreground: #495057;
-  --accent: #FDC010;
+  --sc-accent: #FDC010;
   --accent-foreground: #16222F;
   --destructive: #DC3545;
-  --border: #DEE2E6;
+  --sc-border: #DEE2E6;
   --input: #DEE2E6;
   --ring: #FDC010;
   --chart-1: #FDC010;

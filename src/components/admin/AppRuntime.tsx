@@ -252,17 +252,18 @@ export function AppRuntime({ surveys = false }: { /** Can use the CRM: keep the 
       <style>{`
         .hx-rt-bar { position: fixed; left: 50%; bottom: var(--hx-rt-bottom, 16px); transform: translateX(-50%); z-index: 50;
           display: flex; flex-direction: column; gap: 6px; align-items: center; width: max-content; max-width: calc(100vw - 32px); }
+        /* Ink toasts in both themes (an "ink moment"), with a hairline on dark so they stand off the page. */
         .hx-rt-note, .hx-rt-pill { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
-          background: #211f18; color: #fffdf8; padding: 10px 14px; border-radius: 4px; font-size: .88rem; font-weight: 600;
-          box-shadow: 0 6px 24px rgba(0,0,0,.18); }
-        .hx-rt-pill { background: #c77f04; padding: 6px 12px; font-size: .78rem; }
+          background: var(--moment); color: var(--moment-text); padding: 10px 14px; border-radius: 4px; font-size: .88rem; font-weight: 600;
+          box-shadow: var(--shadow); border: 1px solid var(--border); }
+        .hx-rt-pill { background: var(--accent); color: var(--accent-ink); padding: 6px 12px; font-size: .78rem; }
         .hx-rt-btn { font: inherit; font-size: .82rem; font-weight: 700; padding: .35rem .75rem; border-radius: 2px;
-          border: 1px solid rgba(255,253,248,.35); background: transparent; color: inherit; cursor: pointer; text-decoration: none; }
-        .hx-rt-btn.is-primary { background: #f8bc1e; border-color: #f8bc1e; color: #211f18; }
-        .hx-rt-modal { position: fixed; inset: 0; z-index: 60; background: rgba(33,31,24,.6); display: grid; place-items: center; padding: 16px; }
-        .hx-rt-card { background: #fffdf8; color: #211f18; max-width: 420px; padding: 24px; border-radius: 4px; }
+          border: 1px solid color-mix(in srgb, var(--moment-text) 35%, transparent); background: transparent; color: inherit; cursor: pointer; text-decoration: none; }
+        .hx-rt-btn.is-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+        .hx-rt-modal { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: grid; place-items: center; padding: 16px; }
+        .hx-rt-card { background: var(--raised); color: var(--text); max-width: 420px; padding: 24px; border-radius: 4px; border: 1px solid var(--border); }
         .hx-rt-card h2 { margin: 0 0 8px; font-size: 1.2rem; }
-        .hx-rt-card p, .hx-rt-card li { color: #6e6a5e; line-height: 1.5; font-size: .92rem; }
+        .hx-rt-card p, .hx-rt-card li { color: var(--muted); line-height: 1.5; font-size: .92rem; }
         .hx-rt-card .hx-rt-btn { display: inline-block; margin-top: 8px; font-size: .95rem; padding: .6rem 1rem; }
       `}</style>
     </>
