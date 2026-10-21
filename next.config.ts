@@ -34,7 +34,13 @@ const nextConfig: NextConfig = {
       },
       { source: '/portal/:path*', headers: [...sensitiveHeaders, { key: 'X-Frame-Options', value: 'DENY' }] },
       { source: '/portal', headers: [...sensitiveHeaders, { key: 'X-Frame-Options', value: 'DENY' }] },
+      // The site app on trades' phones: the camera (photos, scanning) and location (photo stamps, when
+      // the owner turns them on) for its own pages only. Later entries win, so this replaces the
+      // Permissions-Policy above; the other /portal pages keep the camera blocked.
+      { source: '/portal/site', headers: [{ key: 'Permissions-Policy', value: 'camera=(self), geolocation=(self), microphone=(), payment=()' }] },
+      { source: '/portal/site/:path*', headers: [{ key: 'Permissions-Policy', value: 'camera=(self), geolocation=(self), microphone=(), payment=()' }] },
       { source: '/api/portal/:path*', headers: sensitiveHeaders },
+      { source: '/api/site/:path*', headers: sensitiveHeaders },
       // Survey booking links (/book/<token>) are personal. Not /book-a-survey, the public form.
       { source: '/book/:path*', headers: sensitiveHeaders },
       { source: '/api/book/:path*', headers: sensitiveHeaders },

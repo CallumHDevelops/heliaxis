@@ -45,8 +45,8 @@ export const SOURCE_LABEL: Record<Source, string> = {
   job: 'From the job',
 };
 
-/** One answer as stored: the value, its source, and when it was given (ISO). */
-export type Answer = { v: unknown; src?: Source; at?: string };
+/** One answer as stored: the value, its source, when it was given (ISO), and the phone it came from (site_devices id). */
+export type Answer = { v: unknown; src?: Source; at?: string; dev?: string };
 export type Answers = Record<string, Answer>;
 
 /** Answers as plain values (what the rules read). */
