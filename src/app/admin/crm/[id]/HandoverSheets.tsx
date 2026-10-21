@@ -552,7 +552,8 @@ export function InvoiceSheet({
   const [on, setOn] = useState(today);
   const [method, setMethod] = useState('bank_transfer');
   const [ref, setRef] = useState('');
-  const [final, setFinal] = useState(true);
+  // Ticked on purpose: a stage or part payment recorded as final would tick "Final invoice paid".
+  const [final, setFinal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const pence = Math.round(Number(amount.replace(/[£,\s]/g, '')) * 100);

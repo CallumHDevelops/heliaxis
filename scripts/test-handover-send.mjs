@@ -428,6 +428,13 @@ eq('Regenerate on F43: made again by the site app for that item only, by whoever
 eq('…the new version in their portal, the old one archived, nothing Out of date, the pack rebuilt', [regen.status, f43After.version, f43After.visible, !!docs().find((d) => d.id === f43Before.id).archived_at, regen.body.slots.find((s) => s.code === 'F43').state, cur('PACK').version], [200, 2, true, true, 'complete', packBefore + 1]);
 eq('…and logged', globalThis.__rec.activity.includes('Handover pack: Solar PV Array Test Form made again'), true);
 
+// The Overview card after Send: the final invoice to send, then (uploaded, unpaid) their payment to wait for.
+eq('Overview card after Send: send the final invoice', (await H.handoverSummary(db, pid)).next, 'Send the final invoice');
+await upload('Final invoice', await simplePdf('Final invoice'), { handover_slot: 'CC13' });
+eq('…uploaded and not paid yet: waiting for payment, not “send” again', (await H.handoverSummary(db, pid)).next, 'Waiting for payment');
+const sheets = fs.readFileSync(new URL('../src/app/admin/crm/[id]/HandoverSheets.tsx', import.meta.url), 'utf8');
+eq('Record a payment: “This is the final payment” starts unticked', /const \[final, setFinal\] = useState\(false\)/.test(sheets), true);
+
 /* ── 6. Payments and the receipt ───────────────────────────────────────────── */
 const pay = await post({ action: 'record-payment', amount_pence: 900000, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042', kind: 'final' });
 eq('payment recorded, Final invoice paid ticked', [pay.status, globalThis.__rec.rpc.some(([n, k]) => n === 'crm_checklist_set' && k === 'x_paid')], [200, true]);

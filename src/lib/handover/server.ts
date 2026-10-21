@@ -507,13 +507,17 @@ export async function handoverSummary(db: Db, projectId: string): Promise<{ word
   const check = sendCheck(views);
   const sent = !!l.pack?.sent_at;
   const cc13 = views.find((v) => v.code === 'CC13');
+  // The final invoice is in their pack (the receipt aside): what's left is their payment, not another send.
+  const invoiced = !!cc13?.docs.some((d) => d.key !== 'CC13_RECEIPT');
   const prep = prepList(l, views);
   const early = !sent && ['won', 'design', 'ready', 'install_booked'].includes(l.facts.job.stage);
   const next = early
     ? `Before the install day: ${prep.filter((x) => x.done).length} of ${prep.length} ready`
     : sent
     ? cc13 && cc13.state !== 'complete' && cc13.state !== 'na'
-      ? 'Send the final invoice'
+      ? invoiced
+        ? 'Waiting for payment'
+        : 'Send the final invoice'
       : check.following.length
         ? `${check.following.length} on ${check.following.length === 1 ? 'its' : 'their'} way to the customer`
         : 'All in the customer’s portal'
