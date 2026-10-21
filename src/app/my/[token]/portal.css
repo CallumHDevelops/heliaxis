@@ -434,6 +434,9 @@
 .pt-hv-items li.is-multi .pt-hv-docs {
   flex-basis: 100%;
   align-items: flex-start;
+  /* A long file name shortens with "…" instead of pushing the page sideways. */
+  min-width: 0;
+  max-width: 100%;
 }
 .pt-hv-items li.is-multi .pt-hv-docs a {
   max-width: 100%;

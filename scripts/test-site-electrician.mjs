@@ -472,6 +472,11 @@ eq('every step after the reply stamped', ['po_done_at', 'docs_done_at', 'notifie
 eq('their instruments remembered for next time', db.rows('site_contacts')[0].instruments.map((x) => x.text), ['Megger MFT1741+ s/n 1234567']);
 const storedF75 = flat(await textOf(db.files.get(`crm-docs/${made.find((d) => d.generated_key === 'F75').storage_path}`)));
 eq('the stored F75 carries the engineer and the signature line', [storedF75.includes('Sam Sparks'), storedF75.includes('Signed on the Heliaxis app')], [true, true]);
+// What the handover pack is told (site/handover-facts.ts): their certificate's reference, and F78's
+// verification as the form works it out from F43's (it isn't stored unless they change it).
+const HF = await import('../src/lib/site/handover-facts.ts');
+const hf = await HF.siteHandoverFacts(db, p1.id, {});
+eq('the handover pack is told: their certificate’s reference, F78 "initial" (from F43), nothing waiting', [hf.certRef, hf.values.f78_kind, e1.answers.f78_kind, hf.certWaits, hf.nextInspection], ['NAPIT EIC 00123456', 'initial', undefined, null, null]);
 
 // An EV job signed the day before Christmas: the call skips the bank holidays; the DNO to-do.
 fixed = Date.parse('2026-12-24T14:00:00Z');

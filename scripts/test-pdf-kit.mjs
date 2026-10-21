@@ -109,7 +109,9 @@ function fakeDb() {
     let mode = 'select';
     let patch = null;
     let inserted = null;
+    let clash = null;
     const run = () => {
+      if (clash) return { data: null, error: clash };
       if (mode === 'insert') return { data: inserted, error: null };
       let list = rows.filter((r) => where.every((w) => w(r)));
       if (mode === 'update') {
@@ -124,10 +126,16 @@ function fakeDb() {
       select: () => b,
       eq: (c, v) => (where.push((r) => r[c] === v), b),
       is: (c, v) => (where.push((r) => (r[c] ?? null) === v), b),
+      lt: (c, v) => (where.push((r) => r[c] < v), b),
       order: (col, o) => ((order = { col, asc: o?.ascending !== false }), b),
       limit: (k) => ((lim = k), b),
       insert: (r) => {
         mode = 'insert';
+        // crm_documents.storage_path is unique (crm-v2.sql).
+        if (rows.some((x) => x.storage_path === r.storage_path)) {
+          clash = { code: '23505', message: 'duplicate key value violates unique constraint "crm_documents_storage_path_key"' };
+          return b;
+        }
         inserted = { id: `d${++n}`, archived_at: null, ...r };
         rows.push(inserted);
         return b;
@@ -155,6 +163,18 @@ eq('changed inputs on a visible document: out of date, nothing new', [r4.status,
 eq('isOutOfDate agrees', S.isOutOfDate(r4.doc, { a: 3 }), true);
 const r5 = await S.saveGenerated(db, 'p1', { key: 'RF_REPORT', name: 'HX-0042 Roofer report.pdf', bytes: pdf, inputs: { a: 3 }, force: true });
 eq('Regenerate (force) replaces it, the old one archived and hidden', [r5.status, r5.doc.version, db.rows[1].visible, !!db.rows[1].archived_at], ['saved', 3, false, true]);
+// Two saves at once (the cron and the Handover tab) both read v3 as current and pick v4: the file path
+// is unique, so one is refused (the next refresh makes it), and there's never a second current version.
+const both = await Promise.allSettled([
+  S.saveGenerated(db, 'p1', { key: 'RF_REPORT', name: 'HX-0042 Roofer report.pdf', bytes: pdf, inputs: { a: 4 } }),
+  S.saveGenerated(db, 'p1', { key: 'RF_REPORT', name: 'HX-0042 Roofer report.pdf', bytes: pdf, inputs: { a: 5 } }),
+]);
+const live = () => db.rows.filter((r) => r.generated_key === 'RF_REPORT' && !r.archived_at).map((r) => r.version);
+eq('two saves at once: one saved, one refused, one current version', [both.map((x) => x.status).sort(), live()], [['fulfilled', 'rejected'], [4]]);
+// One that slipped through earlier (v4 and v5 both current): the next save archives every older version.
+db.rows.push({ id: 'd-stray', project_id: 'p1', generated_key: 'RF_REPORT', version: 5, inputs_hash: 'x', visible: true, archived_at: null, storage_path: 'projects/p1/generated/RF_REPORT-v5.pdf' });
+const r8 = await S.saveGenerated(db, 'p1', { key: 'RF_REPORT', name: 'HX-0042 Roofer report.pdf', bytes: pdf, inputs: { a: 6 }, force: true });
+eq('…and the next save leaves only itself current, the others hidden', [r8.doc.version, live(), db.rows.filter((r) => r.generated_key === 'RF_REPORT' && r.visible).length], [6, [6], 0]);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

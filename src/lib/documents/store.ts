@@ -127,7 +127,17 @@ export async function saveGenerated(db: Db, projectId: string, d: SaveGenerated)
     .select('*')
     .single();
   if (error || !row) throw new Error(`Couldn’t save ${d.name}: ${error?.message ?? 'no row'}`);
-  if (current) await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: d.by ?? null, visible: false }).eq('id', current.id);
+  // Every older version still current, not just the one read above: two saves at once (the cron and
+  // the Handover tab, say) would otherwise leave both in the customer's portal. The newest stays.
+  if (current) {
+    await db
+      .from('crm_documents')
+      .update({ archived_at: new Date().toISOString(), archived_by: d.by ?? null, visible: false })
+      .eq('project_id', projectId)
+      .eq('generated_key', d.key)
+      .lt('version', version)
+      .is('archived_at', null);
+  }
   await fingerprintDocument(String(row.id));
   return { status: 'saved', doc: row as GeneratedDoc, replaced: current };
 }
