@@ -1,5 +1,6 @@
 // The site app's pure parts: what the office changed between two packs (pack-shared.ts), a labour
-// PO's state for the trade, the sync pill and its sentence (sync.ts), and the link manifest.
+// PO's state for the trade, the sync pill and its sentence (sync.ts), the photo and serial counters
+// (ui/counts.ts), and the link manifest.
 // Usage: node --experimental-strip-types scripts/test-site-app.mjs
 import { registerHooks } from 'node:module';
 
@@ -99,6 +100,20 @@ eq('failed items by kind', ['answers', 'photo-delete', 'signoff', 'put-right', '
   'Taking a file off',
   'Something else',
 ]);
+
+/* ── The counters over a photo slot and a serial list (ui/counts.ts) ───────── */
+
+const K = await import('../src/app/portal/site/ui/counts.ts');
+eq('a slot short of photos', K.photoCount(1, 2), '1 of 2 needed');
+eq('enough photos', K.photoCount(2, 2), '2 photos ✓');
+eq('more than needed (three picked from the gallery for "need 2"): never "3 of 2 ✓"', K.photoCount(3, 2), '3 photos ✓');
+eq('the put right: two photos of the fix, one needed', K.photoCount(2, 1), '2 photos ✓');
+eq('one photo, one needed', K.photoCount(1, 1), '1 photo ✓');
+eq('an optional slot', [K.photoCount(0, 0), K.photoCount(1, 0), K.photoCount(4, 0)], ['Only if there’s something to show', '1 photo', '4 photos']);
+eq('serials short', K.scanCount(1, 2), { text: '1 of 2', done: false });
+eq('serials complete', K.scanCount(1, 1), { text: '1 scanned ✓', done: true });
+eq('more serials than the job has (the inverter): no "2 of 1", no tick', K.scanCount(2, 1), { text: '2 scanned, 1 expected', done: false });
+eq('no count expected', [K.scanCount(0, 0).text, K.scanCount(3, 0).text], ['None yet', '3 scanned']);
 
 /* ── The manifest ──────────────────────────────────────────────────────────── */
 
