@@ -4,6 +4,7 @@ import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
 import { certRef, routeOf } from './forms/electrician/cert';
 import { designOf, eicSummary } from './forms/electrician/eic';
+import { circuitsTested } from './forms/electrician/f78';
 import { valueOf } from './rules';
 import { assignmentRow, type Db } from './server';
 
@@ -28,6 +29,11 @@ export const siteHandoverFacts: FactsPlugin = async (db: Db, projectId: string) 
     if (!f.auto || ctx.values[f.key] !== undefined) continue;
     const v = valueOf(f, ctx);
     if (v !== undefined) worked[f.key] = v;
+  }
+  // F78's circuits tested, when they didn't type it: F43's strings and the EIC's circuits.
+  if (ctx.values.f78_p_circuits === undefined) {
+    const circuits = circuitsTested(ctx);
+    if (circuits) worked.f78_p_circuits = circuits;
   }
   return {
     certRef: certRef(ctx),

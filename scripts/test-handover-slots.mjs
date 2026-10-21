@@ -200,6 +200,9 @@ eq('F78 PV description from the job', f78ok.input?.pv?.desc, '12 × JA Solar JAM
 const noClass = I.f78Input(facts({ design: designOf({ est_kwh_year: 4620, shade_factor: 0.95, battery_kw: 3.6, roof_faces: 'Rear roof' }), settings: { ...settings, nextInspectionYears: 10 } }));
 eq('F78 with no system class: Missing, named, nothing printed', [noClass.ok, noClass.why, 'input' in noClass], [false, 'Needs the battery system class on Job details.', false]);
 eq('F78 before the electrician signs: Waiting', I.f78Input(facts({ electrician: { ...facts().electrician, signedAt: null, signaturePath: null } })).state, 'waiting');
+const noCircuits = I.f78Input(facts({ electrician: { ...facts().electrician, values: { f78_kind: 'initial', eess_backup: 'yes' } }, settings: { ...settings, nextInspectionYears: 10 } }));
+eq('F78 with no circuits tested (not typed, not on the EIC): Missing, F78 details, never "Not answered"', [noCircuits.ok, noCircuits.fix], [false, 'values']);
+eq('F78 with the office’s circuits tested: ready, printed', I.f78Input(facts({ electrician: { ...facts().electrician, values: { f78_kind: 'initial', eess_backup: 'yes' } }, data: { F78: { ...facts().data.F78, values: { circuits: '2 PV strings; 1 AC circuit' } } }, settings: { ...settings, nextInspectionYears: 10 } })).input?.pv?.circuits, '2 PV strings; 1 AC circuit');
 eq('F78 without the design signature: Sign the design part', I.f78Input(facts({ data: {}, settings: { ...settings, nextInspectionYears: 10 } })).fix, 'sign-design');
 
 const sched = I.scheduleInput(facts());

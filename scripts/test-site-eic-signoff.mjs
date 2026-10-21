@@ -320,6 +320,10 @@ const ok = await signDesign(db, read(one.id), DESIGN, STAFF);
 eq('signed by the office', ok.ok, true);
 hf = await HF.siteHandoverFacts(db, project.id, {});
 eq('handover facts once the design part is signed: the next inspection from it, nothing waiting', [hf.certRef, hf.nextInspection, hf.certWaits], ['HX-0042-EIC', '10 years', null]);
+// F78's "Circuits tested", not typed on the phone: F43's strings and the EIC's circuits, as the phone suggests them.
+const ctxOne = await (await import('../src/lib/site/form-ctx.ts')).serverCtx(db, read(one.id));
+const circuitsNow = E.eicSummary(ctxOne).circuits;
+eq('handover facts: F78’s circuits tested from the strings and the EIC’s circuits', [circuitsNow.length > 0, hf.values.f78_p_circuits, (await import('../src/lib/site/forms/electrician/f78.ts')).circuitsTested(ctxOne)], [true, `1 PV string; ${circuitsNow.join('; ')}`, `1 PV string; ${circuitsNow.join('; ')}`]);
 const design = read(one.id).answers.eic_design?.v;
 eq('kept on the assignment, its signature in crm-docs', [design?.name, design?.next_n, design?.next_unit, db.files.has(`crm-docs/${design?.path}`)], ['Sarah Jones', 10, 'years', true]);
 const fin = current('EIC');

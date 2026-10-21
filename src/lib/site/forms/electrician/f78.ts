@@ -19,6 +19,16 @@ export function ratedPowerCheck(c: FormCtx): { design: number; fitted: number } 
   return { design: c.system.kwp, fitted: Math.round(panels * wp) / 1000 };
 }
 
+/**
+ * "2 PV strings; Solar PV inverter (circuit 7)": F78's circuits tested from F43's strings and the AC
+ * circuits on the EIC made in the app, the same as the phone suggests; null until the EIC lists them.
+ */
+export function circuitsTested(c: FormCtx): string | null {
+  const s = stringsF43(c);
+  const ac = eicSummary(c).circuits;
+  return ac.length ? `${s} PV string${s === 1 ? '' : 's'}; ${ac.join('; ')}` : null;
+}
+
 const lines = (rows: [string, string | null][]) => rows.map(([k, v]) => `${k}: ${v ?? 'the office adds this'}`).join('\n');
 
 export const F78_FIELDS: Field[] = [

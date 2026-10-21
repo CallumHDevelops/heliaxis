@@ -505,6 +505,9 @@ export function f78Input(f: HandoverFacts): Made<F78Input> {
   if (solar && !cert) return missing('Needs the electrical certificate’s number: it’s on the EIC.', 'values');
   const kindRaw = val(f, 'F78', 'kind') ?? str(v.f78_kind);
   if (kindRaw !== 'initial' && kindRaw !== 'periodic') return missing('Say whether it’s an initial or a periodic verification.', 'values');
+  // The electrician's, the office's, or F43's strings with the EIC's circuits (site/handover-facts.ts): never printed "Not answered".
+  const circuits = val(f, 'F78', 'circuits') ?? str(v.f78_p_circuits);
+  if (solar && !circuits) return missing('Say which circuits were tested (F78 details): the electrician didn’t, and the EIC doesn’t list them.', 'values');
   // The EIC made in the app gives the next inspection once its design part is signed.
   if (e.certWaits && !e.nextInspection) return missing(e.certWaits, 'site');
   const next = e.nextInspection ?? (f.settings.nextInspectionYears ? `${f.settings.nextInspectionYears} years` : null);
@@ -531,7 +534,7 @@ export function f78Input(f: HandoverFacts): Made<F78Input> {
             kw: s.kwp!,
             location: val(f, 'F78', 'p_loc') ?? d.roof_faces!,
             est: d.est_kwh_year!,
-            circuits: val(f, 'F78', 'circuits') ?? str(v.f78_p_circuits),
+            circuits,
             insp: `${cert}: Schedule of inspections`,
             test: `${cert}: Schedule of test results`,
             f44a: `${ref}-${made.has('F44A') ? 'F44A' : 'F44'}`,

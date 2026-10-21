@@ -307,6 +307,10 @@ const cur = (key) => docs().find((d) => d.generated_key === key && !d.archived_a
 const r1 = await H.refreshHandover(db, pid, { by: 'staff-1' });
 eq('made from the job: F19I, F16E, CC4, F49, F47, the receipt, the cover letter', r1.made.sort(), ['CC13_RECEIPT', 'CC4', 'F07BI', 'F16E', 'F19I', 'F47', 'F49'].sort());
 eq('F78 not made yet', !!cur('F78'), false);
+// Circuits tested: the electrician skipped it and their own certificate lists none, so it's the office's (never "Not answered" on the certificate).
+const f78q = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'F78');
+eq('F78 with no circuits tested anywhere: Missing, fill it in on F78 details', [f78q.state, f78q.fix, f78q.why], ['missing', 'values', 'Say which circuits were tested (F78 details): the electrician didn’t, and the EIC doesn’t list them.']);
+await post({ action: 'values', slot: 'F78', values: { circuits: '2 PV strings; 1 AC circuit' } });
 eq('F78 not made until the design part is signed (Missing: sign the design part)', (await H.handoverView(db, pid)).slots.find((s) => s.code === 'F78').fix, 'sign-design');
 eq('the manual attached from the library into CC5, the procedure into CC4', docs().filter((d) => d.source === 'library').map((d) => d.handover_slot), ['CC5', 'CC4']);
 const cc4 = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'CC4');
