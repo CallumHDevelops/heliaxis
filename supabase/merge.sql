@@ -68,7 +68,7 @@ create table if not exists public.crm_lead_origins (
   role             text not null check (role in ('own','also')),
   source           text not null,
   came_in_at       timestamptz,   -- when that customer came in
-  job_created_at   timestamptz not null,   -- when that job was made (the Reports period)
+  job_created_at   timestamptz not null,   -- the Reports period: when that job was made ('own': this job's date)
   first_contact_at timestamptz,
   owner_id         uuid references public.profiles(id) on delete set null,
   meta_lead_id     text,
@@ -433,6 +433,9 @@ begin
     left_over := public.crm_merge_left('public.crm_projects', array[v_from]);
     if left_over is not null then raise exception 'merge:left' using detail = left_over; end if;
     delete from public.crm_projects where id = v_from;
+    -- A job's own lead is counted in Reports when the job was made, like any other job's.
+    update public.crm_lead_origins o set job_created_at = cp.created_at
+      from public.crm_projects cp where cp.id = v_into and o.project_id = v_into and o.role = 'own';
   end loop;
 
   -- 7. The customer.

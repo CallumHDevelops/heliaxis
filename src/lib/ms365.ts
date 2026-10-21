@@ -372,7 +372,13 @@ export async function pollMailbox(onInbound: (enquiryId: string, name: string, s
       .ilike('email', other.trim())
       .order('created_at', { ascending: false })
       .limit(1);
-    const e = enq?.[0];
+    let e = enq?.[0];
+    if (!e) {
+      // An address kept on a customer when two records were merged (src/lib/crm/merge.ts).
+      const { mergedInto } = await import('@/lib/crm/aliases');
+      const hit = await mergedInto('email', other, db);
+      if (hit) e = (await db.from('enquiries').select('id, name').eq('id', hit.enquiry_id).maybeSingle()).data ?? undefined;
+    }
     if (!e) return;
     // Their latest job that's still going (not complete or lost), else their latest.
     const { data: proj } = await db.from('crm_projects').select('id, stage').eq('enquiry_id', e.id).order('created_at', { ascending: false }).limit(20);

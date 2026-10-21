@@ -23,6 +23,7 @@ import { describeMessage as describe, type InboundMessage } from './describe';
 import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waPermission } from './permission';
 import { templateText } from './template-text';
 import { saveAdIds } from '@/lib/meta-ads';
+import { replyNumberFromAlias } from '@/lib/crm/aliases';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -93,6 +94,10 @@ async function enquiryForNumber(
     await db.from('enquiries').update({ wa_id: waId }).eq('id', match.id);
     return { enquiry: { ...match, wa_id: waId }, created: false };
   }
+
+  // A number kept on a customer when two records were merged (src/lib/crm/merge.ts): theirs, replying to it now.
+  const merged = await replyNumberFromAlias(db, waId);
+  if (merged) return { enquiry: merged as unknown as EnquiryWa, created: false };
 
   const ad = referral?.headline ? `Message: Came from WhatsApp ad "${referral.headline}"` : null;
   const { data: row, error } = await db

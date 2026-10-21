@@ -66,9 +66,8 @@ export function reportCounts(p: {
 
   let leads = 0;
   for (const j of p.jobs) {
+    if (!since(j.created_at, p.from)) continue;
     const o = own.get(j.id);
-    // A job that moved customer in a merge is counted from when its own lead came in.
-    if (!since(o ? o.job_created_at : j.created_at, p.from)) continue;
     const c = customer.get(j.enquiry_id);
     const source = ((o ? o.source : c?.source) || 'unknown').trim() || 'unknown';
     const won = isWonStage(j.stage);

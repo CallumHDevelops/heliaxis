@@ -1,16 +1,14 @@
 import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, json } from '@/lib/crm/server';
-import { isWonStage, STAGE_KEYS } from '@/lib/crm/stages';
-import { spendTable, type AdSpendReport, type LeadOutcome } from '@/lib/ad-spend';
+import { reportCounts, type ReportJob, type ReportOrigin } from '@/lib/crm/report-counts';
+import { spendTable, type AdSpendReport } from '@/lib/ad-spend';
 import { adSpendConfigured, adSpendFigures } from '@/lib/meta-ads';
 import { afterReports } from '@/lib/meta-ad-ids';
 
 export const dynamic = 'force-dynamic';
 // Meta can be slow the first time a period is asked for (after that it's cached).
 export const maxDuration = 60;
-
-const at = (s: string) => STAGE_KEYS.indexOf(s as (typeof STAGE_KEYS)[number]);
 
 /**
  * Sales numbers for a period: by source / campaign, by person, the funnel, response times and Meta
@@ -39,7 +37,20 @@ export async function GET(req: Request) {
     .gte('created_at', since)
     .limit(5000);
   if (error) return json({ error: error.message }, 500);
-  const ids = [...new Set((projects ?? []).map((p) => p.enquiry_id))];
+  // Leads that merges moved or joined (merge.sql; none before it's run): a job's own lead, and leads
+  // joined into another job, counted once, with nothing sold (src/lib/crm/report-counts.ts). A job's own
+  // lead carries the job's date, so the period's jobs have theirs here.
+  const origins = await db
+    .from('crm_lead_origins')
+    .select('project_id, role, source, came_in_at, job_created_at, first_contact_at, owner_id, meta_ad_id')
+    .gte('job_created_at', since)
+    .limit(5000)
+    .then(
+      (r) => (r.error ? [] : ((r.data ?? []) as ReportOrigin[])),
+      () => [] as ReportOrigin[]
+    );
+  const jobs = (projects ?? []) as ReportJob[];
+  const ids = [...new Set(jobs.map((p) => p.enquiry_id))];
   type Enq = { id: string; source: string | null; created_at?: string | null; meta_ad_id?: string | null };
   const enquiries = async (): Promise<Enq[]> => {
     if (!ids.length) return [];
@@ -52,56 +63,8 @@ export async function GET(req: Request) {
     return data ?? [];
   };
   const [enq, { data: people }] = await Promise.all([enquiries(), db.from('profiles').select('id, full_name, email')]);
-  const src = new Map(enq.map((e) => [e.id, (e.source || 'unknown').trim()]));
-  const adOf = new Map(enq.map((e) => [e.id, e.meta_ad_id ?? null]));
-  const cameIn = new Map(enq.map((e) => [e.id, e.created_at ?? null]));
   const name = new Map((people ?? []).map((p) => [p.id, p.full_name || p.email || 'Someone']));
-
-  type Row = { key: string; leads: number; surveys: number; won: number; lost: number; value: number };
-  const blank = (key: string): Row => ({ key, leads: 0, surveys: 0, won: 0, lost: 0, value: 0 });
-  const bySource = new Map<string, Row>();
-  const byOwner = new Map<string, Row>();
-  const responses: number[] = [];
-  const funnel = STAGE_KEYS.filter((k) => k !== 'lost').map((k) => ({ key: k, n: 0 }));
-  const outcomes: LeadOutcome[] = [];
-
-  for (const p of projects ?? []) {
-    const source = src.get(p.enquiry_id) || 'unknown';
-    const owner = p.owner_id ? name.get(p.owner_id) || 'Someone' : 'Unassigned';
-    const won = isWonStage(p.stage);
-    const surveyed = !!p.survey_at || at(p.stage) >= at('survey_booked');
-    for (const [map, key] of [
-      [bySource, source],
-      [byOwner, owner],
-    ] as const) {
-      const r = map.get(key) ?? blank(key);
-      r.leads++;
-      if (surveyed && p.stage !== 'lost') r.surveys++;
-      if (won) {
-        r.won++;
-        r.value += Number(p.value) || 0;
-      }
-      if (p.stage === 'lost') r.lost++;
-      map.set(key, r);
-    }
-    outcomes.push({
-      source,
-      metaAdId: adOf.get(p.enquiry_id),
-      at: cameIn.get(p.enquiry_id),
-      surveyed,
-      won,
-      lost: p.stage === 'lost',
-      value: won ? Number(p.value) || 0 : 0,
-    });
-    if (p.stage !== 'lost') for (const f of funnel) if (at(p.stage) >= at(f.key)) f.n++;
-    if (p.first_contact_at) responses.push((new Date(p.first_contact_at).getTime() - new Date(p.created_at).getTime()) / 60_000);
-  }
-  responses.sort((a, b) => a - b);
-  const median = responses.length ? responses[Math.floor(responses.length / 2)] : null;
-  const all = [...bySource.values()];
-  const won = all.reduce((n, r) => n + r.won, 0);
-  const lost = all.reduce((n, r) => n + r.lost, 0);
-  const sort = (m: Map<string, Row>) => [...m.values()].sort((a, b) => b.value - a.value || b.leads - a.leads);
+  const { totals, bySource, byOwner, funnel, outcomes } = reportCounts({ jobs, customers: enq, origins, names: name, from: since });
   const figures = await spending;
   const adSpend: AdSpendReport =
     figures.state === 'ok'
@@ -121,16 +84,9 @@ export async function GET(req: Request) {
       : figures;
   return json({
     days,
-    totals: {
-      leads: (projects ?? []).length,
-      won,
-      value: all.reduce((n, r) => n + r.value, 0),
-      winRate: won + lost ? won / (won + lost) : null,
-      medianResponseMins: median,
-      contactedWithin15: responses.length ? responses.filter((m) => m <= 15).length / responses.length : null,
-    },
-    bySource: sort(bySource),
-    byOwner: sort(byOwner),
+    totals,
+    bySource,
+    byOwner,
     funnel,
     /** Meta spend beside the Meta rows of bySource, grouped by campaign ('off' until it's set up). */
     adSpend,

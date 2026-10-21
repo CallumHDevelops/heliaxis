@@ -2,6 +2,7 @@ import 'server-only';
 import { postcodePattern } from '@/lib/global-search';
 import { looksLikeRef, refMatches, refOnly, refPatterns } from '@/lib/projects/refs';
 import { missingColumn, type Db } from '@/lib/projects/server';
+import { aliasMatches } from '@/lib/crm/aliases';
 
 /**
  * Finding customers by what someone typed: name, email, phone digits, postcode, or a reference
@@ -18,6 +19,8 @@ export type FoundCustomer = {
   postcode: string | null;
   created_at: string;
   customer_ref?: string | null;
+  /** Found by an old reference, number or email of a record merged into them (HX-0069). */
+  was?: string | null;
 };
 
 const COLS = 'id, name, email, phone, postcode, created_at';
@@ -76,6 +79,13 @@ export async function findCustomers(db: Db, q: string, limit = 20): Promise<{ cu
     }
     if (r.error) return { customers: [], refs, error: r.error.message };
     keep(r.data as FoundCustomer[]);
+  }
+
+  // Old references, numbers and emails of records merged into someone (src/lib/crm/merge.ts) find them too.
+  if (found.size < limit) {
+    const merged = (await aliasMatches(db, q, refs)).filter((m) => !found.has(m.id));
+    const { data } = merged.length ? await db.from('enquiries').select(COLS).in('id', merged.map((m) => m.id)) : { data: null };
+    for (const c of (data ?? []) as FoundCustomer[]) found.set(c.id, { ...c, was: merged.find((m) => m.id === c.id)?.was ?? null });
   }
 
   return { customers: [...found.values()].slice(0, limit), refs, error: null };

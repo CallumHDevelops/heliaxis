@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logActivity } from '@/lib/crm/server';
 import { aliasValue, type AliasKind } from '@/lib/crm/merge-rules';
+import { leadSourceLabel } from '@/lib/lead-source';
 
 /**
  * What still finds a record after a merge (crm_aliases, supabase/merge.sql): an old customer or job id
@@ -107,6 +108,37 @@ export async function otherContacts(db: Db, enquiryId: string): Promise<{ kind: 
   } catch {
     return [];
   }
+}
+
+export type MergeExtras = {
+  /** Leads of records merged into them: "Also came in via Meta ad · Video 4 on 3 Sep (HX-0069)". */
+  alsoCameIn: { label: string; at: string | null; ref: string | null }[];
+  /** Other numbers and emails kept for search and incoming messages. */
+  otherNumbers: Awaited<ReturnType<typeof otherContacts>>;
+};
+
+/** What a merge left on a customer, for their card (the record page). Empty before merge.sql. */
+export async function mergeExtras(db: Db, c: { id: string; source?: unknown; created_at?: unknown }): Promise<MergeExtras> {
+  const [origins, otherNumbers] = await Promise.all([
+    db
+      .from('crm_lead_origins')
+      .select('source, came_in_at, customer_ref')
+      .eq('enquiry_id', c.id)
+      .order('came_in_at')
+      .limit(20)
+      .then(
+        (r) => (r.error ? [] : ((r.data ?? []) as { source: string; came_in_at: string | null; customer_ref: string | null }[])),
+        () => []
+      ),
+    otherContacts(db, c.id),
+  ]);
+  // Not their own lead again (a credit swap writes it as an origin too), and each lead once.
+  const own = (o: { source: string; came_in_at: string | null }) => o.source === c.source && !!o.came_in_at && Date.parse(o.came_in_at) === Date.parse(String(c.created_at));
+  const seen = new Set<string>();
+  const alsoCameIn = origins
+    .filter((o) => !own(o) && !seen.has(`${o.source}|${o.came_in_at}`) && !!seen.add(`${o.source}|${o.came_in_at}`))
+    .map((o) => ({ label: leadSourceLabel(o.source), at: o.came_in_at, ref: o.customer_ref }));
+  return { alsoCameIn, otherNumbers };
 }
 
 /** Their other phone numbers, emails and Meta lead ids, for the deleted list (src/lib/crm/delete-customer.ts). */
