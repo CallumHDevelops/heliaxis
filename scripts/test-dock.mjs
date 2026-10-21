@@ -3,7 +3,22 @@
 // anything or marks anything read.
 // Usage: node --experimental-strip-types scripts/test-dock.mjs
 import { readFileSync } from 'node:fs';
-import {
+import { registerHooks } from 'node:module';
+
+// dock-shared.ts imports '@/lib/search-words' as the app's bundler expects (the alias, and no .ts on the
+// end; search-words.ts imports its neighbours the same way). Node needs both spelled out.
+registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier.startsWith('@/')) specifier = new URL(`../src/${specifier.slice(2)}`, import.meta.url).href;
+    try {
+      return next(specifier, context);
+    } catch (e) {
+      if (/^(?:\.\.?\/|file:)/.test(specifier) && !/\.\w+$/.test(specifier)) return next(`${specifier}.ts`, context);
+      throw e;
+    }
+  },
+});
+const {
   chatMatches,
   chooseDock,
   cookieFrom,
@@ -17,7 +32,7 @@ import {
   parseDockCookie,
   refMatches,
   windowPill,
-} from '../src/components/admin/whatsapp/dock-shared.ts';
+} = await import('../src/components/admin/whatsapp/dock-shared.ts');
 
 let failed = 0;
 function eq(name, got, want) {

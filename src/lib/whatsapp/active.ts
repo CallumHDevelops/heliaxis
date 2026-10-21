@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { looksLikeRef, refMatches, refOnly, refPatterns } from '@/lib/projects/refs';
+import { accentPattern, everyGroup, searchWords, withoutAccents } from '@/lib/search-words';
 import { SERVICE_WINDOW_MS } from '@/lib/whatsapp/shared';
 import type { ActiveChat, ActiveCounts } from '@/components/admin/whatsapp/dock-shared';
 
@@ -296,10 +297,28 @@ export async function allChats(
 
 const SEARCH_LIMIT = 20;
 
+/** One word's alternatives: name (accents aside), postcode (with or without its space) or number. None for "HX…", only ever a reference. */
+function chatWord(w: string): string[] {
+  if (refOnly(w)) return [];
+  const ors = [`name.ilike.%${w}%`, `postcode.ilike.%${w}%`];
+  const squashed = w.replace(/\s/g, '');
+  if (/^[a-z]{1,2}\d[a-z\d]?\d[a-z]{2}$/i.test(squashed)) ors.push(`postcode.ilike.%${squashed.slice(0, -3)}%${squashed.slice(-3)}%`);
+  const digits = w.replace(/\D/g, '');
+  if (digits.length >= 3 && /^[\d\s+-]+$/.test(w)) {
+    // Phones are kept as typed, WhatsApp ids as digits (447700…).
+    const intl = digits.startsWith('0') ? `44${digits.slice(1)}` : digits;
+    ors.push(`phone.ilike.%${digits}%`, `wa_id.like.*${intl}*`);
+    if (digits.length >= 6) ors.push(`phone.ilike.%${digits.slice(0, -6)}%${digits.slice(-6, -3)}%${digits.slice(-3)}%`);
+  }
+  const accents = accentPattern(w);
+  if (accents) ors.push(`name.imatch.${accents}`);
+  return ors;
+}
+
 /**
- * The dock's search box across every chat, not only the active ones: name, number (07700… or
- * +44 7700…), postcode or HX-ref, as chatMatches in dock-shared.ts. Up to 20, newest message first;
- * people never messaged are left out.
+ * The dock's search box across every chat, not only the active ones, word by word ("rob evans"): name,
+ * number (07700… or +44 7700…), postcode or HX-ref, as chatMatches in dock-shared.ts. Up to 20, newest
+ * message first; people never messaged are left out.
  */
 export async function searchChats(scope: ChatScope, query: string, canInbox: boolean): Promise<ActiveChat[]> {
   // Characters that would change the meaning of a filter come out.
@@ -312,24 +331,34 @@ export async function searchChats(scope: ChatScope, query: string, canInbox: boo
   };
   // Someone with a chat, or a number that may have one on another of their enquiries.
   const chats = 'wa_last_message_at.not.is.null,wa_id.not.is.null';
-  const read = (filter: string) =>
-    withFallback<Enq>(
-      (cols) =>
-        db
-          .from('enquiries')
-          .select(cols)
-          .or(`and(or(${filter}),or(${chats}))`)
-          .order('wa_last_message_at', { ascending: false, nullsFirst: false })
-          .limit(40) as unknown as PromiseLike<Rows<Enq>>,
-      ENQ_COLS,
-      'customer_ref'
+  // Every word's group has to match, and so does `chats`. Again without the accent patterns if they're refused.
+  const tolerant = async (groups: string[][], run: (gs: string[][]) => Promise<Enq[] | null>) =>
+    (await run(groups)) ?? (groups.some((g) => g.some((o) => o.includes('.imatch.'))) ? run(withoutAccents(groups)) : null);
+  const read = (groups: string[][]) =>
+    tolerant(groups, (gs) =>
+      withFallback<Enq>(
+        (cols) =>
+          db
+            .from('enquiries')
+            .select(cols)
+            .or(everyGroup([...gs, [chats]]))
+            .order('wa_last_message_at', { ascending: false, nullsFirst: false })
+            .limit(40) as unknown as PromiseLike<Rows<Enq>>,
+        ENQ_COLS,
+        'customer_ref'
+      )
     );
+  const words = searchWords(q);
+  const filters = words.map(chatWord);
 
-  // References: the customer's own, and any of their jobs'. Nothing before customer-refs.sql.
-  const refs = looksLikeRef(q) ? refPatterns(q) : [];
-  if (refs.length) {
+  // References: the customer's own, and any of their jobs'. Nothing before customer-refs.sql. A word that
+  // could be one (the first, if several could) is looked for there; the others narrow it down.
+  const refWord = words.find((w) => looksLikeRef(w));
+  const refs = refWord ? refPatterns(refWord) : [];
+  const others = filters.filter((_, i) => words[i] !== refWord);
+  if (refs.length && others.every((g) => g.length)) {
     const [byCustomer, byJob] = await Promise.all([
-      read(refs.map((p) => `customer_ref.ilike.${p}`).join(',')),
+      read([refs.map((p) => `customer_ref.ilike.${p}`), ...others]),
       db
         .from('crm_projects')
         .select('enquiry_id, project_ref')
@@ -337,31 +366,21 @@ export async function searchChats(scope: ChatScope, query: string, canInbox: boo
         .limit(40),
     ]);
     keep(byCustomer);
-    const ids = byJob.error ? [] : [...new Set((byJob.data ?? []).filter((j) => refMatches(q, j.project_ref as string)).map((j) => j.enquiry_id as string))];
+    const ids = byJob.error ? [] : [...new Set((byJob.data ?? []).filter((j) => refMatches(refWord!, j.project_ref as string)).map((j) => j.enquiry_id as string))];
     if (ids.length) {
       keep(
-        await withFallback<Enq>(
-          (cols) => db.from('enquiries').select(cols).in('id', ids.slice(0, 100)).or(chats) as unknown as PromiseLike<Rows<Enq>>,
-          ENQ_COLS,
-          'customer_ref'
+        await tolerant(others, (gs) =>
+          withFallback<Enq>(
+            (cols) => db.from('enquiries').select(cols).in('id', ids.slice(0, 100)).or(everyGroup([...gs, [chats]])) as unknown as PromiseLike<Rows<Enq>>,
+            ENQ_COLS,
+            'customer_ref'
+          )
         )
       );
     }
   }
-  // Name, postcode and number. "HX…" is only ever a reference; "0042" could be part of a number too.
-  if (!refOnly(q)) {
-    const ors = [`name.ilike.%${q}%`, `postcode.ilike.%${q}%`];
-    const squashed = q.replace(/\s/g, '');
-    if (/^[a-z]{1,2}\d[a-z\d]?\d[a-z]{2}$/i.test(squashed)) ors.push(`postcode.ilike.%${squashed.slice(0, -3)}%${squashed.slice(-3)}%`);
-    const digits = q.replace(/\D/g, '');
-    if (digits.length >= 3 && /^[\d\s+-]+$/.test(q)) {
-      // Phones are kept as typed, WhatsApp ids as digits (447700…).
-      const intl = digits.startsWith('0') ? `44${digits.slice(1)}` : digits;
-      ors.push(`phone.ilike.%${digits}%`, `wa_id.like.*${intl}*`);
-      if (digits.length >= 6) ors.push(`phone.ilike.%${digits.slice(0, -6)}%${digits.slice(-6, -3)}%${digits.slice(-3)}%`);
-    }
-    keep(await read(ors.join(',')));
-  }
+  // Name, postcode and number, every word. A word that's only ever a reference ("HX…") has been looked for above.
+  if (words.length && filters.every((g) => g.length)) keep(await read(filters));
   if (!found.size) return [];
   const drafts = (await draftsFor(db, [...found.values()], scope))
     .filter((d) => d.lastAt)

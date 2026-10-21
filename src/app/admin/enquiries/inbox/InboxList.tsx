@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PushBanner } from '@/components/admin/PushBanner';
 import { refMatches, relativeTime } from '@/lib/enquiries';
 import { NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
+import { everyWord, hasText } from '@/lib/search-words';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
@@ -77,7 +78,7 @@ export function InboxList() {
 
   const shown = (items ?? []).filter(
     (c) =>
-      (!q || `${c.name} ${c.phone || ''}`.toLowerCase().includes(q.trim().toLowerCase()) || refMatches(c.customer_ref, q)) &&
+      everyWord(q, (w) => hasText(`${c.name} ${c.phone || ''}`, w) || refMatches(c.customer_ref, w)) &&
       (filter === 'all' || (filter === 'reply' ? needsReply(c) : waitingOnThem(c)))
   );
   const count = (f: Filter) => (items ?? []).filter(f === 'reply' ? needsReply : f === 'waiting' ? waitingOnThem : () => true).length;

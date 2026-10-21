@@ -1,7 +1,20 @@
 // The Enquiries list's status cards and search (src/lib/enquiries.ts): ?status= in the address bar,
 // and which leads show for a status card plus the search box.
 // Usage: node --experimental-strip-types scripts/test-enquiry-filter.mjs
-import { leadMatches, shownLeads, statusFromParam } from '../src/lib/enquiries.ts';
+import { registerHooks } from 'node:module';
+
+// enquiries.ts imports './search-words' without the .ts on the end (as the app's bundler expects); Node needs it.
+registerHooks({
+  resolve(specifier, context, next) {
+    try {
+      return next(specifier, context);
+    } catch (e) {
+      if (/^\.\.?\//.test(specifier) && !/\.\w+$/.test(specifier)) return next(`${specifier}.ts`, context);
+      throw e;
+    }
+  },
+});
+const { leadMatches, shownLeads, statusFromParam } = await import('../src/lib/enquiries.ts');
 
 let failed = 0;
 function eq(name, got, want) {

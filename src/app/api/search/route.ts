@@ -7,34 +7,47 @@ import { sourcesNow } from '@/lib/lead-source-server';
 import { canAccess } from '@/lib/portals';
 import { looksLikeRef, refOnly, refPatterns } from '@/lib/projects/refs';
 import { missingColumn, type Db } from '@/lib/projects/server';
+import { accentPattern, everyGroup, searchWords, withoutAccents } from '@/lib/search-words';
 
 export const dynamic = 'force-dynamic';
 
 const JOB_COLS = 'id, enquiry_id, title, stage, created_at, address, postcode';
 const PERSON_COLS = 'id, name, postcode, phone, source, status, created_at';
 
-/** Jobs that match by themselves: their title, site address or postcode, or their reference (crm-v3.sql). */
+/** One word's alternatives on a job: title or site address (accents aside), postcode, or its reference. */
+function jobWord(w: string): string[] {
+  const ors = refOnly(w) ? [] : [`title.ilike.%${w}%`, `address.ilike.%${w}%`, `postcode.ilike.%${w}%`];
+  const postcode = refOnly(w) ? null : postcodePattern(w);
+  if (postcode) ors.push(`postcode.ilike.${postcode}`);
+  const accents = refOnly(w) ? null : accentPattern(w);
+  if (accents) ors.push(`title.imatch.${accents}`, `address.imatch.${accents}`);
+  return [...ors, ...(looksLikeRef(w) ? refPatterns(w).map((p) => `project_ref.ilike.${p}`) : [])];
+}
+
+/** Jobs that match by themselves, every word: their title, site address or postcode, or their reference (crm-v3.sql). */
 async function jobsMatching(db: Db, q: string): Promise<JobRow[]> {
-  const refs = looksLikeRef(q) ? refPatterns(q) : [];
-  const text = refOnly(q) ? [] : [`title.ilike.%${q}%`, `address.ilike.%${q}%`, `postcode.ilike.%${q}%`];
-  const postcode = refOnly(q) ? null : postcodePattern(q);
-  if (postcode) text.push(`postcode.ilike.${postcode}`);
-  const read = (cols: string, ors: string[]) =>
-    db.from('crm_projects').select(cols).or(ors.join(',')).order('updated_at', { ascending: false }).limit(20);
-  const all = [...text, ...refs.map((p) => `project_ref.ilike.${p}`)];
-  if (!all.length) return [];
-  let r = await read(`${JOB_COLS}, project_ref`, all);
+  const groups = searchWords(q).map(jobWord);
+  if (!groups.length || groups.some((g) => !g.length)) return [];
+  const read = (cols: string, gs: string[][]) =>
+    db.from('crm_projects').select(cols).or(everyGroup(gs)).order('updated_at', { ascending: false }).limit(20);
+  let cols = `${JOB_COLS}, project_ref`;
+  let gs = groups;
+  let r = await read(cols, gs);
   // Before crm-v3.sql there are no job references.
-  if (r.error && missingColumn(r.error) && text.length) r = await read(JOB_COLS, text);
+  const text = gs.map((g) => g.filter((o) => !o.startsWith('project_ref')));
+  if (r.error && missingColumn(r.error) && text.every((g) => g.length)) r = await read((cols = JOB_COLS), (gs = text));
+  // A database that refuses the accent patterns still gets the rest.
+  if (r.error && gs.some((g) => g.some((o) => o.includes('.imatch.')))) r = await read(cols, withoutAccents(gs));
   if (r.error) return [];
   return ((r.data ?? []) as unknown as JobRow[]).filter((j) => jobMatches(j, q));
 }
 
 /**
- * GET /api/search?q= — the dashboard's and the header's search, for Enquiries and CRM staff: people by
- * name, email, phone, postcode or HX reference, and (CRM staff) jobs by title, site address, postcode or
- * reference, each person with their jobs (src/lib/global-search.ts). Up to 8 people, 3 jobs each. It
- * only reads: picking a result opens a page, it never makes an opportunity.
+ * GET /api/search?q= — the dashboard's and the header's search, for Enquiries and CRM staff, word by
+ * word ("rob evans", src/lib/search-words.ts): people by name, email, phone, postcode or HX reference,
+ * and (CRM staff) jobs by title, site address, postcode or reference, each person with their jobs
+ * (src/lib/global-search.ts). Up to 8 people, 3 jobs each. It only reads: picking a result opens a
+ * page, it never makes an opportunity.
  */
 export async function GET(req: Request) {
   const s = await requireApproved();

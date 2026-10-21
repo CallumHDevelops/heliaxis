@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { stageLabel, surveyTypeFor } from '@/lib/crm/stages';
+import { everyWord, hasText } from '@/lib/search-words';
 
 /**
  * "+ New survey": find the customer, pick their job (or start a new opportunity for them), pick
@@ -51,18 +52,14 @@ export function NewSurveySheet({ onClose }: { onClose: () => void }) {
 
   const matches = useMemo(() => {
     if (!customers) return [];
-    const t = fold(q);
-    const d = digits(q);
-    if (!t) return customers.slice(0, 12);
-    return customers
-      .filter(
-        (c) =>
-          fold(c.name).includes(t) ||
-          fold(c.postcode).replace(/\s/g, '').includes(t.replace(/\s/g, '')) ||
-          (d.length >= 4 && digits(c.phone).includes(d)) ||
-          c.projects.some((p) => fold(p.title).includes(t))
-      )
-      .slice(0, 20);
+    if (!fold(q)) return customers.slice(0, 12);
+    // Every word, in any order ("rob evans"): name, postcode, phone digits or a job's title.
+    const fits = (c: Customer, w: string) =>
+      hasText(c.name, w) ||
+      fold(c.postcode).replace(/\s/g, '').includes(fold(w).replace(/\s/g, '')) ||
+      (digits(w).length >= 4 && digits(c.phone).includes(digits(w))) ||
+      c.projects.some((p) => hasText(p.title, w));
+    return customers.filter((c) => everyWord(q, (w) => fits(c, w))).slice(0, 20);
   }, [customers, q]);
 
   function choose(customer: Customer, project: Project | null) {

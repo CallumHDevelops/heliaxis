@@ -1,7 +1,7 @@
 /**
  * The WhatsApp dock's rules, shared by the admin layout (server), the dock (browser) and
- * scripts/test-dock.mjs. Pure: `import type` only and erasable TypeScript, so the test runs it with
- * `node --experimental-strip-types`.
+ * scripts/test-dock.mjs. Pure: erasable TypeScript importing only types and the pure search-words.ts,
+ * so the test runs it with `node --experimental-strip-types`.
  *
  * The dock sits on the right of every desktop admin page (src/app/admin/layout.tsx). Each page starts
  * it open, folded to a strip of chat heads, hidden (the WhatsApp inbox, where the chat already fills
@@ -12,6 +12,7 @@
  * by importing this file, so either can ship first.
  */
 import type { CrmDoc } from '@/app/admin/crm/[id]/ProjectExtras';
+import { everyWord, fold, hasText } from '@/lib/search-words';
 
 /** Window events (`window.dispatchEvent(new CustomEvent(name, { detail }))`). */
 export const DOCK_EVENTS = {
@@ -250,20 +251,21 @@ export function refMatches(q: string, ref: string | null | undefined): boolean {
 
 const digitsOf = (s: string | null | undefined) => (s ?? '').replace(/\D/g, '');
 
-/** The dock's search box: name, number (07700… or +44 7700…), postcode or HX-ref. */
+/** The dock's search box: name, number (07700… or +44 7700…), postcode or HX-ref, every word in any order ("rob evans"). */
 export function chatMatches(q: string, row: Pick<ActiveChat, 'name' | 'phone' | 'waId' | 'postcode' | 'customerRef' | 'project'>): boolean {
-  const t = q.trim().toLowerCase();
-  if (!t) return true;
-  if (looksLikeRef(t)) return refMatches(t, row.customerRef) || refMatches(t, row.project?.ref);
-  if (row.name.toLowerCase().includes(t)) return true;
-  if ((row.postcode ?? '').replace(/\s/g, '').toLowerCase().includes(t.replace(/\s/g, ''))) return true;
-  const d = digitsOf(t);
-  if (d.length >= 3) {
-    const local = d.startsWith('0') ? `44${d.slice(1)}` : d;
-    const numbers = [digitsOf(row.phone), digitsOf(row.waId)];
-    return numbers.some((n) => n.includes(d) || n.includes(local));
-  }
-  return false;
+  return everyWord(q, (w) => {
+    const t = fold(w);
+    if (looksLikeRef(t)) return refMatches(t, row.customerRef) || refMatches(t, row.project?.ref);
+    if (hasText(row.name, t)) return true;
+    if ((row.postcode ?? '').replace(/\s/g, '').toLowerCase().includes(t.replace(/\s/g, ''))) return true;
+    const d = digitsOf(t);
+    if (d.length >= 3) {
+      const local = d.startsWith('0') ? `44${d.slice(1)}` : d;
+      const numbers = [digitsOf(row.phone), digitsOf(row.waId)];
+      return numbers.some((n) => n.includes(d) || n.includes(local));
+    }
+    return false;
+  });
 }
 
 /**
