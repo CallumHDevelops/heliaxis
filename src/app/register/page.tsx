@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import Link from 'next/link';
 import { register } from '@/lib/auth-actions';
 import { AuthShell } from '@/components/auth/AuthShell';
-import { field } from '@/components/auth/authStyles';
+import { brand, field } from '@/components/auth/authStyles';
 
 export default function RegisterPage() {
   const [state, action, pending] = useActionState(register, null);
@@ -16,7 +16,7 @@ export default function RegisterPage() {
       footer={
         <>
           Already have an account?{' '}
-          <Link href="/login" style={{ color: '#C77F04', fontWeight: 600 }}>
+          <Link href="/login" style={{ color: brand.link, fontWeight: 600 }}>
             Sign in
           </Link>
         </>
@@ -49,7 +49,7 @@ export default function RegisterPage() {
             minLength={8}
             autoComplete="new-password"
           />
-          <p style={{ fontSize: '.75rem', color: '#6E6A5E', margin: '.35rem 0 0' }}>
+          <p style={{ fontSize: '.75rem', color: brand.muted, margin: '.35rem 0 0' }}>
             At least 8 characters.
           </p>
         </div>

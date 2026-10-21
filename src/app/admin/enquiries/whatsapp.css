@@ -1,18 +1,25 @@
-/* WhatsApp inbox, chat and smart replies — phone-first (the Android app). */
+/* WhatsApp inbox, chat and smart replies — phone-first (the Android app). Colours: src/app/theme.css. */
 .wa-page {
-  --ink: #211f18;
-  --muted: #6e6a5e;
-  --line: rgba(33, 31, 24, 0.14);
-  --card: #fffdf8;
-  --paper: #f7f2e7;
-  --solar: #f8bc1e;
-  --amber-2: #c77f04;
-  --wa: #1f7a4d;
-  --wa-out: #e3f4d8;
-  --err: #b3261e;
+  --ink: var(--text);
+  --line: var(--border);
+  --card: var(--surface);
+  --paper: var(--bg);
+  --solar: var(--accent);
+  --amber-2: var(--accent-text);
+  --wa-out: var(--wa-soft);
+  --err: var(--danger);
+  /* The dock's chat: a wall below the bubbles in both themes, and its own green for ours. */
+  --wa-wall: var(--surface-2);
+  --wa-out-dock: #d9eedf;
   color: var(--ink);
   max-width: 760px;
   margin: 0 auto;
+}
+@media screen {
+  :root[data-theme='dark'] .wa-page {
+    --wa-wall: var(--bg);
+    --wa-out-dock: var(--wa-soft);
+  }
 }
 /* Pages that ask AdminShell for the full width (templates) use it; text keeps a readable line length. */
 .admin-shell__main--fluid > .wa-page {
@@ -73,25 +80,25 @@
   line-height: 1.5;
 }
 .wa-banner {
-  background: rgba(248, 188, 30, 0.16);
-  border: 1px solid rgba(199, 127, 4, 0.3);
+  background: rgb(var(--accent-rgb) / 0.16);
+  border: 1px solid var(--accent-line);
   padding: 0.6rem 0.8rem;
   border-radius: 4px;
   font-size: 0.85rem;
   margin: 0.5rem 0;
 }
 .wa-banner--err {
-  background: rgba(179, 38, 30, 0.08);
-  border-color: rgba(179, 38, 30, 0.3);
+  background: rgb(var(--danger-rgb) / 0.08);
+  border-color: rgb(var(--danger-rgb) / 0.3);
   color: var(--err);
 }
 .wa-search,
 .wa-input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
-  background: var(--card);
+  background: var(--field);
   padding: 0.6rem 0.7rem;
   font: inherit;
   font-size: 0.95rem;
@@ -128,11 +135,17 @@ textarea.wa-input {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--ink);
-  color: var(--solar);
+  /* Ink with gold initials; on dark a raised disc, so it doesn't sink into the list. */
+  background: var(--moment);
+  color: var(--accent);
   display: grid;
   place-items: center;
   font-weight: 800;
+}
+@media screen {
+  :root[data-theme='dark'] .wa-avatar {
+    background: var(--surface-2);
+  }
 }
 .wa-row-main {
   flex: 1;
@@ -178,12 +191,12 @@ textarea.wa-input {
   font-weight: 600;
 }
 .wa-row.unread .wa-time {
-  color: var(--wa);
+  color: var(--wa-text);
   font-weight: 700;
 }
 .wa-badge {
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
   font-size: 0.7rem;
   font-weight: 700;
   border-radius: 999px;
@@ -196,7 +209,7 @@ textarea.wa-input {
 .wa-chip {
   font-size: 0.68rem;
   font-weight: 600;
-  background: rgba(248, 188, 30, 0.2);
+  background: rgb(var(--accent-rgb) / 0.2);
   color: var(--amber-2);
   padding: 2px 6px;
   border-radius: 2px;
@@ -256,9 +269,9 @@ textarea.wa-input {
 .wa-auto {
   font-size: 0.7rem;
   font-weight: 700;
-  border: 1px solid rgba(31, 122, 77, 0.35);
-  color: var(--wa);
-  background: rgba(31, 122, 77, 0.08);
+  border: 1px solid rgb(var(--wa-rgb) / 0.35);
+  color: var(--wa-text);
+  background: rgb(var(--wa-rgb) / 0.08);
   border-radius: 999px;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
@@ -300,7 +313,7 @@ textarea.wa-input {
 .wa-bubble.out {
   margin-left: auto;
   background: var(--wa-out);
-  border-color: rgba(31, 122, 77, 0.2);
+  border-color: rgb(var(--wa-rgb) / 0.2);
 }
 .wa-bubble.tpl {
   border-style: dashed;
@@ -308,7 +321,7 @@ textarea.wa-input {
 .wa-by {
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--wa);
+  color: var(--wa-text);
 }
 .wa-text {
   white-space: pre-wrap;
@@ -323,8 +336,9 @@ textarea.wa-input {
   display: flex;
   gap: 4px;
 }
+/* Read: blue, dark enough to read on our green bubble. */
 .wa-tick.read {
-  color: #2c8bd6;
+  color: var(--info);
 }
 .wa-tick.failed,
 .wa-err {
@@ -337,14 +351,14 @@ textarea.wa-input {
 .wa-queued {
   margin-left: auto;
   max-width: 88%;
-  border: 1px dashed rgba(199, 127, 4, 0.55);
-  background: rgba(248, 188, 30, 0.08);
+  border: 1px dashed var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.08);
   border-radius: 8px;
   padding: 0.55rem 0.7rem;
 }
 .wa-queued.failed {
-  border-color: rgba(179, 38, 30, 0.45);
-  background: rgba(179, 38, 30, 0.05);
+  border-color: rgb(var(--danger-rgb) / 0.45);
+  background: rgb(var(--danger-rgb) / 0.05);
 }
 .wa-queued-head {
   font-size: 0.75rem;
@@ -371,9 +385,9 @@ textarea.wa-input {
   font-weight: 700;
   padding: 0.4rem 0.75rem;
   border-radius: 3px;
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: var(--solar);
+  border: 1px solid var(--inverse);
+  background: var(--inverse);
+  color: var(--inverse-accent);
   cursor: pointer;
 }
 .wa-queued-actions button.ghost {
@@ -405,7 +419,7 @@ textarea.wa-input {
   border: 0;
   border-radius: 4px;
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
   padding: 0.7rem 1rem;
   cursor: pointer;
 }
@@ -441,8 +455,16 @@ textarea.wa-input {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
 }
+/* Switched off: set back on the page colour with a dashed edge and quieter words (fading it with opacity
+   took the text and its buttons below AA). */
 .wa-rule.off {
-  opacity: 0.55;
+  background: var(--paper);
+  border-style: dashed;
+}
+.wa-rule.off .wa-rule-head b,
+.wa-rule.off .wa-rule-reply,
+.wa-rule.off .wa-chip {
+  color: var(--muted);
 }
 .wa-rule-head {
   display: flex;
@@ -482,23 +504,23 @@ textarea.wa-input {
   cursor: pointer;
 }
 .wa-filters button.on {
-  background: var(--ink);
-  color: var(--solar);
-  border-color: var(--ink);
+  background: var(--inverse);
+  color: var(--inverse-accent);
+  border-color: var(--inverse);
 }
 .wa-filters button span {
   opacity: 0.7;
   margin-left: 2px;
 }
 .wa-chip--chase {
-  background: rgba(31, 122, 77, 0.12);
-  color: var(--wa);
+  background: rgb(var(--wa-rgb) / 0.12);
+  color: var(--wa-text);
 }
 /* A message someone has scheduled (Send later). */
 .wa-chip--later {
-  background: rgba(31, 122, 77, 0.08);
-  color: var(--wa);
-  box-shadow: inset 0 0 0 1px rgba(31, 122, 77, 0.35);
+  background: rgb(var(--wa-rgb) / 0.08);
+  color: var(--wa-text);
+  box-shadow: inset 0 0 0 1px rgb(var(--wa-rgb) / 0.35);
 }
 .wa-chase-pick {
   display: flex;
@@ -511,9 +533,10 @@ textarea.wa-input {
 .wa-chase-pick select {
   font: inherit;
   font-size: 0.78rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 3px;
-  background: var(--card);
+  background: var(--field);
+  color: var(--ink);
   padding: 0.15rem 0.3rem;
 }
 /* When the chaser would go: "tomorrow about 10:00". */
@@ -570,9 +593,9 @@ textarea.wa-input {
   gap: 0.75rem;
   margin: 0.6rem 0 0;
   padding: 0.45rem 0.5rem 0.45rem 0.8rem;
-  border: 1px solid rgba(31, 122, 77, 0.25);
+  border: 1px solid rgb(var(--wa-rgb) / 0.25);
   border-radius: 999px;
-  background: rgba(31, 122, 77, 0.08);
+  background: rgb(var(--wa-rgb) / 0.08);
   font-size: 0.82rem;
 }
 .wa-jobchip span {
@@ -586,13 +609,13 @@ textarea.wa-input {
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
   font-weight: 700;
   text-decoration: none;
 }
 /* One message picked from elsewhere (an Activity entry): lit up for a moment. */
 .wa-bubble.is-lit {
-  box-shadow: 0 0 0 3px rgba(248, 188, 30, 0.6);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.6);
   transition: box-shadow 0.3s;
 }
 
@@ -604,7 +627,7 @@ textarea.wa-input {
   margin: 0;
   display: flex;
   flex-direction: column;
-  background: #efe8d9;
+  background: var(--wa-wall);
   font-size: 14px;
 }
 .wa-pane--dock > .wa-muted,
@@ -633,10 +656,10 @@ textarea.wa-input {
 .wa-pane--dock .wa-bubble {
   max-width: 86%;
   border-radius: 10px;
-  box-shadow: 0 1px 0 rgba(33, 31, 24, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 .wa-pane--dock .wa-bubble.out {
-  background: #d9eedf;
+  background: var(--wa-out-dock);
 }
 .wa-pane--dock .wa-text {
   font-size: 0.88rem;
@@ -693,7 +716,7 @@ textarea.wa-input {
   resize: none;
   border-radius: 8px;
   font-size: 0.9rem;
-  background: #fff;
+  background: var(--field);
 }
 .wa-pane__row .wa-send {
   display: flex;
@@ -705,10 +728,10 @@ textarea.wa-input {
   line-height: 1.1;
   border-radius: 8px;
 }
+/* "Ctrl/⌘ + Enter", or late at night "at 07:00": smaller, at full strength (faded it fell below AA). */
 .wa-pane__row .wa-send small {
   font-size: 0.6rem;
   font-weight: 600;
-  opacity: 0.85;
   white-space: nowrap;
 }
 /* The reply box sits in the dock's footer, not stuck to the bottom of the window. */
@@ -728,11 +751,12 @@ textarea.wa-input {
   font-size: 0.78rem;
 }
 /* Chips: Chase if no reply, and the CRM's Saved replies and Send a document. */
+/* A dropdown, so it takes an input's edge. */
 .wa-pane__chips .wa-chase-pick {
   height: 26px;
   box-sizing: border-box;
   padding: 0 4px 0 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--card);
   font-size: 0.72rem;
@@ -742,6 +766,7 @@ textarea.wa-input {
 .wa-pane__chips .wa-chase-pick select {
   border: 0;
   background: none;
+  color: inherit;
   font-size: 0.72rem;
   padding: 0;
 }
@@ -802,8 +827,8 @@ textarea.wa-input {
   gap: 6px;
 }
 .wa-pane--dock .crm-docpick label.on {
-  border-color: rgba(199, 127, 4, 0.5);
-  background: rgba(248, 188, 30, 0.12);
+  border-color: var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.12);
 }
 .wa-pane--dock .crm-snippet-list small,
 .wa-pane--dock .crm-muted {
@@ -815,7 +840,7 @@ textarea.wa-input {
   border: 1px solid var(--wa);
   border-radius: 6px;
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;

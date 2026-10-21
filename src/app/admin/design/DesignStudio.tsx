@@ -307,7 +307,8 @@ export function DesignStudio() {
   const isText = sel && (sel.type === 'textbox' || sel.type === 'i-text' || sel.type === 'text');
 
   return (
-    <div className="ds">
+    // Dark in both themes (a design tool's chrome): an ink island, so the theme tokens inside are the dark ones.
+    <div className="ds hx-dark">
       <div className="ds-top">
         <button className="ds-btn" onClick={() => addText(true)} disabled={!ready}>+ Heading</button>
         <button className="ds-btn" onClick={() => addText(false)} disabled={!ready}>+ Text</button>
@@ -372,7 +373,7 @@ export function DesignStudio() {
               {BRAND_PALETTE.map((p) => (
                 <button
                   key={p.hex}
-                  className="ds-sw"
+                  className="ds-sw hx-light"
                   style={{ background: p.hex }}
                   title={`${p.name} ${p.hex}`}
                   onClick={() => setFill(p.hex)}
@@ -385,7 +386,8 @@ export function DesignStudio() {
 
         {/* STAGE */}
         <div className="ds-stage">
-          <div className="ds-canvas-wrap">
+          {/* The design itself, on its own paper whatever the theme. */}
+          <div className="ds-canvas-wrap hx-light">
             <canvas ref={canvasElRef} />
           </div>
         </div>

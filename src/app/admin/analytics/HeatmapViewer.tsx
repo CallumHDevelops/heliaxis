@@ -637,7 +637,8 @@ export function HeatmapViewer() {
 
       {error ? <div className="hm__toast">{error}</div> : null}
 
-      <div className="hm__stage">
+      {/* The public website under the heatmap: a light island in both themes. */}
+      <div className="hm__stage hx-light">
         {!hasData && !loading ? (
           <div className="hm__empty">
             <strong>No clicks on {path} yet</strong>

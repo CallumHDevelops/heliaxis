@@ -95,19 +95,19 @@ export default async function SsoPage({ searchParams }: { searchParams: Promise<
         </p>
       </div>
       <style>{`
-        .sso-page { max-width: 560px; color: #211f18; display: flex; flex-direction: column; gap: 14px; }
+        .sso-page { max-width: 560px; color: var(--text); display: flex; flex-direction: column; gap: 14px; }
         .sso-page h1 { font-size: 1.4rem; font-weight: 800; margin: 0; }
-        .sso-page p { margin: 0; line-height: 1.55; color: #4a473e; }
+        .sso-page p { margin: 0; line-height: 1.55; color: var(--text-2); }
         .sso-row { display: flex; gap: 10px; flex-wrap: wrap; }
         .sso-code { font: inherit; font-size: 1.4rem; font-weight: 700; letter-spacing: .25em; width: 9.5em; max-width: 100%;
-          padding: .5rem .7rem; border: 1px solid rgba(33,31,24,.25); border-radius: 2px; background: #fff; color: #211f18; }
-        .sso-btn { font: inherit; font-weight: 800; color: #211f18; background: #f8bc1e; border: 0; border-radius: 2px;
+          padding: .5rem .7rem; border: 1px solid var(--border-strong); border-radius: 2px; background: var(--field); color: var(--text); }
+        .sso-btn { font: inherit; font-weight: 800; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 2px;
           padding: .7rem 1.1rem; cursor: pointer; }
-        .sso-link { font: inherit; font-size: .88rem; background: none; border: 0; padding: 0; color: #8a5d00;
+        .sso-link { font: inherit; font-size: .88rem; background: none; border: 0; padding: 0; color: var(--accent-text);
           text-decoration: underline; cursor: pointer; }
-        .sso-err { color: #a3322a !important; }
+        .sso-err { color: var(--danger) !important; }
         .sso-alt { font-size: .88rem; }
-        .sso-alt a { color: #8a5d00; }
+        .sso-alt a { color: var(--accent-text); }
         .sso-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
       `}</style>
     </AdminShell>

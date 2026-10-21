@@ -1,9 +1,11 @@
 /*
  * A WhatsApp message's photo, video, voice note, sticker or file (MediaBubble.tsx), in the chat page,
  * the dock and anywhere else a chat bubble shows. Sized to fit a 360px dock and a phone: nothing is
- * wider than 260px, and everything shrinks with its bubble.
+ * wider than 260px, and everything shrinks with its bubble. Colours: src/app/theme.css; a video's
+ * letterbox and the photo viewer are black in both themes.
  */
 .wa-media {
+  --wa-media-black: #000;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -20,7 +22,7 @@
   border: 0;
   border-radius: 6px;
   overflow: hidden;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   cursor: zoom-in;
 }
 .wa-media__photo img {
@@ -30,7 +32,7 @@
   object-fit: cover;
 }
 .wa-media__photo:focus-visible {
-  outline: 2px solid var(--wa, #1f7a4d);
+  outline: 2px solid var(--wa);
   outline-offset: 2px;
 }
 .wa-media__sticker {
@@ -51,7 +53,7 @@
   max-width: 100%;
   max-height: 320px;
   border-radius: 6px;
-  background: #000;
+  background: var(--wa-media-black);
 }
 .wa-media__audio {
   display: block;
@@ -62,26 +64,26 @@
 .wa-media__get {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--wa, #1f7a4d);
+  color: var(--wa-text);
 }
 .wa-media__status {
   margin: 2px 0 0;
   font-size: 0.75rem;
   line-height: 1.35;
-  color: var(--err, #b3261e);
+  color: var(--danger);
 }
 .wa-media__status.is-pending {
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
   font-style: italic;
 }
 .wa-media__retry,
 .wa-media__job button {
   margin-left: 6px;
   padding: 3px 9px;
-  border: 1px solid var(--wa, #1f7a4d);
+  border: 1px solid var(--wa);
   border-radius: 999px;
-  background: var(--card, #fffdf8);
-  color: var(--wa, #1f7a4d);
+  background: var(--surface);
+  color: var(--wa-text);
   font: inherit;
   font-size: 0.75rem;
   font-weight: 700;
@@ -105,7 +107,7 @@
 .wa-media__saved {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--wa, #1f7a4d);
+  color: var(--wa-text);
 }
 
 /* A document: a chip with its name and size, and Download. */
@@ -117,9 +119,9 @@
   max-width: 100%;
   box-sizing: border-box;
   padding: 8px 10px;
-  border: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(33, 31, 24, 0.04);
+  background: rgb(var(--fg-rgb) / 0.04);
 }
 .wa-file__icon {
   flex: none;
@@ -144,14 +146,14 @@
 }
 .wa-file__about small {
   font-size: 0.72rem;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
 }
 .wa-file__get {
   flex: none;
   padding: 6px 10px;
   border-radius: 6px;
-  background: var(--wa, #1f7a4d);
-  color: #fff;
+  background: var(--wa);
+  color: var(--on-solid);
   font-size: 0.78rem;
   font-weight: 700;
   text-decoration: none;
@@ -159,6 +161,8 @@
 
 /* The full photo, over everything (a modal dialog sits above the dock and the app header). */
 .wa-viewer {
+  --wav-bar: rgba(20, 18, 12, 0.92);
+  --wav-text: #fff;
   max-width: 100vw;
   max-height: 100vh;
   padding: 0;
@@ -188,8 +192,8 @@
   margin: 10px auto 0;
   padding: 6px 14px;
   border-radius: 10px;
-  background: rgba(20, 18, 12, 0.92);
-  color: #fff;
+  background: var(--wav-bar);
+  color: var(--wav-text);
   font-size: 0.85rem;
   text-align: center;
 }
@@ -201,7 +205,7 @@
   padding: 6px 4px;
   border: 0;
   background: none;
-  color: #fff;
+  color: var(--wav-text);
   font: inherit;
   font-weight: 700;
   text-decoration: underline;
@@ -209,6 +213,6 @@
   cursor: pointer;
 }
 .wa-viewer__bar :focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--wav-text);
   outline-offset: 2px;
 }

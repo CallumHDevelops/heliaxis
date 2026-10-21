@@ -46,7 +46,7 @@ export function BlogAdminCreate({ aiReady }: Props) {
   const field: React.CSSProperties = {
     width: '100%',
     padding: '10px 12px',
-    border: `1px solid ${brand.line}`,
+    border: '1px solid var(--border-strong)',
     borderRadius: 4,
     background: brand.paper,
     fontFamily: brand.body,
@@ -127,7 +127,7 @@ export function BlogAdminCreate({ aiReady }: Props) {
       </p>
 
       {!aiReady && (
-        <p style={{ color: '#b33', fontSize: '0.86rem', fontWeight: 600, margin: '0 0 0.75rem' }}>
+        <p style={{ color: 'var(--danger)', fontSize: '0.86rem', fontWeight: 600, margin: '0 0 0.75rem' }}>
           Set OPENROUTER_API_KEY (or AI_API_KEY) to enable generation.
         </p>
       )}
@@ -159,7 +159,7 @@ export function BlogAdminCreate({ aiReady }: Props) {
             marginBottom: 0,
             fontSize: '0.86rem',
             fontWeight: 600,
-            color: msg.tone === 'err' ? '#b33' : msg.tone === 'ok' ? brand.ok : brand.muted,
+            color: msg.tone === 'err' ? 'var(--danger)' : msg.tone === 'ok' ? brand.ok : brand.muted,
           }}
         >
           {msg.text}
@@ -186,9 +186,9 @@ export function BlogAdminCreate({ aiReady }: Props) {
               disabled={busy !== 'idle' || !draft.title || !draft.slug}
               style={{
                 padding: '9px 16px',
-                background: brand.ink,
-                color: brand.paper,
-                border: `1px solid ${brand.ink}`,
+                background: 'var(--inverse)',
+                color: 'var(--inverse-text)',
+                border: '1px solid var(--inverse)',
                 borderRadius: 4,
                 fontWeight: 700,
                 cursor: busy !== 'idle' ? 'not-allowed' : 'pointer',
