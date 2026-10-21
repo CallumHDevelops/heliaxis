@@ -7,6 +7,7 @@
  * flagged for it, never guessed. Type-only imports.
  */
 import type { Field, FlagRule, FormCtx, Step } from '../types';
+import { eicSummary } from './eic';
 import { describeArray, stringsF43 } from './f43';
 import { has, num, panelsFitted, readOf } from './shared';
 
@@ -60,7 +61,10 @@ export const F78_FIELDS: Field[] = [
     show: (c) => has(c, 'solar'),
     suggest: (c) => {
       const s = stringsF43(c);
-      return { v: `${s} PV string${s === 1 ? '' : 's'}`, src: 'job', text: `${s} PV string${s === 1 ? '' : 's'} (add the AC circuits)` };
+      const pv = `${s} PV string${s === 1 ? '' : 's'}`;
+      // The AC circuits from the EIC made in the app, once they're on it.
+      const ac = eicSummary(c).circuits;
+      return ac.length ? { v: `${pv}; ${ac.join('; ')}`, src: 'job', text: `${pv}; ${ac.join('; ')} (from the EIC)` } : { v: pv, src: 'job', text: `${pv} (add the AC circuits)` };
     },
   },
   {

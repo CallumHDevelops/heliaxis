@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { runSiteJobs } from '@/lib/site/cron';
+// The handover pack's job (held messages, documents made as their data lands).
+import '@/lib/handover/cron';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;

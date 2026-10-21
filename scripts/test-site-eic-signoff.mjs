@@ -1,7 +1,9 @@
 // The electrician's certificate on the server (src/lib/site/eic/*): the electrician signs off through
 // the real sign-off route against an in-memory database, and the sign-off's documents step files the
 // EIC as a draft (the design part still to sign), sets paperwork.eic_on and remembers their test
-// instruments; the office signs the design part and the EIC is final, in handover slot CC21 and held
+// instruments; the handover pack is told the EIC's reference, that it waits for the design part, and
+// the roofer's panel serials (site/handover-facts.ts); the office signs the design part (the next
+// inspection reaches the pack) and the EIC is final, in handover slot CC21 and held
 // for the pack, the draft archived; making it again changes nothing; a reading or a signature that
 // never reached the server stops the sign-off; a single-signature EIC is final at once; Minor Works
 // makes one sheet per circuit, kept out of CC21 while its wording is unverified.
@@ -191,6 +193,7 @@ const { signDesign } = await import('../src/lib/site/eic/design.ts');
 const { assignmentRow } = await import('../src/lib/site/server.ts');
 const FIX = await import('../src/lib/site/fixed/iet-eic.ts');
 const E = await import('../src/lib/site/forms/electrician/eic.ts');
+const HF = await import('../src/lib/site/handover-facts.ts');
 const { full, scribble } = await import('./site-eic-fixture.mjs');
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
@@ -300,6 +303,11 @@ eq('the instruments are remembered on the contact (anything else kept there stay
   { k: 'eic_mft', v: 'Megger MFT1741 · 101234567' },
 ]);
 const so = db.rows('site_signoffs').find((s) => s.assignment_id === one.id);
+// What the handover pack is told (site/handover-facts.ts): the EIC's reference, and that it waits for the design part.
+// The roofer's panel serials come with it (SN_PANEL is the roofer's key).
+db.rows('site_assignments').push({ id: randomUUID(), project_id: project.id, contact_id: contact.id, trade: 'roofer', status: 'signed', forms: [], answers: wrap({ SN_PANEL: [{ s: 'PNL0001', src: 'scan' }, { s: 'PNL0002', src: 'scan' }] }), flags: [], rev: 1, created_at: '2026-11-01T07:00:00Z' });
+let hf = await HF.siteHandoverFacts(db, project.id, {});
+eq('handover facts: the EIC’s reference, no next inspection yet, waiting for the design part, the roofer’s panel serials', [hf.certRef, hf.nextInspection, /^Sign the EIC’s design part/.test(hf.certWaits ?? ''), hf.values.SN_PANEL.map((x) => x.s)], ['HX-0042-EIC', null, true, ['PNL0001', 'PNL0002']]);
 eq('every step after the reply stamped', [!!so.po_done_at, !!so.docs_done_at, !!so.notified_at], [true, true, true]);
 let st = await EICS.certificateStatus(db, read(one.id));
 eq('the Site tab: the design part to sign; their scheme notifies', [st.state, st.ref, st.notify.who, st.notify.scheme, st.notify.reference], ['to_design', 'HX-0042-EIC', 'self', 'NAPIT', 'HX-0042-EIC']);
@@ -310,6 +318,8 @@ const bad = await signDesign(db, read(one.id), { ...DESIGN, next_n: '' }, STAFF)
 eq('the design part needs the next inspection (no default)', [bad.ok, bad.error], [false, 'Say when it should next be inspected: a whole number of years or months.']);
 const ok = await signDesign(db, read(one.id), DESIGN, STAFF);
 eq('signed by the office', ok.ok, true);
+hf = await HF.siteHandoverFacts(db, project.id, {});
+eq('handover facts once the design part is signed: the next inspection from it, nothing waiting', [hf.certRef, hf.nextInspection, hf.certWaits], ['HX-0042-EIC', '10 years', null]);
 const design = read(one.id).answers.eic_design?.v;
 eq('kept on the assignment, its signature in crm-docs', [design?.name, design?.next_n, design?.next_unit, db.files.has(`crm-docs/${design?.path}`)], ['Sarah Jones', 10, 'years', true]);
 const fin = current('EIC');

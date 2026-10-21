@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fillText } from '@/lib/crm/settings-shared';
+import { PACK_ITEMS, slotDef } from '@/lib/handover/slots';
 import type { TrackerStep } from '@/lib/crm/tracker';
 import './extras.css';
 
@@ -29,6 +30,8 @@ export type CrmDoc = {
   generated_key?: string | null;
   source?: string | null;
   archived_at?: string | null;
+  /** The handover pack item it is (handover.sql, the registry): null = not in the pack. */
+  handover_slot?: string | null;
 };
 type LibDoc = { id: string; name: string; description: string | null };
 type Snippet = { id: string; title: string; body: string };
@@ -50,6 +53,10 @@ export const DOC_LABEL: Record<string, string> = {
 };
 /** Kinds site-commissioning.sql adds: offered only once it's been run (the database refuses them before). */
 const SITE_KINDS = ['commissioning', 'certificate', 'po'];
+
+/** Uploading one of these asks "Add it to the handover pack?" (handover.sql), with its item chosen. */
+const PACK_FOR: Record<string, string> = { mcs: 'CC17', warranty: 'CC16', invoice: 'CC13', receipt: 'CC13' };
+const PACK_CHOICES = PACK_ITEMS.filter((p) => p.code !== 'F07BI');
 
 /** Quotes and contracts can be signed by the customer (in the portal, or ticked as signed outside it). */
 const SIGNABLE = ['quote', 'contract'];
@@ -152,8 +159,25 @@ function takePendingAdd() {
 
 /* ── Documents tab ─────────────────────────────────────────────────────────── */
 
-export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: string; docs: CrmDoc[]; onChanged: () => Promise<void>; siteDocs?: boolean }) {
+export function DocumentsTab({
+  id,
+  docs,
+  onChanged,
+  siteDocs = false,
+  handover = false,
+}: {
+  id: string;
+  docs: CrmDoc[];
+  onChanged: () => Promise<void>;
+  siteDocs?: boolean;
+  handover?: boolean;
+}) {
   const [cat, setCat] = useState('quote');
+  // "Add it to the handover pack?" (yes by default) for the kinds that belong there, and which item.
+  const [toPack, setToPack] = useState(true);
+  const [packSlot, setPackSlot] = useState<string | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
+  const packFor = handover ? (packSlot ?? PACK_FOR[cat] ?? null) : null;
   const [visible, setVisible] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -207,7 +231,8 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
     try {
       // Uploading never marks a document for signing: that's Send quote for signing (or the "Needs signing" chip),
       // so a new upload can't replace the quote the customer has been sent.
-      for (const f of Array.from(files)) await uploadFile(`/api/crm/projects/${id}/documents`, f, { category: cat, visible, needs_signature: false });
+      const pack = packFor && toPack && PACK_FOR[cat] ? { handover_slot: packFor, hold: !visible } : {};
+      for (const f of Array.from(files)) await uploadFile(`/api/crm/projects/${id}/documents`, f, { category: cat, visible, needs_signature: false, ...pack });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Upload failed');
     }
@@ -260,7 +285,16 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
   return (
     <div className="crm-docs">
       <div ref={box} className={`crm-doc-upload${flash ? ' qx-flash' : ''}`}>
-        <select className="crm-input" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Document type">
+        <select
+          className="crm-input"
+          value={cat}
+          onChange={(e) => {
+            setCat(e.target.value);
+            setPackSlot(null);
+            setToPack(true);
+          }}
+          aria-label="Document type"
+        >
           {Object.entries(DOC_LABEL)
             .filter(([k]) => siteDocs || !SITE_KINDS.includes(k))
             .map(([k, l]) => (
@@ -277,6 +311,20 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
         </button>
         <input ref={input} type="file" hidden multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" onChange={(e) => onFiles(e.target.files)} />
       </div>
+      {packFor && PACK_FOR[cat] && (
+        <div className="crm-doc-pack">
+          <label className="crm-check" style={{ marginTop: 0 }}>
+            <input type="checkbox" checked={toPack} onChange={(e) => setToPack(e.target.checked)} /> Add it to the handover pack as
+          </label>
+          <select className="crm-input" value={packFor} disabled={!toPack} onChange={(e) => setPackSlot(e.target.value)} aria-label="Handover pack item">
+            {PACK_CHOICES.map((p) => (
+              <option key={p.code} value={p.code}>
+                {p.code} {p.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {cat === 'quote' && (
         <p className="crm-muted crm-small">
           To get a quote signed, use <b>Send quote for signing</b> on the customer portal card: they read and sign it on their phone.
@@ -309,6 +357,7 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
                     {DOC_LABEL[d.category] || 'Document'} · {short(d.created_at)}
                     {d.generated_key || (d.version ?? 1) > 1 ? ` · v${d.version ?? 1}` : ''}
                     {d.archived_at ? ` · archived ${short(d.archived_at)}` : ''}
+                    {handover && d.handover_slot && d.handover_slot !== 'PACK' ? ` · handover pack: ${slotDef(d.handover_slot)?.title ?? d.handover_slot}` : ''}
                   </small>
                 </a>
                 {isSignedQuote && portal?.accepted && (
@@ -345,12 +394,48 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
                   <button type="button" className="crm-chipbtn" onClick={() => whatsapp(d)}>
                     💬 Send
                   </button>
+                  {handover && !d.handover_slot && !d.archived_at && (
+                    <button type="button" className={`crm-chipbtn${moving === d.id ? ' on' : ''}`} onClick={() => setMoving(moving === d.id ? null : d.id)}>
+                      Move into the handover pack
+                    </button>
+                  )}
                   {!isSignedQuote && (
                     <button type="button" className="crm-chipbtn" onClick={() => remove(d)} aria-label={`Delete ${d.name}`}>
                       ✕
                     </button>
                   )}
                 </div>
+                {moving === d.id && (
+                  <div className="qx-markform">
+                    <p className="crm-small">
+                      <b>Which item is it?</b> It shows in their portal’s handover pack straight away.
+                    </p>
+                    <select
+                      className="crm-input"
+                      defaultValue=""
+                      aria-label="Handover pack item"
+                      onChange={async (e) => {
+                        if (!e.target.value) return;
+                        setErr('');
+                        const r = await fetch(`/api/crm/projects/${id}/handover`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'move', doc: d.id, slot: e.target.value }),
+                        });
+                        if (!r.ok) setErr((await r.json().catch(() => ({}))).error || 'Not moved');
+                        setMoving(null);
+                        await refresh();
+                      }}
+                    >
+                      <option value="">Choose…</option>
+                      {PACK_CHOICES.map((p) => (
+                        <option key={p.code} value={p.code}>
+                          {p.code} {p.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {marking === d.id && (
                   <div className="qx-markform">
                     <p className="crm-small">

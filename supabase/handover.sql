@@ -8,17 +8,22 @@ do $$ begin
   end if;
 end $$;
 
--- Per job: an item marked Not needed (with why), or a note.
+-- Per job: an item marked Not needed (with why), or a note, and the office's data for it: the
+-- customer's signature from their portal (F16E, F47), the F78 design signature, values typed exactly
+-- as agreed (F49A, CC4's switch locations), what's still to put right (F16E), which G99 paper each
+-- upload is (F76), and the store's Out of date mark (src/lib/handover/inputs.ts SlotData).
 create table if not exists public.handover_slots (
   project_id uuid not null references public.crm_projects(id) on delete cascade,
   slot       text not null,
   na         boolean not null default false,
   na_reason  text,
   note       text,
+  data       jsonb not null default '{}'::jsonb,
   updated_by uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now(),
   primary key (project_id, slot)
 );
+alter table public.handover_slots add column if not exists data jsonb not null default '{}'::jsonb;
 
 -- Per job: the combined PDF as last built, and when it went to the customer.
 create table if not exists public.handover_packs (
@@ -31,8 +36,10 @@ create table if not exists public.handover_packs (
   sent_at             timestamptz,
   sent_by             uuid references public.profiles(id) on delete set null,
   sent_via            text[] not null default '{}',
-  invoice_prompted_at timestamptz
+  invoice_prompted_at timestamptz,
+  queued              jsonb                    -- messages held by the evening rule: [{at, via, kind, what, by}]
 );
+alter table public.handover_packs add column if not exists queued jsonb;
 
 -- Library documents that belong in packs: which item, which technologies, which product models.
 alter table public.crm_library add column if not exists kind          text check (kind in ('datasheet','manual','warranty','procedure','guide'));

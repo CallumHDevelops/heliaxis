@@ -481,7 +481,7 @@ const PAPER_DATES = [
   'warranties_registered_on',
   'seg_info_sent_on',
 ];
-const PAPER_TEXT = ['mcs_cert_no', 'bus_ref', 'building_regs_ref', 'ibg_ref'];
+const PAPER_TEXT = ['mcs_cert_no', 'bus_ref', 'building_regs_ref', 'ibg_ref', 'ibg_provider'];
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const V3_WARNING = 'Some fields need crm-v3.sql: run it from the to-do list.';
 
@@ -703,6 +703,15 @@ export async function PATCH(req: Request, { params }: Ctx) {
   // 5. Paperwork deadlines become tasks (once each).
   if (saved('commissioned_at') || saved('paperwork') || dnoMove || 'dno_submitted_at' in u) {
     await ensureDeadlineTasks(id, s.user.id);
+  }
+  // 6. The handover pack follows (references into the cover letter and warranty, design figures into
+  // F78 and F48I, its reminders), after the reply.
+  if (saved('paperwork') || saved('system') || saved('commissioned_at') || 'dno_ref' in u || dnoMove) {
+    const by = s.user.id;
+    after(async () => {
+      const { handoverReady, refreshHandover } = await import('@/lib/handover/server');
+      if (await handoverReady()) await refreshHandover(db, id, { by }).catch((e) => console.error('[handover] after job save', e));
+    });
   }
 
   const { data } = await db.from('crm_projects').select('*').eq('id', id).maybeSingle();

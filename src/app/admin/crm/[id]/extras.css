@@ -161,3 +161,17 @@
     min-height: 48px;
   }
 }
+
+/* "Add it to the handover pack as …" under the upload (handover.sql). */
+.crm-doc-pack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.4rem 0;
+}
+.crm-doc-pack .crm-input {
+  width: auto;
+  flex: 1;
+  min-width: 12rem;
+}

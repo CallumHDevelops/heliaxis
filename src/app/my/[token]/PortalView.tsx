@@ -6,6 +6,7 @@ import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import type { PortalData } from '@/lib/crm/portal';
 import { isWonStage } from '@/lib/crm/stages';
 import { useNow } from '@/lib/use-now';
+import { HandoverSection } from './HandoverSection';
 import './portal.css';
 
 const DOC_LABEL: Record<string, string> = {
@@ -162,8 +163,10 @@ function FullPortal({ data, paid }: { data: PortalData; paid: boolean }) {
   }, [now, data.installAt, data.quote, accepted, data.surveyAt]);
 
   const depositDue = data.deposit && !data.deposit.paidAt && !paid && (accepted || isWonStage(data.stage));
-  const handover = data.documents.filter((d) => d.category === 'handover');
-  const others = data.documents.filter((d) => d.category !== 'handover');
+  // Once handover.sql has run the pack is its own section (data.handover), and the documents list is the rest.
+  const pack = data.handover && (data.handover.groups.length || data.handover.signs.length) ? data.handover : null;
+  const handover = data.handover ? [] : data.documents.filter((d) => d.category === 'handover');
+  const others = data.handover ? data.documents : data.documents.filter((d) => d.category !== 'handover');
 
   return (
     <Shell tag="Your project">
@@ -241,6 +244,8 @@ function FullPortal({ data, paid }: { data: PortalData; paid: boolean }) {
         </section>
       )}
 
+      {pack && <HandoverSection token={data.token} data={pack} />}
+
       {handover.length > 0 && (
         <section className="pt-card pt-handover">
           <h2>Your handover pack</h2>
@@ -250,7 +255,7 @@ function FullPortal({ data, paid }: { data: PortalData; paid: boolean }) {
       )}
 
       <section className="pt-card">
-        <h2>{handover.length ? 'Other documents' : 'Your documents'}</h2>
+        <h2>{handover.length || pack ? 'Other documents' : 'Your documents'}</h2>
         {others.length === 0 ? (
           <p className="pt-muted">Your quote, invoices, grid connection (DNO) letters and certificates will appear here.</p>
         ) : (
