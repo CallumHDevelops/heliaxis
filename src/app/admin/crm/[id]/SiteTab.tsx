@@ -99,8 +99,9 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
   const gone = data.assignments.filter((a) => a.status === 'cancelled');
   const flags = live.flatMap((a) => a.flags.filter((f) => !f.resolved_at).map((f) => ({ a, f })));
   const pos = live.filter((a) => a.po);
-  // The scaffold once it's up: tagged (the roofer and electrician can be told to start) or not.
-  const up = live.find((a) => a.trade === 'scaffolder' && (a.status === 'signed' || a.status === 'done'));
+  // The scaffold once it's up: tagged (the roofer and electrician can be told to start) or not. "Not
+  // tagged" counts as soon as the scaffolder says so, before the sign-off, so the hold can go at once.
+  const up = live.find((a) => a.trade === 'scaffolder' && (a.status === 'signed' || a.status === 'done' || a.tagged === false));
   const scaffold: 'tagged' | 'untagged' | null = up ? (up.tagged === false ? 'untagged' : 'tagged') : null;
 
   return (

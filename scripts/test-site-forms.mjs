@@ -2,9 +2,22 @@
 // which paperwork each mix of technologies gets, that every key is unique and none is ever removed,
 // and how the design details are cleaned.
 // Usage: node --experimental-strip-types scripts/test-site-forms.mjs
-import { cleanDesign, designInput, designOf, intListWords, parseIntList } from '../src/lib/site/design.ts';
-import { formsFor, formsMissing, rooferApplies, suggestedTrades } from '../src/lib/site/forms/index.ts';
-import { jobStrip } from '../src/lib/site/strip.ts';
+import { registerHooks } from 'node:module';
+
+// forms/index.ts imports the forms without ".ts", as the bundler expects.
+registerHooks({
+  resolve(specifier, context, next) {
+    try {
+      return next(specifier, context);
+    } catch (e) {
+      if (/^(?:\.\.?\/|file:)/.test(specifier) && !/\.\w+$/.test(specifier)) return next(`${specifier}.ts`, context);
+      throw e;
+    }
+  },
+});
+const { cleanDesign, designInput, designOf, intListWords, parseIntList } = await import('../src/lib/site/design.ts');
+const { formsFor, formsMissing, rooferApplies, suggestedTrades } = await import('../src/lib/site/forms/index.ts');
+const { jobStrip } = await import('../src/lib/site/strip.ts');
 
 let failed = 0;
 function eq(name, got, want) {

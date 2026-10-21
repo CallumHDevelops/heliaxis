@@ -7,6 +7,8 @@
  */
 import type { Design } from '../design';
 import type { Trade } from '../types';
+import { ROOFER } from './roofer';
+import { SCAFFOLD_DOWN, SCAFFOLD_UP } from './scaffold';
 import type { SiteForm } from './types';
 
 /**
@@ -19,7 +21,7 @@ export const SITE_SCHEMA_VERSION = 1;
  * The forms for each trade, stage by stage (the scaffolder's erection, then the strike). The
  * electrician's pack is built from the sections on the assignment (Unit 2 adds them here).
  */
-const BY_TRADE: Partial<Record<Trade, SiteForm[]>> = {};
+const BY_TRADE: Partial<Record<Trade, SiteForm[]>> = { roofer: [ROOFER], scaffolder: [SCAFFOLD_UP, SCAFFOLD_DOWN] };
 const ELECTRICIAN: ((forms: string[]) => SiteForm)[] = [];
 
 /** The forms an assignment is filled in with, in stage order. */
