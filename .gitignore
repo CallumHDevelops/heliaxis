@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Claude Code agent worktrees (temporary)
 .claude/worktrees/
+
+# The site app's barcode decoder, copied from node_modules by scripts/copy-zxing.mjs before each build
+/public/portal/site/zxing_reader.wasm

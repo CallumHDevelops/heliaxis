@@ -83,16 +83,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const id = row.id as string;
     const read = b.read === true;
     after(async () => {
+      // A label read first: what it finds can raise a flag (a model that isn't the design's).
+      await afterPhoto(s.db, a, { id, slot, read });
       const fresh = await readAssignment(s.db, a.id);
       if (fresh) await afterAnswers(s.db, fresh);
-      await afterPhoto(s.db, a, { id, slot, read });
     });
     return siteJson({ id, path });
   }
 
   if (b.action === 'delete') {
-    if (signed) return siteJson({ error: 'signed', message: 'Photos on a signed-off form stay. Ask the office if one needs taking off.' }, 409);
     const { data: rows } = await s.db.from('crm_photos').select('id, storage_path, slot').eq('assignment_id', a.id).like('storage_path', `%/${clientId.toLowerCase()}.%`);
+    // Photos on a signed-off form stay; the slots still open (the tag, the strike) can lose one.
+    if ((rows ?? []).some((r) => !open(String(r.slot ?? '')))) return siteJson({ error: 'signed', message: 'Photos on a signed-off form stay. Ask the office if one needs taking off.' }, 409);
     for (const r of (rows ?? []) as { id: string; storage_path: string }[]) {
       await s.db.storage.from(CRM_BUCKET).remove([r.storage_path, thumbPath(r.storage_path)]);
       await s.db.from('crm_photos').delete().eq('id', r.id);

@@ -78,5 +78,8 @@ export type SitePhoto = { id: string; slot: string; client_id?: string | null; t
 /** A serial captured on site (Unit 2): what was read and whether a person confirmed it. */
 export type Capture = { key: string; value: string | null; src: Source; confirmed: boolean; unreadable?: boolean; photo_id?: string | null };
 
+/** A Yes/No answer as stored ('yes' / 'no'), or null when it isn't answered yet. */
+export const yesNo = (v: unknown): boolean | null => (v === 'yes' || v === true ? true : v === 'no' || v === false ? false : null);
+
 /** "Dave Price" → "Dave". */
 export const firstNameOf = (name: string | null | undefined) => (name || '').trim().split(/\s+/)[0] || '';

@@ -7,6 +7,26 @@
  */
 import type { Design } from '../design';
 import type { Trade } from '../types';
+import type { SiteForm } from './types';
+
+/**
+ * Bumped when fields are added. Stored on each assignment when it's made, and an assignment is
+ * always shown with the forms of its own version (keys never change once used; new ones are added).
+ */
+export const SITE_SCHEMA_VERSION = 1;
+
+/**
+ * The forms for each trade, stage by stage (the scaffolder's erection, then the strike). The
+ * electrician's pack is built from the sections on the assignment (Unit 2 adds them here).
+ */
+const BY_TRADE: Partial<Record<Trade, SiteForm[]>> = {};
+const ELECTRICIAN: ((forms: string[]) => SiteForm)[] = [];
+
+/** The forms an assignment is filled in with, in stage order. */
+export function schemaFor(a: { trade: Trade; forms?: string[] | null; schema_version?: number | null }): SiteForm[] {
+  if (a.trade === 'electrician') return ELECTRICIAN.map((make) => make(a.forms ?? []));
+  return BY_TRADE[a.trade] ?? [];
+}
 
 /** The electrician's sections in the order they appear on the phone (SPEC 2.1). */
 export const ELECTRICIAN_FORMS = ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'pas63100', 'ev', 'heatpump', 'f78', 'cert', 'finish'] as const;

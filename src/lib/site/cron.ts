@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDue } from './send';
 import { siteReady, type Db } from './server';
+import { retryReads } from './vision';
 
 /**
  * /api/cron/site: every 5 minutes from pg_cron (the line in site-commissioning.sql) and once a day
@@ -17,6 +18,8 @@ const OPS_DAYS = 60;
 export const SITE_JOBS: SiteJob[] = [
   // 1. Messages whose time has come (held overnight by the evening rule, or retried).
   { name: 'messages', run: (db) => sendDue(db) },
+  // 3. Label photos that arrived while nobody was waiting on the read.
+  { name: 'reads', run: (db) => retryReads(db) },
   // 6. Phones not used for 90 days have to open their link again.
   {
     name: 'devices',

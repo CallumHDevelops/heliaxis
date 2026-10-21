@@ -9,8 +9,9 @@ import { designOf } from './design';
 import { siteShort } from './messages';
 import type { PackFile, PackPhoto, SitePack } from './pack-shared';
 import { assignmentRow, type AssignmentRow, type Db } from './server';
+import { getSiteSettings } from './settings';
 import { jobStrip } from './strip';
-import { firstNameOf, STATUS_LABEL, TRADE_LABEL, valuesOf, type Stage } from './types';
+import { firstNameOf, STATUS_LABEL, TRADE_LABEL, valuesOf, yesNo, type Stage } from './types';
 
 /**
  * The job pack (GET /api/site/jobs/<id>/pack): everything a trade needs on site for one job, built
@@ -172,7 +173,7 @@ export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
   };
   const version = createHash('sha256').update(canonicalJson(details)).digest('hex').slice(0, 16);
   const strip = jobStrip({
-    scaffold: live.filter((t) => t.trade === 'scaffolder').map((t) => ({ status: t.status, tagged: typeof answersOf(t).SC3 === 'boolean' ? (answersOf(t).SC3 as boolean) : null, struck: t.status === 'done' })),
+    scaffold: live.filter((t) => t.trade === 'scaffolder').map((t) => ({ status: t.status, tagged: yesNo(answersOf(t).SC3), struck: t.status === 'done' })),
     roof: live.filter((t) => t.trade === 'roofer').map((t) => ({ status: t.status })),
     electrics: live.filter((t) => t.trade === 'electrician').map((t) => ({ status: t.status })),
     scaffold_up_on: str(project.scaffold_up_on),
@@ -209,5 +210,6 @@ export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
         }
       : null,
     reads: (reads ?? []) as SitePack['reads'],
+    settings: { locationStamps: (await getSiteSettings()).locationStamps },
   };
 }

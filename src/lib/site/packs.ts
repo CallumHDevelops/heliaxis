@@ -1,7 +1,7 @@
 'use client';
 
 import { siteFetch, type Outcome } from './client';
-import { byJob, changed, delRec, getDevice, getPack, getRec, mergeServer, putRec, updateDevice, updatePack, type DraftRecord, type FileRecord, type PackRecord } from './offline';
+import { byJob, changed, delRec, getDevice, getPack, getRec, mergeServer, putRec, updateDevice, updatePack, type DraftRecord, type FileRecord, type PackRecord, type PhotoRecord } from './offline';
 import { packChanges, type SiteJobRow, type SitePack } from './pack-shared';
 
 /**
@@ -112,8 +112,10 @@ export async function refreshJobs(force = false): Promise<Outcome<SiteJobRow[]>>
       continue;
     }
     const p = await getPack(j.id);
+    // A label photo from this phone that went up in the last hour: its read (suggestions) comes with the pack.
+    const unread = !!p && (await byJob<PhotoRecord>('photos', j.id)).some((x) => x.read && x.uploadedId && Date.now() - Date.parse(x.takenAt) < 3_600_000 && !p.pack.reads.some((r) => r.photo_id === x.uploadedId));
     // New, or changed on the server since this phone's copy (rev counts answers from other phones too).
-    if (!p || p.pack.assignment.rev !== j.rev || p.pack.assignment.status !== j.status || force || Date.now() - Date.parse(p.storedAt) > 30 * 60_000) await downloadPack(j.id);
+    if (!p || unread || p.pack.assignment.rev !== j.rev || p.pack.assignment.status !== j.status || force || Date.now() - Date.parse(p.storedAt) > 30 * 60_000) await downloadPack(j.id);
   }
   for (const id of d?.jobs ?? []) {
     if (listed.has(id)) continue;

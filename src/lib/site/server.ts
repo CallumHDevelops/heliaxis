@@ -9,7 +9,7 @@ import { formsFor, isElectricianForm, suggestedTrades } from './forms';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
 import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
-import { STATUS_LABEL, TRADE_LABEL, valuesOf, type Answers, type AssignmentStatus, type Flag, type Trade } from './types';
+import { STATUS_LABEL, TRADE_LABEL, valuesOf, yesNo, type Answers, type AssignmentStatus, type Flag, type Trade } from './types';
 
 /**
  * The site app on the server: whether its SQL has run, the people who go to site (a firm's contact or
@@ -611,7 +611,7 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
       po: poOf.get(a.id) ?? null,
       messages: msgOf.get(a.id) ?? [],
       link: { generation: a.link_generation, created_at: a.link_created_at, phones: phones.get(c.id) ?? 0 },
-      tagged: typeof answers.SC3 === 'boolean' ? answers.SC3 : null,
+      tagged: yesNo(answers.SC3),
     });
   }
   const live = views.filter((v) => v.status !== 'cancelled');

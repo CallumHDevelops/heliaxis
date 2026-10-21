@@ -73,6 +73,8 @@ export type SitePack = {
   photos: PackPhoto[];
   po: PackPo | null;
   reads: { photo_id: string; key: string; status: string; result: unknown }[];
+  /** The owner's choices the phone needs (location on photos only when turned on, D18). */
+  settings: { locationStamps: boolean };
 };
 
 /** One job on the home screen (GET /api/site/jobs). */
