@@ -193,8 +193,8 @@ export type LightData = {
   timeline: Entry[];
 };
 
-export type Tab = 'overview' | 'activity' | 'photos' | 'docs' | 'orders' | 'surveys' | 'details';
-export const TABS: Tab[] = ['overview', 'activity', 'photos', 'docs', 'orders', 'surveys', 'details'];
+export type Tab = 'overview' | 'activity' | 'photos' | 'docs' | 'orders' | 'site' | 'surveys' | 'details';
+export const TABS: Tab[] = ['overview', 'activity', 'photos', 'docs', 'orders', 'site', 'surveys', 'details'];
 export type Area = 'crm' | 'projects';
 
 /** The tab a job opens on (spec 4.3): Overview for projects, Activity for opportunities (and Lost jobs). */

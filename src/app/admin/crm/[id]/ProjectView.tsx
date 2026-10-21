@@ -20,6 +20,7 @@ import { PhotosTab } from './PhotosTab';
 import { DocumentsTab, EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
+import { SiteTab } from './SiteTab';
 import {
   ActionMenu,
   CallPrompt,
@@ -280,8 +281,10 @@ export function ProjectView({
   const fallbackTab = stage ? defaultTab(stage, area) : 'activity';
   // Orders (purchase-orders.sql): for jobs from Won, and any job that already has some.
   const ordersTab = !!schema.purchaseOrders && (isProjectStage(stage) || (rec?.orders?.count ?? 0) > 0);
+  // Site (site-commissioning.sql): the trades on the job, from Won.
+  const siteTab = !!schema.site && isProjectStage(stage);
   let tab: Tab = tabSel ?? fallbackTab;
-  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys) || (tab === 'orders' && !ordersTab)) tab = fallbackTab;
+  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys) || (tab === 'orders' && !ordersTab) || (tab === 'site' && !siteTab)) tab = fallbackTab;
 
   const pickTab = useCallback((t: Tab) => {
     setTabSel(t);
@@ -532,9 +535,10 @@ export function ProjectView({
     photos: <>Photos{counts.photos > 0 && <i>{counts.photos}</i>}</>,
     docs: <>Docs{counts.docs > 0 && <i>{counts.docs}</i>}</>,
     orders: <>Orders{(rec.orders?.count ?? 0) > 0 && <i>{rec.orders?.count}</i>}</>,
+    site: 'Site',
     surveys: <>Surveys{counts.surveys > 0 && <i>{counts.surveys}</i>}</>,
   };
-  const shownTabs = (['overview', 'activity', 'photos', 'docs', ...(ordersTab ? ['orders'] : []), ...(schema.surveys ? ['surveys'] : [])] as Exclude<Tab, 'details'>[]);
+  const shownTabs = ['overview', 'activity', 'photos', 'docs', ...(ordersTab ? ['orders'] : []), ...(siteTab ? ['site'] : []), ...(schema.surveys ? ['surveys'] : [])] as Exclude<Tab, 'details'>[];
 
   return (
     <div className="crm crmh crmr" data-tab={tab} data-phase={phaseOf(p.stage)}>
@@ -670,6 +674,7 @@ export function ProjectView({
             {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={refresh} />}
             {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} siteDocs={schema.site} />}
             {tab === 'orders' && <OrdersTab projectId={id} today={today} myName={rec.team.find((t) => t.id === me)?.name ?? null} onChanged={refresh} />}
+            {tab === 'site' && <SiteTab projectId={id} now={now} onChanged={() => void refresh()} />}
             {tab === 'surveys' && <SurveysPanel surveys={rec.surveys} busy={starting} onStart={(type) => void startSurvey(type)} />}
           </div>
           <RecordFabs unread={wa.unread} name={c.name} onWhatsApp={() => openWhatsApp()} onAdd={() => openSheet('menu')} />
@@ -757,6 +762,7 @@ export function ProjectView({
           mode="project"
           me={me}
           team={rec.team}
+          siteApp={schema.site}
           customer={{
             id: c.id,
             name: c.name,

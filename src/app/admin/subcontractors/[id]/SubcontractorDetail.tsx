@@ -57,6 +57,7 @@ import {
 } from '../actions';
 import { NTP_TECHNOLOGIES } from '@/lib/subcontractors/ntp-agreement';
 import { TermsForm } from '../TermsForm';
+import { SiteContactsCard } from './SiteContactsCard';
 import '../subcontractors.css';
 
 type AgreementSummary = {
@@ -153,6 +154,7 @@ export function SubcontractorDetail({
   ntps,
   requests,
   reminders,
+  siteContacts = false,
 }: {
   sub: SubcontractorRow;
   agreement: AgreementSummary;
@@ -166,6 +168,8 @@ export function SubcontractorDetail({
   /** Document requests (newest first), every status. */
   requests: DocRequestRow[];
   reminders: { paused: boolean; outstanding: { kind: string; text: string; urgent: boolean }[] };
+  /** site-commissioning.sql has run: show the firm's site contacts. */
+  siteContacts?: boolean;
 }) {
   const router = useRouter();
   // Local copy of the documents: approving / editing updates the row, compliance summary
@@ -527,6 +531,7 @@ export function SubcontractorDetail({
             onMakeNtp={(id) => setNtpFor((p) => ({ id, n: (p?.n ?? 0) + 1 }))}
           />
           <JobsPanel jobs={jobs} team={team} />
+          {siteContacts && <SiteContactsCard firmId={sub.id} />}
 
           {/* ---------------- terms ---------------- */}
           <section className="sc-card">

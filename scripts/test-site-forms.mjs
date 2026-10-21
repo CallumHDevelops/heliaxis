@@ -3,6 +3,8 @@
 // and how the design details are cleaned.
 // Usage: node --experimental-strip-types scripts/test-site-forms.mjs
 import { cleanDesign, designInput, designOf, intListWords, parseIntList } from '../src/lib/site/design.ts';
+import { formsFor, formsMissing, rooferApplies, suggestedTrades } from '../src/lib/site/forms/index.ts';
+import { jobStrip } from '../src/lib/site/strip.ts';
 
 let failed = 0;
 function eq(name, got, want) {
@@ -40,6 +42,49 @@ eq('designOf reads what is set', [d.strings_design, d.optimisers, d.mounting, d.
 eq('and leaves the rest empty, never a guess', [d.battery_backup, d.bs7671_edition, d.est_kwh_year, d.battery_kw], [null, null, null, null]);
 eq('designOf ignores junk', designOf({ strings_design: 'lots', mounting: 'tiles', optimisers: 'yes' }).strings_design, null);
 eq('the box shows a list as typed', [designInput('strings_design', [8, 8]), designInput('optimisers', false), designInput('optimisers', undefined)], ['8 + 8', 'no', '']);
+
+/* ── Technologies → paperwork (SPEC 5.1) ──────────────────────────────────── */
+
+eq('solar only', formsFor(['solar']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f78', 'cert', 'finish']);
+eq('battery only: F74, no F43', formsFor(['battery']), ['photos', 'serials', 'f74', 'f78', 'cert', 'finish']);
+eq('battery with PAS 63100', formsFor(['battery'], { pas63100: true }), ['photos', 'serials', 'f74', 'pas63100', 'f78', 'cert', 'finish']);
+eq('solar + battery: both', formsFor(['solar', 'battery']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'f78', 'cert', 'finish']);
+eq('EV only: the EV record and the certificate', formsFor(['ev']), ['photos', 'serials', 'ev', 'cert', 'finish']);
+eq('heat pump only: the supply record and the certificate', formsFor(['heatpump']), ['photos', 'serials', 'heatpump', 'cert', 'finish']);
+eq('infrared / LED / other: certificate and common photos only', [formsFor(['infrared']), formsFor(['led']), formsFor(['other'])], [
+  ['photos', 'cert', 'finish'],
+  ['photos', 'cert', 'finish'],
+  ['photos', 'cert', 'finish'],
+]);
+eq('order is always the phone’s order', formsFor(['heatpump', 'ev', 'battery', 'solar']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'ev', 'heatpump', 'f78', 'cert', 'finish']);
+eq('a battery added later: what’s missing', formsMissing(formsFor(['solar']), ['solar', 'battery']), ['f74']);
+eq('the roofer is for solar jobs', [rooferApplies(['solar']), rooferApplies(['battery']), rooferApplies(['solar', 'battery'])], [true, false, true]);
+eq('suggested trades: solar', suggestedTrades(['solar']), ['scaffolder', 'roofer', 'electrician']);
+eq('suggested trades: battery / EV / heat pump', [suggestedTrades(['battery']), suggestedTrades(['ev']), suggestedTrades(['heatpump'])], [['electrician'], ['electrician'], ['electrician']]);
+eq('suggested trades: infrared', suggestedTrades(['infrared']), []);
+
+/* ── The job strip ─────────────────────────────────────────────────────────── */
+
+const labels = (s) => s.map((x) => `${x.label}:${x.state}`);
+eq('nothing started', labels(jobStrip({ scaffold: [{ status: 'sent' }], roof: [{ status: 'sent' }], electrics: [{ status: 'draft' }] })), [
+  'Scaffold:todo',
+  'Roof:todo',
+  'Electrics:todo',
+  'Handover:todo',
+]);
+eq('scaffold up and tagged, roof done, electrics going', labels(jobStrip({ scaffold: [{ status: 'signed', tagged: true }], roof: [{ status: 'done' }], electrics: [{ status: 'started' }] })), [
+  'Scaffold up ✓ (tagged):done',
+  'Roof ✓:done',
+  'Electrics in progress:now',
+  'Handover:todo',
+]);
+eq('scaffold up, not tagged', labels(jobStrip({ scaffold: [{ status: 'signed', tagged: false }], roof: [], electrics: [] })), ['Scaffold up · needs tagging:warn', 'Handover:todo']);
+eq('scaffold down', labels(jobStrip({ scaffold: [{ status: 'done', tagged: true, struck: true }], roof: [], electrics: [], handover_at: '2026-11-04T10:00:00Z' })), [
+  'Scaffold down ✓:done',
+  'Handover ✓:done',
+]);
+eq('cancelled trades don’t count', labels(jobStrip({ scaffold: [], roof: [{ status: 'cancelled' }], electrics: [{ status: 'done' }, { status: 'cancelled' }] })), ['Electrics ✓:done', 'Handover:todo']);
+eq('two electricians, one done: in progress', labels(jobStrip({ scaffold: [], roof: [], electrics: [{ status: 'done' }, { status: 'sent' }] })), ['Electrics in progress:now', 'Handover:todo']);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

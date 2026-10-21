@@ -58,6 +58,7 @@ export function ProjectsBoard({
   team,
   today: serverToday,
   orders = false,
+  site = false,
 }: {
   me: string;
   initialView: ProjectsView;
@@ -66,6 +67,8 @@ export function ProjectsBoard({
   today: string;
   /** purchase-orders.sql has been run: link to Purchase orders. */
   orders?: boolean;
+  /** site-commissioning.sql has been run: New project can add the trades. */
+  site?: boolean;
 }) {
   const router = useRouter();
   const now = useNow(60_000);
@@ -237,7 +240,7 @@ export function ProjectsBoard({
       )}
 
       {adding && (
-        <NewProjectSheet mode="project" me={me} team={team} onClose={() => setAdding(false)} onCreated={(id) => router.push(`/admin/projects/${id}`)} />
+        <NewProjectSheet mode="project" me={me} team={team} siteApp={site} onClose={() => setAdding(false)} onCreated={(id) => router.push(`/admin/projects/${id}`)} />
       )}
     </div>
   );

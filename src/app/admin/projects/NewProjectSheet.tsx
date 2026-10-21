@@ -5,6 +5,7 @@ import { PRODUCTS, PROJECT_START_STAGES, stageLabel } from '@/lib/crm/stages';
 import type { TeamMember } from '@/lib/projects/server';
 import { Sheet } from '../crm/CrmUi';
 import { productsShort } from '../crm/crm-shared';
+import { NewProjectTrades, rowsFor, tradesBody, useVatDefault, type TradeRow } from './NewProjectTrades';
 
 type Customer = {
   id: string;
@@ -34,6 +35,7 @@ export function NewProjectSheet({
   me,
   team,
   customer: preset,
+  siteApp = false,
   onClose,
   onCreated,
 }: {
@@ -42,6 +44,8 @@ export function NewProjectSheet({
   team: TeamMember[];
   /** Start with this customer chosen ("New project for Jane" on a job). */
   customer?: Customer | null;
+  /** site-commissioning.sql has run: a project can have its trades added here. */
+  siteApp?: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -56,6 +60,10 @@ export function NewProjectSheet({
   const [start, setStart] = useState<string>(mode === 'project' ? 'won' : 'lead');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  // Who's doing the work (projects, once site-commissioning.sql has run).
+  const trades = siteApp && mode === 'project';
+  const [tradeRows, setTradeRows] = useState<TradeRow[]>([]);
+  const vatDefault = useVatDefault(trades);
 
   const postcode = fresh ? person.postcode.trim().toUpperCase() : site.postcode.trim().toUpperCase();
   const defaultTitle = [productsShort(products), postcode].filter(Boolean).join(' · ');
@@ -67,8 +75,18 @@ export function NewProjectSheet({
     setSite({ address: c.latest?.address ?? '', postcode: c.latest?.postcode ?? c.postcode ?? '' });
   }
 
+  function pickProducts(next: string[]) {
+    setProducts(next);
+    if (trades) setTradeRows((rows) => rowsFor(next, rows));
+  }
+
   async function save() {
     if (!ready) return;
+    const t = trades ? tradesBody(tradeRows, vatDefault) : ({ ok: true, assignments: [] } as const);
+    if (!t.ok) {
+      setErr(t.error);
+      return;
+    }
     setBusy(true);
     setErr('');
     const body: Record<string, unknown> = {
@@ -79,14 +97,18 @@ export function NewProjectSheet({
       owner_id: owner || null,
       start_stage: start,
       source: 'crm',
+      ...(t.assignments.length ? { assignments: t.assignments } : {}),
     };
     if (fresh) Object.assign(body, { name: person.name.trim(), phone: person.phone.trim(), email: person.email.trim(), postcode });
     else Object.assign(body, { enquiry_id: customer!.id, postcode });
     const r = await fetch('/api/crm/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     setBusy(false);
-    if (r.ok && d.id) onCreated(d.id);
-    else setErr(d.error || 'Not created. Try again.');
+    if (r.ok && d.id) {
+      // Made, but a trade wasn't added: say so on the job.
+      if (d.warning) window.alert(d.warning);
+      onCreated(d.id);
+    } else setErr(d.error || 'Not created. Try again.');
   }
 
   const noun = mode === 'project' ? 'project' : 'opportunity';
@@ -143,7 +165,7 @@ export function NewProjectSheet({
             <input
               type="checkbox"
               checked={products.includes(p.key)}
-              onChange={(e) => setProducts(e.target.checked ? [...products, p.key] : products.filter((x) => x !== p.key))}
+              onChange={(e) => pickProducts(e.target.checked ? [...products, p.key] : products.filter((x) => x !== p.key))}
             />
             {p.label}
           </label>
@@ -207,6 +229,8 @@ export function NewProjectSheet({
           </label>
         ))}
       </fieldset>
+
+      {trades && tradeRows.length > 0 && <NewProjectTrades rows={tradeRows} onChange={setTradeRows} vatDefault={vatDefault} />}
 
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       <div className="crm-actions">

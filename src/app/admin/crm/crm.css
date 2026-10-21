@@ -3042,6 +3042,73 @@ button.crmb-rail {
   text-decoration: none;
 }
 
+/* New project's "Who's doing the work" (NewProjectTrades.tsx) */
+.nps-trades {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.nps-trades legend {
+  padding: 0;
+}
+.nps-trades > p {
+  margin: 0;
+}
+.nps-trade {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.nps-trade__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.nps-trade__head select {
+  width: auto;
+  font-weight: 700;
+}
+.nps-trade__money {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.nps-trade__money > * {
+  flex: 1 1 8rem;
+  width: auto;
+}
+.nps-pounds {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.nps-pounds > span {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.nps-pounds .crm-input {
+  padding-left: 1.5rem;
+}
+.nps-trade__money .nps-qty {
+  flex: 0 1 5rem;
+}
+.nps-novat {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 /* New project / new opportunity sheet */
 .nps-fresh {
   display: flex;

@@ -1,0 +1,307 @@
+/* The job record's Site tab (SiteTab.tsx) and the trade sheet (AssignmentSheet.tsx). Inside .crm. */
+
+.sx {
+  display: grid;
+  gap: 1rem;
+}
+
+/* The job strip: Scaffold up ✓ → Roof ✓ → Electrics → Handover. */
+.sx-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sx-strip li {
+  position: relative;
+  padding: 0.45rem 0.8rem 0.45rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  background: var(--paper);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.sx-strip li + li::before {
+  content: '→';
+  position: absolute;
+  left: -0.62rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-weight: 400;
+}
+.sx-strip li.is-done {
+  background: rgba(63, 125, 78, 0.1);
+  border-color: rgba(63, 125, 78, 0.35);
+  color: var(--ok);
+}
+.sx-strip li.is-now {
+  background: rgba(248, 188, 30, 0.18);
+  border-color: rgba(199, 127, 4, 0.4);
+  color: var(--ink);
+}
+.sx-strip li.is-warn {
+  background: rgba(179, 38, 30, 0.08);
+  border-color: rgba(179, 38, 30, 0.4);
+  color: var(--err);
+}
+
+.sx-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 1023px) {
+  .sx-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sx-main,
+.sx-side {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.sx-empty,
+.sx-panel,
+.sx-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+.sx-empty p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+.sx-panel h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sx-addrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.sx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+}
+.sx-list small {
+  display: block;
+  color: var(--muted);
+}
+
+.sx-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.sx-card h4 {
+  margin: 0.1rem 0 0.1rem;
+  font-size: 1.05rem;
+}
+.sx-card header small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.sx-trade {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber-2);
+}
+.sx-card--cancelled {
+  opacity: 0.6;
+}
+
+.sx-pill {
+  flex: none;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sx-pill--sent,
+.sx-pill--opened {
+  color: var(--ink);
+  border-color: rgba(199, 127, 4, 0.4);
+  background: rgba(248, 188, 30, 0.14);
+}
+.sx-pill--started {
+  color: var(--ink);
+  background: rgba(248, 188, 30, 0.3);
+  border-color: rgba(199, 127, 4, 0.5);
+}
+.sx-pill--signed,
+.sx-pill--done {
+  color: var(--ok);
+  background: rgba(63, 125, 78, 0.1);
+  border-color: rgba(63, 125, 78, 0.35);
+}
+
+.sx-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.8rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.88rem;
+}
+.sx-facts dt {
+  color: var(--muted);
+}
+.sx-facts dd {
+  margin: 0;
+}
+.sx-preview {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(248, 188, 30, 0.16);
+  border-left: 3px solid var(--solar);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.sx-preview.is-wait {
+  background: var(--paper);
+  border-left-color: var(--line);
+  font-weight: 600;
+  color: var(--muted);
+}
+.sx-meta {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.sx-meta:empty {
+  display: none;
+}
+.sx-warnline {
+  color: var(--amber-2);
+  font-weight: 600;
+}
+.sx-flags {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.sx-flag {
+  font-size: 0.84rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(248, 188, 30, 0.14);
+  border-left: 3px solid var(--amber-2);
+}
+.sx-flag--stop,
+.sx-flag--urgent {
+  background: rgba(179, 38, 30, 0.07);
+  border-left-color: var(--err);
+}
+.sx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+.sx-gone summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.sx-gone ul {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* The sheet */
+.sx-fs {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.sx-fs legend {
+  padding: 0;
+}
+.sx-rate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+.sx-money {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 9rem;
+}
+.sx-money > span {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.sx-money .crm-input {
+  padding-left: 1.5rem;
+}
+.sx-rate select {
+  flex: 1 1 10rem;
+  width: auto;
+}
+.sx-qty {
+  flex: 0 1 6rem;
+}
+.sx-chip {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(63, 125, 78, 0.1);
+  color: var(--ok);
+}
+.sx-locked {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--paper);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.sx-line {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.sx-picked {
+  margin-bottom: 0.25rem;
+}
+.sx-newperson {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
