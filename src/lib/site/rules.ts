@@ -11,6 +11,7 @@
  * - Derived values: the expected string Voc, the F44 item 24 limit, the insulation-resistance minimum.
  */
 import type { Field, FormCtx, SiteForm, Step } from './forms/types';
+import { carryAcross } from './forms/electrician/carry';
 import { IR_MINIMUM } from './fixed/iec62446';
 import type { Answers, Flag, Stage } from './types';
 
@@ -26,8 +27,12 @@ export function valuesFrom(a: Answers): Record<string, unknown> {
   return out;
 }
 
-/** A context from its parts: the phone builds them from the job pack and its draft, the server from the database. */
-export const makeCtx = (p: Omit<FormCtx, 'values'>): FormCtx => ({ ...p, values: valuesFrom(p.answers) });
+/**
+ * A context from its parts: the phone builds them from the job pack and its draft, the server from the
+ * database. On the electrician's pack, what's asked twice is carried across from the first answer
+ * (forms/electrician/carry.ts), so every reader sees the same values.
+ */
+export const makeCtx = (p: Omit<FormCtx, 'values' | 'carried'>): FormCtx => carryAcross({ ...p, values: valuesFrom(p.answers) });
 
 /** The photo slots a field fills: one, or one per scaffold side (KEY:front …). */
 export function slotsOf(f: Field, c: FormCtx): string[] {

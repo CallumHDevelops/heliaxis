@@ -362,7 +362,8 @@ async function linkOf(db: Db, doc: GeneratedDoc | null): Promise<string | null> 
 export async function certificateStatus(db: Db, a: AssignmentRow): Promise<CertStatus> {
   const d = await certificateData(db, a);
   const missing = d.route === 'own' ? [] : certMissing(d.ctx);
-  const started = Object.keys(d.ctx.values).some((k) => k.startsWith('eic_') && k !== 'eic_design');
+  // Their own answers only: an earthing or electrode reading carried from the EV record (carry.ts) isn't a start.
+  const started = Object.keys(d.ctx.answers).some((k) => k.startsWith('eic_') && k !== 'eic_design');
   const final = d.route === 'meiwc' ? null : await currentGenerated(db, a.project_id, d.key);
   const draft = final ? null : d.route === 'meiwc' ? null : await currentGenerated(db, a.project_id, `${d.key}_DRAFT`);
   const sheets: CertStatus['sheets'] = [];

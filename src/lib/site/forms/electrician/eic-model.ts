@@ -75,8 +75,12 @@ export const newId = () => Math.random().toString(36).slice(2, 8) + Date.now().t
 /* ── Columns ─────────────────────────────────────────────────────────────────── */
 
 export type PropType = 'NUM' | 'TEXT' | 'SEL' | 'YN' | 'PF' | 'PFN' | 'CONFIRM' | 'MULTI';
-/** What a column's show/suggest can depend on beyond its own record: the route, three-phase, a TT supply, and the boards with a T3 SPD. */
-export type PropCtx = { route: CertRoute; threePhase: boolean; tt?: boolean; t3?: string[] };
+/**
+ * What a column's show/suggest can depend on beyond its own record: the route, three-phase, a TT
+ * supply, the boards with a T3 SPD, and whether the work is on an existing installation (an EIC for an
+ * addition or alteration), where the new circuits go on after the board's existing ones.
+ */
+export type PropCtx = { route: CertRoute; threePhase: boolean; tt?: boolean; t3?: string[]; existing?: boolean };
 /** A figure offered beside a question (never filled in): tapping it sets the value, and `also` with it. */
 export type PropSuggestion = { v: number | string; text: string; also?: Rec };
 export type Prop = {
@@ -115,6 +119,15 @@ export const BOARD: Prop[] = [
   { k: 'ref', label: 'Board reference', head: 'DB/CU reference', type: 'TEXT', level: 'must', picks: ['DB1', 'CU1', 'DB2'], hint: '“DB/CU reference” on the certificate. As it’s labelled on the board.' },
   { k: 'loc', label: 'Location', type: 'TEXT', level: 'must', picks: ['Hall cupboard', 'Under the stairs', 'Garage', 'Utility room', 'Kitchen'], hint: 'Where the board is.' },
   { k: 'from', label: 'Supplied from', type: 'TEXT', level: 'must', picks: ['Origin', 'Main switch'], show: notMeiwc, hint: 'The origin, or the board that feeds this one.' },
+  {
+    k: 'free',
+    label: 'First free way for the new circuits',
+    type: 'NUM',
+    dp: 0,
+    level: 'must',
+    hint: 'The existing circuits stay as they are, so the new ones are numbered from here. A board you’ve put in new: 1.',
+    show: (_, p) => p.route !== 'meiwc' && !!p.existing,
+  },
   { k: 'ocpd_bs', label: 'Distribution circuit OCPD: BS (EN)', type: 'TEXT', level: 'should', picks: ['88-3', '60898-1', '60947-2', '1361'], show: notMeiwc, hint: 'The device protecting the cable that feeds this board (the cut-out fuse for a board at the origin).' },
   { k: 'ocpd_type', label: 'Distribution circuit OCPD: type', type: 'TEXT', level: 'should', picks: ['B', 'C', 'D', 'gG'], show: notMeiwc },
   { k: 'ocpd_a', label: 'Distribution circuit OCPD: rating/setting', type: 'NUM', unit: 'A', level: 'should', chips: [60, 63, 80, 100], show: notMeiwc },
@@ -283,11 +296,15 @@ export function filled(p: Prop, v: unknown): boolean {
   }
 }
 
+/** The EIC is for work on an existing installation (an addition or an alteration). */
+export const onExisting = (c: FormCtx) => (routeOf(c) === 'eic' || routeOf(c) === 'eic_single') && (c.values.eic_work === 'addition' || c.values.eic_work === 'alteration');
+
 export const propCtx = (c: FormCtx): PropCtx => ({
   route: routeOf(c),
   threePhase: threePhase(c),
   tt: c.values.eic_earthing === 'tt',
   t3: boardsOf(c.values).boards.filter((b) => Array.isArray(b.spd) && (b.spd as string[]).includes('T3')).map((b) => b.id),
+  existing: onExisting(c),
 });
 export const shownProps = (props: Prop[], x: Rec, p: PropCtx) => props.filter((q) => !q.show || q.show(x, p));
 
@@ -364,19 +381,55 @@ export const SUGGESTED: { sug: string; product: string; desc: string }[] = [
   { sug: 'heatpump', product: 'heatpump', desc: 'Heat pump supply' },
 ];
 
-/** The suggestions still to offer on the first board: not added yet, and not turned down. */
-export function suggestionsFor(products: string[], boards: Board[], circuits: Circuit[]) {
+/**
+ * Does the battery have its own supply circuit on this job? Only when it has its own battery inverter
+ * (AC-coupled): per the job's design first, then the electrician's "separate battery inverter?"
+ * answer, and on a battery-only job it brings its own inverter. A hybrid inverter that runs the
+ * battery (DC-coupled) has none: the solar inverter's circuit is the only one.
+ */
+export function batteryCircuit(c: Pick<FormCtx, 'products' | 'design' | 'values'>): boolean {
+  if (!c.products.includes('battery')) return false;
+  if (c.design.battery_coupling) return c.design.battery_coupling === 'ac';
+  if (c.products.includes('solar')) return c.values.bat_inv_sep === 'yes';
+  return true;
+}
+
+/** The suggestions still to offer on the first board: not added yet, not turned down, and only what this job has. */
+export function suggestionsFor(c: Pick<FormCtx, 'products' | 'design' | 'values'>, boards: Board[], circuits: Circuit[]) {
   const first = boards[0];
   if (!first) return [];
   const skip = Array.isArray(first.skip) ? (first.skip as string[]) : [];
   const used = new Set(circuits.map((x) => x.sug).filter(Boolean));
-  return SUGGESTED.filter((s) => products.includes(s.product) && !used.has(s.sug) && !skip.includes(s.sug));
+  return SUGGESTED.filter((s) => c.products.includes(s.product) && (s.sug !== 'battery' || batteryCircuit(c)) && !used.has(s.sug) && !skip.includes(s.sug));
 }
 
-/** The next circuit number on a board: one more than the highest plain number there. */
-export function nextNumber(board: string, circuits: Circuit[]): string {
-  const nums = circuits.filter((x) => x.board === board).map((x) => Number(x.n)).filter((n) => Number.isInteger(n));
-  return String(nums.length ? Math.max(...nums) + 1 : 1);
+const wayOf = (v: unknown) => {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && /^\s*\d+\s*$/.test(v) ? Number(v) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+/**
+ * The number a new circuit on this board gets: after the board's highest, and never one already used
+ * there. On an existing installation the new circuits start at the board's first free way; until the
+ * electrician says what that is, none (they type it, or it's filled in once the free way is given). On
+ * Minor Works the circuit is an existing one, so its own number is typed. '' when there's none to give.
+ */
+export function nextNumber(board: Board, circuits: Circuit[], p: PropCtx): string {
+  if (p.route === 'meiwc') return '';
+  const start = p.existing ? wayOf(board.free) : 1;
+  if (start === null) return '';
+  const nums = circuits.filter((x) => x.board === board.id).map((x) => wayOf(x.n)).filter((n): n is number => n !== null);
+  return String(Math.max(start, nums.length ? Math.max(...nums) + 1 : start));
+}
+
+/** Circuit numbers used more than once on a board ("7", "L1/2"…), as typed. Each way has one circuit. */
+export function numbersTwice(board: string, circuits: Circuit[]): string[] {
+  const seen = new Map<string, number>();
+  for (const x of circuits.filter((y) => y.board === board)) {
+    const n = String(x.n ?? '').trim().toUpperCase();
+    if (n) seen.set(n, (seen.get(n) ?? 0) + 1);
+  }
+  return [...seen].filter(([, k]) => k > 1).map(([n]) => n);
 }
 
 /* ── Test instruments ────────────────────────────────────────────────────────── */

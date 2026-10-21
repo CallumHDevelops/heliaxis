@@ -6,7 +6,7 @@ import type { Answer } from '@/lib/site/types';
 export const dynamic = 'force-dynamic';
 
 const KEY = /^[A-Za-z][A-Za-z0-9_]{0,30}(?::[A-Za-z0-9_-]{1,30})?$/;
-const SOURCES = ['typed', 'scan', 'photo', 'roofer', 'design', 'job', 'calc', 'last'];
+const SOURCES = ['typed', 'scan', 'photo', 'roofer', 'design', 'job', 'calc', 'last', 'survey'];
 const isUuid = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f-]{36}$/i.test(s);
 
 /** One answer from the phone, checked (value at most 4 kB of JSON), with the phone it came from. */

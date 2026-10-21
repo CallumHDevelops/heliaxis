@@ -54,6 +54,13 @@ export type FormCtx = {
   el?: ElectricianFacts;
   /** The electrician's certificate (Unit 3): the office's route and what's remembered for it (site/eic/facts.ts). */
   eic?: EicFacts;
+  /**
+   * Answers carried across from earlier on this job (forms/electrician/carry.ts): the same fact or the
+   * same reading asked in another place, by key (a circuit's column as `eic_db:c-<id>.<column>`), with
+   * where it came from. Their values are in `values` too, so everything reads them as answers; the
+   * trade's own answer, once given, always wins.
+   */
+  carried?: Record<string, { from: string }>;
 };
 
 /**
@@ -76,6 +83,8 @@ export type ElectricianFacts = {
   heat_pump_model: string | null;
   /** The survey's battery spot (F5), for the battery location check. */
   survey_battery_spot: string | null;
+  /** The survey's earthing (E5) in the EIC's codes (site/earthing.ts), offered to confirm on site. */
+  survey_earthing?: string | null;
   /** What the roofer has synced: their answers (values), what Claude read from their photos, their photo counts. */
   roofer: { status: string; values: Record<string, unknown>; reads: { key: string; status: string; result: LabelReadResult | null }[]; photos: Record<string, number> } | null;
   /** F43: how far a measured string Voc may be from the expected before it's flagged (percent, a setting). */

@@ -118,7 +118,8 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
                 return n ? `${n} photo${n === 1 ? '' : 's'}` : null;
               })()
             : answerWords(f, valueOf(f, ctx), ctx);
-        rows.push({ key: f.key, label: f.label, value, src: ans?.src ? (SOURCE_LABEL[ans.src] ?? ans.src) : null, at: ans?.at ?? null, flags: a.flags.filter((x) => x.key === f.key) });
+        const carried = !ans && ctx.carried?.[f.key] ? `From earlier on this job (${ctx.carried[f.key].from})` : null;
+        rows.push({ key: f.key, label: f.label, value, src: ans?.src ? (SOURCE_LABEL[ans.src] ?? ans.src) : carried, at: ans?.at ?? null, flags: a.flags.filter((x) => x.key === f.key) });
       }
       if (rows.length) steps.push({ form: form.title, stage: form.stage, signed: signed.includes(form.stage), step: step.title, rows });
     }

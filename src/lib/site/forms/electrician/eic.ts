@@ -17,6 +17,7 @@ import type { Field, FlagRule, FormCtx, Part, SiteForm, Step, Suggestion } from 
 import { missing } from '../../rules';
 import { editionWords, INSPECTIONS } from '../../fixed/iet-eic';
 import { IR_TABLE_64 } from '../../fixed/bs7671-ir';
+import { EARTHING_LABEL, isEarthing } from '../../earthing';
 import {
   BOARD,
   boardDone,
@@ -31,6 +32,7 @@ import {
   irLow,
   isRoute,
   missingProps,
+  numbersTwice,
   officeRoute,
   propCtx,
   ROUTE_HINT,
@@ -167,6 +169,9 @@ function boardParts(c: FormCtx): Part[] {
     if (gaps.length) out.push({ label: `${boardName(b)}: board details`, why: gaps.join(', ') });
     const mine = circuits.filter((x) => x.board === b.id);
     if (!mine.length) out.push({ label: `${boardName(b)}: circuits`, why: 'Add at least one circuit' });
+    // Each way on a board has one circuit: two with the same number can't both be right.
+    const twice = numbersTwice(b.id, circuits);
+    if (twice.length) out.push({ label: `${boardName(b)}: circuit numbers`, why: `${twice.length === 1 ? `Circuit ${twice[0]} is` : `Circuits ${twice.join(', ')} are each`} on this board twice. Give each circuit its own way number.` });
     for (const x of mine) {
       const d = missingProps(DETAILS, x, p);
       const t = missingProps(TESTS, x, p);
@@ -233,7 +238,15 @@ const supplyStep: Step = {
   intro: 'Section F on the certificate: the supply, how it’s earthed and the supplier’s fuse.',
   show: notOwn,
   fields: [
-    must('eic_earthing', 'SEL', 'Earthing arrangements', { options: EARTHING, hint: 'How the supply is earthed.' }),
+    must('eic_earthing', 'SEL', 'Earthing arrangements', {
+      options: EARTHING,
+      hint: 'How the supply is earthed.',
+      // The surveyor's answer, to confirm on site (the EV record's, once given, is carried across: carry.ts).
+      suggest: (c) => {
+        const e = c.el?.survey_earthing;
+        return isEarthing(e) ? { v: e, src: 'survey', text: EARTHING_LABEL[e] } : null;
+      },
+    }),
     must('eic_live', 'SEL', 'Number and type of live conductors', { options: LIVE, hint: 'A single-phase house supply is AC 1-phase, 2-wire.', show: notMeiwc }),
     must('eic_polarity', 'CONFIRM', 'Confirmation of supply polarity', { hint: 'You’ve checked the polarity of the incoming supply.', show: notMeiwc }),
     must('eic_u0', 'NUM', 'Nominal voltage, U₀', { unit: 'V', chips: [230], dp: 0, hint: 'Line to earth. By enquiry.', show: notMeiwc }),

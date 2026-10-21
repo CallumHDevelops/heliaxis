@@ -127,5 +127,26 @@ eq('version 3 adds only the EIC’s new questions to version 2', (KEYS['3'] ?? [
 ]);
 eq('the roofer’s panel serials are in no version (owner, 21 Oct: no scanning)', Object.entries(KEYS).filter(([, list]) => list.includes('SN_PANEL')).map(([v]) => v), []);
 
+/* ── Panel serial scanning is gone everywhere (owner decision 3) ───────────── */
+
+const { DESIGN_KEYS } = await import('../src/lib/site/design.ts');
+eq('no form asks for panel serials, and the design has no "roofer scans the panel serials" switch', [now.has('SN_PANEL'), DESIGN_KEYS.includes('scan_panel_serials')], [false, false]);
+const rooferForms = allForms().filter((f) => f.id === 'roofer');
+eq('the roofer has nothing to scan', [rooferForms.length, rooferForms.flatMap((f) => f.steps.flatMap((st) => st.fields)).filter((x) => x.type === 'SCAN').map((x) => x.key)], [1, []]);
+// Nothing in the app's code reads, writes or prints them (a saved SN_PANEL from old test data is just ignored).
+const fs = await import('node:fs');
+const path = await import('node:path');
+const SRC_DIR = new URL('../src/', import.meta.url).pathname;
+const hits = [];
+const walk = (dir) => {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walk(p);
+    else if (/\.(ts|tsx|js|mjs|sql|json)$/.test(e.name) && /SN_PANEL|scan_panel_serials/.test(fs.readFileSync(p, 'utf8'))) hits.push(path.relative(SRC_DIR, p));
+  }
+};
+walk(SRC_DIR);
+eq('no SN_PANEL or scan_panel_serials anywhere in src/', hits, []);
+
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

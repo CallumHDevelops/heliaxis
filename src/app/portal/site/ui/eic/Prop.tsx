@@ -37,6 +37,7 @@ export function PropRow({
   warn,
   suggest,
   onTake,
+  carried,
 }: {
   p: Prop;
   id: string;
@@ -48,6 +49,8 @@ export function PropRow({
   /** A worked-out figure offered above the box (never filled in): one tap takes it. */
   suggest?: PropSuggestion | null;
   onTake?: () => void;
+  /** Carried across from earlier on this job (where from): the value shows in the box, and typing over it changes it here. */
+  carried?: string | null;
 }) {
   const f = asField(p, id);
   let widget: React.ReactNode;
@@ -79,6 +82,7 @@ export function PropRow({
       </div>
       {p.hint && <p className="sa-q-hint">{p.hint}</p>}
       {note && <p className="sa-q-note">{note}</p>}
+      {carried && <p className="sa-autotag">From earlier on this job ({carried}) ✓</p>}
       {suggest && onTake && !disabled && (
         <button type="button" className="sa-suggest" onClick={onTake}>
           <span className="sa-suggest-src">Worked out</span>

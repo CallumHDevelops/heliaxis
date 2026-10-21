@@ -54,6 +54,17 @@ export const DESIGN_FIELDS: DesignField[] = [
   { key: 'est_kwh_year', label: 'Estimated generation (kWh a year)', kind: 'number', for: SOLAR, max: 1_000_000, hint: 'The MCS estimate from the design.' },
   { key: 'shade_factor', label: 'Shade factor', kind: 'number', for: SOLAR, max: 1, hint: 'From the design (0 to 1).' },
   { key: 'bird_mesh', label: 'Bird mesh sold', kind: 'bool', for: SOLAR },
+  {
+    key: 'battery_coupling',
+    label: 'What runs the battery',
+    kind: 'enum',
+    for: BATTERY,
+    options: [
+      { value: 'dc', label: 'The hybrid inverter (DC-coupled)' },
+      { value: 'ac', label: 'Its own battery inverter (AC-coupled)' },
+    ],
+    hint: 'AC-coupled: the battery inverter has its own supply circuit, so the electrician’s certificate offers one.',
+  },
   { key: 'battery_backup', label: 'Battery gives back-up power in a power cut', kind: 'bool', for: BATTERY },
   {
     key: 'eess_class',
@@ -137,6 +148,8 @@ export type Design = {
   est_kwh_year: number | null;
   shade_factor: number | null;
   bird_mesh: boolean | null;
+  /** What runs the battery: the hybrid inverter ('dc') or its own battery inverter ('ac'). */
+  battery_coupling: 'dc' | 'ac' | null;
   battery_backup: boolean | null;
   eess_class: number | null;
   battery_kw: number | null;
@@ -154,6 +167,7 @@ export function designOf(system: Record<string, unknown> | null | undefined): De
   const text = (k: string) => (typeof s[k] === 'string' && (s[k] as string).trim() ? (s[k] as string).trim() : null);
   const strings = parseIntList(s.strings_design);
   const mounting = text('mounting');
+  const coupling = text('battery_coupling');
   return {
     strings_design: strings && strings.length ? strings : null,
     optimisers: bool('optimisers'),
@@ -163,6 +177,7 @@ export function designOf(system: Record<string, unknown> | null | undefined): De
     est_kwh_year: num('est_kwh_year'),
     shade_factor: num('shade_factor'),
     bird_mesh: bool('bird_mesh'),
+    battery_coupling: coupling === 'dc' || coupling === 'ac' ? coupling : null,
     battery_backup: bool('battery_backup'),
     eess_class: num('eess_class'),
     battery_kw: num('battery_kw'),

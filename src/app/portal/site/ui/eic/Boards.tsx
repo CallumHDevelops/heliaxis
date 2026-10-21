@@ -13,6 +13,7 @@ import {
   DETAILS,
   isGt,
   missingProps,
+  nextNumber,
   propCtx,
   readingOf,
   routeOf,
@@ -60,14 +61,14 @@ export function EicBoards({ rec, jf, locked }: CustomProps) {
   };
   const newCircuit = async (b: Board, from: { desc?: string; sug?: string } = {}) => {
     setBusy(true);
-    const id = await addCircuit(job, b.id, circuits, from);
+    const id = await addCircuit(job, b, circuits, pc, from);
     setBusy(false);
     openCircuit(id);
   };
 
   const editing = open.startsWith('c-') ? circuits.find((x) => x.id === open.slice(2)) : null;
   const editingBoard = open.startsWith('b-') ? boards.find((x) => x.id === open.slice(2)) : null;
-  const suggestions = suggestionsFor(ctx.products, boards, circuits);
+  const suggestions = suggestionsFor(ctx, boards, circuits);
 
   return (
     <div className="sa-eic">
@@ -123,7 +124,7 @@ export function EicBoards({ rec, jf, locked }: CustomProps) {
           {boards.length ? '+ Add another board' : '+ Add the board'}
         </button>
       )}
-      {editing && <CircuitEditor key={editing.id} job={job} x={editing} boards={boards} circuits={circuits} pc={pc} locked={locked} base={base} />}
+      {editing && <CircuitEditor key={editing.id} job={job} x={editing} boards={boards} circuits={circuits} pc={pc} locked={locked} base={base} carried={ctx.carried ?? {}} />}
       {editingBoard && <BoardEditor key={editingBoard.id} job={job} b={editingBoard} boards={boards} circuits={circuits} pc={pc} locked={locked} base={base} />}
     </div>
   );
@@ -180,7 +181,25 @@ function limits(p: Prop, x: Circuit, pc: PropCtx): { note: string | null; warn: 
   return { note: null, warn: null };
 }
 
-function CircuitEditor({ job, x, boards, circuits, pc, locked, base }: { job: string; x: Circuit; boards: Board[]; circuits: Circuit[]; pc: PropCtx; locked: boolean; base: string }) {
+function CircuitEditor({
+  job,
+  x,
+  boards,
+  circuits,
+  pc,
+  locked,
+  base,
+  carried,
+}: {
+  job: string;
+  x: Circuit;
+  boards: Board[];
+  circuits: Circuit[];
+  pc: PropCtx;
+  locked: boolean;
+  base: string;
+  carried: Record<string, { from: string }>;
+}) {
   const [tab, setTab] = useState<'details' | 'tests'>(missingProps(DETAILS, x, pc).length ? 'details' : 'tests');
   const key = circuitKey(x.id);
   const board = boards.find((b) => b.id === x.board);
@@ -210,7 +229,9 @@ function CircuitEditor({ job, x, boards, circuits, pc, locked, base }: { job: st
         {list.map((p) => {
           const l = limits(p, x, pc);
           // A worked-out figure (max Zs) is offered until a value is there; taking it records its source for Remarks.
-          const sug = x[p.k] === undefined ? (p.suggest?.(x, pc) ?? null) : null;
+          // A circuit added before its board's first free way was given: the next free way, offered.
+          const way = p.k === 'n' && board && !String(x.n ?? '').trim() ? nextNumber(board, circuits, pc) : '';
+          const sug = way ? { v: way, text: `${way}, the next free way on ${boardName(board!)}` } : x[p.k] === undefined ? (p.suggest?.(x, pc) ?? null) : null;
           const take = sug
             ? async () => {
                 await setProp(job, key, p.k, sug.v);
@@ -222,7 +243,9 @@ function CircuitEditor({ job, x, boards, circuits, pc, locked, base }: { job: st
             // Typed over the worked-out figure: its "calculated" note no longer says where the figure came from.
             if (p.k === 'zs_max' && isCalculatedSource(x.zs_src) && readingOf(v) !== readingOf(x.zs_max)) void setProp(job, key, 'zs_src', undefined);
           };
-          return <PropRow key={p.k} p={p} id={`${key}.${p.k}`} value={x[p.k]} onChange={change} disabled={locked} note={l.note} warn={l.warn} suggest={sug} onTake={take} />;
+          return (
+            <PropRow key={p.k} p={p} id={`${key}.${p.k}`} value={x[p.k]} onChange={change} disabled={locked} note={l.note} warn={l.warn} suggest={sug} onTake={take} carried={carried[`${key}.${p.k}`]?.from ?? null} />
+          );
         })}
         {!locked && tab === 'details' && (
           <div className="sa-eic-more">
@@ -230,7 +253,8 @@ function CircuitEditor({ job, x, boards, circuits, pc, locked, base }: { job: st
               type="button"
               className="sa-btn sa-btn-2"
               onClick={async () => {
-                const id = await addCircuit(job, x.board, circuits, { copy: x });
+                if (!board) return;
+                const id = await addCircuit(job, board, circuits, pc, { copy: x });
                 go(`${base}/c-${id}`, { replace: true });
               }}
             >
