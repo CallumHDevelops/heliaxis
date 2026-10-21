@@ -69,6 +69,7 @@ export async function GET(req: Request) {
         projects: theirs.length,
         latest: latest ? { address: latest.address, postcode: latest.postcode, products: latest.products ?? [] } : null,
         possible_duplicate: dupes.get(c.id)?.[0] ?? null,
+        was: c.was ?? null,
       };
     });
   return json({ customers });

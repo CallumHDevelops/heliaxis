@@ -6,23 +6,34 @@ import { chunks } from '@/lib/crm/delete-customer';
 /**
  * Possible duplicates (spec 4.10): other customers with the same email, the same WhatsApp number or
  * the same phone number (07… and +44 … count as the same), plus a website booking that matched an
- * existing customer (survey_bookings.duplicate_of). Read-only: it's a badge for staff, and merging is
- * for later.
+ * existing customer (survey_bookings.duplicate_of). The other numbers and emails a merge kept on a
+ * customer count too (crm_aliases), and people staff said aren't the same person are left alone
+ * (crm_distinct_pairs, both from merge.sql). It's a badge for staff, with Merge… beside it
+ * (src/lib/crm/merge.ts).
  *
  * Everyone's contact details are read once and kept for a minute, so the CRM board can show the badge
- * on every card without a search per customer.
+ * on every card without a search per customer. A merge starts it afresh (resetDuplicateIndex).
  */
 
-export type Duplicate = { enquiry_id: string; name: string; project_ref: string | null; project_id: string | null };
+export type Duplicate = {
+  enquiry_id: string;
+  name: string;
+  project_ref: string | null;
+  project_id: string | null;
+  /** What they share: the same email, the same number, or a website booking that matched them. */
+  why?: 'email' | 'number' | 'booking';
+};
 
 type Db = ReturnType<typeof createAdminClient>;
 type Person = { id: string; name: string | null; email: string | null; phone: string | null; wa_id: string | null };
-type Index = { at: number; byId: Map<string, Person>; byKey: Map<string, string[]> };
+type Index = { at: number; byId: Map<string, Person>; byKey: Map<string, string[]>; extra: Map<string, string[]>; distinct: Set<string> };
 
 const TTL = 60_000;
 const PAGE = 1000;
 let index: Index | null = null;
 let pending: Promise<Index> | null = null;
+/** Bumped by resetDuplicateIndex, so a read started before a merge doesn't come back as the index. */
+let generation = 0;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -52,18 +63,46 @@ async function readPeople(db: Db): Promise<Person[]> {
   }
 }
 
+/** The other numbers and emails kept on merged customers ("n:4477…", "e:jo@…" by customer), and the "not the same person" pairs. None before merge.sql. */
+async function readMerged(db: Db): Promise<{ extra: Map<string, string[]>; distinct: Set<string> }> {
+  const extra = new Map<string, string[]>();
+  const distinct = new Set<string>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db.from('crm_aliases').select('kind, value, enquiry_id').in('kind', ['phone', 'email']).order('value').range(from, from + PAGE - 1);
+    if (error) break;
+    for (const r of (data ?? []) as { kind: string; value: string; enquiry_id: string }[]) {
+      extra.set(r.enquiry_id, [...(extra.get(r.enquiry_id) ?? []), `${r.kind === 'phone' ? 'n' : 'e'}:${r.value}`]);
+    }
+    if ((data?.length ?? 0) < PAGE) break;
+  }
+  const { data: pairs } = await db.from('crm_distinct_pairs').select('a, b').limit(5000);
+  for (const p of (pairs ?? []) as { a: string; b: string }[]) distinct.add(`${p.a}|${p.b}`);
+  return { extra, distinct };
+}
+
 async function build(db: Db): Promise<Index> {
-  const people = await readPeople(db);
+  const [people, merged] = await Promise.all([readPeople(db), readMerged(db)]);
   const byId = new Map(people.map((p) => [p.id, p]));
   const byKey = new Map<string, string[]>();
-  for (const p of people) for (const k of keysOf(p)) byKey.set(k, [...(byKey.get(k) ?? []), p.id]);
-  return { at: Date.now(), byId, byKey };
+  for (const p of people) for (const k of [...keysOf(p), ...(merged.extra.get(p.id) ?? [])]) byKey.set(k, [...new Set([...(byKey.get(k) ?? []), p.id])]);
+  return { at: Date.now(), byId, byKey, ...merged };
+}
+
+/** After a merge: the next look reads everyone again. */
+export function resetDuplicateIndex() {
+  generation++;
+  index = null;
+  pending = null;
 }
 
 async function currentIndex(db: Db): Promise<Index> {
   if (index && Date.now() - index.at < TTL) return index;
+  const gen = generation;
   pending ??= build(db)
-    .then((i) => (index = i))
+    .then((i) => {
+      if (gen === generation) index = i;
+      return i;
+    })
     .finally(() => {
       pending = null;
     });
@@ -115,37 +154,41 @@ export async function possibleDuplicates(enquiryIds: string[]): Promise<Map<stri
     const db = createAdminClient();
     const [idx, links] = await Promise.all([currentIndex(db), bookingLinks(db, ids)]);
     const others = new Map<string, Set<string>>();
-    const add = (a: string, b: string) => {
-      if (a !== b) others.set(a, (others.get(a) ?? new Set()).add(b));
+    const why = new Map<string, Duplicate['why']>();
+    const add = (a: string, b: string, w: Duplicate['why']) => {
+      if (a === b || idx.distinct.has(a < b ? `${a}|${b}` : `${b}|${a}`)) return;
+      others.set(a, (others.get(a) ?? new Set()).add(b));
+      if (!why.has(`${a}|${b}`)) why.set(`${a}|${b}`, w);
     };
     for (const id of ids) {
       const p = idx.byId.get(id);
-      if (p) for (const k of keysOf(p)) for (const o of idx.byKey.get(k) ?? []) add(id, o);
+      if (p) for (const k of [...keysOf(p), ...(idx.extra.get(id) ?? [])]) for (const o of idx.byKey.get(k) ?? []) add(id, o, k.startsWith('e:') ? 'email' : 'number');
     }
     const wanted = new Set(ids);
     for (const [a, b] of links) {
-      if (wanted.has(a)) add(a, b);
-      if (wanted.has(b)) add(b, a);
+      if (wanted.has(a)) add(a, b, 'booking');
+      if (wanted.has(b)) add(b, a, 'booking');
     }
     if (!others.size) return result;
 
     const everyone = [...new Set([...others.values()].flatMap((s) => [...s]))];
     const jobs = await jobsOf(db, everyone);
-    // Someone added since the index was read (a booking duplicate): fetch their name.
-    const unknown = everyone.filter((id) => !idx.byId.has(id));
+    // Their names as they are now: someone added since the index was read (a booking duplicate) is
+    // found, and someone merged or deleted since (another server's index can be a minute old) isn't.
     const names = new Map<string, string>();
-    for (const part of chunks(unknown, 100)) {
+    for (const part of chunks(everyone, 100)) {
       const { data } = await db.from('enquiries').select('id, name').in('id', part);
       for (const r of data ?? []) names.set(r.id as string, (r.name as string) || '');
     }
     for (const [id, set] of others) {
       const list = [...set]
-        .filter((o) => idx.byId.has(o) || names.has(o))
+        .filter((o) => names.has(o))
         .map((o) => ({
           enquiry_id: o,
-          name: (idx.byId.get(o)?.name ?? names.get(o) ?? '').trim() || 'Unknown',
+          name: (names.get(o) ?? '').trim() || 'Unknown',
           project_ref: jobs.get(o)?.project_ref ?? null,
           project_id: jobs.get(o)?.id ?? null,
+          why: why.get(`${id}|${o}`),
         }));
       if (list.length) result.set(id, list);
     }

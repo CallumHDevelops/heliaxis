@@ -9,6 +9,7 @@ import { ENQUIRY_STATUS_LABEL, INTEREST_KEYS, shownLeads, statusFromParam } from
 import { inSource, SOURCE_GROUPS, sourceCounts, sourceFromParam, type SourceGroup } from '@/lib/lead-source';
 import { osmEmbedUrl } from '@/lib/geocode-postcode';
 import { DeleteCustomers, type DeleteDone } from './DeleteCustomers';
+import { MergeSheet, mergedWords } from '../crm/MergeSheet';
 import './enquiries.css';
 
 const STATUSES = Object.values(ENQUIRY_STATUS_LABEL);
@@ -113,6 +114,7 @@ export function EnquiriesCrm({
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [deleting, setDeleting] = useState<{ ids: string[]; name?: string } | null>(null);
+  const [merging, setMerging] = useState<[string, string] | null>(null);
   const [notice, setNotice] = useState<{ text: string; errors: string[] } | null>(null);
   const params = useSearchParams();
   const [q, setQ] = useState('');
@@ -471,6 +473,32 @@ export function EnquiriesCrm({
           >
             Delete selected ({pickedIds.length})
           </button>
+          <button
+            type="button"
+            className="enq-btn"
+            disabled={pickedIds.length !== 2}
+            title={pickedIds.length === 2 ? 'The same person twice: merge them into one' : 'Tick two people to merge'}
+            onClick={() => setMerging([pickedIds[0], pickedIds[1]])}
+          >
+            Merge 2 selected
+          </button>
+        </div>
+      )}
+      {merging && (
+        <div className="crm">
+          <MergeSheet
+            start={{ a: merging[0], b: merging[1] }}
+            isAdmin={canDelete}
+            onClose={() => setMerging(null)}
+            onDone={async (done, preview) => {
+              setMerging(null);
+              setSelecting(false);
+              setPicked(new Set());
+              setNotice({ text: mergedWords(done, preview), errors: [] });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              await refresh();
+            }}
+          />
         </div>
       )}
 

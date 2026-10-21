@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { requirePortal } from '@/lib/auth';
+import { mergedInto } from '@/lib/crm/aliases';
 import { canAccess } from '@/lib/portals';
 import { schemaReady } from '@/lib/schema-ready';
 import { ProjectView } from './ProjectView';
@@ -14,6 +15,9 @@ export async function recordPage({ params, searchParams }: RecordPageProps, area
   if (!session) redirect('/admin?denied=1');
   const [{ id }, sp, schema] = await Promise.all([params, searchParams, schemaReady()]);
   const tab = typeof sp.tab === 'string' && (TABS as string[]).includes(sp.tab) ? (sp.tab as Tab) : null;
+  // A job joined into another (src/lib/crm/merge.ts): old links and notifications open that one.
+  const joined = await mergedInto('job', id);
+  if (joined?.project_id) redirect(`/admin/${area === 'projects' ? 'projects' : 'crm'}/${joined.project_id}${tab ? `?tab=${tab}` : ''}`);
   const entry = typeof sp.entry === 'string' && /^[\w-]{1,64}$/.test(sp.entry) ? sp.entry : null;
   return (
     <AdminShell active="crm" fluid>

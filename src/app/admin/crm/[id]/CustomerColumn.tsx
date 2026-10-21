@@ -7,6 +7,7 @@ import type { TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
 import { followsCustomerPostcode, siteHasOtherPostcode } from '@/lib/crm/site-postcode';
+import { toWaId } from '@/lib/whatsapp/shared';
 import { StageChip } from '../CrmUi';
 import { firstName, jobLabel, shortDate, ukDayOf } from '../crm-shared';
 import { DnoDeposit, PortalCard } from './ProjectExtras';
@@ -220,6 +221,54 @@ function Field({ label, children, extra }: { label: string; children: ReactNode;
       <span className="crmr-field__v">{children}</span>
       {extra && <span className="crmr-field__x">{extra}</span>}
     </div>
+  );
+}
+
+/** The other numbers and emails a merge kept (for search and incoming messages): make one the main one, or forget it. */
+function OtherNumbers({ customer, onSaved, onError }: { customer: Customer; onSaved: () => Promise<void> | void; onError: (e: string) => void }) {
+  const [busy, setBusy] = useState('');
+  async function act(o: NonNullable<Customer['otherNumbers']>[number], action: 'main' | 'remove') {
+    // The number they WhatsApp from, when it isn't their phone, is kept too.
+    const waOnly = customer.wa_id && customer.wa_id !== o.value && customer.wa_id !== toWaId(customer.phone) ? phoneShown({ phone: null }, customer.wa_id) : null;
+    const now = [customer.phone, waOnly].filter(Boolean).join(' and ') || 'the number they have now';
+    const ask =
+      action === 'main'
+        ? o.kind === 'phone'
+          ? `Make ${o.shown} ${customer.name}’s main number? WhatsApp replies go to it from now on, and ${now} ${customer.phone && waOnly ? 'are kept as other numbers' : 'is kept as another number'}.`
+          : `Make ${o.shown} ${customer.name}’s email? The one they have now is kept as another email.`
+        : `Forget ${o.shown}? Search and incoming ${o.kind === 'phone' ? 'WhatsApps' : 'emails'} won’t find ${customer.name} by it any more.`;
+    if (!window.confirm(ask)) return;
+    setBusy(`${o.kind}:${o.value}`);
+    try {
+      await send(`/api/crm/customers/${customer.id}/numbers`, 'POST', { kind: o.kind, value: o.value, action });
+      await onSaved();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Not saved');
+    } finally {
+      setBusy('');
+    }
+  }
+  return (
+    <Field label="Other numbers">
+      <span className="crmr-others-n">
+        {customer.otherNumbers!.map((o) => (
+          <span key={`${o.kind}:${o.value}`} className="crmr-other-n">
+            <span className="crmr-wrap">
+              {o.shown}
+              {o.from_ref ? <small> from {o.from_ref}</small> : null}
+            </span>
+            <span className="crmr-other-n__acts">
+              <button type="button" className="crm-link" disabled={!!busy} onClick={() => void act(o, 'main')}>
+                {o.kind === 'phone' ? 'Use for WhatsApp' : 'Make main'}
+              </button>
+              <button type="button" className="crm-link" disabled={!!busy} onClick={() => void act(o, 'remove')}>
+                Remove
+              </button>
+            </span>
+          </span>
+        ))}
+      </span>
+    </Field>
   );
 }
 
@@ -445,9 +494,25 @@ function CustomerCard({
               <span className="crm-muted">No address yet</span>
             )}
           </Field>
-          <Field label="Source" extra={[customer.source_note, customer.created_at ? `Came in ${ukWhen(customer.created_at)}` : ''].filter(Boolean).join(' · ') || undefined}>
+          <Field
+            label="Source"
+            extra={
+              <>
+                {[customer.source_note, customer.created_at ? `Came in ${ukWhen(customer.created_at)}` : ''].filter(Boolean).join(' · ') || null}
+                {/* Leads of records merged into them (src/lib/crm/merge.ts). */}
+                {customer.alsoCameIn?.map((o) => (
+                  <span key={`${o.label}|${o.at}`} className="crmr-also">
+                    Also came in via {o.label}
+                    {o.at ? ` on ${shortDate(ukDayOf(o.at)).replace(/^\w+ /, '')}` : ''}
+                    {o.ref ? ` (${o.ref})` : ''}
+                  </span>
+                ))}
+              </>
+            }
+          >
             <span className="crmr-wrap">{customer.source_label || customer.source || 'Not known'}</span>
           </Field>
+          {!!customer.otherNumbers?.length && <OtherNumbers customer={customer} onSaved={onSaved} onError={setErr} />}
           <Field label="Owner">{owner || <span className="crm-muted">Nobody yet</span>}</Field>
           {note && <p className="crm-muted crm-small">{note}</p>}
           {err && <p className="crm-banner crm-banner--err">{err}</p>}
