@@ -61,19 +61,23 @@ export default async function GetAppPage({ searchParams }: { searchParams: Promi
 
       <style>{`
         .ga { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; box-sizing: border-box;
-          background: #f7f2e7; color: #211f18; font-family: 'Segoe UI', system-ui, sans-serif; }
-        .ga-card { width: 100%; max-width: 440px; background: #fffdf8; border: 1px solid rgba(33,31,24,.14); border-radius: 6px;
+          background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+          --ga-icon-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); }
+        .ga-card { width: 100%; max-width: 440px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
           padding: 28px 22px; box-sizing: border-box; text-align: center; }
-        .ga-icon img { border-radius: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+        .ga-icon img { border-radius: 16px; box-shadow: var(--ga-icon-shadow); }
         .ga h1 { font-size: 1.4rem; line-height: 1.25; margin: 16px 0 8px; }
-        .ga-lede { color: #6e6a5e; line-height: 1.5; margin: 0 0 20px; }
-        .ga-btn { display: block; background: #f8bc1e; color: #211f18; font-weight: 800; font-size: 1.05rem;
+        .ga-lede { color: var(--muted); line-height: 1.5; margin: 0 0 20px; }
+        .ga-btn { display: block; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 1.05rem;
           padding: 15px 16px; border-radius: 3px; text-decoration: none; }
-        .ga-meta { font-size: .8rem; color: #6e6a5e; margin: 10px 0 18px; }
-        .ga-steps { text-align: left; margin: 0; padding: 14px 14px 14px 32px; background: #f7f2e7; border-radius: 4px;
-          font-size: .9rem; line-height: 1.55; color: #4a473e; }
+        .ga-meta { font-size: .8rem; color: var(--muted); margin: 10px 0 18px; }
+        .ga-steps { text-align: left; margin: 0; padding: 14px 14px 14px 32px; background: var(--bg); border-radius: 4px;
+          font-size: .9rem; line-height: 1.55; color: var(--text-2); }
         .ga-steps li + li { margin-top: 6px; }
-        .ga-note { font-size: .78rem; color: #6e6a5e; margin: 16px 0 0; }
+        .ga-note { font-size: .78rem; color: var(--muted); margin: 16px 0 0; }
+        @media screen {
+          :root[data-theme='dark'] .ga { --ga-icon-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+        }
       `}</style>
     </main>
   );

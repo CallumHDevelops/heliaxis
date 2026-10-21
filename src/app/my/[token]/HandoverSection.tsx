@@ -120,7 +120,10 @@ function SignCard({ token, sign }: { token: string; sign: PortalHandover['signs'
           </label>
           <input id={`pt-hv-${sign.kind}`} className="pt-input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
           <label className="pt-label">Sign here</label>
-          <SignaturePad onChange={setSig} height={150} />
+          {/* A white sheet in both themes: what's drawn is kept as ink on paper. */}
+          <div className="hx-light">
+            <SignaturePad onChange={setSig} height={150} />
+          </div>
           <label className="pt-check">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> {sign.declaration}
           </label>

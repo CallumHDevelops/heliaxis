@@ -1,8 +1,9 @@
 'use client';
 
-import Image from 'next/image';
 import { useMemo, useState, type ReactNode } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
+import { BrandLogo } from '@/components/theme/BrandLogo';
+import { ThemeChoice } from '@/components/theme/ThemeChoice';
 import type { PortalData } from '@/lib/crm/portal';
 import { isWonStage } from '@/lib/crm/stages';
 import { useNow } from '@/lib/use-now';
@@ -10,6 +11,7 @@ import { HandoverSection } from './HandoverSection';
 import './portal.css';
 import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 import { shortDate, ukDayOf, ukTime } from '@/app/admin/crm/crm-shared';
+import { THEME_GROUP_LABEL, type ThemePref } from '@/lib/theme/shared';
 
 const DOC_LABEL: Record<string, string> = {
   quote: 'Quote',
@@ -43,21 +45,29 @@ const CANCEL_NOTE = 'You can change your mind and cancel within 14 days of signi
 
 /**
  * The customer's private link. At Quote sent it's a quote-only page (read and sign); from Won it's
- * their portal: progress, dates, documents, photos and the deposit.
+ * their portal: progress, dates, documents, photos and the deposit. `themePref`: their Light / Dark /
+ * Match phone as the server rendered it (from this phone's cookie), so the toggle hydrates as drawn.
  */
-export function PortalView({ data, paid = false }: { data: PortalData; paid?: boolean }) {
-  return data.mode === 'quote' ? <QuotePage data={data} /> : <FullPortal data={data} paid={paid} />;
+export function PortalView({ data, paid = false, themePref = 'system' }: { data: PortalData; paid?: boolean; themePref?: ThemePref }) {
+  return data.mode === 'quote' ? <QuotePage data={data} themePref={themePref} /> : <FullPortal data={data} paid={paid} themePref={themePref} />;
 }
 
-function Shell({ tag, children }: { tag: string; children: ReactNode }) {
+function Shell({ tag, themePref, children }: { tag: string; themePref: ThemePref; children: ReactNode }) {
   return (
     <div className="pt">
       <header className="pt-head">
-        <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={128} height={29} style={{ width: 128, height: 'auto' }} />
+        <BrandLogo width={128} />
         <span className="pt-head-tag">{tag}</span>
       </header>
       <main className="pt-main">
         {children}
+        {/* Light / Dark / Match phone: kept on this phone (cookie and storage), no account needed. */}
+        <div className="pt-theme">
+          <span className="pt-theme-label" aria-hidden="true">
+            {THEME_GROUP_LABEL}
+          </span>
+          <ThemeChoice size="sm" serverPref={themePref} />
+        </div>
         <p className="pt-foot">This is your private link. Please don’t share it. Heliaxis Limited</p>
       </main>
     </div>
@@ -87,10 +97,10 @@ const quoteWord = (q: { category: string }) => (q.category === 'contract' ? 'con
 
 /* ── Quote sent: just the quote, to read and sign ──────────────────────────── */
 
-function QuotePage({ data }: { data: PortalData }) {
+function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref }) {
   const q = data.quote;
   return (
-    <Shell tag="Your quote">
+    <Shell tag="Your quote" themePref={themePref}>
       <section className="pt-hello">
         <h1>Hi {data.first}</h1>
         <p>{data.title}</p>
@@ -135,7 +145,7 @@ function QuotePage({ data }: { data: PortalData }) {
 
 /* ── Won onwards: the full portal ──────────────────────────────────────────── */
 
-function FullPortal({ data, paid }: { data: PortalData; paid: boolean }) {
+function FullPortal({ data, paid, themePref }: { data: PortalData; paid: boolean; themePref: ThemePref }) {
   const [signing, setSigning] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const now = useNow(60_000);
@@ -167,7 +177,7 @@ function FullPortal({ data, paid }: { data: PortalData; paid: boolean }) {
   const others = data.handover ? data.documents : data.documents.filter((d) => d.category !== 'handover');
 
   return (
-    <Shell tag="Your project">
+    <Shell tag="Your project" themePref={themePref}>
       <section className="pt-hello">
         <h1>Hi {data.first}</h1>
         <p>
@@ -399,7 +409,10 @@ function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Qu
       </label>
       <input id="pt-name" className="pt-input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
       <label className="pt-label">Sign here</label>
-      <SignaturePad onChange={setSig} height={150} />
+      {/* A white sheet in both themes: what's drawn is kept as ink on paper. */}
+      <div className="hx-light">
+        <SignaturePad onChange={setSig} height={150} />
+      </div>
       <p className="pt-cancel">{CANCEL_NOTE}</p>
       <label className="pt-check">
         <input type="checkbox" checked={startEarly} onChange={(e) => setStartEarly(e.target.checked)} /> Please start work within the 14 days. I

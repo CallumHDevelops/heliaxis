@@ -1,5 +1,8 @@
 /* Survey booking (BookingFlow): the website form and customers' own links. Phone first: big
-   targets (48 px and up), one column, nothing wider than the screen. */
+   targets (48 px and up), one column, nothing wider than the screen.
+   Colours: the public website's form (/book-a-survey) isn't themed and keeps the values below as they
+   are. A customer's own link (/book/{token}) follows their Light / Dark / Match phone: there the same
+   names point at the theme's tokens (src/app/theme.css), at the end of this file. */
 .bk,
 .bk-page {
   --bk-ink: #211f18;
@@ -7,11 +10,23 @@
   --bk-paper: #f7f2e7;
   --bk-card: #fffdf8;
   --bk-line: rgba(33, 31, 24, 0.14);
+  /* Input edges, and the white of inputs and of the choice buttons. */
+  --bk-edge: rgba(33, 31, 24, 0.14);
+  --bk-field: #fff;
+  --bk-option: #fff;
   --bk-solar: #f8bc1e;
+  /* Amber words (links) and the dashed edge of "soonest". */
   --bk-amber: #c77f04;
   --bk-ok: #2f6e41;
+  --bk-ok-rgb: 47 110 65;
   --bk-wa: #1f7a4d;
   --bk-err: #b3261e;
+  --bk-on-solid: #fff;
+  /* The ink button with gold words, and the chosen day (ink, gold date, cream line). */
+  --bk-btn: #211f18;
+  --bk-btn-text: #f8bc1e;
+  --bk-btn-sub: #fffdf8;
+  --bk-intro-line: rgba(199, 127, 4, 0.3);
 }
 .bk {
   color: var(--bk-ink);
@@ -36,8 +51,8 @@
   line-height: 1.5;
 }
 .bk-intro {
-  background: rgba(248, 188, 30, 0.16);
-  border: 1px solid rgba(199, 127, 4, 0.3);
+  background: rgb(var(--accent-rgb) / 0.16);
+  border: 1px solid var(--bk-intro-line);
   border-radius: 12px;
   padding: 12px 14px;
   margin: 0;
@@ -53,7 +68,7 @@
   min-width: 0;
 }
 .bk-card--done {
-  border-color: rgba(47, 110, 65, 0.4);
+  border-color: rgb(var(--bk-ok-rgb) / 0.4);
   box-shadow: inset 0 4px 0 var(--bk-ok);
 }
 .bk .bk-h {
@@ -90,9 +105,9 @@
 .bk-input {
   width: 100%;
   min-height: 50px;
-  border: 1.5px solid var(--bk-line);
+  border: 1.5px solid var(--bk-edge);
   border-radius: 10px;
-  background: #fff;
+  background: var(--bk-field);
   padding: 12px 14px;
   font: inherit;
   font-size: 1.05rem; /* 16 px or more: phones don't zoom in */
@@ -103,7 +118,7 @@ textarea.bk-input {
   resize: vertical;
 }
 .bk-input:focus {
-  outline: 3px solid rgba(248, 188, 30, 0.6);
+  outline: 3px solid rgb(var(--accent-rgb) / 0.6);
   outline-offset: 1px;
   border-color: var(--bk-amber);
 }
@@ -133,9 +148,9 @@ textarea.bk-input {
   min-height: 50px;
   padding: 12px 18px;
   border-radius: 10px;
-  border: 1.5px solid var(--bk-ink);
-  background: var(--bk-ink);
-  color: var(--bk-solar);
+  border: 1.5px solid var(--bk-btn);
+  background: var(--bk-btn);
+  color: var(--bk-btn-text);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -157,12 +172,12 @@ textarea.bk-input {
 .bk-btn--wa {
   background: var(--bk-wa);
   border-color: var(--bk-wa);
-  color: #fff;
+  color: var(--bk-on-solid);
 }
 .bk-btn--danger {
   background: var(--bk-err);
   border-color: var(--bk-err);
-  color: #fff;
+  color: var(--bk-on-solid);
 }
 .bk-btn--wide {
   width: 100%;
@@ -193,8 +208,8 @@ textarea.bk-input {
   flex: 1 1 150px;
 }
 .bk-err {
-  background: rgba(179, 38, 30, 0.07);
-  border: 1px solid rgba(179, 38, 30, 0.3);
+  background: rgb(var(--danger-rgb) / 0.07);
+  border: 1px solid rgb(var(--danger-rgb) / 0.3);
   color: var(--bk-err);
   border-radius: 10px;
   padding: 10px 12px;
@@ -214,7 +229,7 @@ textarea.bk-input {
   padding: 12px 16px;
   border-radius: 12px;
   border: 1.5px solid var(--bk-line);
-  background: #fff;
+  background: var(--bk-option);
   color: var(--bk-ink);
   cursor: pointer;
   display: flex;
@@ -234,7 +249,7 @@ textarea.bk-input {
 .bk-type.is-on {
   border-color: var(--bk-ink);
   box-shadow: inset 0 0 0 1.5px var(--bk-ink);
-  background: rgba(248, 188, 30, 0.14);
+  background: rgb(var(--accent-rgb) / 0.14);
 }
 
 /* Times */
@@ -243,7 +258,7 @@ textarea.bk-input {
   min-height: 52px;
   border-radius: 12px;
   border: 1.5px dashed var(--bk-amber);
-  background: rgba(248, 188, 30, 0.12);
+  background: rgb(var(--accent-rgb) / 0.12);
   color: var(--bk-ink);
   padding: 10px 14px;
   text-align: left;
@@ -267,7 +282,7 @@ textarea.bk-input {
   min-height: 56px;
   border-radius: 10px;
   border: 1.5px solid var(--bk-line);
-  background: #fff;
+  background: var(--bk-option);
   color: var(--bk-ink);
   cursor: pointer;
   display: flex;
@@ -286,12 +301,12 @@ textarea.bk-input {
   color: var(--bk-muted);
 }
 .bk-day.is-on {
-  background: var(--bk-ink);
-  border-color: var(--bk-ink);
-  color: var(--bk-solar);
+  background: var(--bk-btn);
+  border-color: var(--bk-btn);
+  color: var(--bk-btn-text);
 }
 .bk-day.is-on span {
-  color: #fffdf8;
+  color: var(--bk-btn-sub);
 }
 .bk-times {
   display: grid;
@@ -303,7 +318,7 @@ textarea.bk-input {
   min-height: 56px;
   border-radius: 12px;
   border: 1.5px solid var(--bk-line);
-  background: #fff;
+  background: var(--bk-option);
   color: var(--bk-ink);
   cursor: pointer;
   display: flex;
@@ -326,7 +341,7 @@ textarea.bk-input {
 .bk-time.is-on {
   border-color: var(--bk-ink);
   box-shadow: inset 0 0 0 1.5px var(--bk-ink);
-  background: rgba(248, 188, 30, 0.18);
+  background: rgb(var(--accent-rgb) / 0.18);
 }
 .bk-turnstile {
   margin-top: 14px;
@@ -339,7 +354,7 @@ textarea.bk-input {
   bottom: 0;
   margin: 14px -18px -20px;
   padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
-  background: linear-gradient(to bottom, rgba(255, 253, 248, 0.85), var(--bk-card) 30%);
+  background: linear-gradient(to bottom, rgb(var(--surface-rgb) / 0.85), var(--bk-card) 30%);
   border-radius: 0 0 16px 16px;
   display: flex;
   flex-direction: column;
@@ -349,8 +364,8 @@ textarea.bk-input {
 
 /* Held time */
 .bk-hold {
-  background: rgba(47, 110, 65, 0.08);
-  border: 1px solid rgba(47, 110, 65, 0.3);
+  background: rgb(var(--bk-ok-rgb) / 0.08);
+  border: 1px solid rgb(var(--bk-ok-rgb) / 0.3);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 12px;
@@ -365,8 +380,8 @@ textarea.bk-input {
   font-variant-numeric: tabular-nums;
 }
 .bk-hold--gone {
-  background: rgba(179, 38, 30, 0.07);
-  border-color: rgba(179, 38, 30, 0.3);
+  background: rgb(var(--danger-rgb) / 0.07);
+  border-color: rgb(var(--danger-rgb) / 0.3);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -470,6 +485,30 @@ textarea.bk-input {
 .bk-page--site {
   min-height: 0;
 }
+/* A customer's own link: Light / Dark / Match phone, a quiet row under the flow. */
+.bk-theme {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 26px;
+}
+.bk-theme-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bk-muted);
+}
+.bk-theme .hx-tc {
+  width: 100%;
+  max-width: 320px;
+}
+@media print {
+  .bk-theme {
+    display: none;
+  }
+}
 
 @media (max-width: 420px) {
   .bk-card {
@@ -492,5 +531,47 @@ textarea.bk-input {
   }
   .bk-time {
     padding: 8px 10px;
+  }
+}
+
+/* A customer's own link: the same names on the theme's tokens, so it follows Light / Dark / Match phone.
+   Inputs get a drawn edge (3:1), amber words the darker amber that reads on paper (gold on dark), and
+   the ink button turns paper on dark. The website's form never has data-theme-scope, so it's unchanged. */
+:root[data-theme-scope='app'] .bk,
+:root[data-theme-scope='app'] .bk-page {
+  --bk-ink: var(--text);
+  --bk-muted: var(--muted);
+  --bk-paper: var(--bg);
+  --bk-card: var(--surface);
+  --bk-line: var(--border);
+  --bk-edge: var(--border-strong);
+  --bk-field: var(--field);
+  --bk-option: var(--field);
+  --bk-solar: var(--accent);
+  --bk-amber: var(--accent-text);
+  --bk-ok: var(--ok);
+  --bk-ok-rgb: var(--ok-rgb);
+  --bk-wa: var(--wa);
+  --bk-err: var(--danger);
+  --bk-on-solid: var(--on-solid);
+  --bk-btn: var(--inverse);
+  --bk-btn-text: var(--inverse-accent);
+  --bk-btn-sub: var(--inverse-text);
+  --bk-intro-line: var(--accent-line);
+}
+/* On dark the choice buttons sit a step up from the card (an input-dark well would read as a field), and
+   a chosen one is edged in gold over a lighter tint (a cream edge on a gold tint reads as brown there). */
+@media screen {
+  :root[data-theme='dark'] .bk {
+    --bk-option: var(--surface-2);
+  }
+  :root[data-theme='dark'] .bk-type.is-on,
+  :root[data-theme='dark'] .bk-time.is-on {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+    background: rgb(var(--accent-rgb) / 0.1);
+  }
+  :root[data-theme='dark'] .bk-soonest.is-on {
+    border-color: var(--accent);
   }
 }

@@ -18,21 +18,25 @@ type Data = { ready: boolean; settings: Settings; customers: Customer[]; count: 
 
 const CSS = `
 .wap-list{list-style:none;margin:.4rem 0 0;padding:0}
-.wap-row{display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.75rem 0;border-top:1px solid var(--line)}
+.wap-row{display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.75rem 0;border-top:1px solid var(--border)}
 .wap-who{display:flex;flex-direction:column;gap:2px;min-width:0}
 .wap-who b{font-size:1rem}
 .wap-who span,.wap-who a{font-size:.82rem;color:var(--muted);overflow-wrap:anywhere}
-.wap-who a{color:var(--amber-2);font-weight:600;text-decoration:none}
+.wap-who a{color:var(--accent-text);font-weight:600;text-decoration:none}
 .wap-btns{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;flex:0 0 auto}
 .wap-btns .crm-btn,.wap-rule .crm-btn,.wap-toast .crm-btn{min-height:48px}
-.wap-rule-state{display:inline-block;font-weight:800;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;padding:.15rem .5rem;border-radius:999px;background:rgba(33,31,24,.08);margin-left:.4rem;vertical-align:middle}
-.wap-rule-state.on{background:rgba(63,125,78,.15);color:var(--ok)}
+.wap-rule-state{display:inline-block;font-weight:800;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;padding:.15rem .5rem;border-radius:999px;background:rgb(var(--fg-rgb) / .08);margin-left:.4rem;vertical-align:middle}
+.wap-rule-state.on{background:rgb(var(--ok-rgb) / .15);color:var(--ok)}
 .wap-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.7rem}
-.wap-toast{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:.6rem;background:var(--ink);color:var(--paper);border-radius:10px;padding:.5rem .6rem .5rem .9rem;margin-top:1rem;font-size:.9rem;z-index:5}
-.wap-toast .crm-btn{background:transparent;border-color:var(--solar);color:var(--solar)}
+.wap-toast{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:.6rem;background:var(--moment);color:var(--moment-text);border-radius:10px;padding:.5rem .6rem .5rem .9rem;margin-top:1rem;font-size:.9rem;z-index:5}
+.wap-toast .crm-btn{background:transparent;border-color:var(--accent);color:var(--accent)}
 @media(max-width:640px){
   .wap-row{flex-direction:column;align-items:stretch}
   .wap-btns{width:100%}
+}
+/* The undo toast stays ink on dark too, edged so it stands off the page. */
+@media screen{
+  :root[data-theme='dark'] .wap-toast{box-shadow:0 0 0 1px var(--border),var(--shadow)}
 }
 `;
 

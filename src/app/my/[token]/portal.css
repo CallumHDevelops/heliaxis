@@ -1,25 +1,21 @@
-/* Customer portal — Heliaxis brand, phone first. */
+/* Customer portal — Heliaxis brand, phone first. Light and dark from the theme tokens (src/app/theme.css). */
 .pt {
-  --ink: #211f18;
-  --muted: #6b6659;
-  --paper: #f7f2e7;
-  --card: #fffdf8;
-  --line: rgba(33, 31, 24, 0.12);
-  --solar: #f8bc1e;
-  --ok: #2f6e41;
-  --wa: #1f7a4d;
   min-height: 100vh;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The sheets' backdrop: darker than the theme's scrim, so a photo opened full screen stands out. */
+  --pt-scrim: rgba(20, 18, 14, 0.7);
+  /* The deep-amber glow under a card that wants something from them. */
+  --pt-glow: rgba(199, 127, 4, 0.6);
 }
 .pt-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: calc(14px + env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 14px max(18px, env(safe-area-inset-left));
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 .pt-head-tag {
   font-size: 0.72rem;
@@ -46,9 +42,15 @@
   margin: 2px 0 0;
   color: var(--muted);
 }
+/* The countdown: an ink band on light; on dark, a raised panel edged in gold so it still stands out from the cards. */
 .pt-next {
-  background: var(--ink);
-  color: #fffdf8;
+  --pt-next-bg: var(--moment);
+  --pt-next-text: var(--moment-text);
+  --pt-next-muted: rgba(255, 253, 248, 0.7);
+  --pt-next-edge: transparent;
+  background: var(--pt-next-bg);
+  color: var(--pt-next-text);
+  box-shadow: inset 0 0 0 1px var(--pt-next-edge);
   border-radius: 16px;
   padding: 20px;
   display: flex;
@@ -59,19 +61,19 @@
   font-family: var(--font-outfit), 'Outfit', sans-serif;
   font-size: 2.6rem;
   line-height: 1;
-  color: var(--solar);
+  color: var(--accent);
 }
 .pt-next span {
   font-size: 1.05rem;
   font-weight: 600;
 }
 .pt-next small {
-  color: rgba(255, 253, 248, 0.7);
+  color: var(--pt-next-muted);
   font-size: 0.9rem;
 }
 .pt-card {
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 18px;
   display: flex;
@@ -89,8 +91,8 @@
   line-height: 1.5;
 }
 .pt-action {
-  border-color: var(--solar);
-  box-shadow: 0 6px 20px -14px rgba(199, 127, 4, 0.6);
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px -14px var(--pt-glow);
 }
 .pt-muted {
   color: var(--muted);
@@ -98,13 +100,13 @@
 }
 .pt-banner {
   margin: 0;
-  background: rgba(248, 188, 30, 0.16);
+  background: var(--accent-soft);
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 0.95rem;
 }
 .pt-banner.ok {
-  background: rgba(47, 110, 65, 0.12);
+  background: var(--ok-soft);
   color: var(--ok);
 }
 .pt-row {
@@ -119,8 +121,8 @@
   border: 0;
   border-radius: 10px;
   padding: 12px 18px;
-  background: var(--solar);
-  color: var(--ink);
+  background: var(--accent);
+  color: var(--accent-ink);
   cursor: pointer;
   text-decoration: none;
   text-align: center;
@@ -135,12 +137,13 @@
 }
 .pt-btn.ghost {
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-weight: 700;
 }
 .pt-btn.wa {
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .pt-link {
   background: none;
@@ -172,7 +175,7 @@
   top: 24px;
   bottom: 0;
   width: 2px;
-  background: var(--line);
+  background: var(--border);
 }
 .pt-track li.done:not(:last-child)::before {
   background: var(--ok);
@@ -181,13 +184,13 @@
   flex: 0 0 24px;
   height: 24px;
   border-radius: 50%;
-  border: 2px solid var(--line);
-  background: var(--card);
+  border: 2px solid var(--border);
+  background: var(--surface);
   display: grid;
   place-items: center;
   font-size: 0.75rem;
   font-weight: 900;
-  color: #fff;
+  color: var(--on-solid);
   z-index: 1;
 }
 .pt-track li.done .pt-dot {
@@ -195,8 +198,8 @@
   border-color: var(--ok);
 }
 .pt-track li.current .pt-dot {
-  border-color: var(--solar);
-  box-shadow: 0 0 0 4px rgba(248, 188, 30, 0.3);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.3);
 }
 .pt-track li div {
   display: flex;
@@ -216,7 +219,7 @@
   padding: 0;
 }
 .pt-docs li + li {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 .pt-docs a {
   display: flex;
@@ -247,7 +250,7 @@
 .pt-doc-open {
   font-weight: 800;
   font-size: 0.85rem;
-  color: #a06c00;
+  color: var(--accent-text);
 }
 /* "Print version" under a document: the same document without the colour, made when it's asked for. */
 .pt-docs a.pt-doc-print {
@@ -271,7 +274,7 @@
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  background: #e9e3d4;
+  background: var(--surface-2);
 }
 .pt-photos img {
   width: 100%;
@@ -284,17 +287,41 @@
   color: var(--muted);
   margin: 8px 0 0;
 }
+/* Light / Dark / Match phone, kept on this phone (no account): a quiet row above the footer line. */
+.pt-theme {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pt-theme-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pt-theme .hx-tc {
+  width: 100%;
+  max-width: 320px;
+}
+@media print {
+  .pt-theme {
+    display: none;
+  }
+}
 .pt-sheet {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(20, 18, 14, 0.7);
+  background: var(--pt-scrim);
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 .pt-sheet-box {
-  background: var(--card);
+  background: var(--raised);
   width: min(560px, 100%);
   max-height: 92vh;
   overflow: auto;
@@ -322,9 +349,10 @@
   font: inherit;
   font-size: 1rem;
   padding: 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: #fff;
+  background: var(--field);
+  color: var(--text);
 }
 .pt-check {
   display: flex;
@@ -336,13 +364,13 @@
   cursor: pointer;
 }
 .pt-err {
-  color: #9b2d24;
+  color: var(--danger);
   margin: 0;
   font-size: 0.9rem;
 }
 /* Signing: the quote-only page shows the form in the card; the full portal in a sheet. */
 .pt-sign {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
   margin-top: 4px;
   padding-top: 14px;
 }
@@ -351,11 +379,17 @@
   flex-direction: column;
   gap: 10px;
 }
+/* The signature pad's white sheet (.hx-light round SignaturePad): "only light", because with plain
+   "light" Chrome's auto-dark (a dark phone with "dark mode for web contents" on) still repaints the pad
+   near-black, and the ink drawn on it all but disappears. */
+.pt .hx-light {
+  color-scheme: only light;
+}
 .pt-cancel {
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(47, 110, 65, 0.1);
+  background: rgb(var(--ok-rgb) / 0.1);
   color: var(--ok);
   font-size: 0.92rem;
   font-weight: 600;
@@ -366,10 +400,10 @@
   width: 22px;
   height: 22px;
   margin: 1px 0 0;
-  accent-color: var(--ink);
+  accent-color: var(--text);
 }
 .pt-handover {
-  border-color: rgba(47, 110, 65, 0.35);
+  border-color: var(--ok-line);
 }
 @media (min-width: 640px) {
   .pt-sheet {
@@ -406,7 +440,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 .pt-hv-item {
   display: flex;
@@ -450,10 +484,11 @@
   margin: -4px 0 12px;
   text-align: center;
 }
+/* "View": a gold pill. On dark, gold words on a gold tint with a gold edge (a plain tint reads as brown there). */
 .pt-hv-docs a {
   font-weight: 800;
-  color: var(--ink);
-  background: rgba(248, 188, 30, 0.22);
+  color: var(--text);
+  background: rgb(var(--accent-rgb) / 0.22);
   border-radius: 999px;
   padding: 8px 14px;
   text-decoration: none;
@@ -481,7 +516,7 @@
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--muted);
-  border: 1px dashed var(--line);
+  border: 1px dashed var(--border);
   border-radius: 999px;
   padding: 6px 11px;
   white-space: nowrap;
@@ -490,16 +525,16 @@
   color: var(--muted);
 }
 .pt-hv-sign {
-  border: 1px solid var(--solar);
+  border: 1px solid var(--accent);
   border-radius: 12px;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: rgba(248, 188, 30, 0.08);
+  background: rgb(var(--accent-rgb) / 0.08);
 }
 .pt-hv-now {
-  background: var(--paper);
+  background: var(--bg);
   border-radius: 12px;
   padding: 12px 14px;
 }
@@ -510,4 +545,30 @@
   display: grid;
   gap: 6px;
   line-height: 1.45;
+}
+
+/* Dark: the moments that are ink on light become raised panels; the photo backdrop goes to black. */
+@media screen {
+  :root[data-theme='dark'] .pt {
+    --pt-scrim: rgba(0, 0, 0, 0.78);
+    --pt-glow: rgb(var(--accent-rgb) / 0.35);
+  }
+  :root[data-theme='dark'] .pt-next {
+    --pt-next-bg: var(--surface-2);
+    --pt-next-text: var(--text);
+    --pt-next-muted: var(--muted);
+    --pt-next-edge: var(--accent-line);
+  }
+  /* A gold button that can't be pressed yet: faded gold turns brown on dark, so it goes quiet instead. */
+  :root[data-theme='dark'] .pt-btn:disabled:not(.ghost) {
+    opacity: 1;
+    background: var(--surface-2);
+    color: var(--muted);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  :root[data-theme='dark'] .pt-hv-docs a:not(.pt-hv-print) {
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+  }
 }
