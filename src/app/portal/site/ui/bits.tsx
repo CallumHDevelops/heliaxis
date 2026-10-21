@@ -4,8 +4,11 @@ import Image from 'next/image';
 import { useState, type ReactNode } from 'react';
 import { OFFICE_PHONE } from '@/lib/site/client';
 import { allRec, type OutboxRecord, type PhotoRecord } from '@/lib/site/offline';
-import { drain, removeFailed, retryFailed, syncWords } from '@/lib/site/sync';
+import { drain, outboxLabel, removeFailed, retryFailed, syncWords } from '@/lib/site/sync';
 import { back, useLive, useSync } from './nav';
+
+/** Items that go once every photo for the job is up. */
+const AFTER_PHOTOS = ['signoff', 'put-right'];
 
 /** Top bar (56 px): back · title · sync pill. */
 export function TopBar({ title, backTo, onBack }: { title: string; backTo?: string; onBack?: () => void }) {
@@ -88,24 +91,20 @@ export function SyncSheet({ onClose }: { onClose: () => void }) {
         <dl className="sa-counts">
           <div>
             <dt>Answers</dt>
-            <dd>{s.waiting.answers ? `${s.waiting.answers} waiting` : 'Sent'}</dd>
+            <dd>{s.waiting.answers ? 'Waiting' : 'Sent'}</dd>
           </div>
           <div>
             <dt>Photos</dt>
             <dd>{s.waiting.photos ? `${s.waiting.photos} waiting` : 'Sent'}</dd>
           </div>
-          {!!s.waiting.signoffs && (
-            <div>
-              <dt>Sign-off</dt>
-              <dd>Waiting: it goes once the photos are up</dd>
-            </div>
-          )}
-          {s.waiting.other - (s.waiting.signoffs ?? 0) > 0 && (
-            <div>
-              <dt>Other</dt>
-              <dd>{s.waiting.other - (s.waiting.signoffs ?? 0)} waiting</dd>
-            </div>
-          )}
+          {Object.entries(s.waiting.kinds ?? {})
+            .filter(([, n]) => n > 0)
+            .map(([kind, n]) => (
+              <div key={kind}>
+                <dt>{outboxLabel(kind)}</dt>
+                <dd>{AFTER_PHOTOS.includes(kind) ? 'Waiting: it goes once the photos are up' : `${n} waiting`}</dd>
+              </div>
+            ))}
           {s.storage && (
             <div>
               <dt>Storage used</dt>
@@ -132,7 +131,7 @@ export function SyncSheet({ onClose }: { onClose: () => void }) {
             {failed.ops.map((o) => (
               <div className="sa-failed-row" key={o.op_id}>
                 <span>
-                  {o.kind === 'answers' ? 'Answers' : o.kind === 'photo-delete' ? 'Taking a photo off' : 'Sign-off'}: {o.failed}
+                  {outboxLabel(o.kind)}: {o.failed}
                 </span>
                 <button type="button" className="sa-small" onClick={() => void removeFailed(o.op_id, 'op')}>
                   Remove

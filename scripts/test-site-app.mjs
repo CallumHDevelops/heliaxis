@@ -71,6 +71,35 @@ eq('a failed photo', words({ failed: { photos: 1, other: 0, total: 1 } }), { pil
 eq('waiting beats an old All sent', words({ lastOkAt: '2026-10-21T08:00:00Z', waiting }).pill, '3 waiting');
 eq('signed out', words({ revoked: true, waiting }).line, 'Open the link in your message again. Nothing waiting is lost.');
 
+// Things, not batches: a job's answers go on the outbox every 800 ms, but they're one thing to the trade.
+const job = (patch) => ({ answers: 0, photos: 0, other: 0, failed: 0, failedPhotos: 0, signoffs: 0, kinds: {}, ...patch });
+const offline1 = S.countWaiting([job({ answers: 8, photos: 6, other: 1, signoffs: 1, kinds: { signoff: 1 } })]);
+eq('8 answer batches, 6 photos and the sign-off: 8 things, not 15', [offline1.waiting.total, offline1.waiting.answers], [8, 1]);
+eq('… and the line names them', words({ online: false, waiting: offline1.waiting }), { pill: '8 waiting', line: '6 photos, your answers and your sign-off waiting. They’ll send when you have signal.', tone: 'wait' });
+eq('two jobs’ answers are two things', S.countWaiting([job({ answers: 3 }), job({ answers: 1, photos: 1 })]).waiting.total, 3);
+eq('the job card counts the same way', S.thingsOf(job({ answers: 5, photos: 2, other: 1 })), 4);
+const pr = S.countWaiting([job({ other: 1, kinds: { 'put-right': 1 } })]).waiting;
+eq('a put right waiting is a put right, not a sign-off', words({ waiting: pr }).line, 'Your put right waiting. It’ll send when you have signal.');
+const el = S.countWaiting([job({ other: 4, signoffs: 1, kinds: { file: 2, 'customer-sign': 1, signoff: 1 } })]).waiting;
+eq('the electrician’s items by name', words({ waiting: el }).line, '2 certificate files, the customer’s signature and your sign-off waiting. They’ll send when you have signal.');
+eq('an item of a kind with no words yet', words({ waiting: S.countWaiting([job({ other: 1, kinds: { 'eic-board': 1 } })]).waiting }).line, '1 other item waiting. It’ll send when you have signal.');
+// The customer's signature after a sign-off the server turned down: it waits for them, not for signal.
+eq('waiting behind a turned-down sign-off', words({ online: true, gated: 1, waiting: S.countWaiting([job({ other: 1, kinds: { 'customer-sign': 1 } })]).waiting }).line, 'The customer’s signature waiting. Not signed off yet: open the job to see what Heliaxis still needs, then sign again.');
+eq('a failed batch of answers is one item, as is each other', S.countWaiting([job({ failed: 2 })]).failed.total, 2);
+
+/* ── What each item is called (the sending sheet, "Couldn’t send") ─────────── */
+
+eq('failed items by kind', ['answers', 'photo-delete', 'signoff', 'put-right', 'customer-sign', 'file', 'file-delete', 'eic-board'].map(S.outboxLabel), [
+  'Answers',
+  'Taking a photo off',
+  'Sign-off',
+  'Put right',
+  'Customer’s signature',
+  'Certificate file',
+  'Taking a file off',
+  'Something else',
+]);
+
 /* ── The manifest ──────────────────────────────────────────────────────────── */
 
 const token = 'A'.repeat(43);

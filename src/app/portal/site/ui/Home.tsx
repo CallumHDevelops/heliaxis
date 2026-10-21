@@ -3,7 +3,7 @@
 import { pounds, shortDate } from '@/lib/site/client';
 import { allPacks, allRec, getDevice, type DraftRecord, type OutboxRecord, type PackRecord, type PhotoRecord } from '@/lib/site/offline';
 import { poState, type SiteJobRow } from '@/lib/site/pack-shared';
-import { workByJob, type JobWork } from '@/lib/site/sync';
+import { thingsOf, workByJob, type JobWork } from '@/lib/site/sync';
 import { STATUS_LABEL, type AssignmentStatus } from '@/lib/site/types';
 import { SyncLine, TopBar } from './bits';
 import { onThisPhone } from './home-state';
@@ -55,7 +55,8 @@ const GROUPS: { key: string; title: string; has: (c: Card) => boolean }[] = [
 function syncOf(w: JobWork | undefined): string | null {
   if (!w) return null;
   if (w.failed + w.failedPhotos) return 'Couldn’t send something: tap the pill';
-  const n = w.answers + w.photos + w.other;
+  // Things, as the pill counts them: its answers are one, however many batches.
+  const n = thingsOf(w);
   return n ? `${n} waiting to send` : null;
 }
 
