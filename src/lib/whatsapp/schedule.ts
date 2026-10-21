@@ -1,7 +1,9 @@
 /**
  * When automatic messages go out: quiet hours (UK time, to the minute: 21:00 → 08:45 by default)
- * and keeping chasers inside the free 24-hour window. Pure (no I/O, nothing imported at run time)
- * so it's safe anywhere and scripts/test-wa-schedule.mjs can check it directly.
+ * and keeping chasers inside the free 24-hour window. And when a message a person writes goes:
+ * "Send later" and the late-night rule (typed after 20:30, it goes at 07:00). Pure (no I/O, nothing
+ * imported at run time) so it's safe anywhere and scripts/test-wa-schedule.mjs and
+ * scripts/test-wa-send-later.mjs can check it directly.
  */
 import type { WaSettings } from './settings-shared';
 
@@ -155,7 +157,8 @@ export type HoldSettings = ChaseTimes & Pick<WaSettings, 'smartRepliesQuietHours
  * time to wait for. Chasers and final nudges never go in quiet hours, nor before the evening rule's
  * morning time worked out from our last message in the chat (`lastOutAt`), so chasers queued under
  * older rules follow today's. Smart replies and intros wait only when their quiet-hours hold is on.
- * Something a person pressed "Send now" on (`sendNow`) always goes.
+ * Something a person pressed "Send now" on (`sendNow`) always goes, and so does a message a person
+ * scheduled ('scheduled'): its time was their choice, quiet hours or not.
  */
 export function holdUntil(opts: {
   kind: string;
@@ -166,7 +169,7 @@ export function holdUntil(opts: {
   rand?: () => number;
 }): Date | null {
   const { kind, now, settings: s } = opts;
-  if (opts.sendNow) return null;
+  if (opts.sendNow || kind === 'scheduled') return null;
   const held = kind === 'chase' || (kind === 'reply' && s.smartRepliesQuietHours) || (kind === 'intro' && s.firstContactQuietHours);
   if (!held) return null;
   const floor = kind === 'chase' && opts.lastOutAt ? eveningFloor(opts.lastOutAt, s) : null;
@@ -174,12 +177,15 @@ export function holdUntil(opts: {
   return at.getTime() > now.getTime() ? at : null;
 }
 
-/** What a chat needs to say when a chaser would go: the chase times, and whether chasers stay free. */
-export type ChaseView = ChaseTimes & { keepFree: boolean };
+/**
+ * What a chat needs to say when a chaser would go: the chase times, whether chasers stay free, and the
+ * late-night rule (a message typed late goes in the morning, and its chaser counts from then).
+ */
+export type ChaseView = ChaseTimes & LateRule & { keepFree: boolean };
 
 export function chaseView(s: WaSettings): ChaseView {
-  const { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepChasesFree } = s;
-  return { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepFree: keepChasesFree };
+  const { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepChasesFree, lateRule, lateFromMin, lateSendAtMin } = s;
+  return { quietFromMin, quietToMin, eveningRule, eveningFromMin, eveningNotBeforeMin, keepFree: keepChasesFree, lateRule, lateFromMin, lateSendAtMin };
 }
 
 const weekdayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
@@ -194,12 +200,157 @@ export function whenWords(at: Date, now: Date): string {
   return `${day} about ${time}`;
 }
 
+type ChaseAsk = { now: Date; hours: number; lastInboundAt: string | null; view: ChaseView; sendAt?: Date | null };
+
 /**
- * When a chaser set now would go, in words, worked out as the server will plan it (without the
- * jitter, so it's the earliest): for the "Chase if no reply" choices.
+ * When a chaser set now would go, worked out as the server will plan it (without the jitter, so it's
+ * the earliest). A message that goes later (`sendAt`: Send later, the late-night rule) is chased from
+ * when it goes.
  */
-export function chaseWhen(opts: { now: Date; hours: number; lastInboundAt: string | null; view: ChaseView }): string {
+export function chaseTime(opts: ChaseAsk): Date {
   const { now, hours, lastInboundAt, view } = opts;
-  const plan = planChase({ sentAt: now, hours, lastInboundAt, settings: view, keepFree: view.keepFree, rand: () => 0 });
-  return whenWords(plan.at, now);
+  const sentAt = opts.sendAt && opts.sendAt.getTime() > now.getTime() ? opts.sendAt : now;
+  return planChase({ sentAt, hours, lastInboundAt, settings: view, keepFree: view.keepFree, rand: () => 0 }).at;
+}
+
+/** chaseTime in words, for the "Chase if no reply" choices: "tomorrow about 10:00". */
+export function chaseWhen(opts: ChaseAsk): string {
+  return whenWords(chaseTime(opts), opts.now);
+}
+
+/* ── Messages a person sends later: "Send later" and the late-night rule ─────────────────────────── */
+
+/** The late-night rule from the settings (Smart replies → Chasers). */
+export type LateRule = Pick<WaSettings, 'lateRule' | 'lateFromMin' | 'lateSendAtMin'>;
+
+/**
+ * When a message a person sends now really goes under the late-night rule: null = straight away,
+ * otherwise the next `lateSendAtMin` on a UK clock. It covers `lateFromMin` (20:30) right through the
+ * small hours to that morning time, so 20:29 goes, 20:30 and 23:49 wait for 07:00 the next day, and
+ * 02:00 waits for 07:00 that morning. Off, or the same two times: never.
+ */
+export function lateSendAt(now: Date, s: LateRule): Date | null {
+  if (!s.lateRule || !isQuiet(now, { quietFromMin: s.lateFromMin, quietToMin: s.lateSendAtMin })) return null;
+  return nextClock(now, s.lateSendAtMin);
+}
+
+/**
+ * A message someone scheduled answers the customer (the chat doesn't need a reply, and nobody is
+ * reminded) only if it was written at or after their last message: one written before doesn't answer
+ * what they've said since. False when nothing is scheduled.
+ */
+export function scheduledAnswers(writtenAt: string | null | undefined, lastInboundAt: string | null | undefined): boolean {
+  if (!writtenAt) return false;
+  return !lastInboundAt || Date.parse(writtenAt) >= Date.parse(lastInboundAt);
+}
+
+/** "Send later"'s quick choices, minutes after midnight, UK time: 07:00, 08:45 and 09:30. */
+export const LATER_TIMES = [7 * 60, 8 * 60 + 45, 9 * 60 + 30];
+
+export type LaterChoice = { at: Date; label: string };
+
+/** The UK calendar day of `d`, as days since 1 January 1970. */
+const ukDay = (d: Date | number) => Math.floor(ukReading(d) / DAY);
+const two = (n: number) => String(n).padStart(2, '0');
+const clockOf = (minute: number) => `${two(Math.floor(minute / 60))}:${two(minute % 60)}`;
+const longWeekday = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'long' });
+const dayMonth = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short' });
+
+/** The real time when UK clocks show `minute` on UK day `day` (a time the clocks skip counts as just after the jump). */
+function ukAt(day: number, minute: number): Date {
+  // Two hours before, a UK clock reads late the evening before or early that day: the next `minute` is the one.
+  return nextClock(new Date(day * DAY + minute * MIN - 2 * HOUR), minute);
+}
+
+/**
+ * The quick choices, as the composer lists them: 07:00, 08:45 and 09:30 the next morning ("This
+ * morning" in the small hours, before 07:00), with Monday instead of a Sunday morning. Real times,
+ * right on the days the clocks change.
+ */
+export function laterChoices(now: Date): LaterChoice[] {
+  const today = ukDay(now);
+  let day = londonMinute(now) < LATER_TIMES[0] ? today : today + 1;
+  if (new Date(day * DAY).getUTCDay() === 0) day++;
+  const word = day === today ? 'This morning' : day === today + 1 ? 'Tomorrow' : longWeekday.format(new Date(day * DAY + 12 * HOUR));
+  return LATER_TIMES.map((m) => ({ at: ukAt(day, m), label: `${word} ${clockOf(m)}` }));
+}
+
+/**
+ * When a person's message goes, in words, seen from `now`: "07:00 tomorrow", "01:00 tonight" (the
+ * small hours, seen from the evening), "07:00 today", "07:00 on Monday", "07:00 on Thu 29 Oct".
+ */
+export function atWords(at: Date, now: Date): string {
+  const days = ukDay(at) - ukDay(now);
+  const m = londonMinute(at);
+  const time = clockOf(m);
+  if (days <= 0) return `${time} today`;
+  if (days === 1) return m < 5 * 60 && londonMinute(now) >= 18 * 60 ? `${time} tonight` : `${time} tomorrow`;
+  if (days < 7) return `${time} on ${longWeekday.format(at)}`;
+  return `${time} on ${dateFmt.format(at).replace(',', '')}`;
+}
+
+/** For a chat list: "07:00" within the next 24 hours (so always the next 07:00), else "Mon 07:00", or "29 Oct 07:00". */
+export function shortAt(at: Date, now: Date): string {
+  const time = clockOf(londonMinute(at));
+  const ahead = at.getTime() - now.getTime();
+  if (ahead < DAY) return time;
+  if (ahead < 6 * DAY) return `${weekdayFmt.format(at)} ${time}`;
+  return `${dayMonth.format(at)} ${time}`;
+}
+
+/** A time for <input type="datetime-local">, as UK time whatever the computer's own clock is set to. */
+export function ukInput(d: Date): string {
+  return new Date(ukReading(d)).toISOString().slice(0, 16);
+}
+
+/** What a datetime-local box says ("2026-10-21T07:00"), read as UK time; null if it isn't a date and time. */
+export function fromUkInput(v: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(v.trim());
+  if (!m) return null;
+  const [y, mo, d, h, mi] = m.slice(1).map(Number);
+  if (mo < 1 || mo > 12 || h > 23 || mi > 59) return null;
+  const day = Date.UTC(y, mo - 1, d) / DAY;
+  if (new Date(day * DAY).getUTCDate() !== d) return null; // 31 June and the like
+  return ukAt(day, h * 60 + mi);
+}
+
+/** When their free 24-hour window closes (their last message + 24h), in ms; null if they've never messaged. */
+export function windowClosesAt(lastInboundAt: string | null | undefined): number | null {
+  const t = lastInboundAt ? new Date(lastInboundAt).getTime() : NaN;
+  return Number.isFinite(t) ? t + WINDOW_MS : null;
+}
+
+/**
+ * Can a typed (free) message still go at `at`? Only inside the 24h window, with the outbox's minute
+ * to spare: it runs once a minute, so something due at 00:59 for a window closing at 01:00 could miss.
+ */
+export function freeAt(at: Date, lastInboundAt: string | null | undefined): boolean {
+  const close = windowClosesAt(lastInboundAt);
+  return close !== null && at.getTime() <= close - RUN_GAP;
+}
+
+/**
+ * Why a typed message can't go at `at`, in plain words: "David’s free 24-hour window closes at 01:00
+ * tonight, before 07:00 tomorrow. After that WhatsApp only takes an approved template, until David
+ * messages again." For the chat, the job's WhatsApp sheet and the server's answer alike.
+ */
+export function windowShutWords(name: string | null | undefined, lastInboundAt: string | null | undefined, at: Date, now: Date): string {
+  const first = (name || '').trim().split(/\s+/)[0];
+  const whose = first ? `${first}’s` : 'Their';
+  const close = windowClosesAt(lastInboundAt);
+  const until = `until ${first || 'they'} ${first ? 'messages' : 'message'} again`;
+  if (close === null) return `${first || 'They'} ${first ? 'hasn’t' : 'haven’t'} messaged this number yet, so WhatsApp only takes an approved template.`;
+  if (close <= now.getTime()) return `${whose} free 24-hour window has closed, so WhatsApp only takes an approved template ${until}.`;
+  return `${whose} free 24-hour window closes at ${atWords(new Date(close), now)}, before ${atWords(at, now)}. After that WhatsApp only takes an approved template, ${until}.`;
+}
+
+/**
+ * The latest time worth offering inside the window: 5 minutes before it closes, on a 5-minute mark.
+ * Null when that has gone (or nearly: under 2 minutes away), or they've never messaged.
+ */
+export function lastFreeAt(lastInboundAt: string | null | undefined, now: Date): Date | null {
+  const close = windowClosesAt(lastInboundAt);
+  if (close === null) return null;
+  const t = Math.floor((close - STEP) / STEP) * STEP;
+  return t > now.getTime() + RUN_GAP ? new Date(t) : null;
 }

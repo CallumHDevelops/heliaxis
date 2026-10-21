@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { siteUrl } from './server';
+import { mergedInto } from './aliases';
 
 /**
  * The customer's survey booking link (/book/<token>), separate from the portal: a lead can pick or
@@ -51,7 +52,13 @@ export async function projectByBookingToken(token: string): Promise<BookingProje
   if (!TOKEN.test(token)) return null;
   try {
     // select('*'): the booking columns may not exist yet, and then this just finds nothing.
-    const { data: p, error } = await createAdminClient().from('crm_projects').select('*').eq('booking_token', token).maybeSingle();
+    const db = createAdminClient();
+    let { data: p, error } = await db.from('crm_projects').select('*').eq('booking_token', token).maybeSingle();
+    // The link of a job joined into another (src/lib/crm/merge.ts) books that job's survey.
+    if (!p && !error) {
+      const hit = await mergedInto('booking_token', token, db);
+      if (hit?.project_id) ({ data: p, error } = await db.from('crm_projects').select('*').eq('id', hit.project_id).maybeSingle());
+    }
     if (error || !p || !bookable(p.stage)) return null;
     return {
       id: p.id as string,

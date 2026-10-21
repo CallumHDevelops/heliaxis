@@ -6,6 +6,7 @@ import { remindDueTasks } from '@/lib/tasks-server';
 import { runBookingJobs } from '@/lib/booking/jobs';
 import { pollMailbox } from '@/lib/ms365';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
+import { finishMergeFiles } from '@/lib/crm/merge';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -36,7 +37,9 @@ export async function GET(req: Request) {
   const emails = await pollMailbox((enquiryId, name, subject) =>
     notifyEnquiryTeam(`Email from ${name}`, subject, `/admin/crm?enquiry=${enquiryId}`, { tag: `em-${enquiryId}` })
   ).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
+  // Files from a merge whose move was cut off (src/lib/crm/merge.ts). Never throws.
+  const mergeFiles = await finishMergeFiles();
   // Last, so a long Outlook copy never holds up the customer messages or the mailbox.
   const booking = await runBookingJobs({ until: started + 40_000 }).catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, booking, crm, emails });
+  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, booking, crm, emails, mergeFiles });
 }

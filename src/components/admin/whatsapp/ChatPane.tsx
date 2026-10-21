@@ -10,12 +10,13 @@ import { stageLabel } from '@/lib/crm/stages';
 import { chatRef, chatTag, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { closeShownNotifications } from '@/lib/push-client';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
-import { chaseWhen, type ChaseView } from '@/lib/whatsapp/schedule';
+import { atWords, chaseTime, chaseWhen, type ChaseView } from '@/lib/whatsapp/schedule';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
 import { useChatTasks } from './ChatTasks';
 import { MediaBubble } from './MediaBubble';
+import { ScheduledBubble, useSendLater } from './SendLater';
 import '@/app/admin/enquiries/whatsapp.css';
 
 /**
@@ -26,7 +27,9 @@ import '@/app/admin/enquiries/whatsapp.css';
  * - 'dock': inside the WhatsApp dock, which scrolls its own box so the page never moves, with saved
  *   replies, documents and "Replying to …" above the reply box.
  * Both keep an unsent reply per person and chat in this browser, and send on Ctrl/⌘ + Enter (Enter
- * alone adds a line, so a half-written message never goes by accident).
+ * alone adds a line, so a half-written message never goes by accident). The clock beside Send is Send
+ * later; late at night Send itself waits for the morning (the late-night rule), with Send now beside
+ * it (SendLater.tsx).
  */
 
 // Only loaded when a chat in the dock needs them (they're the CRM's, and big).
@@ -47,7 +50,8 @@ type Msg = {
 } & MediaFields; // a photo, voice note or file they sent (whatsapp-media.sql): MediaBubble
 type Queued = {
   id: string;
-  kind: 'reply' | 'intro' | 'chase';
+  /** 'scheduled': a message someone wrote, to go later (Send later, the late-night rule). */
+  kind: 'reply' | 'intro' | 'chase' | 'scheduled';
   chase_step: number;
   rule: string | null;
   body: string | null;
@@ -55,6 +59,10 @@ type Queued = {
   send_after: string;
   status: 'pending' | 'sending' | 'failed';
   last_error: string | null;
+  created_at: string;
+  /** A scheduled message: who wrote it, and whether you may change it (its author or an admin). */
+  by?: string | null;
+  canChange?: boolean;
 };
 type Enquiry = {
   id: string;
@@ -100,7 +108,8 @@ export type ChatPaneProps = {
   notice?: ReactNode;
   /** page: their HX-0042 for the header (customer-refs.sql), null until it's been run. */
   customerRef?: string | null;
-  onSent?: () => void;
+  /** After a send; `scheduledAt` when it was scheduled instead (Send later, the late-night rule). */
+  onSent?: (scheduledAt?: string) => void;
 };
 
 const TICKS: Record<string, string> = { sent: '✓', delivered: '✓✓', read: '✓✓', failed: '!' };
@@ -208,6 +217,10 @@ export function ChatPane({
   const [defaultTemplate, setDefaultTemplate] = useState<string | null>(null);
   const [chaseDefaults, setChaseDefaults] = useState<{ questions: boolean; hours: number; view?: ChaseView }>({ questions: true, hours: 12 });
   const [chaseChoice, setChaseChoice] = useState('auto');
+  /** Send later can hold messages (whatsapp-scheduled.sql has been run). */
+  const [laterReady, setLaterReady] = useState(false);
+  /** A template to go at this time instead of a typed message that would miss the free window. */
+  const [tplAt, setTplAt] = useState<Date | null>(null);
   const [error, setError] = useState('');
   const key = draftKey(me, id);
   const [text, setText] = useState(() => readDraft(key));
@@ -275,6 +288,7 @@ export function ChatPane({
           setConfigured(d.configured);
           setDefaultTemplate(d.defaultTemplate);
           if (d.chase) setChaseDefaults(d.chase);
+          setLaterReady(!!d.later?.ready);
           version.current = d.v || '';
         }
         setError('');
@@ -382,8 +396,9 @@ export function ChatPane({
   const open = windowOpen(enquiry?.wa_last_inbound_at, now);
   const left = windowLeft(enquiry?.wa_last_inbound_at, now);
 
-  // Outside the 24h window only a template can go: pre-filled from what the CRM knows.
-  const tplSend = useTemplateSend(id, !!enquiry && !open, defaultTemplate);
+  // Outside the 24h window only a template can go: pre-filled from what the CRM knows. (Or inside
+  // it, to go later than the window lasts.)
+  const tplSend = useTemplateSend(id, !!enquiry && (!open || !!tplAt), defaultTemplate);
   const { templates, pick: tpl } = tplSend;
   // "+ Add task", each message's ⋯ and the sheets (ChatTasks.tsx), on the job the chat was opened from.
   const tasks = useChatTasks({ threadId: id, projectId: projectId ?? job?.projectId ?? null, me, name: enquiry?.name ?? null, messages, enabled: canCrm });
@@ -401,7 +416,7 @@ export function ChatPane({
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Not sent');
       await reload();
-      onSent?.();
+      onSent?.(d.scheduled?.at);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Not sent');
@@ -420,35 +435,42 @@ export function ChatPane({
     return chaseDefaults.questions && !isTemplate && message.includes('?') ? chaseDefaults.hours : 0;
   }
 
-  async function send() {
+  /** When: { now: true } straight away, or { sendAt } (Send later, the late-night rule). */
+  const when = (at: Date | null) => (at ? { sendAt: at.toISOString() } : { now: true });
+
+  /** A typed message, now or at `at`. The draft goes only once it's gone (or is scheduled); if that fails it stays in the box (and saved). */
+  async function sendTyped(at: Date | null) {
     const t = text.trim();
-    if (!t || sending || !configured) return;
-    // The draft goes only once it's sent; if sending fails it stays in the box (and saved).
-    if (await post({ text: t, chaseHours: chaseHoursFor(t) })) {
+    if (!t || sending || !configured) return false;
+    const ok = await post({ text: t, chaseHours: chaseHoursFor(t), ...when(at) });
+    if (ok) {
       setDraft('');
       setChaseChoice('auto');
     }
+    return ok;
   }
 
-  /** Ctrl + Enter (⌘ + Enter on a Mac) sends; Enter on its own starts a new line. */
-  function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      void send();
-    }
+  /** The approved template picked below, now or at `at`. */
+  async function sendTemplate(at: Date | null) {
+    if (!tpl || sending || !configured || !tplSend.ready) return false;
+    const ok = await post({ template: tpl.name, lang: tpl.lang, params: tpl.params, chaseHours: chaseHoursFor('', true), ...when(at) });
+    if (ok) setTplAt(null);
+    return ok;
   }
 
-  async function outboxAction(qid: string, action: 'cancel' | 'send-now' | 'edit', body?: string) {
+  async function outboxAction(qid: string, action: 'cancel' | 'send-now' | 'edit', body?: string, sendAt?: string) {
     setError('');
     const r = await fetch(`/api/whatsapp/outbox/${qid}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, body }),
+      body: JSON.stringify({ action, body, sendAt }),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) setError(d.error || 'That didn’t work');
     if (action === 'edit' && r.ok) setEditing(null);
     await reload();
+    // After the reload (which clears the last error), so "Too late: that message has already gone" shows.
+    if (!r.ok) setError(d.error || 'That didn’t work');
+    return r.ok;
   }
 
   async function toggleAuto() {
@@ -479,6 +501,43 @@ export function ChatPane({
     }
   }
 
+  /** When this message's chaser would go if it went at `at` (null = now): Send later shows it against each choice. */
+  const chaseAtFor = (message: string, isTemplate: boolean) => (at: Date | null) => {
+    const h = chaseHoursFor(message, isTemplate);
+    const view = chaseDefaults.view;
+    return h && view ? chaseTime({ now: new Date(now), hours: h, lastInboundAt: enquiry?.wa_last_inbound_at ?? null, view, sendAt: at }) : null;
+  };
+
+  // Send later and the late-night rule, for a typed reply and for a template.
+  const later = {
+    now,
+    view: chaseDefaults.view,
+    ready: laterReady,
+    lastInboundAt: enquiry?.wa_last_inbound_at ?? null,
+    name: enquiry?.name ?? '',
+  };
+  const typed = useSendLater({
+    ...later,
+    disabled: !text.trim() || sending || !configured,
+    submit: sendTyped,
+    onTemplate: setTplAt,
+    chaseAt: chaseAtFor(text, false),
+  });
+  const tplLater = useSendLater({ ...later, template: true, disabled: !configured || sending || !tplSend.ready, submit: sendTemplate, chaseAt: chaseAtFor('', true) });
+  // In the dock the panel opens above the reply box: keep the box in view as it opens or grows.
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (typed.panelState) rowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [typed.panelState]);
+
+  /** Ctrl + Enter (⌘ + Enter on a Mac) does what the Send button says; Enter on its own starts a new line. */
+  function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      typed.main();
+    }
+  }
+
   if (!enquiry) {
     return (
       <div className={dock ? 'wa-page wa-pane--dock' : 'wa-page'}>
@@ -489,11 +548,12 @@ export function ChatPane({
   }
 
   const windowCloses = enquiry.wa_last_inbound_at ? new Date(enquiry.wa_last_inbound_at).getTime() + SERVICE_WINDOW_MS : 0;
-  const chasePicker = (message: string, isTemplate = false) => {
+  const chasePicker = (message: string, isTemplate = false, sendAt: Date | null = null) => {
     const h = chaseHoursFor(message, isTemplate);
-    // When it would really go: quiet hours and the evening rule can move it ("tomorrow about 10:00").
+    // When it would really go: quiet hours and the evening rule can move it ("tomorrow about 10:00"),
+    // counted from when the message goes (Send later, the late-night rule).
     const view = chaseDefaults.view;
-    const when = h && view ? chaseWhen({ now: new Date(now), hours: h, lastInboundAt: enquiry.wa_last_inbound_at, view }) : null;
+    const when = h && view ? chaseWhen({ now: new Date(now), hours: h, lastInboundAt: enquiry.wa_last_inbound_at, view, sendAt }) : null;
     return (
       <div className="wa-chase-pick">
         <span>Chase if no reply:</span>
@@ -555,7 +615,17 @@ export function ChatPane({
         );
       })}
 
-      {outbox.map((o) => (
+      {outbox.map((o) =>
+        o.kind === 'scheduled' ? (
+          <ScheduledBubble
+            key={o.id}
+            o={o}
+            now={now}
+            name={enquiry.name}
+            lastInboundAt={enquiry.wa_last_inbound_at}
+            onAction={(action, change) => outboxAction(o.id, action, change?.body, change?.sendAt)}
+          />
+        ) : (
         <div key={o.id} className={`wa-queued ${o.status}`}>
           <div className="wa-queued-head">
             {o.status === 'failed'
@@ -603,7 +673,8 @@ export function ChatPane({
             </>
           )}
         </div>
-      ))}
+        )
+      )}
     </div>
   );
 
@@ -611,6 +682,15 @@ export function ChatPane({
 
   const templateBox = (
     <div className="wa-compose wa-compose--tpl">
+      {tplAt ? (
+        <p className="wa-muted">
+          A template to go at <b>{atWords(tplAt, new Date(now))}</b>: {enquiry.name.split(/\s+/)[0]}’s free window will have closed by then, so WhatsApp
+          only takes a template.{' '}
+          <button type="button" className="wsl-link" onClick={() => setTplAt(null)}>
+            Back to typing
+          </button>
+        </p>
+      ) : (
       <p className="wa-muted">
         {messages.some((m) => m.direction === 'in' && m.via !== 'import')
           ? 'It’s been over 24 hours since they last messaged, so WhatsApp only allows an approved template. Free chat reopens as soon as they reply.'
@@ -618,6 +698,7 @@ export function ChatPane({
             ? 'This chat was imported from the WhatsApp Business app. They haven’t messaged the CRM’s WhatsApp number yet, so start with an approved template. Once they reply you can chat freely for 24 hours.'
             : 'Start the conversation with an approved template. Once they reply you can chat freely for 24 hours.'}
       </p>
+      )}
       {templates === null ? (
         <p className="wa-muted">Loading templates…</p>
       ) : templates.length === 0 ? (
@@ -633,15 +714,23 @@ export function ChatPane({
         tpl && (
           <>
             <TemplateSendFields send={tplSend} inputClass="wa-input" />
-            {chasePicker('', true)}
-            <button
-              type="button"
-              className="wa-send"
-              disabled={!configured || sending || !tplSend.ready}
-              onClick={() => post({ template: tpl.name, lang: tpl.lang, params: tpl.params, chaseHours: chaseHoursFor('', true) })}
-            >
-              {sending ? 'Sending…' : 'Send template'}
-            </button>
+            {chasePicker('', true, tplAt ?? tplLater.lateAt)}
+            {tplAt ? (
+              <button type="button" className="wa-send" disabled={!configured || sending || !tplSend.ready} onClick={() => void sendTemplate(tplAt)}>
+                {sending ? 'Sending…' : `Send template at ${atWords(tplAt, new Date(now)).replace(/ (today|tomorrow|tonight)$/, '')}`}
+              </button>
+            ) : (
+              <>
+                {tplLater.panel}
+                <div className="wsl-sendgroup wsl-sendgroup--wide">
+                  <button type="button" className="wa-send" disabled={!configured || sending || !tplSend.ready} onClick={tplLater.main}>
+                    {sending ? 'Sending…' : tplLater.lateTime ? `Send template at ${tplLater.lateTime}` : 'Send template'}
+                  </button>
+                  {tplLater.clock()}
+                </div>
+                {tplLater.lateNote}
+              </>
+            )}
           </>
         )
       )}
@@ -676,7 +765,7 @@ export function ChatPane({
         <div className="wa-pane__foot">
           {errorLine}
           {notice}
-          {open ? (
+          {open && !tplAt ? (
             <div className="wa-pane__compose">
               <p className="wa-replying">
                 Replying to <b>{enquiry.name}</b>
@@ -684,10 +773,11 @@ export function ChatPane({
               </p>
               <div className="wa-pane__chips">
                 {projectId && <SnippetPicker projectId={projectId} name={enquiry.name} onPick={(t) => setDraft(textNow.current.trim() ? `${textNow.current}\n${t}` : t)} />}
-                {projectId && docs && <WhatsAppDocSend id={projectId} docs={docs} onSent={async () => void (await reload())} />}
-                {chasePicker(text)}
+                {projectId && docs && <WhatsAppDocSend id={projectId} docs={docs} lateTime={typed.lateTime} onSent={async () => void (await reload())} />}
+                {chasePicker(text, false, typed.lateAt)}
               </div>
-              <div className="wa-pane__row">
+              {typed.panel}
+              <div className="wa-pane__row" ref={rowRef}>
                 <textarea
                   ref={inputRef}
                   className="wa-input"
@@ -701,11 +791,16 @@ export function ChatPane({
                   // Read-only (not disabled) while sending, so the cursor stays in the box for the next message.
                   readOnly={sending}
                 />
-                <button type="button" className="wa-send" onClick={send} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
-                  {sending ? '…' : 'Send'}
-                  <small>Ctrl/⌘ + Enter</small>
-                </button>
+                <div className="wsl-sendgroup">
+                  <button type="button" className="wa-send" onClick={typed.main} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
+                    {sending ? '…' : 'Send'}
+                    {/* Late at night it says when it goes ("at 07:00"); the title keeps the shortcut. */}
+                    <small>{typed.lateTime ? `at ${typed.lateTime}` : 'Ctrl/⌘ + Enter'}</small>
+                  </button>
+                  {typed.clock()}
+                </div>
               </div>
+              {typed.lateNote}
             </div>
           ) : (
             templateBox
@@ -749,24 +844,32 @@ export function ChatPane({
       {thread}
       {errorLine}
 
-      {open ? (
+      {open && !tplAt ? (
         <>
-          {chasePicker(text)}
-          <div className="wa-compose">
-            <textarea
-              ref={inputRef}
-              className="wa-input"
-              rows={2}
-              placeholder="Message"
-              value={text}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={onKey}
-              disabled={!configured}
-              readOnly={sending}
-            />
-            <button type="button" className="wa-send" onClick={send} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
-              {sending ? '…' : 'Send'}
-            </button>
+          {chasePicker(text, false, typed.lateAt)}
+          <div className="wa-compose wsl-compose">
+            {typed.panel}
+            <div className="wsl-row">
+              <textarea
+                ref={inputRef}
+                className="wa-input"
+                rows={2}
+                placeholder="Message"
+                value={text}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={onKey}
+                disabled={!configured}
+                readOnly={sending}
+              />
+              <div className="wsl-sendgroup">
+                <button type="button" className="wa-send" onClick={typed.main} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
+                  {sending ? '…' : 'Send'}
+                  {typed.lateTime && <small>at {typed.lateTime}</small>}
+                </button>
+                {typed.clock()}
+              </div>
+            </div>
+            {typed.lateNote}
           </div>
         </>
       ) : (

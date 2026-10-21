@@ -327,6 +327,8 @@ export async function importLead(
     const { data } = await db.from('enquiries').select('id, name, meta_lead_id, wa_id').eq('name', name).eq('created_at', when).limit(1);
     existing = (data?.[0] as ExistingEnquiry | undefined) ?? null;
   }
+  // Merged into another customer: this lead is theirs already.
+  if (existing?.viaAlias === 'meta_lead') return 'already';
   if (existing && metaLeadId && existing.meta_lead_id === metaLeadId) {
     // In from before ad-spend.sql (by import or live): its ad ids now, for the ad spend in Reports.
     await saveAdIds(existing.id, lead, true);

@@ -425,6 +425,16 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     whatsapp && !(await has('whatsapp_messages', 'media_status')),
     sql('whatsapp-media.sql', 'Shows the photos, videos, voice notes and files customers send on WhatsApp in the chat, and lets you save their photos to the job.', 2, 'whatsapp.sql')
   );
+  // Send later and the late-night rule: until it's run, messages go when Send is pressed, as before.
+  add(
+    whatsapp && chasers && !(await has('whatsapp_outbox', 'reply_noted_at')),
+    sql(
+      'whatsapp-scheduled.sql',
+      'WhatsApp “Send later”, and the late-night rule: a message typed after 20:30 waits until 07:00 the next morning.',
+      2,
+      'whatsapp-chasers.sql'
+    )
+  );
   add(!crm, sql('crm.sql', 'Switches the CRM on: opportunities, the timeline, site photos and tasks on opportunities.', 3));
   add(!crmV2, sql('crm-v2.sql', 'Customer portal, documents, email, reminders and deposits.', 4, 'crm.sql'));
   add(
@@ -454,6 +464,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   add(
     crmV3 && !(await has('purchase_order_lines')),
     sql('purchase-orders.sql', 'Purchase orders: order the kit for a job from your suppliers, email them the PO as a PDF, and track it to delivery.', 5, 'crm-v3.sql')
+  );
+  // Merging duplicate customers and jobs: the Merge buttons say this is needed until it's run.
+  add(
+    (await customerRefs) && !(await has('crm_merges')),
+    sql('merge.sql', 'Merge duplicate customers (someone who came in twice, say from the website and a Meta ad) and their jobs for the same work.', 6, 'customer-refs.sql')
   );
   // Design studio: works without it, but designs and templates can't be saved until it's run.
   add(

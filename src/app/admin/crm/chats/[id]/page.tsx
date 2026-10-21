@@ -4,6 +4,7 @@ import { ChatThread } from '@/app/admin/enquiries/inbox/[id]/ChatThread';
 import { requirePortal } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
 import { chatJob } from '@/lib/whatsapp/active';
+import { mergedInto } from '@/lib/crm/aliases';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,9 @@ export default async function CrmChatPage({
   const s = await requirePortal('crm');
   if (!s) redirect('/admin');
   const [{ id }, { job, tab }] = await Promise.all([params, searchParams]);
+  // A customer merged into another (src/lib/crm/merge.ts): their chat is that one's now.
+  const merged = await mergedInto('customer', id);
+  if (merged) redirect(`/admin/crm/chats/${merged.enquiry_id}${job ? `?job=${encodeURIComponent(job)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}` : ''}`);
   const from = await chatJob(job, tab, true);
   return (
     <AdminShell active="whatsapp">

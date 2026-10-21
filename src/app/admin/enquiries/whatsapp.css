@@ -494,6 +494,12 @@ textarea.wa-input {
   background: rgba(31, 122, 77, 0.12);
   color: var(--wa);
 }
+/* A message someone has scheduled (Send later). */
+.wa-chip--later {
+  background: rgba(31, 122, 77, 0.08);
+  color: var(--wa);
+  box-shadow: inset 0 0 0 1px rgba(31, 122, 77, 0.35);
+}
 .wa-chase-pick {
   display: flex;
   align-items: center;
