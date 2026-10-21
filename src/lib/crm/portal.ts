@@ -5,6 +5,7 @@ import { CRM_BUCKET, thumbPath } from './server';
 import { buildTracker } from './tracker';
 import { portalMode } from './stages';
 import { stripeConfigured } from '@/lib/stripe';
+import { portalHandover } from '@/lib/handover/portal';
 
 const TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -32,7 +33,8 @@ const isSigned = (p: { accepted_at?: unknown }, docs: DocRow[]) =>
  * - 'quote' (Quote sent): only their first name, the job title, who's looking after them, the quote
  *   to sign (even if it isn't marked visible), the deposit once signed, and how to get in touch.
  *   No tracker, dates, photos or other documents.
- * - 'full' (Won onwards): progress, dates, documents marked visible (handover pack first) and photos.
+ * - 'full' (Won onwards): progress, dates, documents marked visible (handover pack first, as its own
+ *   section once handover.sql has run) and photos.
  */
 export async function loadPortal(token: string) {
   if (!TOKEN.test(token)) return null;
@@ -70,7 +72,13 @@ export async function loadPortal(token: string) {
   const acceptedDoc = p.accepted_document_id ? docs.find((d) => d.id === p.accepted_document_id) : undefined;
   // An archived version (a generated document replaced since) is never shown, whatever its flag says.
   const visible = full ? docs.filter((d) => d.visible && !(d as { archived_at?: string | null }).archived_at) : [];
-  const ordered = [...visible.filter((d) => d.category === 'handover'), ...visible.filter((d) => d.category !== 'handover')];
+  // Once handover.sql has run, the handover pack is its own section, grouped and in pack order
+  // (src/lib/handover/portal.ts); the documents in it aren't listed again below.
+  const handover = full ? await portalHandover(p.id).catch(() => null) : null;
+  const inPack = new Set(handover?.ids ?? []);
+  const ordered = handover
+    ? visible.filter((d) => !inPack.has(d.id) && !(d as { handover_slot?: string | null }).handover_slot && d.category !== 'handover')
+    : [...visible.filter((d) => d.category === 'handover'), ...visible.filter((d) => d.category !== 'handover')];
   const amount = Number(p.deposit_amount) || 0;
   const hasSigned = isSigned(p, docs);
   return {
@@ -86,6 +94,7 @@ export async function loadPortal(token: string) {
     installAt: full ? (p.install_at as string | null) : null,
     tracker: full ? buildTracker({ ...p, products: p.products ?? [] }, hols) : [],
     documents: ordered.map((d) => ({ id: d.id, category: d.category, name: d.name, at: d.created_at })),
+    handover,
     photos: (photos ?? []).map((ph) => ({
       id: ph.id as string,
       thumb: signed.get(thumbPath(ph.storage_path)) ?? signed.get(ph.storage_path) ?? null,

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { CrmSettings, SequenceStep } from '@/lib/crm/settings-shared';
+import { HandoverSettings } from './HandoverSettings';
 import '../crm.css';
 
 type Team = { id: string; name: string }[];
@@ -245,6 +246,7 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
 
       <Snippets />
       <Library />
+      <HandoverSettings isAdmin={isAdmin} />
     </div>
   );
 }

@@ -19,10 +19,11 @@ import { checkGroupFor, type CheckView } from '@/lib/projects/checklist';
 import type { EnaInfo } from '@/lib/projects/ena';
 import type { TeamMember } from '@/lib/projects/server';
 import { cleanDesign, DESIGN_FIELDS, designInput } from '@/lib/site/design';
+import { HandoverCard } from '../../crm/[id]/HandoverCard';
 import { DOC_LABEL } from '../../crm/[id]/ProjectExtras';
 import { londonIso, shortDate, ukDayOf, ukTime } from '../../crm/crm-shared';
 import { useMedia } from '../../crm/use-stored';
-import type { RecordData, SurveyItem, Tab } from '../../crm/[id]/record-shared';
+import { HANDOVER_STAGES, type RecordData, type SurveyItem, type Tab } from '../../crm/[id]/record-shared';
 import { askNewOrder } from '../orders/OrdersTab';
 import { KitOrdered, ordersCount } from '../orders/OrdersUi';
 
@@ -67,6 +68,7 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
   return (
     <div className="crmr-ov">
       <JobFile rec={rec} today={today} actions={actions} />
+      {rec.schema.handover && HANDOVER_STAGES.includes(p.stage) && <HandoverCard projectId={p.id} version={p.updated_at} onOpen={() => actions.openTab('handover')} />}
       {v3 ? (
         <Checklist rec={rec} actions={actions} />
       ) : (
@@ -776,6 +778,7 @@ const PAPER_GROUPS: { title: string; fields: PaperField[]; heat?: boolean }[] = 
   {
     title: 'Guarantees',
     fields: [
+      { key: 'ibg_provider', label: 'Guarantee provider' },
       { key: 'ibg_ref', label: 'Insurance-backed guarantee ref' },
       { key: 'ibg_registered_on', label: 'Guarantee registered', date: true },
       { key: 'warranties_registered_on', label: 'Warranties registered', date: true },

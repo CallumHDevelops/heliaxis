@@ -369,3 +369,107 @@
     border-radius: 18px;
   }
 }
+
+/* "Your handover pack" (HandoverSection.tsx): download everything, groups, on its way, sign, what to do now. */
+.pt-hv-all {
+  text-align: center;
+  padding: 15px 18px;
+  font-size: 1.02rem;
+}
+.pt-hv-group h3,
+.pt-hv-now h3 {
+  margin: 6px 0 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pt-hv-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pt-hv-items li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.pt-hv-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pt-hv-item small {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+.pt-hv-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+.pt-hv-docs a {
+  font-weight: 800;
+  color: var(--ink);
+  background: rgba(248, 188, 30, 0.22);
+  border-radius: 999px;
+  padding: 8px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* More than one file (manuals, invoice and receipt): each on its own line, below the item. */
+.pt-hv-items li.is-multi {
+  flex-wrap: wrap;
+}
+.pt-hv-items li.is-multi .pt-hv-docs {
+  flex-basis: 100%;
+  align-items: flex-start;
+}
+.pt-hv-items li.is-multi .pt-hv-docs a {
+  max-width: 100%;
+}
+.pt-hv-coming {
+  flex: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 6px 11px;
+  white-space: nowrap;
+}
+.pt-hv-items li.is-coming b {
+  color: var(--muted);
+}
+.pt-hv-sign {
+  border: 1px solid var(--solar);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(248, 188, 30, 0.08);
+}
+.pt-hv-now {
+  background: var(--paper);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.pt-hv-now ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+  display: grid;
+  gap: 6px;
+  line-height: 1.45;
+}

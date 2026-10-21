@@ -72,13 +72,33 @@ export async function currentGenerated(db: Db, projectId: string, key: string): 
 /** Is a stored version behind what it would be made from now? */
 export const isOutOfDate = (doc: Pick<GeneratedDoc, 'inputs_hash'>, inputs: unknown) => doc.inputs_hash !== inputsHash(inputs);
 
+/**
+ * Remember that a pack item's document is behind what it would be made from now (handover.sql), so
+ * the Handover tab shows it Out of date until the office regenerates it. Before handover.sql: nothing.
+ */
+async function markOutOfDate(db: Db, projectId: string, slot: string, key: string, hash: string) {
+  try {
+    const { data, error } = await db.from('handover_slots').select('*').eq('project_id', projectId).eq('slot', slot).maybeSingle();
+    if (error) return;
+    const prev = (data?.data ?? {}) as Record<string, unknown>;
+    await db
+      .from('handover_slots')
+      .upsert({ project_id: projectId, slot, na: data?.na ?? false, na_reason: data?.na_reason ?? null, note: data?.note ?? null, data: { ...prev, stale: { key, hash, at: new Date().toISOString() } } }, { onConflict: 'project_id,slot' });
+  } catch {
+    // The document stays as it is either way.
+  }
+}
+
 const withVersion = (name: string, v: number) => (v > 1 ? name.replace(/(\.pdf)?$/i, ` v${v}.pdf`) : name.endsWith('.pdf') ? name : `${name}.pdf`);
 
 export async function saveGenerated(db: Db, projectId: string, d: SaveGenerated): Promise<SaveResult> {
   const hash = inputsHash(d.inputs);
   const current = await currentGenerated(db, projectId, d.key);
   if (current && current.inputs_hash === hash) return { status: 'same', doc: current };
-  if (current && current.visible && !d.force) return { status: 'out_of_date', doc: current, inputsHash: hash };
+  if (current && current.visible && !d.force) {
+    if (d.slot) await markOutOfDate(db, projectId, d.slot, d.key, hash);
+    return { status: 'out_of_date', doc: current, inputsHash: hash };
+  }
 
   const { data: last } = await db.from('crm_documents').select('version').eq('project_id', projectId).eq('generated_key', d.key).order('version', { ascending: false }).limit(1);
   const version = Number((last ?? [])[0]?.version ?? 0) + 1;

@@ -100,6 +100,8 @@ export type JobLookups = {
   subcontracts: Map<string, Assignment[]>;
   /** Site app trades per job, with their synced photo counts (none before site-commissioning.sql). */
   site: Map<string, { trade: string; status: string; photos: number }[]>;
+  /** Jobs whose handover pack has gone to the customer (handover_packs.sent_at; none before handover.sql). */
+  handoverSent: Set<string>;
   outlook: boolean;
 };
 
@@ -120,7 +122,7 @@ export async function jobLookups(
 ): Promise<JobLookups> {
   const ids = projects.map((p) => p.id);
   const rams = [...new Set(projects.map((p) => text(p.rams_project_id)?.trim()).filter((r): r is string => !!r))];
-  const [docs, photos, surveys, assignments, trades] = await Promise.all([
+  const [docs, photos, surveys, assignments, trades, packs] = await Promise.all([
     // select('*'): signed_outside_at (crm-v3.sql) and survey_id (surveys.sql) may not be there yet.
     opts.docs ??
       readAll<DocRow>(ids, (b, from, to) => db.from('crm_documents').select('*').in('project_id', b).order('id').range(from, to) as unknown as PromiseLike<Res<DocRow>>),
@@ -150,6 +152,10 @@ export async function jobLookups(
     // The site app's trades (an error before site-commissioning.sql reads as none).
     readAll<{ id: string; project_id: string; trade: string; status: string }>(ids, (b, from, to) =>
       db.from('site_assignments').select('id, project_id, trade, status').in('project_id', b).order('id').range(from, to)
+    ),
+    // Handover packs that have gone (an error before handover.sql reads as none).
+    readAll<{ project_id: string; sent_at: string | null }>(ids, (b, from, to) =>
+      db.from('handover_packs').select('project_id, sent_at').in('project_id', b).not('sent_at', 'is', null).order('project_id').range(from, to)
     ),
   ]);
   const tradePhotos = trades.length
@@ -185,6 +191,7 @@ export async function jobLookups(
     surveys: group(surveys, (s) => s.project_id),
     subcontracts,
     site: new Map([...site].map(([k, v]) => [k, v.map(({ trade, status, photos }) => ({ trade, status, photos }))])),
+    handoverSent: new Set(packs.map((x) => x.project_id)),
     outlook: msConfigured(),
   };
 }
@@ -202,6 +209,7 @@ export function checkCtxFor(p: ProjectRow, l: JobLookups, today: string): CheckC
       .map((s) => ({ type: s.type as 'solar' | 'ashp', status: s.status, simpliheat_url: text(s.simpliheat_url), hasDoc: surveyDocs.has(s.id) })),
     subcontracts: (l.subcontracts.get(p.id) ?? []).map((a) => ({ status: a.status })),
     site: l.site.get(p.id) ?? [],
+    handoverSent: l.handoverSent.has(p.id),
     outlook: l.outlook,
     today,
   };
@@ -229,6 +237,10 @@ const RULES: Record<Deadline['key'], (p: ProjectRow, d: Deadline, cal: DeadlineC
   g99: (p, d, cal) => ({
     title: `${d.label} (deadline ${shortDay(d.due)})`,
     notes: `The DNO should answer a G99 application within 45 working days (applied ${shortDay(cal.ukDay(String(p.dno_submitted_at)))}). Chase them if it isn’t approved yet.`,
+  }),
+  cc16: (p, d) => ({
+    title: `${d.label} (deadline ${shortDay(d.due)})`,
+    notes: `The insurance-backed guarantee (MCS financial protection) is bought within 7 days of creating the MCS certificate (registered ${shortDay(String(p.paperwork.mcs_registered_on ?? ''))}). Save its reference on the job and upload the policy into the handover pack.`,
   }),
 };
 
@@ -520,7 +532,7 @@ export type ProjectListRow = {
   next_date: NextDate | null;
 };
 
-const DEADLINE_SHORT: Record<Deadline['key'], string> = { mcs: 'MCS', g98: 'G98 notice', regs: 'Building Regs', bus: 'BUS voucher', g99: 'G99 chase' };
+const DEADLINE_SHORT: Record<Deadline['key'], string> = { mcs: 'MCS', g98: 'G98 notice', regs: 'Building Regs', bus: 'BUS voucher', g99: 'G99 chase', cc16: 'Guarantee' };
 
 /** The next survey or install that hasn't finished yet (an install counts until its last working day). */
 export function nextDate(p: ProjectRow, cal: DeadlineCal): NextDate | null {

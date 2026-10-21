@@ -18,6 +18,7 @@ import { useMedia } from '../use-stored';
 import { ActivityTab } from './ActivityTab';
 import { CompactCustomer, CustomerColumn } from './CustomerColumn';
 import { PhotosTab } from './PhotosTab';
+import { HandoverTab } from './HandoverTab';
 import { DocumentsTab, EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
@@ -40,6 +41,7 @@ import {
 import { TasksCard } from './TasksCard';
 import {
   defaultTab,
+  HANDOVER_STAGES,
   nextDateWords,
   phoneShown,
   refOf,
@@ -284,8 +286,11 @@ export function ProjectView({
   const ordersTab = !!schema.purchaseOrders && (isProjectStage(stage) || ordersCount(rec?.orders) > 0);
   // Site (site-commissioning.sql): the trades on the job, from Won.
   const siteTab = !!schema.site && isProjectStage(stage);
+  // Handover (handover.sql): the customer's handover pack, from Ready.
+  const handoverTab = !!schema.handover && HANDOVER_STAGES.includes(stage);
   let tab: Tab = tabSel ?? fallbackTab;
-  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys) || (tab === 'orders' && !ordersTab) || (tab === 'site' && !siteTab)) tab = fallbackTab;
+  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys) || (tab === 'orders' && !ordersTab) || (tab === 'site' && !siteTab) || (tab === 'handover' && !handoverTab))
+    tab = fallbackTab;
 
   const pickTab = useCallback((t: Tab) => {
     setTabSel(t);
@@ -366,7 +371,8 @@ export function ProjectView({
   const hasQuote = rec.documents.some((d) => d.category === 'quote' || d.category === 'contract');
   const counts = {
     photos: rec.photos.length,
-    docs: rec.documents.length,
+    // Old versions of generated documents are kept (archived): the count is what the tab lists.
+    docs: rec.documents.filter((d) => !d.archived_at).length,
     surveys: rec.surveys.length,
   };
 
@@ -537,9 +543,19 @@ export function ProjectView({
     docs: <>Docs{counts.docs > 0 && <i>{counts.docs}</i>}</>,
     orders: <>Orders{ordersCount(rec.orders) > 0 && <i>{ordersCount(rec.orders)}</i>}</>,
     site: 'Site',
+    handover: 'Handover',
     surveys: <>Surveys{counts.surveys > 0 && <i>{counts.surveys}</i>}</>,
   };
-  const shownTabs = ['overview', 'activity', 'photos', 'docs', ...(ordersTab ? ['orders'] : []), ...(siteTab ? ['site'] : []), ...(schema.surveys ? ['surveys'] : [])] as Exclude<Tab, 'details'>[];
+  const shownTabs = [
+    'overview',
+    'activity',
+    'photos',
+    'docs',
+    ...(ordersTab ? ['orders'] : []),
+    ...(siteTab ? ['site'] : []),
+    ...(handoverTab ? ['handover'] : []),
+    ...(schema.surveys ? ['surveys'] : []),
+  ] as Exclude<Tab, 'details'>[];
 
   return (
     <div className="crm crmh crmr" data-tab={tab} data-phase={phaseOf(p.stage)}>
@@ -673,9 +689,12 @@ export function ProjectView({
               />
             )}
             {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={refresh} />}
-            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} siteDocs={schema.site} />}
+            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} siteDocs={schema.site} handover={schema.handover} />}
             {tab === 'orders' && <OrdersTab projectId={id} today={today} myName={rec.team.find((t) => t.id === me)?.name ?? null} onChanged={refresh} />}
             {tab === 'site' && <SiteTab projectId={id} now={now} onChanged={() => void refresh()} />}
+            {tab === 'handover' && (
+              <HandoverTab projectId={id} now={now} me={rec.team.find((t) => t.id === me)?.name ?? ''} isAdmin={isAdmin} onChanged={() => void refresh()} openTab={pickTab} />
+            )}
             {tab === 'surveys' && <SurveysPanel surveys={rec.surveys} busy={starting} onStart={(type) => void startSurvey(type)} />}
           </div>
           <RecordFabs unread={wa.unread} name={c.name} onWhatsApp={() => openWhatsApp()} onAdd={() => openSheet('menu')} />

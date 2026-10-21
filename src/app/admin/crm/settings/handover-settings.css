@@ -1,0 +1,62 @@
+/* CRM settings → Handover pack and Product library (HandoverSettings.tsx). Inside .crm. */
+.hs-subhead {
+  margin: 1.2rem 0 0.2rem;
+  font-size: 0.95rem;
+}
+.hs-row {
+  grid-template-columns: 1fr 2fr 1fr 1fr;
+  margin-bottom: 0.4rem;
+}
+.hs-draft {
+  margin: 0.5rem 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  background: var(--card);
+}
+.hs-draft summary {
+  cursor: pointer;
+}
+.hs-draft pre {
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 0.88rem;
+  background: var(--paper);
+  border-radius: 6px;
+  padding: 0.6rem;
+}
+.hs-ok {
+  color: var(--ok);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.hs-todo {
+  color: var(--amber-2);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.hs-gaps {
+  border-left: 4px solid var(--solar);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+.hs-gaps ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+}
+.hs-libfields {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+@media (max-width: 640px) {
+  .hs-row,
+  .hs-libfields {
+    grid-template-columns: 1fr;
+  }
+}
