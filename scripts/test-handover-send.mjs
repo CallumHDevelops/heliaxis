@@ -403,6 +403,14 @@ eq('the guarantee is in their portal now (released at Send)', portal.groups.flat
 const v = cur('PACK').version;
 await upload('Schematic', await simplePdf('Schematic'), { handover_slot: 'CC10' });
 eq('an upload after Send: the pack rebuilt by itself, released at once', [cur('PACK').version, cur('PACK').visible], [v + 1, true]);
+// "Tell the customer" on the final invoice, in the day: it's their final invoice (not "paid"), and an
+// added document never goes as the "your pack is ready" WhatsApp template.
+const [mails, was] = [globalThis.__rec.email.length, globalThis.__rec.whatsapp.length];
+const told = await H.tellCustomer(db, pid, 'CC13', ['whatsapp', 'email'], 'staff-1', new Date('2026-11-05T11:00:00Z'));
+eq('told now, by both', [told.at, told.notes], [null, ['Sent by WhatsApp.', 'Emailed.']]);
+eq('the email: “We’ve added your final invoice”', globalThis.__rec.email.slice(mails), ['We’ve added your final invoice to your handover pack']);
+eq('WhatsApp: as text, no template', globalThis.__rec.whatsapp.slice(was).map((w) => w.template), [null]);
+eq('…and the timeline says what went', globalThis.__rec.activity.at(-1), 'Handover pack: final invoice sent to the customer (Sent by WhatsApp. Emailed.)');
 
 // After Send the electrician's F43 is the customer's; a reading is corrected and they sign again, so
 // the store marks it Out of date (newer inputs than the customer's copy). Regenerate on F43 makes it

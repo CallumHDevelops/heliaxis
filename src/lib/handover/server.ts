@@ -721,7 +721,9 @@ async function deliverMessage(db: Db, projectId: string, via: Via[], m: Message)
   const { data: owner } = p.owner_id ? await db.from('profiles').select('full_name').eq('id', p.owner_id).maybeSingle() : { data: null };
   if (via.includes('whatsapp')) {
     const text = m.kind === 'pack' ? packWords(first, link) : addedWords(first, m.what ?? 'document', link);
-    const r = await sendSystem(String(p.enquiry_id), { text, template: 'handover_pack_ready', params: [first || 'there', link] }, 'handover').catch((e) => ({ ok: false as const, error: String(e) }));
+    // The approved template says "your handover pack is ready": only for that. An added document goes as text in the 24-hour window (the email says what it is either way).
+    const msg = m.kind === 'pack' ? { text, template: 'handover_pack_ready', params: [first || 'there', link] } : { text, template: null };
+    const r = await sendSystem(String(p.enquiry_id), msg, 'handover').catch((e) => ({ ok: false as const, error: String(e) }));
     notes.push(r.ok ? 'Sent by WhatsApp.' : `WhatsApp didn’t go: ${r.error}.`);
   }
   if (via.includes('email')) {
@@ -826,10 +828,13 @@ export async function sendHandover(db: Db, projectId: string, opts: { via: Via[]
   return { ok: true, notes: msg.notes, at: msg.at };
 }
 
-/** "We've added your MCS certificate to your handover pack" (the Tell the customer toggle on an upload). */
-export async function tellCustomer(db: Db, projectId: string, slot: string, via: Via[], by: string | null) {
-  const what = (slotDef(slot)?.pick ?? slotDef(slot)?.title ?? 'document').replace(/^Something else$/, 'document');
-  return sendOrHold(db, projectId, via, { kind: 'added', what: what.charAt(0).toLowerCase() + what.slice(1) }, by);
+/**
+ * "We've added your MCS certificate to your handover pack" (the Tell the customer toggle on an
+ * upload). The final invoice is told as just that: it isn't paid when it goes in.
+ */
+export async function tellCustomer(db: Db, projectId: string, slot: string, via: Via[], by: string | null, now = new Date()) {
+  const what = slot === 'CC13' ? 'final invoice' : (slotDef(slot)?.pick ?? slotDef(slot)?.title ?? 'document').replace(/^Something else$/, 'document');
+  return sendOrHold(db, projectId, via, { kind: 'added', what: what.charAt(0).toLowerCase() + what.slice(1) }, by, now);
 }
 
 /* ── The office's actions on an item ─────────────────────────────────────── */
