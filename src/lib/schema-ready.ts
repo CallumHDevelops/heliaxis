@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * screens and sections can stay hidden until their tables exist. Server pages pass the result to
  * client components as a prop.
  */
-export type SchemaReady = { crmV3: boolean; surveys: boolean; booking: boolean; purchaseOrders: boolean };
+export type SchemaReady = { crmV3: boolean; surveys: boolean; booking: boolean; purchaseOrders: boolean; design: boolean };
 
 const TTL = 60_000;
 let cached: { at: number; value: SchemaReady } | null = null;
@@ -26,14 +26,15 @@ async function has(table: string, column = 'id') {
 }
 
 async function check(): Promise<SchemaReady> {
-  const [crmV3, surveys, bookings, diary, purchaseOrders] = await Promise.all([
+  const [crmV3, surveys, bookings, diary, purchaseOrders, design] = await Promise.all([
     has('crm_projects', 'project_ref'), // crm-v3.sql
     has('crm_surveys'), // surveys.sql
     has('survey_bookings'), // survey-booking.sql
     has('diary_entries'),
     has('purchase_order_lines'), // purchase-orders.sql (its last table)
+    has('design_projects'), // design-studio.sql
   ]);
-  return { crmV3, surveys, booking: bookings && diary, purchaseOrders };
+  return { crmV3, surveys, booking: bookings && diary, purchaseOrders, design };
 }
 
 /** Cached in memory for 60 s, so a `false` is checked again a minute after the SQL is run. Never throws. */

@@ -21,6 +21,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fabric": "^6.7.1",
+    "fontkit": "^2.0.4",
     "heatmap.js": "^2.0.5",
     "heic-decode": "2.1.0",
     "lucide-react": "^0.561.0",
