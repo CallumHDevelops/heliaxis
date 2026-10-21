@@ -146,7 +146,7 @@ const REGS_DETAILS = { 1: 'n', 2: 'desc', 3: 'wiring', 4: 'ref', 5: 'points', 6:
 const REGS_TESTS = { 18: 'r1', 19: 'rn', 20: 'r2', 21: 'r12', 22: 'r2only', 23: 'ir_v', 24: 'ir_ll', 25: 'ir_le', 26: 'pol', 27: 'zs', 28: 'rcd_ms', 29: 'rcd_btn', 30: 'afdd_btn', 31: 'remarks' };
 eq('circuit details: columns 1–16 in order', M.DETAILS.filter((p) => p.col).map((p) => [p.col, p.k]), Object.entries(REGS_DETAILS).map(([c, k]) => [Number(c), k]));
 eq('test results: columns 18–31 in order (17 repeats the circuit number)', M.TESTS.filter((p) => p.col).map((p) => [p.col, p.k]), Object.entries(REGS_TESTS).map(([c, k]) => [Number(c), k]));
-eq('board: reference, location, supplied from, distribution OCPD, SPD type, the board’s RCD, Zdb, Ipf, polarity, phase sequence, SPD status', M.BOARD.map((p) => p.k), ['ref', 'loc', 'from', 'ocpd_bs', 'ocpd_type', 'ocpd_a', 'spd', 'rcd', 'rcd_bs', 'rcd_type', 'rcd_a', 'rcd_idn', 'zdb', 'ipf', 'pol', 'phase', 'spd_ok']);
+eq('board: reference, location, supplied from, the first free way (an addition), distribution OCPD, SPD type, the board’s RCD, Zdb, Ipf, polarity, phase sequence, SPD status', M.BOARD.map((p) => p.k), ['ref', 'loc', 'from', 'free', 'ocpd_bs', 'ocpd_type', 'ocpd_a', 'spd', 'rcd', 'rcd_bs', 'rcd_type', 'rcd_a', 'rcd_idn', 'zdb', 'ipf', 'pol', 'phase', 'spd_ok']);
 eq('SPD types T1, T2, T3, N/A', M.BOARD.find((p) => p.k === 'spd').options.map((o) => o.key), ['T1', 'T2', 'T3', 'na']);
 eq('test instruments: the six on the form', M.INSTRUMENTS.map((i) => i.k), ['mft', 'cont', 'ir', 'efli', 'rcd', 'earth']);
 eq('wiring codes A–H and O, as the form’s key has them', FIX.WIRING_CODES.map((w) => `${w.code} ${w.label}`), [
@@ -187,7 +187,7 @@ for (const id of ['c1', 'c2', 'c3']) {
 }
 eq('taking out any reading reopens the gate, naming the circuit', reopened, []);
 eq('e.g. Zs gone from circuit 8', E.certMissing(ctxOf(without(ans, 'eic_db:c-c2', 'zs'))).map((m) => [m.label, m.why]), [['DB1 circuit 8 (Battery inverter supply): test results', 'Zs: maximum measured']]);
-eq('a board with no circuits', E.certMissing(ctxOf({ ...ans, 'eic_db:b-b2': a({ o: 2, ref: 'DB2', loc: 'Garage', from: 'DB1', spd: ['na'], rcd: 'no', zdb: 0.4, ipf: 1.1, pol: true }) })).map((m) => m.label), ['DB2: circuits']);
+eq('a board with no circuits', E.certMissing(ctxOf({ ...ans, 'eic_db:b-b2': a({ o: 2, ref: 'DB2', loc: 'Garage', from: 'DB1', free: 1, spd: ['na'], rcd: 'no', zdb: 0.4, ipf: 1.1, pol: true }) })).map((m) => m.label), ['DB2: circuits']);
 eq('no boards at all', E.certMissing(ctxOf(Object.fromEntries(Object.entries(ans).filter(([k]) => !k.startsWith('eic_db:'))))).some((m) => m.label.includes('consumer unit')), true);
 eq('instruments: none', E.certMissing(ctxOf(without(ans, 'eic_inst'))).map((m) => m.why), ['The multifunction tester (or each tester you used)']);
 eq('instruments: single testers instead of a multifunction tester', E.certMissing(ctxOf({ ...ans, eic_inst: a({ cont: 'A', ir: 'B', efli: 'C' }) })).map((m) => m.why), ['RCD']);
@@ -218,8 +218,40 @@ eq('a fresh draft has no eic_ answers', Object.keys(fresh.values).filter((k) => 
 eq('no reading or inspection is offered (no suggestion on any of them)', MEASURED.filter((k) => fieldOf(k)?.suggest?.(fresh) || fieldOf(k)?.suggest?.(c0)), []);
 eq('every board and circuit reading is marked a test', [...M.BOARD, ...M.TESTS].filter((p) => ['zdb', 'ipf', 'pol', 'phase', 'spd_ok', 'r1', 'rn', 'r2', 'r12', 'r2only', 'ir_v', 'ir_ll', 'ir_le', 'zs', 'rcd_ms', 'rcd_btn', 'afdd_btn'].includes(p.k)).every((p) => p.test), true);
 eq('Duplicate copies details only, never a reading', M.COPIED.filter((k) => M.TESTS.some((p) => p.k === k) || M.BOARD.some((p) => p.test && p.k === k)), []);
-eq('suggested circuits are descriptions only', M.suggestionsFor(['solar', 'battery', 'ev'], [{ id: 'b1', o: 1 }], []).map((s) => Object.keys(s).sort().join(',')), ['desc,product,sug', 'desc,product,sug', 'desc,product,sug']);
-eq('and go once added or turned down', M.suggestionsFor(['solar', 'battery'], [{ id: 'b1', o: 1, skip: ['battery'] }], [{ id: 'x', board: 'b1', o: 1, sug: 'solar' }]).length, 0);
+const jobOf = (products, design = {}, values = {}) => ({ products, design: designOf(design), values });
+eq('suggested circuits are descriptions only', M.suggestionsFor(jobOf(['solar', 'battery', 'ev'], { battery_coupling: 'ac' }), [{ id: 'b1', o: 1 }], []).map((s) => Object.keys(s).sort().join(',')), ['desc,product,sug', 'desc,product,sug', 'desc,product,sug']);
+eq('and go once added or turned down', M.suggestionsFor(jobOf(['solar', 'battery'], { battery_coupling: 'ac' }), [{ id: 'b1', o: 1, skip: ['battery'] }], [{ id: 'x', board: 'b1', o: 1, sug: 'solar' }]).length, 0);
+
+/* ── The battery's circuit: only when it has its own battery inverter (round-1 fix) ── */
+
+const sugs = (c) => M.suggestionsFor(c, [{ id: 'b1', o: 1 }], []).map((s) => s.sug);
+eq('solar + battery, the design says the hybrid inverter runs it: no "Battery inverter supply"', sugs(jobOf(['solar', 'battery'], { battery_coupling: 'dc' })), ['solar']);
+eq('…the design says AC-coupled (its own battery inverter): its circuit is offered', sugs(jobOf(['solar', 'battery'], { battery_coupling: 'ac' })), ['solar', 'battery']);
+eq('…the design decides, whatever the separate-inverter answer says (a gateway isn’t a supply circuit)', [sugs(jobOf(['solar', 'battery'], { battery_coupling: 'dc' }, { bat_inv_sep: 'yes' })), sugs(jobOf(['solar', 'battery'], { battery_coupling: 'ac' }, { bat_inv_sep: 'no' }))], [['solar'], ['solar', 'battery']]);
+eq('…no design: the electrician’s "separate battery inverter?" answer', [sugs(jobOf(['solar', 'battery'], {}, { bat_inv_sep: 'yes' })), sugs(jobOf(['solar', 'battery'], {}, { bat_inv_sep: 'no' }))], [['solar', 'battery'], ['solar']]);
+eq('…nothing known yet: not offered (it can still be added, and the description is in the picks)', [sugs(jobOf(['solar', 'battery'])), M.DETAILS.find((q) => q.k === 'desc').picks.includes('Battery inverter supply')], [['solar'], true]);
+eq('a battery on its own brings its own inverter, unless the design says a hybrid already runs it', [sugs(jobOf(['battery'])), sugs(jobOf(['battery'], { battery_coupling: 'dc' }))], [['battery'], []]);
+eq('the EIC’s own job (a GivEnergy hybrid, nothing in the design) isn’t offered a battery circuit', sugs(c0), ['solar']);
+eq('the design option: what runs the battery (hybrid or its own inverter), kept as dc / ac', [designOf({ battery_coupling: 'ac' }).battery_coupling, designOf({ battery_coupling: 'x' }).battery_coupling, designOf({}).battery_coupling], ['ac', null, null]);
+
+/* ── Circuit numbers on an existing board (round-1 fix) ───────────────────── */
+
+const B = (extra = {}) => ({ id: 'b1', o: 1, ref: 'DB1', ...extra });
+const C = (n, board = 'b1') => ({ id: `x${n}`, board, o: 1, n: n === undefined ? undefined : String(n) });
+const newJob = M.propCtx(ctxOf({ ...ans, eic_work: a('new') }));
+const addition = M.propCtx(c0);
+eq('a new installation: circuits numbered from 1, then after the highest', [M.nextNumber(B(), [], newJob), M.nextNumber(B(), [C(1), C(2)], newJob), M.nextNumber(B(), [C(1), C(5)], newJob)], ['1', '3', '6']);
+eq('an addition: the board asks for its first free way (and only then)', [M.shownProps(M.BOARD, B(), addition).some((q) => q.k === 'free'), M.shownProps(M.BOARD, B(), newJob).some((q) => q.k === 'free'), M.shownProps(M.BOARD, B(), M.propCtx(ctxOf({ ...ans, eic_work: a('alteration') }))).some((q) => q.k === 'free')], [true, false, true]);
+eq('…and it’s needed for the board’s details', E.certMissing(ctxOf({ ...ans, 'eic_db:b-b1': a({ ...ans['eic_db:b-b1'].v, free: undefined }) })).map((m) => [m.label, m.why]), [['DB1: board details', 'First free way for the new circuits']]);
+eq('an addition, free way 9: the new circuits are 9, 10…, never 1', [M.nextNumber(B({ free: 9 }), [], addition), M.nextNumber(B({ free: 9 }), [C(9)], addition), M.nextNumber(B({ free: 9 }), [C(9), C(10)], addition)], ['9', '10', '11']);
+eq('…a number typed into a gap below doesn’t pull the next one back', M.nextNumber(B({ free: 9 }), [C(3)], addition), '9');
+eq('…the free way not given yet: no number (typed, or offered once it is)', [M.nextNumber(B(), [], addition), M.nextNumber(B({ free: 'x' }), [], addition)], ['', '']);
+eq('…only this board’s circuits count', M.nextNumber(B({ free: 4 }), [C(12, 'b2')], addition), '4');
+eq('Minor Works: the circuit is an existing one, so its own number is typed', M.nextNumber(B({ free: 9 }), [], M.propCtx(ctxOf({ ...ans, eic_route: a('meiwc') }))), '');
+const clash = { ...ans, 'eic_db:c-c2': a({ ...ans['eic_db:c-c2'].v, n: '7' }) };
+eq('two circuits with one number on a board: the gate says so, and why', E.certMissing(ctxOf(clash)).map((m) => [m.label, m.why]), [['DB1: circuit numbers', 'Circuit 7 is on this board twice. Give each circuit its own way number.']]);
+eq('…the same number on different boards is fine', M.numbersTwice('b1', [C(7), C(7, 'b2')]), []);
+eq('the fixture’s new circuits follow its free way (7, 8, 9)', M.boardsOf(c0.values).circuits.map((x) => x.n), ['7', '8', '9']);
 eq('what is offered: the client, the address and the person signing (from the job)', ['eic_client', 'eic_client_addr', 'eic_sig_name', 'eic_sig_tel'].map((k) => fieldOf(k).suggest(fresh)?.src), ['job', 'job', 'job', 'job']);
 eq('the route is offered from the office’s choice', fieldOf('eic_route').suggest(fresh), { v: 'eic', src: 'job', text: 'Electrical Installation Certificate (what the office chose)' });
 eq('max Zs is typed until the Chapter 41 table is verified', [M.zsTableReady(), M.zsLimit({ ocpd_bs: '60898-1', ocpd_type: 'B', ocpd_a: 32 })], [false, null]);
@@ -513,7 +545,7 @@ const LONG = {
 const big = { ...ans, eic_client: a(LONG.client), eic_client_addr: a(LONG.clientAddr), eic_desc: a(LONG.desc), eic_ec_mat: a('other'), eic_ec_mat_other: a('Copper-clad aluminium') };
 for (let i = 1; i <= 20; i++) big[`eic_db:c-k${i}`] = a({ ...details(i, i === 5 ? 'Sockets: kitchen worktop, island and the utility room appliances (washer, dryer)' : `Circuit ${i} lights and sockets`), ...tests, o: i });
 for (const k of ['eic_db:c-c1', 'eic_db:c-c2', 'eic_db:c-c3']) delete big[k];
-big['eic_db:b-b2'] = a({ o: 2, ref: 'DB2', loc: LONG.loc, from: 'DB1 circuit 20', ocpd_bs: '60898-1', ocpd_type: 'C', ocpd_a: 40, spd: ['T2', 'T3'], rcd: 'yes', rcd_bs: '61008-1', rcd_type: 'A', rcd_a: 63, rcd_idn: 100, zdb: 0.61, ipf: 0.62, pol: true, spd_ok: 'yes' });
+big['eic_db:b-b2'] = a({ o: 2, ref: 'DB2', loc: LONG.loc, from: 'DB1 circuit 20', free: 1, ocpd_bs: '60898-1', ocpd_type: 'C', ocpd_a: 40, spd: ['T2', 'T3'], rcd: 'yes', rcd_bs: '61008-1', rcd_type: 'A', rcd_a: 63, rcd_idn: 100, zdb: 0.61, ipf: 0.62, pol: true, spd_ok: 'yes' });
 for (let i = 1; i <= 3; i++) big[`eic_db:c-g${i}`] = a({ ...details(i, i === 2 ? LONG.cdesc : `Garage circuit ${i}`, { board: 'b2', ocpd_a: 16, zs_max: 2.73, zs_src: null }), ...tests, o: i, zs: 0.9 });
 eq('the gate asks what an “other” conductor material is', E.certMissing(ctxOf({ ...big, eic_ec_mat_other: undefined })).map((m) => m.key), ['eic_ec_mat_other']);
 const bigCtx = ctxOf(big);

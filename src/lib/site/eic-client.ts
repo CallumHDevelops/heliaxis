@@ -1,6 +1,6 @@
 'use client';
 
-import { boardKey, circuitKey, newId, nextNumber, COPIED, type Board, type Circuit, type Rec } from './forms/electrician/eic-model';
+import { boardKey, circuitKey, newId, nextNumber, COPIED, type Board, type Circuit, type PropCtx, type Rec } from './forms/electrician/eic-model';
 import { changed, getDraft, putRec, setAnswer, type PhotoRecord } from './offline';
 import { drainSoon } from './sync';
 import type { Answer } from './types';
@@ -50,12 +50,16 @@ export async function addBoard(job: string, boards: Board[]): Promise<string> {
   return id;
 }
 
-/** A new circuit on a board, numbered after the board's highest; a suggested one brings its description only. */
-export async function addCircuit(job: string, board: string, circuits: Circuit[], from: { desc?: string; sug?: string; copy?: Circuit } = {}): Promise<string> {
+/**
+ * A new circuit on a board, numbered after the board's highest (on an existing board, from its first
+ * free way; none yet if that isn't given); a suggested one brings its description only.
+ */
+export async function addCircuit(job: string, board: Board, circuits: Circuit[], pc: PropCtx, from: { desc?: string; sug?: string; copy?: Circuit } = {}): Promise<string> {
   const id = newId();
   const o = Math.max(0, ...circuits.map((x) => x.o)) + 1;
   const copied = from.copy ? Object.fromEntries(COPIED.filter((k) => k in from.copy!).map((k) => [k, from.copy![k]])) : {};
-  await updateAnswer(job, circuitKey(id), () => ({ ...copied, board, o, n: nextNumber(board, circuits), ...(from.desc ? { desc: from.desc } : {}), ...(from.sug ? { sug: from.sug } : {}) }));
+  const n = nextNumber(board, circuits, pc);
+  await updateAnswer(job, circuitKey(id), () => ({ ...copied, board: board.id, o, ...(n ? { n } : {}), ...(from.desc ? { desc: from.desc } : {}), ...(from.sug ? { sug: from.sug } : {}) }));
   return id;
 }
 

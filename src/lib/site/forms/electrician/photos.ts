@@ -5,6 +5,7 @@
  * their serials (serials.ts), so nothing is asked twice. Type-only imports.
  */
 import type { Field, FormCtx, Step } from '../types';
+import { installationTT } from './carry';
 import { has, is } from './shared';
 
 const photo = (key: string, label: string, hint: string, extra: Partial<Field> = {}): Field => ({ key, type: 'PHOTOS', label, hint, level: 'must', need: 1, ...extra });
@@ -15,8 +16,8 @@ const hp = (c: FormCtx) => has(c, 'heatpump');
 
 /** F44 Table 2 a, b or c ticked: the array frame is earthed, so its connection is photographed (EP25). */
 export const frameEarthed = (c: FormCtx) => Array.isArray(c.values.f44_t2) && (c.values.f44_t2 as string[]).some((x) => x === 'a' || x === 'b' || x === 'c');
-/** An earth electrode is fitted: a back-up battery, F74 row 18 ticked, or the EV charger on its own rod. */
-export const electrodeFitted = (c: FormCtx) => is(c, 'eess_backup', 'yes') || is(c, 'f74_1_18', 'done') || is(c, 'ev_earthing', 'tt') || is(c, 'ev_openpen', 'electrode');
+/** An earth electrode is fitted: a back-up battery, F74 row 18 ticked, a TT installation (the EIC's or the EV record's answer), or the EV charger on its own rod. */
+export const electrodeFitted = (c: FormCtx) => is(c, 'eess_backup', 'yes') || is(c, 'f74_1_18', 'done') || installationTT(c) || is(c, 'ev_openpen', 'electrode');
 
 export const PHOTO_FIELDS: Field[] = [
   photo('EP01', 'Consumer unit before', 'Before you touch anything: cover on, every label readable.', { group: 'Before you touch anything' }),

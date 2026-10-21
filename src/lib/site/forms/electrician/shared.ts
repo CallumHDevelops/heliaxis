@@ -23,6 +23,7 @@ const NO_FACTS: ElectricianFacts = {
   ev_model: null,
   heat_pump_model: null,
   survey_battery_spot: null,
+  survey_earthing: null,
   roofer: null,
   voc_tolerance: 10,
   instruments: null,

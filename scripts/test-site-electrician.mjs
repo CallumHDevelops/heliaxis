@@ -231,6 +231,17 @@ const batFlags = (patch) => R.flagsFor(bat, ctxOf(['battery'], { ...fb.values, .
 eq('no back-up but back-up rows ticked done: Review', batFlags({ f74_1_19: 'done' }).includes('EESS_BACKUP'), true);
 eq('back-up but its rows N/A: Review', batFlags({ eess_backup: 'yes', f74_1_17: 'na' }).includes('EESS_BACKUP'), true);
 
+/* ── The battery's own inverter, per the job's design (round-1 fix) ──────────── */
+const sbShown = (c) => R.allVisible(sb, c).map(({ f }) => f.key);
+const designed = (d, values = {}) => ctxOf(['solar', 'battery'], values, {}, {}, { ...DESIGN, ...d });
+const BINV = ['bat_inv_sep', 'EP32', 'SN_BINV'];
+eq('a hybrid in the design: "separate battery inverter?" offered as No, and its label and serial aren’t asked', [offer('bat_inv_sep', designed({ battery_coupling: 'dc' })), BINV.filter((k) => sbShown(designed({ battery_coupling: 'dc' })).includes(k))], [['design', 'no'], ['bat_inv_sep']]);
+eq('AC-coupled in the design: offered as Yes, its label and serial asked', [offer('bat_inv_sep', designed({ battery_coupling: 'ac' })), BINV.filter((k) => sbShown(designed({ battery_coupling: 'ac' })).includes(k))], [['design', 'yes'], BINV]);
+eq('…what the electrician says is on the wall decides the label and serial', BINV.filter((k) => sbShown(designed({ battery_coupling: 'ac' }, { bat_inv_sep: 'no' })).includes(k)), ['bat_inv_sep']);
+eq('nothing in the design: asked, nothing offered, as before', [offer('bat_inv_sep'), BINV.filter((k) => sbShown(c0).includes(k)), BINV.filter((k) => sbShown(ctxOf(['solar', 'battery'], { bat_inv_sep: 'yes' })).includes(k))], [null, ['bat_inv_sep'], BINV]);
+const batShown = (c) => R.allVisible(bat, c).map(({ f }) => f.key).filter((k) => BINV.includes(k));
+eq('a battery on its own has its own inverter; a hybrid in the design asks first', [batShown(ctxOf(['battery'])), batShown(ctxOf(['battery'], {}, {}, {}, { ...DESIGN, battery_coupling: 'dc' }))], [['EP32', 'SN_BINV'], ['bat_inv_sep']]);
+
 /* ── The PDFs ─────────────────────────────────────────────────────────────────── */
 const D = {
   f43: await import('../src/lib/documents/site/f43.ts'),

@@ -5,18 +5,15 @@
  * assessment, load management, maximum demand against the cut-out fuse, smart charging evidence and
  * the DNO connect-and-notify route (which makes the office's to-do at sign-off). Type-only imports.
  */
+import { EARTHING_LABEL, earthingFromEv, earthingToEv, isEarthing } from '../../earthing';
 import type { Field, FlagRule, FormCtx, Step } from '../types';
-import { has, is, num, text, yn } from './shared';
+import { el, has, is, num, text, yn } from './shared';
 
 export const EV_TITLE = 'EV Charge Point Installation Record';
 export const EV_REVISION = 'Rev 1';
 
-export const EARTHING = [
-  { key: 'tn_s', label: 'TN-S' },
-  { key: 'tncs_pme', label: 'TN-C-S (PME)' },
-  { key: 'tncs_pnb', label: 'TN-C-S (PNB)' },
-  { key: 'tt', label: 'TT' },
-];
+/** This record's own keys (saved answers use them), labelled as the EIC labels the same arrangement (site/earthing.ts). */
+export const EARTHING = ['tn_s', 'tncs_pme', 'tncs_pnb', 'tt'].map((key) => ({ key, label: EARTHING_LABEL[earthingFromEv(key)!] }));
 export const OPEN_PEN = [
   { key: 'electrode', label: 'Earth electrode' },
   { key: 'device_charger', label: 'Device in the charger' },
@@ -33,7 +30,20 @@ const pen = (c: FormCtx) => is(c, 'ev_earthing', 'tncs_pme') || is(c, 'ev_earthi
 const rod = (c: FormCtx) => is(c, 'ev_earthing', 'tt') || (pen(c) && is(c, 'ev_openpen', 'electrode'));
 
 export const EV_FIELDS: Field[] = [
-  { key: 'ev_earthing', type: 'SEL', label: 'Earthing system', level: 'must', options: EARTHING, group: 'Earthing' },
+  {
+    key: 'ev_earthing',
+    type: 'SEL',
+    label: 'Earthing system',
+    level: 'must',
+    options: EARTHING,
+    group: 'Earthing',
+    // The surveyor's answer, in this record's keys, to confirm on site (the EIC's, once given, is carried across: carry.ts).
+    suggest: (c) => {
+      const e = el(c).survey_earthing;
+      const key = earthingToEv(e);
+      return key && isEarthing(e) ? { v: key, src: 'survey', text: EARTHING_LABEL[e] } : null;
+    },
+  },
   { key: 'ev_openpen', type: 'SEL', label: 'Open-PEN protection method', hint: 'How the charger is protected if the PEN conductor breaks.', level: 'must', options: OPEN_PEN, show: pen },
   { key: 'ev_openpen_how', type: 'TEXT', label: 'Charger model and how it does it', level: 'must', parent: 'ev_openpen', show: (c) => is(c, 'ev_openpen', 'device_charger') },
   { key: 'ev_openpen_dev', type: 'TEXT', label: 'Which device, and how it works', level: 'must', parent: 'ev_openpen', show: (c) => is(c, 'ev_openpen', 'device_separate') || is(c, 'ev_openpen', 'other') },

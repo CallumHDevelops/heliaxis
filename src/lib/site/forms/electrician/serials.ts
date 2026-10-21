@@ -10,8 +10,18 @@ import { captures, el, has, is, num, optimisers, panelsFitted, plural, readOf, s
 
 const solar = (c: FormCtx) => has(c, 'solar');
 const battery = (c: FormCtx) => has(c, 'battery');
-/** The battery has its own inverter or gateway: always on a battery-only job, on solar + battery when the electrician says so. */
-export const separateBatteryInverter = (c: FormCtx) => battery(c) && (!solar(c) || is(c, 'bat_inv_sep', 'yes'));
+/** Asked on solar + battery, and on a battery-only job whose design says a hybrid inverter runs it (one already on the wall). */
+const askSeparate = (c: FormCtx) => battery(c) && (solar(c) || c.design.battery_coupling === 'dc');
+/**
+ * The battery has its own inverter or gateway (its label and serial are asked for): what the
+ * electrician says where it's asked, else what the design says, else a battery-only job has one.
+ */
+export const separateBatteryInverter = (c: FormCtx) => {
+  if (!battery(c)) return false;
+  if (askSeparate(c) && (is(c, 'bat_inv_sep', 'yes') || is(c, 'bat_inv_sep', 'no'))) return is(c, 'bat_inv_sep', 'yes');
+  if (c.design.battery_coupling) return c.design.battery_coupling === 'ac';
+  return !solar(c);
+};
 
 const label = (key: string, title: string, hint: string, extra: Partial<Field> = {}): Field => ({ key, type: 'PHOTOS', label: title, hint, level: 'must', need: 1, label_photo: true, read: true, ...extra });
 const scan = (key: string, title: string, photo: string, extra: Partial<Field> = {}): Field => ({ key, type: 'SCAN', label: title, level: 'must', need: 1, photo, ...extra });
@@ -63,7 +73,16 @@ export const SERIAL_FIELDS: Field[] = [
 
   label('EP31', 'Battery labels', 'Each battery module’s label, serial readable.', { group: 'Battery', show: battery }),
   scan('SN_BAT', 'Battery serial numbers', 'EP31', { hint: 'One for each battery module.', show: battery }),
-  yn('bat_inv_sep', 'Is there a separate battery inverter or gateway?', { hint: 'No if the solar inverter is a hybrid that runs the battery.', show: (c) => solar(c) && battery(c) }),
+  yn('bat_inv_sep', 'Is there a separate battery inverter or gateway?', {
+    hint: 'No if the solar inverter is a hybrid that runs the battery.',
+    show: askSeparate,
+    suggest: (c) =>
+      c.design.battery_coupling === 'dc'
+        ? { v: 'no', src: 'design', text: 'No: the hybrid inverter runs the battery' }
+        : c.design.battery_coupling === 'ac'
+          ? { v: 'yes', src: 'design', text: 'Yes: its own battery inverter (AC-coupled)' }
+          : null,
+  }),
   label('EP32', 'Battery inverter / gateway label', 'Straight on, serial readable.', { show: separateBatteryInverter }),
   scan('SN_BINV', 'Battery inverter / gateway serial number', 'EP32', { expect: () => 1, show: separateBatteryInverter }),
 

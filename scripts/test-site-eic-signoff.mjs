@@ -406,6 +406,38 @@ const mText = await textOf(fileOf(sheets.find((d) => d.generated_key === 'MEIWC5
 eq('each is a data sheet for its circuit', [mText.includes('Minor Works data sheet'), mText.includes('HX-0042-MW5.1'), mText.includes('Extended the circuit')], [true, true, true]);
 eq('the Site tab says their signed Minor Works goes in the pack', (await EICS.certificateStatus(db, read(minor.id))).state, 'data_sheet');
 
+/* ── Their test instruments: F43's line and the EIC's testers, both kept (round-1 fix) ── */
+// F43's sign-off used to replace the contact's list outright, wiping the EIC's remembered testers after
+// every job; each now keeps the other's entries. The documents step runs the job step again, and the
+// cron runs both again: the list must come out the same however many times they run.
+const { pluginDocs, pluginJob } = await import('../src/lib/site/signoff-plugins.ts');
+const { electricianPack } = await import('../src/lib/site/electrician.ts');
+const { eicFacts } = await import('../src/lib/site/eic/facts.ts');
+const kept = { k: 'f43_tester', v: 'Kept by another part of the pack' };
+const sorted = (list) => [...list].map((x) => JSON.stringify(x)).sort();
+const listNow = () => db.rows('site_contacts')[0].instruments;
+db.rows('site_contacts')[0].instruments = [kept, { text: 'An old F43 line', at: '2026-01-01T00:00:00Z' }, { k: 'eic_rcd', v: 'An old RCD tester' }];
+eq('(their list before: another part’s entry, an old F43 line, an old EIC tester)', listNow().length, 3);
+const both = electrician({ ...values, f43_instruments: 'Megger MFT1741+ s/n 1234567', eic_inst: { mft: 'Megger MFT1741 · 101234567', earth: 'Kewtech KT62 · 5501' } }, ['eic_sig_con', 'eic_sig_ins']);
+const r5 = await sign(both);
+await afterReply();
+const so5 = db.rows('site_signoffs').find((x) => x.assignment_id === both.id);
+const want5 = [kept, { text: 'Megger MFT1741+ s/n 1234567', at: so5.signed_at }, { k: 'eic_mft', v: 'Megger MFT1741 · 101234567' }, { k: 'eic_earth', v: 'Kewtech KT62 · 5501' }];
+eq('F43 and the EIC both remembered after the sign-off and its documents step (the old ones of each replaced, the rest kept)', [r5.status, sorted(listNow())], [200, sorted(want5)]);
+await pluginJob(db, read(both.id), so5);
+await pluginDocs(db, read(both.id), so5);
+await pluginDocs(db, read(both.id), so5);
+eq('…the same after the cron runs the steps again', sorted(listNow()), sorted(want5));
+const nextJob = { ...read(both.id), id: randomUUID() };
+const pack = await electricianPack(db, nextJob, project, null);
+const ef = await eicFacts(db, nextJob, project);
+eq('their next job offers both: F43’s line, and each EIC tester', [pack.facts.instruments, ef.instruments], ['Megger MFT1741+ s/n 1234567', { mft: 'Megger MFT1741 · 101234567', earth: 'Kewtech KT62 · 5501' }]);
+const swap = electrician({ ...values, f43_instruments: 'Kewtech KT65DL s/n 998877', eic_inst: { mft: 'Kewtech KT65DL · 998877' } }, ['eic_sig_con', 'eic_sig_ins']);
+await sign(swap);
+await afterReply();
+const so6 = db.rows('site_signoffs').find((x) => x.assignment_id === swap.id);
+eq('new testers on a later job replace theirs (one F43 line, the EIC’s as given), nothing doubled', sorted(listNow()), sorted([kept, { text: 'Kewtech KT65DL s/n 998877', at: so6.signed_at }, { k: 'eic_mft', v: 'Kewtech KT65DL · 998877' }]));
+
 if (process.env.PDF_OUT) {
   const fs = await import('node:fs');
   for (const [k, v] of db.files) if (k.endsWith('.pdf')) fs.writeFileSync(`${process.env.PDF_OUT}/${k.split('/').pop()}`, v);

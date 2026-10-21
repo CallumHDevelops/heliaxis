@@ -122,6 +122,8 @@ export function FieldRow({ f, rec, answers, jf, locked }: { f: Field; rec: PackR
   const changedSince = s && given && !locked && s.src === 'roofer' && answers[f.key]?.src === 'roofer' && JSON.stringify(ctx.values[f.key]) !== JSON.stringify(s.v) ? s : null;
   const note = f.note?.(ctx);
   const auto = f.auto && !given && v !== undefined ? (f.autoFrom?.(ctx) ?? 'Worked out for you') : null;
+  // Asked earlier on this job (carry.ts): shown here, and typing over it changes it here only.
+  const carried = ctx.carried?.[f.key]?.from ?? null;
   const labels = slotLabels(jf);
   let widget: React.ReactNode = null;
   switch (f.type) {
@@ -223,6 +225,7 @@ export function FieldRow({ f, rec, answers, jf, locked }: { f: Field; rec: PackR
       {note && <p className="sa-q-note">{note}</p>}
       <Evidence f={f} jf={jf} rec={rec} labels={labels} />
       {auto && <p className="sa-autotag">{auto} ✓</p>}
+      {carried && <p className="sa-autotag">From earlier on this job ({carried}) ✓</p>}
       {bulk && (
         <button type="button" className="sa-btn sa-btn-2 sa-bulk" onClick={() => bulk.keys.forEach((k) => ctx.values[k] === undefined && void setAnswer(job, k, bulk.v, 'typed'))}>
           {bulk.label}

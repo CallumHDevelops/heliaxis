@@ -10,7 +10,8 @@ import zlib from 'node:zlib';
 export const INSPECTIONS_NA = ['5.0', '12.0', '13.0'];
 
 export const a = (v, src = 'typed') => ({ v, src, at: '2026-11-03T15:00:00Z' });
-export const board = { o: 1, ref: 'DB1', loc: 'Under the stairs', from: 'Origin', ocpd_bs: '88-3', ocpd_type: 'gG', ocpd_a: 100, spd: ['T2'], rcd: 'no', zdb: 0.23, ipf: 1.8, pol: true, spd_ok: 'yes' };
+// The existing board's first free way is 7, so the new circuits are 7, 8 and 9.
+export const board = { o: 1, ref: 'DB1', loc: 'Under the stairs', from: 'Origin', free: 7, ocpd_bs: '88-3', ocpd_type: 'gG', ocpd_a: 100, spd: ['T2'], rcd: 'no', zdb: 0.23, ipf: 1.8, pol: true, spd_ok: 'yes' };
 /** What zsCalculated says for each device (scripts/test-site-eic.mjs checks they still agree). */
 export const ZS_SRC = {
   B32: 'Max Zs calculated: U0 × Cmin ÷ Ia = 230 × 0.95 ÷ 160 = 1.37 Ω (type B: Ia = 5 × In)',
