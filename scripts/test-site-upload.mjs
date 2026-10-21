@@ -48,12 +48,12 @@ globalThis.fetch = (url, init) => {
   return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
 };
 const t0 = Date.now();
-const r = await C.putToStorage('https://storage.example/upload/sign/x.jpg?token=t', blob, { 'content-type': 'image/jpeg', 'x-upsert': 'true' }, 60);
+const r = await C.putToStorage('https://storage.example/upload/sign/x.jpg?token=t', blob, { 'content-type': 'image/jpeg' }, 60);
 const took = Date.now() - t0;
 eq('a stalled upload counts as no signal (sent again later)', r, 'offline');
 eq('… once its time is up, not before', took >= 50 && took < 2000, true);
 eq('… and the request itself was stopped', seen.signal.aborted, true);
-eq('a PUT with the upload headers, no cookies', [seen.method, seen.headers, seen.credentials], ['PUT', { 'content-type': 'image/jpeg', 'x-upsert': 'true' }, 'omit']);
+eq('a PUT with the upload headers, no cookies', [seen.method, seen.headers, seen.credentials], ['PUT', { 'content-type': 'image/jpeg' }, 'omit']);
 
 // The default limit comes from the blob's size.
 const realTimeout = globalThis.setTimeout;

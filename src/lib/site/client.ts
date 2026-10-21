@@ -74,8 +74,9 @@ export const uploadTimeoutMs = (bytes: number) => 60_000 + Math.ceil(Math.max(0,
 
 /**
  * A PUT to a signed storage link (a photo, its thumbnail, a certificate PDF), with that time limit.
- * 'offline' when it couldn't get through or ran out of time (sent again later, from the start: the
- * upload overwrites), 'error' when storage said no.
+ * 'offline' when it couldn't get through or ran out of time (sent again later, from the start, with
+ * a fresh link: the server never overwrites a file, and gives no link for one that has arrived),
+ * 'error' when storage said no.
  */
 export async function putToStorage(url: string, blob: Blob, headers: Record<string, string>, timeoutMs = uploadTimeoutMs(blob.size)): Promise<'ok' | 'offline' | 'error'> {
   // AbortController and a timer, as siteFetch (older iPhones have no AbortSignal.timeout).

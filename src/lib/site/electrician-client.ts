@@ -48,8 +48,11 @@ export async function removeFile(assignmentId: string, f: { op_id?: string; clie
   drainSoon(0);
 }
 
-/** Straight to storage, with a time limit (a stalled upload counts as no signal and goes again later). */
-const put = (url: string, blob: Blob, mime: string) => putToStorage(url, blob, { 'content-type': mime, 'x-upsert': 'true' });
+/**
+ * Straight to storage, with a time limit (a stalled upload counts as no signal and goes again later).
+ * The link can't overwrite (the server makes it without upsert), so nothing here asks to.
+ */
+const put = (url: string, blob: Blob, mime: string) => putToStorage(url, blob, { 'content-type': mime });
 
 registerSender('file', {
   rank: 15,
