@@ -35,6 +35,12 @@
   color: var(--err);
   text-decoration: line-through;
 }
+/* A trade's labour PO (raised by their sign-off), beside the name where a supplier would be. */
+.po-chip--labour {
+  background: rgba(33, 31, 24, 0.82);
+  color: #fff;
+  vertical-align: 1px;
+}
 .po-chip.is-late,
 .po-chip--changed {
   background: rgba(179, 38, 30, 0.1);

@@ -198,6 +198,29 @@
   color: var(--amber-2);
   font-weight: 600;
 }
+/* The labour PO on a trade's card: held (amber, with what it needs) or issued. */
+.sx-po {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--paper);
+  border-left: 3px solid var(--line);
+  font-size: 0.86rem;
+}
+.sx-po p {
+  margin: 0;
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.sx-po.is-held {
+  background: rgba(248, 188, 30, 0.16);
+  border-left-color: var(--amber-2);
+}
 .sx-flags {
   list-style: none;
   margin: 0.55rem 0 0;

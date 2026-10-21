@@ -150,6 +150,18 @@ eq('send: every line priced', sendBlocker({ status: 'draft', lines: [{ qty: 1, u
 eq('send: free is fine', sendBlocker({ status: 'sent', lines: [{ qty: 1, unit_cost_pence: 0, vat_rate: 20 }] }), null);
 eq('send: not once delivered', sendBlocker({ status: 'delivered', lines: [{ qty: 1, unit_cost_pence: 1, vat_rate: 20 }] }), 'A delivered order can’t be sent.');
 
+/* ── Labour POs (raised by a trade's sign-off) ──────────────────────────── */
+
+eq('labour: a held one is issued or deleted', actionsFor('draft', 'labour'), ['issue', 'delete']);
+eq('labour: an issued one is issued again or cancelled', actionsFor('sent', 'labour'), ['issue', 'cancel']);
+eq('labour: never emailed as a supplier order', canDo('draft', 'send', 'labour'), false);
+eq('labour: nothing happens once cancelled', actionsFor('cancelled', 'labour'), []);
+eq('labour: what was signed can’t be edited', checkChange('sent', ['lines'], 'labour')?.startsWith('A labour PO says what was signed for'), true);
+eq('labour: their invoice once issued', [checkChange('sent', ['supplier_invoice_ref', 'paid_on'], 'labour'), checkChange('draft', ['paid_on'], 'labour')], [null, 'Add their invoice once the PO has been issued.']);
+eq('labour: our note, always', checkChange('draft', ['internal_note'], 'labour'), null);
+eq('labour: editable', editable('sent', 'labour'), { supplier: false, order: false, invoice: true, internal: true, received: false });
+eq('supplier orders are as before', [actionsFor('draft'), actionsFor('draft', 'supply')], [['send', 'mark_sent', 'delete'], ['send', 'mark_sent', 'delete']]);
+
 /* ── Dates ──────────────────────────────────────────────────────────────── */
 
 eq('days', [isDay('2026-11-03'), isDay('2026-02-30'), isDay('3/11/2026'), isDay('1999-01-01')], [true, false, false, false]);

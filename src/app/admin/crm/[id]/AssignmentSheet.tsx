@@ -105,6 +105,9 @@ export function AssignmentSheet({
   const [err, setErr] = useState('');
   const set = (p: Partial<Draft>) => setD((x) => ({ ...x, ...p }));
   const signed = existing?.status === 'signed' || existing?.status === 'done';
+  // Signed off, the money can still be put right while the PO waits for the office; once it has
+  // gone, reopen the sign-off to change it.
+  const fixed = signed && !!existing?.po && (existing.po.status !== 'draft' || existing.po.version > 0);
 
   // Who it is, for the VAT and CIS lines.
   const person = existing
@@ -153,7 +156,7 @@ export function AssignmentSheet({
       share_customer_phone: d.share_customer_phone,
       note_to_trade: d.note_to_trade,
       ...(d.trade === 'electrician' ? { forms: d.forms, cert_route: d.cert_route } : {}),
-      ...(signed
+      ...(fixed
         ? {}
         : {
             rate_pence: ratePence,
@@ -223,8 +226,15 @@ export function AssignmentSheet({
         </div>
       </div>
 
-      <fieldset className="sx-fs" disabled={signed}>
-        <legend className="crm-label">Agreed rate {signed && <small className="crm-muted">(fixed: it’s signed off)</small>}</legend>
+      <fieldset className="sx-fs" disabled={fixed}>
+        <legend className="crm-label">
+          Agreed rate{' '}
+          {fixed ? (
+            <small className="crm-muted">(fixed: the PO has gone. Reopen the sign-off to change it)</small>
+          ) : (
+            signed && <small className="crm-muted">(signed off: the PO waits for this)</small>
+          )}
+        </legend>
         <div className="sx-rate">
           <span className="sx-money">
             <span aria-hidden="true">£</span>

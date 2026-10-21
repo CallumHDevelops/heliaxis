@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDue } from './send';
 import { siteReady, type Db } from './server';
+import { finishSignoffs } from './signoff';
 import { strikeReminders } from './strike';
 import { retryReads } from './vision';
 
@@ -20,6 +21,9 @@ export const SITE_JOBS: SiteJob[] = [
   // 4. Strike photos asked for (and chased) after the scaffold's down date: queued first, so the
   // messages job below sends them in the same run.
   { name: 'strike', run: (db) => strikeReminders(db) },
+  // 2. Sign-offs whose steps after the reply didn't all run (the PO issued, the report, the owner told):
+  // before the messages, so a PO email it queues goes in the same run.
+  { name: 'signoffs', run: (db, until) => finishSignoffs(db, until) },
   // 1. Messages whose time has come (held overnight by the evening rule, or retried).
   { name: 'messages', run: (db) => sendDue(db) },
   // 3. Label photos that arrived while nobody was waiting on the read.

@@ -4,7 +4,8 @@ import { useCallback, useState } from 'react';
 import { KIND_LABEL, sendTimeWords, type MessageKind } from '@/lib/site/messages';
 import { formatPence } from '@/lib/site/money';
 import type { SendResult } from '@/lib/site/send';
-import type { AssignmentView, SiteMessageView, SiteTabData } from '@/lib/site/server';
+import { HELD_WORDS, OVERRIDABLE } from '@/lib/site/po-shared';
+import type { AssignmentView, PoView, SiteMessageView, SiteTabData } from '@/lib/site/server';
 import type { StripStep } from '@/lib/site/strip';
 import { TRADE_LABEL, type Trade } from '@/lib/site/types';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
@@ -83,6 +84,39 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
     setBusy(null);
   }
 
+  /** Issue the PO (a held one, or again after a change). `override`: past the owner's own holds. */
+  async function issuePo(a: AssignmentView, override = false) {
+    const po = a.po;
+    if (!po) return;
+    const again = po.version > 0;
+    if (again && !window.confirm(`Issue ${po.po_number} again to ${a.contact.name}? It says it replaces the version sent on ${po.issued ? shortDate(po.issued) : 'before'}.`)) return;
+    setBusy(a.id);
+    setError('');
+    try {
+      const r = await send<{ ok: true; po: { po_number: string }; data: SiteTabData }>(`/api/crm/site-assignments/${a.id}/issue-po`, 'POST', { override });
+      changed(r.data);
+      const queued = r.data.assignments.find((x) => x.id === a.id)?.messages.find((m) => m.kind === 'po' && m.status === 'queued');
+      setNotice(`${r.po.po_number} ${again ? 'issued again' : 'issued'}.${queued ? ` It goes to ${a.contact.name.split(/\s+/)[0]} at ${sendTimeWords(queued.send_after)}.` : ''}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Not issued. Try again.');
+    }
+    setBusy(null);
+  }
+
+  async function reopen(a: AssignmentView) {
+    if (!window.confirm(`Reopen ${a.contact.name}’s sign-off? They can change their answers and sign again from the same link. The PO stays; if the money changes you can issue it again.`)) return;
+    setBusy(a.id);
+    setError('');
+    try {
+      const r = await send<{ ok: true; data: SiteTabData }>(`/api/crm/site-assignments/${a.id}/reopen`, 'POST', {});
+      changed(r.data);
+      setNotice(`Reopened. ${a.contact.name.split(/\s+/)[0]} can sign again.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Not reopened. Try again.');
+    }
+    setBusy(null);
+  }
+
   async function cancel(a: AssignmentView) {
     if (!window.confirm(`Take ${a.contact.name} (${a.title.toLowerCase()}) off this job? Their link stops working straight away.`)) return;
     setBusy(a.id);
@@ -136,6 +170,8 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
               onEdit={() => setSheet({ edit: a, trade: null })}
               onCancel={() => void cancel(a)}
               onMessage={(o) => void message(a, o)}
+              onIssue={(override) => void issuePo(a, override)}
+              onReopen={() => void reopen(a)}
               onHoldAll={() => {
                 for (const t of live.filter((x) => (x.trade === 'roofer' || x.trade === 'electrician') && x.status !== 'signed' && x.status !== 'done')) void message(t, { via: 'both', kind: 'scaffold_hold' });
               }}
@@ -180,7 +216,7 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
                   <li key={a.id}>
                     <b>{a.po!.po_number}</b> {a.contact.name}
                     <small>
-                      {a.po!.status === 'draft' ? 'Held: the office to check' : a.po!.status}
+                      {poWords(a.po!)}
                       {a.po!.payable_pence != null ? ` · ${formatPence(a.po!.payable_pence)} to pay` : ''}
                     </small>
                   </li>
@@ -219,6 +255,13 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
       )}
     </div>
   );
+}
+
+/** A labour PO's state for the office: "Held: Add the agreed rate…", "Issued 3 Nov", "Changed since it was sent". */
+function poWords(po: PoView): string {
+  if (po.status === 'draft') return po.held.length ? `Held: ${po.held.map((h) => HELD_WORDS[h]).join('. ')}` : po.version ? 'Issued, waiting to send' : 'Being issued';
+  if (po.changed_since_sent) return 'Changed since it was sent: issue it again';
+  return `${po.status === 'sent' ? 'Issued' : po.status[0].toUpperCase() + po.status.slice(1)}${po.issued ? ` ${shortDate(po.issued)}` : ''}${po.sent_at ? '' : ' (not delivered yet)'}`;
 }
 
 /** Scaffold up ✓ → Roof ✓ → Electrics in progress → Handover. */
@@ -260,6 +303,8 @@ function AssignmentCard({
   onCancel,
   onMessage,
   onHoldAll,
+  onIssue,
+  onReopen,
 }: {
   a: AssignmentView;
   now: number;
@@ -269,6 +314,8 @@ function AssignmentCard({
   onCancel: () => void;
   onMessage: (o: { via: 'email' | 'whatsapp' | 'both' | 'link'; kind?: MessageKind; rotate?: boolean; chat?: boolean }) => void;
   onHoldAll: () => void;
+  onIssue: (override: boolean) => void;
+  onReopen: () => void;
 }) {
   const open = a.flags.filter((f) => !f.resolved_at);
   const signed = a.status === 'signed' || a.status === 'done';
@@ -321,6 +368,7 @@ function AssignmentCard({
           .filter(Boolean)
           .join(' · ')}
       </p>
+      {a.po && <PoLine po={a.po} busy={busy} onIssue={onIssue} />}
       {open.length > 0 && (
         <ul className="sx-flags">
           {open.map((f) => (
@@ -379,6 +427,11 @@ function AssignmentCard({
             New link
           </button>
         )}
+        {signed && (
+          <button type="button" className="crm-chipbtn" onClick={onReopen} disabled={busy}>
+            Reopen sign-off
+          </button>
+        )}
         {!signed && (
           <button type="button" className="crm-chipbtn" onClick={onCancel} disabled={busy}>
             Take off the job
@@ -386,5 +439,32 @@ function AssignmentCard({
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * The PO on a trade's card: held (what it needs, and Issue once only the owner's own holds are left:
+ * "Issue anyway"), being issued, changed since it was sent (Issue again), or issued.
+ */
+function PoLine({ po, busy, onIssue }: { po: PoView; busy: boolean; onIssue: (override: boolean) => void }) {
+  const blocking = po.held.filter((h) => !OVERRIDABLE.includes(h));
+  const own = po.held.filter((h) => OVERRIDABLE.includes(h));
+  const draft = po.status === 'draft';
+  return (
+    <div className={`sx-po${draft && po.held.length ? ' is-held' : ''}`}>
+      <p>
+        <b>{po.po_number}</b> · {poWords(po)}
+      </p>
+      {draft && !blocking.length && (
+        <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={busy} onClick={() => onIssue(own.length > 0)}>
+          {own.length ? 'Issue anyway' : 'Issue PO'}
+        </button>
+      )}
+      {!draft && po.status !== 'cancelled' && (
+        <button type="button" className={`crm-btn crm-btn--small ${po.changed_since_sent ? 'crm-btn--solar' : 'crm-btn--ghost'}`} disabled={busy} onClick={() => onIssue(true)}>
+          Issue again
+        </button>
+      )}
+    </div>
   );
 }

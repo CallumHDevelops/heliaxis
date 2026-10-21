@@ -19,7 +19,8 @@ import {
   type MoneyLine,
   type PoStatus,
 } from '@/lib/purchase-orders/money';
-import { addressLine, DELIVER_LABEL, defaultPoMessage, type DeliverTo, type PoFull, type PoSuggestion, type Supplier } from '@/lib/purchase-orders/shared';
+import { addressLine, DELIVER_LABEL, defaultPoMessage, labourWho, type DeliverTo, type PoFull, type PoSuggestion, type Supplier } from '@/lib/purchase-orders/shared';
+import { HELD_WORDS, OVERRIDABLE } from '@/lib/site/po-shared';
 import { Sheet } from '../../crm/CrmUi';
 import { shortDate, ukDayOf } from '../../crm/crm-shared';
 import { api, neededWords, StatusChip } from './OrdersUi';
@@ -48,7 +49,7 @@ const isBlank = (l: LineDraft) => !l.description.trim() && !l.qty.trim() && !l.u
 function draftOf(full: PoFull): Draft {
   const o = full.order;
   return {
-    supplier_id: o.supplier_id,
+    supplier_id: o.supplier_id ?? '',
     deliver_to: o.deliver_to,
     deliver_address: o.deliver_address ?? '',
     deliver_postcode: o.deliver_postcode ?? '',
@@ -236,7 +237,7 @@ export function OrderSheet({
       <div className="po-sheet">
         {o && (
           <div className="po-sheet__chips">
-            <StatusChip status={o.status} />
+            <StatusChip status={o.status} labour={o.kind === 'labour'} />
             {o.changed_since_sent && <span className="po-chip po-chip--changed">Changed since sent</span>}
             {showJob && full?.job && (
               <Link className="po-joblink" href={`/admin/projects/${full.job.id}?tab=orders`}>
@@ -319,7 +320,28 @@ export function OrderSheet({
                 onBack={() => setMode('view')}
               />
             )}
-            {mode === 'view' && (
+            {mode === 'view' && o.kind === 'labour' && (
+              <LabourView
+                full={full}
+                busy={busy}
+                onIssue={() => {
+                  const again = (o.labour?.version ?? 0) > 0;
+                  if (again && !window.confirm(`Issue ${o.po_number} again? It says it replaces the version sent on ${o.labour?.issued ? shortDate(o.labour.issued) : 'before'}.`)) return;
+                  void move({ action: 'issue' }, again ? 'Issued again ✓' : 'Issued ✓');
+                }}
+                onCancel={() => setMode('cancel')}
+                onDelete={() => {
+                  if (!window.confirm(`Delete the held PO ${o.po_number}? It hasn’t gone to anyone. Issuing from the Site tab raises it again.`)) return;
+                  void run(async () => {
+                    await api(`/api/crm/purchase-orders/${o.id}`, { method: 'DELETE' }, 'Not deleted. Try again.');
+                    onChanged(null);
+                    onClose();
+                  });
+                }}
+                onSave={(body, msg) => move(body, msg)}
+              />
+            )}
+            {mode === 'view' && o.kind !== 'labour' && (
               <OrderView
                 full={full}
                 today={today}
@@ -681,6 +703,133 @@ function InvoiceForm({ full, busy, onSave }: { full: PoFull; busy: boolean; onSa
   );
 }
 
+/* ── A labour PO ─────────────────────────────────────────────────────────────── */
+
+/**
+ * A trade's labour PO (raised by their sign-off): read-only, as it was frozen, apart from their
+ * invoice, our note and Cancel. Issue (a held one), Issue again (after a change), the PDF that went.
+ */
+function LabourView({
+  full,
+  busy,
+  onIssue,
+  onCancel,
+  onDelete,
+  onSave,
+}: {
+  full: PoFull;
+  busy: boolean;
+  onIssue: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+  onSave: (body: Record<string, unknown>, msg: string) => Promise<void>;
+}) {
+  const o = full.order;
+  const l = o.labour ?? null;
+  const s = o.status;
+  const issued = (l?.version ?? 0) > 0;
+  const day = (iso: string | null) => (iso ? shortDate(ukDayOf(iso)) : '');
+  const steps = [
+    `Raised ${day(o.created_at)}${l?.signed ? ` when ${l.signed.by} signed off` : ''}`,
+    l?.issued ? `Issued ${shortDate(l.issued)}${l.version > 1 ? ` (version ${l.version})` : ''}` : '',
+    o.sent_at ? `Reached them ${day(o.sent_at)}${o.sent_to ? ` (${o.sent_to})` : ''}` : issued ? 'Waiting to send' : '',
+    o.paid_on ? `Paid ${shortDate(o.paid_on)}` : '',
+    o.cancelled_at ? `Cancelled ${day(o.cancelled_at)}` : '',
+  ].filter(Boolean);
+  return (
+    <div className="po-view">
+      {s === 'draft' && !!l?.held.length && (
+        <div className="crm-banner po-changed">
+          <span>Held: {l.held.map((h) => HELD_WORDS[h]).join('. ')}.</span>
+        </div>
+      )}
+      {o.changed_since_sent && (
+        <div className="crm-banner po-changed">
+          <span>The sign-off changed since this went to them. Issue it again so they have the latest version.</span>
+          <button type="button" className="crm-btn crm-btn--small" disabled={busy} onClick={onIssue}>
+            Issue again
+          </button>
+        </div>
+      )}
+      <div className="po-view__top">
+        <section className="po-box" aria-label="Who it’s for">
+          <h4>{l?.trade_title ?? 'Labour'}</h4>
+          <b>{labourWho(o)}</b>
+          {l?.sub.mobile && <span>{l.sub.mobile}</span>}
+          {l?.sub.email ? <span>{l.sub.email}</span> : <span className="crm-muted">No email</span>}
+          {l?.sub.firm_ref && <span className="crm-muted">{l.sub.firm_ref}</span>}
+        </section>
+        <section className="po-box" aria-label="The work">
+          <h4>The work</h4>
+          <span>{l?.scope || 'As agreed'}</span>
+          {l?.job.address && <span className="crm-muted">{l.job.address}</span>}
+        </section>
+        <section className="po-box" aria-label="History">
+          <h4>So far</h4>
+          {steps.map((x) => (
+            <span key={x}>{x}</span>
+          ))}
+        </section>
+      </div>
+      {l ? (
+        <dl className="po-totals" aria-label="What they’re paid">
+          <div>
+            <dt>{l.rate_words ?? 'No agreed rate yet'}</dt>
+            <dd>{formatPence(l.labour_net)}</dd>
+          </div>
+          {l.materials_net > 0 && (
+            <div>
+              <dt>Materials (no CIS)</dt>
+              <dd>{formatPence(l.materials_net)}</dd>
+            </div>
+          )}
+          <div>
+            <dt>{l.vat_words}</dt>
+            <dd>{formatPence(l.vat)}</dd>
+          </div>
+          <div>
+            <dt>{l.cis.words}</dt>
+            <dd>{l.cis.pence ? `−${formatPence(l.cis.pence)}` : formatPence(0)}</dd>
+          </div>
+          <div className="po-totals__gross">
+            <dt>What they’ll be paid</dt>
+            <dd>{formatPence(l.payable)}</dd>
+          </div>
+          {l.payment_terms && <p className="crm-small crm-muted">{l.payment_terms}</p>}
+        </dl>
+      ) : (
+        <p className="crm-muted">Nothing frozen on this PO yet.</p>
+      )}
+      <NoteForm key={`n-${o.updated_at}`} value={o.internal_note ?? ''} busy={busy} onSave={(v) => onSave({ internal_note: v }, 'Saved ✓')} />
+      {editable(s, 'labour').invoice && <InvoiceForm key={`i-${o.updated_at}`} full={full} busy={busy} onSave={(b) => onSave(b, 'Saved ✓')} />}
+      <div className="po-actions">
+        {issued && (
+          <a className="crm-btn crm-btn--ghost" href={`/api/crm/purchase-orders/${o.id}/pdf`} download>
+            Download PDF
+          </a>
+        )}
+        {canDo(s, 'issue', 'labour') && (!o.labour?.held.some((h) => !OVERRIDABLE.includes(h)) || issued) && (
+          <button type="button" className={`crm-btn${s === 'draft' || o.changed_since_sent ? ' crm-btn--solar' : ' crm-btn--ghost'}`} disabled={busy} onClick={onIssue}>
+            {issued ? 'Issue again' : o.labour?.held.length ? 'Issue anyway' : 'Issue PO'}
+          </button>
+        )}
+        <span className="po-actions__end">
+          {canDo(s, 'cancel', 'labour') && (
+            <button type="button" className="crm-link po-danger" disabled={busy} onClick={onCancel}>
+              Cancel PO
+            </button>
+          )}
+          {canDo(s, 'delete', 'labour') && !issued && (
+            <button type="button" className="crm-link po-danger" disabled={busy} onClick={onDelete}>
+              Delete
+            </button>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /* ── Moving it on ────────────────────────────────────────────────────────────── */
 
 function SendPanel({
@@ -835,7 +984,15 @@ function CancelPanel({ full, busy, onDone, onBack }: { full: PoFull; busy: boole
     <section className="po-panel" aria-label="Cancel the order">
       <h3>Cancel {full.order.po_number}?</h3>
       <p>
-        It stays on the job, marked Cancelled. <b>This doesn’t tell {full.supplier?.name ?? 'the supplier'}</b>: call or email them too.
+        {full.order.kind === 'labour' ? (
+          <>
+            It stays on the job, marked Cancelled, and anything still waiting to send to {labourWho(full.order)} is stopped. <b>It doesn’t tell them</b>: call them too.
+          </>
+        ) : (
+          <>
+            It stays on the job, marked Cancelled. <b>This doesn’t tell {full.supplier?.name ?? 'the supplier'}</b>: call or email them too.
+          </>
+        )}
       </p>
       <label className="crm-label" htmlFor="po-cancel-why">
         Why (optional, goes on the job’s timeline)

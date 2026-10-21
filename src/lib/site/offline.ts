@@ -1,7 +1,7 @@
 'use client';
 
 import type { SiteJobRow, SitePack } from './pack-shared';
-import type { Answer, Answers } from './types';
+import type { Answer, Answers, Stage } from './types';
 
 /**
  * The site app's copy on the phone (IndexedDB "hx-site", version 1), so everything works with no
@@ -48,6 +48,10 @@ export type PackRecord = {
   changes: string[];
   /** The job was cancelled or taken off this person's list (P17); everything waiting stays. */
   problem?: { kind: string; message: string; at: string };
+  /** The server turned a sign-off down: what it still needs (P11). Cleared when they sign again. */
+  gate?: { stage: Stage; message: string; missing: { label: string; key: string; step: string }[]; at: string };
+  /** From the sign-off's reply: the evening rule holds the PO's messages until then. */
+  poGoesAt?: string | null;
 };
 export type FileRecord = { id: string; assignmentId: string; name: string; mime: string; blob: Blob; storedAt: string };
 export type DraftRecord = { id: string; answers: Answers; base: Answers; baseRev: number; dirty: string[]; savedAt: string };

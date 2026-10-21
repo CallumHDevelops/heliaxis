@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
 import { cleanAssignment, vatFor } from '@/lib/site/assign';
 import { isElectricianForm } from '@/lib/site/forms';
+import { livePo, refreshDraftPo } from '@/lib/site/labour-po';
 import { getSiteSettings } from '@/lib/site/settings';
 import { firmsById, logJob, logSiteEvent, moneyFacts, notReady, readAssignment, siteReady, siteTabData, type ContactRow } from '@/lib/site/server';
 import { TRADE_LABEL } from '@/lib/site/types';
@@ -29,7 +30,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (!a) return json({ error: 'That trade isn’t on the job any more.' }, 404);
   if (a.status === 'cancelled') return json({ error: 'This trade was cancelled.' }, 409);
   const signed = a.status === 'signed' || a.status === 'done';
-  if (signed && MONEY.some((k) => k in b)) return json({ error: 'It’s signed off, so the rate and PO are fixed. Reopen the sign-off to change them.' }, 409);
+  // Signed off: the money can still be put right while the PO waits for the office; once it has
+  // gone, reopen the sign-off to change it.
+  if (signed && MONEY.some((k) => k in b)) {
+    const po = await livePo(db, a.id);
+    if (po && (po.status !== 'draft' || (po.labour?.version ?? 0) > 0)) return json({ error: 'The PO has gone, so the rate is fixed. Reopen the sign-off to change it.' }, 409);
+  }
 
   const clean = cleanAssignment(b, true, a);
   if (!clean.ok) return json({ error: clean.error }, 400);
@@ -57,6 +63,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (error) return json({ error: error.message }, 500);
   const changed = Object.keys(u).filter((k) => k !== 'updated_at');
   await logSiteEvent(db, id, s.user.email ?? s.user.id, 'edited', { fields: changed });
+  if (signed && changed.some((k) => MONEY.includes(k))) {
+    const now = await readAssignment(db, id);
+    if (now) await refreshDraftPo(db, now);
+  }
   return json(await siteTabData(db, a.project_id));
 }
 

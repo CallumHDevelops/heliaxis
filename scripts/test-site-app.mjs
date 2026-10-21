@@ -64,6 +64,8 @@ const waiting = { answers: 0, photos: 3, other: 0, total: 3 };
 eq('3 photos waiting', words({ online: false, waiting }), { pill: '3 waiting', line: '3 photos waiting. They’ll send when you have signal.', tone: 'wait' });
 eq('photos and answers', words({ waiting: { answers: 1, photos: 2, other: 0, total: 3 } }).line, '2 photos and your answers waiting. They’ll send when you have signal.');
 eq('one photo', words({ waiting: { answers: 0, photos: 1, other: 0, total: 1 } }).line, '1 photo waiting. It’ll send when you have signal.');
+eq('a sign-off is named', words({ waiting: { answers: 0, photos: 0, other: 1, total: 1, signoffs: 1 } }).line, 'Your sign-off waiting. It’ll send when you have signal.');
+eq('photos and a sign-off', words({ waiting: { answers: 0, photos: 2, other: 1, total: 3, signoffs: 1 } }).line, '2 photos and your sign-off waiting. They’ll send when you have signal.');
 eq('sending 2 of 5', words({ phase: 'sending', done: 1, total: 5 }).pill, 'Sending 2 of 5…');
 eq('a failed photo', words({ failed: { photos: 1, other: 0, total: 1 } }), { pill: '1 not sent', line: 'Couldn’t send 1 photo. Tap to retry.', tone: 'bad' });
 eq('waiting beats an old All sent', words({ lastOkAt: '2026-10-21T08:00:00Z', waiting }).pill, '3 waiting');

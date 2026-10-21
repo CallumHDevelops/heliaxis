@@ -94,10 +94,16 @@ export function SyncSheet({ onClose }: { onClose: () => void }) {
             <dt>Photos</dt>
             <dd>{s.waiting.photos ? `${s.waiting.photos} waiting` : 'Sent'}</dd>
           </div>
-          {s.waiting.other > 0 && (
+          {!!s.waiting.signoffs && (
+            <div>
+              <dt>Sign-off</dt>
+              <dd>Waiting: it goes once the photos are up</dd>
+            </div>
+          )}
+          {s.waiting.other - (s.waiting.signoffs ?? 0) > 0 && (
             <div>
               <dt>Other</dt>
-              <dd>{s.waiting.other} waiting</dd>
+              <dd>{s.waiting.other - (s.waiting.signoffs ?? 0)} waiting</dd>
             </div>
           )}
           {s.storage && (

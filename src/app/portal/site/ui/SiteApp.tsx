@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { getDevice } from '@/lib/site/offline';
+// The sign-off's sender on the outbox: registered before the first send, whatever screen opens first.
+import '@/lib/site/signoff-client';
 import { refreshJobs } from '@/lib/site/packs';
 import { isDraining, startSync } from '@/lib/site/sync';
 import { ProblemScreen, Splash } from './bits';

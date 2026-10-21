@@ -215,6 +215,19 @@ export async function deliver(db: Db, m: MessageRow): Promise<MessageRow | null>
     const u = result.ok ? { status: 'sent', sent_at: now, provider_id: result.id, error: null } : { status: 'failed', error: result.error.slice(0, 500) };
     const { data: done } = await db.from('site_messages').update(u).eq('id', m.id).select('*').single();
     await logSiteEvent(db, m.assignment_id, 'system', result.ok ? 'message_sent' : 'message_failed', { channel: m.channel, kind: m.kind, ...(result.ok ? {} : { error: result.error }) });
+    // A labour PO counts as sent once it has actually reached them (po:<id>:v<n>:<channel>): the
+    // first message to arrive sets when, and the email address says where (over a WhatsApp number).
+    const po = m.kind === 'po' ? /^po:([0-9a-f-]{36}):/i.exec(m.dedupe_key)?.[1] : null;
+    if (result.ok && po) {
+      const { data: cur } = await db.from('purchase_orders').select('sent_at, sent_to').eq('id', po).maybeSingle();
+      const was = (cur ?? {}) as { sent_at?: string | null; sent_to?: string | null };
+      const to = m.channel === 'email' ? m.to_address : was.sent_to?.includes('@') ? was.sent_to : `WhatsApp ${m.to_address}`;
+      await db
+        .from('purchase_orders')
+        .update({ status: 'sent', sent_at: was.sent_at ?? now, sent_to: to, updated_at: now })
+        .eq('id', po)
+        .in('status', ['draft', 'sent']);
+    }
     return (done as MessageRow | null) ?? null;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Not sent';
@@ -236,7 +249,7 @@ export async function sendDue(db: Db, limit = 50): Promise<number> {
 
 /* ── Staff sends: the job pack, clear to start, don't use the scaffold ───────── */
 
-const emailHtml = (e: EmailText) =>
+export const emailHtml = (e: EmailText) =>
   emailShell(
     e.title,
     e.paragraphs.map((p) => `<p>${esc(p)}</p>`).join(''),

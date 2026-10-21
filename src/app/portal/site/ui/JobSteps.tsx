@@ -27,7 +27,7 @@ export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Ans
     if (key.startsWith('sign-') || key.startsWith('done-')) {
       const form = forms.find((f) => f.stage === key.slice(5));
       if (form && key.startsWith('sign-')) return <CheckSign rec={rec} jf={jf} form={form} />;
-      if (form) return <DoneScreen rec={rec} form={form} />;
+      if (form) return <DoneScreen rec={rec} form={form} pending={jf.pendingSign.includes(form.stage)} />;
     }
     for (const form of openForms(forms, jf.signed)) {
       const step = form.steps.find((s) => s.key === key);

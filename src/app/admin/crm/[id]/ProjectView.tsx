@@ -10,6 +10,7 @@ import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { useNow } from '@/lib/use-now';
 import { NewProjectSheet } from '../../projects/NewProjectSheet';
 import { OrdersTab } from '../../projects/orders/OrdersTab';
+import { ordersCount } from '../../projects/orders/OrdersUi';
 import { ProjectOverview, SurveysPanel, type OverviewActions } from '../../projects/[id]/ProjectOverview';
 import { firstName, phaseOf, ukDayOf } from '../crm-shared';
 import { DOCK, openDock, sendDockJob, useDockState, type DockJob } from '../dock-link';
@@ -280,7 +281,7 @@ export function ProjectView({
   const stage = rec?.project.stage ?? '';
   const fallbackTab = stage ? defaultTab(stage, area) : 'activity';
   // Orders (purchase-orders.sql): for jobs from Won, and any job that already has some.
-  const ordersTab = !!schema.purchaseOrders && (isProjectStage(stage) || (rec?.orders?.count ?? 0) > 0);
+  const ordersTab = !!schema.purchaseOrders && (isProjectStage(stage) || ordersCount(rec?.orders) > 0);
   // Site (site-commissioning.sql): the trades on the job, from Won.
   const siteTab = !!schema.site && isProjectStage(stage);
   let tab: Tab = tabSel ?? fallbackTab;
@@ -534,7 +535,7 @@ export function ProjectView({
     ),
     photos: <>Photos{counts.photos > 0 && <i>{counts.photos}</i>}</>,
     docs: <>Docs{counts.docs > 0 && <i>{counts.docs}</i>}</>,
-    orders: <>Orders{(rec.orders?.count ?? 0) > 0 && <i>{rec.orders?.count}</i>}</>,
+    orders: <>Orders{ordersCount(rec.orders) > 0 && <i>{ordersCount(rec.orders)}</i>}</>,
     site: 'Site',
     surveys: <>Surveys{counts.surveys > 0 && <i>{counts.surveys}</i>}</>,
   };

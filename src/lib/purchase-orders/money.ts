@@ -179,7 +179,12 @@ export type Editable = {
   received: boolean;
 };
 
-export function editable(status: string): Editable {
+/** A supplier's order, or a trade's labour PO (raised by their sign-off: src/lib/site/labour-po.ts). */
+export type PoKind = 'supply' | 'labour';
+
+export function editable(status: string, kind: PoKind = 'supply'): Editable {
+  // A labour PO is frozen as it was issued: only their invoice and our note change on it.
+  if (kind === 'labour') return { supplier: false, order: false, invoice: status === 'sent', internal: true, received: false };
   switch (status) {
     case 'draft':
       return { supplier: true, order: true, invoice: false, internal: true, received: false };
@@ -194,10 +199,14 @@ export function editable(status: string): Editable {
 }
 
 /** Which of these changes can be saved in this status, or what's stopping them. */
-export function checkChange(status: string, keys: string[]): string | null {
-  const e = editable(status);
+export function checkChange(status: string, keys: string[], kind: PoKind = 'supply'): string | null {
+  const e = editable(status, kind);
   const word = STATUS_LABEL[status as PoStatus]?.toLowerCase() ?? status;
   for (const k of keys) {
+    if (kind === 'labour' && (SUPPLIER_FIELDS as readonly string[]).includes(k)) return 'A labour PO says what was signed for. Change the rate on the Site tab (reopen the sign-off first if it has gone), then issue it again.';
+    if (kind === 'labour' && (k === 'supplier_invoice_ref' || k === 'supplier_invoice_pence' || k === 'paid_on') && !e.invoice) {
+      return status === 'draft' ? 'Add their invoice once the PO has been issued.' : `A ${word} PO has no invoice to record.`;
+    }
     if (k === 'supplier_id' && !e.supplier) return `The supplier can’t change once the order has gone to them. Cancel it and make a new one instead.`;
     if ((SUPPLIER_FIELDS as readonly string[]).includes(k) && k !== 'supplier_id' && !e.order) return `A ${word} order can’t be changed.`;
     if ((k === 'supplier_invoice_ref' || k === 'supplier_invoice_pence' || k === 'paid_on') && !e.invoice) {
@@ -216,7 +225,7 @@ export const marksChanged = (status: string, keys: string[]) => isOpen(status) &
  */
 export const stillChanged = (status: string, changedSinceSent: unknown) => isOpen(status) && !!changedSinceSent;
 
-export type PoAction = 'send' | 'mark_sent' | 'confirm' | 'deliver' | 'undeliver' | 'cancel' | 'delete';
+export type PoAction = 'send' | 'mark_sent' | 'confirm' | 'deliver' | 'undeliver' | 'cancel' | 'delete' | 'issue';
 const ACTIONS: Record<PoStatus, PoAction[]> = {
   draft: ['send', 'mark_sent', 'delete'],
   sent: ['send', 'mark_sent', 'confirm', 'deliver', 'cancel'],
@@ -224,8 +233,10 @@ const ACTIONS: Record<PoStatus, PoAction[]> = {
   delivered: ['undeliver'],
   cancelled: [],
 };
-export const actionsFor = (status: string): PoAction[] => ACTIONS[status as PoStatus] ?? [];
-export const canDo = (status: string, a: PoAction) => actionsFor(status).includes(a);
+/** Labour POs: a held one is issued (or deleted); an issued one is issued again (after a change) or cancelled. */
+const LABOUR_ACTIONS: Record<PoStatus, PoAction[]> = { draft: ['issue', 'delete'], sent: ['issue', 'cancel'], confirmed: ['issue', 'cancel'], delivered: [], cancelled: [] };
+export const actionsFor = (status: string, kind: PoKind = 'supply'): PoAction[] => (kind === 'labour' ? LABOUR_ACTIONS : ACTIONS)[status as PoStatus] ?? [];
+export const canDo = (status: string, a: PoAction, kind: PoKind = 'supply') => actionsFor(status, kind).includes(a);
 
 /**
  * The status after sending (emailing it, or "Mark as sent"): a draft becomes Sent. Sent again after

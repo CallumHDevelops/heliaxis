@@ -8,6 +8,7 @@ import { readAll, withFallback } from '@/lib/projects/server';
 import { schemaReady } from '@/lib/schema-ready';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { formatPence, isDay, stillChanged, totals, type CleanLine } from './money';
+import { snapshotOf } from '@/lib/site/po-shared';
 import type { PoPdfInput } from './pdf';
 import { matchesOrder, summariseOrders, type DeliverTo, type Office, type OrdersSummary, type PoFull, type PoJob, type PoLine, type PoListRow, type PoSuggestion, type PurchaseOrder, type Supplier } from './shared';
 
@@ -30,13 +31,19 @@ const text = (v: unknown) => (typeof v === 'string' ? v : null);
 
 /** A purchase_orders row with its numbers as numbers (PostgREST can send bigints as strings). */
 function orderRow(r: Record<string, unknown>): PurchaseOrder {
+  const kind = r.kind === 'labour' ? 'labour' : 'supply';
   return {
     ...(r as unknown as PurchaseOrder),
+    kind,
     net_pence: num(r.net_pence),
     vat_pence: num(r.vat_pence),
     gross_pence: num(r.gross_pence),
     supplier_invoice_pence: numOrNull(r.supplier_invoice_pence),
-    changed_since_sent: stillChanged(String(r.status ?? ''), r.changed_since_sent),
+    // A labour PO is issued again when the trade's sign-off changes it, whatever its status.
+    changed_since_sent: kind === 'labour' ? r.status !== 'cancelled' && r.changed_since_sent === true : stillChanged(String(r.status ?? ''), r.changed_since_sent),
+    cis_pence: numOrNull(r.cis_pence),
+    payable_pence: numOrNull(r.payable_pence),
+    labour: kind === 'labour' ? snapshotOf(r.labour) : null,
   };
 }
 
@@ -111,7 +118,7 @@ export async function readOrder(db: Db, id: string): Promise<PoFull | null> {
   const order = orderRow(raw);
   const [{ data: lines }, { data: supplier }, jobs, office, names] = await Promise.all([
     db.from('purchase_order_lines').select('*').eq('purchase_order_id', id).order('position'),
-    db.from('suppliers').select('*').eq('id', order.supplier_id).maybeSingle(),
+    order.supplier_id ? db.from('suppliers').select('*').eq('id', order.supplier_id).maybeSingle() : Promise.resolve({ data: null }),
     jobsFor(db, [order.project_id]),
     officeOf(),
     nameOf(db, [order.created_by, order.sent_by]),
@@ -159,7 +166,7 @@ export async function listOrders(db: Db, f: ListFilters = {}): Promise<PoListRow
   const ids = orders.map((o) => o.id);
   const [suppliers, jobs, lineCounts] = await Promise.all([
     readAll<{ id: string; name: string; email: string | null }>(
-      orders.map((o) => o.supplier_id),
+      orders.map((o) => o.supplier_id).filter((x): x is string => !!x),
       (b, from, to) => db.from('suppliers').select('id, name, email').in('id', b).order('id').range(from, to)
     ),
     jobsFor(
@@ -171,7 +178,7 @@ export async function listOrders(db: Db, f: ListFilters = {}): Promise<PoListRow
   const sup = new Map(suppliers.map((s) => [s.id, s]));
   const counts = new Map<string, number>();
   for (const l of lineCounts) counts.set(l.purchase_order_id, (counts.get(l.purchase_order_id) ?? 0) + 1);
-  const list = orders.map((o) => ({ ...o, supplier: sup.get(o.supplier_id) ?? null, job: jobs.get(o.project_id) ?? null, lines: counts.get(o.id) ?? 0 }));
+  const list = orders.map((o) => ({ ...o, supplier: o.supplier_id ? (sup.get(o.supplier_id) ?? null) : null, job: jobs.get(o.project_id) ?? null, lines: counts.get(o.id) ?? 0 }));
   const q = (f.q ?? '').trim().toLowerCase();
   return q ? list.filter((o) => matchesOrder(o, q)) : list;
 }
@@ -179,8 +186,14 @@ export async function listOrders(db: Db, f: ListFilters = {}): Promise<PoListRow
 /** A job's orders at a glance, or null before purchase-orders.sql (or if the read fails). Never throws. */
 export async function ordersSummary(db: Db, projectId: string): Promise<OrdersSummary | null> {
   try {
-    const { data, error } = await db.from('purchase_orders').select('status, net_pence, required_by').eq('project_id', projectId);
-    return error ? null : summariseOrders((data ?? []) as { status: string; net_pence: number | null; required_by: string | null }[]);
+    type Row = { status: string; net_pence: number | null; required_by: string | null; kind?: string; payable_pence?: number | null };
+    // kind and payable_pence come with site-commissioning.sql: without them every order is kit.
+    const { data, error } = await withFallback<Row>(
+      (cols) => db.from('purchase_orders').select(cols).eq('project_id', projectId) as unknown as PromiseLike<{ data: Row[] | null; error: PgError }>,
+      'status, net_pence, required_by',
+      'kind, payable_pence'
+    );
+    return error ? null : summariseOrders(data ?? []);
   } catch {
     return null;
   }

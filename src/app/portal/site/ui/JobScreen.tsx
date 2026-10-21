@@ -7,6 +7,7 @@ import type { PackFile, SitePack } from '@/lib/site/pack-shared';
 import { downloadPack, seenChanges } from '@/lib/site/packs';
 import { Splash, SyncLine, TopBar } from './bits';
 import { JobSteps } from './JobSteps';
+import { PoCard } from './PoCard';
 import { useLive } from './nav';
 
 const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`;
@@ -90,6 +91,7 @@ export function JobScreen({ id, rest }: { id: string; rest: string[] }) {
         </div>
 
         <JobSteps rec={rec} answers={draft?.answers ?? pack.assignment.answers} rest={[]} />
+        {pack.po && pack.assignment.signoffs.length > 0 && <PoCard rec={rec} stage={pack.assignment.signoffs.at(-1)!.stage} />}
 
         {pack.assignment.note_to_trade && (
           <section className="sa-card">

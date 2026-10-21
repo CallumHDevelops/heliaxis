@@ -39,7 +39,8 @@ export type SyncState = {
   phase: 'idle' | 'checking' | 'sending' | 'offline';
   done: number;
   total: number;
-  waiting: { answers: number; photos: number; other: number; total: number };
+  /** `signoffs` are among `other`: a sign-off waiting is named as one. */
+  waiting: { answers: number; photos: number; other: number; total: number; signoffs?: number };
   failed: { photos: number; other: number; total: number };
   /** The last real round trip that left nothing waiting. */
   lastOkAt: string | null;
@@ -94,14 +95,14 @@ registerSender('photo-delete', {
 
 /* ── Counting ────────────────────────────────────────────────────────────────── */
 
-export type JobWork = { answers: number; photos: number; other: number; failed: number; failedPhotos: number };
+export type JobWork = { answers: number; photos: number; other: number; failed: number; failedPhotos: number; signoffs: number };
 
 /** What's waiting for each job (drafts with unsent keys count as answers). */
 export async function workByJob(): Promise<Map<string, JobWork>> {
   const out = new Map<string, JobWork>();
   const of = (id: string) => {
     let w = out.get(id);
-    if (!w) out.set(id, (w = { answers: 0, photos: 0, other: 0, failed: 0, failedPhotos: 0 }));
+    if (!w) out.set(id, (w = { answers: 0, photos: 0, other: 0, failed: 0, failedPhotos: 0, signoffs: 0 }));
     return w;
   };
   for (const d of await allRec<DraftRecord>('drafts')) if (d.dirty.length) of(d.id).answers++;
@@ -109,7 +110,10 @@ export async function workByJob(): Promise<Map<string, JobWork>> {
     const w = of(op.assignmentId);
     if (op.failed) w.failed++;
     else if (op.kind === 'answers') w.answers++;
-    else w.other++;
+    else {
+      w.other++;
+      if (op.kind === 'signoff') w.signoffs++;
+    }
   }
   for (const p of await allRec<PhotoRecord>('photos')) {
     if (!p.full) continue;
@@ -122,12 +126,13 @@ export async function workByJob(): Promise<Map<string, JobWork>> {
 
 async function recount() {
   const work = await workByJob();
-  const waiting = { answers: 0, photos: 0, other: 0, total: 0 };
+  const waiting = { answers: 0, photos: 0, other: 0, total: 0, signoffs: 0 };
   const failed = { photos: 0, other: 0, total: 0 };
   for (const w of work.values()) {
     waiting.answers += w.answers;
     waiting.photos += w.photos;
     waiting.other += w.other;
+    waiting.signoffs += w.signoffs;
     failed.photos += w.failedPhotos;
     failed.other += w.failed;
   }
@@ -149,7 +154,9 @@ export function syncWords(s: SyncState): { pill: string; line: string; tone: 'ok
     return { pill: `${s.failed.total} not sent`, line: `Couldn’t send ${what}. Tap to retry.`, tone: 'bad' };
   }
   if (s.waiting.total) {
-    const parts = [s.waiting.photos ? n(s.waiting.photos, 'photo') : '', s.waiting.answers ? 'your answers' : '', s.waiting.other ? n(s.waiting.other, 'other item') : ''].filter(Boolean);
+    const signoffs = s.waiting.signoffs ?? 0;
+    const others = s.waiting.other - signoffs;
+    const parts = [s.waiting.photos ? n(s.waiting.photos, 'photo') : '', s.waiting.answers ? 'your answers' : '', others ? n(others, 'other item') : '', signoffs ? 'your sign-off' : ''].filter(Boolean);
     const line = `${parts.join(' and ')} waiting. ${s.waiting.photos + s.waiting.other > 1 || s.waiting.answers ? 'They’ll' : 'It’ll'} send when you have signal.`;
     return { pill: `${s.waiting.total} waiting`, line: line[0].toUpperCase() + line.slice(1), tone: 'wait' };
   }

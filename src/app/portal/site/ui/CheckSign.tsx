@@ -55,6 +55,12 @@ export function CheckSign({ rec, jf, form }: { rec: PackRecord; jf: JobForms; fo
           </div>
         ) : (
           <>
+            {rec.gate?.stage === form.stage && (
+              <div className="sa-alert sa-alert-bad" role="alert">
+                <b>Not signed yet</b>
+                <span>{rec.gate.missing.length ? `Heliaxis still needs: ${rec.gate.missing.map((m) => m.label).join('; ')}.` : rec.gate.message}</span>
+              </div>
+            )}
             {flags.length > 0 && (
               <section className="sa-flags">
                 {flags.map((f) => (

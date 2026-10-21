@@ -7,7 +7,7 @@ import { canonicalJson } from '@/lib/subcontractors/hashing';
 import { fieldIndex } from '@/lib/surveys/solar-schema';
 import { designOf } from './design';
 import { siteShort } from './messages';
-import type { PackFile, PackPhoto, SitePack } from './pack-shared';
+import type { PackFile, PackPhoto, PackPo, SitePack } from './pack-shared';
 import { assignmentRow, type AssignmentRow, type Db } from './server';
 import { getSiteSettings } from './settings';
 import { jobStrip } from './strip';
@@ -42,6 +42,23 @@ function surveyWords(id: string, v: unknown): string | null {
 async function signed(db: Db, bucket: string, path: string): Promise<string | null> {
   const { data } = await db.storage.from(bucket).createSignedUrl(path, LINK_SECONDS);
   return data?.signedUrl ?? null;
+}
+
+/** A labour PO as the phone keeps it (the pack, and the sign-off's reply). */
+export function packPo(po: Record<string, unknown>): PackPo {
+  return {
+    id: String(po.id),
+    po_number: String(po.po_number),
+    status: String(po.status),
+    net_pence: Number(po.net_pence) || 0,
+    vat_pence: Number(po.vat_pence) || 0,
+    cis_pence: po.cis_pence == null ? null : Number(po.cis_pence),
+    payable_pence: po.payable_pence == null ? null : Number(po.payable_pence),
+    sent_at: (po.sent_at as string | null) ?? null,
+    paid_on: (po.paid_on as string | null) ?? null,
+    changed_since_sent: po.changed_since_sent === true,
+    labour: (po.labour as Record<string, unknown> | null) ?? null,
+  };
 }
 
 export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
@@ -195,20 +212,7 @@ export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
     files,
     skipped,
     photos: held,
-    po: po
-      ? {
-          id: String(po.id),
-          po_number: String(po.po_number),
-          status: String(po.status),
-          net_pence: Number(po.net_pence) || 0,
-          vat_pence: Number(po.vat_pence) || 0,
-          cis_pence: po.cis_pence == null ? null : Number(po.cis_pence),
-          payable_pence: po.payable_pence == null ? null : Number(po.payable_pence),
-          sent_at: (po.sent_at as string | null) ?? null,
-          paid_on: (po.paid_on as string | null) ?? null,
-          labour: (po.labour as Record<string, unknown> | null) ?? null,
-        }
-      : null,
+    po: po ? packPo(po) : null,
     reads: (reads ?? []) as SitePack['reads'],
     settings: { locationStamps: (await getSiteSettings()).locationStamps },
   };

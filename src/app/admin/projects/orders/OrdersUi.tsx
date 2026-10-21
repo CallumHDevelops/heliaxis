@@ -2,7 +2,7 @@
 
 import { money } from '@/lib/crm/stages';
 import { formatPence, isLate, STATUS_LABEL, type PoStatus } from '@/lib/purchase-orders/money';
-import type { OrdersSummary } from '@/lib/purchase-orders/shared';
+import type { OrdersSummary, PurchaseOrder } from '@/lib/purchase-orders/shared';
 import { shortDate } from '../../crm/crm-shared';
 
 /** Small pieces shared by the job's Orders tab, the order sheet and the Purchase orders page. */
@@ -25,13 +25,25 @@ export async function api<T>(url: string, init: { method?: string; body?: unknow
 }
 
 /** The status in its colour: Draft grey, Sent amber, Confirmed blue, Delivered green, Cancelled red. Late when it's open and past its date. */
-export function StatusChip({ status, late = false }: { status: string; late?: boolean }) {
+export function StatusChip({ status, late = false, labour = false }: { status: string; late?: boolean; labour?: boolean }) {
+  // A labour PO that's still a draft is held for the office; once issued it's "Issued".
+  const label = labour && status === 'draft' ? 'Held' : labour && status === 'sent' ? 'Issued' : (STATUS_LABEL[status as PoStatus] ?? status);
   return (
     <span className={`po-chip po-chip--${status}${late ? ' is-late' : ''}`}>
-      {STATUS_LABEL[status as PoStatus] ?? status}
+      {label}
       {late ? ' · late' : ''}
     </span>
   );
+}
+
+/** Kit orders and labour POs together (the tab's count). */
+export const ordersCount = (s: OrdersSummary | null | undefined) => (s ? s.count + (s.labour?.count ?? 0) : 0);
+
+/** A labour PO's date column: when it was signed for, and paid. */
+export function labourWhen(o: Pick<PurchaseOrder, 'labour' | 'paid_on'>): string {
+  if (o.paid_on) return `Paid ${shortDate(o.paid_on)}`;
+  const at = o.labour?.signed?.at;
+  return at ? `Signed ${shortDate(at.slice(0, 10))}` : 'Not signed';
 }
 
 /** "Needed Tue 3 Nov", "Late: needed Mon 2 Nov", or "No date". */
@@ -48,6 +60,13 @@ export function neededWords(o: { status: string; required_by: string | null }, t
  */
 export function KitOrdered({ s, today, value }: { s: OrdersSummary; today: string; value?: number | null }) {
   const late = !!s.nextDelivery && !!today && s.nextDelivery < today;
+  const labour = s.labour?.count ? (
+    <small className="po-kit__sub">
+      Labour {formatPence(s.labour.payable)} to pay
+      {s.labour.held ? ` · ${s.labour.held} held for you to check` : ''}
+    </small>
+  ) : null;
+  if (!s.count) return labour;
   return (
     <>
       <span className="po-kit">
@@ -63,6 +82,7 @@ export function KitOrdered({ s, today, value }: { s: OrdersSummary; today: strin
           .filter(Boolean)
           .join(' · ')}
       </small>
+      {labour}
     </>
   );
 }

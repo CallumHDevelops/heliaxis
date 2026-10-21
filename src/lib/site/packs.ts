@@ -33,7 +33,9 @@ export async function downloadPack(id: string, onStep?: (s: ReadyStep) => void):
   const pack = r.data;
   const was = await getPack(id);
   const changes = was && was.version !== pack.version ? [...new Set([...(was.changes ?? []), ...packChanges(was.pack, pack)])] : (was?.changes ?? []);
-  const rec: PackRecord = { id, pack, version: pack.version, storedAt: new Date().toISOString(), changes };
+  // What a sign-off left on the phone stays: the gate's list until that stage is signed, the PO's time.
+  const gate = was?.gate && !pack.assignment.signoffs.some((x) => x.stage === was.gate?.stage) ? was.gate : undefined;
+  const rec: PackRecord = { id, pack, version: pack.version, storedAt: new Date().toISOString(), changes, ...(gate ? { gate } : {}), ...(was?.poGoesAt ? { poGoesAt: was.poGoesAt } : {}) };
   await putRec('packs', rec);
   const step: ReadyStep = { details: true, design: null, drawings: null, offline: null, missing: 0 };
   onStep?.({ ...step });
@@ -56,8 +58,19 @@ export async function downloadPack(id: string, onStep?: (s: ReadyStep) => void):
   onStep?.({ ...step });
   for (const p of pack.photos) if (p.thumb) await keepFile(id, `thumb:${p.id}`, `${p.slot}.jpg`, 'image/jpeg', p.thumb);
 
+  // The PO once it has been issued: its PDF, to open with no signal (each version once).
+  let poFile: string | null = null;
+  const version = Number((pack.po?.labour as { version?: unknown } | null)?.version) || 0;
+  if (pack.po && version > 0) {
+    poFile = `po:${pack.po.id}:v${version}`;
+    if (!(await getRec<FileRecord>('files', poFile))) {
+      const po = await siteFetch<{ url: string | null }>(`/api/site/jobs/${id}/po`, { job: id });
+      if (po.ok && po.data.url) await keepFile(id, poFile, `${pack.po.po_number}.pdf`, 'application/pdf', po.data.url);
+    }
+  }
+
   // Files the office has since taken off the job go from the phone too.
-  const keep = new Set([...pack.files.map((f) => f.id), ...pack.photos.map((p) => `thumb:${p.id}`)]);
+  const keep = new Set([...pack.files.map((f) => f.id), ...pack.photos.map((p) => `thumb:${p.id}`), ...(poFile ? [poFile] : [])]);
   for (const f of await byJob<FileRecord>('files', id)) if (!keep.has(f.id)) await delRec('files', f.id);
 
   const d = await getDevice();
@@ -115,7 +128,9 @@ export async function refreshJobs(force = false): Promise<Outcome<SiteJobRow[]>>
     // A label photo from this phone that went up in the last hour: its read (suggestions) comes with the pack.
     const unread = !!p && (await byJob<PhotoRecord>('photos', j.id)).some((x) => x.read && x.uploadedId && Date.now() - Date.parse(x.takenAt) < 3_600_000 && !p.pack.reads.some((r) => r.photo_id === x.uploadedId));
     // New, or changed on the server since this phone's copy (rev counts answers from other phones too).
-    if (!p || unread || p.pack.assignment.rev !== j.rev || p.pack.assignment.status !== j.status || force || Date.now() - Date.parse(p.storedAt) > 30 * 60_000) await downloadPack(j.id);
+    // The PO issued or paid since (its PDF comes with the pack).
+    const poMoved = !!p && ((p.pack.po?.status ?? null) !== (j.po?.status ?? null) || (p.pack.po?.sent_at ?? null) !== (j.po?.sent_at ?? null) || (p.pack.po?.paid_on ?? null) !== (j.po?.paid_on ?? null));
+    if (!p || unread || poMoved || p.pack.assignment.rev !== j.rev || p.pack.assignment.status !== j.status || force || Date.now() - Date.parse(p.storedAt) > 30 * 60_000) await downloadPack(j.id);
   }
   for (const id of d?.jobs ?? []) {
     if (listed.has(id)) continue;

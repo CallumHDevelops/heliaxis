@@ -207,7 +207,8 @@ export type DocOptions = {
   label?: string;
 };
 
-export type Row = { label: string; value: string | null | undefined; must?: boolean; note?: string | null };
+/** `strong`: the figure the document is for ("What you'll be paid"), on a paper band and larger. */
+export type Row = { label: string; value: string | null | undefined; must?: boolean; note?: string | null; strong?: boolean };
 export type Mark = 'tick' | 'cross' | 'na' | null;
 export type CheckItem = { label: string; mark: Mark; note?: string | null; must?: boolean };
 export type PhotoItem = { bytes: Uint8Array; mime: string; caption: string; sub?: string | null };
@@ -294,7 +295,7 @@ export async function newDocument(o: DocOptions) {
   const continued = () => {
     page = doc.addPage(size);
     y = size[1] - MARGIN.t;
-    text(`${label} · ${o.title}${o.jobRef ? ` · ${o.jobRef}` : ''} (continued)`, X, y - 9, 8.5, { bold: true, color: MUTED });
+    text(`${label === o.title ? label : `${label} · ${o.title}`}${o.jobRef ? ` · ${o.jobRef}` : ''} (continued)`, X, y - 9, 8.5, { bold: true, color: MUTED });
     y -= 24;
   };
   /** Room for h more on this page, else a new page (then `again`: a table's headings). */
@@ -378,6 +379,14 @@ export async function newDocument(o: DocOptions) {
       for (const r of items) {
         const empty = r.value === null || r.value === undefined || String(r.value).trim() === '';
         if (empty && r.must && !o.draft) throw new MissingAnswer(r.label);
+        if (r.strong && !empty) {
+          need(26);
+          page.drawRectangle({ x: X, y: y - 24, width: W, height: 24, color: PAPER });
+          text(r.label, X + 8, y - 16, 10.5, { bold: true });
+          text(String(r.value), X + W * 0.62, y - 16, 10.5, { bold: true });
+          y -= 28;
+          continue;
+        }
         const ll = lines(r.label, 9, lw);
         const vl = empty ? ['Not answered'] : lines(String(r.value), 9, vw, true);
         const nl = r.note ? lines(r.note, 7.5, lw) : [];

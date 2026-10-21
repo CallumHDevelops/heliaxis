@@ -3,6 +3,7 @@
  * changed between two of them. Types and pure helpers only: safe in the browser.
  */
 import type { Design } from './design';
+import type { PoNext } from './po-shared';
 import type { StripStep } from './strip';
 import type { Answers, Flag, Stage, Trade } from './types';
 
@@ -18,6 +19,8 @@ export type PackPo = {
   payable_pence: number | null;
   sent_at: string | null;
   paid_on: string | null;
+  /** Gone, then changed: the office issues it again. */
+  changed_since_sent: boolean;
   labour: Record<string, unknown> | null;
 };
 
@@ -75,6 +78,19 @@ export type SitePack = {
   reads: { photo_id: string; key: string; status: string; result: unknown }[];
   /** The owner's choices the phone needs (location on photos only when turned on, D18). */
   settings: { locationStamps: boolean };
+};
+
+/** The reply to a sign-off (POST /api/site/jobs/<id>/signoff): what the done screen shows (P11). */
+export type SignoffReply = {
+  signoff: { id: string; stage: Stage; signed_at: string; signed_name: string };
+  status: string;
+  po: PackPo | null;
+  /** What happens to the PO next (po-shared.ts poNext). */
+  po_next: PoNext;
+  /** The evening rule holds the PO's messages until then (07:00). */
+  goes_at: string | null;
+  /** A retry: the first sign-off's result. */
+  again: boolean;
 };
 
 /** One job on the home screen (GET /api/site/jobs). */

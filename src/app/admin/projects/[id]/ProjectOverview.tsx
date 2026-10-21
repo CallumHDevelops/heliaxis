@@ -24,7 +24,7 @@ import { londonIso, shortDate, ukDayOf, ukTime } from '../../crm/crm-shared';
 import { useMedia } from '../../crm/use-stored';
 import type { RecordData, SurveyItem, Tab } from '../../crm/[id]/record-shared';
 import { askNewOrder } from '../orders/OrdersTab';
-import { KitOrdered } from '../orders/OrdersUi';
+import { KitOrdered, ordersCount } from '../orders/OrdersUi';
 
 /** Opens RAMS already signed in (src/lib/sso.ts). Not a page here: a plain link, so it's never prefetched. */
 const RAMS_URL = '/api/sso/rams';
@@ -253,17 +253,17 @@ function JobFile({ rec, today, actions }: { rec: RecordData; today: string; acti
           </Tile>
         )}
         {/* Purchase orders (purchase-orders.sql): the kit ordered beside the job's value. */}
-        {rec.orders && (isProjectStage(p.stage) || rec.orders.count > 0) && (
+        {rec.orders && (isProjectStage(p.stage) || ordersCount(rec.orders) > 0) && (
           <Tile
             title="Purchase orders"
-            count={rec.orders.count}
+            count={ordersCount(rec.orders)}
             onOpen={() => actions.openTab('orders')}
             onAdd={() => {
               askNewOrder(p.id);
               actions.openTab('orders');
             }}
           >
-            {rec.orders.count ? (
+            {ordersCount(rec.orders) ? (
               <KitOrdered s={rec.orders} today={today} value={p.value} />
             ) : (
               <span className="crm-muted">No orders yet{p.value ? ` · job value ${money(p.value)} inc VAT` : ''}</span>

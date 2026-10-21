@@ -59,11 +59,12 @@ async function download(db: Db, bucket: string, path: string): Promise<Uint8Arra
 const mimeOf = (path: string) => (/\.png$/i.test(path) ? 'image/png' : /\.webp$/i.test(path) ? 'image/webp' : 'image/jpeg');
 
 /** One form's answers, step by step, as rows (photo questions say how many; the photos follow later). */
-function answerSections(kit: Kit, form: SiteForm, c: FormCtx) {
+/** The answers by step. `titled`: the form has its own heading already, so a one-step form doesn't repeat it. */
+function answerSections(kit: Kit, form: SiteForm, c: FormCtx, titled = false) {
   for (const step of form.steps.filter((s) => stepShown(s, c))) {
     const fields = visibleFields(step, c).filter((f) => f.type !== 'SIG');
     if (!fields.length) continue;
-    kit.section(step.title);
+    if (!(titled && form.steps.length === 1)) kit.section(step.title);
     kit.rows(
       fields.map((f) => {
         if (f.type === 'PHOTOS') {
@@ -137,7 +138,7 @@ export async function saveTradeReport(db: Db, assignmentId: string): Promise<Sav
     const so1 = signed(form.stage);
     if (form.after && !so1 && !signed(form.after)) continue;
     if (forms.length > 1) kit.section(form.title === 'Scaffold up' ? 'Putting it up' : form.title === 'Scaffold down' ? 'Taking it down' : form.title, { intro: so1 ? `Signed off ${stampWords(so1.signed_at)}` : 'Not signed off yet' });
-    answerSections(kit, form, c);
+    answerSections(kit, form, c, forms.length > 1);
   }
   flagSection(kit, flags);
 

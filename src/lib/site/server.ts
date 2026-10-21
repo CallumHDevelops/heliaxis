@@ -9,6 +9,7 @@ import { formsFor, isElectricianForm, suggestedTrades } from './forms';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
 import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
+import { snapshotOf, type HeldReason } from './po-shared';
 import { STATUS_LABEL, TRADE_LABEL, valuesOf, yesNo, type Answers, type AssignmentStatus, type Flag, type Trade } from './types';
 
 /**
@@ -493,11 +494,25 @@ export type AssignmentView = {
   photos: number;
   flags: Flag[];
   open_flags: number;
-  po: { id: string; po_number: string; status: string; payable_pence: number | null } | null;
+  po: PoView | null;
   messages: SiteMessageView[];
   link: { generation: number; created_at: string | null; phones: number };
   /** The scaffold: was it tagged at erection (SC3)? */
   tagged: boolean | null;
+};
+
+/** A trade's labour PO on the Site tab: what it's held for, and whether it has gone and changed since. */
+export type PoView = {
+  id: string;
+  po_number: string;
+  status: string;
+  payable_pence: number | null;
+  /** 0 until it's issued; 2 after Issue again… */
+  version: number;
+  issued: string | null;
+  sent_at: string | null;
+  held: HeldReason[];
+  changed_since_sent: boolean;
 };
 
 export type SiteTabData = {
@@ -538,10 +553,22 @@ export async function siteTabData(db: Db, projectId: string): Promise<SiteTabDat
   const firms = await firmsById(db, [...contacts.values()].map((c) => c.subcontractor_id));
   const photoCount = new Map<string, number>();
   for (const r of (photos ?? []) as { assignment_id: string }[]) photoCount.set(r.assignment_id, (photoCount.get(r.assignment_id) ?? 0) + 1);
-  const poOf = new Map<string, { id: string; po_number: string; status: string; payable_pence: number | null }>();
+  const poOf = new Map<string, PoView>();
   for (const o of (orders ?? []) as Record<string, unknown>[]) {
     const a = String(o.assignment_id);
-    if (!poOf.has(a) && o.status !== 'cancelled') poOf.set(a, { id: String(o.id), po_number: String(o.po_number), status: String(o.status), payable_pence: o.payable_pence == null ? null : Number(o.payable_pence) });
+    if (poOf.has(a) || o.status === 'cancelled') continue;
+    const snap = snapshotOf(o.labour);
+    poOf.set(a, {
+      id: String(o.id),
+      po_number: String(o.po_number),
+      status: String(o.status),
+      payable_pence: o.payable_pence == null ? null : Number(o.payable_pence),
+      version: snap?.version ?? 0,
+      issued: snap?.issued ?? null,
+      sent_at: (o.sent_at as string | null) ?? null,
+      held: o.status === 'draft' ? (snap?.held ?? []) : [],
+      changed_since_sent: o.changed_since_sent === true,
+    });
   }
   const msgOf = new Map<string, SiteMessageView[]>();
   for (const m of (messages ?? []) as (SiteMessageView & { assignment_id: string })[]) {

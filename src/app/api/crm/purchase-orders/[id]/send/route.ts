@@ -30,6 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const full = await readOrder(db, id);
   if (!full) return json({ error: 'That order isn’t there any more.' }, 404);
   const o = full.order;
+  if (o.kind === 'labour') return json({ error: 'A labour PO goes to the trade by Issue (email with the PDF, and WhatsApp).' }, 409);
   if (b.expect_updated_at && Date.parse(String(b.expect_updated_at)) !== Date.parse(o.updated_at)) {
     return json({ error: 'Someone else changed this order a moment ago. Close it and open it again before sending.', stale: true }, 409);
   }

@@ -162,7 +162,7 @@
 .sa-jobcard-sync { color: var(--amber); font-size: 15px; }
 
 .sa-pos { padding: 4px 16px; }
-.sa-po-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.sa-po-row { display: flex; justify-content: space-between; gap: 12px; width: 100%; min-height: 56px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; }
 .sa-po-row:last-child { border-bottom: 0; }
 .sa-po-row > div { display: flex; flex-direction: column; min-width: 0; }
 .sa-po-amount { align-items: flex-end; text-align: right; flex: none; }

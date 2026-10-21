@@ -106,7 +106,7 @@ export function Home() {
             <h2>Your POs and payments</h2>
             <div className="sa-card sa-pos">
               {pos.map((c) => (
-                <div className="sa-po-row" key={c.id}>
+                <button type="button" className="sa-po-row" key={c.id} onClick={() => go(`/portal/site/job/${c.id}`)}>
                   <div>
                     <b>{c.po!.po_number}</b>
                     <span className="sa-muted">
@@ -118,7 +118,7 @@ export function Home() {
                     <b>{c.po!.payable_pence != null ? pounds(c.po!.payable_pence) : '–'}</b>
                     <span className="sa-muted">{poState(c.po!)}</span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </section>

@@ -235,3 +235,18 @@
 .sa-left { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--amber-bg); }
 .sa-left h4 { margin: 0; font-size: 16px; color: var(--amber); }
 .sa-left .sa-todo-row { min-height: 48px; }
+
+/* ── Signed (P11) and the PO ───────────────────────────────────────────────── */
+.sa-done { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+.sa-done .sa-alert { margin-bottom: 12px; }
+.sa-po-head h3 { font-size: 24px; margin-top: 2px; }
+.sa-po-lines { margin-top: 10px; }
+.sa-po-lines > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 16px; }
+.sa-po-lines dt { flex: 1; min-width: 0; }
+.sa-po-lines dd { flex: none; font-weight: 600; text-align: right; }
+.sa-po-pay { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 4px; padding: 12px; border-radius: 10px; background: var(--ok-bg); color: var(--ok); }
+.sa-po-pay span { font-weight: 600; }
+.sa-po-pay b { font-size: 26px; }
+.sa-po .sa-muted { margin-top: 10px; }
+.sa-po-where { margin-top: 10px; font-size: 16px; }
+.sa-po-paid { margin-top: 8px; font-weight: 700; color: var(--ok); }
