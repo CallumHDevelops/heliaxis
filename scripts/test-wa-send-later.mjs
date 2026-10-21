@@ -2,8 +2,10 @@
 // typed after 20:30, or in the small hours, goes at 07:00 (on both sides of the clocks changing,
 // Sunday 29 March and Sunday 25 October 2026); the quick choices (07:00, 08:45, 09:30 the next
 // morning, Monday instead of Sunday); the date/time box read as UK time; the free 24h window checked
-// against when it goes; chasers counted from when it goes; and the outbox never holding a message a
-// person scheduled.
+// against when it goes; chasers counted from when it goes (and said against each way of sending); the
+// outbox never holding a message a person scheduled; a scheduled message only answering a chat when
+// written after their last message; and (from the source) what happens around it: Cancel that says
+// when it's too late, chasers left until it goes, STOP telling its author, Metis's Send now.
 // Usage: node --experimental-strip-types scripts/test-wa-send-later.mjs
 import { readFileSync } from 'node:fs';
 import {
@@ -16,6 +18,7 @@ import {
   lastFreeAt,
   laterChoices,
   lateSendAt,
+  scheduledAnswers,
   shortAt,
   ukInput,
   windowClosesAt,
@@ -207,6 +210,37 @@ eq(
   'tomorrow about 11:49'
 );
 
+// Send later shows the chaser against each way of sending, counted from when it would really go: the
+// box's own label counts from the Send button's time. 15:00, David last wrote at 14:50 (free till 14:50 tomorrow).
+const day = at('2026-10-20T15:00:00+01:00');
+const dayIn = '2026-10-20T14:50:00+01:00';
+const chaseFor = (sendAt, view = V) => chaseWhen({ now: day, hours: 12, lastInboundAt: dayIn, view, sendAt });
+eq('daytime Send: chased tomorrow about 08:45 (12h on, out of quiet hours)', chaseFor(null), 'tomorrow about 08:45');
+eq(
+  '…but each quick choice is chased from its own time, kept inside the free window: 13:50',
+  laterChoices(day).map((c) => [c.label, chaseFor(c.at)]),
+  [
+    ['Tomorrow 07:00', 'tomorrow about 13:50'],
+    ['Tomorrow 08:45', 'tomorrow about 13:50'],
+    ['Tomorrow 09:30', 'tomorrow about 13:50'],
+  ]
+);
+eq('…Tomorrow 09:30 with keep-it-free off: Thursday 08:45', chaseFor(laterChoices(day)[2].at, { ...V, keepFree: false }), 'Thu about 08:45');
+eq(
+  'late at night the quick choices differ from Send at 07:00',
+  laterChoices(now).map((c) => chaseWhen({ now, hours: 12, lastInboundAt: '2026-10-20T20:01:00+01:00', view: V, sendAt: c.at })),
+  ['tomorrow about 19:00', 'tomorrow about 19:01', 'tomorrow about 19:01']
+);
+
+// A scheduled message answers the chat (Needs reply, the 30-minute reminder) only if it was written
+// after their last message.
+eq('scheduled after their message: answered', scheduledAnswers('2026-10-20T23:49:00Z', '2026-10-20T23:40:00Z'), true);
+eq('scheduled before their message: still needs a reply', scheduledAnswers('2026-10-16T17:00:00Z', '2026-10-17T10:00:00Z'), false);
+eq('…to the millisecond', scheduledAnswers('2026-10-20T23:40:00.000+00:00', '2026-10-20T23:40:00.001+00:00'), false);
+eq('the same moment counts as answered', scheduledAnswers('2026-10-20T23:40:00+00:00', '2026-10-20T23:40:00.000Z'), true);
+eq('nothing scheduled: not answered', scheduledAnswers(null, '2026-10-20T23:40:00Z'), false);
+eq('they never wrote: answered', scheduledAnswers('2026-10-20T23:49:00Z', null), true);
+
 // The outbox never holds a message a person scheduled: their time, quiet hours or not.
 const hold = (kind, iso, lastOut = null) => {
   const w = holdUntil({ kind, now: at(iso), settings: S, lastOutAt: lastOut ? at(lastOut) : null, rand: () => 0 });
@@ -217,6 +251,35 @@ eq('scheduled for 02:00: goes', hold('scheduled', '2026-10-21T02:00:00+01:00'), 
 eq('scheduled for 23:00, after an evening message: goes', hold('scheduled', '2026-10-20T23:00:00+01:00', '2026-10-20T20:00:00+01:00'), 'send');
 eq('…while a chaser at 07:00 still waits for 10:00', hold('chase', '2026-10-21T07:00:00+01:00', '2026-10-20T20:34:00+01:00'), 'Wed 21 Oct 10:00');
 eq('…and a smart reply at 07:00 for 08:45', hold('reply', '2026-10-21T07:00:00+01:00'), 'Wed 21 Oct 08:45');
+
+// What happens around a scheduled message, from the source (it needs the database to run).
+const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+const inboxSrc = src('src/lib/whatsapp/inbox.ts');
+const fn = (name) => inboxSrc.slice(inboxSrc.indexOf(`function ${name}(`), inboxSrc.indexOf('\n}\n', inboxSrc.indexOf(`function ${name}(`)));
+const schedule = fn('scheduleManual');
+eq('scheduling stands down smart replies only (a chaser waits until it goes)', [/cancelAutomatic\(/.test(schedule), /\.eq\('kind', 'reply'\)/.test(schedule)], [false, true]);
+const outbox = fn('processOutbox');
+eq('a chaser due with a scheduled message for that chat waits a run', /item\.kind === 'chase' && laterFor\.has\(item\.enquiry_id\)/.test(outbox), true);
+eq('…and stands down once that goes', /if \(scheduled\) \{\s*\/\/[^\n]*\n\s*await cancelAutomatic\(db, e\.id/.test(outbox), true);
+eq('its author’s “still scheduled” push is replaced once it goes', /item\.reply_noted_at && item\.sent_by[\s\S]{0,400}tag: `wa-later-\$\{item\.id\}`/.test(outbox), true);
+eq('STOP doesn’t say “still scheduled”', /if \(m\.type !== 'reaction' && word !== 'stop'\) await tellScheduledAuthors\(db, enquiry\)/.test(inboxSrc), true);
+const stop = fn('stopOrStart');
+eq('STOP tells each author whose message it cancelled, after cancelling it', /\.eq\('status', 'pending'\)\s*\.select\([\s\S]*won’t go[\s\S]*tag: `wa-later-\$\{item\.id\}`/.test(stop), true);
+eq('the reminder skips a chat only for a reply scheduled since their message', /scheduledAnswers\(q\.created_at, e\.wa_last_inbound_at\)/.test(fn('remindUnanswered')), true);
+const cancelRoute = src('src/app/api/whatsapp/outbox/[id]/route.ts');
+eq('Cancel says when it’s too late', [/const kind = await cancelQueued\(id\)/.test(cancelRoute), cancelRoute.includes("'Too late: that message has already gone' }, 409")], [true, true]);
+const sw = src('src/app/sw.js/route.ts');
+eq('the notification button says what really happened', [sw.includes("d.kind === 'scheduled' ? 'Cancelled: that message won’t go'"), sw.includes('(d.error ||')], [true, true]);
+const metis = src('src/app/admin/assistant/AssistantView.tsx');
+eq('Metis offers Send now (free) when the window shuts before the morning', [/setShut\(!!res\?\.windowClosesAt/.test(metis), metis.includes('{ text: body, now: true }'), metis.includes('Send now (free)')], [true, true, true]);
+const sheet = src('src/app/admin/crm/[id]/RecordSheets.tsx');
+const job = src('src/app/api/crm/projects/[id]/route.ts');
+eq('the job’s WhatsApp sheet waits for the SQL like the chat does', [sheet.includes('ready: !!wa?.laterReady'), job.includes('lateRule: st.lateRule && laterReady')], [true, true]);
+const pane = src('src/components/admin/whatsapp/ChatPane.tsx');
+eq('documents say they don’t wait, in the dock and the job sheet', [pane.includes('lateTime={typed.lateTime}'), sheet.includes('lateTime={typed.lateTime}')], [true, true]);
+const later = src('src/components/admin/whatsapp/SendLater.tsx');
+eq('Send later shows the chaser on each choice, the picked time and Send now', ['chased(c.at, true)', 'chased(pickAt)', 'chased(null)'].map((x) => later.includes(x)), [true, true, true]);
+eq('both reply boxes pass the chase time in', [pane.includes('chaseAt: chaseAtFor(text, false)'), sheet.includes('chaseAt: (at) =>')], [true, true]);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall ok');
 process.exit(failed ? 1 : 0);

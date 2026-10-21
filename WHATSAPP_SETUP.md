@@ -127,14 +127,18 @@ Redeploy after adding them.
   messages and templates alike. It waits in the chat as "Scheduled for 07:00 tomorrow", where whoever
   wrote it (or an admin) can **Edit**, **Send now** or **Cancel**; the chat lists say "Scheduled 07:00".
   It goes at that time as them, quiet hours or not (it was their choice), and a chaser picked with it
-  counts from then. If the customer writes first it stays scheduled and its author gets one push. A
-  typed message can only be scheduled inside the free 24h window: past it, the chat offers to send it
-  now, pick an earlier time, or schedule a template. If the window has closed by the time it's due
-  (they went quiet), it isn't sent: it shows as failed with the reason and its author is told.
-  Documents from a job still go straight away.
+  counts from then (each Send later choice says when that would be). A chaser already waiting stays
+  until it goes, so cancelling it never leaves the chat unchased. If the customer writes first it
+  stays scheduled and its author gets one push, replaced by "went at 07:00" once it goes; their new
+  message puts the chat back in *Needs reply*. STOP cancels it and tells its author. A typed message
+  can only be scheduled inside the free 24h window: past it, the chat (and Metis's draft card) offers
+  to send it now, pick an earlier time, or schedule a template. If the window has closed by the time
+  it's due (they went quiet), it isn't sent: it shows as failed with the reason and its author is told.
+  Documents from a job still go straight away (late at night the button says so).
 - **The late-night rule** (Smart replies → Chasers, on by default): a message typed after 20:30, or in
   the small hours, waits until 07:00 the next morning (UK time). While it applies, the button reads
-  **Send at 07:00** (Ctrl/⌘ + Enter does the same), with **Send now instead** beside it.
+  **Send** with "at 07:00" under it (**Send at 07:00** on the job's WhatsApp sheet; Ctrl/⌘ + Enter does
+  the same), with **Send now instead** beside it.
 - **Photos, videos, voice notes and files** customers send show in the chat (once
   `whatsapp-media.sql` has been run). WhatsApp only keeps them for 7 days, so each one is downloaded
   as it arrives and kept in a private storage bucket, `whatsapp-media` (the app creates it). Tap a

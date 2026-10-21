@@ -9,6 +9,7 @@ import {
   laterChoices,
   lateSendAt,
   ukInput,
+  whenWords,
   windowClosesAt,
   windowShutWords,
   type LateRule,
@@ -42,6 +43,11 @@ export type LaterOptions = {
   submit: (at: Date | null) => Promise<boolean>;
   /** "Send a template at 07:00 instead", for a typed message that would miss the window. */
   onTemplate?: (at: Date) => void;
+  /**
+   * When its chaser would go if it's sent at `at` (null = now); null = no chaser. Shown against each
+   * other way of sending: the box's own "Chase if no reply" counts from the Send button's time.
+   */
+  chaseAt?: (at: Date | null) => Date | null;
 };
 
 const STEP_S = 300; // the date/time box moves in 5 minutes
@@ -105,6 +111,20 @@ export function useSendLater(o: LaterOptions) {
   const choices = laterChoices(now);
   const close24 = windowClosesAt(o.lastInboundAt);
   const lastFree = lastFreeAt(o.lastInboundAt, now);
+  /**
+   * The chaser if it's sent at `at` instead: "chased tomorrow about 19:00". On a quick choice (`short`)
+   * the same day goes without saying, so the choices stay small: "chased about 19:00".
+   */
+  const chased = (at: Date | null, short = false) => {
+    const t = o.chaseAt?.(at);
+    if (!t) return null;
+    const words = whenWords(t, now);
+    return `chased ${short && at && ukInput(t).slice(0, 10) === ukInput(at).slice(0, 10) ? words.replace(/^.*?(?=about )/, '') : words}`;
+  };
+  // Sent now rather than at the Send button's time (late at night): its chaser counts from now.
+  const chasedNow = lateAt ? chased(null) : null;
+  const pickAt = pick ? fromUkInput(pick) : null;
+  const pickChase = pickAt && pickAt.getTime() >= o.now + 60_000 && free(pickAt) ? chased(pickAt) : null;
 
   const clock = (className = '') => (
     <button
@@ -162,6 +182,7 @@ export function useSendLater(o: LaterOptions) {
             Back
           </button>
         </div>
+        {chasedNow && <p className="wsl-note">Sent now, it’s {chasedNow} if there’s no reply.</p>}
       </div>
     );
   } else if (open) {
@@ -178,12 +199,17 @@ export function useSendLater(o: LaterOptions) {
         ) : (
           <>
             <div className="wsl-choices">
-              {choices.map((c) => (
-                <button key={c.label} type="button" className="wsl-choice" disabled={busy || o.disabled} onClick={() => void go(c.at)}>
-                  <span>{c.label}</span>
-                  {!free(c.at) && <small>after {first}’s free window</small>}
-                </button>
-              ))}
+              {choices.map((c) => {
+                const ok = free(c.at);
+                const chase = ok && chased(c.at, true);
+                return (
+                  <button key={c.label} type="button" className="wsl-choice" disabled={busy || o.disabled} onClick={() => void go(c.at)}>
+                    <span>{c.label}</span>
+                    {!ok && <small>after {first}’s free window</small>}
+                    {chase && <small className="wsl-chased">{chase}</small>}
+                  </button>
+                );
+              })}
               <button
                 type="button"
                 className={`wsl-choice wsl-choice--pick${pick !== null ? ' is-on' : ''}`}
@@ -211,6 +237,7 @@ export function useSendLater(o: LaterOptions) {
                 </button>
               </div>
             )}
+            {pickChase && <p className="wsl-note">Sent then, it’s {pickChase} if there’s no reply.</p>}
             {pickErr && <p className="wsl-err">{pickErr}</p>}
             {o.disabled && <p className="wsl-note">Type your message first.</p>}
             <p className="wsl-note">It goes as you at that time (UK), and waits in the chat until then: edit it, send it now or cancel it there.</p>
@@ -226,6 +253,7 @@ export function useSendLater(o: LaterOptions) {
       <button type="button" className="wsl-link" disabled={o.disabled || busy} onClick={() => void go(null)}>
         Send now instead
       </button>
+      {chasedNow && <span>(then {chasedNow} if there’s no reply)</span>}
     </p>
   );
 
@@ -236,14 +264,14 @@ export function useSendLater(o: LaterOptions) {
     /** The late-night rule applies: the Send button sends at this time. */
     lateAt,
     lateTime,
-    /** What the Send button says. */
-    label: lateTime ? `Send at ${lateTime}` : 'Send',
     /** The Send button and Ctrl/⌘ + Enter. */
     main: () => void go(lateAt),
     sendNow: () => void go(null),
     busy,
     clock,
     panel,
+    /** Which panel is showing ('' for none), so the dock can keep the reply box in view as it opens or grows. */
+    panelState: warn ? 'warn' : open ? (pick !== null ? 'pick' : 'open') : '',
     lateNote,
   };
 }

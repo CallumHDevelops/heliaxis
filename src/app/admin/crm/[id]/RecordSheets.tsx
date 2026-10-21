@@ -10,7 +10,7 @@ import type { TeamMember } from '@/lib/projects/server';
 import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
 import { useSendLater } from '@/components/admin/whatsapp/SendLater';
 import { useNow } from '@/lib/use-now';
-import { atWords, chaseWhen } from '@/lib/whatsapp/schedule';
+import { atWords, chaseTime, chaseWhen } from '@/lib/whatsapp/schedule';
 import { Sheet, StageChip } from '../CrmUi';
 import { firstName, londonIso, nextWeekday, ukDayOf, ukTime } from '../crm-shared';
 import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
@@ -464,8 +464,16 @@ export function WhatsAppComposer({
   const chaseHours = asks && chase ? (wa?.chaseHours ?? 0) : 0;
   /** When: { now: true } straight away, or { sendAt } (Send later, the late-night rule). */
   const when = (at: Date | null) => (at ? { sendAt: at.toISOString() } : { now: true });
-  const later = { now, view: wa?.chaseView, ready: true, lastInboundAt: wa?.lastInbound ?? null, name: customer.name };
-  const typed = useSendLater({ ...later, disabled: busy || !text.trim(), submit: (at) => go({ text: text.trim(), chaseHours, ...when(at) }), onTemplate: setTplAt });
+  const later = { now, view: wa?.chaseView, ready: !!wa?.laterReady, lastInboundAt: wa?.lastInbound ?? null, name: customer.name };
+  const typed = useSendLater({
+    ...later,
+    disabled: busy || !text.trim(),
+    submit: (at) => go({ text: text.trim(), chaseHours, ...when(at) }),
+    onTemplate: setTplAt,
+    // Its chaser if it's sent at another time than the Send button's (a Send later choice, or now).
+    chaseAt: (at) =>
+      chaseHours && wa?.chaseView ? chaseTime({ now: new Date(now), hours: chaseHours, lastInboundAt: wa.lastInbound ?? null, view: wa.chaseView, sendAt: at }) : null,
+  });
   const tplLater = useSendLater({
     ...later,
     template: true,
@@ -515,7 +523,7 @@ export function WhatsAppComposer({
       {wa.windowOpen && !tplAt ? (
         <>
           <SnippetPicker projectId={projectId} name={customer.name} onPick={(t) => setText((cur) => (cur.trim() ? `${cur}\n${t}` : t))} />
-          <WhatsAppDocSend id={projectId} docs={docs} onSent={async () => onSent()} />
+          <WhatsAppDocSend id={projectId} docs={docs} lateTime={typed.lateTime} onSent={async () => onSent()} />
           <textarea
             className="crm-input"
             rows={4}

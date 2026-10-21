@@ -129,10 +129,12 @@ self.addEventListener('notificationclick', (event) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: event.action === 'outbox-send' ? 'send-now' : 'cancel' }),
       }).catch(() => null);
-      await self.registration.showNotification(
-        r && r.ok ? (event.action === 'outbox-send' ? 'Reply sent' : 'Smart reply cancelled') : 'Couldn’t do that — open the chat',
-        { body: '', icon: '/icon-192.png', badge: '/badge-96.png', tag: 'outbox-' + outboxId, data: { href } }
-      );
+      // What really happened: a message that has already gone says so, never "cancelled".
+      const d = r ? await r.json().catch(() => ({})) : {};
+      const title = r && r.ok
+        ? (event.action === 'outbox-send' ? 'Reply sent' : d.kind === 'scheduled' ? 'Cancelled: that message won’t go' : 'Smart reply cancelled')
+        : (d.error || 'Couldn’t do that — open the chat');
+      await self.registration.showNotification(title, { body: '', icon: '/icon-192.png', badge: '/badge-96.png', tag: 'outbox-' + outboxId, data: { href } });
     })());
     return;
   }

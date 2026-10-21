@@ -28,6 +28,8 @@ type Convo = {
   chasing: boolean;
   /** When the next message someone has scheduled goes (Send later), or null. */
   scheduled_at?: string | null;
+  /** A message was scheduled after their last one: that answers them. */
+  scheduled_reply?: boolean;
 };
 
 type Filter = 'all' | 'reply' | 'waiting';
@@ -36,7 +38,7 @@ const FILTERS: [Filter, string][] = [
   ['reply', 'Needs reply'],
   ['waiting', 'Waiting on them'],
 ];
-const needsReply = (c: Convo) => c.last?.direction === 'in' && !c.queued && !c.scheduled_at;
+const needsReply = (c: Convo) => c.last?.direction === 'in' && !c.queued && !c.scheduled_reply;
 const waitingOnThem = (c: Convo) => c.last?.direction === 'out' || (!c.last && c.chasing);
 
 export function InboxList() {

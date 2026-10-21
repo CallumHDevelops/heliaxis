@@ -311,7 +311,7 @@ export function SmartReplies() {
           </div>
           <p className="wa-muted">
             For everyone on the team, UK time. The small hours count too: typed at 02:00, it goes at {hhmm(settings.lateSendAtMin)} that morning.
-            While it applies, Send reads <b>Send at {hhmm(settings.lateSendAtMin)}</b> (Ctrl/⌘ + Enter does the same), with <b>Send now instead</b>{' '}
+            While it applies, Send says <b>at {hhmm(settings.lateSendAtMin)}</b> under it (Ctrl/⌘ + Enter does the same), with <b>Send now instead</b>{' '}
             beside it for anything that can’t wait. The message waits in the chat as “Scheduled”, where whoever wrote it can edit, send or
             cancel it, and goes as them. Templates follow it too; documents from a job still go straight away. Any time of day, the clock
             beside Send schedules a message for later.

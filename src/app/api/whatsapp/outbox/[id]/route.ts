@@ -30,8 +30,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (body.action === 'cancel') {
-    await cancelQueued(id);
-    return json({ ok: true });
+    // Its kind says which words to show; nothing cancelled means it's gone (or going) already.
+    const kind = await cancelQueued(id);
+    if (kind) return json({ ok: true, kind });
+    const { data: now } = await db.from('whatsapp_outbox').select('status').eq('id', id).maybeSingle();
+    return json({ error: now?.status === 'cancelled' ? 'That message was already cancelled' : 'Too late: that message has already gone' }, 409);
   }
   if (body.action === 'edit' && item.kind === 'scheduled') {
     let at: Date | null = null;

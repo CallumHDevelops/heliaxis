@@ -3,6 +3,7 @@ import { customerRefs } from '@/lib/enquiries-server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
 import { processOutbox } from '@/lib/whatsapp/inbox';
+import { scheduledAnswers } from '@/lib/whatsapp/schedule';
 import { json, session, version } from '@/lib/whatsapp/routes';
 
 export const dynamic = 'force-dynamic';
@@ -59,17 +60,20 @@ export async function GET(req: Request) {
           .in('enquiry_id', ids)
           .order('created_at', { ascending: false })
           .limit(1000),
-        db.from('whatsapp_outbox').select('enquiry_id, kind, send_after').in('enquiry_id', ids).eq('status', 'pending'),
+        db.from('whatsapp_outbox').select('enquiry_id, kind, send_after, created_at').in('enquiry_id', ids).eq('status', 'pending'),
       ])
     : [{ data: [] }, { data: [] }];
   const lastBy = new Map<string, { direction: string; body: string | null }>();
   for (const m of last ?? []) if (!lastBy.has(m.enquiry_id)) lastBy.set(m.enquiry_id, m);
   const pendingBy = new Map<string, Set<string>>();
   for (const p of pending ?? []) pendingBy.set(p.enquiry_id, (pendingBy.get(p.enquiry_id) ?? new Set()).add(p.kind));
-  // The next message someone has scheduled (Send later) in each chat.
+  // The next message someone has scheduled (Send later) in each chat, and when the newest was written.
   const laterBy = new Map<string, string>();
+  const writtenBy = new Map<string, string>();
   for (const p of pending ?? []) {
-    if (p.kind === 'scheduled' && (!laterBy.has(p.enquiry_id) || p.send_after < laterBy.get(p.enquiry_id)!)) laterBy.set(p.enquiry_id, p.send_after);
+    if (p.kind !== 'scheduled') continue;
+    if (!laterBy.has(p.enquiry_id) || p.send_after < laterBy.get(p.enquiry_id)!) laterBy.set(p.enquiry_id, p.send_after);
+    if (p.created_at > (writtenBy.get(p.enquiry_id) ?? '')) writtenBy.set(p.enquiry_id, p.created_at);
   }
 
   const refBy = await refs;
@@ -84,6 +88,8 @@ export async function GET(req: Request) {
       queued: !!pendingBy.get(d.id)?.has('reply') || !!pendingBy.get(d.id)?.has('intro'),
       chasing: !!pendingBy.get(d.id)?.has('chase'),
       scheduled_at: laterBy.get(d.id) ?? null,
+      // A reply scheduled after their last message answers them; one scheduled before it doesn't.
+      scheduled_reply: scheduledAnswers(writtenBy.get(d.id), d.wa_last_inbound_at),
     })),
   });
 }

@@ -10,7 +10,7 @@ import { stageLabel } from '@/lib/crm/stages';
 import { chatRef, chatTag, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { closeShownNotifications } from '@/lib/push-client';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
-import { atWords, chaseWhen, type ChaseView } from '@/lib/whatsapp/schedule';
+import { atWords, chaseTime, chaseWhen, type ChaseView } from '@/lib/whatsapp/schedule';
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
@@ -466,9 +466,10 @@ export function ChatPane({
       body: JSON.stringify({ action, body, sendAt }),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) setError(d.error || 'That didn’t work');
     if (action === 'edit' && r.ok) setEditing(null);
     await reload();
+    // After the reload (which clears the last error), so "Too late: that message has already gone" shows.
+    if (!r.ok) setError(d.error || 'That didn’t work');
     return r.ok;
   }
 
@@ -500,6 +501,13 @@ export function ChatPane({
     }
   }
 
+  /** When this message's chaser would go if it went at `at` (null = now): Send later shows it against each choice. */
+  const chaseAtFor = (message: string, isTemplate: boolean) => (at: Date | null) => {
+    const h = chaseHoursFor(message, isTemplate);
+    const view = chaseDefaults.view;
+    return h && view ? chaseTime({ now: new Date(now), hours: h, lastInboundAt: enquiry?.wa_last_inbound_at ?? null, view, sendAt: at }) : null;
+  };
+
   // Send later and the late-night rule, for a typed reply and for a template.
   const later = {
     now,
@@ -508,8 +516,19 @@ export function ChatPane({
     lastInboundAt: enquiry?.wa_last_inbound_at ?? null,
     name: enquiry?.name ?? '',
   };
-  const typed = useSendLater({ ...later, disabled: !text.trim() || sending || !configured, submit: sendTyped, onTemplate: setTplAt });
-  const tplLater = useSendLater({ ...later, template: true, disabled: !configured || sending || !tplSend.ready, submit: sendTemplate });
+  const typed = useSendLater({
+    ...later,
+    disabled: !text.trim() || sending || !configured,
+    submit: sendTyped,
+    onTemplate: setTplAt,
+    chaseAt: chaseAtFor(text, false),
+  });
+  const tplLater = useSendLater({ ...later, template: true, disabled: !configured || sending || !tplSend.ready, submit: sendTemplate, chaseAt: chaseAtFor('', true) });
+  // In the dock the panel opens above the reply box: keep the box in view as it opens or grows.
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (typed.panelState) rowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [typed.panelState]);
 
   /** Ctrl + Enter (⌘ + Enter on a Mac) does what the Send button says; Enter on its own starts a new line. */
   function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -754,11 +773,11 @@ export function ChatPane({
               </p>
               <div className="wa-pane__chips">
                 {projectId && <SnippetPicker projectId={projectId} name={enquiry.name} onPick={(t) => setDraft(textNow.current.trim() ? `${textNow.current}\n${t}` : t)} />}
-                {projectId && docs && <WhatsAppDocSend id={projectId} docs={docs} onSent={async () => void (await reload())} />}
+                {projectId && docs && <WhatsAppDocSend id={projectId} docs={docs} lateTime={typed.lateTime} onSent={async () => void (await reload())} />}
                 {chasePicker(text, false, typed.lateAt)}
               </div>
               {typed.panel}
-              <div className="wa-pane__row">
+              <div className="wa-pane__row" ref={rowRef}>
                 <textarea
                   ref={inputRef}
                   className="wa-input"
@@ -774,8 +793,9 @@ export function ChatPane({
                 />
                 <div className="wsl-sendgroup">
                   <button type="button" className="wa-send" onClick={typed.main} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
-                    {sending ? '…' : typed.label}
-                    <small>Ctrl/⌘ + Enter</small>
+                    {sending ? '…' : 'Send'}
+                    {/* Late at night it says when it goes ("at 07:00"); the title keeps the shortcut. */}
+                    <small>{typed.lateTime ? `at ${typed.lateTime}` : 'Ctrl/⌘ + Enter'}</small>
                   </button>
                   {typed.clock()}
                 </div>
@@ -843,7 +863,8 @@ export function ChatPane({
               />
               <div className="wsl-sendgroup">
                 <button type="button" className="wa-send" onClick={typed.main} disabled={!configured || sending || !text.trim()} title="Ctrl + Enter (⌘ + Enter on a Mac)">
-                  {sending ? '…' : typed.label}
+                  {sending ? '…' : 'Send'}
+                  {typed.lateTime && <small>at {typed.lateTime}</small>}
                 </button>
                 {typed.clock()}
               </div>

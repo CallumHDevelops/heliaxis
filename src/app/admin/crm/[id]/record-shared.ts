@@ -122,6 +122,8 @@ export type WaInfo = {
   chaseHours: number;
   /** Quiet hours and the evening rule, to say when a chaser would really go. */
   chaseView?: ChaseView | null;
+  /** Send later can hold a message (whatsapp-scheduled.sql has been run). */
+  laterReady?: boolean;
 };
 
 export type OtherJob = { id: string; title: string; stage: string; products: string[]; created_at: string; project_ref: string | null };

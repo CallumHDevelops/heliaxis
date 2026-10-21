@@ -161,7 +161,8 @@ export async function GET(req: Request, { params }: Ctx) {
  * Send: { text } or { template, lang, params }, plus optional { chaseHours } if they don't reply.
  * When: { now: true } sends straight away; { sendAt } (an ISO time) schedules it (Send later). With
  * neither (Metis's drafts, a page from before Send later) the late-night rule decides. A typed message
- * scheduled past the free 24h window is refused with { windowClosesAt }, so the chat can offer another way.
+ * scheduled past the free 24h window is refused with { windowClosesAt }, so the chat (and Metis's draft
+ * card) can offer another way: Send now, while the window is still open.
  */
 export async function POST(req: Request, { params }: Ctx) {
   const s = await chatSession();

@@ -39,11 +39,14 @@
   outline: 2px solid var(--ink, #211f18);
   outline-offset: 2px;
 }
-/* In the dock the Send button is a rounded box with "Ctrl/⌘ + Enter" under it. */
+/* In the dock the Send button is a rounded box with "Ctrl/⌘ + Enter" (late at night "at 07:00") under
+   it, and a narrow clock, so the reply box keeps its width. */
 .wa-pane__row .wsl-sendgroup > .wa-send {
   border-radius: 8px 0 0 8px;
 }
 .wa-pane__row .wsl-clock {
+  min-width: 32px;
+  padding: 0;
   border-radius: 0 8px 8px 0;
 }
 .crm-actions .wsl-clock {
@@ -111,6 +114,10 @@
   font-size: 0.66rem;
   font-weight: 600;
   color: var(--amber-2, #c77f04);
+}
+/* When its chaser would go, sent at that time. */
+.wsl-choice small.wsl-chased {
+  color: var(--muted, #6e6a5e);
 }
 .wsl-choice.is-on {
   border-color: var(--wa, #1f7a4d);
@@ -282,15 +289,19 @@
 .wsl-row .wa-send {
   white-space: nowrap;
 }
-/* On a phone "Send at 07:00" goes over two lines, so the box keeps its width. */
-@media (max-width: 560px) {
-  .wsl-row .wa-send {
-    max-width: 6.5rem;
-    padding-left: 0.8rem;
-    padding-right: 0.8rem;
-    white-space: normal;
-    line-height: 1.15;
-  }
+/* Late at night "Send" keeps its size with "at 07:00" under it, so the box keeps its width. */
+.wsl-row .wa-send {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.1;
+}
+.wsl-row .wa-send small {
+  font-size: 0.66rem;
+  font-weight: 600;
+  opacity: 0.85;
 }
 /* A template's Send button spans the box, as before. */
 .wsl-sendgroup--wide > .wa-send {

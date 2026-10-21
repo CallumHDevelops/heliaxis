@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { looksLikeRef, refMatches, refOnly, refPatterns } from '@/lib/projects/refs';
+import { scheduledAnswers } from '@/lib/whatsapp/schedule';
 import { SERVICE_WINDOW_MS } from '@/lib/whatsapp/shared';
 import type { ActiveChat, ActiveCounts } from '@/components/admin/whatsapp/dock-shared';
 
@@ -37,7 +38,7 @@ type Enq = {
   customer_ref?: string | null;
 };
 type Proj = { id: string; enquiry_id: string; title: string | null; stage: string; created_at: string; project_ref?: string | null };
-type Pending = { enquiry_id: string; kind: string; send_after: string };
+type Pending = { enquiry_id: string; kind: string; send_after: string; created_at: string };
 type PgError = { code?: string; message?: string } | null;
 type Rows<T> = { data: T[] | null; error: PgError };
 /** A row before its last-message preview is read. */
@@ -92,7 +93,7 @@ async function projectsFor(db: Db, enquiryIds: string[]): Promise<Proj[]> {
 
 async function pendingFor(db: Db, enquiryIds: string[]): Promise<Pending[]> {
   return inBatches(enquiryIds, async (batch) => {
-    const { data } = await db.from('whatsapp_outbox').select('enquiry_id, kind, send_after').in('enquiry_id', batch).eq('status', 'pending');
+    const { data } = await db.from('whatsapp_outbox').select('enquiry_id, kind, send_after, created_at').in('enquiry_id', batch).eq('status', 'pending');
     return (data ?? []) as Pending[];
   });
 }
@@ -110,10 +111,13 @@ function buildDrafts(enquiries: Enq[], projects: Proj[], pending: Pending[], sco
   for (const p of projects) projectsOf.set(p.enquiry_id, [...(projectsOf.get(p.enquiry_id) ?? []), p]);
   const kindsOf = new Map<string, Set<string>>();
   for (const p of pending) kindsOf.set(p.enquiry_id, (kindsOf.get(p.enquiry_id) ?? new Set()).add(p.kind));
-  // The next message someone has scheduled for each enquiry (Send later).
+  // The next message someone has scheduled for each enquiry (Send later), and when the newest was written.
   const laterOf = new Map<string, string>();
+  const writtenOf = new Map<string, string>();
   for (const p of pending) {
-    if (p.kind === 'scheduled' && (!laterOf.has(p.enquiry_id) || p.send_after < laterOf.get(p.enquiry_id)!)) laterOf.set(p.enquiry_id, p.send_after);
+    if (p.kind !== 'scheduled') continue;
+    if (!laterOf.has(p.enquiry_id) || p.send_after < laterOf.get(p.enquiry_id)!) laterOf.set(p.enquiry_id, p.send_after);
+    if (p.created_at > (writtenOf.get(p.enquiry_id) ?? '')) writtenOf.set(p.enquiry_id, p.created_at);
   }
 
   const drafts: Draft[] = [];
@@ -131,6 +135,8 @@ function buildDrafts(enquiries: Enq[], projects: Proj[], pending: Pending[], sco
     const lastInbound = latest(group.map((e) => e.wa_last_inbound_at));
     // Their message is the newest (an incoming message sets both times; ours only the last one).
     const theyWroteLast = !!lastInbound && lastInbound >= (lastAt ?? '');
+    // A reply someone scheduled after their last message answers them; one scheduled before it doesn't.
+    const answered = scheduledAnswers(latest(ids.map((id) => writtenOf.get(id))), lastInbound);
     const owner = (open && group.find((e) => e.id === open.enquiry_id)) || thread;
     drafts.push({
       threadId: thread.id,
@@ -142,8 +148,7 @@ function buildDrafts(enquiries: Enq[], projects: Proj[], pending: Pending[], sco
       customerRef: owner.customer_ref ?? group.find((e) => e.customer_ref)?.customer_ref ?? null,
       postcode: owner.postcode ?? group.find((e) => e.postcode)?.postcode ?? null,
       unread: group.reduce((n, e) => n + (e.wa_unread ?? 0), 0),
-      // A reply someone has scheduled answers them too.
-      needsReply: theyWroteLast && !queued && !scheduledAt,
+      needsReply: theyWroteLast && !queued && !answered,
       windowClosesAt: lastInbound ? new Date(new Date(lastInbound).getTime() + SERVICE_WINDOW_MS).toISOString() : null,
       queued,
       chasing: kinds.has('chase'),
@@ -262,7 +267,7 @@ export async function activeChats(
   const drafts = sortDrafts(await draftsFor(db, recent, scope));
 
   const v = hash(
-    drafts.map((d) => [d.threadId, d.enquiryIds, d.unread, d.lastAt, d.queued, d.chasing, d.scheduledAt, d.name, d.customerRef, d.project?.id, d.project?.stage, d.project?.ref, d.hasProject])
+    drafts.map((d) => [d.threadId, d.enquiryIds, d.unread, d.lastAt, d.queued, d.chasing, d.scheduledAt, d.needsReply, d.name, d.customerRef, d.project?.id, d.project?.stage, d.project?.ref, d.hasProject])
   );
   if (opts.known && opts.known === v) return { same: true, v };
 

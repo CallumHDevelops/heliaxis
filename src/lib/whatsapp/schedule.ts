@@ -200,16 +200,22 @@ export function whenWords(at: Date, now: Date): string {
   return `${day} about ${time}`;
 }
 
+type ChaseAsk = { now: Date; hours: number; lastInboundAt: string | null; view: ChaseView; sendAt?: Date | null };
+
 /**
- * When a chaser set now would go, in words, worked out as the server will plan it (without the
- * jitter, so it's the earliest): for the "Chase if no reply" choices. A message that goes later
- * (`sendAt`: Send later, the late-night rule) is chased from when it goes.
+ * When a chaser set now would go, worked out as the server will plan it (without the jitter, so it's
+ * the earliest). A message that goes later (`sendAt`: Send later, the late-night rule) is chased from
+ * when it goes.
  */
-export function chaseWhen(opts: { now: Date; hours: number; lastInboundAt: string | null; view: ChaseView; sendAt?: Date | null }): string {
+export function chaseTime(opts: ChaseAsk): Date {
   const { now, hours, lastInboundAt, view } = opts;
   const sentAt = opts.sendAt && opts.sendAt.getTime() > now.getTime() ? opts.sendAt : now;
-  const plan = planChase({ sentAt, hours, lastInboundAt, settings: view, keepFree: view.keepFree, rand: () => 0 });
-  return whenWords(plan.at, now);
+  return planChase({ sentAt, hours, lastInboundAt, settings: view, keepFree: view.keepFree, rand: () => 0 }).at;
+}
+
+/** chaseTime in words, for the "Chase if no reply" choices: "tomorrow about 10:00". */
+export function chaseWhen(opts: ChaseAsk): string {
+  return whenWords(chaseTime(opts), opts.now);
 }
 
 /* ── Messages a person sends later: "Send later" and the late-night rule ─────────────────────────── */
@@ -226,6 +232,16 @@ export type LateRule = Pick<WaSettings, 'lateRule' | 'lateFromMin' | 'lateSendAt
 export function lateSendAt(now: Date, s: LateRule): Date | null {
   if (!s.lateRule || !isQuiet(now, { quietFromMin: s.lateFromMin, quietToMin: s.lateSendAtMin })) return null;
   return nextClock(now, s.lateSendAtMin);
+}
+
+/**
+ * A message someone scheduled answers the customer (the chat doesn't need a reply, and nobody is
+ * reminded) only if it was written at or after their last message: one written before doesn't answer
+ * what they've said since. False when nothing is scheduled.
+ */
+export function scheduledAnswers(writtenAt: string | null | undefined, lastInboundAt: string | null | undefined): boolean {
+  if (!writtenAt) return false;
+  return !lastInboundAt || Date.parse(writtenAt) >= Date.parse(lastInboundAt);
 }
 
 /** "Send later"'s quick choices, minutes after midnight, UK time: 07:00, 08:45 and 09:30. */

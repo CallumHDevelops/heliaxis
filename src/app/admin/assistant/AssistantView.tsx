@@ -282,6 +282,8 @@ function DraftCard({ d, open, onToggle, onDone }: { d: Draft; open: boolean; onT
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
   /** A WhatsApp sent late at night waits for the morning (the late-night rule): when it goes. */
   const [later, setLater] = useState<string | null>(null);
+  /** It's late, but their free window shuts before the morning: Send becomes Send now, while it's still free. */
+  const [shut, setShut] = useState(false);
   const [error, setError] = useState('');
 
   const patch = (b: Record<string, unknown>) =>
@@ -291,9 +293,11 @@ function DraftCard({ d, open, onToggle, onDone }: { d: Draft; open: boolean; onT
       body: JSON.stringify(b),
     });
 
-  async function send() {
+  /** Send it (a WhatsApp late at night waits for the morning); `now` sends it straight away anyway. */
+  async function send(now = false) {
     setState('sending');
     setError('');
+    setShut(false);
     const r =
       d.kind === 'email'
         ? await fetch(`/api/crm/projects/${d.project_id}/email`, {
@@ -304,12 +308,14 @@ function DraftCard({ d, open, onToggle, onDone }: { d: Draft; open: boolean; onT
         : await fetch(`/api/whatsapp/conversations/${d.enquiry_id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: body }),
+            body: JSON.stringify(now ? { text: body, now: true } : { text: body }),
           }).catch(() => null);
     const res = await r?.json().catch(() => ({}));
     if (!r?.ok) {
       setState('idle');
       setError(res?.error || 'Not sent — check your connection.');
+      // Still open now, but shut before the morning: it can go free straight away.
+      setShut(!!res?.windowClosesAt && Date.parse(res.windowClosesAt) > Date.now());
       return;
     }
     await patch({ status: 'sent', subject, body });
@@ -355,8 +361,8 @@ function DraftCard({ d, open, onToggle, onDone }: { d: Draft; open: boolean; onT
             </p>
           )}
           <div className="as-draft-actions">
-            <button type="button" className="as-btn is-primary" onClick={send} disabled={state !== 'idle' || !body.trim()}>
-              {state === 'sending' ? 'Sending…' : state === 'sent' ? (later ? `Scheduled for ${later} ✓` : 'Sent ✓') : 'Send'}
+            <button type="button" className="as-btn is-primary" onClick={() => void send(shut)} disabled={state !== 'idle' || !body.trim()}>
+              {state === 'sending' ? 'Sending…' : state === 'sent' ? (later ? `Scheduled for ${later} ✓` : 'Sent ✓') : shut ? 'Send now (free)' : 'Send'}
             </button>
             {d.project_id && (
               <Link href={`/admin/crm/${d.project_id}`} className="as-btn">
