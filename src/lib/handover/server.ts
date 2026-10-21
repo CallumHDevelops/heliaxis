@@ -105,7 +105,13 @@ function genApplies(g: Gen, l: Loaded, views: SlotView[]): boolean {
   return !!v && !(v.state === 'na' && !v.office) && !v.office?.na;
 }
 
-const hashOf = (g: Gen, input: unknown) => inputsHash({ key: g.key, input });
+/**
+ * What a document's inputs hash is taken over: everything it's made from except the day it's made
+ * (`issued`), so it's made again only when its data changes, not every morning. The PDF itself is
+ * still dated the day it's made (g.make gets the whole input), and its print version the same day.
+ */
+const hashed = (g: Gen, input: unknown) => ({ key: g.key, input: { ...(input as object), issued: undefined } });
+const hashOf = (g: Gen, input: unknown) => inputsHash(hashed(g, input));
 
 /** The states, with each generator's need (its inputs hashed, or what it's missing). */
 export function statesOf(l: Loaded): { views: SlotView[]; made: Map<string, Made<unknown>> } {
@@ -237,7 +243,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
       key: g.key,
       name: docFileName(at.facts.job.ref, g.label, g.title),
       bytes,
-      inputs: { key: g.key, input: m.input },
+      inputs: hashed(g, m.input),
       category: g.category,
       slot: g.slot,
       release: g.slot ? 'with_pack' : 'now',
@@ -624,11 +630,9 @@ export async function handoverDocPrint(db: Db, ref: StoredRef): Promise<Reprint>
   if (!g) return null;
   const l = await loadHandover(db, ref.projectId);
   if (!l) return null;
-  // Dated as it was made (each document carries the day it was made), or today.
-  for (const today of new Set([ukDay(new Date(ref.madeAt)), l.facts.today])) {
-    const m = statesOf({ ...l, facts: { ...l.facts, today } }).made.get(g.key);
-    if (m?.ok && hashOf(g, m.input) === ref.hash) return g.make({ ...(m.input as object), variant: 'print' } as never, loaderFor(db));
-  }
+  // Dated as the stored copy was made (the day isn't part of what's hashed).
+  const m = statesOf({ ...l, facts: { ...l.facts, today: ukDay(new Date(ref.madeAt)) } }).made.get(g.key);
+  if (m?.ok && hashOf(g, m.input) === ref.hash) return g.make({ ...(m.input as object), variant: 'print' } as never, loaderFor(db));
   return 'changed';
 }
 

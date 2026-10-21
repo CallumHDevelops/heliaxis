@@ -428,6 +428,25 @@ const receiptNow = cur('CC13_RECEIPT');
 eq('a copy behind what it’s made from has no print version', await H.handoverDocPrint(db, { ...refOf(receiptNow), hash: 'something else' }), 'changed');
 eq('nor a pack behind its documents', await H.packPrint(db, { ...refOf(cur('PACK')), hash: 'something else' }, async () => null), 'changed');
 
+/* ── 9. The same job the next day (and the next): nothing changed, so nothing new ─────── */
+// The day a document is made isn't part of what it's hashed on: the daily cron mustn't re-date the
+// warranty and cover letter, rebuild the pack or leave anything Out of date.
+const genVersions = () => Object.fromEntries(docs().filter((d) => d.source === 'generated' && !d.archived_at).map((d) => [d.generated_key, d.version]));
+const day0 = { view: await H.handoverView(db, pid), versions: genVersions(), rows: docs().length, pack: cur('PACK').version, log: globalThis.__rec.activity.length };
+eq('today: nothing to catch up', [day0.view.dirty, day0.view.headline.stale], [false, 0]);
+const coverWords = await allText(db.files.get(`crm-docs/${cur('F07BI').storage_path}`));
+for (const day of ['2026-11-04', '2026-11-05']) {
+  globalThis.__today = day;
+  const v9 = await H.handoverView(db, pid);
+  eq(`${day}: the same headline, nothing Out of date, nothing to make`, [v9.headline.words, v9.headline.stale, v9.slots.filter((s) => s.state === 'stale').map((s) => s.code), v9.dirty], [day0.view.headline.words, 0, [], false]);
+  const r9 = await H.refreshHandover(db, pid, {}); // what the daily /api/cron/site handover job runs
+  eq(`${day}: the cron makes nothing and leaves the pack as it is`, [r9.made, r9.stale, r9.rebuilt], [[], [], false]);
+  eq(`${day}: no new versions, no new rows, nothing logged`, [genVersions(), docs().length, cur('PACK').version, globalThis.__rec.activity.length], [day0.versions, day0.rows, day0.pack, day0.log]);
+}
+const coverPrint = await H.handoverDocPrint(db, refOf(cur('F07BI')));
+eq('a print version asked for days later: the same words as the stored copy (dated the day it was made)', coverPrint instanceof Uint8Array && JSON.stringify(await allText(coverPrint)) === JSON.stringify(coverWords), true);
+globalThis.__today = '2026-11-03';
+
 if (process.env.PDF_OUT) fs.writeFileSync(`${process.env.PDF_OUT}/PACK-server.pdf`, db.files.get(`crm-docs/${cur('PACK').storage_path}`));
 console.log(failed ? `\n${failed} failed` : '\nAll passed');
 process.exit(failed ? 1 : 0);
