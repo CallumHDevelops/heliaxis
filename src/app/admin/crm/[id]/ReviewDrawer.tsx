@@ -45,6 +45,8 @@ const EVENT_WORDS: Record<string, string> = {
   review_green: 'Green light',
   review_return: 'Return to site required',
   put_right_signed: 'Put right signed',
+  trade_reply: 'WhatsApp from them',
+  office_whatsapp: 'WhatsApp to them (typed in the WhatsApp app)',
   cancelled: 'Taken off the job',
 };
 
@@ -71,6 +73,9 @@ function eventDetail(e: ReviewEvent): string {
       return [v('stage'), d.return ? `put right ${v('return')}` : '', v('po')].filter(Boolean).join(' · ');
     case 'put_right_signed':
       return `${v('name')} · ${v('photos')} photo${d.photos === 1 ? '' : 's'}`;
+    case 'trade_reply':
+    case 'office_whatsapp':
+      return [v('body'), d.word === 'stop' ? 'STOP: job messages by email only' : ''].filter(Boolean).join(' · ');
     case 'two_phones':
       return `${v('key')}: ${JSON.stringify(d.was)} → ${JSON.stringify(d.now)}`;
     case 'edited':
