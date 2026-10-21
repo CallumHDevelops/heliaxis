@@ -38,7 +38,9 @@ export function HubMetaLeads({ data }: { data: Data }) {
                   {r.ref && <span className="hub-meta-ref">{r.ref}</span>}
                 </b>
                 <small>
-                  <span className="hub-meta-ad">{r.ad}</span>
+                  <span className="hub-meta-ad" title={r.note ?? undefined}>
+                    {r.ad}
+                  </span>
                   {r.postcode && <span>{r.postcode}</span>}
                   <time dateTime={r.at}>{r.ago}</time>
                 </small>

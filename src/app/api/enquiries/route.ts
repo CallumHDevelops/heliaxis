@@ -5,9 +5,8 @@ import {
   ENQUIRY_STATUSES,
   enrichLeadsWithGeo,
   labelToDbStatus,
-  rowToCrmLead,
 } from '@/lib/enquiries';
-import { listEnquiryRows } from '@/lib/enquiries-server';
+import { crmLeads, listEnquiryRows } from '@/lib/enquiries-server';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -23,7 +22,7 @@ export async function GET() {
     return NextResponse.json({ error }, { status: 500, headers: NO_STORE });
   }
 
-  const leads = await enrichLeadsWithGeo(rows.map(rowToCrmLead));
+  const leads = await enrichLeadsWithGeo(await crmLeads(rows));
   return NextResponse.json({ items: rows, leads }, { headers: NO_STORE });
 }
 

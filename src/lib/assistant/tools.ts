@@ -2,6 +2,7 @@ import 'server-only';
 import type Anthropic from '@anthropic-ai/sdk';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logActivity } from '@/lib/crm/server';
+import { sourceNowOf } from '@/lib/lead-source-server';
 import { PRODUCT_KEYS, stageLabel } from '@/lib/crm/stages';
 import { notify } from '@/lib/notify';
 import { todayISO } from '@/lib/tasks';
@@ -172,9 +173,11 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
         db.from('tasks').select('title, assignee_name, due_date, status').eq('crm_project_id', id).neq('status', 'done'),
         db.from('assistant_drafts').select('kind, subject, body').eq('project_id', id).eq('status', 'draft'),
       ]);
+      // Where they came from in words, with a Meta ad's name now ("source" is the name it had then).
+      const shown = c.data ? await sourceNowOf({ id: p.enquiry_id, source: c.data.source }) : null;
       return JSON.stringify({
         project_id: id,
-        customer: c.data,
+        customer: c.data && shown ? { ...c.data, source_label: shown.label, ...(shown.note ? { source_note: shown.note } : {}) } : c.data,
         title: p.title,
         stage: stageLabel(p.stage),
         products: p.products,

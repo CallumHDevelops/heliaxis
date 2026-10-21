@@ -376,6 +376,34 @@ export async function currentAdNames(): Promise<AdNameLookup> {
 }
 
 /**
+ * currentAdNames from cms_kv alone, for pages that show a lead's source on every load
+ * (src/lib/lead-source-server.ts): Meta's list as Reports last kept it and the names the CRM has
+ * seen, in one read. Never asks Meta and never writes. Null when neither is there or the read fails.
+ */
+export async function cachedAdNames(): Promise<AdNameLookup | null> {
+  try {
+    const { data, error } = await createAdminClient().from('cms_kv').select('key, value').in('key', [NAMES_KEY, SEEN_KEY]);
+    if (error || !data?.length) return null;
+    const value = (key: string): unknown => {
+      try {
+        const v: unknown = data.find((r) => r.key === key)?.value;
+        return typeof v === 'string' ? JSON.parse(v) : (v ?? null);
+      } catch {
+        return null;
+      }
+    };
+    const names = value(NAMES_KEY) as Names | null;
+    // Another ad account's names (META_AD_ACCOUNT_ID changed) aren't these leads' ads.
+    const account = configuredAccount();
+    const listed = names?.v === 1 && names.ads && (!account || names.account === account) ? names.ads : null;
+    // Only Reports asks Meta for the list again, so it may be old: a newer name a lead brought wins.
+    return nameLookup(listed, readHistory(value(SEEN_KEY)), listed ? Date.parse(names?.at ?? '') : undefined);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Ad spend for the last `days` days (today included) in the ad account's time zone, each ad on its
  * own under its name now. `refresh`: "Refresh from Meta", the names and today's figures asked for now.
  */

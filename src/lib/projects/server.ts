@@ -6,6 +6,7 @@ import { chunks } from '@/lib/crm/delete-customer';
 import { isProjectStage, isStage, PROJECT_STAGES, stageIndex, type StageKey } from '@/lib/crm/stages';
 import { msConfigured } from '@/lib/ms365';
 import { canAccess, type AccessProfile } from '@/lib/portals';
+import { sourcesNow } from '@/lib/lead-source-server';
 import { stageProgress, type CheckCtx, type ProjectRow } from './checklist';
 import { deadlinesFor, shortDay, daysBetween, type Deadline, type DeadlineCal } from './deadlines';
 import { possibleDuplicates, type Duplicate } from './duplicates';
@@ -299,6 +300,8 @@ type ListRow = {
 };
 type Extras = { id: string; first_contact_at?: string | null; project_ref?: string | null; on_hold?: boolean | null; project_started_at?: string | null };
 type Enquiry = { id: string; name: string; phone: string | null; email: string | null; postcode: string | null; interest: string | null; source: string | null; status: string; created_at: string };
+/** `source` in words, with a Meta ad's name now ("Meta ad · Tim Facts", src/lib/lead-source-server.ts). */
+type ToSort = Enquiry & { source_label: string };
 
 export type CrmCounts = {
   followUpsDue: number;
@@ -328,7 +331,7 @@ export type PipelineProject = ListRow & {
   possible_duplicate: Duplicate | null;
 };
 
-export type Pipeline = { projects: PipelineProject[]; unassigned: Enquiry[]; counts: CrmCounts };
+export type Pipeline = { projects: PipelineProject[]; unassigned: ToSort[]; counts: CrmCounts };
 
 /** The newer columns for the same rows as the list (same order and limit), or nothing before crm-v2/v3.sql. */
 async function listExtras(db: Db): Promise<Map<string, Extras>> {
@@ -445,7 +448,9 @@ export async function pipeline(): Promise<Pipeline | { error: string }> {
     };
   });
   // Leads not yet turned into a project (excluding lost ones).
-  const unassigned = ((recent ?? []) as Enquiry[]).filter((e) => !withProject.has(e.id) && e.status !== 'lost').slice(0, 30);
+  const left = ((recent ?? []) as Enquiry[]).filter((e) => !withProject.has(e.id) && e.status !== 'lost').slice(0, 30);
+  const sources = await sourcesNow(left);
+  const unassigned = left.map((e) => ({ ...e, source_label: sources.get(e.id)?.label ?? e.source ?? '' }));
   return { projects: rows, unassigned, counts: crmCounts(rows, unassigned, tasksDue) };
 }
 
