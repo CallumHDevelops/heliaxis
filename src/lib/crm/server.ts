@@ -204,7 +204,20 @@ export const DOC_MIME = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ];
 export const MAX_DOC_BYTES = 25 * 1024 * 1024;
-export const DOC_CATEGORIES = ['quote', 'invoice', 'dno', 'mcs', 'warranty', 'handover', 'design', 'contract', 'receipt', 'other'] as const;
+export const DOC_CATEGORIES = ['quote', 'invoice', 'dno', 'mcs', 'warranty', 'handover', 'design', 'contract', 'receipt', 'other', 'commissioning', 'certificate', 'po'] as const;
+/** The kinds site-commissioning.sql adds to crm_documents' check list: before it's run, the database refuses them. */
+export const SITE_DOC_CATEGORIES: readonly string[] = ['commissioning', 'certificate', 'po'];
+
+/** A document kind from a request, or `fallback` when it isn't one (or is a site kind and site-commissioning.sql hasn't been run). */
+export async function docCategoryOf(v: unknown, fallback = 'other'): Promise<string> {
+  const c = String(v ?? '');
+  if (!(DOC_CATEGORIES as readonly string[]).includes(c)) return fallback;
+  if (SITE_DOC_CATEGORIES.includes(c)) {
+    const { schemaReady } = await import('@/lib/schema-ready');
+    if (!(await schemaReady()).site) return fallback;
+  }
+  return c;
+}
 
 let docsReady = false;
 export async function ensureDocsBucket() {

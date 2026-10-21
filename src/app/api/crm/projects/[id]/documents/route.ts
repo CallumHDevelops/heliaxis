@@ -2,7 +2,7 @@ import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   crmSession,
-  DOC_CATEGORIES,
+  docCategoryOf,
   DOC_MIME,
   DOCS_BUCKET,
   ensureDocsBucket,
@@ -46,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (b.action === 'save') {
     const path = String(b.path || '');
     if (!path.startsWith(`projects/${id}/`) || path.includes('..')) return json({ error: 'Bad file' }, 400);
-    const category = (DOC_CATEGORIES as readonly string[]).includes(b.category) ? b.category : 'other';
+    const category = await docCategoryOf(b.category);
     const name = String(b.name || '').trim().slice(0, 140) || 'Document';
     const { data: doc, error } = await db
       .from('crm_documents')

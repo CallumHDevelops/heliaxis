@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { crmSession, DOC_CATEGORIES, DOCS_BUCKET, isUuid, json, logActivity, signedDoc } from '@/lib/crm/server';
+import { crmSession, docCategoryOf, DOCS_BUCKET, isUuid, json, logActivity, signedDoc } from '@/lib/crm/server';
 import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 
 export const dynamic = 'force-dynamic';
@@ -48,7 +48,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const u: Record<string, unknown> = {};
   if ('visible' in b) u.visible = !!b.visible;
   if ('name' in b) u.name = String(b.name || '').trim().slice(0, 140) || 'Document';
-  if ('category' in b && (DOC_CATEGORIES as readonly string[]).includes(b.category)) u.category = b.category;
+  if ('category' in b) {
+    const c = await docCategoryOf(b.category, '');
+    if (c) u.category = c;
+  }
   if ('needs_signature' in b) u.needs_signature = !!b.needs_signature && SIGNABLE_CATEGORIES.includes(String(u.category ?? d.category));
   if (signedQuote && Object.keys(u).some((k) => k !== 'visible')) return json({ error: SIGNED_QUOTE }, 409);
   const db = createAdminClient();

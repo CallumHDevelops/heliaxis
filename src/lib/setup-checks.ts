@@ -451,9 +451,21 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     sql('survey-booking.sql', 'Online survey booking, your diary, and the Outlook copy of surveys, installs and diary entries.', 5, 'surveys.sql')
   );
   // Purchase orders against jobs: every PO screen stays hidden until this has been run.
+  const purchaseOrders = crmV3 && (await has('purchase_order_lines'));
   add(
-    crmV3 && !(await has('purchase_order_lines')),
+    crmV3 && !purchaseOrders,
     sql('purchase-orders.sql', 'Purchase orders: order the kit for a job from your suppliers, email them the PO as a PDF, and track it to delivery.', 5, 'crm-v3.sql')
+  );
+  // The site app (trades' job packs, sign-offs, labour POs) and then the handover pack: their tabs and
+  // the /portal/site app stay hidden until each has been run (src/lib/schema-ready.ts).
+  const site = purchaseOrders && (await has('site_messages')) && (await has('crm_documents', 'handover_slot'));
+  add(
+    purchaseOrders && !site,
+    sql('site-commissioning.sql', 'Site app: send trades a job pack, collect their sign-offs and raise their POs.', 5, 'purchase-orders.sql')
+  );
+  add(
+    site && !(await has('handover_packs', 'project_id')),
+    sql('handover.sql', 'Handover pack: every document for the customer in one place, and uploads straight into their portal.', 5, 'site-commissioning.sql')
   );
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));

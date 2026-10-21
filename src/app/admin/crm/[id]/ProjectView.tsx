@@ -668,7 +668,7 @@ export function ProjectView({
               />
             )}
             {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={refresh} />}
-            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} />}
+            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} siteDocs={schema.site} />}
             {tab === 'orders' && <OrdersTab projectId={id} today={today} myName={rec.team.find((t) => t.id === me)?.name ?? null} onChanged={refresh} />}
             {tab === 'surveys' && <SurveysPanel surveys={rec.surveys} busy={starting} onStart={(type) => void startSurvey(type)} />}
           </div>

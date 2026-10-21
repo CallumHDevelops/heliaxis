@@ -39,7 +39,12 @@ export const DOC_LABEL: Record<string, string> = {
   contract: 'Contract',
   receipt: 'Receipt',
   other: 'Other',
+  commissioning: 'Commissioning',
+  certificate: 'Certificate',
+  po: 'Purchase order',
 };
+/** Kinds site-commissioning.sql adds: offered only once it's been run (the database refuses them before). */
+const SITE_KINDS = ['commissioning', 'certificate', 'po'];
 
 /** Quotes and contracts can be signed by the customer (in the portal, or ticked as signed outside it). */
 const SIGNABLE = ['quote', 'contract'];
@@ -142,7 +147,7 @@ function takePendingAdd() {
 
 /* ── Documents tab ─────────────────────────────────────────────────────────── */
 
-export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc[]; onChanged: () => Promise<void> }) {
+export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: string; docs: CrmDoc[]; onChanged: () => Promise<void>; siteDocs?: boolean }) {
   const [cat, setCat] = useState('quote');
   const [visible, setVisible] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -248,11 +253,13 @@ export function DocumentsTab({ id, docs, onChanged }: { id: string; docs: CrmDoc
     <div className="crm-docs">
       <div ref={box} className={`crm-doc-upload${flash ? ' qx-flash' : ''}`}>
         <select className="crm-input" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Document type">
-          {Object.entries(DOC_LABEL).map(([k, l]) => (
-            <option key={k} value={k}>
-              {l}
-            </option>
-          ))}
+          {Object.entries(DOC_LABEL)
+            .filter(([k]) => siteDocs || !SITE_KINDS.includes(k))
+            .map(([k, l]) => (
+              <option key={k} value={k}>
+                {l}
+              </option>
+            ))}
         </select>
         <label className="crm-check" style={{ marginTop: 0 }}>
           <input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} /> Show in their portal

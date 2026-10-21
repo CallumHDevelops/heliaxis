@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   crmSession,
-  DOC_CATEGORIES,
+  docCategoryOf,
   DOC_MIME,
   DOCS_BUCKET,
   ensureDocsBucket,
@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (b.action === 'save') {
     const path = String(b.path || '');
     if (!path.startsWith(`projects/${projectId}/`) || path.includes('..')) return json({ error: 'Bad file' }, 400);
-    const category = (DOC_CATEGORIES as readonly string[]).includes(String(b.category)) ? String(b.category) : 'design';
+    const category = await docCategoryOf(b.category, 'design');
     const name = String(b.name || '').trim().slice(0, 140) || (survey.type === 'ashp' ? 'SimpliHeat report' : 'Survey document');
     const { data: doc, error } = await db
       .from('crm_documents')
