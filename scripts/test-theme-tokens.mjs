@@ -36,6 +36,91 @@ const CONVERTED = [
   'src/app/admin/app/page.tsx',
   'src/app/admin/app/AppDownload.tsx',
   'src/app/admin/app/SendToPhone.tsx',
+  // Comms and the admin pages (wf-theme-comms): WhatsApp inbox, chats, templates, smart replies, imports,
+  // Send later, chat tasks, media; the dashboard; tasks; users; setup; From Claude; the sign-in pages;
+  // the blog list, analytics and heatmap chrome, the RAMS/social sign-in step and the design studio chrome.
+  'src/app/admin/enquiries/whatsapp.css',
+  'src/app/admin/enquiries/templates/templates.css',
+  'src/app/admin/enquiries/import/import.css',
+  'src/app/admin/enquiries/import/meta-import.css',
+  'src/app/admin/enquiries/import/wa-import.css',
+  'src/app/admin/hub.css',
+  'src/app/admin/tasks/tasks.css',
+  'src/app/admin/users/users.css',
+  'src/app/admin/setup/setup.css',
+  'src/app/admin/blog/blog-admin.css',
+  'src/app/admin/analytics/analytics.css',
+  'src/app/admin/analytics/heatmap/heatmap.css',
+  'src/app/admin/design/design.css',
+  'src/components/admin/from-claude.css',
+  'src/components/admin/contacted-catch-up.css',
+  'src/components/admin/surveys-tabs.css',
+  'src/components/admin/wa-template.css',
+  'src/components/admin/whatsapp/chat-tasks.css',
+  'src/components/admin/whatsapp/media.css',
+  'src/components/admin/whatsapp/send-later.css',
+  'src/components/auth/authStyles.ts',
+  'src/components/auth/AuthShell.tsx',
+  'src/app/login/LoginForm.tsx',
+  'src/app/login/page.tsx',
+  'src/app/register/page.tsx',
+  'src/app/forgot-password/page.tsx',
+  'src/app/reset-password/page.tsx',
+  'src/app/pending/page.tsx',
+  'src/app/admin/page.tsx',
+  'src/app/admin/layout.tsx',
+  'src/app/admin/HubView.tsx',
+  'src/app/admin/HubMetaLeads.tsx',
+  'src/app/admin/HubMyDay.tsx',
+  'src/app/admin/approvals/page.tsx',
+  'src/app/admin/tasks/page.tsx',
+  'src/app/admin/tasks/TasksBoard.tsx',
+  'src/app/admin/users/page.tsx',
+  'src/app/admin/users/UsersManager.tsx',
+  'src/app/admin/setup/env/page.tsx',
+  'src/app/admin/setup/env/WhatsAppConnection.tsx',
+  'src/app/admin/setup/guide/[name]/page.tsx',
+  'src/app/admin/setup/sql/[file]/page.tsx',
+  'src/app/admin/enquiries/inbox/page.tsx',
+  'src/app/admin/enquiries/inbox/InboxList.tsx',
+  'src/app/admin/enquiries/inbox/[id]/page.tsx',
+  'src/app/admin/enquiries/inbox/[id]/ChatThread.tsx',
+  'src/app/admin/enquiries/smart-replies/page.tsx',
+  'src/app/admin/enquiries/smart-replies/SmartReplies.tsx',
+  'src/app/admin/enquiries/templates/page.tsx',
+  'src/app/admin/enquiries/templates/TemplatesManager.tsx',
+  'src/app/admin/enquiries/import/page.tsx',
+  'src/app/admin/enquiries/import/MetaImport.tsx',
+  'src/app/admin/enquiries/import/WhatsAppImport.tsx',
+  'src/app/admin/crm/chats/page.tsx',
+  'src/app/admin/crm/chats/[id]/page.tsx',
+  'src/app/admin/blog/page.tsx',
+  'src/app/admin/blog/BlogAdminCreate.tsx',
+  'src/app/admin/blog/BlogAdminList.tsx',
+  'src/app/admin/blog/BlogAdminPostActions.tsx',
+  'src/app/admin/analytics/page.tsx',
+  'src/app/admin/analytics/HeatmapViewer.tsx',
+  'src/app/admin/analytics/heatmap/page.tsx',
+  'src/app/admin/sso/page.tsx',
+  'src/app/admin/design/page.tsx',
+  'src/app/admin/design/DesignStudio.tsx',
+  'src/components/admin/ContactedCatchUp.tsx',
+  'src/components/admin/CopyButton.tsx',
+  'src/components/admin/FromClaude.tsx',
+  'src/components/admin/GlobalSearch.tsx',
+  'src/components/admin/NativePushCapture.tsx',
+  'src/components/admin/PushBanner.tsx',
+  'src/components/admin/SurveysTabs.tsx',
+  'src/components/admin/TemplateSend.tsx',
+  'src/components/admin/whatsapp/ChatPane.tsx',
+  'src/components/admin/whatsapp/ChatTaskSheets.tsx',
+  'src/components/admin/whatsapp/ChatTasks.tsx',
+  'src/components/admin/whatsapp/DockChip.tsx',
+  'src/components/admin/whatsapp/DockFrame.tsx',
+  'src/components/admin/whatsapp/MediaBubble.tsx',
+  'src/components/admin/whatsapp/SendLater.tsx',
+  'src/components/admin/whatsapp/WhatsAppDock.tsx',
+  'src/components/admin/whatsapp/WhatsAppPanel.tsx',
 ];
 /** Literals a converted file may keep, and why. */
 const ALLOWED_LITERALS = {
@@ -43,6 +128,13 @@ const ALLOWED_LITERALS = {
   'src/components/admin/AdminShell.tsx': ['#111'],
   // Metis's tile is brand artwork: ink with a gold glyph in both themes.
   'src/components/admin/MetisIcon.tsx': ['#ffd35c', '#e3a014', '#211f18'],
+  // The photo viewer's backdrop: ::backdrop doesn't inherit custom properties in older browsers; black in both themes.
+  'src/components/admin/whatsapp/media.css': ['rgba(20, 18, 12, 0.88)'],
+  // What's drawn on the canvas (the design itself), not the studio's chrome.
+  'src/app/admin/design/DesignStudio.tsx': ['#ffffff', '#211f18', '#f8bc1e'],
+  // Written into the previewed public page (the iframe), which stays white.
+  // and the heat scale drawn over it (a data colour ramp, the same in both themes).
+  'src/app/admin/analytics/HeatmapViewer.tsx': ['#fff', 'rgb(0, 180, 255)', 'rgb(0, 220, 120)', 'rgb(255, 220, 0)', 'rgb(255, 120, 0)', 'rgb(220, 0, 40)'],
 };
 /** Area A, the CRM: home, board and list, the job record (all its tabs, sheets, fabs and the merge sheet),
     customers, projects, purchase orders, reports and the surveys tool. */
@@ -125,7 +217,8 @@ for (const p of ['src/app/portal/site/layout.tsx', 'src/app/portal/(onboarding)/
 
 // 4. Converted files.
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
-const RGB = /rgba?\(\s*\d/g;
+// The whole literal (so ALLOWED_LITERALS can name an rgba() too).
+const RGB = /rgba?\(\s*\d[^)]*\)/g;
 for (const p of CONVERTED) {
   const raw = read(p);
   const src = stripComments(raw);

@@ -178,6 +178,10 @@ function inPage(expectDark) {
   for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea, [role=checkbox], [role=radio], [role=switch]')) {
     if (!visible(el) || el.closest(':disabled, [aria-disabled="true"]')) continue;
     if (/^(checkbox|radio|switch)$/.test(el.getAttribute('role') || '') && el.textContent.trim()) continue;
+    // A native checkbox or radio (appearance auto) is painted by the browser in the page's color-scheme with its
+    // own edge (Chrome: #767676 on light, #858585 on dark, over 4:1 on every surface here); its CSS border and
+    // background aren't what's on screen, so measuring them (or the box round it) would be wrong.
+    if (el.tagName === 'INPUT' && /^(checkbox|radio)$/.test(el.type) && getComputedStyle(el).appearance !== 'none') continue;
     if (getComputedStyle(el).boxShadow !== 'none') continue;
     let e = edgeOf(el);
     for (let up = el.parentElement, i = 0; e.none && up && i < 2; up = up.parentElement, i++) e = edgeOf(up);

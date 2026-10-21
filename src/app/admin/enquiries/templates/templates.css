@@ -50,19 +50,19 @@
   white-space: nowrap;
 }
 .wat-badge.ok {
-  background: rgba(31, 122, 77, 0.12);
-  color: var(--wa);
+  background: rgb(var(--wa-rgb) / 0.12);
+  color: var(--wa-text);
 }
 .wat-badge.wait {
-  background: rgba(248, 188, 30, 0.24);
-  color: var(--amber-2);
+  background: rgb(var(--accent-rgb) / 0.24);
+  color: var(--accent-text);
 }
 .wat-badge.bad {
-  background: rgba(179, 38, 30, 0.1);
-  color: var(--err);
+  background: rgb(var(--danger-rgb) / 0.1);
+  color: var(--danger);
 }
 .wat-badge.off {
-  background: rgba(33, 31, 24, 0.08);
+  background: rgb(var(--fg-rgb) / 0.08);
   color: var(--muted);
 }
 .wat-meta {
@@ -74,8 +74,8 @@
   color: var(--muted);
 }
 .wat-chip-job {
-  background: rgba(31, 122, 77, 0.12);
-  color: var(--wa);
+  background: rgb(var(--wa-rgb) / 0.12);
+  color: var(--wa-text);
 }
 .wat-note {
   font-size: 0.84rem;
@@ -83,10 +83,10 @@
   margin: 0;
 }
 .wat-note.bad {
-  color: var(--err);
+  color: var(--danger);
 }
 .wat-note.good {
-  color: var(--wa);
+  color: var(--wa-text);
   font-weight: 600;
 }
 .wat-actions {
@@ -101,9 +101,9 @@
   padding: 0.55rem 0.9rem;
   min-height: 40px;
   border-radius: 4px;
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: var(--solar);
+  border: 1px solid var(--inverse);
+  background: var(--inverse);
+  color: var(--inverse-accent);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -112,24 +112,24 @@
 .wat-btn.wa {
   background: var(--wa);
   border-color: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .wat-btn.ghost {
   background: transparent;
-  color: var(--ink);
-  border-color: var(--line);
+  color: var(--text);
+  border-color: var(--border);
 }
 .wat-btn.danger {
   background: transparent;
-  color: var(--err);
-  border-color: rgba(179, 38, 30, 0.35);
+  color: var(--danger);
+  border-color: rgb(var(--danger-rgb) / 0.35);
 }
 .wat-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
 .wat-panel {
-  border-top: 1px dashed var(--line);
+  border-top: 1px dashed var(--border);
   padding-top: 0.6rem;
   display: flex;
   flex-direction: column;
@@ -141,7 +141,7 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
 }
 .wat-job:last-child {
   border-bottom: 0;
@@ -159,7 +159,7 @@
   line-height: 1.4;
 }
 .wat-job small.why {
-  color: var(--err);
+  color: var(--danger);
 }
 .wat-job .wat-btn {
   flex: 0 0 auto;
@@ -174,9 +174,9 @@
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
-  border: 1px dashed rgba(199, 127, 4, 0.55);
-  background: rgba(248, 188, 30, 0.12);
-  color: var(--amber-2);
+  border: 1px dashed var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.12);
+  color: var(--accent-text);
   border-radius: 999px;
   padding: 0.4rem 0.75rem;
   min-height: 36px;
@@ -190,15 +190,15 @@
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.65rem;
-  background: var(--card);
+  background: var(--surface);
   cursor: pointer;
 }
 .wat-cat.on {
-  border-color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--ink);
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text);
 }
 .wat-cat input {
   margin-top: 0.2rem;
@@ -235,7 +235,7 @@
   font: inherit;
   width: 40px;
   height: 40px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 4px;
   background: transparent;
   color: var(--muted);
@@ -250,7 +250,7 @@
 .wat-problems {
   margin: 0;
   padding-left: 1.1rem;
-  color: var(--err);
+  color: var(--danger);
   font-size: 0.82rem;
   line-height: 1.45;
 }

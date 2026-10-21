@@ -31,7 +31,7 @@ export function BlogAdminPostActions({ slug }: Props) {
         href={`/admin/blog/preview/${encodeURIComponent(previewParam)}`}
         target="_blank"
         rel="noopener noreferrer"
-        style={{ ...btn, background: brand.solar, borderColor: brand.solar }}
+        style={{ ...btn, background: brand.solar, borderColor: brand.solar, color: 'var(--accent-ink)' }}
       >
         Preview
       </a>

@@ -32,7 +32,7 @@ export default async function AdminBlogPage() {
             <h1 className="blog-admin__title">AI Blog</h1>
             <p className="blog-admin__lede">
               Manage AI articles separately from website pages in the{' '}
-              <Link href="/admin/cms" style={{ color: '#211F18', fontWeight: 600 }}>
+              <Link href="/admin/cms" style={{ color: 'var(--text)', fontWeight: 600 }}>
                 CMS
               </Link>
               . Publish now, or schedule to go live automatically.
@@ -54,7 +54,7 @@ export default async function AdminBlogPage() {
         {profile?.role === 'admin' ? (
           <BlogAdminCreate aiReady={aiReady} />
         ) : (
-          <p style={{ color: '#6E6A5E', margin: 0 }}>Only admins can create posts.</p>
+          <p style={{ color: 'var(--muted)', margin: 0 }}>Only admins can create posts.</p>
         )}
 
         <BlogAdminList posts={posts} />

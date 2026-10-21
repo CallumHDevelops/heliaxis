@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/theme/BrandLogo';
 import { brand } from './authStyles';
 
 export function AuthShell({
@@ -22,7 +22,8 @@ export function AuthShell({
         justifyContent: 'center',
         padding: '2rem 1rem',
         backgroundColor: brand.paper,
-        backgroundImage: 'url(/assets/heliaxis-card-fill-light.svg)',
+        // The card-fill pattern for the theme (light or dark), from src/app/theme.css.
+        backgroundImage: 'var(--fill-texture)',
         backgroundSize: 'cover',
         backgroundPosition: 'top right',
         backgroundRepeat: 'no-repeat',
@@ -32,14 +33,7 @@ export function AuthShell({
     >
       <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <Image
-            src="/assets/heliaxis-logo.png"
-            alt="Heliaxis"
-            width={180}
-            height={41}
-            style={{ width: 180, height: 'auto' }}
-            priority
-          />
+          <BrandLogo width={180} priority />
         </div>
 
         <div
