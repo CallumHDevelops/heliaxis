@@ -26,7 +26,8 @@ type Store = 'device' | 'packs' | 'files' | 'drafts' | 'outbox' | 'photos';
 export type DeviceRecord = {
   id: 'me';
   token: string;
-  contact: { name: string; first: string };
+  /** Who the session is for (id from the server since round 1's review; older records have only the name). */
+  contact: { id?: string; name: string; first: string };
   /** Jobs this phone knows about (from links opened and the home list). */
   jobs: string[];
   /** The home list as the server last sent it, for opening with no signal. */
@@ -54,7 +55,16 @@ export type PackRecord = {
   putRightGate?: { n: number; message: string; at: string };
 };
 export type FileRecord = { id: string; assignmentId: string; name: string; mime: string; blob: Blob; storedAt: string };
-export type DraftRecord = { id: string; answers: Answers; base: Answers; baseRev: number; dirty: string[]; savedAt: string };
+export type DraftRecord = {
+  id: string;
+  answers: Answers;
+  base: Answers;
+  baseRev: number;
+  dirty: string[];
+  savedAt: string;
+  /** Words typed that aren't answers (the Put right's "What did you do?"): kept here, never sent as answers. */
+  notes?: Record<string, string>;
+};
 /** Units 2–4 add their own kinds (and a sender for each, sync.ts registerSender). */
 export type OutboxKind = 'answers' | 'photo-delete' | 'capture-confirm' | 'signoff' | (string & {});
 export type OutboxRecord = { op_id: string; assignmentId: string; kind: OutboxKind; payload: Record<string, unknown>; createdAt: string; tries: number; failed?: string };
@@ -126,11 +136,21 @@ export const changed = () => {
 /* ── The device ──────────────────────────────────────────────────────────────── */
 
 export const getDevice = () => getRec<DeviceRecord>('device', 'me');
-/** A session from an opened link: the jobs already known stay, and a revoked session is replaced. */
+/** Another person's link on this phone (a shared van phone, the boss's link on an operative's phone). */
+export const otherPerson = (was: Pick<DeviceRecord, 'contact'> | null | undefined, now: DeviceRecord['contact']) =>
+  !!was && (was.contact.id && now.id ? was.contact.id !== now.id : was.contact.name !== now.name);
+const clearStore = (s: Store) => tx(s, 'readwrite', (x) => x.clear());
+/**
+ * A session from an opened link: the jobs already known stay, and a revoked session is replaced.
+ * Someone else's link: nothing of the last person's stays on the phone (their jobs, customers'
+ * details, drawings, photos, drafts, POs and anything still waiting to send).
+ */
 export async function saveDevice(d: Pick<DeviceRecord, 'token' | 'contact'> & { job?: string }) {
   const was = await getDevice();
-  const jobs = [...new Set([...(was?.jobs ?? []), ...(d.job ? [d.job] : [])])];
-  const keep = was && was.token === d.token ? was : { remember: was?.remember, home: was?.home, links: was?.links };
+  const other = otherPerson(was, d.contact);
+  if (other) for (const s of ['packs', 'files', 'drafts', 'outbox', 'photos'] as const) await clearStore(s);
+  const jobs = [...new Set([...(other ? [] : (was?.jobs ?? [])), ...(d.job ? [d.job] : [])])];
+  const keep = was && was.token === d.token ? was : other ? {} : { remember: was?.remember, home: was?.home, links: was?.links };
   await putRec('device', { ...keep, token: d.token, contact: d.contact, jobs, id: 'me', revoked: undefined, savedAt: new Date().toISOString() } satisfies DeviceRecord);
   changed();
 }
@@ -229,6 +249,32 @@ export async function flushDraft(assignmentId: string) {
 /** Every job's unsent keys onto the outbox now (Send now, the app going to the background). */
 export async function flushAll() {
   for (const d of await allRec<DraftRecord>('drafts')) if (d.dirty.length) await flushDraft(d.id);
+}
+
+/**
+ * Keep words typed on a screen that aren't answers (the Put right's note and name) in the job's
+ * draft, as they're typed, so a reload, Back, or Android closing the tab while the camera is open
+ * doesn't lose them. '' takes one off.
+ */
+export async function setDraftNote(assignmentId: string, key: string, text: string) {
+  await withJobLock(assignmentId, async () => {
+    const d = await getDraft(assignmentId);
+    const notes = { ...(d.notes ?? {}) };
+    if (text) notes[key] = text;
+    else delete notes[key];
+    await putRec('drafts', { ...d, notes });
+  });
+  changed();
+}
+
+/** Take off the notes whose keys start with this (once what they were for has reached the server). */
+export async function clearDraftNotes(assignmentId: string, prefix: string) {
+  await withJobLock(assignmentId, async () => {
+    const d = await getRec<DraftRecord>('drafts', assignmentId);
+    if (!d?.notes || !Object.keys(d.notes).some((k) => k.startsWith(prefix))) return;
+    await putRec('drafts', { ...d, notes: Object.fromEntries(Object.entries(d.notes).filter(([k]) => !k.startsWith(prefix))) });
+  });
+  changed();
 }
 
 /** The server's answers after a send: kept as the base; any answer not changed here since takes the server's value (another phone's). */

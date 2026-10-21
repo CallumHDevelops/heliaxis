@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { moneyLine, vatFor } from '@/lib/site/assign';
 import { ELECTRICIAN_FORMS, FORM_LABEL, formsFor } from '@/lib/site/forms';
 import { defaultCertRoute } from '@/lib/site/forms/electrician/cert';
-import { BASIS_LABEL, CIS_RATES, penceToInput, poundsToPence, VAT_WORDS, type CisRate, type RateBasis, type VatTreatment } from '@/lib/site/money';
+import { basesFor, BASIS_LABEL, CIS_RATES, penceToInput, poundsToPence, VAT_WORDS, type CisRate, type RateBasis, type VatTreatment } from '@/lib/site/money';
 import type { AssignmentView, SiteTabData } from '@/lib/site/server';
 import { TRADE_LABEL, TRADES, type Trade } from '@/lib/site/types';
 import { Sheet } from '../CrmUi';
@@ -243,7 +243,8 @@ export function AssignmentSheet({
           </span>
           <select className="crm-input" value={d.rate_basis} onChange={(e) => set({ rate_basis: e.target.value as RateBasis | '' })} aria-label="How the rate is paid">
             <option value="">How is it paid?</option>
-            {(Object.keys(BASIS_LABEL) as RateBasis[]).map((b) => (
+            {/* Per panel for the roofer only; an older one on another trade still shows, to be changed. */}
+            {[...basesFor(d.trade), ...(d.rate_basis === 'per_panel' && d.trade !== 'roofer' ? (['per_panel'] as RateBasis[]) : [])].map((b) => (
               <option key={b} value={b}>
                 {BASIS_LABEL[b]}
               </option>

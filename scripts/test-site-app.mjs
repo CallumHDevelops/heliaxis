@@ -1,5 +1,6 @@
 // The site app's pure parts: what the office changed between two packs (pack-shared.ts), a labour
-// PO's state for the trade, the sync pill and its sentence (sync.ts), and the link manifest.
+// PO's state for the trade, the sync pill and its sentence (sync.ts), the photo and serial counters
+// (ui/counts.ts), and the link manifest.
 // Usage: node --experimental-strip-types scripts/test-site-app.mjs
 import { registerHooks } from 'node:module';
 
@@ -70,6 +71,49 @@ eq('sending 2 of 5', words({ phase: 'sending', done: 1, total: 5 }).pill, 'Sendi
 eq('a failed photo', words({ failed: { photos: 1, other: 0, total: 1 } }), { pill: '1 not sent', line: 'Couldn’t send 1 photo. Tap to retry.', tone: 'bad' });
 eq('waiting beats an old All sent', words({ lastOkAt: '2026-10-21T08:00:00Z', waiting }).pill, '3 waiting');
 eq('signed out', words({ revoked: true, waiting }).line, 'Open the link in your message again. Nothing waiting is lost.');
+
+// Things, not batches: a job's answers go on the outbox every 800 ms, but they're one thing to the trade.
+const job = (patch) => ({ answers: 0, photos: 0, other: 0, failed: 0, failedPhotos: 0, signoffs: 0, kinds: {}, ...patch });
+const offline1 = S.countWaiting([job({ answers: 8, photos: 6, other: 1, signoffs: 1, kinds: { signoff: 1 } })]);
+eq('8 answer batches, 6 photos and the sign-off: 8 things, not 15', [offline1.waiting.total, offline1.waiting.answers], [8, 1]);
+eq('… and the line names them', words({ online: false, waiting: offline1.waiting }), { pill: '8 waiting', line: '6 photos, your answers and your sign-off waiting. They’ll send when you have signal.', tone: 'wait' });
+eq('two jobs’ answers are two things', S.countWaiting([job({ answers: 3 }), job({ answers: 1, photos: 1 })]).waiting.total, 3);
+eq('the job card counts the same way', S.thingsOf(job({ answers: 5, photos: 2, other: 1 })), 4);
+const pr = S.countWaiting([job({ other: 1, kinds: { 'put-right': 1 } })]).waiting;
+eq('a put right waiting is a put right, not a sign-off', words({ waiting: pr }).line, 'Your put right waiting. It’ll send when you have signal.');
+const el = S.countWaiting([job({ other: 4, signoffs: 1, kinds: { file: 2, 'customer-sign': 1, signoff: 1 } })]).waiting;
+eq('the electrician’s items by name', words({ waiting: el }).line, '2 certificate files, the customer’s signature and your sign-off waiting. They’ll send when you have signal.');
+eq('an item of a kind with no words yet', words({ waiting: S.countWaiting([job({ other: 1, kinds: { 'eic-board': 1 } })]).waiting }).line, '1 other item waiting. It’ll send when you have signal.');
+// The customer's signature after a sign-off the server turned down: it waits for them, not for signal.
+eq('waiting behind a turned-down sign-off', words({ online: true, gated: 1, waiting: S.countWaiting([job({ other: 1, kinds: { 'customer-sign': 1 } })]).waiting }).line, 'The customer’s signature waiting. Not signed off yet: open the job to see what Heliaxis still needs, then sign again.');
+eq('a failed batch of answers is one item, as is each other', S.countWaiting([job({ failed: 2 })]).failed.total, 2);
+
+/* ── What each item is called (the sending sheet, "Couldn’t send") ─────────── */
+
+eq('failed items by kind', ['answers', 'photo-delete', 'signoff', 'put-right', 'customer-sign', 'file', 'file-delete', 'eic-board'].map(S.outboxLabel), [
+  'Answers',
+  'Taking a photo off',
+  'Sign-off',
+  'Put right',
+  'Customer’s signature',
+  'Certificate file',
+  'Taking a file off',
+  'Something else',
+]);
+
+/* ── The counters over a photo slot and a serial list (ui/counts.ts) ───────── */
+
+const K = await import('../src/app/portal/site/ui/counts.ts');
+eq('a slot short of photos', K.photoCount(1, 2), '1 of 2 needed');
+eq('enough photos', K.photoCount(2, 2), '2 photos ✓');
+eq('more than needed (three picked from the gallery for "need 2"): never "3 of 2 ✓"', K.photoCount(3, 2), '3 photos ✓');
+eq('the put right: two photos of the fix, one needed', K.photoCount(2, 1), '2 photos ✓');
+eq('one photo, one needed', K.photoCount(1, 1), '1 photo ✓');
+eq('an optional slot', [K.photoCount(0, 0), K.photoCount(1, 0), K.photoCount(4, 0)], ['Only if there’s something to show', '1 photo', '4 photos']);
+eq('serials short', K.scanCount(1, 2), { text: '1 of 2', done: false });
+eq('serials complete', K.scanCount(1, 1), { text: '1 scanned ✓', done: true });
+eq('more serials than the job has (the inverter): no "2 of 1", no tick', K.scanCount(2, 1), { text: '2 scanned, 1 expected', done: false });
+eq('no count expected', [K.scanCount(0, 0).text, K.scanCount(3, 0).text], ['None yet', '3 scanned']);
 
 /* ── The manifest ──────────────────────────────────────────────────────────── */
 

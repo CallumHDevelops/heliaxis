@@ -1,16 +1,16 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { siteFetch } from '@/lib/site/client';
-import { getDevice, getPack, linkKey, saveDevice, updateDevice } from '@/lib/site/offline';
+import { getDevice, getPack, linkKey, otherPerson, saveDevice, updateDevice } from '@/lib/site/offline';
 import { downloadPack, type ReadyStep } from '@/lib/site/packs';
 import { drain } from '@/lib/site/sync';
 import { ProblemScreen, Splash, Tick } from './bits';
 import { chromeIntent, installEnv, installLater, promptInstall, safariLink, setInstallLater, useInstallPrompt, type InstallEnv } from './install';
 import { go } from './nav';
 
-type OpenReply = { deviceToken?: string; contact: { name: string; first: string }; assignment: { id: string; trade: string; title: string; site: string } };
+type OpenReply = { deviceToken?: string; contact: { id?: string; name: string; first: string }; assignment: { id: string; trade: string; title: string; site: string } };
 type Phase =
   | { kind: 'opening' }
   | { kind: 'install' }
@@ -33,17 +33,31 @@ export function Landing({ token }: { token: string }) {
   const [who, setWho] = useState<{ first: string; site: string; id: string; title: string } | null>(null);
   const [steps, setSteps] = useState<ReadyStep | null>(null);
   const [softFail, setSoftFail] = useState(false);
+  // The download started while the install step shows: "Not now" carries on with it, not a second one.
+  const running = useRef<{ id: string; p: ReturnType<typeof downloadPack> } | null>(null);
+  const lastStep = useRef<ReadyStep | null>(null);
+
+  const fetchPack = (id: string) => {
+    if (running.current?.id === id) return running.current.p;
+    const p = downloadPack(id, (s) => {
+      lastStep.current = s;
+      setSteps(s);
+    });
+    running.current = { id, p };
+    // No pack (no signal): the next try starts afresh.
+    void p.then((r) => {
+      if (!r.ok && running.current?.p === p) running.current = null;
+    });
+    return p;
+  };
 
   const ready = async (id: string) => {
     setPhase({ kind: 'ready' });
-    let last: ReadyStep | null = null;
-    const r = await downloadPack(id, (s) => {
-      last = s;
-      setSteps(s);
-    });
+    const r = await fetchPack(id);
     if (r.ok) {
-      // Everything's on the phone: on to the job. Anything missing stays on screen until they tap.
-      if (!(last as ReadyStep | null)?.missing) setTimeout(() => go(jobPath(id), { replace: true }), 900);
+      // Everything's on the phone: on to the job (unless they've already tapped through to it).
+      // Anything missing stays on screen until they tap.
+      if (!lastStep.current?.missing) setTimeout(() => window.location.pathname.startsWith('/portal/site/j/') && go(jobPath(id), { replace: true }), 900);
       return;
     }
     if (r.kind === 'problem') {
@@ -60,6 +74,9 @@ export function Landing({ token }: { token: string }) {
     const r = await siteFetch<OpenReply>('/api/site/open', { body: { token, device: dev?.token ?? null, standalone: env === 'standalone' }, token: null });
     if (r.ok) {
       const a = r.data.assignment;
+      // Someone else's link on this phone: the last person's waiting work gets one try with their own
+      // session first, then nothing of theirs stays (saveDevice).
+      if (dev && !dev.revoked && otherPerson(dev, r.data.contact)) await drain().catch(() => false);
       await saveDevice({ token: r.data.deviceToken ?? dev?.token ?? '', contact: r.data.contact, job: a.id });
       if (key) {
         const d = await getDevice();
@@ -71,7 +88,7 @@ export function Landing({ token }: { token: string }) {
       else {
         setPhase({ kind: 'install' });
         // Android shares this phone's copy with the installed app: get the job meanwhile.
-        void downloadPack(a.id, setSteps);
+        void fetchPack(a.id);
       }
       return;
     }
@@ -129,7 +146,10 @@ export function Landing({ token }: { token: string }) {
           <Tick done={steps?.offline ?? null}>{steps?.offline === false ? 'Ready offline once the app has finished loading' : 'Ready offline'}</Tick>
         </ul>
         {(softFail || (steps?.missing ?? 0) > 0) && <p className="sa-warn">We’ll finish when you have signal.</p>}
-        {(softFail || steps?.offline != null) && (
+        {!softFail && !!steps?.details && steps.offline == null && <p className="sa-muted">You can open the job now. The rest carries on downloading.</p>}
+        {/* The job is on the phone once its details are: drawings and design files follow in the background
+            (the job screen says "Not on this phone yet" for any still to come). */}
+        {(softFail || !!steps?.details) && (
           <button type="button" className="sa-btn sa-btn-1" onClick={() => go(jobPath(who.id), { replace: true })}>
             Open the job
           </button>

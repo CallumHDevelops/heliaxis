@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatPence } from '@/lib/site/money';
-import { HELD_WORDS } from '@/lib/site/po-shared';
+import { heldWords } from '@/lib/site/po-shared';
 import { PO_REVIEW_LABEL, poReviewOf } from '@/lib/site/review-shared';
 import type { ReviewEvent, ReviewPhoto, ReviewRead, SiteReview } from '@/lib/site/review';
 import type { AssignmentView, SiteTabData } from '@/lib/site/server';
@@ -46,6 +46,8 @@ const EVENT_WORDS: Record<string, string> = {
   review_green: 'Green light',
   review_return: 'Return to site required',
   put_right_signed: 'Put right signed',
+  trade_reply: 'WhatsApp from them',
+  office_whatsapp: 'WhatsApp to them (typed in the WhatsApp app)',
   cancelled: 'Taken off the job',
 };
 
@@ -72,6 +74,9 @@ function eventDetail(e: ReviewEvent): string {
       return [v('stage'), d.return ? `put right ${v('return')}` : '', v('po')].filter(Boolean).join(' · ');
     case 'put_right_signed':
       return `${v('name')} · ${v('photos')} photo${d.photos === 1 ? '' : 's'}`;
+    case 'trade_reply':
+    case 'office_whatsapp':
+      return [v('body'), d.word === 'stop' ? 'STOP: job messages by email only' : ''].filter(Boolean).join(' · ');
     case 'two_phones':
       return `${v('key')}: ${JSON.stringify(d.was)} → ${JSON.stringify(d.now)}`;
     case 'edited':
@@ -314,7 +319,10 @@ export function ReviewDrawer({
                       </div>
                       <div>
                         <dt>Declaration</dt>
-                        <dd>{s.declaration}</dd>
+                        <dd>
+                          {s.declaration}
+                          {s.declaration_phone && <p className="sx-warnline">The phone sent other words, kept here but not recorded as signed: “{s.declaration_phone}”</p>}
+                        </dd>
                       </div>
                       <div>
                         <dt>Answers and photos signed</dt>
@@ -351,7 +359,7 @@ export function ReviewDrawer({
                       {review.po.po_number} · {review.po.status === 'draft' ? (review.po.labour?.held.length ? 'Held' : 'Being issued') : review.po.changed_since_sent ? 'Changed since it was sent' : 'Issued'}
                       {poReview && <span className={`sxr-state sxr-state--${poReview === 'hold' ? 'bad' : poReview === 'green' ? 'ok' : 'wait'}`}>{PO_REVIEW_LABEL[poReview]}</span>}
                     </h4>
-                    {review.po.status === 'draft' && !!review.po.labour?.held.length && <p className="sx-warnline">{review.po.labour.held.map((h) => HELD_WORDS[h]).join('. ')}.</p>}
+                    {review.po.status === 'draft' && !!review.po.labour?.held.length && <p className="sx-warnline">{heldWords(review.po.labour).join('. ')}.</p>}
                     {review.po.labour && (
                       <dl className="sxr-rows">
                         <div>

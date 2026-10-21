@@ -1,6 +1,6 @@
 'use client';
 
-import { siteFetch, type Outcome } from './client';
+import { putToStorage, siteFetch, type Outcome } from './client';
 import type { CustomerSignKind, TradeFile } from './electrician-shared';
 import { byJob, changed, delRec, putRec, updatePack, type OutboxRecord } from './offline';
 import { drainSoon, registerSender } from './sync';
@@ -48,14 +48,11 @@ export async function removeFile(assignmentId: string, f: { op_id?: string; clie
   drainSoon(0);
 }
 
-async function put(url: string, blob: Blob, mime: string): Promise<'ok' | 'offline' | 'error'> {
-  try {
-    const r = await fetch(url, { method: 'PUT', body: blob, headers: { 'content-type': mime, 'x-upsert': 'true' }, credentials: 'omit' });
-    return r.ok ? 'ok' : 'error';
-  } catch {
-    return 'offline';
-  }
-}
+/**
+ * Straight to storage, with a time limit (a stalled upload counts as no signal and goes again later).
+ * The link can't overwrite (the server makes it without upsert), so nothing here asks to.
+ */
+const put = (url: string, blob: Blob, mime: string) => putToStorage(url, blob, { 'content-type': mime });
 
 registerSender('file', {
   rank: 15,
@@ -63,9 +60,10 @@ registerSender('file', {
     const p = op.payload as FilePayload;
     const job = op.assignmentId;
     const meta = { client_id: p.client_id, slot: p.slot, name: p.name, mime: p.mime, size: p.size };
-    const prep = await siteFetch<{ url: string }>(`/api/site/jobs/${job}/files`, { body: { action: 'prepare', ...meta }, job });
+    // The link is null when the file has arrived already (the server never overwrites one).
+    const prep = await siteFetch<{ url: string | null }>(`/api/site/jobs/${job}/files`, { body: { action: 'prepare', ...meta }, job });
     if (!prep.ok) return prep;
-    const up = await put(prep.data.url, p.blob, p.mime);
+    const up = prep.data.url ? await put(prep.data.url, p.blob, p.mime) : 'ok';
     if (up !== 'ok') return up === 'offline' ? { ok: false, kind: 'offline' } : { ok: false, kind: 'error', status: 502, message: 'The file didn’t upload. It will try again.', data: {}, retry: true };
     const save = await siteFetch<{ file: TradeFile }>(`/api/site/jobs/${job}/files`, { body: { action: 'save', ...meta }, job });
     if (save.ok) {

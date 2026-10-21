@@ -1,7 +1,7 @@
 'use client';
 
 import { siteFetch } from './client';
-import { changed, putRec, updatePack, type OutboxRecord } from './offline';
+import { changed, clearDraftNotes, putRec, updatePack, type OutboxRecord } from './offline';
 import type { ReturnView } from './review-shared';
 import { drainSoon, registerSender } from './sync';
 
@@ -13,6 +13,9 @@ import { drainSoon, registerSender } from './sync';
  * for the Put right screen and this one is done with.
  */
 export type PutRightPayload = { n: number; note: string; name: string; signature: string; declaration: string; signed_at: string };
+
+/** Where the Put right screen keeps what they did and their name while they type (the job's draft, offline.ts setDraftNote). */
+export const putRightNoteKeys = (n: number) => ({ note: `put-right-${n}:note`, name: `put-right-${n}:name`, prefix: `put-right-${n}:` });
 
 export async function queuePutRight(assignmentId: string, p: Omit<PutRightPayload, 'signed_at'>): Promise<string> {
   const op: OutboxRecord = {
@@ -39,6 +42,8 @@ registerSender('put-right', {
     if (r.ok) {
       const ret = r.data.return;
       await updatePack(op.assignmentId, (x) => ({ ...x, putRightGate: undefined, pack: { ...x.pack, returns: [...(x.pack.returns ?? []).filter((y) => y.id !== ret.id), ret].sort((a, b) => a.n - b.n) } }));
+      // It's with Heliaxis: the words kept while typing go (until now a turned-down one could be signed again with them).
+      await clearDraftNotes(op.assignmentId, putRightNoteKeys(p.n).prefix).catch(() => {});
       return r;
     }
     if (r.kind === 'error' && !r.retry) {

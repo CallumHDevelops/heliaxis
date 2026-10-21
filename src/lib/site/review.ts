@@ -46,6 +46,8 @@ export type ReviewSignoff = {
   ip: string | null;
   user_agent: string | null;
   declaration: string;
+  /** Other words the phone sent (the declaration as worded was recorded). */
+  declaration_phone: string | null;
   answers_hash: string;
   signature: string | null;
   steps_done: { po: boolean; docs: boolean; notified: boolean };
@@ -54,7 +56,7 @@ export type ReviewDoc = { id: string; name: string; key: string | null; version:
 /** A return to site with its written notice as it went, the messages that carried it, and the put right's signature. */
 export type ReviewReturn = ReturnView & {
   notice: { subject: string; paragraphs: string[] } | null;
-  messages: { channel: string; kind: string; status: string; sent_at: string | null; error: string | null }[];
+  messages: { id: string; channel: string; kind: string; status: string; sent_at: string | null; error: string | null }[];
   fixed_declaration: string | null;
   fixed_signature: string | null;
 };
@@ -98,7 +100,7 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
     livePo(db, a.id),
     submissionsOf(db, a.id),
     db.from('site_returns').select('id, notice, fixed_declaration, fixed_signature_path').eq('assignment_id', a.id),
-    db.from('site_messages').select('channel, kind, status, sent_at, error, dedupe_key').eq('assignment_id', a.id).in('kind', ['return_to_site']),
+    db.from('site_messages').select('id, channel, kind, status, sent_at, error, dedupe_key').eq('assignment_id', a.id).in('kind', ['return_to_site']),
     fixByDefault(),
   ]);
   const signed = ((so ?? []) as { stage: Stage }[]).map((s) => s.stage);
@@ -166,6 +168,7 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
     ip: (s.ip as string | null) ?? null,
     user_agent: (s.user_agent as string | null) ?? null,
     declaration: String(s.declaration),
+    declaration_phone: ((s.extra as { declaration_phone?: string } | null)?.declaration_phone ?? null) || null,
     answers_hash: String(s.answers_hash),
     signature: sigs.get(String(s.signature_path)) ?? null,
     steps_done: { po: !!s.po_done_at, docs: !!s.docs_done_at, notified: !!s.notified_at },
@@ -179,9 +182,9 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
     return {
       ...r,
       notice: x?.notice ?? null,
-      messages: ((msgs ?? []) as { channel: string; kind: string; status: string; sent_at: string | null; error: string | null; dedupe_key: string }[])
+      messages: ((msgs ?? []) as { id: string; channel: string; kind: string; status: string; sent_at: string | null; error: string | null; dedupe_key: string }[])
         .filter((m) => m.dedupe_key.startsWith(`return:${r.id}:`))
-        .map(({ channel, kind, status, sent_at, error }) => ({ channel, kind, status, sent_at, error })),
+        .map(({ id, channel, kind, status, sent_at, error }) => ({ id, channel, kind, status, sent_at, error })),
       fixed_declaration: x?.fixed_declaration ?? null,
       fixed_signature: x?.fixed_signature_path ? (putRightSigs.get(x.fixed_signature_path) ?? null) : null,
     };

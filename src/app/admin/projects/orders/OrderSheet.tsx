@@ -20,7 +20,7 @@ import {
   type PoStatus,
 } from '@/lib/purchase-orders/money';
 import { addressLine, DELIVER_LABEL, defaultPoMessage, labourWho, type DeliverTo, type PoFull, type PoSuggestion, type Supplier } from '@/lib/purchase-orders/shared';
-import { HELD_WORDS, OVERRIDABLE } from '@/lib/site/po-shared';
+import { heldWords, OVERRIDABLE } from '@/lib/site/po-shared';
 import { Sheet } from '../../crm/CrmUi';
 import { shortDate, ukDayOf } from '../../crm/crm-shared';
 import { api, neededWords, ReviewChip, StatusChip } from './OrdersUi';
@@ -752,7 +752,7 @@ function LabourView({
       )}
       {s === 'draft' && !!l?.held.length && (
         <div className="crm-banner po-changed">
-          <span>Held: {l.held.map((h) => HELD_WORDS[h]).join('. ')}.</span>
+          <span>Held: {heldWords(l).join('. ')}.</span>
         </div>
       )}
       {o.changed_since_sent && (

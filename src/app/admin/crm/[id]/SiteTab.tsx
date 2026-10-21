@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { KIND_LABEL, sendTimeWords, type MessageKind } from '@/lib/site/messages';
 import { formatPence } from '@/lib/site/money';
 import type { SendResult } from '@/lib/site/send';
-import { HELD_WORDS, OVERRIDABLE } from '@/lib/site/po-shared';
+import { OVERRIDABLE } from '@/lib/site/po-shared';
 import { PO_REVIEW_LABEL, REVIEW_STATE_LABEL, STAGE_WORDS } from '@/lib/site/review-shared';
 import type { AssignmentView, PoView, SiteMessageView, SiteTabData } from '@/lib/site/server';
 import type { StripStep } from '@/lib/site/strip';
@@ -89,21 +89,40 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
     setBusy(null);
   }
 
-  /** Issue the PO (a held one, or again after a change). `override`: past the owner's own holds. */
+  /**
+   * Issue the PO (a held one, or again after a change), or raise it again for a signed trade whose PO
+   * was cancelled or deleted in Orders. `override`: past the owner's own holds.
+   */
   async function issuePo(a: AssignmentView, override = false) {
     const po = a.po;
-    if (!po) return;
-    const again = po.version > 0;
-    if (again && !window.confirm(`Issue ${po.po_number} again to ${a.contact.name}? It says it replaces the version sent on ${po.issued ? shortDate(po.issued) : 'before'}.`)) return;
+    const again = !!po && po.version > 0;
+    if (po && again && !window.confirm(`Issue ${po.po_number} again to ${a.contact.name}? It says it replaces the version sent on ${po.issued ? shortDate(po.issued) : 'before'}.`)) return;
     setBusy(a.id);
     setError('');
     try {
-      const r = await send<{ ok: true; po: { po_number: string }; data: SiteTabData }>(`/api/crm/site-assignments/${a.id}/issue-po`, 'POST', { override });
+      const r = await send<{ ok: true; po: { po_number: string }; notes?: string[]; data: SiteTabData }>(`/api/crm/site-assignments/${a.id}/issue-po`, 'POST', { override });
       changed(r.data);
       const queued = r.data.assignments.find((x) => x.id === a.id)?.messages.find((m) => m.kind === 'po' && m.status === 'queued');
-      setNotice(`${r.po.po_number} ${again ? 'issued again' : 'issued'}.${queued ? ` It goes to ${a.contact.name.split(/\s+/)[0]} at ${sendTimeWords(queued.send_after)}.` : ''}`);
+      setNotice([`${r.po.po_number} ${again ? 'issued again' : 'issued'}.${queued ? ` It goes to ${a.contact.name.split(/\s+/)[0]} at ${sendTimeWords(queued.send_after)}.` : ''}`, ...(r.notes ?? [])].join(' '));
     } catch (e) {
+      // Held (a new PO raised but waiting for something): the tab shows it with what it needs.
+      const d = (e as { data?: { data?: SiteTabData } }).data?.data;
+      if (d) changed(d);
       setError(e instanceof Error ? e.message : 'Not issued. Try again.');
+    }
+    setBusy(null);
+  }
+
+  /** Send a message that didn't go again: the same message, so it's never "updated" when nothing reached them. */
+  async function resend(a: AssignmentView, messageId: string) {
+    setBusy(a.id);
+    setError('');
+    try {
+      const r = await send<{ ok: true; message: SiteMessageView | null; data: SiteTabData }>(`/api/crm/site-assignments/${a.id}/resend`, 'POST', { message_id: messageId });
+      changed(r.data);
+      setNotice(r.message?.status === 'sent' ? 'Sent.' : r.message?.status === 'failed' ? `It didn’t go again: ${r.message.error ?? 'try later'}.` : 'Nothing to send: it may have gone already.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Not sent. Try again.');
     }
     setBusy(null);
   }
@@ -176,6 +195,7 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
               onCancel={() => void cancel(a)}
               onMessage={(o) => void message(a, o)}
               onIssue={(override) => void issuePo(a, override)}
+              onResend={(id) => void resend(a, id)}
               onReopen={() => void reopen(a)}
               onReview={() => setReviewing(a.id)}
               onHoldAll={() => {
@@ -281,7 +301,7 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
  * was sent", then your review of the work: "On hold: return to site required", "Green light".
  */
 function poWords(po: PoView): string {
-  if (po.status === 'draft') return po.held.length ? `Held: ${po.held.map((h) => HELD_WORDS[h]).join('. ')}` : po.version ? 'Issued, waiting to send' : 'Being issued';
+  if (po.status === 'draft') return po.held.length ? `Held: ${po.held_words.join('. ')}` : po.version ? 'Issued, waiting to send' : 'Being issued';
   if (po.changed_since_sent) return 'Changed since it was sent: issue it again';
   const issued = `${po.status === 'sent' ? 'Issued' : po.status[0].toUpperCase() + po.status.slice(1)}${po.issued ? ` ${shortDate(po.issued)}` : ''}${po.sent_at ? '' : ' (not delivered yet)'}`;
   return po.review && po.status !== 'cancelled' ? `${issued} · ${PO_REVIEW_LABEL[po.review]}` : issued;
@@ -300,10 +320,10 @@ export function JobStrip({ steps }: { steps: StripStep[] }) {
   );
 }
 
-/** "Emailed 10:42", "WhatsApp waiting to send at 07:00", "Email didn't go: …" for the latest of each. */
-function messageWords(list: SiteMessageView[]): { text: string; bad: boolean }[] {
+/** "Emailed 10:42", "WhatsApp waiting to send at 07:00", "Email didn't go: …" (with Send again) for the latest of each. */
+function messageWords(list: SiteMessageView[]): { text: string; bad: boolean; retry?: string }[] {
   const seen = new Set<string>();
-  const out: { text: string; bad: boolean }[] = [];
+  const out: { text: string; bad: boolean; retry?: string }[] = [];
   for (const m of list) {
     const k = `${m.kind}:${m.channel}`;
     if (seen.has(k) || m.status === 'cancelled') continue;
@@ -312,7 +332,7 @@ function messageWords(list: SiteMessageView[]): { text: string; bad: boolean }[]
     const what = KIND_LABEL[m.kind as MessageKind] ?? m.kind;
     if (m.status === 'queued') out.push({ text: `${what} by ${how}: waiting to send at ${sendTimeWords(m.send_after)}`, bad: false });
     else if (m.status === 'sent') out.push({ text: `${what} sent by ${how} ${m.sent_at ? sendTimeWords(m.sent_at) : ''}`.trim(), bad: false });
-    else if (m.status === 'failed') out.push({ text: `${what} by ${how} didn’t go: ${m.error ?? 'try again'}`, bad: true });
+    else if (m.status === 'failed') out.push({ text: `${what} by ${how} didn’t go: ${m.error ?? 'try again'}`, bad: true, retry: m.id });
   }
   return out.slice(0, 4);
 }
@@ -327,6 +347,7 @@ function AssignmentCard({
   onMessage,
   onHoldAll,
   onIssue,
+  onResend,
   onReopen,
   onReview,
   children,
@@ -340,6 +361,7 @@ function AssignmentCard({
   onMessage: (o: { via: 'email' | 'whatsapp' | 'both' | 'link'; kind?: MessageKind; rotate?: boolean; chat?: boolean }) => void;
   onHoldAll: () => void;
   onIssue: (override: boolean) => void;
+  onResend: (messageId: string) => void;
   onReopen: () => void;
   onReview: () => void;
   /** More for this trade (the electrician's certificate). */
@@ -399,6 +421,21 @@ function AssignmentCard({
           .join(' · ')}
       </p>
       {a.po && <PoLine po={a.po} busy={busy} onIssue={onIssue} />}
+      {!a.po && signed && a.raise_po && (
+        <div className="sx-po is-held">
+          <p>No live PO: it was cancelled or deleted in Orders.</p>
+          <button
+            type="button"
+            className="crm-btn crm-btn--solar crm-btn--small"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(`Raise a new PO for ${a.contact.name}’s signed work and send it to them? If anything holds it, it waits here for you instead.`)) onIssue(false);
+            }}
+          >
+            Raise the PO again
+          </button>
+        </div>
+      )}
       {a.review.length > 0 && (
         <ul className="sx-reviews">
           {a.review.map((r) => (
@@ -425,6 +462,14 @@ function AssignmentCard({
           {msgs.map((m) => (
             <li key={m.text} className={m.bad ? 'is-bad' : undefined}>
               {m.text}
+              {m.retry && (
+                <>
+                  {' '}
+                  <button type="button" className="crm-link" disabled={busy} onClick={() => onResend(m.retry!)}>
+                    Send again
+                  </button>
+                </>
+              )}
             </li>
           ))}
         </ul>

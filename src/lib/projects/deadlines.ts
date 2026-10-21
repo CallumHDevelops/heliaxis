@@ -100,10 +100,12 @@ export function deadlinesFor(p: ProjectRow, cal: DeadlineCal): Deadline[] {
   }
 
   // The insurance-backed guarantee (MCS financial protection) is bought within 7 calendar days of
-  // creating the MCS certificate; done once its reference is saved.
+  // creating the MCS certificate; done once its reference or the date it was registered is saved
+  // (Paperwork's "Guarantee registered", which ticks the checklist's warranties item too).
   const mcsOn = text(p.paperwork?.mcs_registered_on);
   if (isYmd(mcsOn) && products.some((x) => x === 'solar' || x === 'battery' || x === 'heatpump')) {
-    add('cc16', 'Buy the insurance-backed guarantee', addDays(mcsOn, 7), !!text(p.paperwork?.ibg_ref), cal.addWorkingDays(addDays(mcsOn, 7), -2, cal.hols));
+    const bought = !!text(p.paperwork?.ibg_ref) || isYmd(text(p.paperwork?.ibg_registered_on));
+    add('cc16', 'Buy the insurance-backed guarantee', addDays(mcsOn, 7), bought, cal.addWorkingDays(addDays(mcsOn, 7), -2, cal.hols));
   }
 
   const expiry = products.includes('heatpump') ? busExpiry(p.paperwork) : null;

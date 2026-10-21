@@ -7,6 +7,7 @@ import type { Field, LabelReadResult } from '@/lib/site/forms/types';
 import { getFile, updatePack, type PackRecord } from '@/lib/site/offline';
 import { addPhoto, removePhoto, removeServerPhoto, retryPhoto } from '@/lib/site/photo-queue';
 import { drainSoon } from '@/lib/site/sync';
+import { photoCount } from './counts';
 import type { SlotPhoto } from './form-state';
 import { useBlobUrl, useLive } from './nav';
 
@@ -104,7 +105,7 @@ export function PhotoSlot({
     <div className="sa-photos">
       {title && <p className="sa-photos-title">{title}</p>}
       <p className={`sa-photos-count${need && n >= need ? ' is-done' : ''}`}>
-        {need ? (n >= need ? `${n} of ${need} ✓` : `${n} of ${need} needed`) : n ? `${n} photo${n === 1 ? '' : 's'}` : 'Only if there’s something to show'}
+        {photoCount(n, need)}
       </p>
       {!!photos.length && (
         <div className="sa-thumbs">

@@ -1,6 +1,6 @@
 'use client';
 
-import { siteFetch, type Outcome } from './client';
+import { putToStorage, siteFetch, type Outcome } from './client';
 import { byJob, changed, delRec, getRec, putRec, withJobLock, type OutboxRecord, type PhotoRecord } from './offline';
 
 /**
@@ -110,14 +110,11 @@ export async function retryPhoto(clientId: string) {
   queued();
 }
 
-async function put(url: string, blob: Blob, mime: string): Promise<'ok' | 'offline' | 'error'> {
-  try {
-    const r = await fetch(url, { method: 'PUT', body: blob, headers: { 'content-type': mime, 'x-upsert': 'true' }, credentials: 'omit' });
-    return r.ok ? 'ok' : 'error';
-  } catch {
-    return 'offline';
-  }
-}
+/**
+ * Straight to storage, with a time limit (a stalled upload counts as no signal and goes again later).
+ * The link can't overwrite (the server makes it without upsert), so nothing here asks to.
+ */
+const put = (url: string, blob: Blob, mime: string) => putToStorage(url, blob, { 'content-type': mime });
 
 export type SendResult = 'sent' | 'offline' | 'failed' | 'later' | Outcome<unknown>;
 
@@ -132,14 +129,15 @@ export async function sendPhoto(rec: PhotoRecord): Promise<SendResult> {
     changed();
   };
   await mark({ tries: rec.tries + 1 });
-  const prep = await siteFetch<{ url: string; thumbUrl: string }>(`/api/site/jobs/${job}/photos`, {
+  // A link is null when that file has arrived already (the server never overwrites one).
+  const prep = await siteFetch<{ url: string | null; thumbUrl: string | null }>(`/api/site/jobs/${job}/photos`, {
     body: { action: 'prepare', client_id: rec.client_id, slot: rec.slot, mime: rec.mime, size: rec.full.size },
     job,
   });
   if (!prep.ok) return settle(prep, mark);
-  const main = await put(prep.data.url, rec.full, rec.mime);
+  const main = prep.data.url ? await put(prep.data.url, rec.full, rec.mime) : 'ok';
   if (main !== 'ok') return main === 'offline' ? 'offline' : 'later';
-  const thumb = await put(prep.data.thumbUrl, rec.thumb, 'image/jpeg');
+  const thumb = prep.data.thumbUrl ? await put(prep.data.thumbUrl, rec.thumb, 'image/jpeg') : 'ok';
   if (thumb !== 'ok') return thumb === 'offline' ? 'offline' : 'later';
   const save = await siteFetch<{ id: string }>(`/api/site/jobs/${job}/photos`, {
     body: {

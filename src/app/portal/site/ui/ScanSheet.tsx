@@ -7,6 +7,7 @@ import { needOf } from '@/lib/site/rules';
 import { beep, getDetector, scanImage } from '@/lib/site/scan';
 import { brandHint, duplicates, pickSerial, type Parsed } from '@/lib/site/serials';
 import type { Source } from '@/lib/site/types';
+import { scanCount } from './counts';
 
 /** One serial as kept in the answers. An unreadable label keeps its photo instead. */
 export type Captured = { s: string; src: Source; unread?: boolean; photo?: string };
@@ -50,9 +51,7 @@ export function ScanField({ field, ctx, value, onChange, job, disabled }: { fiel
 
   return (
     <div className="sa-scan">
-      <p className={`sa-photos-count${need && list.length >= need ? ' is-done' : ''}`}>
-        {need ? `${list.length} of ${need}` : list.length ? `${list.length} scanned` : 'None yet'}
-      </p>
+      <p className={`sa-photos-count${scanCount(list.length, need).done ? ' is-done' : ''}`}>{scanCount(list.length, need).text}</p>
       {!!list.length && (
         <ul className="sa-serials">
           {list.map((c, i) => (
@@ -227,7 +226,7 @@ export function ScanSheet({ need, have, known, onClose, onDone }: { need: number
       <video ref={video} className="sa-scan-video" playsInline muted />
       <div className="sa-scan-aim" aria-hidden="true" />
       <div className="sa-scan-top">
-        <span className="sa-scan-count">{need ? `${total} of ${need}` : `${total} scanned`}</span>
+        <span className="sa-scan-count">{need ? scanCount(total, need).text : `${total} scanned`}</span>
         {torch !== null && (
           <button type="button" className={`sa-small sa-torch${torch ? ' is-on' : ''}`} onClick={() => void toggleTorch()}>
             {torch ? 'Torch off' : 'Torch'}

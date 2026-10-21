@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { mobileProblem } from '@/lib/site/assign';
+import { mobileProblem } from '@/lib/site/phone';
 import type { ContactRow } from '@/lib/site/server';
 import { TRADE_LABEL, type Trade } from '@/lib/site/types';
 

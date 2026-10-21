@@ -70,6 +70,27 @@ export async function ensureLink(db: Db, a: AssignmentRow, rotate = false): Prom
   return { token: linkTokenFor(a.id, generation), generation, rotated: fresh && rotate };
 }
 
+/**
+ * A new link was made: every phone that opened one of this assignment's earlier links (open() logs
+ * each as site_events 'opened' with its device and the link's generation) is signed out, so a
+ * forwarded or mis-sent link stops working on the phones that have it. The trade opens the new link
+ * and gets a new session. Returns how many phones were signed out.
+ */
+export async function signOutOldLinks(db: Db, assignmentId: string, generation: number): Promise<number> {
+  const { data: ev } = await db.from('site_events').select('detail').eq('assignment_id', assignmentId).eq('type', 'opened');
+  const ids = [
+    ...new Set(
+      ((ev ?? []) as { detail: { device?: unknown; generation?: unknown } | null }[])
+        .map((e) => e.detail)
+        .filter((d): d is { device: string; generation?: unknown } => typeof d?.device === 'string' && (Number(d.generation) || 0) < generation)
+        .map((d) => d.device)
+    ),
+  ];
+  if (!ids.length) return 0;
+  const { data } = await db.from('site_devices').update({ revoked_at: new Date().toISOString() }).in('id', ids).is('revoked_at', null).select('id');
+  return data?.length ?? 0;
+}
+
 /* ── What a message is about ─────────────────────────────────────────────────── */
 
 export type Job = { ref: string | null; address: string | null; postcode: string | null };
@@ -238,8 +259,42 @@ export async function deliver(db: Db, m: MessageRow): Promise<MessageRow | null>
       () => null,
       () => null
     );
-    return null;
+    // Said as it is: it failed (a caller would otherwise report the row it queued as "waiting to send").
+    return { ...m, status: 'failed', error: msg.slice(0, 500) };
   }
+}
+
+/**
+ * Send a message that didn't go again (the office's "Send again"): the same row and the same dedupe
+ * key, so the notice or PO stays as it was recorded and Resend's idempotency key stops a double if
+ * the first try did reach them. A PO's message only for the version that's current, and a return to
+ * site's notice only while it's still with them. Null when there's nothing to send again.
+ */
+export async function sendAgain(db: Db, id: string, assignmentId: string, actor: string): Promise<MessageRow | null> {
+  const { data: m } = await db.from('site_messages').select('*').eq('id', id).eq('assignment_id', assignmentId).maybeSingle();
+  const row = m as MessageRow | null;
+  if (!row || row.status !== 'failed') return null;
+  if (row.kind === 'po') {
+    const [, poId, v] = /^po:([0-9a-f-]{36}):v(\d+):/i.exec(row.dedupe_key) ?? [];
+    const { data: po } = poId ? await db.from('purchase_orders').select('status, labour').eq('id', poId).maybeSingle() : { data: null };
+    const version = Number((po?.labour as { version?: number } | null)?.version ?? 0);
+    if (!po || po.status === 'cancelled' || version !== Number(v)) return null;
+  }
+  if (row.kind === 'return_to_site') {
+    const retId = /^return:([0-9a-f-]{36}):/i.exec(row.dedupe_key)?.[1];
+    const { data: ret } = retId ? await db.from('site_returns').select('status').eq('id', retId).maybeSingle() : { data: null };
+    if (!ret || ret.status !== 'open') return null;
+  }
+  const { data: back } = await db
+    .from('site_messages')
+    .update({ status: 'queued', send_after: new Date().toISOString(), error: null })
+    .eq('id', row.id)
+    .eq('status', 'failed')
+    .select('*');
+  const queued = ((back ?? []) as MessageRow[])[0];
+  if (!queued) return null;
+  await logSiteEvent(db, assignmentId, actor, 'message_resent', { channel: row.channel, kind: row.kind, error_was: row.error });
+  return (await deliver(db, queued)) ?? queued;
 }
 
 /** /api/cron/site: send every message whose time has come. Returns how many went. */
@@ -296,7 +351,11 @@ export async function sendToTrade(
     a.status = 'sent';
     a.sent_at = at;
   }
-  if (opts.rotate) await logSiteEvent(db, a.id, opts.actor, 'link_rotated', { generation });
+  if (opts.rotate) {
+    await logSiteEvent(db, a.id, opts.actor, 'link_rotated', { generation });
+    const out = await signOutOldLinks(db, a.id, generation);
+    if (out) await logSiteEvent(db, a.id, opts.actor, 'phones_signed_out', { phones: out, generation });
+  }
   if (opts.via === 'link') {
     await logSiteEvent(db, a.id, opts.actor, 'link_copied', { generation });
     return out;

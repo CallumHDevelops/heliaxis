@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { suggestedTrades } from '@/lib/site/forms';
-import { BASIS_LABEL, penceToInput, poundsToPence, VAT_WORDS, type RateBasis, type VatTreatment } from '@/lib/site/money';
+import { suggestedTrades } from '@/lib/site/trades';
+import { basesFor, BASIS_LABEL, penceToInput, poundsToPence, VAT_WORDS, type RateBasis, type VatTreatment } from '@/lib/site/money';
 import { TRADE_LABEL, TRADES, type Trade } from '@/lib/site/types';
 import { newPersonProblem, PersonPicker, personBody, type Picked } from '../crm/[id]/SitePeople';
 
@@ -89,7 +89,7 @@ export function NewProjectTrades({ rows, onChange, vatDefault }: { rows: TradeRo
                 </span>
                 <select className="crm-input" value={r.basis} onChange={(e) => set(r.key, { basis: e.target.value as RateBasis | '' })} aria-label={`${TRADE_LABEL[r.trade]}: how it’s paid`}>
                   <option value="">How is it paid?</option>
-                  {(Object.keys(BASIS_LABEL) as RateBasis[]).map((b) => (
+                  {basesFor(r.trade).map((b) => (
                     <option key={b} value={b}>
                       {BASIS_LABEL[b]}
                     </option>

@@ -9,27 +9,8 @@ import { isTrade, type CertRoute, type Trade } from './types';
 
 /* ── The person ──────────────────────────────────────────────────────────────── */
 
-/** A phone number as WhatsApp ids it (country code and number, digits only), as whatsapp/shared.ts toWaId. */
-export function waIdOf(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  let d = phone.trim().replace(/^\+/, '00').replace(/\D/g, '');
-  if (d.startsWith('00')) d = d.slice(2);
-  else if (d.startsWith('0')) d = `44${d.slice(1)}`;
-  if (d.startsWith('440')) d = `44${d.slice(3)}`;
-  return d.length >= 10 && d.length <= 15 ? d : null;
-}
-
-/** What's wrong with a number typed as a mobile, in plain words, or null. Numbers abroad are taken as they are. */
-export function mobileProblem(mobile: string | null | undefined): string | null {
-  const s = String(mobile ?? '').trim();
-  if (!s) return null;
-  const wa = waIdOf(s);
-  if (!wa) return 'That isn’t a phone number we can use. Check the digits.';
-  if (wa.startsWith('44') && !/^447\d{9}$/.test(wa)) return 'That looks like a landline. WhatsApp needs a mobile.';
-  return null;
-}
-
-export const isEmail = (s: unknown): s is string => typeof s === 'string' && s.length <= 200 && /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(s);
+// In phone.ts (no imports), so the admin pages that only check a mobile don't load the forms.
+export { isEmail, mobileProblem, waIdOf } from './phone';
 
 /* ── VAT (D9) ────────────────────────────────────────────────────────────────── */
 
@@ -53,6 +34,16 @@ export function vatFor(registered: boolean, requested: unknown, companyDefault: 
   }
   if (companyDefault) return { ok: true, value: companyDefault };
   return { ok: false, error: 'They’re VAT registered. Choose the VAT for this job: reverse charge, 20% VAT or zero-rated.' };
+}
+
+/**
+ * The VAT a PO uses now, from their registration as it is now (a firm can add or lose its VAT number
+ * after they were put on the job): not registered, no VAT; registered, what was chosen, but "no VAT"
+ * (saved while they weren't) or nothing counts as not chosen yet, so the PO waits for the office.
+ */
+export function vatNow(registered: boolean, stored: VatTreatment | null | undefined): VatTreatment | null {
+  if (!registered) return 'none';
+  return stored && stored !== 'none' ? stored : null;
 }
 
 /* ── The assignment as typed ─────────────────────────────────────────────────── */
@@ -90,12 +81,12 @@ export function cleanAssignment(
 export function cleanAssignment(
   b: Record<string, unknown>,
   partial: true,
-  current: Pick<AssignmentFields, 'rate_basis' | 'rate_pence' | 'rate_qty'>
+  current: Pick<AssignmentFields, 'rate_basis' | 'rate_pence' | 'rate_qty'> & { trade?: Trade }
 ): { ok: true; fields: Partial<AssignmentFields> } | { ok: false; error: string };
 export function cleanAssignment(
   b: Record<string, unknown>,
   partial: boolean,
-  current?: Pick<AssignmentFields, 'rate_basis' | 'rate_pence' | 'rate_qty'>
+  current?: Pick<AssignmentFields, 'rate_basis' | 'rate_pence' | 'rate_qty'> & { trade?: Trade }
 ): { ok: true; fields: Partial<AssignmentFields> } | { ok: false; error: string } {
   const out: Partial<AssignmentFields> = {};
   const given = (k: string) => !partial || k in b;
@@ -144,6 +135,9 @@ export function cleanAssignment(
   const basis = 'rate_basis' in out ? out.rate_basis : current?.rate_basis ?? null;
   const qty = 'rate_qty' in out ? out.rate_qty : current?.rate_qty ?? null;
   if (rate != null && !basis) return { ok: false, error: 'Choose how the rate is paid: fixed, per panel, per day or per hour.' };
+  // Per panel pays the panels the roofer signs for: no other trade signs a count, so their PO could never go.
+  const trade = out.trade ?? current?.trade;
+  if (basis === 'per_panel' && trade && trade !== 'roofer' && (!partial || 'rate_basis' in out)) return { ok: false, error: 'Per panel is for the roofer (it pays the panels they sign for). Choose fixed, per day or per hour.' };
   if (basis === 'fixed' || basis === 'per_panel') {
     if ('rate_qty' in out || (!partial && qty != null)) out.rate_qty = null;
   } else if (basis && rate != null && qty == null) return { ok: false, error: `How many ${basis === 'per_day' ? 'days' : 'hours'} were agreed?` };
