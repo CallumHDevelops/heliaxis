@@ -816,12 +816,18 @@ export async function sendHandover(db: Db, projectId: string, opts: { via: Via[]
   // Handed over now, before the pack is built: a warranty dated from the handover (and the cover
   // letter that lists it) is made in time to go in this pack, not slipped into a later one.
   const now = (opts.now ?? new Date()).toISOString();
-  await db.from('crm_projects').update({ handover_at: now }).eq('id', projectId).is('handover_at', null);
-  await refreshHandover(db, projectId, { by: opts.by });
-  l = (await loadHandover(db, projectId))!;
-  if (!l.pack?.version || packKey(l) !== currentPack(l)?.inputs_hash) {
-    await buildHandover(db, projectId, { by: opts.by });
+  const { data: stamped } = await db.from('crm_projects').update({ handover_at: now }).eq('id', projectId).is('handover_at', null).select('id');
+  try {
+    await refreshHandover(db, projectId, { by: opts.by });
     l = (await loadHandover(db, projectId))!;
+    if (!l.pack?.version || packKey(l) !== currentPack(l)?.inputs_hash) {
+      await buildHandover(db, projectId, { by: opts.by });
+      l = (await loadHandover(db, projectId))!;
+    }
+  } catch (e) {
+    // The pack didn't build, so it hasn't been handed over: the date comes off again (the job's strip, the warranty).
+    if (stamped?.length) await db.from('crm_projects').update({ handover_at: null }).eq('id', projectId).eq('handover_at', now);
+    throw e;
   }
   await db.from('crm_documents').update({ visible: true, release: 'now' }).eq('project_id', projectId).eq('release', 'with_pack').not('handover_slot', 'is', null).is('archived_at', null);
   const via = [...new Set([...(l.pack?.sent_via ?? []), ...opts.via])];

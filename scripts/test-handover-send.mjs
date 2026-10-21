@@ -9,6 +9,8 @@
 // receipt with exactly what was recorded; the portal never shows archived or held documents, and
 // shows nothing new before handover.sql; and every document it makes, and the pack, has a print
 // version with the same words on the same pages and no cream page, made on request, never stored.
+// Regenerate on any of the electrician's documents that went Out of date after Send (F43, their EV
+// record, the EIC) makes it again from their sign-off; a Send whose pack doesn't build hands nothing over.
 // Usage: node --experimental-strip-types scripts/test-handover-send.mjs
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -66,8 +68,18 @@ const STUBS = {
       globalThis.__rec.siteDocs.push({ id, ...opts });
       const a = db.rows('site_assignments').find((x) => x.id === id);
       const out = [];
-      for (const slot of opts.force ?? []) out.push(await saveGenerated(db, a.project_id, { key: slot, name: 'HX-0042 ' + slot + '.pdf', bytes: globalThis.__siteDoc.bytes, inputs: globalThis.__siteDoc.inputs, category: 'commissioning', slot, release: 'with_pack', visible: false, force: !!opts.force?.includes(slot), by: opts.by ?? null }));
+      // Only what the electrician's sign-off makes for that item (none of their own certificate's pages here).
+      for (const slot of (opts.force ?? []).filter((x) => x !== 'CC21')) { const key = globalThis.__siteDoc.key ?? slot; out.push(await saveGenerated(db, a.project_id, { key, name: 'HX-0042 ' + key + '.pdf', bytes: globalThis.__siteDoc.bytes, inputs: globalThis.__siteDoc.inputs, category: 'commissioning', slot, release: 'with_pack', visible: false, force: !!opts.force?.includes(slot), by: opts.by ?? null })); }
       return out;
+    }`,
+  // The EIC made in the app (test-site-eic-signoff has the real thing): Regenerate's call recorded, the new version stored as it would be.
+  '@/lib/site/eic/server': `
+    import { saveGenerated } from '${SRC}lib/documents/store.ts';
+    export async function saveCertificate(db, id, by = null, opt = {}) {
+      globalThis.__rec.certs.push({ id, by, ...opt });
+      const a = db.rows('site_assignments').find((x) => x.id === id);
+      const r = await saveGenerated(db, a.project_id, { key: 'EIC', name: 'HX-0043 EIC.pdf', bytes: globalThis.__siteDoc.bytes, inputs: globalThis.__siteDoc.inputs, category: 'certificate', slot: 'CC21', release: 'with_pack', visible: false, force: opt.force, by });
+      return { route: 'eic', saved: [{ key: 'EIC', status: r.status, final: true, missing: null }] };
     }`,
 };
 registerHooks({
@@ -194,7 +206,7 @@ function fakeDb() {
 }
 
 globalThis.__after = [];
-globalThis.__rec = { email: [], whatsapp: [], notify: [], tasks: [], closed: [], activity: [], moves: [], rpc: [], siteDocs: [], deadlines: [] };
+globalThis.__rec = { email: [], whatsapp: [], notify: [], tasks: [], closed: [], activity: [], moves: [], rpc: [], siteDocs: [], certs: [], deadlines: [] };
 globalThis.__today = '2026-11-03';
 const db = (globalThis.__db = fakeDb());
 const runAfter = async () => {
@@ -558,6 +570,64 @@ eq('…dated the day the pack went', !!f19 && (await allText(db.files.get(`crm-d
 const cover2 = (await allText(db.files.get(`crm-docs/${docs2.find((d) => d.generated_key === 'F07BI').storage_path}`))).join(' ').replace(/\s+/g, ' ');
 eq('…and the cover letter sent with it says it’s enclosed', /Workmanship Warranty Enclosed/.test(cover2), true);
 settingsRow.value = settingsWas;
+
+/* ── 11. The electrician's other documents after Send: Out of date, then Regenerate ─────── */
+// Their EV charger record (in CCMH) and the EIC made in the app (CC21) are theirs too: a correction
+// after the pack has gone puts them Out of date, and Regenerate makes them again from the sign-off.
+{
+  const ev = { id: randomUUID(), project_id: pid2, contact_id: contact.id, trade: 'electrician', status: 'done', created_at: '2026-11-04T00:00:00Z', flags: [], answers: {} };
+  db.rows('site_assignments').push(ev);
+  const docs2 = () => db.rows('crm_documents').filter((d) => d.project_id === pid2);
+  const cur2 = (key) => docs2().find((d) => d.generated_key === key && !d.archived_at);
+  const regen2 = async (slot) => {
+    const res = await route.POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ action: 'regenerate', slot }) }), { params: Promise.resolve({ id: pid2 }) });
+    return { status: res.status, body: await res.json() };
+  };
+  const ST = await import('../src/lib/documents/store.ts');
+  for (const [slot, key, title] of [['CCMH', 'EV_REC', 'EV charger record'], ['CC21', 'EIC', 'Electrical Installation Certificate']]) {
+    const path = `projects/${pid2}/generated/${key}-v1.pdf`;
+    db.files.set(`crm-docs/${path}`, await simplePdf(title));
+    db.rows('crm_documents').push({ id: randomUUID(), project_id: pid2, category: 'commissioning', name: `HX-0043 ${title}.pdf`, storage_path: path, mime: 'application/pdf', size: 1, visible: true, created_at: '2026-11-05T09:00:00Z', handover_slot: slot, release: 'now', source: 'generated', generated_key: key, version: 1, inputs_hash: `${key}-1`, archived_at: null });
+    db.rows('handover_slots').push({ project_id: pid2, slot, na: false, data: { stale: { key, hash: ST.inputsHash({ doc: key, corrected: true }), at: '2026-11-06T09:00:00Z' } } });
+  }
+  await H.buildHandover(db, pid2, { by: 'staff-1' });
+  const hv11 = await H.handoverView(db, pid2);
+  eq('EV record and EIC behind their sign-off after Send: Out of date', ['CCMH', 'CC21'].map((c) => hv11.slots.find((s) => s.code === c).state), ['stale', 'stale']);
+  eq('…and the tab offers Regenerate on any made document that’s Out of date', /\|\| s\.docs\.some\(\(d\) => d\.source === 'generated' && d\.stale\)/.test(tabSrc), true);
+  for (const [slot, key] of [['CCMH', 'EV_REC'], ['CC21', 'EIC']]) {
+    globalThis.__rec.siteDocs = [];
+    globalThis.__rec.certs = [];
+    globalThis.__siteDoc = { key, bytes: await simplePdf(`${key} (corrected)`), inputs: { doc: key, corrected: true } };
+    const before = cur2(key);
+    const packV = cur2('PACK').version;
+    const r = await regen2(slot);
+    const after = cur2(key);
+    eq(`Regenerate on ${slot}: the site app makes it again for that item, by whoever pressed it`, [globalThis.__rec.siteDocs, slot === 'CC21' ? globalThis.__rec.certs : []], [[{ id: ev.id, force: [slot], by: 'staff-1' }], slot === 'CC21' ? [{ id: ev.id, by: 'staff-1', force: true }] : []]);
+    eq(`…${key} v2 in their portal, v1 archived, nothing Out of date, the pack rebuilt`, [r.status, after.version, after.visible, !!docs2().find((d) => d.id === before.id).archived_at, r.body.slots.find((s) => s.code === slot).state, cur2('PACK').version], [200, 2, true, true, 'complete', packV + 1]);
+  }
+}
+
+/* ── 12. A Send whose pack doesn't build hasn't handed anything over ─────────────────── */
+{
+  settingsRow.value = JSON.stringify({ ...JSON.parse(settingsWas), warrantyStart: 'handover' });
+  const pid5 = randomUUID();
+  const enq5 = randomUUID();
+  db.rows('crm_projects').push({ id: pid5, enquiry_id: enq5, owner_id: 'owner-1', title: 'EV charger', stage: 'installing', project_ref: 'HX-0044', address: '5 Mill Lane, Newport', postcode: 'NP20 5CD', products: ['ev'], install_at: '2026-11-04T08:00:00Z', install_days: 1, commissioned_at: '2026-11-04T15:00:00Z', handover_at: null, value: 1200, portal_token: 'portal-token-5', checklist: {}, system: { ev_charger_model: 'Zappi 2' }, paperwork: {} });
+  db.rows('enquiries').push({ id: enq5, name: 'Sam Hill', email: 'sam@example.test', phone: null, postcode: 'NP20 5CD' });
+  const realStorage = db.storage.from;
+  db.storage.from = (bucket) => {
+    const b = realStorage(bucket);
+    return { ...b, upload: async (path, bytes) => (/\/handover\/pack-/.test(path) ? { error: { message: 'storage is down' } } : b.upload(path, bytes)) };
+  };
+  const failed5 = await H.sendHandover(db, pid5, { via: [], by: 'staff-1', byName: 'Sarah Office', override: true, now: new Date('2026-11-05T10:00:00Z') }).then(() => 'sent', (e) => String(e.message));
+  const p5 = () => db.rows('crm_projects').find((p) => p.id === pid5);
+  eq('the pack didn’t build: the Send fails, the job isn’t marked handed over, the pack not sent', [failed5, p5().handover_at, db.rows('handover_packs').find((x) => x.project_id === pid5)?.sent_at ?? null, p5().stage], ['Couldn’t store the pack: storage is down', null, null, 'installing']);
+  db.storage.from = realStorage;
+  const sent5 = await H.sendHandover(db, pid5, { via: [], by: 'staff-1', byName: 'Sarah Office', override: true, now: new Date('2026-11-06T10:00:00Z') });
+  const f19i5 = db.rows('crm_documents').find((d) => d.project_id === pid5 && d.generated_key === 'F19I' && !d.archived_at);
+  eq('…sent the next day: handed over that day, the warranty dated from it', [sent5.ok, p5().handover_at, (await allText(db.files.get(`crm-docs/${f19i5.storage_path}`))).join(' ').includes('6 November 2026')], [true, '2026-11-06T10:00:00.000Z', true]);
+  settingsRow.value = settingsWas;
+}
 
 if (process.env.PDF_OUT) fs.writeFileSync(`${process.env.PDF_OUT}/PACK-server.pdf`, db.files.get(`crm-docs/${cur('PACK').storage_path}`));
 console.log(failed ? `\n${failed} failed` : '\nAll passed');

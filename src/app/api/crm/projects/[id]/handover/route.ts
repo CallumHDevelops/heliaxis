@@ -79,12 +79,20 @@ export async function POST(req: Request, { params }: Ctx) {
         break;
       case 'regenerate': {
         if (!slot) return json({ error: 'Which item?' }, 400);
-        // The electrician's own documents (F43…) are made by the site app, from their sign-off.
+        // The electrician's own documents are made by the site app, from their sign-off: F43…, the EV
+        // and heat pump records (CCMH), their certificate (CC21: the EIC made in the app, or the pages
+        // of their own). The latest electrician last, so theirs is the current one (as the pack reads it).
         let siteMade = false;
-        if (slotDef(slot)?.maker === 'site') {
+        if (slotDef(slot)?.maker === 'site' || slot === 'CCMH' || slot === 'CC21') {
           const { saveElectricianDocs } = await import('@/lib/site/electrician-docs');
-          const { data: els } = await db.from('site_assignments').select('id').eq('project_id', id).eq('trade', 'electrician').neq('status', 'cancelled');
-          for (const e of (els ?? []) as { id: string }[]) siteMade = (await saveElectricianDocs(db, e.id, { force: [slot], by })).some((x) => x.status === 'saved') || siteMade;
+          const { data: els } = await db.from('site_assignments').select('id').eq('project_id', id).eq('trade', 'electrician').neq('status', 'cancelled').order('created_at');
+          for (const e of (els ?? []) as { id: string }[]) {
+            siteMade = (await saveElectricianDocs(db, e.id, { force: [slot], by })).some((x) => x.status === 'saved') || siteMade;
+            if (slot === 'CC21') {
+              const { saveCertificate } = await import('@/lib/site/eic/server');
+              siteMade = !!(await saveCertificate(db, e.id, by, { force: true }))?.saved.some((x) => x.status === 'saved') || siteMade;
+            }
+          }
         }
         // Released into their portal once the pack has gone, and the pack rebuilt.
         const r = await refreshHandover(db, id, { by, force: [slot] });
