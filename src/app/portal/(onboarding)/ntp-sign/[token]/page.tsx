@@ -44,7 +44,7 @@ export default async function NtpSignPage({ params }: { params: Promise<{ token:
         </p>
       </section>
       <div className="pt-card">
-        <div className="pt-doc">
+        <div className="pt-doc hx-light">
           <NtpDocument snapshot={ntp.snapshot} showAudit={false} />
         </div>
         <NtpSignForm token={token} hash={ntp.content_hash} defaultName={ntp.ntp_name} />

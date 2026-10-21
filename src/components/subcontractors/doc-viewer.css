@@ -1,14 +1,23 @@
-/* Full-screen document viewer (DocViewer.tsx) — portalled into <body>, so it brings its own tokens. */
+/* Full-screen document viewer (DocViewer.tsx) — portalled into <body>, so it brings its own palette.
+   Light and dark (src/app/theme.css): the bars stay ink in both themes; the area round the pages is
+   grey on light and the theme's dark well on dark; the pages themselves are always white paper. */
 .dv-root {
-  --dv-chrome: #211f18;
+  --dv-chrome: var(--moment);
   --dv-chrome-text: #f6f1e4;
   --dv-chrome-muted: #d9d1bd;
   --dv-chrome-line: rgba(255, 253, 248, 0.2);
-  --dv-accent: #f8bc1e;
+  --dv-chrome-hover: rgba(255, 253, 248, 0.09);
+  --dv-chrome-press: rgba(255, 253, 248, 0.14);
+  --dv-chrome-hover-line: rgba(248, 188, 30, 0.55);
+  --dv-actions-line: rgba(248, 188, 30, 0.45);
+  --dv-actions-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
+  --dv-accent: var(--accent);
   --dv-area: #d8d6d0;
   --dv-text: #26231c;
   --dv-muted: #5c584e;
   --dv-line: rgba(33, 31, 24, 0.22);
+  --dv-sheet: #fff;
+  --dv-sheet-number: #c9c5bb;
   --dv-sheet-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 6px 18px rgba(0, 0, 0, 0.12);
   --dv-font: 'Hanken Grotesk', var(--font-outfit, 'Outfit'), system-ui, -apple-system, 'Segoe UI', sans-serif;
 
@@ -22,7 +31,6 @@
   font-family: var(--dv-font);
   font-size: 16px;
   line-height: 1.4;
-  color-scheme: light dark;
   pointer-events: auto;
   outline: none;
   -webkit-tap-highlight-color: transparent;
@@ -35,13 +43,14 @@
   box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  .dv-root {
-    --dv-area: #2b2924;
-    --dv-text: #f1ebdd;
-    --dv-muted: #bdb5a1;
-    --dv-line: rgba(255, 253, 248, 0.22);
+@media screen {
+  :root[data-theme='dark'] .dv-root {
+    --dv-area: var(--surface-2);
+    --dv-text: var(--text);
+    --dv-muted: var(--muted);
+    --dv-line: rgb(var(--fg-rgb) / 0.22);
     --dv-sheet-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 8px 26px rgba(0, 0, 0, 0.45);
+    --dv-actions-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45);
   }
 }
 
@@ -166,12 +175,12 @@
 }
 @media (hover: hover) {
   .dv-btn:not(:disabled):not([aria-disabled='true']):hover {
-    background: rgba(255, 253, 248, 0.09);
-    border-color: rgba(248, 188, 30, 0.55);
+    background: var(--dv-chrome-hover);
+    border-color: var(--dv-chrome-hover-line);
   }
 }
 .dv-btn:not(:disabled):not([aria-disabled='true']):active {
-  background: rgba(255, 253, 248, 0.14);
+  background: var(--dv-chrome-press);
 }
 
 /* Phones: title + download + close on row 1, page / zoom tools on row 2. */
@@ -242,7 +251,7 @@
 .dv-page {
   position: relative;
   flex: none;
-  background: #fff;
+  background: var(--dv-sheet);
   box-shadow: var(--dv-sheet-shadow);
 }
 .dv-page::before {
@@ -253,7 +262,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #c9c5bb;
+  color: var(--dv-sheet-number);
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
@@ -270,7 +279,7 @@
   display: block;
   flex: none;
   max-width: none;
-  background: #fff;
+  background: var(--dv-sheet);
   box-shadow: var(--dv-sheet-shadow);
   -webkit-user-drag: none;
   -webkit-touch-callout: none;
@@ -342,7 +351,7 @@
 .dv-cta {
   border: 0;
   background: var(--dv-accent);
-  color: #211f18;
+  color: var(--accent-ink);
 }
 .dv-ghost {
   border: 1px solid var(--dv-line);
@@ -361,8 +370,8 @@
   padding: 10px max(16px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: var(--dv-chrome);
   color: var(--dv-chrome-text);
-  border-top: 1px solid rgba(248, 188, 30, 0.45);
-  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
+  border-top: 1px solid var(--dv-actions-line);
+  box-shadow: var(--dv-actions-shadow);
 }
 
 @media (forced-colors: active) {

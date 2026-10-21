@@ -1,51 +1,60 @@
+/* The subcontractor onboarding portal. Colours: the theme's tokens (src/app/theme.css), so it follows
+   the person's Light / Dark / Match phone choice; the rules use the tokens directly, which also keeps
+   the agreement's paper sheet (.pt-doc, an .hx-light island) right inside a dark page. The top bar
+   stays ink in both themes. A few colours tuned on purpose are the portal's own (--pt-*), with their
+   dark values below. */
 .pt-shell {
-  --ink: #211f18;
-  --muted: #6e6a5e;
-  --line: rgba(33, 31, 24, 0.14);
-  --card: #fffdf8;
-  --paper: #f7f2e7;
-  --solar: #f8bc1e;
-  --amber: #c77f04;
-  --ok: #3f7d4e;
-  --bad: #a3322a;
-  --field: #fff;
-  --surface: #fff;
-  --disabled: #f4f1ea;
-  --fill: url(/assets/heliaxis-card-fill-light.svg);
-  /* We style dark mode ourselves, so browsers must not auto-darken (that hid the logo and headings). */
-  color-scheme: light dark;
+  /* Lists and boxes inside a card: white on light, the page's colour (a step down) on dark. */
+  --pt-inner: #fff;
+  --pt-disabled: #f4f1ea;
+  /* The amber edge of a document that's needed or asked for: deep amber on light, gold on dark. */
+  --pt-amber-rule: #c77f04;
+  /* The ink top bar's tag, the same in both themes; and the page when printed. */
+  --pt-top-tag: #e8e1cf;
+  --pt-top-rule: rgba(255, 253, 248, 0.25);
+  --pt-print: #fff;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--paper) var(--fill) top right / cover no-repeat;
-  color: var(--ink);
+  background: var(--bg) var(--fill-texture) top right / cover no-repeat;
+  color: var(--text);
   font-family: 'Hanken Grotesk', var(--font-outfit), system-ui, -apple-system, sans-serif;
+}
+@media screen {
+  :root[data-theme='dark'] .pt-shell {
+    --pt-inner: var(--bg);
+    --pt-disabled: var(--surface-2);
+    --pt-amber-rule: var(--accent);
+  }
 }
 .pt-top {
   display: flex;
   align-items: center;
   gap: 0.9rem;
   padding: 0.9rem 1rem;
-  background: #211f18;
-  border-bottom: 3px solid var(--solar);
+  background: var(--moment);
+  border-bottom: 3px solid var(--accent);
 }
 .pt-top-tag {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #e8e1cf;
-  border-left: 1px solid rgba(255, 253, 248, 0.25);
+  color: var(--pt-top-tag);
+  border-left: 1px solid var(--pt-top-rule);
   padding-left: 0.9rem;
   line-height: 1.3;
 }
 .pt-main { flex: 1; width: 100%; max-width: 960px; margin: 0 auto; padding: 1.25rem 1rem 3rem; box-sizing: border-box; }
 .pt-foot { text-align: center; font-size: 0.75rem; color: var(--muted); padding: 1rem; }
 .pt-foot a, .pt-card a { color: inherit; }
+/* Light / Dark / Match phone (ThemeChoice), above the company line. */
+.pt-appearance { display: flex; justify-content: center; margin: 0 0 0.9rem; }
+.pt-appearance .hx-tc { width: 100%; max-width: 320px; }
 
 .pt-card {
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1.25rem;
   margin-bottom: 1rem;
@@ -56,12 +65,12 @@
 .pt-muted { color: var(--muted); font-size: 0.9rem; margin: 0 0 1rem; }
 
 .pt-hero { margin-bottom: 1rem; }
-.pt-hero h1 { font-size: 1.9rem; font-weight: 800; margin: 0.1rem 0 0.6rem; line-height: 1.15; color: var(--ink); letter-spacing: -0.01em; }
+.pt-hero h1 { font-size: 1.9rem; font-weight: 800; margin: 0.1rem 0 0.6rem; line-height: 1.15; color: var(--text); letter-spacing: -0.01em; }
 .pt-kicker {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--amber);
+  color: var(--accent-text);
   margin: 0;
 }
 .pt-banner {
@@ -69,14 +78,14 @@
   border-radius: 3px;
   font-size: 0.9rem;
   margin: 0.5rem 0 0.75rem;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
+  border: 1px solid var(--border);
+  background: var(--pt-inner);
+  color: var(--text);
 }
-.pt-banner.is-info { border-color: rgba(248, 188, 30, 0.6); background: rgba(248, 188, 30, 0.1); }
-.pt-banner.is-ok { border-color: rgba(63, 125, 78, 0.4); background: rgba(63, 125, 78, 0.08); }
-.pt-banner.is-warn { border-color: rgba(199, 127, 4, 0.5); background: rgba(199, 127, 4, 0.1); }
-.pt-banner.is-bad { border-color: rgba(163, 50, 42, 0.45); background: rgba(163, 50, 42, 0.08); }
+.pt-banner.is-info { border-color: rgb(var(--accent-rgb) / 0.6); background: rgb(var(--accent-rgb) / 0.1); }
+.pt-banner.is-ok { border-color: var(--ok-line); background: rgb(var(--ok-rgb) / 0.08); }
+.pt-banner.is-warn { border-color: var(--warn-line); background: var(--warn-soft); }
+.pt-banner.is-bad { border-color: var(--danger-line); background: rgb(var(--danger-rgb) / 0.08); }
 
 .pt-steps {
   display: grid;
@@ -89,8 +98,8 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.7rem 0.75rem;
-  border: 1px solid var(--line);
-  background: var(--card);
+  border: 1px solid var(--border);
+  background: var(--surface);
   border-radius: 3px;
   font: inherit;
   font-size: 0.88rem;
@@ -99,7 +108,7 @@
   cursor: pointer;
   text-align: left;
 }
-.pt-step.is-active { border-color: var(--ink); color: var(--ink); box-shadow: inset 0 -3px 0 var(--solar); }
+.pt-step.is-active { border-color: var(--text); color: var(--text); box-shadow: inset 0 -3px 0 var(--accent); }
 .pt-step-n {
   flex: none;
   width: 1.6rem;
@@ -107,11 +116,15 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--paper);
+  background: var(--bg);
   font-size: 0.8rem;
 }
-.pt-step.is-done .pt-step-n { background: var(--ok); color: #fff; }
-.pt-step.is-active:not(.is-done) .pt-step-n { background: var(--solar); color: #211f18; border-color: var(--solar); }
+.pt-step.is-done .pt-step-n { background: var(--ok); color: var(--on-solid); }
+.pt-step.is-active:not(.is-done) .pt-step-n { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* On dark a step's number is an outline (the done tick keeps its green fill). */
+@media screen {
+  :where(:root[data-theme='dark']) .pt-step-n { background: transparent; border: 1px solid var(--border); }
+}
 
 fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-grid legend {
@@ -141,17 +154,17 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   padding: 0.62rem 0.7rem;
   font: inherit;
   font-size: 0.95rem;
-  color: var(--ink);
+  color: var(--text);
   background: var(--field);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 2px;
 }
 .pt-field input:focus,
 .pt-field select:focus,
-.pt-field textarea:focus { outline: 2px solid var(--solar); outline-offset: 0; border-color: var(--ink); }
+.pt-field textarea:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: var(--text); }
 .pt-field input:disabled,
 .pt-field select:disabled,
-.pt-field textarea:disabled { background: var(--disabled); color: var(--muted); }
+.pt-field textarea:disabled { background: var(--pt-disabled); color: var(--muted); }
 
 .pt-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; margin-top: 0.5rem; }
 .pt-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
@@ -161,8 +174,8 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   font: inherit;
   font-weight: 700;
   font-size: 0.95rem;
-  color: #211f18;
-  background: var(--solar);
+  color: var(--accent-ink);
+  background: var(--accent);
   border: 0;
   border-radius: 2px;
   cursor: pointer;
@@ -173,39 +186,38 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--text);
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 2px;
   cursor: pointer;
   white-space: nowrap;
 }
-.pt-link { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.pt-link { font-size: 0.85rem; font-weight: 600; color: var(--text); }
 .pt-inline { background: none; border: 0; padding: 0; font: inherit; text-decoration: underline; cursor: pointer; color: inherit; }
 .pt-msg { margin: 0; font-size: 0.88rem; }
 .pt-msg.is-ok { color: var(--ok); }
-.pt-msg.is-err { color: var(--bad); }
+.pt-msg.is-err { color: var(--danger); }
 
+/* The agreement always reads as a light paper document, in dark mode too (an .hx-light island). */
 .pt-doc {
   max-height: 60vh;
   overflow: auto;
-  border: 1px solid var(--line);
-  /* The agreement always reads as a light paper document, in dark mode too. */
-  background: #fffefb;
-  color: #211f18;
-  color-scheme: light;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   padding: 1.25rem;
   margin: 0.5rem 0 1rem;
 }
-.pt-sign { border-top: 1px solid var(--line); padding-top: 1rem; display: grid; gap: 0.9rem; }
+.pt-sign { border-top: 1px solid var(--border); padding-top: 1rem; display: grid; gap: 0.9rem; }
 .pt-sign h3 { margin: 0; font-size: 1rem; }
 .pt-check { display: flex; gap: 0.6rem; align-items: flex-start; font-size: 0.9rem; }
 .pt-check input { margin-top: 0.25rem; width: 1.1rem; height: 1.1rem; flex: none; }
 
 
 .pt-cats { display: grid; gap: 0.75rem; margin-bottom: 1rem; }
-.pt-cat { border: 1px solid var(--line); border-radius: 3px; padding: 0.85rem; background: var(--surface); }
-.pt-cat.is-needed { border-left: 3px solid var(--amber); }
+.pt-cat { border: 1px solid var(--border); border-radius: 3px; padding: 0.85rem; background: var(--pt-inner); }
+.pt-cat.is-needed { border-left: 3px solid var(--pt-amber-rule); }
 .pt-cat-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; }
 .pt-cat-head h3 { margin: 0 0 0.2rem; font-size: 0.98rem; }
 .pt-cat-head .pt-hint { margin: 0; display: block; }
@@ -219,8 +231,8 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   vertical-align: 2px;
   margin-left: 0.3rem;
 }
-.pt-req { background: rgba(199, 127, 4, 0.14); color: var(--amber); }
-.pt-opt { background: var(--paper); color: var(--muted); }
+.pt-req { background: var(--accent-soft); color: var(--accent-text); }
+.pt-opt { background: var(--bg); color: var(--muted); }
 .pt-doclist { list-style: none; margin: 0.7rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
 .pt-doclist li {
   display: flex;
@@ -228,50 +240,28 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   align-items: center;
   gap: 0.35rem 0.6rem;
   padding: 0.5rem 0.6rem;
-  background: var(--paper);
+  background: var(--bg);
   border-radius: 2px;
   font-size: 0.88rem;
 }
-.pt-doclist a { font-weight: 600; color: var(--ink); word-break: break-word; }
+.pt-doclist a { font-weight: 600; color: var(--text); word-break: break-word; }
 .pt-docmeta { color: var(--muted); font-size: 0.8rem; }
-.pt-docnote { flex-basis: 100%; color: var(--bad); font-size: 0.8rem; }
+.pt-docnote { flex-basis: 100%; color: var(--danger); font-size: 0.8rem; }
 .pt-chip {
   font-size: 0.72rem;
   font-weight: 700;
   padding: 0.12rem 0.45rem;
   border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--pt-inner);
+  border: 1px solid var(--border);
   color: var(--muted);
   margin-left: auto;
 }
-.pt-chip.is-ok { color: var(--ok); border-color: rgba(63, 125, 78, 0.4); }
-.pt-chip.is-warn { color: var(--amber); border-color: rgba(199, 127, 4, 0.5); }
-.pt-chip.is-bad { color: var(--bad); border-color: rgba(163, 50, 42, 0.45); }
+.pt-chip.is-ok { color: var(--ok); border-color: var(--ok-line); }
+.pt-chip.is-warn { color: var(--accent-text); border-color: var(--warn-line); }
+.pt-chip.is-bad { color: var(--danger); border-color: var(--danger-line); }
 .pt-x { background: none; border: 0; font-size: 1.2rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 0.2rem; }
-.pt-upload { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed var(--line); display: grid; gap: 0.8rem; }
-
-@media (prefers-color-scheme: dark) {
-  .pt-shell {
-    --ink: #f6f1e4;
-    --muted: #bdb5a1;
-    --line: rgba(255, 253, 248, 0.16);
-    --card: #26231c;
-    --paper: #171510;
-    --surface: #1f1c16;
-    --field: #14120e;
-    --disabled: #2a2720;
-    --amber: #f8bc1e;
-    --ok: #6fbf84;
-    --bad: #f08a80;
-    --fill: url(/assets/heliaxis-card-fill-dark.svg);
-  }
-  .pt-banner.is-info { background: rgba(248, 188, 30, 0.12); }
-  .pt-step.is-done .pt-step-n { color: #14120e; }
-  .pt-step-n { background: transparent; border: 1px solid var(--line); }
-  .pt-req { color: var(--solar); }
-  .pt-btn-ghost, .pt-link, .pt-doclist a, .pt-x { color: var(--ink); }
-}
+.pt-upload { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed var(--border); display: grid; gap: 0.8rem; }
 
 @media (max-width: 600px) {
   .pt-steps { grid-template-columns: 1fr; }
@@ -285,7 +275,7 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 
 @media print {
   .pt-top, .pt-foot, .pt-noprint { display: none !important; }
-  .pt-shell { background: #fff; }
+  .pt-shell { background: var(--pt-print); }
   .pt-main { max-width: none; padding: 0; }
   .pt-card { border: 0; padding: 0; }
 }
@@ -293,7 +283,6 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-signin { display: grid; gap: 0.8rem; margin-top: 1rem; }
 .pt-signin p { margin: 0; }
 .pt-signin input[autocomplete='one-time-code'] { font-size: 1.4rem; letter-spacing: 0.35em; text-align: center; }
-.pt-banner.is-warn { border-color: rgba(199, 127, 4, 0.5); background: rgba(199, 127, 4, 0.1); }
 
 .pt-steps { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .pt-signout { font-size: 0.82rem; color: var(--muted); }
@@ -304,8 +293,8 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
   align-items: center;
   gap: 0.6rem;
   padding: 0.55rem 0.7rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--pt-inner);
+  border: 1px solid var(--border);
   border-radius: 3px;
 }
 .pt-team li > div { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -313,14 +302,14 @@ fieldset.pt-grid { border: 0; padding: 0; margin: 0 0 1.25rem; min-width: 0; }
 .pt-team.is-archived li { opacity: 0.7; }
 
 /* Documents Heliaxis has asked for */
-.pt-requests { border: 1px solid rgba(199, 127, 4, 0.5); border-left: 3px solid var(--amber); background: rgba(199, 127, 4, 0.07); border-radius: 3px; padding: 0.85rem; margin: 0 0 1rem; display: grid; gap: 0.6rem; }
+.pt-requests { border: 1px solid var(--warn-line); border-left: 3px solid var(--pt-amber-rule); background: rgb(var(--accent-rgb) / 0.07); border-radius: 3px; padding: 0.85rem; margin: 0 0 1rem; display: grid; gap: 0.6rem; }
 .pt-requests > h3 { margin: 0; font-size: 1rem; }
-.pt-request { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 0.7rem; min-width: 0; }
-.pt-request.is-overdue { border-color: rgba(163, 50, 42, 0.45); }
+.pt-request { background: var(--pt-inner); border: 1px solid var(--border); border-radius: 3px; padding: 0.7rem; min-width: 0; }
+.pt-request.is-overdue { border-color: var(--danger-line); }
 .pt-request-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; flex-wrap: wrap; }
 .pt-request-head > div { display: grid; gap: 0.2rem; min-width: 0; }
-.pt-request.is-overdue .pt-docmeta { color: var(--bad); }
-.pt-reqnote { font-size: 0.85rem; color: var(--ink); }
+.pt-request.is-overdue .pt-docmeta { color: var(--danger); }
+.pt-reqnote { font-size: 0.85rem; color: var(--text); }
 /* Long URLs / references in a request note mustn't widen the page on a phone. */
 .pt-request-head > div, .pt-reqnote, .pt-request .pt-docnote { overflow-wrap: anywhere; }
 .pt-live:empty { margin: 0; }

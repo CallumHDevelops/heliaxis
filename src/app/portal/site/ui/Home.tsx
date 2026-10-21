@@ -3,6 +3,8 @@
 import { pounds, shortDate } from '@/lib/site/client';
 import { allPacks, allRec, getDevice, type DraftRecord, type OutboxRecord, type PackRecord, type PhotoRecord } from '@/lib/site/offline';
 import { poState, type SiteJobRow } from '@/lib/site/pack-shared';
+import { ThemeChoice } from '@/components/theme/ThemeChoice';
+import { THEME_GROUP_LABEL } from '@/lib/theme/shared';
 import { thingsOf, workByJob, type JobWork } from '@/lib/site/sync';
 import { STATUS_LABEL, type AssignmentStatus } from '@/lib/site/types';
 import { SyncLine, TopBar } from './bits';
@@ -141,6 +143,11 @@ export function Home() {
             </div>
           </section>
         )}
+        {/* Light, Dark or Match phone: kept on this phone (src/lib/theme). */}
+        <section className="sa-group sa-appearance" aria-labelledby="sa-appearance">
+          <h2 id="sa-appearance">{THEME_GROUP_LABEL}</h2>
+          <ThemeChoice size="lg" />
+        </section>
       </main>
     </>
   );

@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useState, type ReactNode } from 'react';
+import { BrandLogo } from '@/components/theme/BrandLogo';
 import { OFFICE_PHONE } from '@/lib/site/client';
 import { allRec, type OutboxRecord, type PhotoRecord } from '@/lib/site/offline';
 import { drain, outboxLabel, removeFailed, retryFailed, syncWords } from '@/lib/site/sync';
@@ -157,7 +158,7 @@ export function ProblemScreen({ title, message, children }: { title: string; mes
   const waiting = s.waiting.total + s.failed.total;
   return (
     <div className="sa-problem">
-      <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={150} height={35} className="sa-problem-logo" unoptimized priority />
+      <BrandLogo width={150} className="sa-problem-logo" priority />
       <h1>{title}</h1>
       <p>{message}</p>
       {waiting > 0 && <p className="sa-keep">{waiting === 1 ? '1 thing' : `${waiting} things`} on this phone haven’t been sent yet. They’re kept, and will send once this is sorted.</p>}
@@ -172,7 +173,7 @@ export function ProblemScreen({ title, message, children }: { title: string; mes
 export function Splash({ text = 'Opening…' }: { text?: string }) {
   return (
     <div className="sa-splash">
-      <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={150} height={35} unoptimized priority />
+      <BrandLogo width={150} priority />
       <p>{text}</p>
     </div>
   );

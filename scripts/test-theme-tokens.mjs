@@ -165,8 +165,26 @@ CONVERTED.push(...CONVERTED_CRM);
 // Mark-up drawn onto survey photos (saved into the image and the report): the same in both themes.
 ALLOWED_LITERALS['src/app/admin/surveys/[id]/MarkupEditor.tsx'] = ['#F8BC1E', '#E02424', '#111'];
 ALLOWED_LITERALS['src/app/admin/surveys/[id]/PhotoSlot.tsx'] = ['rgba(0'];
+/** Area C, the trades: the site app (/portal/site), the subcontractor onboarding portal and its documents
+    (agreement, NTP, the document viewer, the signature pad), and the office's subcontractor pages. */
+const CONVERTED_TRADES = [
+  ...['site.css', 'form.css', 'electrician.css', 'eic.css', 'layout.tsx', 'page.tsx', 'shell/page.tsx', 'j/[token]/page.tsx', 'job/[id]/page.tsx', 'job/[id]/[...step]/page.tsx'].map((f) => `src/app/portal/site/${f}`),
+  ...['CheckSign', 'CustomerSign', 'DoneScreen', 'FileSlot', 'Home', 'JobScreen', 'JobSteps', 'Landing', 'PhotoSlot', 'PoCard', 'Review', 'ScanSheet', 'SiteApp', 'StepScreen', 'StringsStep', 'bits', 'custom', 'rows', 'widgets', 'eic/Boards', 'eic/Instruments', 'eic/Prop', 'eic/Sign', 'eic/Sources'].map((f) => `src/app/portal/site/ui/${f}.tsx`),
+  ...['portal.css', 'layout.tsx', 'page.tsx', 'SignIn.tsx', 'app/PortalApp.tsx', 'app/page.tsx', 'app/agreement/page.tsx', 'app/ntp/[id]/page.tsx', 'ntp-sign/[token]/NtpSignForm.tsx', 'ntp-sign/[token]/page.tsx'].map((f) => `src/app/portal/(onboarding)/${f}`),
+  ...['agreement.css', 'doc-viewer.css', 'signature-pad.css', 'AgreementDocument.tsx', 'DocViewer.tsx', 'NtpDocument.tsx', 'PrintButton.tsx', 'SignaturePad.tsx'].map((f) => `src/components/subcontractors/${f}`),
+  ...['subcontractors.css', 'SubcontractorsList.tsx', 'TermsForm.tsx', 'page.tsx', '[id]/SiteContactsCard.tsx', '[id]/SubcontractorDetail.tsx', '[id]/page.tsx', '[id]/agreement/page.tsx', '[id]/ntp/[ntpId]/page.tsx'].map((f) => `src/app/admin/subcontractors/${f}`),
+];
+CONVERTED.push(...CONVERTED_TRADES);
+// A saved signature's ink: dark on a transparent ground in both themes (it goes into documents and PDFs).
+ALLOWED_LITERALS['src/components/subcontractors/SignaturePad.tsx'] = ['#1a1a3a'];
+/** Stylesheets loaded together with another that declares the unit's palette: they may use its names. */
+const SHARES = {
+  'src/app/portal/site/form.css': ['src/app/portal/site/site.css'],
+  'src/app/portal/site/electrician.css': ['src/app/portal/site/site.css'],
+  'src/app/portal/site/eic.css': ['src/app/portal/site/site.css'],
+};
 /** Still keyed on the phone's setting; their areas convert them to html[data-theme]. */
-const LEFTOVERS = ['src/app/portal/(onboarding)/portal.css', 'src/components/subcontractors/doc-viewer.css'];
+const LEFTOVERS = [];
 /** Not themed: the public website, the CMS editor (pinned light), the brand page. */
 const OUT_OF_SCOPE = [/^src\/app\/\(site\)\//, /^src\/app\/branding\//, /^src\/app\/admin\/cms\.css$/, /^src\/app\/admin\/preview\//, /^src\/components\/(site|home|blog|legal|cms)\//];
 /** Custom properties that come from elsewhere on purpose (layout, not colour). */
@@ -224,6 +242,7 @@ for (const p of CONVERTED) {
   const src = stripComments(raw);
   const allowed = new Set((ALLOWED_LITERALS[p] ?? []).map((s) => s.toLowerCase()));
   const own = new Set([...src.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
+  for (const f of SHARES[p] ?? []) for (const m of stripComments(read(f)).matchAll(/(--[\w-]+)\s*:/g)) own.add(m[1]);
   for (const re of [HEX, RGB]) {
     for (const m of src.matchAll(re)) {
       if (allowed.has(m[0].toLowerCase())) continue;

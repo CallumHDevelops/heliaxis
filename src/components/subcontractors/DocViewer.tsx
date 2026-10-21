@@ -882,7 +882,7 @@ function Viewer({ doc, onClose, actions }: { doc: ViewerDoc; onClose: () => void
           <div ref={contentRef} className="dv-content dv-content--image" style={{ padding: pad }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL; next/image can't optimise it */}
             <img
-              className={imageSize ? 'dv-img' : 'dv-img dv-img--sizing'}
+              className={imageSize ? 'dv-img hx-light' : 'dv-img dv-img--sizing'}
               src={load.url}
               alt={title}
               draggable={false}
@@ -1002,7 +1002,7 @@ function PdfPage({
   return (
     <div
       ref={setRef}
-      className="dv-page"
+      className="dv-page hx-light"
       data-index={index}
       data-page={index + 1}
       style={{ width, height }}

@@ -104,7 +104,7 @@ function Signature({ p }: { p: SlotPhoto }) {
   const server = useLive(() => (p.server ? getFile(`thumb:${p.server.id}`) : Promise.resolve(undefined)), `thumb:${p.id}`);
   const url = useBlobUrl(p.local?.thumb ?? server?.blob ?? null) ?? p.server?.thumb ?? null;
   return (
-    <div className="sa-eic-sigimg">
+    <div className="sa-eic-sigimg hx-light">
       {/* eslint-disable-next-line @next/next/no-img-element -- a blob from the phone */}
       {url ? <img src={url} alt="Your signature" /> : <span className="sa-muted">Signature saved</span>}
     </div>

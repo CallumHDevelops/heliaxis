@@ -1,7 +1,7 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { BrandLogo } from '@/components/theme/BrandLogo';
 import { siteFetch } from '@/lib/site/client';
 import { getDevice, getPack, linkKey, otherPerson, saveDevice, updateDevice } from '@/lib/site/offline';
 import { downloadPack, type ReadyStep } from '@/lib/site/packs';
@@ -134,7 +134,7 @@ export function Landing({ token }: { token: string }) {
   if (phase.kind === 'ready' && who) {
     return (
       <div className="sa-landing">
-        <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={150} height={35} unoptimized priority />
+        <BrandLogo width={150} priority />
         <h1>Getting your job ready</h1>
         <p className="sa-muted">{who.site}</p>
         <ul className="sa-ticks">
@@ -160,7 +160,7 @@ export function Landing({ token }: { token: string }) {
 
   return (
     <div className="sa-landing">
-      <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={150} height={35} unoptimized priority />
+      <BrandLogo width={150} priority />
       {who && (
         <h1>
           {who.first ? `${who.first}, this` : 'This'} is your job pack for {who.site || 'your Heliaxis job'}
@@ -266,9 +266,9 @@ function InstallCard({ env }: { env: InstallEnv }) {
 
 function ShareIcon() {
   return (
-    <svg className="sa-step-icon" viewBox="0 0 32 32" aria-hidden="true">
-      <path d="M16 4v15M10.5 9.5L16 4l5.5 5.5" fill="none" stroke="#0A84FF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M11 13H8v15h16V13h-3" fill="none" stroke="#0A84FF" strokeWidth="2.2" strokeLinejoin="round" />
+    <svg className="sa-step-icon sa-step-share" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M16 4v15M10.5 9.5L16 4l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11 13H8v15h16V13h-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -276,8 +276,8 @@ function ShareIcon() {
 function AddIcon() {
   return (
     <svg className="sa-step-icon" viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="5" y="5" width="22" height="22" rx="5" fill="none" stroke="#211F18" strokeWidth="2.2" />
-      <path d="M16 10.5v11M10.5 16h11" stroke="#211F18" strokeWidth="2.2" strokeLinecap="round" />
+      <rect x="5" y="5" width="22" height="22" rx="5" fill="none" stroke="currentColor" strokeWidth="2.2" />
+      <path d="M16 10.5v11M10.5 16h11" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
 }
