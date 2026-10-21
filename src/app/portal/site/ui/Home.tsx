@@ -1,15 +1,16 @@
 'use client';
 
 import { pounds, shortDate } from '@/lib/site/client';
-import { allPacks, allRec, getDevice, type DraftRecord, type PackRecord } from '@/lib/site/offline';
+import { allPacks, allRec, getDevice, type DraftRecord, type OutboxRecord, type PackRecord, type PhotoRecord } from '@/lib/site/offline';
 import { poState, type SiteJobRow } from '@/lib/site/pack-shared';
 import { workByJob, type JobWork } from '@/lib/site/sync';
 import { STATUS_LABEL, type AssignmentStatus } from '@/lib/site/types';
 import { SyncLine, TopBar } from './bits';
+import { onThisPhone } from './home-state';
 import { jobProgress } from './progress';
 import { go, useLive } from './nav';
 
-type Card = SiteJobRow & { pack: PackRecord | null; problem: string | null };
+type Card = SiteJobRow & { pack: PackRecord | null; problem: string | null; local?: string | null };
 
 /** The home list from the server, with jobs only this phone knows yet (opened from a link with no signal since). */
 function cardsOf(rows: SiteJobRow[], packs: PackRecord[]): Card[] {
@@ -64,8 +65,11 @@ export function Home() {
   const packs = useLive(allPacks, 'packs');
   const work = useLive(workByJob, 'work');
   const drafts = useLive(() => allRec<DraftRecord>('drafts'), 'drafts');
+  const outbox = useLive(() => allRec<OutboxRecord>('outbox'), 'outbox');
+  const photos = useLive(() => allRec<PhotoRecord>('photos'), 'photos');
 
-  const cards = cardsOf(device?.home?.rows ?? [], packs ?? []);
+  // The server's list, with what's been done on this phone and not sent yet on top (home-state.ts).
+  const cards = cardsOf(device?.home?.rows ?? [], packs ?? []).map((c) => onThisPhone(c, outbox ?? [], photos ?? [], drafts?.find((d) => d.id === c.id)));
   const pos = cards.filter((c) => c.po);
   return (
     <>
@@ -81,7 +85,7 @@ export function Home() {
             <section key={g.key} className={`sa-group sa-group-${g.key}`}>
               <h2>{g.title}</h2>
               {list.map((c) => {
-                const progress = c.pack ? jobProgress(c.pack.pack, drafts?.find((d) => d.id === c.id)?.answers ?? c.pack.pack.assignment.answers) : null;
+                const progress = c.pack ? jobProgress(c.pack.pack, drafts?.find((d) => d.id === c.id)?.answers ?? c.pack.pack.assignment.answers, photos ?? [], outbox ?? []) : null;
                 const sync = syncOf(work?.get(c.id));
                 return (
                   <button type="button" key={c.id} className="sa-card sa-jobcard" onClick={() => go(`/portal/site/job/${c.id}`)}>
@@ -94,13 +98,18 @@ export function Home() {
                       <span className="sa-jobcard-bad">{c.problem}</span>
                     ) : c.put_right ? (
                       <span className="sa-jobcard-bad">Put it right by {shortDate(c.put_right.fix_by)}</span>
-                    ) : c.po ? (
-                      <span className="sa-jobcard-po">
-                        {c.po.po_number}
-                        {c.po.payable_pence != null ? ` · ${pounds(c.po.payable_pence)} to pay` : ''} · {poState(c.po)}
-                      </span>
                     ) : (
-                      <span className="sa-jobcard-state">{progress ?? c.status_label}</span>
+                      <>
+                        {c.local && <span className="sa-jobcard-state">{c.local}</span>}
+                        {c.po ? (
+                          <span className="sa-jobcard-po">
+                            {c.po.po_number}
+                            {c.po.payable_pence != null ? ` · ${pounds(c.po.payable_pence)} to pay` : ''} · {poState(c.po)}
+                          </span>
+                        ) : (
+                          !c.local && <span className="sa-jobcard-state">{progress ?? c.status_label}</span>
+                        )}
+                      </>
                     )}
                     {sync && <span className="sa-jobcard-sync">{sync}</span>}
                   </button>
