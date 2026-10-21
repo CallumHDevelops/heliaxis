@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { isProjectStage, stageLabel } from '@/lib/crm/stages';
 import { shownRef } from '@/lib/projects/refs';
+import { nameRank } from '@/lib/search-words';
 import { Icon, StageDot } from './CrmUi';
 import { isLive, matchesSearch, type PipelineProject } from './crm-shared';
 
@@ -21,10 +22,10 @@ type Hit =
 const jobHref = (p: PipelineProject) => (isProjectStage(p.stage) ? `/admin/projects/${p.id}` : `/admin/crm/${p.id}`);
 
 /**
- * The CRM search: name, postcode, phone or HX-ref. Jobs on the page match as you type; customers
- * without one show up from the server (GET /api/crm/customers). The list jumps straight to a record;
- * Enter on its own opens List filtered by what was typed. "/" puts the cursor here from anywhere on
- * the page.
+ * The CRM search: name, postcode, phone or HX-ref, word by word ("rob evans"). Jobs on the page match
+ * as you type, names the words start first; customers without one show up from the server
+ * (GET /api/crm/customers). The list jumps straight to a record; Enter on its own opens List filtered
+ * by what was typed. "/" puts the cursor here from anywhere on the page.
  */
 export function CrmSearch({
   projects,
@@ -79,7 +80,11 @@ export function CrmSearch({
     };
   }, [t]);
 
-  const jobs = t.length < 1 ? [] : projects.filter((p) => matchesSearch(p, t)).sort((a, b) => Number(isLive(b)) - Number(isLive(a)) || b.updated_at.localeCompare(a.updated_at));
+  const rank = (p: PipelineProject) => nameRank(t, p.customer || p.title);
+  const jobs =
+    t.length < 1
+      ? []
+      : projects.filter((p) => matchesSearch(p, t)).sort((a, b) => rank(a) - rank(b) || Number(isLive(b)) - Number(isLive(a)) || b.updated_at.localeCompare(a.updated_at));
   const withJob = new Set(jobs.map((p) => p.enquiry_id));
   const customers = server.q === t ? server.rows.filter((c) => !withJob.has(c.id) && !projects.some((p) => p.enquiry_id === c.id)) : [];
   const hits: Hit[] = [

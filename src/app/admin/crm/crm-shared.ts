@@ -7,6 +7,7 @@ import type { PipelineProject } from '@/lib/projects/server';
 import { isProjectStage, SALES_STAGES, stageLabel } from '@/lib/crm/stages';
 import { plusDays } from '@/lib/projects/feed';
 import { looksLikeRef, refMatches, refOnly } from '@/lib/projects/refs';
+import { everyWord, hasText } from '@/lib/search-words';
 
 export type { PipelineProject };
 
@@ -183,23 +184,23 @@ export function phoneDigits(s: string | null | undefined): string {
 export const squashPostcode = (s: string | null | undefined) => (s || '').replace(/\s+/g, '').toUpperCase();
 
 /**
- * Does a job match the search box? Name, job title, postcode (with or without its space), phone digits,
- * or a reference (HX-0042, hx42, 0042 find the customer's ref and each job's).
+ * Does a job match the search box, every word of it in any order ("rob evans", src/lib/search-words.ts)?
+ * Name or job title (accents aside), postcode (with or without its space), phone digits, or a reference
+ * (HX-0042, hx42, 0042 find the customer's ref and each job's).
  */
 export function matchesSearch(
   p: { customer?: string | null; title?: string | null; postcode?: string | null; phone?: string | null; project_ref?: string | null; customer_ref?: string | null },
   q: string
 ): boolean {
-  const t = q.trim();
-  if (!t) return true;
-  if (looksLikeRef(t) && (refMatches(t, p.project_ref) || refMatches(t, p.customer_ref))) return true;
-  if (refOnly(t)) return false;
-  const low = t.toLowerCase();
-  if (`${p.customer ?? ''} ${p.title ?? ''}`.toLowerCase().includes(low)) return true;
-  const pc = squashPostcode(t);
-  if (pc.length >= 3 && squashPostcode(p.postcode).includes(pc)) return true;
-  const d = phoneDigits(t);
-  return d.length >= 4 && /^[\d\s+()-]+$/.test(t) && phoneDigits(p.phone).includes(d);
+  return everyWord(q, (t) => {
+    if (looksLikeRef(t) && (refMatches(t, p.project_ref) || refMatches(t, p.customer_ref))) return true;
+    if (refOnly(t)) return false;
+    if (hasText(`${p.customer ?? ''} ${p.title ?? ''}`, t)) return true;
+    const pc = squashPostcode(t);
+    if (pc.length >= 3 && squashPostcode(p.postcode).includes(pc)) return true;
+    const d = phoneDigits(t);
+    return d.length >= 4 && /^[\d\s+()-]+$/.test(t) && phoneDigits(p.phone).includes(d);
+  });
 }
 
 /** Remember a view: the cookie the dock reads (hx-crm-view), and ?view= in the address bar without a reload. */

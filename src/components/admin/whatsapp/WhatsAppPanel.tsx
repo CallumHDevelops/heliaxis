@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { stageLabel } from '@/lib/crm/stages';
+import { nameRank } from '@/lib/search-words';
 import { useNow } from '@/lib/use-now';
 import { shownBody } from '@/lib/whatsapp/describe';
 import { chatMatches, initialsOf, mergeChats, shortAgo, windowPill, type ActiveChat, type ActiveCounts, type ChatFilter } from './dock-shared';
@@ -94,10 +95,10 @@ export function ChatList({ mode, rows, counts, error, canCrm, filter, onFilter, 
   const searching = query.trim().length > 0;
   const everyone = useAllChats(f === 'everyone' && !searching);
   const found = useChatSearch(query);
-  // A search looks through every chat (what's loaded now, then the server's answer); the chips narrow
-  // the live list, and All chats lays it over everyone else.
+  // A search looks through every chat (what's loaded now, then the server's answer), names the words
+  // start first; the chips narrow the live list, and All chats lays it over everyone else.
   const list = searching
-    ? mergeChats(mergeChats(all, everyone.rows ?? []).filter((r) => chatMatches(query, r)), found.rows)
+    ? mergeChats(mergeChats(all, everyone.rows ?? []).filter((r) => chatMatches(query, r)), found.rows).sort((a, b) => nameRank(query, a.name) - nameRank(query, b.name))
     : f === 'everyone'
       ? mergeChats(all, everyone.rows ?? [])
       : all.filter(keep[f]);

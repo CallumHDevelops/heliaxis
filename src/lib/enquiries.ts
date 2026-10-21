@@ -1,5 +1,6 @@
 /** Shared enquiry CRM helpers (CMS + /admin/enquiries). */
 import type { SourceNow } from './lead-source';
+import { everyWord, fold, hasText } from './search-words';
 
 export const ENQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as const;
 export type EnquiryStatus = (typeof ENQUIRY_STATUSES)[number];
@@ -176,20 +177,21 @@ export function refMatches(ref: string | null | undefined, query: string): boole
   return Number(have) === Number(want) || (want.startsWith('0') && have.startsWith(want));
 }
 
-/** Name, email, phone, postcode or customer reference (HX-0042, hx42, 0042). */
+/** Name, email, phone, postcode or customer reference (HX-0042, hx42, 0042), every word in any order ("rob evans"). */
 export function leadMatches(l: CrmLead, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  if (`${l.name} ${l.org} ${l.email} ${l.postcode}`.toLowerCase().includes(q)) return true;
-  const squashed = q.replace(/\s+/g, '');
-  if (l.postcode.replace(/\s+/g, '').toLowerCase().includes(squashed)) return true;
-  const digits = q.replace(/\D/g, '');
-  if (digits.length >= 3 && /^[\d\s()+-]+$/.test(q)) {
-    const phone = l.phone.replace(/\D/g, '');
-    const national = (d: string) => d.replace(/^(?:44|0)/, ''); // 07700 900123 finds +44 7700 900123
-    if (phone.includes(digits) || (digits.length >= 6 && national(phone).includes(national(digits)))) return true;
-  }
-  return refMatches(l.ref, q);
+  return everyWord(query, (w) => {
+    const q = fold(w);
+    if (hasText(`${l.name} ${l.org} ${l.email} ${l.postcode}`, q)) return true;
+    const squashed = q.replace(/\s+/g, '');
+    if (l.postcode.replace(/\s+/g, '').toLowerCase().includes(squashed)) return true;
+    const digits = q.replace(/\D/g, '');
+    if (digits.length >= 3 && /^[\d\s()+-]+$/.test(q)) {
+      const phone = l.phone.replace(/\D/g, '');
+      const national = (d: string) => d.replace(/^(?:44|0)/, ''); // 07700 900123 finds +44 7700 900123
+      if (phone.includes(digits) || (digits.length >= 6 && national(phone).includes(national(digits)))) return true;
+    }
+    return refMatches(l.ref, q);
+  });
 }
 
 /**

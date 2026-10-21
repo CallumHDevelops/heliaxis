@@ -324,7 +324,8 @@ remembers which you used last. On a computer the WhatsApp panel is on the right 
   the WhatsApp panel, or **+ Note** to add one. The **WhatsApp** chip shows just the chats; **Mine**
   shows the notes you wrote and the WhatsApps you sent.
 - **Search** finds a customer by name, postcode, phone number or reference (HX-0042, hx42 or
-  0042). Press **/** to jump to it.
+  0042). Type bits of words in any order: "rob evans", "evans rob" and "rob np15" all find
+  Robert Evans, and accents don't matter ("sian" finds Siân). Press **/** to jump to it.
 - **+ New** adds an opportunity, for a new customer or one already in the CRM (a second job for an
   existing customer doesn't get the new-lead follow-ups).
 - On a phone the counts are a row of chips, then **Needs reply** (the people waiting for an answer

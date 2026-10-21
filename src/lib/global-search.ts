@@ -2,6 +2,7 @@ import { isProjectStage, stageLabel } from './crm/stages';
 import { dbToUiStatus } from './enquiries';
 import { leadSourceLabel } from './lead-source';
 import { refMatches } from './projects/refs';
+import { everyWord, fold, hasText, nameRank, searchWords } from './search-words';
 
 /**
  * The search on the dashboard and in the header (GET /api/search): what it sends back, how people and
@@ -46,12 +47,15 @@ export function postcodePattern(q: string): string | null {
 }
 
 /**
- * Order for a customer in the results: 0 when the reference searched for (`refs`, from refPatterns) is
- * theirs or one of their jobs', 1 when their name starts with what was typed, 2 otherwise.
+ * Order for a customer in the results, after how well their name fits (nameRank): 0 when the reference
+ * searched for (`refs`, from refPatterns) is theirs or one of their jobs', 1 when their name starts with
+ * what was typed, 2 otherwise.
  */
 export function customerRank(q: string, refs: string[], c: { name: string; ref: string | null | undefined; jobRefs: (string | null | undefined)[] }): number {
-  if (refs.length && (refMatches(q, c.ref) || c.jobRefs.some((r) => refMatches(q, r)))) return 0;
-  return c.name.toLowerCase().startsWith(q.toLowerCase()) ? 1 : 2;
+  const words = refs.length ? searchWords(q) : [];
+  const isRef = (r: string | null | undefined) => words.some((w) => refMatches(w, r));
+  if (isRef(c.ref) || c.jobRefs.some(isRef)) return 0;
+  return fold(c.name).startsWith(fold(q)) ? 1 : 2;
 }
 
 export type PersonRow = {
@@ -79,40 +83,43 @@ export const jobHref = (j: { id: string; stage: string }) => (isProjectStage(j.s
 const isOpen = (stage: string) => stage !== 'complete' && stage !== 'lost';
 
 /**
- * Does the job itself match what was typed: its title, site address or postcode (with or without the
- * space), or its reference? The query's rows are checked again here, as a reference pattern finds a
- * little more than refMatches does.
+ * Does the job itself match what was typed, every word of it: its title, site address or postcode (with
+ * or without the space), or its reference? The query's rows are checked again here, as a reference
+ * pattern finds a little more than refMatches does.
  */
 export function jobMatches(j: JobRow, q: string): boolean {
-  const t = q.trim().toLowerCase();
-  if (!t) return false;
-  if (refMatches(q, j.project_ref)) return true;
-  if (`${j.title ?? ''} ${j.address ?? ''} ${j.postcode ?? ''}`.toLowerCase().includes(t)) return true;
-  const squashed = t.replace(/\s/g, '');
-  return squashed.length >= 2 && (j.postcode ?? '').replace(/\s/g, '').toLowerCase().includes(squashed);
+  const words = searchWords(q);
+  return (
+    words.length > 0 &&
+    words.every((w) => {
+      if (refMatches(w, j.project_ref)) return true;
+      if (hasText(`${j.title ?? ''} ${j.address ?? ''} ${j.postcode ?? ''}`, w)) return true;
+      const squashed = fold(w).replace(/\s/g, '');
+      return squashed.length >= 2 && fold(j.postcode).replace(/\s/g, '').includes(squashed);
+    })
+  );
 }
 
 /**
  * The results: the people found (customers matching, and the owners of jobs that matched), each with
- * their jobs. References first, then names starting with what was typed, then the rest, newest first
- * within each; up to MAX_PEOPLE, with JOBS_EACH jobs each. `matched` are the ids of jobs that matched
- * themselves; they come first under their person, unless it's that person's name that was typed.
- * `enquiries`: this person can open Enquiries.
+ * their jobs. Names the words start first (nameRank), then references, then names starting with what
+ * was typed, then the rest, newest first within each; up to MAX_PEOPLE, with JOBS_EACH jobs each.
+ * `matched` are the ids of jobs that matched themselves; they come first under their person, unless
+ * it's that person's name that was typed. `enquiries`: this person can open Enquiries.
  */
 export function groupResults(a: { q: string; refs: string[]; people: PersonRow[]; jobs: JobRow[]; matched: ReadonlySet<string>; enquiries: boolean }): SearchPerson[] {
   const jobsOf = new Map<string, JobRow[]>();
   for (const j of a.jobs) jobsOf.set(j.enquiry_id, [...(jobsOf.get(j.enquiry_id) ?? []), j]);
   // When it's their name that was typed, a job only "matched" because its title carries the name ("Tom
   // Hughes · NP20 4AB", the default), so an old Lost one doesn't jump ahead of the job they're on now.
-  const t = a.q.trim().toLowerCase();
   const order = (byName: boolean) => (x: JobRow, y: JobRow) =>
     (byName ? 0 : Number(a.matched.has(y.id)) - Number(a.matched.has(x.id))) || Number(isOpen(y.stage)) - Number(isOpen(x.stage)) || y.created_at.localeCompare(x.created_at);
   return a.people
     .map((p) => {
-      const theirs = [...(jobsOf.get(p.id) ?? [])].sort(order(p.name.toLowerCase().includes(t)));
-      return { p, theirs, rank: customerRank(a.q, a.refs, { name: p.name, ref: p.customer_ref, jobRefs: theirs.map((j) => j.project_ref) }) };
+      const theirs = [...(jobsOf.get(p.id) ?? [])].sort(order(everyWord(a.q, (w) => hasText(p.name, w))));
+      return { p, theirs, name: nameRank(a.q, p.name), rank: customerRank(a.q, a.refs, { name: p.name, ref: p.customer_ref, jobRefs: theirs.map((j) => j.project_ref) }) };
     })
-    .sort((x, y) => x.rank - y.rank || y.p.created_at.localeCompare(x.p.created_at))
+    .sort((x, y) => x.name - y.name || x.rank - y.rank || y.p.created_at.localeCompare(x.p.created_at))
     .slice(0, MAX_PEOPLE)
     .map(({ p, theirs }) => {
       const jobs = theirs.slice(0, JOBS_EACH).map((j) => ({ id: j.id, title: j.title?.trim() || 'Job', stage: stageLabel(j.stage), ref: j.project_ref || null, href: jobHref(j) }));
