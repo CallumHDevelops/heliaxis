@@ -224,6 +224,16 @@ eq('G98 data sheet: no MPAN, Missing', I.g98Input(facts({ system: { ...facts().s
 eq('CC4: no switch locations, Missing and named', I.switchInput(facts()).why, 'Say where the switches are: consumer unit circuit, ac isolator, dc isolator and battery isolator.');
 const sw = I.switchInput(facts({ data: { CC4: { values: { cu: 'Hall, labelled Solar PV', ac: 'Loft, by the inverter', dc: 'Built into the inverter', battery: 'Side of the battery' } } } }));
 eq('CC4: back-up warning on a back-up job', [sw.ok, sw.input.steps.some((s) => s.includes('back-up power'))], [true, true]);
+// The steps the job has, numbered 1…n, and back on from n (a customer's safety instruction).
+const SWITCHES = { cu: 'Hall', ac: 'Loft', dc: 'Inverter', battery: 'Battery side' };
+const order = (products) => {
+  const s = I.switchInput(facts({ job: { ...facts().job, products }, data: { CC4: { values: SWITCHES } } })).input.steps;
+  return [s.filter((l) => /^\d\./.test(l)).map((l) => l.slice(0, 2)), s.find((l) => l.startsWith('To switch it back on'))];
+};
+eq('switching off, solar + battery: 1–4, back on 4, 3, 2, then 1', order(['solar', 'battery']), [['1.', '2.', '3.', '4.'], 'To switch it back on, go the other way: 4, 3, 2, then 1.']);
+eq('solar only: 1–3, back on from 3', order(['solar']), [['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.']);
+eq('battery only: its isolator is step 3, back on from 3', [order(['battery']), I.switchInput(facts({ job: { ...facts().job, products: ['battery'] }, data: { CC4: { values: SWITCHES } } })).input.steps[2]], [[['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.'], '3. Battery: switch it off at its own isolator, as its manual shows: Battery side.']);
+eq('EV only: 1 and 2, back on 2, then 1', order(['ev']), [['1.', '2.'], 'To switch it back on, go the other way: 2, then 1.']);
 
 const rec = I.receiptInput(facts({ payments: [{ id: 'x1', kind: 'final', amount_pence: 512345, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042' }] }));
 eq('receipt: exactly the recorded payments (the deposit, then the final), nothing worked out', rec.input.lines.map((l) => [l.what, l.pence]), [['Deposit', 50000], ['Final payment', 512345]]);

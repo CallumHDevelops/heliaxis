@@ -566,9 +566,15 @@ export function switchInput(f: HandoverFacts): Made<SwitchInput> {
     return missing(`Say where the switches are: ${list(gaps.map((g) => g.label.toLowerCase()))}.`, 'switches');
   }
   const lines = DRAFTS.shutdown.text.split('\n');
-  const steps = lines
+  const kept = lines
     .filter((l) => (!/^3\./.test(l) || has(f, 'solar')) && (!/^4\./.test(l) || has(f, 'battery')))
-    .filter((l) => !/back-up power/.test(l) || f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes')
+    .filter((l) => !/back-up power/.test(l) || f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes');
+  // The steps this job has, numbered 1…n, and switched back on the other way from the last of them (n…1).
+  let n = 0;
+  const numbered = kept.map((l) => (/^\d+\./.test(l) ? l.replace(/^\d+\./, `${++n}.`) : l));
+  const back = n > 1 ? `${Array.from({ length: n - 1 }, (_, i) => n - i).join(', ')}, then 1` : '1';
+  const steps = numbered
+    .map((l) => (/^\d+\./.test(l) ? l : l.replace(/\d+(?:, \d+)*,? then \d+/, back)))
     .map((l) => l.replace('{cu}', where.cu ?? '').replace('{ac}', where.ac ?? '').replace('{dc}', where.dc ?? '').replace('{battery}', where.battery ?? ''));
   return {
     ok: true,
