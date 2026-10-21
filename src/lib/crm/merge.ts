@@ -31,8 +31,8 @@ import { moveSitePostcodes } from './move-site-postcodes';
  * duplicates"). The rules are in merge-rules.ts; the database does the merge itself in one go
  * (crm_merge() in supabase/merge.sql), so it's all or nothing. A preview runs the very same merge and
  * undoes it, to show what will move. Files in storage are moved straight after (they can't be part of a
- * database transaction): each row keeps pointing at the old, still-there file until its file has moved,
- * and the every-minute job finishes any that were cut off.
+ * database transaction): a folder's files first, then the rows that name them. A move cut off in between,
+ * or one storage or the database turned down, is finished by the every-minute job.
  */
 
 type Db = ReturnType<typeof createAdminClient>;
@@ -107,7 +107,8 @@ async function readSide(db: Db, enquiryId: string, names: Map<string, string>): 
   const ids = jobs.map((j) => j.id);
   const none = Promise.resolve([] as never[]);
   type Doc = { project_id: string; category: string; needs_signature: boolean; signed_outside_at?: string | null };
-  const [docs, orders, surveys, bookings, origins, messages, outbox] = await Promise.all([
+  const count = (q: PromiseLike<{ count: number | null; error: unknown }>) => Promise.resolve(q).then((r) => (r.error ? 0 : (r.count ?? 0)));
+  const [docs, orders, surveys, bookings, origins, messages, inbound, outbox] = await Promise.all([
     ids.length ? rows<Doc>(db.from('crm_documents').select('*').in('project_id', ids)) : none,
     ids.length ? rows<{ project_id: string; status: string }>(db.from('purchase_orders').select('project_id, status').in('project_id', ids)) : none,
     ids.length ? rows<{ id: string; project_id: string; type: string; status: string; answers: unknown }>(db.from('crm_surveys').select('id, project_id, type, status, answers').in('project_id', ids).in('status', ['booked', 'draft'])) : none,
@@ -115,11 +116,9 @@ async function readSide(db: Db, enquiryId: string, names: Map<string, string>): 
       ? rows<{ id: string; project_id: string; status: string; onsite: string }>(db.from('survey_bookings').select('id, project_id, status, onsite').in('project_id', ids).in('status', ['requested', 'confirmed']))
       : none,
     ids.length ? rows<Origin & { project_id: string }>(db.from('crm_lead_origins').select('*').in('project_id', ids).eq('role', 'own')) : none,
-    db
-      .from('whatsapp_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('enquiry_id', enquiryId)
-      .then((r) => (r.error ? 0 : (r.count ?? 0))),
+    count(db.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('enquiry_id', enquiryId)),
+    // The ones they sent: which number they're really on (chooseWhatsApp).
+    count(db.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('enquiry_id', enquiryId).eq('direction', 'in')),
     rows<Record<string, unknown>>(db.from('whatsapp_outbox').select('*').eq('enquiry_id', enquiryId).eq('status', 'pending').limit(200)),
   ]);
   const facts: JobFacts[] = jobs.map((job) => {
@@ -151,7 +150,7 @@ async function readSide(db: Db, enquiryId: string, names: Map<string, string>): 
   const scheduled = outbox
     .filter((o) => o.kind === 'scheduled')
     .map((o) => ({ at: String(o.send_after), by: (typeof o.created_by === 'string' ? names.get(o.created_by) : null) ?? (typeof o.by_name === 'string' ? o.by_name : null) }));
-  return { customer: customer as Customer, jobs: facts, messages, outbox: { automatic, scheduled } };
+  return { customer: customer as Customer, jobs: facts, messages, inbound, outbox: { automatic, scheduled } };
 }
 
 async function teamNames(db: Db): Promise<Map<string, string>> {
@@ -327,7 +326,9 @@ async function filesUnder(db: Db, bucket: string, prefix: string): Promise<strin
   const walk = async (dir: string, depth: number) => {
     for (let offset = 0; ; offset += PAGE) {
       const { data, error } = await db.storage.from(bucket).list(dir, { limit: PAGE, offset, sortBy: { column: 'name', order: 'asc' } });
-      if (error || !data) return;
+      // Not an empty folder: its rows would be pointed at files that never moved.
+      if (error) throw new Error(`${bucket}/${dir}: ${error.message}`);
+      if (!data) return;
       for (const f of data) {
         if (f.id) out.push(`${dir}/${f.name}`);
         else if (depth < 4) await walk(`${dir}/${f.name}`, depth + 1);
@@ -347,7 +348,7 @@ const fileColumns = (bucket: string) =>
  * Move one folder's files to the kept record's folder, then the rows that name them. Retry-safe: a file
  * already gone from the old folder is taken as moved; one already in the new folder is the same file in
  * the WhatsApp bucket (named by its content), so the old copy goes; elsewhere it's left where it is, and
- * its row with it. → how many couldn't be moved.
+ * its row with it. → how many couldn't be moved (rows included); throws if the folder can't be read.
  */
 export async function moveFolder(db: Db, m: { bucket: string; from: string; to: string }): Promise<number> {
   const store = db.storage.from(m.bucket);
@@ -369,12 +370,16 @@ export async function moveFolder(db: Db, m: { bucket: string; from: string; to: 
     );
   }
   for (const [table, col] of fileColumns(m.bucket)) {
-    const { data, error } = await db.from(table).select(`id, ${col}`).like(col, `${m.from}%`).limit(5000);
-    if (error) continue; // a table or column that isn't there yet
+    const { data, error, status } = await db.from(table).select(`id, ${col}`).like(col, `${m.from}%`).limit(5000);
+    if (error) {
+      if (notThere({ error, status }) || /column|does not exist/i.test(error.message)) continue; // a table or column that isn't there yet
+      throw new Error(`${table}: ${error.message}`);
+    }
     for (const row of (data ?? []) as unknown as Record<string, string>[]) {
       const path = row[col];
       if (!path || stuck.has(path)) continue;
-      await db.from(table).update({ [col]: m.to + path.slice(m.from.length) }).eq('id', row.id);
+      const { error: failed } = await db.from(table).update({ [col]: m.to + path.slice(m.from.length) }).eq('id', row.id);
+      if (failed) stuck.add(path); // tried again by the every-minute job
     }
   }
   return stuck.size;
@@ -387,7 +392,8 @@ export async function moveFolder(db: Db, m: { bucket: string; from: string; to: 
 export async function finishMergeFiles(mergeId?: string): Promise<number> {
   try {
     const db = createAdminClient();
-    let q = db.from('crm_merges').select('id, files').is('files_done_at', null).order('at').limit(5);
+    // Ones that haven't failed yet first, so a stuck one never holds up newer merges.
+    let q = db.from('crm_merges').select('id, files').is('files_done_at', null).order('files_error', { nullsFirst: true }).order('at').limit(5);
     // A file that still won't move after a week is left where it is (its row still points at it).
     q = mergeId ? q.eq('id', mergeId) : q.lt('at', new Date(Date.now() - 120_000).toISOString()).gt('at', new Date(Date.now() - 7 * 86_400_000).toISOString());
     const { data, error } = await q;

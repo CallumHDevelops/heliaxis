@@ -36,19 +36,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const { data: c } = await db.from('enquiries').select('*').eq('id', id).maybeSingle();
   if (!c) return json({ error: 'Not found' }, 404);
-  const old = kind === 'phone' ? (c.phone as string | null) || (c.wa_id ? shownNumber(String(c.wa_id)) : null) : (c.email as string | null) || null;
+  // Their phone and, when it's a different one, the number they WhatsApp from: both stay findable.
+  const olds = kind === 'phone' ? [(c.phone as string | null) || null, c.wa_id ? shownNumber(String(c.wa_id)) : null] : [(c.email as string | null) || null];
   const update = kind === 'phone' ? { phone: shown, ...('wa_id' in c ? { wa_id: toWaId(shown) ?? value } : {}) } : { email: shown };
   const { error } = await db.from('enquiries').update(update).eq('id', id);
   if (error) return json({ error: error.message }, 500);
   await db.from('crm_aliases').delete().eq('kind', kind).eq('value', value);
-  const oldValue = old ? aliasValue(kind, old) : null;
-  if (old && oldValue && oldValue !== value) {
+  const kept: string[] = [];
+  for (const old of olds) {
+    const oldValue = old ? aliasValue(kind, old) : null;
+    if (!old || !oldValue || oldValue === value || kept.some((k) => aliasValue(kind, k) === oldValue)) continue;
+    kept.push(old);
     await db.from('crm_aliases').upsert({ kind, value: oldValue, shown: old, enquiry_id: id, from_ref: (c.customer_ref as string | null) ?? null }, { onConflict: 'kind,value', ignoreDuplicates: true });
   }
+  const keptWords = kept.length ? `; ${kept.join(' and ')} ${kept.length > 1 ? 'are' : 'is'} kept as ${kind === 'phone' ? (kept.length > 1 ? 'other numbers' : 'another number') : 'another email'}` : '';
   await logActivity({
     enquiryId: id,
     kind: 'system',
-    body: kind === 'phone' ? `${who} made ${shown} their main number (WhatsApp replies go to it)${old ? `; ${old} is kept as another number` : ''}` : `${who} made ${shown} their email${old ? `; ${old} is kept as another email` : ''}`,
+    body: kind === 'phone' ? `${who} made ${shown} their main number (WhatsApp replies go to it)${keptWords}` : `${who} made ${shown} their email${keptWords}`,
     byId: s.user.id,
   });
   return json({ ok: true });

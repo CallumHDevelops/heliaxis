@@ -7,6 +7,7 @@ import type { TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
 import { followsCustomerPostcode, siteHasOtherPostcode } from '@/lib/crm/site-postcode';
+import { toWaId } from '@/lib/whatsapp/shared';
 import { StageChip } from '../CrmUi';
 import { firstName, jobLabel, shortDate, ukDayOf } from '../crm-shared';
 import { DnoDeposit, PortalCard } from './ProjectExtras';
@@ -227,10 +228,13 @@ function Field({ label, children, extra }: { label: string; children: ReactNode;
 function OtherNumbers({ customer, onSaved, onError }: { customer: Customer; onSaved: () => Promise<void> | void; onError: (e: string) => void }) {
   const [busy, setBusy] = useState('');
   async function act(o: NonNullable<Customer['otherNumbers']>[number], action: 'main' | 'remove') {
+    // The number they WhatsApp from, when it isn't their phone, is kept too.
+    const waOnly = customer.wa_id && customer.wa_id !== o.value && customer.wa_id !== toWaId(customer.phone) ? phoneShown({ phone: null }, customer.wa_id) : null;
+    const now = [customer.phone, waOnly].filter(Boolean).join(' and ') || 'the number they have now';
     const ask =
       action === 'main'
         ? o.kind === 'phone'
-          ? `Make ${o.shown} ${customer.name}’s main number? WhatsApp replies go to it from now on, and ${customer.phone || 'the number they have now'} is kept as another number.`
+          ? `Make ${o.shown} ${customer.name}’s main number? WhatsApp replies go to it from now on, and ${now} ${customer.phone && waOnly ? 'are kept as other numbers' : 'is kept as another number'}.`
           : `Make ${o.shown} ${customer.name}’s email? The one they have now is kept as another email.`
         : `Forget ${o.shown}? Search and incoming ${o.kind === 'phone' ? 'WhatsApps' : 'emails'} won’t find ${customer.name} by it any more.`;
     if (!window.confirm(ask)) return;

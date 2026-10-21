@@ -23,7 +23,7 @@ import { describeMessage as describe, type InboundMessage } from './describe';
 import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waPermission } from './permission';
 import { templateText } from './template-text';
 import { saveAdIds } from '@/lib/meta-ads';
-import { replyNumberFromAlias } from '@/lib/crm/aliases';
+import { mergedInto, replyNumberFromAlias } from '@/lib/crm/aliases';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -64,12 +64,13 @@ export async function notifyEnquiryTeam(
   );
 }
 
-/** The lead this WhatsApp number belongs to; creates one for a brand-new number. */
+/** The lead this WhatsApp number belongs to; creates one for a brand-new number. `inbound` false: one we sent from the app. */
 async function enquiryForNumber(
   db: Db,
   waId: string,
   profileName: string,
-  referral: InboundMessage['referral'] | null
+  referral: InboundMessage['referral'] | null,
+  inbound = true
 ): Promise<{ enquiry: EnquiryWa; created: boolean }> {
   const { data: byWa } = await db
     .from('enquiries')
@@ -96,7 +97,7 @@ async function enquiryForNumber(
   }
 
   // A number kept on a customer when two records were merged (src/lib/crm/merge.ts): theirs, replying to it now.
-  const merged = await replyNumberFromAlias(db, waId);
+  const merged = await replyNumberFromAlias(db, waId, inbound);
   if (merged) return { enquiry: merged as unknown as EnquiryWa, created: false };
 
   const ad = referral?.headline ? `Message: Came from WhatsApp ad "${referral.headline}"` : null;
@@ -119,6 +120,14 @@ async function enquiryForNumber(
   return { enquiry: row as EnquiryWa, created: true };
 }
 
+/** The customer a record was merged into just as a message for it came in (src/lib/crm/merge.ts), or null. */
+async function mergedEnquiry(db: Db, id: string): Promise<EnquiryWa | null> {
+  const hit = await mergedInto('customer', id, db);
+  if (!hit) return null;
+  const { data } = await db.from('enquiries').select(ENQ_COLS).eq('id', hit.enquiry_id).maybeSingle();
+  return (data as EnquiryWa | null) ?? null;
+}
+
 // What each kind of message says in the chat: describe.ts (pure, so it can be tested).
 export type { InboundMessage };
 
@@ -127,14 +136,15 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   const { data: dup } = await db.from('whatsapp_messages').select('id').eq('wa_message_id', m.id).maybeSingle();
   if (dup) return; // Meta retries webhooks
 
-  const { enquiry, created } = await enquiryForNumber(db, m.from, profileName, m.referral ?? null);
+  const found = await enquiryForNumber(db, m.from, profileName, m.referral ?? null);
+  const created = found.created;
+  let enquiry = found.enquiry;
   if (created) await ensureOpportunity(enquiry.id, m.referral ? 'WhatsApp ad' : 'WhatsApp');
   const { kind, body } = describe(m);
   const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
   const media = await inboundMediaColumns(m); // a photo, voice note or file to fetch (whatsapp-media.sql)
 
-  const { error } = await db.from('whatsapp_messages').insert({
-    enquiry_id: enquiry.id,
+  const row = {
     wa_message_id: m.id,
     direction: 'in',
     kind,
@@ -142,7 +152,14 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
     status: 'received',
     created_at: at,
     ...media,
-  });
+  };
+  let { error } = await db.from('whatsapp_messages').insert({ enquiry_id: enquiry.id, ...row });
+  // Merged into another customer while this came in: it's theirs now (Meta won't send it again; the webhook has answered).
+  const mergedTo = error?.code === '23503' ? await mergedEnquiry(db, enquiry.id) : null;
+  if (mergedTo) {
+    enquiry = mergedTo;
+    ({ error } = await db.from('whatsapp_messages').insert({ enquiry_id: mergedTo.id, ...row }));
+  }
   if (error) {
     if (error.code === '23505') return; // a parallel retry got there first
     throw new Error(error.message);
@@ -651,11 +668,10 @@ export async function handleEcho(m: MessageEcho) {
   const db = createAdminClient();
   const { data: dup } = await db.from('whatsapp_messages').select('id').eq('wa_message_id', m.id).maybeSingle();
   if (dup) return;
-  const { enquiry } = await enquiryForNumber(db, m.to, '', null);
+  let { enquiry } = await enquiryForNumber(db, m.to, '', null, false);
   const { kind, body } = describe(m);
   const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
-  const { error } = await db.from('whatsapp_messages').insert({
-    enquiry_id: enquiry.id,
+  const row = {
     wa_message_id: m.id,
     direction: 'out',
     kind,
@@ -663,7 +679,14 @@ export async function handleEcho(m: MessageEcho) {
     status: 'sent',
     via: 'whatsapp-app',
     created_at: at,
-  });
+  };
+  let { error } = await db.from('whatsapp_messages').insert({ enquiry_id: enquiry.id, ...row });
+  // Merged into another customer meanwhile: theirs now (as in handleInboundMessage).
+  const mergedTo = error?.code === '23503' ? await mergedEnquiry(db, enquiry.id) : null;
+  if (mergedTo) {
+    enquiry = mergedTo;
+    ({ error } = await db.from('whatsapp_messages').insert({ enquiry_id: mergedTo.id, ...row }));
+  }
   if (error) {
     if (error.code === '23505') return;
     throw new Error(error.message);

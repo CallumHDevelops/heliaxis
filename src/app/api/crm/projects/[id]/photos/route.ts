@@ -120,7 +120,8 @@ export async function POST(req: Request, { params }: Ctx) {
       for (const i of items.filter((x) => x.path.startsWith(`${asked}/`))) {
         const files = [i.path, thumbPath(i.path), i.markup_path].filter((x): x is string => !!x?.startsWith(`${asked}/`));
         const [moved] = await Promise.all(files.map((f) => db.storage.from(CRM_BUCKET).move(f, into(f)).then((r) => !r.error)));
-        if (!moved) continue;
+        // Moved already by the merge's own file step (moveFolder in src/lib/crm/merge.ts), before it had a row to follow.
+        if (!moved && !(await db.storage.from(CRM_BUCKET).exists(into(i.path)).then((r) => r.data, () => false))) continue;
         was.set(into(i.path), i.path);
         i.path = into(i.path);
         if (i.markup_path?.startsWith(`${asked}/`)) i.markup_path = into(i.markup_path);

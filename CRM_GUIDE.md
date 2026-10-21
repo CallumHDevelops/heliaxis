@@ -422,7 +422,9 @@ merge them into one.
   **joined into** the one that stays (it keeps the stage that's further on). Its notes, tasks, photos,
   documents, surveys, bookings and next step come with it. Otherwise it stays as its own job, with its
   own reference, under the kept customer. Pick either for each job. Two signed jobs, two projects, two
-  surveys with answers or two RAMS projects are never joined.
+  surveys with answers or two RAMS projects are never joined, and a job with a signed quote or a paid
+  deposit is always the one that stays. When both have a survey (booked, or a date set by phone), the
+  other one is cancelled and there's a box to tick.
 - **What happens** lists what moves (WhatsApp messages, notes, tasks, photos…), what's cancelled (an
   automatic WhatsApp still waiting for the other number, say), where WhatsApp replies will go and what
   their WhatsApp permission ends up as (a STOP from either always stays). Anything marked with a box

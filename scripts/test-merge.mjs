@@ -46,7 +46,7 @@ const job = (c, o = {}) => ({
   opensolar_url: null, site_lat: null, site_lng: null, ...o,
 });
 const facts = (j, o = {}) => ({ job: j, signed: false, paid: false, ordersSent: 0, surveys: [], booking: null, waitingQuote: false, own: null, ...o });
-const side = (c, jobs, o = {}) => ({ customer: c, jobs, messages: 0, outbox: { automatic: 0, scheduled: [] }, ...o });
+const side = (c, jobs, o = {}) => ({ customer: c, jobs, messages: 0, inbound: 0, outbox: { automatic: 0, scheduled: [] }, ...o });
 
 /* ── Which customer stays ─────────────────────────────────────────────────── */
 
@@ -85,8 +85,11 @@ eq('nothing on either side: no line', pick(R.fieldRows(web, meta), 'interest'), 
 
 /* ── WhatsApp: the number and the permission ──────────────────────────────── */
 
-const wa = (c, messages, inbound = null) => side({ ...c, wa_id: R.aliasValue('phone', c.phone), wa_last_inbound_at: inbound }, [], { messages });
-eq('only one has a chat: its number', R.chooseWhatsApp(wa(web, 0), wa(meta, 3), '07791 120089'), { waId: '441291672595', from: 'merge' });
+// inbound: when they last messaged (wa_last_inbound_at); fromThem: how many of the messages are theirs.
+const wa = (c, messages, inbound = null, fromThem = inbound ? 1 : 0) => side({ ...c, wa_id: R.aliasValue('phone', c.phone), wa_last_inbound_at: inbound }, [], { messages, inbound: fromThem });
+eq('only one has a chat: its number', R.chooseWhatsApp(wa(web, 0), wa(meta, 3, '2026-09-20T08:00:00Z'), '07791 120089'), { waId: '441291672595', from: 'merge' });
+eq('…an imported one too (no last-message time)', R.chooseWhatsApp(wa(web, 0), wa(meta, 3, null, 2), '07791 120089').waId, '441291672595');
+eq('only our messages to a landline (the intro failed): the mobile', R.chooseWhatsApp(wa(web, 0), wa(meta, 1), '07791 120089'), { waId: '447791120089', from: 'keep' });
 eq('both: the one they last messaged from', R.chooseWhatsApp(wa(web, 2, '2026-09-25T08:00:00Z'), wa(meta, 3, '2026-09-20T08:00:00Z'), null), { waId: '447791120089', from: 'keep' });
 eq('…the other way round', R.chooseWhatsApp(wa(web, 2, '2026-09-20T08:00:00Z'), wa(meta, 3, '2026-09-25T08:00:00Z'), null).from, 'merge');
 eq('neither: the main mobile (and its 24-hour window is the other record’s)', R.chooseWhatsApp(wa(meta, 0), wa(web, 0), '07791 120089'), { waId: '447791120089', from: 'merge' });
@@ -128,6 +131,10 @@ eq('two open jobs on one side: the person picks', jc(robWeb, side(meta, [facts(j
 eq('a Lost job isn’t joined by default', jc(robWeb, side(meta, [facts(job(meta, { stage: 'lost' }))])), [[false, 'It’s Lost']]);
 const signedJ = (c, stage) => facts(job(c, { stage }), { signed: true });
 eq('both signed: blocked', R.pairBlockers(signedJ(web, 'won'), facts(job(meta, { stage: 'quote_sent' }), { paid: true })), ['Both jobs have a signed quote or a paid deposit.', 'Both jobs are already projects (Won or later).'].slice(0, 1));
+const paidMeta = facts(job(meta, { stage: 'quote_sent' }), { paid: true });
+eq('kit ordered doesn’t take a paid deposit’s place', R.pairBlockers(facts(job(web, { stage: 'won' }), { ordersSent: 1 }), paidMeta), ['The signed quote or paid deposit is on the job that would go (the other is further on, with kit ordered).']);
+eq('…nor is that join offered', jc(side(web, [facts(job(web, { stage: 'won' }), { ordersSent: 1 })]), side(meta, [paidMeta]))[0][0], false);
+eq('the paid one further on: fine', R.pairBlockers(facts(job(web, { stage: 'contacted' })), paidMeta), []);
 eq('both projects: blocked', R.pairBlockers(facts(job(web, { stage: 'won' })), facts(job(meta, { stage: 'design' }))), ['Both jobs are already projects (Won or later).']);
 eq('both surveys answered: blocked', R.pairBlockers(facts(job(web), { surveys: [{ id: 's1', type: 'solar', answered: true }] }), facts(job(meta), { surveys: [{ id: 's2', type: 'solar', answered: true }] })), [
   'Both jobs have a survey with answers in it: finish or cancel one first.',
@@ -204,6 +211,23 @@ eq('the sale counts for the job that stays, by default', [credit.joins[0].credit
 eq('the Meta lead is kept for Reports, with its ad', [credit.plan.joins[0].credit, credit.plan.joins[0].origin_from.source], ['into', 'meta: Video 4']);
 const swapped = plan(robWeb, robMeta, { credit: { [robMeta.jobs[0].job.id]: 'from' } });
 eq('one tap counts it for Meta instead', swapped.plan.joins[0].credit, 'from');
+const twoJobs = side(meta, [facts(job(meta)), facts(job(meta, { project_ref: 'HX-0069-2', created_at: '2026-09-04T09:00:00.000Z' }))]);
+const both = plan(robWeb, twoJobs, { joins: { [twoJobs.jobs[0].job.id]: robWeb.jobs[0].job.id, [twoJobs.jobs[1].job.id]: robWeb.jobs[0].job.id } });
+eq('two of their jobs picked for one kept job: only the first joins, the sheet says why', [both.plan.joins.length, both.joins.map((j) => [j.with !== null, j.why.startsWith('Another of their jobs is joining that one')])], [1, [[true, false], [false, true]]]);
+
+const phoneSurvey = side(web, [facts(job(web, { stage: 'surveyed', survey_at: '2026-10-30T10:00:00.000Z' }))]);
+const booked = side(meta, [facts(job(meta, { stage: 'survey_booked', survey_at: '2026-11-07T10:00:00.000Z', survey_booking_id: 'b-7' }), { booking: { id: 'b-7', status: 'confirmed', start: '2026-11-07T10:00:00.000Z' } })]);
+const sv = plan(phoneSurvey, booked).warnings.find((w) => w.text.startsWith('Both jobs have a survey booked'));
+eq('a survey date set by phone and their own booking: said, and ticked', sv, { text: 'Both jobs have a survey booked: the HX-0069 one (7 Nov) is cancelled and taken out of Outlook.', tick: 'I’ll tell Robert if they booked both' });
+eq('…not when only one has a survey', plan(side(web, [facts(job(web, { stage: 'surveyed' }))]), booked).warnings.some((w) => w.text.startsWith('Both jobs have a survey')), false);
+
+const video2 = customer({ source: 'meta: Video 2', meta_lead_id: 'L-2', created_at: '2026-06-01T09:00:00.000Z', customer_ref: 'HX-0010' });
+const video4 = customer({ source: 'meta: Video 4', meta_lead_id: 'L-4', meta_ad_id: 'AD-4', meta_adset_id: 'AS-4', meta_campaign_id: 'C-4', customer_ref: 'HX-0069' });
+const twoAds = plan(side(video2, [facts(job(video2))]), side(video4, [facts(job(video4))]));
+eq('two Meta leads: the other’s ad isn’t put on the kept one (Reports would count both for it)', ['meta_ad_id', 'meta_adset_id', 'meta_campaign_id'].map((c) => c in twoAds.plan.customer.set), [false, false, false]);
+eq('…its lead keeps its ad for Reports', [twoAds.plan.joins[0].origin_from.meta_ad_id, twoAds.plan.joins[0].origin_into.meta_ad_id], ['AD-4', null]);
+eq('a website customer still gets the Meta lead’s ad', 'meta_ad_id' in plan(robWeb, side(video4, [facts(job(video4))])).plan.customer.set, true);
+
 const twice = R.planMerge({ a: side(web, [robWeb.jobs[0], facts(job(web, { project_ref: 'HX-0080-2' }))]), b: null, choices: { keep: 'a' }, by: { id: null, name: 'Callum' }, now: NOW, jobPair: [null, null] });
 eq('no pair picked: nothing to join', twice.plan.joins.length, 0);
 
@@ -401,7 +425,8 @@ function sideOf(db, id) {
     })
   );
   const outbox = (db.whatsapp_outbox ?? []).filter((o) => o.enquiry_id === id && o.status === 'pending');
-  return side(c, jobs, { messages: (db.whatsapp_messages ?? []).filter((m) => m.enquiry_id === id).length, outbox: { automatic: outbox.filter((o) => o.kind !== 'scheduled').length, scheduled: [] } });
+  const messages = (db.whatsapp_messages ?? []).filter((m) => m.enquiry_id === id);
+  return side(c, jobs, { messages: messages.length, inbound: messages.filter((m) => m.direction === 'in').length, outbox: { automatic: outbox.filter((o) => o.kind !== 'scheduled').length, scheduled: [] } });
 }
 
 /** The lookups that use what a merge leaves (src/lib/crm/aliases.ts, the inbound WhatsApp in src/lib/whatsapp/inbox.ts). */
@@ -511,6 +536,28 @@ try {
   refused = e.message;
 }
 eq('a record that changed meanwhile is refused', [refused, db2.enquiries.length], ['merge:changed', 2]);
+
+// Rob as he really is: the website record has no chat yet, and the Meta intro went to the landline (and failed).
+function twoRobs(w, m, messages) {
+  const d = { enquiries: [w, m], crm_projects: [job(w, { stage: 'surveyed' }), job(m, { project_ref: m.customer_ref })], whatsapp_messages: messages, crm_aliases: [], crm_lead_origins: [], crm_merges: [] };
+  const p = R.planMerge({ a: sideOf(d, w.id), b: sideOf(d, m.id), choices: { keep: 'a' }, by: { id: null, name: 'Callum' }, now: NOW });
+  crmMerge(d, p.plan);
+  return { d, p };
+}
+const W2 = customer();
+const M2 = customer({ phone: '+441291672595', wa_id: '441291672595', source: 'meta: Video 4', created_at: '2026-09-03T09:12:00.000Z', customer_ref: 'HX-0069' });
+const real = twoRobs(W2, M2, [{ id: uuid(), enquiry_id: M2.id, direction: 'out', body: 'Hi Robert, thanks for your enquiry', status: 'failed' }]);
+eq('Rob, no chat on HX-0080: replies still go to his mobile, the landline another number', [real.p.whatsapp.waId, real.p.whatsapp.otherNumbers, W2.wa_id], ['447791120089', ['+441291672595'], '447791120089']);
+eq('…and a WhatsApp from either number finds him', [enquiryForNumber(real.d, '447791120089').id === W2.id, enquiryForNumber(real.d, '441291672595')], [true, { id: W2.id, how: 'an other number' }]);
+
+// Two mobiles, only the other record's has a chat: replies go to that one, and his main phone stays findable.
+const W3 = customer();
+const M3 = customer({ phone: '07700 900123', wa_id: '447700900123', customer_ref: 'HX-0069' });
+const mob = twoRobs(W3, M3, [{ id: uuid(), enquiry_id: M3.id, direction: 'in', body: 'Hi, is Thursday OK?' }]);
+eq('two mobiles: replies to the one he messaged from, his main phone another number', [mob.p.whatsapp.waId, mob.p.plan.aliases.filter((x) => x.kind === 'phone').map((x) => [x.value, x.shown]), W3.phone], [
+  '447700900123', [['447791120089', '07791 120089']], '07791 120089',
+]);
+eq('…so a WhatsApp from his main phone lands in his chat, not a new customer', enquiryForNumber(mob.d, '447791120089'), { id: W3.id, how: 'an other number' });
 
 console.log(failed ? `\n${failed} FAILED` : '\nAll passed.');
 process.exit(failed ? 1 : 0);

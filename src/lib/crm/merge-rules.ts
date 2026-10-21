@@ -2,6 +2,7 @@ import { isProjectStage, SALES_STAGES, stageIndex, stageLabel } from './stages';
 import { postcodeKey, ukPostcode } from './site-postcode';
 import { toWaId } from '../whatsapp/shared';
 import { leadSourceLabel } from '../lead-source';
+import { isMetaSource } from '../ad-spend';
 
 /**
  * Merging duplicates (src/lib/crm/merge.ts does the reading and writing): which customer stays, which of
@@ -229,6 +230,8 @@ export type Side = {
   jobs: JobFacts[];
   /** WhatsApp messages on this record. */
   messages: number;
+  /** Of those, the ones they sent us: proof the number is on WhatsApp (ours to it may have failed). */
+  inbound: number;
   /** Automatic WhatsApps waiting to go, and messages staff scheduled (Send later). */
   outbox: { automatic: number; scheduled: { at: string; by: string | null }[] };
 };
@@ -345,16 +348,18 @@ export function fieldRows(kept: Customer, other: Customer): FieldRow[] {
 /* ── WhatsApp ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * Who replies go to: the number the conversation is on. One record with messages: its number; both: the
- * one they last messaged from (its 24-hour window may be open); neither: the main phone if it's a mobile,
- * else any mobile they have. `from`: whose number (and 24-hour window) it is.
+ * Who replies go to: the number the conversation is on. One record they've messaged from: its number;
+ * both: the one they last messaged from (its 24-hour window may be open); neither: the main phone if it's
+ * a mobile, else any mobile they have. `from`: whose number (and 24-hour window) it is.
  */
 export function chooseWhatsApp(kept: Side, other: Side, mainPhone: string | null): { waId: string | null; from: 'keep' | 'merge' | null } {
   const numberOf = (s: Side) => s.customer.wa_id || toWaId(s.customer.phone) || null;
   const pick = (from: 'keep' | 'merge') => ({ waId: numberOf(from === 'keep' ? kept : other), from });
-  if (kept.messages && numberOf(kept) && !(other.messages && numberOf(other))) return pick('keep');
-  if (other.messages && numberOf(other) && !(kept.messages && numberOf(kept))) return pick('merge');
-  if (kept.messages && other.messages && numberOf(kept) && numberOf(other)) {
+  // Only their own messages count: our intro to a landline is saved as sent before Meta says it failed.
+  const chat = (s: Side) => !!(s.inbound || text(s.customer.wa_last_inbound_at)) && !!numberOf(s);
+  if (chat(kept) && !chat(other)) return pick('keep');
+  if (chat(other) && !chat(kept)) return pick('merge');
+  if (chat(kept) && chat(other)) {
     const a = text(kept.customer.wa_last_inbound_at);
     const b = text(other.customer.wa_last_inbound_at);
     return pick(b > a ? 'merge' : 'keep');
@@ -460,7 +465,10 @@ export function originOf(f: Pick<JobFacts, 'job' | 'own'>, c: Customer): Origin 
 /** Why two jobs can't be joined (they can still stay separate under one customer). */
 export function pairBlockers(x: JobFacts, y: JobFacts): string[] {
   const out: string[] = [];
-  if ((x.signed || x.paid) && (y.signed || y.paid)) out.push('Both jobs have a signed quote or a paid deposit.');
+  const proof = (f: JobFacts) => f.signed || f.paid;
+  if (proof(x) && proof(y)) out.push('Both jobs have a signed quote or a paid deposit.');
+  // Kit ordered can put the other job first, but the signature and the payment can't move off theirs.
+  else if (proof(orderPair(x, y).from)) out.push('The signed quote or paid deposit is on the job that would go (the other is further on, with kit ordered).');
   if (isProjectStage(x.job.stage) && isProjectStage(y.job.stage)) out.push('Both jobs are already projects (Won or later).');
   const answered = (f: JobFacts) => new Set(f.surveys.filter((s) => s.answered).map((s) => s.type));
   const both = [...answered(x)].filter((t) => answered(y).has(t));
@@ -799,7 +807,10 @@ export function planMerge(input: {
       customer.clear.meta_lead_id = { from: O.meta_lead_id, to: null };
       setK('meta_lead_id', O.meta_lead_id);
     }
-    for (const col of ['meta_ad_id', 'meta_adset_id', 'meta_campaign_id', 'meta_fbc']) if (blank(K[col]) && !blank(O[col])) setK(col, O[col]);
+    // The ad, only onto a record that isn't a Meta lead itself: Reports would count its own lead for the other's ad
+    // (the other's lead keeps its ad in crm_lead_origins).
+    const adCols = isMetaSource(text(K.source)) ? ['meta_fbc'] : ['meta_ad_id', 'meta_adset_id', 'meta_campaign_id', 'meta_fbc'];
+    for (const col of adCols) if (blank(K[col]) && !blank(O[col])) setK(col, O[col]);
   }
 
   // Jobs.
@@ -809,15 +820,19 @@ export function planMerge(input: {
   const pairs: { x: JobFacts; y: JobFacts; credit: 'into' | 'from' }[] = [];
   const joins: JoinView[] = [];
   if (merging) {
+    // Each kept job takes one join per merge (each is worked out from the job as it is now).
+    const taken = new Set<string>();
     for (const d of defaults) {
       const f = byId.get(d.job)!;
       const picked = choices.joins && d.job in choices.joins ? choices.joins[d.job] : d.with;
-      const w = picked && byId.get(picked) && kept.jobs.some((k) => k.job.id === picked) && !d.blocked[picked]?.length ? byId.get(picked)! : null;
+      const clash = !!picked && taken.has(picked);
+      const w = picked && !clash && byId.get(picked) && kept.jobs.some((k) => k.job.id === picked) && !d.blocked[picked]?.length ? byId.get(picked)! : null;
+      if (w) taken.add(w.job.id);
       const credit = choices.credit?.[d.job] ?? 'into';
       const view: JoinView = {
         job: { id: f.job.id, ref: f.job.project_ref ?? null, title: f.job.title, stage: f.job.stage, products: f.job.products ?? [] },
         with: w?.job.id ?? null,
-        why: d.why,
+        why: clash ? 'Another of their jobs is joining that one: after merging, join this one from ⋯ on its page' : d.why,
         options: kept.jobs.map((k) => ({ id: k.job.id, ref: k.job.project_ref ?? null, title: k.job.title, stage: k.job.stage, blocked: d.blocked[k.job.id] ?? [] })),
         stays: null,
         credit,
@@ -893,14 +908,14 @@ export function planMerge(input: {
   if (merging) {
     alias('customer', O.id, null, otherRef);
     alias('customer_ref', O.customer_ref, O.customer_ref, otherRef);
-    const finalNumbers = new Set([toWaId(mainPhone), wa.waId].filter(Boolean));
     for (const [c, ref] of [
       [K, keptRef],
       [O, otherRef],
     ] as const) {
       for (const n of [c.phone, c.wa_id]) {
         const v = aliasValue('phone', n);
-        if (v && !finalNumbers.has(v)) {
+        // Every number but the one replies go to, their main phone too: inbox.ts only matches a phone that has no WhatsApp number.
+        if (v && v !== wa.waId) {
           // As typed when it's their phone, else the WhatsApp number written the UK way.
           const typed = toWaId(c.phone) === v ? c.phone : showPhone(v);
           alias('phone', n, typed, ref);
@@ -957,12 +972,15 @@ export function planMerge(input: {
     }
     warnings.push({ text: permission.why });
   }
+  // A survey booked or a survey date (one set by phone, say): never two on one job.
+  const hasSurvey = (f: JobFacts) => !!f.booking || !blank(f.job.survey_at) || !blank(f.job.survey_booking_id);
   for (const j of joinPlans) {
     const F = byId.get(j.from)!;
     const Kf = byId.get(j.into)!;
-    if (F.booking && Kf.booking) {
+    if (hasSurvey(F) && hasSurvey(Kf)) {
       const gone = j.cancel_booking === 'from' ? F : Kf;
-      const when = gone.booking?.start ? ` (${ukDate(gone.booking.start)})` : '';
+      const at = gone.booking?.start ?? (blank(gone.job.survey_at) ? null : String(gone.job.survey_at));
+      const when = at ? ` (${ukDate(at)})` : '';
       warnings.push({ text: `Both jobs have a survey booked: the ${jobRef(gone.job)} one${when} is cancelled and taken out of Outlook.`, tick: `I’ll tell ${K.name.split(/\s+/)[0] || 'them'} if they booked both` });
     }
     if (F.waitingQuote && Kf.waitingQuote) warnings.push({ text: `${jobRef(F.job)}’s quote waiting to be signed stops asking for a signature: ${jobRef(Kf.job)}’s is the one in their portal.` });

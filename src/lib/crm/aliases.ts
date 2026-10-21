@@ -69,15 +69,16 @@ export async function aliasMatches(db: Db, q: string, refs: string[]): Promise<{
  * A WhatsApp from a number kept on a merged customer (src/lib/whatsapp/inbox.ts, before a new customer
  * would be made): the message is theirs, and replies now go to that number (WhatsApp's 24-hour window is
  * per number and they've just opened it on this one). Their old reply number becomes an other number.
- * → their enquiry row, or null.
+ * `inbound` false (one we typed to it in the WhatsApp Business app): just finds them. → their enquiry row, or null.
  */
-export async function replyNumberFromAlias(db: Db, waId: string): Promise<Record<string, unknown> | null> {
+export async function replyNumberFromAlias(db: Db, waId: string, inbound = true): Promise<Record<string, unknown> | null> {
   const hit = await mergedInto('phone', waId, db);
   if (!hit) return null;
   const { data: row } = await db.from('enquiries').select('*').eq('id', hit.enquiry_id).maybeSingle();
   if (!row) return null;
   const was = (row as { wa_id?: string | null }).wa_id ?? null;
-  if (was === waId) return row as Record<string, unknown>;
+  // Only a message from them opens this number's 24-hour window.
+  if (was === waId || !inbound) return row as Record<string, unknown>;
   try {
     await db.from('enquiries').update({ wa_id: waId }).eq('id', hit.enquiry_id);
     // The old number stays findable; this one is their main WhatsApp number now, not an "other" one.

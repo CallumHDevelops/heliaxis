@@ -26,11 +26,11 @@ create table if not exists public.crm_merges (
   gone_ref        text,
   gone_name       text,
   joins           jsonb not null default '[]',  -- [{from, from_ref, into, into_ref, credit}]
-  snapshot        jsonb not null,               -- {customer: {…}, jobs: [{…}]} as they were
+  snapshot        jsonb not null,               -- {customer: {…}, jobs: [{…}], cancelled_ids: {table: [id]}, dropped: {table: [{…}]}} as they were
   choices         jsonb not null default '{}',  -- which value each detail took, and why
   summary         jsonb not null default '{}',  -- {"whatsapp_messages": 14, …}: what moved to the kept record
   moved           jsonb not null default '{}',  -- {"whatsapp_messages.enquiry_id": 14, …}
-  cancelled       jsonb not null default '{}',  -- {"whatsapp_outbox": 1, …}: closed or dropped
+  cancelled       jsonb not null default '{}',  -- {"whatsapp_outbox": 1, …}: closed or dropped (which ones: in snapshot)
   warnings        text[] not null default '{}',
   files           jsonb not null default '[]',  -- [{bucket, from, to}]: storage folders to move (src/lib/crm/merge.ts)
   files_done_at   timestamptz,
@@ -138,6 +138,13 @@ language sql immutable set search_path = public as $$
            group by key) y;
 $$;
 
+-- {a: [1]} + {a: [2], b: [3]} = {a: [1, 2], b: [3]}
+create or replace function public.crm_merge_cat(a jsonb, b jsonb) returns jsonb
+language sql immutable set search_path = public as $$
+  select coalesce(jsonb_object_agg(key, coalesce(a->key, '[]') || coalesce(b->key, '[]')), '{}'::jsonb)
+    from (select jsonb_object_keys(coalesce(a, '{}')) as key union select jsonb_object_keys(coalesce(b, '{}'))) k;
+$$;
+
 -- Every single-column foreign key to p_target: (table, its name, column, column number).
 create or replace function public.crm_merge_fks(p_target regclass)
 returns table (tbl regclass, tname text, col text, attnum int2)
@@ -153,12 +160,13 @@ $$;
 -- Move every row that points at p_from (through any foreign key to p_target) to p_to. First, rows of
 -- p_from's that a unique index would see clash with p_to's: the table's policy says what happens
 -- ("drop-ours": p_from's copy goes; {"cancel": {col: value}}: set those on p_from's copy; anything else,
--- or no policy: refuse, so nothing is ever lost quietly). → {moved: {"table.col": n}, dropped, cancelled}.
+-- or no policy: refuse, so nothing is ever lost quietly). → {moved: {"table.col": n}, dropped, cancelled,
+-- gone: {table: [the rows dropped]}, ids: {table: [the ids cancelled]}}, so the merge log can say which.
 create or replace function public.crm_merge_move(p_target regclass, p_from uuid, p_to uuid, p_policies jsonb, p_skip text[])
 returns jsonb language plpgsql set search_path = public as $$
 declare
-  fk record; ix record; keys text; pred text; sets text; tids tid[]; pol jsonb; n int;
-  moved jsonb := '{}'; dropped jsonb := '{}'; cancelled jsonb := '{}';
+  fk record; ix record; keys text; pred text; sets text; tids tid[]; pol jsonb; n int; v_rows jsonb;
+  moved jsonb := '{}'; dropped jsonb := '{}'; cancelled jsonb := '{}'; gone jsonb := '{}'; ids jsonb := '{}';
 begin
   for fk in select * from public.crm_merge_fks(p_target) f where f.tname <> all(p_skip) loop
     for ix in
@@ -180,15 +188,17 @@ begin
       continue when coalesce(cardinality(tids), 0) = 0;
       pol := p_policies -> fk.tname;
       if pol = '"drop-ours"'::jsonb then
-        execute format('delete from %s where ctid = any($1)', fk.tbl) using tids;
-        get diagnostics n = row_count;
+        execute format('with d as (delete from %s t where ctid = any($1) returning t.*) select count(*), coalesce(jsonb_agg(to_jsonb(d)), ''[]'') from d', fk.tbl)
+          into n, v_rows using tids;
         dropped := public.crm_merge_add(dropped, jsonb_build_object(fk.tname, n));
+        gone := public.crm_merge_cat(gone, jsonb_build_object(fk.tname, v_rows));
       elsif jsonb_typeof(pol) = 'object' and jsonb_typeof(pol->'cancel') = 'object' then
         select string_agg(format('%1$I = n.%1$I', key), ', ') into sets from jsonb_object_keys(pol->'cancel') key;
-        execute format('update %1$s t set %2$s from jsonb_populate_record(null::%1$s, $2) n where t.ctid = any($1)', fk.tbl, sets)
-          using tids, pol->'cancel';
-        get diagnostics n = row_count;
+        execute format('with u as (update %1$s t set %2$s from jsonb_populate_record(null::%1$s, $2) n where t.ctid = any($1) returning t.*) '
+                       || 'select count(*), coalesce(jsonb_agg(to_jsonb(u)->''id''), ''[]'') from u', fk.tbl, sets)
+          into n, v_rows using tids, pol->'cancel';
         cancelled := public.crm_merge_add(cancelled, jsonb_build_object(fk.tname, n));
+        ids := public.crm_merge_cat(ids, jsonb_build_object(fk.tname, v_rows));
       else
         raise exception 'merge:clash' using detail = fk.tname;
       end if;
@@ -197,7 +207,7 @@ begin
     get diagnostics n = row_count;
     if n > 0 then moved := public.crm_merge_add(moved, jsonb_build_object(fk.tname || '.' || fk.col, n)); end if;
   end loop;
-  return jsonb_build_object('moved', moved, 'dropped', dropped, 'cancelled', cancelled);
+  return jsonb_build_object('moved', moved, 'dropped', dropped, 'cancelled', cancelled, 'gone', gone, 'ids', ids);
 end $$;
 
 -- The first "table.column" with rows still pointing at any of p_ids, or null. The foreign keys are
@@ -276,9 +286,10 @@ declare
   j jsonb; x jsonb; r jsonb;
   v_from uuid; v_into uuid;
   v_merge uuid;
-  live_f uuid; live_k uuid;
+  live_f uuid; live_k uuid; v_one uuid; v_row jsonb; v_list jsonb;
   v_moved jsonb := '{}'; v_dropped jsonb := '{}'; v_cancelled jsonb := '{}'; v_summary jsonb;
-  v_counted uuid[];
+  v_ids jsonb := '{}'; v_gone jsonb := '{}';   -- which rows were cancelled, and the ones dropped, for the log
+  v_counted uuid[]; v_lead_jobs uuid[];
   left_over text; n int; v_text text; v_body text;
   v_joins jsonb := coalesce(p->'joins', '[]');
   v_policies jsonb := coalesce(p->'policies', '{}');
@@ -383,30 +394,39 @@ begin
         select id, answers into sk from public.crm_surveys where project_id = v_into and type = sf.type and status in ('booked', 'draft');
         if found then
           if sf.answers <> '{}'::jsonb and sk.answers <> '{}'::jsonb then raise exception 'merge:surveys'; end if;
-          update public.crm_surveys set status = 'cancelled', updated_at = now()
-           where id = case when sf.answers <> '{}'::jsonb then sk.id else sf.id end;
+          update public.crm_surveys set status = 'cancelled', notes = concat_ws(E'\n\n', notes, p->>'cancel_reason'), updated_at = now()
+           where id = case when sf.answers <> '{}'::jsonb then sk.id else sf.id end
+          returning id into v_one;
           v_cancelled := public.crm_merge_add(v_cancelled, '{"crm_surveys": 1}');
+          v_ids := public.crm_merge_cat(v_ids, jsonb_build_object('crm_surveys', jsonb_build_array(v_one)));
         end if;
       end loop;
     end if;
 
-    -- One live booking per job: the other is cancelled (the app says which, with the survey it keeps).
+    -- One live booking per job, and none beside the other job's survey date (one set by phone, say): the
+    -- app says whose goes, with the survey it keeps, and the sheet says so.
     if to_regclass('public.survey_bookings') is not null then
       select id into live_f from public.survey_bookings where project_id = v_from and status in ('requested', 'confirmed');
       select id into live_k from public.survey_bookings where project_id = v_into and status in ('requested', 'confirmed');
-      if live_f is not null and live_k is not null then
+      v_one := case when j->>'cancel_booking' = 'into' then live_k else live_f end;
+      select to_jsonb(cp) into v_row from public.crm_projects cp where cp.id = case when j->>'cancel_booking' = 'into' then v_from else v_into end;
+      if v_one is not null and ((live_f is not null and live_k is not null) or coalesce(v_row->>'survey_at', v_row->>'survey_booking_id') is not null) then
         update public.survey_bookings
            set status = 'cancelled', cancel_reason = p->>'cancel_reason', cancelled_at = now(), updated_at = now()
-         where id = case when j->>'cancel_booking' = 'into' then live_k else live_f end;
+         where id = v_one;
         v_cancelled := public.crm_merge_add(v_cancelled, '{"survey_bookings": 1}');
+        v_ids := public.crm_merge_cat(v_ids, jsonb_build_object('survey_bookings', jsonb_build_array(v_one)));
       end if;
     end if;
 
     -- A quote waiting to be signed: only the kept job's, if it has one (so the portal offers the right one).
     if exists (select 1 from public.crm_documents where project_id = v_into and needs_signature) then
-      update public.crm_documents set needs_signature = false where project_id = v_from and needs_signature;
-      get diagnostics n = row_count;
-      if n > 0 then v_cancelled := public.crm_merge_add(v_cancelled, jsonb_build_object('crm_documents', n)); end if;
+      with u as (update public.crm_documents set needs_signature = false where project_id = v_from and needs_signature returning id)
+      select count(*), coalesce(jsonb_agg(id), '[]') into n, v_list from u;
+      if n > 0 then
+        v_cancelled := public.crm_merge_add(v_cancelled, jsonb_build_object('crm_documents', n));
+        v_ids := public.crm_merge_cat(v_ids, jsonb_build_object('crm_documents', v_list));
+      end if;
     end if;
 
     -- The kept job's details (src/lib/crm/merge-rules.ts combineJobs), after clearing what moves off the other
@@ -430,6 +450,8 @@ begin
     v_moved := public.crm_merge_add(v_moved, r->'moved');
     v_dropped := public.crm_merge_add(v_dropped, r->'dropped');
     v_cancelled := public.crm_merge_add(v_cancelled, r->'cancelled');
+    v_ids := public.crm_merge_cat(v_ids, r->'ids');
+    v_gone := public.crm_merge_cat(v_gone, r->'gone');
     left_over := public.crm_merge_left('public.crm_projects', array[v_from]);
     if left_over is not null then raise exception 'merge:left' using detail = left_over; end if;
     delete from public.crm_projects where id = v_from;
@@ -442,16 +464,20 @@ begin
   if v_dup is not null then
     -- Automatic WhatsApps still waiting for the merged-away record (staff's own Send later messages move and stay).
     if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'whatsapp_outbox' and column_name = 'kind') then
-      execute 'update public.whatsapp_outbox set status = ''cancelled'', last_error = $3 where enquiry_id = $1 and status = ''pending'' and kind = any($2)'
+      execute 'with u as (update public.whatsapp_outbox set status = ''cancelled'', last_error = $3 where enquiry_id = $1 and status = ''pending'' and kind = any($2) returning id)
+               select count(*), coalesce(jsonb_agg(id), ''[]'') from u'
+        into n, v_list
         using v_dup, array(select jsonb_array_elements_text(coalesce(p->'outbox_cancel_kinds', '["reply","intro","chase"]'))), p->>'cancel_reason';
-      get diagnostics n = row_count;
     elsif to_regclass('public.whatsapp_outbox') is not null then
-      update public.whatsapp_outbox set status = 'cancelled', last_error = p->>'cancel_reason' where enquiry_id = v_dup and status = 'pending';
-      get diagnostics n = row_count;
+      with u as (update public.whatsapp_outbox set status = 'cancelled', last_error = p->>'cancel_reason' where enquiry_id = v_dup and status = 'pending' returning id)
+      select count(*), coalesce(jsonb_agg(id), '[]') into n, v_list from u;
     else
       n := 0;
     end if;
-    if n > 0 then v_cancelled := public.crm_merge_add(v_cancelled, jsonb_build_object('whatsapp_outbox', n)); end if;
+    if n > 0 then
+      v_cancelled := public.crm_merge_add(v_cancelled, jsonb_build_object('whatsapp_outbox', n));
+      v_ids := public.crm_merge_cat(v_ids, jsonb_build_object('whatsapp_outbox', v_list));
+    end if;
 
     -- "Not the same person" pairs: rewritten for the kept customer (lowest id first); the pair itself goes.
     insert into public.crm_distinct_pairs (a, b, by_id, at)
@@ -491,6 +517,8 @@ begin
     v_moved := public.crm_merge_add(v_moved, r->'moved');
     v_dropped := public.crm_merge_add(v_dropped, r->'dropped');
     v_cancelled := public.crm_merge_add(v_cancelled, r->'cancelled');
+    v_ids := public.crm_merge_cat(v_ids, r->'ids');
+    v_gone := public.crm_merge_cat(v_gone, r->'gone');
 
     -- A website booking flagged as a possible duplicate of the other record is now the same person.
     if to_regclass('public.survey_bookings') is not null then
@@ -517,12 +545,20 @@ begin
     end loop;
     if v_dup is not null and exists (select 1 from information_schema.columns
                                       where table_schema = 'public' and table_name = 'notifications' and column_name = 'ref') then
+      -- The merged-away lead's new-lead alerts (its chat, its enquiry) are done with when every job its lead
+      -- is on now (the one it joined, or its own) has been contacted.
+      v_lead_jobs := array(select coalesce((select (y->>'into')::uuid from jsonb_array_elements(v_joins) y where (y->>'from')::uuid = f limit 1), f)
+                             from unnest(v_counted) f);
+      if exists (select 1 from public.crm_projects where id = any(v_lead_jobs))
+         and not exists (select 1 from public.crm_projects where id = any(v_lead_jobs) and first_contact_at is null) then
+        execute 'update public.notifications set read_at = now() where ref = ''lead:'' || $1 and read_at is null' using v_dup;
+      end if;
       execute 'update public.notifications set ref = replace(ref, $1::text, $2::text) where ref in (''wa:'' || $1, ''wa-reply:'' || $1, ''lead:'' || $1)'
         using v_dup, v_keep;
-      -- A new-lead alert for someone we've already been in touch with is done with.
-      if exists (select 1 from public.crm_projects where enquiry_id = v_keep and first_contact_at is not null) then
-        execute 'update public.notifications set read_at = now() where ref = ''lead:'' || $1 and read_at is null' using v_keep;
-      end if;
+      -- And one that opens a job we've been in touch with (say, one joined into a contacted job).
+      execute 'update public.notifications n set read_at = now() from public.crm_projects cp
+                where n.ref = ''lead:'' || $1 and n.read_at is null and n.href = ''/admin/crm/'' || cp.id
+                  and cp.enquiry_id = $1 and cp.first_contact_at is not null' using v_keep;
     end if;
   end if;
 
@@ -547,7 +583,10 @@ begin
   end if;
 
   v_cancelled := public.crm_merge_add(v_cancelled, v_dropped);
-  update public.crm_merges set moved = v_moved, cancelled = v_cancelled, summary = v_summary where id = v_merge;
+  update public.crm_merges
+     set moved = v_moved, cancelled = v_cancelled, summary = v_summary,
+         snapshot = snapshot || jsonb_build_object('cancelled_ids', v_ids, 'dropped', v_gone)
+   where id = v_merge;
   return jsonb_build_object('ok', true, 'merge_id', v_merge, 'kept', jsonb_build_object('id', k.id, 'ref', k.customer_ref),
                             'summary', v_summary, 'moved', v_moved, 'cancelled', v_cancelled, 'files', coalesce(p->'files', '[]'));
 end $$;
@@ -577,7 +616,7 @@ alter table public.crm_distinct_pairs enable row level security;
 
 do $$ declare f text; begin
   foreach f in array array[
-    'public.crm_merge_set(regclass, uuid, jsonb)', 'public.crm_merge_expect(regclass, uuid, jsonb)', 'public.crm_merge_add(jsonb, jsonb)',
+    'public.crm_merge_set(regclass, uuid, jsonb)', 'public.crm_merge_expect(regclass, uuid, jsonb)', 'public.crm_merge_add(jsonb, jsonb)', 'public.crm_merge_cat(jsonb, jsonb)',
     'public.crm_merge_fks(regclass)', 'public.crm_merge_move(regclass, uuid, uuid, jsonb, text[])', 'public.crm_merge_left(regclass, uuid[])',
     'public.crm_merge_counts(uuid[], uuid[], text[])', 'public.crm_merge_contract(uuid)', 'public.crm_merge_origin(jsonb, uuid, text, uuid)',
     'public.crm_merge_run(jsonb)', 'public.crm_merge(jsonb)']
