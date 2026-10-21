@@ -14,6 +14,7 @@ import { ordersCount } from '../../projects/orders/OrdersUi';
 import { ProjectOverview, SurveysPanel, type OverviewActions } from '../../projects/[id]/ProjectOverview';
 import { firstName, phaseOf, ukDayOf } from '../crm-shared';
 import { DOCK, openDock, sendDockJob, useDockState, type DockJob } from '../dock-link';
+import { MergeSheet, mergedWords, mergeNotice, type MergeStart } from '../MergeSheet';
 import { useMedia } from '../use-stored';
 import { ActivityTab } from './ActivityTab';
 import { CompactCustomer, CustomerColumn } from './CustomerColumn';
@@ -127,7 +128,11 @@ export function ProjectView({
 
   const [rec, setRec] = useState<RecordData | null>(() => seen.get(id) ?? null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  // After a merge that opened this job: "Merged. HX-0069 now finds Robert Evans HX-0080."
+  const [notice, setNotice] = useState(() => mergeNotice.read());
+  const [merging, setMerging] = useState<MergeStart | null>(null);
+  /** This job was joined into another while open (a merge elsewhere). */
+  const [joined, setJoined] = useState<{ id: string; ref: string | null } | null>(null);
   const [tabSel, setTabSel] = useState<Tab | null>(initialTab && TABS.includes(initialTab) ? initialTab : null);
   const [photoView, setPhotoView] = useState<{ cat: string | null; key: number }>({ cat: null, key: 0 });
   const [sheet, setSheet] = useState<SheetKey>(null);
@@ -147,6 +152,7 @@ export function ProjectView({
     recRef.current = rec;
     if (rec) seen.set(id, rec);
   });
+  useEffect(() => mergeNotice.clear(), []);
   // Back from the chat page: where the page was.
   const restored = useRef(false);
   useEffect(() => {
@@ -168,7 +174,8 @@ export function ProjectView({
     const started = Date.now();
     const r = await fetch(`/api/crm/projects/${id}`, { cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || 'Could not load this job');
+    if (!r.ok && d.error === 'merged' && d.into) setJoined(d.into);
+    if (!r.ok) throw new Error(d.error === 'merged' ? 'This job was joined into another.' : d.error || 'Could not load this job');
     wantFull.current = false;
     signedAt.current = started;
     cursor.current = cursorFrom(d.timeline ?? []);
@@ -185,7 +192,8 @@ export function ProjectView({
       }
       const since = cursor.current ? `&since=${encodeURIComponent(cursor.current)}` : '';
       const r = await fetch(`/api/crm/projects/${id}?light=1${since}`, { cache: 'no-store' });
-      const d = (await r.json().catch(() => ({}))) as LightData & { error?: string };
+      const d = (await r.json().catch(() => ({}))) as LightData & { error?: string; into?: { id: string; ref: string | null } };
+      if (!r.ok && d.error === 'merged' && d.into) setJoined(d.into);
       if (!r.ok) throw new Error(d.error || 'Could not load this job');
       // Something else changed the job, or its photos or documents: read it all again.
       if (d.project.updated_at !== cur.project.updated_at || d.counts.photos !== cur.photos.length || d.counts.documents !== cur.documents.length) {
@@ -341,10 +349,19 @@ export function ProjectView({
     [id, refresh]
   );
 
+  const base = area === 'projects' ? '/admin/projects' : '/admin/crm';
+  const joinedBanner = joined && (
+    <p className="crm-banner">
+      This job was joined into {joined.ref ?? 'another job'}.{' '}
+      <a className="crm-link" href={`${base}/${joined.id}`}>
+        Open it
+      </a>
+    </p>
+  );
   if (!rec) {
     return (
       <div className="crm crmh crmr">
-        <p className={error ? 'crm-banner crm-banner--err' : 'crm-muted'}>{error || 'Loading…'}</p>
+        {joinedBanner || <p className={error ? 'crm-banner crm-banner--err' : 'crm-muted'}>{error || 'Loading…'}</p>}
       </div>
     );
   }
@@ -586,7 +603,17 @@ export function ProjectView({
         }}
         onNewProject={() => openSheet('newproject')}
         onDelete={() => openSheet('delete')}
+        onMerge={(other) => setMerging({ a: c.id, b: other, name: c.name })}
+        onJoinJobs={() => setMerging({ a: c.id, name: c.name, jobPair: [id, rec.others.length === 1 ? rec.others[0].id : ''], jobs: rec.others.map((o) => ({ id: o.id, ref: o.project_ref, title: o.title, stage: o.stage })) })}
+        onNotSame={async (other) => {
+          const ok = await send('/api/crm/merge', 'POST', { action: 'distinct', a: c.id, b: other }).then(
+            () => true,
+            (e: Error) => (setError(e.message), false)
+          );
+          if (ok) void refresh();
+        }}
       />
+      {joinedBanner}
 
       {callPrompt && (
         <CallPrompt
@@ -776,6 +803,24 @@ export function ProjectView({
         />
       )}
       {sheet === 'link' && <LinkSheet projectId={id} onClose={closeSheet} onWhatsApp={(text) => (closeSheet(), openWhatsApp(text))} />}
+      {merging && (
+        <MergeSheet
+          start={merging}
+          isAdmin={isAdmin}
+          onClose={() => setMerging(null)}
+          onDone={(done, preview) => {
+            setMerging(null);
+            const words = mergedWords(done, preview);
+            if (!done.job || done.job === id) {
+              setNotice(words);
+              void refresh();
+              return;
+            }
+            mergeNotice.set(words);
+            router.push(`${base}/${done.job}`);
+          }}
+        />
+      )}
       {sheet === 'delete' && <DeleteSheet project={p} customer={c} canInbox={canInbox} area={area} onClose={closeSheet} onDone={(to) => router.push(to)} />}
       {sheet === 'newproject' && (
         <NewProjectSheet

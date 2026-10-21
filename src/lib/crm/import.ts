@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { grantPermission } from '@/lib/whatsapp/permission';
 import { guessProducts } from './stages';
+import { aliasCustomer } from './aliases';
 
 /**
  * Bringing in people from before the CRM: old Meta lead-form leads, chats exported from the
@@ -12,9 +13,16 @@ import { guessProducts } from './stages';
  * opportunity is marked so the speed-to-lead alert and follow-ups never pick it up.
  */
 
-export type ExistingEnquiry = { id: string; name: string; meta_lead_id: string | null; wa_id: string | null };
+export type ExistingEnquiry = {
+  id: string;
+  name: string;
+  meta_lead_id: string | null;
+  wa_id: string | null;
+  /** Found by what a merge kept on them (src/lib/crm/merge.ts): their old Meta lead id, another number or email. */
+  viaAlias?: 'meta_lead' | 'phone' | 'email';
+};
 
-/** Same person already in the CRM? By Meta lead id, then phone (any format), then email. */
+/** Same person already in the CRM? By Meta lead id, then phone (any format), then email, then what a merge kept on them. */
 export async function findExistingEnquiry(p: {
   metaLeadId?: string | null;
   phone?: string | null;
@@ -44,6 +52,11 @@ export async function findExistingEnquiry(p: {
     const { data } = await db.from('enquiries').select(cols).ilike('email', like).limit(20);
     const hit = ((data ?? []) as Row[]).find((r) => r.email?.trim().toLowerCase() === email);
     if (hit) return hit;
+  }
+  const alias = await aliasCustomer(p, db);
+  if (alias) {
+    const { data } = await db.from('enquiries').select(cols).eq('id', alias.enquiry_id).maybeSingle();
+    if (data) return { ...(data as Row), viaAlias: alias.via };
   }
   return null;
 }

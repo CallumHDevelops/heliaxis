@@ -11,9 +11,13 @@ const SLOT = /^[A-Za-z][A-Za-z0-9_]{0,30}(?::[A-Za-z0-9_-]{1,30})?$/;
 const isUuid = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f-]{36}$/i.test(s);
 const MIME = ['image/jpeg', 'image/png', 'image/webp'];
 
-/** projects/<job>/site/<assignment>/<slot>/<phone's queue id>.jpg: named by the phone, so a retried upload overwrites itself. */
+/**
+ * <job>/site/<assignment>/<slot>/<phone's queue id>.jpg: named by the phone, so a retried upload overwrites
+ * itself. In the job's own folder of crm-photos, so merging jobs moves them and deleting the customer
+ * removes them (crm/merge.ts, crm/delete-customer.ts).
+ */
 const pathFor = (projectId: string, assignmentId: string, slot: string, clientId: string, mime: string) =>
-  `projects/${projectId}/site/${assignmentId}/${slot.replace(':', '_')}/${clientId.toLowerCase()}.${mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'}`;
+  `${projectId}/site/${assignmentId}/${slot.replace(':', '_')}/${clientId.toLowerCase()}.${mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'}`;
 
 /**
  * Trade photos, straight from the phone to storage (Vercel limits request bodies):

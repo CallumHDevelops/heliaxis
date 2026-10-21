@@ -9,12 +9,15 @@ import { ensureOpportunity } from '@/lib/crm/server';
 import { leadRef } from '@/lib/notification-refs';
 import { isTestLead } from '@/lib/meta-leads-csv';
 import { saveAdIds } from '@/lib/meta-ads';
+import { mergedInto } from '@/lib/crm/aliases';
 
 /** A Lead Ads webhook ping → fetch the answers → an enquiry (once, however often Meta retries). */
 export async function ingestLead(leadgenId: string) {
   const db = createAdminClient();
   const { data: existing } = await db.from('enquiries').select('id').eq('meta_lead_id', leadgenId).maybeSingle();
   if (existing) return;
+  // Merged into another customer (src/lib/crm/merge.ts): a webhook retry mustn't bring the old record back.
+  if (await mergedInto('meta_lead', leadgenId, db)) return;
 
   const r = await fetchLead(leadgenId);
   if (!r.ok) {

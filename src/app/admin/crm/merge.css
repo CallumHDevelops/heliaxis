@@ -1,0 +1,345 @@
+/* ⋯ has longer items now (Merge with another customer…, Join this job with another of Rob's jobs…). */
+.crmr-more__list {
+  min-width: 290px;
+  max-width: min(340px, calc(100vw - 32px));
+}
+.crmr-more__list button {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  line-height: 1.3;
+}
+
+/* The record header's possible-duplicate badge, with Merge… beside the name (it never gets cut off).
+   In the pinned row there's only room for who; under the name on phones it wraps and says why. */
+.crmr-badge.crmr-badge--dupe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 360px;
+}
+.crmr-badges--a .crmr-badge__why {
+  display: none;
+}
+.crmr-badges--b .crmr-badge.crmr-badge--dupe {
+  flex-wrap: wrap;
+  max-width: 100%;
+  white-space: normal;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.crmr-badges--b .crmr-badge--dupe > a {
+  white-space: normal;
+}
+.crmr-badge--dupe > a,
+.crmr-badge__why {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  text-decoration: none;
+}
+.crmr-badge__why {
+  flex: 0 1 auto;
+  font-weight: 600;
+}
+.crmr-badge__act {
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: var(--blue, #2c5f99);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* The customer card: other leads under Source, and the other numbers a merge kept. */
+.crmr-also {
+  display: block;
+  margin-top: 2px;
+}
+.crmr-others-n {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.crmr-other-n {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+.crmr-other-n small {
+  color: var(--muted);
+}
+.crmr-other-n__acts {
+  display: inline-flex;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+.crmr-other-n__acts .crm-link {
+  margin: 0;
+}
+
+/* The merge sheet (MergeSheet.tsx): wider than other sheets, full height on phones, columns stacked there. */
+.crm-sheet-box:has(> .mrg) {
+  width: min(880px, 100%);
+}
+.mrg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.mrg[data-loading] .mrg-sec {
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.mrg-sec {
+  border-top: 1px solid var(--line);
+  padding: 0.8rem 0 0.4rem;
+}
+.mrg-sec:first-child {
+  border-top: 0;
+}
+.mrg-sec h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.mrg-why {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.mrg-why .crm-link {
+  margin-left: 0.15rem;
+}
+
+/* Which record stays */
+.mrg-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.mrg-card {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  cursor: pointer;
+}
+.mrg-card.on {
+  border-color: var(--amber-2);
+  box-shadow: 0 0 0 1px var(--amber-2) inset;
+  background: rgba(248, 188, 30, 0.07);
+}
+.mrg-card input {
+  margin-top: 0.2rem;
+  accent-color: var(--amber-2);
+}
+.mrg-card__b {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.mrg-card__h {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.mrg-card__h em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--solar);
+  border-radius: 99px;
+  padding: 0.05rem 0.45rem;
+}
+.mrg-card__jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.mrg-card__jobs small {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+/* Details */
+.mrg-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.mrg-field {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: 'l a b' '. w w';
+  gap: 0.2rem 0.5rem;
+  align-items: center;
+}
+.mrg-field.is-same {
+  grid-template-areas: 'l s s';
+}
+.mrg-field__l {
+  grid-area: l;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.mrg-field__same {
+  grid-area: s;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+.mrg-field__same small,
+.mrg-opt small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.mrg-field__why {
+  grid-area: w;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.mrg-opt {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.mrg-opt:nth-of-type(1) {
+  grid-area: a;
+}
+.mrg-opt:nth-of-type(2) {
+  grid-area: b;
+}
+.mrg-opt.on {
+  border-color: var(--amber-2);
+  background: rgba(248, 188, 30, 0.07);
+}
+.mrg-opt input {
+  margin-top: 0.15rem;
+  accent-color: var(--amber-2);
+}
+.mrg-opt i {
+  color: var(--muted);
+}
+
+/* Jobs */
+.mrg-job {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.mrg-job__h {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}
+.mrg-job__pick {
+  max-width: 26rem;
+}
+.mrg-credit {
+  margin: 0.5rem 0 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(44, 110, 180, 0.07);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* What happens */
+.mrg-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.mrg-tick {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(199, 127, 4, 0.35);
+  border-radius: 6px;
+  background: rgba(248, 188, 30, 0.1);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.mrg-tick input {
+  margin-top: 0.2rem;
+  accent-color: var(--amber-2);
+}
+.mrg-tick b {
+  display: block;
+  margin-top: 0.15rem;
+}
+.mrg-typed {
+  max-width: 14rem;
+}
+.mrg-foot {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .crm-sheet-box:has(> .mrg) {
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    /* The buttons' own bar pins to the very bottom (a sticky bar keeps clear of the box's padding). */
+    padding-bottom: 0;
+  }
+  .mrg-cards {
+    grid-template-columns: 1fr;
+  }
+  .mrg-field {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'l' 'a' 'b' 'w';
+  }
+  .mrg-field.is-same {
+    grid-template-areas: 'l' 's';
+  }
+  .mrg-job__pick {
+    max-width: none;
+  }
+  .mrg-foot {
+    position: sticky;
+    bottom: 0;
+    background: var(--paper);
+    padding: 0.6rem 0 calc(0.6rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+  }
+}

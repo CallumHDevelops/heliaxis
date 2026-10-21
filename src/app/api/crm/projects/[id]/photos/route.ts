@@ -5,6 +5,7 @@ import { PHOTO_KEYS, photoLabel } from '@/lib/crm/stages';
 import { cleanMarkup, MARKUP_MAX_BYTES, markupBytes, markupPathFor } from '@/lib/surveys/markup';
 import { recomputeFlags } from '@/lib/surveys/server';
 import { SLOT_RE } from '@/lib/surveys/solar-schema';
+import { mergedInto } from '@/lib/crm/aliases';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -23,10 +24,12 @@ const isHeicMime = (m: unknown) => typeof m === 'string' && /^image\/hei[cf]$/i.
 export async function POST(req: Request, { params }: Ctx) {
   const s = await crmSession();
   if (!s) return json({ error: 'unauthorized' }, 401);
-  const { id } = await params;
-  if (!isUuid(id)) return json({ error: 'Not found' }, 404);
+  const { id: asked } = await params;
+  if (!isUuid(asked)) return json({ error: 'Not found' }, 404);
   const b = await req.json().catch(() => ({}));
   const db = createAdminClient();
+  // Photos queued on a phone for a job since joined into another (src/lib/crm/merge.ts) go to that one.
+  const id = (await mergedInto('job', asked, db))?.project_id ?? asked;
   const { data: project } = await db.from('crm_projects').select('id, enquiry_id').eq('id', id).maybeSingle();
   if (!project) return json({ error: 'Not found' }, 404);
 
@@ -104,11 +107,26 @@ export async function POST(req: Request, { params }: Ctx) {
       markup_path?: string;
     };
     const raw = (Array.isArray(b.items) ? (b.items as Item[]) : []).filter(
-      (i) => typeof i?.path === 'string' && i.path.startsWith(`${id}/`) && !i.path.includes('..')
+      (i) => typeof i?.path === 'string' && (i.path.startsWith(`${id}/`) || i.path.startsWith(`${asked}/`)) && !i.path.includes('..')
     );
     const items = raw.map((i) => (i.survey_id ? { ...i, category: 'survey' } : i)).filter((i) => PHOTO_KEYS.includes(i.category));
     if (!items.length) return json({ error: 'Nothing to save' }, 400);
 
+    // Uploaded to a job's folder before it was joined into this one: into this job's folder first
+    // (the reply still names it by the path the phone knows).
+    const was = new Map<string, string>();
+    if (asked !== id) {
+      const into = (path: string) => `${id}/${path.slice(asked.length + 1)}`;
+      for (const i of items.filter((x) => x.path.startsWith(`${asked}/`))) {
+        const files = [i.path, thumbPath(i.path), i.markup_path].filter((x): x is string => !!x?.startsWith(`${asked}/`));
+        const [moved] = await Promise.all(files.map((f) => db.storage.from(CRM_BUCKET).move(f, into(f)).then((r) => !r.error)));
+        // Moved already by the merge's own file step (moveFolder in src/lib/crm/merge.ts), before it had a row to follow.
+        if (!moved && !(await db.storage.from(CRM_BUCKET).exists(into(i.path)).then((r) => r.data, () => false))) continue;
+        was.set(into(i.path), i.path);
+        i.path = into(i.path);
+        if (i.markup_path?.startsWith(`${asked}/`)) i.markup_path = into(i.markup_path);
+      }
+    }
     const survey = items.filter((i) => i.survey_id);
     const known = await surveysOfJob([...new Set(survey.map((i) => String(i.survey_id)))]);
     if (survey.length && (!known || survey.some((i) => !known.has(String(i.survey_id))))) return json({ error: 'survey_not_found' }, 404);
@@ -137,6 +155,7 @@ export async function POST(req: Request, { params }: Ctx) {
       );
     const ids: Record<string, string> = {};
     for (const r of rows ?? []) ids[r.storage_path as string] = r.id as string;
+    for (const [now, before] of was) if (ids[now]) ids[before] = ids[now];
 
     // Survey columns (surveys.sql) go in a follow-up update, so the save above works without them.
     for (const i of survey) {

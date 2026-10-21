@@ -7,6 +7,7 @@ import { refMatches, relativeTime } from '@/lib/enquiries';
 import { NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { everyWord, hasText } from '@/lib/search-words';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
+import { shortAt } from '@/lib/whatsapp/schedule';
 import { windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
 import '../whatsapp.css';
@@ -26,6 +27,10 @@ type Convo = {
   last: { direction: string; body: string | null } | null;
   queued: boolean;
   chasing: boolean;
+  /** When the next message someone has scheduled goes (Send later), or null. */
+  scheduled_at?: string | null;
+  /** A message was scheduled after their last one: that answers them. */
+  scheduled_reply?: boolean;
 };
 
 type Filter = 'all' | 'reply' | 'waiting';
@@ -34,7 +39,7 @@ const FILTERS: [Filter, string][] = [
   ['reply', 'Needs reply'],
   ['waiting', 'Waiting on them'],
 ];
-const needsReply = (c: Convo) => c.last?.direction === 'in' && !c.queued;
+const needsReply = (c: Convo) => c.last?.direction === 'in' && !c.queued && !c.scheduled_reply;
 const waitingOnThem = (c: Convo) => c.last?.direction === 'out' || (!c.last && c.chasing);
 
 export function InboxList() {
@@ -140,6 +145,7 @@ export function InboxList() {
                     <span className="wa-row-bottom">
                       <span className="wa-preview">{preview}</span>
                       {c.queued && <span className="wa-chip">⏱ reply queued</span>}
+                      {c.scheduled_at && <span className="wa-chip wa-chip--later">🕐 scheduled {shortAt(new Date(c.scheduled_at), new Date(now))}</span>}
                       {c.chasing && <span className="wa-chip wa-chip--chase">↻ chasing</span>}
                       {c.wa_unread > 0 && <span className="wa-badge">{c.wa_unread}</span>}
                     </span>

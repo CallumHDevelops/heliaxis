@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { useNow } from '@/lib/use-now';
+import { atWords } from '@/lib/whatsapp/schedule';
 import { appendDraft, ChatPane } from './ChatPane';
 import {
   DOCK_EVENTS,
@@ -77,6 +78,7 @@ function rowFromJob(job: DockJob, canInbox: boolean): ActiveChat {
     windowClosesAt: null,
     queued: false,
     chasing: false,
+    scheduledAt: null,
     project: { id: job.projectId, ref: job.ref, stage: job.stage, title: job.name },
     hasProject: true,
     chatHref: canInbox ? `/admin/enquiries/inbox/${threadId}` : `/admin/crm/chats/${threadId}`,
@@ -117,7 +119,7 @@ export function WhatsAppDock({
   const shows = state === 'open' || state === 'collapsed';
   const docked = state === 'open' && wide1280 && !overlay;
   const panel = docked || (overlay && shows);
-  const { data, error } = useActiveChats(shows && wide760 && (access.inbox || access.crm));
+  const { data, error, reload: reloadChats } = useActiveChats(shows && wide760 && (access.inbox || access.crm));
   const rows = data?.rows ?? null;
   const canInbox = data?.canInbox ?? access.inbox;
 
@@ -144,6 +146,8 @@ export function WhatsAppDock({
   const [scrollTo, setScrollTo] = useState<{ thread: string; message: string } | null>(null);
   /** Just replied in this chat: "Sent ✓ · Next needing reply: …". */
   const [sent, setSent] = useState<string | null>(null);
+  /** …or scheduled it (Send later, the late-night rule): when it goes. */
+  const [sentAt, setSentAt] = useState<string | null>(null);
   const panelRef = useRef<HTMLElement>(null);
   const opener = useRef<Element | null>(null);
 
@@ -532,7 +536,7 @@ export function WhatsAppDock({
             />
             {sent === openRow.threadId && (
               <p className="hxd-sent" role="status">
-                Sent ✓
+                {sentAt ? `Scheduled for ${atWords(new Date(sentAt), new Date(now))} ✓` : 'Sent ✓'}
                 {nextUp && (
                   <>
                     {' · Next needing reply: '}
@@ -563,7 +567,12 @@ export function WhatsAppDock({
                 focusKey={paneFocus(openRow.threadId)}
                 scrollToMessage={paneScroll(openRow.threadId)}
                 alsoRead={openRow.unreadIds}
-                onSent={() => setSent(openRow.threadId)}
+                onSent={(at) => {
+                  setSent(openRow.threadId);
+                  setSentAt(at ?? null);
+                  // The list catches up now (Scheduled 07:00, no longer needing a reply), not at its next look.
+                  void reloadChats();
+                }}
                 notice={
                   wrongCustomer && jobHere ? (
                     <div className="hxd-wrong" role="note">

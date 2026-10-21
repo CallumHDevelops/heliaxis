@@ -6,6 +6,7 @@ import { buildTracker } from './tracker';
 import { portalMode } from './stages';
 import { stripeConfigured } from '@/lib/stripe';
 import { portalHandover } from '@/lib/handover/portal';
+import { mergedInto } from './aliases';
 
 const TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -39,7 +40,13 @@ const isSigned = (p: { accepted_at?: unknown }, docs: DocRow[]) =>
 export async function loadPortal(token: string) {
   if (!TOKEN.test(token)) return null;
   const db = createAdminClient();
-  const { data: p } = await db.from('crm_projects').select('*').eq('portal_token', token).maybeSingle();
+  let { data: p } = await db.from('crm_projects').select('*').eq('portal_token', token).maybeSingle();
+  // The link of a job joined into another (src/lib/crm/merge.ts): that job's portal, on its own link from here.
+  if (!p) {
+    const hit = await mergedInto('portal_token', token, db);
+    if (hit?.project_id) ({ data: p } = await db.from('crm_projects').select('*').eq('id', hit.project_id).not('portal_token', 'is', null).maybeSingle());
+    if (p) token = String(p.portal_token);
+  }
   const mode = portalMode(p?.stage as string | undefined);
   if (!p || !mode) return null;
   const full = mode === 'full';

@@ -20,7 +20,7 @@ You in the app ──▶ /api/whatsapp/conversations/<id> ──▶ WhatsApp Clo
 
 ## 1. Database
 
-Run `supabase/whatsapp.sql`, then `supabase/whatsapp-chasers.sql` and `supabase/whatsapp-media.sql`, in the Supabase SQL editor. Then turn on the **pg_cron** and **pg_net**
+Run `supabase/whatsapp.sql`, then `supabase/whatsapp-chasers.sql`, `supabase/whatsapp-media.sql` and `supabase/whatsapp-scheduled.sql`, in the Supabase SQL editor. Then turn on the **pg_cron** and **pg_net**
 extensions (Database → Extensions) and run the `cron.schedule(...)` block at the bottom of that file,
 with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody has the app open.
 (Vercel's Hobby plan only allows daily crons, so Supabase triggers this one.)
@@ -122,6 +122,23 @@ Redeploy after adding them.
   - can have an optional final nudge (off by default), which keeps to the same hours;
   - are checked again just before they go, so one queued under older settings still waits for the
     morning. **Send now** in the chat always sends straight away.
+- **Send later** (once `whatsapp-scheduled.sql` has been run): the clock beside **Send** offers
+  tomorrow 07:00, 08:45 or 09:30 (Monday instead of a Sunday) or any date and time, for typed
+  messages and templates alike. It waits in the chat as "Scheduled for 07:00 tomorrow", where whoever
+  wrote it (or an admin) can **Edit**, **Send now** or **Cancel**; the chat lists say "Scheduled 07:00".
+  It goes at that time as them, quiet hours or not (it was their choice), and a chaser picked with it
+  counts from then (each Send later choice says when that would be). A chaser already waiting stays
+  until it goes, so cancelling it never leaves the chat unchased. If the customer writes first it
+  stays scheduled and its author gets one push, replaced by "went at 07:00" once it goes; their new
+  message puts the chat back in *Needs reply*. STOP cancels it and tells its author. A typed message
+  can only be scheduled inside the free 24h window: past it, the chat (and Metis's draft card) offers
+  to send it now, pick an earlier time, or schedule a template. If the window has closed by the time
+  it's due (they went quiet), it isn't sent: it shows as failed with the reason and its author is told.
+  Documents from a job still go straight away (late at night the button says so).
+- **The late-night rule** (Smart replies → Chasers, on by default): a message typed after 20:30, or in
+  the small hours, waits until 07:00 the next morning (UK time). While it applies, the button reads
+  **Send** with "at 07:00" under it (**Send at 07:00** on the job's WhatsApp sheet; Ctrl/⌘ + Enter does
+  the same), with **Send now instead** beside it.
 - **Photos, videos, voice notes and files** customers send show in the chat (once
   `whatsapp-media.sql` has been run). WhatsApp only keeps them for 7 days, so each one is downloaded
   as it arrives and kept in a private storage bucket, `whatsapp-media` (the app creates it). Tap a
