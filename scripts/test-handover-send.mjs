@@ -27,7 +27,7 @@ const STUBS = {
   '@/lib/crm/server': `
     export const DOCS_BUCKET = 'crm-docs'; export const CRM_BUCKET = 'crm-photos'; export const MAX_DOC_BYTES = 25 * 1024 * 1024;
     export const DOC_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
-    export const isUuid = (s) => /^[0-9a-f-]{36}$/i.test(s);
+    export const isUuid = (s) => /^[0-9a-f-]{36}$/i.test(s); export const thumbPath = (p) => p;
     export const safeName = (n) => (n || 'document').replace(/[^\\w.\\- ]+/g, '').replace(/\\s+/g, '-').slice(0, 80) || 'document';
     export async function ensureDocsBucket() {} export async function fingerprintDocument() { return null; }
     export async function docCategoryOf(v, fallback = 'other') { return typeof v === 'string' && v ? v : fallback; }
@@ -57,6 +57,17 @@ const STUBS = {
     export async function closeSourceTask(db, p, key) { globalThis.__rec.closed.push(key); }
     export function addDaysYmd(ymd, n) { const d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }`,
   '@/lib/handover/read': `export async function readMcsNumber() { return 'MCS-00998877'; }`,
+  // The electrician's documents are made from their sign-off (test-site-electrician has the real
+  // thing, force included); here Regenerate's call is recorded and the new version stored as it would be.
+  '@/lib/site/electrician-docs': `
+    import { saveGenerated } from '${SRC}lib/documents/store.ts';
+    export async function saveElectricianDocs(db, id, opts = {}) {
+      globalThis.__rec.siteDocs.push({ id, ...opts });
+      const a = db.rows('site_assignments').find((x) => x.id === id);
+      const out = [];
+      for (const slot of opts.force ?? []) out.push(await saveGenerated(db, a.project_id, { key: slot, name: 'HX-0042 ' + slot + '.pdf', bytes: globalThis.__siteDoc.bytes, inputs: globalThis.__siteDoc.inputs, category: 'commissioning', slot, release: 'with_pack', visible: false, force: !!opts.force?.includes(slot), by: opts.by ?? null }));
+      return out;
+    }`,
 };
 registerHooks({
   resolve(specifier, context, next) {
@@ -182,7 +193,7 @@ function fakeDb() {
 }
 
 globalThis.__after = [];
-globalThis.__rec = { email: [], whatsapp: [], notify: [], tasks: [], closed: [], activity: [], moves: [], rpc: [] };
+globalThis.__rec = { email: [], whatsapp: [], notify: [], tasks: [], closed: [], activity: [], moves: [], rpc: [], siteDocs: [] };
 globalThis.__today = '2026-11-03';
 const db = (globalThis.__db = fakeDb());
 const runAfter = async () => {
@@ -250,7 +261,7 @@ db.t.cms_kv = [
 ];
 const contact = { id: randomUUID(), name: 'Dave Price', company: 'Price Electrical', part_p_by: 'heliaxis' };
 db.rows('site_contacts').push(contact);
-const ea = { id: randomUUID(), project_id: pid, contact_id: contact.id, trade: 'electrician', status: 'done', created_at: '2026-11-01T00:00:00Z', flags: [], answers: { f78_kind: { v: 'initial' }, eess_backup: { v: 'yes' }, CERT_NO: { v: 'HX-0042-EIC' }, f43_iso_loc: { v: ['Built into the inverter'] } } };
+const ea = { id: randomUUID(), project_id: pid, contact_id: contact.id, trade: 'electrician', cert_route: 'own', status: 'done', created_at: '2026-11-01T00:00:00Z', flags: [], answers: { f78_kind: { v: 'initial' }, eess_backup: { v: 'yes' }, CERT_NO: { v: 'HX-0042-EIC' }, f43_iso_loc: { v: ['Built into the inverter'] } } };
 db.rows('site_assignments').push(ea);
 db.files.set('crm-docs/signatures/p/site-s1.png', SIG);
 db.files.set('crm-docs/signatures/p/cust.png', SIG);
@@ -383,6 +394,22 @@ eq('the guarantee is in their portal now (released at Send)', portal.groups.flat
 const v = cur('PACK').version;
 await upload('Schematic', await simplePdf('Schematic'), { handover_slot: 'CC10' });
 eq('an upload after Send: the pack rebuilt by itself, released at once', [cur('PACK').version, cur('PACK').visible], [v + 1, true]);
+
+// After Send the electrician's F43 is the customer's; a reading is corrected and they sign again, so
+// the store marks it Out of date (newer inputs than the customer's copy). Regenerate on F43 makes it
+// again from the sign-off, releases it into their portal and rebuilds the pack.
+const ST = await import('../src/lib/documents/store.ts');
+globalThis.__siteDoc = { bytes: await simplePdf('PV Array Test Report (corrected)'), inputs: { doc: 'F43', corrected: true } };
+const f43Before = cur('F43');
+db.rows('handover_slots').push({ project_id: pid, slot: 'F43', na: false, data: { stale: { key: 'F43', hash: ST.inputsHash(globalThis.__siteDoc.inputs), at: '2026-11-04T09:00:00Z' } } });
+const hv5 = await H.handoverView(db, pid);
+eq('F43 behind its sign-off after it went: Out of date (it’s the electrician’s: maker site)', [hv5.slots.find((s) => s.code === 'F43').state, hv5.slots.find((s) => s.code === 'F43').maker], ['stale', 'site']);
+const packBefore = cur('PACK').version;
+const regen = await post({ action: 'regenerate', slot: 'F43' });
+const f43After = cur('F43');
+eq('Regenerate on F43: made again by the site app for that item only, by whoever pressed it', globalThis.__rec.siteDocs, [{ id: ea.id, force: ['F43'], by: 'staff-1' }]);
+eq('…the new version in their portal, the old one archived, nothing Out of date, the pack rebuilt', [regen.status, f43After.version, f43After.visible, !!docs().find((d) => d.id === f43Before.id).archived_at, regen.body.slots.find((s) => s.code === 'F43').state, cur('PACK').version], [200, 2, true, true, 'complete', packBefore + 1]);
+eq('…and logged', globalThis.__rec.activity.includes('Handover pack: Solar PV Array Test Form made again'), true);
 
 /* ── 6. Payments and the receipt ───────────────────────────────────────────── */
 const pay = await post({ action: 'record-payment', amount_pence: 900000, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042', kind: 'final' });

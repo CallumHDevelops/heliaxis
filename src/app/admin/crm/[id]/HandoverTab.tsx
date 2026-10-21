@@ -211,7 +211,8 @@ export function HandoverTab({
     const sheetId = s.code === 'F47' ? v.helpers.f47Sheet : s.code === 'F76' ? v.helpers.f76Sheet : null;
     if (sheetId && s.state !== 'na') helpers.push({ label: s.code === 'F47' ? 'G98 data sheet' : 'G99 data sheet', run: () => void window.open(`/api/crm/documents/${sheetId}`, '_blank', 'noopener') });
     if (s.code === 'CC13') helpers.push({ label: 'Final invoice and payments', run: () => setSheet({ kind: 'invoice' }), fix: 'invoice' });
-    const regen = s.maker === 'pack' && s.kind !== 'C' && s.docs.some((d) => d.source === 'generated');
+    // Ours, or the electrician's (F43…: made again from their sign-off, after a correction once the customer has it).
+    const regen = (s.maker === 'pack' || s.maker === 'site') && s.kind !== 'C' && s.docs.some((d) => d.source === 'generated');
     return (
       <div className={inSheet ? 'hv-acts hv-acts--sheet' : 'hv-acts'}>
         {s.docs.map((d) => (

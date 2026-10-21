@@ -79,8 +79,16 @@ export async function POST(req: Request, { params }: Ctx) {
         break;
       case 'regenerate': {
         if (!slot) return json({ error: 'Which item?' }, 400);
+        // The electrician's own documents (F43…) are made by the site app, from their sign-off.
+        let siteMade = false;
+        if (slotDef(slot)?.maker === 'site') {
+          const { saveElectricianDocs } = await import('@/lib/site/electrician-docs');
+          const { data: els } = await db.from('site_assignments').select('id').eq('project_id', id).eq('trade', 'electrician').neq('status', 'cancelled');
+          for (const e of (els ?? []) as { id: string }[]) siteMade = (await saveElectricianDocs(db, e.id, { force: [slot], by })).some((x) => x.status === 'saved') || siteMade;
+        }
+        // Released into their portal once the pack has gone, and the pack rebuilt.
         const r = await refreshHandover(db, id, { by, force: [slot] });
-        if (r.made.length) await log(`Handover pack: ${slotDef(slot)?.title} made again`);
+        if (r.made.length || siteMade) await log(`Handover pack: ${slotDef(slot)?.title} made again`);
         else notes.push('Nothing to make: it’s up to date, or it still needs something (see the row).');
         break;
       }

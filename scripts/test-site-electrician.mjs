@@ -518,6 +518,21 @@ eq('the handover pack is told: their certificate’s reference, F78 "initial" (f
   eq('after the design part is signed: every print version still made, with the same words', afterDesign.sort(), ['F43', 'F44', 'F44A', 'F74', 'F75']);
   const again = await ED.saveElectricianDocs(db, e1.id);
   eq('…and the documents aren’t made again for it (nothing they print changed)', again.map((r) => r.status), ['same', 'same', 'same', 'same', 'same']);
+
+  // After the pack has gone (the documents are the customer's), a reading is put right: each one is
+  // Out of date, never replaced by itself, and the office's Regenerate on F43 makes just F43 again.
+  for (const d of db.rows('crm_documents').filter((x) => x.project_id === p1.id && ['F43', 'F44', 'F44A', 'F74', 'F75'].includes(x.generated_key) && !x.archived_at)) Object.assign(d, { visible: true, release: 'now' });
+  const voc = [...e1.answers.f43_test_voc.v];
+  voc[0] = 394.9;
+  e1.answers.f43_test_voc = { v: voc, src: 'typed', at: '2026-11-07T09:00:00Z' };
+  const behind = await ED.saveElectricianDocs(db, e1.id);
+  const oldF43 = db.rows('crm_documents').find((x) => x.project_id === p1.id && x.generated_key === 'F43' && !x.archived_at);
+  eq('a correction after the customer has them: each Out of date, none replaced', [behind.map((r) => r.status), db.rows('handover_slots').some((s) => s.project_id === p1.id && s.slot === 'F43' && s.data?.stale?.key === 'F43')], [['out_of_date', 'out_of_date', 'out_of_date', 'out_of_date', 'out_of_date'], true]);
+  const regen = await ED.saveElectricianDocs(db, e1.id, { force: ['F43'], by: 'staff-1' });
+  const newF43 = db.rows('crm_documents').find((x) => x.project_id === p1.id && x.generated_key === 'F43' && !x.archived_at);
+  eq('Regenerate on F43: only F43 made again (v2, held to be released), the old one archived', [regen.map((r) => [r.doc.generated_key, r.status]), newF43.version, newF43.release, !!db.rows('crm_documents').find((x) => x.id === oldF43.id).archived_at], [[['F43', 'saved']], 2, 'with_pack', true]);
+  eq('…from the corrected answers, so it isn’t Out of date any more', newF43.inputs_hash === db.rows('handover_slots').find((s) => s.project_id === p1.id && s.slot === 'F43').data.stale.hash, true);
+  eq('…and its print version follows the new copy', (await ED.electricianDocPrint(db, ref(newF43))) instanceof Uint8Array, true);
 }
 
 // An EV job signed the day before Christmas: the call skips the bank holidays; the DNO to-do.

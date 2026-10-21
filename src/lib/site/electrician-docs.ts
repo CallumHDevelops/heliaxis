@@ -148,8 +148,12 @@ async function pagesPdf(images: { bytes: Uint8Array; mime: string }[], title: st
   return doc.save();
 }
 
-/** Make and store the electrician's documents (after the sign-off, and again by the cron if it failed). */
-export async function saveElectricianDocs(db: Db, assignmentId: string): Promise<SaveResult[]> {
+/**
+ * Make and store the electrician's documents (after the sign-off, and again by the cron if it
+ * failed). `force`: the handover items the office pressed Regenerate on (F43…), made again even
+ * though the customer has the old version (only those); `by`: who pressed it.
+ */
+export async function saveElectricianDocs(db: Db, assignmentId: string, opts: { force?: string[]; by?: string | null } = {}): Promise<SaveResult[]> {
   const a = await readAssignment(db, assignmentId);
   if (!a || a.trade !== 'electrician') return [];
   const built = await electricianInput(db, a);
@@ -159,6 +163,7 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
   const out: SaveResult[] = [];
   for (const d of ELECTRICIAN_DOCS) {
     if (!a.forms.includes(d.section) || !d.products.some((p) => products.includes(p))) continue;
+    if (opts.force && !opts.force.includes(d.slot)) continue;
     const bytes = await d.make(input);
     out.push(
       await saveGenerated(db, a.project_id, {
@@ -170,11 +175,13 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
         slot: d.slot,
         release: 'with_pack',
         visible: false,
+        force: !!opts.force?.includes(d.slot),
+        by: opts.by ?? null,
       })
     );
   }
   // Their own certificate, as photos of its pages (a PDF they uploaded is filed already).
-  if (certRouteOf(input.ctx) === 'own') {
+  if (certRouteOf(input.ctx) === 'own' && (!opts.force || opts.force.includes('CC21'))) {
     const pdfs = (await tradeFiles(db, a)).filter((f) => f.slot === 'CERT_FILE');
     const { data: ph } = await db.from('crm_photos').select('id, storage_path').eq('assignment_id', a.id).eq('slot', 'CERT_FILE').order('created_at');
     const photos = (ph ?? []) as { id: string; storage_path: string }[];
@@ -196,6 +203,8 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
           slot: 'CC21',
           release: 'with_pack',
           visible: false,
+          force: !!opts.force?.includes('CC21'),
+          by: opts.by ?? null,
         })
       );
     }
