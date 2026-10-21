@@ -249,7 +249,8 @@ export async function previewMerge(ask: MergeAsk, by: By): Promise<MergePreview>
   const l = await load(ask);
   const choices = choicesFor(l, ask.choices);
   const planned = planFor(l, ask, choices, by, true);
-  const dry = await rpc(l.db, planned.plan);
+  // Two of one customer's jobs that can't be joined: nothing to run, the sheet says why.
+  const dry = planned.plan.merge || planned.plan.joins.length ? await rpc(l.db, planned.plan) : { summary: {}, cancelled: {} };
   const { needsAdmin, bothSigned } = access(l);
   const kept = planned.kept.customer;
   return {

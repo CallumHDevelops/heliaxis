@@ -112,6 +112,21 @@ export function summaryWords(summary: Record<string, number> | null | undefined)
     .join(', ');
 }
 
+/** What a merge closes or drops ({table: n} from crm_merge()), in words: "1 automatic WhatsApp waiting to go". */
+export function cancelledWords(cancelled: Record<string, number> | null | undefined): string {
+  const words: Record<string, [string, string]> = {
+    whatsapp_outbox: ['automatic WhatsApp waiting to go', 'automatic WhatsApps waiting to go'],
+    survey_bookings: ['survey booking', 'survey bookings'],
+    crm_surveys: ['empty survey', 'empty surveys'],
+    tasks: ['automatic task already on the job', 'automatic tasks already on the job'],
+    crm_documents: ['quote no longer waiting to be signed', 'quotes no longer waiting to be signed'],
+  };
+  return Object.entries(cancelled ?? {})
+    .filter(([, n]) => Number(n) > 0)
+    .map(([t, n]) => `${n} ${(words[t] ?? [t, t])[Number(n) === 1 ? 0 : 1]}`)
+    .join(', ');
+}
+
 /** Storage folders to move: each job joined into another, and the merged-away customer's WhatsApp files. */
 export function folderMoves(p: { merge: string | null; keep: string; joins: { from: string; into: string }[] }): { bucket: string; from: string; to: string }[] {
   const out: { bucket: string; from: string; to: string }[] = [];
@@ -813,8 +828,23 @@ export function planMerge(input: {
       joins.push(view);
     }
   } else if (input.jobPair) {
+    // Two of one customer's jobs: the one picked, joined with the other unless something blocks it.
     const [goes, into] = input.jobPair.map((id) => byId.get(id));
-    if (goes && into) pairs.push({ x: into, y: goes, credit: choices.credit?.[goes.job.id] ?? 'into' });
+    if (goes && into) {
+      const blocked = pairBlockers(into, goes);
+      const opt = (f: JobFacts) => ({ id: f.job.id, ref: f.job.project_ref ?? null, title: f.job.title, stage: f.job.stage, blocked });
+      joins.push({
+        job: { id: goes.job.id, ref: goes.job.project_ref ?? null, title: goes.job.title, stage: goes.job.stage, products: goes.job.products ?? [] },
+        with: blocked.length ? null : into.job.id,
+        why: blocked[0] ?? 'Two jobs for the same customer',
+        options: [opt(into)],
+        stays: null,
+        credit: 'into',
+        creditWords: null,
+        notes: [],
+      });
+      if (!blocked.length) pairs.push({ x: into, y: goes, credit: choices.credit?.[goes.job.id] ?? 'into' });
+    }
   }
 
   const joinPlans: JoinPlan[] = [];

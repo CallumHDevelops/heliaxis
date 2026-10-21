@@ -25,6 +25,8 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
 10. `supabase/whatsapp-feed-index.sql` (optional, any time after `whatsapp.sql`) — makes the WhatsApp
    rows in **Latest notes** load faster once there are lots of messages (section 15). Nothing depends
    on it.
+11. `supabase/merge.sql` (after `customer-refs.sql`) — merging duplicate customers and their jobs
+   (section 17). Until it's run, **Merge** says it needs this step and nothing else changes.
 
 Until 5 to 8 are run the CRM works as before; the new screens appear once their file is done.
 
@@ -403,3 +405,41 @@ emails are already there. Every job from **Won** to **Complete** is a project.
   their last job, the customer stays in Enquiries; delete them there too if you want them gone.
 
 Needs `supabase/crm-v3.sql` (until then Projects shows a note and the CRM works as before).
+
+## 17. Merging duplicates
+
+When the same person is in the CRM twice (Rob came in from the website and again from a Meta ad, say),
+merge them into one.
+
+- **Where**: on their job's page, **⋯ → Merge with another customer…** (find the other one by name,
+  number, email or HX-ref), or **Merge…** on the *Looks like the same person as …* badge. In
+  Enquiries, **Select**, tick the two, then **Merge 2 selected**.
+- **The sheet** suggests which record stays (the one whose job is further on; a tie, the one that came
+  in first) and why, with **Swap**. For each detail where they differ (name, mobile, email, postcode)
+  it ticks the better one and says why: a mobile over a landline (WhatsApp needs one), a real name over
+  "Meta lead", a UK postcode over "88888". Tap the other to use it instead.
+- **Jobs**: when both have an open job for the same thing at the same address, the other one is
+  **joined into** the one that stays (it keeps the stage that's further on). Its notes, tasks, photos,
+  documents, surveys, bookings and next step come with it. Otherwise it stays as its own job, with its
+  own reference, under the kept customer. Pick either for each job. Two signed jobs, two projects, two
+  surveys with answers or two RAMS projects are never joined.
+- **What happens** lists what moves (WhatsApp messages, notes, tasks, photos…), what's cancelled (an
+  automatic WhatsApp still waiting for the other number, say), where WhatsApp replies will go and what
+  their WhatsApp permission ends up as (a STOP from either always stays). Anything marked with a box
+  needs a tick first. It can't be undone; the kept customer's timeline says what was merged, by whom.
+- **Afterwards**: the old reference (HX-0069), old links and notifications, the other number and email
+  all find the kept customer. A WhatsApp from the other number lands in their chat (and replies go to
+  that number from then on). Re-importing Meta leads doesn't bring the old record back, and Meta's
+  Conversions API still hears about the sale. Their card shows **Also came in via …** under Source, and
+  **Other numbers** (tap **Use for WhatsApp** to make one their main number, or **Remove**).
+- **Reports** still count both leads, each for its own source (so cost per lead for the ad stays right),
+  and the sale once, for the job that stays. The job row says which; tap to count it for the other
+  lead instead.
+- **Two of one customer's jobs** (made twice by mistake): **⋯ → Join this job with another of Rob's
+  jobs…**.
+- **Not the same person** (in **⋯** when the badge shows): the badge stops suggesting it, for partners
+  who share an email, say.
+- Records with a signed quote, a paid deposit or kit ordered can only be merged by an admin; when both
+  have signed paperwork, it asks for the kept reference to be typed.
+
+Needs `supabase/merge.sql`.

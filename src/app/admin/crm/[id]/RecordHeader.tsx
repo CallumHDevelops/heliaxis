@@ -37,6 +37,9 @@ export function RecordHeader({
   onName,
   onNewProject,
   onDelete,
+  onMerge,
+  onJoinJobs,
+  onNotSame,
 }: {
   project: Project;
   customer: Customer;
@@ -59,6 +62,10 @@ export function RecordHeader({
   onName: () => void;
   onNewProject: () => void;
   onDelete: () => void;
+  /** Merge with another customer: the possible duplicate's id, or null to find one. */
+  onMerge: (other: string | null) => void;
+  onJoinJobs: () => void;
+  onNotSame: (other: string) => void;
 }) {
   const sentinel = useRef<HTMLDivElement>(null);
   const [stuck, setStuck] = useState(false);
@@ -80,10 +87,16 @@ export function RecordHeader({
       {project.on_hold && <span className="crmr-badge crmr-badge--hold">On hold{project.hold_reason ? `: ${project.hold_reason}` : ''}</span>}
       {project.stage === 'lost' && <span className="crmr-badge crmr-badge--lost">Lost</span>}
       {dupe && (
-        <Link className="crmr-badge crmr-badge--dupe" href={dupe.project_id ? `/admin/crm/${dupe.project_id}` : '/admin/crm'}>
-          Possible duplicate of {dupe.name}
-          {dupe.project_ref ? ` (${dupe.project_ref})` : ''}
-        </Link>
+        <span className="crmr-badge crmr-badge--dupe">
+          <Link href={dupe.project_id ? `/admin/crm/${dupe.project_id}` : '/admin/crm'}>
+            Looks like the same person as {dupe.name}
+            {dupe.project_ref ? ` (${dupe.project_ref})` : ''}
+          </Link>
+          {dupe.why && <span className="crmr-badge__why"> · {DUPE_WHY[dupe.why]}</span>}
+          <button type="button" className="crmr-badge__act" onClick={() => onMerge(dupe.enquiry_id)}>
+            Merge…
+          </button>
+        </span>
       )}
     </>
   );
@@ -130,6 +143,9 @@ export function RecordHeader({
             items={[
               ...primary.menu.map((m) => ({ label: m.label, run: () => onPrimary(m.action) })),
               { label: `New project for ${firstName(customer.name) || 'them'}`, run: onNewProject },
+              { label: 'Merge with another customer…', run: () => onMerge(null) },
+              ...(others.length ? [{ label: `Join this job with another of ${firstName(customer.name) || 'their'}’s jobs…`, run: onJoinJobs }] : []),
+              ...(dupe ? [{ label: `Not the same person as ${dupe.name}`, run: () => onNotSame(dupe.enquiry_id) }] : []),
               {
                 label: 'Copy link to this job',
                 run: () => {
@@ -312,6 +328,13 @@ function StagePath({
     </nav>
   );
 }
+
+/** Why two records look like one person (src/lib/projects/duplicates.ts). */
+const DUPE_WHY: Record<NonNullable<Duplicate['why']>, string> = {
+  email: 'same email',
+  number: 'same number',
+  booking: 'booked online with the same details',
+};
 
 /** ⋯: a small menu of the rarer actions. Esc or a click elsewhere closes it. */
 function MoreMenu({ items }: { items: { label: string; run: () => void; danger?: boolean }[] }) {
