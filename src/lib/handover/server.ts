@@ -211,18 +211,22 @@ async function attachLibrary(db: Db, l: Loaded, by: string | null): Promise<numb
   return n;
 }
 
-export type RefreshResult = { made: string[]; stale: string[]; attached: number; released: number; rebuilt: boolean };
+export type RefreshResult = { made: string[]; stale: string[]; attached: number; released: number; rebuilt: boolean; archived: number };
+
+/** A generator's current (not archived) document on the job, the newest version. */
+const currentOf = (l: Loaded, key: string) => l.docs.filter((d) => d.generated_key === key && !d.archived_at).sort((a, b) => Number(b.version) - Number(a.version))[0];
 
 /**
  * Make what can be made now (SPEC 2.13 item 6, 4.5): each of the pack's own documents whose inputs
  * changed, as a new version (saveGenerated keeps the old one, archived). One the customer already
  * has is left alone and shows Out of date, unless the office pressed Regenerate (`force`) or it's
- * one that should follow its data (the cover letter, warranty and receipt). Then the library's files,
- * and once the pack has gone, anything new is released straight into the portal and the combined
- * PDF rebuilt.
+ * one that should follow its data (the cover letter, warranty and receipt). One made for an item that
+ * has stopped applying since (marked Not needed, the DNO route changed) is archived before the
+ * customer has it, so it never goes out with the pack. Then the library's files, and once the pack
+ * has gone, anything new is released straight into the portal and the combined PDF rebuilt.
  */
 export async function refreshHandover(db: Db, projectId: string, opts: { by?: string | null; force?: string[]; rebuild?: boolean } = {}): Promise<RefreshResult> {
-  const out: RefreshResult = { made: [], stale: [], attached: 0, released: 0, rebuilt: false };
+  const out: RefreshResult = { made: [], stale: [], attached: 0, released: 0, rebuilt: false, archived: 0 };
   let l = await loadHandover(db, projectId);
   if (!l) return out;
   out.attached = await attachLibrary(db, l, opts.by ?? null);
@@ -232,9 +236,16 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
   const make = async (g: Gen, at: Loaded) => {
     const { views, made } = statesOf(at);
     const m = made.get(g.key);
-    if (!m?.ok || !genApplies(g, at, views)) return;
+    const cur = currentOf(at, g.key);
+    const applies = genApplies(g, at, views);
+    if (g.slot && cur && !cur.visible && !applies) {
+      // It stopped applying before the customer had it: out of the pack (kept, archived). Needed after all: made again.
+      await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: opts.by ?? null }).eq('id', cur.id);
+      out.archived++;
+      return;
+    }
+    if (!m?.ok || !applies) return;
     const hash = hashOf(g, m.input);
-    const cur = at.docs.filter((d) => d.generated_key === g.key && !d.archived_at).sort((a, b) => Number(b.version) - Number(a.version))[0];
     if (cur?.inputs_hash === hash) return;
     const force = !!opts.force?.includes(g.key) || !!(g.slot && opts.force?.includes(g.slot)) || !!g.live;
     if (cur?.visible && !force) {
@@ -258,7 +269,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
   };
   for (const g of GENS) if (g.key !== 'F07BI') await make(g, l);
   // The cover letter lists every other item's state, so it's made from what's there now.
-  if (out.made.length) l = (await loadHandover(db, projectId))!;
+  if (out.made.length || out.archived) l = (await loadHandover(db, projectId))!;
   await make(GENS.find((g) => g.key === 'F07BI')!, l);
   if (sent) {
     // After the pack has gone, anything new for it goes straight into the portal.
@@ -272,7 +283,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
       .select('id');
     out.released = data?.length ?? 0;
   }
-  if (out.made.length || out.attached || out.released) l = (await loadHandover(db, projectId))!;
+  if (out.made.length || out.attached || out.released || out.archived) l = (await loadHandover(db, projectId))!;
   if ((sent || opts.rebuild) && l.pack?.version && packKey(l) !== currentPack(l)?.inputs_hash) {
     await buildHandover(db, projectId, { by: opts.by ?? null, auto: true });
     out.rebuilt = true;
@@ -449,8 +460,11 @@ function isDirty(l: Loaded, views: SlotView[], made: Map<string, Made<unknown>>)
   const pack = currentPack(l);
   const behindGen = GENS.some((g) => {
     const m = made.get(g.key);
-    if (!m?.ok || !genApplies(g, l, views)) return false;
-    const cur = l.docs.filter((d) => d.generated_key === g.key && !d.archived_at).sort((a, b) => Number(b.version) - Number(a.version))[0];
+    const cur = currentOf(l, g.key);
+    const applies = genApplies(g, l, views);
+    // Made for an item that has stopped applying, not with the customer yet: to archive.
+    if (g.slot && cur && !cur.visible && !applies) return true;
+    if (!m?.ok || !applies) return false;
     return cur?.inputs_hash !== hashOf(g, m.input) && (!cur?.visible || !!g.live);
   });
   return (

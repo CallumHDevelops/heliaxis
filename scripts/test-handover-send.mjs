@@ -335,6 +335,14 @@ hv = await H.handoverView(db, pid);
 eq('the form as sent uploaded: Complete, the G98 notice ticked as sent', [hv.slots.find((s) => s.code === 'F47').state, hv.slots.find((s) => s.code === 'F47').docs.map((d) => d.id), globalThis.__rec.rpc.some(([n, k]) => n === 'crm_checklist_set' && k === 'c_dno_notified')], ['complete', [g98.document.id], true]);
 eq('…and the portal stops asking for a G98 signature', (await P.portalHandover(pid)).signs.map((x) => x.kind), []);
 
+// Not needed after it was made: the document made for it leaves the pack (archived, kept) before the customer has it.
+const f49 = cur('F49');
+const na = await post({ action: 'na', slot: 'F49', reason: 'Other: covered by the maintenance plan' });
+eq('marked Not needed: its made document archived, not on the item', [na.status, !!docs().find((d) => d.id === f49.id).archived_at, na.body.slots.find((s) => s.code === 'F49').state, na.body.slots.find((s) => s.code === 'F49').docs.length], [200, true, 'na', 0]);
+eq('…and nothing left to catch up', na.body.dirty, false);
+const back = await post({ action: 'restore', slot: 'F49' });
+eq('Needed after all: made again as the next version', [back.body.slots.find((s) => s.code === 'F49').state, cur('F49')?.version], ['complete', 2]);
+
 /* ── 3. Build ──────────────────────────────────────────────────────────────── */
 const b1 = await post({ action: 'build' });
 const pack1 = cur('PACK');
