@@ -41,7 +41,8 @@ const STUBS = {
   '@/lib/projects/server': `
     export const projectRow = (raw) => ({ ...raw, products: raw.products ?? [], checklist: raw.checklist ?? {}, paperwork: raw.paperwork ?? {}, system: raw.system ?? {}, reminders_sent: [] });
     import { addWorkingDays, ukDay } from '${SRC}lib/bank-holidays.ts';
-    export async function calendarNow() { return { today: globalThis.__today, hols: new Set(), addWorkingDays, ukDay }; }`,
+    export async function calendarNow() { return { today: globalThis.__today, hols: new Set(), addWorkingDays, ukDay }; }
+    export async function ensureDeadlineTasks(id) { globalThis.__rec.deadlines.push(id); return 0; }`,
   '@/lib/notify': 'export async function notify(n) { globalThis.__rec.notify.push(n.title); }',
   '@/lib/schema-ready': 'export async function schemaReady() { return { site: true, handover: globalThis.__handover !== false, purchaseOrders: true }; }',
   '@/lib/whatsapp/inbox': `export async function sendSystem(enquiryId, msg, via) { globalThis.__rec.whatsapp.push({ template: msg.template, params: msg.params, via }); return { ok: true }; }`,
@@ -193,7 +194,7 @@ function fakeDb() {
 }
 
 globalThis.__after = [];
-globalThis.__rec = { email: [], whatsapp: [], notify: [], tasks: [], closed: [], activity: [], moves: [], rpc: [], siteDocs: [] };
+globalThis.__rec = { email: [], whatsapp: [], notify: [], tasks: [], closed: [], activity: [], moves: [], rpc: [], siteDocs: [], deadlines: [] };
 globalThis.__today = '2026-11-03';
 const db = (globalThis.__db = fakeDb());
 const runAfter = async () => {
@@ -334,6 +335,12 @@ eq('MCS certificate in the pack, in their portal at once, its number offered', [
 let portal = await P.portalHandover(pid);
 const shownIds = portal.groups.flatMap((g) => g.items.flatMap((i) => i.docs.map((d) => d.id)));
 eq('the portal shows it straight away, and nothing that’s held', [shownIds.includes(mcs.document.id), shownIds.length], [true, 1]);
+// The certificate is in, so the guarantee is next: its 7 days start the day it's uploaded (no registered date on the job).
+const cc16 = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'CC16');
+eq('the MCS certificate uploaded: registered today, the guarantee Missing with its 7-day deadline and task', [db.rows('crm_projects')[0].paperwork.mcs_registered_on, cc16.state, cc16.fix, cc16.due, globalThis.__rec.deadlines.includes(pid)], ['2026-11-03', 'missing', 'upload', '2026-11-10', true]);
+// The number saved on its own (typed, or "Save it" from the read): the job save starts the same clock, unless a date comes with it.
+const jobRoute = fs.readFileSync(new URL('../src/app/api/crm/projects/[id]/route.ts', import.meta.url), 'utf8');
+eq('saving the MCS number with no registered date sets it to today', /'mcs_cert_no' in input && !\('mcs_registered_on' in input\) && m\.mcs_cert_no && !m\.mcs_registered_on\) m\.mcs_registered_on = \(await calendarNow\(\)\)\.today/.test(jobRoute), true);
 const held = await upload('Guarantee', await simplePdf('Guarantee'), { handover_slot: 'CC16', hold: true });
 portal = await P.portalHandover(pid);
 eq('"Hold it until the pack is sent": hidden', portal.groups.flatMap((g) => g.items.flatMap((i) => i.docs.map((d) => d.id))).includes(held.document.id), false);

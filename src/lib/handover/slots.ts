@@ -655,7 +655,8 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       return { state: 'waiting', why: 'After the system is switched on.' };
     case 'CC16':
       if (docs.length) return docsState(docs);
-      if (p.mcs_registered_on) return { state: 'missing', why: `Buy the guarantee and upload the policy.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
+      // Once the MCS certificate is in (registered, its number saved or the certificate uploaded).
+      if (p.mcs_registered_on || p.mcs_cert_no || c.docs.some((x) => x.slot === 'CC17')) return { state: 'missing', why: `Buy the guarantee and upload the policy.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
       return { state: 'waiting', why: 'After the MCS certificate.' };
     case 'CC14':
       if (docs.length) return docsState(docs);

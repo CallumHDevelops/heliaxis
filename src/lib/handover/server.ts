@@ -923,6 +923,22 @@ export async function recordPayment(
     }).catch(() => null);
 }
 
+/**
+ * The MCS certificate is in (uploaded into CC17): it was registered by today, so the guarantee's 7
+ * days (deadlines.ts cc16, and its task) start today, unless the job already has a registered date
+ * (Job details shows it, to correct).
+ */
+export async function mcsRegistered(db: Db, projectId: string, by: string | null): Promise<boolean> {
+  const { data: p } = await db.from('crm_projects').select('paperwork').eq('id', projectId).maybeSingle();
+  const paperwork = (p?.paperwork ?? {}) as Record<string, unknown>;
+  if (!p || paperwork.mcs_registered_on) return false;
+  const { calendarNow, ensureDeadlineTasks } = await import('@/lib/projects/server');
+  const { error } = await db.from('crm_projects').update({ paperwork: { ...paperwork, mcs_registered_on: (await calendarNow()).today } }).eq('id', projectId);
+  if (error) return false;
+  await ensureDeadlineTasks(projectId, by);
+  return true;
+}
+
 /** "Sent to DNO" for the G98 data sheet ticks the checklist's G98 item (c_dno_notified). */
 export async function markDnoSent(db: Db, projectId: string, by: string | null, byName: string) {
   const value = { done_at: new Date().toISOString(), by_id: by, by: byName };

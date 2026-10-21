@@ -105,6 +105,8 @@ const waitsDesign = byCode(S.slotStates(ctx({ certWaits: 'Sign the EIC’s desig
 eq('the EIC made in the app, signed off but its design part not signed: Missing, open the Site tab (it blocks Send)', [waitsDesign.state, waitsDesign.fix, waitsDesign.why.startsWith('Sign the EIC’s design part'), S.SITE_SLOTS.includes('CC21')], ['missing', 'site', true, true]);
 eq('MCS certificate: Waiting, due in 10 working days', [part.CC17.state, part.CC17.why, part.CC17.due], ['waiting', 'Due Tue 17 Nov (10 working days)', '2026-11-17']);
 eq('guarantee: Waiting until the MCS certificate', [part.CC16.state, part.CC16.why], ['waiting', 'After the MCS certificate.']);
+eq('guarantee: Missing once the MCS certificate’s number is saved, or the certificate is uploaded', [byCode(S.slotStates(ctx({ paperwork: { mcs_cert_no: 'MCS-123' } }))).CC16.state, byCode(S.slotStates(ctx({ docs: [doc('CC17', { source: 'upload', key: null })] }))).CC16.fix], ['missing', 'upload']);
+eq('…with its 7 days once they start', byCode(S.slotStates(ctx({ paperwork: { mcs_cert_no: 'MCS-123', mcs_registered_on: '2026-11-12' }, due: { ...ctx().due, cc16: '2026-11-19' } }))).CC16.why, 'Buy the guarantee and upload the policy. Due Thu 19 Nov (7 days).');
 eq('Building Control: Missing (Heliaxis notifies), due in 30 days', [part.CC14.state, part.CC14.fix], ['missing', 'notify-bc']);
 eq('Building Control by the electrician’s scheme: Waiting for them', byCode(S.slotStates(ctx({ partPBy: 'self' }))).CC14.why, 'Waiting for Dave to notify their scheme and send the reference.');
 eq('F78: Missing until the design part is signed', [part.F78.state, part.F78.fix], ['missing', 'sign-design']);
