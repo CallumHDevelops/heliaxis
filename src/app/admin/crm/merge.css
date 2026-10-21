@@ -1,9 +1,34 @@
-/* The record header's possible-duplicate badge, with Merge… beside the name (it never gets cut off). */
+/* ⋯ has longer items now (Merge with another customer…, Join this job with another of Rob's jobs…). */
+.crmr-more__list {
+  min-width: 290px;
+  max-width: min(340px, calc(100vw - 32px));
+}
+.crmr-more__list button {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  line-height: 1.3;
+}
+
+/* The record header's possible-duplicate badge, with Merge… beside the name (it never gets cut off).
+   In the pinned row there's only room for who; under the name on phones it wraps and says why. */
 .crmr-badge.crmr-badge--dupe {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 480px;
+  max-width: 360px;
+}
+.crmr-badges--a .crmr-badge__why {
+  display: none;
+}
+.crmr-badges--b .crmr-badge.crmr-badge--dupe {
+  flex-wrap: wrap;
+  max-width: 100%;
+  white-space: normal;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.crmr-badges--b .crmr-badge--dupe > a {
+  white-space: normal;
 }
 .crmr-badge--dupe > a,
 .crmr-badge__why {
@@ -254,6 +279,7 @@
 .mrg-list {
   margin: 0;
   padding-left: 1.1rem;
+  list-style: disc;
   font-size: 0.88rem;
   line-height: 1.5;
 }
@@ -293,6 +319,8 @@
     height: 100dvh;
     max-height: 100dvh;
     border-radius: 0;
+    /* The buttons' own bar pins to the very bottom (a sticky bar keeps clear of the box's padding). */
+    padding-bottom: 0;
   }
   .mrg-cards {
     grid-template-columns: 1fr;

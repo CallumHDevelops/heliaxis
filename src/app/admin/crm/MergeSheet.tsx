@@ -363,7 +363,14 @@ function Join({ j, jobMode, onWith, onCredit }: { j: JoinView; jobMode: boolean;
         {j.job.title && j.job.ref && <span className="crm-muted crm-small">{j.job.title}</span>}
       </div>
       {jobMode ? (
-        <p className="mrg-why">{j.with ? `Joined with ${label(j.options[0])}.` : `Can’t be joined: ${j.why}`}</p>
+        <p className="mrg-why">
+          {!j.with
+            ? `Can’t be joined: ${j.why}`
+            : j.stays === j.job.id
+              ? `${label(j.options[0])} is joined into ${label(j.job)}, which keeps its stage.`
+              : `${label(j.job)} is joined into ${label(j.options[0])}, which keeps its stage.`}
+          {j.with && j.notes.length > 1 ? ` ${j.notes.slice(0, -1).join(' ')}` : ''}
+        </p>
       ) : (
         <>
           <select className="crm-input mrg-job__pick" value={j.with ?? ''} onChange={(e) => onWith(e.target.value || null)} aria-label={`What happens to ${j.job.ref ?? 'this job'}`}>

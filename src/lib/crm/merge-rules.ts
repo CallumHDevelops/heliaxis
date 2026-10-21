@@ -950,7 +950,7 @@ export function planMerge(input: {
       const kept = others.length === 1 ? 'stays on their record as another number' : 'stay on their record as other numbers';
       warnings.push({ text: `WhatsApp replies will go to ${showPhone(wa.waId)}.${others.length ? ` ${others.join(', ')} ${kept}, for search and incoming messages.` : ''}` });
     }
-    if (other.outbox.automatic) warnings.push({ text: `${plural(other.outbox.automatic, 'automatic WhatsApp')} waiting to go to ${otherRef} ${other.outbox.automatic === 1 ? 'is' : 'are'} cancelled.` });
+    // Automatic WhatsApps cancelled: the database's dry run counts them ("Cancelled: …" in the sheet).
     for (const s of other.outbox.scheduled) {
       const when = new Date(s.at).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
       warnings.push({ text: `A message ${s.by ?? 'someone'} scheduled for ${when} will go to ${wa.waId ? showPhone(wa.waId) : 'the main number'}.` });
@@ -971,6 +971,10 @@ export function planMerge(input: {
   for (const f of contracts) {
     const what = [f.signed && 'a signed quote', f.paid && 'a paid deposit', f.ordersSent && plural(f.ordersSent, 'purchase order') + ' sent'].filter(Boolean).join(', ');
     warnings.push({ text: `${jobRef(f.job)} has ${what}.` });
+    // Signed by someone whose name isn't the one the record keeps: worth a look before merging.
+    const signedAs = text(f.job.accepted_name);
+    const keptName = text(merging ? valueOf('name') : K.name);
+    if (signedAs && !sameName(signedAs, keptName)) warnings.push({ text: `${jobRef(f.job)}’s quote was signed as “${signedAs}”, not ${keptName}.` });
   }
   for (const b2 of blockedPairs) warnings.push({ text: `Not joined: ${b2} They stay as separate jobs.` });
 

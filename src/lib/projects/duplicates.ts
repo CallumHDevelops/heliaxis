@@ -32,6 +32,8 @@ const TTL = 60_000;
 const PAGE = 1000;
 let index: Index | null = null;
 let pending: Promise<Index> | null = null;
+/** Bumped by resetDuplicateIndex, so a read started before a merge doesn't come back as the index. */
+let generation = 0;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -88,13 +90,19 @@ async function build(db: Db): Promise<Index> {
 
 /** After a merge: the next look reads everyone again. */
 export function resetDuplicateIndex() {
+  generation++;
   index = null;
+  pending = null;
 }
 
 async function currentIndex(db: Db): Promise<Index> {
   if (index && Date.now() - index.at < TTL) return index;
+  const gen = generation;
   pending ??= build(db)
-    .then((i) => (index = i))
+    .then((i) => {
+      if (gen === generation) index = i;
+      return i;
+    })
     .finally(() => {
       pending = null;
     });
@@ -165,19 +173,19 @@ export async function possibleDuplicates(enquiryIds: string[]): Promise<Map<stri
 
     const everyone = [...new Set([...others.values()].flatMap((s) => [...s]))];
     const jobs = await jobsOf(db, everyone);
-    // Someone added since the index was read (a booking duplicate): fetch their name.
-    const unknown = everyone.filter((id) => !idx.byId.has(id));
+    // Their names as they are now: someone added since the index was read (a booking duplicate) is
+    // found, and someone merged or deleted since (another server's index can be a minute old) isn't.
     const names = new Map<string, string>();
-    for (const part of chunks(unknown, 100)) {
+    for (const part of chunks(everyone, 100)) {
       const { data } = await db.from('enquiries').select('id, name').in('id', part);
       for (const r of data ?? []) names.set(r.id as string, (r.name as string) || '');
     }
     for (const [id, set] of others) {
       const list = [...set]
-        .filter((o) => idx.byId.has(o) || names.has(o))
+        .filter((o) => names.has(o))
         .map((o) => ({
           enquiry_id: o,
-          name: (idx.byId.get(o)?.name ?? names.get(o) ?? '').trim() || 'Unknown',
+          name: (names.get(o) ?? '').trim() || 'Unknown',
           project_ref: jobs.get(o)?.project_ref ?? null,
           project_id: jobs.get(o)?.id ?? null,
           why: why.get(`${id}|${o}`),

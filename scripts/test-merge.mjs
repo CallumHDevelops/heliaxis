@@ -188,7 +188,15 @@ const sian = side(customer({ name: 'Sian Evans', customer_ref: 'HX-0070', create
 eq('different names: ticked to confirm', plan(robWeb, sian).warnings[0], { text: 'The names are different: Robert Evans and Sian Evans.', tick: 'Yes, it’s the same person (not a partner sharing a phone or email)' });
 const outboxMeta = side(meta, robMeta.jobs, { outbox: { automatic: 1, scheduled: [{ at: '2026-10-22T06:00:00Z', by: 'Esther' }] } });
 const ws = plan(robWeb, outboxMeta).warnings.map((w) => w.text);
-eq('says what’s cancelled and what will still go', [ws.includes('1 automatic WhatsApp waiting to go to HX-0069 is cancelled.'), ws.includes('A message Esther scheduled for Thu 07:00 will go to 07791 120089.')], [true, true]);
+eq('says what will still go (staff’s Send later messages move and stay)', ws.includes('A message Esther scheduled for Thu 07:00 will go to 07791 120089.'), true);
+eq('what’s cancelled, in words (from the dry run)', [R.cancelledWords({ whatsapp_outbox: 1, tasks: 2 }), R.cancelledWords({ survey_bookings: 1, crm_surveys: 0 }), R.cancelledWords({})], [
+  '1 automatic WhatsApp waiting to go, 2 automatic tasks already on the job',
+  '1 survey booking',
+  '',
+]);
+const signedBySian = side(web, [facts(job(web, { stage: 'won', accepted_name: 'Sian Evans' }), { signed: true })]);
+eq('a quote signed under another name is called out', plan(signedBySian, robMeta).warnings.map((w) => w.text).filter((t) => /signed as/.test(t)), ['HX-0080’s quote was signed as “Sian Evans”, not Robert Evans.']);
+eq('…not when it’s their name, give or take', plan(side(web, [facts(job(web, { stage: 'won', accepted_name: 'Rob Evans' }), { signed: true })]), robMeta).warnings.some((w) => /signed as/.test(w.text)), false);
 eq('two postcodes: two properties?', plan(robWeb, side(customer({ postcode: 'CF10 1AA', customer_ref: 'HX-0071' }), [])).warnings.some((w) => w.text.startsWith('Two postcodes')), true);
 
 const credit = plan(robWeb, robMeta);
