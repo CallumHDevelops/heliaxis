@@ -24,6 +24,11 @@ export const SITE_SCHEMA_VERSION = 1;
 const BY_TRADE: Partial<Record<Trade, SiteForm[]>> = { roofer: [ROOFER], scaffolder: [SCAFFOLD_UP, SCAFFOLD_DOWN] };
 const ELECTRICIAN: ((forms: string[]) => SiteForm)[] = [];
 
+/** Every form of every trade (the electrician's with all its sections), for the key checks in the tests. */
+export function allForms(): SiteForm[] {
+  return [...Object.values(BY_TRADE).flat(), ...ELECTRICIAN.map((make) => make([...ELECTRICIAN_FORMS]))];
+}
+
 /** The forms an assignment is filled in with, in stage order. */
 export function schemaFor(a: { trade: Trade; forms?: string[] | null; schema_version?: number | null }): SiteForm[] {
   if (a.trade === 'electrician') return ELECTRICIAN.map((make) => make(a.forms ?? []));

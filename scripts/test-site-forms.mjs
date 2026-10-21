@@ -16,7 +16,8 @@ registerHooks({
   },
 });
 const { cleanDesign, designInput, designOf, intListWords, parseIntList } = await import('../src/lib/site/design.ts');
-const { formsFor, formsMissing, rooferApplies, suggestedTrades } = await import('../src/lib/site/forms/index.ts');
+const { allForms, formsFor, formsMissing, rooferApplies, SITE_SCHEMA_VERSION, suggestedTrades } = await import('../src/lib/site/forms/index.ts');
+const KEYS = JSON.parse((await import('node:fs')).readFileSync(new URL('./site-form-keys.json', import.meta.url), 'utf8'));
 const { jobStrip } = await import('../src/lib/site/strip.ts');
 
 let failed = 0;
@@ -98,6 +99,18 @@ eq('scaffold down', labels(jobStrip({ scaffold: [{ status: 'done', tagged: true,
 ]);
 eq('cancelled trades don’t count', labels(jobStrip({ scaffold: [], roof: [{ status: 'cancelled' }], electrics: [{ status: 'done' }, { status: 'cancelled' }] })), ['Electrics ✓:done', 'Handover:todo']);
 eq('two electricians, one done: in progress', labels(jobStrip({ scaffold: [], roof: [], electrics: [{ status: 'done' }, { status: 'sent' }] })), ['Electrics in progress:now', 'Handover:todo']);
+
+/* ── Keys: unique across every form, and never removed once used ─────────── */
+
+const keys = allForms().flatMap((f) => [...f.steps.flatMap((st) => st.fields.map((x) => x.key)), f.sig.key]);
+const twice = keys.filter((k, i) => keys.indexOf(k) !== i);
+eq('every key is used once, across every trade’s forms', twice, []);
+eq('keys are short and plain (they are stored on every answer)', keys.filter((k) => !/^[A-Za-z][A-Za-z0-9_]{0,30}$/.test(k)), []);
+// scripts/site-form-keys.json: the keys of each SITE_SCHEMA_VERSION as it shipped. A version's keys
+// can only grow; a new field means a new entry (and SITE_SCHEMA_VERSION bumped) once it has shipped.
+const now = new Set(keys);
+for (const [v, list] of Object.entries(KEYS)) eq(`no key from version ${v} has gone`, list.filter((k) => !now.has(k)), []);
+eq(`version ${SITE_SCHEMA_VERSION} is in the snapshot, as it is now`, [...(KEYS[String(SITE_SCHEMA_VERSION)] ?? [])].sort(), [...now].sort());
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);
