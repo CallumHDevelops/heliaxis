@@ -9,7 +9,8 @@ import { begin, INSTALLER_LINES, MCS_CONTACT, type Loader } from './common';
  * solar and battery each in its own section (or a line saying there's none), the MCS battery system
  * class with this system's marked, the records behind the summary (each with its code, reference and
  * whether it's in the pack), the next inspection and notes, then the two sign-offs, each under its
- * own declaration (a) and (b) naming only the standards that apply, with the note (c) under both,
+ * own declaration (a) and (b) naming only the standards that apply ((b) as the electrician signed
+ * it), with the note (c) under both,
  * and who to contact.
  */
 export const SUMMARY_TITLE = 'System summary and sign-off';
@@ -54,7 +55,7 @@ export async function makeSummary(f: SummaryInput, load: Loader): Promise<Uint8A
 
   kit.section('Sign-off', { keep: 200 });
   kit.paragraph(`Designed by. ${SUMMARY_DECLARATIONS.design(f.standards)}`);
-  kit.paragraph(`Installed, inspected and tested by. ${SUMMARY_DECLARATIONS.install(f.standards)}`);
+  kit.paragraph(`Installed, inspected and tested by. ${f.electrician.statement}`);
   const [dPng, ePng] = await Promise.all([load('docs', f.design.path), load('docs', f.electrician.path)]);
   await kit.signatures([
     { title: 'Designed by', png: dPng, name: f.design.name, at: f.design.signed_at, line: `Signed in the Heliaxis office, ${stampWords(f.design.signed_at)}` },

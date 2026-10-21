@@ -3,6 +3,7 @@ import { newDocument, type CheckItem } from '@/lib/documents/pdf-kit';
 import { ISSUE } from '@/lib/documents/issue';
 import { RECORD_TITLE } from '@/lib/site/declaration';
 import { FRAME_QUESTIONS, frameNeedsLine, MOUNTINGS, PV_INSPECT_FIELDS, PV_INSPECT_ROWS, PV_INSPECT_SECTIONS, type PvInspectSection } from '@/lib/site/forms/electrician/pv-inspect';
+import { NEW_IN_V4, NOT_ON_EARLIER, savedBeforeV4 } from '@/lib/site/forms/legacy';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { valueOf } from '@/lib/site/rules';
 import { markOf, signature, siteBox, type ElectricianDocInput } from './common';
@@ -41,6 +42,8 @@ export async function makePvInspect(d: ElectricianDocInput): Promise<Uint8Array>
   kit.header({ meta: [['Job reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Inspected by');
   const n = notes();
+  // A record signed before version 4 (a preview job) has no answer for the questions added since: it says so.
+  const earlier = (key: string) => savedBeforeV4(c.answers) && NEW_IN_V4.has(key) && c.values[key] === undefined;
 
   const item = (key: string): CheckItem | null => {
     const f = BY_KEY.get(key)!;
@@ -51,6 +54,7 @@ export async function makePvInspect(d: ElectricianDocInput): Promise<Uint8Array>
     const why = key === 'pvi_grid' && !given ? text(c, 'pvc_gridn') : text(c, `${key}n`);
     const worked = !given && v !== undefined ? FROM[key] : null;
     const extra = key === 'pvi_dc_volts' ? (f.note?.(c) ?? null) : null;
+    if (!mark && earlier(key)) return { label: f.label, mark: 'empty', note: NOT_ON_EARLIER };
     return { label: f.label, mark, must: true, note: [mark === 'cross' ? n.add(why) : null, worked, extra].filter(Boolean).join(' · ') || null };
   };
   const checklist = (s: PvInspectSection) => {
@@ -63,9 +67,9 @@ export async function makePvInspect(d: ElectricianDocInput): Promise<Uint8Array>
   for (const s of PV_INSPECT_SECTIONS) {
     if (s === 'Notes') continue;
     kit.section(s);
-    if (s === 'Roof and panels') kit.rows([{ label: 'Mounting', value: MOUNTINGS.find((m) => m.key === c.values.pvi_mount)?.label ?? null, must: true }]);
+    if (s === 'Roof and panels') kit.rows([{ label: 'Mounting', value: MOUNTINGS.find((m) => m.key === c.values.pvi_mount)?.label ?? (earlier('pvi_mount') ? NOT_ON_EARLIER : null), must: true }]);
     if (s === 'Frame earthing') {
-      kit.rows(FRAME_QUESTIONS.filter((f) => !f.show || f.show(c)).map((f) => ({ label: f.label, value: YN[String(c.values[f.key] ?? '')] ?? null, must: true })));
+      kit.rows(FRAME_QUESTIONS.filter((f) => !f.show || f.show(c)).map((f) => ({ label: f.label, value: YN[String(c.values[f.key] ?? '')] ?? (earlier(f.key) ? NOT_ON_EARLIER : null), must: true })));
     }
     checklist(s);
     if (s === 'Frame earthing') {

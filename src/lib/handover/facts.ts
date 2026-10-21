@@ -154,6 +154,7 @@ async function electricianOf(db: Db, projectId: string): Promise<{ facts: Electr
       signedAt: signed ? String(so!.signed_at) : null,
       signedOn: signed ? ukDay(String(so!.signed_at)) : null,
       signaturePath: signed ? str(so!.signature_path) : null,
+      declaration: signed ? str(so!.declaration) : null,
       values,
       customer,
       partPBy: contact?.part_p_by === 'self' || contact?.part_p_by === 'heliaxis' ? contact.part_p_by : null,

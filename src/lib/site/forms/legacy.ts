@@ -2,8 +2,10 @@
  * Answers saved before the electrician's records were rewritten in Heliaxis's own words (schema
  * version 4, WORDING-SPEC 12): preview jobs only, as none of it had shipped. Read-time aliases, so an
  * old answer shows under its new key until the preview rows are migrated, plus the few value rules
- * where a check was split, merged or reworded. Drop this file once the preview rows are migrated.
- * Pure, no imports: the rules (rules.ts) apply it when they read the answers.
+ * where a check was split, merged or reworded. The preview migration renames the keys and applies the
+ * merged-row rules; the roof kind and the frame table stay under their old keys and are read across
+ * here, so this file goes only once no preview job holds them. Pure, no imports: the rules (rules.ts)
+ * and schemaFor (forms/index.ts) apply it when they read the answers and the sections.
  */
 
 /** Old key → new key, for each base key (a ✓ / ✗ / N/A row's note and photo follow it: TICKS). */
@@ -172,10 +174,22 @@ export const LEGACY_SECTIONS: Record<string, string> = { f43: 'pvtests', f44: 'p
 export const legacySections = (forms: string[]): string[] => [...new Set(forms.map((f) => LEGACY_SECTIONS[f] ?? f))];
 
 const has = (v: Record<string, unknown>, k: string) => Object.prototype.hasOwnProperty.call(v, k);
+const OLD_KEY = /^(f43_|f44|f74_|f78_|eess_[ta]_|bl_vent$|bl_notice$)/;
+
+/** Answers saved before version 4 (a preview job): any key from the old forms. */
+export const savedBeforeV4 = (answers: Record<string, unknown> | null | undefined) => Object.keys(answers ?? {}).some((k) => OLD_KEY.test(k));
+
+/**
+ * Questions version 4 added, or split out of an old answer that can't always be read across (the
+ * mounting, the frame table): a record signed before then has no answer to print for them, so it
+ * says so instead of refusing to print (documents/site/pv-inspect.ts).
+ */
+export const NEW_IN_V4 = new Set(['pvi_watertight', 'pvi_frame_earthed', 'pvi_frame_func', 'pvi_mount', 'pvi_frame_metal', 'pvi_frame_ext', 'pvi_frame_exp', 'pvi_frame_lp']);
+export const NOT_ON_EARLIER = 'Not on the earlier version of this record';
 
 /** The values with every old answer read under its new key, where the new key has none (WORDING-SPEC 12.3). */
 export function withLegacy(values: Record<string, unknown>): Record<string, unknown> {
-  if (!Object.keys(values).some((k) => /^(f43_|f44|f74_|f78_|eess_[ta]_|bl_vent$|bl_notice$)/.test(k))) return values;
+  if (!Object.keys(values).some((k) => OLD_KEY.test(k))) return values;
   const out: Record<string, unknown> = { ...values };
   const fill = (k: string, v: unknown) => {
     if (!has(out, k) && v !== undefined) out[k] = v;
@@ -199,9 +213,25 @@ export function withLegacy(values: Record<string, unknown>): Record<string, unkn
       if (t.length === 1 && t[0] === 'd') ['pvi_frame_ext', 'pvi_frame_exp', 'pvi_frame_lp'].forEach((k) => fill(k, 'no'));
     }
   }
-  // Rows merged into others: copied where those are still unanswered.
+  // A problem found on an old row carries into the row it joined, with its note, whatever that row said.
+  const problem = (now: string, note: unknown) => {
+    const kept = out[now] === 'problem' && typeof out[`${now}n`] === 'string' ? (out[`${now}n`] as string).trim() : '';
+    const added = typeof note === 'string' ? note.trim() : '';
+    const notes = [...new Set([kept, added].filter(Boolean))];
+    out[now] = 'problem';
+    if (notes.length) out[`${now}n`] = notes.join('; ');
+    else delete out[`${now}n`];
+  };
+  // Rows merged into others: copied where those are still unanswered, and a problem carries over
+  // whatever the old row it joined said (an answer given since, under the new key, stands).
   const copy = (old: string, now: string) => {
-    if (!has(values, old) || has(out, now)) return;
+    if (!has(values, old) || has(values, now)) return;
+    if (values[old] === 'problem') {
+      problem(now, values[`${old}n`]);
+      fill(`${now}p`, values[`${old}p`]);
+      return;
+    }
+    if (has(out, now)) return;
     out[now] = values[old];
     fill(`${now}n`, values[`${old}n`]);
     fill(`${now}p`, values[`${old}p`]);
@@ -210,8 +240,8 @@ export function withLegacy(values: Record<string, unknown>): Record<string, unkn
   copy('f74_1_03', 'bat_manual');
   copy('f74_1_09', 'bat_conditions');
   copy('f74_1_15', 'bat_reach');
-  // Part 2's notes join the inspection's.
-  if (typeof values.f74_2_notes === 'string' && values.f74_2_notes.trim()) {
+  // Part 2's notes join the inspection's (once: notes saved since, under the new key, already hold them).
+  if (typeof values.f74_2_notes === 'string' && values.f74_2_notes.trim() && !has(values, 'bat_inspect_notes')) {
     const before = typeof out.bat_inspect_notes === 'string' ? out.bat_inspect_notes.trim() : '';
     out.bat_inspect_notes = before ? `${before}\n${values.f74_2_notes.trim()}` : values.f74_2_notes.trim();
   }
@@ -220,11 +250,9 @@ export function withLegacy(values: Record<string, unknown>): Record<string, unkn
     ['bl_vent', 'bat_space_vent', 'Not ventilated as the maker asks'],
     ['bl_notice', 'bat_notices', 'Battery notices not up'],
   ] as const) {
+    if (has(values, now)) continue;
     if (values[old] === 'yes') fill(now, 'done');
-    if (values[old] === 'no' && !has(out, now)) {
-      out[now] = 'problem';
-      fill(`${now}n`, note);
-    }
+    if (values[old] === 'no') problem(now, note);
   }
   for (const k of [...Object.values(LEGACY_KEYS), ...RETIRED_KEYS]) delete out[k];
   return out;

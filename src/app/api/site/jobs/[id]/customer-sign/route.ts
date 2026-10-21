@@ -30,14 +30,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch {
     return siteJson({ error: 'bad', message: 'That signature didn’t arrive whole. Ask them to sign again.' }, 400);
   }
-  const kind = KINDS.find((k) => k === b.kind);
+  // A phone still running the earlier app sends the completion sign-off under its old kind (f16e).
+  const kind = KINDS.find((k) => k === (b.kind === 'f16e' ? 'completion' : b.kind));
   if (!kind) return siteJson({ error: 'bad', message: 'That signature didn’t make sense.' }, 400);
   const { data: so } = await s.db.from('site_signoffs').select('id, extra').eq('assignment_id', a.id).eq('stage', 'main').maybeSingle();
   // The electrician's sign-off goes first on the phone; until it's here, this waits.
   if (!so) return siteJson({ error: 'busy', message: 'Waiting for your sign-off to send first.' }, 503);
   const extra = (so.extra ?? {}) as Record<string, unknown>;
   const customer = (extra.customer ?? {}) as Record<string, { name: string; signed_at: string }>;
-  if (customer[kind]) return siteJson({ kind, name: customer[kind].name, signed_at: customer[kind].signed_at, again: true });
+  const had = customer[kind] ?? (kind === 'completion' ? customer.f16e : undefined);
+  if (had) return siteJson({ kind, name: had.name, signed_at: had.signed_at, again: true });
 
   const name = typeof b.name === 'string' ? b.name.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
   if (!name) return siteJson({ error: 'bad', message: 'Their name is needed with the signature.' }, 400);

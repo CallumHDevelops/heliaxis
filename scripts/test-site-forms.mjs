@@ -159,7 +159,7 @@ eq('every alias reads an old key into one that exists now', Object.keys(LEGACY_K
 const old = withLegacy({ f43_strings: 2, f44_13: 'problem', f44_13n: 'Rail loose', f44_20_kind: 'pitched', f44_t2: ['b'], f74_1_03: 'done', f74_1_23: 'done', f74_1_09: 'problem', f74_1_notes: 'One', f74_2_notes: 'Two', bl_vent: 'no', bl_notice: 'yes', eess_a_06_ra: 12.5, eess_backup: 'yes' });
 eq('old answers read under their new keys', [old.pvt_strings, old.pvi_fixed, old.pvi_fixedn, old.pvi_mount, old.bat_bu_ra, old.eess_backup], [2, 'problem', 'Rail loose', 'on_roof', 12.5, 'yes']);
 eq('the frame table becomes the four questions (b: exposed, so not extraneous)', [old.pvi_frame_metal, old.pvi_frame_ext, old.pvi_frame_exp, old.pvi_frame_lp], ['yes', 'no', 'yes', undefined]);
-eq('a merged row fills only what is still unanswered', [old.bat_standards, old.bat_manual, old.bat_conditions], ['done', 'done', 'done']);
+eq('a merged row fills what is still unanswered, and a problem on it carries over', [old.bat_standards, old.bat_manual, old.bat_conditions], ['done', 'done', 'problem']);
 eq('the notes are joined, and the location rows become the inspection’s', [old.bat_inspect_notes, old.bat_space_vent, old.bat_space_ventn, old.bat_notices], ['One\nTwo', 'problem', 'Not ventilated as the maker asks', 'done']);
 eq('the old keys are gone from what the forms read', Object.keys(old).filter((k) => /^(f43|f44a?|f74|f78)_|^eess_[ta]_|^bl_vent$|^bl_notice$/.test(k)), []);
 eq('the watertight check starts unanswered', old.pvi_watertight, undefined);

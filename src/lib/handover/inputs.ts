@@ -10,7 +10,7 @@
  * from the database.
  */
 import type { Design } from '../site/design';
-import { summaryStandards } from '../site/declaration';
+import { signedStatement, summaryStandards, SUMMARY_DECLARATIONS } from '../site/declaration';
 import { MIS3002_NOTES } from '../site/fixed/mis3002';
 import { approved, DRAFTS, warrantyReady, type HandoverSettings, type ScheduleRow } from './settings-shared';
 import { contentsGroups, type Fix, type SlotCode, type SlotView, type Tech } from './slots';
@@ -91,6 +91,8 @@ export type ElectricianFacts = {
   certRef: string | null;
   /** "10 years", from the EIC. */
   nextInspection: string | null;
+  /** What they signed (site_signoffs.declaration): the summary prints its "Installed, inspected and tested by" part from it. */
+  declaration?: string | null;
   /** What the certificate still waits for from the office ("Sign the EIC’s design part…"), from site/handover-facts.ts. */
   certWaits?: string | null;
   /** The certificate's route ('eic', 'eic_single', 'meiwc', 'own'), from site/handover-facts.ts. */
@@ -496,7 +498,8 @@ export type SummaryInput = JobHead & {
   /** "Within 10 years, as recommended on the electrical certificate". */
   next: string;
   comments: string | null;
-  electrician: { name: string; company: string | null; at: string; path: string };
+  /** The electrician's sign-off, with declaration (b) as they signed it (WORDING-SPEC 0.7). */
+  electrician: { name: string; company: string | null; at: string; path: string; statement: string };
   design: OfficeSig;
 };
 
@@ -590,7 +593,7 @@ export function summaryInput(f: HandoverFacts): Made<SummaryInput> {
       records,
       next,
       comments: val(f, 'HX-HO-02', 'comments'),
-      electrician: { name: e.name, company: e.company, at: e.signedAt, path: e.signaturePath },
+      electrician: { name: e.name, company: e.company, at: e.signedAt, path: e.signaturePath, statement: signedStatement(e.declaration, 'HX-HO-02') ?? SUMMARY_DECLARATIONS.install(summaryStandards(f.job.products)) },
       design,
     },
   };

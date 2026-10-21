@@ -8,6 +8,7 @@
 import type { Design } from '../design';
 import type { Trade } from '../types';
 import { electricianForm } from './electrician/index';
+import { legacySections } from './legacy';
 import { ROOFER } from './roofer';
 import { SCAFFOLD_DOWN, SCAFFOLD_UP } from './scaffold';
 import type { SiteForm } from './types';
@@ -33,9 +34,9 @@ export function allForms(): SiteForm[] {
   return [...Object.values(BY_TRADE).flat(), ...ELECTRICIAN.map((make) => make([...ELECTRICIAN_FORMS]))];
 }
 
-/** The forms an assignment is filled in with, in stage order. */
+/** The forms an assignment is filled in with, in stage order (a phone's copy saved before version 4 may still hold the old section ids). */
 export function schemaFor(a: { trade: Trade; forms?: string[] | null; schema_version?: number | null }): SiteForm[] {
-  if (a.trade === 'electrician') return ELECTRICIAN.map((make) => make(a.forms ?? []));
+  if (a.trade === 'electrician') return ELECTRICIAN.map((make) => make(legacySections(a.forms ?? [])));
   return BY_TRADE[a.trade] ?? [];
 }
 
