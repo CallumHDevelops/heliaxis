@@ -344,7 +344,8 @@
 .sx-msgs li.is-bad {
   color: var(--err);
 }
-.sx-tell {
+.sx-tell,
+.sx-record {
   margin-top: 0.6rem;
 }
 

@@ -6,6 +6,7 @@ import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { canonicalJson } from '@/lib/subcontractors/hashing';
 import { fieldIndex } from '@/lib/surveys/solar-schema';
 import { designOf } from './design';
+import { electricianPack } from './electrician';
 import { siteShort } from './messages';
 import type { PackFile, PackPhoto, PackPo, SitePack } from './pack-shared';
 import { assignmentRow, type AssignmentRow, type Db } from './server';
@@ -215,5 +216,6 @@ export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
     po: po ? packPo(po) : null,
     reads: (reads ?? []) as SitePack['reads'],
     settings: { locationStamps: (await getSiteSettings()).locationStamps },
+    ...(a.trade === 'electrician' ? { electrician: await electricianPack(db, a, project, sa, { links: true }) } : {}),
   };
 }

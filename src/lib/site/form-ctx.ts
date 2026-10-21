@@ -1,5 +1,7 @@
 import 'server-only';
 import { designOf } from './design';
+import { electricianPack } from './electrician';
+import { withFiles } from './electrician-shared';
 import type { FormCtx, LabelReadResult } from './forms/types';
 import { makeCtx } from './rules';
 import type { AssignmentRow, Db } from './server';
@@ -23,10 +25,13 @@ export async function serverCtx(db: Db, a: AssignmentRow): Promise<FormCtx> {
   ]);
   const project = (p ?? {}) as Record<string, unknown>;
   const sys = (project.system ?? {}) as Record<string, unknown>;
-  const s1 = ((surveys?.[0] as { answers?: Record<string, unknown> } | undefined)?.answers ?? {}).S1;
+  const surveyAnswers = (surveys?.[0] as { answers?: Record<string, unknown> } | undefined)?.answers ?? {};
+  const s1 = surveyAnswers.S1;
   const counts: Record<string, number> = {};
   for (const ph of (photos ?? []) as { slot: string | null }[]) if (ph.slot) counts[ph.slot] = (counts[ph.slot] ?? 0) + 1;
   const address = [...String(project.address ?? '').split(/\n/).map((l) => l.trim()).filter(Boolean), str(project.postcode)].filter(Boolean).join(', ');
+  // The electrician's forms read the roofer, the job's paperwork and their uploaded certificate too.
+  const el = a.trade === 'electrician' ? await electricianPack(db, a, project, surveyAnswers) : null;
   return makeCtx({
     trade: a.trade,
     answers: a.answers,
@@ -34,9 +39,10 @@ export async function serverCtx(db: Db, a: AssignmentRow): Promise<FormCtx> {
     system: { kwp: num(sys.kwp), panel_count: num(sys.panel_count), panel_model: str(sys.panel_model), inverter_model: str(sys.inverter_model), battery_model: str(sys.battery_model) },
     products: (Array.isArray(project.products) ? project.products : []) as string[],
     sides: Array.isArray(s1) ? (s1 as string[]).filter((x) => SIDES.includes(x)) : [],
-    photos: counts,
+    photos: el ? withFiles(counts, el.uploads) : counts,
     reads: ((reads ?? []) as { key: string; status: string; result: LabelReadResult | null }[]).map((r) => ({ key: r.key, status: r.status, result: r.result })),
     address,
     signed: ((signoffs ?? []) as { stage: Stage }[]).map((x) => x.stage),
+    ...(el ? { el: { ...el.facts, cert_route: a.cert_route } } : {}),
   });
 }

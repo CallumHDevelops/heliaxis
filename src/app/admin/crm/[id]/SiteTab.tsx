@@ -13,6 +13,7 @@ import { agoShort, shortDate } from '../crm-shared';
 import { AssignmentSheet } from './AssignmentSheet';
 import { ReviewDrawer } from './ReviewDrawer';
 import { copyText, send } from './record-shared';
+import { ElectricianExtras } from './SiteElectrician';
 import './site.css';
 
 /**
@@ -404,6 +405,7 @@ function AssignmentCard({
         </ul>
       )}
       {a.link.phones > 0 && <p className="sx-meta">{a.link.phones === 1 ? '1 phone has opened this link' : `${a.link.phones} phones opened this link`}</p>}
+      <ElectricianExtras a={a} onEdit={onEdit} />
       {working && scaffold === 'tagged' && (
         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small sx-tell" disabled={busy} onClick={() => onMessage({ via: 'both', kind: 'clear_to_start' })}>
           Tell {first} ({a.title.toLowerCase()}) they’re clear to start

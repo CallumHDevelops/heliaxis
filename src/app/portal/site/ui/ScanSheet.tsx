@@ -17,17 +17,22 @@ const norm = (s: string) => s.trim().toUpperCase();
 /**
  * A SCAN field: the serials so far with a count against what's expected ("6 of 14"), Scan (the live
  * camera, P7), Type it instead, and Couldn't read it: keep the photo. A duplicate shows "Already
- * scanned" and isn't added twice.
+ * scanned" and isn't added twice. With a label photo slot (`field.photo`), what Claude read from it
+ * is offered one serial at a time ("Read from photo: check it"), and an unreadable label's photo goes
+ * in that slot.
  */
 export function ScanField({ field, ctx, value, onChange, job, disabled }: { field: Field; ctx: FormCtx; value: unknown; onChange: (v: Captured[] | undefined) => void; job: string; disabled?: boolean }) {
   const list = listOf(value);
-  const need = needOf(field, ctx);
+  const need = field.expect?.(ctx) ?? needOf(field, ctx);
   const [open, setOpen] = useState(false);
   const [typing, setTyping] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const photo = useRef<HTMLInputElement>(null);
   const still = useRef<HTMLInputElement>(null);
   const have = new Set(list.filter((c) => !c.unread).map((c) => norm(c.s)));
+  const read = field.photo
+    ? [...new Set(ctx.reads.filter((r) => r.key === field.photo && r.status === 'read').flatMap((r) => r.result?.serials ?? []))].filter((x) => x.trim() && !have.has(norm(x)))
+    : [];
 
   const add = (items: Captured[]) => {
     const fresh: Captured[] = [];
@@ -53,7 +58,7 @@ export function ScanField({ field, ctx, value, onChange, job, disabled }: { fiel
           {list.map((c, i) => (
             <li key={`${c.s}-${i}`} className="sa-serial">
               <span className="sa-serial-s">{c.unread ? 'Couldn’t read: photo kept' : c.s}</span>
-              <span className="sa-src">{c.src === 'scan' ? 'Scanned' : c.src === 'photo' ? 'From the photo' : 'Typed'}</span>
+              <span className="sa-src">{c.src === 'scan' ? 'Scanned' : c.src === 'photo' ? 'From the photo' : c.src === 'roofer' ? 'From the roofer' : 'Typed'}</span>
               {!c.unread && brandHint(c.s) && <span className="sa-muted">{brandHint(c.s)}</span>}
               {!disabled && (
                 <button type="button" className="sa-x" aria-label={`Remove ${c.s || 'this'}`} onClick={() => onChange(list.filter((_, j) => j !== i).length ? list.filter((_, j) => j !== i) : undefined)}>
@@ -65,6 +70,17 @@ export function ScanField({ field, ctx, value, onChange, job, disabled }: { fiel
         </ul>
       )}
       {duplicates(list.filter((c) => !c.unread).map((c) => c.s)).length > 0 && <p className="sa-hint-warn">The same serial is on the list twice.</p>}
+      {!disabled &&
+        read.map((x) => (
+          <button key={x} type="button" className="sa-suggest" onClick={() => add([{ s: x, src: 'photo' }])}>
+            <span className="sa-suggest-src">Read from photo</span>
+            <span className="sa-suggest-val">{x}</span>
+            <span className="sa-suggest-tick" aria-hidden="true">
+              ✓
+            </span>
+            <span className="sa-sr">Check it against the label, then add it</span>
+          </button>
+        ))}
       {note && <p className="sa-hint-warn">{note}</p>}
       {!disabled && (
         <>
@@ -118,7 +134,7 @@ export function ScanField({ field, ctx, value, onChange, job, disabled }: { fiel
               const f = e.target.files?.[0];
               e.target.value = '';
               if (!f) return;
-              const p = await addPhoto(job, field.key, f, { label: true, read: true });
+              const p = await addPhoto(job, field.photo ?? field.key, f, { label: true, read: true });
               add([{ s: '', src: 'photo', unread: true, photo: p.client_id }]);
             }}
           />

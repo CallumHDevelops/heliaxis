@@ -81,7 +81,7 @@ export function CheckSign({ rec, jf, form }: { rec: PackRecord; jf: JobForms; fo
               <section className="sa-card">
                 <h3>Still to do</h3>
                 <ul className="sa-todo">
-                  {check.must.map((m) => (
+                  {check.must.slice(0, 12).map((m) => (
                     <li key={m.key}>
                       <button type="button" className="sa-todo-row" onClick={() => go(`/portal/site/job/${job}/${m.step}`)}>
                         <span>{m.label}</span>
@@ -89,6 +89,7 @@ export function CheckSign({ rec, jf, form }: { rec: PackRecord; jf: JobForms; fo
                       </button>
                     </li>
                   ))}
+                  {check.must.length > 12 && <li className="sa-muted">and {check.must.length - 12} more</li>}
                 </ul>
               </section>
             )}

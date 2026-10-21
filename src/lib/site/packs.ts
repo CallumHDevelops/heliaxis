@@ -57,6 +57,9 @@ export async function downloadPack(id: string, onStep?: (s: ReadyStep) => void):
   step.missing += drawings.length - got;
   onStep?.({ ...step });
   for (const p of pack.photos) if (p.thumb) await keepFile(id, `thumb:${p.id}`, `${p.slot}.jpg`, 'image/jpeg', p.thumb);
+  // An electrician's: the roofer's evidence photos (F44), and the certificate files already sent.
+  for (const p of pack.electrician?.roofer_photos ?? []) if (p.thumb) await keepFile(id, `thumb:${p.id}`, `${p.slot}.jpg`, 'image/jpeg', p.thumb);
+  for (const f of pack.electrician?.uploads ?? []) if (f.url) await keepFile(id, `upload:${f.id}`, f.name, f.mime, f.url);
 
   // The PO once it has been issued: its PDF, to open with no signal (each version once).
   let poFile: string | null = null;
@@ -70,7 +73,13 @@ export async function downloadPack(id: string, onStep?: (s: ReadyStep) => void):
   }
 
   // Files the office has since taken off the job go from the phone too.
-  const keep = new Set([...pack.files.map((f) => f.id), ...pack.photos.map((p) => `thumb:${p.id}`), ...(poFile ? [poFile] : [])]);
+  const keep = new Set([
+    ...pack.files.map((f) => f.id),
+    ...pack.photos.map((p) => `thumb:${p.id}`),
+    ...(pack.electrician?.roofer_photos ?? []).map((p) => `thumb:${p.id}`),
+    ...(pack.electrician?.uploads ?? []).map((f) => `upload:${f.id}`),
+    ...(poFile ? [poFile] : []),
+  ]);
   for (const f of await byJob<FileRecord>('files', id)) if (!keep.has(f.id)) await delRec('files', f.id);
 
   const d = await getDevice();

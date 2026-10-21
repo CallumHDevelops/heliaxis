@@ -1,5 +1,6 @@
 'use client';
 
+import { factsFromPack, withFiles } from '@/lib/site/electrician-shared';
 import { schemaFor } from '@/lib/site/forms';
 import type { LabelReadResult } from '@/lib/site/forms/types';
 import type { SitePack } from '@/lib/site/pack-shared';
@@ -25,10 +26,11 @@ export function jobProgress(pack: SitePack, answers: Answers): string | null {
     system: pack.system,
     products: pack.job.products,
     sides: pack.sides,
-    photos,
+    photos: withFiles(photos, pack.electrician?.uploads ?? []),
     reads: pack.reads.map((r) => ({ key: r.key, status: r.status, result: r.result as LabelReadResult | null })),
     address: '',
     signed,
+    el: factsFromPack(pack),
   });
   const p = formProgress(form, ctx);
   return `${form.title} ${p.done} of ${p.total}`;

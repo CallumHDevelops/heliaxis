@@ -11,7 +11,7 @@ import { isStage, stageIndex, stageLabel, type StageKey } from './stages';
  */
 
 /** Things that happen to a job, and the stage each moves it to (only from the stages listed). */
-export type StageEvent = 'contacted' | 'survey_booked' | 'surveyed' | 'quote_sent' | 'accepted' | 'install_booked' | 'install_started';
+export type StageEvent = 'contacted' | 'survey_booked' | 'surveyed' | 'quote_sent' | 'accepted' | 'install_booked' | 'install_started' | 'commissioned';
 
 const RULES: Record<StageEvent, { to: StageKey; from: StageKey[] }> = {
   // Someone on the team got in touch (WhatsApp, email, a logged call or visit).
@@ -22,6 +22,8 @@ const RULES: Record<StageEvent, { to: StageKey; from: StageKey[] }> = {
   accepted: { to: 'won', from: ['lead', 'contacted', 'survey_booked', 'surveyed', 'quote_sent'] },
   install_booked: { to: 'install_booked', from: ['won', 'design', 'ready'] },
   install_started: { to: 'installing', from: ['install_booked'] },
+  // The electrician signed off the site app's pack: commissioned, so on to the paperwork and handover.
+  commissioned: { to: 'handover', from: ['install_booked', 'installing', 'commissioning'] },
 };
 
 export type StageMove = { moved: boolean; from: string | null };

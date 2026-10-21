@@ -5,6 +5,7 @@ import { formProgress, missing, openForms, stepProgress, stepShown, summaryLine 
 import { STAGES_FOR, type Answers } from '@/lib/site/types';
 import { shortDate } from '@/lib/site/client';
 import { CheckSign } from './CheckSign';
+import { CustomerSign, CustomerSignCard } from './CustomerSign';
 import { DoneScreen } from './DoneScreen';
 import { useJobForms } from './form-state';
 import { go } from './nav';
@@ -14,7 +15,7 @@ import { StepScreen } from './StepScreen';
  * The job's forms. On the job screen (no `rest`): "16 questions, 9 photos, about 10 minutes", the
  * step list with progress and ticks, What's left, and Start / Carry on / Check and sign. With `rest`
  * (/portal/site/job/<id>/<step>): that step (P5), its Check and sign (sign-<stage>, P10) or the
- * signed screen (done-<stage>, P11).
+ * signed screen (done-<stage>, P11); for an electrician, "Hand the phone to Jane" (customer, P15).
  */
 export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Answers; rest: string[] }) {
   const jf = useJobForms(rec, answers);
@@ -24,6 +25,7 @@ export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Ans
   const key = rest[0];
 
   if (key) {
+    if (key === 'customer' && rec.pack.assignment.trade === 'electrician') return <CustomerSign rec={rec} />;
     if (key.startsWith('sign-') || key.startsWith('done-')) {
       const form = forms.find((f) => f.stage === key.slice(5));
       if (form && key.startsWith('sign-')) return <CheckSign rec={rec} jf={jf} form={form} />;
@@ -120,6 +122,7 @@ export function JobSteps({ rec, answers, rest }: { rec: PackRecord; answers: Ans
           </section>
         );
       })}
+      {rec.pack.assignment.trade === 'electrician' && (rec.pack.assignment.signoffs.length > 0 || jf.pendingSign.length > 0) && <CustomerSignCard rec={rec} />}
       {waiting.map((form) => (
         <section key={form.id} className="sa-card sa-form is-waiting">
           <div className="sa-form-head">

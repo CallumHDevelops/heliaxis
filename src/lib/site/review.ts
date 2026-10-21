@@ -4,10 +4,11 @@ import { CRM_BUCKET, DOCS_BUCKET, thumbPath } from '@/lib/crm/server';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
 import type { LabelReadResult } from './forms/types';
+import { ELECTRICIAN_DOC_KEYS } from './electrician-docs';
 import { livePo } from './labour-po';
 import type { LabourSnapshot } from './po-shared';
 import { answerWords, labelOf } from './reports';
-import { openForms, slotsOf, stepShown, visibleFields } from './rules';
+import { openForms, slotsOf, stepShown, valueOf, visibleFields } from './rules';
 import { logJob, logSiteEvent, readAssignment, type AssignmentRow, type Db } from './server';
 import { SOURCE_LABEL, TRADE_LABEL, type Answer, type Flag, type Stage } from './types';
 
@@ -101,7 +102,7 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
                 const n = slotsOf(f, ctx).reduce((t, s) => t + (ctx.photos[s] ?? 0), 0);
                 return n ? `${n} photo${n === 1 ? '' : 's'}` : null;
               })()
-            : answerWords(f, ans?.v, ctx);
+            : answerWords(f, valueOf(f, ctx), ctx);
         rows.push({ key: f.key, label: f.label, value, src: ans?.src ? (SOURCE_LABEL[ans.src] ?? ans.src) : null, at: ans?.at ?? null, flags: a.flags.filter((x) => x.key === f.key) });
       }
       if (rows.length) steps.push({ form: form.title, stage: form.stage, signed: signed.includes(form.stage), step: step.title, rows });
@@ -154,8 +155,11 @@ export async function siteReview(db: Db, a: AssignmentRow): Promise<SiteReview> 
     steps_done: { po: !!s.po_done_at, docs: !!s.docs_done_at, notified: !!s.notified_at },
   }));
 
-  // The trade's documents: their report, and the PO that went.
-  const keys = [a.trade === 'roofer' ? 'RF_REPORT' : a.trade === 'scaffolder' ? 'SC_REPORT' : null, po?.po_number ?? null].filter((k): k is string => !!k);
+  // The trade's documents: their report (the electrician's paperwork), and the PO that went.
+  const keys = [
+    ...(a.trade === 'roofer' ? ['RF_REPORT'] : a.trade === 'scaffolder' ? ['SC_REPORT'] : a.trade === 'electrician' ? ELECTRICIAN_DOC_KEYS : []),
+    po?.po_number ?? null,
+  ].filter((k): k is string => !!k);
   const { data: dd } = keys.length
     ? await db.from('crm_documents').select('id, name, storage_path, generated_key, version').eq('project_id', a.project_id).in('generated_key', keys).is('archived_at', null)
     : { data: [] };

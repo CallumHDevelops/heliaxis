@@ -34,6 +34,16 @@ const WHAT: Record<string, string> = {
   RF12: 'the data label on the back of a solar panel',
   RF7b: 'an optimiser layout plan with the optimisers’ serial stickers stuck on it (read every sticker)',
   SN_PANEL: 'a solar panel’s serial label',
+  // The electrician's label photos (FORMS 4.3).
+  EP21: 'the data label of a solar or hybrid inverter',
+  EP26: 'a generation meter: copy the reading (kWh) into meter.reading_kwh and its serial number',
+  EP31: 'the data label of a home battery module',
+  EP32: 'the data label of a battery inverter, gateway or battery management unit',
+  EP41: 'the data label of an EV charge point',
+  EP53: 'the data label of a heat pump’s outdoor unit',
+  EP54: 'the data label of a heat pump’s indoor unit or controller',
+  SN_OPT: 'an optimiser layout plan or optimiser serial stickers (read every sticker)',
+  SN_METERp: 'an electricity supply meter: copy its serial number',
 };
 
 const PROMPT = (what: string) =>

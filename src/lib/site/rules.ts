@@ -43,9 +43,53 @@ export const stringsOf = (f: Field, c: FormCtx) => Math.min(12, Math.max(1, Math
 /** A number as typed, or a ">999" reading from a meter that shows "greater than". */
 export const isReading = (v: unknown) => num(v) !== null || (typeof v === 'string' && /^>\s*\d+(\.\d+)?$/.test(v.trim()));
 
+/**
+ * A field's answer as the rules read it: what was given, else what it works out to from other
+ * answers (`auto`: F44 items 36–38, F44A). 'off' is a worked-out answer the person took away.
+ */
+export function valueOf(f: Field, c: FormCtx): unknown {
+  const v = Object.prototype.hasOwnProperty.call(c.values, f.key) ? c.values[f.key] : f.auto?.(c);
+  return v === 'off' ? undefined : v;
+}
+
+/**
+ * A per-string field's value for each string (F43): strings 2 onwards with nothing of their own
+ * are "Same as string 1" when the field says so; '' means that was switched off and nothing typed.
+ */
+export function perStringValues(f: Field, c: FormCtx): unknown[] {
+  const raw = valueOf(f, c);
+  const list = Array.isArray(raw) ? raw : [];
+  const n = stringsOf(f, c);
+  return Array.from({ length: n }, (_, i) => {
+    const v = list[i];
+    if (i > 0 && f.same && (v === null || v === undefined)) return list[0] ?? null;
+    return v ?? null;
+  });
+}
+
+/** One answer of this field's type given? (A per-string field asks it of each string.) */
+function given(f: Field, v: unknown): boolean {
+  if (f.na && v === 'na') return true;
+  switch (f.type) {
+    case 'NUM':
+      return isReading(v);
+    case 'TEXT':
+    case 'LONG':
+      return text(v).length > 0;
+    case 'CONFIRM':
+      return v === true || v === 'cant';
+    case 'MULTI':
+      return Array.isArray(v) && v.length > 0;
+    default:
+      return typeof v === 'string' && v.length > 0;
+  }
+}
+
 /** Is this field done? (Photos and captures count against their minimum.) */
 export function isAnswered(f: Field, c: FormCtx): boolean {
-  const v = c.values[f.key];
+  if (f.done) return f.done(c);
+  if (f.perString) return perStringValues(f, c).every((x) => given(f, x));
+  const v = valueOf(f, c);
   switch (f.type) {
     case 'PHOTOS': {
       const need = needOf(f, c);
@@ -61,21 +105,12 @@ export function isAnswered(f: Field, c: FormCtx): boolean {
       const n = stringsOf(f, c);
       return list.length >= n && list.slice(0, n).every((x) => isReading(x));
     }
-    case 'CONFIRM':
-      return v === true || v === 'cant';
-    case 'MULTI':
-      return Array.isArray(v) && v.length > 0;
-    case 'NUM':
-      return isReading(v);
-    case 'TEXT':
-    case 'LONG':
-      return text(v).length > 0;
     case 'AUTO':
       return true;
     case 'SIG':
       return false;
     default:
-      return typeof v === 'string' && v.length > 0;
+      return given(f, v);
   }
 }
 
@@ -97,7 +132,8 @@ export const stepShown = (s: Step, c: FormCtx) => !s.show || s.show(c);
 /** Every field asked on this form now. */
 export const allVisible = (form: SiteForm, c: FormCtx) => form.steps.filter((s) => stepShown(s, c)).flatMap((s) => visibleFields(s, c).map((f) => ({ f, step: s })));
 
-const counts = (f: Field) => f.type !== 'SIG' && f.type !== 'AUTO' && f.level !== 'optional';
+/** Rows the gate and the progress count: not signatures, not read-only rows (unless the gate checks one), not optional. */
+const counts = (f: Field) => f.type !== 'SIG' && (f.type !== 'AUTO' || !!f.done) && f.level !== 'optional';
 
 function why(f: Field, c: FormCtx): string {
   if (f.type === 'PHOTOS') {
@@ -116,6 +152,10 @@ function why(f: Field, c: FormCtx): string {
     return need ? `${got} of ${need} scanned` : 'Not scanned';
   }
   if (f.type === 'PER_STRING') return 'A number for every string';
+  if (f.perString) {
+    const short = perStringValues(f, c).map((v, i) => (given(f, v) ? 0 : i + 1)).filter(Boolean);
+    return `String${short.length === 1 ? '' : 's'} ${short.join(', ')}`;
+  }
   return 'Not answered';
 }
 
@@ -127,6 +167,8 @@ export function missing(form: SiteForm, c: FormCtx): { must: Missing[]; should: 
     if (!counts(f) || isAnswered(f, c)) continue;
     // A photo slot with no minimum is never "missing".
     if (f.type === 'PHOTOS' && needOf(f, c) === 0) continue;
+    // A worked-out row waiting on others that are listed (F44 item 37 on F43): not listed twice.
+    if (f.autoWaits?.(c) && !Object.prototype.hasOwnProperty.call(c.values, f.key)) continue;
     const m = { key: f.key, label: f.label, step: step.key, why: why(f, c) };
     (f.level === 'must' ? must : should).push(m);
   }

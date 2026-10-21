@@ -6,6 +6,7 @@ import { DEFAULT_RATES } from '@/lib/subcontractors/agreement';
 import { cleanAssignment, mobileProblem, moneyLine, vatFor, waIdOf, isEmail, type MoneyLine } from './assign';
 import { designOf } from './design';
 import { formsFor, isElectricianForm, suggestedTrades } from './forms';
+import { defaultCertRoute } from './forms/electrician/cert';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
 import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
@@ -409,7 +410,13 @@ export async function createAssignments(
         : [];
     ready.push({
       person: { contactId: contact?.id, firmId: !contact ? firm?.id : undefined, fresh },
-      fields: { ...clean.fields, vat_treatment: vat.value, vat_note: String(input.vat_note ?? '').trim().slice(0, 200) || null, forms },
+      fields: {
+        ...clean.fields,
+        vat_treatment: vat.value,
+        vat_note: String(input.vat_note ?? '').trim().slice(0, 200) || null,
+        forms,
+        ...(clean.fields.trade === 'electrician' && !clean.fields.cert_route ? { cert_route: defaultCertRoute() } : {}),
+      },
     });
   }
 

@@ -4,6 +4,7 @@
  * checks the VAT and CIS rules directly.
  */
 import { cisPercent, cisWords, isCisRate, isRateBasis, isVatTreatment, labourMoney, previewWords, rateWords, VAT_WORDS, type CisRate, type RateBasis, type VatTreatment } from './money';
+import { defaultCertRoute } from './forms/electrician/cert';
 import { isTrade, type CertRoute, type Trade } from './types';
 
 /* ── The person ──────────────────────────────────────────────────────────────── */
@@ -155,7 +156,7 @@ export function cleanAssignment(
   if (given('share_customer_phone')) out.share_customer_phone = b.share_customer_phone !== false;
   if (given('note_to_trade')) out.note_to_trade = String(b.note_to_trade ?? '').trim().slice(0, 1000) || null;
   if (given('cert_route')) {
-    if (b.cert_route === undefined || b.cert_route === null || b.cert_route === '') out.cert_route = 'eic';
+    if (b.cert_route === undefined || b.cert_route === null || b.cert_route === '') out.cert_route = defaultCertRoute();
     else if (!isCertRoute(b.cert_route)) return { ok: false, error: 'Unknown certificate route.' };
     else out.cert_route = b.cert_route;
   }

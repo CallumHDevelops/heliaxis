@@ -6,7 +6,7 @@ import { saveGenerated, type SaveResult } from '@/lib/documents/store';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
 import type { Field, FormCtx, SiteForm } from './forms/types';
-import { slotsOf, stepShown, stringsOf, visibleFields } from './rules';
+import { perStringValues, slotsOf, stepShown, stringsOf, visibleFields } from './rules';
 import { readAssignment, type ContactRow, type Db } from './server';
 import { SEVERITY_LABEL, type Flag, type Stage } from './types';
 
@@ -27,6 +27,14 @@ const WORD: Record<string, string> = { yes: 'Yes', no: 'No', na: 'N/A', pass: 'P
 /** An answer as words for a document. */
 export function answerWords(f: Field, v: unknown, c: FormCtx): string | null {
   if (v === undefined || v === null || v === '') return null;
+  // One answer per PV string (the electrician's F43): "String 1: 395.2 V · String 2: …".
+  if (f.perString) {
+    const list = perStringValues(f, c);
+    const one = { ...f, perString: false };
+    return list.some((x) => x !== null && x !== '') ? list.map((x, i) => `String ${i + 1}: ${answerWords(one, x, c) ?? '–'}`).join(' · ') : null;
+  }
+  if (v === 'na') return 'N/A';
+  if (v === 'off') return null;
   switch (f.type) {
     case 'CONFIRM':
       return v === true ? 'Confirmed' : v === 'cant' ? 'Couldn’t confirm' : null;

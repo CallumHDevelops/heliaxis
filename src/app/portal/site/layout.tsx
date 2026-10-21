@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import './site.css';
 import './form.css';
+import './electrician.css';
 
 export const metadata: Metadata = {
   title: 'Heliaxis Site',

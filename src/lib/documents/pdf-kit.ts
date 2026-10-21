@@ -209,8 +209,11 @@ export type DocOptions = {
 
 /** `strong`: the figure the document is for ("What you'll be paid"), on a paper band and larger. */
 export type Row = { label: string; value: string | null | undefined; must?: boolean; note?: string | null; strong?: boolean };
-export type Mark = 'tick' | 'cross' | 'na' | null;
+/** A drawn tick, a cross, N/A, or 'empty' (a box left blank on purpose: a Table 2 condition that doesn't apply). */
+export type Mark = 'tick' | 'cross' | 'na' | 'empty' | null;
 export type CheckItem = { label: string; mark: Mark; note?: string | null; must?: boolean };
+/** results(): a bold title, the wording, sub-lines, italic guidance, and a result in words or a mark. */
+export type ResultItem = { title?: string | null; label: string; lines?: string[]; guidance?: string | null; italic?: boolean; value?: string | null; mark?: Mark; note?: string | null; must?: boolean };
 export type PhotoItem = { bytes: Uint8Array; mime: string; caption: string; sub?: string | null };
 export type SignatureItem = { title: string; png: Uint8Array | string | null; name: string; at: string | null; line?: string | null };
 
@@ -421,7 +424,67 @@ export async function newDocument(o: DocOptions) {
           page.drawLine({ start: { x: bx + 3.5, y: by + 3.5 }, end: { x: bx + 10.5, y: by + 10.5 }, thickness: 1.6, color: RED });
           page.drawLine({ start: { x: bx + 3.5, y: by + 10.5 }, end: { x: bx + 10.5, y: by + 3.5 }, thickness: 1.6, color: RED });
         } else if (it.mark === 'na') text('N/A', bx + 19, by + 4, 7.5, { bold: true, color: MUTED });
-        else text('Not answered', bx - 60, by + 4, 7.5, { italic: true, color: o.draft ? RED : MUTED });
+        else if (it.mark !== 'empty') text('Not answered', bx - 60, by + 4, 7.5, { italic: true, color: o.draft ? RED : MUTED });
+        y -= h;
+        hairline(y + 2, LINE, 0.4);
+      }
+      y -= 4;
+    },
+    /**
+     * Test and inspection rows as the owner's forms lay them out (F74, F75): a bold title, the
+     * wording (italic where the form has it), sub-lines, guidance in italics, and on the right the
+     * result in words (Pass, N/A) or a drawn tick or cross.
+     */
+    results(items: ResultItem[]) {
+      const lw = W - 84;
+      for (const raw of items) {
+        // N/A prints as words on the right, like Pass and Fail.
+        const it = raw.mark === 'na' ? { ...raw, mark: null, value: 'N/A' } : raw;
+        const empty = !it.mark && (it.value === null || it.value === undefined || String(it.value).trim() === '');
+        if (empty && it.must && !o.draft) throw new MissingAnswer(it.title || it.label);
+        const tl = it.title ? lines(it.title, 9, lw, true) : [];
+        const ll = it.label ? lines(it.label, 9, lw) : [];
+        const sl = (it.lines ?? []).flatMap((l) => lines(`•  ${l}`, 8.5, lw - 10));
+        const gl = it.guidance ? lines(it.guidance, 8, lw) : [];
+        const nl = it.note ? lines(it.note, 7.5, lw) : [];
+        const h = Math.max(tl.length * 11.5 + ll.length * 11.5 + sl.length * 10.5 + (gl.length ? gl.length * 10 + 3 : 0) + nl.length * 9.5, 16) + 9;
+        need(h);
+        let ty = y - 11;
+        for (const l of tl) {
+          text(l, X, ty, 9, { bold: true });
+          ty -= 11.5;
+        }
+        for (const l of ll) {
+          text(l, X, ty, 9, { italic: it.italic });
+          ty -= 11.5;
+        }
+        for (const l of sl) {
+          text(l, X + 10, ty, 8.5, { italic: it.italic });
+          ty -= 10.5;
+        }
+        if (gl.length) ty -= 3;
+        for (const l of gl) {
+          text(l, X, ty, 8, { italic: true, color: MUTED });
+          ty -= 10;
+        }
+        for (const l of nl) {
+          text(l, X, ty, 7.5, { color: MUTED });
+          ty -= 9.5;
+        }
+        const bx = X + W - 44;
+        const by = y - 16;
+        if (it.mark) {
+          page.drawRectangle({ x: bx, y: by, width: 14, height: 14, borderColor: INK, borderWidth: 0.8 });
+          // (an 'empty' mark is the box alone)
+          if (it.mark === 'tick') {
+            page.drawLine({ start: { x: bx + 3, y: by + 7 }, end: { x: bx + 6, y: by + 3.5 }, thickness: 1.6, color: INK });
+            page.drawLine({ start: { x: bx + 6, y: by + 3.5 }, end: { x: bx + 11.5, y: by + 11 }, thickness: 1.6, color: INK });
+          } else if (it.mark === 'cross') {
+            page.drawLine({ start: { x: bx + 3.5, y: by + 3.5 }, end: { x: bx + 10.5, y: by + 10.5 }, thickness: 1.6, color: RED });
+            page.drawLine({ start: { x: bx + 3.5, y: by + 10.5 }, end: { x: bx + 10.5, y: by + 3.5 }, thickness: 1.6, color: RED });
+          }
+        } else if (empty) text('Not answered', X + W - 70, by + 4, 7.5, { italic: true, color: o.draft ? RED : MUTED });
+        else right(String(it.value), X + W, by + 4, 9, { bold: true, color: it.value === 'Fail' ? RED : INK });
         y -= h;
         hairline(y + 2, LINE, 0.4);
       }

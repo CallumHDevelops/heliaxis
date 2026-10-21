@@ -49,6 +49,43 @@ export type FormCtx = {
   address: string;
   /** Stages already signed off on this assignment. */
   signed: Stage[];
+  /** The electrician's pack: what the forms read from the job, the roofer and the office (Unit 2). */
+  el?: ElectricianFacts;
+};
+
+/**
+ * What the electrician's forms know about the job beyond the design (src/lib/site/electrician-shared.ts
+ * builds it from the job pack on the phone, and from the database at sign-off). Empty means not known:
+ * nothing is guessed.
+ */
+export type ElectricianFacts = {
+  /** The assignment's certificate route (D16): 'eic', 'eic_single', 'meiwc' or 'own'. */
+  cert_route: string;
+  /** "Jane", for "Have you told Jane…". */
+  customer_first: string;
+  /** The job's DNO route (paperwork.dno_route: g98, g99, demand, not_needed) and reference. */
+  dno_route: string | null;
+  dno_ref: string | null;
+  export_limit_kw: number | null;
+  inverter_kw: number | null;
+  battery_kwh: number | null;
+  ev_model: string | null;
+  heat_pump_model: string | null;
+  /** The survey's battery spot (F5), for the battery location check. */
+  survey_battery_spot: string | null;
+  /** What the roofer has synced: their answers (values), what Claude read from their photos, their photo counts. */
+  roofer: { status: string; values: Record<string, unknown>; reads: { key: string; status: string; result: LabelReadResult | null }[]; photos: Record<string, number> } | null;
+  /** Serials captured elsewhere on the job (the roofer's panels and optimisers), for "no serial twice". */
+  serials_elsewhere: string[];
+  /** F43: how far a measured string Voc may be from the expected before it's flagged (percent, a setting). */
+  voc_tolerance: number;
+  /** The test instruments this person gave on their last job, offered for F43. */
+  instruments: string | null;
+  /** The electrician's own name (from their contact), for "Tested by". */
+  name: string | null;
+  /** Their scheme and number, offered for an uploaded certificate. */
+  scheme: string | null;
+  scheme_number: string | null;
 };
 
 /** What a label photo was read as (src/lib/site/vision.ts LabelRead). */
@@ -112,6 +149,47 @@ export type Field = {
   declaration?: (c: FormCtx) => string;
   /** Still takes answers after its stage is signed off (the scaffold's tag photo). */
   late?: boolean;
+
+  /* The electrician's pack (Unit 2). */
+  /** The question in words for this job ("Is the charger commissioned?", "Have you told Jane…"); `label` stays the record's. */
+  say?: (c: FormCtx) => string;
+  /** A heading above this row, starting a group of questions within the step ("Inverter"). */
+  group?: string;
+  /** Guidance behind an ⓘ (F74 Part 4's italic notes), shown in full when tapped. */
+  info?: string;
+  /** Asked once per PV string (F43): the value is a list, one per string (strings from `strings`). */
+  perString?: boolean;
+  /** perString: strings 2 onwards are "Same as string 1" until that's switched off. */
+  same?: boolean;
+  /** perString: a line beside one string's box ("Expected about 395.2 V (8 × 49.4 V)"). */
+  stringNote?: (c: FormCtx, i: number) => string | null;
+  /** NUM and TEXT: an N/A choice, stored as 'na' (an OCPD rating when none is fitted). */
+  na?: boolean;
+  /** TEXT: quick choices under the box ("None fitted", "gPV fuse"). */
+  choices?: string[];
+  /** Choosing this fills other rows: "None fitted" puts N/A in the three OCPD rows. */
+  fills?: { when: string; keys: string[]; v: unknown };
+  /** A one-tap answer for several rows at once ("N/A: no back-up"), offered while `when` holds. */
+  bulk?: { label: string; keys: string[]; v: unknown; when: (c: FormCtx) => boolean };
+  /** Worked out from other answers until someone answers it (F44 items 36–38, F44A): a tap changes it. */
+  auto?: (c: FormCtx) => unknown;
+  /** Where the worked-out answer comes from ("Done in PV tests (F43)"). */
+  autoFrom?: (c: FormCtx) => string | null;
+  /** Worked out from rows still to do (which the gate lists themselves): not listed again while they are. */
+  autoWaits?: (c: FormCtx) => boolean;
+  /** AUTO rows the gate checks: answered when this says so (the certificate until its route is built). */
+  done?: (c: FormCtx) => boolean;
+  /** Photo slots shown beside the row as evidence (F44: the cable route photos). */
+  evidence?: string[];
+  /** The roofer's photo slots shown beside the row (F44 item 13: the fixings). */
+  rooferEvidence?: string[];
+  /** SCAN: the label photo slot it reads from ("Read from photo" serials), and how many are expected. */
+  photo?: string;
+  expect?: (c: FormCtx) => number | null;
+  /** PHOTOS: a PDF is taken too (a certificate from the scheme's software). */
+  files?: boolean;
+  /** A panel the phone draws on this row: 'missing' is the Finish screen's "Everything provided" list. */
+  panel?: 'missing';
 };
 
 export type Step = {
@@ -122,6 +200,8 @@ export type Step = {
   intro?: string;
   fields: Field[];
   show?: (c: FormCtx) => boolean;
+  /** 'strings': the F43 screen, with a tab per PV string and the per-string rows in cards (P8). */
+  layout?: 'strings';
 };
 
 /** A flag rule (FORMS 5): when it's raised, how bad it is, and what the office reads. */

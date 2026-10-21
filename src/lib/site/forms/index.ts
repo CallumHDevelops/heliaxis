@@ -7,6 +7,7 @@
  */
 import type { Design } from '../design';
 import type { Trade } from '../types';
+import { electricianForm } from './electrician/index';
 import { ROOFER } from './roofer';
 import { SCAFFOLD_DOWN, SCAFFOLD_UP } from './scaffold';
 import type { SiteForm } from './types';
@@ -15,14 +16,14 @@ import type { SiteForm } from './types';
  * Bumped when fields are added. Stored on each assignment when it's made, and an assignment is
  * always shown with the forms of its own version (keys never change once used; new ones are added).
  */
-export const SITE_SCHEMA_VERSION = 1;
+export const SITE_SCHEMA_VERSION = 2;
 
 /**
  * The forms for each trade, stage by stage (the scaffolder's erection, then the strike). The
- * electrician's pack is built from the sections on the assignment (Unit 2 adds them here).
+ * electrician's pack is built from the sections on the assignment (forms/electrician).
  */
 const BY_TRADE: Partial<Record<Trade, SiteForm[]>> = { roofer: [ROOFER], scaffolder: [SCAFFOLD_UP, SCAFFOLD_DOWN] };
-const ELECTRICIAN: ((forms: string[]) => SiteForm)[] = [];
+const ELECTRICIAN: ((forms: string[]) => SiteForm)[] = [(forms) => electricianForm(forms, ELECTRICIAN_FORMS)];
 
 /** Every form of every trade (the electrician's with all its sections), for the key checks in the tests. */
 export function allForms(): SiteForm[] {

@@ -4,6 +4,7 @@ import { shortDate } from '@/lib/site/client';
 import type { SiteForm } from '@/lib/site/forms/types';
 import type { PackRecord } from '@/lib/site/offline';
 import { SyncLine, TopBar } from './bits';
+import { CustomerSignCard } from './CustomerSign';
 import { go } from './nav';
 import { PoCard } from './PoCard';
 
@@ -57,6 +58,7 @@ export function DoneScreen({ rec, form, pending }: { rec: PackRecord; form: Site
               </p>
             </div>
             <PoCard rec={rec} stage={form.stage} />
+            <CustomerSignCard rec={rec} />
           </>
         ) : (
           <div className="sa-card sa-signed">
@@ -67,6 +69,7 @@ export function DoneScreen({ rec, form, pending }: { rec: PackRecord; form: Site
             </p>
           </div>
         )}
+        {!gate && !signed && <CustomerSignCard rec={rec} />}
         <button type="button" className="sa-btn sa-btn-2" onClick={() => go(`/portal/site/job/${job}`)}>
           Back to the job
         </button>

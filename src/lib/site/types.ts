@@ -34,8 +34,8 @@ export const STAGES_FOR: Record<Trade, Stage[]> = { roofer: ['main'], electricia
 export type { CisRate, RateBasis, VatTreatment } from './money';
 export type CertRoute = 'eic' | 'eic_single' | 'meiwc' | 'own';
 
-/** Where a value came from: typed, scanned, read from a photo, or offered from the roofer, the design or the job. */
-export type Source = 'typed' | 'scan' | 'photo' | 'roofer' | 'design' | 'job';
+/** Where a value came from: typed, scanned, read from a photo, offered from the roofer, the design or the job, calculated, or remembered from the last job. */
+export type Source = 'typed' | 'scan' | 'photo' | 'roofer' | 'design' | 'job' | 'calc' | 'last';
 export const SOURCE_LABEL: Record<Source, string> = {
   typed: 'Typed',
   scan: 'Scanned',
@@ -43,6 +43,8 @@ export const SOURCE_LABEL: Record<Source, string> = {
   roofer: 'From the roofer',
   design: 'From the design',
   job: 'From the job',
+  calc: 'Calculated',
+  last: 'From your last job',
 };
 
 /** One answer as stored: the value, its source, when it was given (ISO), and the phone it came from (site_devices id). */

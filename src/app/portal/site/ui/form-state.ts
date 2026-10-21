@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { factsFromPack, withFiles } from '@/lib/site/electrician-shared';
 import { schemaFor } from '@/lib/site/forms';
 import type { FormCtx, LabelReadResult, SiteForm } from '@/lib/site/forms/types';
 import { byJob, type OutboxRecord, type PackRecord, type PhotoRecord } from '@/lib/site/offline';
@@ -46,6 +47,8 @@ export function useJobForms(rec: PackRecord, answers: Answers): JobForms | null 
     }
     const counts: Record<string, number> = {};
     for (const [slot, list] of Object.entries(photos)) counts[slot] = list.length;
+    // An electrician's certificate PDFs count in their slot too: on the server, or still on the phone.
+    const files = [...(pack.electrician?.uploads ?? []), ...outbox.filter((o) => o.kind === 'file' && !o.failed).map((o) => ({ slot: String(o.payload.slot) }))];
     const signed = [...new Set([...pack.assignment.signoffs.map((s) => s.stage), ...pendingSign])];
     const ctx = makeCtx({
       trade: pack.assignment.trade,
@@ -54,10 +57,11 @@ export function useJobForms(rec: PackRecord, answers: Answers): JobForms | null 
       system: pack.system,
       products: pack.job.products,
       sides: pack.sides,
-      photos: counts,
+      photos: withFiles(counts, files),
       reads: pack.reads.map((r) => ({ key: r.key, status: r.status, result: r.result as LabelReadResult | null })),
       address: [...pack.job.address, pack.job.postcode].filter(Boolean).join(', '),
       signed,
+      el: factsFromPack(pack),
     });
     return { ctx, forms: schemaFor(pack.assignment), signed, pendingSign, photos };
   }, [rec, answers, local, outbox]);

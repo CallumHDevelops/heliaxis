@@ -193,6 +193,15 @@ function System({ pack }: { pack: SitePack }) {
   if (s.battery_model) rows.push(['Battery', s.battery_model]);
   if (pack.design.strings_design?.length) rows.push(['Strings', pack.design.strings_design.map((n, i) => `${i + 1}: ${n} panels`).join(' · ')]);
   if (pack.design.mounting) rows.push(['Mounting', { on_roof: 'On roof', in_roof: 'In roof', flat: 'Flat roof', ground: 'Ground' }[pack.design.mounting]]);
+  // An electrician's pack: what the roofer has given so far (it's offered on F43 with one tap).
+  const r = pack.electrician?.facts.roofer;
+  if (r) {
+    const v = r.values;
+    const strings = Array.isArray(v.RF11) ? (v.RF11 as unknown[]).join(' + ') : null;
+    if (v.RF10) rows.push(['Roofer: strings', `${v.RF10}${strings ? ` (${strings})` : ''}`]);
+    if (typeof v.RF13 === 'string') rows.push(['Roofer: panel', `${v.RF13}${typeof v.RF14 === 'number' ? ` · Voc ${v.RF14} V` : ''}`]);
+    if (v.RF7 === 'yes' || v.RF7 === 'no') rows.push(['Roofer: optimisers', v.RF7 === 'yes' ? 'Fitted' : 'None']);
+  }
   if (!rows.length) return null;
   return (
     <section className="sa-card sa-rows">

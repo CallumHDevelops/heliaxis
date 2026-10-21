@@ -9,18 +9,21 @@ import { addSourceTask } from '@/lib/surveys/server';
 import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
-import type { FormCtx, SiteForm } from './forms/types';
+import type { SiteForm } from './forms/types';
 import { issueLabourPo, livePo, raiseLabourPo, sendPoMessages } from './labour-po';
 import { sendAfter, siteShort } from './messages';
 import { packPo } from './pack';
 import type { SignoffReply } from './pack-shared';
 import { HELD_WORDS, poNext, type HeldReason } from './po-shared';
 import { formatPence } from './money';
+// The electrician's sign-off steps register themselves (commissioning, tasks, the paperwork).
+import './electrician-signoff';
 import { saveTradeReport } from './reports';
-import { flagsFor, openForms, recordAnswers, signCheck, type Missing } from './rules';
+import { flagsFor, openForms, recordAnswers, signCheck } from './rules';
+import { pluginDocs, pluginGate, pluginJob, registerSignoff, type SignoffRow } from './signoff-plugins';
 import { jobOf } from './send';
 import { logJob, logSiteEvent, readAssignment, type AssignmentRow, type Db } from './server';
-import { TRADE_LABEL, type AssignmentStatus, type Flag, type Stage, type Trade } from './types';
+import { TRADE_LABEL, type AssignmentStatus, type Flag, type Stage } from './types';
 
 /**
  * Signing off (SPEC 1I, ARCH 7.1): the server's own gate over what has reached it, one
@@ -29,40 +32,11 @@ import { TRADE_LABEL, type AssignmentStatus, type Flag, type Stage, type Trade }
  * issued, the trade's report, the job owner told), each step stamping a column so /api/cron/site
  * can finish any that didn't run.
  *
- * Units 2 and 3 plug in per trade with registerSignoff: more for the gate to check (the
- * electrician's completion gate), job updates (commissioned_at) and the documents a sign-off makes.
+ * Units 2 and 3 plug in per trade with registerSignoff (signoff-plugins.ts): more for the gate to
+ * check, job updates (commissioned_at) and the documents a sign-off makes. The electrician's pack
+ * registers in electrician-signoff.ts, imported above so it's there wherever a sign-off runs.
  */
-
-export type SignoffRow = {
-  id: string;
-  assignment_id: string;
-  stage: Stage;
-  signed_name: string;
-  signature_path: string;
-  signed_at: string;
-  received_at: string;
-  device_id: string | null;
-  ip: string | null;
-  user_agent: string | null;
-  declaration: string;
-  answers_hash: string;
-  flags: Flag[];
-  extra: Record<string, unknown>;
-  po_done_at: string | null;
-  docs_done_at: string | null;
-  notified_at: string | null;
-};
-
-export type SignoffPlugin = {
-  /** More for the gate to check before a sign-off is taken (what's still missing, in the forms' words). */
-  gate?: (db: Db, a: AssignmentRow, stage: Stage, ctx: FormCtx) => Promise<Missing[]>;
-  /** Job record updates, only where empty and each logged. */
-  job?: (db: Db, a: AssignmentRow, s: SignoffRow) => Promise<void>;
-  /** The documents a sign-off makes (after the reply; docs_done_at). */
-  docs?: (db: Db, a: AssignmentRow, s: SignoffRow) => Promise<unknown>;
-};
-const PLUGINS = new Map<Trade, SignoffPlugin>();
-export const registerSignoff = (trade: Trade, p: SignoffPlugin) => void PLUGINS.set(trade, { ...PLUGINS.get(trade), ...p });
+export { registerSignoff, type SignoffPlugin, type SignoffRow } from './signoff-plugins';
 
 /** The scaffold's dates on the job, only where they're empty: up at erection, down at the strike. */
 async function scaffoldDates(db: Db, a: AssignmentRow, s: SignoffRow) {
@@ -147,7 +121,7 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
   if (!forms.length) return { ok: false, status: 409, body: { error: 'status', message: 'There’s nothing to sign for this job yet.' } };
   const ctx = await serverCtx(db, a);
   const checks = forms.map((f) => signCheck(f, ctx));
-  const extra = (await PLUGINS.get(a.trade)?.gate?.(db, a, stage, ctx)) ?? [];
+  const extra = await pluginGate(db, a, stage, ctx);
   const missing = [...checks.flatMap((c) => c.must), ...extra];
   const stops = checks.flatMap((c) => c.stops);
   if (missing.length || stops.length) {
@@ -224,7 +198,8 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
     .in('status', FROM[stage]);
   await logSiteEvent(db, a.id, 'trade', 'signed_off', { stage, signoff: id, name, device: meta.deviceId, answers_hash: hash }, meta.ip);
   const now = (await readAssignment(db, a.id)) ?? a;
-  await PLUGINS.get(a.trade)?.job?.(db, now, s);
+  // Job updates are made only where empty, so a failure here is left for the documents step to try again.
+  await pluginJob(db, now, s).catch((e) => console.error('[site/signoff] job', e));
 
   // The PO, now, so the phone can show its number (none for the strike: the erection raised it).
   if (stage !== 'strike') await raiseLabourPo(db, now, { id: s.id, signed_name: s.signed_name, signed_at: s.signed_at, stage });
@@ -264,7 +239,7 @@ export async function finishSignoff(db: Db, signoffId: string): Promise<{ po: bo
   }
   if (!s.docs_done_at) {
     try {
-      await PLUGINS.get(a.trade)?.docs?.(db, a, s);
+      await pluginDocs(db, a, s);
       await stamp(db, s.id, 'docs_done_at');
       out.docs = true;
     } catch (e) {

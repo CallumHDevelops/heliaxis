@@ -25,6 +25,8 @@ export type SiteSettings = {
   locationStamps: boolean;
   /** New assignments show the customer's mobile in the job pack. */
   shareCustomerPhone: boolean;
+  /** F43: a measured string Voc further than this from expected (percent) goes to the office to check (SPEC 2.5 starts at 10). */
+  vocTolerancePct: number;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -36,6 +38,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   strikeReminderDays: [1, 3, 5],
   locationStamps: false,
   shareCustomerPhone: true,
+  vocTolerancePct: 10,
 };
 
 const VAT_DEFAULTS = ['', 'reverse_charge', 'standard', 'zero'];
@@ -56,5 +59,6 @@ export function cleanSiteSettings(b: Partial<Record<keyof SiteSettings, unknown>
     strikeReminderDays: reminders,
     locationStamps: bool(b.locationStamps, d.locationStamps),
     shareCustomerPhone: bool(b.shareCustomerPhone, d.shareCustomerPhone),
+    vocTolerancePct: Number.isFinite(Number(b.vocTolerancePct)) && Number(b.vocTolerancePct) >= 1 && Number(b.vocTolerancePct) <= 50 ? Number(b.vocTolerancePct) : d.vocTolerancePct,
   };
 }
