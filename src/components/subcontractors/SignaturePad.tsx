@@ -12,9 +12,27 @@ export function SignaturePad({ onChange, height = 160 }: { onChange: (dataUrl: s
 
   useEffect(() => {
     const c = canvasRef.current!;
+    // The canvas's size as last fitted: -1 before the first fit (and again when `height` changes).
+    let lastW = -1;
+    let lastRatio = 1;
     const fit = () => {
       const ratio = window.devicePixelRatio || 1;
       const w = c.clientWidth;
+      // A phone's address bar showing or hiding as the page scrolls fires resize with the same width:
+      // the signature stays as it is.
+      if (w === lastW && ratio === lastRatio) return;
+      const first = lastW < 0;
+      // Rotated, or the window really changed width: keep the ink (resizing the canvas wipes it).
+      let keep: HTMLCanvasElement | null = null;
+      if (!first && c.width && c.height) {
+        keep = document.createElement('canvas');
+        keep.width = c.width;
+        keep.height = c.height;
+        keep.getContext('2d')!.drawImage(c, 0, 0);
+      }
+      const was = { w: lastW, ratio: lastRatio };
+      lastW = w;
+      lastRatio = ratio;
       c.width = w * ratio;
       c.height = height * ratio;
       const ctx = c.getContext('2d')!;
@@ -23,6 +41,12 @@ export function SignaturePad({ onChange, height = 160 }: { onChange: (dataUrl: s
       ctx.lineJoin = 'round';
       ctx.lineWidth = 2.4;
       ctx.strokeStyle = '#1a1a3a';
+      if (keep) {
+        // Back where it was, shrunk to fit if the pad got narrower. What was sent with onChange is still the signature.
+        const scale = Math.min(1, w / Math.max(1, was.w));
+        ctx.drawImage(keep, 0, 0, (keep.width / was.ratio) * scale, (keep.height / was.ratio) * scale);
+        return;
+      }
       setEmpty(true);
       onChange(null);
     };
