@@ -51,6 +51,8 @@ export const ELECTRICIAN_DOCS: DocDef[] = [
   { key: 'EV_REC', label: '', title: EV_TITLE, slot: 'CCMH', section: 'ev', products: ['ev'], make: makeEvRecord },
   { key: 'HP_REC', label: '', title: HP_TITLE, slot: 'CCMH', section: 'heatpump', products: ['heatpump'], make: makeHpRecord },
 ];
+/** Answers the office writes on the assignment (eic/design.ts), not the electrician: left out of what their documents are hashed on. */
+const OFFICE_KEYS = ['eic_design'];
 /** Every generated document key an electrician's sign-off can make (the review drawer lists them). */
 export const ELECTRICIAN_DOC_KEYS = [...ELECTRICIAN_DOCS.map((d) => d.key), 'CERT_OWN', 'EP_RECORD'];
 
@@ -94,8 +96,11 @@ export async function electricianInput(
     ctx,
     draft: opts.draft || !signoff,
   };
-  // The hash: what the documents print from (not the signature image's bytes, which never change).
-  const inputs = { values: ctx.values, design: ctx.design, system: ctx.system, products: ctx.products, el: ctx.el ?? null, jobRef: input.jobRef, address, customer: input.customer, engineer: input.engineer, company: input.company, date: input.date, signoff: signoff?.id ?? null };
+  // The hash: what the documents print from (not the signature image's bytes, which never change),
+  // and not the office's own answers kept beside the electrician's (the EIC's design part): none of
+  // these documents prints them, so signing the design part doesn't put them out of date.
+  const values = Object.fromEntries(Object.entries(ctx.values).filter(([k]) => !OFFICE_KEYS.includes(k)));
+  const inputs = { values, design: ctx.design, system: ctx.system, products: ctx.products, el: ctx.el ?? null, jobRef: input.jobRef, address, customer: input.customer, engineer: input.engineer, company: input.company, date: input.date, signoff: signoff?.id ?? null };
   return { input, inputs, signoffId: signoff?.id ?? null };
 }
 

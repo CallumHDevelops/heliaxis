@@ -501,6 +501,24 @@ eq('the stored F75 carries the engineer and the signature line', [storedF75.incl
 const HF = await import('../src/lib/site/handover-facts.ts');
 const hf = await HF.siteHandoverFacts(db, p1.id, {});
 eq('the handover pack is told: their certificate’s reference, F78 "initial" (from F43), nothing waiting', [hf.certRef, hf.values.f78_kind, e1.answers.f78_kind, hf.certWaits, hf.nextInspection], ['NAPIT EIC 00123456', 'initial', undefined, null, null]);
+{
+  const ED = await import('../src/lib/site/electrician-docs.ts');
+  const ref = (d) => ({ projectId: d.project_id, key: d.generated_key, hash: d.inputs_hash, madeAt: d.created_at });
+  // The office signs the EIC's design part (it's kept on the assignment's answers, beside the
+  // electrician's): none of their documents print it, so their print versions still work.
+  const { signDesign } = await import('../src/lib/site/eic/design.ts');
+  const { readAssignment } = await import('../src/lib/site/server.ts');
+  const designed = await signDesign(db, await readAssignment(db, e1.id), { name: 'Sarah Jones', company: 'Heliaxis Ltd', address: '9 Turner Street, Newport', postcode: 'NP19 7AZ', tel: '01633 965205', next_n: 10, next_unit: 'years', departures: null, signature: SIG }, { id: 'staff-1', name: 'Sarah Jones' });
+  eq('the office signs the EIC’s design part', [designed.ok, !!db.rows('site_assignments').find((x) => x.id === e1.id).answers.eic_design], [true, true]);
+  const afterDesign = [];
+  for (const d of made.filter((x) => !x.generated_key.startsWith('PO-'))) {
+    const bytes = await ED.electricianDocPrint(db, ref(d));
+    if (bytes instanceof Uint8Array && flat(await textOf(bytes)) === flat(await textOf(db.files.get(`crm-docs/${d.storage_path}`)))) afterDesign.push(d.generated_key);
+  }
+  eq('after the design part is signed: every print version still made, with the same words', afterDesign.sort(), ['F43', 'F44', 'F44A', 'F74', 'F75']);
+  const again = await ED.saveElectricianDocs(db, e1.id);
+  eq('…and the documents aren’t made again for it (nothing they print changed)', again.map((r) => r.status), ['same', 'same', 'same', 'same', 'same']);
+}
 
 // An EV job signed the day before Christmas: the call skips the bank holidays; the DNO to-do.
 fixed = Date.parse('2026-12-24T14:00:00Z');
