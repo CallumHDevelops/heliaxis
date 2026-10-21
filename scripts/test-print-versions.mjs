@@ -1,6 +1,6 @@
 // The print version of every document the app makes (the owner: "a digital version and a print
 // version, print offers an ink saving"): the labour PO with its terms, the supplier's PO, the
-// electrician's F43, F44, F44A, F74, F75, EV and heat pump records and photo record, the EIC (final,
+// electrician's solar PV and battery records (HX-PV-01 to 03, HX-BAT-01 and 02), EV and heat pump records and photo record, the EIC (final,
 // draft, single signature, a long variant) and a Minor Works sheet, each made in both of the kit's
 // variants from the same inputs: the same words on the same pages, the digital one on the cream page
 // with its dark bands, the print one with no cream, card or band fill; the EIC's IET body on its
@@ -93,15 +93,15 @@ async function both(name, make, opts = {}) {
 const PS = await imp('lib/documents/print-shared.ts');
 eq(
   'a print version for every document the app makes',
-  ['PACK', 'F43', 'F44', 'F44A', 'F74', 'F75', 'EV_REC', 'HP_REC', 'EP_RECORD', 'RF_REPORT', 'SC_REPORT', 'EIC', 'EIC2', 'EIC_DRAFT', 'MEIWC-1', 'MEIWC2-3', 'F78', 'F19I', 'F16E', 'CC4', 'F48I', 'F49', 'F49A', 'F47', 'F76_SHEET', 'CC13_RECEIPT', 'F07BI', 'PO-0042'].filter((k) => !PS.hasPrintVersion(k)),
+  ['PACK', 'HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-EV-01', 'HX-HP-01', 'EP_RECORD', 'RF_REPORT', 'SC_REPORT', 'EIC', 'EIC2', 'EIC_DRAFT', 'MEIWC-1', 'MEIWC2-3', 'HX-HO-02', 'HX-HO-06', 'HX-HO-08', 'HX-HO-09', 'HX-HO-10', 'HX-HO-11', 'HX-HO-12', 'HX-HO-15-SHEET', 'HX-HO-16-SHEET', 'HX-HO-18-RECEIPT', 'HX-HO-01', 'PO-0042'].filter((k) => !PS.hasPrintVersion(k)),
   []
 );
-eq('none for uploads, the library or their own certificate', ['CERT_OWN', 'LIB-123', null, '', 'F74B'].filter((k) => PS.hasPrintVersion(k)), []);
-eq('the link', [PS.PRINT_LABEL, PS.printHref('/api/crm/documents/x'), PS.printHref('/api/x/pdf?inline=1'), PS.printName('HX-0042 F43 PV Array Test Report.pdf')], [
+eq('none for uploads, the library or their own certificate', ['CERT_OWN', 'LIB-123', null, '', 'HX-BAT-04', 'HX-HO-15', 'HX-HO-03'].filter((k) => PS.hasPrintVersion(k)), []);
+eq('the link', [PS.PRINT_LABEL, PS.printHref('/api/crm/documents/x'), PS.printHref('/api/x/pdf?inline=1'), PS.printName('HX-0042 Solar PV string test results.pdf')], [
   'Print version',
   '/api/crm/documents/x?variant=print',
   '/api/x/pdf?inline=1&variant=print',
-  'HX-0042 F43 PV Array Test Report (print version).pdf',
+  'HX-0042 Solar PV string test results (print version).pdf',
 ]);
 
 /* ── The electrician's documents ──────────────────────────────────────────────── */
@@ -114,16 +114,17 @@ const { ctxOf, formFor, fillAll, input } = X.makeFixtures({ R, F, designOf });
 const products = ['solar', 'battery'];
 const full = fillAll(formFor(products), products);
 const d = { ...input(ctxOf(products, full.values, full.photos)), date: '2026-11-03', signature: SIG };
-const f43 = await imp('lib/documents/site/f43.ts');
-const f44 = await imp('lib/documents/site/f44.ts');
-const f74 = await imp('lib/documents/site/f74.ts');
+const pvt = await imp('lib/documents/site/pv-tests.ts');
+const pvi = await imp('lib/documents/site/pv-inspect.ts');
+const pvc = await imp('lib/documents/site/pv-switch-on.ts');
+const bat = await imp('lib/documents/site/battery.ts');
 const rec = await imp('lib/documents/site/records.ts');
 for (const [name, make] of [
-  ['F43', f43.makeF43],
-  ['F44', f44.makeF44],
-  ['F44A', f44.makeF44A],
-  ['F74', f74.makeF74],
-  ['F75', f74.makeF75],
+  ['HX-PV-01', pvi.makePvInspect],
+  ['HX-PV-02', pvt.makePvTests],
+  ['HX-PV-03', pvc.makePvSwitchOn],
+  ['HX-BAT-01', bat.makeBatteryInspection],
+  ['HX-BAT-02', bat.makeBatteryTests],
 ]) {
   const text = await both(name, (variant) => make({ ...d, variant }));
   eq(`${name}: the title block on every page`, text.every((p, i) => p.includes(`Page ${i + 1} of ${text.length}`) && p.includes('Registered in England and Wales No. 16734783')), true);

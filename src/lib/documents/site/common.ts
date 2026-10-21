@@ -1,18 +1,18 @@
 import 'server-only';
-import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { longDate, type Kit, type Mark, type SignatureItem, type Variant } from '@/lib/documents/pdf-kit';
+import { recordStatement, signedStatement, type RecordCode } from '@/lib/site/declaration';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { valueOf } from '@/lib/site/rules';
 
 /**
- * What the electrician's documents share (F43, F44, F44A, F74, F75, the EV and heat pump records):
- * the input every generator takes, the merge fields (FORMS 0.5), marks and words for answers, and
- * the signature block. The answers come as the rules' context, so "answer once, print everywhere"
- * (FORMS 1.6) is one set of values read by every document.
+ * What the electrician's documents share (the solar PV and battery records, the EV and heat pump
+ * records): the input every generator takes, the job's details at the top, marks and words for
+ * answers, the record's statement as signed, and the signature block. The answers come as the rules'
+ * context, so "answer once, print everywhere" (FORMS 1.6) is one set of values read by every document.
  */
 
 export type ElectricianDocInput = {
-  /** crm_projects.project_ref ("HX-0042"): the forms' "Project reference". */
+  /** crm_projects.project_ref ("HX-0042"): the records' "Job reference". */
   jobRef: string | null;
   /** The installation address, a line each, the postcode last. */
   address: string[];
@@ -30,6 +30,10 @@ export type ElectricianDocInput = {
   draft?: boolean;
   /** 'digital' (the default: stored, emailed, the portal, the handover pack) or 'print' (the ink saver, on request). */
   variant?: Variant;
+  /** The declaration as signed (site_signoffs.declaration): each record prints its own statement from it. */
+  declaration?: string | null;
+  /** The job's Building Control reference (paperwork.building_regs_ref), once the office has it. */
+  buildingRef?: string | null;
 };
 
 const WORD: Record<string, string> = { yes: 'Yes', no: 'No', na: 'N/A', pass: 'Pass', fail: 'Fail' };
@@ -60,21 +64,26 @@ export const answer = (f: Field, c: FormCtx) => valueOf(f, c);
 
 export const addressWords = (lines: string[]) => lines.filter(Boolean).join(', ');
 
-/** The merge fields at the top of every form: Project reference, Installation Address, by, Date. */
-export function siteBox(kit: Kit, d: ElectricianDocInput, by: string) {
+/** The job's details at the top of every record: Job reference, the date, Address, and who did it. */
+export function siteBox(kit: Kit, d: ElectricianDocInput, by: string, dateLabel = 'Date') {
   kit.idGrid([
-    ['Project reference', d.jobRef],
-    ['Date', longDate(d.date)],
-    ['Installation address', addressWords(d.address)],
+    ['Job reference', d.jobRef],
+    [dateLabel, longDate(d.date)],
+    ['Address', addressWords(d.address)],
     [by, [d.engineer, d.company].filter(Boolean).join(', ')],
   ]);
 }
 
-/** The installer's block (F44 carries it under the header). */
-export const installerLines = () => [HELIAXIS_COMPANY.tradingName, ...HELIAXIS_COMPANY.addressLines, HELIAXIS_COMPANY.phone, HELIAXIS_COMPANY.email].join(', ');
+/** A record's statement: as the electrician signed it (their declaration), else as it reads for this job. */
+export const statementOf = (d: ElectricianDocInput, code: RecordCode) =>
+  signedStatement(d.declaration, code) ?? recordStatement(code, addressWords(d.address), longDate(d.date), d.ctx.products);
 
-/** The electrician's signature at the end (FORMS 1.1–1.4 Rec.: F43, F44 and F74 have no line of their own). */
-export async function signature(kit: Kit, d: ElectricianDocInput, title: string) {
+/** The record's statement, then the electrician's signature under it (drafts: the statement only). */
+export async function signature(kit: Kit, d: ElectricianDocInput, title: string, code?: RecordCode) {
+  if (code) {
+    kit.section('Statement', { keep: 120 });
+    kit.paragraph(statementOf(d, code));
+  }
   if (d.draft) return;
   const sig: SignatureItem = { title, png: d.signature, name: [d.engineer, d.company].filter(Boolean).join(', '), at: d.signedAt };
   await kit.signatures([sig]);

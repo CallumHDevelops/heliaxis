@@ -30,8 +30,8 @@ const PARTS = ['application', 'acceptance', 'installation', 'g100'];
  * (needs_signature only on quotes and contracts).
  *
  * Straight into the customer's handover pack (owner's ask [8], SPEC 4.4), once handover.sql has run:
- * save also takes handover_slot (the item: CC17, CCMH…), hold (keep it until the pack is sent; shown
- * in their portal at once otherwise), replace (the document it replaces, archived), part (F76's
+ * save also takes handover_slot (the item: HX-HO-03, HX-HO-19…), hold (keep it until the pack is sent; shown
+ * in their portal at once otherwise), replace (the document it replaces, archived), part (HX-HO-16's
  * paper) and tell ['whatsapp' | 'email'] ("We've added your MCS certificate"). A photo becomes an A4
  * PDF page. An MCS certificate is read for its number, offered back to save.
  */
@@ -103,8 +103,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (isUuid(String(b.replace ?? ''))) {
         await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: s.user.id, visible: false }).eq('id', String(b.replace)).eq('project_id', id).eq('handover_slot', slot);
       }
-      if (slot === 'F76' && PARTS.includes(String(b.part))) await patchSlotData(db, id, 'F76', { parts: { [doc.id]: String(b.part) } }, s.user.id);
-      if (slot === 'CC17' && mime && (mime === 'application/pdf' || IMAGE.test(mime))) {
+      if (slot === 'HX-HO-16' && PARTS.includes(String(b.part))) await patchSlotData(db, id, 'HX-HO-16', { parts: { [doc.id]: String(b.part) } }, s.user.id);
+      if (slot === 'HX-HO-03' && mime && (mime === 'application/pdf' || IMAGE.test(mime))) {
         const { data: file } = await db.storage.from(DOCS_BUCKET).download(path);
         const n = file ? await readMcsNumber(new Uint8Array(await file.arrayBuffer()), mime) : null;
         if (n) read = { mcs_cert_no: n };

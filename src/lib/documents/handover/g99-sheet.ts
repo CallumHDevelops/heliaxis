@@ -4,16 +4,16 @@ import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { begin } from './common';
 
 /**
- * The G99 data sheet beside F76 (SPEC 4.5): everything the job holds that the DNO's G99 forms ask
+ * The G99 data sheet beside HX-HO-16 (SPEC 4.5): everything the job holds that the DNO's G99 forms ask
  * for, to copy into whichever form National Grid wants now (G99 Issue 2 may have replaced the owner's
  * Issue 1.9, src/lib/site/fixed/g99.ts). An office helper: it's never in the customer's pack, which
  * gets the application, the acceptance and the installation document as sent.
  */
-export const F76_SHEET_TITLE = 'G99 data sheet';
+export const G99_SHEET_TITLE = 'G99 data sheet';
 const NOT = 'Not recorded';
 
 export async function makeG99Sheet(g: G99Input): Promise<Uint8Array> {
-  const kit = await begin('F76', F76_SHEET_TITLE, g, { pairs: [['MPAN', g.mpan ?? NOT], ['DNO reference', g.dnoRef ?? 'Not applied yet']] });
+  const kit = await begin('HX-HO-16', G99_SHEET_TITLE, g, { pairs: [['MPAN', g.mpan ?? NOT], ['DNO reference', g.dnoRef ?? 'Not applied yet']] });
   kit.note('For the office: the values the G99 forms ask for, to copy into the DNO’s current form. Not for the customer’s pack.');
   kit.section('Customer');
   kit.rows([

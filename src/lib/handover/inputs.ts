@@ -1,8 +1,8 @@
 /**
  * What each of the pack's own documents is made from (SPEC 4.5), worked out from the job's facts:
- * the cover letter, warranty, completion record, G98 data sheet, G99 data sheet, shading and
- * performance, maintenance schedule and agreement, F78, the switching-off page and the payment
- * receipt. Each either has everything it needs (its inputs, hashed by the server to spot changes) or
+ * the covering letter, warranty, completion sign-off, G98 data sheet, G99 data sheet, solar estimate
+ * and shading, maintenance schedule and plan, the system summary, the switching-off page and the
+ * payment receipt. Each either has everything it needs (its inputs, hashed by the server to spot changes) or
  * says what it's missing or waiting for, in the office's words. Nothing is guessed: a value the job
  * hasn't got stays out, and if the document needs it, it isn't made (D14, "never invent").
  *
@@ -10,6 +10,7 @@
  * from the database.
  */
 import type { Design } from '../site/design';
+import { signedStatement, summaryStandards, SUMMARY_DECLARATIONS } from '../site/declaration';
 import { MIS3002_NOTES } from '../site/fixed/mis3002';
 import { approved, DRAFTS, warrantyReady, type HandoverSettings, type ScheduleRow } from './settings-shared';
 import { contentsGroups, type Fix, type SlotCode, type SlotView, type Tech } from './slots';
@@ -18,7 +19,7 @@ import { contentsGroups, type Fix, type SlotCode, type SlotView, type Tech } fro
 
 /** A customer's signature for one document: on the electrician's phone (P15) or in their portal (C2). */
 export type CustomerSig = { name: string; signed_at: string; path: string; via: 'phone' | 'portal'; declaration?: string | null };
-/** The office's design signature on F78. */
+/** The office's design signature on the system summary (HX-HO-02). */
 export type OfficeSig = { name: string; signed_at: string; path: string; by: string | null };
 /** A payment recorded against the job (crm_payments), typed from the invoice. */
 export type Payment = { id: string; kind: 'stage' | 'final' | 'other'; amount_pence: number; paid_on: string; method: 'card' | 'bank_transfer' | 'other'; reference: string | null };
@@ -43,15 +44,15 @@ export type Equipment = { what: string; tech: Tech; model: string | null; count:
 
 /** The office's own data on an item (handover_slots.data). */
 export type SlotData = {
-  /** F16E, F47: signed in the customer's portal. */
+  /** The completion sign-off (HX-HO-08), the G98 notice (HX-HO-15): signed in the customer's portal. */
   customer?: CustomerSig;
-  /** F78: the design part, signed in the office. */
+  /** The system summary (HX-HO-02): the design part, signed in the office. */
   design?: OfficeSig;
-  /** Typed values: F49A's agreement, CC4's switch locations, F78's overrides. */
+  /** Typed values: the maintenance plan as agreed, where the switches are, the system summary's overrides, the G98 isolator. */
   values?: Record<string, string>;
-  /** F16E: anything still to put right, with the date it will be done by. */
+  /** The completion sign-off: anything still to put right, with the date it will be done by. */
   outstanding?: { text: string; by: string | null }[];
-  /** F76: which G99 paper each document is. */
+  /** HX-HO-16: which G99 paper each document is. */
   parts?: Record<string, string>;
   /** Set by the document store: newer inputs than the version the customer has. */
   stale?: { key: string; hash: string; at: string };
@@ -84,14 +85,18 @@ export type ElectricianFacts = {
   signaturePath: string | null;
   /** The pack's answers (values only). */
   values: Record<string, unknown>;
-  customer: Partial<Record<'f16e' | 'g98', CustomerSig>>;
+  customer: Partial<Record<'completion' | 'g98', CustomerSig>>;
   partPBy: 'self' | 'heliaxis' | null;
   /** The electrical certificate's reference (the EIC's, or their own scheme's number). */
   certRef: string | null;
   /** "10 years", from the EIC. */
   nextInspection: string | null;
+  /** What they signed (site_signoffs.declaration): the summary prints its "Installed, inspected and tested by" part from it. */
+  declaration?: string | null;
   /** What the certificate still waits for from the office ("Sign the EIC’s design part…"), from site/handover-facts.ts. */
   certWaits?: string | null;
+  /** The certificate's route ('eic', 'eic_single', 'meiwc', 'own'), from site/handover-facts.ts. */
+  certRoute?: string | null;
 };
 
 export type HandoverFacts = {
@@ -126,7 +131,7 @@ export type HandoverFacts = {
   payments: Payment[];
   /** From the solar survey: what shades the roof, and the sun-path photo. */
   survey: { shading: string[]; sunPath: string | null };
-  /** Pack items with a current document (F43, F74, F75…): for F78's references and part ticks. */
+  /** Pack items with a current document (HX-PV-02, HX-BAT-01…): for the system summary's records. */
   made: string[];
   settings: HandoverSettings;
 };
@@ -194,11 +199,11 @@ export function installedLines(f: HandoverFacts): string[] {
     });
 }
 
-/** Product models on the job (for the library: CC4, CC5). */
+/** Product models on the job (for the library: switching off, product manuals). */
 export const modelsOf = (f: HandoverFacts) => [...new Set(equipmentOf(f).map((e) => e.model).filter((m): m is string => !!m))];
 
 /** The electrical certificate's reference: the electrician's, or the office's typed one. */
-const certRef = (f: HandoverFacts) => val(f, 'F78', 'cert_ref') ?? f.electrician?.certRef ?? null;
+const certRef = (f: HandoverFacts) => val(f, 'HX-HO-02', 'cert_ref') ?? f.electrician?.certRef ?? null;
 
 /* ── What each document is made from ─────────────────────────────────────── */
 
@@ -217,7 +222,7 @@ const signed = (f: HandoverFacts) => !!f.electrician?.signedAt;
 export type JobHead = { ref: string | null; issued: string; customer: string; address: string[]; postcode: string | null; variant?: 'digital' | 'print' };
 const head = (f: HandoverFacts): JobHead => ({ ref: f.job.ref, issued: f.today, customer: f.customer.name, address: f.job.addressLines, postcode: f.job.postcode });
 
-/** F07BI: the cover letter. */
+/** HX-HO-01: the covering letter. */
 export type CoverInput = JobHead & {
   first: string;
   installed: string[];
@@ -230,17 +235,17 @@ export type CoverInput = JobHead & {
 /** How each item reads in the cover letter's contents. */
 function coverStatus(v: SlotView): string {
   if (v.state === 'complete' || v.state === 'stale') return 'Enclosed';
-  if (v.code === 'CC17') return 'To follow: we register it with MCS within 10 working days of switching your system on';
-  if (v.code === 'CC16') return 'To follow, once the MCS certificate is registered';
-  if (v.code === 'CC14') return 'To follow from Building Control';
-  if (v.code === 'CC13') return 'To follow with your final invoice';
-  if (v.code === 'F16E') return 'To follow, once you’ve signed it';
+  if (v.code === 'HX-HO-03') return 'To follow: we register it with MCS within 10 working days of switching your system on';
+  if (v.code === 'HX-HO-07') return 'To follow, once the MCS certificate is registered';
+  if (v.code === 'HX-HO-05') return 'To follow from Building Control';
+  if (v.code === 'HX-HO-18') return 'To follow with your final invoice';
+  if (v.code === 'HX-HO-08') return 'To follow, once you’ve signed it';
   return 'To follow';
 }
 
 export function coverInput(f: HandoverFacts, views: SlotView[]): Made<CoverInput> {
-  if (!approved(f.settings, 'cover')) return missing('Approve the cover letter wording in CRM settings.', 'settings');
-  const items = views.filter((v) => !v.hidden && v.state !== 'na' && v.code !== 'F07BI');
+  if (!approved(f.settings, 'cover')) return missing('Approve the covering letter wording in CRM settings.', 'settings');
+  const items = views.filter((v) => !v.hidden && v.state !== 'na' && v.code !== 'HX-HO-01');
   const p = f.paperwork;
   const refs: [string, string][] = [];
   if (p.mcs_cert_no) refs.push(['MCS certificate', p.mcs_cert_no]);
@@ -268,7 +273,7 @@ export function coverInput(f: HandoverFacts, views: SlotView[]): Made<CoverInput
   };
 }
 
-/** F19I: the workmanship warranty, from the owner's term and wording. */
+/** HX-HO-06: the workmanship warranty, from the owner's term and wording. */
 export type WarrantyInput = JobHead & { years: number; start: string; startRule: string; text: string; backedBy: string | null; installed: string[] };
 export function warrantyInput(f: HandoverFacts): Made<WarrantyInput> {
   const s = f.settings;
@@ -290,7 +295,7 @@ export function warrantyInput(f: HandoverFacts): Made<WarrantyInput> {
   };
 }
 
-/** F16E: the completion of works record, with the customer's own signature. */
+/** HX-HO-08: the completion sign-off, with the customer's own signature. */
 export type CompletionInput = JobHead & {
   installDays: string | null;
   commissionedOn: string | null;
@@ -301,9 +306,9 @@ export type CompletionInput = JobHead & {
   installer: string | null;
 };
 export function completionInput(f: HandoverFacts): Made<CompletionInput> {
-  if (!approved(f.settings, 'completion')) return missing('Approve the completion record wording in CRM settings.', 'settings');
+  if (!approved(f.settings, 'completion')) return missing('Approve the completion sign-off wording in CRM settings.', 'settings');
   if (!signed(f) && !f.job.commissionedOn) return f.electrician ? waitElectrician(f) : waiting('After the system is switched on.');
-  const sig = f.data.F16E?.customer ?? f.electrician?.customer.f16e;
+  const sig = f.data['HX-HO-08']?.customer ?? f.electrician?.customer.completion;
   if (!sig) return waiting(`Waiting for ${f.customer.first || 'the customer'} to sign (on the electrician’s phone or in their portal).`);
   return {
     ok: true,
@@ -312,7 +317,7 @@ export function completionInput(f: HandoverFacts): Made<CompletionInput> {
       installDays: daysWords(f.job.installDays),
       commissionedOn: f.job.commissionedOn,
       done: installedLines(f),
-      outstanding: f.data.F16E?.outstanding ?? [],
+      outstanding: f.data['HX-HO-08']?.outstanding ?? [],
       declaration: sig.declaration || DRAFTS.completion.text.replace('{address}', siteAddress(f) || 'my home'),
       signature: sig,
       installer: f.electrician ? [f.electrician.name, f.electrician.company].filter(Boolean).join(', ') : null,
@@ -320,7 +325,7 @@ export function completionInput(f: HandoverFacts): Made<CompletionInput> {
   };
 }
 
-/** F47 until Form B's own layout and wording are copied in (D14): the values in the form's order, for copying. */
+/** The G98 data sheet beside HX-HO-15 (until Form B's own layout and wording are copied in, D14): the values in the form's order, for copying. */
 export type G98Input = JobHead & {
   phone: string | null;
   email: string | null;
@@ -356,14 +361,14 @@ export function g98Input(f: HandoverFacts): Made<G98Input> {
       phone: f.customer.phone,
       email: f.customer.email,
       mpan: f.system.mpan,
-      isolator: val(f, 'F47', 'isolator') ?? str(f.electrician?.values.g98_isolator) ?? null,
+      isolator: val(f, 'HX-HO-15', 'isolator') ?? str(f.electrician?.values.g98_isolator) ?? null,
       devices,
-      signature: f.data.F47?.customer ?? f.electrician?.customer.g98 ?? null,
+      signature: f.data['HX-HO-15']?.customer ?? f.electrician?.customer.g98 ?? null,
     },
   };
 }
 
-/** The G99 data sheet (an office helper beside F76: never in the customer's pack). */
+/** The G99 data sheet (an office helper beside HX-HO-16: never in the customer's pack). */
 export type G99Input = JobHead & { phone: string | null; email: string | null; mpan: string | null; exportLimit: string | null; dnoRef: string | null; devices: G98Input['devices'] };
 export function g99Input(f: HandoverFacts): Made<G99Input> {
   const devices = equipmentOf(f)
@@ -391,12 +396,12 @@ export function g99Input(f: HandoverFacts): Made<G99Input> {
   };
 }
 
-/** F48I: shading, performance and maintenance, from the design. The handover never works an estimate out. */
+/** HX-HO-10: the solar estimate, shading and care, from the design. The handover never works an estimate out. */
 export type ShadingInput = JobHead & { kwh: number; shade: number; note: string; shadingNote: string | null; shading: string[]; sunPath: string | null; source: string };
 export function shadingInput(f: HandoverFacts, notes = MIS3002_NOTES): Made<ShadingInput> {
   const need = [f.design.est_kwh_year === null && 'the estimated generation', f.design.shade_factor === null && 'the shade factor'].filter(Boolean) as string[];
   if (need.length) return missing(`Add ${list(need)} from the design on Job details.`, 'job');
-  if (!notes.verified) return missing('MIS 3002’s estimate wording has to be copied into the app first. Until then, upload your own F48I.', 'upload');
+  if (!notes.verified) return missing('MIS 3002’s estimate wording has to be copied into the app first. Until then, upload your own estimate page.', 'upload');
   return {
     ok: true,
     input: {
@@ -412,9 +417,9 @@ export function shadingInput(f: HandoverFacts, notes = MIS3002_NOTES): Made<Shad
   };
 }
 
-/** F49: the maintenance schedule. Every interval from somewhere real, or "as the manufacturer's manual says". */
+/** HX-HO-11: the maintenance schedule. Every interval from somewhere real, or "as the maker's manual says". */
 export type ScheduleInput = JobHead & { rows: { item: string; check: string; who: string; often: string; source: string }[] };
-export const MANUAL_SAYS = 'As the manufacturer’s manual says (see Manufacturer Information, CC5)';
+export const MANUAL_SAYS = 'As the maker’s manual says (see Product manuals and warranties)';
 export function scheduleInput(f: HandoverFacts): Made<ScheduleInput> {
   const rows: ScheduleInput['rows'] = [];
   const next = f.electrician?.nextInspection ?? null;
@@ -445,7 +450,7 @@ export function scheduleInput(f: HandoverFacts): Made<ScheduleInput> {
   return { ok: true, input: { ...head(f), rows } };
 }
 
-/** F49A: the maintenance agreement, in the owner's words with the values typed exactly as quoted. */
+/** HX-HO-12: the maintenance plan, in the owner's words with the values typed exactly as quoted. */
 export const AGREEMENT_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: 'plan', label: 'The plan', hint: 'Its name, as on the quote' },
   { key: 'included', label: 'What’s included' },
@@ -456,97 +461,149 @@ export const AGREEMENT_FIELDS: { key: string; label: string; hint?: string }[] =
 ];
 export type AgreementInput = JobHead & { text: string; values: { label: string; value: string }[] };
 export function agreementInput(f: HandoverFacts): Made<AgreementInput> {
-  if (!f.settings.maintenanceText) return missing('Add your maintenance agreement wording in CRM settings.', 'settings');
-  const gaps = AGREEMENT_FIELDS.filter((x) => !val(f, 'F49A', x.key));
+  if (!f.settings.maintenanceText) return missing('Add your maintenance plan wording in CRM settings.', 'settings');
+  const gaps = AGREEMENT_FIELDS.filter((x) => !val(f, 'HX-HO-12', x.key));
   if (gaps.length) return missing(`Type the plan’s details exactly as agreed: ${list(gaps.map((g) => g.label.toLowerCase()))}.`, 'values');
-  return { ok: true, input: { ...head(f), text: f.settings.maintenanceText, values: AGREEMENT_FIELDS.map((x) => ({ label: x.label, value: val(f, 'F49A', x.key)! })) } };
+  return { ok: true, input: { ...head(f), text: f.settings.maintenanceText, values: AGREEMENT_FIELDS.map((x) => ({ label: x.label, value: val(f, 'HX-HO-12', x.key)! })) } };
 }
 
-/** F78: the EESS & PV handover document (FORMS 1.5). */
-export type F78Input = JobHead & {
+/** What the office can type for the system summary (Summary details): only what the job doesn't already say. */
+export const SUMMARY_FIELDS: { key: string; label: string; hint: string; options?: { key: string; label: string }[] }[] = [
+  {
+    key: 'kind',
+    label: 'New installation or re-test?',
+    hint: 'Only if the electrician didn’t answer.',
+    options: [
+      { key: 'initial', label: 'New installation' },
+      { key: 'periodic', label: 'Re-test of an existing system' },
+    ],
+  },
+  { key: 'cert_ref', label: 'Electrical certificate number', hint: 'Only if the electrician’s certificate isn’t in the app.' },
+  { key: 'p_loc', label: 'Where the panels are', hint: 'The roof faces, for example “Rear roof, south-west”. Leave empty to use the design’s.' },
+  { key: 'p_desc', label: 'Solar: what was fitted', hint: 'Leave empty to use the job’s products.' },
+  { key: 'e_desc', label: 'Battery: what was fitted', hint: 'Leave empty to use the job’s products.' },
+  { key: 'circuits', label: 'Which circuits were tested', hint: 'Leave empty to use the electrician’s answer.' },
+  { key: 'comments', label: 'Notes for the customer', hint: 'Printed under the next inspection. Leave empty for none.' },
+];
+
+/** One row of the summary's "Records behind this summary": the record, its code, its reference, and whether it's in the pack. */
+export type SummaryRecord = { record: string; code: string; ref: string; inPack: boolean };
+
+/** HX-HO-02, the system summary and sign-off (WORDING-SPEC 7.4). */
+export type SummaryInput = JobHead & {
   kind: 'initial' | 'periodic';
+  /** The day it was tested and switched on (or re-tested). */
   testDate: string;
-  eess: { desc: string; cls: number; island: boolean | null; maxKw: number; usableKwh: number; parts: [boolean, boolean, boolean, boolean] } | null;
-  pv: { desc: string; kw: number; location: string; est: number; circuits: string | null; insp: string; test: string; f44a: string; f43: string } | null;
+  /** "MCS MIS 3002 (solar PV) and MCS MIS 3012 (battery storage)": the standards that apply to this job. */
+  standards: string;
+  pv: { desc: string; kwp: number; location: string; est: number; circuits: string | null } | null;
+  battery: { desc: string; cls: number; island: boolean | null; maxKw: number; usableKwh: number } | null;
+  records: SummaryRecord[];
+  /** "Within 10 years, as recommended on the electrical certificate". */
   next: string;
   comments: string | null;
-  electrician: { name: string; at: string; path: string };
+  /** The electrician's sign-off, with declaration (b) as they signed it (WORDING-SPEC 0.7). */
+  electrician: { name: string; company: string | null; at: string; path: string; statement: string };
   design: OfficeSig;
 };
-export const F78_DECLARATION =
-  'I/we being the person(s) responsible for the design, construction, inspection and testing of the electrical installation (as indicated by the signatures below), particulars of which are described above, having exercised reasonable skill and care when carrying out the design, construction, inspection and testing, hereby certify that the said work for which I/we have been responsible is, to the best of my/our knowledge and belief, in accordance with MCS Installation Standard MIS 3002 and MIS 3012.';
 
-export function f78Input(f: HandoverFacts): Made<F78Input> {
+/** "10 years" → "Within 10 years". */
+const within = (n: string) => `Within ${n}`;
+
+export function summaryInput(f: HandoverFacts): Made<SummaryInput> {
   const e = f.electrician;
-  if (!e?.signedAt || !e.signaturePath) return e ? waitElectrician(f) : missing('Add the electrician on the Site tab: F78 is signed with their sign-off.', 'site');
+  if (!e?.signedAt || !e.signaturePath) return e ? waitElectrician(f) : missing('Add the electrician on the Site tab: the system summary is signed with their sign-off.', 'site');
   const v = e.values;
   const s = f.system;
   const d = f.design;
   const battery = has(f, 'battery');
   const solar = has(f, 'solar');
-  const maxKw = d.battery_kw ?? (typeof v.f78_e_kw === 'number' ? v.f78_e_kw : null);
+  const maxKw = d.battery_kw ?? (typeof v.hos_bat_kw === 'number' ? v.hos_bat_kw : null);
   const need: string[] = [];
   if (battery) {
     if (d.eess_class === null) need.push('the battery system class');
-    if (maxKw === null) need.push('the battery’s maximum power output');
-    if (!s.battery_kwh) need.push('the battery’s usable capacity');
+    if (maxKw === null) need.push('the battery’s maximum output');
+    if (!s.battery_kwh) need.push('the battery’s usable storage');
   }
   if (solar) {
     if (!s.kwp) need.push('the system size (kWp)');
-    if (d.est_kwh_year === null) need.push('the estimated performance');
-    if (!d.roof_faces && !val(f, 'F78', 'p_loc')) need.push('the roof faces');
+    if (d.est_kwh_year === null) need.push('the estimated generation');
+    if (!d.roof_faces && !val(f, 'HX-HO-02', 'p_loc')) need.push('the roof faces');
   }
   if (need.length) return missing(`Needs ${list(need)} on Job details.`, 'job');
   const made = new Set(f.made);
-  if (battery && (!made.has('F74') || !made.has('F75'))) return waiting('Waiting for F74 and F75 from the electrician’s sign-off.');
-  if (solar && !made.has('F43')) return waiting('Waiting for F43 from the electrician’s sign-off.');
+  if (battery && (!made.has('HX-BAT-01') || !made.has('HX-BAT-02'))) return waiting('Waiting for the battery records from the electrician’s sign-off.');
+  if (solar && !made.has('HX-PV-02')) return waiting('Waiting for the string test results from the electrician’s sign-off.');
   const ref = f.job.ref ?? 'HX';
   const cert = certRef(f);
   if (solar && !cert) return missing('Needs the electrical certificate’s number: it’s on the EIC.', 'values');
-  const kindRaw = val(f, 'F78', 'kind') ?? str(v.f78_kind);
-  if (kindRaw !== 'initial' && kindRaw !== 'periodic') return missing('Say whether it’s an initial or a periodic verification.', 'values');
+  const kindRaw = val(f, 'HX-HO-02', 'kind') ?? str(v.hos_kind);
+  if (kindRaw !== 'initial' && kindRaw !== 'periodic') return missing('Say whether it’s a new installation or a re-test.', 'values');
   // The EIC made in the app gives the next inspection once its design part is signed.
   if (e.certWaits && !e.nextInspection) return missing(e.certWaits, 'site');
-  const next = e.nextInspection ?? (f.settings.nextInspectionYears ? `${f.settings.nextInspectionYears} years` : null);
-  if (!next) return missing('Set the next inspection (years) in CRM settings: the EIC doesn’t give one.', 'settings');
-  const design = f.data.F78?.design;
+  const next = e.nextInspection ? `${within(e.nextInspection)}, as recommended on the electrical certificate` : f.settings.nextInspectionYears ? `${within(`${f.settings.nextInspectionYears} years`)}, as Heliaxis recommends` : null;
+  if (!next) return missing('Set the next inspection (years) in CRM settings: the electrical certificate doesn’t give one.', 'settings');
+  const design = f.data['HX-HO-02']?.design;
   if (!design) return missing('Sign the design part.', 'sign-design');
   const optimisers = equipmentOf(f).find((x) => x.what === 'Optimisers');
   const panels = s.panel_model ? `${s.panel_count ? `${s.panel_count} × ` : ''}${s.panel_model}${s.kwp ? ` (${num(s.kwp, 3)} kWp)` : ''}` : null;
   const opt = optimisers ? [optimisers.count ? `${optimisers.count} ×` : null, optimisers.model, 'optimisers'].filter(Boolean).join(' ') : null;
-  const pvDesc = val(f, 'F78', 'p_desc') ?? [panels, s.inverter_model, opt].filter(Boolean).join(', ');
-  const eDesc = val(f, 'F78', 'e_desc') ?? [s.battery_model ? `${s.battery_model}${s.battery_kwh ? ` (${num(s.battery_kwh)} kWh usable)` : ''}` : null, solar ? null : s.inverter_model].filter(Boolean).join(', ');
+  const pvDesc = val(f, 'HX-HO-02', 'p_desc') ?? [panels, s.inverter_model, opt].filter(Boolean).join(', ');
+  const eDesc = val(f, 'HX-HO-02', 'e_desc') ?? [s.battery_model ? `${s.battery_model}${s.battery_kwh ? ` (${num(s.battery_kwh)} kWh usable)` : ''}` : null, solar ? null : s.inverter_model].filter(Boolean).join(', ');
   if ((solar && !pvDesc) || (battery && !eDesc)) return missing('Needs the product models on Job details (or type the descriptions).', 'job');
   const island = typeof v.eess_backup === 'string' ? v.eess_backup === 'yes' : (d.battery_backup ?? null);
+  // The records behind it: the certificate's schedules, then each site record that applies.
+  const certNo = cert ?? 'To follow';
+  const inPack = (code: string) => made.has(code);
+  const records: SummaryRecord[] = [];
+  if (solar || battery) {
+    if (e.certRoute === 'meiwc') records.push({ record: 'Minor works certificate', code: 'HX-HO-04', ref: certNo, inPack: inPack('HX-HO-04') });
+    else
+      records.push(
+        { record: 'Inspection schedule, on the electrical certificate', code: 'HX-HO-04', ref: certNo, inPack: inPack('HX-HO-04') },
+        { record: 'Test results, on the electrical certificate', code: 'HX-HO-04', ref: certNo, inPack: inPack('HX-HO-04') }
+      );
+  }
+  if (solar)
+    records.push(
+      { record: 'Solar PV inspection record', code: 'HX-PV-01', ref, inPack: inPack('HX-PV-01') },
+      { record: 'Solar PV string test results', code: 'HX-PV-02', ref, inPack: inPack('HX-PV-02') },
+      { record: 'Solar PV switch-on record', code: 'HX-PV-03', ref, inPack: inPack('HX-PV-03') }
+    );
+  if (battery)
+    records.push(
+      { record: 'Battery inspection record', code: 'HX-BAT-01', ref, inPack: inPack('HX-BAT-01') },
+      { record: 'Battery electrical tests (BS 7671)', code: 'HX-BAT-01 and HX-HO-04', ref: `${ref} and ${certNo}`, inPack: inPack('HX-BAT-01') && inPack('HX-HO-04') },
+      { record: 'Battery function tests (charging, controls, alarms, cooling)', code: 'HX-BAT-02', ref, inPack: inPack('HX-BAT-02') },
+      { record: 'Battery grid and back-up tests (loss of supply, export limit, switching to back-up)', code: 'HX-BAT-02', ref, inPack: inPack('HX-BAT-02') }
+    );
   return {
     ok: true,
     input: {
       ...head(f),
       kind: kindRaw,
       testDate: f.job.commissionedOn ?? e.signedOn ?? f.today,
-      eess: battery ? { desc: eDesc, cls: d.eess_class!, island, maxKw: maxKw!, usableKwh: s.battery_kwh!, parts: [made.has('F74'), made.has('F74'), made.has('F75'), made.has('F75')] } : null,
+      standards: summaryStandards(f.job.products),
+      battery: battery ? { desc: eDesc, cls: d.eess_class!, island, maxKw: maxKw!, usableKwh: s.battery_kwh! } : null,
       pv: solar
         ? {
             desc: pvDesc,
-            kw: s.kwp!,
-            location: val(f, 'F78', 'p_loc') ?? d.roof_faces!,
+            kwp: s.kwp!,
+            location: val(f, 'HX-HO-02', 'p_loc') ?? d.roof_faces!,
             est: d.est_kwh_year!,
-            circuits: val(f, 'F78', 'circuits') ?? str(v.f78_p_circuits),
-            insp: `${cert}: Schedule of inspections`,
-            test: `${cert}: Schedule of test results`,
-            f44a: `${ref}-${made.has('F44A') ? 'F44A' : 'F44'}`,
-            f43: `${ref}-F43`,
+            circuits: val(f, 'HX-HO-02', 'circuits') ?? str(v.hos_circuits),
           }
         : null,
+      records,
       next,
-      comments: val(f, 'F78', 'comments'),
-      electrician: { name: e.name, at: e.signedAt, path: e.signaturePath },
+      comments: val(f, 'HX-HO-02', 'comments'),
+      electrician: { name: e.name, company: e.company, at: e.signedAt, path: e.signaturePath, statement: signedStatement(e.declaration, 'HX-HO-02') ?? SUMMARY_DECLARATIONS.install(summaryStandards(f.job.products)) },
       design,
     },
   };
 }
 
-/** CC4's own page: how to switch this house's system off, from where the switches are. */
+/** HX-HO-09's own page: how to switch this house's system off, from where the switches are. */
 export const SWITCH_FIELDS: { key: 'cu' | 'ac' | 'dc' | 'battery'; label: string; hint: string; for?: Tech }[] = [
   { key: 'cu', label: 'Consumer unit circuit', hint: 'Where it is and its label, e.g. Under the stairs, labelled Solar PV' },
   { key: 'ac', label: 'AC isolator', hint: 'e.g. On the wall next to the inverter, in the loft' },
@@ -557,8 +614,8 @@ export type SwitchInput = JobHead & { steps: string[]; backup: boolean; procedur
 export function switchInput(f: HandoverFacts): Made<SwitchInput> {
   if (!approved(f.settings, 'shutdown')) return missing('Approve the switching-off wording in CRM settings.', 'settings');
   const v = f.electrician?.values ?? {};
-  const dcSite = Array.isArray(v.f43_iso_loc) ? str((v.f43_iso_loc as unknown[])[0]) : str(v.f43_iso_loc);
-  const where: Record<string, string | null> = { cu: val(f, 'CC4', 'cu'), ac: val(f, 'CC4', 'ac'), dc: val(f, 'CC4', 'dc') ?? dcSite, battery: val(f, 'CC4', 'battery') };
+  const dcSite = Array.isArray(v.pvt_iso_where) ? str((v.pvt_iso_where as unknown[])[0]) : str(v.pvt_iso_where);
+  const where: Record<string, string | null> = { cu: val(f, 'HX-HO-09', 'cu'), ac: val(f, 'HX-HO-09', 'ac'), dc: val(f, 'HX-HO-09', 'dc') ?? dcSite, battery: val(f, 'HX-HO-09', 'battery') };
   const wanted = SWITCH_FIELDS.filter((x) => !x.for || has(f, x.for));
   const gaps = wanted.filter((x) => !where[x.key]);
   if (gaps.length) {
@@ -576,12 +633,12 @@ export function switchInput(f: HandoverFacts): Made<SwitchInput> {
       ...head(f),
       steps,
       backup: f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes',
-      procedures: f.library.filter((l) => l.slot === 'CC4' || l.kind === 'procedure').map((l) => l.name),
+      procedures: f.library.filter((l) => l.slot === 'HX-HO-09' || l.kind === 'procedure').map((l) => l.name),
     },
   };
 }
 
-/** CC13's payment receipt: only the payments recorded, never a balance (D21). */
+/** HX-HO-18's payment receipt: only the payments recorded, never a balance (D21). */
 export type ReceiptInput = JobHead & { lines: { date: string; what: string; method: string; reference: string | null; pence: number }[] };
 const METHOD: Record<Payment['method'], string> = { card: 'Card', bank_transfer: 'Bank transfer', other: 'Other' };
 const KIND: Record<Payment['kind'], string> = { stage: 'Stage payment', final: 'Final payment', other: 'Payment' };

@@ -8,7 +8,7 @@
  *
  * - Earthing arrangements: the EV charger record and the EIC (each in its own keys, mapped through
  *   site/earthing.ts).
- * - The installation's earth electrode: its reading (battery back-up test item 4, the EV record on a
+ * - The installation's earth electrode: its reading (the battery's back-up changeover test, the EV record on a
  *   TT supply, the EIC's RA/Ze), its type and where it is. Only where the box is about that
  *   electrode: an EV charger's own rod on a PME supply, or a back-up battery's electrode on a TN
  *   supply, is a different electrode, so nothing is carried into or out of those.
@@ -51,7 +51,7 @@ const ev = (c: FormCtx) => has(c, 'ev');
 export const evElectrode = (c: FormCtx) => ev(c) && is(c, 'ev_earthing', 'tt');
 /** The installation is earthed by its own electrode (TT), as the EIC or the EV record says (each in its own codes). */
 export const installationTT = (c: FormCtx) => is(c, 'eic_means', 'electrode') || (earthingFromEic(c.values.eic_earthing) ?? earthingFromEv(c.values.ev_earthing)) === 'tt';
-/** Back-up test item 4 (the consumer's earth electrode), on a TT installation: the same electrode. */
+/** The battery's back-up changeover test (its earth electrode reading), on a TT installation: the same electrode. */
 export const eessElectrode = (c: FormCtx) => has(c, 'battery') && is(c, 'eess_backup', 'yes') && installationTT(c);
 
 /** Each group is one fact; they're carried in this order (the electrode's boxes depend on the earthing). */
@@ -61,7 +61,7 @@ const GROUPS: Box[][] = [
     { key: 'eic_earthing', where: WHERE.eic, on: eicSupply, read: earthingFromEic, write: earthingFromEic },
   ],
   [
-    { key: 'eess_a_06_ra', where: WHERE.eess, on: eessElectrode },
+    { key: 'bat_bu_ra', where: WHERE.eess, on: eessElectrode },
     { key: 'ev_ra', where: WHERE.ev, on: evElectrode },
     { key: 'eic_ra', where: WHERE.eic, on: eicElectrode },
   ],

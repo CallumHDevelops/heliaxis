@@ -1,7 +1,8 @@
 // The handover pack's own documents (src/lib/documents/handover/*) made from fixture data, and the
-// combined pack: every generated document renders with its title, the legal footer on every page and
-// nothing "Not answered"; F78 prints only the tables for the job's technologies and never a value
-// the job hasn't got; the receipt lists exactly the recorded payments; Build gives one PDF with the
+// combined pack: every generated document renders with its title and Heliaxis code, the legal footer
+// on every page and nothing "Not answered"; the system summary (HX-HO-02) prints only what the job's
+// technologies have, its records by Heliaxis code, the standards that apply and never a value the job
+// hasn't got; the receipt lists exactly the recorded payments; Build gives one PDF with the
 // contents page straight after the cover, a signed PDF and a 30 MB manual left as separate files,
 // the page numbers in the contents matching where each document starts.
 // Usage: node --experimental-strip-types scripts/test-handover-docs.mjs   (PDF_OUT=/dir keeps the PDFs)
@@ -27,16 +28,16 @@ const H = await import('../src/lib/handover/settings-shared.ts');
 const { designOf } = await import('../src/lib/site/design.ts');
 const D = {
   cover: await import('../src/lib/documents/handover/cover-letter.ts'),
-  f19i: await import('../src/lib/documents/handover/f19i.ts'),
-  f16e: await import('../src/lib/documents/handover/f16e.ts'),
-  f47: await import('../src/lib/documents/handover/f47.ts'),
-  f76: await import('../src/lib/documents/handover/f76-sheet.ts'),
-  f48i: await import('../src/lib/documents/handover/f48i.ts'),
-  f49: await import('../src/lib/documents/handover/f49.ts'),
-  f49a: await import('../src/lib/documents/handover/f49a.ts'),
-  f78: await import('../src/lib/documents/handover/f78.ts'),
-  cc4: await import('../src/lib/documents/handover/cc4.ts'),
-  cc13: await import('../src/lib/documents/handover/cc13-receipt.ts'),
+  warranty: await import('../src/lib/documents/handover/warranty.ts'),
+  completion: await import('../src/lib/documents/handover/completion.ts'),
+  g98: await import('../src/lib/documents/handover/g98-sheet.ts'),
+  g99: await import('../src/lib/documents/handover/g99-sheet.ts'),
+  estimate: await import('../src/lib/documents/handover/estimate.ts'),
+  schedule: await import('../src/lib/documents/handover/schedule.ts'),
+  plan: await import('../src/lib/documents/handover/plan.ts'),
+  summary: await import('../src/lib/documents/handover/summary.ts'),
+  switchOff: await import('../src/lib/documents/handover/switch-off.ts'),
+  receipt: await import('../src/lib/documents/handover/receipt.ts'),
   pack: await import('../src/lib/documents/handover/pack.ts'),
 };
 const K = await import('../src/lib/documents/pdf-kit.ts');
@@ -105,22 +106,22 @@ const facts = (over = {}) => ({
     signedAt: '2026-11-03T17:41:00Z',
     signedOn: '2026-11-03',
     signaturePath: 'signatures/p1/site-s1.png',
-    values: { f78_kind: 'initial', eess_backup: 'yes', f78_p_circuits: '2 PV strings; 1 AC circuit', f43_iso_loc: ['Built into the inverter'], SN_INV: [{ s: 'SA2231G123', src: 'scan' }], SN_BAT: [{ s: 'BT99887766', src: 'scan' }] },
-    customer: { f16e: sig('phone'), g98: { ...sig('phone'), path: 'signatures/p1/cust-g98.png' } },
+    values: { hos_kind: 'initial', eess_backup: 'yes', hos_circuits: '2 PV strings; 1 AC circuit', pvt_iso_where: ['Built into the inverter'], SN_INV: [{ s: 'SA2231G123', src: 'scan' }], SN_BAT: [{ s: 'BT99887766', src: 'scan' }] },
+    customer: { completion: sig('phone'), g98: { ...sig('phone'), path: 'signatures/p1/cust-g98.png' } },
     partPBy: 'heliaxis',
     certRef: 'HX-0042-EIC',
     nextInspection: null,
   },
   data: {
-    F78: { design: { name: 'Callum Hughes', signed_at: '2026-11-03T18:00:00Z', path: 'signatures/p1/f78-design.png', by: 'u1' } },
-    CC4: { values: { cu: 'Under the stairs, labelled Solar PV and battery', ac: 'On the loft wall next to the inverter', battery: 'On the side of the battery, in the garage' } },
-    F49A: { values: { plan: 'Care Plan', included: 'A yearly visit and a health check of the system', visits: 'One a year', price: '£99 a year', starts: '3 November 2026', cancel: 'Tell us in writing; 30 days’ notice' } },
-    F16E: { outstanding: [{ text: 'One cracked ridge tile to replace (scaffold back up)', by: '2026-11-12' }] },
+    'HX-HO-02': { design: { name: 'Callum Hughes', signed_at: '2026-11-03T18:00:00Z', path: 'signatures/p1/summary-design.png', by: 'u1' } },
+    'HX-HO-09': { values: { cu: 'Under the stairs, labelled Solar PV and battery', ac: 'On the loft wall next to the inverter', battery: 'On the side of the battery, in the garage' } },
+    'HX-HO-12': { values: { plan: 'Care Plan', included: 'A yearly visit and a health check of the system', visits: 'One a year', price: '£99 a year', starts: '3 November 2026', cancel: 'Tell us in writing; 30 days’ notice' } },
+    'HX-HO-08': { outstanding: [{ text: 'One cracked ridge tile to replace (scaffold back up)', by: '2026-11-12' }] },
   },
   library: [],
   payments: [{ id: 'x1', kind: 'final', amount_pence: 512345, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042' }],
   survey: { shading: ['Chimney', 'Trees'], sunPath: null },
-  made: ['F43', 'F44', 'F44A', 'F74', 'F75'],
+  made: ['HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02'],
   settings,
   ...over,
 });
@@ -131,7 +132,7 @@ async function check(name, bytes, must = [], mustNot = []) {
   const pages = await textOf(bytes);
   const all = pages.join('\n').replace(/\s+/g, ' ');
   eq(`${name}: the legal footer on every page`, pages.every((p, i) => p.includes(LEGAL) && p.includes(`Page ${i + 1} of ${pages.length}`)), true);
-  eq(`${name}: nothing "Not answered", no Easy MCS`, [/Not answered/.test(all), /easy\s*mcs/i.test(all)], [false, false]);
+  eq(`${name}: nothing "Not answered", no other company’s name or form code`, [/Not answered/.test(all), /easy\s*mcs/i.test(all), /\b(F\d\d[A-Z]*|CC\d+|CCMH)\b/.test(all)], [false, false, false]);
   for (const m of must) eq(`${name}: has "${m}"`, all.includes(m), true);
   for (const m of mustNot) eq(`${name}: hasn’t "${m}"`, all.includes(m), false);
   return { pages, all };
@@ -150,7 +151,7 @@ const views = S.slotStates({
   dnoRoute: 'g98',
   pas63100: false,
   maintenancePlan: true,
-  docs: ['F43', 'F44', 'F44A', 'F74', 'F75', 'CC21', 'F78', 'F19I', 'F16E', 'CC4', 'F49', 'F49A', 'F47'].map((c, i) => ({ id: `d${i}`, slot: c, name: c, source: 'generated', key: c, visible: false, release: 'with_pack', at: '2026-11-03T18:00:00Z', version: 1, mime: 'application/pdf', size: 1, hash: 'h' })),
+  docs: ['HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-HO-04', 'HX-HO-02', 'HX-HO-06', 'HX-HO-08', 'HX-HO-09', 'HX-HO-11', 'HX-HO-12', 'HX-HO-15'].map((c, i) => ({ id: `d${i}`, slot: c, name: c, source: 'generated', key: c, visible: false, release: 'with_pack', at: '2026-11-03T18:00:00Z', version: 1, mime: 'application/pdf', size: 1, hash: 'h' })),
   marks: {},
   gen: {},
   electrician: 'signed',
@@ -166,32 +167,56 @@ const views = S.slotStates({
   sent: false,
 });
 const docs = {};
-docs.F07BI = await D.cover.makeCoverLetter(must(I.coverInput(f, views)));
-await check('F07BI', docs.F07BI, ['Handover Cover Letter', 'Dear Jane,', '12 × JA Solar JAM54S30 440 solar panels (5.28 kWp)', 'MCS-00123456', 'HIES · HIES-998877', 'Smart Export Guarantee', 'Callum Hughes', 'Enclosed']);
-docs.F19I = await D.f19i.makeWarranty(must(I.warrantyInput(f)));
-await check('F19I', docs.F19I, ['Workmanship Warranty', '10 years from 3 November 2026', 'FIXTURE WORDING', 'HIES, policy HIES-998877', 'Your statutory rights are not affected.']);
-docs.F16E = await D.f16e.makeCompletion(must(I.completionInput(f)), load);
-await check('F16E', docs.F16E, ['Completion of Works Record', '2 and 3 November 2026', 'One cracked ridge tile to replace', '12 November 2026', 'Signed on the Heliaxis app', 'Dave Price, Price Electrical']);
-docs.F47 = await D.f47.makeG98Sheet(must(I.g98Input(f)), load);
-await check('F47', docs.F47, ['G98 Form B data sheet', '1012345678901', 'MCS NAP-82308', 'SA2231G123', 'Not recorded', 'It isn’t the form itself']);
-docs.F76_SHEET = await D.f76.makeG99Sheet(must(I.g99Input(f)));
-await check('F76_SHEET', docs.F76_SHEET, ['G99 data sheet', 'Not for the customer’s pack']);
-docs.F48I = await D.f48i.makeShading(must(I.shadingInput(f, { source: 'MIS 3002', issue: 'FIXTURE', verified: true, importantNote: 'FIXTURE NOTE: not MIS 3002’s wording.', shadingNote: 'FIXTURE SHADING NOTE.' })), load);
-await check('F48I', docs.F48I, ['Solar PV Shading and Maintenance', '4,620 kWh', 'FIXTURE NOTE', 'Chimney, Trees', 'Never go on the roof']);
-docs.F49 = await D.f49.makeSchedule(must(I.scheduleInput(f)));
-await check('F49', docs.F49, ['Solar PV Maintenance Schedule', 'As the manufacturer’s manual says', 'Every spring', 'Electrical Installation Certificate']);
-docs.F49A = await D.f49a.makeAgreement(must(I.agreementInput(f)));
-await check('F49A', docs.F49A, ['Solar PV Maintenance Agreement', '£99 a year', 'FIXTURE WORDING']);
-docs.F78 = await D.f78.makeF78(must(I.f78Input(f)), load);
-const f78 = await check('F78', docs.F78, ['EESS & PV Handover Document', 'Initial verification', 'This system', 'Class 1', '3.6 kW', '9.5 kWh', 'HX-0042-EIC: Schedule of inspections', 'HX-0042-F44A', 'HX-0042-F43', 'MIS 3002 and MIS 3012', '10 years', '0333 103 8130', 'Signed in the Heliaxis office'], ['Not part of this installation']);
-eq('F78: both signatures', ['Construction, inspection and testing', 'Design'].every((x) => f78.all.toUpperCase().includes(x.toUpperCase())), true);
-const batteryOnly = facts({ job: { ...f.job, products: ['battery'] }, made: ['F74', 'F75'] });
-const f78b = await check('F78-battery-only', await D.f78.makeF78(must(I.f78Input(batteryOnly)), load), ['Not part of this installation']);
-eq('F78 battery only: the PV table says not part of it, the EESS table prints', [f78b.all.includes('Usable capacity'), f78b.all.includes('Rated power (kW DC)')], [true, false]);
-docs.CC4 = await D.cc4.makeSwitchOff(must(I.switchInput(f)));
-await check('CC4', docs.CC4, ['How to switch your system off', 'Under the stairs', 'Built into the inverter', 'back-up power']);
-docs.CC13_RECEIPT = await D.cc13.makeReceipt(must(I.receiptInput(f)));
-const rc = await check('CC13_RECEIPT', docs.CC13_RECEIPT, ['Payment receipt', '£500.00', '£5,123.45', 'INV-0042', 'pi_3QX']);
+docs['HX-HO-01'] = await D.cover.makeCoverLetter(must(I.coverInput(f, views)));
+await check('HX-HO-01', docs['HX-HO-01'], ['Covering letter', 'HX-HO-01 · PROJECT HX-0042', 'Dear Jane,', '12 × JA Solar JAM54S30 440 solar panels (5.28 kWp)', 'MCS-00123456', 'HIES · HIES-998877', 'Smart Export Guarantee', 'Callum Hughes', 'Enclosed']);
+docs['HX-HO-06'] = await D.warranty.makeWarranty(must(I.warrantyInput(f)));
+await check('HX-HO-06', docs['HX-HO-06'], ['Heliaxis workmanship warranty', 'HX-HO-06 · Issue 1', '10 years from 3 November 2026', 'FIXTURE WORDING', 'HIES, policy HIES-998877', 'Your statutory rights are not affected.']);
+docs['HX-HO-08'] = await D.completion.makeCompletion(must(I.completionInput(f)), load);
+await check('HX-HO-08', docs['HX-HO-08'], ['Completion sign-off', 'HX-HO-08 · Issue 1', '2 and 3 November 2026', 'One cracked ridge tile to replace', '12 November 2026', 'Signed on the Heliaxis app', 'Dave Price, Price Electrical']);
+docs['HX-HO-15-SHEET'] = await D.g98.makeG98Sheet(must(I.g98Input(f)), load);
+await check('HX-HO-15-SHEET', docs['HX-HO-15-SHEET'], ['G98 data sheet', 'HX-HO-15 · PROJECT HX-0042', '1012345678901', 'MCS NAP-82308', 'SA2231G123', 'Not recorded', 'It isn’t the form itself']);
+docs['HX-HO-16-SHEET'] = await D.g99.makeG99Sheet(must(I.g99Input(f)));
+await check('HX-HO-16-SHEET', docs['HX-HO-16-SHEET'], ['G99 data sheet', 'HX-HO-16 · PROJECT HX-0042', 'Not for the customer’s pack']);
+docs['HX-HO-10'] = await D.estimate.makeShading(must(I.shadingInput(f, { source: 'MIS 3002', issue: 'FIXTURE', verified: true, importantNote: 'FIXTURE NOTE: not MIS 3002’s wording.', shadingNote: 'FIXTURE SHADING NOTE.' })), load);
+await check('HX-HO-10', docs['HX-HO-10'], ['Solar estimate, shading and care', 'HX-HO-10 · Issue 1', '4,620 kWh', 'FIXTURE NOTE', 'Chimney, Trees', 'Never go on the roof']);
+docs['HX-HO-11'] = await D.schedule.makeSchedule(must(I.scheduleInput(f)));
+await check('HX-HO-11', docs['HX-HO-11'], ['Maintenance schedule', 'HX-HO-11 · Issue 1', 'As the maker’s manual says (see Product manuals and warranties)', 'Every spring', 'Electrical Installation Certificate', 'The makers’ manuals and warranties are in Product manuals and warranties, in this pack.']);
+docs['HX-HO-12'] = await D.plan.makeAgreement(must(I.agreementInput(f)));
+await check('HX-HO-12', docs['HX-HO-12'], ['Your maintenance plan', 'HX-HO-12 · Issue 1', '£99 a year', 'FIXTURE WORDING']);
+docs['HX-HO-02'] = await D.summary.makeSummary(must(I.summaryInput(f)), load);
+const sum = await check(
+  'HX-HO-02',
+  docs['HX-HO-02'],
+  [
+    'System summary and sign-off',
+    'HX-HO-02 · Issue 1',
+    'TESTED AND SWITCHED ON',
+    'New installation',
+    'This system',
+    'Class 1',
+    '3.6 kW',
+    '9.5 kWh',
+    'Records behind this summary',
+    'Solar PV inspection record HX-PV-01 HX-0042',
+    'Solar PV string test results HX-PV-02 HX-0042',
+    'Battery function tests',
+    'HX-HO-04 HX-0042-EIC',
+    'MCS MIS 3002 (solar PV) and MCS MIS 3012 (battery storage)',
+    'Within 10 years',
+    '0333 103 8130',
+    'Signed in the Heliaxis office',
+  ],
+  ['No solar panels in this installation.', 'No battery in this installation.']
+);
+eq('system summary: both sign-offs', ['Designed by', 'Installed, inspected and tested by'].every((x) => sum.all.toUpperCase().includes(x.toUpperCase())), true);
+eq('system summary: in the pack ticked, the certificate to follow', [sum.all.includes('✓'), sum.all.includes('To follow')], [true, true]);
+const batteryOnly = facts({ job: { ...f.job, products: ['battery'] }, made: ['HX-BAT-01', 'HX-BAT-02'] });
+const sumB = await check('HX-HO-02-battery-only', await D.summary.makeSummary(must(I.summaryInput(batteryOnly)), load), ['No solar panels in this installation.', 'MCS MIS 3012 (battery storage)'], ['MCS MIS 3002']);
+eq('system summary battery only: the solar part says there is none, the battery part prints', [sumB.all.includes('Usable storage'), sumB.all.includes('Panel power (kWp, DC)')], [true, false]);
+docs['HX-HO-09'] = await D.switchOff.makeSwitchOff(must(I.switchInput(f)));
+await check('HX-HO-09', docs['HX-HO-09'], ['How to switch your system off', 'HX-HO-09 · Issue 1', 'Under the stairs', 'Built into the inverter', 'back-up power']);
+docs['HX-HO-18-RECEIPT'] = await D.receipt.makeReceipt(must(I.receiptInput(f)));
+const rc = await check('HX-HO-18-RECEIPT', docs['HX-HO-18-RECEIPT'], ['Payment receipt', 'HX-HO-18 · Issue 1', '£500.00', '£5,123.45', 'INV-0042', 'pi_3QX']);
 eq('receipt: no balance or total worked out', /balance|total|owed/i.test(rc.all.replace('what the installation cost', '')), false);
 
 /* ── The combined pack ─────────────────────────────────────────────────────── */
@@ -223,23 +248,23 @@ const part = (slot, bytes, extra = {}) => {
   return { slot, title: d.title, group: d.group, order: d.order, docId: `doc-${slot}${extra.n ?? ''}`, name: `${slot}.pdf`, mime: 'application/pdf', bytes, ...extra };
 };
 const parts = [
-  part('F78', docs.F78),
-  part('CC17', signed),
-  part('CC21', await simple('Electrical Installation Certificate', 3)),
-  part('F19I', docs.F19I),
-  part('F16E', docs.F16E),
-  part('CC4', docs.CC4),
-  part('F49', docs.F49),
-  part('F49A', docs.F49A),
-  part('CC10', new Uint8Array(photo), { mime: 'image/png', name: 'schematic.png' }),
-  part('F43', await simple('PV Array Test Report', 2)),
-  part('F74', await simple('Battery Testing Checklist')),
-  part('F75', await simple('Battery Commissioning Checklist')),
-  part('F47', docs.F47),
-  part('CC5', big, { manual: true, name: 'Battery manual.pdf' }),
-  part('CCMH', new Uint8Array([0x50, 0x4b, 3, 4]), { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', name: 'SEG guide.docx' }),
+  part('HX-HO-02', docs['HX-HO-02']),
+  part('HX-HO-03', signed),
+  part('HX-HO-04', await simple('Electrical Installation Certificate', 3)),
+  part('HX-HO-06', docs['HX-HO-06']),
+  part('HX-HO-08', docs['HX-HO-08']),
+  part('HX-HO-09', docs['HX-HO-09']),
+  part('HX-HO-11', docs['HX-HO-11']),
+  part('HX-HO-12', docs['HX-HO-12']),
+  part('HX-HO-13', new Uint8Array(photo), { mime: 'image/png', name: 'schematic.png' }),
+  part('HX-PV-02', await simple('Solar PV string test results', 2)),
+  part('HX-BAT-01', await simple('Battery inspection record')),
+  part('HX-BAT-02', await simple('Battery switch-on and test record')),
+  part('HX-HO-15', await simple('G98 notice (as sent, fixture)')),
+  part('HX-HO-17', big, { manual: true, name: 'Battery manual.pdf' }),
+  part('HX-HO-19', new Uint8Array([0x50, 0x4b, 3, 4]), { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', name: 'SEG guide.docx' }),
 ];
-const follow = ['CC14', 'CC16', 'CC13'].map((c) => ({ slot: c, title: S.slotDef(c).title, group: S.slotDef(c).group, order: S.slotDef(c).order }));
+const follow = ['HX-HO-05', 'HX-HO-07', 'HX-HO-18'].map((c) => ({ slot: c, title: S.slotDef(c).title, group: S.slotDef(c).group, order: S.slotDef(c).order }));
 const built = await D.pack.buildPack({
   ref: 'HX-0042',
   issued: '2026-11-03',
@@ -254,24 +279,24 @@ const built = await D.pack.buildPack({
     ['Switched on', '3 November 2026'],
     ['MCS certificate', 'MCS-00123456'],
   ],
-  cover: docs.F07BI,
+  cover: docs['HX-HO-01'],
   parts,
   follow,
 });
 keep('PACK', built.bytes);
-const coverPages = (await PDFDocument.load(docs.F07BI)).getPageCount();
+const coverPages = (await PDFDocument.load(docs['HX-HO-01'])).getPageCount();
 const packText = await textOf(built.bytes);
-eq('one PDF, the contents straight after the cover', [packText[0].includes('Handover Cover Letter'), packText[coverPages].includes('Your handover pack')], [true, true]);
+eq('one PDF, the contents straight after the cover', [packText[0].includes('Covering letter'), packText[coverPages].includes('Your handover pack')], [true, true]);
 const sep = Object.fromEntries(built.contents.filter((c) => c.separate).map((c) => [c.slot, c.separate]));
-eq('left separate: the signed PDF, the 30 MB manual, the Word file', sep, { CC17: 'signed', CC5: 'size', CCMH: 'not_pdf' });
+eq('left separate: the signed PDF, the 30 MB manual, the Word file', sep, { 'HX-HO-03': 'signed', 'HX-HO-17': 'size', 'HX-HO-19': 'not_pdf' });
 eq('under 20 MB', built.bytes.length < D.pack.PACK_LIMIT_BYTES, true);
 const contentsText = packText.slice(coverPages, coverPages + built.contentsPages).join(' ').replace(/\s+/g, ' ');
-eq('contents: separate files and what’s to follow say so', [contentsText.includes('MCS Certificate: separate file in your portal'), contentsText.includes('Paid Invoice: to follow'), contentsText.includes('What’s new in version 2: Adds your MCS certificate')], [true, true, true]);
+eq('contents: separate files and what’s to follow say so', [contentsText.includes('MCS certificate: separate file in your portal'), contentsText.includes('Invoice and receipt: to follow'), contentsText.includes('What’s new in version 2: Adds your MCS certificate')], [true, true, true]);
 // Every merged document starts on the page the contents gives it.
 const firsts = built.contents.filter((c) => c.first_page);
-const titleOn = { F78: 'EESS & PV Handover Document', CC21: 'Electrical Installation Certificate', F19I: 'Workmanship Warranty', F43: 'PV Array Test Report', F47: 'G98 Form B data sheet' };
+const titleOn = { 'HX-HO-02': 'System summary and sign-off', 'HX-HO-04': 'Electrical Installation Certificate', 'HX-HO-06': 'Heliaxis workmanship warranty', 'HX-PV-02': 'Solar PV string test results', 'HX-HO-15': 'G98 notice (as sent, fixture)' };
 eq('the page numbers match where each document starts', firsts.filter((c) => titleOn[c.slot]).every((c) => packText[c.first_page - 1].includes(titleOn[c.slot])), true);
-eq('the photo became one A4 page', firsts.find((c) => c.slot === 'CC10').pages, 1);
+eq('the photo became one A4 page', firsts.find((c) => c.slot === 'HX-HO-13').pages, 1);
 eq('page count adds up', built.pages, coverPages + built.contentsPages + firsts.reduce((n, c) => n + c.pages, 0));
 eq('the pack is titled for the job', (await PDFDocument.load(built.bytes)).getTitle(), 'HX-0042 Handover pack');
 

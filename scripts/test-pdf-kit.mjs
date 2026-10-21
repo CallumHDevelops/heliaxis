@@ -41,7 +41,7 @@ async function textOf(bytes) {
 
 /* ── A document with the symbols, long enough to run onto more pages ───────── */
 async function fixture(variant) {
-  const kit = await K.newDocument({ code: 'F43', title: 'PV Array Test Report', revision: 'Rev 2', jobRef: 'HX-0042', issued: '2026-11-03', variant });
+  const kit = await K.newDocument({ code: 'HX-PV-02', title: 'Solar PV string test results', revision: 'Issue 1', jobRef: 'HX-0042', issued: '2026-11-03', variant });
   kit.header({ meta: [['Reference', 'HX-0042'], ['Date', '3 November 2026']] });
   kit.idGrid([
     ['Installation address', '12 High Street, Maindee, Newport, NP20 4AB'],
@@ -73,17 +73,17 @@ const all = pages.join('\n');
 eq('runs onto more than one page', pages.length > 1, true);
 for (const sym of ['Ω', '²', '≥', '°', '±']) eq(`"${sym}" prints as itself`, all.includes(sym), true);
 eq('no "?" stands in for a symbol', /\?/.test(all), false);
-eq('the footer is on every page', pages.every((p, i) => p.includes(`F43 · Rev 2 · Page ${i + 1} of ${pages.length}`) && p.includes('Registered in England and Wales No. 16734783')), true);
+eq('the footer is on every page', pages.every((p, i) => p.includes(`HX-PV-02 · Issue 1 · Page ${i + 1} of ${pages.length}`) && p.includes('Registered in England and Wales No. 16734783')), true);
 const flat = all.replace(/\s+/g, ' ');
 eq('the legal line has the MCS number and the address (it wraps)', ['MCS NAP-82308', 'VAT GB507431316', '9 Turner Street', 'NP19 7AZ'].every((x) => flat.includes(x)), true);
 eq('no Easy MCS anywhere', /easy\s*mcs/i.test(all), false);
-eq('the eyebrow and title', all.includes('F43 · PROJECT HX-0042') && all.includes('PV Array Test Report'), true);
+eq('the eyebrow and title', all.includes('HX-PV-02 · PROJECT HX-0042') && all.includes('Solar PV string test results'), true);
 eq('table headings repeat on the next page', pages.slice(1).some((p) => p.includes('VOC (V)')), true);
 eq('an empty should prints "Not answered"', all.includes('Not answered'), true);
 eq('small: the fonts are cut down to what documents use', bytes.length < 250_000, true);
 const { PDFDocument } = await import('pdf-lib');
 const meta = await PDFDocument.load(bytes);
-eq('metadata: title and author', [meta.getTitle(), meta.getAuthor()], ['F43 PV Array Test Report – HX-0042', 'Heliaxis Limited']);
+eq('metadata: title and author', [meta.getTitle(), meta.getAuthor()], ['HX-PV-02 Solar PV string test results – HX-0042', 'Heliaxis Limited']);
 eq('Δ in IΔn as its look-alike (the brand face hasn’t a Greek capital delta), never "?"', /I ?[∆Δ] ?n 30 mA/.test(flat) && !/I ?\? ?n/.test(flat), true);
 eq('numbered terms: the number apart, the words beside it', flat.includes('1. The first term') && flat.includes('2. The second.'), true);
 
@@ -147,7 +147,7 @@ draft.rows([{ label: 'Panel model', value: '', must: true }]);
 const dtext = (await textOf(await draft.save())).join(' ');
 eq('a draft carries the banner and "Not answered"', dtext.includes('Draft: not signed yet') && dtext.includes('Not answered'), true);
 eq('a report labels its footer by name', dtext.includes('Roofer report · Page 1 of 1'), true);
-eq('file names start with the job ref', [K.docFileName('HX-0042', 'F43', 'PV array test report', 2), K.docFileName('HX-0042', '', 'Roofer report')], ['HX-0042 F43 PV array test report v2.pdf', 'HX-0042 Roofer report.pdf']);
+eq('file names start with the job ref, then the title (no code)', [K.docFileName('HX-0042', '', 'Solar PV string test results', 2), K.docFileName('HX-0042', '', 'Roofer report')], ['HX-0042 Solar PV string test results v2.pdf', 'HX-0042 Roofer report.pdf']);
 eq('signed stamp in UK time', K.stampWords('2026-11-03T17:41:00Z'), '3 Nov 2026 17:41');
 
 /* ── saveGenerated, against an in-memory stand-in for the database ─────────── */

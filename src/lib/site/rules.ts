@@ -8,23 +8,22 @@
  *   its count; should items listed as "Not filled", never blocking.
  * - flagsFor: FORMS 5 (Stop / Urgent / Review), and mergeFlags to keep when each was raised and how
  *   the office resolved it.
- * - Derived values: the expected string Voc, the F44 item 24 limit, the insulation-resistance minimum.
+ * - Derived values: the expected string Voc, the DC voltage limit, the insulation-resistance minimum.
  */
 import type { Field, FormCtx, SiteForm, Step } from './forms/types';
 import { carryAcross } from './forms/electrician/carry';
 import { IR_MINIMUM } from './fixed/iec62446';
 import type { Answers, Flag, Stage } from './types';
+import { valuesOf } from './values';
 
 export type Missing = { key: string; label: string; step: string; why: string };
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
-/** The context's values from its answers. */
+/** The context's values from its answers (an answer saved under a key from before version 4 read under its new one). */
 export function valuesFrom(a: Answers): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, x] of Object.entries(a ?? {})) if (x && typeof x === 'object' && 'v' in x) out[k] = x.v;
-  return out;
+  return valuesOf(a);
 }
 
 /**
@@ -50,7 +49,7 @@ export const isReading = (v: unknown) => num(v) !== null || (typeof v === 'strin
 
 /**
  * A field's answer as the rules read it: what was given, else what it works out to from other
- * answers (`auto`: F44 items 36–38, F44A). 'off' is a worked-out answer the person took away.
+ * answers (`auto`: the PV inspection's paperwork rows, the switch-on record). 'off' is a worked-out answer the person took away.
  */
 export function valueOf(f: Field, c: FormCtx): unknown {
   const v = Object.prototype.hasOwnProperty.call(c.values, f.key) ? c.values[f.key] : f.auto?.(c);
@@ -58,7 +57,7 @@ export function valueOf(f: Field, c: FormCtx): unknown {
 }
 
 /**
- * A per-string field's value for each string (F43): strings 2 onwards with nothing of their own
+ * A per-string field's value for each string (the string tests): strings 2 onwards with nothing of their own
  * are "Same as string 1" when the field says so; '' means that was switched off and nothing typed.
  */
 export function perStringValues(f: Field, c: FormCtx): unknown[] {
@@ -181,7 +180,7 @@ export function missing(form: SiteForm, c: FormCtx): { must: Missing[]; should: 
     if (isAnswered(f, c)) continue;
     // A photo slot with no minimum is never "missing".
     if (f.type === 'PHOTOS' && needOf(f, c) === 0) continue;
-    // A worked-out row waiting on others that are listed (F44 item 37 on F43): not listed twice.
+    // A worked-out row waiting on others that are listed (the PV inspection's string tests row): not listed twice.
     if (f.autoWaits?.(c) && !Object.prototype.hasOwnProperty.call(c.values, f.key)) continue;
     const m = { key: f.key, label: f.say?.(c) ?? f.label, step: step.key, why: why(f, c) };
     (f.level === 'must' ? must : should).push(m);
@@ -297,7 +296,7 @@ export function expectedStringVoc(panels: number | null, panelVoc: number | null
   return Math.round(panels * panelVoc * 10) / 10;
 }
 
-/** F44 item 24: an isolator or OCPD's DC rating must be at least the highest string Voc × 1.25. */
+/** The PV inspection's DC rating check: an isolator or string fuse's DC rating must be at least the highest string Voc × 1.25. */
 export function dcRatingLimit(stringVocs: (number | null)[]): number | null {
   const known = stringVocs.filter((v): v is number => typeof v === 'number' && v > 0);
   return known.length ? Math.round(Math.max(...known) * 1.25 * 10) / 10 : null;

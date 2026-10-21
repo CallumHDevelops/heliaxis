@@ -17,7 +17,7 @@ end $$;
 alter table public.crm_documents add column if not exists handover_slot text;   -- src/lib/handover/slots.ts; null = not in the pack
 alter table public.crm_documents add column if not exists release       text not null default 'now' check (release in ('now','with_pack'));
 alter table public.crm_documents add column if not exists source        text check (source in ('upload','generated','library','site'));
-alter table public.crm_documents add column if not exists generated_key text;   -- 'F43', 'RF_REPORT', 'PO-0123' …
+alter table public.crm_documents add column if not exists generated_key text;   -- 'HX-PV-02', 'RF_REPORT', 'PO-0123' …
 alter table public.crm_documents add column if not exists version       int not null default 1;
 alter table public.crm_documents add column if not exists inputs_hash   text;   -- what a generated document was made from
 alter table public.crm_documents add column if not exists archived_at   timestamptz;
@@ -133,7 +133,7 @@ create table if not exists public.site_signoffs (
   declaration    text not null,
   answers_hash   text not null,                -- sha256 of canonical JSON of the answers + photo ids signed
   flags          jsonb not null default '[]'::jsonb,
-  extra          jsonb not null default '{}'::jsonb,  -- customer signatures taken after it (F16E, G98)
+  extra          jsonb not null default '{}'::jsonb,  -- customer signatures taken after it (completion, g98)
   po_done_at     timestamptz,                  -- steps after the reply; the cron finishes any left
   docs_done_at   timestamptz,
   notified_at    timestamptz,

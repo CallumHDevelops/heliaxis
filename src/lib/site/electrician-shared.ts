@@ -1,7 +1,7 @@
 /**
  * The electrician's part of the job pack (pack.ts adds it for electricians): the facts their forms
  * read (FormCtx.el: the roofer's synced answers and reads, the DNO route, the design's extras, what
- * this person used last time), the roofer's evidence photos for F44, the certificate files already
+ * this person used last time), the roofer's evidence photos for the PV inspection, the certificate files already
  * uploaded, and the customer's signatures taken after the sign-off. Types and pure helpers only:
  * safe in the browser, on the server and in the tests.
  */
@@ -11,12 +11,12 @@ import type { Answers } from './types';
 /** A file the trade uploaded (their own certificate), as the server holds it. */
 export type TradeFile = { id: string; slot: string; name: string; mime: string; client_id: string | null; url: string | null };
 /** A customer's signature taken on the electrician's phone after the sign-off (P15), per document. */
-export type CustomerSignKind = 'f16e' | 'g98';
+export type CustomerSignKind = 'completion' | 'g98';
 export type CustomerSigned = { name: string; signed_at: string };
 
 export type ElectricianPack = {
   facts: Omit<ElectricianFacts, 'cert_route'>;
-  /** The roofer's photos shown as evidence beside F44 rows (fixings, the cable entry). */
+  /** The roofer's photos shown as evidence beside the PV inspection's rows (fixings, the finished roof, the cable entry). */
   roofer_photos: { id: string; slot: string; thumb: string | null }[];
   uploads: TradeFile[];
   /** Customer signatures the server has, by document. */
@@ -38,9 +38,9 @@ export function withFiles(photos: Record<string, number>, files: { slot: string 
 }
 
 /** What the roofer has given that the electrician's forms read (FORMS 1.6), and nothing else. */
-export const ROOFER_KEYS = ['RF7', 'RF7a', 'RF10', 'RF11', 'RF13', 'RF14', 'RX1', 'RX2', 'RX4', 'RX5'];
-/** The roofer's photo slots shown beside F44 rows. */
-export const ROOFER_EVIDENCE = ['RF2', 'RX4p'];
+export const ROOFER_KEYS = ['RF7', 'RF7a', 'RF8', 'RF9', 'RF10', 'RF11', 'RF13', 'RF14', 'RX1', 'RX2', 'RX3', 'RX3r', 'RX4', 'RX5'];
+/** The roofer's photo slots shown beside the PV inspection's rows (the fixings, the finished roof, the cable entry). */
+export const ROOFER_EVIDENCE = ['RF2', 'RF3', 'RX4p'];
 
 export function rooferValues(a: Answers | null | undefined): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -53,11 +53,11 @@ export function rooferValues(a: Answers | null | undefined): Record<string, unkn
 
 /**
  * What the customer reads above each signature (P15), one per document (D15: a signature is never
- * reused). The completion line is a plain draft for the owner's approval (F16E is his to word); the
+ * reused). The completion line is a plain draft for the owner's approval (the completion sign-off is his to word); the
  * G98 one only says what the signature is for, as Form B's own wording isn't copied in yet (D14).
  */
 export const CUSTOMER_DECLARATION: Record<CustomerSignKind, (address: string) => string> = {
-  f16e: (address) => `I’m happy that the work at ${address || 'my home'} has been finished, and I’ve been shown how the system works and how to switch it off.`,
+  completion: (address) => `I’m happy that the work at ${address || 'my home'} has been finished, and I’ve been shown how the system works and how to switch it off.`,
   g98: () => 'Your signature for the G98 Form B, which tells the electricity network (DNO) about your system.',
 };
-export const CUSTOMER_SIGN_TITLE: Record<CustomerSignKind, string> = { f16e: 'Completion of works', g98: 'G98 notice to the DNO' };
+export const CUSTOMER_SIGN_TITLE: Record<CustomerSignKind, string> = { completion: 'Work finished', g98: 'G98 notice to the DNO' };

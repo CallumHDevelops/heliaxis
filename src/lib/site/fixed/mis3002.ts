@@ -1,9 +1,9 @@
 /**
  * MIS 3002's wording for the performance estimate (the "Important Note") and the shading notes, for
- * F48I (SPEC 4.5, D14). Not copied yet: the research could only see the note's first lines in search
+ * HX-HO-10, the solar estimate, shading and care page (SPEC 4.5, D14). Not copied yet: the research could only see the note's first lines in search
  * extracts, and the handover pack never prints a standard's wording from a summary. Until someone
  * copies both texts word for word from the issue the owner works to (owner question 3) and sets
- * `verified: true` in a commit naming that document, F48I isn't made: the office uploads its own.
+ * `verified: true` in a commit naming that document, HX-HO-10 isn't made: the office uploads its own.
  */
 export type Mis3002Notes = { source: string; issue: string; verified: boolean; importantNote: string; shadingNote: string };
 

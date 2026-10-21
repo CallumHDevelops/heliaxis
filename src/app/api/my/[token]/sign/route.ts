@@ -11,7 +11,7 @@ const fail = (error: string, status: number) => NextResponse.json({ error }, { s
 
 /**
  * The customer signs in their portal (SPEC 4.10, C2) when they didn't on the electrician's phone:
- * { kind: 'f16e' | 'g98', name, signature, agree }. Only when the portal is offering that card; each
+ * { kind: 'completion' | 'g98', name, signature, agree }. Only when the portal is offering that card; each
  * document gets its own signature (D15), and the first one counts. The completion record (or the
  * G98 data sheet) is made straight after, and goes into their pack.
  */
@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const p = await projectByToken(token);
   if (!p || p.mode !== 'full') return fail('Not found', 404);
   const b = await req.json().catch(() => ({}));
-  const kind = b.kind === 'f16e' || b.kind === 'g98' ? (b.kind as 'f16e' | 'g98') : null;
+  const kind = b.kind === 'completion' || b.kind === 'g98' ? (b.kind as 'completion' | 'g98') : null;
   const name = String(b.name || '').replace(/\s+/g, ' ').trim().slice(0, 120);
   const sig = String(b.signature || '');
   if (!kind) return fail('Not found', 404);

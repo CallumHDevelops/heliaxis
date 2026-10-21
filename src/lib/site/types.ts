@@ -2,6 +2,7 @@
  * The site app's shared shapes: trades, assignment statuses, answers with where each came from,
  * flags, and what the staff screens and the phone are sent. Types and small pure helpers only (type
  * imports at most), so they're safe in the browser, on the server and in scripts/test-site-*.mjs.
+ * Answers as plain values, with the old keys' aliases, are values.ts's.
  */
 
 export type Trade = 'roofer' | 'scaffolder' | 'electrician' | 'other';
@@ -51,13 +52,6 @@ export const SOURCE_LABEL: Record<Source, string> = {
 /** One answer as stored: the value, its source, when it was given (ISO), and the phone it came from (site_devices id). */
 export type Answer = { v: unknown; src?: Source; at?: string; dev?: string };
 export type Answers = Record<string, Answer>;
-
-/** Answers as plain values (what the rules read). */
-export function valuesOf(a: Answers | null | undefined): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, x] of Object.entries(a ?? {})) if (x && typeof x === 'object' && 'v' in x) out[k] = x.v;
-  return out;
-}
 
 export type Severity = 'stop' | 'urgent' | 'review';
 export const SEVERITY_LABEL: Record<Severity, string> = { stop: 'Fix this', urgent: 'Urgent', review: 'For the office' };

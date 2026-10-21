@@ -75,7 +75,7 @@ export function HandoverSettings({ isAdmin }: { isAdmin: boolean }) {
         <h2>Handover pack</h2>
         <p className="crm-muted crm-small">Your own words and numbers for the customer’s handover pack. Nothing here is filled in for you: until it’s set, that document isn’t made.</p>
         <fieldset disabled={!isAdmin || busy} className="crm-fieldset">
-          <h3 className="hs-subhead">Workmanship warranty (F19I)</h3>
+          <h3 className="hs-subhead">Workmanship warranty (HX-HO-06)</h3>
           <div className="crm-grid2">
             <div>
               <label className="crm-label" htmlFor="hs-years">
@@ -99,16 +99,16 @@ export function HandoverSettings({ isAdmin }: { isAdmin: boolean }) {
           </label>
           <textarea id="hs-wtext" className="crm-input" rows={6} value={s.warrantyText} onChange={(e) => set('warrantyText', e.target.value)} placeholder="Your warranty wording. A blank line starts a new paragraph." />
 
-          <h3 className="hs-subhead">F78 next inspection</h3>
+          <h3 className="hs-subhead">Next inspection, when the electrical certificate doesn’t say</h3>
           <label className="crm-label" htmlFor="hs-next">
             Years, when the electrical certificate doesn’t say
           </label>
           <input id="hs-next" className="crm-input crm-narrow" inputMode="numeric" value={s.nextInspectionYears ?? ''} onChange={(e) => set('nextInspectionYears', e.target.value ? Number(e.target.value) || null : null)} />
 
-          <h3 className="hs-subhead">Maintenance agreement (F49A)</h3>
-          <textarea className="crm-input" rows={5} value={s.maintenanceText} onChange={(e) => set('maintenanceText', e.target.value)} placeholder="Your agreement wording. The plan’s details are typed per job, exactly as quoted." aria-label="Maintenance agreement wording" />
+          <h3 className="hs-subhead">Maintenance plan (HX-HO-12)</h3>
+          <textarea className="crm-input" rows={5} value={s.maintenanceText} onChange={(e) => set('maintenanceText', e.target.value)} placeholder="Your plan wording. The plan’s details are typed per job, exactly as quoted." aria-label="Maintenance plan wording" />
 
-          <h3 className="hs-subhead">Your maintenance rows (F49)</h3>
+          <h3 className="hs-subhead">Your maintenance rows</h3>
           <p className="crm-muted crm-small">Added to every schedule, with Heliaxis as the source. Intervals for products come from the product library.</p>
           {s.scheduleRows.map((r, i) => (
             <div key={i} className="crm-grid2 hs-row">
@@ -180,7 +180,7 @@ export function HandoverSettings({ isAdmin }: { isAdmin: boolean }) {
                 <div>
                   <b>{d.name}</b>
                   <div className="hs-libfields">
-                    <select className="crm-input" value={d.kind ?? ''} disabled={!isAdmin} onChange={(e) => void patchLib(d.id, { kind: e.target.value || null, handover_slot: e.target.value === 'procedure' ? 'CC4' : e.target.value === 'guide' ? 'CCMH' : e.target.value ? 'CC5' : null })} aria-label="Kind">
+                    <select className="crm-input" value={d.kind ?? ''} disabled={!isAdmin} onChange={(e) => void patchLib(d.id, { kind: e.target.value || null, handover_slot: e.target.value === 'procedure' ? 'HX-HO-09' : e.target.value === 'guide' ? 'HX-HO-19' : e.target.value ? 'HX-HO-17' : null })} aria-label="Kind">
                       <option value="">Not for packs</option>
                       <option value="manual">Manual</option>
                       <option value="datasheet">Datasheet</option>
@@ -197,7 +197,7 @@ export function HandoverSettings({ isAdmin }: { isAdmin: boolean }) {
                       onBlur={(e) => e.target.value !== (d.models ?? []).join('; ') && void patchLib(d.id, { models: e.target.value.split(';') })}
                     />
                     <label className="crm-check" style={{ margin: 0 }}>
-                      <input type="checkbox" checked={!!d.every_pack} disabled={!isAdmin} onChange={(e) => void patchLib(d.id, { every_pack: e.target.checked, ...(e.target.checked && !d.kind ? { kind: 'guide', handover_slot: 'CCMH' } : {}) })} /> In every pack
+                      <input type="checkbox" checked={!!d.every_pack} disabled={!isAdmin} onChange={(e) => void patchLib(d.id, { every_pack: e.target.checked, ...(e.target.checked && !d.kind ? { kind: 'guide', handover_slot: 'HX-HO-19' } : {}) })} /> In every pack
                     </label>
                   </div>
                 </div>

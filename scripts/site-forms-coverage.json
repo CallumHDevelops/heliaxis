@@ -1,0 +1,3564 @@
+{
+ "about": "Every item of the five source forms the site records replaced, described in our words (scripts/test-site-forms-coverage.mjs proves each one). Ids: the record and the item's place in its source form.",
+ "sections": {
+  "PV-02": 39,
+  "PV-01": 66,
+  "BAT-01+02": 95,
+  "BAT-02b": 24,
+  "HO-02": 38
+ },
+ "rows": [
+  {
+   "id": "PV-02.00",
+   "record": "HX-PV-02",
+   "kind": "title",
+   "what": "Form title",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Solar PV string test results",
+     "on": "HX-PV-02"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.01",
+   "record": "HX-PV-02",
+   "kind": "heading+option",
+   "what": "Certificate heading with the first-time option",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_kind",
+     "option": "initial",
+     "label": "New installation"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.02",
+   "record": "HX-PV-02",
+   "kind": "option",
+   "what": "Re-test option",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_kind",
+     "option": "periodic",
+     "label": "Re-test of an existing system"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.03",
+   "record": "HX-PV-02",
+   "kind": "merge label",
+   "what": "Job reference",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Job reference",
+     "on": "HX-PV-02"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.04",
+   "record": "HX-PV-02",
+   "kind": "merge label",
+   "what": "Date of the tests",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Test date",
+     "on": "HX-PV-02"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.05",
+   "record": "HX-PV-02",
+   "kind": "merge label",
+   "what": "Site address",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Address",
+     "on": "HX-PV-02"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.06",
+   "record": "HX-PV-02",
+   "kind": "label",
+   "what": "What is under test",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_desc"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.07",
+   "record": "HX-PV-02",
+   "kind": "label",
+   "what": "Instruments used",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_tester"
+    },
+    {
+     "key": "pvt_tester_cal"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.08",
+   "record": "HX-PV-02",
+   "kind": "merge label",
+   "what": "Who tested",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Tested by",
+     "on": "HX-PV-02"
+    },
+    {
+     "printed": "Signed on the Heliaxis app",
+     "on": "HX-PV-02"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.09",
+   "record": "HX-PV-02",
+   "kind": "layout",
+   "what": "Per-string column header 1…n",
+   "how": "layout only",
+   "proofs": [
+    {
+     "key": "pvt_strings"
+    },
+    {
+     "perString": "pvt_"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.10",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Panel make and model",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_panel"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.11",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Number of panels on the string",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_panels"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.12",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Expected open-circuit voltage at STC",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_voc_stc"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.13",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Expected short-circuit current at STC",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_isc_stc"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.14",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "String protective device type",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_fuse"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.15",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Its current rating",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_fuse_a"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.16",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Its DC voltage rating",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_fuse_v"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.17",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Its breaking capacity",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_fuse_ka"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.18",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "String cable type",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_cable"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.19",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Live conductor size",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_cable_mm2"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.20",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Earth conductor size",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_earth_mm2"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.21",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Measured open-circuit voltage",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_voc"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.22",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Measured short-circuit current",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_isc"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.23",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Irradiance at the time",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_irr"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.24",
+   "record": "HX-PV-02",
+   "kind": "layout",
+   "what": "Second per-string header row",
+   "how": "layout only",
+   "proofs": [
+    {
+     "perString": "pvt_"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.25",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Polarity",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_polarity"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.26",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Insulation test voltage",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_ir_v"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.27",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Insulation, positive to earth",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_ir_pos"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.28",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Insulation, negative to earth",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_ir_neg"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.29",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Frame earth continuity where there is one",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_frame_earth"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.30",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "DC isolator current rating",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_iso_a"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.31",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "DC isolator voltage rating",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_iso_v"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.32",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "DC isolator position",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_iso_where"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.33",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "DC isolator works",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_iso_ok"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.34",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Inverter make and model",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_inv"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.35",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Inverter serial number",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_inv_serial"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.36",
+   "record": "HX-PV-02",
+   "kind": "check",
+   "what": "Inverter works",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_inv_ok"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.37",
+   "record": "HX-PV-02",
+   "kind": "label",
+   "what": "Free comments",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvt_notes"
+    }
+   ]
+  },
+  {
+   "id": "PV-02.38",
+   "record": "HX-PV-02",
+   "kind": "chrome",
+   "what": "Revision date, the source's mark, form code, page count",
+   "how": "dropped (the source's page furniture)",
+   "proofs": [
+    {
+     "footer": "HX-PV-02"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.00",
+   "record": "HX-PV-01",
+   "kind": "title",
+   "what": "Form title",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Solar PV inspection record",
+     "on": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.01",
+   "record": "HX-PV-01",
+   "kind": "fact",
+   "what": "Heliaxis name, address, phone, email (our own data)",
+   "how": "kept as a fact",
+   "proofs": [
+    {
+     "printed": "Heliaxis Limited",
+     "on": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.n0",
+   "record": "HX-PV-01",
+   "kind": "heading",
+   "what": "Notes heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "hint": "pvi_frame_metal"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.n1",
+   "record": "HX-PV-01",
+   "kind": "note",
+   "what": "Names the lightning protection standard",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "pvi_frame_lp"
+    },
+    {
+     "hint": "pvi_frame_lp"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.n2",
+   "record": "HX-PV-01",
+   "kind": "note",
+   "what": "A frame cannot be both kinds of conductive part",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_exp"
+    },
+    {
+     "hint": "pvi_frame_exp"
+    },
+    {
+     "key": "pvi_frame_ext"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.n3",
+   "record": "HX-PV-01",
+   "kind": "note",
+   "what": "Earthing rules apply only to connected metal frames",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_metal"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.n4",
+   "record": "HX-PV-01",
+   "kind": "note",
+   "what": "Exception: all non-conducting structures",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "pvi_frame_metal"
+    },
+    {
+     "hint": "pvi_frame_metal"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.n5",
+   "record": "HX-PV-01",
+   "kind": "note",
+   "what": "Exception: separate metal parts with no path between panels",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "pvi_frame_metal"
+    },
+    {
+     "hint": "pvi_frame_metal"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.02",
+   "record": "HX-PV-01",
+   "kind": "merge label",
+   "what": "Job reference",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Job reference",
+     "on": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.03",
+   "record": "HX-PV-01",
+   "kind": "merge label",
+   "what": "Site address",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Address",
+     "on": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.04",
+   "record": "HX-PV-01",
+   "kind": "merge label",
+   "what": "Who inspected, and the date",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Inspected by",
+     "on": "HX-PV-01"
+    },
+    {
+     "printed": "Date",
+     "on": "HX-PV-01"
+    },
+    {
+     "printed": "Signed on the Heliaxis app",
+     "on": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r01",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 1: Kit to standard, right choice, undamaged",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_kit"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r02",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 2: Kit reachable to use, inspect and service",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_access"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r03",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 3: Kit and accessories connected properly",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_connected"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r04",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 4: Extra measures in a special location",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_special"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r05",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 5: Kit and protection suit the external influences",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_suits"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r06",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 6: No harmful interaction with other services",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_clear"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r07",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 7: Terminations made and marked",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_ends"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r08",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 8: Cables sized for current and volt drop",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_sizes"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r09",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 9: Cable routes safe or protected from damage",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_routes"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r10",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 10: Fire stopping, seals, protection from heat",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_fire_stop"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r11",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 11: Air gap behind the panels",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_airflow"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r12",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 12: Frame and fixings resist corrosion",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_corrosion"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r13a",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 13, first half: frame fixed and stable",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_fixed"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r13b",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 13, second half: roof fixings watertight",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_watertight"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r14",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 14: Roof cable entry sealed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_entry"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r15",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 15: Live parts safe from touch",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_live"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r16",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 16: Frame bonding where needed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_bonded"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r17",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 17: Surge protection where needed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_spd"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r18",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 18: RCD where needed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_rcd"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r19",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 19: Frame joined to an existing lightning system",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_lps"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r20",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 20: roof fire performance unharmed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_roof_fire"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r20o1",
+   "record": "HX-PV-01",
+   "kind": "option",
+   "what": "Row 20 roof kind: pitched (on-roof)",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_mount",
+     "option": "on_roof"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r20o2",
+   "record": "HX-PV-01",
+   "kind": "option",
+   "what": "Row 20 roof kind: in-roof",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_mount",
+     "option": "in_roof"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r20d",
+   "record": "HX-PV-01",
+   "kind": "layout",
+   "what": "Row 20 repeated (merged table cell)",
+   "how": "layout only",
+   "proofs": [
+    {
+     "key": "pvi_roof_fire"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r21",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 21: DC and AC cables kept apart",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_ac_dc"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r22",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 22: DC switch-disconnector fitted (IEC clause given)",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "pvi_dc_switch"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r23",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 23: DC cable insulation where needed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_dc_insul"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r24",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 24: DC parts rated for the highest array voltage (with a factor)",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_dc_volts"
+    },
+    {
+     "flag": "PVI_DC_RATING"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r25",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 25: String fuses or blocking diodes where needed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_string_fuse"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r26",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 26: AC isolator can be locked off only",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_ac_lock"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r27",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 27: Generation meter easy to read, and sealed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_meter"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r28",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 28: inverter protection settings as the network requires",
+   "how": "worked out",
+   "proofs": [
+    {
+     "auto": "pvi_grid"
+    },
+    {
+     "key": "pvc_grid"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r29",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 29: Circuits, devices, switches, terminals labelled",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "pvi_labels"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r30",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 30: Schematic on site",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_schematic"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r31",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 31: Settings and installer details on site",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_settings_note"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r32",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 32: Emergency shutdown steps on site",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_shutdown"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r33",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 33: AC isolator labelled",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_ac_label"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r34",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 34: DC isolator and junction boxes labelled",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_dc_label"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r35",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 35: Labels fixed and lasting",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_labels_last"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r36",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 36: DNO details on the job",
+   "how": "worked out",
+   "proofs": [
+    {
+     "auto": "pvi_dno"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r37",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 37: String tests done",
+   "how": "worked out",
+   "proofs": [
+    {
+     "auto": "pvi_tests"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r38a",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 38, certificate half: electrical certificate done",
+   "how": "worked out",
+   "proofs": [
+    {
+     "auto": "pvi_cert"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.r38b",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Row 38, Building Control half: notified",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Building Control",
+     "on": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2h",
+   "record": "HX-PV-01",
+   "kind": "heading",
+   "what": "Frame earthing table heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Frame earthing",
+     "on": "HX-PV-01"
+    },
+    {
+     "section": "pvi_frame_metal",
+     "on": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2a",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Condition a): frame is an extraneous-conductive-part",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_ext"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2aR",
+   "record": "HX-PV-01",
+   "kind": "requirement",
+   "what": "a) needs main protective bonding (BS 7671 Section 544)",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_bonded"
+    },
+    {
+     "key": "pvi_frame_ext"
+    },
+    {
+     "hint": "pvi_frame_ext"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2i1",
+   "record": "HX-PV-01",
+   "kind": "instruction",
+   "what": "Tick each condition that applies, then earth to suit",
+   "how": "asked",
+   "proofs": [
+    {
+     "printed": "The frame needs",
+     "on": "HX-PV-01"
+    },
+    {
+     "key": "pvi_frame_metal"
+    },
+    {
+     "key": "pvi_frame_ext"
+    },
+    {
+     "key": "pvi_frame_exp"
+    },
+    {
+     "key": "pvi_frame_lp"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2i2",
+   "record": "HX-PV-01",
+   "kind": "instruction",
+   "what": "Where several apply, meet the strictest",
+   "how": "printed",
+   "proofs": [
+    {
+     "groupNote": "pvi_frame_metal"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2b",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Condition b): frame is an exposed-conductive-part",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_exp"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2bR",
+   "record": "HX-PV-01",
+   "kind": "requirement",
+   "what": "b) needs a protective earth conductor (BS 7671 Section 543)",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_earthed"
+    },
+    {
+     "key": "pvi_frame_exp"
+    },
+    {
+     "hint": "pvi_frame_exp"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2c",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Condition c): lightning protection needed or nearby",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_lp"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2cR",
+   "record": "HX-PV-01",
+   "kind": "requirement",
+   "what": "c) earth for lightning protection to the lightning standard",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_lps"
+    },
+    {
+     "key": "pvi_frame_lp"
+    },
+    {
+     "hint": "pvi_frame_lp"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2d",
+   "record": "HX-PV-01",
+   "kind": "check",
+   "what": "Condition d): none of a) to c)",
+   "how": "worked out",
+   "proofs": [
+    {
+     "printed": "The frame needs",
+     "on": "HX-PV-01"
+    },
+    {
+     "key": "pvi_frame_metal"
+    },
+    {
+     "key": "pvi_frame_ext"
+    },
+    {
+     "key": "pvi_frame_exp"
+    },
+    {
+     "key": "pvi_frame_lp"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.t2dR",
+   "record": "HX-PV-01",
+   "kind": "requirement",
+   "what": "d) functional earth where a maker or the designer asks (BS 7671 Chapter 54, Section 444)",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "pvi_frame_func"
+    }
+   ]
+  },
+  {
+   "id": "PV-01.99",
+   "record": "HX-PV-01",
+   "kind": "chrome",
+   "what": "Revision date, the source's mark, form code, page count",
+   "how": "dropped (the source's page furniture)",
+   "proofs": [
+    {
+     "footer": "HX-PV-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.00",
+   "record": "HX-BAT-01",
+   "kind": "title",
+   "what": "Form title",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Battery inspection record",
+     "on": "HX-BAT-01"
+    },
+    {
+     "printed": "Battery switch-on and test record",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.01",
+   "record": "HX-BAT-01",
+   "kind": "merge label",
+   "what": "Job reference",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Job reference",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.02",
+   "record": "HX-BAT-01",
+   "kind": "merge label",
+   "what": "Site address",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Address",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.03",
+   "record": "HX-BAT-01",
+   "kind": "merge label",
+   "what": "Who did it, and the date",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Inspected by",
+     "on": "HX-BAT-01"
+    },
+    {
+     "printed": "Tested by",
+     "on": "HX-BAT-02"
+    },
+    {
+     "printed": "Date",
+     "on": "HX-BAT-02"
+    },
+    {
+     "printed": "Signed on the Heliaxis app",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.04a",
+   "record": "HX-BAT-01",
+   "kind": "guidance",
+   "what": "Inspect to BS 7671 and each maker's instructions",
+   "how": "printed",
+   "proofs": [
+    {
+     "intro": "battery-inspect"
+    },
+    {
+     "statement": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.04b",
+   "record": "HX-BAT-01",
+   "kind": "guidance",
+   "what": "Apply to the whole installation, AC and DC sides",
+   "how": "printed",
+   "proofs": [
+    {
+     "intro": "battery-inspect"
+    },
+    {
+     "statement": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.05",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Part 1 heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_space_vent",
+     "on": "HX-BAT-01"
+    },
+    {
+     "section": "bat_design",
+     "on": "HX-BAT-01"
+    },
+    {
+     "section": "bat_cable_rating",
+     "on": "HX-BAT-01"
+    },
+    {
+     "section": "bat_live_parts",
+     "on": "HX-BAT-01"
+    },
+    {
+     "section": "bat_bu_isolate",
+     "on": "HX-BAT-01"
+    },
+    {
+     "section": "bat_labels",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.06",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Section heading on design, choice and connection; answer-column heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_design",
+     "on": "HX-BAT-01"
+    },
+    {
+     "section": "bat_cable_rating",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r01",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 1: Kit complies with its product standards",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_standards"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r02",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 2: Installed to the design",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_design"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r03a",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 3, \"selected\" half: chosen to standards",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_standards"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r03b",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 3, \"erected\" half: put up to makers' instructions",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_manual"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r04",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 4: Undamaged",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_undamaged"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r05",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 5: Conductors connected, marked and routed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_cable_ends"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r06",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 6: Cables suit the voltage and current",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_cable_rating"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r07",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 7: Switchgear and devices suit the voltage and current",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_device_rating"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r08",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 8: Switchgear and devices fitted and connected properly",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_device_fit"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r09",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 9: Components suit the location and external influences",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_conditions"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.s2",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Section heading: shock protection",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_live_parts",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r10",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 10: basic protection",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_live_parts"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r10a",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 10 line 1: insulation of live parts",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_live_parts"
+    },
+    {
+     "hint": "bat_live_parts"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r10b",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 10 line 2: barriers or enclosures with a suitable IP rating",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_live_parts"
+    },
+    {
+     "hint": "bat_live_parts"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r11",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 11: additional protection",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_extra_prot"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r11a",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 11 line 1: 30 mA RCD",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_extra_prot"
+    },
+    {
+     "hint": "bat_extra_prot"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r11b",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 11 line 2: supplementary bonding",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_extra_prot"
+    },
+    {
+     "hint": "bat_extra_prot"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r12",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 12: other protective methods",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_other_prot"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r12a",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 12 line 1: SELV",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_other_prot"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r12b",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 12 line 2: PELV",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_other_prot"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r12c",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 12 line 3: double or reinforced insulation",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_other_prot"
+    },
+    {
+     "hint": "bat_other_prot"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r13",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 13: automatic disconnection",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_earthing"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r13a",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 13 line 1: main earth",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_earthing"
+    },
+    {
+     "hint": "bat_earthing"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r13b",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 13 line 2: earth connections",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_earthing"
+    },
+    {
+     "hint": "bat_earthing"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r13c",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 13 line 3: main protective bonding",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_earthing"
+    },
+    {
+     "hint": "bat_earthing"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r13d",
+   "record": "HX-BAT-01",
+   "kind": "sub-check",
+   "what": "Row 13 line 4: RCDs for fault protection where needed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_earthing"
+    },
+    {
+     "hint": "bat_earthing"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.s3",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Section heading: general",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "key": "bat_reach"
+    },
+    {
+     "key": "bat_apart"
+    },
+    {
+     "key": "bat_labels"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r14",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 14: No harmful interaction with other services",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_apart"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r15",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 15: Location allows access",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_reach"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r16",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 16: Labels and signs present and lasting",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_labels"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.s4",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Section heading: back-up supplies",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "key": "eess_backup"
+    },
+    {
+     "section": "bat_bu_isolate",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r17",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 17: back-up supply cut off from the grid on all live conductors",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "bat_bu_isolate"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r18",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 18: the house's own earth electrode",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "bat_bu_electrode"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r19",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 19: RCDs so disconnection times are still met",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "bat_bu_rcd"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r20",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 20: surge protection",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "bat_bu_spd"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r21",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 21: staggered start or load shedding at changeover",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "bat_bu_load"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.s5",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Section heading: battery location",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_space_vent",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r22",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 22: Room ventilation suits the battery and its kit",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_space_vent"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r23",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 23: Location suits the IP rating",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_conditions"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r24",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 24: Fire prevention and detection suited to the battery type",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_fire"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r25",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 25: Safety signs suited to the battery type, lasting",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_signs"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.s6",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Section heading: battery equipment",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_design",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r26",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 26: Installed to the makers' requirements",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_manual"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r27",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 27: Clearances to the maker's figures",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_space"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r28",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 28: Kit's own ventilation to the maker's needs, unobstructed",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_vents_clear"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r29",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 29: Clearance from heat sources",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_heat"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r30",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 30: Battery reachable to use and maintain",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_reach"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.r31",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "Row 31: Battery notices: more than one supply; battery present",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_notices"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p1n",
+   "record": "HX-BAT-01",
+   "kind": "label",
+   "what": "Part 1 notes",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_inspect_notes"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p2h",
+   "record": "HX-BAT-01",
+   "kind": "heading",
+   "what": "Part 2 heading: BS 7671 tests",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_tests_done",
+     "on": "HX-BAT-01"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p2t",
+   "record": "HX-BAT-01",
+   "kind": "check",
+   "what": "BS 7671 tests done, answered yes, no or not applicable",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_tests_done"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p2r",
+   "record": "HX-BAT-01",
+   "kind": "label",
+   "what": "Certificate and schedule references",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_tests_ref"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p2n",
+   "record": "HX-BAT-01",
+   "kind": "label",
+   "what": "Part 2 notes",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_inspect_notes"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p3h",
+   "record": "HX-BAT-02",
+   "kind": "heading",
+   "what": "Part 3 heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_online",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st1",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 1: Data and control systems working",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_control"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st2",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 2: Set up and communicating",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_online"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st3",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 3: User displays and alarms working",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_display"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st4a",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 4: charge and discharge work",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_cycle"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st4b",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 4: functional checks the maker or a standard recommends (a standard named)",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "bat_cycle"
+    },
+    {
+     "info": "bat_cycle"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st4c",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 4: a capacity test is not normally needed at home",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_cycle"
+    },
+    {
+     "info": "bat_cycle"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st5",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 5: Thermal management working",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_temp"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st6",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 6: Ventilation and its controls working",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_vent_fans"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st7",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 7: Fire detection or management working",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_fire_test"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st8",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 8: Liquids in the battery checked (lead-acid)",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_electrolyte"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.st9",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 9: Other parts of the system working (pumps, valves)",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_other_parts"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p4h",
+   "record": "HX-BAT-02",
+   "kind": "heading",
+   "what": "Part 4 heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_grid_loss",
+     "on": "HX-BAT-02"
+    },
+    {
+     "section": "bat_bu_switch",
+     "on": "HX-BAT-02"
+    },
+    {
+     "section": "bat_grid_services",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at1a",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 1: grid-parallel operation",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_grid_loss"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at1b",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 1: at least a loss of mains test",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_grid_loss"
+    },
+    {
+     "info": "bat_grid_loss"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at1c",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 1: larger systems may need a longer sequence (injection testing)",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_grid_loss"
+    },
+    {
+     "info": "bat_grid_loss"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at2a",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 2: export limit tests where one is specified",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_export_cap"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at2b",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 2: the network operator's expected tests are in G100",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_export_cap"
+    },
+    {
+     "info": "bat_export_cap"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at3a",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 3: tests for any grid service provided",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_grid_services"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at3b",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 3: simulate grid conditions, watch the response",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_grid_services"
+    },
+    {
+     "info": "bat_grid_services"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at3c",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 3: example, frequency step and ramp response",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_grid_services"
+    },
+    {
+     "info": "bat_grid_services"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at4a",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 4: income metering works and is accurate",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_meters"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at4b",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 4: also meters a warranty relies on",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_meters"
+    },
+    {
+     "hint": "bat_meters"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at5a",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 5: back-up supply quality",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_bu_quality"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at5b",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 5: from voltage and frequency up to waveform and harmonics",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_bu_quality"
+    },
+    {
+     "hint": "bat_bu_quality"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at6a",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 6: changeover to and from back-up",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_bu_switch"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at6b",
+   "record": "HX-BAT-02",
+   "kind": "guidance",
+   "what": "Test 6: names two IET Code of Practice sections",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "key": "bat_bu_switch"
+    },
+    {
+     "info": "bat_bu_switch"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at6c1",
+   "record": "HX-BAT-02",
+   "kind": "sub-check",
+   "what": "Test 6 item 1: changeover switches or relays",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_bu_switch"
+    },
+    {
+     "info": "bat_bu_switch"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at6c2",
+   "record": "HX-BAT-02",
+   "kind": "sub-check",
+   "what": "Test 6 item 2: neutral-earth switching",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_bu_switch"
+    },
+    {
+     "info": "bat_bu_switch"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at6c3",
+   "record": "HX-BAT-02",
+   "kind": "sub-check",
+   "what": "Test 6 item 3: back-up circuits kept apart from the rest",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "bat_bu_switch"
+    },
+    {
+     "info": "bat_bu_switch"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.at6c4",
+   "record": "HX-BAT-02",
+   "kind": "sub-check",
+   "what": "Test 6 item 4: earth electrode resistance",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_bu_ra"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.mfr",
+   "record": "HX-BAT-02",
+   "kind": "label",
+   "what": "Maker's commissioning report reference",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_mfr_ref"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.p4n",
+   "record": "HX-BAT-02",
+   "kind": "label",
+   "what": "Part 4 notes",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "bat_test_notes"
+    }
+   ]
+  },
+  {
+   "id": "BAT-01+02.99",
+   "record": "HX-BAT-01",
+   "kind": "chrome",
+   "what": "Revision date, the source's mark, form code, page count",
+   "how": "dropped (the source's page furniture)",
+   "proofs": [
+    {
+     "footer": "HX-BAT-01"
+    },
+    {
+     "footer": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.00",
+   "record": "HX-BAT-02",
+   "kind": "title",
+   "what": "Form title",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Battery switch-on and test record",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.01",
+   "record": "HX-BAT-02",
+   "kind": "merge label",
+   "what": "Job reference",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Job reference",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.02",
+   "record": "HX-BAT-02",
+   "kind": "merge label",
+   "what": "Site address",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Address",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.03",
+   "record": "HX-BAT-02",
+   "kind": "merge label",
+   "what": "Who did it, and the date",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Tested by",
+     "on": "HX-BAT-02"
+    },
+    {
+     "printed": "Date",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.04",
+   "record": "HX-BAT-02",
+   "kind": "heading",
+   "what": "Heading over the nine system tests",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_online",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st1",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 1 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_control"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st2",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 2 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_online"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st3",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 3 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_display"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st4",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 4 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_cycle"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st5",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 5 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_temp"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st6",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 6 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_vent_fans"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st7",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 7 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_fire_test"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st8",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 8 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_electrolyte"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.st9",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "System test 9 (the same as the system tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_other_parts"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.05",
+   "record": "HX-BAT-02",
+   "kind": "heading",
+   "what": "Heading over the six application tests",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "section": "bat_grid_loss",
+     "on": "HX-BAT-02"
+    },
+    {
+     "section": "bat_bu_switch",
+     "on": "HX-BAT-02"
+    },
+    {
+     "section": "bat_grid_services",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.at1",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 1 (the same as the application tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_grid_loss"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.at2",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 2 (the same as the application tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_export_cap"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.at3",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 3 (the same as the application tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_grid_services"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.at4",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 4 (the same as the application tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_meters"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.at5",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 5 (the same as the application tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_bu_quality"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.at6",
+   "record": "HX-BAT-02",
+   "kind": "test",
+   "what": "Application test 6 (the same as the application tests of BAT-01+02)",
+   "how": "merged",
+   "proofs": [
+    {
+     "key": "bat_bu_switch"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.06",
+   "record": "HX-BAT-02",
+   "kind": "label",
+   "what": "Signature",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Tested by",
+     "on": "HX-BAT-02"
+    },
+    {
+     "printed": "Signed on the Heliaxis app",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.07",
+   "record": "HX-BAT-02",
+   "kind": "label",
+   "what": "Date",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Date",
+     "on": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "BAT-02b.99",
+   "record": "HX-BAT-02",
+   "kind": "chrome",
+   "what": "Revision date, the source's mark, form code, page count",
+   "how": "dropped (the source's page furniture)",
+   "proofs": [
+    {
+     "footer": "HX-BAT-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.00",
+   "record": "HX-HO-02",
+   "kind": "title",
+   "what": "Document title",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "System summary and sign-off",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.01",
+   "record": "HX-HO-02",
+   "kind": "heading",
+   "what": "Battery block heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Battery",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.02",
+   "record": "HX-HO-02",
+   "kind": "heading",
+   "what": "Solar block heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Solar panels",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.03",
+   "record": "HX-HO-02",
+   "kind": "heading+option",
+   "what": "Certificate heading with the first-time option",
+   "how": "asked",
+   "proofs": [
+    {
+     "printed": "Type",
+     "on": "HX-HO-02"
+    },
+    {
+     "key": "hos_kind",
+     "option": "initial"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.04",
+   "record": "HX-HO-02",
+   "kind": "option",
+   "what": "Re-test option",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "hos_kind",
+     "option": "periodic"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.05",
+   "record": "HX-HO-02",
+   "kind": "merge label",
+   "what": "Site address",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Address",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.06",
+   "record": "HX-HO-02",
+   "kind": "merge label",
+   "what": "Customer's name",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Customer",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.07",
+   "record": "HX-HO-02",
+   "kind": "merge label",
+   "what": "Test date",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Tested and switched on",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.08",
+   "record": "HX-HO-02",
+   "kind": "label+fact",
+   "what": "Installer's details (Heliaxis)",
+   "how": "kept as a fact",
+   "proofs": [
+    {
+     "printed": "Heliaxis, your installer",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.09",
+   "record": "HX-HO-02",
+   "kind": "label+fact",
+   "what": "MCS phone and email",
+   "how": "kept as a fact",
+   "proofs": [
+    {
+     "printed": "0333 103 8130",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "MCS, the scheme that certifies our work",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.10",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Battery: what was fitted",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "hos_bat_view"
+    },
+    {
+     "office": "e_desc"
+    },
+    {
+     "printed": "What was fitted",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.11",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Battery system class 1 to 4 (MIS 3012, a section given)",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "printed": "MCS battery system class (MIS 3012)",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.12",
+   "record": "HX-HO-02",
+   "kind": "tick",
+   "what": "Part 1 of the battery commissioning done",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Battery inspection record",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "HX-BAT-01",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.13",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Gives back-up power (yes or no)",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "eess_backup"
+    },
+    {
+     "printed": "Gives power in a power cut (island mode)",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.14",
+   "record": "HX-HO-02",
+   "kind": "tick",
+   "what": "Part 2 done",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Battery electrical tests (BS 7671)",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "HX-BAT-01",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.15",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Battery maximum output, kW",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "hos_bat_kw"
+    },
+    {
+     "printed": "Maximum output",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.16",
+   "record": "HX-HO-02",
+   "kind": "tick",
+   "what": "Part 3 done",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Battery function tests",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "HX-BAT-02",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.17",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Usable storage, kWh",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Usable storage",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.18",
+   "record": "HX-HO-02",
+   "kind": "tick",
+   "what": "Part 4 done",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Battery grid and back-up tests",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "HX-BAT-02",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.19",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Solar: what was fitted",
+   "how": "printed",
+   "proofs": [
+    {
+     "key": "hos_pv_view"
+    },
+    {
+     "office": "p_desc"
+    },
+    {
+     "printed": "What was fitted",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.20",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Panel power, kW DC",
+   "how": "printed",
+   "proofs": [
+    {
+     "flag": "HOS_KWP"
+    },
+    {
+     "printed": "Panel power (kWp, DC)",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.21",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Reference of the inspection schedule",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "printed": "Inspection schedule, on the electrical certificate",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.22",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Where the panels are",
+   "how": "printed",
+   "proofs": [
+    {
+     "office": "p_loc"
+    },
+    {
+     "printed": "Where the panels are",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.23",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Reference of the test results",
+   "how": "kept, citation number dropped",
+   "proofs": [
+    {
+     "printed": "Test results, on the electrical certificate",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.24",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Estimated yearly generation",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Estimated generation per year",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.25",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Reference of the PV inspection (pointed at the commissioning code)",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Solar PV inspection record",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "Solar PV switch-on record",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "HX-PV-01",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "HX-PV-03",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.26",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Circuits tested",
+   "how": "asked",
+   "proofs": [
+    {
+     "key": "hos_circuits"
+    },
+    {
+     "office": "circuits"
+    },
+    {
+     "printed": "What was tested",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.27",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Reference of the string tests",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Solar PV string test results",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "HX-PV-02",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.28",
+   "record": "HX-HO-02",
+   "kind": "heading",
+   "what": "Sign-off heading",
+   "how": "heading replaced",
+   "proofs": [
+    {
+     "printed": "Sign-off",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.29a",
+   "record": "HX-HO-02",
+   "kind": "declaration",
+   "what": "Declaration: design responsibility, reasonable care, meets MIS 3002 / MIS 3012",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Designed by",
+     "on": "HX-HO-02"
+    },
+    {
+     "declaration": "design"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.29b",
+   "record": "HX-HO-02",
+   "kind": "declaration",
+   "what": "Declaration: installation, inspection and testing responsibility, same standards",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Installed, inspected and tested by",
+     "on": "HX-HO-02"
+    },
+    {
+     "declaration": "install"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.30",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Signature, name, date (row 1)",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Installed, inspected and tested by",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "Designed by",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.31",
+   "record": "HX-HO-02",
+   "kind": "note",
+   "what": "Each signature limited to the work described",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Each signature covers only the part that person signed for",
+     "on": "HX-HO-02"
+    },
+    {
+     "declaration": "note"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.32",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Next inspection interval in years",
+   "how": "printed",
+   "proofs": [
+    {
+     "setting": "nextInspectionYears"
+    },
+    {
+     "printed": "Next inspection",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.33",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Signature row 2",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Installed, inspected and tested by",
+     "on": "HX-HO-02"
+    },
+    {
+     "printed": "Designed by",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.34",
+   "record": "HX-HO-02",
+   "kind": "label",
+   "what": "Comments",
+   "how": "printed",
+   "proofs": [
+    {
+     "office": "comments"
+    },
+    {
+     "printed": "Notes",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.35",
+   "record": "HX-HO-02",
+   "kind": "merge",
+   "what": "Engineer's name merge field",
+   "how": "printed",
+   "proofs": [
+    {
+     "printed": "Installed, inspected and tested by",
+     "on": "HX-HO-02"
+    }
+   ]
+  },
+  {
+   "id": "HO-02.36",
+   "record": "HX-HO-02",
+   "kind": "chrome",
+   "what": "Heliaxis legal line (ours) and the source's revision, mark, code and page count",
+   "how": "dropped (the source's page furniture)",
+   "proofs": [
+    {
+     "footer": "HX-HO-02"
+    },
+    {
+     "printed": "Registered in England and Wales",
+     "on": "HX-HO-02"
+    }
+   ]
+  }
+ ]
+}

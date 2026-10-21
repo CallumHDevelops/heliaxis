@@ -6,7 +6,7 @@ import type { Db } from '@/lib/site/server';
 
 /**
  * Generated documents on a job (SPEC 5.5): every version is a crm_documents row with the same
- * generated_key (F43, RF_REPORT, PO-0123), its version number and an inputs_hash (sha256 of the
+ * generated_key (HX-PV-02, RF_REPORT, PO-0123), its version number and an inputs_hash (sha256 of the
  * canonical JSON of what it was made from).
  *
  * saveGenerated():

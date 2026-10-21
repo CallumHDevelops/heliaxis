@@ -4,15 +4,15 @@ import { stampWords } from '../pdf-kit';
 import { begin, type Loader } from './common';
 
 /**
- * F16E, the completion of works record (SPEC 4.5, HANDOVER F16E): when the work was done and the
+ * HX-HO-08, the completion sign-off (SPEC 4.5): when the work was done and the
  * system switched on, what was done, anything still to put right with the date it will be, and the
  * customer's own confirmation and signature (taken on the electrician's phone or in their portal,
  * never reused from another document, D15), with the installer's name.
  */
-export const F16E_TITLE = 'Completion of Works Record';
+export const COMPLETION_TITLE = 'Completion sign-off';
 
 export async function makeCompletion(c: CompletionInput, load: Loader): Promise<Uint8Array> {
-  const kit = await begin('F16E', F16E_TITLE, c, { pairs: [['Installed', c.installDays], ['Switched on', c.commissionedOn ? longDay(c.commissionedOn) : null]] });
+  const kit = await begin('HX-HO-08', COMPLETION_TITLE, c, { pairs: [['Installed', c.installDays], ['Switched on', c.commissionedOn ? longDay(c.commissionedOn) : null]] });
   if (c.done.length) {
     kit.section('What was done');
     kit.paragraph(c.done.map((l) => `•  ${l}`).join('\n'));

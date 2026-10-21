@@ -14,7 +14,8 @@ import type { PackFile, PackPhoto, PackPo, SitePack } from './pack-shared';
 import { assignmentRow, type AssignmentRow, type Db } from './server';
 import { getSiteSettings } from './settings';
 import { jobStrip } from './strip';
-import { firstNameOf, STATUS_LABEL, TRADE_LABEL, valuesOf, yesNo, type Stage } from './types';
+import { firstNameOf, STATUS_LABEL, TRADE_LABEL, yesNo, type Stage } from './types';
+import { valuesOf } from './values';
 
 /**
  * The job pack (GET /api/site/jobs/<id>/pack): everything a trade needs on site for one job, built

@@ -5,7 +5,7 @@
  *
  * Every number and every customer-facing promise here is the owner's (SPEC 4.5, D14): the warranty
  * term and wording, the next-inspection default, the maintenance agreement. Nothing is printed until
- * he's set it. The three drafts below (cover letter, completion record, switching-off page) are our
+ * he's set it. The three drafts below (covering letter, completion sign-off, switching-off page) are our
  * plain words; each is used only once he's approved that version.
  */
 
@@ -14,18 +14,18 @@ export type WarrantyStart = '' | 'commissioning' | 'handover';
 export type ScheduleRow = { item: string; check: string; who: string; often: string };
 
 export type HandoverSettings = {
-  /** F19I: the workmanship warranty's term in years, when it starts, and his wording. All three, or no F19I is made. */
+  /** HX-HO-06: the workmanship warranty's term in years, when it starts, and his wording. All three, or no warranty is made. */
   warrantyYears: number | null;
   warrantyStart: WarrantyStart;
   /** What's covered, what isn't and how to claim, as he writes it (paragraphs). */
   warrantyText: string;
   /** Approved draft versions (ISO time per draft key), so a changed draft needs approving again. */
   approved: Partial<Record<DraftKey, { version: string; at: string; by: string | null }>>;
-  /** F78 "next inspection after not more than N years", when the EIC doesn't give it. */
+  /** The system summary's next inspection ("within N years"), when the electrical certificate doesn't give it. */
   nextInspectionYears: number | null;
-  /** F49A: his maintenance agreement wording. Empty: F49A can't be made. */
+  /** HX-HO-12: his maintenance plan wording. Empty: the plan can't be made. */
   maintenanceText: string;
-  /** F49: his own maintenance rows, printed with Heliaxis as their source. */
+  /** HX-HO-11: his own maintenance rows, printed with Heliaxis as their source. */
   scheduleRows: ScheduleRow[];
   /** "Tell the customer" is ticked by default on uploads into the pack. */
   tellOnUpload: boolean;
@@ -53,7 +53,7 @@ export type DraftKey = 'cover' | 'completion' | 'shutdown';
 export const DRAFTS: Record<DraftKey, { version: string; title: string; text: string }> = {
   cover: {
     version: 'cover-1',
-    title: 'Cover letter (F07BI)',
+    title: 'Covering letter (HX-HO-01)',
     text: [
       'Dear {first},',
       'Thank you for choosing Heliaxis. This pack has everything about the system we installed at your home: the certificates, the warranties, how to look after it and the manufacturers’ information.',
@@ -67,12 +67,12 @@ export const DRAFTS: Record<DraftKey, { version: string; title: string; text: st
   },
   completion: {
     version: 'completion-1',
-    title: 'Completion of works record (F16E)',
+    title: 'Completion sign-off (HX-HO-08)',
     text: 'I’m happy that the work at {address} has been finished, and I’ve been shown how the system works and how to switch it off.',
   },
   shutdown: {
     version: 'shutdown-1',
-    title: 'How to switch your system off (CC4)',
+    title: 'Switching off (HX-HO-09)',
     text: [
       '1. Switch off the circuit at your consumer unit (fuse box): {cu}.',
       '2. Switch off the AC isolator: {ac}.',

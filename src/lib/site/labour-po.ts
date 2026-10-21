@@ -15,7 +15,8 @@ import { aboutOf, emailHtml, jobOf, queueMessage, whatsappProblem, type MessageR
 import { assignmentRow, firmsById, logSiteEvent, moneyFacts, readAssignment, type AssignmentRow, type ContactRow, type Db } from './server';
 import { getSiteSettings } from './settings';
 import { siteLink, linkTokenFor } from './tokens';
-import { TRADE_LABEL, TRADE_WORK, valuesOf, type Stage } from './types';
+import { TRADE_LABEL, TRADE_WORK, type Stage } from './types';
+import { valuesOf } from './values';
 
 /**
  * The labour PO a sign-off raises (SPEC 1I): the agreed rate × the quantity (the roofer's "How many

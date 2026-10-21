@@ -90,9 +90,9 @@ export function tick(key: string, label: string, extra: Partial<Field> = {}): Fi
   ];
 }
 
-/** "Done in PV tests (F43)": where a worked-out tick comes from. */
+/** "Done in String tests": where a worked-out tick comes from. */
 export const doneIn = (section: string) => () => `Done in ${section}`;
 
-/** A step is complete: every must on it that's asked now is answered (F44 item 37 reads F43's). */
+/** A step is complete: every must on it that's asked now is answered (the PV inspection's string tests row reads the string tests'). */
 export const stepComplete = (step: Step, c: FormCtx) =>
   (!step.show || step.show(c)) && visibleFields(step, c).every((f) => f.level !== 'must' || f.type === 'SIG' || (f.type === 'AUTO' && !f.done) || isAnswered(f, c));

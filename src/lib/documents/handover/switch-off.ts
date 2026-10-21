@@ -3,16 +3,16 @@ import type { SwitchInput } from '@/lib/handover/inputs';
 import { begin } from './common';
 
 /**
- * CC4's own page, "How to switch your system off" (SPEC 4.5): where this house's switches are (the
+ * HX-HO-09's own page, "How to switch your system off" (SPEC 4.5): where this house's switches are (the
  * consumer unit circuit, the AC, DC and battery isolators), the order to switch them, and the
  * back-up warning when the battery keeps circuits on in a power cut. The words are the draft the
  * owner approved (DRAFTS.shutdown); the manufacturers' own start-up and shutdown procedures follow
  * it in the pack, from the product library.
  */
-export const CC4_TITLE = 'How to switch your system off';
+export const SWITCH_OFF_TITLE = 'How to switch your system off';
 
 export async function makeSwitchOff(s: SwitchInput): Promise<Uint8Array> {
-  const kit = await begin('CC4', CC4_TITLE, s, { label: 'CC4' });
+  const kit = await begin('HX-HO-09', SWITCH_OFF_TITLE, s);
   const order = s.steps.filter((l) => /^\d\./.test(l));
   const after = s.steps.filter((l) => !/^\d\./.test(l));
   kit.section('To switch it off', { intro: 'In this order. Each switch is labelled.' });

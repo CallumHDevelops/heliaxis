@@ -10,7 +10,6 @@ import type { Field, FlagRule, FormCtx, Step } from '../types';
 import { el, has, is, num, text, yn } from './shared';
 
 export const EV_TITLE = 'EV Charge Point Installation Record';
-export const EV_REVISION = 'Rev 1';
 
 /** This record's own keys (saved answers use them), labelled as the EIC labels the same arrangement (site/earthing.ts). */
 export const EARTHING = ['tn_s', 'tncs_pme', 'tncs_pnb', 'tt'].map((key) => ({ key, label: EARTHING_LABEL[earthingFromEv(key)!] }));

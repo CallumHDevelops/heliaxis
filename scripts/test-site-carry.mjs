@@ -6,7 +6,7 @@
 // pump's insulation test is typed once, on its record or on its circuit, at 500 V, single-phase; what's
 // carried counts for the gate, isn't stored as their answer, says where it came from, never beats
 // their own answer, agrees with when the forms ask each box, and is printed on every document that
-// has the box (the EV and heat pump records, F74, the EIC).
+// has the box (the EV and heat pump records, the battery switch-on and test record, the EIC).
 // Usage: node --experimental-strip-types scripts/test-site-carry.mjs
 import { registerHooks } from 'node:module';
 
@@ -39,7 +39,7 @@ const EVF = await import('../src/lib/site/forms/electrician/ev.ts');
 const { SOURCE_LABEL } = await import('../src/lib/site/types.ts');
 const FIX = await import('../src/lib/site/fixed/iet-eic.ts');
 const REC = await import('../src/lib/documents/site/records.ts');
-const F74D = await import('../src/lib/documents/site/f74.ts');
+const BATD = await import('../src/lib/documents/site/battery.ts');
 const { eicPdf } = await import('../src/lib/documents/eic/eic.ts');
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 const X = await import('./site-electrician-fixtures.mjs');
@@ -110,21 +110,21 @@ eq('only on the electrician’s pack', [roofer.carried, roofer.values.eic_earthi
 
 const tt = (values, products = ['ev', 'battery']) => job(products, { eess_backup: 'yes', ...values });
 const t1 = tt({ eic_earthing: 'tt', eic_ra: 21, eic_rod_type: 'Rod', eic_rod_loc: 'By the back door' });
-eq('the EIC’s RA is carried to the EV record and the back-up test (item 4)', [t1.values.ev_ra, t1.values.eess_a_06_ra, t1.carried.ev_ra, t1.carried.eess_a_06_ra], [21, 21, { from: 'the certificate' }, { from: 'the certificate' }]);
+eq('the EIC’s RA is carried to the EV record and the back-up changeover test', [t1.values.ev_ra, t1.values.bat_bu_ra, t1.carried.ev_ra, t1.carried.bat_bu_ra], [21, 21, { from: 'the certificate' }, { from: 'the certificate' }]);
 eq('…and its type and where it is, to the EV record', [t1.values.ev_rod_type, t1.values.ev_rod_loc], ['Rod', 'By the back door']);
 eq('…so the EV record asks none of them again', R.missing(form, t1).must.filter((m) => ['ev_ra', 'ev_rod_type', 'ev_rod_loc'].includes(m.key)), []);
 const t2 = tt({ ev_earthing: 'tt', ev_ra: 23.5, ev_rod_type: 'Rod', ev_rod_loc: 'Front garden' });
-eq('typed first on the EV record: the EIC gets the earthing and the electrode (and asks for it), the back-up test the reading', [t2.values.eic_earthing, t2.values.eic_ra, t2.values.eic_rod_type, t2.values.eess_a_06_ra, t2.carried.eic_ra], ['tt', 23.5, 'Rod', 23.5, { from: 'the EV charger record' }]);
+eq('typed first on the EV record: the EIC gets the earthing and the electrode (and asks for it), the back-up test the reading', [t2.values.eic_earthing, t2.values.eic_ra, t2.values.eic_rod_type, t2.values.bat_bu_ra, t2.carried.eic_ra], ['tt', 23.5, 'Rod', 23.5, { from: 'the EV charger record' }]);
 eq('…what the EIC still asks of the electrode is only what isn’t carried (RA or Ze)', R.missing(form, t2).must.filter((m) => ['eic_ra', 'eic_ra_kind', 'eic_rod_type', 'eic_rod_loc'].includes(m.key)).map((m) => m.key), ['eic_ra_kind']);
 const t3 = tt({ eic_earthing: 'tt', eic_ra: 21, ev_ra: 22 });
-eq('two readings typed: each stands; the box left takes the first in the order the phone asks', [t3.values.ev_ra, t3.values.eic_ra, t3.values.eess_a_06_ra, t3.carried.eess_a_06_ra.from], [22, 21, 22, 'the EV charger record']);
-const t4 = tt({ eess_a_06_ra: 19, eic_means: 'electrode', eic_earthing: 'tt' }, ['battery']);
+eq('two readings typed: each stands; the box left takes the first in the order the phone asks', [t3.values.ev_ra, t3.values.eic_ra, t3.values.bat_bu_ra, t3.carried.bat_bu_ra.from], [22, 21, 22, 'the EV charger record']);
+const t4 = tt({ bat_bu_ra: 19, eic_means: 'electrode', eic_earthing: 'tt' }, ['battery']);
 eq('typed first in the battery tests, on a TT job: carried to the EIC', [t4.values.eic_ra, t4.carried.eic_ra.from], [19, 'the battery tests']);
 const p1 = job(['ev', 'battery'], { eess_backup: 'yes', ev_earthing: 'tncs_pme', ev_openpen: 'electrode', ev_ra: 45 });
-eq('PME, the charger on its own rod: a different electrode, carried nowhere', [shown(p1).includes('ev_ra'), p1.values.eic_ra, p1.values.eess_a_06_ra, p1.carried?.eic_ra], [true, undefined, undefined, undefined]);
-const p2 = job(['battery'], { eess_backup: 'yes', eess_a_06_ra: 12, eic_earthing: 'tn_c_s_pme', eic_means: 'distributor' });
+eq('PME, the charger on its own rod: a different electrode, carried nowhere', [shown(p1).includes('ev_ra'), p1.values.eic_ra, p1.values.bat_bu_ra, p1.carried?.eic_ra], [true, undefined, undefined, undefined]);
+const p2 = job(['battery'], { eess_backup: 'yes', bat_bu_ra: 12, eic_earthing: 'tn_c_s_pme', eic_means: 'distributor' });
 eq('PME with back-up: the island-mode electrode isn’t the installation’s, so nothing is carried', [p2.values.eic_ra, p2.carried], [undefined, undefined]);
-eq('no back-up: the battery test’s electrode box isn’t asked, so nothing goes into it', tt({ eess_backup: 'no', eic_earthing: 'tt', eic_ra: 21 }).values.eess_a_06_ra, undefined);
+eq('no back-up: the battery test’s electrode box isn’t asked, so nothing goes into it', tt({ eess_backup: 'no', eic_earthing: 'tt', eic_ra: 21 }).values.bat_bu_ra, undefined);
 eq('a stale answer to a question no longer asked is never carried', job(['ev'], { ev_earthing: 'tn_s', ev_ra: 30, eic_earthing: 'tt' }).values.eic_ra, undefined);
 eq('the electrode photo (EP37) is asked on a TT installation whichever form says TT', [shown(job(['solar'], { eic_earthing: 'tt' })).includes('EP37'), shown(job(['solar'], { eic_means: 'electrode' })).includes('EP37'), shown(job(['ev'], { ev_earthing: 'tt' })).includes('EP37'), shown(job(['solar'], { eic_earthing: 'tn_c_s_pme' })).includes('EP37')], [true, true, true, false]);
 eq('Minor Works has no origin section: nothing carried into its RA', job(['ev'], { eic_route: 'meiwc', ev_earthing: 'tt', ev_ra: 23.5 }).values.eic_ra, undefined);
@@ -144,7 +144,7 @@ for (const products of [['ev'], ['battery'], ['ev', 'battery'], ['solar', 'batte
               const where = JSON.stringify({ products, ...values });
               if (C.eicElectrode(c) !== s.includes('eic_ra')) disagree.push(`eic_ra ${where}`);
               if (C.evElectrode(c) && !s.includes('ev_ra')) disagree.push(`ev_ra ${where}`);
-              if (C.eessElectrode(c) && !s.includes('eess_a_06_ra')) disagree.push(`eess_a_06_ra ${where}`);
+              if (C.eessElectrode(c) && !s.includes('bat_bu_ra')) disagree.push(`bat_bu_ra ${where}`);
               for (const k of Object.keys(c.carried ?? {})) if (!k.includes('.') && !s.includes(k)) disagree.push(`carried into ${k}, not asked: ${where}`);
             }
           }
@@ -197,9 +197,9 @@ const hpText = await text(await REC.makeHpRecord(input(hpcx)));
 eq('the heat pump record prints the insulation readings from the circuit', ['Insulation resistance, line to earth (500 V) 300 MΩ', 'Insulation resistance, line to neutral (500 V) >999 MΩ'].filter((x) => !hpText.includes(x)), []);
 
 const fb = fillAll(formFor(['battery']), ['battery'], {}, { eess_backup: 'yes' });
-delete fb.values.eess_a_06_ra;
+delete fb.values.bat_bu_ra;
 const batc = ctxOf(['battery'], { ...fb.values, eic_route: 'eic', eic_earthing: 'tt', eic_ra: 21.4 }, fb.photos);
-eq('F74 prints the back-up test’s electrode reading from the EIC', (await text(await F74D.makeF74(input(batc)))).includes('Earth electrode resistance: 21.4 Ω'), true);
+eq('the battery switch-on and test record prints the back-up test’s electrode reading from the EIC', (await text(await BATD.makeBatteryTests(input(batc)))).includes('Earth electrode resistance: 21.4 Ω'), true);
 
 // The EIC: its earthing and electrode from the EV record, the heat pump circuit's insulation from its record.
 const ans = EF.full(FIX.INSPECTIONS, E.INSPECTION_KEY);

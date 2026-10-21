@@ -15,11 +15,11 @@ export const PRINT_TITLE = 'The same document without the cream page and dark ba
 /** The documents the app makes and can make again as a print version, by their generated_key. */
 const PRINTABLE = [
   /^PACK$/,
-  /^(F43|F44|F44A|F74|F75|EV_REC|HP_REC|EP_RECORD)$/,
+  /^(HX-PV-0[123]|HX-BAT-0[12]|HX-EV-01|HX-HP-01|EP_RECORD)$/,
   /^(RF_REPORT|SC_REPORT)$/,
   /^EIC\d*(_DRAFT)?$/,
   /^MEIWC\d*-\d+$/,
-  /^(F78|F19I|F16E|CC4|F48I|F49|F49A|F47|F76_SHEET|CC13_RECEIPT|F07BI)$/,
+  /^(HX-HO-(01|02|06|08|09|10|11|12)|HX-HO-15-SHEET|HX-HO-16-SHEET|HX-HO-18-RECEIPT)$/,
   /^PO-\d+$/,
 ];
 
@@ -29,5 +29,5 @@ export const hasPrintVersion = (key: string | null | undefined): boolean => !!ke
 /** "?variant=print" on a document's own link (keeping what's there: ?download=1 → &variant=print). */
 export const printHref = (href: string) => `${href}${href.includes('?') ? '&' : '?'}variant=print`;
 
-/** "HX-0042 F43 PV array test report (print version).pdf". */
+/** "HX-0042 Solar PV string test results (print version).pdf". */
 export const printName = (name: string) => `${name.replace(/\.pdf$/i, '')} (print version).pdf`;

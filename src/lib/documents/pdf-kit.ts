@@ -38,7 +38,7 @@ import { HELIAXIS_COMPANY, HELIAXIS_PARTY } from '@/lib/subcontractors/agreement
  * the Ezra heading, field labels in JetBrains Mono and answers in Hanken Grotesk bold (so Ω, ², ≥ and
  * ° print as themselves), panels and photo cards a shade lighter than the page, ticks drawn as lines,
  * and a dark banner at the foot of every page on a gold rule laid out as a title block: the reversed
- * wordmark, the legal line and "F43 · Rev 2 · Page x of y".
+ * wordmark, the legal line and "HX-PV-02 · Issue 1 · Page x of y".
  *
  * A ruled form (the IET's EIC and its schedules: DocOptions.pageHead) keeps its own body, type (Noto
  * Sans, as drawn to the model form) and page head, and takes the brand's chrome round it: the ® logo
@@ -592,7 +592,7 @@ export async function pageKit(doc: PDFDocument, opt: { bannerOnly?: boolean; var
 
   /**
    * The first page's ink header band: the reversed wordmark, the spark and the eyebrow in gold mono
-   * ("F43 · PROJECT HX-0042"), the title in Ezra in cream, and the document's references on the right
+   * ("HX-PV-02 · PROJECT HX-0042"), the title in Ezra in cream, and the document's references on the right
    * in mono on dark hairlines; a gold rule under it. Then, on the page, the line a supplier needs
    * (`under`: our name and address). Everything is at least 5 mm in from the paper's edge, where a
    * printer can reach. Returns where the content starts.
@@ -660,7 +660,7 @@ export async function pageKit(doc: PDFDocument, opt: { bannerOnly?: boolean; var
 
   /**
    * The top of a later page: a slim ink strip (12 mm) on a gold rule, with the reversed wordmark and
-   * what the document is ("F43 · PV ARRAY TEST REPORT · HX-0042 (CONTINUED)", or `short` where that's
+   * what the document is ("HX-PV-02 · SOLAR PV STRING TEST RESULTS · HX-0042 (CONTINUED)", or `short` where that's
    * too long), so a loose page can be put back (its page number is in the banner at the foot). Returns
    * where the content starts.
    */
@@ -682,7 +682,7 @@ export async function pageKit(doc: PDFDocument, opt: { bannerOnly?: boolean; var
   /**
    * The banner across the foot of a page on a gold rule, laid out as a drawing's title block: the
    * reversed wordmark, then the legal line in mono (broken between its items), then `label`
-   * ("Document"; '' for none) over `tag` ("F43 · Rev 2 · Page 1 of 2") and an optional `sub` (a line,
+   * ("Document"; '' for none) over `tag` ("HX-PV-02 · Issue 1 · Page 1 of 2") and an optional `sub` (a line,
    * or lines parted by a line break), the three parted by hairlines. `tagRoom` is the widest tag the
    * document has, so every page lines up. Also what's drawn once the page is full: the gold rule down
    * the left margin (`spine`, not on a ruled form), from the top band (or the top edge) to the banner.
@@ -722,7 +722,7 @@ export async function pageKit(doc: PDFDocument, opt: { bannerOnly?: boolean; var
     const labelText = o.label ?? 'Document';
     const subs = o.sub ? o.sub.split('\n') : [];
     const c2 = m.l + logoW + 16;
-    // The tag on one line, or on two ("Heat pump supply · Rev 1" over "Page 1 of 2") when one line would
+    // The tag on one line, or on two ("HX-BAT-02 · Issue 1" over "Page 1 of 2") when one line would
     // leave the legal line too little room to keep each of its items (the registered address) whole.
     const widest = Math.max(...legalText.split(' · ').map((t) => width(t, legalSize, 'mono')));
     const subW = Math.max(0, ...subs.map((t) => width(t, subSize, 'mono')));
@@ -769,10 +769,10 @@ export async function pageKit(doc: PDFDocument, opt: { bannerOnly?: boolean; var
 /* ── The document kit ────────────────────────────────────────────────────────── */
 
 export type DocOptions = {
-  /** F43, F44… or RF_REPORT; with the title it makes the eyebrow, the footer and the metadata. */
+  /** HX-PV-02, HX-HO-01… or RF_REPORT; with the title it makes the eyebrow, the footer and the metadata. */
   code: string;
   title: string;
-  /** "Rev 2", one constant per form. */
+  /** "Issue 1", from the one map of issues (documents/issue.ts). */
   revision?: string | null;
   jobRef: string | null;
   /** YYYY-MM-DD (UK). */
@@ -827,7 +827,7 @@ export type Drawing = {
 
 /** `strong`: the figure the document is for ("What you'll be paid"), on an ink band and larger. */
 export type Row = { label: string; value: string | null | undefined; must?: boolean; note?: string | null; strong?: boolean };
-/** A drawn tick, a cross, N/A, or 'empty' (a box left blank on purpose: a Table 2 condition that doesn't apply). */
+/** A drawn tick, a cross, N/A, or 'empty' (a box left blank on purpose: a condition that doesn't apply). */
 export type Mark = 'tick' | 'cross' | 'na' | 'empty' | null;
 export type CheckItem = { label: string; mark: Mark; note?: string | null; must?: boolean };
 /** results(): a bold title, the wording, sub-lines, italic guidance, and a result in words or a mark. */
@@ -1216,7 +1216,7 @@ export async function newDocument(o: DocOptions) {
       y -= 6;
     },
     /**
-     * Test and inspection rows as the owner's forms lay them out (F74, F75): a bold title, the
+     * Test and inspection rows (the battery switch-on and test record): a bold title, the
      * wording (italic where the form has it), sub-lines, guidance in italics, and on the right the
      * result in words (Pass, N/A) or a drawn tick or cross.
      */
@@ -1273,7 +1273,7 @@ export async function newDocument(o: DocOptions) {
     /**
      * A table on card, mono headings on a paper band, hairline rules and columns; the headings repeat
      * on each new page. Widths are shares of the page (even by default). Rows whose first cell is ''
-     * continue the group above (F43's "Array Isolator": Rating (A), Rating (V)…), and a group is kept
+     * continue the group above (a group's heading, then its parts: Rating (A), Rating (V)…), and a group is kept
      * on one page when it fits on one.
      */
     grid(t: { columns: string[]; rows: (string | null)[][]; widths?: number[] }) {
@@ -1441,7 +1441,7 @@ export async function newDocument(o: DocOptions) {
     gap(h: number) {
       y -= h;
     },
-    /** The banner on every page (the reversed wordmark, the legal line, "F43 · Rev 2 · Page x of y"), then the bytes. */
+    /** The banner on every page (the reversed wordmark, the legal line, "HX-PV-02 · Issue 1 · Page x of y"), then the bytes. */
     async save(): Promise<Uint8Array> {
       const pages = doc.getPages();
       const ref = o.footer?.ref ?? `${label}${o.revision ? ` · ${o.revision}` : ''}`;
@@ -1456,6 +1456,6 @@ export async function newDocument(o: DocOptions) {
   };
 }
 
-/** A generated document's file name, starting with the job ref: "HX-0042 F43 PV array test report v2.pdf". */
+/** A generated document's file name, starting with the job ref: "HX-0042 Solar PV string test results v2.pdf" (no code: WORDING-SPEC 0.2). */
 export const docFileName = (jobRef: string | null, label: string, title: string, version = 1) =>
   `${[jobRef, label, title].filter(Boolean).join(' ')}${version > 1 ? ` v${version}` : ''}.pdf`.replace(/[\\/:*?"<>|]+/g, '-');

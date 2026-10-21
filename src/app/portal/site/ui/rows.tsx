@@ -62,7 +62,7 @@ export function Evidence({ f, jf, rec, labels }: { f: Field; jf: JobForms; rec: 
   );
 }
 
-/** Guidance behind ⓘ (F74 Part 4), in full when tapped. */
+/** How to do it, behind ⓘ (the battery tests), in full when tapped. */
 export function Info({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (

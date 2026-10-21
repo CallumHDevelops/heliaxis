@@ -37,11 +37,13 @@ export function StepScreen({ rec, answers, jf, form, step }: { rec: PackRecord; 
   const prev = at > 0 ? `/portal/site/job/${job}/${steps[at - 1].key}` : `/portal/site/job/${job}`;
 
   const row = (f: Field) => <FieldRow key={f.key} f={f} rec={rec} answers={answers} jf={jf} locked={locked && !f.late} />;
-  // A group's heading above the first of its rows that's asked ("Solar PV", "Part 1: General").
+  // A group's heading (and its note) above the first of its rows that's asked ("Solar PV", "Frame earthing").
   const groupOf = new Map<string, string>();
+  const noteOf = new Map<string, string>();
   let group = '';
   for (const f of step.fields) {
     if (f.group) group = f.group;
+    if (f.group && f.groupNote) noteOf.set(f.group, f.groupNote);
     groupOf.set(f.key, group);
   }
   const rows = (list: Field[]) =>
@@ -50,6 +52,7 @@ export function StepScreen({ rec, answers, jf, form, step }: { rec: PackRecord; 
       return (
         <Fragment key={f.key}>
           {head && head !== groupOf.get(list[i - 1]?.key ?? '') && <h3 className="sa-qgroup">{head}</h3>}
+          {head && head !== groupOf.get(list[i - 1]?.key ?? '') && noteOf.get(head) && <p className="sa-intro">{noteOf.get(head)}</p>}
           {row(f)}
         </Fragment>
       );
@@ -91,7 +94,7 @@ export function StepScreen({ rec, answers, jf, form, step }: { rec: PackRecord; 
 
 /** Labels of every photo slot on the job's forms, and the roofer's evidence, for the evidence lines. */
 function slotLabels(jf: JobForms): Record<string, string> {
-  const out: Record<string, string> = { RF2: 'roof hooks', RX4p: 'cable entry' };
+  const out: Record<string, string> = { RF2: 'roof hooks', RF3: 'finished roof', RX4p: 'cable entry' };
   for (const form of jf.forms) for (const st of form.steps) for (const f of st.fields) if (f.type === 'PHOTOS') out[f.key] = f.label;
   return out;
 }

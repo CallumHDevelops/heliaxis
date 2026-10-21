@@ -11,9 +11,9 @@ const SLOT = /^[A-Za-z][A-Za-z0-9_]{0,30}$/;
 const isUuid = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f-]{36}$/i.test(s);
 const MAX_BYTES = 15 * 1024 * 1024;
 const MIME = ['application/pdf'];
-/** The slots a file can go in, and the handover item it is (D3): the certificate from their own scheme goes in CC21. */
+/** The slots a file can go in, and the handover item it is (D3): the certificate from their own scheme goes in HX-HO-04. */
 const SLOTS: Record<string, { category: string; handover: string | null; title: string }> = {
-  CERT_FILE: { category: 'certificate', handover: 'CC21', title: 'Electrical certificate' },
+  CERT_FILE: { category: 'certificate', handover: 'HX-HO-04', title: 'Electrical certificate' },
 };
 
 /**

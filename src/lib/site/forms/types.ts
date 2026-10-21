@@ -87,9 +87,9 @@ export type ElectricianFacts = {
   survey_earthing?: string | null;
   /** What the roofer has synced: their answers (values), what Claude read from their photos, their photo counts. */
   roofer: { status: string; values: Record<string, unknown>; reads: { key: string; status: string; result: LabelReadResult | null }[]; photos: Record<string, number> } | null;
-  /** F43: how far a measured string Voc may be from the expected before it's flagged (percent, a setting). */
+  /** The string tests: how far a measured string Voc may be from the expected before it's flagged (percent, a setting). */
   voc_tolerance: number;
-  /** The test instruments this person gave on their last job, offered for F43. */
+  /** The tester this person gave on their last job, offered on the string tests. */
   instruments: string | null;
   /** The electrician's own name (from their contact), for "Tested by". */
   name: string | null;
@@ -169,8 +169,8 @@ export type Field = {
   fix?: { when: unknown; text: string };
   /** CONFIRM: the way out ("I can't confirm this"), stored as 'cant'. */
   cant?: string;
-  /** SIG: the declaration above the pad. */
-  declaration?: (c: FormCtx) => string;
+  /** SIG: the declaration above the pad; `at`, when it's signed (the electrician's records name the day; now when not given). */
+  declaration?: (c: FormCtx, at?: Date) => string;
   /** Still takes answers after its stage is signed off (the scaffold's tag photo). */
   late?: boolean;
 
@@ -179,9 +179,11 @@ export type Field = {
   say?: (c: FormCtx) => string;
   /** A heading above this row, starting a group of questions within the step ("Inverter"). */
   group?: string;
-  /** Guidance behind an ⓘ (F74 Part 4's italic notes), shown in full when tapped. */
+  /** A line under that heading, for the whole group ("Do these before anything is switched on."). */
+  groupNote?: string;
+  /** How to do it, behind an ⓘ (the battery tests'), shown in full when tapped and printed on the record. */
   info?: string;
-  /** Asked once per PV string (F43): the value is a list, one per string (strings from `strings`). */
+  /** Asked once per PV string (the string tests): the value is a list, one per string (strings from `strings`). */
   perString?: boolean;
   /** perString: strings 2 onwards are "Same as string 1" until that's switched off. */
   same?: boolean;
@@ -195,17 +197,17 @@ export type Field = {
   fills?: { when: string; keys: string[]; v: unknown };
   /** A one-tap answer for several rows at once ("N/A: no back-up"), offered while `when` holds. */
   bulk?: { label: string; keys: string[]; v: unknown; when: (c: FormCtx) => boolean };
-  /** Worked out from other answers until someone answers it (F44 items 36–38, F44A): a tap changes it. */
+  /** Worked out from other answers until someone answers it (the PV inspection's paperwork rows, the switch-on record): a tap changes it. */
   auto?: (c: FormCtx) => unknown;
-  /** Where the worked-out answer comes from ("Done in PV tests (F43)"). */
+  /** Where the worked-out answer comes from ("Done in String tests"). */
   autoFrom?: (c: FormCtx) => string | null;
   /** Worked out from rows still to do (which the gate lists themselves): not listed again while they are. */
   autoWaits?: (c: FormCtx) => boolean;
   /** AUTO rows the gate checks: answered when this says so (the certificate until its route is built). */
   done?: (c: FormCtx) => boolean;
-  /** Photo slots shown beside the row as evidence (F44: the cable route photos). */
+  /** Photo slots shown beside the row as evidence (the PV inspection: the cable route photos). */
   evidence?: string[];
-  /** The roofer's photo slots shown beside the row (F44 item 13: the fixings). */
+  /** The roofer's photo slots shown beside the row (the PV inspection's fixings row). */
   rooferEvidence?: string[];
   /** SCAN: the label photo slot it reads from ("Read from photo" serials), and how many are expected. */
   photo?: string;
@@ -237,7 +239,7 @@ export type Step = {
   intro?: string;
   fields: Field[];
   show?: (c: FormCtx) => boolean;
-  /** 'strings': the F43 screen, with a tab per PV string and the per-string rows in cards (P8). */
+  /** 'strings': the string tests screen, with a tab per PV string and the per-string rows in cards (P8). */
   layout?: 'strings';
 };
 

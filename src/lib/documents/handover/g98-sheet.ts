@@ -5,17 +5,16 @@ import { G98_FORM_B } from '@/lib/site/fixed/g98-form-b';
 import { begin, type Loader } from './common';
 
 /**
- * F47 (SPEC 4.5, D14). Until Form B's layout, labels and declaration are copied in from the copy the
- * DNO wants (src/lib/site/fixed/g98-form-b.ts), this is a "G98 Form B data sheet": the values in the
- * form's order, for copying into the DNO's own form. The item also takes the form as sent, and it's
- * Complete once that's uploaded or this sheet is marked "Sent to DNO". Anything the job hasn't got
- * says so, rather than being filled in.
+ * The G98 data sheet beside HX-HO-15 (SPEC 4.5, D14; OWNER-DECISIONS 9): an office helper, never in
+ * the customer's pack. The values G98 Form B asks for, in its order, to copy into the DNO's own form
+ * (src/lib/site/fixed/g98-form-b.ts); the pack's HX-HO-15 item takes the notice as sent. Anything
+ * the job hasn't got says so, rather than being filled in.
  */
-export const F47_TITLE = G98_FORM_B.verified ? 'G98 Form B' : 'G98 Form B data sheet';
+export const G98_SHEET_TITLE = G98_FORM_B.verified ? 'G98 Form B' : 'G98 data sheet';
 const NOT = 'Not recorded';
 
 export async function makeG98Sheet(g: G98Input, load: Loader): Promise<Uint8Array> {
-  const kit = await begin('F47', F47_TITLE, g, { pairs: [['MPAN', g.mpan], ['Switched on', g.devices[0]?.installed ? longDay(g.devices[0].installed) : null]] });
+  const kit = await begin('HX-HO-15', G98_SHEET_TITLE, g, { pairs: [['MPAN', g.mpan], ['Switched on', g.devices[0]?.installed ? longDay(g.devices[0].installed) : null]] });
   kit.note('This sheet lists the values Form B asks for, in its order, to copy into the network operator’s (DNO’s) own form. It isn’t the form itself: anything not recorded here is filled in on the DNO’s form.');
   kit.section('1. Customer');
   kit.rows([

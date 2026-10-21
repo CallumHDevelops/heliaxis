@@ -14,10 +14,20 @@ const battery = (c: FormCtx) => has(c, 'battery');
 const ev = (c: FormCtx) => has(c, 'ev');
 const hp = (c: FormCtx) => has(c, 'heatpump');
 
-/** F44 Table 2 a, b or c ticked: the array frame is earthed, so its connection is photographed (EP25). */
-export const frameEarthed = (c: FormCtx) => Array.isArray(c.values.f44_t2) && (c.values.f44_t2 as string[]).some((x) => x === 'a' || x === 'b' || x === 'c');
-/** An earth electrode is fitted: a back-up battery, F74 row 18 ticked, a TT installation (the EIC's or the EV record's answer), or the EV charger on its own rod. */
-export const electrodeFitted = (c: FormCtx) => is(c, 'eess_backup', 'yes') || is(c, 'f74_1_18', 'done') || installationTT(c) || is(c, 'ev_openpen', 'electrode');
+/** The PV inspection's frame earthing says the frame is bonded, earthed or earthed for lightning protection: its connection is photographed (EP25). */
+export const frameEarthed = (c: FormCtx) => is(c, 'pvi_frame_metal', 'yes') && (is(c, 'pvi_frame_ext', 'yes') || is(c, 'pvi_frame_exp', 'yes') || is(c, 'pvi_frame_lp', 'yes'));
+/**
+ * Does the frame have a safety earth (PV inspection, frame earthing)? true when it's bonded or earthed,
+ * false when it isn't a connected metal frame or every question was No, null while it's unanswered.
+ */
+export function frameSafetyEarth(c: FormCtx): boolean | null {
+  if (is(c, 'pvi_frame_metal', 'no')) return false;
+  if (!is(c, 'pvi_frame_metal', 'yes')) return null;
+  if (frameEarthed(c)) return true;
+  return is(c, 'pvi_frame_ext', 'no') && is(c, 'pvi_frame_exp', 'no') && is(c, 'pvi_frame_lp', 'no') ? false : null;
+}
+/** An earth electrode is fitted: a back-up battery, the battery inspection's own electrode ticked, a TT installation (the EIC's or the EV record's answer), or the EV charger on its own rod. */
+export const electrodeFitted = (c: FormCtx) => is(c, 'eess_backup', 'yes') || is(c, 'bat_bu_electrode', 'done') || installationTT(c) || is(c, 'ev_openpen', 'electrode');
 
 export const PHOTO_FIELDS: Field[] = [
   photo('EP01', 'Consumer unit before', 'Before you touch anything: cover on, every label readable.', { group: 'Before you touch anything' }),
@@ -36,7 +46,7 @@ export const PHOTO_FIELDS: Field[] = [
   photo('EP22', 'DC isolator(s)', 'Each DC isolator with its label (built-in ones too).', { show: solar }),
   photo('EP23', 'AC isolator', 'The AC isolator by the inverter, label readable, shown locked off if you can.', { show: solar }),
   photo('EP24', 'DC cable entry and loft run', 'Where the DC cables come into the building and their route in the loft.', { need: 2, show: solar }),
-  photo('EP25', 'Array frame earth', 'The earth connection on the array frame.', { show: (c) => solar(c) && frameEarthed(c), note: () => 'Needed because F44 Table 2 has a, b or c ticked.' }),
+  photo('EP25', 'Array frame earth', 'The earth connection on the array frame.', { show: (c) => solar(c) && frameEarthed(c), note: () => 'Needed because the frame is bonded or earthed (PV inspection, frame earthing).' }),
   photo('EP27', 'Inverter commissioned', 'Inverter screen or app showing it running, plus the grid-protection settings page.', { show: solar }),
   photo('EP28', 'CT clamp / export limiter', 'Where fitted: the CT clamp on the meter tails, arrow the right way.', { level: 'should', show: solar }),
 

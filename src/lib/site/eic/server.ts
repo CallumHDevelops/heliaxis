@@ -24,9 +24,10 @@ import { readAssignment, type AssignmentRow, type Db } from '../server';
  *
  * - The EIC is final once the electrician has signed off and, for the three-part EIC, the office has
  *   signed the design part. Final: generated key EIC (EIC2 for a second electrician), handover slot
- *   CC21, held until the pack is sent (release 'with_pack'), F74B appended when there is one. Before
+ *   HX-HO-04, held until the pack is sent (release 'with_pack'), the battery location statement
+ *   (HX-BAT-04) appended when there is one. Before
  *   that it's a draft (EIC_DRAFT): on the job's Docs, never in the pack or the customer's portal.
- * - Minor Works sheets (MEIWC-1, -2…) are filed as certificates but not into CC21 while their wording
+ * - Minor Works sheets (MEIWC-1, -2…) are filed as certificates but not into HX-HO-04 while their wording
  *   is unverified: the electrician's own signed Minor Works goes there instead.
  * - Their own certificate (route 'own') is Unit 2's upload; nothing is made here.
  */
@@ -131,7 +132,7 @@ export type Made = { key: string; name: string; bytes: Uint8Array; inputs: unkno
  * The EIC as it stands (final when it can be; a draft otherwise, or when a must turns out empty).
  * `variant`: 'digital' (the default: what's filed) or 'print' (the ink saver, on request).
  */
-export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | null = null, opts: { variant?: Variant } = {}): Promise<Made> {
+export async function makeEic(db: Db, d: CertificateData, statement: GeneratedDoc | null = null, opts: { variant?: Variant } = {}): Promise<Made> {
   const [con, ins, one, designPng, attachments] = await Promise.all([
     sigOf(db, d.photos.eic_sig_con),
     sigOf(db, d.photos.eic_sig_ins),
@@ -166,8 +167,8 @@ export async function makeEic(db: Db, d: CertificateData, f74b: GeneratedDoc | n
     missing = e.label;
     bytes = await eicPdf({ ...input, draft: true });
   }
-  if (final && f74b) bytes = await appendPdf(db, bytes, f74b.storage_path);
-  return { key: final ? d.key : `${d.key}_DRAFT`, name: docFileName(d.jobRef, d.key, `${title}${final ? '' : ' (draft)'}`), bytes, inputs: inputsOf(d, { design: d.design, f74b: f74b?.inputs_hash ?? null }), final, missing };
+  if (final && statement) bytes = await appendPdf(db, bytes, statement.storage_path);
+  return { key: final ? d.key : `${d.key}_DRAFT`, name: docFileName(d.jobRef, d.key, `${title}${final ? '' : ' (draft)'}`), bytes, inputs: inputsOf(d, { design: d.design, statement: statement?.inputs_hash ?? null }), final, missing };
 }
 
 /** The Minor Works sheets, one per circuit (`variant` as makeEic's). */
@@ -206,7 +207,7 @@ async function attachmentsOf(db: Db, d: CertificateData): Promise<Attachment[]> 
   return out;
 }
 
-/** Another PDF's pages after this one's (F74B after the EIC). The EIC alone when it can't be read. */
+/** Another PDF's pages after this one's (the battery location statement after the EIC). The EIC alone when it can't be read. */
 async function appendPdf(db: Db, bytes: Uint8Array, path: string): Promise<Uint8Array> {
   const extra = await download(db, DOCS_BUCKET, path);
   if (!extra) return bytes;
@@ -244,7 +245,7 @@ export async function saveCertificate(
         bytes: m.bytes,
         inputs: m.inputs,
         category: 'certificate',
-        slot: m.final && IET_MEIWC.verified ? 'CC21' : null,
+        slot: m.final && IET_MEIWC.verified ? 'HX-HO-04' : null,
         release: m.final && IET_MEIWC.verified ? 'with_pack' : 'now',
         visible: false,
         force: opt.force,
@@ -254,15 +255,15 @@ export async function saveCertificate(
     }
     return { route: d.route, saved };
   }
-  const f74b = await currentGenerated(db, a.project_id, 'F74B');
-  const m = await makeEic(db, d, f74b);
+  const statement = await currentGenerated(db, a.project_id, 'HX-BAT-04');
+  const m = await makeEic(db, d, statement);
   const r = await saveGenerated(db, a.project_id, {
     key: m.key,
     name: m.name,
     bytes: m.bytes,
     inputs: m.inputs,
     category: 'certificate',
-    slot: m.final ? 'CC21' : null,
+    slot: m.final ? 'HX-HO-04' : null,
     release: m.final ? 'with_pack' : 'now',
     visible: false,
     force: opt.force,
@@ -294,7 +295,7 @@ export async function certificatePrint(db: Db, ref: StoredRef): Promise<Reprint>
     if (!d.signoff) d.issued = ukDay(new Date(ref.madeAt));
     const made = eic
       ? d.route === 'eic' || d.route === 'eic_single'
-        ? [await makeEic(db, d, await currentGenerated(db, a.project_id, 'F74B'), { variant: 'print' })]
+        ? [await makeEic(db, d, await currentGenerated(db, a.project_id, 'HX-BAT-04'), { variant: 'print' })]
         : []
       : d.route === 'meiwc'
         ? await makeMeiwcs(db, d, { variant: 'print' })
@@ -308,7 +309,7 @@ export async function certificatePrint(db: Db, ref: StoredRef): Promise<Reprint>
   return changed ? 'changed' : null;
 }
 
-/* ── Where it stands (the Site tab, the handover pack's CC21, the gate) ─────── */
+/* ── Where it stands (the Site tab, the handover pack's HX-HO-04, the gate) ─── */
 
 export type CertState = 'own' | 'not_started' | 'in_progress' | 'to_sign_off' | 'to_design' | 'complete' | 'data_sheet';
 export type CertStatus = {
@@ -350,8 +351,8 @@ export type CertStatus = {
 /** Has what the filed EIC is made from changed since (an answer, a signature, the design part, a draft that can now be final)? */
 async function staleness(db: Db, d: CertificateData, doc: GeneratedDoc): Promise<boolean> {
   if (doc.generated_key !== d.key && isFinal(d)) return true;
-  const f74b = doc.generated_key === d.key ? await currentGenerated(db, d.a.project_id, 'F74B') : null;
-  return isOutOfDate(doc, inputsOf(d, { design: d.design, f74b: f74b?.inputs_hash ?? null }));
+  const statement = doc.generated_key === d.key ? await currentGenerated(db, d.a.project_id, 'HX-BAT-04') : null;
+  return isOutOfDate(doc, inputsOf(d, { design: d.design, statement: statement?.inputs_hash ?? null }));
 }
 
 async function linkOf(db: Db, doc: GeneratedDoc | null): Promise<string | null> {

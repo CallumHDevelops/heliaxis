@@ -146,9 +146,10 @@ export async function signOff(db: Db, a: AssignmentRow, b: SignoffInput, meta: S
   const phoneAt = typeof b.signed_at === 'string' ? Date.parse(b.signed_at) : NaN;
   const signedAt = Number.isFinite(phoneAt) && Math.abs(phoneAt - Date.now()) <= CLOCK_SLACK_MS ? new Date(phoneAt).toISOString() : new Date().toISOString();
   // What was signed is the declaration worded here from its constant, never the text the phone sends;
-  // a phone that sent other words is kept beside it and flagged for the office.
-  const declaration = forms[0].sig.declaration?.(ctx) ?? '';
-  const phoneText = typeof b.declaration === 'string' ? b.declaration.trim().slice(0, 2000) : '';
+  // a phone that sent other words is kept beside it and flagged for the office. The electrician's
+  // records in it carry the day they were signed (as the phone words them), so it's worded for that day.
+  const declaration = forms[0].sig.declaration?.(ctx, new Date(signedAt)) ?? '';
+  const phoneText = typeof b.declaration === 'string' ? b.declaration.trim().slice(0, 6000) : '';
   const changed = !!phoneText && sameWords(phoneText) !== sameWords(declaration);
 
   await ensureDocsBucket();

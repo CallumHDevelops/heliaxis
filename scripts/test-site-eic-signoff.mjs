@@ -3,10 +3,10 @@
 // EIC as a draft (the design part still to sign), sets paperwork.eic_on and remembers their test
 // instruments; the handover pack is told the EIC's reference and that it waits for the design part,
 // and nothing of the roofer's panel serials (owner, 21 Oct: no scanning) (site/handover-facts.ts); the office signs the design part (the next
-// inspection reaches the pack) and the EIC is final, in handover slot CC21 and held
+// inspection reaches the pack) and the EIC is final, in handover slot HX-HO-04 and held
 // for the pack, the draft archived; making it again changes nothing; a reading or a signature that
 // never reached the server stops the sign-off; a single-signature EIC is final at once; Minor Works
-// makes one sheet per circuit, kept out of CC21 while its wording is unverified.
+// makes one sheet per circuit, kept out of HX-HO-04 while its wording is unverified.
 // Usage: node --experimental-strip-types scripts/test-site-eic-signoff.mjs   (PDF_OUT=/dir keeps the PDFs)
 import { createHash, randomUUID } from 'node:crypto';
 import { registerHooks } from 'node:module';
@@ -241,7 +241,7 @@ const contact = {
   vat_number: null,
   cis_rate: 'net',
   cis_verified_on: '2026-01-10',
-  instruments: [{ k: 'f43_tester', v: 'Kept by another part of the pack' }],
+  instruments: [{ k: 'pvt_tester', v: 'Kept by another part of the pack' }],
   part_p_by: 'self',
   scheme: 'NAPIT',
   scheme_number: '12345',
@@ -299,7 +299,7 @@ await afterReply();
 eq('the documents step made the EIC as a draft: not in the pack, not visible', docs('EIC_DRAFT').map((d) => [d.category, d.handover_slot, d.visible]), [['certificate', null, false]]);
 eq('…and no final EIC yet', docs('EIC').length, 0);
 eq('the instruments are remembered on the contact (anything else kept there stays)', db.rows('site_contacts')[0].instruments, [
-  { k: 'f43_tester', v: 'Kept by another part of the pack' },
+  { k: 'pvt_tester', v: 'Kept by another part of the pack' },
   { k: 'eic_mft', v: 'Megger MFT1741 · 101234567' },
 ]);
 const so = db.rows('site_signoffs').find((s) => s.assignment_id === one.id);
@@ -323,7 +323,7 @@ eq('handover facts once the design part is signed: the next inspection from it, 
 const design = read(one.id).answers.eic_design?.v;
 eq('kept on the assignment, its signature in crm-docs', [design?.name, design?.next_n, design?.next_unit, db.files.has(`crm-docs/${design?.path}`)], ['Sarah Jones', 10, 'years', true]);
 const fin = current('EIC');
-eq('the EIC is final: handover slot CC21, held for the pack, not visible yet', [fin?.handover_slot, fin?.release, fin?.visible, fin?.category, fin?.version], ['CC21', 'with_pack', false, 'certificate', 1]);
+eq('the EIC is final: handover slot HX-HO-04, held for the pack, not visible yet', [fin?.handover_slot, fin?.release, fin?.visible, fin?.category, fin?.version], ['HX-HO-04', 'with_pack', false, 'certificate', 1]);
 eq('the draft is archived (kept)', [docs('EIC_DRAFT').length, !!docs('EIC_DRAFT')[0].archived_at], [1, true]);
 eq('its file name starts with the job ref', fin.name, 'HX-0042 EIC Electrical Installation Certificate.pdf');
 const finText = await textOf(fileOf(fin));
@@ -374,7 +374,7 @@ await afterReply();
 const sref = (await EICS.certificateStatus(db, read(single.id))).ref;
 const skey = EICS.certKey(sref);
 eq('single signature: its own reference and key (the fourth electrician on the job)', [sref, skey], ['HX-0042-EIC4', 'EIC4']);
-eq('…final at once, in CC21', [r3.status, current(skey)?.handover_slot, docs(`${skey}_DRAFT`).length], [200, 'CC21', 0]);
+eq('…final at once, in HX-HO-04', [r3.status, current(skey)?.handover_slot, docs(`${skey}_DRAFT`).length], [200, 'HX-HO-04', 0]);
 const sText = await textOf(fileOf(current(skey)));
 // The A4 form has no single-signature declaration: the one person signs in each of the three places (Note 3).
 eq('one signatory in each place, the next inspection from the electrician', [
@@ -386,7 +386,7 @@ eq('one signatory in each place, the next inspection from the electrician', [
 ], [3, true, 3, false, true]);
 eq('its file name has no “(single signature)”', current(skey).name, 'HX-0042 EIC4 Electrical Installation Certificate.pdf');
 
-/* ── Minor Works: a sheet per circuit, kept out of CC21 while unverified ─────── */
+/* ── Minor Works: a sheet per circuit, kept out of HX-HO-04 while unverified ─────── */
 const minor = electrician(
   {
     ...values,
@@ -400,7 +400,7 @@ const minor = electrician(
 const r4 = await sign(minor);
 await afterReply();
 const sheets = db.rows('crm_documents').filter((d) => /^MEIWC5-/.test(d.generated_key ?? ''));
-eq('Minor Works: three sheets, one per circuit, kept out of CC21', [r4.status, sheets.map((d) => d.generated_key).sort(), sheets.every((d) => d.handover_slot === null && d.category === 'certificate')], [
+eq('Minor Works: three sheets, one per circuit, kept out of HX-HO-04', [r4.status, sheets.map((d) => d.generated_key).sort(), sheets.every((d) => d.handover_slot === null && d.category === 'certificate')], [
   200,
   ['MEIWC5-1', 'MEIWC5-2', 'MEIWC5-3'],
   true,
@@ -411,24 +411,24 @@ const mPrint = await EICS.certificatePrint(db, certRef(sheets.find((d) => d.gene
 eq('a Minor Works sheet’s print version: the same words', mPrint instanceof Uint8Array && (await textOf(mPrint)) === mText, true);
 eq('the Site tab says their signed Minor Works goes in the pack', (await EICS.certificateStatus(db, read(minor.id))).state, 'data_sheet');
 
-/* ── Their test instruments: F43's line and the EIC's testers, both kept (round-1 fix) ── */
-// F43's sign-off used to replace the contact's list outright, wiping the EIC's remembered testers after
+/* ── Their test instruments: the string tests' line and the EIC's testers, both kept (round-1 fix) ── */
+// The string tests' sign-off used to replace the contact's list outright, wiping the EIC's remembered testers after
 // every job; each now keeps the other's entries. The documents step runs the job step again, and the
 // cron runs both again: the list must come out the same however many times they run.
 const { pluginDocs, pluginJob } = await import('../src/lib/site/signoff-plugins.ts');
 const { electricianPack } = await import('../src/lib/site/electrician.ts');
 const { eicFacts } = await import('../src/lib/site/eic/facts.ts');
-const kept = { k: 'f43_tester', v: 'Kept by another part of the pack' };
+const kept = { k: 'hp_tester', v: 'Kept by another part of the pack' };
 const sorted = (list) => [...list].map((x) => JSON.stringify(x)).sort();
 const listNow = () => db.rows('site_contacts')[0].instruments;
-db.rows('site_contacts')[0].instruments = [kept, { text: 'An old F43 line', at: '2026-01-01T00:00:00Z' }, { k: 'eic_rcd', v: 'An old RCD tester' }];
-eq('(their list before: another part’s entry, an old F43 line, an old EIC tester)', listNow().length, 3);
-const both = electrician({ ...values, f43_instruments: 'Megger MFT1741+ s/n 1234567', eic_inst: { mft: 'Megger MFT1741 · 101234567', earth: 'Kewtech KT62 · 5501' } }, ['eic_sig_con', 'eic_sig_ins']);
+db.rows('site_contacts')[0].instruments = [kept, { text: 'An old string tests line', at: '2026-01-01T00:00:00Z' }, { k: 'eic_rcd', v: 'An old RCD tester' }];
+eq('(their list before: another part’s entry, an old string tests line, an old EIC tester)', listNow().length, 3);
+const both = electrician({ ...values, pvt_tester: 'Megger MFT1741+ s/n 1234567', eic_inst: { mft: 'Megger MFT1741 · 101234567', earth: 'Kewtech KT62 · 5501' } }, ['eic_sig_con', 'eic_sig_ins']);
 const r5 = await sign(both);
 await afterReply();
 const so5 = db.rows('site_signoffs').find((x) => x.assignment_id === both.id);
 const want5 = [kept, { text: 'Megger MFT1741+ s/n 1234567', at: so5.signed_at }, { k: 'eic_mft', v: 'Megger MFT1741 · 101234567' }, { k: 'eic_earth', v: 'Kewtech KT62 · 5501' }];
-eq('F43 and the EIC both remembered after the sign-off and its documents step (the old ones of each replaced, the rest kept)', [r5.status, sorted(listNow())], [200, sorted(want5)]);
+eq('The string tests and the EIC both remembered after the sign-off and its documents step (the old ones of each replaced, the rest kept)', [r5.status, sorted(listNow())], [200, sorted(want5)]);
 await pluginJob(db, read(both.id), so5);
 await pluginDocs(db, read(both.id), so5);
 await pluginDocs(db, read(both.id), so5);
@@ -436,12 +436,12 @@ eq('…the same after the cron runs the steps again', sorted(listNow()), sorted(
 const nextJob = { ...read(both.id), id: randomUUID() };
 const pack = await electricianPack(db, nextJob, project, null);
 const ef = await eicFacts(db, nextJob, project);
-eq('their next job offers both: F43’s line, and each EIC tester', [pack.facts.instruments, ef.instruments], ['Megger MFT1741+ s/n 1234567', { mft: 'Megger MFT1741 · 101234567', earth: 'Kewtech KT62 · 5501' }]);
-const swap = electrician({ ...values, f43_instruments: 'Kewtech KT65DL s/n 998877', eic_inst: { mft: 'Kewtech KT65DL · 998877' } }, ['eic_sig_con', 'eic_sig_ins']);
+eq('their next job offers both: the string tests’ line, and each EIC tester', [pack.facts.instruments, ef.instruments], ['Megger MFT1741+ s/n 1234567', { mft: 'Megger MFT1741 · 101234567', earth: 'Kewtech KT62 · 5501' }]);
+const swap = electrician({ ...values, pvt_tester: 'Kewtech KT65DL s/n 998877', eic_inst: { mft: 'Kewtech KT65DL · 998877' } }, ['eic_sig_con', 'eic_sig_ins']);
 await sign(swap);
 await afterReply();
 const so6 = db.rows('site_signoffs').find((x) => x.assignment_id === swap.id);
-eq('new testers on a later job replace theirs (one F43 line, the EIC’s as given), nothing doubled', sorted(listNow()), sorted([kept, { text: 'Kewtech KT65DL s/n 998877', at: so6.signed_at }, { k: 'eic_mft', v: 'Kewtech KT65DL · 998877' }]));
+eq('new testers on a later job replace theirs (one string tests line, the EIC’s as given), nothing doubled', sorted(listNow()), sorted([kept, { text: 'Kewtech KT65DL s/n 998877', at: so6.signed_at }, { k: 'eic_mft', v: 'Kewtech KT65DL · 998877' }]));
 
 if (process.env.PDF_OUT) {
   const fs = await import('node:fs');

@@ -14,7 +14,7 @@ import {
   removePayment,
   refreshHandover,
   sendHandover,
-  signF78Design,
+  signSummaryDesign,
   tellCustomer,
   type Via,
 } from '@/lib/handover/server';
@@ -48,7 +48,7 @@ export async function GET(req: Request, { params }: Ctx) {
  * The office's actions on the pack, each answered with the tab's data again:
  * refresh · regenerate {slot} · na {slot, reason} · restore {slot} · archive {doc} · visible {doc, visible}
  * · move {doc, slot, release} · values {slot, values} · outstanding {items} · part {doc, part}
- * · sign-f78-design {name, signature} · dno-sent · record-payment {kind, amount_pence, paid_on, method, reference}
+ * · sign-summary-design {name, signature} · dno-sent · record-payment {kind, amount_pence, paid_on, method, reference}
  * · delete-payment {payment} (admin) · build · send {via, override} · tell {slot, via}.
  */
 export async function POST(req: Request, { params }: Ctx) {
@@ -133,21 +133,21 @@ export async function POST(req: Request, { params }: Ctx) {
           .map((x: { text?: unknown; by?: unknown }) => ({ text: String(x?.text ?? '').trim().slice(0, 300), by: YMD.test(String(x?.by ?? '')) ? String(x.by) : null }))
           .filter((x: { text: string }) => x.text)
           .slice(0, 20);
-        await patchSlotData(db, id, 'F16E', { outstanding: items }, by);
+        await patchSlotData(db, id, 'HX-HO-08', { outstanding: items }, by);
         await refreshHandover(db, id, { by });
         break;
       }
       case 'part': {
         const d = await docOf(b.doc);
         if (!d || !PARTS.includes(String(b.part))) return json({ error: 'Which G99 paper is it?' }, 400);
-        await patchSlotData(db, id, 'F76', { parts: { [d.id]: String(b.part) } }, by);
+        await patchSlotData(db, id, 'HX-HO-16', { parts: { [d.id]: String(b.part) } }, by);
         break;
       }
-      case 'sign-f78-design': {
+      case 'sign-summary-design': {
         const name = String(b.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
         if (name.length < 3 || !validSignature(b.signature)) return json({ error: 'Type your name and sign.' }, 400);
-        await signF78Design(db, id, { name, signature: String(b.signature), by });
-        await log(`F78 design part signed by ${name}`);
+        await signSummaryDesign(db, id, { name, signature: String(b.signature), by });
+        await log(`System summary design part signed by ${name}`);
         await refreshHandover(db, id, { by });
         break;
       }

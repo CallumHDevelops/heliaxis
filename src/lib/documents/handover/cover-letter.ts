@@ -2,18 +2,18 @@ import 'server-only';
 import type { CoverInput } from '@/lib/handover/inputs';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { longDate, newDocument } from '../pdf-kit';
-import { REVISION } from './common';
+import { issueOf } from '../issue';
 
 /**
- * F07BI, the handover cover letter (SPEC 4.5): the letterhead, the customer and address, a thank-you,
+ * HX-HO-01, the covering letter (SPEC 4.5): the letterhead, the customer and address, a thank-you,
  * what was installed in plain words, the pack's contents with each item enclosed or to follow, the
  * references as they arrive, what to do next, who to call, signed with the job owner's typed name.
  * The words are the draft the owner approved in CRM settings (DRAFTS.cover).
  */
-export const COVER_TITLE = 'Handover Cover Letter';
+export const COVER_TITLE = 'Covering letter';
 
 export async function makeCoverLetter(c: CoverInput): Promise<Uint8Array> {
-  const kit = await newDocument({ code: 'F07BI', title: COVER_TITLE, revision: REVISION.F07BI, jobRef: c.ref, issued: c.issued, variant: c.variant });
+  const kit = await newDocument({ code: 'HX-HO-01', title: COVER_TITLE, revision: issueOf('HX-HO-01'), jobRef: c.ref, issued: c.issued, variant: c.variant });
   kit.header({ meta: [['Project', c.ref ?? '–'], ['Date', longDate(c.issued)]] });
   kit.paragraph([c.customer, ...c.address].join('\n'), { bold: true });
   kit.gap(4);

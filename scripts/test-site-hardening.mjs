@@ -124,12 +124,12 @@ const put = await post(putRoute, decA, 'put-right', decPhone.token, { op_id: ran
 const r1 = db.rows('site_returns').find((r) => r.id === ret.ret.id);
 eq('a put right sent with other words: the wording is recorded, the phone’s on the history', [put.status, r1.fixed_declaration, db.rows('site_events').find((e) => e.assignment_id === decA.id && e.type === 'put_right_signed')?.detail.declaration_phone], [200, D.putRightDeclaration('Two tiles left lifted.', ADDR), 'Nothing to see here.']);
 
-// The customer's completion record on the electrician's phone.
+// The customer's completion sign-off on the electrician's phone.
 const elSo = { id: randomUUID(), assignment_id: el.id, stage: 'main', signed_name: 'Sam Sparks', signed_at: new Date().toISOString(), signature_path: 'x.png', extra: {} };
 db.rows('site_signoffs').push(elSo);
-const cust = await post(custRoute, el, 'customer-sign', elPhone.token, { kind: 'f16e', name: 'Jane Smith', signature: kit.SIG, declaration: 'I agree to pay £10,000 extra.', signed_at: new Date().toISOString() });
-const entry = db.rows('site_signoffs').find((s) => s.id === elSo.id).extra.customer.f16e;
-eq('the customer’s signature: the completion wording, as the phone shows it, whatever the phone sends', [cust.status, entry.declaration, entry.declaration_phone], [200, ES.CUSTOMER_DECLARATION.f16e(ADDR), 'I agree to pay £10,000 extra.']);
+const cust = await post(custRoute, el, 'customer-sign', elPhone.token, { kind: 'completion', name: 'Jane Smith', signature: kit.SIG, declaration: 'I agree to pay £10,000 extra.', signed_at: new Date().toISOString() });
+const entry = db.rows('site_signoffs').find((s) => s.id === elSo.id).extra.customer.completion;
+eq('the customer’s signature: the completion wording, as the phone shows it, whatever the phone sends', [cust.status, entry.declaration, entry.declaration_phone], [200, ES.CUSTOMER_DECLARATION.completion(ADDR), 'I agree to pay £10,000 extra.']);
 
 /* ── Claude's label reads ──────────────────────────────────────────────────── */
 

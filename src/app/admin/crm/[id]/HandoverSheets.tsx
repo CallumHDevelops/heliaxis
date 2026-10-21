@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
-import { F78_DECLARATION, type CopyField } from '@/lib/handover/inputs';
+import type { CopyField } from '@/lib/handover/inputs';
 import type { HandoverView } from '@/lib/handover/server';
 import { slotDef, UPLOAD_PICKS, type SlotCode } from '@/lib/handover/slots';
 import { createClient } from '@/lib/supabase/client';
@@ -11,7 +11,7 @@ import { copyText, send } from './record-shared';
 
 /**
  * The Handover tab's sheets (screens D7–D11): upload straight into the customer's pack, Not needed
- * with a reason, the F78 design signature, values typed for an item, what's still to put right,
+ * with a reason, the system summary's design signature, values typed for an item, what's still to put right,
  * Copy for MID and Notify building control, Send to customer, and the final invoice with recorded
  * payments. Each posts to /api/crm/projects/{id}/handover (or the documents route) and hands the
  * tab's fresh data back.
@@ -68,7 +68,7 @@ export function UploadSheet({
 
   async function go(files: FileList | null) {
     if (!files?.length || !slot) return;
-    if (slot === 'F76' && !part) return setErr('Say which G99 paper it is first.');
+    if (slot === 'HX-HO-16' && !part) return setErr('Say which G99 paper it is first.');
     setBusy(true);
     setErr('');
     try {
@@ -106,7 +106,7 @@ export function UploadSheet({
           ))}
         </fieldset>
       )}
-      {slot === 'CCMH' && (
+      {slot === 'HX-HO-19' && (
         <>
           <label className="crm-label" htmlFor="hv-up-name">
             What is it?
@@ -114,7 +114,7 @@ export function UploadSheet({
           <input id="hv-up-name" className="crm-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Smart Export Guarantee guide" maxLength={140} />
         </>
       )}
-      {slot === 'F76' && (
+      {slot === 'HX-HO-16' && (
         <>
           <label className="crm-label" htmlFor="hv-up-part">
             Which G99 paper?
@@ -212,17 +212,17 @@ export function NotNeededSheet({ projectId, slot, reasons, onClose, onDone }: { 
   );
 }
 
-/* ── F78's design part, signed in the office ─────────────────────────────── */
+/* ── The system summary's design part, signed in the office ───────────────── */
 
-export function SignDesignSheet({ projectId, me, onClose, onDone }: { projectId: string; me: string; onClose: () => void; onDone: Done }) {
+export function SignDesignSheet({ projectId, me, declaration, onClose, onDone }: { projectId: string; me: string; declaration: string; onClose: () => void; onDone: Done }) {
   const [name, setName] = useState(me);
   const [sig, setSig] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   return (
     <PlainSheet label="Sign the design part" onClose={onClose}>
-      <h2>F78: sign the design part</h2>
-      <p className="hv-decl">{F78_DECLARATION}</p>
+      <h2>System summary: sign the design part</h2>
+      <p className="hv-decl">{declaration}</p>
       <label className="crm-label" htmlFor="hv-sig-name">
         Your name
       </label>
@@ -238,7 +238,7 @@ export function SignDesignSheet({ projectId, me, onClose, onDone }: { projectId:
           onClick={async () => {
             setBusy(true);
             try {
-              onDone(await send(`/api/crm/projects/${projectId}/handover`, 'POST', { action: 'sign-f78-design', name: name.trim(), signature: sig }));
+              onDone(await send(`/api/crm/projects/${projectId}/handover`, 'POST', { action: 'sign-summary-design', name: name.trim(), signature: sig }));
             } catch (e) {
               setErr(e instanceof Error ? e.message : 'Not signed');
               setBusy(false);
@@ -252,7 +252,7 @@ export function SignDesignSheet({ projectId, me, onClose, onDone }: { projectId:
   );
 }
 
-/* ── Values typed for an item (F49A as agreed, CC4's switches, F78, F47) ─── */
+/* ── Values typed for an item (the plan as agreed, the switches, the summary's details, the G98 isolator) ── */
 
 export function ValuesSheet({
   projectId,
@@ -267,7 +267,7 @@ export function ValuesSheet({
   slot: SlotCode;
   title: string;
   intro?: string;
-  fields: { key: string; label: string; hint?: string; value: string; from?: string | null }[];
+  fields: { key: string; label: string; hint?: string; value: string; from?: string | null; options?: { key: string; label: string }[] }[];
   onClose: () => void;
   onDone: Done;
 }) {
@@ -283,7 +283,18 @@ export function ValuesSheet({
           <label className="crm-label" htmlFor={`hv-v-${f.key}`}>
             {f.label}
           </label>
-          <input id={`hv-v-${f.key}`} className="crm-input" value={vals[f.key] ?? ''} placeholder={f.hint} onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))} />
+          {f.options ? (
+            <select id={`hv-v-${f.key}`} className="crm-input" value={vals[f.key] ?? ''} onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))}>
+              <option value="">{f.hint ?? 'Choose…'}</option>
+              {f.options.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input id={`hv-v-${f.key}`} className="crm-input" value={vals[f.key] ?? ''} placeholder={f.hint} onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))} />
+          )}
           {f.from && !vals[f.key] && (
             <button type="button" className="hv-chip" onClick={() => setVals((v) => ({ ...v, [f.key]: f.from! }))}>
               From the electrician: {f.from} ✓
@@ -317,9 +328,9 @@ export function ValuesSheet({
   );
 }
 
-/* ── F16E: still to put right ─────────────────────────────────────────────── */
+/* ── The completion sign-off: still to put right ──────────────────────────── */
 
-export function OutstandingSheet({ projectId, items, flags, onClose, onDone }: { projectId: string; items: HandoverView['forms']['F16E']; flags: HandoverView['flags']; onClose: () => void; onDone: Done }) {
+export function OutstandingSheet({ projectId, items, flags, onClose, onDone }: { projectId: string; items: HandoverView['forms']['outstanding']; flags: HandoverView['flags']; onClose: () => void; onDone: Done }) {
   const [list, setList] = useState(items.length ? items : [{ text: '', by: null }]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -327,7 +338,7 @@ export function OutstandingSheet({ projectId, items, flags, onClose, onDone }: {
   return (
     <PlainSheet label="Still to put right" onClose={onClose}>
       <h2>Still to put right</h2>
-      <p className="crm-muted crm-small">Printed on the completion record (F16E) with the date it will be done by. Leave it empty if the work’s finished.</p>
+      <p className="crm-muted crm-small">Printed on the completion sign-off with the date it will be done by. Leave it empty if the work’s finished.</p>
       {list.map((x, i) => (
         <div key={i} className="hv-out">
           <input className="crm-input" value={x.text} onChange={(e) => set(i, { text: e.target.value })} placeholder="What’s still to do" maxLength={300} />
@@ -627,7 +638,7 @@ export function InvoiceSheet({
   );
 }
 
-/* ── Upload a manual once, for every job with that model (D12, CC5's gaps) ── */
+/* ── Upload a manual once, for every job with that model (D12, the product manuals' gaps) ── */
 
 export function LibrarySheet({ model, tech, onClose, onDone }: { model: string; tech: string[]; onClose: () => void; onDone: () => void }) {
   const [kind, setKind] = useState('manual');
@@ -651,7 +662,7 @@ export function LibrarySheet({ model, tech, onClose, onDone }: { model: string; 
         mime: f.type,
         size: f.size,
         kind,
-        handover_slot: kind === 'procedure' ? 'CC4' : 'CC5',
+        handover_slot: kind === 'procedure' ? 'HX-HO-09' : 'HX-HO-17',
         models: models.split(/\n|;/),
         technologies: tech,
       });

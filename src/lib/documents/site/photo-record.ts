@@ -16,7 +16,7 @@ export type RecordDeclaration = { title: string; text: string; name: string; at:
 
 export async function makePhotoRecord(d: ElectricianDocInput, slots: RecordSlot[], serials: RecordSerial[], declarations: RecordDeclaration[] = []): Promise<Uint8Array> {
   const kit = await newDocument({ code: 'EP_RECORD', label: 'Photo record', title: 'Electrician photo record', jobRef: d.jobRef, issued: d.date, draft: d.draft, variant: d.variant });
-  kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
+  kit.header({ meta: [['Job reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Electrician');
   if (serials.length) {
     kit.section('Serial numbers');
