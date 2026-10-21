@@ -285,9 +285,11 @@ const originStep: Step = {
     must('eic_md', 'NUM', 'Maximum demand (load)', { dp: 0, hint: 'In amps or kVA: say which next.' }),
     must('eic_md_unit', 'SEL', 'Maximum demand: kVA or A?', { options: MD_UNIT, hint: 'The other is struck out on the certificate.' }),
     must('eic_ec_mat', 'SEL', 'Earthing conductor: material', { options: MATERIAL }),
+    must('eic_ec_mat_other', 'TEXT', 'Earthing conductor: what material?', { parent: 'eic_ec_mat', hint: 'It’s written on the certificate in place of “Other”.', show: (c) => is(c, 'eic_ec_mat', 'other') }),
     must('eic_ec_csa', 'NUM', 'Earthing conductor: csa', { unit: 'mm²', chips: [10, 16, 25], hint: 'Its size.' }),
     must('eic_ec_ok', 'CONFIRM', 'Earthing conductor: connection / continuity verified'),
     must('eic_mb_mat', 'SEL', 'Main protective bonding conductors: material', { options: MATERIAL }),
+    must('eic_mb_mat_other', 'TEXT', 'Main protective bonding conductors: what material?', { parent: 'eic_mb_mat', hint: 'It’s written on the certificate in place of “Other”.', show: (c) => is(c, 'eic_mb_mat', 'other') }),
     must('eic_mb_csa', 'NUM', 'Main protective bonding conductors: csa', { unit: 'mm²', chips: [10, 16], hint: 'Their size.' }),
     must('eic_mb_ok', 'CONFIRM', 'Main protective bonding conductors: connection / continuity verified'),
     ...BONDS.map((b, i) =>

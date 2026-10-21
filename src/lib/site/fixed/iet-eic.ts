@@ -94,6 +94,8 @@ export const NEXT_INSPECTION = (n: string, unit: 'years' | 'months') =>
   `I/We, the designer(s), recommend that this installation is further inspected and tested after an interval of not more than ${n} ${unit}.`;
 /** As the form prints it, before it's filled in. */
 export const NEXT_INSPECTION_BLANK = 'I/We, the designer(s), recommend that this installation is further inspected and tested after an interval of not more than';
+/** The line under it: the one that doesn't apply is struck out. */
+export const NEXT_INSPECTION_UNITS = 'years/months.';
 
 export const E_LABELS = {
   designer1: 'Designer (No 1)',

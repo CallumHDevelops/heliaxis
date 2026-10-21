@@ -23,6 +23,7 @@ import {
   J_VALID,
   LIABILITY,
   NEXT_INSPECTION_BLANK,
+  NEXT_INSPECTION_UNITS,
   PART_HEADINGS,
   PART_LEADS,
   REPORT_NO,
@@ -46,8 +47,10 @@ import { blank, crossMark, dots, fitText, formDate, frame, hline, INK, plain, RE
  * The Electrical Installation Certificate (SPEC 3.3, REGS 1.2): the IET's model form for BS 7671:2018+
  * A4:2026, filled in, without the IET logo (the IET's licence). Page 1 holds Sections A–D and page 2
  * Sections E–J, each a ruled frame in the form's order with its tick boxes and dotted blanks; then the
- * continuation sheets the form calls for (a long extent, the other sources of supply, the risk
- * assessment, the main switch's settings); then for each board the Generic Schedule of Circuit Details
+ * continuation sheets the form calls for (anything written that won't fit its box: the client, the
+ * description, the extent, departures, exceptions and the risk assessment, the other sources of supply,
+ * the main switch, a board's location, a circuit's description or remarks; nothing is cut short);
+ * then for each board the Generic Schedule of Circuit Details
  * (columns 1–16) and the Generic Schedule of Test Results (17–31) in landscape, 12 ruled rows a sheet
  * with the form's headings, column numbers, codes and footnotes; then the form's Notes for the person
  * producing the Certificate and its Guidance for recipients. "Certificate No." is at the top of every
@@ -106,7 +109,9 @@ const str = (o: Rec, k: string) => (typeof o[k] === 'string' && (o[k] as string)
 
 /* ── What the document is laid out from ───────────────────────────────────────── */
 
-type Cont = { n: number; section: string; title: string; paras: string[]; images: Uint8Array[] };
+/** A paragraph of a continuation sheet: an answer (bold), or the form's own words (`form`, regular). */
+type Para = string | { t: string; form: true };
+type Cont = { n: number; section: string; title: string; paras: Para[]; images: Uint8Array[]; caption?: string };
 type Numbers = { schedFrom: number; schedTo: number; total: number };
 type HeadKind = 'cert1' | 'cert' | 'details' | 'tests' | 'plain';
 
@@ -154,19 +159,28 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
 
   /* ── The continuation sheets, numbered before anything is drawn ─────────────── */
   const conts: Cont[] = [];
-  const addCont = (section: string, title: string, paras: string[], images: Uint8Array[] = []) => {
-    const c = { n: conts.length + 1, section, title, paras, images };
+  const addCont = (section: string, title: string, paras: Para[], images: Uint8Array[] = [], caption?: string) => {
+    const c = { n: conts.length + 1, section, title, paras, images, caption };
     conts.push(c);
     return c.n;
   };
   const measure = kit; // lines() measures in the document's own fonts
   const W = kit.width;
+  const form = (t: string): Para => ({ t, form: true });
 
+  // Section A: the client's name and address on the form's dotted line, a second line when it's long.
+  const client = [s('eic_client'), s('eic_client_addr')].filter(Boolean).join(', ');
+  const clientLines = client ? measure.lines(client, 8, W - 17, true) : [];
+  const clientCont = clientLines.length > 2 ? addCont('A', `${ST.A} (continued)`, [client]) : null;
+  // Section B: the description, two lines in its box.
+  const descText = s('eic_desc');
+  const descLines = descText ? wrapFirst(measure, descText, 7.8, W * 0.805 - 12 - kit.widthOf(B_LABELS.description, 7.8) - 6, W * 0.805 - 12) : [];
+  const descCont = descLines.length > 2 ? addCont('B', `${ST.B}: ${plain(B_LABELS.description).replace(/:$/, '')} (continued)`, [form(B_LABELS.description), descText!]) : null;
   // Section B: the extent, about five lines in its box.
   const extent = s('eic_extent');
   const extentFirst = W * 0.805 - 12 - kit.widthOf(B_LABELS.extent, 7.8) - 6;
   const extentLines = extent ? wrapFirst(measure, extent, 7.8, extentFirst, W * 0.805 - 12) : [];
-  const extentCont = extentLines.length > 5 ? addCont('B', `${ST.B}: ${plain(B_LABELS.extent)} (continued)`, [extent!]) : null;
+  const extentCont = extentLines.length > 5 ? addCont('B', `${ST.B}: ${plain(B_LABELS.extent).replace(/:$/, '')} (continued)`, [form(B_LABELS.extent), extent!]) : null;
   // Section C: departures longer than their two lines (the same words can serve more than one part).
   const depText = (part: Part): string | null => {
     if (part === 'design' && !single) return x.design?.departures?.trim() || null;
@@ -182,37 +196,50 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   const ra = (x.attachments ?? []).filter((a) => a.slot === 'eic_exc_ra').map((a) => a.bytes);
   const excText = v.eic_exc === 'yes' ? s('eic_exc_what') : null;
   const excLines = excText ? measure.lines(excText, 7.8, W - 120, true) : [];
-  const excCont = v.eic_exc === 'yes' && (ra.length || excLines.length > 3) ? addCont('C', `${ST.C}: Details of permitted exceptions; ${RISK_ASSESSMENT_ATTACHED.toLowerCase()}`, [EXCEPTIONS, excText ?? ''], ra) : null;
+  const excCont =
+    v.eic_exc === 'yes' && (ra.length || excLines.length > 3)
+      ? addCont('C', `${ST.C}: Details of permitted exceptions${ra.length ? `; ${RISK_ASSESSMENT_ATTACHED.toLowerCase()}` : ''}`, [form(EXCEPTIONS), excText ?? ''], ra, ra.length ? `${RISK_ASSESSMENT_ATTACHED}:` : undefined)
+      : null;
+  // What the exceptions box shows: up to three lines; the rest, and where the risk assessment is, on its sheet.
+  const excShown = (() => {
+    if (!excText) return [];
+    if (!excCont) return excLines;
+    const room = ra.length ? 2 : 3;
+    const head = excLines.length > room ? [...excLines.slice(0, room - 1), `(continued on continuation sheet No. ${excCont})`] : excLines;
+    return ra.length ? [...head, `Risk assessment: see continuation sheet No. ${excCont}`] : head;
+  })();
   // Section F: the other sources of supply.
   const sources = Array.isArray(v.eic_src) ? (v.eic_src as unknown[]).filter((t): t is string => typeof t === 'string' && !!t.trim()) : [];
   const srcCont = v.eic_other === 'yes' ? addCont('F', `${ST.F}: ${F_LABELS.otherSources}`, sources.length ? sources.map((t, i) => `${i + 1}. ${t}`) : ['Not answered']) : null;
-  // Section G: the main switch's protective device settings.
+  // Section G: the main switch: an "other" device type too long for its blank, and the protective device settings.
   const settings = (x.attachments ?? []).filter((a) => a.slot === 'eic_ms_settings').map((a) => a.bytes);
-  const setCont = v.eic_ms_ocpd === 'yes' && settings.length ? addCont('G', `${ST.G}: Main switch protective device settings`, [G_LABELS.attachSettings], settings) : null;
+  const devOther = v.eic_ms_ocpd === 'yes' && v.eic_ms_dev === 'other' ? s('eic_ms_dev_other') : null;
+  const devRoom = W * 0.327 - 13 - richWidth(kit, G_LABELS.deviceType, 7.1) - 3.5;
+  const devLong = !!devOther && kit.widthOf(devOther, 6.4, true) > devRoom;
+  const setCont =
+    v.eic_ms_ocpd === 'yes' && (settings.length || devLong)
+      ? addCont('G', `${ST.G}: Main switch`, [...(devLong ? [form(`${G_LABELS.ifOcpd}: ${G_LABELS.deviceType}:`), devOther!] : [])], settings, settings.length ? G_LABELS.attachSettings : undefined)
+      : null;
   // Section I: two lines on the form.
   const picked = Array.isArray(v.eic_cmt) ? (v.eic_cmt as string[]).map((k) => labelOf(COMMENTS, k)).filter((t): t is string => !!t) : [];
   const comments = v.eic_work === 'new' ? 'N/A: new installation' : [...picked, s('eic_cmt_more')].filter(Boolean).join('. ') || null;
   const commentLines = comments ? measure.lines(comments, 7.8, W - 14, true) : [];
   const cmtCont = commentLines.length > 2 ? addCont('I', `${ST.I}`, [comments!]) : null;
-  // Remarks (column 31) longer than two lines in a row.
   // Column 31: their remarks, where max Zs came from (footnote §), what a T3 SPD protects (footnote †), and what wiring "O" is.
   const remarksOf = (c: Circuit) =>
     [str(c, 'remarks'), str(c, 'zs_src'), str(c, 'spd_t3') ? `T3 SPD: ${str(c, 'spd_t3')}` : null, c.wiring === 'O' && str(c, 'wiring_other') ? `Type of wiring O: ${str(c, 'wiring_other')}` : null]
       .filter((t): t is string => !!t)
       .join('; ') || null;
-  const remarkCont = new Map<string, number>();
-  const longRemarks = circuits.filter((c) => {
-    const t = remarksOf(c);
-    return t && measure.lines(t, 6.2, colWidths(TEST_W, LANDSCAPE_W)[14] - 6, true).length > 2;
-  });
-  if (longRemarks.length) {
-    const n = addCont(
-      'Schedule of Test Results',
-      `${TS.title}: Remarks (column 31) continued`,
-      longRemarks.map((c) => `${String(boards.find((b) => b.id === c.board)?.ref ?? 'Board')} circuit ${String(c.n ?? '?')}: ${remarksOf(c)}`)
-    );
-    for (const c of longRemarks) remarkCont.set(c.id, n);
-  }
+  // The schedules' written entries that won't fit their boxes (a board's location, a circuit's description
+  // beyond two lines, remarks beyond two lines) go over to one continuation sheet, word for word.
+  const sched = scheduleLayout(measure, boards, circuits, remarksOf);
+  const schedCont = sched.over.length
+    ? addCont(
+        'Schedules',
+        `${CS.title} AND ${TS.title.replace('GENERIC ', '')}: entries continued`,
+        sched.over.map((o) => `${o.where}, ${o.what}: ${o.text}`)
+      )
+    : null;
 
   /* ── Page 1: Sections A–D ─────────────────────────────────────────────────── */
   const name = s('eic_sig_name');
@@ -225,7 +252,8 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   const declOf = (part: Part) => kit.lines(DECLARATION[part](amended), 7.8, W - 14);
   const depLinesOf = (dep: Val) => (dep && !dep.missing ? wrapFirst(kit, dep.s, 7.8, W - 14 - kit.widthOf(DEPARTURES, 7.8) - 6, W - 14) : ['']);
   // A–D stay on page 1, as on the form: when long departures make it run over, the roomiest boxes give way first.
-  const sq = { a: 28, b: 51, h2: 70, eh: 58, lib: 33, sig: 22, d: 44 };
+  const twoClient = clientLines.length > 1;
+  const sq = { a: twoClient ? 37 : 28, b: 51, h2: 70, eh: 58, lib: 33, sig: 22, d: 44 };
   {
     const natural =
       sq.a + sq.b + 37 + sq.h2 + 18 + sq.d + sq.eh +
@@ -243,15 +271,17 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     give('lib', 30, 3);
     give('h2', 62);
     give('b', 47);
-    give('a', 26);
+    give('a', twoClient ? 35 : 26);
   }
 
-  // A
+  // A: one dotted line, as on the form; a second when the name and address are long.
   kit.block(sq.a, (d) => {
     frame(d, d.x, d.top, d.width, sq.a);
     d.text(ST.A, d.x + 6, d.top - 11, 8.8, { bold: true });
-    const client = [s('eic_client'), s('eic_client_addr')].filter(Boolean).join(', ');
-    blank(d, { x: d.x + 6, y: d.top - sq.a + 5.5, end: d.x + d.width - 8, label: '', v: must('Details of the client', s('eic_client') ? client : null) });
+    const cv = must('Details of the client', s('eic_client') ? client : null);
+    const shown = cv?.missing ? [] : clientCont ? [clientLines[0], `(continued on continuation sheet No. ${clientCont})`] : clientLines;
+    if (!twoClient) blank(d, { x: d.x + 6, y: d.top - sq.a + 5.5, end: d.x + d.width - 8, label: '', v: cv?.missing ? cv : given(shown[0]) });
+    else shown.forEach((l, i) => blank(d, { x: d.x + 6, y: d.top - sq.a + 14.5 - i * 9, end: d.x + d.width - 8, label: '', v: given(l) }));
   });
   // B: the installation address
   kit.block(sq.b, (d) => {
@@ -275,14 +305,14 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
       vline(d, X + L, d.top, d.top - h1 - h2);
       hline(d, X, X + L, d.top - h1);
       d.text(B_LABELS.descExtent, X + 6, d.top - 10.5, 8.8, { bold: true });
-      const desc = must('Description of installation', s('eic_desc'));
+      const desc = must('Description of installation', descText);
       const lw = d.widthOf(B_LABELS.description, 7.8);
       d.text(B_LABELS.description, X + 6, d.top - 21, 7.8);
-      const dl = desc && !desc.missing ? wrapFirst(d, desc.s, 7.8, L - 12 - lw - 6, L - 12) : [];
+      const dl = descCont ? [descLines[0], `(continued on continuation sheet No. ${descCont})`] : descLines;
       if (desc?.missing) value(d, desc, X + 6 + lw + 4, X + L - 6, d.top - 21);
       else {
         value(d, given(dl[0]), X + 6 + lw + 4, X + L - 6, d.top - 21, 7.8);
-        if (dl[1]) value(d, given(dl.slice(1).join(' ')), X + 6, X + L - 6, d.top - 30.5, 7.8);
+        if (dl[1]) value(d, given(dl[1]), X + 6, X + L - 6, d.top - 30.5, 7.8);
       }
       // Extent
       const t2 = d.top - h1;
@@ -298,7 +328,8 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
       const scx = X + L - 150;
       d.text(B_LABELS.seeContinuation, scx, t2 - h2 + 6, 7.8);
       dots(d, scx + sc + 2, X + L - 8, t2 - h2 + 6);
-      value(d, extentCont ? { s: String(extentCont) } : NA, scx + sc + 5, X + L - 8, t2 - h2 + 6.6, 8);
+      const bConts = [descCont, extentCont].filter((n): n is number => !!n);
+      value(d, bConts.length ? { s: bConts.join(', ') } : NA, scx + sc + 5, X + L - 8, t2 - h2 + 6.6, 8);
       // New / adding / alteration
       const R = X + L;
       const RW = d.width - L;
@@ -368,8 +399,7 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
         d.text(EXCEPTIONS, d.x + 7, d.top - 12, 7.8);
         if (exc?.missing) value(d, exc, d.x + 7, d.x + d.width - 8, d.top - 23);
         else if (exc) {
-          const el = d.lines(exc.s, 7.8, d.width - 120, true);
-          const shown = el.length > 3 ? [...el.slice(0, 2), `(continued on continuation sheet No. ${excCont})`] : el;
+          const shown = v.eic_exc === 'yes' ? excShown : [exc.s];
           shown.forEach((l, i) => value(d, given(l), d.x + 7, d.x + d.width - 110, d.top - 23 - i * 9.4, 7.8));
         }
         const rw = d.widthOf(RISK_ASSESSMENT_ATTACHED, 7.8);
@@ -414,8 +444,10 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   // D
   {
     const nextN = single ? readingOf(v.eic_next) : (x.design?.next_n ?? null);
-    const unit: 'years' | 'months' = single ? (v.eic_next_unit === 'months' ? 'months' : 'years') : (x.design?.next_unit ?? 'years');
-    const nv: Val = nextN ? { s: String(nextN) } : !single && draft ? { s: 'To follow (the designer’s)', missing: true } : must('Next inspection', null);
+    const unitGiven = single ? v.eic_next_unit : x.design?.next_unit;
+    const unit: 'years' | 'months' | null = unitGiven === 'months' || unitGiven === 'years' ? unitGiven : null;
+    if (!draft && !unit) throw new MissingAnswer('Next inspection: years or months');
+    const nv: Val = nextN ? { s: String(nextN) } : !single && draft ? { s: 'To follow', missing: true } : must('Next inspection', null);
     kit.block(sq.d, (d) => {
       frame(d, d.x, d.top, d.width, sq.d);
       const t = d.top + (44 - sq.d) / 2;
@@ -424,7 +456,11 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
       d.text(NEXT_INSPECTION_BLANK, d.x + 7, t - 25.5, 7.8);
       dots(d, d.x + 7 + lw + 3, d.x + d.width - 8, t - 25.5);
       value(d, nv, d.x + 7 + lw + 6, d.x + d.width - 8, t - 24.9, 8.2);
-      d.text(nextN === 1 ? `${unit.replace(/s$/, '')}.` : `${unit}.`, d.x + 7, t - 36, 7.8, { bold: !!nextN });
+      // "years/months." as the form prints it, the one that doesn't apply struck out.
+      const y = t - 36;
+      d.text(NEXT_INSPECTION_UNITS, d.x + 7, y, 7.8);
+      if (unit === 'years') strike(d, d.x + 7 + d.widthOf('years/', 7.8), y, d.widthOf('months', 7.8), 7.8);
+      else if (unit === 'months') strike(d, d.x + 7, y, d.widthOf('years', 7.8), 7.8);
     });
   }
 
@@ -665,12 +701,14 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
       const B = X + c1 + 6;
       const BE = X + c1 + c2 - 7;
       d.text(G_LABELS.ifOcpd, B, d.top - 11, 7.8, { bold: true });
-      const dev = msOcpd ? (v.eic_ms_dev === 'other' ? must('Device type: other', s('eic_ms_dev_other')) : must('Device type', labelOf(MS_DEVICE, v.eic_ms_dev))) : NA;
+      // An "other" type too long for the form's short blank is stated on the continuation sheet, named below.
+      const dev = msOcpd ? (v.eic_ms_dev === 'other' ? (devLong ? null : must('Device type: other', devOther)) : must('Device type', labelOf(MS_DEVICE, v.eic_ms_dev))) : NA;
       blank(d, { x: B, y: d.top - 21, end: BE, label: G_LABELS.deviceType, v: dev, size: 7.1, vsize: 7.6, gap: 1 });
       blank(d, { x: B, y: d.top - 31, end: BE, label: G_LABELS.deviceSetting, v: msOcpd ? must('Device rating/setting', r('eic_ms_set')) : NA, unit: 'A', size: 7.6 });
       blank(d, { x: B, y: d.top - 41, end: BE, label: G_LABELS.breaking, v: msOcpd ? must('Breaking capacity', r('eic_ms_ka')) : NA, unit: 'kA', size: 7.6 });
       d.lines(G_LABELS.attachSettings, 7.6, BE - B).forEach((l, i) => d.text(l, B, d.top - 55 - i * 9, 7.6));
-      if (setCont) value(d, { s: `See continuation sheet No. ${setCont}` }, B, BE, d.top - 71.5 + 0.6, 6.6);
+      const what = devLong ? (settings.length ? 'Device type and settings: see' : 'Device type: see') : 'See';
+      if (setCont) value(d, { s: `${what} continuation sheet No. ${setCont}` }, B, BE, d.top - 71.5 + 0.6, 6.6);
       // If RCD main switch
       const C = X + c1 + c2 + 6;
       const CE = X + d.width - 7;
@@ -691,7 +729,9 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     label.forEach((l, i) => d.text(l, X + 7, y - i * 9, 7.6));
     const yy = d.top - h / 2 - 2.6;
     const what = k === 'eic_ec' ? 'Earthing conductor' : 'Main protective bonding conductors';
-    blank(d, { x: X + 106, y: yy, end: X + 250, label: G_LABELS.material, v: must(`${what}: material`, labelOf(MATERIAL, v[`${k}_mat`])), size: 7.6 });
+    // "Other": the material they stated.
+    const mat = v[`${k}_mat`] === 'other' ? must(`${what}: other material`, s(`${k}_mat_other`)) : must(`${what}: material`, labelOf(MATERIAL, v[`${k}_mat`]));
+    blank(d, { x: X + 106, y: yy, end: X + 250, label: G_LABELS.material, v: mat, size: 7.6 });
     blank(d, { x: X + 258, y: yy, end: R - 8, label: G_LABELS.csa, v: must(`${what}: csa`, r(`${k}_csa`)), unit: 'mm²', size: 7.6 });
     d.text(G_LABELS.verified, R + 6, yy, 7.6);
     tickBox(d, X + d.width - 16, yy - 1.2, v[`${k}_ok`] === true, 7.8);
@@ -772,20 +812,29 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     const schedSheets = boards.reduce((a, b) => a + 2 * Math.max(1, Math.ceil(circuits.filter((c) => c.board === b.id).length / ROWS)), 0);
     const sections = [...new Set(conts.map((c) => c.section))].join(', ');
     const pages = numbers ? (numbers.schedFrom === numbers.schedTo ? `page ${numbers.schedFrom}` : `pages ${numbers.schedFrom}–${numbers.schedTo}`) : 'pages –';
-    // The form's line with its four blanks filled, the fills in bold.
+    // The form's line with its four blanks filled, the fills in bold. Section H is this certificate's
+    // Schedule of Inspection (Note 2), so it counts as one; there is never a separate one.
     const SEP = '\u0001';
     const fill = (t: string) => `${SEP}${t}${SEP}`;
-    const parts = J_LINE(fill(String(conts.length)), fill(sections || 'N/A'), fill('0'), fill(String(schedSheets)))
+    const parts = J_LINE(fill(String(conts.length)), fill(sections || 'N/A'), fill('1'), fill(String(schedSheets)))
       .split(SEP)
       .map((t, i): [string, boolean] => [t, i % 2 === 1]);
+    // One line, as on the form: a long list of sections makes the words smaller, never a second line over the next.
+    const jw = W - 14;
+    const width = (sz: number) => parts.reduce((a, [t, b]) => a + kit.widthOf(t, sz, b), 0);
+    let js = 7.6;
+    while (js > 6.2 && width(js) > jw) js -= 0.2;
+    const jLines = flowLines(kit, parts, jw, js);
+    const jh = 52 + (jLines - 1) * 9.2;
     section([
-      [52, (d) => {
-        frame(d, d.x, d.top, d.width, 52);
+      [jh, (d) => {
+        frame(d, d.x, d.top, d.width, jh);
         d.text(ST.J, d.x + 7, d.top - 11.2, 8.8, { bold: true });
-        flow(d, parts, d.x + 7, d.top - 22, d.width - 14, 7.6, 9.2);
-        d.text(J_VALID, d.x + 7, d.top - 37, 7.6);
+        flow(d, parts, d.x + 7, d.top - 22, d.width - 14, js, 9.2);
+        const below = d.top - 37 - (jLines - 1) * 9.2;
+        d.text(J_VALID, d.x + 7, below, 7.6);
         const tail = `Schedules of Circuit Details and Test Results: ${pages}. Total number of pages: ${numbers ? numbers.total : '–'}.`;
-        d.text(fitText(d, tail, 6.6, d.width - 14, true), d.x + 7, d.top - 47, 6.6, { bold: true });
+        d.text(fitText(d, tail, 6.6, d.width - 14, true), d.x + 7, below - 10, 6.6, { bold: true });
       }],
     ]);
   }
@@ -794,15 +843,26 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   for (const c of conts) {
     kind = 'cert';
     kit.newPage();
-    kit.block(30, (d) => {
-      frame(d, d.x, d.top, d.width, 30);
+    const tl = kit.lines(c.title, 7.8, W - 14);
+    const th = 21 + tl.length * 9.5;
+    kit.block(th, (d) => {
+      frame(d, d.x, d.top, d.width, th);
       d.text(`${EIC_TITLE}: ${CONTINUATION_TITLE(c.n)}`, d.x + 7, d.top - 12, 8.8, { bold: true });
-      d.text(fitText(d, c.title, 7.8, d.width - 14, false), d.x + 7, d.top - 23, 7.8);
+      tl.forEach((l, i) => d.text(l, d.x + 7, d.top - 23 - i * 9.5, 7.8));
     });
     kit.gap(8);
-    for (const p of c.paras.filter(Boolean)) {
-      const ls = kit.lines(p, 8.4, W - 14, true);
-      for (const l of ls) kit.block(11, (d) => d.text(l, d.x + 7, d.top - 9, 8.4, { bold: true }));
+    // The form's own words in its regular type, what was written in bold.
+    for (const p of c.paras) {
+      const t = typeof p === 'string' ? p : p.t;
+      const bold = typeof p === 'string';
+      if (!t) continue;
+      const ls = kit.lines(t, 8.4, W - 14, bold);
+      for (const l of ls) kit.block(11, (d) => d.text(l, d.x + 7, d.top - 9, 8.4, { bold }));
+      kit.gap(4);
+    }
+    if (c.images.length && c.caption) {
+      const ls = kit.lines(c.caption, 8.4, W - 14);
+      for (const l of ls) kit.block(11, (d) => d.text(l, d.x + 7, d.top - 9, 8.4));
       kit.gap(4);
     }
     for (const bytes of c.images) {
@@ -823,10 +883,10 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
       kind = 'details';
       kit.newPage({ landscape: true });
       if (!schedFrom) schedFrom = kit.pageNumber;
-      detailsSheet(kit, b, rows, { must, given, NA, draft });
+      detailsSheet(kit, b, rows, { must, given, NA, draft, sched, schedCont });
       kind = 'tests';
       kit.newPage({ landscape: true });
-      testsSheet(kit, x, b, rows, { must, given, NA, draft, three, remarksOf, remarkCont, sig: single ? { img: one, at: x.sig.one?.at ?? null } : { img: ins, at: x.sig.ins?.at ?? null }, name });
+      testsSheet(kit, x, b, rows, { must, given, NA, draft, sched, schedCont, three, remarksOf, sig: single ? { img: one, at: x.sig.one?.at ?? null } : { img: ins, at: x.sig.ins?.at ?? null }, name });
     }
   }
   const schedTo = schedFrom ? kit.pageNumber : 0;
@@ -890,13 +950,106 @@ type Helpers = {
   given: (t: string | null | undefined) => Val;
   NA: Val;
   draft: boolean;
+  /** How the written entries fit, and the continuation sheet for those that don't. */
+  sched: SchedLayout;
+  schedCont: number | null;
 };
-type Cell = string | null | { mark: 'tick' | 'cross' | 'na' | null };
+/** A cell: words (centred, or from the left), a mark, or words already in lines (a description, remarks). */
+type Cell = string | null | { mark: 'tick' | 'cross' | 'na' | null } | { lines: string[]; size: number };
 
-const HEAD_H = 120;
-const G1 = 18;
-const G2 = 17;
+// The heading block tall enough for each heading to run up its column on one line, as on the form.
+const HEAD_H = 134;
+const G1 = 16;
+const G2 = 16;
+const HEAD_SIZE = 7.2;
 const ROW_H = 15;
+const BOX_H = 80;
+
+/* ── What fits where on the schedules (worked out before the certificate is drawn) ─ */
+
+type Measure = { lines: (s: string, sz: number, max: number, bold?: boolean) => string[]; widthOf: (s: string, sz: number, bold?: boolean) => number };
+type Over = { where: string; what: string; text: string };
+type BoardRow = { xs: number[]; ws: number[]; fits: boolean[] };
+type SchedLayout = { over: Over[]; boards: Map<string, BoardRow>; cut: Set<string> };
+
+const DETAIL_WS = colWidths(DETAIL_W, LANDSCAPE_W);
+const TEST_WS = colWidths(TEST_W, LANDSCAPE_W);
+/** The written words a value can shrink to on the schedules before it goes on the continuation sheet. */
+const READABLE = 6.4;
+const CONT_NOTE = (n: number | null) => `(see continuation sheet No. ${n ?? '–'})`;
+
+/**
+ * "DB/CU reference: … Location: … Supplied from: …": the form's three blanks in a row. Where they
+ * are now unless one won't fit; then each gets what it needs (the reference as little as it can) and
+ * the rest is shared out. `fits` says whether each value can be written at a readable size.
+ */
+function boardRow(m: Measure, vals: (string | null)[]): BoardRow {
+  const first = spans(m, vals);
+  if (first.fits.every(Boolean)) return first;
+  // Laid out again with the note in place of what goes over, so the note has room too.
+  const again = spans(m, vals.map((t, i) => (first.fits[i] ? t : CONT_NOTE(99).slice(1, -1))));
+  return { ...again, fits: first.fits };
+}
+function spans(m: Measure, vals: (string | null)[]): BoardRow {
+  const total = LANDSCAPE_W * 0.625 - 22;
+  const gap = 8;
+  const lab = [CS.dbRef, CS.location, CS.suppliedFrom].map((l) => m.widthOf(l, 8.2) + 4.5);
+  const need = vals.map((t, i) => lab[i] + (t ? m.widthOf(t, 8.4, true) : 0) + 4);
+  let ws = [168, 146, total - 168 - 146 - 2 * gap];
+  if (need.some((n, i) => n > ws[i])) {
+    const min = [96, 100, 100];
+    const room = total - 2 * gap;
+    const want = need.map((n, i) => Math.max(n, min[i]));
+    const sum = want.reduce((a, b) => a + b, 0);
+    if (sum <= room) ws = want.map((x) => x + (room - sum) / 3);
+    else {
+      const flex = want.map((x, i) => x - min[i]);
+      const fsum = flex.reduce((a, b) => a + b, 0);
+      ws = want.map((x, i) => x - (flex[i] / fsum) * (sum - room));
+    }
+  }
+  const xs = [0, ws[0] + gap, ws[0] + ws[1] + 2 * gap];
+  const fits = vals.map((t, i) => !t || m.widthOf(t, READABLE, true) <= ws[i] - lab[i] - 1);
+  return { xs, ws, fits };
+}
+
+/** A circuit's description or remarks in its cell: one line, else two smaller, else two with where the rest is. */
+function wrapCell(m: Measure, t: string, w: number, one: number, cont: number | null): { lines: string[]; size: number; cut: boolean } {
+  if (m.widthOf(t, one, true) <= w - 6) return { lines: [t], size: one, cut: false };
+  const ls = m.lines(t, 6.2, w - 6, true);
+  if (ls.length <= 2) return { lines: ls, size: 6.2, cut: false };
+  const note = CONT_NOTE(cont);
+  const room = w - 6 - m.widthOf(` ${note}`, 6.2, true);
+  return { lines: [ls[0], `${fitText(m, ls.slice(1).join(' '), 6.2, room, true)} ${note}`], size: 6.2, cut: true };
+}
+
+function scheduleLayout(m: Measure, boards: Board[], circuits: Circuit[], remarksOf: (c: Circuit) => string | null): SchedLayout {
+  const over: Over[] = [];
+  const rows = new Map<string, BoardRow>();
+  const cut = new Set<string>();
+  for (const b of boards) {
+    const ref = String(b.ref ?? 'Board');
+    const vals = [str(b, 'ref'), str(b, 'loc'), str(b, 'from')];
+    const row = boardRow(m, vals);
+    rows.set(b.id, row);
+    if (!row.fits[1]) over.push({ where: ref, what: plain(CS.location).replace(/:$/, ''), text: vals[1]! });
+    if (!row.fits[2]) over.push({ where: ref, what: plain(CS.suppliedFrom).replace(/:$/, ''), text: vals[2]! });
+    for (const c of circuits.filter((x) => x.board === b.id)) {
+      const where = `${ref} circuit ${String(c.n ?? '?')}`;
+      const desc = str(c, 'desc');
+      if (desc && wrapCell(m, desc, DETAIL_WS[1], 7.2, null).cut) {
+        cut.add(`${c.id}:desc`);
+        over.push({ where, what: `${CS.heads[2]} (column 2)`, text: desc });
+      }
+      const rem = remarksOf(c);
+      if (rem && wrapCell(m, rem, TEST_WS[14], 6.2, null).cut) {
+        cut.add(`${c.id}:remarks`);
+        over.push({ where, what: `${TS.heads[31]} (column 31)`, text: rem });
+      }
+    }
+  }
+  return { over, boards: rows, cut };
+}
 
 /** The heading block of a schedule: group rows, each column's heading (turned up the page) and its number in the corner. */
 function headings(d: Drawing, top: number, first: number, ws: number[], heads: Record<number, string>, groups: ScheduleGroup[], horizontal: number[]) {
@@ -913,7 +1066,7 @@ function headings(d: Drawing, top: number, first: number, ws: number[], heads: R
     const gt = g.row === 1 ? top : top - G1;
     const gh = g.row === 1 ? G1 : G2;
     d.rect(gx, gt - gh, gw, gh, { border: INK, line: 0.6 });
-    if (g.label) richCentre(d, g.label, gx, gw, gt - gh + 5.6, 8);
+    if (g.label) richCentre(d, g.label, gx, gw, gt - gh + 5, 8);
   }
   ws.forEach((w, i) => {
     const n = first + i;
@@ -925,17 +1078,17 @@ function headings(d: Drawing, top: number, first: number, ws: number[], heads: R
     if (!label) return;
     if (horizontal.includes(n)) {
       if (n === 31) {
-        richCentre(d, label, xs[i], w, ct - 20, 8, { bold: true });
-        TS.remarksNote.forEach((l, j) => richCentre(d, l, xs[i], w, ct - 36 - j * 9.5 - (j === 2 ? 6 : 0), 7.6));
+        richCentre(d, label, xs[i], w, ct - 24, 8, { bold: true });
+        TS.remarksNote.forEach((l, j) => richCentre(d, l, xs[i], w, ct - 42 - j * 9.5 - (j === 2 ? 6 : 0), 7.6));
       } else richCentre(d, label, xs[i], w, bottom + 13, 8);
       return;
     }
-    // Turned up the page, from just above the column number; two lines when it's long.
-    const room = ct - bottom - 14;
-    const lines = richLines(d, label, 7.6, room);
-    const lh = 8.6;
-    const cx = xs[i] + w / 2 + (lines.length * lh) / 2 - 2.2;
-    lines.forEach((l, j) => rich(d, l, cx - (lines.length - 1 - j) * lh, bottom + 11, 7.6, { rotate: 90 }));
+    // Turned up the page from just above the column number, on one line as on the form (two only if it can't be).
+    const room = ct - bottom - 13;
+    const lines = richLines(d, label, HEAD_SIZE, room);
+    const lh = 8.2;
+    const cx = xs[i] + w / 2 + (lines.length * lh) / 2 - 2.1;
+    lines.forEach((l, j) => rich(d, l, cx - (lines.length - 1 - j) * lh, bottom + 10.5, HEAD_SIZE, { rotate: 90 }));
   });
   vline(d, X + d.width, top, bottom, 0.8);
 }
@@ -957,7 +1110,7 @@ function richLines(d: { widthOf: (s: string, sz: number, bold?: boolean) => numb
 }
 
 /** 12 ruled rows, the circuits in the first ones (centred; the description and remarks from the left). */
-function rowsBlock(d: Drawing, top: number, ws: number[], rows: Cell[][], left: number[], remarks?: number) {
+function rowsBlock(d: Drawing, top: number, ws: number[], rows: Cell[][], left: number[]) {
   const X = d.x;
   const xs = ws.map((_, i) => X + ws.slice(0, i).reduce((a, b) => a + b, 0));
   const H = ROWS * ROW_H;
@@ -968,6 +1121,10 @@ function rowsBlock(d: Drawing, top: number, ws: number[], rows: Cell[][], left: 
     const y = top - j * ROW_H;
     row.forEach((c, i) => {
       const w = ws[i];
+      if (c && typeof c === 'object' && 'lines' in c) {
+        c.lines.forEach((l, k) => d.text(l, xs[i] + 3, y - (c.lines.length === 1 ? 10.2 : 6.6 + k * 6.6), c.size, { bold: true }));
+        return;
+      }
       if (c && typeof c === 'object') {
         if (c.mark === 'tick') tickMark(d, xs[i] + (w - 8) / 2, y - ROW_H / 2 - 4, 8);
         else if (c.mark === 'cross') crossMark(d, xs[i] + (w - 8) / 2, y - ROW_H / 2 - 4, 8);
@@ -975,11 +1132,6 @@ function rowsBlock(d: Drawing, top: number, ws: number[], rows: Cell[][], left: 
         return;
       }
       if (!c) return;
-      if (i === remarks) {
-        const ls = d.lines(c, 6.2, w - 6, true).slice(0, 2);
-        ls.forEach((l, k) => d.text(l, xs[i] + 3, y - (ls.length === 1 ? 10 : 6.6 + k * 6.6), 6.2, { bold: true }));
-        return;
-      }
       let sz = 7.2;
       while (sz > 5 && d.widthOf(c, sz, true) > w - 4) sz -= 0.2;
       const t = fitText(d, c, sz, w - 4, true);
@@ -1007,45 +1159,53 @@ function detailsSheet(kit: Kit, b: Board, list: Circuit[], h: Helpers) {
   const ws = colWidths(DETAIL_W, kit.width);
   const spd = Array.isArray(b.spd) ? (b.spd as string[]) : [];
   const rcd = b.rcd === 'yes';
-  kit.block(86, (d) => {
+  const row1 = h.sched.boards.get(b.id) ?? boardRow(kit, [str(b, 'ref'), str(b, 'loc'), str(b, 'from')]);
+  kit.block(BOX_H, (d) => {
     const X = d.x;
     const L = d.width * 0.625;
-    frame(d, X, d.top, d.width, 86, 0.8);
-    vline(d, X + L, d.top, d.top - 86, 0.8);
+    frame(d, X, d.top, d.width, BOX_H, 0.8);
+    vline(d, X + L, d.top, d.top - BOX_H, 0.8);
     const A = X + 12;
     const E = X + L - 10;
     d.text(CS.boardBox, A, d.top - 13, 8.4, { bold: true });
-    blank(d, { x: A, y: d.top - 30, end: A + 168, label: CS.dbRef, v: must('DB/CU reference', str(b, 'ref')), size: 8.2 });
-    blank(d, { x: A + 176, y: d.top - 30, end: A + 322, label: CS.location, v: must('Location', str(b, 'loc')), size: 8.2 });
-    blank(d, { x: A + 330, y: d.top - 30, end: E, label: CS.suppliedFrom, v: must('Supplied from', str(b, 'from')), size: 8.2 });
-    blank(d, { x: A, y: d.top - 46, end: A + 255, label: CS.ocpd, v: given(str(b, 'ocpd_bs')) ?? NA, size: 8.2 });
-    blank(d, { x: A + 262, y: d.top - 46, end: A + 322, label: CS.ocpdType, v: given(str(b, 'ocpd_type')) ?? NA, size: 8.2 });
-    blank(d, { x: A + 330, y: d.top - 46, end: E, label: CS.ocpdRating, v: given(reading(b.ocpd_a)) ?? NA, unit: 'A', size: 8.2 });
-    d.text(CS.spd, A, d.top - 62, 8.2);
+    // Reference, location, supplied from: a value too long to read in its blank is on the continuation sheet.
+    const r1 = (i: number, label: string, k: string, what: string) => {
+      const t = str(b, k);
+      const v = t && !row1.fits[i] ? { s: CONT_NOTE(h.schedCont).slice(1, -1) } : must(what, t);
+      blank(d, { x: A + row1.xs[i], y: d.top - 28, end: A + row1.xs[i] + row1.ws[i], label, v, size: 8.2 });
+    };
+    r1(0, CS.dbRef, 'ref', 'DB/CU reference');
+    r1(1, CS.location, 'loc', 'Location');
+    r1(2, CS.suppliedFrom, 'from', 'Supplied from');
+    blank(d, { x: A, y: d.top - 43, end: A + 255, label: CS.ocpd, v: given(str(b, 'ocpd_bs')) ?? NA, size: 8.2 });
+    blank(d, { x: A + 262, y: d.top - 43, end: A + 322, label: CS.ocpdType, v: given(str(b, 'ocpd_type')) ?? NA, size: 8.2 });
+    blank(d, { x: A + 330, y: d.top - 43, end: E, label: CS.ocpdRating, v: given(reading(b.ocpd_a)) ?? NA, unit: 'A', size: 8.2 });
+    d.text(CS.spd, A, d.top - 58, 8.2);
     if (!h.draft && !spd.length) throw new MissingAnswer('SPD Details: Type(s)');
     const keys = ['T1', 'T2', 'T3', 'na'];
     CS.spdBoxes.forEach((l, i) => {
       const bx = A + 106 + i * 36;
-      const lw = rich(d, l, bx, d.top - 62, 8.2);
-      tickBox(d, bx + lw + 4, d.top - 64.5, spd.includes(keys[i]), 9);
+      const lw = rich(d, l, bx, d.top - 58, 8.2);
+      tickBox(d, bx + lw + 4, d.top - 60.5, spd.includes(keys[i]), 9);
     });
-    d.text(CS.rcd, A, d.top - 78, 8.2);
+    d.text(CS.rcd, A, d.top - 73, 8.2);
     const rv = (k: string, label: string, num = false): Val => (rcd ? must(`Board RCD: ${label}`, num ? reading(b[k]) : str(b, k)) : NA);
     if (!h.draft && b.rcd !== 'yes' && b.rcd !== 'no') throw new MissingAnswer('RCD for the whole board?');
-    blank(d, { x: A + 34, y: d.top - 78, end: A + 118, label: CS.rcdBs, v: rv('rcd_bs', 'BS (EN)'), size: 8.2 });
-    blank(d, { x: A + 124, y: d.top - 78, end: A + 178, label: CS.rcdType, v: rv('rcd_type', 'type'), size: 8.2 });
-    blank(d, { x: A + 184, y: d.top - 78, end: A + 250, label: CS.rcdRating, v: rv('rcd_a', 'rating', true), unit: 'A', size: 8.2 });
-    blank(d, { x: A + 262, y: d.top - 78, end: E, label: CS.rcdIdn, v: rv('rcd_idn', 'IΔn', true), unit: 'mA', size: 8.2 });
+    blank(d, { x: A + 34, y: d.top - 73, end: A + 118, label: CS.rcdBs, v: rv('rcd_bs', 'BS (EN)'), size: 8.2 });
+    blank(d, { x: A + 124, y: d.top - 73, end: A + 178, label: CS.rcdType, v: rv('rcd_type', 'type'), size: 8.2 });
+    blank(d, { x: A + 184, y: d.top - 73, end: A + 250, label: CS.rcdRating, v: rv('rcd_a', 'rating', true), unit: 'A', size: 8.2 });
+    blank(d, { x: A + 262, y: d.top - 73, end: E, label: CS.rcdIdn, v: rv('rcd_idn', 'IΔn', true), unit: 'mA', size: 8.2 });
   });
   kit.block(18, (d) => band(d, d.top, CS.band));
   kit.block(HEAD_H, (d) => headings(d, d.top, 1, ws, CS.heads, CS.groups, [2]));
   const rows: Cell[][] = list.map((c) => {
     const r = c.rcd === 'yes';
     const v = (k: string) => reading(c[k]) ?? str(c, k);
-    return [str(c, 'n'), str(c, 'desc'), str(c, 'wiring'), str(c, 'ref'), v('points'), v('csa_live'), v('csa_cpc'), str(c, 'ocpd_bs'), str(c, 'ocpd_type'), v('ocpd_a'), v('ocpd_ka'), v('zs_max'), r ? str(c, 'rcd_bs') : 'N/A', r ? str(c, 'rcd_type') : 'N/A', r ? v('rcd_idn') : 'N/A', r ? v('rcd_a') : 'N/A'];
+    const desc = str(c, 'desc');
+    return [str(c, 'n'), desc ? wrapCell(kit, desc, ws[1], 7.2, h.schedCont) : null, str(c, 'wiring'), str(c, 'ref'), v('points'), v('csa_live'), v('csa_cpc'), str(c, 'ocpd_bs'), str(c, 'ocpd_type'), v('ocpd_a'), v('ocpd_ka'), v('zs_max'), r ? str(c, 'rcd_bs') : 'N/A', r ? str(c, 'rcd_type') : 'N/A', r ? v('rcd_idn') : 'N/A', r ? v('rcd_a') : 'N/A'];
   });
   kit.block(ROWS * ROW_H, (d) => rowsBlock(d, d.top, ws, rows, [1]));
-  kit.gap(6);
+  kit.gap(5);
   // Codes for types of wiring; what "O" stands for on this board, on its dotted line.
   const others = [...new Set(list.filter((c) => c.wiring === 'O').map((c) => str(c, 'wiring_other')).filter((t): t is string => !!t))].join('; ');
   kit.block(58, (d) => {
@@ -1071,8 +1231,9 @@ function detailsSheet(kit: Kit, b: Board, list: Circuit[], h: Helpers) {
     });
   });
   kit.gap(3);
-  const fl = footnoteLines(kit, CS.footnotes, 5.6, kit.width);
-  kit.block(fl.length * 6.8 + 2, (d) => footnotes(d, d.top, fl, 5.6, 6.8));
+  // The form's footnotes in its small type: § on one line, as it is there.
+  const fl = footnoteLines(kit, CS.footnotes, 5.3, kit.width);
+  kit.block(fl.length * 6.4 + 2, (d) => footnotes(d, d.top, fl, 5.3, 6.4));
 }
 
 function testsSheet(
@@ -1080,36 +1241,36 @@ function testsSheet(
   x: EicInput,
   b: Board,
   list: Circuit[],
-  h: Helpers & { three: boolean; remarksOf: (c: Circuit) => string | null; remarkCont: Map<string, number>; sig: { img: PDFImage | null; at: string | null }; name: string | null }
+  h: Helpers & { three: boolean; remarksOf: (c: Circuit) => string | null; sig: { img: PDFImage | null; at: string | null }; name: string | null }
 ) {
   const { must, given, NA } = h;
   const ws = colWidths(TEST_W, kit.width);
   const spdNa = !Array.isArray(b.spd) || (b.spd as string[]).every((s) => s === 'na');
-  kit.block(86, (d) => {
+  kit.block(BOX_H, (d) => {
     const X = d.x;
     const L = d.width * 0.62;
-    frame(d, X, d.top, d.width, 86, 0.8);
-    vline(d, X + L, d.top, d.top - 86, 0.8);
+    frame(d, X, d.top, d.width, BOX_H, 0.8);
+    vline(d, X + L, d.top, d.top - BOX_H, 0.8);
     const A = X + 12;
     const E = X + L - 10;
     d.text(TS.boardBox, A, d.top - 13, 8.4, { bold: true });
-    blank(d, { x: A, y: d.top - 33, end: A + 168, label: TS.dbRef, v: must('DB/CU reference', str(b, 'ref')), size: 8.2 });
-    blank(d, { x: A + 180, y: d.top - 33, end: A + 296, label: TS.zdb, v: must('Zdb', reading(b.zdb)), unit: 'Ω', size: 8.2 });
-    blank(d, { x: A + 306, y: d.top - 33, end: E, label: TS.ipf, v: must('Ipf', reading(b.ipf)), unit: 'kA', size: 8.2 });
-    d.text(TS.confirmed, A, d.top - 53, 8.2);
+    blank(d, { x: A, y: d.top - 31, end: A + 168, label: TS.dbRef, v: must('DB/CU reference', str(b, 'ref')), size: 8.2 });
+    blank(d, { x: A + 180, y: d.top - 31, end: A + 296, label: TS.zdb, v: must('Zdb', reading(b.zdb)), unit: 'Ω', size: 8.2 });
+    blank(d, { x: A + 306, y: d.top - 31, end: E, label: TS.ipf, v: must('Ipf', reading(b.ipf)), unit: 'kA', size: 8.2 });
+    d.text(TS.confirmed, A, d.top - 50, 8.2);
     const pw = d.widthOf(TS.polarity, 8.2);
-    d.text(TS.polarity, A + 112, d.top - 53, 8.2);
-    tickBox(d, A + 112 + pw + 5, d.top - 55.5, b.pol === true, 9);
+    d.text(TS.polarity, A + 112, d.top - 50, 8.2);
+    tickBox(d, A + 112 + pw + 5, d.top - 52.5, b.pol === true, 9);
     if (!h.draft && b.pol !== true) throw new MissingAnswer('Confirmed: correct polarity');
     const qw = d.widthOf(TS.phase, 8.2);
-    d.text(TS.phase, A + 222, d.top - 53, 8.2);
-    tickBox(d, A + 222 + qw + 5, d.top - 55.5, h.three && b.phase === true, 9);
-    if (!h.three) d.text('N/A', A + 222 + qw + 18, d.top - 53, 7.4, { bold: true });
-    d.text(TS.spd, A, d.top - 73, 8.2);
-    const sw = rich(d, TS.spdOk, A + 112, d.top - 73, 8.2);
-    tickBox(d, A + 112 + sw + 5, d.top - 75.5, !spdNa && b.spd_ok === 'yes', 9);
-    d.text(TS.na, A + 268, d.top - 73, 8.2);
-    tickBox(d, A + 268 + d.widthOf(TS.na, 8.2) + 5, d.top - 75.5, spdNa || b.spd_ok === 'na', 9);
+    d.text(TS.phase, A + 222, d.top - 50, 8.2);
+    tickBox(d, A + 222 + qw + 5, d.top - 52.5, h.three && b.phase === true, 9);
+    if (!h.three) d.text('N/A', A + 222 + qw + 18, d.top - 50, 7.4, { bold: true });
+    d.text(TS.spd, A, d.top - 69, 8.2);
+    const sw = rich(d, TS.spdOk, A + 112, d.top - 69, 8.2);
+    tickBox(d, A + 112 + sw + 5, d.top - 71.5, !spdNa && b.spd_ok === 'yes', 9);
+    d.text(TS.na, A + 268, d.top - 69, 8.2);
+    tickBox(d, A + 268 + d.widthOf(TS.na, 8.2) + 5, d.top - 71.5, spdNa || b.spd_ok === 'na', 9);
     if (!h.draft && !spdNa && b.spd_ok !== 'yes' && b.spd_ok !== 'na') throw new MissingAnswer('SPD: operational status confirmed');
     // Details of test instruments used
     const I = X + L + 8;
@@ -1118,7 +1279,7 @@ function testsSheet(
     const inst = (x.values.eic_inst ?? {}) as Record<string, unknown>;
     TS.instruments.forEach((t, i) => {
       const val = typeof inst[t.k] === 'string' && (inst[t.k] as string).trim() ? (inst[t.k] as string).trim() : null;
-      blank(d, { x: I, y: d.top - 27 - i * 10.2, end: IE, label: t.label, v: given(val) ?? NA, size: 7.8 });
+      blank(d, { x: I, y: d.top - 25.5 - i * 9.9, end: IE, label: t.label, v: given(val) ?? NA, size: 7.8 });
     });
   });
   kit.block(18, (d) => band(d, d.top, TS.band));
@@ -1135,7 +1296,6 @@ function testsSheet(
       return null;
     };
     const rem = h.remarksOf(c);
-    const cont = h.remarkCont.get(c.id);
     const pf = (p: unknown): Cell => ({ mark: p === 'pass' ? 'tick' : p === 'fail' ? 'cross' : p === 'na' ? 'na' : null });
     return [
       str(c, 'n'),
@@ -1152,33 +1312,33 @@ function testsSheet(
       r ? req('rcd_ms', 'Disconnection time') : NAc,
       r ? pf(c.rcd_btn) : NAc,
       c.afdd === 'yes' ? pf(c.afdd_btn) : NAc,
-      rem ? (cont ? `${rem.slice(0, 120)}… (continued on continuation sheet No. ${cont})` : rem) : null,
+      rem ? wrapCell(kit, rem, ws[14], 6.2, h.schedCont) : null,
     ];
   });
-  kit.block(ROWS * ROW_H, (d) => rowsBlock(d, d.top, ws, rows, [], 14));
-  kit.gap(7);
+  kit.block(ROWS * ROW_H, (d) => rowsBlock(d, d.top, ws, rows, []));
+  kit.gap(5);
   // Tested by
-  kit.block(54, (d) => {
+  kit.block(46, (d) => {
     const X = d.x;
     const w = d.width * 0.594;
-    frame(d, X, d.top, w, 54, 0.8);
+    frame(d, X, d.top, w, 46, 0.8);
     const name = h.name ? { s: h.name.toUpperCase() } : must(TS.testedBy, null);
-    blank(d, { x: X + 10, y: d.top - 17, end: X + w - 12, label: TS.testedBy, v: name, size: 8.2 });
-    d.text(TS.signature, X + 10, d.top - 41, 8.2);
+    blank(d, { x: X + 10, y: d.top - 15, end: X + w - 12, label: TS.testedBy, v: name, size: 8.2 });
+    d.text(TS.signature, X + 10, d.top - 36, 8.2);
     const sx = X + 10 + d.widthOf(TS.signature, 8.2) + 2;
     const dateX = X + w - 120;
-    dots(d, sx, dateX - 4, d.top - 41);
-    if (h.sig.img) d.image(h.sig.img, sx + 4, d.top - 44, dateX - sx - 16, 20);
-    else if (h.draft) value(d, { s: NOT_SIGNED, missing: true }, sx + 4, dateX - 6, d.top - 40.4, 7.6);
+    dots(d, sx, dateX - 4, d.top - 36);
+    if (h.sig.img) d.image(h.sig.img, sx + 4, d.top - 39, dateX - sx - 16, 17);
+    else if (h.draft) value(d, { s: NOT_SIGNED, missing: true }, sx + 4, dateX - 6, d.top - 35.4, 7.6);
     else throw new MissingAnswer('Tested by: signature');
-    d.text(TS.date, dateX, d.top - 41, 8.2);
+    d.text(TS.date, dateX, d.top - 36, 8.2);
     const dx = dateX + d.widthOf(TS.date, 8.2) + 2;
-    dots(d, dx, X + w - 12, d.top - 41);
-    value(d, given(formDate(h.sig.at)), dx + 3, X + w - 12, d.top - 40.4, 8.2);
+    dots(d, dx, X + w - 12, d.top - 36);
+    value(d, given(formDate(h.sig.at)), dx + 3, X + w - 12, d.top - 35.4, 8.2);
   });
-  kit.gap(4);
-  const fl = footnoteLines(kit, TS.footnotes, 6, kit.width);
-  kit.block(fl.length * 7 + 2, (d) => footnotes(d, d.top, fl, 6, 7));
+  kit.gap(3);
+  const fl = footnoteLines(kit, TS.footnotes, 5.6, kit.width);
+  kit.block(fl.length * 6.6 + 2, (d) => footnotes(d, d.top, fl, 5.6, 6.6));
 }
 
 /* ── Text pages ─────────────────────────────────────────────────────────────── */
@@ -1229,6 +1389,22 @@ function wrapFirst(d: { lines: (s: string, sz: number, max: number, bold?: boole
   }
   const tail = words.slice(i).join(' ');
   return tail ? [line, ...d.lines(tail, size, rest, true)] : [line];
+}
+
+/** How many lines flow() will take. */
+function flowLines(d: { widthOf: (s: string, sz: number, bold?: boolean) => number }, parts: [string, boolean][], w: number, size: number): number {
+  let cx = 0;
+  let n = 1;
+  for (const [t, bold] of parts)
+    for (const word of t.split(/(?<= )/)) {
+      const ww = d.widthOf(word, size, bold);
+      if (cx + ww > w && cx > 0) {
+        cx = 0;
+        n++;
+      }
+      cx += ww;
+    }
+  return n;
 }
 
 /** Runs of text (bold where given) flowing over lines. */

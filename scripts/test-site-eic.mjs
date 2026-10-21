@@ -111,8 +111,8 @@ const REGS_PAGE = {
   'Means of earthing': ['eic_means'],
   'Maximum demand, kVA / A': ['eic_md', 'eic_md_unit'],
   'Installation earth electrode: type, location, resistance/impedance RA/Ze': ['eic_rod_type', 'eic_rod_loc', 'eic_ra', 'eic_ra_kind'],
-  'Earthing conductor: material, csa, verified': ['eic_ec_mat', 'eic_ec_csa', 'eic_ec_ok'],
-  'Main protective bonding conductors: material, csa, verified': ['eic_mb_mat', 'eic_mb_csa', 'eic_mb_ok'],
+  'Earthing conductor: material (what it is, if other), csa, verified': ['eic_ec_mat', 'eic_ec_mat_other', 'eic_ec_csa', 'eic_ec_ok'],
+  'Main protective bonding conductors: material (what it is, if other), csa, verified': ['eic_mb_mat', 'eic_mb_mat_other', 'eic_mb_csa', 'eic_mb_ok'],
   'Bonding: water, gas, oil, structural steel, lightning protection, other (specify)': ['eic_b_water', 'eic_b_gas', 'eic_b_oil', 'eic_b_steel', 'eic_b_lightning', 'eic_b_other', 'eic_b_other_what'],
   'Main switch: location, BS (EN), poles, current rating, voltage rating': ['eic_ms_loc', 'eic_ms_bs', 'eic_ms_poles', 'eic_ms_a', 'eic_ms_v'],
   'If overcurrent protective device: device type, rating/setting, breaking capacity, settings attached': ['eic_ms_ocpd', 'eic_ms_dev', 'eic_ms_dev_other', 'eic_ms_set', 'eic_ms_ka', 'eic_ms_settings'],
@@ -359,7 +359,7 @@ eq('the test schedule’s headings (columns 17–31) and groups', [...Object.val
 eq('the footnotes word for word: * † ‡ § and ¶ # ** ‡‡ ††', [...FIX.CIRCUIT_SCHEDULE.footnotes.map(plain).filter((t) => !squash(landscape[0].text).includes(squash(t))), ...FIX.TEST_SCHEDULE.footnotes.map(plain).filter((t) => !squash(landscape[1].text).includes(squash(t)))], []);
 eq('the codes for types of wiring table', [landscape[0].text.includes('CODES FOR TYPES OF WIRING'), FIX.WIRING_CODES.every((w) => squash(landscape[0].text).includes(squash(w.label)))], [true, true]);
 eq('“Certificate No.:” on the certificate pages, “Certificate/Report No.:” on the schedules', pages.map((p, i) => p.text.includes(`${p.w > p.h ? 'Certificate/Report No.:' : 'Certificate No.:'} HX-0042-EIC`) || i), pages.map(() => true));
-eq('Section J filled in: the continuation sheet for F, no separate schedule of inspection, 2 schedules, their pages and the total', [all.includes('1 Continuation sheet(s) for Section(s) F 0 Schedule(s) of Inspection 2 Schedule(s) of Circuit Details and Schedule(s) of Test Results'), all.includes('Schedules of Circuit Details and Test Results: pages 4–5. Total number of pages: 7.')], [true, true]);
+eq('Section J filled in: the continuation sheet for F, Section H as the schedule of inspection, 2 schedules, their pages and the total', [all.includes('1 Continuation sheet(s) for Section(s) F 1 Schedule(s) of Inspection 2 Schedule(s) of Circuit Details and Schedule(s) of Test Results'), all.includes('Schedules of Circuit Details and Test Results: pages 4–5. Total number of pages: 7.')], [true, true]);
 eq('the other sources on continuation sheet No. 1, as Section F says', [pages[1].text.includes('Continuation sheet No. 1'), pages[2].text.includes('CONTINUATION SHEET No. 1'), pages[2].text.includes('Solar PV, 5.28 kWp')], [true, true, true]);
 eq('the board’s RCD line (N/A here) and the empty right-hand box', [landscape[0].text.includes('RCD: BS (EN) N/A Type N/A Rating N/A A')], [true]);
 eq('the worked-out max Zs says so in Remarks (footnote §)', A.includes(squash(ZS_SRC.B32)) && A.includes(squash(ZS_SRC.B20)), true);
@@ -376,7 +376,7 @@ const colNums = (t, from, to) => {
 eq('circuit details page: columns 1–16 in order', colNums(` ${landscape[0].text} `, 1, 16), 'all');
 eq('test results page: columns 17–31 in order', colNums(` ${landscape[1].text} `, 17, 31), 'all');
 eq('three declarations, the design one signed', [all.split('hereby CERTIFY').length - 1, all.includes('Designer No 1'), all.includes('Designer No 2**'), all.includes('SARAH JONES'), all.includes('Constructor'), all.includes('Inspector')], [3, true, true, true, true, true]);
-eq('the edition and the next inspection', [all.includes('BS 7671:2018, amended to 2026 (A4)'), all.includes('not more than 10 years')], [true, true]);
+eq('the edition and the next inspection, “years/months.” as the form prints it (one struck out)', [all.includes('BS 7671:2018, amended to 2026 (A4)'), all.includes('not more than 10 years/months.')], [true, true]);
 eq('readings print as given (>999, Ω, MΩ, mm², IΔn)', ['>999', 'Ω', 'MΩ', 'mm²', 'IΔn'].every((x) => A.includes(x)), true);
 eq('no "?" stands in for a symbol, no "Not answered", no draft banner', [/\?/.test(all), all.includes('Not answered'), all.includes('Draft: not signed yet')], [false, false, false]);
 eq('the footer on every page: the certificate number, page x of y, Heliaxis’s details, the form’s edition', pages.every((p, i) => p.text.includes(`Certificate No. HX-0042-EIC · Page ${i + 1} of ${pages.length}`) && p.text.includes('Heliaxis Ltd · 9 Turner Street') && p.text.includes('IET model form, BS 7671:2018+A4:2026')), true);
@@ -436,9 +436,14 @@ const variant = {
 const vpages = (await pagesOf(await eicPdf({ ...base, values: variant, attachments: [{ slot: 'eic_exc_ra', bytes: PNG }] }))).map((p) => p.text);
 const V = squash(vpages.join('\n'));
 eq('long departures go to a continuation sheet, numbered where they’d be', [vpages[0].includes('(continued on continuation sheet No. 1)'), vpages[2].includes('CONTINUATION SHEET No. 1') && vpages[2].includes('fire-rated board')], [true, true]);
-eq('the exceptions and the risk assessment attached: a continuation sheet for C (and one for long remarks), all counted in J', [vpages[3].includes('CONTINUATION SHEET No. 2') && vpages[3].includes('Risk assessment attached'.toLowerCase()), vpages[1].includes('4 Continuation sheet(s) for Section(s) C, F, Schedule of Test Results')], [true, true]);
+eq('the exceptions and the risk assessment attached: a continuation sheet for C (and one for long remarks), all counted in J', [vpages[3].includes('CONTINUATION SHEET No. 2') && vpages[3].includes('Risk assessment attached'.toLowerCase()), vpages[1].includes('4 Continuation sheet(s) for Section(s) C, F, Schedules')], [true, true]);
+eq('the exceptions box says where the risk assessment is; the sheet has the form’s words and the photo', [vpages[0].includes('Risk assessment: see continuation sheet No. 2'), vpages[3].includes('Risk assessment attached:')], [true, true]);
 eq('the electrode (Ze), the demand in kVA, the main switch’s fuse and RCD, all on page 2', ['Front garden, by the meter box', 'Electrode resistance/impedance', 'Fuse(s)', 'Rated time delay 150 ms', 'Breaking capacity 10 kA'].map((t) => squash(vpages[1]).includes(squash(t))), [true, true, true, true, true]);
 eq('the board’s RCD line, the T3 box, the T3 and wiring “O” in Remarks (footnote †)', [squash(vpages.join(' ')).includes(squash('RCD: BS (EN) 61008-1 Type A Rating 100 A')), V.includes(squash('T3 SPD: the inverter’s AC supply')), V.includes(squash('Type of wiring O: Thermosetting flexible cable (H07RN-F) to the inverter'))], [true, true, true]);
+
+// An "other" main switch device too long for the form's short blank: stated on G's continuation sheet.
+const devPages = (await pagesOf(await eicPdf({ ...base, values: { ...c0.values, eic_ms_ocpd: 'yes', eic_ms_dev: 'other', eic_ms_dev_other: 'Switch-disconnector-fuse with BS 88 fuse links', eic_ms_set: 100, eic_ms_ka: 16 } }))).map((p) => p.text);
+eq('a long “other” device type: page 2 points to the sheet, which states it; J counts G', [devPages[1].includes('Device type: see continuation sheet No. 2'), devPages.some((t) => t.includes('CONTINUATION SHEET No. 2') && t.includes('Switch-disconnector-fuse with BS 88 fuse links')), devPages[1].includes('2 Continuation sheet(s) for Section(s) F, G')], [true, true, true]);
 
 // A draft: the design part not signed yet.
 const draftBytes = await eicPdf({ ...base, design: null, draft: true });
@@ -482,6 +487,58 @@ const mtext = (await pagesOf(mwBytes)).map((p) => p.text).join('\n');
 eq('Minor Works: a data sheet while unverified, titled so, for this circuit', [mtext.includes('Minor Works data sheet'), mtext.includes('It isn’t the certificate'), mtext.includes('DB1 circuit 7'), mtext.includes('Added a socket')], [true, true, true, true]);
 const mwCert = (await pagesOf(await meiwcPdf({ ref: 'HX-0042-MW1', jobRef: 'HX-0042', issued: '2026-11-03', edition: 'A4:2026', values: { ...mw.values, eic_mw_fp: 'ADS' }, address: mw.address, circuit: { ...mwList[0].circuit, work: 'Added a socket' }, name: mwList[0].name, sig, draft: false, wording: { verified: true, declaration: (x) => `TEST MW WORDING to ${x}` } }))).map((p) => p.text).join('\n');
 eq('once verified: the certificate with its declaration', [mwCert.includes('Minor Electrical Installation Works Certificate'), mwCert.includes('TEST MW WORDING to 2026 (A4)'), mwCert.includes('data sheet')], [true, true, false]);
+
+/* ── The assessor's pass: long entries, two boards, both signing routes ──── */
+
+// Items with where they are (x, y), for checks a page's words can't show (one line, not two).
+async function itemsOf(bytes) {
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false, disableFontFace: true }).promise;
+  const out = [];
+  for (let i = 1; i <= doc.numPages; i++) out.push((await (await doc.getPage(i)).getTextContent()).items.map((x) => ({ s: x.str, x: x.transform[4], y: x.transform[5] })));
+  return out;
+}
+const LONG = {
+  client: 'Mr and Mrs Bartholomew-Fitzgerald-Williams (care of the property management company)',
+  clientAddr: 'Apartment 3, Riverside Court Business Quarter, 45-49 Usk Way, Newport, NP20 2BW',
+  desc: 'Installation of solar PV (8.4 kWp, 21 panels on two roofs, east and west), two 9.5 kWh batteries in the garage, a new 18-way dual-RCD consumer unit replacing the old rewireable fuse board, a sub-board in the detached garage and an EV charge point on the drive',
+  loc: 'In the detached double garage at the bottom of the garden, on the back wall behind the workbench',
+  cdesc: 'Workshop sockets on the back wall, the bench grinder, the compressor and the lighting over the workbench and the loft hatch, wired in SWA from DB2',
+};
+const big = { ...ans, eic_client: a(LONG.client), eic_client_addr: a(LONG.clientAddr), eic_desc: a(LONG.desc), eic_ec_mat: a('other'), eic_ec_mat_other: a('Copper-clad aluminium') };
+for (let i = 1; i <= 20; i++) big[`eic_db:c-k${i}`] = a({ ...details(i, i === 5 ? 'Sockets: kitchen worktop, island and the utility room appliances (washer, dryer)' : `Circuit ${i} lights and sockets`), ...tests, o: i });
+for (const k of ['eic_db:c-c1', 'eic_db:c-c2', 'eic_db:c-c3']) delete big[k];
+big['eic_db:b-b2'] = a({ o: 2, ref: 'DB2', loc: LONG.loc, from: 'DB1 circuit 20', ocpd_bs: '60898-1', ocpd_type: 'C', ocpd_a: 40, spd: ['T2', 'T3'], rcd: 'yes', rcd_bs: '61008-1', rcd_type: 'A', rcd_a: 63, rcd_idn: 100, zdb: 0.61, ipf: 0.62, pol: true, spd_ok: 'yes' });
+for (let i = 1; i <= 3; i++) big[`eic_db:c-g${i}`] = a({ ...details(i, i === 2 ? LONG.cdesc : `Garage circuit ${i}`, { board: 'b2', ocpd_a: 16, zs_max: 2.73, zs_src: null }), ...tests, o: i, zs: 0.9 });
+eq('the gate asks what an “other” conductor material is', E.certMissing(ctxOf({ ...big, eic_ec_mat_other: undefined })).map((m) => m.key), ['eic_ec_mat_other']);
+const bigCtx = ctxOf(big);
+eq('the big job is complete on the phone', E.certMissing(bigCtx), []);
+for (const [label, extra] of [
+  ['three signatures', {}],
+  ['single signature', { route: 'eic_single', values: { ...bigCtx.values, eic_route: 'eic_single', eic_next: 6, eic_next_unit: 'months' }, sig: { one: sig }, design: null }],
+]) {
+  const b = await eicPdf({ ...base, values: bigCtx.values, address: 'Flat 14, The Old Granary Buildings, 123 Llanthewy Road, off Stow Hill, St Woolos, Newport, Gwent, NP20 4JR', ...extra });
+  keep(`EIC-big-${extra.route ?? 'eic'}.pdf`, b);
+  const pg = await pagesOf(b);
+  const it = await itemsOf(b);
+  const T = pg.map((p) => p.text);
+  const S = squash(T.join('\n'));
+  const kinds2 = pg.map((p) => (p.w > p.h ? (p.text.includes('GENERIC SCHEDULE OF CIRCUIT DETAILS') ? 'D' : 'T') : 'P')).join('');
+  eq(`${label}: A–D on page 1, E–J on page 2, then 2 sheets of each schedule for DB1 (20 circuits) and 1 for DB2`, [SECTIONS.slice(0, 4).every((h) => T[0].includes(h)), SECTIONS.slice(4).every((h) => T[1].includes(h)), kinds2.replace(/^P+/, '').replace(/P+$/, '')], [true, true, 'DTDTDT']);
+  eq(`${label}: Section J counts them, Section H as the schedule of inspection`, [squash(T[1]).includes(squash('1 Schedule(s) of Inspection 6 Schedule(s) of Circuit Details and Schedule(s) of Test Results')), /Total number of pages: (\d+)\./.exec(T[1])?.[1]], [true, String(pg.length)]);
+  // Nothing written is lost: each long entry is on the form whole, or on a continuation sheet word for word.
+  eq(`${label}: the long client, description, location and circuit description are all there in full`, [LONG.client, LONG.clientAddr, LONG.desc, LONG.loc, LONG.cdesc, 'Copper-clad aluminium'].map((t) => S.includes(squash(t))), [true, true, true, true, true, true]);
+  eq(`${label}: nothing cut short, except a cell that says where the rest is`, T.join('\n').match(/…(?! \(see continuation sheet No\. \d+\))/g), null);
+  eq(`${label}: the client on Section A’s two lines, not shrunk`, it[0].filter((x) => x.s.startsWith('Mr and Mrs Bartholomew')).length, 1);
+  // Section J's filled-in line stays one line above "The schedule(s) and continuation sheet(s) listed…".
+  const j0 = it[1].findIndex((x) => x.s.trim() === 'Continuation');
+  const j1 = it[1].findIndex((x) => x.s.startsWith('The schedule(s) and continuation'));
+  const jy = it[1].slice(j0, j1).filter((x) => x.s.trim()).map((x) => Math.round(x.y));
+  const vy = it[1][j1]?.y;
+  eq(`${label}: Section J’s line is one line, clear of the next`, [new Set(jy).size, jy.every((y) => y - vy > 8)], [1, true]);
+  // The headings run up their columns on one line each, as on the form.
+  const heads = new Set(it.filter((_, i) => pg[i].w > pg[i].h).flat().map((x) => x.s));
+  eq(`${label}: the long column headings on one line`, ['Number of points served', 'Breaking capacity (kA)', 'Disconnection time (ms)**', 'Test button operation', 'Manual test button operation', 'Maximum measured'].filter((h) => !heads.has(h)), []);
+}
 
 /* ── For the rest of the pack ────────────────────────────────────────────── */
 

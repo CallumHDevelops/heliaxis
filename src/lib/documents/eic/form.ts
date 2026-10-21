@@ -116,7 +116,7 @@ export function value(d: Drawing, v: Val, x: number, end: number, y: number, siz
   return s === v.s;
 }
 /** Text cut to a width with "…". */
-export function fitText(d: Drawing, s: string, size: number, room: number, bold: boolean): string {
+export function fitText(d: Pick<Drawing, 'widthOf'>, s: string, size: number, room: number, bold: boolean): string {
   if (d.widthOf(s, size, bold) <= room) return s;
   let n = s.length;
   while (n > 1 && d.widthOf(`${s.slice(0, n)}…`, size, bold) > room) n--;
