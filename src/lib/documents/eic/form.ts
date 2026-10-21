@@ -123,6 +123,47 @@ export function fitText(d: Pick<Drawing, 'widthOf'>, s: string, size: number, ro
   return `${s.slice(0, n).trimEnd()}…`;
 }
 
+/** A written name as it fits its blank: its lines (one, or two) and their size. */
+export type Fitted = { lines: string[]; size: number };
+
+/**
+ * How a name (a signatory's, a firm's) fits a blank `room` wide, never cut: on one line, made smaller
+ * down to `oneMin`; else, where the form has room under the dotted line (`two`), over two lines broken
+ * at a space or after a hyphen, no bigger than `twoMax`; else on one line down to `min`; else null,
+ * and it goes on a continuation sheet.
+ */
+export function fitName(m: Pick<Drawing, 'widthOf'>, s: string, room: number, o: { size?: number; oneMin?: number; min?: number; two?: boolean; twoMax?: number } = {}): Fitted | null {
+  const size = o.size ?? 8;
+  const min = o.min ?? 5.6;
+  const oneMin = Math.max(min, o.oneMin ?? min);
+  const w = (t: string, sz: number) => m.widthOf(t, sz, true);
+  // Sizes from the largest down in 0.2 pt steps (worked in tenths so they stay tidy).
+  const sizes = (from: number, to: number) => {
+    const out: number[] = [];
+    for (let t = Math.round(from * 10); t >= Math.round(to * 10) - 1e-9; t -= 2) out.push(t / 10);
+    return out;
+  };
+  const one = sizes(size, oneMin).find((sz) => w(s, sz) <= room);
+  if (one !== undefined) return { lines: [s], size: one };
+  // Smaller still on one line, or over two lines: whichever is written the bigger.
+  const small = sizes(oneMin - 0.2, min).find((sz) => w(s, sz) <= room);
+  let two: Fitted | null = null;
+  if (o.two) {
+    // Where it can break: at a space (dropped) or after a hyphen (kept); the break that evens the lines out.
+    const splits: [string, string][] = [];
+    for (let i = 1; i < s.length - 1; i++) {
+      if (s[i] === ' ') splits.push([s.slice(0, i).trimEnd(), s.slice(i + 1).trimStart()]);
+      else if (s[i] === '-') splits.push([s.slice(0, i + 1), s.slice(i + 1)]);
+    }
+    const longer = ([a, b]: [string, string]) => Math.max(w(a, 1), w(b, 1));
+    const best = splits.filter(([a, b]) => a && b).sort((x, y) => longer(x) - longer(y))[0];
+    const sz = best ? sizes(Math.min(size, o.twoMax ?? size), min).find((z) => w(best[0], z) <= room && w(best[1], z) <= room) : undefined;
+    if (best && sz !== undefined) two = { lines: best, size: sz };
+  }
+  if (two && (small === undefined || two.size >= small)) return two;
+  return small !== undefined ? { lines: [s], size: small } : null;
+}
+
 /**
  * The form's "Label ........ unit" with the value written in the blank: the label (marked up), a
  * dotted leader to the unit (or to `end`), the value bold over the leader just after the label.

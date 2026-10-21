@@ -1411,14 +1411,27 @@ export async function newDocument(o: DocOptions) {
       }
       y -= 4;
     },
-    /** Signatures on a baseline, two to a row, with the name and "Signed on the Heliaxis app, 3 Nov 2026 17:41". */
+    /**
+     * Signatures on a baseline, two to a row, with the name and "Signed on the Heliaxis app, 3 Nov 2026
+     * 17:41". A long name (a full name and a firm) or line wraps within its column, never past the
+     * margin, and its row grows by the lines it needs.
+     */
     async signatures(items: SignatureItem[]) {
       const colW = (W - 30) / 2;
+      const NAME_LH = 11;
+      const LINE_LH = 9;
+      const laid = items.map((s) => {
+        const line = s.line ?? (s.at ? `Signed on the Heliaxis app, ${stampWords(s.at)}` : null);
+        return { s, name: lines(s.name || '–', 9, colW, 'bold'), line: line ? lines(line, 7.5, colW) : [] };
+      });
       y -= 8;
-      for (let i = 0; i < items.length; i += 2) {
+      for (let i = 0; i < laid.length; i += 2) {
+        const row = laid.slice(i, i + 2);
+        // The lines past one name line and one "Signed on" line, in the column that needs most.
+        const extra = Math.max(...row.map((r) => (r.name.length - 1) * NAME_LH + Math.max(0, r.line.length - 1) * LINE_LH));
         // What a signature takes: its label, the signature, the line, the name and when (88 pt), and a little under it.
-        need(94);
-        for (const [j, s] of items.slice(i, i + 2).entries()) {
+        need(94 + extra);
+        for (const [j, { s, name, line }] of row.entries()) {
           const sx = X + j * (colW + 30);
           label7(s.title, sx, y - 8, 6.6, LABEL, true);
           const base = y - 62;
@@ -1430,11 +1443,11 @@ export async function newDocument(o: DocOptions) {
             }
           }
           page.drawLine({ start: { x: sx, y: base }, end: { x: sx + colW, y: base }, thickness: 0.8, color: INK });
-          text(s.name || '–', sx, base - 12, 9, { bold: true });
-          const line = s.line ?? (s.at ? `Signed on the Heliaxis app, ${stampWords(s.at)}` : null);
-          if (line) text(line, sx, base - 23, 7.5, { color: MUTED });
+          name.forEach((l, k) => text(l, sx, base - 12 - k * NAME_LH, 9, { bold: true }));
+          const ly = base - 23 - (name.length - 1) * NAME_LH;
+          line.forEach((l, k) => text(l, sx, ly - k * LINE_LH, 7.5, { color: MUTED }));
         }
-        y -= 104;
+        y -= 104 + extra;
       }
     },
     /** Space, in points. */

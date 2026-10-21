@@ -213,6 +213,28 @@ eq('system summary: in the pack ticked, the certificate to follow', [sum.all.inc
 const batteryOnly = facts({ job: { ...f.job, products: ['battery'] }, made: ['HX-BAT-01', 'HX-BAT-02'] });
 const sumB = await check('HX-HO-02-battery-only', await D.summary.makeSummary(must(I.summaryInput(batteryOnly)), load), ['No solar panels in this installation.', 'MCS MIS 3012 (battery storage)'], ['MCS MIS 3002']);
 eq('system summary battery only: the solar part says there is none, the battery part prints', [sumB.all.includes('Usable storage'), sumB.all.includes('Panel power (kWp, DC)')], [true, false]);
+// A full name and a longer Ltd name under the electrician's signature: wrapped in its column, every
+// text run inside the page's margins (it once ran off the right edge), in both variants.
+{
+  const longFirm = facts({ electrician: { ...f.electrician, name: 'Christopher Williams', company: 'Llewellyn Electrical Contractors and Renewables Ltd' } });
+  for (const variant of ['digital', 'print']) {
+    const bytes = await D.summary.makeSummary({ ...must(I.summaryInput(longFirm)), variant }, load);
+    const lf = await check(`HX-HO-02-long-firm-${variant}`, bytes, ['Christopher Williams, Llewellyn Electrical Contractors and', 'Renewables Ltd', 'Signed on the Heliaxis app, 3 Nov 2026 17:41']);
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false, disableFontFace: true }).promise;
+    const outside = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const pw = page.view[2];
+      for (const it of (await page.getTextContent()).items) {
+        if (!it.str.trim() || it.transform[1] !== 0) continue;
+        const x = it.transform[4];
+        if (x < K.MARGIN.l - 0.05 || x + it.width > pw - K.MARGIN.r + 0.05) outside.push(`p${i} ${it.str}`);
+      }
+    }
+    eq(`HX-HO-02 with a long firm (${variant}): every text run inside the margins`, outside, []);
+    eq(`HX-HO-02 with a long firm (${variant}): still two pages, the note after the signatures`, [lf.pages.length, /Renewables Ltd Signed on the Heliaxis app, 3 Nov 2026 17:41 Each signature covers/.test(lf.all)], [2, true]);
+  }
+}
 docs['HX-HO-09'] = await D.switchOff.makeSwitchOff(must(I.switchInput(f)));
 await check('HX-HO-09', docs['HX-HO-09'], ['How to switch your system off', 'HX-HO-09 · Issue 1', 'Under the stairs', 'Built into the inverter', 'back-up power']);
 docs['HX-HO-18-RECEIPT'] = await D.receipt.makeReceipt(must(I.receiptInput(f)));

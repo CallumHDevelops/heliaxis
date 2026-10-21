@@ -196,6 +196,40 @@ const vv = {
 };
 const long = await both('EIC (a long one)', (variant) => eicPdf({ ...base, values: vv, attachments: [{ slot: 'eic_exc_ra', bytes: PNG }], variant }));
 eq('EIC (a long one): its continuation sheets after page 2, the schedules still landscape', [long.slice(2).some((p) => p.includes('CONTINUATION SHEET No. 1')), long.some((p) => p.includes('GENERIC SCHEDULE OF TEST RESULTS'))], [true, true]);
+// Long names, never cut with "…": a double-barrelled signatory over two lines under Section C's dotted
+// line, a long firm over two lines in Section E (its second beside the address), and a long DB/CU
+// reference on the continuation sheet in full, each schedule saying where (as both sheets do); in the
+// three- and single-signature forms. A name too long even for that is written in full on a
+// continuation sheet for Section C or E.
+{
+  const FIRM = 'Llewellyn-Fitzgerald Electrical Contractors and Renewable Energy Systems Ltd';
+  const DB = 'DB2 Garage sub-board (Hager VML110 10-way, fed from DB1 way 12)';
+  const withDb = (vals, ref) => Object.fromEntries(Object.entries(vals).map(([k, x]) => [k, k.startsWith('eic_db:b-') ? { ...x, ref } : x]));
+  const vals = withDb({ ...ctx.values, eic_sig_name: 'Bartholomew Llewellyn-Fitzgerald', eic_sig_co: FIRM }, DB);
+  const three = await both('EIC (long names)', (variant) => eicPdf({ ...base, values: vals, design: { ...design, name: 'Christopher Llewellyn-Williams', company: FIRM }, variant }));
+  const one = await both('EIC (long names, single signature)', (variant) =>
+    eicPdf({ ...base, route: 'eic_single', values: { ...vals, eic_sig_name: 'Christopher Llewellyn-Williams', eic_route: 'eic_single', eic_next: 5, eic_next_unit: 'years' }, sig: { one: sg }, design: null, variant })
+  );
+  const flatPages = (pages) => pages.map((p) => p.replace(/\s+/g, ' '));
+  const contNo = (pages, what) => Number(/CONTINUATION SHEET No\. (\d+)/.exec(pages.find((p) => p.includes('CONTINUATION SHEET No.') && p.includes(what)) ?? '')?.[1] ?? 0);
+  for (const [name, pages, c, i] of [['three signatures', flatPages(three), ['CHRISTOPHER LLEWELLYN-WILLIAMS Designer No 1', 'BARTHOLOMEW LLEWELLYN-FITZGERALD Constructor', 'BARTHOLOMEW LLEWELLYN-FITZGERALD Inspector'], 'Bartholomew Llewellyn-Fitzgerald'], ['single signature', flatPages(one), ['CHRISTOPHER LLEWELLYN-WILLIAMS Designer No 1', 'CHRISTOPHER LLEWELLYN-WILLIAMS Constructor', 'CHRISTOPHER LLEWELLYN-WILLIAMS Inspector'], 'Christopher Llewellyn-Williams']]) {
+    eq(`EIC long names (${name}): nothing cut with "…" on any page`, pages.filter((p) => p.includes('…')).length, 0);
+    eq(`EIC long names (${name}): each name in full on its line in Section C`, c.filter((t) => !pages[0].includes(t)), []);
+    eq(`EIC long names (${name}): Section E, each name and the firm in full`, [pages[1].includes(`Name: ${i}`), (pages[1].match(new RegExp(`For/on behalf of: ${FIRM}`, 'g')) ?? []).length], [true, 3]);
+    const n = contNo(pages, `DB/CU reference: ${DB}`);
+    const sheets = pages.filter((p) => /GENERIC SCHEDULE OF (CIRCUIT DETAILS|TEST RESULTS)/.test(p) && p.includes('Distribution board/Consumer unit details'));
+    eq(`EIC long names (${name}): the DB/CU reference in full on continuation sheet ${n}, both schedules saying so`, [n > 0, sheets.length, sheets.every((p) => p.includes(`DB/CU reference: see continuation sheet No. ${n}`))], [true, 2, true]);
+    eq(`EIC long names (${name}): no continuation sheet for Section C or E (two lines were enough)`, /Section\(s\) [^S]*\b(C|E)\b/.test(pages[1].split('SECTION J')[1] ?? ''), false);
+  }
+  const NAME = 'Maximilian Alexander Christopher Llewellyn-Fitzgerald-Williams-Montgomery';
+  const BIG = `${FIRM}, trading as Fitzgerald Solar and Battery Storage of Cardiff, Newport and the Valleys`;
+  const huge = flatPages(await both('EIC (names too long for the form)', (variant) => eicPdf({ ...base, route: 'eic_single', values: { ...vals, eic_sig_name: NAME, eic_sig_co: BIG, eic_route: 'eic_single', eic_next: 5, eic_next_unit: 'years' }, sig: { one: sg }, design: null, variant })));
+  const [cn, en] = [contNo(huge, 'SECTION C: CERTIFICATION SIGNATORIES: Name (IN BLOCK CAPITALS)'), contNo(huge, 'SECTION E: PARTICULARS OF SIGNATORIES IN SECTION C (continued)')];
+  eq('EIC names too long for the form: nothing cut with "…"', huge.filter((p) => p.includes('…')).length, 0);
+  eq('…Section C points to its continuation sheet, where the name is in full, in capitals', [cn > 0, (huge[0].match(new RegExp(`Name \\(IN BLOCK CAPITALS\\): see continuation sheet No\\. ${cn}`, 'g')) ?? []).length, huge.some((p) => p.includes(`CONTINUATION SHEET No. ${cn}`) && p.includes(`Designer No 1: ${NAME.toUpperCase()}`))], [true, 3, true]);
+  eq('…Section E too, the name and the firm in full', [en > 0, huge[1].includes(`Name: see continuation sheet No. ${en}`), huge[1].includes(`For/on behalf of: see continuation sheet No. ${en}`), huge.some((p) => p.includes(`CONTINUATION SHEET No. ${en}`) && p.includes(`Constructor: For/on behalf of: ${BIG}`))], [true, true, true, true]);
+  eq('…and Section J lists them', /Continuation sheet\(s\) for Section\(s\) C, E, F, Schedules/.test(huge[1]), true);
+}
 const c = M.boardsOf(ctx.values).circuits[0];
 await both('Minor Works sheet', (variant) => meiwcPdf({ ref: 'HX-0042-MW1', jobRef: 'HX-0042', issued: '2026-11-03', edition: 'A4:2026', values: ctx.values, address: ctx.address, circuit: c, name: 'DB1 circuit 7', sig: sg, draft: true, variant }));
 

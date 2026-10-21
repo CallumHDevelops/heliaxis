@@ -362,6 +362,31 @@ eq('rows from before the labour columns are all kit', summariseOrders([{ status:
     if (process.env.PDF_OUT) (await import('node:fs')).writeFileSync(`${process.env.PDF_OUT}/${d.storage_path.split('/').pop().replace(/\.pdf$/, '')} (print).pdf`, b);
   }
   eq('the reports and POs: print versions with the same words as the stored copies', [stored.length > 1, same.sort()], [true, stored.map((d) => `${d.generated_key}:${d.project_id}`).sort()]);
+  // What a trade report prints round the answers (the job ref, the site address, the customer, the
+  // trade's name, company and mobile) is in what it's hashed on: a change to any, and its print
+  // version says "changed" (make it again) rather than print what the stored copy doesn't.
+  const rep = stored.find((d) => d.generated_key === 'RF_REPORT');
+  const proj = db.rows('crm_projects').find((x) => x.id === rep.project_id);
+  const enq = db.rows('enquiries').find((x) => x.id === proj.enquiry_id);
+  const who = db.rows('site_contacts').find((x) => x.id === db.rows('site_assignments').find((a) => a.project_id === proj.id && a.trade === 'roofer').contact_id);
+  const changes = [
+    ['the customer’s name', enq, 'name', 'Jane Smyth'],
+    ['the site address', proj, 'address', '14 High Street\nMaindee, Newport'],
+    ['the site postcode', proj, 'postcode', 'NP20 4AC'],
+    ['the job ref', proj, 'project_ref', 'HX-0099'],
+    ['the roofer’s name', who, 'name', 'David Price'],
+    ['the roofer’s company', who, 'company', 'Price Roofing Ltd'],
+    ['the roofer’s mobile', who, 'mobile', '07700 900999'],
+  ];
+  const got = [];
+  for (const [what, row, k, v] of changes) {
+    const was = row[k];
+    row[k] = v;
+    got.push([what, await RP.tradeReportPrint(db, ref(rep))]);
+    row[k] = was;
+  }
+  eq('a trade report’s print version after a change to what it prints round the answers: "changed", each', got, changes.map(([what]) => [what, 'changed']));
+  eq('…and with them as they were, it opens again', (await RP.tradeReportPrint(db, ref(rep))) instanceof Uint8Array, true);
 }
 
 // PDF_OUT=/some/dir keeps the PDFs made (the POs and the trade reports) to look at.

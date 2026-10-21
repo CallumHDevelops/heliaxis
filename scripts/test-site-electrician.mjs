@@ -608,6 +608,32 @@ eq('the handover pack is told: their certificate’s reference, the summary’s 
   eq('…from the corrected answers, so it isn’t Out of date any more', newTests.inputs_hash === db.rows('handover_slots').find((s) => s.project_id === p1.id && s.slot === 'HX-PV-02').data.stale.hash, true);
   eq('…and its print version follows the new copy', (await ED.electricianDocPrint(db, ref(newTests))) instanceof Uint8Array, true);
 }
+// The photo record (made when the office asks): its print version has the stored copy's words; a
+// change to its site box (the job ref, the address, the electrician's firm) and it says "changed"
+// (make it again) rather than print what the stored copy doesn't.
+{
+  const ED = await import('../src/lib/site/electrician-docs.ts');
+  const ref = (d) => ({ projectId: d.project_id, key: d.generated_key, hash: d.inputs_hash, madeAt: d.created_at });
+  const { doc } = await ED.savePhotoRecord(db, e1.id, 'staff-1');
+  const print = await ED.photoRecordPrint(db, ref(doc));
+  eq('the photo record: stored, its print version with the same words', [doc.generated_key, print instanceof Uint8Array && flat(await textOf(print)) === flat(await textOf(db.files.get(`crm-docs/${doc.storage_path}`)))], ['EP_RECORD', true]);
+  const proj = db.rows('crm_projects').find((x) => x.id === p1.id);
+  const changes = [
+    ['the job ref', proj, 'project_ref', 'HX-0099'],
+    ['the address', proj, 'address', '14 High Street\nMaindee\nNewport'],
+    ['the postcode', proj, 'postcode', 'NP20 4AC'],
+    ['the electrician’s firm', contact, 'company', 'Sparks Electrical Ltd'],
+  ];
+  const got = [];
+  for (const [what, row, k, v] of changes) {
+    const was = row[k];
+    row[k] = v;
+    got.push([what, await ED.photoRecordPrint(db, ref(doc))]);
+    row[k] = was;
+  }
+  eq('the photo record’s print version after a change to its site box: "changed", each', got, changes.map(([what]) => [what, 'changed']));
+  eq('…and with them as they were, it opens again', (await ED.photoRecordPrint(db, ref(doc))) instanceof Uint8Array, true);
+}
 
 // An EV job signed the day before Christmas: the call skips the bank holidays; the DNO to-do.
 fixed = Date.parse('2026-12-24T14:00:00Z');

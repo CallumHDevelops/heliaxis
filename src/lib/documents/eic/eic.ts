@@ -41,7 +41,7 @@ import { BONDS, COMMENTS, EARTHING, INSPECTION_KEY, MATERIAL, MS_DEVICE, type De
 import { boardsOf, isGt, readingOf, type Board, type Circuit, type Rec } from '@/lib/site/forms/electrician/eic-model';
 import { HELIAXIS_COMPANY, HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { AMBER, MissingAnswer, newDocument, type Drawing, type Kit, type Variant } from '../pdf-kit';
-import { blank, crossMark, dots, fitText, formDate, frame, hline, INK, plain, RED, rich, richCentre, richWidth, strike, tickBox, tickMark, value, vline, type Val } from './form';
+import { blank, crossMark, dots, fitName, fitText, formDate, frame, hline, INK, plain, RED, rich, richCentre, richWidth, strike, tickBox, tickMark, value, vline, type Fitted, type Val } from './form';
 
 /**
  * The Electrical Installation Certificate (SPEC 3.3, REGS 1.2): the IET's model form for BS 7671:2018+
@@ -49,7 +49,8 @@ import { blank, crossMark, dots, fitText, formDate, frame, hline, INK, plain, RE
  * Sections E–J, each a ruled frame in the form's order with its tick boxes and dotted blanks; then the
  * continuation sheets the form calls for (anything written that won't fit its box: the client, the
  * description, the extent, departures, exceptions and the risk assessment, the other sources of supply,
- * the main switch, a board's location, a circuit's description or remarks; nothing is cut short);
+ * the main switch, a board's reference or location, a circuit's description or remarks, a signatory's
+ * name or firm too long even for the second line it's given; nothing is cut short);
  * then for each board the Generic Schedule of Circuit Details
  * (columns 1–16) and the Generic Schedule of Test Results (17–31) in landscape, 12 ruled rows a sheet
  * with the form's headings, column numbers, codes and footnotes; then the form's Notes for the person
@@ -220,6 +221,24 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     const head = excLines.length > room ? [...excLines.slice(0, room - 1), `(continued on continuation sheet No. ${excCont})`] : excLines;
     return ra.length ? [...head, `Risk assessment: see continuation sheet No. ${excCont}`] : head;
   })();
+  // Section C: each signatory's name in block capitals on their line, on two lines when it's long (the
+  // second under the dotted line); one too long even for that is written in full on a continuation sheet.
+  const name = s('eic_sig_name');
+  const me: Person = { name, company: s('eic_sig_co'), address: s('eic_sig_addr'), postcode: s('eic_sig_pc'), tel: s('eic_sig_tel') };
+  const signNames: [string, string | null][] = [[ROLES.designer1, single ? name : (x.design?.name ?? null)], [ROLES.constructor, name], [ROLES.inspector, name]];
+  const signOver = signNames.filter(([role, n]) => n && !signFit(kit, W, role, n));
+  const signCont = signOver.length ? addCont('C', `${ST.C}: ${SIGN_LINE.name}`, signOver.flatMap(([role, n]): Para[] => [form(`${role}:`), n!.toUpperCase()])) : null;
+  // Section E: a long firm over two lines (its second beside the address); a name or firm too long for
+  // its blank even so, in full on a continuation sheet.
+  const designer: Person | 'tofollow' | null = single ? me : x.design ? { name: x.design.name, company: x.design.company, address: x.design.address, postcode: x.design.postcode, tel: x.design.tel } : draft ? 'tofollow' : null;
+  const fits = new Map<Person, PersonFit>();
+  const fitOf = (p: Person) => fits.get(p) ?? fits.set(p, personFit(kit, W, p)).get(p)!;
+  const eOver = ([[E_LABELS.designer1, designer], [E_LABELS.constructor, me], [E_LABELS.inspector, me]] as const).flatMap(([label, p]): Para[] => {
+    if (!p || p === 'tofollow') return [];
+    const f = fitOf(p);
+    return [...(p.name && !f.name ? [form(`${label}: ${E_LABELS.name}`), p.name] : []), ...(p.company && !f.firm ? [form(`${label}: ${E_LABELS.onBehalf}`), p.company] : [])];
+  });
+  const eCont = eOver.length ? addCont('E', `${ST.E} (continued)`, eOver) : null;
   // Section F: the other sources of supply.
   const sources = Array.isArray(v.eic_src) ? (v.eic_src as unknown[]).filter((t): t is string => typeof t === 'string' && !!t.trim()) : [];
   const srcCont = v.eic_other === 'yes' ? addCont('F', `${ST.F}: ${F_LABELS.otherSources}`, sources.length ? sources.map((t, i) => `${i + 1}. ${t}`) : ['Not answered']) : null;
@@ -254,8 +273,6 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     : null;
 
   /* ── Page 1: Sections A–D ─────────────────────────────────────────────────── */
-  const name = s('eic_sig_name');
-  const me = { name, company: s('eic_sig_co'), address: s('eic_sig_addr'), postcode: s('eic_sig_pc'), tel: s('eic_sig_tel') };
   const departuresOf = (part: Part): Val => {
     if (part === 'design' && !single) return x.design ? { s: x.design.departures?.trim() || 'None' } : draft ? { s: TO_FOLLOW, missing: true } : must(DEPARTURES, null);
     return v.eic_dep === 'yes' ? must('Details of departures', s('eic_dep_what')) : v.eic_dep === 'no' ? { s: 'None' } : must('Any departures from BS 7671?', null);
@@ -431,14 +448,14 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   }
   /** "Signature: …… Date: …… Name (IN BLOCK CAPITALS): …… Designer No 1", drawn in the order it reads. */
   function signLine(d: Drawing, y: number, who: Signer | null, role: string, part: Part) {
-    const X = d.x + 7;
-    const end = d.x + d.width - 6;
-    const roleW = d.widthOf(role, 7.8);
-    const sx = X + d.widthOf(SIGN_LINE.signature, 7.8) + 2;
-    const dateX = X + 192;
-    const dx = dateX + d.widthOf(SIGN_LINE.date, 7.8) + 2;
-    const nameX = dateX + 70;
-    const nx = nameX + d.widthOf(SIGN_LINE.name, 7.8) + 2;
+    const g = signGeom(d, d.width, role);
+    const X = d.x + g.X;
+    const end = d.x + g.end;
+    const sx = d.x + g.sx;
+    const dateX = d.x + g.dateX;
+    const dx = d.x + g.dx;
+    const nameX = d.x + g.nameX;
+    const nx = d.x + g.nx;
     if (who && !draft && (!who.img || !who.name)) throw new MissingAnswer(`${role}: signature`);
     d.text(SIGN_LINE.signature, X, y, 7.8);
     dots(d, sx, dateX - 4, y);
@@ -448,10 +465,15 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     dots(d, dx, nameX - 4, y);
     if (who) value(d, given(formDate(who.at)), dx + 2, nameX - 5, y + 0.6, 8);
     d.text(SIGN_LINE.name, nameX, y, 7.8);
-    dots(d, nx, end - roleW - 3, y);
-    // Designer No 2: Heliaxis's design has one designer.
-    value(d, who ? given(who.name?.toUpperCase()) : NA, nx + 2, end - roleW - 4, y + 0.6, 8);
-    d.text(role, end - roleW, y, 7.8);
+    dots(d, nx, d.x + g.nameEnd + 1, y);
+    // Designer No 2: Heliaxis's design has one designer. A long name: its second line under the dotted
+    // line; one too long for that: where it's written in full.
+    const fit = who?.name ? signFit(d, d.width, role, who.name) : null;
+    if (!who) value(d, NA, d.x + g.nameFrom, d.x + g.nameEnd, y + 0.6, 8);
+    else if (!who.name) value(d, null, d.x + g.nameFrom, d.x + g.nameEnd, y + 0.6, 8);
+    else if (!fit) value(d, { s: CONT_NOTE(signCont).slice(1, -1) }, d.x + g.nameFrom, d.x + g.nameEnd, y + 0.6, 8);
+    else fit.lines.forEach((l, k) => value(d, { s: l }, d.x + g.nameFrom, d.x + g.nameEnd, y + 0.6 - k * (fit.size + 1.2), fit.size));
+    d.text(role, end - g.roleW, y, 7.8);
   }
   // D
   {
@@ -486,8 +508,6 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
   };
 
   // E
-  type Person = { name: string | null; company: string | null; address: string | null; postcode: string | null; tel: string | null };
-  const designer: Person | 'tofollow' | null = single ? me : x.design ? { name: x.design.name, company: x.design.company, address: x.design.address, postcode: x.design.postcode, tel: x.design.tel } : draft ? 'tofollow' : null;
   if (!designer) throw new MissingAnswer(`${E_LABELS.designer1}: particulars`);
   const PH = 33;
   section([
@@ -504,15 +524,23 @@ async function render(x: EicInput, numbers: Numbers | null): Promise<{ kit: Kit;
     frame(d, d.x, d.top, d.width, PH);
     d.text(label, d.x + 7, d.top - 11, 8, { bold: true });
     if (sub) d.text(sub, d.x + 7, d.top - 20, 8);
-    const X = d.x + 80;
-    const end = d.x + d.width - 7;
+    const X = d.x + PX.x;
+    const end = d.x + d.width - PX.r;
     const f = (k: keyof Person, lab: string): Val => (p === 'na' ? (k === 'name' ? NA : null) : toFollow ? (k === 'name' ? { s: TO_FOLLOW, missing: true } : null) : must(`${label}: ${lab}`, p ? p[k] : null));
-    blank(d, { x: X, y: d.top - 11, end: X + 205, label: E_LABELS.name, v: f('name', 'name'), size: 8 });
-    blank(d, { x: X + 210, y: d.top - 11, end, label: E_LABELS.onBehalf, v: f('company', 'for/on behalf of'), size: 8 });
+    // As it fits (personFit): the name on its line, the firm on one line or two, else where they're in full.
+    const fit = p && p !== 'na' && !toFollow ? fitOf(p) : null;
+    const shown = (v: Val, ft: Fitted | null | undefined, line = 0): { v: Val; vsize?: number } =>
+      !v || v.missing || !fit ? { v } : ft ? { v: ft.lines[line] ? { s: ft.lines[line] } : null, vsize: ft.size } : line ? { v: null } : { v: { s: CONT_NOTE(eCont).slice(1, -1) } };
+    const nv = f('name', 'name');
+    const cv = f('company', 'for/on behalf of');
+    blank(d, { x: X, y: d.top - 11, end: X + PX.nameEnd, label: E_LABELS.name, size: 8, ...shown(nv, fit?.name) });
+    blank(d, { x: X + PX.firm, y: d.top - 11, end, label: E_LABELS.onBehalf, size: 8, ...shown(cv, fit?.firm) });
+    const firm2 = fit?.firm && fit.firm.lines.length === 2 ? fit.firm : null;
+    // A firm's second line beside the address, on its own dotted line under the first.
+    if (firm2) blank(d, { x: X + PX.firm + d.widthOf(E_LABELS.onBehalf, 8) + 2, y: d.top - 20.5, end, label: '', size: 8, ...shown(cv, firm2, 1) });
     const addr = f('address', 'address');
-    const aw = d.widthOf(E_LABELS.address, 8);
-    const al = addr && !addr.missing ? wrapFirst(d, addr.s, 8.2, end - X - aw - 6, X + 228 - X) : [];
-    blank(d, { x: X, y: d.top - 20.5, end, label: E_LABELS.address, v: addr?.missing ? addr : given(al[0]), size: 8 });
+    const al = addr && !addr.missing ? (fit?.addr ?? addressLines(d, d.width, addr.s, false)) : [];
+    blank(d, { x: X, y: d.top - 20.5, end: firm2 ? X + PX.nameEnd : end, label: E_LABELS.address, v: addr?.missing ? addr : given(al[0]), size: 8 });
     blank(d, { x: X, y: d.top - 30, end: X + 228, label: '', v: given(al.slice(1).join(' ')), size: 8 });
     blank(d, { x: X + 232, y: d.top - 30, end: X + 340, label: E_LABELS.postcode, v: f('postcode', 'postcode'), size: 8 });
     blank(d, { x: X + 346, y: d.top - 30, end, label: E_LABELS.tel, v: f('tel', 'tel no'), size: 8 });
@@ -998,13 +1026,16 @@ const BOX_H = 80;
 type Measure = { lines: (s: string, sz: number, max: number, bold?: boolean) => string[]; widthOf: (s: string, sz: number, bold?: boolean) => number };
 type Over = { where: string; what: string; text: string };
 type BoardRow = { xs: number[]; ws: number[]; fits: boolean[] };
-type SchedLayout = { over: Over[]; boards: Map<string, BoardRow>; cut: Set<string> };
+/** `testRef`: the boards whose reference is too long to read in the test results sheet's blank (it's on the continuation sheet). */
+type SchedLayout = { over: Over[]; boards: Map<string, BoardRow>; cut: Set<string>; testRef: Set<string> };
 
 const DETAIL_WS = colWidths(DETAIL_W, LANDSCAPE_W);
 const TEST_WS = colWidths(TEST_W, LANDSCAPE_W);
 /** The written words a value can shrink to on the schedules before it goes on the continuation sheet. */
 const READABLE = 6.4;
 const CONT_NOTE = (n: number | null) => `(see continuation sheet No. ${n ?? '–'})`;
+/** The test results sheet's "DB/CU reference:" blank, from its left. */
+const TEST_REF_W = 168;
 
 /**
  * "DB/CU reference: … Location: … Supplied from: …": the form's three blanks in a row. Where they
@@ -1055,11 +1086,16 @@ function scheduleLayout(m: Measure, boards: Board[], circuits: Circuit[], remark
   const over: Over[] = [];
   const rows = new Map<string, BoardRow>();
   const cut = new Set<string>();
-  for (const b of boards) {
+  const testRef = new Set<string>();
+  for (const [i, b] of boards.entries()) {
     const ref = String(b.ref ?? 'Board');
     const vals = [str(b, 'ref'), str(b, 'loc'), str(b, 'from')];
     const row = boardRow(m, vals);
     rows.set(b.id, row);
+    // The reference: on both sheets when it can be read there; on the continuation sheet, in full, when it can't on either.
+    const testFits = !vals[0] || m.widthOf(vals[0], READABLE, true) <= TEST_REF_W - m.widthOf(TS.dbRef, 8.2) - 4.5;
+    if (!testFits) testRef.add(b.id);
+    if (!row.fits[0] || !testFits) over.push({ where: boards.length > 1 ? `Distribution board ${i + 1} of ${boards.length}` : 'Distribution board', what: plain(CS.dbRef).replace(/:$/, ''), text: vals[0]! });
     if (!row.fits[1]) over.push({ where: ref, what: plain(CS.location).replace(/:$/, ''), text: vals[1]! });
     if (!row.fits[2]) over.push({ where: ref, what: plain(CS.suppliedFrom).replace(/:$/, ''), text: vals[2]! });
     for (const c of circuits.filter((x) => x.board === b.id)) {
@@ -1076,7 +1112,7 @@ function scheduleLayout(m: Measure, boards: Board[], circuits: Circuit[], remark
       }
     }
   }
-  return { over, boards: rows, cut };
+  return { over, boards: rows, cut, testRef };
 }
 
 /** The heading block of a schedule: group rows, each column's heading (turned up the page) and its number in the corner. */
@@ -1282,7 +1318,9 @@ function testsSheet(
     const A = X + 12;
     const E = X + L - 10;
     d.text(TS.boardBox, A, d.top - 13, 8.4, { bold: true });
-    blank(d, { x: A, y: d.top - 31, end: A + 168, label: TS.dbRef, v: must('DB/CU reference', str(b, 'ref')), size: 8.2 });
+    // The reference, as on the circuit details sheet: too long to read in its blank, it's on the continuation sheet.
+    const ref = str(b, 'ref');
+    blank(d, { x: A, y: d.top - 31, end: A + TEST_REF_W, label: TS.dbRef, v: ref && h.sched.testRef.has(b.id) ? { s: CONT_NOTE(h.schedCont).slice(1, -1) } : must('DB/CU reference', ref), size: 8.2 });
     blank(d, { x: A + 180, y: d.top - 31, end: A + 296, label: TS.zdb, v: must('Zdb', reading(b.zdb)), unit: 'Ω', size: 8.2 });
     blank(d, { x: A + 306, y: d.top - 31, end: E, label: TS.ipf, v: must('Ipf', reading(b.ipf)), unit: 'kA', size: 8.2 });
     d.text(TS.confirmed, A, d.top - 50, 8.2);
@@ -1399,6 +1437,59 @@ function textPage(kit: Kit, title: string, heading: string, paras: { n: string |
       ls.forEach((l, i) => d.text(l, d.x + textX, d.top - 10 - i * 12.4, 9.4));
     });
   }
+}
+
+/* ── Section C's names and Section E's particulars (worked out before anything is drawn) ── */
+
+/** Section C's signature line, from the frame's left: where each part of "Signature … Date … Name (IN BLOCK CAPITALS) … role" goes. */
+function signGeom(m: Measure, W: number, role: string) {
+  const X = 7;
+  const end = W - 6;
+  const roleW = m.widthOf(role, 7.8);
+  const sx = X + m.widthOf(SIGN_LINE.signature, 7.8) + 2;
+  const dateX = X + 192;
+  const dx = dateX + m.widthOf(SIGN_LINE.date, 7.8) + 2;
+  const nameX = dateX + 70;
+  const nx = nameX + m.widthOf(SIGN_LINE.name, 7.8) + 2;
+  return { X, end, roleW, sx, dateX, dx, nameX, nx, nameFrom: nx + 2, nameEnd: end - roleW - 4 };
+}
+
+/**
+ * A signatory's name in block capitals on their line: on one line (made a little smaller), else over
+ * two with the second under the dotted line (the room down to the next line), else null: too long for
+ * that, it's written in full on a continuation sheet. Never cut.
+ */
+function signFit(m: Measure, W: number, role: string, name: string): Fitted | null {
+  const g = signGeom(m, W, role);
+  return fitName(m, name.toUpperCase(), g.nameEnd - g.nameFrom - 0.01, { size: 8, oneMin: 6.8, two: true, twoMax: 7.2 });
+}
+
+type Person = { name: string | null; company: string | null; address: string | null; postcode: string | null; tel: string | null };
+/** Section E's blanks, from the frame's left: where the values start, where the name's blank ends, where the firm's starts; the margin at the right. */
+const PX = { x: 80, nameEnd: 205, firm: 210, r: 7 };
+/** How a person's particulars fit Section E: the name, the firm (one line or two), the address's lines. A null name or firm is on the continuation sheet. */
+type PersonFit = { name: Fitted | null; firm: Fitted | null; addr: string[] };
+
+/** The address's lines: the first after its label (only as far as the name's blank when a firm's second line is beside it), the rest on the line under. */
+function addressLines(m: Measure, W: number, s: string, narrow: boolean): string[] {
+  const end = narrow ? PX.x + PX.nameEnd : W - PX.r;
+  return wrapFirst(m, s, 8.2, end - PX.x - m.widthOf(E_LABELS.address, 8) - 6, 228);
+}
+
+/**
+ * A person's particulars as they fit Section E, never cut: the name on its line (made smaller if it
+ * must); the firm on its line, else over two with the second on the address's line beside the address
+ * (when the address still fits beside the name's blank and on the line under); else null, written in
+ * full on a continuation sheet.
+ */
+function personFit(m: Measure, W: number, p: Person): PersonFit {
+  // A value's room in "Label: ……": from after the label to the end of its blank, as blank() and value() measure it.
+  const room = (from: number, to: number, label: string) => to - 1 - (from + m.widthOf(label, 8) + 3.5) - 0.01;
+  const name = p.name ? fitName(m, p.name, room(PX.x, PX.x + PX.nameEnd, E_LABELS.name), { size: 8.2 }) : null;
+  const narrow = p.address ? addressLines(m, W, p.address, true) : [];
+  const roomy = narrow.length <= 1 || m.widthOf(narrow.slice(1).join(' '), 5.6, true) <= 228 - 2.5 - 0.01;
+  const firm = p.company ? fitName(m, p.company, room(PX.x + PX.firm, W - PX.r, E_LABELS.onBehalf), { size: 8.2, oneMin: 6.6, two: roomy }) : null;
+  return { name, firm, addr: p.address ? (firm?.lines.length === 2 ? narrow : addressLines(m, W, p.address, false)) : [] };
 }
 
 /* ── Small layout helpers ───────────────────────────────────────────────────── */

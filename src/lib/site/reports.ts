@@ -112,7 +112,13 @@ export function labelOf(forms: SiteForm[], slot: string): string {
   return slot;
 }
 
-export type ReportInputs = { a: string; answers: unknown; flags: Flag[]; photos: string[]; signoffs: string[]; review?: unknown };
+/**
+ * What a trade report is hashed on: everything it prints. The answers, flags, photos, sign-offs and
+ * the office's review, and the job's details round them (`site`: the job ref, the site address, the
+ * customer, the trade's name, company and mobile, and the design the form's questions follow), so a
+ * change to any of those makes its print version say "changed" rather than differ from the stored copy.
+ */
+export type ReportInputs = { a: string; answers: unknown; flags: Flag[]; photos: string[]; signoffs: string[]; review?: unknown; site?: unknown };
 
 /** Build and store the trade report for an assignment (roofer or scaffolder, the digital copy); null for trades without one. */
 export async function saveTradeReport(db: Db, assignmentId: string): Promise<SaveResult | null> {
@@ -247,7 +253,23 @@ export async function tradeReport(
     flags,
     photos: photos.map((x) => x.id),
     signoffs: signoffs.map((x) => x.id),
-    review: { signoffs: signoffs.map((x) => [x.id, x.review_status ?? 'waiting', x.reviewed_at ?? null]), returns: returns.map((r) => [r.id, r.status, r.fixed_at, r.reviewed_at, r.notice_sent_at]) },
+    review: {
+      signoffs: signoffs.map((x) => [x.id, x.review_status ?? 'waiting', x.reviewed_at ?? null, x.reviewed_by ?? null]),
+      returns: returns.map((r, i) => [
+        r.id, r.status, r.what, r.fix_by, r.safety, r.created_at, r.created_by_name, r.notice_sent_at, r.fixed_at, r.fixed_name, r.fixed_note, r.reviewed_at, r.reviewed_by,
+        returnRows[i].fixed_declaration ?? null, returnRows[i].fixed_signature_path ?? null,
+      ]),
+    },
+    site: {
+      jobRef,
+      address: c.address,
+      customer: (cust as { name?: string } | null)?.name ?? null,
+      contact: [person?.name ?? null, person?.company ?? null, person?.mobile ?? null],
+      design: c.design,
+      system: c.system,
+      products: c.products,
+      sides: c.sides,
+    },
   };
   return { bytes, projectId: a.project_id, key: roofer ? 'RF_REPORT' : 'SC_REPORT', name: docFileName(jobRef, '', title), inputs };
 }

@@ -298,6 +298,13 @@ async function photoRecord(db: Db, a: AssignmentRow, opts: { variant?: Variant; 
   return {
     bytes,
     name: docFileName(input.jobRef, '', 'Electrician photo record'),
-    inputs: { photos: photos.map((x) => x.id), serials, declarations: declarations.map((x) => [x.title, x.text, x.at]) },
+    // Everything it prints: the photos, serials and declarations, and the site box (job ref, date,
+    // address, the electrician and their firm), so a change to any makes its print version "changed".
+    inputs: {
+      photos: photos.map((x) => [x.id, x.slot, x.taken_at]),
+      serials,
+      declarations: declarations.map((x) => [x.title, x.text, x.name, x.at]),
+      site: { jobRef: input.jobRef, date: input.date, address: input.address, engineer: input.engineer, company: input.company, draft: !!input.draft },
+    },
   };
 }
