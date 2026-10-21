@@ -8,6 +8,7 @@ import { validSignature } from '@/lib/subcontractors/server';
 import { addSourceTask, closeSourceTask } from '@/lib/surveys/server';
 import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { putRightDeclaration } from './declaration';
+import { siteAddress } from './form-ctx';
 import { livePo } from './labour-po';
 import { saveTradeReport } from './reports';
 import { dayWords, greenEmail, greenParams, KIND_TEMPLATE, returnEmail, returnParams, sendAfterFor, siteShort, type EmailText } from './messages';
@@ -287,9 +288,9 @@ export async function putRight(db: Db, a: AssignmentRow, b: PutRightInput, meta:
   const photos = ((ph ?? []) as { id: string }[]).map((p) => p.id).sort();
   if (!photos.length) return { ok: false, status: 422, body: { error: 'gate', message: 'Heliaxis hasn’t got a photo of the fix yet.', missing: [{ key: slot, label: 'A photo of the fix', step: '' }] } };
 
-  const { data: p } = await db.from('crm_projects').select('address, postcode').eq('id', a.project_id).maybeSingle();
-  const project = (p ?? {}) as { address?: string | null; postcode?: string | null };
-  const address = [...String(project.address ?? '').split(/\n/).map((l) => l.trim()).filter(Boolean), (project.postcode ?? '').trim()].filter(Boolean).join(', ');
+  const { data: p } = await db.from('crm_projects').select('address, postcode, enquiry_id').eq('id', a.project_id).maybeSingle();
+  // The address as the phone's pack gives it (the customer's postcode when the job has none), so an honest phone's words match.
+  const address = await siteAddress(db, p);
   // What was signed is the declaration worded here, never the phone's text (that's kept on the history if it differs).
   const declaration = putRightDeclaration(ret.what, address);
   const phoneText = typeof b.declaration === 'string' ? b.declaration.trim().slice(0, 3000) : '';

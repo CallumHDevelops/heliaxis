@@ -13,6 +13,24 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : n
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
 /**
+ * The site's address as the trade's job pack gives it (pack.ts): the job's lines and its postcode, or
+ * the customer's when the job has none. The declarations are worded on the server from it, so an
+ * honest phone's words (made from the pack) match them.
+ */
+export async function siteAddress(db: Db, project: { address?: unknown; postcode?: unknown; enquiry_id?: unknown } | null | undefined): Promise<string> {
+  const lines = String(project?.address ?? '')
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  let postcode = str(project?.postcode);
+  if (!postcode && typeof project?.enquiry_id === 'string' && project.enquiry_id) {
+    const { data: c } = await db.from('enquiries').select('postcode').eq('id', project.enquiry_id).maybeSingle();
+    postcode = str((c as { postcode?: unknown } | null)?.postcode);
+  }
+  return [...lines, postcode].filter(Boolean).join(', ');
+}
+
+/**
  * The rules' context from what the server holds (photos that have arrived, not the phone's queue),
  * so the gate at sign-off and the flags can't count anything that isn't there.
  */
@@ -30,7 +48,7 @@ export async function serverCtx(db: Db, a: AssignmentRow): Promise<FormCtx> {
   const s1 = surveyAnswers.S1;
   const counts: Record<string, number> = {};
   for (const ph of (photos ?? []) as { slot: string | null }[]) if (ph.slot) counts[ph.slot] = (counts[ph.slot] ?? 0) + 1;
-  const address = [...String(project.address ?? '').split(/\n/).map((l) => l.trim()).filter(Boolean), str(project.postcode)].filter(Boolean).join(', ');
+  const address = await siteAddress(db, project);
   // The electrician's forms read the roofer, the job's paperwork and their uploaded certificate too.
   const el = a.trade === 'electrician' ? await electricianPack(db, a, project, surveyAnswers) : null;
   return makeCtx({

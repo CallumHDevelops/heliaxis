@@ -102,6 +102,19 @@ await post(signRoute, honest, 'signoff', honestPhone.token, { op_id: randomUUID(
 await kit.afterReply();
 const so2 = db.rows('site_signoffs').find((s) => s.assignment_id === honest.id);
 eq('an honest phone: no flag, nothing kept beside it', [so2.declaration === ROOFER.sig.declaration({ address: ADDR }), so2.flags.some((f) => f.code === 'declaration_changed'), 'declaration_phone' in so2.extra], [true, false, false]);
+// A job with no postcode of its own: the phone's pack gives the customer's, and so does the server.
+const noPc = kit.addJob(db, { postcode: null });
+const npC = kit.addContact(db, { name: 'Nora Postcode' });
+const npA = kit.addAssignment(db, noPc, npC);
+const npPhone = await kit.addPhone(db, npC);
+await post(signRoute, npA, 'signoff', npPhone.token, { op_id: randomUUID(), stage: 'main', name: 'Nora Postcode', signature: kit.SIG, declaration: ROOFER.sig.declaration({ address: ADDR }), signed_at: new Date().toISOString(), rev: 7 });
+await kit.afterReply();
+const so3 = db.rows('site_signoffs').find((s) => s.assignment_id === npA.id);
+eq('…on a job with only the customer’s postcode too (worded with it, as the pack shows it)', [so3.declaration === ROOFER.sig.declaration({ address: ADDR }), so3.flags.some((f) => f.code === 'declaration_changed'), 'declaration_phone' in so3.extra], [true, false, false]);
+const npRet = await RT.returnToSite(db, read(npA), so3.id, { what: 'One tile cracked.', fix_by: addWorkingDays(ukDay(new Date()), 7, new Set()) }, { id: 'staff-1', name: 'Office' });
+db.rows('crm_photos').push({ id: randomUUID(), project_id: noPc.id, assignment_id: npA.id, slot: 'PR:1', storage_path: `${noPc.id}/site/${npA.id}/PR_1/fix.jpg`, taken_at: null });
+await post(putRoute, npA, 'put-right', npPhone.token, { op_id: randomUUID(), n: 1, note: 'Swapped it.', name: 'Nora Postcode', signature: kit.SIG, declaration: D.putRightDeclaration('One tile cracked.', ADDR), signed_at: new Date().toISOString() });
+eq('…and its put right', [db.rows('site_returns').find((r) => r.id === npRet.ret.id)?.fixed_declaration, 'declaration_phone' in (db.rows('site_events').find((e) => e.assignment_id === npA.id && e.type === 'put_right_signed')?.detail ?? {})], [D.putRightDeclaration('One tile cracked.', ADDR), false]);
 
 // A put right with other words.
 const fixBy = addWorkingDays(ukDay(new Date()), 7, new Set());
