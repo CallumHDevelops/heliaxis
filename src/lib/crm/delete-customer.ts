@@ -101,6 +101,8 @@ type Project = {
   signed_outside?: boolean;
   /** A purchase order on it has gone to a supplier (purchase-orders.sql): kit's been bought for it. */
   ordered?: boolean;
+  /** A trade signed off on site (site-commissioning.sql): their sign-offs, the certificates and labour POs. */
+  signed_off?: boolean;
 };
 
 async function customersIn(db: Db, ids: string[]): Promise<Customer[]> {
@@ -135,22 +137,23 @@ async function projectsOf(db: Db, enquiryIds: string[]): Promise<Project[]> {
     return [];
   });
   const ticked = new Set(docs.filter((d) => d.signed_outside_at).map((d) => d.project_id));
-  // Purchase orders sent, confirmed or delivered (drafts don't count: they go with the job). None before purchase-orders.sql.
-  const orders = await rowsIn<{ project_id: string; status: string }>(
-    db,
-    'purchase_orders',
-    'project_id, status',
-    'project_id',
-    projects.map((p) => p.id),
-    true
-  );
-  const ordered = new Set(orders.filter((o) => isOrdered(o.status)).map((o) => o.project_id));
-  return projects.map((p) => ({ ...p, signed_outside: ticked.has(p.id), ordered: ordered.has(p.id) }));
+  // Purchase orders sent, confirmed or delivered (drafts don't count: they go with the job). None before
+  // purchase-orders.sql; '*' because the kind column comes with site-commissioning.sql.
+  const orders = await rowsIn<{ project_id: string; status: string; kind?: string | null }>(db, 'purchase_orders', '*', 'project_id', projects.map((p) => p.id), true);
+  const ordered = new Set(orders.filter((o) => isOrdered(o.status) && o.kind !== 'labour').map((o) => o.project_id));
+  // A trade signed off on site, or a labour PO of any status (held ones too). None before site-commissioning.sql.
+  const site = await rowsIn<{ project_id: string; status: string; signed_at: string | null }>(db, 'site_assignments', 'project_id, status, signed_at', 'project_id', projects.map((p) => p.id), true);
+  const signedOff = new Set([
+    ...site.filter((a) => a.signed_at || a.status === 'signed' || a.status === 'done').map((a) => a.project_id),
+    ...orders.filter((o) => o.kind === 'labour').map((o) => o.project_id),
+  ]);
+  return projects.map((p) => ({ ...p, signed_outside: ticked.has(p.id), ordered: ordered.has(p.id), signed_off: signedOff.has(p.id) }));
 }
 
 const signed = (p: Project) => !!(p.accepted_at || p.accepted_signature || p.signed_outside);
 const paid = (p: Project) => !!p.deposit_paid_at;
 const hasOrders = (p: Project) => !!p.ordered;
+const signedOff = (p: Project) => !!p.signed_off;
 
 /* ── The deleted list ────────────────────────────────────────────────────────── */
 
@@ -212,10 +215,10 @@ export type DeleteCounts = {
 };
 
 export type DeletePreview = {
-  customers: { id: string; name: string; signed: boolean; paid: boolean; ordered: boolean }[];
+  customers: { id: string; name: string; signed: boolean; paid: boolean; ordered: boolean; signed_off: boolean }[];
   /** Ids that aren't in the CRM (already deleted). */
   gone: number;
-  /** What goes with everyone, and with everyone but those with a signed quote, paid deposit or purchase order. */
+  /** What goes with everyone, and with everyone but those with a signed quote, paid deposit, purchase order or trade sign-off. */
   counts: { all: DeleteCounts; withoutSigned: DeleteCounts };
   /** Someone not being deleted has the same WhatsApp number (a duplicate): they stay. */
   sameNumber: { name: string; other: string }[];
@@ -266,9 +269,9 @@ export async function previewDelete(ids: string[]): Promise<DeletePreview> {
   const projects = await projectsOf(db, [...idSet]);
   const customers = found.map((c) => {
     const mine = projects.filter((p) => p.enquiry_id === c.id);
-    return { id: c.id, name: c.name, signed: mine.some(signed), paid: mine.some(paid), ordered: mine.some(hasOrders) };
+    return { id: c.id, name: c.name, signed: mine.some(signed), paid: mine.some(paid), ordered: mine.some(hasOrders), signed_off: mine.some(signedOff) };
   });
-  const held = new Set(customers.filter((c) => c.signed || c.paid || c.ordered).map((c) => c.id));
+  const held = new Set(customers.filter((c) => c.signed || c.paid || c.ordered || c.signed_off).map((c) => c.id));
 
   const numbers = [...new Set(found.map((c) => c.wa_id).filter((w): w is string => !!w))];
   const [all, sharing, importsSkip] = await Promise.all([
@@ -336,11 +339,11 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
   }
   out.gone += ids.length - found.length;
 
-  const held = new Set(includeSigned ? [] : projects.filter((p) => signed(p) || paid(p) || hasOrders(p)).map((p) => p.enquiry_id));
+  const held = new Set(includeSigned ? [] : projects.filter((p) => signed(p) || paid(p) || hasOrders(p) || signedOff(p)).map((p) => p.enquiry_id));
   for (const c of found) {
     if (!held.has(c.id)) continue;
     const mine = projects.filter((p) => p.enquiry_id === c.id);
-    const reasons = [mine.some(signed) && 'a signed quote', mine.some(paid) && 'a paid deposit', mine.some(hasOrders) && 'a purchase order sent to a supplier'].filter(
+    const reasons = [mine.some(signed) && 'a signed quote', mine.some(paid) && 'a paid deposit', mine.some(hasOrders) && 'a purchase order sent to a supplier', mine.some(signedOff) && 'trade sign-offs and certificates'].filter(
       (x): x is string => !!x
     );
     const what = reasons.length > 1 ? `${reasons.slice(0, -1).join(', ')} and ${reasons.at(-1)}` : reasons[0];

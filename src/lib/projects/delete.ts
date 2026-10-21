@@ -20,9 +20,11 @@ import { syncEnquiryStatus } from './server';
  * bookings cascade; survey-booking.sql's trigger writes Outlook tombstones for future events), then
  * its files, so a storage hiccup never leaves a job pointing at missing files.
  *
- * A job with a signed quote or a paid deposit is the evidence of a contract, and one with a purchase
- * order that's gone to a supplier has kit bought for it, so it's only deleted when the person types its
- * reference (or its title before references exist). Draft orders just go with it.
+ * A job with a signed quote or a paid deposit is the evidence of a contract, one with a purchase
+ * order that's gone to a supplier has kit bought for it, and one a trade has signed off on site holds
+ * their signed sign-offs, the certificates and customer signatures made from them, any return to site
+ * and their labour POs (held ones too), so it's only deleted when the person types its reference (or
+ * its title before references exist). Draft kit orders just go with it.
  */
 
 export type DeleteJobResult =
@@ -60,27 +62,35 @@ export async function deleteProject(
   let photos: Photo[];
   let surveys: Survey[];
   let taskIds: string[];
-  let orders: { status: string }[];
+  let orders: { status: string; kind?: string | null }[];
+  let site: { status: string; signed_at: string | null }[];
   try {
     // select('*'): signed_outside_at (crm-v3.sql), markup_path and crm_surveys (surveys.sql) may not be there yet.
-    [docs, photos, surveys, taskIds, orders] = await Promise.all([
+    [docs, photos, surveys, taskIds, orders, site] = await Promise.all([
       rowsIn<Doc>(db, 'crm_documents', '*', 'project_id', [id], true),
       rowsIn<Photo>(db, 'crm_photos', '*', 'project_id', [id], true),
       rowsIn<Survey>(db, 'crm_surveys', '*', 'project_id', [id], true),
       rowsIn<{ id: string }>(db, 'tasks', 'id', 'crm_project_id', [id], true).then((t) => t.map((x) => x.id)),
-      // purchase-orders.sql: none before it's run.
-      rowsIn<{ status: string }>(db, 'purchase_orders', 'status', 'project_id', [id], true),
+      // purchase-orders.sql: none before it's run. '*': the kind column comes with site-commissioning.sql.
+      rowsIn<{ status: string; kind?: string | null }>(db, 'purchase_orders', '*', 'project_id', [id], true),
+      // site-commissioning.sql: none before it's run.
+      rowsIn<{ status: string; signed_at: string | null }>(db, 'site_assignments', 'status, signed_at', 'project_id', [id], true),
     ]);
   } catch (e) {
     return { ok: false, status: 500, error: errorText(e) };
   }
 
   const contract = !!(p.accepted_at || p.accepted_signature || p.deposit_paid_at || docs.some((d) => d.signed_outside_at));
-  const ordered = orders.some((o) => isOrdered(o.status));
-  if ((contract || ordered) && norm(opts.confirm) !== norm(label)) {
+  const ordered = orders.some((o) => isOrdered(o.status) && o.kind !== 'labour');
+  // A trade signed off (the sign-off, its certificates, the customer's signatures), or a labour PO of any status.
+  const signedOff = site.some((a) => a.signed_at || a.status === 'signed' || a.status === 'done') || orders.some((o) => o.kind === 'labour');
+  if ((contract || ordered || signedOff) && norm(opts.confirm) !== norm(label)) {
+    const work = signedOff ? 'trade sign-offs and certificates (and their labour POs)' : '';
     const why = contract
-      ? `This job has a signed quote or a paid deposit${ordered ? ', and purchase orders sent to suppliers' : ''}. That’s your evidence of the contract.`
-      : 'This job has purchase orders that have gone to suppliers: they’d be deleted too.';
+      ? `This job has a signed quote or a paid deposit${ordered ? ', and purchase orders sent to suppliers' : ''}${work ? `, and ${work}` : ''}. That’s your evidence of the contract.`
+      : ordered
+        ? `This job has purchase orders that have gone to suppliers${work ? `, and ${work}` : ''}: they’d be deleted too.`
+        : `This job has ${work}: the signed record of the work. They’d be deleted too.`;
     return {
       ok: false,
       status: 409,

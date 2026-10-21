@@ -38,7 +38,11 @@ export const STUBS = {
   '@/lib/purchase-orders/server': 'export async function logOrder(db, o, event, body) { globalThis.__rec.orders.push({ event, body }); }',
   '@/lib/whatsapp/settings': 'export async function getSettings() { return { quietFromMin: 1260, quietToMin: 525, lateRule: false, lateFromMin: 1230, lateSendAtMin: 420 }; }',
   '@/lib/whatsapp/api': `
-    export const whatsappConfigured = () => true; export const defaultTemplate = () => ({ lang: 'en_GB' });
+    export const whatsappConfigured = () => true; export const leadAdsConfigured = () => false; export const defaultTemplate = () => ({ lang: 'en_GB' });
+    export async function graph() { return { ok: false, error: 'offline in the test' }; }
+    export async function sendText() { return { ok: false, error: 'offline in the test' }; }
+    export async function sendDocument() { return { ok: false, error: 'offline in the test' }; }
+    export async function markRead() {}
     export async function sendTemplate(to, name, lang, params) {
       if (globalThis.__fail?.whatsapp) return { ok: false, error: 'Meta said no' };
       globalThis.__rec.whatsapp.push({ to, name, params }); return { ok: true, data: { messages: [{ id: 'wamid.' + globalThis.__rec.whatsapp.length }] } };
@@ -64,17 +68,20 @@ export const STUBS = {
 /** Register the stand-ins (with any of the test's own) and the "no .ts" resolution, and the globals they record into. */
 export function setup(extra = {}) {
   const stubs = { ...STUBS, ...extra };
+  // A stood-in module is stood in however it's imported ("@/lib/crm/server", or "./server" next to it).
+  const byUrl = new Map(Object.keys(stubs).filter((k) => k.startsWith('@/')).map((k) => [`${SRC}${k.slice(2)}.ts`, stubs[k]]));
+  const stubbed = (r) => (byUrl.has(r.url) ? { url: mod(byUrl.get(r.url)), shortCircuit: true } : r);
   registerHooks({
     resolve(specifier, context, next) {
       if (stubs[specifier]) return { url: mod(stubs[specifier]), shortCircuit: true };
       const spec = specifier.startsWith('@/') ? SRC + specifier.slice(2) : specifier;
       try {
-        return next(spec, context);
+        return stubbed(next(spec, context));
       } catch (e) {
         if (!/^(?:\.\.?\/|file:)/.test(spec) || /\.\w+$/.test(spec)) throw e;
         // Without ".ts", as the bundler expects; a folder is its index.ts.
         try {
-          return next(`${spec}.ts`, context);
+          return stubbed(next(`${spec}.ts`, context));
         } catch {
           return next(`${spec}/index.ts`, context);
         }
@@ -109,7 +116,9 @@ export function fakeDb() {
     if (table === 'site_signoffs') return { ...base, received_at: now(), po_done_at: null, docs_done_at: null, notified_at: null, flags: [], extra: {}, review_status: 'waiting', reviewed_at: null, reviewed_by: null, ...r };
     if (table === 'site_returns') return { ...base, status: 'open', photo_ids: [], notice: null, notice_sent_at: null, fixed_at: null, fixed_note: null, fixed_name: null, fixed_signature_path: null, fixed_declaration: null, reviewed_at: null, reviewed_by: null, ...r };
     if (table === 'site_messages') return { ...base, status: 'queued', sent_at: null, provider_id: null, error: null, ...r };
-    if (table === 'crm_documents') return { ...base, archived_at: null, visible: false, ...r };
+    if (table === 'crm_documents') return { ...base, visible: false, archived_at: null, archived_by: null, handover_slot: null, release: 'now', source: null, generated_key: null, version: 1, inputs_hash: null, uploaded_by: null, ...r };
+    if (table === 'handover_slots') return { na: false, na_reason: null, note: null, data: {}, updated_by: null, updated_at: now(), ...r };
+    if (table === 'handover_packs') return { version: 0, document_id: null, contents: null, built_at: null, built_by: null, sent_at: null, sent_by: null, sent_via: [], invoice_prompted_at: null, queued: null, ...r };
     if (table === 'site_devices') return { ...base, revoked_at: null, last_seen_at: now(), ...r };
     if (table === 'site_events') return { ...base, at: now(), ...r };
     return { ...base, ...r };
@@ -130,13 +139,22 @@ export function fakeDb() {
         const list = (Array.isArray(payload) ? payload : [payload]).map((r) => defaults(table, structuredClone(r)));
         const kept = [];
         for (const r of list) {
+          // An upsert onto its conflict columns updates the row that's there.
+          const on = upsertOpts?.onConflict && !upsertOpts.ignoreDuplicates ? upsertOpts.onConflict.split(',').map((c) => c.trim()) : null;
+          const hit = on ? rows(table).find((x) => on.every((c) => x[c] === r[c])) : null;
+          if (hit) {
+            const given = Array.isArray(payload) ? payload[list.indexOf(r)] : payload;
+            Object.assign(hit, structuredClone(given));
+            kept.push(hit);
+            continue;
+          }
           if (clash(table, r)) {
             if (upsertOpts?.ignoreDuplicates) continue;
             return { data: null, error: { code: '23505', message: 'duplicate key' } };
           }
+          rows(table).push(r);
           kept.push(r);
         }
-        rows(table).push(...kept);
         return { data: Array.isArray(payload) ? kept : kept[0] ?? null, error: null, many: Array.isArray(payload) };
       }
       let list = rows(table).filter((r) => where.every((w) => w(r)));
@@ -174,7 +192,10 @@ export function fakeDb() {
       upsert: (r, o) => ((mode = 'insert'), (payload = r), (upsertOpts = o ?? null), b),
       update: (p) => ((mode = 'update'), (payload = p), b),
       delete: () => ((mode = 'delete'), b),
-      eq: (c, v) => (where.push((r) => r[c] === v), b),
+      // A jsonb column compared with a JSON string, as PostgREST casts it.
+      eq: (c, v) => (where.push((r) => (r[c] && typeof r[c] === 'object' && typeof v === 'string' ? JSON.stringify(r[c]) === JSON.stringify(JSON.parse(v)) : r[c] === v)), b),
+      contains: (c, v) => (where.push((r) => JSON.stringify(r[c]) === JSON.stringify(v)), b),
+      containedBy: (c, v) => (where.push((r) => JSON.stringify(r[c]) === JSON.stringify(v)), b),
       neq: (c, v) => (where.push((r) => r[c] !== v), b),
       in: (c, v) => (where.push((r) => v.includes(r[c])), b),
       is: (c, v) => (where.push((r) => (r[c] ?? null) === v), b),
@@ -208,8 +229,15 @@ export function fakeDb() {
       },
       download: async (path) => ({ data: files.has(`${bucket}/${path}`) ? new Blob([files.get(`${bucket}/${path}`)]) : null }),
       remove: async (paths) => (paths.forEach((p) => files.delete(`${bucket}/${p}`)), { error: null }),
+      copy: async (a, b2) => (files.has(`${bucket}/${a}`) ? (files.set(`${bucket}/${b2}`, files.get(`${bucket}/${a}`)), { error: null }) : { error: { message: 'not found' } }),
       exists: async (path) => ({ data: files.has(`${bucket}/${path}`), error: null }),
       info: async (path) => (files.has(`${bucket}/${path}`) ? { data: { size: files.get(`${bucket}/${path}`).length, contentType: 'application/pdf' }, error: null } : { data: null, error: { message: 'Object not found' } }),
+      list: async (prefix) => {
+        const names = new Map();
+        const pre = prefix ? `${bucket}/${prefix.replace(/\/$/, '')}/` : `${bucket}/`;
+        for (const k of files.keys()) if (k.startsWith(pre)) names.set(k.slice(pre.length).split('/')[0], k.slice(pre.length).includes('/'));
+        return { data: [...names].map(([name, isFolder]) => (isFolder ? { name, id: null } : { name, id: name })), error: null };
+      },
       createSignedUrl: async (path) => ({ data: { signedUrl: `https://storage.test/${bucket}/${path}` } }),
       createSignedUploadUrl: async (path, o) => {
         uploads.push({ bucket, path, upsert: !!o?.upsert });
@@ -220,7 +248,20 @@ export function fakeDb() {
     getBucket: async () => ({ data: {} }),
     createBucket: async () => ({}),
   };
-  return { t, rows, files, uploads, from, storage, rpc: async () => ({ data: null, error: { message: 'no rpc' } }) };
+  // The database functions the code calls (crm-v3.sql's checklist tick); anything else isn't there.
+  const rpc = async (name, args) => {
+    if (name === 'crm_checklist_set') {
+      const p = rows('crm_projects').find((x) => x.id === args.p_project);
+      if (!p) return { data: null, error: null };
+      const c = { ...(p.checklist ?? {}) };
+      if (args.p_value == null) delete c[args.p_key];
+      else c[args.p_key] = args.p_value;
+      p.checklist = c;
+      return { data: c, error: null };
+    }
+    return { data: null, error: { message: 'no rpc' } };
+  };
+  return { t, rows, files, uploads, from, storage, rpc };
 }
 
 let failed = 0;
