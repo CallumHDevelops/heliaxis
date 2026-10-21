@@ -105,7 +105,9 @@ export function AssistantView({ firstName }: { firstName: string }) {
       return;
     }
     // Chrome on Android can't listen continuously (see dictation.ts), so there it hears one sentence at a time.
-    const oneSentence = /Android/i.test(navigator.userAgent);
+    // Big Android tablets ask for desktop sites and call themselves Linux; a touchscreen gives them away.
+    const ua = navigator.userAgent;
+    const oneSentence = /Android/i.test(ua) || (/\bLinux\b/.test(ua) && !/CrOS/.test(ua) && navigator.maxTouchPoints > 0);
     let said = text;
     const m: Mic = { r: null as unknown as Recognition, keep: true, live: true };
     const done = () => {
@@ -122,8 +124,8 @@ export function AssistantView({ firstName }: { firstName: string }) {
       let now = '';
       r.onresult = (e) => {
         if (!m.live) return;
-        now = fixName(heard(Array.from(e.results, (x) => x[0]?.transcript ?? ''), oneSentence));
-        setText(joinSaid(said, now));
+        now = heard(Array.from(e.results, (x) => x[0]?.transcript ?? ''), oneSentence);
+        setText(fixName(joinSaid(said, now)));
       };
       // Any error (no speech for a while, no permission, no signal) ends it; onend still runs.
       r.onerror = () => {
