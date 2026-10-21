@@ -645,6 +645,12 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   background: rgba(31, 122, 77, 0.12);
   color: var(--hxd-wa);
 }
+/* A message someone has scheduled (Send later): "Scheduled 07:00". */
+.hxd-chip--later {
+  background: rgba(31, 122, 77, 0.08);
+  color: var(--hxd-wa);
+  box-shadow: inset 0 0 0 1px rgba(31, 122, 77, 0.35);
+}
 .hxd-nocrm {
   font-size: 11.5px;
   color: var(--hxd-muted);

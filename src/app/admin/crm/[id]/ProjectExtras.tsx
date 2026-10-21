@@ -925,8 +925,11 @@ export function EmailComposerV2({
   );
 }
 
-/** Send one document (theirs or from the library) on WhatsApp. */
-export function WhatsAppDocSend({ id, docs, onSent }: { id: string; docs: CrmDoc[]; onSent: () => Promise<void> }) {
+/**
+ * Send one document (theirs or from the library) on WhatsApp. It goes straight away: late at night
+ * (`lateTime`, while typed messages wait for the morning) the button says so.
+ */
+export function WhatsAppDocSend({ id, docs, onSent, lateTime }: { id: string; docs: CrmDoc[]; onSent: () => Promise<void>; lateTime?: string | null }) {
   const [open, setOpen] = useState(false);
   const [pick, setPick] = useState<PickedDoc[]>([]);
   const [busy, setBusy] = useState(false);
@@ -958,8 +961,9 @@ export function WhatsAppDocSend({ id, docs, onSent }: { id: string; docs: CrmDoc
               await onSent();
             }}
           >
-            {busy ? 'Sending…' : 'Send document'}
+            {busy ? 'Sending…' : lateTime ? 'Send document now' : 'Send document'}
           </button>
+          {lateTime && <p className="crm-muted crm-small">Documents don’t wait for {lateTime}: this one goes straight away.</p>}
         </>
       )}
     </div>

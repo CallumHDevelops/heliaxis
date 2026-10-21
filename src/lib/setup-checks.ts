@@ -425,6 +425,16 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     whatsapp && !(await has('whatsapp_messages', 'media_status')),
     sql('whatsapp-media.sql', 'Shows the photos, videos, voice notes and files customers send on WhatsApp in the chat, and lets you save their photos to the job.', 2, 'whatsapp.sql')
   );
+  // Send later and the late-night rule: until it's run, messages go when Send is pressed, as before.
+  add(
+    whatsapp && chasers && !(await has('whatsapp_outbox', 'reply_noted_at')),
+    sql(
+      'whatsapp-scheduled.sql',
+      'WhatsApp “Send later”, and the late-night rule: a message typed after 20:30 waits until 07:00 the next morning.',
+      2,
+      'whatsapp-chasers.sql'
+    )
+  );
   add(!crm, sql('crm.sql', 'Switches the CRM on: opportunities, the timeline, site photos and tasks on opportunities.', 3));
   add(!crmV2, sql('crm-v2.sql', 'Customer portal, documents, email, reminders and deposits.', 4, 'crm.sql'));
   add(

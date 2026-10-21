@@ -62,7 +62,7 @@ export function SmartReplies() {
   }
   const set = <K extends keyof WaSettings>(k: K, v: WaSettings[K]) => settings && setSettings({ ...settings, [k]: v });
   /** A time box ("08:45"): kept as minutes after midnight; a half-typed time is left alone. */
-  const setTime = (k: 'quietFromMin' | 'quietToMin' | 'eveningFromMin' | 'eveningNotBeforeMin', v: string) => {
+  const setTime = (k: 'quietFromMin' | 'quietToMin' | 'eveningFromMin' | 'eveningNotBeforeMin' | 'lateFromMin' | 'lateSendAtMin', v: string) => {
     const m = fromHhmm(v);
     if (m !== null) set(k, m);
   };
@@ -273,7 +273,8 @@ export function SmartReplies() {
           <p className="wa-muted">
             Chasers, final nudges and reminders never go out in quiet hours: they wait until they end, then go a few
             minutes after, at random, so they don’t look automated. Smart replies and the first message to new leads wait
-            too, while their boxes below are ticked. A message you type, or <b>Send now</b>, always goes.
+            too, while their boxes below are ticked. A message you type goes when you press Send (late at night, the rule
+            for messages we type late below decides), and <b>Send now</b> always goes.
           </p>
           <div className="wa-check wa-check--times">
             <input type="checkbox" aria-label="Evening rule" checked={settings.eveningRule} onChange={(e) => set('eveningRule', e.target.checked)} />
@@ -292,6 +293,28 @@ export function SmartReplies() {
           <p className="wa-muted">
             Gives them a chance to wake up. It counts any message we send after that time or in quiet hours, by hand or
             automatically, and the chaser waits even if that means it’s no longer free. {example(settings)}
+          </p>
+          <label className="wa-label" htmlFor="wa-late-rule">Messages we type late</label>
+          <div className="wa-check wa-check--times">
+            <input id="wa-late-rule" type="checkbox" checked={settings.lateRule} onChange={(e) => set('lateRule', e.target.checked)} />
+            <span>
+              <span>
+                If Send is pressed after{' '}
+                <input className="wa-input wa-time" type="time" step={60} aria-label="If Send is pressed after" disabled={!settings.lateRule} value={hhmm(settings.lateFromMin)} onChange={(e) => setTime('lateFromMin', e.target.value)} />,
+              </span>{' '}
+              <span>
+                send at{' '}
+                <input className="wa-input wa-time" type="time" step={60} aria-label="Send at" disabled={!settings.lateRule} value={hhmm(settings.lateSendAtMin)} onChange={(e) => setTime('lateSendAtMin', e.target.value)} />
+              </span>{' '}
+              <span>the next morning</span>
+            </span>
+          </div>
+          <p className="wa-muted">
+            For everyone on the team, UK time. The small hours count too: typed at 02:00, it goes at {hhmm(settings.lateSendAtMin)} that morning.
+            While it applies, Send says <b>at {hhmm(settings.lateSendAtMin)}</b> under it (Ctrl/⌘ + Enter does the same), with <b>Send now instead</b>{' '}
+            beside it for anything that can’t wait. The message waits in the chat as “Scheduled”, where whoever wrote it can edit, send or
+            cancel it, and goes as them. Templates follow it too; documents from a job still go straight away. Any time of day, the clock
+            beside Send schedules a message for later.
           </p>
           <label className="wa-label">Remind me after (min, 0 = off)</label>
           <input className="wa-input" type="number" min={0} value={settings.remindUnansweredMinutes} onChange={(e) => set('remindUnansweredMinutes', Number(e.target.value))} />
