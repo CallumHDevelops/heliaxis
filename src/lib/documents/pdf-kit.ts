@@ -360,10 +360,10 @@ export async function newDocument(o: DocOptions) {
       }
       y -= total + 14;
     },
-    /** A section heading over a rule, kept with its first rows; an optional line under it. */
-    section(title: string, opt: { intro?: string | null } = {}) {
+    /** A section heading over a rule, kept with its first rows (`keep` points of them); an optional line under it. */
+    section(title: string, opt: { intro?: string | null; keep?: number } = {}) {
       const intro = opt.intro ? lines(opt.intro, 8.5, W) : [];
-      need(30 + intro.length * 11 + 44);
+      need(30 + intro.length * 11 + (opt.keep ?? 44));
       y -= 4;
       text(title, X, y - 10, 10.5, { bold: true });
       y -= 15;

@@ -2,6 +2,7 @@ import 'server-only';
 import { newDocument, type Kit, type Row } from '@/lib/documents/pdf-kit';
 import { EV_FIELDS, EV_REVISION, EV_TITLE } from '@/lib/site/forms/electrician/ev';
 import { HP_FIELDS, HP_REVISION, HP_TITLE } from '@/lib/site/forms/electrician/heatpump';
+import { captures } from '@/lib/site/forms/electrician/shared';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { visibleFields } from '@/lib/site/rules';
 import { signature, siteBox, words, type ElectricianDocInput } from './common';
@@ -42,11 +43,21 @@ function record(kit: Kit, fields: Field[], c: FormCtx) {
   flush();
 }
 
+/** The serials captured in Serials, as printed ("ZAPPI-22110456"; unread labels said so). */
+function serialRow(label: string, v: unknown): Row[] {
+  const list = captures(v);
+  if (!list.length) return [];
+  const read = list.filter((x) => !x.unread).map((x) => x.s);
+  const unread = list.length - read.length;
+  return [{ label, value: [read.join(', '), unread ? `${unread} label${unread === 1 ? '' : 's'} couldn’t be read (photo kept)` : ''].filter(Boolean).join('; ') }];
+}
+
 export async function makeEvRecord(d: ElectricianDocInput): Promise<Uint8Array> {
   const kit = await newDocument({ code: 'EV', label: 'EV record', title: EV_TITLE, revision: EV_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Installed by');
-  if (d.ctx.el?.ev_model) kit.rows([{ label: 'Charger', value: d.ctx.el.ev_model }]);
+  const top = [...(d.ctx.el?.ev_model ? [{ label: 'Charger', value: d.ctx.el.ev_model }] : []), ...serialRow('Charger serial number', d.ctx.values.SN_EV)];
+  if (top.length) kit.rows(top);
   record(kit, EV_FIELDS, d.ctx);
   await signature(kit, d, 'Installed and tested by');
   return kit.save();
@@ -56,7 +67,12 @@ export async function makeHpRecord(d: ElectricianDocInput): Promise<Uint8Array> 
   const kit = await newDocument({ code: 'HP', label: 'Heat pump supply', title: HP_TITLE, revision: HP_REVISION, jobRef: d.jobRef, issued: d.date, draft: d.draft });
   kit.header({ meta: [['Project reference', d.jobRef ?? '–']] });
   siteBox(kit, d, 'Installed by');
-  if (d.ctx.el?.heat_pump_model) kit.rows([{ label: 'Heat pump', value: d.ctx.el.heat_pump_model }]);
+  const top = [
+    ...(d.ctx.el?.heat_pump_model ? [{ label: 'Heat pump', value: d.ctx.el.heat_pump_model }] : []),
+    ...serialRow('Outdoor unit serial number', d.ctx.values.SN_HP),
+    ...serialRow('Indoor unit / controller serial number', d.ctx.values.SN_HP2),
+  ];
+  if (top.length) kit.rows(top);
   kit.note('The electrical supply only. The heat pump’s own commissioning record comes from the heating engineer.');
   record(kit, HP_FIELDS, d.ctx);
   await signature(kit, d, 'Installed and tested by');

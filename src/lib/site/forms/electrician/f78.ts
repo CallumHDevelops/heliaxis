@@ -115,7 +115,10 @@ export const F78_FLAGS: FlagRule[] = [
     key: '*F78',
     severity: 'review',
     when: (c) => missingOffice(c).length > 0,
-    text: (c) => `F78 needs ${missingOffice(c).join(', ')} from the design: fill it in on the job before the pack goes`,
+    text: (c) => {
+      const m = missingOffice(c);
+      return `F78 needs ${m.length > 1 ? `${m.slice(0, -1).join(', ')} and ${m.at(-1)}` : m[0]} from the design: fill it in on the job before the pack goes`;
+    },
   },
   {
     code: 'F78_KWP',

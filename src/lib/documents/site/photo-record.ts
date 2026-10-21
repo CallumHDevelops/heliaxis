@@ -21,7 +21,8 @@ export async function makePhotoRecord(d: ElectricianDocInput, slots: RecordSlot[
   }
   for (const s of slots) {
     if (!s.photos.length) continue;
-    kit.section(s.title, { intro: s.instruction });
+    // Kept with its first row of photos, so a heading never ends a page on its own.
+    kit.section(s.title, { intro: s.instruction, keep: 170 });
     await kit.photos(s.photos);
   }
   return kit.save();

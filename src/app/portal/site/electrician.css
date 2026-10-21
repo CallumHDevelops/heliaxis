@@ -75,3 +75,9 @@
 .sa-provided-head { font-weight: 700; color: var(--amber); }
 .sa-provided-step h4 { margin: 10px 0 0; font-size: 16px; }
 .sa-provided .sa-todo-row { min-height: 48px; }
+
+/* P15: the customer's signature */
+.sa-sign .sa-kicker + h3 { margin-top: 6px; }
+.sa-sign .sa-kicker + h3 + p { margin-top: 4px; }
+.sa-sign .sa-card > .sa-muted + .sa-declaration,
+.sa-sign .sa-kicker + .sa-declaration { margin-top: 10px; }

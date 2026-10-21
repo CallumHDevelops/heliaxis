@@ -82,7 +82,7 @@ async function electricianJob(db: Db, a: AssignmentRow, s: SignoffRow): Promise<
     projectId: a.project_id,
     key: `site-call:${a.id}`,
     title: `Handover call: go through the pack and ${appWordsFor(products)} with ${first}`,
-    notes: `${s.signed_name} told ${first} one of the team would be in touch today. The paperwork is on the job’s ${(await schemaReady()).handover ? 'Handover' : 'Docs'} tab.`,
+    notes: `${s.signed_name} told ${first} on ${new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/London' }).format(new Date(s.signed_at))} that one of the team would be in touch the next working day. The paperwork is on the job’s ${(await schemaReady()).handover ? 'Handover' : 'Docs'} tab.`,
     assigneeId: owner,
     dueDate: addWorkingDays(day, 1, hols),
   });

@@ -156,11 +156,12 @@ const without = (keys) => {
 };
 eq('EF1 unticked: Finish stays grey with the reason', without(['EF1']).must.map((m) => [m.key, m.step]), [['EF1', 'finish']]);
 eq('EF3 unticked: the same', without(['EF3']).must.map((m) => m.key), ['EF3']);
+eq('the gate lists a row in its own words (an EV job is asked about the charger)', R.signCheck(formFor(['ev']), ctxOf(['ev'], {}, {})).must.find((m) => m.key === 'EF1')?.label, 'Is the charger commissioned?');
 eq('a test row missing blocks it too', without(['eess_t_04']).must.map((m) => m.key), ['eess_t_04']);
 eq('a photo short blocks it', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, { ...full.photos, EP07: 2 })).must.map((m) => [m.key, m.why]), [['EP07', '2 of 3 photos']]);
 eq('the certificate on the EIC route (not built yet) is a required item', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, full.photos, { cert_route: 'eic' })).must.map((m) => m.key), ['CERT_WAIT']);
 eq('…and F44 item 38 then isn’t ticked for them', R.valueOf(field('f44_38'), ctxOf(['solar', 'battery'], full.values, full.photos, { cert_route: 'eic' })), undefined);
-eq('the own certificate needs its file', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, { ...full.photos, CERT_FILE: 0 })).must.map((m) => m.key), ['CERT_FILE']);
+eq('the own certificate needs its file ("Not added yet", not a photo count)', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, { ...full.photos, CERT_FILE: 0 })).must.map((m) => [m.key, m.why]), [['CERT_FILE', 'Not added yet']]);
 eq('EF2 Not possible needs the why', R.signCheck(sb, ctxOf(['solar', 'battery'], { ...full.values, EF2: 'not_possible' }, full.photos)).must.map((m) => m.key), ['EF2n']);
 const ef2 = R.flagsFor(sb, ctxOf(['solar', 'battery'], { ...full.values, EF2: 'not_possible', EF2n: 'No Wi-Fi in the garage' }, full.photos));
 eq('…and with it a Review flag for the office', ef2.filter((f) => f.code === 'EF2').map((f) => [f.severity, f.text]), [['review', 'Not on the customer’s internet: No Wi-Fi in the garage. Set up the monitoring remotely']]);
@@ -277,10 +278,12 @@ const fe = fillAll(ev, ['ev']);
 const evText = flat(await textOf(await D.rec.makeEvRecord(input(ctxOf(['ev'], fe.values, fe.photos)))));
 await keep('EV', await D.rec.makeEvRecord(input(ctxOf(['ev'], fe.values, fe.photos))));
 eq('EV record: title, earthing, open-PEN, RCD, demand vs fuse, smart charging, DNO route', ['EV Charge Point Installation Record', 'TN-C-S (PME)', 'Device in the charger', 'Type A RCD, 6 mA DC detection (RDC-DD) in the charger', '52 A', '80 A', 'Statement of compliance handed over', '60 A or less: notify within 28 days'].filter((x) => !evText.includes(x)), []);
+eq('EV record: the charger serial from Serials', evText.includes(`Charger serial number ${fe.values.SN_EV[0].s}`), true);
 const hp = formFor(['heatpump']);
 const fh = fillAll(hp, ['heatpump']);
 const hpText = flat(await textOf(await D.rec.makeHpRecord(input(ctxOf(['heatpump'], fh.values, fh.photos)))));
 eq('heat pump record: readings, notification, isolator, DNO', ['Heat Pump Electrical Supply Record', 'Insulation resistance, line to earth (500 V)', '>999 MΩ', '240.1 V', 'Self-certified under a competent person scheme', 'Isolator location'].filter((x) => !hpText.includes(x)), []);
+eq('heat pump record: the outdoor unit serial from Serials', hpText.includes(`Outdoor unit serial number ${fh.values.SN_HP[0].s}`), true);
 
 /* ── Signing off through the route (an in-memory database) ───────────────────── */
 const UNIQUE = { site_signoffs: [['assignment_id', 'stage']], purchase_orders: [['signoff_id']], site_messages: [['dedupe_key']], site_ops: [['assignment_id', 'op_id']], crm_documents: [['storage_path']] };

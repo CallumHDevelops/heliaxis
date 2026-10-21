@@ -136,6 +136,7 @@ export const allVisible = (form: SiteForm, c: FormCtx) => form.steps.filter((s) 
 const counts = (f: Field) => f.type !== 'SIG' && (f.type !== 'AUTO' || !!f.done) && f.level !== 'optional';
 
 function why(f: Field, c: FormCtx): string {
+  if (f.type === 'PHOTOS' && f.files) return 'Not added yet';
   if (f.type === 'PHOTOS') {
     const need = needOf(f, c);
     const slots = slotsOf(f, c);
@@ -169,7 +170,7 @@ export function missing(form: SiteForm, c: FormCtx): { must: Missing[]; should: 
     if (f.type === 'PHOTOS' && needOf(f, c) === 0) continue;
     // A worked-out row waiting on others that are listed (F44 item 37 on F43): not listed twice.
     if (f.autoWaits?.(c) && !Object.prototype.hasOwnProperty.call(c.values, f.key)) continue;
-    const m = { key: f.key, label: f.label, step: step.key, why: why(f, c) };
+    const m = { key: f.key, label: f.say?.(c) ?? f.label, step: step.key, why: why(f, c) };
     (f.level === 'must' ? must : should).push(m);
   }
   return { must, should };
