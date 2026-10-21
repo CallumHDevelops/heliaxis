@@ -103,6 +103,8 @@ export function makeFixtures({ R, F, designOf }) {
   let serial = 0;
   function valueFor(f, c) {
     if (f.key in ONE) return ONE[f.key];
+    // Which certificate: the office's choice, as offered (the EIC's own tests cover changing it).
+    if (f.key === 'eic_route') return f.suggest(c).v;
     if (f.perString) return Array.from({ length: R.stringsOf(f, c) }, (_, i) => (PER[f.key] ? PER[f.key](i) : 'x'));
     switch (f.type) {
       case 'TICK':

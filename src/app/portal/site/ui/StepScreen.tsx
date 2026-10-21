@@ -10,6 +10,7 @@ import { FileSlot } from './FileSlot';
 import type { JobForms } from './form-state';
 import { go } from './nav';
 import { PhotoSlot } from './PhotoSlot';
+import { CustomField } from './custom';
 import { Evidence, Info, MissingPanel } from './rows';
 import { ScanField } from './ScanSheet';
 import { StringsStep } from './StringsStep';
@@ -190,6 +191,9 @@ export function FieldRow({ f, rec, answers, jf, locked }: { f: Field; rec: PackR
       break;
     case 'AUTO':
       widget = f.panel === 'missing' ? <MissingPanel jf={jf} rec={rec} /> : <p className="sa-auto">{s ? s.text : '–'}</p>;
+      break;
+    case 'CUSTOM':
+      widget = <CustomField f={f} rec={rec} jf={jf} locked={locked} />;
       break;
     case 'PHOTOS': {
       const need = needOf(f, ctx);

@@ -4,6 +4,7 @@
  */
 import type { Design } from './design';
 import type { ElectricianPack } from './electrician-shared';
+import type { EicFacts } from './forms/types';
 import type { PoNext } from './po-shared';
 import type { StripStep } from './strip';
 import type { Answers, Flag, Stage, Trade } from './types';
@@ -81,6 +82,8 @@ export type SitePack = {
   settings: { locationStamps: boolean };
   /** Electricians: what their forms read from the roofer, the job and the office, and their uploads (electrician-shared.ts). */
   electrician?: ElectricianPack;
+  /** Electricians: what the certificate's questions are offered from (site/eic/facts.ts). */
+  eic?: EicFacts;
 };
 
 /** The reply to a sign-off (POST /api/site/jobs/<id>/signoff): what the done screen shows (P11). */

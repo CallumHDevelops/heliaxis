@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { moneyLine, vatFor } from '@/lib/site/assign';
 import { ELECTRICIAN_FORMS, FORM_LABEL, formsFor } from '@/lib/site/forms';
-import { certRouteReady, defaultCertRoute } from '@/lib/site/forms/electrician/cert';
+import { defaultCertRoute } from '@/lib/site/forms/electrician/cert';
 import { BASIS_LABEL, CIS_RATES, penceToInput, poundsToPence, VAT_WORDS, type CisRate, type RateBasis, type VatTreatment } from '@/lib/site/money';
 import type { AssignmentView, SiteTabData } from '@/lib/site/server';
 import { TRADE_LABEL, TRADES, type Trade } from '@/lib/site/types';
@@ -314,11 +314,10 @@ export function AssignmentSheet({
             {CERT_ROUTES.map(([k, l]) => (
               <option key={k} value={k}>
                 {l}
-                {certRouteReady(k) ? '' : ' (not switched on yet)'}
               </option>
             ))}
           </select>
-          {!certRouteReady(d.cert_route) && <p className="sx-warnline">The certificate made in the app isn’t switched on yet: they couldn’t finish. Choose their own certificate for now.</p>}
+          <p className="sx-meta">They can change it on their phone if the job turns out different; they’re asked why, and it’s flagged for you.</p>
         </>
       )}
 

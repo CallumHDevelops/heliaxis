@@ -62,6 +62,7 @@ export function useJobForms(rec: PackRecord, answers: Answers): JobForms | null 
       address: [...pack.job.address, pack.job.postcode].filter(Boolean).join(', '),
       signed,
       el: factsFromPack(pack),
+      eic: pack.eic,
     });
     return { ctx, forms: schemaFor(pack.assignment), signed, pendingSign, photos };
   }, [rec, answers, local, outbox]);

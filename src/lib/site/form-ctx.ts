@@ -2,6 +2,7 @@ import 'server-only';
 import { designOf } from './design';
 import { electricianPack } from './electrician';
 import { withFiles } from './electrician-shared';
+import { eicFacts } from './eic/facts';
 import type { FormCtx, LabelReadResult } from './forms/types';
 import { makeCtx } from './rules';
 import type { AssignmentRow, Db } from './server';
@@ -44,5 +45,6 @@ export async function serverCtx(db: Db, a: AssignmentRow): Promise<FormCtx> {
     address,
     signed: ((signoffs ?? []) as { stage: Stage }[]).map((x) => x.stage),
     ...(el ? { el: { ...el.facts, cert_route: a.cert_route } } : {}),
+    eic: await eicFacts(db, a, project),
   });
 }

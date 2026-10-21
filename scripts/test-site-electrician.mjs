@@ -111,16 +111,17 @@ const textOf = (bytes) => textIn(pdfjs, bytes);
 
 /* ── Sections by technology (SPEC 5.1, Unit 2 acceptance) ───────────────────── */
 const steps = (products, design) => formFor(products, design).steps.map((s) => s.key);
-eq('solar only: F43, F44, F44A and no battery sections', steps(['solar']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f78', 'cert-own', 'cert', 'finish']);
-eq('battery only: F74 with no F43', steps(['battery']), ['photos', 'serials', 'f74', 'f74t', 'f78', 'cert-own', 'cert', 'finish']);
-eq('solar + battery: both', steps(['solar', 'battery']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'f74t', 'f78', 'cert-own', 'cert', 'finish']);
+eq('solar only: F43, F44, F44A and no battery sections', steps(['solar']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f78', 'eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-existing', 'eic-extent', 'eic-sign', 'cert-own', 'cert', 'finish']);
+eq('battery only: F74 with no F43', steps(['battery']), ['photos', 'serials', 'f74', 'f74t', 'f78', 'eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-existing', 'eic-extent', 'eic-sign', 'cert-own', 'cert', 'finish']);
+eq('solar + battery: both', steps(['solar', 'battery']), ['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'f74t', 'f78', 'eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-existing', 'eic-extent', 'eic-sign', 'cert-own', 'cert', 'finish']);
 eq('battery with PAS 63100: the battery location check', steps(['battery'], { ...DESIGN, pas63100: true }).includes('battery-location'), true);
-eq('EV only: the EV record and the certificate', steps(['ev']), ['photos', 'serials', 'ev', 'cert-own', 'cert', 'finish']);
-eq('heat pump only: the supply record and the certificate', steps(['heatpump']), ['photos', 'serials', 'heatpump', 'cert-own', 'cert', 'finish']);
-eq('the certificate and Finish are there even if unticked', F.schemaFor({ trade: 'electrician', forms: ['photos'] })[0].steps.map((s) => s.key), ['photos', 'cert-own', 'cert', 'finish']);
+eq('EV only: the EV record and the certificate', steps(['ev']), ['photos', 'serials', 'ev', 'eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-existing', 'eic-extent', 'eic-sign', 'cert-own', 'cert', 'finish']);
+eq('heat pump only: the supply record and the certificate', steps(['heatpump']), ['photos', 'serials', 'heatpump', 'eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-existing', 'eic-extent', 'eic-sign', 'cert-own', 'cert', 'finish']);
+eq('the certificate and Finish are there even if unticked', F.schemaFor({ trade: 'electrician', forms: ['photos'] })[0].steps.map((s) => s.key), ['photos', 'eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-existing', 'eic-extent', 'eic-sign', 'cert-own', 'cert', 'finish']);
 const shownSteps = (products, el) => formFor(products).steps.filter((s) => R.stepShown(s, ctxOf(products, {}, {}, el))).map((s) => s.key);
 eq('own certificate: its upload step shows, the waiting one doesn’t', shownSteps(['solar'], { cert_route: 'own' }).filter((k) => k.startsWith('cert')), ['cert-own']);
-eq('EIC in the app (not built yet): the waiting step, a required item', shownSteps(['solar'], { cert_route: 'eic' }).filter((k) => k.startsWith('cert')), ['cert']);
+eq('EIC in the app: its screens, no upload and no waiting step', [shownSteps(['solar'], { cert_route: 'eic' }).filter((k) => k.startsWith('cert')), shownSteps(['solar'], { cert_route: 'eic' }).filter((k) => k.startsWith('eic-'))], [[], ['eic-cert', 'eic-supply', 'eic-origin', 'eic-inspect', 'eic-boards', 'eic-instruments', 'eic-extent', 'eic-sign']]);
+eq('own certificate: of the EIC only “Which certificate?” shows', shownSteps(['solar'], { cert_route: 'own' }).filter((k) => k.startsWith('eic-')), ['eic-cert']);
 
 /* ── Prefill: offered with a chip, never filled in; measured boxes empty ─────── */
 const sb = formFor(['solar', 'battery']);
@@ -159,19 +160,23 @@ eq('EF3 unticked: the same', without(['EF3']).must.map((m) => m.key), ['EF3']);
 eq('the gate lists a row in its own words (an EV job is asked about the charger)', R.signCheck(formFor(['ev']), ctxOf(['ev'], {}, {})).must.find((m) => m.key === 'EF1')?.label, 'Is the charger commissioned?');
 eq('a test row missing blocks it too', without(['eess_t_04']).must.map((m) => m.key), ['eess_t_04']);
 eq('a photo short blocks it', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, { ...full.photos, EP07: 2 })).must.map((m) => [m.key, m.why]), [['EP07', '2 of 3 photos']]);
-eq('the certificate on the EIC route (not built yet) is a required item', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, full.photos, { cert_route: 'eic' })).must.map((m) => m.key), ['CERT_WAIT']);
-eq('…and F44 item 38 then isn’t ticked for them', R.valueOf(field('f44_38'), ctxOf(['solar', 'battery'], full.values, full.photos, { cert_route: 'eic' })), undefined);
+const onEic = (() => {
+  const v = { ...full.values };
+  delete v.eic_route;
+  return ctxOf(['solar', 'battery'], v, full.photos, { cert_route: 'eic' });
+})();
+eq('the EIC route: the in-app certificate is required (its boards, instruments and signatures)', ['eic_route', 'eic_earthing', 'eic_db', 'eic_inst', 'eic_sig_con', 'eic_sig_ins'].filter((k) => !R.signCheck(sb, onEic).must.some((m) => m.key === k)), []);
+eq('…and F44 item 38 then isn’t ticked for them', R.valueOf(field('f44_38'), onEic), undefined);
+eq('the electrician switching to their own certificate is asked why', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, full.photos, { cert_route: 'eic' })).must.map((m) => m.key), ['eic_route_why']);
 eq('the own certificate needs its file ("Not added yet", not a photo count)', R.signCheck(sb, ctxOf(['solar', 'battery'], full.values, { ...full.photos, CERT_FILE: 0 })).must.map((m) => [m.key, m.why]), [['CERT_FILE', 'Not added yet']]);
 eq('EF2 Not possible needs the why', R.signCheck(sb, ctxOf(['solar', 'battery'], { ...full.values, EF2: 'not_possible' }, full.photos)).must.map((m) => m.key), ['EF2n']);
 const ef2 = R.flagsFor(sb, ctxOf(['solar', 'battery'], { ...full.values, EF2: 'not_possible', EF2n: 'No Wi-Fi in the garage' }, full.photos));
 eq('…and with it a Review flag for the office', ef2.filter((f) => f.code === 'EF2').map((f) => [f.severity, f.text]), [['review', 'Not on the customer’s internet: No Wi-Fi in the garage. Set up the monitoring remotely']]);
 
-/* A route Unit 3 registers: its steps show, and "done" is what it says. */
-CERT.registerCertRoute('meiwc', { steps: [{ key: 'cert-test', title: 'Certificate (test)', fields: [{ key: 'CERT_TEST', type: 'TEXT', label: 'Test field', level: 'must' }] }], done: (c) => c.values.CERT_TEST === 'ok', ref: () => 'MW 9' });
-const reg = F.schemaFor({ trade: 'electrician', forms: ['photos'] })[0];
-const regMissing = (v) => R.signCheck(reg, ctxOf(['infrared'], { ...v, EF1: true, EF2: 'yes', EF3: true }, fillAll(reg, ['infrared'], { cert_route: 'meiwc' }).photos, { cert_route: 'meiwc' })).must.map((m) => m.key);
-eq('a registered route: its steps are the certificate', regMissing({}), ['CERT_TEST']);
-eq('…its done and ref are read through the registry', [CERT.certDone(ctxOf(['infrared'], { CERT_TEST: 'nope' }, {}, { cert_route: 'meiwc' })), CERT.certDone(ctxOf(['infrared'], { CERT_TEST: 'ok' }, {}, { cert_route: 'meiwc' })), CERT.certRef(ctxOf(['infrared'], {}, {}, { cert_route: 'meiwc' }))], [false, true, 'MW 9']);
+/* The certificate made in the app (Unit 3) is registered for its three routes: done and ref come through the registry. */
+eq('every route is ready, and new electricians default to the EIC in the app', [['eic', 'eic_single', 'meiwc', 'own'].map(CERT.certRouteReady), CERT.defaultCertRoute()], [[true, true, true, true], 'eic']);
+const eicRef = { ...ctxOf(['solar'], {}, {}, { cert_route: 'eic' }), eic: { route: 'eic', ref: 'HX-0042-EIC', client: null, contact: { name: '' }, instruments: {} } };
+eq('…its done and ref are read through the registry', [CERT.certDone(eicRef), CERT.certRef(eicRef), CERT.certRef(cFull)], [false, 'HX-0042-EIC', 'NAPIT EIC 00123456']);
 
 /* ── Worked-out ticks: F44 36–38 and F44A ───────────────────────────────────── */
 eq('item 36: the job has a DNO route and reference', R.valueOf(field('f44_36'), cFull), 'done');

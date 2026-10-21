@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { certRouteReady } from '@/lib/site/forms/electrician/cert';
 
 /**
- * The electrician's extras on their Site tab card: a word when their certificate route isn't built
- * yet (the in-app EIC), and the photo record PDF, made when it's asked for (it can be big).
+ * The electrician's extras on their Site tab card: a word when their certificate route isn't one the
+ * app knows (forms/electrician/cert.ts), and the photo record PDF, made when it's asked for (it can be big).
  */
 export function ElectricianExtras({ a, onEdit }: { a: { id: string; trade: string; cert_route: string; photos: number; status: string }; onEdit: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -35,7 +35,7 @@ export function ElectricianExtras({ a, onEdit }: { a: { id: string; trade: strin
     <>
       {waiting && (
         <p className="crm-banner">
-          Their certificate is set to be made in the app, which isn’t switched on yet, so they can’t finish. Choose “They upload their own NAPIT / NICEIC certificate” for now.{' '}
+          Their certificate isn’t set to one the app knows, so they can’t finish. Choose which certificate they’re doing.{' '}
           <button type="button" className="crm-link" onClick={onEdit}>
             Change it
           </button>

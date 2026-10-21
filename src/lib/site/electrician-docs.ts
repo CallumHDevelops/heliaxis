@@ -13,6 +13,7 @@ import { saveGenerated, type SaveResult } from '@/lib/documents/store';
 import { tradeFiles } from './electrician';
 import { serverCtx } from './form-ctx';
 import { schemaFor } from './forms';
+import { routeOf as certRouteOf } from './forms/electrician/cert';
 import { EV_TITLE } from './forms/electrician/ev';
 import { F44A_TITLE } from './forms/electrician/f44a';
 import { HP_TITLE } from './forms/electrician/heatpump';
@@ -132,7 +133,7 @@ export async function saveElectricianDocs(db: Db, assignmentId: string): Promise
     );
   }
   // Their own certificate, as photos of its pages (a PDF they uploaded is filed already).
-  if (a.cert_route === 'own') {
+  if (certRouteOf(input.ctx) === 'own') {
     const pdfs = (await tradeFiles(db, a)).filter((f) => f.slot === 'CERT_FILE');
     const { data: ph } = await db.from('crm_photos').select('id, storage_path').eq('assignment_id', a.id).eq('slot', 'CERT_FILE').order('created_at');
     const photos = (ph ?? []) as { id: string; storage_path: string }[];

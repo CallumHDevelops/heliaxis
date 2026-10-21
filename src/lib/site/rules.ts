@@ -107,6 +107,8 @@ export function isAnswered(f: Field, c: FormCtx): boolean {
     }
     case 'AUTO':
       return true;
+    case 'CUSTOM':
+      return !(f.parts?.(c) ?? []).some((p) => (p.level ?? 'must') === 'must');
     case 'SIG':
       return false;
     default:
@@ -165,7 +167,13 @@ export function missing(form: SiteForm, c: FormCtx): { must: Missing[]; should: 
   const must: Missing[] = [];
   const should: Missing[] = [];
   for (const { f, step } of allVisible(form, c)) {
-    if (!counts(f) || isAnswered(f, c)) continue;
+    if (!counts(f)) continue;
+    // A field with its own widget lists each thing it still needs ("DB1 circuit 2: test results").
+    if (f.type === 'CUSTOM' && f.parts) {
+      for (const p of f.parts(c)) ((p.level ?? 'must') === 'must' && f.level === 'must' ? must : should).push({ key: f.key, label: p.label, step: step.key, why: p.why });
+      continue;
+    }
+    if (isAnswered(f, c)) continue;
     // A photo slot with no minimum is never "missing".
     if (f.type === 'PHOTOS' && needOf(f, c) === 0) continue;
     // A worked-out row waiting on others that are listed (F44 item 37 on F43): not listed twice.
@@ -182,6 +190,12 @@ export function stepProgress(step: Step, c: FormCtx): { done: number; total: num
   let total = 0;
   for (const f of visibleFields(step, c)) {
     if (!counts(f) || (f.type === 'PHOTOS' && needOf(f, c) === 0)) continue;
+    const own = f.type === 'CUSTOM' ? f.progress?.(c) : undefined;
+    if (own) {
+      done += Math.min(own.done, own.total);
+      total += own.total;
+      continue;
+    }
     total++;
     if (isAnswered(f, c)) done++;
   }
@@ -243,11 +257,14 @@ export function signCheck(form: SiteForm, c: FormCtx): { ok: boolean; stops: Fla
   return { ok: !stops.length && !must.length, stops, must, should, flags };
 }
 
-/** The answers that go on the record: only questions asked now (a hidden follow-up's answer stays on the phone). */
+/**
+ * The answers that go on the record: only questions asked now (a hidden follow-up's answer stays on
+ * the phone). A KEY:anything answer belongs to field KEY (the EIC's boards and circuits).
+ */
 export function recordAnswers(form: SiteForm, c: FormCtx): Answers {
   const keys = new Set(allVisible(form, c).map(({ f }) => f.key));
   const out: Answers = {};
-  for (const [k, a] of Object.entries(c.answers)) if (keys.has(k)) out[k] = a;
+  for (const [k, a] of Object.entries(c.answers)) if (keys.has(k) || keys.has(k.split(':')[0])) out[k] = a;
   return out;
 }
 

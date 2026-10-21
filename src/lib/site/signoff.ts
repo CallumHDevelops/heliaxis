@@ -19,6 +19,7 @@ import { formatPence } from './money';
 // The electrician's sign-off steps register themselves (commissioning, tasks, the paperwork).
 import './electrician-signoff';
 import { saveTradeReport } from './reports';
+import { EIC_SIGNOFF } from './eic/plugin';
 import { flagsFor, openForms, recordAnswers, signCheck } from './rules';
 import { pluginDocs, pluginGate, pluginJob, registerSignoff, type SignoffRow } from './signoff-plugins';
 import { jobOf } from './send';
@@ -48,6 +49,8 @@ async function scaffoldDates(db: Db, a: AssignmentRow, s: SignoffRow) {
 }
 registerSignoff('roofer', { docs: (db, a) => saveTradeReport(db, a.id) });
 registerSignoff('scaffolder', { job: scaffoldDates, docs: (db, a) => saveTradeReport(db, a.id) });
+// The certificate (Unit 3): the EIC or Minor Works made after the reply, paperwork.eic_on, the instruments remembered.
+registerSignoff('electrician', EIC_SIGNOFF);
 
 /** Where each stage can be signed from, and where it goes (SPEC 5.2). */
 const FROM: Record<Stage, AssignmentStatus[]> = { main: ['sent', 'opened', 'started'], erection: ['sent', 'opened', 'started'], strike: ['signed'] };

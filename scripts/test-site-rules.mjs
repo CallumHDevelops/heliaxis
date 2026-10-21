@@ -158,7 +158,7 @@ eq('roofer keys (a change here means a key was renamed: add a new one instead)',
 eq('scaffold keys', [SCAFFOLD_UP, SCAFFOLD_DOWN].flatMap((form) => [...form.steps.flatMap((x) => x.fields), form.sig]).map((x) => x.key).join(' '),
   'SC1 SC1p SC1n SC2 SC2n SCX1 SC3 SC3p SC4 SCX2 SCX2p SCX2n SCX3 SCX3a SCX4 SC5 SC_SIG SS1 SS1n SS2 SS3 SS3p SS3n SS4 SS4n SS5 SS_SIG');
 eq('schemaFor: the roofer gets the roof checks; the scaffolder up then down', [F.schemaFor({ trade: 'roofer' }).map((x) => x.id), F.schemaFor({ trade: 'scaffolder' }).map((x) => x.id)], [['roofer'], ['scaffold-erection', 'scaffold-strike']]);
-eq('the schema version (2: the electrician’s pack)', F.SITE_SCHEMA_VERSION, 2);
+eq('the schema version (2: the electrician’s pack and certificate)', F.SITE_SCHEMA_VERSION, 2);
 
 /* ── Derived values ────────────────────────────────────────────────────────── */
 eq('expected string Voc: panels × Voc', R.expectedStringVoc(8, 49.6, false), 396.8);
