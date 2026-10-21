@@ -160,6 +160,9 @@ create table if not exists public.site_reads (
   attempts      int not null default 0,
   read_at       timestamptz
 );
+-- Checked against the photo by someone in the office (the review drawer's Confirm).
+alter table public.site_reads add column if not exists confirmed_at timestamptz;
+alter table public.site_reads add column if not exists confirmed_by uuid references public.profiles(id) on delete set null;
 
 -- What happened (opened, synced, overwritten values, flags, messages), for the Site tab and disputes.
 create table if not exists public.site_events (

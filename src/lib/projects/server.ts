@@ -98,6 +98,8 @@ export type JobLookups = {
   photoCounts: Map<string, Record<string, number>>;
   surveys: Map<string, SurveyRow[]>;
   subcontracts: Map<string, Assignment[]>;
+  /** Site app trades per job, with their synced photo counts (none before site-commissioning.sql). */
+  site: Map<string, { trade: string; status: string; photos: number }[]>;
   outlook: boolean;
 };
 
@@ -118,7 +120,7 @@ export async function jobLookups(
 ): Promise<JobLookups> {
   const ids = projects.map((p) => p.id);
   const rams = [...new Set(projects.map((p) => text(p.rams_project_id)?.trim()).filter((r): r is string => !!r))];
-  const [docs, photos, surveys, assignments] = await Promise.all([
+  const [docs, photos, surveys, assignments, trades] = await Promise.all([
     // select('*'): signed_outside_at (crm-v3.sql) and survey_id (surveys.sql) may not be there yet.
     opts.docs ??
       readAll<DocRow>(ids, (b, from, to) => db.from('crm_documents').select('*').in('project_id', b).order('id').range(from, to) as unknown as PromiseLike<Res<DocRow>>),
@@ -145,7 +147,23 @@ export async function jobLookups(
         .order('id')
         .range(from, to) as unknown as PromiseLike<Res<Omit<Assignment, 'firm'> & { subcontractors?: { company_name?: string | null } | null }>>
     ),
+    // The site app's trades (an error before site-commissioning.sql reads as none).
+    readAll<{ id: string; project_id: string; trade: string; status: string }>(ids, (b, from, to) =>
+      db.from('site_assignments').select('id, project_id, trade, status').in('project_id', b).order('id').range(from, to)
+    ),
   ]);
+  const tradePhotos = trades.length
+    ? await readAll<{ assignment_id: string }>(
+        trades.map((t) => t.id),
+        (b, from, to) => db.from('crm_photos').select('assignment_id').in('assignment_id', b).order('id').range(from, to)
+      )
+    : [];
+  const photosOf = new Map<string, number>();
+  for (const r of tradePhotos) photosOf.set(r.assignment_id, (photosOf.get(r.assignment_id) ?? 0) + 1);
+  const site = group(
+    trades.map((t) => ({ project_id: t.project_id, trade: t.trade, status: t.status, photos: photosOf.get(t.id) ?? 0 })),
+    (t) => t.project_id
+  );
   const photoCounts = new Map<string, Record<string, number>>(Object.entries(opts.photoCounts ?? {}));
   for (const p of photos) {
     const c = photoCounts.get(p.project_id) ?? {};
@@ -166,6 +184,7 @@ export async function jobLookups(
     photoCounts,
     surveys: group(surveys, (s) => s.project_id),
     subcontracts,
+    site: new Map([...site].map(([k, v]) => [k, v.map(({ trade, status, photos }) => ({ trade, status, photos }))])),
     outlook: msConfigured(),
   };
 }
@@ -182,6 +201,7 @@ export function checkCtxFor(p: ProjectRow, l: JobLookups, today: string): CheckC
       .filter((s) => s.type === 'solar' || s.type === 'ashp')
       .map((s) => ({ type: s.type as 'solar' | 'ashp', status: s.status, simpliheat_url: text(s.simpliheat_url), hasDoc: surveyDocs.has(s.id) })),
     subcontracts: (l.subcontracts.get(p.id) ?? []).map((a) => ({ status: a.status })),
+    site: l.site.get(p.id) ?? [],
     outlook: l.outlook,
     today,
   };

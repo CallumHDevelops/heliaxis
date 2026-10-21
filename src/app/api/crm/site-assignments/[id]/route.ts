@@ -3,12 +3,24 @@ import { crmSession, isUuid, json } from '@/lib/crm/server';
 import { cleanAssignment, vatFor } from '@/lib/site/assign';
 import { isElectricianForm } from '@/lib/site/forms';
 import { livePo, refreshDraftPo } from '@/lib/site/labour-po';
+import { reviewOf } from '@/lib/site/review';
 import { getSiteSettings } from '@/lib/site/settings';
 import { firmsById, logJob, logSiteEvent, moneyFacts, notReady, readAssignment, siteReady, siteTabData, type ContactRow } from '@/lib/site/server';
 import { TRADE_LABEL } from '@/lib/site/types';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
+
+/** The review drawer (D4): answers by step, photos, reads, the sign-off evidence, the PO and documents, the history. */
+export async function GET(_req: Request, { params }: Ctx) {
+  const s = await crmSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
+  if (!(await siteReady())) return notReady();
+  const { id } = await params;
+  if (!isUuid(id)) return json({ error: 'Not found' }, 404);
+  const review = await reviewOf(createAdminClient(), id);
+  return review ? json(review) : json({ error: 'That trade isn’t on the job any more.' }, 404);
+}
 
 /** What decides the PO: fixed once the trade has signed off (the office reopens the sign-off to change it). */
 const MONEY = ['rate_pence', 'rate_basis', 'rate_qty', 'raise_po', 'vat_treatment', 'vat_note', 'cis_override'];

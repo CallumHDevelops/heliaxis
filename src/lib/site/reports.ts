@@ -93,7 +93,7 @@ async function photoItems(db: Db, list: Photo[], caption: (p: Photo) => string):
 }
 
 /** Where a photo slot's field is, for its caption ("Before you start", "Front: up"). */
-function labelOf(forms: SiteForm[], slot: string): string {
+export function labelOf(forms: SiteForm[], slot: string): string {
   const [key, side] = slot.split(':');
   for (const form of forms) for (const s of form.steps) for (const f of s.fields) if (f.key === key) return `${f.label}${side ? ` (${SIDE[side] ?? side})` : ''}`;
   return slot;

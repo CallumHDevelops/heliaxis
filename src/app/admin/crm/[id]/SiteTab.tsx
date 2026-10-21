@@ -11,6 +11,7 @@ import { TRADE_LABEL, type Trade } from '@/lib/site/types';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { agoShort, shortDate } from '../crm-shared';
 import { AssignmentSheet } from './AssignmentSheet';
+import { ReviewDrawer } from './ReviewDrawer';
 import { copyText, send } from './record-shared';
 import './site.css';
 
@@ -26,6 +27,7 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
   const [sheet, setSheet] = useState<{ edit: AssignmentView | null; trade: Trade | null } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const [reviewing, setReviewing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -172,6 +174,7 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
               onMessage={(o) => void message(a, o)}
               onIssue={(override) => void issuePo(a, override)}
               onReopen={() => void reopen(a)}
+              onReview={() => setReviewing(a.id)}
               onHoldAll={() => {
                 for (const t of live.filter((x) => (x.trade === 'roofer' || x.trade === 'electrician') && x.status !== 'signed' && x.status !== 'done')) void message(t, { via: 'both', kind: 'scaffold_hold' });
               }}
@@ -232,8 +235,10 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
               <ul className="sx-list">
                 {flags.map(({ a, f }) => (
                   <li key={`${a.id}-${f.code}-${f.key}`} className={`sx-flag sx-flag--${f.severity}`}>
-                    {f.text}
-                    <small>{a.contact.name}</small>
+                    <button type="button" className="sx-flaglink" onClick={() => setReviewing(a.id)}>
+                      {f.text}
+                      <small>{a.contact.name} · Review</small>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -241,6 +246,15 @@ export function SiteTab({ projectId, now, onChanged }: { projectId: string; now:
           </section>
         </aside>
       </div>
+      {reviewing && data.assignments.some((x) => x.id === reviewing) && (
+        <ReviewDrawer
+          a={data.assignments.find((x) => x.id === reviewing)!}
+          onClose={() => setReviewing(null)}
+          onChanged={changed}
+          onIssue={(override) => void issuePo(data.assignments.find((x) => x.id === reviewing)!, override)}
+          onReopen={() => void reopen(data.assignments.find((x) => x.id === reviewing)!)}
+        />
+      )}
       {sheet && (
         <AssignmentSheet
           data={data}
@@ -305,6 +319,7 @@ function AssignmentCard({
   onHoldAll,
   onIssue,
   onReopen,
+  onReview,
 }: {
   a: AssignmentView;
   now: number;
@@ -316,6 +331,7 @@ function AssignmentCard({
   onHoldAll: () => void;
   onIssue: (override: boolean) => void;
   onReopen: () => void;
+  onReview: () => void;
 }) {
   const open = a.flags.filter((f) => !f.resolved_at);
   const signed = a.status === 'signed' || a.status === 'done';
@@ -411,6 +427,11 @@ function AssignmentCard({
               WhatsApp from my phone
             </button>
           </>
+        )}
+        {(a.sent_at || a.photos > 0 || signed) && (
+          <button type="button" className={signed || open.length ? 'crm-btn crm-btn--small' : 'crm-chipbtn'} onClick={onReview} disabled={busy}>
+            Review{open.length ? ` (${open.length} flag${open.length === 1 ? '' : 's'})` : ''}
+          </button>
         )}
         <button type="button" className="crm-chipbtn" onClick={onEdit} disabled={busy}>
           {signed ? 'Details' : 'Edit'}

@@ -123,7 +123,7 @@ const job = (over = {}) => ({
   reminders_sent: [],
   ...over,
 });
-const ctx = (p, over = {}) => ({ p, docs: [], photoCounts: {}, surveys: [], subcontracts: [], outlook: false, today: '2026-10-23', ...over });
+const ctx = (p, over = {}) => ({ p, docs: [], photoCounts: {}, surveys: [], subcontracts: [], site: [], handoverSent: false, outlook: false, today: '2026-10-23', ...over });
 const items = (c, stage) => checklistView(c).find((g) => g.stage === stage)?.items ?? [];
 const item = (c, stage, key) => items(c, stage).find((i) => i.key === key);
 
@@ -181,6 +181,22 @@ const item = (c, stage, key) => items(c, stage).find((i) => i.key === key);
   eq('trades: one still waiting', item(waiting, 'ready', 'r_trades')?.done, false);
   const none = ctx(job({ stage: 'ready', rams_project_id: 'R1' }));
   eq('trades: nobody booked yet', item(none, 'ready', 'r_trades')?.done, false);
+  // The site app (SPEC 1K): every live trade sent their job pack also counts.
+  const sent = ctx(job({ stage: 'ready' }), { site: [{ trade: 'roofer', status: 'opened', photos: 0 }, { trade: 'scaffolder', status: 'sent', photos: 0 }, { trade: 'electrician', status: 'cancelled', photos: 0 }] });
+  eq('trades: every live site trade sent', item(sent, 'ready', 'r_trades')?.done, true);
+  const draft = ctx(job({ stage: 'ready' }), { site: [{ trade: 'roofer', status: 'sent', photos: 0 }, { trade: 'electrician', status: 'draft', photos: 0 }] });
+  eq('trades: one site trade not sent yet', item(draft, 'ready', 'r_trades')?.done, false);
+  eq('trades: an empty site list (or before the SQL) changes nothing', [item(ctx(job({ stage: 'ready' }), { site: [] }), 'ready', 'r_trades')?.done, item(ctx(job({ stage: 'ready' }), { site: undefined }), 'ready', 'r_trades')?.done], [false, false]);
+}
+{
+  const synced = ctx(job({ stage: 'installing' }), { site: [{ trade: 'roofer', status: 'started', photos: 3 }] });
+  eq('progress photos: a trade photo synced', item(synced, 'installing', 'n_progress')?.done, true);
+  eq('progress photos: trades with none', item(ctx(job({ stage: 'installing' }), { site: [{ trade: 'roofer', status: 'started', photos: 0 }] }), 'installing', 'n_progress')?.done, false);
+  const sparks = (status) => item(ctx(job({ stage: 'commissioning' }), { site: [{ trade: 'electrician', status, photos: 12 }] }), 'commissioning', 'c_photos')?.done;
+  eq('completion photos: the electrician signed (signed, done), not before', [sparks('signed'), sparks('done'), sparks('started')], [true, true, false]);
+  eq('completion photos: a roofer signing is not enough', item(ctx(job({ stage: 'commissioning' }), { site: [{ trade: 'roofer', status: 'done', photos: 9 }] }), 'commissioning', 'c_photos')?.done, false);
+  const pack = (over) => item(ctx(job({ stage: 'handover' }), over), 'handover', 'h_pack')?.done;
+  eq('handover pack: sent (Unit 4), or a visible handover document', [pack({ handoverSent: true }), pack({ docs: [{ category: 'handover', visible: true, needs_signature: false, signed_outside_at: null }] }), pack({})], [true, true, false]);
 }
 {
   const bus = (exp) => item(ctx(job({ products: ['heatpump'], paperwork: { bus_issued_on: '2026-08-01', bus_expires_on: exp } })), 'ready', 'r_bus_ok')?.done;
