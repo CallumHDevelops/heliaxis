@@ -39,6 +39,13 @@
 .crm-small {
   font-size: 0.78rem;
 }
+/* A problem with one field, under it ("Numbers only, e.g. 8 + 8"). */
+.crm-err {
+  display: block;
+  color: var(--err);
+  font-size: 0.8rem;
+  margin-top: 0.2rem;
+}
 .crm-back {
   display: inline-block;
   font-size: 0.85rem;

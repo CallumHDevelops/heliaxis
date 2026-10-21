@@ -28,6 +28,7 @@ import { enaForJob } from '@/lib/projects/ena';
 import { calendarNow, checkCtxFor, ensureDeadlineTasks, jobLookups, nextDate, projectRow, withFallback, type DocRow } from '@/lib/projects/server';
 import { ordersSummary } from '@/lib/purchase-orders/server';
 import { sourceNowOf } from '@/lib/lead-source-server';
+import { cleanDesign, DESIGN_KEYS } from '@/lib/site/design';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -451,8 +452,8 @@ export async function GET(req: Request, { params }: Ctx) {
 const TEXT = ['title', 'address', 'postcode', 'simpliheat_url', 'opensolar_url', 'lost_reason', 'notes', 'dno_ref'] as const;
 const DNO = ['not_required', 'not_started', 'submitted', 'approved', 'rejected'];
 const DNO_ROUTES = ['g98', 'g99', 'demand', 'not_needed'];
-/** system keys and how each is cleaned. */
-const SYSTEM: Record<string, 'number' | 'int' | 'text'> = {
+/** system keys and how each is cleaned ('design': the site paperwork's design details, src/lib/site/design.ts). */
+const SYSTEM: Record<string, 'number' | 'int' | 'text' | 'design'> = {
   kwp: 'number',
   panel_count: 'int',
   panel_model: 'text',
@@ -466,6 +467,7 @@ const SYSTEM: Record<string, 'number' | 'int' | 'text'> = {
   mpan: 'text',
   export_limit_kw: 'number',
   monitoring: 'text',
+  ...Object.fromEntries(DESIGN_KEYS.map((k) => [k, 'design' as const])),
 };
 const PAPER_DATES = [
   'mcs_registered_on',
@@ -501,6 +503,10 @@ function merge(current: unknown, input: unknown, clean: (key: string, v: unknown
 }
 
 function cleanSystem(key: string, v: unknown): unknown {
+  if (SYSTEM[key] === 'design') {
+    const c = cleanDesign(key, v);
+    return c.ok ? c.value : null;
+  }
   if (v === null || v === undefined || v === '') return null;
   if (SYSTEM[key] === 'text') return String(v).trim().slice(0, 200) || null;
   const n = Number(String(v).replace(/,/g, ''));
@@ -599,6 +605,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
   if ('hold_reason' in b) v3.hold_reason = textOrNull(b.hold_reason, 300);
   if ('system' in b) {
+    // A design detail that isn't what it should be ("eight" strings) is refused, not quietly dropped.
+    for (const [k, v] of Object.entries(b.system && typeof b.system === 'object' ? (b.system as Row) : {})) {
+      if (SYSTEM[k] !== 'design') continue;
+      const c = cleanDesign(k, v);
+      if (!c.ok) return json({ error: c.error, field: k }, 400);
+    }
     const m = merge(before.system, b.system, cleanSystem, (k) => k in SYSTEM);
     if (m) v3.system = m;
   }
