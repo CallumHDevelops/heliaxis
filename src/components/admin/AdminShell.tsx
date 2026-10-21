@@ -30,6 +30,7 @@ type Tab =
   | 'subcontractors'
   | 'tasks'
   | 'assistant'
+  | 'design'
   | 'app';
 
 // Open RAMS and the social studio already signed in when they can (src/lib/sso.ts).
@@ -186,6 +187,12 @@ const icons = {
     <svg {...ICON}>
       <path d="M8 2.5h8A1.5 1.5 0 0 1 17.5 4v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5z" />
       <path d="M12 7v6M9.5 10.5 12 13l2.5-2.5M11 18.5h2" />
+    </svg>
+  ),
+  design: (
+    <svg {...ICON}>
+      <path d="M4.5 19.5 8 18.8 18.2 8.6a2.2 2.2 0 0 0-3.1-3.1L4.9 15.7z" />
+      <path d="m13.5 6.5 3.1 3.1M4.9 15.7 8 18.8" />
     </svg>
   ),
 };
@@ -350,6 +357,7 @@ export async function AdminShell({
       id: 'apps',
       label: 'Apps',
       items: [
+        { href: '/admin/design', label: 'Design studio', short: 'Design', icon: icons.design, active: active === 'design', show: can('design') },
         { href: SOCIAL_URL, label: 'Social media studio', short: 'Social media', icon: icons.social, show: can('social') },
         { href: '/admin/app', label: 'Get the app', icon: icons.app, active: active === 'app', show: true },
       ],
