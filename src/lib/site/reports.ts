@@ -1,0 +1,175 @@
+import 'server-only';
+import { ukDay } from '@/lib/bank-holidays';
+import { CRM_BUCKET, DOCS_BUCKET } from '@/lib/crm/server';
+import { docFileName, longDate, newDocument, stampWords, type Kit, type PhotoItem, type SignatureItem } from '@/lib/documents/pdf-kit';
+import { saveGenerated, type SaveResult } from '@/lib/documents/store';
+import { serverCtx } from './form-ctx';
+import { schemaFor } from './forms';
+import type { Field, FormCtx, SiteForm } from './forms/types';
+import { slotsOf, stepShown, stringsOf, visibleFields } from './rules';
+import { readAssignment, type ContactRow, type Db } from './server';
+import { SEVERITY_LABEL, type Flag, type Stage } from './types';
+
+/**
+ * The trades' own reports (internal: never visible to the customer): the roofer report (answers by
+ * step, flags, the declaration and signature, every photo with its slot) and the scaffold report
+ * (putting it up, then taking it down once signed, each side's photos up and down together). Made
+ * with the PDF kit and stored as generated documents RF_REPORT / SC_REPORT, a new version only
+ * when something in them changed.
+ */
+
+type Signoff = { id: string; stage: Stage; signed_name: string; signed_at: string; signature_path: string; declaration: string };
+type Photo = { id: string; slot: string | null; storage_path: string; taken_at: string | null; created_at: string };
+
+const SIDE: Record<string, string> = { front: 'Front', rear: 'Rear', left: 'Left side', right: 'Right side' };
+const WORD: Record<string, string> = { yes: 'Yes', no: 'No', na: 'N/A', pass: 'Pass', fail: 'Fail', done: 'Done', problem: 'Problem' };
+
+/** An answer as words for a document. */
+export function answerWords(f: Field, v: unknown, c: FormCtx): string | null {
+  if (v === undefined || v === null || v === '') return null;
+  switch (f.type) {
+    case 'CONFIRM':
+      return v === true ? 'Confirmed' : v === 'cant' ? 'Couldn’t confirm' : null;
+    case 'NUM':
+      return `${v}${f.unit ? ` ${f.unit}` : ''}`;
+    case 'PER_STRING': {
+      const list = Array.isArray(v) ? v.slice(0, stringsOf(f, c)) : [];
+      return list.length ? list.map((x, i) => `String ${i + 1}: ${x ?? '–'}${f.unit ? ` ${f.unit}` : ''}`).join(' · ') : null;
+    }
+    case 'SCAN': {
+      const list = (Array.isArray(v) ? v : []) as { s: string; unread?: boolean }[];
+      const read = list.filter((x) => !x.unread).map((x) => x.s);
+      const unread = list.length - read.length;
+      return [read.join(', '), unread ? `${unread} couldn’t be read (photo kept)` : ''].filter(Boolean).join('; ') || null;
+    }
+    case 'SEL':
+      return f.options?.find((o) => o.key === v)?.label ?? String(v);
+    case 'MULTI':
+      return Array.isArray(v) ? v.map((k) => f.options?.find((o) => o.key === k)?.label ?? String(k)).join(', ') : null;
+    default:
+      return typeof v === 'string' ? (WORD[v] ?? v) : String(v);
+  }
+}
+
+async function download(db: Db, bucket: string, path: string): Promise<Uint8Array | null> {
+  const { data } = await db.storage.from(bucket).download(path);
+  return data ? new Uint8Array(await data.arrayBuffer()) : null;
+}
+
+const mimeOf = (path: string) => (/\.png$/i.test(path) ? 'image/png' : /\.webp$/i.test(path) ? 'image/webp' : 'image/jpeg');
+
+/** One form's answers, step by step, as rows (photo questions say how many; the photos follow later). */
+function answerSections(kit: Kit, form: SiteForm, c: FormCtx) {
+  for (const step of form.steps.filter((s) => stepShown(s, c))) {
+    const fields = visibleFields(step, c).filter((f) => f.type !== 'SIG');
+    if (!fields.length) continue;
+    kit.section(step.title);
+    kit.rows(
+      fields.map((f) => {
+        if (f.type === 'PHOTOS') {
+          const n = slotsOf(f, c).reduce((a, s) => a + (c.photos[s] ?? 0), 0);
+          return { label: f.label, value: n ? `${n} photo${n === 1 ? '' : 's'} (below)` : 'None', must: false };
+        }
+        return { label: f.label, value: answerWords(f, c.values[f.key], c), must: false };
+      })
+    );
+  }
+}
+
+function flagSection(kit: Kit, flags: Flag[]) {
+  if (!flags.length) return;
+  kit.section('Flagged', { intro: 'What the answers raised for the office, and how each was dealt with.' });
+  kit.rows(flags.map((f) => ({ label: f.text, value: `${SEVERITY_LABEL[f.severity]}${f.resolved_at ? `: resolved${f.note ? ` (${f.note})` : ''}` : ''}` })));
+}
+
+async function photoItems(db: Db, list: Photo[], caption: (p: Photo) => string): Promise<PhotoItem[]> {
+  const out: PhotoItem[] = [];
+  for (const p of list) {
+    const bytes = await download(db, CRM_BUCKET, p.storage_path);
+    if (bytes) out.push({ bytes, mime: mimeOf(p.storage_path), caption: caption(p), sub: p.taken_at ? `Taken ${stampWords(p.taken_at)}` : null });
+  }
+  return out;
+}
+
+/** Where a photo slot's field is, for its caption ("Before you start", "Front: up"). */
+function labelOf(forms: SiteForm[], slot: string): string {
+  const [key, side] = slot.split(':');
+  for (const form of forms) for (const s of form.steps) for (const f of s.fields) if (f.key === key) return `${f.label}${side ? ` (${SIDE[side] ?? side})` : ''}`;
+  return slot;
+}
+
+export type ReportInputs = { a: string; answers: unknown; flags: Flag[]; photos: string[]; signoffs: string[] };
+
+/** Build and store the trade report for an assignment (roofer or scaffolder); null for trades without one. */
+export async function saveTradeReport(db: Db, assignmentId: string): Promise<SaveResult | null> {
+  const a = await readAssignment(db, assignmentId);
+  if (!a || (a.trade !== 'roofer' && a.trade !== 'scaffolder')) return null;
+  const forms = schemaFor(a);
+  const [{ data: p }, { data: contact }, { data: so }, { data: ph }] = await Promise.all([
+    db.from('crm_projects').select('*').eq('id', a.project_id).maybeSingle(),
+    db.from('site_contacts').select('*').eq('id', a.contact_id).maybeSingle(),
+    db.from('site_signoffs').select('*').eq('assignment_id', a.id).order('signed_at'),
+    db.from('crm_photos').select('id, slot, storage_path, taken_at, created_at').eq('assignment_id', a.id).order('created_at'),
+  ]);
+  const project = (p ?? {}) as Record<string, unknown>;
+  const person = contact as ContactRow | null;
+  const signoffs = (so ?? []) as Signoff[];
+  const photos = (ph ?? []) as Photo[];
+  const { data: cust } = await db.from('enquiries').select('name').eq('id', String(project.enquiry_id ?? '')).maybeSingle();
+  const c = await serverCtx(db, a);
+  const jobRef = (project.project_ref as string | null) ?? null;
+  const roofer = a.trade === 'roofer';
+  const title = roofer ? 'Roofer report' : 'Scaffold report';
+  const signed = (s: Stage) => signoffs.find((x) => x.stage === s);
+  const issued = ukDay(signoffs.at(-1)?.signed_at ?? new Date());
+
+  const kit = await newDocument({ code: roofer ? 'RF_REPORT' : 'SC_REPORT', label: title, title, jobRef, issued, draft: !signoffs.length });
+  kit.header({ meta: [['Job', jobRef ?? '–'], ['Date', longDate(issued)]] });
+  kit.idGrid([
+    ['Site address', c.address],
+    ['Customer', (cust as { name?: string } | null)?.name ?? null],
+    [roofer ? 'Roofer' : 'Scaffolder', [person?.name, person?.company].filter(Boolean).join(' · ')],
+    ['Mobile', person?.mobile ?? null],
+  ]);
+
+  const flags = a.flags;
+  for (const form of forms) {
+    const so1 = signed(form.stage);
+    if (form.after && !so1 && !signed(form.after)) continue;
+    if (forms.length > 1) kit.section(form.title === 'Scaffold up' ? 'Putting it up' : form.title === 'Scaffold down' ? 'Taking it down' : form.title, { intro: so1 ? `Signed off ${stampWords(so1.signed_at)}` : 'Not signed off yet' });
+    answerSections(kit, form, c);
+  }
+  flagSection(kit, flags);
+
+  // Photos: by slot; for the scaffold, each side's photos up and down side by side.
+  const bySlot = new Map<string, Photo[]>();
+  for (const x of photos) if (x.slot) bySlot.set(x.slot, [...(bySlot.get(x.slot) ?? []), x]);
+  if (photos.length) {
+    kit.section('Photos', { intro: `${photos.length} photo${photos.length === 1 ? '' : 's'}, each with the question it answers.` });
+    const paired = new Set<string>();
+    if (!roofer) {
+      const sides = [...new Set([...bySlot.keys()].filter((s) => /^(SCX1|SS2):/.test(s)).map((s) => s.split(':')[1]))];
+      for (const side of sides) {
+        const pair = [...(bySlot.get(`SCX1:${side}`) ?? []).slice(0, 1), ...(bySlot.get(`SS2:${side}`) ?? []).slice(0, 1)];
+        pair.forEach((x) => paired.add(x.id));
+        await kit.photos(await photoItems(db, pair, (x) => `${SIDE[side] ?? side}: ${x.slot?.startsWith('SS2') ? 'down' : 'up'}`), { perRow: 2 });
+      }
+    }
+    await kit.photos(await photoItems(db, photos.filter((x) => !paired.has(x.id)), (x) => labelOf(forms, x.slot ?? '')));
+  }
+
+  // The declarations and signatures.
+  const sigs: SignatureItem[] = [];
+  for (const form of forms) {
+    const s = signed(form.stage);
+    if (!s) continue;
+    kit.section(`${form.title}: declaration`);
+    kit.paragraph(s.declaration);
+    sigs.push({ title: form.sig.label, png: await download(db, DOCS_BUCKET, s.signature_path), name: s.signed_name, at: s.signed_at });
+  }
+  if (sigs.length) await kit.signatures(sigs);
+
+  const bytes = await kit.save();
+  const inputs: ReportInputs = { a: a.id, answers: a.answers, flags, photos: photos.map((x) => x.id), signoffs: signoffs.map((x) => x.id) };
+  return saveGenerated(db, a.project_id, { key: roofer ? 'RF_REPORT' : 'SC_REPORT', name: docFileName(jobRef, '', title), bytes, inputs, category: 'commissioning', visible: false });
+}

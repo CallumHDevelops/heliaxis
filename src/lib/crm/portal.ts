@@ -68,7 +68,8 @@ export async function loadPortal(token: string) {
   // quote-only page shows one that isn't in their portal; the full portal keeps to visible documents.
   const toSign = docs.find((d) => d.needs_signature && (!full || d.visible) && SIGNABLE_CATEGORIES.includes(d.category));
   const acceptedDoc = p.accepted_document_id ? docs.find((d) => d.id === p.accepted_document_id) : undefined;
-  const visible = full ? docs.filter((d) => d.visible) : [];
+  // An archived version (a generated document replaced since) is never shown, whatever its flag says.
+  const visible = full ? docs.filter((d) => d.visible && !(d as { archived_at?: string | null }).archived_at) : [];
   const ordered = [...visible.filter((d) => d.category === 'handover'), ...visible.filter((d) => d.category !== 'handover')];
   const amount = Number(p.deposit_amount) || 0;
   const hasSigned = isSigned(p, docs);

@@ -57,8 +57,13 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/setup/file': ['./supabase/*.sql'],
     '/admin/setup/**': ['./supabase/*.sql', './*.md'],
-    // The logo on purchase order PDFs (src/lib/purchase-orders/pdf.ts).
-    '/api/crm/purchase-orders/**': ['./public/assets/heliaxis-logo.png'],
+    // The logo on purchase order PDFs (src/lib/purchase-orders/pdf.ts), and the logo and fonts of the
+    // document kit (src/lib/documents/pdf-kit.ts) wherever site paperwork, labour POs and reports are made.
+    '/api/crm/purchase-orders/**': ['./public/assets/heliaxis-logo.png', './public/assets/fonts/*.ttf'],
+    '/api/site/**': ['./public/assets/heliaxis-logo.png', './public/assets/fonts/*.ttf'],
+    '/api/crm/site-assignments/**': ['./public/assets/heliaxis-logo.png', './public/assets/fonts/*.ttf'],
+    '/api/crm/projects/**': ['./public/assets/heliaxis-logo.png', './public/assets/fonts/*.ttf'],
+    '/api/cron/site': ['./public/assets/heliaxis-logo.png', './public/assets/fonts/*.ttf'],
   },
   images: {
     remotePatterns: [

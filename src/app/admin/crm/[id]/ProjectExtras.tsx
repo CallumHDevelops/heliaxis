@@ -24,6 +24,11 @@ export type CrmDoc = {
   /** crm-v3.sql: ticked as signed on paper or with another e-sign service. */
   signed_outside_at?: string | null;
   signed_outside_note?: string | null;
+  /** site-commissioning.sql: generated documents keep every version; replaced ones are archived. */
+  version?: number | null;
+  generated_key?: string | null;
+  source?: string | null;
+  archived_at?: string | null;
 };
 type LibDoc = { id: string; name: string; description: string | null };
 type Snippet = { id: string; title: string; body: string };
@@ -156,6 +161,9 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
   const [flash, setFlash] = useState(false);
   const [marking, setMarking] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const archived = docs.filter((d) => d.archived_at);
+  const shown = showArchived ? docs : docs.filter((d) => !d.archived_at);
   const input = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLDivElement>(null);
   // Reload the link state when the documents change (who signed, which one is the signed quote).
@@ -276,14 +284,19 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
       )}
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {sent && <p className="crm-banner">{sent}</p>}
-      {docs.length === 0 ? (
+      {archived.length > 0 && (
+        <button type="button" className={`crm-chipbtn${showArchived ? ' on' : ''}`} aria-pressed={showArchived} onClick={() => setShowArchived((v) => !v)}>
+          {showArchived ? `Hide archived (${archived.length})` : `Archived (${archived.length})`}
+        </button>
+      )}
+      {shown.length === 0 ? (
         <p className="crm-muted crm-emptystate">
           No documents yet. Upload quotes, invoices, DNO letters and certificates. Ones marked visible appear in the customer’s portal once the job is
           Won.
         </p>
       ) : (
         <ul className="crm-doclist">
-          {docs.map((d) => {
+          {shown.map((d) => {
             const signable = SIGNABLE.includes(d.category);
             const isSignedQuote = d.id === signedQuoteId;
             const outside = signedBy.get(d.id);
@@ -294,6 +307,8 @@ export function DocumentsTab({ id, docs, onChanged, siteDocs = false }: { id: st
                   <b>{d.name}</b>
                   <small>
                     {DOC_LABEL[d.category] || 'Document'} · {short(d.created_at)}
+                    {d.generated_key || (d.version ?? 1) > 1 ? ` · v${d.version ?? 1}` : ''}
+                    {d.archived_at ? ` · archived ${short(d.archived_at)}` : ''}
                   </small>
                 </a>
                 {isSignedQuote && portal?.accepted && (
