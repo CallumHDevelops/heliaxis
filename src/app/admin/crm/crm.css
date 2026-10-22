@@ -1279,7 +1279,7 @@ textarea.crm-input {
 }
 .crmh-seg a:focus-visible,
 .crmh-seg button:focus-visible {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 @media (max-width: 1023px) {
@@ -1422,7 +1422,7 @@ textarea.crm-input {
   border-color: rgb(var(--fg-rgb) / 0.3);
 }
 .crmh-count:focus-visible {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-count__lab {
@@ -2207,7 +2207,7 @@ textarea.crm-input {
   background: var(--inverse-accent);
 }
 .crmh-switch input:focus-visible + span {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-day__h {
@@ -2294,7 +2294,7 @@ a.crmh-cust::after {
   inset: 0;
 }
 a.crmh-cust:focus-visible {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-ref {
@@ -2724,7 +2724,7 @@ button.crmb-rail {
   outline: none;
 }
 .crmh-card2__link:focus-visible::after {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-card2__wa {
@@ -3226,7 +3226,7 @@ button.crmb-rail {
   height: 1px;
 }
 .nps-starts label:has(input:focus-visible) {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 @media (max-width: 760px) {

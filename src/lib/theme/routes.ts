@@ -48,6 +48,15 @@ export function themeRouteFor(pathname: string): ThemeRoute | null {
 }
 
 /**
+ * An address on this site that is pinned light (the CMS editor and its previews). Links to one from a
+ * themed page are plain <a> (a full load), not next/link: a client-side navigation keeps the old page's
+ * <html>, so the editor would start in the dark theme until ThemeSync reloads it.
+ */
+export function isPinnedLight(href: string): boolean {
+  return href.startsWith('/') && !href.startsWith('//') && themeRouteFor(href)?.scope === 'light';
+}
+
+/**
  * For a page with no route header (built ahead of time): sets data-theme-scope and data-bar from the
  * address, before BOOT_SCRIPT runs. ES5, never throws, does nothing where the server already said.
  */

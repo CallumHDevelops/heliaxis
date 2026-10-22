@@ -34,7 +34,7 @@ const {
   THEME_LABELS,
   THEME_MAX_AGE,
 } = shared;
-const { decodeThemeRoute, encodeThemeRoute, SELF_ROUTE_SCRIPT, SITE_THEME_COLOR, themeRouteFor, themeViewportFor } = routes;
+const { decodeThemeRoute, encodeThemeRoute, isPinnedLight, SELF_ROUTE_SCRIPT, SITE_THEME_COLOR, themeRouteFor, themeViewportFor } = routes;
 
 let passed = 0;
 let failed = 0;
@@ -69,6 +69,14 @@ await test('the CMS editor and its previews are pinned light', () => {
   // Not the blog list itself, and not a page that merely starts with "cms".
   assert.equal(themeRouteFor('/admin/blog')?.scope, 'app');
   assert.equal(themeRouteFor('/admin/cmsx')?.scope, 'app');
+});
+await test('links into the pinned-light pages are the ones that load afresh', () => {
+  for (const h of ['/admin/cms', '/admin/cms/', '/admin/cms/home?tab=seo', '/admin/cms#x', '/admin/preview/x', '/admin/blog/preview/my-post']) {
+    assert.equal(isPinnedLight(h), true, h);
+  }
+  for (const h of ['/admin', '/admin/blog', '/admin/cmsx', '/admin/tasks', '/', '/portal/site', 'https://example.com/admin/cms', '//example.com/admin/cms', 'admin/cms']) {
+    assert.equal(isPinnedLight(h), false, h);
+  }
 });
 await test('the public website, /branding and /subcontractor-form are left alone', () => {
   for (const p of ['/', '/blog', '/blog/post', '/book-a-survey', '/book', '/my', '/branding', '/subcontractor-form', '/privacy-policy', '/administrator', '/portalx', '/loginx']) {

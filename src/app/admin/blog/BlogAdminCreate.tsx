@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { brand } from '@/components/auth/authStyles';
 import type { CmsArticleAi } from '@/lib/blog/cms-article-template';
@@ -36,7 +35,6 @@ const emptyDraft = (): CmsArticleAi => ({
 });
 
 export function BlogAdminCreate({ aiReady }: Props) {
-  const router = useRouter();
   const [prompt, setPrompt] = useState('');
   const [draft, setDraft] = useState<CmsArticleAi | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -111,7 +109,8 @@ export function BlogAdminCreate({ aiReady }: Props) {
         tone: 'ok',
         text: `Created ${data.slug}. Opening editor…`,
       });
-      router.push(data.editPath || `/admin/cms${data.slug}`);
+      // A full load: the CMS editor is pinned light (src/lib/theme/routes.ts).
+      window.location.assign(data.editPath || `/admin/cms${data.slug}`);
     } catch (err) {
       setMsg({ tone: 'err', text: err instanceof Error ? err.message : 'Create failed' });
       setBusy('idle');

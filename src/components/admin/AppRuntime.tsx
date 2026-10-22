@@ -224,7 +224,7 @@ export function AppRuntime({ surveys = false }: { /** Can use the CRM: keep the 
         <div className="hx-rt-bar" role="status">
           {!online && <span className="hx-rt-pill">Offline — changes will sync when you reconnect</span>}
           {waiting && (
-            <span className="hx-rt-note">
+            <span className="hx-rt-note hx-moment">
               Heliaxis has been updated.
               <button
                 type="button"
@@ -236,7 +236,7 @@ export function AppRuntime({ surveys = false }: { /** Can use the CRM: keep the 
             </span>
           )}
           {apkUpdate && !apkUpdate.forced && (
-            <span className="hx-rt-note">
+            <span className="hx-rt-note hx-moment">
               App update {apkUpdate.release.versionName} available.
               <Link className="hx-rt-btn is-primary" href="/admin/app">
                 Update

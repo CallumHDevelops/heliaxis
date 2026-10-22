@@ -639,7 +639,7 @@
   font-size: 1.0625rem;
 }
 .svf-input:focus {
-  outline: 3px solid var(--sv-solar);
+  outline: 3px solid var(--focus);
   outline-offset: 1px;
 }
 .svf-input:disabled {

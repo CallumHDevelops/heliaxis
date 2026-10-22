@@ -6,6 +6,8 @@
  *   anything printed is always light. src/lib/theme/shared.ts sets the attribute (cookie + boot script).
  * - .hx-light and .hx-dark are islands: a paper document or signature pad inside a dark page, an ink
  *   band inside a light one. Ordinary tokens work inside them.
+ * - .hx-moment goes on a --moment band (ink in both themes) that holds links or buttons: their focus
+ *   ring turns gold, which shows on ink (light's own --focus is a dark amber, made for paper).
  * - Use these names in page CSS (scripts/test-theme-tokens.mjs checks the rules):
  *     surfaces  --bg (page) --surface (cards, header, tab bar) --surface-2 (wells, chips, icon tiles)
  *               --raised (menus, sheets, dialogs: with --shadow) --field (inputs)
@@ -195,6 +197,12 @@
 .hx-light {
   color-scheme: only light;
   color: var(--text);
+}
+/* An ink band ("moment") on the page, in either theme: gold focus rings (9:1 on ink, where light's
+   #805400 is 2.5:1). On the band, not on a control: a ring drawn outside the band sits on the page. */
+.hx-moment {
+  --focus: var(--accent);
+  --focus-ring: 0 0 0 2px var(--moment), 0 0 0 4px var(--accent);
 }
 
 /* The page canvas and defaults on themed pages (the CMS editor, pinned light, keeps its own look).

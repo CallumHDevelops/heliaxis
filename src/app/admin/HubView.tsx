@@ -5,6 +5,7 @@ import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import { HubMetaLeads } from './HubMetaLeads';
 import { HubSearch } from '@/components/admin/GlobalSearch';
+import { isPinnedLight } from '@/lib/theme/routes';
 import type { HubMetaLeads as MetaLeads } from './meta-leads';
 import './hub.css';
 
@@ -115,6 +116,9 @@ function Card({
     ) : (
       <a className={cls} href={href} target="_blank" rel="noopener noreferrer">{body}</a>
     )
+  ) : isPinnedLight(href) ? (
+    // The CMS editor is pinned light: a full load, so it never starts in this page's dark theme.
+    <a className={cls} href={href}>{body}</a>
   ) : (
     <Link className={cls} href={href}>{body}</Link>
   );
@@ -195,7 +199,7 @@ export function HubView({
       )}
 
       {attention.length > 0 && (
-        <section className="hub-needs" aria-label="Needs your attention">
+        <section className="hub-needs hx-moment" aria-label="Needs your attention">
           <h2 className="hub-needs-h">Needs you</h2>
           <ul>
             {attention.map((a) => (

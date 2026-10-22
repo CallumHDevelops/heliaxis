@@ -686,7 +686,7 @@ export function PortalCard({
 
   if (mode === 'quote') {
     return (
-      <div className="crm-portal">
+      <div className="crm-portal hx-moment">
         <div className="crm-portal-head">
           <b>Customer portal</b>
           <span className="crm-muted crm-small">✍ Waiting for their signature</span>
@@ -721,7 +721,7 @@ export function PortalCard({
   if (mode !== 'full') {
     const lost = (state?.stage ?? '') === 'lost';
     return (
-      <div className="crm-portal">
+      <div className="crm-portal hx-moment">
         <div className="crm-portal-head">
           <b>Customer portal</b>
           <span className="crm-muted crm-small">🔒 Not yet</span>
@@ -753,7 +753,7 @@ export function PortalCard({
   }
 
   return (
-    <div className="crm-portal">
+    <div className="crm-portal hx-moment">
       <div className="crm-portal-head">
         <b>Customer portal</b>
         {current && <span className="crm-muted crm-small">Now: {current.label}</span>}

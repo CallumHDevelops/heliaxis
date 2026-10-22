@@ -150,6 +150,8 @@
   background: var(--moment);
   color: var(--sa-on-bar);
   border-bottom: 3px solid var(--accent);
+  /* Ink in both themes: a gold focus ring, which shows on it (the light theme's blue doesn't, 2.7:1). */
+  --sa-focus: var(--accent);
 }
 .sa-back {
   flex: none;

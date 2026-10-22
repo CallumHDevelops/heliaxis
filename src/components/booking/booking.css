@@ -559,6 +559,10 @@ textarea.bk-input {
   --bk-btn-sub: var(--inverse-text);
   --bk-intro-line: var(--accent-line);
 }
+/* The theme's focus colour: the website's soft gold ring is 1.4:1 on paper (3:1 needed to see focus). */
+:root[data-theme-scope='app'] .bk-input:focus {
+  outline-color: var(--focus);
+}
 /* On dark the choice buttons sit a step up from the card (an input-dark well would read as a field), and
    a chosen one is edged in gold over a lighter tint (a cream edge on a gold tint reads as brown there). */
 @media screen {

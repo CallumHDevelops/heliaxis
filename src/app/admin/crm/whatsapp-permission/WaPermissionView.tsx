@@ -262,7 +262,7 @@ export function WaPermissionView({ isAdmin, ready }: { isAdmin: boolean; ready: 
           )}
 
           {undo && (
-            <div className="wap-toast" role="status">
+            <div className="wap-toast hx-moment" role="status">
               <span>{undo.text}</span>
               <button type="button" className="crm-btn crm-btn--small" disabled={busy === undo.id} onClick={undoLast}>
                 Undo
