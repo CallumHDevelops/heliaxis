@@ -540,6 +540,8 @@ const SURVEY_GROUP = ['survey_at', 'survey_type', 'survey_minutes', 'survey_mail
 const INSTALL_GROUP = ['install_at', 'install_days', 'install_team', 'install_event_ids', 'install_event_mailbox', 'install_event_hash', 'install_event_until', 'scaffold_up_on', 'scaffold_down_on'];
 const SITE_GROUP = ['address', 'postcode', 'site_lat', 'site_lng'];
 const DNO_GROUP = ['dno_status', 'dno_ref', 'dno_submitted_at', 'dno_approved_at'];
+// A job's organisation and its contact there (organisations.sql): together, from one job.
+const ORG_GROUP = ['organisation_id', 'organisation_contact_id'];
 /** The kept job's, unless it has none. */
 const OR_THEIRS = ['value', 'owner_id', 'simpliheat_url', 'opensolar_url', 'rams_project_id', 'first_response_alerted_at', 'deposit_amount', 'commissioned_at', 'handover_at'];
 
@@ -616,6 +618,7 @@ export function combineJobs(K: Job, F: Job, now: string): JoinedJob {
   }
   const dnoStarted = (j: Job) => (!blank(j.dno_status) && j.dno_status !== 'not_started') || !blank(j.dno_ref);
   if (!dnoStarted(K) && dnoStarted(F)) copyGroup(DNO_GROUP);
+  if (!has(K, ['organisation_id']) && has(F, ['organisation_id'])) copyGroup(ORG_GROUP);
 
   // The next step: K's; both, F's becomes a task on K.
   if (blank(K.next_step) && !blank(F.next_step)) {

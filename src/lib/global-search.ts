@@ -2,6 +2,7 @@ import { isProjectStage, stageLabel } from './crm/stages';
 import { dbToUiStatus } from './enquiries';
 import { leadSourceLabel } from './lead-source';
 import { refMatches } from './projects/refs';
+import { orgTypeLabel } from './organisations/shared';
 import { everyWord, fold, hasText, nameRank, searchWords } from './search-words';
 
 /**
@@ -139,17 +140,38 @@ export function groupResults(a: { q: string; refs: string[]; people: PersonRow[]
     });
 }
 
+// ── Organisations (supabase/organisations.sql; CRM staff) ──
+
+/** An organisation found by its own details, or by one of its contacts' (`contact`: who matched). */
+export type SearchOrg = { id: string; name: string; type: string; postcode: string | null; contact: { id: string; name: string; role: string | null } | null; href: string };
+
+/** The organisations found (src/lib/organisations/server.ts searchOrganisations), with their type in words, names the words start first. */
+export function orgResults(q: string, hits: { id: string; name: string; type: string; postcode: string | null; contact: { id: string; name: string; role: string | null } | null }[]): SearchOrg[] {
+  const rank = (h: (typeof hits)[number]) => Math.min(nameRank(q, h.name), h.contact ? nameRank(q, h.contact.name) : 99);
+  return [...hits]
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'en-GB'))
+    .map((h) => ({ ...h, type: orgTypeLabel(h.type), href: `/admin/crm/organisations/${h.id}` }));
+}
+
 // ── The search box's list ──
 
-/** One line in the list: a person, or (when they have several) one of their jobs beneath them. */
-export type SearchOption = { key: string; kind: 'person' | 'job'; person: SearchPerson; job: SearchJob | null; href: string | null };
+/** One line in the list: a person, (when they have several) one of their jobs beneath them, or an organisation. */
+export type SearchOption =
+  | { key: string; kind: 'person' | 'job'; person: SearchPerson; job: SearchJob | null; org?: undefined; href: string | null }
+  | { key: string; kind: 'org'; person: null; job: null; org: SearchOrg; href: string };
 
-/** A person with one job opens it from their own line; with several, each job gets a line of its own. */
-export function searchOptions(people: SearchPerson[]): SearchOption[] {
-  return people.flatMap((p) => [
-    { key: `p-${p.id}`, kind: 'person' as const, person: p, job: null, href: p.href },
-    ...(p.jobs.length > 1 ? p.jobs.map((j) => ({ key: `j-${j.id}`, kind: 'job' as const, person: p, job: j, href: j.href })) : []),
-  ]);
+/**
+ * A person with one job opens it from their own line; with several, each job gets a line of its own.
+ * Organisations come after the people.
+ */
+export function searchOptions(people: SearchPerson[], orgs: SearchOrg[] = []): SearchOption[] {
+  return [
+    ...people.flatMap((p): SearchOption[] => [
+      { key: `p-${p.id}`, kind: 'person', person: p, job: null, href: p.href },
+      ...(p.jobs.length > 1 ? p.jobs.map((j): SearchOption => ({ key: `j-${j.id}`, kind: 'job', person: p, job: j, href: j.href })) : []),
+    ]),
+    ...orgs.map((o): SearchOption => ({ key: `o-${o.id}${o.contact ? `-${o.contact.id}` : ''}`, kind: 'org', person: null, job: null, org: o, href: o.href })),
+  ];
 }
 
 /** ↑ / ↓ from `from` (-1: nothing yet), round the ends, skipping lines that open nothing. -1 when none do. */

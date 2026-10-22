@@ -130,8 +130,24 @@
   opacity: 0.55;
 }
 .gs-opt.is-person + .gs-opt.is-person,
-.gs-opt.is-job + .gs-opt.is-person {
+.gs-opt.is-job + .gs-opt.is-person,
+.gs-opt.is-org + .gs-opt.is-org {
   border-top: 1px solid var(--border-soft);
+}
+/* Organisations and their contacts (CRM staff): after the people, under a heading of their own. */
+.gs-opt.is-firstorg::before {
+  content: attr(data-group);
+  display: block;
+  padding: 0.55rem 0.7rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gs-opt.is-firstorg:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
 }
 .gs-row {
   display: flex;
