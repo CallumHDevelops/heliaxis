@@ -19,6 +19,8 @@ The **Users** page lists everyone who has an account, one account per person. Fr
 
 The old Approvals page now opens this page.
 
+![The Users page with one person awaiting approval](/help/admin/users-page.jpg "The Users page: a new sign-up at the top with Approve and Reject")
+
 ## What’s on the page
 
 At the top it says how many people are **awaiting approval**, and there’s a **Search name or email…** box.
@@ -42,5 +44,3 @@ You can’t change your own **Status** or **Role**, so you can’t lock yourself
 - [Reset someone’s password](/admin/help/admin/reset-someones-password)
 
 > **Once switched on:** Ticking access per person needs user-portals.sql. Until it has been run, the page says "Portal access isn’t set up in the database yet" and members keep the old access: Website CMS and Enquiries.
-
-<!-- shot: admin/users-page.jpg | The Users page: a new sign-up at the top with Approve and Reject | The Users page with one person awaiting approval -->

@@ -9,7 +9,7 @@ access: crm
 ---
 **CRM › Pipeline** is where sales work starts. On a phone, tap **CRM** on the bottom bar. It opens on the view you picked last time (**Home**, **Board** or **List**), or **Home** the first time.
 
-<!-- shot: customers/pipeline-home.jpg | The CRM Pipeline on Home: counts, stage strip, My work, Latest notes and the WhatsApp panel. | The CRM Pipeline page on a computer, with the five counts, the stage strip, My work and Latest notes. -->
+![The CRM Pipeline page on a computer, with the five counts, the stage strip, My work and Latest notes.](/help/customers/pipeline-home.jpg "The CRM Pipeline on Home: counts, stage strip, My work, Latest notes and the WhatsApp panel.")
 
 ## Across the top
 
@@ -17,7 +17,7 @@ access: crm
 - A short summary, such as “24 open · 6 at Lead”. On wide screens it also shows the value quoted and how many were won in the last 30 days.
 - The search box: see [Find a customer](/admin/help/customers/find-a-customer).
 - **Home**, **Board** and **List**. The one you pick is remembered for next time. There’s no Board on phones and small tablets.
-- **Reports** (see [The CRM reports page](/admin/help/reports/crm-reports-page)), the gear (**CRM settings**, see [CRM settings](/admin/help/admin/crm-settings)) and **+ New** (see [Add a customer by hand](/admin/help/customers/add-a-customer)). On a phone these are replaced by a search button, a gear button and a yellow **+** at the bottom; for reports, tap **More**, then **CRM reports**.
+- **Reports** (see [The CRM reports page](/admin/help/reports/crm-reports-page)), the gear (**CRM settings**, see [CRM settings](/admin/help/admin/crm-settings)) and **+ New** (see [Add a new customer by hand](/admin/help/customers/add-a-customer)). On a phone these are replaced by a search button, a gear button and a yellow **+** at the bottom; for reports, tap **More**, then **CRM reports**.
 
 ## The five counts
 
@@ -35,7 +35,7 @@ Tap any of them to see what’s behind it.
 
 One line with each sales stage and how many are in it (**Lead**, **Contacted**, **Survey booked**, **Surveyed**, **Quote sent**), then **Won (30 days)**. Tap a stage to jump to that column on the Board (on a phone, the List filtered to it). **Open board →** opens the Board.
 
-If a line says, for example, “3 enquiries aren’t in the CRM yet”, press **Review**. Each one has **Create opportunity**. See [Add a customer by hand](/admin/help/customers/add-a-customer).
+If a line says, for example, “3 enquiries aren’t in the CRM yet”, press **Review**. Each one has **Create opportunity**. See [Add a new customer by hand](/admin/help/customers/add-a-customer).
 
 > **Admins only:** Admins may also see a line saying how many customers you’ve already messaged on WhatsApp are still at Lead, with **Move them all to Contacted** and **Not now**. See [Move messaged customers to Contacted](/admin/help/enquiries/contacted-catch-up).
 

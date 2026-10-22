@@ -36,11 +36,11 @@ It isn’t shared out on the rota. Like any new lead at **Lead**, if nobody is i
 
 Change any of it on the job’s page. From there you work them through the sales stages: see [Sales stages and moving a customer along](/admin/help/customers/sales-stages).
 
-> **Good to know:** The CRM home also tells you about enquiries without a job ("2 enquiries aren’t in the CRM yet") with **Review**, where you can press **Create opportunity** for each. See [Add a customer by hand](/admin/help/customers/add-a-customer).
+> **Good to know:** The CRM home also tells you about enquiries without a job ("2 enquiries aren’t in the CRM yet") with **Review**, where you can press **Create opportunity** for each. See [Add a new customer by hand](/admin/help/customers/add-a-customer).
 
 ## A second job for the same customer
 
-**Open in CRM** never makes a second job for someone who already has one. To start another job for them (say, a battery a year after their panels), use **+ New** in the CRM and pick them: see [Add a customer by hand](/admin/help/customers/add-a-customer).
+**Open in CRM** never makes a second job for someone who already has one. To start another job for them (say, a battery a year after their panels), use **+ New** in the CRM and pick them: see [Add a new customer by hand](/admin/help/customers/add-a-customer).
 
 ## Someone who isn’t on Enquiries
 

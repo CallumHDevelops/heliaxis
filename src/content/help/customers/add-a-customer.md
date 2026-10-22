@@ -1,5 +1,5 @@
 ---
-title: Add a customer by hand
+title: Add a new customer by hand
 summary: Add a new enquiry for someone who phoned, was referred or walked in, or a new opportunity for someone already in the CRM.
 order: 60
 keywords: new customer, new enquiry, new lead, new opportunity, + New, phone call, referral, walk-in, add person, create opportunity, enquiries not in the CRM

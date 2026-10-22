@@ -15,6 +15,8 @@ access: crm
 
 With nothing on, it says "No surveys, installs or diary entries today."
 
+![Today and My day on a phone](/help/dashboard/today-my-day.jpg "Today and My day on a phone")
+
 ## Each line
 
 - **The time**: a survey’s start and finish ("09:00–10:30"), an install’s start time on its first day and **All day** after that, or a diary entry’s times (or **All day**).
@@ -41,5 +43,3 @@ A **Visit** has no survey button: it’s a home visit with no survey form. That�
 For doing the survey itself, see [Start a survey](/admin/help/surveys/start-a-survey).
 
 > **Once switched on:** Today needs surveys.sql. Your diary entries and **+ Add to my diary** need survey-booking.sql too.
-
-<!-- shot: dashboard/today-my-day.jpg | Today and My day on a phone | Today and My day on a phone -->

@@ -5,7 +5,7 @@ order: 150
 keywords: schedule, scheduled message, send later, clock button, tomorrow morning, 07:00, 08:45, 09:30, pick a date and time, delay sending, cancel scheduled message, edit scheduled message
 access: enquiries, crm
 ---
-<!-- shot: whatsapp/send-later.jpg | Send later: quick times, or pick a date and time | The Send later choices open above the reply box on a phone -->
+![The Send later choices open above the reply box on a phone](/help/whatsapp/send-later.jpg "Send later: quick times, or pick a date and time")
 
 ## Schedule a message
 

@@ -11,6 +11,8 @@ Open it from **Team › Tasks** on a computer (just **Tasks** in the top menu if
 
 It’s a shared list: you see everyone’s tasks, not just your own.
 
+![The Tasks page on a computer](/help/tasks/tasks-page.jpg "Tasks: counts, tabs, filters and the list")
+
 ## At the top
 
 - **Tasks**, with "Create a task, assign it, give it a deadline — then tick it off." and a line saying whether your changes are saved (**All changes saved**, **Syncing…**, or how many are waiting).
@@ -49,5 +51,3 @@ With no tasks at all the page says "No tasks yet — add the first one above." I
 - The **Tasks** card on a customer’s job (CRM): that job’s tasks. See [Tasks and next steps on a job](/admin/help/projects/tasks-and-next-steps).
 
 > **Once switched on:** Tasks needs tasks.sql. Until it has been run, the page says the tasks table isn’t set up yet.
-
-<!-- shot: tasks/tasks-page.jpg | Tasks: counts, tabs, filters and the list | The Tasks page on a computer -->

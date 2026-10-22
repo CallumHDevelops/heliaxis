@@ -13,6 +13,8 @@ When a new feature needs switching on (a database file to run, a key to add in V
 
 For what the kinds of setup job are (a database file, a key in Vercel, a setting), see [How setup works](/admin/help/admin/how-setup-works).
 
+![The From Claude card with a to-do open](/help/dashboard/from-claude.jpg "From Claude: a setup to-do’s steps, tick and Who sees this")
+
 ## Follow a to-do
 
 The card says how many setup jobs are left. Tap one to open its step-by-step instructions. Depending on the job you’ll see:
@@ -45,5 +47,3 @@ A **Question for you** has a **Your answer** box. Type your answer and press **S
 > - Tap people’s names to show it only to them (they can tick it off too). The to-do then says who it’s shared with, or **Only you**.
 >
 > To-dos passed only to other people are under **Shared with others** at the bottom of the card, where you can still tick them or change who sees them.
-
-<!-- shot: dashboard/from-claude.jpg | From Claude: a setup to-do’s steps, tick and Who sees this | The From Claude card with a to-do open -->

@@ -11,7 +11,7 @@ On a phone, tap **More** at the bottom of the screen, then **Surveys and diary**
 
 The page has four tabs along the top: **Diary**, **To do**, **Drafts** and **Done**. Admins also see **⚙**, which opens the survey booking settings. You book surveys on the Diary. The other three tabs list the surveys themselves: see [Surveys to do, started and finished](/admin/help/surveys/survey-lists).
 
-<!-- shot: surveys/diary.jpg | The Diary: requests waiting at the top, then each day with its drives | The Diary on a computer, with a request waiting and two days of appointments -->
+![The Diary on a computer, with a request waiting and two days of appointments](/help/surveys/diary.jpg "The Diary: requests waiting at the top, then each day with its drives")
 
 ## The buttons at the top
 

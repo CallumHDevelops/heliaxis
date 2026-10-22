@@ -9,7 +9,7 @@ access: enquiries
 ---
 **CRM › Enquiries** lists everyone who has got in touch, newest first. You need Enquiries access to open it. On a phone it’s under **More** (or it’s a tab at the bottom, if you have Enquiries but not CRM).
 
-<!-- shot: enquiries/enquiries-page.jpg | Status cards, the From buttons, search and the list | The Enquiries page -->
+![The Enquiries page](/help/enquiries/enquiries-page.jpg "Status cards, the From buttons, search and the list")
 
 ## At the top
 

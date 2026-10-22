@@ -9,6 +9,8 @@ access: crm
 ---
 **CRM settings** is where you choose what the CRM sends and does by itself. Anyone with **CRM** access can open it. Most of it can only be changed by an admin: for everyone else it’s greyed out and the top says "Only admins can change these."
 
+![The top of CRM settings: Connections, Survey booking and diary, and New leads](/help/admin/crm-settings.jpg "CRM settings: the Connections list and the New leads section")
+
 ## What’s on the page, top to bottom
 
 | Part | What it’s for | Who can change it |
@@ -30,5 +32,3 @@ access: crm
 The **Reports** button at the top right opens **CRM reports**.
 
 > **Once switched on:** The **Handover pack** and **Product library** parts only appear once handover.sql has been run.
-
-<!-- shot: admin/crm-settings.jpg | CRM settings: the Connections list and the New leads section | The top of CRM settings: Connections, Survey booking and diary, and New leads -->

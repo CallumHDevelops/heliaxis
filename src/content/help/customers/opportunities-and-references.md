@@ -31,7 +31,7 @@ On their page, **Other projects (n) ▾** in the header lists them, and the left
 
 ## Add another job
 
-- For more sales work (a new enquiry, a quote to do): press **+ New** on the CRM page and pick them. See [Add a customer by hand](/admin/help/customers/add-a-customer). It doesn’t get the new-lead follow-up messages.
+- For more sales work (a new enquiry, a quote to do): press **+ New** on the CRM page and pick them. See [Add a new customer by hand](/admin/help/customers/add-a-customer). It doesn’t get the new-lead follow-up messages.
 - For a job that’s already sold or under way (an add-on battery, a callback): on their page, use **New project for Jane** in **⋯** or at the bottom of the left column (on a phone, the bottom of the **Details** tab). See [Start a project](/admin/help/projects/start-a-project).
 
 If two of a customer’s jobs are really the same work, made twice by mistake, use **⋯ › Join this job with another of Jane’s jobs…**. See [Merge a customer who’s in twice](/admin/help/customers/merge-duplicates).

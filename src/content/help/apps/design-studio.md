@@ -9,13 +9,13 @@ access: design
 ---
 **Apps › Design studio** (on a phone: **More**, then **Design**) is a simple page for making on-brand artwork with the Heliaxis logos, colours and fonts.
 
-<!-- shot: apps/design-studio-v1.jpg | Format and brand pieces on the left, the page in the middle, Selected on the right | The design studio -->
+![The design studio](/help/apps/design-studio-v1.jpg "Format and brand pieces on the left, the page in the middle, Selected on the right")
 
 ## Make a design
 
 1. Under **Format**, pick a size, such as **Business card (85×55)**, **A5 leaflet (148×210)**, **Roller banner (850×2000)** or **Social square (1080×1080)**. Pick the size first: changing it later doesn’t move or resize what’s already on the page.
 2. Add things with the buttons along the top: **+ Heading**, **+ Text**, **+ Box** and **+ Image**. Add a logo from **Brand logos** on the left.
-3. Click something on the page to change it under **Selected** on the right: for text, its **Text**, **Font**, **Size**, **Bold**, **Left** or **Centre**; for anything, its **Colour** and **Opacity**, and **Bring front**, **Send back**, **Duplicate** or **Delete**. Drag things on the page to move or resize them.
+3. Click something on the page to change it under **Selected** on the right: for text, its **Text**, **Font**, **Size**, **Bold**, **Left** or **Centre**; for anything, its **Colour** and **Opacity**, and **Bring front**, **Send back**, **Duplicate** or **Delete**. Drag things on the page to move or resize them. To change the words of a heading or text, click it, click it again, and type on the page.
 4. To colour something in a brand colour, select it, then click a colour under **Brand colours**.
 5. **↶ Undo** takes back the last thing you added, moved, resized or deleted. Changes made under **Selected** or **Brand colours** can’t be undone on their own.
 
@@ -27,6 +27,8 @@ To design over a supplier’s template, click **Import PDF background**. Page 1 
 - **Export PNG** downloads a picture.
 
 The logos, colours and fonts the studio uses are on [The brand guidelines page](/admin/help/apps/brand-guidelines).
+
+> **Watch out:** After each change under **Selected** to a heading or text (a letter typed in **Text**, a new **Font** or **Size**, **Bold**, **Left**, **Centre** or a colour), its text boxes go from **Selected**. Click off it and back on it to make the next change. Typing the words on the page doesn’t do this.
 
 > **Watch out:** Designs aren’t saved. If you leave or refresh the page, your design is gone, so export before you go.
 

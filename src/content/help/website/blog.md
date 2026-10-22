@@ -9,6 +9,8 @@ access: cms
 ---
 **CMS › Blog** (the page is headed **AI Blog**) lists the articles on heliaxis.co.uk/blog. Articles are written into a fixed article layout by AI, then edited and published in the CMS like any page. They’re kept off the CMS dashboard’s page list so they don’t get mixed up with website pages.
 
+![The Blog page](/help/website/blog-list.jpg "Article counts, the New article box and the list of articles")
+
 ## At the top
 
 - **Drafts**, **Scheduled** and **Live**: how many articles are in each state.
@@ -33,5 +35,3 @@ And these buttons:
 - **⋯** for **Preview**, **Publish now** or **Unpublish**, and **Delete**.
 
 See [Publish, schedule or take down a blog article](/admin/help/website/publish-a-blog-article).
-
-<!-- shot: website/blog-list.jpg | Article counts, the New article box and the list of articles | The Blog page -->

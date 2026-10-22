@@ -14,7 +14,7 @@ To open it:
 - on a computer, **CRM › CRM reports**, or the **Reports** button at the top of the CRM page (also on **CRM settings**),
 - on a phone, **More** › **CRM reports**.
 
-<!-- shot: reports/reports-page.jpg | The period buttons and the figures at the top | The top of CRM reports -->
+![The top of CRM reports](/help/reports/reports-page.jpg "The period buttons and the figures at the top")
 
 ## Pick a period
 
@@ -35,7 +35,7 @@ Everything on the page counts opportunities made in that period, and where each 
 
 ## Below the figures
 
-- **By source and ad campaign**: leads, surveys, sales and £ won for each source. Once ad spend is connected, each Meta campaign and ad with its spend and cost per lead, survey and sale. See [Sources in the report](/admin/help/reports/sources) and [Meta ad spend and cost per lead](/admin/help/reports/meta-ad-spend).
+- **By source and ad campaign**: leads, surveys, sales and £ won for each source. Once ad spend is connected, each Meta campaign and ad with its spend and cost per lead, survey and sale. See [Sources in the report](/admin/help/reports/sources) and [Meta ad spend and cost per lead in the report](/admin/help/reports/meta-ad-spend).
 - **Pipeline funnel**: how many of the period’s opportunities have reached each stage.
 - **By person**: the same figures for each owner.
 - **Export**: admins only. See [Export customers and jobs](/admin/help/reports/export).

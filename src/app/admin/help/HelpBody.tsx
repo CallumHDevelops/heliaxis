@@ -6,9 +6,14 @@ import { useEffect, useRef } from 'react';
 /** Links that need a full page load: the CMS (its own stylesheet) and anything that isn't a page here. */
 const hard = (href: string) => !/^\/admin(\/|$|\?|#)/.test(href) || /^\/admin\/cms(\/|$|\?|#)/.test(href);
 
+/** A phone picture in Help: a 390-wide phone screen, taken at 2x. */
+const PHONE_SHOT = 780;
+
 /**
  * An article's HTML (src/lib/help/render.ts). Links to other pages of the app move without a page load,
- * as the menus do; a picture taller than it is wide is shown narrower (a phone screenshot), in its frame.
+ * as the menus do. A picture is never shown wider than it was taken (a small crop isn't blown up, and a
+ * tall crop of a computer screen keeps its size and scrolls in its frame rather than shrinking); a phone
+ * picture is shown at the phone's own width.
  */
 export function HelpBody({ html, className }: { html: string; className?: string }) {
   const router = useRouter();
@@ -18,7 +23,12 @@ export function HelpBody({ html, className }: { html: string; className?: string
     const root = ref.current;
     if (!root) return;
     const mark = (img: HTMLImageElement) => {
-      if (img.naturalWidth && img.naturalHeight > img.naturalWidth * 1.25) img.closest('.hp-fig')?.classList.add('is-portrait');
+      const fig = img.closest<HTMLElement>('.hp-fig');
+      const w = img.naturalWidth;
+      if (!fig || !w) return;
+      const phone = w === PHONE_SHOT;
+      fig.classList.toggle('is-phone', phone);
+      fig.style.setProperty('--hp-fig-w', `${phone ? w / 2 : w}px`);
     };
     const waiting: HTMLImageElement[] = [];
     const onLoad = (e: Event) => mark(e.currentTarget as HTMLImageElement);

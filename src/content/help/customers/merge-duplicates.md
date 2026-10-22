@@ -10,7 +10,7 @@ When the same person is in the CRM twice (say they came in from the website and 
 
 The app spots likely duplicates (the same email, the same phone or WhatsApp number, or an online booking that matched someone already in the CRM). Their page shows “Looks like the same person as Rob Evans (HX-0069) · same number”, and their card on the Board and List shows **Possible duplicate**.
 
-<!-- shot: customers/merge-sheet.jpg | Merging two records for the same person. | The Merge two records sheet, with Which record stays, Details, Jobs and What happens. -->
+![The Merge two records sheet, with Which record stays, Details, Jobs and What happens.](/help/customers/merge-sheet.jpg "Merging two records for the same person.")
 
 ## Start a merge
 

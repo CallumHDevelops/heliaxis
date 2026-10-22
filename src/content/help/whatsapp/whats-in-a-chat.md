@@ -7,7 +7,7 @@ where: CRM › WhatsApp inbox › a chat
 path: /admin/enquiries/inbox
 access: enquiries, crm
 ---
-<!-- shot: whatsapp/chat-page.jpg | A chat: messages, a chaser waiting, and the reply box | A WhatsApp chat with ticks, a smart reply, a chaser waiting and the reply box -->
+![A WhatsApp chat with ticks, a smart reply, a chaser waiting and the reply box](/help/whatsapp/chat-page.jpg "A chat: messages, a chaser waiting, and the reply box")
 
 ## The top of the chat
 

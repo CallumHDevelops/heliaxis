@@ -9,6 +9,8 @@ access: everyone
 ---
 The dashboard is the page you land on after signing in. Get back to it from anywhere with **Dashboard** in the top menu, **Home** on a phone, or the Heliaxis logo. It only shows what your account can open, so a colleague’s may look different. Each part below appears only for the people it says.
 
+![The dashboard on a computer](/help/dashboard/dashboard.jpg "The dashboard: search, Needs you and New Meta leads")
+
 ## At the top
 
 - Today’s date and **Hi** with your first name.
@@ -56,5 +58,3 @@ Setup to-dos left by Claude, for admins (and anyone an admin passes one to). See
 On a phone, the cards shrink to a grid of icons with their names, and a count shows as a dot.
 
 > **Good to know:** If you’re sent here with "You don’t have access to that area. Ask an admin to add it to your account.", you tried to open a page your account can’t. See [What you can see depends on your access](/admin/help/getting-started/your-access).
-
-<!-- shot: dashboard/dashboard.jpg | The dashboard: search, Needs you, New Meta leads and My day | The dashboard on a computer -->

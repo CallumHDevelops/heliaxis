@@ -20,7 +20,7 @@ Adding a subcontractor creates their record and their Framework Agreement, and e
 5. Leave **Email them their onboarding link now** ticked to send the invite straight away.
 6. Press **Create**.
 
-<!-- shot: team/add-subcontractor.jpg | New subcontractor: who they are, their rates under Clause 4.1, and the invite tick | The New subcontractor form with bespoke rates chosen -->
+![The New subcontractor form with bespoke rates chosen](/help/team/add-subcontractor.jpg "New subcontractor: who they are, their rates under Clause 4.1, and the invite tick")
 
 ## What happens next
 

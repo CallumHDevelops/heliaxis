@@ -7,7 +7,7 @@ where: CRM › Surveys and diary › To do
 path: /admin/surveys/todo
 access: crm
 ---
-<!-- shot: surveys/survey-phone.jpg | One screen at a time, with Back, Take photo and Next along the bottom | The solar survey on a phone, on the Roof screen -->
+![The solar survey on a phone, on the Roof screen](/help/surveys/survey-phone.jpg "One screen at a time, with Back, Take photo and Next along the bottom")
 
 ## The screens
 

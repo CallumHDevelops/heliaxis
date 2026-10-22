@@ -1,8 +1,8 @@
 ---
-title: The Purchase orders page
+title: Purchase orders: every job’s orders in one place
 summary: See every job’s supplier orders and labour POs in one place, grouped by when they’re due, with search and filters.
 order: 40
-keywords: purchase orders list, all orders, orders page, late, due in the next 7 days, drafts, awaiting delivery, delivered, cancelled, every supplier, search PO number, Finance menu, More Orders
+keywords: purchase orders list, all orders, orders page, late, due in the next 7 days, drafts, awaiting delivery, delivered, cancelled, every supplier, search PO number, Finance menu, More Orders, Purchase orders page
 where: Finance › Purchase orders
 path: /admin/projects/orders
 access: crm

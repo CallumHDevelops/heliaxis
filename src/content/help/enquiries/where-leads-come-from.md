@@ -43,7 +43,7 @@ Also:
 
 ## Leads you add or import
 
-- Someone who phoned or was referred: add them with **+ New** in the CRM. See [Add a customer by hand](/admin/help/customers/add-a-customer).
+- Someone who phoned or was referred: add them with **+ New** in the CRM. See [Add a new customer by hand](/admin/help/customers/add-a-customer).
 - Older Meta leads: see [Import older Meta leads](/admin/help/enquiries/import-meta-leads). Imported people keep their original dates, and nobody is notified or messaged.
 
 ## If something looks wrong

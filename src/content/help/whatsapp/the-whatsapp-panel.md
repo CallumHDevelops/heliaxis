@@ -7,7 +7,7 @@ access: crm, enquiries
 ---
 Anyone with CRM or Enquiries access gets the WhatsApp panel on a computer or tablet, so you can answer chats without leaving the page you’re on. Phones don’t have it: use **WhatsApp** on the bottom bar.
 
-<!-- shot: whatsapp/panel-chats.jpg | The WhatsApp panel: filters, search and chats | The WhatsApp panel docked open on the CRM Pipeline, on the Chats tab -->
+![The WhatsApp panel docked open on the CRM Pipeline, on the Chats tab](/help/whatsapp/panel-chats.jpg "The WhatsApp panel: filters, search and chats")
 
 ## How it shows
 

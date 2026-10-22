@@ -26,6 +26,8 @@ Every file is safe to run twice. If you’re not sure it worked, run it again.
 
 > **Good to know:** **View SQL** opens the file on a page of its own, with its name at the top, a **Copy SQL** button and the whole file underneath. It’s handy on a computer if you’d rather read it first.
 
+![A database file’s own page, with its name and the Copy SQL button](/help/admin/sql-page.jpg "View SQL: the file’s name, Copy SQL, and the file itself")
+
 ## If something goes wrong
 
 - **Copy SQL** says **Couldn’t copy**: open **View SQL** and use the **Copy SQL** button there, or select the text and copy it.
@@ -38,5 +40,3 @@ Every file is safe to run twice. If you’re not sure it worked, run it again.
 A few older files aren’t in the app to copy: user-portals.sql (access ticks on Users), subcontractors.sql and reminders.sql (Subcontractors and its daily reminders), tasks.sql, ntp.sql, portal-v2.sql, portal-v3.sql, portal-v4.sql, rams-sync.sql, heatmap_clicks.sql and schema.sql. They were run when those parts were first set up. If a page says one of them is needed, ask Claude for it.
 
 See [What each database file switches on](/admin/help/admin/database-files) for the full list.
-
-<!-- shot: admin/sql-page.jpg | View SQL: the file’s name, Copy SQL, and the file itself | A database file’s own page, with its name and the Copy SQL button -->

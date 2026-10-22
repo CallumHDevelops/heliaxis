@@ -1,15 +1,15 @@
 ---
-title: Meta ad spend and cost per lead
+title: Meta ad spend and cost per lead in the report
 summary: Read the Meta part of CRM reports: spend, cost per lead, survey and sale, and return for each campaign and ad.
 order: 40
-keywords: ad spend, Meta spend, Facebook ads, Instagram ads, cost per lead, CPL, cost per sale, cost per survey, return, ROAS, campaign, ad, which ad works best, Refresh from Meta, Meta counted, Ads Manager
+keywords: ad spend, Meta spend, Facebook ads, Instagram ads, cost per lead, CPL, cost per sale, cost per survey, return, ROAS, campaign, ad, which ad works best, Refresh from Meta, Meta counted, Ads Manager, Meta report
 where: CRM › CRM reports › By source and ad campaign
 path: /admin/crm/reports
 access: crm
 ---
 Once an admin has connected your Meta ad account, CRM reports puts what Meta charged beside the leads, surveys and sales each campaign and ad brought in. You can see which ads bring customers, not just form-fillers.
 
-<!-- shot: reports/ad-spend-table.jpg | Campaigns with their ads beneath, spend and cost per lead, survey and sale | The Meta part of By source and ad campaign -->
+![The Meta part of By source and ad campaign](/help/reports/ad-spend-table.jpg "Campaigns with their ads beneath, spend and cost per lead, survey and sale")
 
 ## At the top of the page
 
@@ -66,4 +66,4 @@ Under the table, a note gives the exact dates Meta’s spend covers, and compare
 
 > **Watch out:** Recent leads may still become sales, so cost per sale comes down as they do. Judge a new ad on cost per lead and per survey first.
 
-No spend showing, or a warning about Meta’s figures? See [Ad spend not showing in reports](/admin/help/reports/set-up-ad-spend).
+No spend showing, or a warning about Meta’s figures? See [When ad spend isn’t showing in reports](/admin/help/reports/set-up-ad-spend).

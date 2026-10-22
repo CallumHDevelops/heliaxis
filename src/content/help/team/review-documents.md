@@ -37,7 +37,7 @@ When rejecting, **Email them now and ask for a replacement (chased on day 3, 7 a
 
 Once approved, only the tidy PDF the app made from their upload is kept. Until then, the original upload is kept as well.
 
-<!-- shot: team/documents-card.jpg | Documents: the summary at the top, then each type, with Approve and Reject on a document to review | The Documents card with one document to review -->
+![The Documents card with one document to review](/help/team/documents-card.jpg "Documents: the summary at the top, then each type, with Approve and Reject on a document to review")
 
 ## Other things you can do
 

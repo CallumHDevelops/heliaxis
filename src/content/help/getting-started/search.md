@@ -7,6 +7,8 @@ access: enquiries, crm
 ---
 One search box finds customers and their jobs from anywhere in the app. You need Enquiries or CRM to see it.
 
+![The search box open over a page, with results](/help/getting-started/search.jpg "Search: type a name, postcode, phone, email or HX-ref")
+
 ## Where to search
 
 - **On the dashboard:** the box under the greeting. Press **/** to jump into it.
@@ -50,5 +52,3 @@ Searching never changes anything: opening a result just takes you to the page.
 > **Once switched on:** HX references are searched once customer-refs.sql has been run, and job references once crm-v3.sql has been run.
 
 The CRM page has its own search box too, which also matches word by word. See [Find a customer](/admin/help/customers/find-a-customer). For the keys that open and move through search, see [Keyboard shortcuts](/admin/help/getting-started/keyboard-shortcuts).
-
-<!-- shot: getting-started/search.jpg | Search: type a name, postcode, phone, email or HX-ref | The search box open over a page, with results -->

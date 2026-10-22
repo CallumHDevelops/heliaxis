@@ -19,6 +19,8 @@ The **From Claude** card only shows while there are setup jobs left. If it has g
 
 The heading says how many essential keys are missing, or "All the essentials are in".
 
+![The Vercel keys page with one group missing a key](/help/admin/vercel-keys.jpg "Check Vercel keys: a tick or cross per group and per key")
+
 ## Reading the page
 
 The keys are grouped by what they’re for. Each group has a mark:
@@ -60,5 +62,3 @@ The From Claude job for each feature gives you the key’s exact name, with a co
 5. Redeploy so the app picks them up: **Deployments** (top menu), the **⋯** on the top deployment, **Redeploy**, then **Redeploy** again. It takes about a minute.
 
 > **Good to know:** A key only shows as set here after the redeploy has finished. If it still shows **✗**, check the name in Vercel matches exactly, capitals included.
-
-<!-- shot: admin/vercel-keys.jpg | Check Vercel keys: a tick or cross per group and per key | The Vercel keys page with one group missing a key -->

@@ -11,6 +11,8 @@ access: subcontractors
 
 > **Good to know:** If **Subcontractors** is the only thing you can open in the **Team** menu, the top menu shows it as a plain **Subcontractors** link instead. On a phone it’s under **More**.
 
+![The Subcontractors page with the four counts and the list](/help/team/subcontractors-page.jpg "Team › Subcontractors: counts, filters and the list of firms")
+
 ## At the top
 
 - **Automatic reminders last ran …**: when the daily reminder emails last went, and how many. If it says they haven’t run, or need setting up, see [Automatic reminders to subcontractors](/admin/help/team/automatic-reminders).
@@ -51,5 +53,3 @@ This emails every firm except terminated ones a new personal link straight into 
 ## Convert existing documents to PDF
 
 If this card shows, some documents were uploaded before the app turned every upload into one compact PDF. Press **Convert them now** to do the same for those. **Stop after this batch** pauses it, and **Carry on** starts again. Documents RAMS has already pulled are left exactly as they are.
-
-<!-- shot: team/subcontractors-page.jpg | Team › Subcontractors: counts, filters and the list of firms | The Subcontractors page with the four counts and the list -->

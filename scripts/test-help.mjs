@@ -10,7 +10,8 @@
 //     labels are (not ', except in code and addresses).
 //  5. Search: the ranking rules on made-up articles (title > keywords > headings > summary > body, every
 //     word, prefixes, plurals, small words and question words, ' and ’ alike, the exact title first),
-//     highlighting, and every real article first for its own title.
+//     highlighting, every real article first for its own title, and the searches staff type ("add customer",
+//     "templates", "ad spend"…) putting the obvious article first.
 //  6. Help for this page: an app path → the articles about it, a [id] placeholder for a record's page (on a
 //     dynamic route, and never offered on another page beside it); only /admin pages are accepted.
 //  7. Metis's search_help: at most three articles, each with its link and trimmed passages; questions
@@ -213,6 +214,9 @@ for (const a of articles) {
   });
   const { html } = renderHelp(a.body);
   ok(`${where}: nothing of a picture still to take shows`, !/<!--|shot:/.test(html), html.match(/.{0,60}(?:<!--|shot:).{0,60}/s)?.[0]);
+  // Markdown that didn't render shows its marks: **✓**s (a bold that can't close before a letter), a broken link.
+  const shown = html.replace(/<code>[\s\S]*?<\/code>/g, '').replace(/<[^>]*>/g, '');
+  ok(`${where}: no ** or ](… left showing`, !/\*\*|\]\(/.test(shown), shown.match(/.{0,40}(?:\*\*|\]\().{0,40}/s)?.[0]);
   for (const m of html.matchAll(/href="([^"]*)"/g)) checkLink(where, m[1]);
   // Pictures written as HTML (the Markdown ones are checked above).
   for (const m of html.matchAll(/<img[^>]*\ssrc="([^"]*)"/g)) {
@@ -387,6 +391,31 @@ for (const a of articles) {
   ok(`search: "${a.title}" finds ${a.section}/${a.slug} first`, hits[0]?.entry.url === a.url || (hits.some((h) => h.entry.url === a.url) && same(hits[0].entry.title)), hits.map((h) => h.entry.url).join(', '));
 }
 ok('search: "search help" finds Find your way around Help first', searchPrepared(RP, 'search help', { limit: 3 })[0]?.entry.url === '/admin/help/getting-started/using-help');
+// The searches staff type, each with the article it should put first (when that article is in the content).
+// Several of these are ties broken by the order of the articles, so a new title or a reorder can move them.
+for (const [q, url] of [
+  ['add customer', 'customers/add-a-customer'],
+  ['new customer', 'customers/add-a-customer'],
+  ['templates', 'whatsapp/templates'],
+  ['whatsapp template', 'whatsapp/templates'],
+  ['whatsapp templates', 'whatsapp/templates'],
+  ['new template', 'whatsapp/add-a-template'],
+  ['template approval', 'whatsapp/template-approval'],
+  ['add whatsapp contact', 'whatsapp/who-you-can-message'],
+  ['whatsapp people', 'whatsapp/who-you-can-message'],
+  ['meta report', 'reports/meta-ad-spend'],
+  ['ad spend', 'reports/meta-ad-spend'],
+  ['ad spend not showing', 'reports/set-up-ad-spend'],
+  ['purchase order', 'purchase-orders/purchase-orders-page'],
+  ['handover pack', 'handover/the-handover-tab'],
+  ['send handover pack', 'handover/send-the-pack'],
+  ['add a trade', 'site/add-a-trade'],
+  ['reset password', 'getting-started/reset-password'],
+  ['light mode', 'getting-started/light-and-dark'],
+]) {
+  if (!articles.some((a) => a.url === `/admin/help/${url}`)) continue;
+  eq(`search: "${q}" → ${url} first`, searchPrepared(RP, q, { limit: 1 })[0]?.entry.url, `/admin/help/${url}`);
+}
 const index = buildHelpIndex(lib);
 ok('index: compact (body words, not sentences)', index.every((e) => !/[.,]/.test(e.words) && e.words.split(' ').length === new Set(e.words.split(' ')).size));
 

@@ -41,4 +41,4 @@ The table shows one row per source, sorted by £ won. The line above it says "�
 
 ## Once ad spend is connected
 
-The Meta rows (all but **meta-organic**) move into the Meta part of the table, grouped by campaign with each ad’s spend. Everything else, **meta-organic** included, is listed below under **Other sources**. See [Meta ad spend and cost per lead](/admin/help/reports/meta-ad-spend).
+The Meta rows (all but **meta-organic**) move into the Meta part of the table, grouped by campaign with each ad’s spend. Everything else, **meta-organic** included, is listed below under **Other sources**. See [Meta ad spend and cost per lead in the report](/admin/help/reports/meta-ad-spend).

@@ -2,7 +2,7 @@
 title: Template statuses, rejections and changes
 summary: What each template status means, what to do when Meta rejects one, and how to change, describe or delete a template.
 order: 110
-keywords: approval, pending, waiting for Meta, approved, rejected, paused, disabled, appeal, edit template, change wording, delete template, rename, fix rejected, quality, blocked, reported, what fills the blanks, WhatsApp Manager
+keywords: approval, Meta approval, pending, waiting for Meta, approved, rejected, paused, disabled, appeal, edit template, change wording, delete template, rename, fix rejected, quality, blocked, reported, what fills the blanks, WhatsApp Manager
 where: CRM › WhatsApp templates › Your templates
 path: /admin/enquiries/templates
 access: enquiries

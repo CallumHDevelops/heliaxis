@@ -1,8 +1,8 @@
 ---
-title: WhatsApp templates
+title: Templates: every WhatsApp template and its status
 summary: The page where templates are sent to Meta, with each one’s status, what fills its blanks and which automatic message uses it.
 order: 90
-keywords: templates page, template list, Your templates, Ready-made, New template, approved, Meta approval, message templates, cost, Utility, Marketing, WhatsApp Manager
+keywords: templates page, template list, Your templates, Ready-made, approved, message templates, cost, Utility, Marketing, WhatsApp Manager, WhatsApp templates
 where: CRM › WhatsApp templates
 path: /admin/enquiries/templates
 access: enquiries
@@ -11,7 +11,7 @@ Once 24 hours have passed since a customer last messaged, WhatsApp only lets you
 
 Anyone with Enquiries access can look. Only admins can add, delete or change templates; everyone else sees "Only admins can add, delete or change them."
 
-<!-- shot: whatsapp/templates-ready-made.jpg | Ready-made templates: one tap sends each to Meta | The WhatsApp templates page on the Ready-made tab -->
+![The WhatsApp templates page on the Ready-made tab](/help/whatsapp/templates-ready-made.jpg "Ready-made templates: one tap sends each to Meta")
 
 ## The tabs
 

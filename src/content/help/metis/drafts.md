@@ -9,7 +9,7 @@ access: crm
 ---
 Every email and WhatsApp Metis writes waits at the top of her page under **… drafts to check**. Home also shows **Drafts** under **Needs you** while there are some waiting.
 
-<!-- shot: metis/draft-open.jpg | An open draft: check it, change it, send it | An open WhatsApp draft with Send, Customer and Discard -->
+![An open WhatsApp draft with Send, Customer and Discard](/help/metis/draft-open.jpg "An open draft: check it, change it, send it")
 
 ## Send a draft
 

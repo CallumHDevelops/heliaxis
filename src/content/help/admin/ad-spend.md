@@ -22,7 +22,7 @@ Open **Show ad spend in your reports (cost per lead and per sale)** on the From 
 4. In Ads Manager, copy your ad account number (it starts `act_`).
 5. Add both as keys in Vercel, using the names in the job, and redeploy. See [The Vercel keys page](/admin/help/admin/vercel-keys).
 
-The **Ad spend in reports** group on the Vercel keys page then has its **✓**s. Open **CRM reports**: the figures at the top now include **Ad spend on Meta** and **Cost per lead**. If they don’t, or Reports shows a warning about Meta, see [Ad spend not showing in reports](/admin/help/reports/set-up-ad-spend), which explains each warning and what to do.
+The **Ad spend in reports** group on the Vercel keys page then shows a **✓** beside each key. Open **CRM reports**: the figures at the top now include **Ad spend on Meta** and **Cost per lead**. If they don’t, or Reports shows a warning about Meta, see [When ad spend isn’t showing in reports](/admin/help/reports/set-up-ad-spend), which explains each warning and what to do.
 
 ## Also run ad-spend.sql
 
