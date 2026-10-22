@@ -16,8 +16,11 @@ export async function GET(_req: Request, { params }: Ctx) {
   return url ? NextResponse.redirect(url) : json({ error: 'Not found' }, 404);
 }
 
+/** Admins only, as on CRM settings → Product library: a change reaches customers' handover packs. */
 export async function PATCH(req: Request, { params }: Ctx) {
-  if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
+  const s = await crmSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
+  if (s.profile.role !== 'admin') return json({ error: 'Only admins can change the product library.' }, 403);
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const b = await req.json().catch(() => ({}));
