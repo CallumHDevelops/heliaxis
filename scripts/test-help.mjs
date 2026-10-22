@@ -3,17 +3,19 @@
 //     file names are lower-case-with-hyphens, orders are unique in a section, icons are the shell's.
 //  2. Links: /admin/help/… goes to a real section or article; other /admin/… and /api/… links, and every
 //     article's `path`, go to a page or route the app has.
-//  3. Pictures exist under public/help/; no shot: placeholders are left.
+//  3. Pictures exist under public/help/; no shot: placeholders are left. A picture still to be taken is an
+//     HTML comment on its own line, <!-- shot: <section>/<file>.jpg | Caption | alt -->, which shows nothing.
 //  4. Callouts are one of the four (Good to know, Watch out, Admins only, Once switched on), and a
-//     "Once switched on" names a SQL file that exists; no # headings.
+//     "Once switched on" names a SQL file that exists; no # headings; apostrophes are ’, as the app's
+//     labels are (not ', except in code and addresses).
 //  5. Search: the ranking rules on made-up articles (title > keywords > headings > summary > body, every
-//     word, prefixes, plurals, small words and question words, the exact title first), highlighting, and
-//     every real article first for its own title.
+//     word, prefixes, plurals, small words and question words, ' and ’ alike, the exact title first),
+//     highlighting, and every real article first for its own title.
 //  6. Help for this page: an app path → the articles about it, a [id] placeholder for a record's page (on a
 //     dynamic route, and never offered on another page beside it); only /admin pages are accepted.
 //  7. Metis's search_help: at most three articles, each with its link and trimmed passages; questions
 //     ("what does On hold mean") find the article about what they ask.
-//  8. Rendering: callouts, tables, figures with captions, heading ids and "On this page".
+//  8. Rendering: callouts, tables, figures with captions, heading ids and "On this page"; comments hidden.
 // It passes whatever content is there, as long as the content follows the rules.
 // Usage: node --experimental-strip-types scripts/test-help.mjs
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -40,9 +42,10 @@ const { Lexer } = await import('marked');
 const { assemble, parseArticle, parseSection, accessLabel, splitFrontmatter } = await import('../src/lib/help/parse.ts');
 const { loadHelp } = await import('../src/lib/help/load.ts');
 const { allArticles, bestHits, buildHelpIndex, findArticle, findSection, passagesFor, searchLibrary } = await import('../src/lib/help/library.ts');
-const { highlightParts, prepareIndex, queryTerms, searchPrepared } = await import('../src/lib/help/search.ts');
+const { highlightParts, normalise, prepareIndex, queryTerms, searchPrepared, wordsOf } = await import('../src/lib/help/search.ts');
 const { articlesForPath, cleanFrom, hasPlaceholder, helpHref, isPlaceholder, metisHref } = await import('../src/lib/help/context.ts');
 const { calloutLabel, CALLOUTS, renderHelp } = await import('../src/lib/help/render.ts');
+const { plainText } = await import('../src/lib/help/text.ts');
 
 let failed = 0;
 let passed = 0;
@@ -113,6 +116,9 @@ ok('content: Getting started › Find your way around Help is there', !!findArti
 const articles = allArticles(lib);
 const sqlFiles = new Set(readdirSync(path.join(ROOT, 'supabase')));
 
+/** `<!-- shot: <section>/<file>.jpg | Caption | alt -->`, a picture still to be taken. */
+const SHOT = /^<!-- shot: [a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*\.jpg \| [^|]*\S \| [^|]*\S -->$/;
+
 function walkTokens(tokens, fn) {
   for (const t of tokens ?? []) {
     fn(t);
@@ -139,8 +145,20 @@ function checkLink(where, href) {
   ok(`${where}: link ${raw} is an app page (/admin/…), a Help article or a full https:// address`, false);
 }
 
+/** The words a reader sees: no code, no addresses, no comments' file names. */
+const prose = (md) =>
+  md
+    .replace(/^```[\s\S]*?^```/gm, '')
+    .replace(/`[^`]*`/g, '')
+    .replace(/\]\([^)]*\)/g, ']')
+    .replace(/<!-- shot: \S+/g, '');
+const straight = (where, texts) => {
+  const lines = texts.flatMap((t) => (t ?? '').split('\n')).filter((l) => l.includes("'"));
+  ok(`${where}: apostrophes are ’ as on the app's screens, not '`, !lines.length, lines.slice(0, 3).join(' / '));
+};
 for (const s of lib.sections) {
   if (s.intro) for (const m of renderHelp(s.intro).html.matchAll(/href="([^"]*)"/g)) checkLink(`${s.key}/_section.md`, m[1]);
+  straight(`${s.key}/_section.md`, [s.title, s.summary, prose(s.intro)]);
 }
 for (const a of articles) {
   const where = `${a.section}/${a.slug}.md`;
@@ -163,7 +181,12 @@ for (const a of articles) {
     }
   }
   if (a.where) ok(`${where}: where uses › between menu levels`, !/\s>\s|->|»/.test(a.where), a.where);
+  straight(where, [a.title, a.summary, a.keywords.join(', '), a.where, prose(a.body)]);
   ok(`${where}: no shot: placeholders left`, !/\]\(\s*shot:/i.test(a.body), (a.body.match(/!\[[^\]]*\]\(\s*shot:[^)]*\)/gi) ?? []).join(' '));
+  // A picture still to be taken: a comment on its own line, nothing else (the renderer shows no comments).
+  for (const line of a.body.split('\n').filter((l) => l.includes('<!--') || /\bshot:/.test(l))) {
+    ok(`${where}: a comment is a picture to take, alone on its line: <!-- shot: <section>/<file>.jpg | Caption | alt -->`, SHOT.test(line), line);
+  }
   const pictures = new Set();
   walkTokens(tokens, (t) => {
     if (t.type === 'heading' && t.depth === 1) ok(`${where}: no # headings (the page has the title): "${t.text}"`, false);
@@ -189,6 +212,7 @@ for (const a of articles) {
     }
   });
   const { html } = renderHelp(a.body);
+  ok(`${where}: nothing of a picture still to take shows`, !/<!--|shot:/.test(html), html.match(/.{0,60}(?:<!--|shot:).{0,60}/s)?.[0]);
   for (const m of html.matchAll(/href="([^"]*)"/g)) checkLink(where, m[1]);
   // Pictures written as HTML (the Markdown ones are checked above).
   for (const m of html.matchAll(/<img[^>]*\ssrc="([^"]*)"/g)) {
@@ -318,6 +342,14 @@ eq('search: so are the words a question is wrapped in', [queryTerms('what does O
 eq('search: … unless that is all there is ("my work")', [queryTerms('my work'), queryTerms('find')], [['work'], ['find']]);
 eq('search: small words alone still search', queryTerms('how to'), ['how', 'to']);
 eq('search: capitals and accents do not matter', top('WHATSÁPP inbox'), ['inbox']);
+eq("search: ' and ’ (and ‘) are the same", [normalise("Don't"), normalise('Don’t'), normalise('‘Find’'), wordsOf("customer’s page")], ['dont', 'dont', 'find', ['customers', 'page']]);
+{
+  const A = fixture({ x: [{ slug: 'curly', title: 'Customer’s page', body: 'Press **Don’t copy any**.\n' }, { slug: 'straight', title: "Who's in", body: "It hasn't arrived.\n" }] });
+  const AP = prepareIndex(buildHelpIndex(A));
+  const find = (q) => searchPrepared(AP, q, { limit: 2 }).map((h) => h.entry.url.split('/').pop());
+  eq("search: a straight ' finds a curly ’ and back", [find("customer's"), find("don't copy"), find('who’s'), find('hasn’t')], [['curly'], ['curly'], ['straight'], ['straight']]);
+  eq('highlight: an apostrophe in the word', highlightParts('Don’t copy any', "don't").filter((p) => p.hit).map((p) => p.text), ['Don’t']);
+}
 eq('search: nothing typed, nothing found', top('   '), []);
 eq('search: the heading that matched is shown', searchPrepared(FP, 'templates chat', { limit: 5 }).find((h) => h.entry.url.endsWith('/inbox'))?.heading, 'Templates in a chat');
 eq('highlight: the part typed', highlightParts('Add a WhatsApp template', 'temp'), [
@@ -453,6 +485,8 @@ for (const a of articles.filter((x) => x.path)) {
     '| Status | Means |\n|---|---|\n| New | Not seen |',
     '![The inbox](/help/whatsapp/inbox.jpg "The WhatsApp inbox")',
     '![Later](shot:whatsapp/x.jpg "Placeholder")',
+    '<!-- shot: whatsapp/later.jpg | To take | A chat -->',
+    'Words <!-- an aside --> go on.',
     '### Below',
   ].join('\n\n');
   const { html, toc } = renderHelp(md);
@@ -465,6 +499,9 @@ for (const a of articles.filter((x) => x.path)) {
   ok('render: a picture on its own is a figure with its caption', html.includes('<figure class="hp-fig"><div class="hp-fig__frame"><img src="/help/whatsapp/inbox.jpg" alt="The inbox"') && html.includes('<figcaption>The WhatsApp inbox</figcaption>'));
   ok('render: no figure inside a paragraph', !/<p>\s*<figure/.test(html));
   ok('render: a shot: placeholder shows nothing', !html.includes('shot:') && !html.includes('Placeholder'));
+  ok('render: comments show nothing (a picture still to take, or any other)', !html.includes('<!--') && !html.includes('To take') && !html.includes('an aside') && /<p>Words\s+go on\.<\/p>/.test(html), html.match(/.{0,80}Words.{0,80}/s)?.[0]);
+  ok('text: comments are not words to search', !/To take|an aside|later\.jpg/.test(plainText(md)) && /Words\s+go on/.test(plainText(md)));
+  ok('test: the shot comment form', SHOT.test('<!-- shot: whatsapp/later.jpg | To take | A chat -->') && !SHOT.test('<!-- shot: whatsapp/later.jpg | To take -->') && !SHOT.test('x <!-- shot: a/b.jpg | C | d -->'));
   ok('render: # becomes ## (the page has the title)', /<h2 id="not-a-title">Not a title<\/h2>/.test(html) && !/<h1/.test(html));
   eq('render: On this page (ids made unique)', toc.map((t) => `${t.depth}:${t.id}`), ['2:not-a-title', '2:steps', '2:steps-2', '3:below']);
   ok('render: links to other sites open in a new tab', /href="https:\/\/example\.com" target="_blank" rel="noopener noreferrer"/.test(html));

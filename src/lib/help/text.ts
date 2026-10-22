@@ -8,6 +8,8 @@ import { Lexer, type Token, type Tokens } from 'marked';
 export type HelpChunk = { heading: string | null; depth: number; text: string };
 
 const lex = (md: string) => Lexer.lex(md, { gfm: true });
+/** Raw HTML as words: no tags, no comments (`<!-- shot: … -->` is a picture still to be taken). */
+const htmlWords = (html: string) => html.replace(/<!--[\s\S]*?(?:-->|$)/g, '').replace(/<[^>]*>/g, '');
 
 function inline(tokens: Token[] | undefined, links: boolean): string {
   let out = '';
@@ -31,7 +33,7 @@ function inline(tokens: Token[] | undefined, links: boolean): string {
         out += inline((t as Tokens.Strong).tokens, links);
         break;
       case 'html':
-        out += (t as Tokens.HTML).text.replace(/<[^>]*>/g, '');
+        out += htmlWords((t as Tokens.HTML).text);
         break;
       default:
         out += 'tokens' in t && Array.isArray(t.tokens) ? inline(t.tokens, links) : 'text' in t ? String(t.text) : '';
@@ -58,7 +60,7 @@ function block(t: Token, links: boolean): string {
       return [row(tb.header), ...tb.rows.map(row)].join('\n');
     }
     case 'html':
-      return (t as Tokens.HTML).text.replace(/<[^>]*>/g, '').trim();
+      return htmlWords((t as Tokens.HTML).text).trim();
     default:
       return 'tokens' in t && Array.isArray(t.tokens) ? inline(t.tokens, links) : 'text' in t ? String(t.text) : '';
   }

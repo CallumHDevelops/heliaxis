@@ -7,7 +7,9 @@ import { Marked, Renderer, type Token, type Tokens } from 'marked';
  *   on:** is a callout, each kind styled on its own;
  * - a picture on its own line is a framed figure with its title as the caption;
  * - tables scroll inside their own box; headings get ids, and the ## and ### ones are listed (On this page);
- * - links to other sites open in a new tab.
+ * - links to other sites open in a new tab;
+ * - HTML comments are left out: `<!-- shot: <section>/<file>.jpg | Caption | alt -->` marks a picture still
+ *   to be taken, and shows nothing until it's a real picture.
  */
 
 export const CALLOUTS = {
@@ -78,6 +80,9 @@ const isBlank = (t: Token) => (t.type === 'text' && !(t as Tokens.Text).text.tri
 /** A placeholder for a picture not taken yet (shot:…): shown as nothing. */
 const placeholder = (href: string) => /^shot:/i.test(href);
 
+/** Raw HTML without its comments (a picture still to be taken, a note to whoever edits the file). */
+export const withoutComments = (html: string) => html.replace(/<!--[\s\S]*?(?:-->|$)/g, '');
+
 export function renderHelp(md: string): { html: string; toc: HelpTocEntry[] } {
   const toc: HelpTocEntry[] = [];
   const used = new Map<string, number>();
@@ -121,6 +126,10 @@ export function renderHelp(md: string): { html: string; toc: HelpTocEntry[] } {
       },
       table(this: Renderer, token: Tokens.Table) {
         return `<div class="hp-table" role="region" aria-label="Table" tabindex="0">${Renderer.prototype.table.call(this, token)}</div>\n`;
+      },
+      html({ text, block }: Tokens.HTML | Tokens.Tag) {
+        const out = withoutComments(text);
+        return block && !out.trim() ? '' : out;
       },
       link(this: Renderer, { href, title, tokens }: Tokens.Link) {
         const inner = this.parser.parseInline(tokens);
