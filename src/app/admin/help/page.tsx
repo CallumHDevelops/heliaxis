@@ -4,7 +4,7 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import { articlesForPath, cleanFrom, metisHref } from '@/lib/help/context';
 import { allArticles } from '@/lib/help/library';
-import { getHelp, getHelpIndex } from '@/lib/help/server';
+import { getHelp, getHelpIndexFile, searchHelpPage } from '@/lib/help/server';
 import { HelpSearch } from './HelpSearch';
 import { articleCount, HelpHead, sectionIcon } from './parts';
 import { helpViewer } from './viewer';
@@ -28,6 +28,9 @@ export default async function HelpHome({ searchParams }: { searchParams: Promise
   const lib = getHelp();
   const here = from ? articlesForPath(allArticles(lib), from) : [];
   const titleOf = new Map(lib.sections.map((s) => [s.key, s.title]));
+  // The index itself comes separately (/api/help/search-index), when the box is first used.
+  const index = getHelpIndexFile();
+  const found = searchHelpPage(q);
 
   return (
     <AdminShell active="help">
@@ -59,7 +62,7 @@ export default async function HelpHome({ searchParams }: { searchParams: Promise
           </section>
         )}
 
-        <HelpSearch index={getHelpIndex()} initial={q} metis={viewer.metis}>
+        <HelpSearch version={index.version} initial={q} initialHits={found.hits} initialClose={found.close} metis={viewer.metis}>
           {lib.sections.length ? (
             <section aria-labelledby="hp-sections-title">
               <h2 id="hp-sections-title" className="hp-h2">

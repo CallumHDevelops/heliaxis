@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { metisHref } from '@/lib/help/context';
+import { hasPlaceholder, metisHref } from '@/lib/help/context';
 import { findArticle } from '@/lib/help/library';
 import { renderHelp } from '@/lib/help/render';
 import { getHelp } from '@/lib/help/server';
@@ -38,7 +38,8 @@ export default async function HelpArticlePage({ params }: Params) {
   const { html, toc } = renderHelp(article.body);
   const parts = toc.filter((t) => t.depth === 2).length >= LONG ? toc : [];
   const has = viewer.has(article.access);
-  const open = article.path && has && viewer.canOpen(article.path) ? article.path : null;
+  // A kind of page (/admin/crm/[id], every customer's page) isn't one page to open.
+  const open = article.path && !hasPlaceholder(article.path) && has && viewer.canOpen(article.path) ? article.path : null;
   // The CMS loads its own stylesheet (a full page load, as from the menu); /api/ links aren't pages.
   const hardLink = open && (/^\/api\//.test(open) || /^\/admin\/cms(\/|$|\?)/.test(open));
 

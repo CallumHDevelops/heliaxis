@@ -1,4 +1,5 @@
 import { PORTAL_KEYS, PORTALS } from '../portals';
+import { isPlaceholder } from './context';
 
 /**
  * The Help section's content (src/content/help): one folder per section, its card in _section.md and one
@@ -8,6 +9,9 @@ import { PORTAL_KEYS, PORTALS } from '../portals';
  *
  *   _section.md   title, summary, order, icon (a name from AdminShell's icons), then an optional intro
  *   <slug>.md     title, summary, order, keywords, where, path, access, then the article
+ *
+ * `path` is one app page, or a kind of page with a placeholder for the record: /admin/crm/[id] is every
+ * customer's page (Help for this page offers it there; there's no single page to open).
  */
 
 export type HelpArticle = {
@@ -21,7 +25,7 @@ export type HelpArticle = {
   keywords: string[];
   /** The menu path on a computer, e.g. "CRM › WhatsApp templates". */
   where: string | null;
-  /** The app page it's mainly about (the "Open this page" button; Help for this page). */
+  /** The app page it's mainly about (the "Open this page" button; Help for this page); /admin/crm/[id] for every customer's page. */
   path: string | null;
   /** Who can use what it describes: ['everyone'], ['admin'] or portal keys (any of them). */
   access: string[];
@@ -136,6 +140,11 @@ export function parseArticle(section: string, slug: string, src: string): { arti
   if (access.length > 1 && access.some((a) => a === 'everyone' || a === 'admin')) problems.push('"access": everyone and admin stand alone');
   const path = data.path?.trim() || null;
   if (path && !/^\/(admin|api)(\/|$|\?)/.test(path)) problems.push(`"path: ${path}" must be an app page starting /admin`);
+  if (path) {
+    const parts = path.split(/[?#]/)[0].split('/').filter(Boolean);
+    if (parts.some((p) => /[[\]]/.test(p) && !isPlaceholder(p))) problems.push(`"path: ${path}": a placeholder is a whole part in square brackets, such as /admin/crm/[id]`);
+    else if (parts.length > 1 && isPlaceholder(parts[1])) problems.push(`"path: ${path}": the part after /${parts[0]} must be a page's name, not a placeholder`);
+  }
   if (title.length > 80) problems.push(`"title" is ${title.length} characters (keep it under about 60)`);
   if (!body.trim()) problems.push('the article has no body');
   return {

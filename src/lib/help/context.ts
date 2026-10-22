@@ -26,6 +26,12 @@ export function cleanFrom(raw: unknown): string | null {
 
 type Pathed = { path: string | null };
 
+/**
+ * A part of an article's `path` in square brackets stands for any one part of the address: /admin/crm/[id]
+ * is every customer's page, /admin/projects/[id] every job's.
+ */
+export const isPlaceholder = (part: string) => /^\[[a-z][A-Za-z]*\]$/.test(part);
+
 function split(raw: string) {
   const p = raw.split('#')[0];
   const q = p.indexOf('?');
@@ -33,23 +39,32 @@ function split(raw: string) {
   const params = new URLSearchParams(q < 0 ? '' : p.slice(q + 1));
   return { pathname, params };
 }
+const partsOf = (pathname: string) => pathname.split('/').filter(Boolean);
+
+/** A path with a placeholder is a kind of page, not one page to open. */
+export const hasPlaceholder = (path: string) => partsOf(split(path).pathname).some(isPlaceholder);
 
 /**
  * The articles about `from`: those whose `path` is `from` or a page above it (/admin/crm for a customer's
- * record at /admin/crm/<id>), keeping only the most specific. An article's own query (?view=board) must be
- * in `from` too, and one that has it comes first. The dashboard's /admin counts only on the dashboard.
+ * record at /admin/crm/<id>), keeping only the most specific: the most parts, then the most parts named
+ * rather than placeholders (so /admin/crm/[id] is a customer's page but /admin/crm/reports is the reports
+ * page's own). An article's own query (?view=board) must be in `from` too, and one that has it comes first.
+ * The dashboard's /admin counts only on the dashboard.
  */
 export function articlesForPath<T extends Pathed>(articles: T[], from: string): T[] {
   const clean = cleanFrom(from);
   if (!clean) return [];
   const here = split(clean);
+  const hereParts = partsOf(here.pathname);
   let best = -1;
-  const found: { a: T; len: number; extra: number }[] = [];
+  const found: { a: T; spec: number; extra: number }[] = [];
   for (const a of articles) {
     if (!a.path) continue;
     const want = split(a.path);
-    const under = here.pathname === want.pathname || (want.pathname !== '/admin' && here.pathname.startsWith(`${want.pathname}/`));
-    if (!under) continue;
+    const wantParts = partsOf(want.pathname);
+    if (!wantParts.length || wantParts.length > hereParts.length) continue;
+    if (wantParts.length === 1 && hereParts.length > 1) continue;
+    if (!wantParts.every((w, i) => (isPlaceholder(w) ? !!hereParts[i] : w === hereParts[i]))) continue;
     let ok = true;
     let extra = 0;
     for (const [k, v] of want.params) {
@@ -57,12 +72,12 @@ export function articlesForPath<T extends Pathed>(articles: T[], from: string): 
       else extra++;
     }
     if (!ok) continue;
-    const len = want.pathname.length;
-    best = Math.max(best, len);
-    found.push({ a, len, extra });
+    const spec = wantParts.length * 100 + wantParts.filter((w) => !isPlaceholder(w)).length;
+    best = Math.max(best, spec);
+    found.push({ a, spec, extra });
   }
   return found
-    .filter((f) => f.len === best)
+    .filter((f) => f.spec === best)
     .sort((x, y) => y.extra - x.extra)
     .map((f) => f.a);
 }

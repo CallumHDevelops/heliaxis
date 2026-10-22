@@ -2,8 +2,9 @@
  * Searching Help: the index the server builds (src/lib/help/library.ts) and the ranking, shared by the
  * search box on /admin/help (in the browser, as you type) and Metis's search_help tool. Every word typed
  * must match the start of a word in the article (so "temp" finds Templates); small words like "how" and
- * "the" are left out. A match in the title counts most, then the keywords, the headings, the summary and
- * the body. No imports: safe in the browser.
+ * "the", and the words a question is wrapped in ("what does … mean"), are left out. A match in the title
+ * counts most, then the keywords, the headings, the summary and the body; the exact title typed comes first.
+ * No imports: safe in the browser.
  */
 
 export type HelpIndexEntry = {
@@ -38,11 +39,35 @@ const STOP = new Set(
 
 export const isStopWord = (w: string) => STOP.has(w);
 
-/** The words to look for: distinct, small words dropped (unless that's all there is), at most 8. */
+/**
+ * The words a question is wrapped in ("what does On hold mean", "how does the chaser work", "where do I
+ * find purchase orders"): left out when the search has other words, so "On hold" is what's looked for. They
+ * stay in the index, so "My work" or "find" on its own still finds them.
+ */
+const FILLER = new Set(
+  'mean means meaning meant did happen happens happened work works working use used using find need needs know tell explain'.split(' '),
+);
+
+/**
+ * The words to look for: distinct, small words and question words dropped (the small words only, if that
+ * leaves nothing; all of them if that still does), at most 8.
+ */
 export function queryTerms(q: string): string[] {
   const all = [...new Set(wordsOf(q))];
-  const real = all.filter((w) => !STOP.has(w));
-  return (real.length ? real : all).slice(0, 8);
+  const real = all.filter((w) => !STOP.has(w) && !FILLER.has(w));
+  const some = real.length ? real : all.filter((w) => !STOP.has(w));
+  return (some.length ? some : all).slice(0, 8);
+}
+
+/** `said` word for word, in order, somewhere in `title` (the last word may be only its start: still typing). */
+function inTitle(title: string[], said: string[]): boolean {
+  const n = said.length;
+  for (let i = 0; i + n <= title.length; i++) {
+    let ok = true;
+    for (let j = 0; j < n && ok; j++) ok = j === n - 1 ? title[i + j].startsWith(said[j]) : title[i + j] === said[j];
+    if (ok) return true;
+  }
+  return false;
 }
 
 /** A word and its plain forms: "templates" also as "template", "approved" as "approv(e)", "sending" as "send". */
@@ -109,6 +134,8 @@ export type HelpHit = {
   matched: number;
   /** The heading that matched best, when the title alone doesn't explain the match. */
   heading: string | null;
+  /** A word was found in the title or the keywords (not only in the article). */
+  strong: boolean;
 };
 
 /**
@@ -120,16 +147,21 @@ export function searchPrepared(prepared: PreparedEntry[], q: string, { mode = 'a
   if (!terms.length) return [];
   const vars = terms.map(variants);
   const phrase = terms.join(' ');
+  // Everything typed, small words too: the title itself, or its words in order ("find a time").
+  const said = wordsOf(q);
+  const saidNorm = said.join(' ');
   const hits: HelpHit[] = [];
   for (const p of prepared) {
     let score = 0;
     let matched = 0;
     let titleAll = true;
+    let strong = false;
     for (const v of vars) {
       let best = 0;
       for (const [field, weight] of FIELDS) {
         const h = hit(p.f[field], v);
         if (h) best = Math.max(best, h * weight);
+        if (h && (field === 'title' || field === 'keywords')) strong = true;
         if (field === 'title' && !h) titleAll = false;
       }
       if (best) {
@@ -138,7 +170,9 @@ export function searchPrepared(prepared: PreparedEntry[], q: string, { mode = 'a
       }
     }
     if (!matched || (mode === 'all' && matched < terms.length)) continue;
-    if (terms.length > 1 && p.titleNorm.includes(phrase)) score += 60;
+    // The exact title, typed or pasted: that article first, whatever else shares its words.
+    if (saidNorm === p.titleNorm) score += 1000;
+    else if ((said.length > 1 && inTitle(p.f.title, said)) || (terms.length > 1 && p.titleNorm.includes(phrase))) score += 60;
     if (terms.length > 1 && titleAll) score += 30;
     if (vars[0].some((x) => p.f.title[0]?.startsWith(x))) score += 5;
     let heading: string | null = null;
@@ -152,7 +186,7 @@ export function searchPrepared(prepared: PreparedEntry[], q: string, { mode = 'a
         }
       });
     }
-    hits.push({ entry: p.entry, score, matched, heading });
+    hits.push({ entry: p.entry, score, matched, heading, strong });
   }
   hits.sort((a, b) => (mode === 'any' ? b.matched - a.matched : 0) || b.score - a.score || a.entry.rank - b.entry.rank);
   return hits.slice(0, limit);

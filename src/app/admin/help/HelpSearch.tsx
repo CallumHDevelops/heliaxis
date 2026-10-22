@@ -2,9 +2,37 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { metisHref } from '@/lib/help/context';
-import { highlightParts, prepareIndex, searchPrepared, type HelpHit, type HelpIndexEntry } from '@/lib/help/search';
+import { highlightParts, prepareIndex, searchPrepared, type HelpHit, type HelpIndexEntry, type PreparedEntry } from '@/lib/help/search';
+
+/** What the box puts in the address for `v` (?q= is left out for nothing but spaces). */
+const forAddress = (v: string) => (v.trim() ? v : '');
+
+/**
+ * The search index (/api/help/search-index), fetched once per version the first time the box is used, and
+ * kept for the rest of the visit: going back to Help's home doesn't fetch it again (nor, while the content
+ * is the same, does the browser, which keeps it).
+ */
+type Index = { version: string; prepared: PreparedEntry[] };
+let kept: Index | null = null;
+let coming: { version: string; promise: Promise<Index> } | null = null;
+
+function fetchIndex(version: string): Promise<Index> {
+  if (kept?.version === version) return Promise.resolve(kept);
+  if (coming?.version === version) return coming.promise;
+  const promise = fetch(`/api/help/search-index?v=${encodeURIComponent(version)}`, { credentials: 'same-origin' })
+    .then((r) => {
+      if (!r.ok) throw new Error(`search index ${r.status}`);
+      return r.json() as Promise<HelpIndexEntry[]>;
+    })
+    .then((entries) => (kept = { version, prepared: prepareIndex(entries) }))
+    .finally(() => {
+      if (coming?.promise === promise) coming = null;
+    });
+  coming = { version, promise };
+  return promise;
+}
 
 /** `text` with the words that match `q` marked. */
 function Marked({ text, q }: { text: string; q: string }) {
@@ -43,21 +71,71 @@ function Results({ hits, q }: { hits: HelpHit[]; q: string }) {
 }
 
 /**
- * The search box on Help's home: instant, in the browser, over the index the server built. What's typed is
- * kept in the address (?q=) so a search can be shared; "/" jumps to the box on a computer; Enter opens the
- * first result. While there's nothing typed, `children` (the sections) show instead of results.
+ * The search box on Help's home: instant, in the browser, over the index the server built (fetched the first
+ * time the box is used; a search in the address shows the results the server worked out until then). What's
+ * typed is kept in the address (?q=) so a search can be shared, and the box follows the address when it
+ * changes some other way (Help in the account menu, from Help's home, clears it); "/" jumps to the box on a
+ * computer; Enter opens the first result. While there's nothing typed, `children` (the sections) show instead
+ * of results.
  */
-export function HelpSearch({ index, initial, metis, children }: { index: HelpIndexEntry[]; initial: string; metis: boolean; children: ReactNode }) {
+export function HelpSearch({
+  version,
+  initial,
+  initialHits,
+  initialClose,
+  metis,
+  children,
+}: {
+  version: string;
+  initial: string;
+  initialHits: HelpHit[];
+  initialClose: HelpHit[];
+  metis: boolean;
+  children: ReactNode;
+}) {
   const router = useRouter();
   // The address first: coming Back to a search, the page can come from the browser's cache without it.
   const params = useSearchParams();
+  const inAddress = params.get('q') ?? '';
   const [q, setQ] = useState(() => params.get('q') ?? initial);
+  // The box follows the address when something else changes it. Typing changes it too, a moment later
+  // (what's typed goes in at once): `sent` is what this box has put there that the address hasn't caught
+  // up with yet, so an earlier one of those, arriving while you type, isn't taken for a change.
+  const [seen, setSeen] = useState(inAddress);
+  const [sent, setSent] = useState<string[]>([]);
+  if (inAddress !== seen) {
+    setSeen(inAddress);
+    if (inAddress === forAddress(q)) setSent([]);
+    else if (!sent.includes(inAddress)) {
+      setSent([]);
+      setQ(inAddress);
+    }
+  }
+  const [index, setIndex] = useState<Index | null>(() => (kept?.version === version ? kept : null));
+  const [failed, setFailed] = useState(false);
   const box = useRef<HTMLInputElement>(null);
-  const prepared = useMemo(() => prepareIndex(index), [index]);
+  const ready = index?.version === version ? index.prepared : null;
   const searching = q.trim().length > 0;
-  const hits = useMemo(() => (searching ? searchPrepared(prepared, q, { limit: 30 }) : []), [prepared, q, searching]);
+  // Before the index has come: the server's results, for the search it was given; otherwise none yet.
+  const early = !ready && q === initial;
+  const hits = useMemo(() => (!searching ? [] : ready ? searchPrepared(ready, q, { limit: 30 }) : early ? initialHits : null), [searching, ready, q, early, initialHits]);
   // Nothing has every word: the ones with most of them, offered as close matches.
-  const close = useMemo(() => (searching && !hits.length ? searchPrepared(prepared, q, { mode: 'any', limit: 5 }) : []), [prepared, q, searching, hits.length]);
+  const close = useMemo(
+    () => (!searching || !hits || hits.length ? [] : ready ? searchPrepared(ready, q, { mode: 'any', limit: 5 }) : early ? initialClose : []),
+    [searching, hits, ready, q, early, initialClose],
+  );
+
+  const load = useCallback(() => {
+    fetchIndex(version).then(
+      (i) => setIndex(i),
+      () => setFailed(true),
+    );
+  }, [version]);
+
+  // Something to search and no index yet: fetch it.
+  useEffect(() => {
+    if (searching && !ready && !failed) load();
+  }, [searching, ready, failed, load]);
 
   // "/" anywhere on the page (not while typing somewhere) puts you in the box.
   useEffect(() => {
@@ -80,9 +158,11 @@ export function HelpSearch({ index, initial, metis, children }: { index: HelpInd
 
   function change(v: string) {
     setQ(v);
+    setFailed(false);
+    setSent((s) => [...s.slice(-30), forAddress(v)]);
     // In the address bar, without a trip to the server.
     const url = new URL(window.location.href);
-    if (v.trim()) url.searchParams.set('q', v);
+    if (forAddress(v)) url.searchParams.set('q', v);
     else url.searchParams.delete('q');
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
   }
@@ -94,7 +174,7 @@ export function HelpSearch({ index, initial, metis, children }: { index: HelpInd
         className="hp-field"
         onSubmit={(e) => {
           e.preventDefault();
-          if (hits[0]) router.push(hits[0].entry.url);
+          if (hits?.[0]) router.push(hits[0].entry.url);
         }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -106,6 +186,8 @@ export function HelpSearch({ index, initial, metis, children }: { index: HelpInd
           type="search"
           value={q}
           onChange={(e) => change(e.target.value)}
+          // About to search: fetch the index now, so the first results don't wait for it.
+          onFocus={() => !ready && !failed && load()}
           onKeyDown={(e) => {
             if (e.key === 'Escape' && q) {
               e.preventDefault();
@@ -129,11 +211,27 @@ export function HelpSearch({ index, initial, metis, children }: { index: HelpInd
       </form>
 
       <p className="hx-sr" role="status">
-        {searching ? (hits.length ? `${hits.length} article${hits.length === 1 ? '' : 's'} found` : 'No articles found') : ''}
+        {searching && hits ? (hits.length ? `${hits.length} article${hits.length === 1 ? '' : 's'} found` : 'No articles found') : ''}
       </p>
 
       {!searching ? (
         children
+      ) : !hits ? (
+        failed ? (
+          <section className="hp-empty" aria-label="Search unavailable">
+            <p className="hp-empty__title">Search couldn’t load.</p>
+            <ul className="hp-empty__tips">
+              <li>Check your connection, then try again.</li>
+            </ul>
+            <button type="button" className="hp-btn" onClick={() => setFailed(false)}>
+              Try again
+            </button>
+          </section>
+        ) : (
+          <p className="hp-count" aria-busy="true">
+            Searching…
+          </p>
+        )
       ) : hits.length ? (
         <section aria-label="Search results">
           <p className="hp-count">

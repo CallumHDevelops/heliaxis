@@ -7,9 +7,12 @@
 //  4. Callouts are one of the four (Good to know, Watch out, Admins only, Once switched on), and a
 //     "Once switched on" names a SQL file that exists; no # headings.
 //  5. Search: the ranking rules on made-up articles (title > keywords > headings > summary > body, every
-//     word, prefixes, plurals, small words), highlighting, and every real article found by its own title.
-//  6. Help for this page: an app path → the articles about it; only /admin pages are accepted.
-//  7. Metis's search_help: at most three articles, each with its link and trimmed passages.
+//     word, prefixes, plurals, small words and question words, the exact title first), highlighting, and
+//     every real article first for its own title.
+//  6. Help for this page: an app path → the articles about it, a [id] placeholder for a record's page (on a
+//     dynamic route, and never offered on another page beside it); only /admin pages are accepted.
+//  7. Metis's search_help: at most three articles, each with its link and trimmed passages; questions
+//     ("what does On hold mean") find the article about what they ask.
 //  8. Rendering: callouts, tables, figures with captions, heading ids and "On this page".
 // It passes whatever content is there, as long as the content follows the rules.
 // Usage: node --experimental-strip-types scripts/test-help.mjs
@@ -36,9 +39,9 @@ registerHooks({
 const { Lexer } = await import('marked');
 const { assemble, parseArticle, parseSection, accessLabel, splitFrontmatter } = await import('../src/lib/help/parse.ts');
 const { loadHelp } = await import('../src/lib/help/load.ts');
-const { allArticles, buildHelpIndex, findArticle, findSection, passagesFor, searchLibrary } = await import('../src/lib/help/library.ts');
+const { allArticles, bestHits, buildHelpIndex, findArticle, findSection, passagesFor, searchLibrary } = await import('../src/lib/help/library.ts');
 const { highlightParts, prepareIndex, queryTerms, searchPrepared } = await import('../src/lib/help/search.ts');
-const { articlesForPath, cleanFrom, helpHref, metisHref } = await import('../src/lib/help/context.ts');
+const { articlesForPath, cleanFrom, hasPlaceholder, helpHref, isPlaceholder, metisHref } = await import('../src/lib/help/context.ts');
 const { calloutLabel, CALLOUTS, renderHelp } = await import('../src/lib/help/render.ts');
 
 let failed = 0;
@@ -96,6 +99,10 @@ ok('routes: a customer record /admin/crm/<id> is a page', routeFor('/admin/crm/b
 ok('routes: /admin/help is a page', routeFor('/admin/help')?.kind === 'page');
 ok('routes: /api/sso/rams is a route', routeFor('/api/sso/rams')?.kind === 'route');
 ok('routes: /admin/nowhere is not (the legacy redirect does not count)', !routeFor('/admin/nowhere'));
+ok('routes: a customer page placeholder /admin/crm/[id] is the record page', routeFor('/admin/crm/[id]')?.segs.join('/') === 'admin/crm/[id]');
+/** A path with its placeholders filled in, as the address of one record would be. */
+const SAMPLE_ID = 'b1000000-0000-4000-8000-000000000001';
+const sample = (p) => p.replace(/\[[^\]/]+\]/g, SAMPLE_ID);
 
 // ── 1–4. The real content. ────────────────────────────────────────────────────────────────────────
 const CONTENT = path.join(ROOT, 'src/content/help');
@@ -138,7 +145,23 @@ for (const s of lib.sections) {
 for (const a of articles) {
   const where = `${a.section}/${a.slug}.md`;
   const tokens = Lexer.lex(a.body, { gfm: true });
-  if (a.path) ok(`${where}: path ${a.path} is a page of the app`, !!routeFor(a.path.split(/[?#]/)[0]));
+  if (a.path) {
+    const pathname = a.path.split(/[?#]/)[0];
+    const r = routeFor(pathname);
+    ok(`${where}: path ${a.path} is a page of the app`, !!r && r.kind === 'page');
+    const parts = pathname.split('/').filter(Boolean);
+    if (r && parts.some(isPlaceholder)) {
+      ok(`${where}: each placeholder in ${a.path} stands for a record (a [..] folder of the app)`, parts.every((p, i) => !isPlaceholder(p) || /^\[.+\]$/.test(r.segs[i])), r.segs.join('/'));
+      // The other pages beside the record's (/admin/crm/reports beside /admin/crm/[id]) must not be offered it.
+      for (const other of routes) {
+        if (other.kind !== 'page' || other.segs.length < parts.length) continue;
+        const beside = parts.every((p, i) => (isPlaceholder(p) ? true : other.segs[i] === p)) && parts.some((p, i) => isPlaceholder(p) && !/^\[.+\]$/.test(other.segs[i]));
+        if (!beside) continue;
+        const there = sample(`/${other.segs.join('/')}`);
+        ok(`${where}: Help for ${there} is not this article (give that page an article with its own path)`, !articlesForPath(articles, there).includes(a));
+      }
+    }
+  }
   if (a.where) ok(`${where}: where uses › between menu levels`, !/\s>\s|->|»/.test(a.where), a.where);
   ok(`${where}: no shot: placeholders left`, !/\]\(\s*shot:/i.test(a.body), (a.body.match(/!\[[^\]]*\]\(\s*shot:[^)]*\)/gi) ?? []).join(' '));
   const pictures = new Set();
@@ -199,6 +222,11 @@ ok('parse: order not a number', /whole number/.test(probs(GOOD.replace('order: 1
 ok('parse: an unknown key', /unknown frontmatter key "author"/.test(probs(`${GOOD}\nauthor: me`)));
 ok('parse: a key twice', /given twice/.test(probs(`${GOOD}\ntitle: Again`)));
 ok('parse: a path that is not an app page', /must be an app page/.test(probs(GOOD.replace('path: /admin/crm', 'path: https://example.com'))));
+eq('parse: a placeholder for a record', [probs(GOOD.replace('path: /admin/crm', 'path: /admin/crm/[id]')), parseArticle('crm', 'x', art(GOOD.replace('path: /admin/crm', 'path: /admin/crm/[id]'))).article.path], ['', '/admin/crm/[id]']);
+ok('parse: a placeholder is a whole part', /whole part in square brackets/.test(probs(GOOD.replace('path: /admin/crm', 'path: /admin/crm/x[id]'))));
+ok('parse: … not half of one', /whole part in square brackets/.test(probs(GOOD.replace('path: /admin/crm', 'path: /admin/crm/[id'))));
+ok('parse: … and not straight after /admin', /must be a page's name/.test(probs(GOOD.replace('path: /admin/crm', 'path: /admin/[id]'))));
+eq('placeholders: which paths have one', [hasPlaceholder('/admin/crm/[id]'), hasPlaceholder('/admin/projects/[id]?tab=site'), hasPlaceholder('/admin/crm'), hasPlaceholder('/admin/crm/reports')], [true, true, false, false]);
 ok('parse: no body', /no body/.test(probs(GOOD, '\n')));
 ok('parse: no frontmatter', /no frontmatter/.test(parseArticle('crm', 'x', 'Just words').problems.join()));
 ok('parse: frontmatter not closed', /not closed/.test(parseArticle('crm', 'x', '---\ntitle: x\nWords').problems.join()));
@@ -286,6 +314,8 @@ eq('search: "approved" finds approval', top('approved')[0], 'templates');
 eq('search: every word must match', top('whatsapp reports'), []);
 eq('search: … or any, most words first, when asked', top('whatsapp reports', 'any').slice(0, 3).sort(), ['inbox', 'reports', 'templates']);
 eq('search: small words are left out', top('how do I add a customer'), ['add-customer']);
+eq('search: so are the words a question is wrapped in', [queryTerms('what does On hold mean'), queryTerms('how does the chaser work'), queryTerms('where do I find purchase orders')], [['hold'], ['chaser'], ['purchase', 'orders']]);
+eq('search: … unless that is all there is ("my work")', [queryTerms('my work'), queryTerms('find')], [['work'], ['find']]);
 eq('search: small words alone still search', queryTerms('how to'), ['how', 'to']);
 eq('search: capitals and accents do not matter', top('WHATSÁPP inbox'), ['inbox']);
 eq('search: nothing typed, nothing found', top('   '), []);
@@ -297,11 +327,32 @@ eq('highlight: the part typed', highlightParts('Add a WhatsApp template', 'temp'
 ]);
 eq('highlight: several words', highlightParts('Read and answer customers on WhatsApp.', 'whatsapp customer').filter((p) => p.hit).map((p) => p.text), ['customer', 'WhatsApp']);
 eq('highlight: nothing to mark', highlightParts('Plain', ''), [{ text: 'Plain', hit: false }]);
-// The real content: every article is found by its own title, near the top.
+// The exact title comes first, even when small words are all that tell it from the others.
+{
+  const T = fixture({
+    whatsapp: [
+      { slug: 'inbox-or-chats', title: 'WhatsApp inbox or WhatsApp chats? Who sees which', keywords: 'inbox, chats' },
+      { slug: 'inbox', title: 'The WhatsApp inbox', keywords: 'messages' },
+    ],
+    metis: [{ slug: 'what-metis-did', title: 'See what Metis did', body: 'Who sees what she changed.\n' }],
+    team: [
+      { slug: 'subcontractors-page', title: 'The Subcontractors page', keywords: 'subcontractor, firms' },
+      { slug: 'subcontractor-page', title: 'A subcontractor’s page' },
+      { slug: 'who-sees-what', title: 'Who sees what' },
+    ],
+    surveys: [{ slug: 'booking', title: 'Book a survey with Find a time' }],
+  });
+  const TP = prepareIndex(buildHelpIndex(T));
+  const first = (q) => searchPrepared(TP, q, { limit: 5 })[0]?.entry.url.split('/').slice(-1)[0];
+  eq('search: the exact title first', ['The WhatsApp inbox', 'A subcontractor’s page', "A subcontractor's page", 'Who sees what', 'who sees what'].map(first), ['inbox', 'subcontractor-page', 'subcontractor-page', 'who-sees-what', 'who-sees-what']);
+  eq('search: the words in the order typed, in a title', [first('find a time'), first('who sees wha')], ['booking', 'who-sees-what']);
+}
+// The real content: every article is first for its own title (or shares that title with the one that is).
 const RP = prepareIndex(buildHelpIndex(lib));
 for (const a of articles) {
-  const urls = searchPrepared(RP, a.title, { limit: 3 }).map((h) => h.entry.url);
-  ok(`search: "${a.title}" finds ${a.section}/${a.slug} in the top three`, urls.includes(a.url), urls.join(', '));
+  const hits = searchPrepared(RP, a.title, { limit: 3 });
+  const same = (t) => queryTerms(t).join(' ') === queryTerms(a.title).join(' ') && t.toLowerCase() === a.title.toLowerCase();
+  ok(`search: "${a.title}" finds ${a.section}/${a.slug} first`, hits[0]?.entry.url === a.url || (hits.some((h) => h.entry.url === a.url) && same(hits[0].entry.title)), hits.map((h) => h.entry.url).join(', '));
 }
 ok('search: "search help" finds Find your way around Help first', searchPrepared(RP, 'search help', { limit: 3 })[0]?.entry.url === '/admin/help/getting-started/using-help');
 const index = buildHelpIndex(lib);
@@ -326,11 +377,20 @@ eq('this page: the dashboard only on the dashboard', [at('/admin'), at('/admin/t
 eq('this page: a trailing slash', at('/admin/crm/'), ['crm']);
 eq('this page: not an app page', [at('https://evil.example/admin/crm'), at('//evil.example/admin'), at('/adminx'), at('')], [[], [], [], []]);
 eq('from: cleaned', [cleanFrom('/admin/crm#notes'), cleanFrom('/admin/crm?x=1'), cleanFrom('/admin\\..'), cleanFrom(42), cleanFrom('/admin/crm\nx')], ['/admin/crm', '/admin/crm?x=1', null, null, null]);
+{
+  const Q = [...P, { id: 'customer', path: '/admin/crm/[id]' }, { id: 'job', path: '/admin/projects/[id]' }, { id: 'job-site', path: '/admin/projects/[id]?tab=site' }, { id: 'chats', path: '/admin/crm/chats' }];
+  const atQ = (from) => articlesForPath(Q, from).map((a) => a.id);
+  eq('this page: a customer’s page (a [id] placeholder)', atQ(`/admin/crm/${SAMPLE_ID}`), ['customer']);
+  eq('this page: … and below it', atQ(`/admin/crm/${SAMPLE_ID}/anything`), ['customer']);
+  eq('this page: a page of its own beside it keeps its articles', [atQ('/admin/crm/reports'), atQ('/admin/crm/chats'), atQ(`/admin/crm/chats/${SAMPLE_ID}`)], [['reports'], ['chats'], ['chats']]);
+  eq('this page: the list itself is not a record', atQ('/admin/crm'), ['crm']);
+  eq('this page: a job’s page, a tab of it first', [atQ(`/admin/projects/${SAMPLE_ID}`), atQ(`/admin/projects/${SAMPLE_ID}?tab=site`)], [['job'], ['job-site', 'job']]);
+}
 eq('help link: carries the page', helpHref('/admin/crm/1?tab=notes'), '/admin/help?from=%2Fadmin%2Fcrm%2F1%3Ftab%3Dnotes');
 eq('help link: from Help itself, Help home', [helpHref('/admin/help'), helpHref('/admin/help/crm/add'), helpHref('/admin/help?q=x')], ['/admin/help', '/admin/help', '/admin/help']);
 eq('Ask Metis link: the question in the box', [metisHref('add a template'), metisHref('  ')], ['/admin/assistant?q=add%20a%20template', '/admin/assistant']);
 for (const a of articles.filter((x) => x.path)) {
-  ok(`this page: ${a.path} offers ${a.section}/${a.slug}`, articlesForPath(articles, a.path).includes(a));
+  ok(`this page: ${a.path} offers ${a.section}/${a.slug}`, articlesForPath(articles, sample(a.path)).includes(a));
 }
 
 // ── 7. Metis's search_help. ───────────────────────────────────────────────────────────────────────
@@ -342,6 +402,19 @@ for (const a of articles.filter((x) => x.path)) {
   const some = searchLibrary(F, FP, 'whatsapp quarterly reports');
   eq('metis: none with every word → the ones with most, marked', some.matched, 'some');
   eq('metis: nothing at all', searchLibrary(F, FP, 'xylophone').matched, 'none');
+  // A question about a label: the article named for it, not ones that happen to say "mean" too.
+  const H = fixture({
+    projects: [
+      { slug: 'projects-list', title: 'The Projects list', body: 'Filter to the jobs on hold. What the colours mean.\n' },
+      { slug: 'labour-pos', title: 'Labour POs', body: 'A PO can be on hold. What each status means.\n' },
+    ],
+    customers: [{ slug: 'lost-and-on-hold', title: 'Lost, on hold and reopening', body: 'Put a customer on hold when they pause.\n' }],
+  });
+  const HP = prepareIndex(buildHelpIndex(H));
+  eq('metis: "what does On hold mean" → the On hold article first', searchLibrary(H, HP, 'what does On hold mean').results[0]?.url, '/admin/help/customers/lost-and-on-hold');
+  const weak = bestHits(HP, 'hold colours');
+  eq('metis: when every word is only in the text, a title with some of them is weighed too', [weak.hits.map((h) => h.entry.url.split('/').pop()), weak.matched], [['lost-and-on-hold', 'projects-list'], 'some']);
+  eq('metis: … but every word in a title stays first', bestHits(HP, 'projects list').hits[0]?.entry.url.split('/').pop(), 'projects-list');
   const long = { ...F.sections[0].articles[0], body: Array.from({ length: 8 }, (_, i) => `## Part ${i}\n${'word '.repeat(150)}${i === 5 ? 'gasket' : ''}\n`).join('\n') };
   const ps = passagesFor(long, 'gasket');
   ok('metis: a long article gives the part that matches', ps.length >= 1 && ps.some((p) => /Part 5/.test(p)), ps.map((p) => p.slice(0, 40)).join(' / '));
@@ -351,6 +424,16 @@ for (const a of articles.filter((x) => x.path)) {
   for (const a of articles) {
     const res = searchLibrary(lib, RP, a.title).results;
     ok(`metis: "${a.title}" → a Help link`, res.length > 0 && res.every((x) => x.url.startsWith('/admin/help/') && x.passages.length > 0));
+  }
+  // The questions the tool's description and Metis's instructions give as examples, when their articles are here.
+  for (const [question, url] of [
+    ['what does On hold mean', '/admin/help/customers/lost-and-on-hold'],
+    ['how do I add a customer', '/admin/help/customers/add-a-customer'],
+    ['add a WhatsApp template', '/admin/help/whatsapp/add-a-template'],
+  ]) {
+    if (!articles.some((a) => a.url === url)) continue;
+    const res = searchLibrary(lib, RP, question).results;
+    eq(`metis: "${question}" → ${url} first`, res[0]?.url, url);
   }
 }
 

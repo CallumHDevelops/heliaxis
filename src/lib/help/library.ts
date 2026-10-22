@@ -1,5 +1,5 @@
 import type { HelpArticle, HelpLibrary } from './parse';
-import { isStopWord, prepareIndex, queryTerms, searchPrepared, variants, wordsOf, type HelpIndexEntry, type PreparedEntry } from './search';
+import { isStopWord, prepareIndex, queryTerms, searchPrepared, variants, wordsOf, type HelpHit, type HelpIndexEntry, type PreparedEntry } from './search';
 import { articleChunks, headingsOf, plainText } from './text';
 
 /** Every article in reading order (sections in order, then their articles). */
@@ -82,16 +82,27 @@ export type HelpAnswer = {
 };
 
 /**
- * For Metis: the best articles for a question (every word first; if none has them all, the ones with the
- * most), with the passages that answer it.
+ * The best articles for a question: those with every word. When none has them all, or the ones that do
+ * have them only in their text (not the title or keywords), the articles with some of the words in their
+ * title or keywords are weighed against them too, and the better ones kept. `matched` is 'all' when the
+ * first has every word.
  */
+export function bestHits(prepared: PreparedEntry[], q: string, n = 3): { hits: HelpHit[]; matched: 'all' | 'some' | 'none' } {
+  const all = searchPrepared(prepared, q, { mode: 'all', limit: n });
+  if (all.some((h) => h.strong)) return { hits: all, matched: 'all' };
+  const some = searchPrepared(prepared, q, { mode: 'any', limit: 50 }).filter((h) => (all.length ? h.strong : true));
+  const seen = new Set<string>();
+  const hits = [...all, ...some]
+    .sort((a, b) => b.score - a.score || b.matched - a.matched || a.entry.rank - b.entry.rank)
+    .filter((h) => !seen.has(h.entry.url) && !!seen.add(h.entry.url))
+    .slice(0, n);
+  const terms = queryTerms(q).length;
+  return { hits, matched: !hits.length ? 'none' : hits[0].matched === terms ? 'all' : 'some' };
+}
+
+/** For Metis: the best articles for a question (bestHits), with the passages that answer it. */
 export function searchLibrary(lib: HelpLibrary, prepared: PreparedEntry[], q: string, n = 3): { results: HelpAnswer[]; matched: 'all' | 'some' | 'none' } {
-  let hits = searchPrepared(prepared, q, { mode: 'all', limit: n });
-  let matched: 'all' | 'some' | 'none' = 'all';
-  if (!hits.length) {
-    hits = searchPrepared(prepared, q, { mode: 'any', limit: n });
-    matched = hits.length ? 'some' : 'none';
-  }
+  const { hits, matched } = bestHits(prepared, q, n);
   const byUrl = new Map(allArticles(lib).map((a) => [a.url, a]));
   const results = hits.flatMap((h) => {
     const a = byUrl.get(h.entry.url);
