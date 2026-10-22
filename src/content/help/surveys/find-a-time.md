@@ -22,7 +22,7 @@ Find a time looks at each surveyor’s day (surveys, installs, Outlook and diary
 4. Tap a time. Each one shows who would go and the extra driving, for example "Nearby · +5 min driving" or "no extra driving".
 5. Tap **Book it: …** (the button shows the day and time you picked).
 
-<!-- shot: surveys/find-a-time.jpg | Times that fit, with who’d go and the extra driving | Find a time on a phone, with a customer picked and times found -->
+![Find a time on a phone, with a customer picked and times found](/help/surveys/find-a-time.jpg "Times that fit, with who’d go and the extra driving")
 
 The Diary then shows "Booked ✓" with the customer, the time and the surveyor.
 

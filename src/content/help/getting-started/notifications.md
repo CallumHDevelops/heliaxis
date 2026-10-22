@@ -7,6 +7,8 @@ access: everyone
 ---
 The app tells you when something needs you: a new task for you, a follow-up that’s due, new WhatsApp messages and new enquiries, and news on your jobs such as a quote accepted, a deposit paid or a survey done. Each one goes in the bell, and also to your phone or computer if you’ve turned notifications on there.
 
+![The notifications panel open under the bell](/help/getting-started/bell.jpg "The bell: unread notifications, Mark all read and Turn on")
+
 ## The bell
 
 The bell is at the top right of every page, on a computer and on a phone.
@@ -48,5 +50,3 @@ People with Enquiries also see a **Turn on notifications** banner at the top of 
 > **Once switched on:** The bell needs notifications.sql, and notifications to the Android app need native-push.sql. Until an admin has also added the notification keys (it’s a **From Claude** to-do on the dashboard), notifications only appear in the bell. For admins, see [Set up phone notifications](/admin/help/admin/phone-notifications-setup).
 
 For notifications about tasks, see [Task notifications and reminders](/admin/help/tasks/task-notifications).
-
-<!-- shot: getting-started/bell.jpg | The bell: unread notifications, Mark all read and Turn on | The notifications panel open under the bell -->

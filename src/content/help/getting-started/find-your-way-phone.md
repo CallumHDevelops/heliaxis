@@ -7,6 +7,8 @@ access: everyone
 ---
 On a phone the top menu is replaced by a bar along the bottom of the screen, like most apps. The bar at the top keeps the Heliaxis logo (back to the dashboard), the bell and your initials.
 
+![The bottom bar with the More sheet open on a phone](/help/getting-started/phone-more.jpg "On a phone: the bottom bar and the More sheet")
+
 ## The bottom bar
 
 What’s on it depends on what you can open. From left to right:
@@ -40,5 +42,3 @@ While the sheet is open, **More** turns into **Close**. Tap a tile, tap **Close*
 - There’s no Search button on a phone. Use the search box at the top of the dashboard instead. See [Search for a customer or project](/admin/help/getting-started/search).
 
 > **Good to know:** On a phone the dashboard’s areas show as a grid of small app icons, without their descriptions. The Website CMS works best on a tablet or computer.
-
-<!-- shot: getting-started/phone-more.jpg | On a phone: the bottom bar and the More sheet | The bottom bar with the More sheet open on a phone -->

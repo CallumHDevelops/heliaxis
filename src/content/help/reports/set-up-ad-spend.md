@@ -1,8 +1,8 @@
 ---
-title: Ad spend not showing in reports
+title: When ad spend isn’t showing in reports
 summary: Why CRM reports has no spend or cost per lead, how it gets switched on, and what its warnings mean.
 order: 60
-keywords: ad spend missing, no spend, cost per lead not showing, connect ad account, Meta ad account, ad spend error, Meta’s figures aren’t available, Meta didn’t send new figures, token expired, ad-spend.sql
+keywords: ad spend missing, no spend, cost per lead not showing, connect ad account, Meta ad account, ad spend error, Meta’s figures aren’t available, Meta didn’t send new figures, token expired, ad-spend.sql, ad spend not showing
 where: CRM › CRM reports
 path: /admin/crm/reports
 access: crm
@@ -15,7 +15,7 @@ Admins see this line above the table: "To see what each Meta campaign and ad cos
 
 > **Admins only:** Connecting the ad account is the **Show ad spend in your reports (cost per lead and per sale)** to-do in From Claude. It gives the app read-only access to your ad figures: it can’t change ads or spend money. The steps are in [Show ad spend in reports](/admin/help/admin/ad-spend).
 
-Once it’s connected, the figures at the top include **Ad spend on Meta** and **Cost per lead**, and **By source and ad campaign** shows each campaign and ad with its spend. See [Meta ad spend and cost per lead](/admin/help/reports/meta-ad-spend).
+Once it’s connected, the figures at the top include **Ad spend on Meta** and **Cost per lead**, and **By source and ad campaign** shows each campaign and ad with its spend. See [Meta ad spend and cost per lead in the report](/admin/help/reports/meta-ad-spend).
 
 > **Once switched on:** ad-spend.sql records the exact Meta ad each new lead came from, so each ad’s spend sits beside its own leads and sales, even when two ads share a name or one is renamed. After it has been run, the app also fills in the ad for older leads, a batch at a time after CRM reports loads, for leads Meta still keeps (about 90 days). Without it, leads are matched to ads by name.
 

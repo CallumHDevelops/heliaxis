@@ -29,7 +29,7 @@ The two work together. The status cards count only the source you’ve picked, a
 
 > **Good to know:** **See all new Meta leads →** on the dashboard’s New Meta leads card opens Enquiries with exactly this filter.
 
-<!-- shot: enquiries/new-meta-filter.jpg | Meta and New picked: the cards count only Meta leads | Enquiries filtered to new Meta leads on a phone -->
+![Enquiries filtered to new Meta leads on a phone](/help/enquiries/new-meta-filter.jpg "Meta and New picked: the cards count only Meta leads")
 
 ## Search
 

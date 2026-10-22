@@ -11,7 +11,7 @@ access: admin
 
 > **Admins only:** The menu item shows for anyone with Analytics access, but the click figures only load for admins. Anyone else sees an **unauthorized** message.
 
-<!-- shot: website/heatmap.jpg | Clicks over the homepage, with the controls on the right | The click heatmap -->
+![The click heatmap](/help/website/heatmap.jpg "Clicks over the homepage, with the controls on the right")
 
 ## The controls
 

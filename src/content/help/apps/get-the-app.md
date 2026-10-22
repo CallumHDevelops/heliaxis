@@ -9,6 +9,8 @@ access: everyone
 ---
 **Apps › Get the app** is open to everyone. (If you have neither studio, the menu shows a plain **Get the app** link instead of **Apps**. On a phone it’s under **More**. The **Android app** card on the dashboard, under **On your phone**, opens it too.) What it shows depends on the device you open it on.
 
+![The Get the app page](/help/apps/get-the-app.jpg "The Android download, Appearance, and Send it to your phone")
+
 ## On a computer or Android phone
 
 The page is headed **Heliaxis for Android**.
@@ -29,5 +31,3 @@ The page is headed **Heliaxis for iPhone**, with the same **Appearance** choice.
 
 - [Install the Android app](/admin/help/getting-started/android-app)
 - [Add Heliaxis to an iPhone Home Screen](/admin/help/getting-started/iphone)
-
-<!-- shot: apps/get-the-app.jpg | The Android download, Appearance, and Send it to your phone | The Get the app page -->

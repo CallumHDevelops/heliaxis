@@ -13,6 +13,8 @@ Every page has the same bar across the top. From left to right:
 - The bell: your notifications. See [Notifications and the bell](/admin/help/getting-started/notifications).
 - Your initials: your account menu.
 
+![The top menu with the CRM group open](/help/getting-started/top-menu.jpg "The top menu: groups, Search, the bell and your initials")
+
 ## The menu
 
 Click a group’s name to open it (with a mouse, just pointing at it opens it too), then click a page. Click anywhere else or press Esc to close it. The group holding the page you’re on is highlighted.
@@ -58,5 +60,3 @@ Click your initials at the top right to see:
 ## On a tablet
 
 On a narrower screen the Search button shrinks to a magnifying glass. On a tablet, on pages with the WhatsApp dock, a **WhatsApp** button beside the bell opens the dock over the page.
-
-<!-- shot: getting-started/top-menu.jpg | The top menu: groups, Search, the bell and your initials | The top menu with the CRM group open -->

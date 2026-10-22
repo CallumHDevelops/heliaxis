@@ -13,7 +13,7 @@ access: admin
 
 Meta only hands over the last 90 days of leads. Bring those in first, then add anything older from a CSV.
 
-<!-- shot: enquiries/import-meta.jpg | Each Facebook Page with its live leads and lead forms | The Import page after Find lead forms -->
+![The Import page after Find lead forms](/help/enquiries/import-meta.jpg "Each Facebook Page with its live leads and lead forms")
 
 ## The last 90 days, straight from Meta
 

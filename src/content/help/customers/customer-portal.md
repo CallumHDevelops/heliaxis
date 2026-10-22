@@ -8,7 +8,7 @@ access: crm
 ---
 Each job has one private link for the customer. There’s no login: anyone with the link can open it, so it’s only sent to the customer. The page says “This is your private link. Please don’t share it.”
 
-<!-- shot: customers/portal-quote.jpg | What the customer sees at Quote sent: their quote to read and sign. | The customer’s quote page on a phone, with View quote and the signing form. -->
+![The customer’s quote page on a phone, with View quote and the signing form.](/help/customers/portal-quote.jpg "What the customer sees at Quote sent: their quote to read and sign.")
 
 ## When the link works
 

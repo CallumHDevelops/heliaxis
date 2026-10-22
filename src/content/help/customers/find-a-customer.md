@@ -28,4 +28,4 @@ As you type, a list shows up to 8 matching jobs, with their stage, reference and
 
 > **Good to know:** The search in the page header (see [Search for a customer or project](/admin/help/getting-started/search)) and Metis can find customers too. This box searches the CRM’s customers and jobs.
 
-To add someone who isn’t there yet, see [Add a customer by hand](/admin/help/customers/add-a-customer).
+To add someone who isn’t there yet, see [Add a new customer by hand](/admin/help/customers/add-a-customer).

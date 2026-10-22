@@ -28,7 +28,7 @@ Check their documents too. If anything required is missing or expired, the count
 
 It says "Countersigned — the agreement is live and a copy has been emailed to them." Their status becomes **Active**. They get an email, "Your Heliaxis subcontractor agreement is live", with a **View your agreement** button so they can download their signed copy and keep their documents up to date. That button is a new portal link, so any older link they have stops working.
 
-<!-- shot: team/countersign.jpg | Framework Agreement: their signature, then Countersign for Heliaxis Limited | The Framework Agreement card ready to countersign -->
+![The Framework Agreement card ready to countersign](/help/team/countersign.jpg "Framework Agreement: their signature, then Countersign for Heliaxis Limited")
 
 Once countersigned, **NTP agreements** can be sent to them (see [NTP agreements](/admin/help/team/ntp-agreements)), and RAMS can see the firm, its team and its approved documents (while it’s **Active**).
 

@@ -22,7 +22,7 @@ The dashboard is headed **Website**. From top to bottom:
 - **Leads & form submissions**: the three newest enquiries. Click one for its details, or **Manage all →** to open Enquiries. They only load if you also have Enquiries access; without it the card says **Sign in required**.
 - **Site & admin**: **Image library**, **Brand logos**, **Mega menu**, **Blog**, **Analytics** and **Click heatmap**.
 
-<!-- shot: website/cms-dashboard.jpg | The Website dashboard: counts, Create buttons and your pages | The CMS dashboard -->
+![The CMS dashboard](/help/website/cms-dashboard.jpg "The Website dashboard: counts, Create buttons and your pages")
 
 ## The page editor
 
@@ -32,7 +32,7 @@ Click a page card (or **Edit page**) to open it. The editor has:
 - **Three tabs on the left**: **Sections** (the page’s layout and the settings for the section you’ve picked), **Images** and **SEO**.
 - **The preview on the right**, with **Desktop** and **Mobile** buttons to see the page at each size. You can type straight into the preview.
 
-<!-- shot: website/cms-editor.jpg | Sections on the left, the live preview on the right | The page editor -->
+![The page editor](/help/website/cms-editor.jpg "Sections on the left, the live preview on the right")
 
 The button at the top right shows your initials and email. Its menu has **Main dashboard**, **View site**, **Blog**, **Enquiries**, **Subcontractors** and **Analytics** (each only if you have that access), **Users** (admins) and **Sign out**. The **🐛 Report** button at the bottom right sends a bug report or feature request.
 

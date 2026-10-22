@@ -18,7 +18,7 @@ Metis is the assistant inside the app. Tell her what happened, after a meeting, 
 
 You need the CRM on your account to use her.
 
-<!-- shot: metis/metis-page.jpg | A request, Metis’s reply, and the chips for what she did | The Metis page with a reply and the chips under it -->
+![The Metis page with a reply and the chips under it](/help/metis/metis-page.jpg "A request, Metis’s reply, and the chips for what she did")
 
 ## What’s on the page
 

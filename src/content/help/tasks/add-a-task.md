@@ -20,6 +20,8 @@ access: tasks
 
 The task appears on the list straight away. **Cancel**, the **×** or Esc closes the box without saving.
 
+![Adding a task on a phone](/help/tasks/new-task.jpg "New task: what needs doing, who, the deadline and priority")
+
 ## The deadline buttons
 
 - **Today** and **Tomorrow** are what they say.
@@ -36,5 +38,3 @@ The task appears on the list straight away. **Cancel**, the **×** or Esc closes
 > **Watch out:** **Assign to** lists everyone who can sign in. A person without Tasks access can’t open the Tasks page, so check they have it before giving them a task here. See [What you can see depends on your access](/admin/help/getting-started/your-access).
 
 > **Good to know:** A task about a customer is better added on their job, so it’s linked to them. See [Add a task from a job or a WhatsApp chat](/admin/help/tasks/from-a-job-or-chat). With CRM you can also add one from **+ Task** in **My work** on the CRM home, linked to a customer or, if you have Tasks access, not linked to one. See [My work: your tasks and next steps](/admin/help/customers/my-work).
-
-<!-- shot: tasks/new-task.jpg | New task: what needs doing, who, the deadline and priority | Adding a task on a phone -->

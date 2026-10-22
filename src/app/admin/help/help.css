@@ -939,11 +939,14 @@
   min-width: 7rem;
 }
 
-/* Pictures: a frame with the caption under it; a very tall one scrolls inside its frame. */
+/* Pictures: a frame with the caption under it, no wider than the picture was taken (--hp-fig-w, set by
+   HelpBody: a phone picture at the phone's width); a very tall one scrolls inside its frame. */
 .hp-fig {
   margin: 1.4rem 0 1.5rem;
 }
 .hp-fig__frame {
+  max-width: var(--hp-fig-w, 100%);
+  margin: 0 auto;
   max-height: min(78vh, 760px);
   overflow: auto;
   border: 1px solid var(--border);
@@ -955,10 +958,6 @@
   display: block;
   width: 100%;
   height: auto;
-}
-.hp-fig.is-portrait .hp-fig__frame {
-  max-width: 400px;
-  margin: 0 auto;
 }
 .hp-fig figcaption {
   margin-top: 0.5rem;

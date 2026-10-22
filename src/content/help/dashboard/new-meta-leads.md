@@ -9,6 +9,8 @@ access: enquiries, crm
 ---
 The **New Meta leads** card shows leads from Meta (Facebook and Instagram lead forms, Meta ad links and WhatsApp ad chats) whose enquiry is still at **New**. It’s near the top of the dashboard for anyone with Enquiries or CRM.
 
+![The New Meta leads card](/help/dashboard/meta-leads.jpg "New Meta leads: count, today, and Open, WhatsApp and Call")
+
 ## What it shows
 
 - Beside the heading: how many new Meta leads are waiting, and how many of them came in today ("2 today").
@@ -37,5 +39,3 @@ The card says "No new Meta leads." and when the last one came in ("The last one 
 > **Once switched on:** HX references show once customer-refs.sql has been run.
 
 For working through leads on Enquiries, see [Contact a new lead](/admin/help/enquiries/contact-a-lead) and [Meta lead ads coming in](/admin/help/enquiries/meta-lead-ads).
-
-<!-- shot: dashboard/meta-leads.jpg | New Meta leads: count, today, and Open, WhatsApp and Call | The New Meta leads card -->

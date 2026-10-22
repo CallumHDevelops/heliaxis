@@ -15,7 +15,7 @@ Nobody is added to WhatsApp separately: you message people through the record th
 
 ## Customers
 
-Add them with their mobile ([Add a customer by hand](/admin/help/customers/add-a-customer)), or add the mobile later on the **Customer** card ([Change a customer’s details](/admin/help/customers/edit-customer-details)). Any chat on that number links to them by itself. The card’s **WhatsApp** line then says "Linked · 12 messages", or "No chat yet" until there is one.
+Add them with their mobile ([Add a new customer by hand](/admin/help/customers/add-a-customer)), or add the mobile later on the **Customer** card ([Change a customer’s details](/admin/help/customers/edit-customer-details)). Any chat on that number links to them by itself. The card’s **WhatsApp** line then says "Linked · 12 messages", or "No chat yet" until there is one.
 
 ## Trades
 

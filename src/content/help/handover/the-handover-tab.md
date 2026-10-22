@@ -1,5 +1,5 @@
 ---
-title: The Handover tab
+title: Handover pack: the Handover tab
 summary: Read the pack’s headline and target, the Before the install day list, and each item’s state.
 order: 20
 keywords: handover pack, handover tab, target, MCS Customer Duty, 30 days, progress, before the install day, can be sent once, items, complete, missing, waiting, not needed, out of date, not for this job, build handover pack, HX-HO

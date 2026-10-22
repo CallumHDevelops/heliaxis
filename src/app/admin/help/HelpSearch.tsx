@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { metisHref } from '@/lib/help/context';
-import { highlightParts, prepareIndex, searchPrepared, type HelpHit, type HelpIndexEntry, type PreparedEntry } from '@/lib/help/search';
+import { highlightParts, prepareIndex, queryTerms, searchPrepared, type HelpHit, type HelpIndexEntry, type PreparedEntry } from '@/lib/help/search';
 
 /** What the box puts in the address for `v` (?q= is left out for nothing but spaces). */
 const forAddress = (v: string) => (v.trim() ? v : '');
@@ -116,6 +116,8 @@ export function HelpSearch({
   const box = useRef<HTMLInputElement>(null);
   const ready = index?.version === version ? index.prepared : null;
   const searching = q.trim().length > 0;
+  // More than one word to look for: nothing found means nothing has all of them ("has all of" makes no sense for one).
+  const several = queryTerms(q).length > 1;
   // Before the index has come: the server's results, for the search it was given; otherwise none yet.
   const early = !ready && q === initial;
   const hits = useMemo(() => (!searching ? [] : ready ? searchPrepared(ready, q, { limit: 30 }) : early ? initialHits : null), [searching, ready, q, early, initialHits]);
@@ -246,9 +248,9 @@ export function HelpSearch({
         </section>
       ) : (
         <section className="hp-empty" aria-label="No results">
-          <p className="hp-empty__title">No article has all of “{q.trim()}”.</p>
+          <p className="hp-empty__title">{several ? `No article has all of “${q.trim()}”.` : `Nothing in Help mentions “${q.trim()}”.`}</p>
           <ul className="hp-empty__tips">
-            <li>Check the spelling, or use fewer words.</li>
+            <li>{several ? 'Check the spelling, or use fewer words.' : 'Check the spelling, or try another word for it.'}</li>
             <li>Try the name on the button or menu, e.g. “templates” or “Pipeline”.</li>
             {metis && (
               <li>

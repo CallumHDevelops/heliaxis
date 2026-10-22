@@ -20,7 +20,7 @@ The quicker a new lead hears from you, the better. Reports measure it as **Typic
 
 **WhatsApp** and **Call** only show when they gave a phone number.
 
-<!-- shot: enquiries/lead-details.jpg | A lead’s details: the map, Source, Interested in, Message and the buttons | A lead’s details on Enquiries -->
+![A lead’s details on Enquiries](/help/enquiries/lead-details.jpg "A lead’s details: the map, Source, Interested in, Message and the buttons")
 
 ## What counts as getting in touch
 

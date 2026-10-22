@@ -7,7 +7,7 @@ where: CRM › Surveys and diary › To do
 path: /admin/surveys/todo
 access: crm
 ---
-<!-- shot: surveys/finish-screen.jpg | Still needed, red flags and what the answers mean, then Finish on site | The Finish screen on a phone -->
+![The Finish screen on a phone](/help/surveys/finish-screen.jpg "Still needed, red flags and what the answers mean, then Finish on site")
 
 ## The Finish screen
 

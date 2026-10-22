@@ -9,7 +9,7 @@ access: crm
 ---
 Open a customer from anywhere in the CRM (a card, the search, My work, Latest notes). Each opportunity has its own page. Once it’s Won, the same page is the project’s page: see [A project’s page](/admin/help/projects/project-page) for what changes then.
 
-<!-- shot: customers/customer-page.jpg | A customer’s page: header and stage path, next step, the customer on the left, Tasks on the right. | A customer’s page at Surveyed, with the header, stage path, next step, the Customer card and Tasks. -->
+![A customer’s page at Surveyed, with the header, stage path, next step, the Customer card and Tasks.](/help/customers/customer-page.jpg "A customer’s page: header and stage path, next step, the customer on the left, Tasks on the right.")
 
 ## The header
 

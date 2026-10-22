@@ -35,7 +35,7 @@ Only leads that have been contacted count. For what counts as getting in touch, 
 
 ## Pipeline funnel
 
-<!-- shot: reports/funnel.jpg | The funnel, then the same figures for each person | The Pipeline funnel and By person -->
+![The Pipeline funnel and By person](/help/reports/funnel.jpg "The funnel, then the same figures for each person")
 
 "How many of this period’s opportunities have reached each stage (lost ones excluded)." Each bar is a stage, from **Lead** to **Complete**, with how many opportunities are at that stage or further on. The bars are drawn against the first one, so you can see where leads drop away. Point at a bar on a computer to see its stage and number.
 

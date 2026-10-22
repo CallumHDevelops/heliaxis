@@ -8,7 +8,7 @@ access: crm
 There’s no "new chat" button: a chat belongs to a person in the CRM, so you start from them.
 
 1. Make sure they’re in the CRM with their mobile.
-   - Someone new: add them with their **Mobile**. See [Add a customer by hand](/admin/help/customers/add-a-customer).
+   - Someone new: add them with their **Mobile**. See [Add a new customer by hand](/admin/help/customers/add-a-customer).
    - Already in, but no mobile: on their **Customer** card, press **Add their mobile** (or **✎ Edit**), fill in **Mobile** and press **Save**.
 2. Open their page and press the green WhatsApp button (just above the yellow **+**). On a computer or tablet the chat opens in the WhatsApp panel; on a phone it opens full screen. (With Enquiries access you can also open the lead on **CRM › Enquiries** and press **WhatsApp**.) See [The + and WhatsApp buttons on a customer’s page](/admin/help/customers/plus-and-whatsapp-buttons).
 3. They haven’t messaged the CRM’s number yet, so the chat says "Start the conversation with an approved template. Once they reply you can chat freely for 24 hours."
