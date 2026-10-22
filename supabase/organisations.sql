@@ -2,8 +2,9 @@
 --     schools and the public sector, partners who refer work (builders, architects, letting agents),
 --     suppliers. Each has its people (one of them the primary contact), and a job can be linked to an
 --     organisation and to the contact you deal with there.
---     Contacts are their own rows, not customer records (enquiries): they never appear in the leads
---     lists, never get an opportunity, a reference or automatic WhatsApps (src/lib/organisations/shared.ts).
+--     Contacts are their own rows, not customer records (enquiries): adding one never puts them in the
+--     leads lists, or gives them an opportunity, a reference or automatic WhatsApps. (A contact who
+--     WhatsApps the business number still arrives as a new chat, as any new number does today.)
 --     Run after crm.sql. Safe to run twice. Server-only tables (RLS on, no policies).
 -- Adding the job's columns briefly locks crm_projects: if something holds it, stop after 5 seconds
 -- (nothing is changed) rather than queue every read of the jobs behind it. Just run it again.

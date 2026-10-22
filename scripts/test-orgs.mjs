@@ -178,6 +178,8 @@ const into = combineJobs(job('k'), job('f', { organisation_id: 'org', organisati
 eq('kept job had none: both come across, together', [into.set.organisation_id?.to, into.set.organisation_contact_id?.to], ['org', 'con']);
 const keeps = combineJobs(job('k', { organisation_id: 'org2', organisation_contact_id: null }), job('f', { organisation_id: 'org', organisation_contact_id: 'con' }), '2026-10-20T10:00:00Z');
 eq('kept job has one: it stays, and no other org’s contact is put on it', [keeps.set.organisation_id, keeps.set.organisation_contact_id], [undefined, undefined]);
+const same = combineJobs(job('k', { organisation_id: 'org' }), job('f', { organisation_id: 'org', organisation_contact_id: 'con' }), '2026-10-20T10:00:00Z');
+eq('same organisation, kept job has no contact: F’s contact comes across', [same.set.organisation_id, same.set.organisation_contact_id?.to], [undefined, 'con']);
 const before = combineJobs({ ...job('k'), organisation_id: undefined }, job('f'), '2026-10-20T10:00:00Z');
 eq('before organisations.sql: nothing to do', 'organisation_id' in before.set, false);
 

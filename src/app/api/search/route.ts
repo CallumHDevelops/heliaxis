@@ -67,7 +67,7 @@ export async function GET(req: Request) {
   const [found, direct, orgs] = await Promise.all([findCustomers(db, q), crm ? jobsMatching(db, q) : Promise.resolve([] as JobRow[]), orgsFound]);
   if (found.error && !direct.length && !orgs.length) return json({ q, error: 'Search isn’t working right now. Try again in a moment.', people: [], orgs: [] }, 500);
   const ids = [...new Set([...found.customers.map((c) => c.id), ...direct.map((j) => j.enquiry_id)])];
-  if (!ids.length) return json({ q, people: [], orgs });
+  if (!ids.length) return json(found.error ? { q, error: 'Search isn’t working right now. Try again in a moment.', people: [], orgs } : { q, people: [], orgs });
 
   // Everything shown about them in one read (the reference once customer-refs.sql has run), and their jobs.
   const readPeople = (cols: string) => db.from('enquiries').select(cols).in('id', ids);

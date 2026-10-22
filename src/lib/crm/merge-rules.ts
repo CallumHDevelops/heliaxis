@@ -619,6 +619,8 @@ export function combineJobs(K: Job, F: Job, now: string): JoinedJob {
   const dnoStarted = (j: Job) => (!blank(j.dno_status) && j.dno_status !== 'not_started') || !blank(j.dno_ref);
   if (!dnoStarted(K) && dnoStarted(F)) copyGroup(DNO_GROUP);
   if (!has(K, ['organisation_id']) && has(F, ['organisation_id'])) copyGroup(ORG_GROUP);
+  // Both with the same organisation: the contact F was dealt with through, when K has none.
+  else if (K.organisation_id && K.organisation_id === F.organisation_id && !has(K, ['organisation_contact_id'])) put(set, K, 'organisation_contact_id', F.organisation_contact_id);
 
   // The next step: K's; both, F's becomes a task on K.
   if (blank(K.next_step) && !blank(F.next_step)) {
