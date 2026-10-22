@@ -8,7 +8,6 @@ import { setupPeople, visibleSetupTodos } from '@/lib/setup-checks';
 import { schemaReady } from '@/lib/schema-ready';
 import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
 import { DEFAULT_SURVEY_MINUTES, isSurveyType, noSurveyNeeded, SURVEY_TYPES, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
-import { jobHref } from '@/lib/global-search';
 import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem } from './HubView';
 import { newMetaLeads } from './meta-leads';
 
@@ -219,8 +218,7 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
       time: `${timeOf(p.survey_at)}–${hhmm.format(new Date(start + minutes * 60_000))}`,
       title: nameOf(p),
       sub: [visit ? 'Home visit' : `${SURVEY_TYPES.find((t) => t.key === type)?.short ?? 'Solar'} survey`, postcodeOf(p)].filter(Boolean).join(' · '),
-      // A job from Won on opens in Projects (Operations), as from the CRM and the search.
-      href: jobHref({ id: String(p.id), stage: String(p.stage ?? '') }),
+      href: `/admin/crm/${p.id}`,
       action: open
         ? { href: `/admin/surveys/${open.id}`, label: open.status === 'draft' ? 'Continue' : 'Start survey' }
         : done
@@ -240,7 +238,7 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
       time: n === 1 ? timeOf(p.install_at) : 'All day',
       title: nameOf(p),
       sub: [days.length > 1 ? `Install, day ${n} of ${days.length}` : 'Install', postcodeOf(p)].filter(Boolean).join(' · '),
-      href: jobHref({ id: String(p.id), stage: String(p.stage ?? '') }),
+      href: `/admin/crm/${p.id}`,
       action: null,
       directions: directions(p.address, postcodeOf(p)),
     });
