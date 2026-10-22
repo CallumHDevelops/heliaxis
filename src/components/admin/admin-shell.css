@@ -417,6 +417,27 @@
     border-radius: 16px 16px 0 0;
     box-shadow: var(--shadow-up);
     animation: hx-sheet-up 0.2s ease-out;
+    /* The tile grid's columns: a group spans them all, a headed group of one tile takes one column, so
+       one-tile groups in a row (Operations, Finance) share a row, each under its own heading. */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 4px;
+    align-content: start;
+  }
+  .hx-more__group {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .hx-more__group--one {
+    grid-column: auto;
+  }
+  .hx-more__group--one .hx-more__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hx-more__group--one .hx-more__title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .hx-more__title {
     margin: 0.75rem 0.25rem 0.35rem;
@@ -484,7 +505,8 @@
   }
 }
 @media (max-width: 340px) {
-  .hx-more__grid {
+  .hx-more__grid,
+  .hx-more__sheet {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

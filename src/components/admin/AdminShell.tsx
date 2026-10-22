@@ -335,8 +335,11 @@ export async function AdminShell({
     },
     {
       // The jobs once they're won (Projects: list, schedule, board and each job's page) and RAMS for site.
+      // Always "Operations", even for someone with only one of the two (CRM staff without RAMS access,
+      // or RAMS only), so "Operations › Projects" is the way there for everyone.
       id: 'operations',
       label: 'Operations',
+      dropdown: true,
       items: [
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         // On site: one tap away on the phone's bottom bar, so not in "More".
@@ -499,7 +502,8 @@ export async function AdminShell({
               {more.map((g) => (
                 <div
                   key={g.id}
-                  className="hx-more__group"
+                  // A headed group of one tile takes one column, so Operations and Finance sit side by side.
+                  className={g.label && g.items.length === 1 ? 'hx-more__group hx-more__group--one' : 'hx-more__group'}
                   role={g.label ? 'group' : undefined}
                   aria-labelledby={g.label ? `hx-more-${g.id}` : undefined}
                 >
