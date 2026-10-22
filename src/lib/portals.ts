@@ -123,6 +123,9 @@ export const HUB_PATH = '/admin';
 /** Also open to every approved user: the Android app download page. */
 export const APP_PATH = '/admin/app';
 
+/** Help (how to use every part of the app): open to every approved user. */
+export const HELP_PATH = '/admin/help';
+
 /** Confirming your email before one-tap sign-in to RAMS or the social studio (src/lib/sso.ts): open to any approved user. */
 export const SSO_PATH = '/admin/sso';
 
@@ -150,13 +153,14 @@ export function canAccess(profile: AccessProfile | null | undefined, key: Portal
 }
 
 /**
- * Which portal an /admin path belongs to: null = open to any approved user (the hub, setup guides),
+ * Which portal an /admin path belongs to: null = open to any approved user (the hub, setup guides, Help),
  * 'admin' = admin only. Unknown /admin/<x> paths are old CMS page-editor links
  * (now /admin/cms/<x>) and are redirected there, so they count as the CMS.
  */
 export function portalForPath(pathname: string): PortalKey | 'admin' | null {
   const p = pathname.replace(/\/$/, '') || '/';
   if (p === HUB_PATH || p === APP_PATH || p === SSO_PATH || p.startsWith(`${SSO_PATH}/`)) return null;
+  if (p === HELP_PATH || p.startsWith(`${HELP_PATH}/`)) return null;
   if (OPEN_SETUP_PATHS.some((a) => p.startsWith(`${a}/`))) return null;
   if (ADMIN_ONLY_PATHS.some((a) => p === a || p.startsWith(`${a}/`))) return 'admin';
   for (const portal of PORTALS) {
