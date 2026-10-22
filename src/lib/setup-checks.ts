@@ -482,6 +482,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     (await customerRefs) && !(await has('crm_merges')),
     sql('merge.sql', 'Merge duplicate customers (someone who came in twice, say from the website and a Meta ad) and their jobs for the same work.', 6, 'customer-refs.sql')
   );
+  // Design studio: works without it, but designs and templates can't be saved until it's run.
+  add(
+    !(await has('design_projects')),
+    sql('design-studio.sql', 'Lets the Design studio save your leaflets, cards and banners, and keep a library of printer templates.', 5)
+  );
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));

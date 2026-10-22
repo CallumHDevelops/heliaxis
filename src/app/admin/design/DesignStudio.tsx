@@ -1,471 +1,682 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  FORMATS,
-  BRAND_PALETTE,
-  BRAND_LOGOS,
-  PT_PER_MM,
-  type Format,
-} from './formats';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { DesignDoc, PageGeometry, TemplateRef, TemplateSummary } from '@/lib/design/types';
+import { StudioEngine, uid } from './lib/engine';
+import { loadBrandFonts } from './lib/fonts';
+import { FORMATS, formatById, geometryFor, matchFormat, type FormatDef } from './lib/formats';
+import { brandSvg, iconSvg, type IconTone } from './lib/assets';
+import { LOGOS } from './lib/brand';
+import { buildStarter } from './lib/starters';
+import { readTemplate, renderTemplate, type TemplateInfo } from './lib/template';
+import * as api from './lib/api';
+import { LeftPanel } from './ui/LeftPanel';
+import { Inspector } from './ui/Inspector';
+import { Dialogs, type DialogKind, type PendingTemplate } from './ui/Dialogs';
+import { Ico } from './ui/icons';
 
-const FONTS = ['Ezra', 'Hanken Grotesk', 'JetBrains Mono', 'Arial', 'Georgia', 'Impact', 'Times New Roman'];
+const EMPTY = { version: '6.7.1', objects: [] as unknown[] };
 
-/** px per mm for the working canvas: crisp for small items, capped so big
- *  banners stay a manageable size on screen (export rescales to target DPI). */
-function workPxPerMm(f: Format) {
-  const fit = 1400 / Math.max(f.w, f.h);
-  return Math.min(fit, 6);
+export function makeDoc(formatId: string, geometry?: PageGeometry, label?: string): DesignDoc {
+  const fmt = formatById(formatId) ?? FORMATS[0];
+  return {
+    v: 2,
+    formatId: fmt.id,
+    formatLabel: label ?? fmt.label,
+    geometry: geometry ?? geometryFor(fmt),
+    template: null,
+    pages: fmt.pages.map((name) => ({ id: uid(), name, json: { ...EMPTY } })),
+    output: { cmyk: fmt.group !== 'Digital', cropMarks: false },
+  };
 }
 
-export function DesignStudio() {
-  const canvasElRef = useRef<HTMLCanvasElement | null>(null);
-  const fabricRef = useRef<any>(null); // the fabric module
-  const canvasRef = useRef<any>(null); // the fabric.Canvas
-  const bgRef = useRef<any>(null); // locked background image (imported PDF)
-  const fileImgRef = useRef<HTMLInputElement | null>(null);
-  const filePdfRef = useRef<HTMLInputElement | null>(null);
+export type StudioApi = {
+  engine: StudioEngine;
+  doc: DesignDoc;
+  page: number;
+  tick: number;
+  cloudReady: boolean;
+  isAdmin: boolean;
+  fmt: FormatDef | undefined;
+  digital: boolean;
+  toast: (m: string) => void;
+  placeFiles: (files: File[]) => Promise<void>;
+  addLogo: (id: string) => Promise<void>;
+  addIcon: (name: string, tone: IconTone) => Promise<void>;
+  addImageUrl: (url: string, assetPath: string | null, name: string) => Promise<void>;
+  applyStarter: (id: string) => Promise<void>;
+  openDialog: (d: DialogKind) => void;
+  importTemplateFile: (file: File) => Promise<void>;
+  useLibraryTemplate: (t: TemplateSummary) => Promise<void>;
+  setTemplateRef: (patch: Partial<TemplateRef>) => void;
+  removeTemplate: () => void;
+  setGeometry: (g: PageGeometry) => void;
+};
 
+type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'local' | 'error';
+
+export function DesignStudio({ cloudReady, isAdmin, projectId }: { cloudReady: boolean; isAdmin: boolean; projectId: string | null }) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<StudioEngine | null>(null);
+  const fabricRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
-  const [format, setFormat] = useState<Format>(FORMATS[0]);
-  const [sel, setSel] = useState<any>(null); // selected object (plain snapshot trigger)
-  const [busy, setBusy] = useState('');
+  const [tick, setTick] = useState(0);
+  const [doc, setDocState] = useState<DesignDoc>(() => makeDoc('a5'));
+  const docRef = useRef(doc);
+  const setDoc = (d: DesignDoc) => {
+    docRef.current = d;
+    setDocState(d);
+  };
+  const [page, setPageState] = useState(0);
+  const pageRef = useRef(0);
+  const setPage = (i: number) => {
+    pageRef.current = i;
+    setPageState(i);
+  };
+  const [project, setProjectState] = useState<{ id: string | null; name: string }>({ id: null, name: 'Untitled design' });
+  const projectRef = useRef(project);
+  const setProject = (p: { id: string | null; name: string }) => {
+    projectRef.current = p;
+    setProjectState(p);
+  };
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [tplBytes, setTplBytes] = useState<Uint8Array | null>(null);
+  const tplBytesRef = useRef<Uint8Array | null>(null);
+  const [dialog, setDialog] = useState<DialogKind | null>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<PendingTemplate | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [guides, setGuides] = useState(true);
+  const [trimPreview, setTrimPreview] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+  const loadingRef = useRef(false);
 
-  // History (undo) — snapshots of canvas JSON.
-  const histRef = useRef<string[]>([]);
-  const restoringRef = useRef(false);
-
-  const pushHistory = useCallback(() => {
-    const c = canvasRef.current;
-    if (!c || restoringRef.current) return;
-    try {
-      histRef.current.push(JSON.stringify(c.toJSON()));
-      if (histRef.current.length > 40) histRef.current.shift();
-    } catch {
-      /* ignore */
-    }
+  const toast = useCallback((m: string) => {
+    setToastMsg(m);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 5200);
   }, []);
 
-  // Init fabric canvas once.
+  const fmt = formatById(doc.formatId);
+  const digital = fmt?.group === 'Digital';
+
+  /** Write the live canvas into the current page of the doc. */
+  const flushPage = useCallback((): DesignDoc => {
+    const eng = engineRef.current;
+    const d = docRef.current;
+    if (!eng) return d;
+    const pages = d.pages.map((p, i) => (i === pageRef.current ? { ...p, json: eng.serialize() } : p));
+    const nd = { ...d, pages };
+    docRef.current = nd;
+    return nd;
+  }, []);
+
+  /* ---------------- saving ---------------- */
+
+  const persist = useCallback(
+    async (explicit: boolean) => {
+      const eng = engineRef.current;
+      if (!eng || loadingRef.current) return;
+      const d = flushPage();
+      setDocState(d);
+      const proj = projectRef.current;
+      api.writeDraft({ doc: d, name: proj.name, projectId: proj.id, at: Date.now(), page: pageRef.current });
+      if (!cloudReady) {
+        setSaveState('local');
+        if (explicit) toast('Saved on this computer. Run design-studio.sql (setup to-do list) to save designs to the cloud.');
+        return;
+      }
+      const thumb = pageRef.current === 0 ? eng.thumbnail(480) : undefined;
+      const run = async () => {
+        setSaveState('saving');
+        try {
+          if (proj.id) {
+            await api.saveProject(proj.id, { name: proj.name, doc: d, thumb });
+          } else if (explicit || d.pages.some((p) => ((p.json as any).objects?.length ?? 0) > 0)) {
+            const r = await api.createProject(proj.name, d, thumb);
+            setProject({ id: r.item.id, name: proj.name });
+            const url = new URL(window.location.href);
+            url.searchParams.set('project', r.item.id);
+            window.history.replaceState(null, '', url.toString());
+          }
+          setSaveState('saved');
+          if (explicit) toast('Saved.');
+        } catch (e) {
+          setSaveState('error');
+          toast(e instanceof Error ? e.message : 'Couldn’t save — your work is kept on this computer.');
+        }
+      };
+      // Serialise saves so an older write can never land after a newer one.
+      saveChain.current = saveChain.current.then(run, run);
+      await saveChain.current;
+    },
+    [cloudReady, flushPage, toast],
+  );
+
+  const markDirty = useCallback(() => {
+    if (loadingRef.current) return;
+    setSaveState((s) => (s === 'saving' ? s : 'dirty'));
+    clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => void persist(false), 1400);
+  }, [persist]);
+
+  /* ---------------- open / load ---------------- */
+
+  const loadTemplateLayer = useCallback(
+    async (ref: TemplateRef | null | undefined, bytes?: Uint8Array | null) => {
+      const eng = engineRef.current!;
+      if (!ref) {
+        eng.setTemplate(null);
+        tplBytesRef.current = null;
+        setTplBytes(null);
+        return;
+      }
+      try {
+        const b = bytes ?? (await api.fetchBytes(api.fileUrl(ref.path)));
+        const img = await renderTemplate(b, ref.page);
+        eng.setTemplate({ ref, image: img });
+        tplBytesRef.current = b;
+        setTplBytes(b);
+      } catch {
+        eng.setTemplate({ ref, image: null });
+        toast('The printer template couldn’t be loaded — the design is fine, but the guide is hidden.');
+      }
+    },
+    [toast],
+  );
+
+  const openDoc = useCallback(
+    async (d: DesignDoc, name: string, id: string | null, pageIdx = 0) => {
+      const eng = engineRef.current!;
+      loadingRef.current = true;
+      try {
+        const p = Math.min(Math.max(0, pageIdx), d.pages.length - 1);
+        setDoc(d);
+        setProject({ id, name });
+        eng.applyGeometry(d.geometry, false);
+        await loadTemplateLayer(d.template ?? null);
+        await eng.loadJson(d.pages[p].json);
+        setPage(p);
+        eng.fit();
+        setSaveState(id ? 'saved' : 'idle');
+      } finally {
+        loadingRef.current = false;
+      }
+    },
+    [loadTemplateLayer],
+  );
+
+  const openProject = useCallback(
+    async (id: string) => {
+      try {
+        const r = await api.getProject(id);
+        await openDoc(r.item.doc, r.item.name, r.item.id, 0);
+        const url = new URL(window.location.href);
+        url.searchParams.set('project', id);
+        window.history.replaceState(null, '', url.toString());
+      } catch (e) {
+        toast(e instanceof Error ? e.message : 'Couldn’t open that design.');
+      }
+    },
+    [openDoc, toast],
+  );
+
+  /* ---------------- init ---------------- */
+
   useEffect(() => {
     let disposed = false;
     (async () => {
+      await loadBrandFonts();
       const fabric = await import('fabric');
-      if (disposed || !canvasElRef.current) return;
+      if (disposed || !canvasRef.current || !stageRef.current) return;
       fabricRef.current = fabric;
-      const c = new fabric.Canvas(canvasElRef.current, {
-        backgroundColor: '#ffffff',
-        preserveObjectStacking: true,
+      const eng = new StudioEngine(fabric, canvasRef.current, stageRef.current, docRef.current.geometry);
+      engineRef.current = eng;
+      eng.on((ev) => {
+        if (ev === 'selection' || ev === 'history' || ev === 'zoom') setTick((t) => t + 1);
+        if (ev === 'change' || ev === 'history') markDirty();
       });
-      canvasRef.current = c;
-      const f = FORMATS[0];
-      const ppm = workPxPerMm(f);
-      c.setDimensions({ width: Math.round(f.w * ppm), height: Math.round(f.h * ppm) });
-
-      const syncSel = () => setSel(c.getActiveObject() ?? null);
-      c.on('selection:created', syncSel);
-      c.on('selection:updated', syncSel);
-      c.on('selection:cleared', () => setSel(null));
-      c.on('object:added', pushHistory);
-      c.on('object:modified', () => { pushHistory(); syncSel(); });
-      c.on('object:removed', pushHistory);
-
-      // Ensure brand fonts are ready before first text render.
-      try { await (document as any).fonts?.ready; } catch { /* ignore */ }
-      setReady(true);
+      eng.onShortcut = (k) => {
+        if (k === 'save') void persist(true);
+        else setDialog('export');
+      };
+      if (projectId) await openProject(projectId);
+      else {
+        const draft = api.readDraft();
+        if (draft?.doc?.v === 2) {
+          await openDoc(draft.doc, draft.name, draft.projectId, draft.page);
+          toast('Picked up where you left off.');
+        } else {
+          await openDoc(makeDoc('a5'), 'Untitled design', null);
+          setDialog('new');
+        }
+      }
+      if (!disposed) setReady(true);
     })();
     return () => {
       disposed = true;
-      try { canvasRef.current?.dispose(); } catch { /* ignore */ }
-      canvasRef.current = null;
+      clearTimeout(autosaveTimer.current);
+      engineRef.current?.dispose();
+      engineRef.current = null;
     };
-  }, [pushHistory]);
-
-  // Resize canvas when the format changes.
-  const applyFormat = useCallback((f: Format) => {
-    setFormat(f);
-    const c = canvasRef.current;
-    if (!c) return;
-    const ppm = workPxPerMm(f);
-    c.setDimensions({ width: Math.round(f.w * ppm), height: Math.round(f.h * ppm) });
-    c.requestRenderAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const add = useCallback((obj: any) => {
-    const c = canvasRef.current;
-    if (!c) return;
-    c.add(obj);
-    c.setActiveObject(obj);
-    c.requestRenderAll();
-    setSel(obj);
-  }, []);
+  // Save on tab close / hide.
+  useEffect(() => {
+    const flush = () => {
+      if (!engineRef.current) return;
+      const d = flushPage();
+      api.writeDraft({ doc: d, name: projectRef.current.name, projectId: projectRef.current.id, at: Date.now(), page: pageRef.current });
+    };
+    const onHide = () => document.visibilityState === 'hidden' && flush();
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      document.removeEventListener('visibilitychange', onHide);
+    };
+  }, [flushPage]);
 
-  const addText = useCallback((heading = false) => {
-    const fabric = fabricRef.current;
-    const c = canvasRef.current;
-    if (!fabric || !c) return;
-    const t = new fabric.Textbox(heading ? 'Heading' : 'Your text here', {
-      left: c.getWidth() * 0.12,
-      top: c.getHeight() * 0.12,
-      width: c.getWidth() * 0.76,
-      fontSize: heading ? Math.round(c.getHeight() * 0.1) : Math.round(c.getHeight() * 0.045),
-      fontFamily: heading ? 'Ezra' : 'Hanken Grotesk',
-      fontWeight: heading ? 800 : 400,
-      fill: '#211F18',
-    });
-    add(t);
-  }, [add]);
+  /* ---------------- pages ---------------- */
 
-  const addRect = useCallback(() => {
-    const fabric = fabricRef.current;
-    const c = canvasRef.current;
-    if (!fabric || !c) return;
-    add(new fabric.Rect({
-      left: c.getWidth() * 0.2, top: c.getHeight() * 0.2,
-      width: c.getWidth() * 0.4, height: c.getHeight() * 0.2,
-      fill: '#F8BC1E',
-    }));
-  }, [add]);
-
-  const addImageFromUrl = useCallback(async (url: string, crossOrigin = false) => {
-    const fabric = fabricRef.current;
-    const c = canvasRef.current;
-    if (!fabric || !c) return;
-    const img = await fabric.FabricImage.fromURL(url, crossOrigin ? { crossOrigin: 'anonymous' } : undefined);
-    const maxW = c.getWidth() * 0.6;
-    if (img.width && img.width > maxW) img.scale(maxW / img.width);
-    img.set({ left: c.getWidth() * 0.2, top: c.getHeight() * 0.2 });
-    add(img);
-  }, [add]);
-
-  const onUploadImage = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    void addImageFromUrl(url);
-  }, [addImageFromUrl]);
-
-  const onImportPdf = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const fabric = fabricRef.current;
-    const c = canvasRef.current;
-    if (!fabric || !c) return;
-    setBusy('Rendering PDF…');
+  const goPage = async (i: number) => {
+    const eng = engineRef.current;
+    if (!eng || i === pageRef.current) return;
+    const d = flushPage();
+    setDocState(d);
+    loadingRef.current = true;
     try {
-      const pdfjs: any = await import('pdfjs-dist');
-      pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-      const data = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data }).promise;
-      const page = await pdf.getPage(1);
-      const base = page.getViewport({ scale: 1 });
-      const scale = c.getWidth() / base.width;
-      const viewport = page.getViewport({ scale });
-      const off = document.createElement('canvas');
-      off.width = Math.round(viewport.width);
-      off.height = Math.round(viewport.height);
-      const ctx = off.getContext('2d')!;
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      const url = off.toDataURL('image/png');
-      const img = await fabric.FabricImage.fromURL(url);
-      img.set({ left: 0, top: 0, selectable: false, evented: false });
-      img.scaleToWidth(c.getWidth());
-      if (bgRef.current) c.remove(bgRef.current);
-      bgRef.current = img;
-      c.add(img);
-      (c as any).sendObjectToBack(img);
-      c.requestRenderAll();
-    } catch (err) {
-      alert('Could not read that PDF. ' + (err instanceof Error ? err.message : ''));
+      await eng.loadJson(d.pages[i].json);
+      setPage(i);
     } finally {
-      setBusy('');
+      loadingRef.current = false;
     }
-  }, []);
-
-  const setFill = useCallback((hex: string) => {
-    const c = canvasRef.current;
-    const o = c?.getActiveObject();
-    if (!o) return;
-    o.set('fill', hex);
-    c.requestRenderAll();
-    setSel({ ...o });
-  }, []);
-
-  const mutate = useCallback((fn: (o: any) => void) => {
-    const c = canvasRef.current;
-    const o = c?.getActiveObject();
-    if (!o) return;
-    fn(o);
-    o.setCoords?.();
-    c.requestRenderAll();
-    setSel({ ...o });
-  }, []);
-
-  const removeSel = useCallback(() => {
-    const c = canvasRef.current;
-    const o = c?.getActiveObject();
-    if (!o) return;
-    if (o === bgRef.current) bgRef.current = null;
-    c.remove(o);
-    c.discardActiveObject();
-    c.requestRenderAll();
-    setSel(null);
-  }, []);
-
-  const duplicate = useCallback(async () => {
-    const c = canvasRef.current;
-    const o = c?.getActiveObject();
-    if (!o) return;
-    const clone = await o.clone();
-    clone.set({ left: (o.left || 0) + 16, top: (o.top || 0) + 16 });
-    add(clone);
-  }, [add]);
-
-  const layer = useCallback((dir: 'front' | 'back') => {
-    const c = canvasRef.current;
-    const o = c?.getActiveObject();
-    if (!o) return;
-    if (dir === 'front') (c as any).bringObjectToFront(o);
-    else (c as any).sendObjectToBack(o);
-    // keep the PDF background pinned behind everything
-    if (bgRef.current) (c as any).sendObjectToBack(bgRef.current);
-    c.requestRenderAll();
-  }, []);
-
-  const undo = useCallback(() => {
-    const c = canvasRef.current;
-    if (!c || histRef.current.length < 2) return;
-    restoringRef.current = true;
-    histRef.current.pop(); // current
-    const prev = histRef.current[histRef.current.length - 1];
-    c.loadFromJSON(prev).then(() => {
-      // re-find the background (first non-selectable image) so the ref stays valid
-      bgRef.current = c.getObjects().find((x: any) => x.selectable === false) ?? null;
-      c.requestRenderAll();
-      restoringRef.current = false;
-      setSel(null);
-    });
-  }, []);
-
-  const exportPng = useCallback(() => {
-    const c = canvasRef.current;
-    if (!c) return;
-    c.discardActiveObject();
-    c.requestRenderAll();
-    const ppm = workPxPerMm(format);
-    const target = format.group === 'Large format' ? 100 : 150;
-    const internalDpi = ppm * 25.4;
-    let mult = target / internalDpi;
-    const maxDim = Math.max(c.getWidth(), c.getHeight()) * mult;
-    if (maxDim > 6000) mult *= 6000 / maxDim;
-    const url = c.toDataURL({ format: 'png', multiplier: mult });
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `heliaxis-${format.id}.png`;
-    a.click();
-  }, [format]);
-
-  const exportPdf = useCallback(async () => {
-    const c = canvasRef.current;
-    if (!c) return;
-    setBusy('Building PDF…');
+  };
+  const addPage = async () => {
+    const d = flushPage();
+    const nd = { ...d, pages: [...d.pages, { id: uid(), name: `Page ${d.pages.length + 1}`, json: { ...EMPTY } }] };
+    setDoc(nd);
+    await goPage(nd.pages.length - 1);
+    markDirty();
+  };
+  const removePage = async (i: number) => {
+    const d = flushPage();
+    if (d.pages.length <= 1 || !window.confirm(`Delete “${d.pages[i].name}”?`)) return;
+    const pages = d.pages.filter((_, k) => k !== i);
+    const next = Math.min(i, pages.length - 1);
+    setDoc({ ...d, pages });
+    loadingRef.current = true;
     try {
-      c.discardActiveObject();
-      c.requestRenderAll();
-      const ppm = workPxPerMm(format);
-      const target = format.group === 'Large format' ? 100 : 150;
-      const internalDpi = ppm * 25.4;
-      let mult = target / internalDpi;
-      const maxDim = Math.max(c.getWidth(), c.getHeight()) * mult;
-      if (maxDim > 6000) mult *= 6000 / maxDim;
-      const dataUrl = c.toDataURL({ format: 'png', multiplier: mult });
-      const { PDFDocument } = await import('pdf-lib');
-      const pdf = await PDFDocument.create();
-      const pageW = format.w * PT_PER_MM;
-      const pageH = format.h * PT_PER_MM;
-      const page = pdf.addPage([pageW, pageH]);
-      const png = await pdf.embedPng(dataUrl);
-      page.drawImage(png, { x: 0, y: 0, width: pageW, height: pageH });
-      const bytes = await pdf.save();
-      const blob = new Blob([bytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `heliaxis-${format.id}.pdf`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-    } catch (err) {
-      alert('Export failed. ' + (err instanceof Error ? err.message : ''));
+      await engineRef.current!.loadJson(pages[next].json);
+      setPage(next);
     } finally {
-      setBusy('');
+      loadingRef.current = false;
     }
-  }, [format]);
+    markDirty();
+  };
+  const duplicatePage = async (i: number) => {
+    const d = flushPage();
+    const copy = { id: uid(), name: `${d.pages[i].name} copy`, json: JSON.parse(JSON.stringify(d.pages[i].json)) };
+    const pages = [...d.pages.slice(0, i + 1), copy, ...d.pages.slice(i + 1)];
+    setDoc({ ...d, pages });
+    await goPage(i + 1);
+    markDirty();
+  };
 
-  const isText = sel && (sel.type === 'textbox' || sel.type === 'i-text' || sel.type === 'text');
+  /* ---------------- content helpers ---------------- */
+
+  const addLogo = async (id: string) => {
+    const eng = engineRef.current!;
+    const def = LOGOS.find((l) => l.id === id)!;
+    try {
+      const svg = await brandSvg(def.asset);
+      const s = eng.safePt();
+      await eng.addSvg(svg, { role: def.role, name: def.name, widthPt: def.role === 'spark' ? Math.min(s.w, s.h) * 0.12 : Math.max(s.w * 0.4, 72), logoId: def.id });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Couldn’t load the logo.');
+    }
+  };
+  const addIcon = async (name: string, tone: IconTone) => {
+    const eng = engineRef.current!;
+    try {
+      const s = eng.safePt();
+      await eng.addSvg(await iconSvg(name, tone), { role: 'icon', name: `Icon · ${name}`, widthPt: Math.min(s.w, s.h) * 0.12, iconName: name });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Couldn’t load the icon.');
+    }
+  };
+  const addImageUrl = async (url: string, assetPath: string | null, name: string) => {
+    const eng = engineRef.current!;
+    const a = eng.active();
+    try {
+      if (a && (a.role === 'photo-slot' || a.type === 'image')) await eng.fillFrame(a, url, { assetPath: assetPath ?? undefined, name });
+      else await eng.addImage(url, { assetPath: assetPath ?? undefined, name });
+    } catch {
+      toast('That image couldn’t be loaded.');
+    }
+  };
+
+  /** Upload + place dropped/chosen files. SVGs come in as editable vectors. */
+  const placeFiles = async (files: File[]) => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    for (const file of files) {
+      if (file.type === 'application/pdf') {
+        await importTemplateFile(file);
+        continue;
+      }
+      if (file.type === 'image/svg+xml') {
+        try {
+          await eng.addSvg(await file.text(), { role: 'graphic', name: file.name.replace(/\.svg$/i, '') });
+        } catch {
+          toast(`${file.name} isn’t an SVG the studio can read.`);
+        }
+        continue;
+      }
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+        toast(`${file.name}: use JPG, PNG, WebP, SVG — or a PDF template.`);
+        continue;
+      }
+      let url: string;
+      let path: string | null = null;
+      try {
+        path = await api.uploadImage(file);
+        url = api.fileUrl(path);
+      } catch {
+        // Offline / storage unavailable: keep it in the design itself.
+        url = await new Promise<string>((res) => {
+          const r = new FileReader();
+          r.onload = () => res(String(r.result));
+          r.readAsDataURL(file);
+        });
+        toast(`${file.name} couldn’t be uploaded, so it’s stored inside the design (fine for small images).`);
+      }
+      await addImageUrl(url, path, file.name.replace(/\.[a-z0-9]+$/i, ''));
+    }
+  };
+
+  const applyStarter = async (id: string) => {
+    const eng = engineRef.current!;
+    const d = flushPage();
+    const hasContent = d.pages.some((p) => ((p.json as any).objects?.length ?? 0) > 0);
+    if (hasContent && !window.confirm('Replace every page with this starting layout?')) return;
+    loadingRef.current = true;
+    try {
+      const jsons = await buildStarter(eng, id, d.pages.length);
+      const nd = { ...d, pages: d.pages.map((p, i) => ({ ...p, json: jsons[i] ?? { ...EMPTY } })) };
+      setDoc(nd);
+      await eng.loadJson(nd.pages[0].json);
+      setPage(0);
+    } finally {
+      loadingRef.current = false;
+    }
+    markDirty();
+  };
+
+  /** New design (from the dialog). */
+  const startNew = async (formatId: string, starterId: string, custom?: PageGeometry) => {
+    const eng = engineRef.current!;
+    const f = formatById(formatId);
+    const d = makeDoc(formatId, custom, custom ? `Custom · ${custom.trim.w}×${custom.trim.h} mm` : undefined);
+    const name = `${(custom ? 'Custom' : f?.label ?? 'Design').split('·')[0].trim()} — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+    api.clearDraft();
+    loadingRef.current = true;
+    try {
+      setDoc(d);
+      setProject({ id: null, name });
+      const url = new URL(window.location.href);
+      url.searchParams.delete('project');
+      window.history.replaceState(null, '', url.toString());
+      eng.applyGeometry(d.geometry, false);
+      await loadTemplateLayer(null);
+      const jsons = await buildStarter(eng, starterId, d.pages.length);
+      const nd = { ...d, pages: d.pages.map((p, i) => ({ ...p, json: jsons[i] ?? { ...EMPTY } })) };
+      setDoc(nd);
+      await eng.loadJson(nd.pages[0].json);
+      setPage(0);
+      eng.fit();
+      setSaveState('idle');
+    } finally {
+      loadingRef.current = false;
+    }
+    setDialog(null);
+  };
+
+  /* ---------------- templates ---------------- */
+
+  const importTemplateFile = async (file: File) => {
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const info: TemplateInfo = await readTemplate(bytes, 1);
+      setPendingTemplate({ file, bytes, info, name: file.name.replace(/\.pdf$/i, ''), library: null });
+      setDialog('template');
+    } catch {
+      toast('That PDF couldn’t be read — is it a printer template?');
+    }
+  };
+
+  const useLibraryTemplate = async (t: TemplateSummary) => {
+    try {
+      const bytes = await api.fetchBytes(api.fileUrl(t.storage_path));
+      const info: TemplateInfo = { title: t.title, pages: 1, geometry: t.geometry, detected: ['From your template library.'], confidence: 'high' };
+      setPendingTemplate({ file: null, bytes, info, name: t.name, library: t });
+      setDialog('template');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Couldn’t load that template.');
+    }
+  };
+
+  /** Apply a template (from the Template dialog). */
+  const applyTemplate = async (o: {
+    pending: PendingTemplate;
+    geometry: PageGeometry;
+    pageNo: number;
+    mode: TemplateRef['mode'];
+    opacity: number;
+    saveToLibrary: boolean;
+    newDesign: boolean;
+  }) => {
+    const eng = engineRef.current!;
+    const { pending } = o;
+    let path = pending.library?.storage_path ?? null;
+    let libraryId = pending.library?.id ?? null;
+    if (!path && pending.file) {
+      try {
+        path = await api.uploadTemplatePdf(pending.file);
+      } catch {
+        toast('The template is on your page, but couldn’t be uploaded — it won’t be saved with the design.');
+      }
+    }
+    if (path && o.saveToLibrary && !libraryId && cloudReady) {
+      try {
+        const r = await api.saveTemplate(path, pending.name, pending.info.title, pending.bytes.length, o.geometry);
+        libraryId = r.item.id;
+      } catch (e) {
+        toast(e instanceof Error ? e.message : 'Couldn’t add it to the template library.');
+      }
+    }
+    const ref: TemplateRef = { path: path ?? '', name: pending.name, title: pending.info.title, libraryId, page: o.pageNo, mode: o.mode, opacity: o.opacity, include: false };
+    loadingRef.current = true;
+    try {
+      let d = o.newDesign ? makeDoc('a5', o.geometry, pending.name) : flushPage();
+      if (o.newDesign) {
+        d = { ...d, pages: [{ id: uid(), name: 'Artwork', json: { ...EMPTY } }] };
+        setProject({ id: null, name: `${pending.name} — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` });
+        api.clearDraft();
+        await eng.loadJson(d.pages[0].json);
+        setPage(0);
+      }
+      const known = matchFormat(o.geometry);
+      const nd: DesignDoc = { ...d, formatId: known?.id ?? 'template', formatLabel: pending.name, geometry: o.geometry, template: path ? ref : null };
+      setDoc(nd);
+      eng.applyGeometry(o.geometry);
+      await loadTemplateLayer(ref, pending.bytes);
+      if (!path) eng.setTemplate({ ref, image: eng.template?.image ?? null });
+    } finally {
+      loadingRef.current = false;
+    }
+    setPendingTemplate(null);
+    setDialog(null);
+    markDirty();
+  };
+
+  const setTemplateRef = (patch: Partial<TemplateRef>) => {
+    const eng = engineRef.current!;
+    const t = eng.template;
+    if (!t) return;
+    const ref = { ...t.ref, ...patch };
+    eng.setTemplate({ ref, image: t.image });
+    const d = docRef.current;
+    if (d.template) setDoc({ ...d, template: ref });
+    setTick((x) => x + 1);
+    markDirty();
+  };
+  const removeTemplate = () => {
+    const eng = engineRef.current!;
+    eng.setTemplate(null);
+    tplBytesRef.current = null;
+    setTplBytes(null);
+    setDoc({ ...docRef.current, template: null });
+    setTick((x) => x + 1);
+    markDirty();
+  };
+  const setGeometry = (g: PageGeometry) => {
+    engineRef.current!.applyGeometry(g);
+    setDoc({ ...docRef.current, geometry: g });
+    markDirty();
+  };
+
+  /* ---------------- drag & drop ---------------- */
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length) void placeFiles(files);
+  };
+
+  const studio: StudioApi | null = useMemo(() => {
+    const engine = engineRef.current;
+    if (!engine || !ready) return null;
+    return {
+      engine, doc, page, tick, cloudReady, isAdmin, fmt, digital: !!digital, toast, placeFiles, addLogo, addIcon, addImageUrl,
+      applyStarter, openDialog: setDialog, importTemplateFile, useLibraryTemplate, setTemplateRef, removeTemplate, setGeometry,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, doc, page, tick, cloudReady, isAdmin, fmt, digital]);
+
+  const eng = engineRef.current;
+  const zoomPct = eng ? Math.round((eng.zoom / (96 / 72)) * 100) : 100;
+  const saveLabel: Record<SaveState, string> = {
+    idle: cloudReady ? 'Not saved yet' : 'On this computer',
+    dirty: 'Unsaved changes',
+    saving: 'Saving…',
+    saved: 'Saved',
+    local: 'Saved on this computer',
+    error: 'Save failed — kept locally',
+  };
 
   return (
     // Dark in both themes (a design tool's chrome): an ink island, so the theme tokens inside are the dark ones.
-    <div className="ds hx-dark">
-      <div className="ds-top">
-        <button className="ds-btn" onClick={() => addText(true)} disabled={!ready}>+ Heading</button>
-        <button className="ds-btn" onClick={() => addText(false)} disabled={!ready}>+ Text</button>
-        <button className="ds-btn" onClick={addRect} disabled={!ready}>+ Box</button>
-        <button className="ds-btn" onClick={() => fileImgRef.current?.click()} disabled={!ready}>+ Image</button>
-        <button className="ds-btn" onClick={undo} disabled={!ready}>↶ Undo</button>
+    <div className="ds2 hx-dark" onDragOver={(e) => { e.preventDefault(); if (!dragOver) setDragOver(true); }} onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }} onDrop={onDrop}>
+      <header className="ds2-top">
+        <button className="ds2-btn ghost" onClick={() => setDialog('projects')} title="Your designs" disabled={!ready}>
+          <Ico n="folder" /> <span className="ds2-hide-sm">Designs</span>
+        </button>
+        <button className="ds2-btn ghost" onClick={() => setDialog('new')} disabled={!ready} title="New design">
+          <Ico n="plus" /> <span className="ds2-hide-sm">New</span>
+        </button>
+        <input
+          className="ds2-name"
+          value={project.name}
+          onChange={(e) => {
+            setProject({ ...projectRef.current, name: e.target.value });
+            markDirty();
+          }}
+          aria-label="Design name"
+        />
+        <span className={`ds2-save is-${saveState}`}>{saveLabel[saveState]}</span>
         <span className="sp" />
-        <span className="ds-dim">{format.w}×{format.h} mm</span>
-        <button className="ds-btn" onClick={exportPng} disabled={!ready}>Export PNG</button>
-        <button className="ds-btn solar" onClick={exportPdf} disabled={!ready || !!busy}>{busy || 'Export PDF'}</button>
+        <button className="ds2-icon" onClick={() => eng?.undo()} disabled={!eng?.canUndo()} title="Undo (Ctrl+Z)"><Ico n="undo" /></button>
+        <button className="ds2-icon" onClick={() => eng?.redo()} disabled={!eng?.canRedo()} title="Redo (Ctrl+Shift+Z)"><Ico n="redo" /></button>
+        <span className="ds2-sep" />
+        <button className={`ds2-icon${guides ? ' on' : ''}`} onClick={() => { const v = !guides; setGuides(v); eng?.setGuides(v); }} title="Show bleed, trim and safe guides"><Ico n="guides" /></button>
+        <button className={`ds2-icon${trimPreview ? ' on' : ''}`} onClick={() => { const v = !trimPreview; setTrimPreview(v); eng?.setTrimPreview(v); }} title="Preview trimmed (as printed)"><Ico n="scissors" /></button>
+        <span className="ds2-sep" />
+        <button className="ds2-icon" onClick={() => eng?.zoomBy(0.8)} title="Zoom out (Ctrl+−)"><Ico n="minus" /></button>
+        <button className="ds2-zoom" onClick={() => eng?.actualSize()} title="Actual size">{zoomPct}%</button>
+        <button className="ds2-icon" onClick={() => eng?.zoomBy(1.25)} title="Zoom in (Ctrl+=)"><Ico n="plus" /></button>
+        <button className="ds2-icon" onClick={() => eng?.fit()} title="Fit (Ctrl+0)"><Ico n="fit" /></button>
+        <span className="ds2-sep" />
+        <button className="ds2-btn" onClick={() => setDialog('checks')} disabled={!ready}><Ico n="check" /> <span className="ds2-hide-sm">Check</span></button>
+        <button className="ds2-btn" onClick={() => void persist(true)} disabled={!ready} title="Save (Ctrl+S)"><Ico n="save" /> <span className="ds2-hide-sm">Save</span></button>
+        <button className="ds2-btn solar" onClick={() => setDialog('export')} disabled={!ready} title="Export (Ctrl+E)"><Ico n="download" /> Export</button>
+      </header>
+
+      <div className="ds2-body">
+        {studio ? <LeftPanel s={studio} /> : <aside className="ds2-left ds2-loading" />}
+        <main className="ds2-stage" ref={stageRef}>
+          {/* The design itself, on its own paper whatever the theme. */}
+          <div className="hx-light">
+            <canvas ref={canvasRef} />
+          </div>
+          {!ready && <div className="ds2-boot"><Ico n="spark" size={28} /> Loading the studio and brand fonts…</div>}
+          {dragOver && <div className="ds2-drop">Drop photos, SVGs or a printer template PDF</div>}
+          {eng?.template?.ref && <div className="ds2-tplbadge" title={eng.template.ref.title ?? ''}><Ico n="template" size={14} /> {eng.template.ref.name} · guide only</div>}
+        </main>
+        {studio ? <Inspector s={studio} /> : <aside className="ds2-right" />}
       </div>
 
-      <div className="ds-body">
-        {/* LEFT: format, brand, PDF import */}
-        <div className="ds-left">
-          <div className="ds-sec">
-            <h3>Format</h3>
-            <select
-              className="ds-sel ds-full"
-              value={format.id}
-              onChange={(e) => applyFormat(FORMATS.find((f) => f.id === e.target.value) || FORMATS[0])}
-            >
-              {['Print', 'Large format', 'Digital'].map((g) => (
-                <optgroup key={g} label={g}>
-                  {FORMATS.filter((f) => f.group === g).map((f) => (
-                    <option key={f.id} value={f.id}>{f.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          <div className="ds-sec">
-            <h3>Template background</h3>
-            <button className="ds-btn ds-full" onClick={() => filePdfRef.current?.click()} disabled={!ready}>
-              Import PDF background
-            </button>
-            <p className="ds-hint">Upload a supplier template or artwork PDF — page 1 is placed as a locked background to design over.</p>
-          </div>
-
-          <div className="ds-sec">
-            <h3>Brand logos</h3>
-            <div className="ds-row" style={{ flexDirection: 'column' }}>
-              {BRAND_LOGOS.map((l) => (
-                <button
-                  key={l.asset}
-                  className={`ds-logo ds-full ${l.dark ? 'dark' : 'light'}`}
-                  onClick={() => addImageFromUrl(`/api/brand/asset/${l.asset}`, true)}
-                  disabled={!ready}
-                  title={`Add ${l.name}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/brand/view/${l.asset}`} alt={l.name} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="ds-sec">
-            <h3>Brand colours</h3>
-            <div className="ds-swatches">
-              {BRAND_PALETTE.map((p) => (
-                <button
-                  key={p.hex}
-                  className="ds-sw hx-light"
-                  style={{ background: p.hex }}
-                  title={`${p.name} ${p.hex}`}
-                  onClick={() => setFill(p.hex)}
-                />
-              ))}
-            </div>
-            <p className="ds-hint">Select an object, then click a colour to fill it.</p>
-          </div>
-        </div>
-
-        {/* STAGE */}
-        <div className="ds-stage">
-          {/* The design itself, on its own paper whatever the theme. */}
-          <div className="ds-canvas-wrap hx-light">
-            <canvas ref={canvasElRef} />
-          </div>
-        </div>
-
-        {/* RIGHT: selection properties */}
-        <div className="ds-right">
-          <div className="ds-sec">
-            <h3>Selected</h3>
-            {!sel ? (
-              <p className="ds-empty">Nothing selected. Add text, a box or an image, or click an element on the canvas.</p>
-            ) : (
+      <footer className="ds2-pages">
+        {doc.pages.map((p, i) => (
+          <div key={p.id} className={`ds2-page${i === page ? ' on' : ''}`}>
+            <button onClick={() => void goPage(i)} onDoubleClick={() => {
+              const n = window.prompt('Page name', p.name);
+              if (n) { setDoc({ ...docRef.current, pages: docRef.current.pages.map((x, k) => (k === i ? { ...x, name: n.slice(0, 40) } : x)) }); markDirty(); }
+            }} title="Double-click to rename"><Ico n="page" size={14} /> {p.name}</button>
+            {i === page && (
               <>
-                {isText && (
-                  <>
-                    <div className="ds-field">
-                      <label>Text</label>
-                      <textarea
-                        value={sel.text || ''}
-                        onChange={(e) => mutate((o) => o.set('text', e.target.value))}
-                      />
-                    </div>
-                    <div className="ds-field">
-                      <label>Font</label>
-                      <select
-                        className="ds-sel ds-full"
-                        value={sel.fontFamily || 'Hanken Grotesk'}
-                        onChange={(e) => mutate((o) => o.set('fontFamily', e.target.value))}
-                      >
-                        {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
-                      </select>
-                    </div>
-                    <div className="ds-field">
-                      <label>Size</label>
-                      <input
-                        type="number"
-                        value={Math.round(sel.fontSize || 0)}
-                        onChange={(e) => mutate((o) => o.set('fontSize', Number(e.target.value) || 1))}
-                      />
-                    </div>
-                    <div className="ds-row" style={{ marginBottom: 11 }}>
-                      <button className="ds-btn" onClick={() => mutate((o) => o.set('fontWeight', o.fontWeight === 800 || o.fontWeight === 'bold' ? 400 : 800))}>Bold</button>
-                      <button className="ds-btn" onClick={() => mutate((o) => o.set('textAlign', 'left'))}>Left</button>
-                      <button className="ds-btn" onClick={() => mutate((o) => o.set('textAlign', 'center'))}>Centre</button>
-                    </div>
-                  </>
-                )}
-                <div className="ds-field">
-                  <label>Colour</label>
-                  <input
-                    type="color"
-                    value={typeof sel.fill === 'string' ? sel.fill : '#211F18'}
-                    onChange={(e) => setFill(e.target.value)}
-                  />
-                </div>
-                <div className="ds-field">
-                  <label>Opacity</label>
-                  <input
-                    type="range" min={0} max={1} step={0.05}
-                    value={sel.opacity ?? 1}
-                    onChange={(e) => mutate((o) => o.set('opacity', Number(e.target.value)))}
-                  />
-                </div>
-                <div className="ds-row">
-                  <button className="ds-btn" onClick={() => layer('front')}>Bring front</button>
-                  <button className="ds-btn" onClick={() => layer('back')}>Send back</button>
-                </div>
-                <div className="ds-row" style={{ marginTop: 7 }}>
-                  <button className="ds-btn" onClick={duplicate}>Duplicate</button>
-                  <button className="ds-btn ghost" onClick={removeSel}>Delete</button>
-                </div>
+                <button className="ds2-pg-act" onClick={() => void duplicatePage(i)} title="Duplicate page"><Ico n="copy" size={13} /></button>
+                {doc.pages.length > 1 && <button className="ds2-pg-act" onClick={() => void removePage(i)} title="Delete page"><Ico n="trash" size={13} /></button>}
               </>
             )}
           </div>
-        </div>
-      </div>
+        ))}
+        <button className="ds2-page-add" onClick={() => void addPage()} title="Add a page"><Ico n="plus" size={14} /> Page</button>
+        <span className="sp" />
+        <span className="ds2-meta">
+          {doc.formatLabel} · {round1(doc.geometry.trim.w)}×{round1(doc.geometry.trim.h)} mm
+          {doc.geometry.trim.x > 0 ? ` · ${round1(doc.geometry.trim.x)} mm bleed` : ''}
+          {doc.geometry.note ? ` · ${doc.geometry.note}` : ''}
+        </span>
+      </footer>
 
-      <input ref={fileImgRef} type="file" accept="image/*" hidden onChange={onUploadImage} />
-      <input ref={filePdfRef} type="file" accept="application/pdf" hidden onChange={onImportPdf} />
+      {toastMsg && <div className="ds2-toast" role="status">{toastMsg}</div>}
+
+      {studio && (
+        <Dialogs
+          s={studio}
+          kind={dialog}
+          close={() => { setDialog(null); setPendingTemplate(null); }}
+          project={project}
+          fabric={fabricRef.current}
+          flushPage={flushPage}
+          templateBytes={tplBytes}
+          startNew={startNew}
+          openProject={async (id) => { setDialog(null); await openProject(id); }}
+          pendingTemplate={pendingTemplate}
+          applyTemplate={applyTemplate}
+          currentProjectId={project.id}
+          onProjectDeleted={(id) => { if (projectRef.current.id === id) setProject({ id: null, name: projectRef.current.name }); }}
+        />
+      )}
     </div>
   );
 }
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
