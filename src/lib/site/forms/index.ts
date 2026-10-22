@@ -17,9 +17,10 @@ import type { SiteForm } from './types';
  * Bumped when fields are added. Stored on each assignment when it's made, and an assignment is
  * always shown with the forms of its own version (keys never change once used; new ones are added).
  * Version 4: the electrician's records in Heliaxis's own words and keys (WORDING-SPEC 12); answers
- * saved under the old keys are read through LEGACY_KEYS (forms/legacy.ts).
+ * saved under the old keys are read through LEGACY_KEYS (forms/legacy.ts). Version 5: the roof checks
+ * are the roofer's (RX10–RX14); the electrician's Roof and panels questions are no longer shown.
  */
-export const SITE_SCHEMA_VERSION = 4;
+export const SITE_SCHEMA_VERSION = 5;
 export { LEGACY_KEYS, withLegacy } from './legacy';
 
 /**

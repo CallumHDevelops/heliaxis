@@ -15,6 +15,8 @@ This is the trade’s side, so you know what they’re looking at when they ring
 6. Later they get **Green light ✓** (“We’ve reviewed your photos and results. Nothing needs putting right.”), or **Return to site required** with what needs putting right, the fix-by date and **Put it right**.
 7. Their home screen lists their Heliaxis jobs and **Your POs and payments**.
 
+> **Good to know:** The roof checks are the roofer’s alone: how the panels are mounted, hooks in the rafters, a solid frame, fixings made for outdoors, air behind the panels, the mounting kit’s fire rating, tiles dressed flat and the cable entry sealed. The electrician isn’t asked them again: their PV inspection record fills its Roof and panels part from the roofer’s sign-off. If the roofer signed off before these questions were added, those boxes are left blank and say so.
+
 ![The roofer’s job pack on his phone, with Roof checks and Notes from the office.](/help/site/s13-trade-job-pack-phone.jpg "What the roofer sees first: the checks to work through and the notes from the office.")
 
 ![The whole job pack: when, people, access and parking, the system, drawings and design.](/help/site/s13b-trade-job-pack-phone-full.jpg "The whole job pack: people, access and parking from the survey, the system, drawings and design.")

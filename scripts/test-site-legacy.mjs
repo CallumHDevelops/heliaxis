@@ -75,7 +75,8 @@ eq('no old key reaches the forms', Object.keys(c.values).filter((k) => /^(f43_|f
 const open = R.allVisible(F.schemaFor({ trade: 'electrician', forms: L.legacySections(['photos', 'serials', 'f43', 'f44', 'f44a', 'f74', 'f78', 'cert', 'finish']) })[0], c)
   .filter(({ f }) => f.level === 'must' && !['SIG', 'PHOTOS', 'AUTO'].includes(f.type) && !R.isAnswered(f, c))
   .map(({ f }) => f.key);
-eq('left to answer on an unsigned job: only the questions version 4 added', open, ['pvi_watertight', 'pvi_frame_func']);
+// The watertight check, added in version 4, is the roofer's since version 5: not asked of the electrician.
+eq('left to answer on an unsigned job: only the questions version 4 added', open, ['pvi_frame_func']);
 
 for (const [code, make] of Object.entries(DOCS)) {
   let text = '';
@@ -94,14 +95,14 @@ for (const [code, make] of Object.entries(DOCS)) {
 // A job signed under version 4 with a must left empty still can't print (the guard is only for old answers).
 {
   const rest = { ...full.values };
-  delete rest.pvi_watertight;
+  delete rest.pvi_routes;
   let threw = null;
   try {
     await DOCS['HX-PV-01']({ ...input(ctxOf(products, rest, full.photos)), declaration: null });
   } catch (e) {
     threw = e instanceof MissingAnswer ? e.label : String(e);
   }
-  eq('a version 4 record with a must empty still stops', threw, 'Is the roof still watertight at every fixing?');
+  eq('a version 4 record with a must empty still stops', threw, 'Are the cables run and protected so they can’t get damaged?');
 }
 
 /* ── The value rules ───────────────────────────────────────────────────────────── */

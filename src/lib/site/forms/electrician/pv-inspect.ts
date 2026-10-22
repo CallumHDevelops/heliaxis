@@ -1,34 +1,49 @@
 /**
  * HX-PV-01 Solar PV inspection record (WORDING-SPEC 1, screen P9): Heliaxis's own checks, round the
- * system from the roof to the meter, each ✓ Done · ✗ Problem · N/A with the evidence beside it
- * (photos, the roofer's answers, the string tests). Four Yes/No questions work out what the frame's
- * earthing needs. The paperwork rows and the grid settings tick themselves from what the app knows
- * for certain, and can be changed. Type-only imports, plus the rules.
+ * system to the meter, each ✓ Done · ✗ Problem · N/A with the evidence beside it (photos, the
+ * roofer's answers, the string tests). Four Yes/No questions work out what the frame's earthing
+ * needs. The paperwork rows and the grid settings tick themselves from what the app knows for
+ * certain, and can be changed.
+ *
+ * The roof is the roofer's (owner, 22 Oct): the electrician isn't asked how the panels are mounted or
+ * the Roof and panels rows. The record takes those from the roofer's sign-off (RX1–RX14, forms/roofer),
+ * and an older record keeps the answers its electrician gave. Type-only imports, plus the rules.
  */
 import { dcRatingLimit, perStringValues } from '../../rules';
 import type { Field, FlagRule, FormCtx, Step } from '../types';
 import { certDone } from './cert';
 import { expectedVoc, pvTestField, PV_TEST_STEP } from './pv-tests';
+import { MOUNTINGS } from '../roofer';
 import { el, has, is, num, optimisers, roofer, stepComplete, text, tick, yn } from './shared';
 
-/** How the panels are mounted (the design's mounting keys). */
-export const MOUNTINGS = [
-  { key: 'on_roof', label: 'On-roof, above the tiles' },
-  { key: 'in_roof', label: 'In-roof, in place of the tiles' },
-  { key: 'flat', label: 'Flat roof' },
-  { key: 'ground', label: 'Ground mount' },
-];
-const MOUNT_WORDS: Record<string, string> = { on_roof: 'on-roof', in_roof: 'in-roof', flat: 'flat roof', ground: 'ground mount' };
-/** The mounting: the electrician's answer, else the design's. */
-export const mountingOf = (c: FormCtx): string | null => (typeof c.values.pvi_mount === 'string' ? c.values.pvi_mount : c.design.mounting);
+export { MOUNTINGS };
+/** The mounting: the electrician's own answer on an older record, else the roofer's, else the design's. */
+export function mountingOf(c: FormCtx): string | null {
+  if (typeof c.values.pvi_mount === 'string') return c.values.pvi_mount;
+  const r = roofer(c, 'RX10');
+  return typeof r === 'string' ? r : c.design.mounting;
+}
 const ground = (c: FormCtx) => mountingOf(c) === 'ground';
 
 /** The record's section headings, in order (phone and PDF). */
 export const PV_INSPECT_SECTIONS = ['Roof and panels', 'Frame earthing', 'Cable runs', 'Kit and protection', 'Meter and grid settings', 'Labels and notices', 'Paperwork', 'Notes'] as const;
 export type PvInspectSection = (typeof PV_INSPECT_SECTIONS)[number];
 
-/** A ✓ / ✗ / N/A row: its key, section, question and help, and whether N/A is expected there. */
-export type PvInspectRow = { key: string; section: PvInspectSection; q: string; help?: string; naOk?: boolean | ((c: FormCtx) => boolean); show?: (c: FormCtx) => boolean };
+/** A row's answer from the roofer's sign-off, and their note when it's a ✗. */
+export type FromRoofer = { v: 'done' | 'problem' | 'na'; why?: string } | null;
+/**
+ * A ✓ / ✗ / N/A row: its key, section, question and help, and whether N/A is expected there. A row
+ * with `fromRoofer` is the roofer's check: never asked of the electrician, its answer comes from them.
+ */
+export type PvInspectRow = {
+  key: string;
+  section: PvInspectSection;
+  q: string;
+  help?: string;
+  naOk?: boolean | ((c: FormCtx) => boolean);
+  show?: (c: FormCtx) => boolean;
+  fromRoofer?: (c: FormCtx) => FromRoofer;
+};
 
 const yes = (c: FormCtx, k: string) => is(c, k, 'yes');
 const no = (c: FormCtx, k: string) => is(c, k, 'no');
@@ -36,10 +51,29 @@ const metal = (c: FormCtx) => yes(c, 'pvi_frame_metal');
 /** The functional-earth row: no connected metal frame, or none of the three conditions. */
 const funcShown = (c: FormCtx) => no(c, 'pvi_frame_metal') || (metal(c) && no(c, 'pvi_frame_ext') && no(c, 'pvi_frame_exp') && no(c, 'pvi_frame_lp'));
 
+/** The roofer's Yes / No answers as one row: ✗ if any is No (with their note), ✓ once all are Yes. */
+const rooferRow =
+  (...keys: string[]) =>
+  (c: FormCtx): FromRoofer => {
+    const bad = keys.find((k) => roofer(c, k) === 'no');
+    if (bad) {
+      const n = roofer(c, `${bad}n`);
+      return { v: 'problem', ...(typeof n === 'string' && n.trim() ? { why: n.trim() } : {}) };
+    }
+    return keys.every((k) => roofer(c, k) === 'yes') ? { v: 'done' } : null;
+  };
+/** Watertight: tiles dressed flat (RX2), and any tiles broken during the works replaced to match (RX3, RX3r). */
+const watertight = (c: FormCtx): FromRoofer => {
+  if (roofer(c, 'RX2') === 'no') return { v: 'problem', why: typeof roofer(c, 'RX2n') === 'string' ? `Tiles not dressed flat: ${roofer(c, 'RX2n')}` : 'Tiles not dressed flat' };
+  if (roofer(c, 'RX3') === 'yes' && roofer(c, 'RX3r') === 'no') return { v: 'problem', why: 'Tiles broken during the works and not replaced to match' };
+  return roofer(c, 'RX2') === 'yes' && (roofer(c, 'RX3') === 'no' || roofer(c, 'RX3r') === 'yes') ? { v: 'done' } : null;
+};
+
 export const PV_INSPECT_ROWS: PvInspectRow[] = [
   {
     key: 'pvi_fixed',
     section: 'Roof and panels',
+    fromRoofer: rooferRow('RX1', 'RX11'),
     q: 'Is the frame fixed firmly to the roof structure?',
     help: 'Rails solid with no movement. Hooks or brackets into the rafters at the spacing the design or kit asks for.',
     naOk: ground,
@@ -47,6 +81,7 @@ export const PV_INSPECT_ROWS: PvInspectRow[] = [
   {
     key: 'pvi_watertight',
     section: 'Roof and panels',
+    fromRoofer: watertight,
     q: 'Is the roof still watertight at every fixing?',
     help: 'Tiles or slates sit flat over each hook, none lifted or cracked. In-roof kits: flashings fitted as the kit’s instructions show.',
     naOk: ground,
@@ -54,6 +89,7 @@ export const PV_INSPECT_ROWS: PvInspectRow[] = [
   {
     key: 'pvi_entry',
     section: 'Roof and panels',
+    fromRoofer: rooferRow('RX4'),
     q: 'Is the cable entry through the roof sealed against the weather?',
     help: 'A proper entry, for example a cable entry tile or a flashed gland, sealed. A gap under a tile doesn’t count.',
     naOk: ground,
@@ -61,18 +97,21 @@ export const PV_INSPECT_ROWS: PvInspectRow[] = [
   {
     key: 'pvi_corrosion',
     section: 'Roof and panels',
+    fromRoofer: rooferRow('RX12'),
     q: 'Will the frame and its fixings last outdoors without corroding?',
     help: 'Rails, hooks, clamps and bolts made for outdoor use (aluminium, stainless steel or similar), with no metals touching that react with each other.',
   },
   {
     key: 'pvi_airflow',
     section: 'Roof and panels',
+    fromRoofer: rooferRow('RX13'),
     q: 'Can air get behind the panels to keep them cool?',
     help: 'On-roof: a clear gap between panels and tiles. In-roof: the kit’s own ventilation fitted as its instructions say. Trapped heat is a fire risk.',
   },
   {
     key: 'pvi_roof_fire',
     section: 'Roof and panels',
+    fromRoofer: (c) => (ground(c) ? { v: 'na' } : rooferRow('RX14')(c)),
     q: 'Has the roof kept its fire performance?',
     help: 'Check the mounting kit’s fire rating in its paperwork suits this roof. This matters most for in-roof kits, which take the place of the tiles.',
     naOk: ground,
@@ -278,20 +317,6 @@ const stringOne = (c: FormCtx, key: string) => perStringValues(pvTestField(key),
 
 /** The evidence and worked-out answers beside each row (WORDING-SPEC 1, "Logic, evidence"). */
 const EXTRA: Record<string, Partial<Field>> = {
-  pvi_fixed: { rooferEvidence: ['RF2'], note: (c) => roofWords(c, [['RX1', 'hooks into the rafters ✓', 'hooks not all into the rafters ✗']]) },
-  pvi_watertight: {
-    rooferEvidence: ['RF3'],
-    note: (c) => {
-      const tiles = roofer(c, 'RX3') === 'no' ? 'no tiles broken ✓' : roofer(c, 'RX3') === 'yes' ? (roofer(c, 'RX3r') === 'yes' ? 'broken tiles replaced to match ✓' : roofer(c, 'RX3r') === 'no' ? 'broken tiles not replaced to match ✗' : 'tiles broken') : '';
-      const flat = roofWords(c, [['RX2', 'tiles dressed flat over every hook ✓', 'tiles not all dressed flat ✗']]);
-      const words = [flat?.replace(/^Roofer: /, ''), tiles].filter(Boolean);
-      return words.length ? `Roofer: ${words.join(' · ')}` : null;
-    },
-  },
-  pvi_entry: { rooferEvidence: ['RX4p'], evidence: ['EP24'], note: (c) => roofWords(c, [['RX4', 'cable entry sealed ✓', 'cable entry not sealed ✗']]) },
-  pvi_corrosion: { rooferEvidence: ['RF3'] },
-  pvi_airflow: { rooferEvidence: ['RF3'], note: (c) => (c.design.mounting ? `Mounting: ${MOUNT_WORDS[c.design.mounting]} (from the design)` : null) },
-  pvi_roof_fire: { auto: (c) => (ground(c) ? 'na' : undefined), autoFrom: (c) => (ground(c) ? 'Ground mount: not on a roof' : null) },
   pvi_frame_bonded: { evidence: ['EP25'] },
   pvi_frame_earthed: { evidence: ['EP25'] },
   pvi_frame_lps: { evidence: ['EP25'] },
@@ -358,28 +383,18 @@ const EXTRA: Record<string, Partial<Field>> = {
 };
 
 const SECTION_NOTE: Partial<Record<PvInspectSection, string>> = {
-  'Roof and panels': 'Check these on the roof, or from the roofer’s answers and photos under each one.',
   'Frame earthing': 'Four questions work out what the frame needs. If more than one answer is Yes, do what each one asks; where they overlap, follow the stricter.',
 };
 
 const rowFields = (r: PvInspectRow, first: boolean): Field[] =>
   tick(r.key, r.q, { ...(r.help ? { hint: r.help } : {}), ...(r.show ? { show: r.show } : {}), ...(first ? { group: r.section, groupNote: SECTION_NOTE[r.section] } : {}), ...EXTRA[r.key] });
 
+/** The roofer's checks: never shown to the electrician. Kept as fields so answers saved under these keys before (an older record) still read. */
+const ROOFERS = () => false;
+
 export const PV_INSPECT_FIELDS: Field[] = [
-  {
-    key: 'pvi_mount',
-    type: 'SEL',
-    label: 'How are the panels mounted?',
-    level: 'must',
-    group: 'Roof and panels',
-    groupNote: SECTION_NOTE['Roof and panels'],
-    options: MOUNTINGS,
-    suggest: (c) => {
-      const m = MOUNTINGS.find((x) => x.key === c.design.mounting);
-      return m ? { v: m.key, src: 'design', text: m.label } : null;
-    },
-  },
-  ...PV_INSPECT_ROWS.filter((r) => r.section === 'Roof and panels').flatMap((r) => rowFields(r, false)),
+  { key: 'pvi_mount', type: 'SEL', label: 'How are the panels mounted?', level: 'must', options: MOUNTINGS, show: ROOFERS },
+  ...PV_INSPECT_ROWS.filter((r) => r.section === 'Roof and panels').flatMap((r) => rowFields({ ...r, show: ROOFERS }, false)),
   ...FRAME_QUESTIONS.map((f, i) => (i === 0 ? { ...f, group: 'Frame earthing', groupNote: SECTION_NOTE['Frame earthing'] } : f)),
   ...PV_INSPECT_ROWS.filter((r) => r.section !== 'Roof and panels').flatMap((r, i, list) => rowFields(r, r.section !== 'Frame earthing' && (i === 0 || list[i - 1].section !== r.section))),
   { key: 'pvi_notes', type: 'LONG', label: 'Anything else the office should know?', level: 'optional', group: 'Notes' },
@@ -425,7 +440,7 @@ export const pvInspectRow = (key: string) => ROW.get(key);
 export const PV_INSPECT_STEP: Step = {
   key: 'pv-inspect',
   title: 'PV inspection',
-  intro: 'Work round the system from the roof to the meter. Tap ✓, ✗ or N/A. ✗ needs a short note. The roofer’s answers and photos show under the checks they help with.',
+  intro: 'Work round the system from the frame to the meter. Tap ✓, ✗ or N/A. ✗ needs a short note. The roof checks are the roofer’s: their answers go on this record for you.',
   show: (c) => has(c, 'solar'),
   fields: PV_INSPECT_FIELDS,
 };

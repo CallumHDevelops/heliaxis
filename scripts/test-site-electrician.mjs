@@ -146,7 +146,9 @@ eq('expected Voc: calculated 8 × 49.4 V', offer('pvt_voc_stc'), ['calc', [395.2
 eq('expected Isc: read from the roofer’s badge photo', offer('pvt_isc_stc'), ['photo', [13.92, 13.92]]);
 eq('the tester from their last job', offer('pvt_tester'), ['last', 'Megger MFT1741+ s/n 1234567']);
 eq('new installation offered', offer('pvt_kind'), ['job', 'initial']);
-eq('the mounting from the design', offer('pvi_mount'), ['design', 'on_roof']);
+const ROOF_ROWS = ['pvi_fixed', 'pvi_watertight', 'pvi_entry', 'pvi_corrosion', 'pvi_airflow', 'pvi_roof_fire'];
+const shownToElectrician = R.allVisible(sb, c0).map(({ f }) => f.key);
+eq('the roof checks are the roofer’s: not asked of the electrician', ['pvi_mount', ...ROOF_ROWS].filter((k) => shownToElectrician.includes(k)), []);
 eq('back-up from the design', offer('eess_backup'), ['design', 'no']);
 eq('nothing is filled in by itself', ['pvt_strings', 'pvt_panels', 'pvt_panel', 'pvt_voc_stc', 'pvi_mount'].map((k) => c0.values[k]), [undefined, undefined, undefined, undefined, undefined]);
 const measured = ['pvt_voc', 'pvt_isc', 'pvt_ir_pos', 'pvt_ir_neg', 'pvt_polarity', 'pvt_frame_earth', 'pvt_iso_ok', 'pvt_inv_ok', 'EP26r', 'hp_ir_le', 'ev_ra', ...BT.BAT_TESTS.map((r) => r.key)];
@@ -154,7 +156,14 @@ eq('measured values and tests are never offered', measured.filter((k) => sb.step
 eq('no expected Voc with optimisers', PVT.expectedVoc(ctxOf(['solar'], {}, {}, { roofer: { ...facts().roofer, values: { ...ROOFER, RF7: 'yes' } } }), 0), null);
 eq('expected Voc beside the measured box', field('pvt_voc').stringNote(c0, 0), 'Expected about 395.2 V (8 × 49.4 V)');
 eq('what’s being tested, from the job', field('pvt_desc').suggest(c0).v, 'New 7.2 kWp solar PV array: 16 × Aiko Neostar 2P 450W in 2 strings, Sigenergy SigenStor EC 6.0 SP');
-eq('the roofer’s answers under the checks they help with', [field('pvi_fixed').note(c0), field('pvi_entry').note(c0), field('pvi_fixed').rooferEvidence, field('pvi_watertight').rooferEvidence], ['Roofer: hooks into the rafters ✓', 'Roofer: cable entry sealed ✓', ['RF2'], ['RF3']]);
+const fromRoofer = (k, c) => PVI.pvInspectRow(k).fromRoofer(c);
+const roofed = (values) => ctxOf(['solar'], {}, {}, { roofer: { ...facts().roofer, values: { ...ROOFER, ...values } } });
+eq('the roof rows come from the roofer’s sign-off', ROOF_ROWS.map((k) => fromRoofer(k, c0)?.v), ['done', 'done', 'done', 'done', 'done', 'done']);
+eq('…a No from the roofer is a ✗ with their note', fromRoofer('pvi_airflow', roofed({ RX13: 'no', RX13n: 'No gap at the ridge' })), { v: 'problem', why: 'No gap at the ridge' });
+eq('…a solid frame needs the hooks in the rafters and the rails solid', [fromRoofer('pvi_fixed', roofed({ RX1: 'no' }))?.v, fromRoofer('pvi_fixed', roofed({ RX11: undefined }))], ['problem', null]);
+eq('…tiles broken and not replaced: not watertight', fromRoofer('pvi_watertight', roofed({ RX3: 'yes', RX3r: 'no' }))?.v, 'problem');
+eq('…a roofer who signed before these questions: nothing to show', fromRoofer('pvi_corrosion', roofed({ RX12: undefined })), null);
+eq('the mounting: the roofer’s, else the design’s', [PVI.mountingOf(roofed({ RX10: 'in_roof' })), PVI.mountingOf(roofed({ RX10: undefined }))], ['in_roof', 'on_roof']);
 
 /* ── The frame earthing: four questions work out what the frame needs ───────── */
 const frame = (v) => ctxOf(['solar'], v);
@@ -207,7 +216,7 @@ eq('…not while a reading is missing', R.valueOf(field('pvi_tests'), ctxOf(['so
 eq('the certificate (own: number and file) complete', R.valueOf(field('pvi_cert'), cFull), 'done');
 eq('un-ticked by the electrician: stays off', R.valueOf(field('pvi_tests'), ctxOf(['solar', 'battery'], { ...full.values, pvi_tests: 'off' }, full.photos)), undefined);
 eq('grid settings: asked once at switch-on, ticked on the inspection from it', [R.valueOf(field('pvi_grid'), cFull), R.valueOf(field('pvi_grid'), ctxOf(['solar'], { ...full.values, pvc_grid: 'problem', pvc_gridn: 'G99 setting' }, full.photos))], ['done', 'problem']);
-eq('a ground mount: the roof’s fire performance is N/A by itself', R.valueOf(field('pvi_roof_fire'), ctxOf(['solar'], { pvi_mount: 'ground' })), 'na');
+eq('a ground mount: the roof’s fire performance is N/A by itself', fromRoofer('pvi_roof_fire', roofed({ RX10: 'ground', RX14: undefined }))?.v, 'na');
 eq('switch-on: started from EF1, monitoring from EF2, meter from Serials, no export limit N/A, labels from the inspection', ['pvc_start', 'pvc_export', 'pvc_meter', 'pvc_monitoring', 'pvc_labels'].map((k) => R.valueOf(field(k), cFull)), ['done', 'na', 'done', 'done', 'done']);
 eq('switch-on monitoring when it wasn’t possible: a cross', R.valueOf(field('pvc_monitoring'), ctxOf(['solar'], { ...full.values, EF2: 'not_possible' }, full.photos)), 'problem');
 eq('the summary’s new installation or re-test follows the string tests', R.valueOf(field('hos_kind'), cFull), 'initial');
@@ -225,7 +234,8 @@ const voc = R.flagsFor(sb, ctxOf(['solar', 'battery'], { ...full.values, pvt_voc
 eq('Voc off by more than the tolerance: Review, "looks 1 panel short"', [voc?.severity, voc?.text], ['review', 'String 1: 346.1 V measured, about 395.2 V expected. Looks 1 panel short']);
 eq('identical strings more than 5% apart', flagsWith({ pvt_voc: [372, 395.5] }).filter(([c]) => c === 'PVT_EVEN'), [['PVT_EVEN', 'review']]);
 eq('strings not the roofer’s', flagText({ pvt_strings: 3, pvt_panels: [8, 8, 8] }, 'PVT_STR'), 'String tests have 3 strings; the roofer said 2');
-eq('PV inspection ✗: Urgent, the question and the note', [flagsWith({ pvi_entry: 'problem', pvi_entryn: 'Gap at the cable entry' }).filter(([c]) => c === 'PVI_ENTRY'), flagText({ pvi_entry: 'problem', pvi_entryn: 'Gap at the cable entry' }, 'PVI_ENTRY')], [[['PVI_ENTRY', 'urgent']], 'PV inspection ✗ Is the cable entry through the roof sealed against the weather: Gap at the cable entry']);
+eq('PV inspection ✗: Urgent, the question and the note', [flagsWith({ pvi_routes: 'problem', pvi_routesn: 'Cable loose in the loft' }).filter(([c]) => c === 'PVI_ROUTES'), flagText({ pvi_routes: 'problem', pvi_routesn: 'Cable loose in the loft' }, 'PVI_ROUTES')], [[['PVI_ROUTES', 'urgent']], 'PV inspection ✗ Are the cables run and protected so they can’t get damaged: Cable loose in the loft']);
+eq('…the roof rows are the roofer’s: no electrician flag for them', flagsWith({ pvi_entry: 'problem', pvi_entryn: 'Gap' }).filter(([c]) => c === 'PVI_ENTRY'), []);
 eq('PV inspection N/A on a row that doesn’t allow it: Review; on one that does, nothing', [flagsWith({ pvi_routes: 'na' }).filter(([c]) => c.startsWith('PVI_ROUTES')), flagsWith({ pvi_spd: 'na' }).filter(([c]) => c.startsWith('PVI_SPD'))], [[['PVI_ROUTES_NA', 'review']], []]);
 eq('…roof rows N/A on a ground mount: nothing', flagsWith({ pvi_mount: 'ground', pvi_fixed: 'na', pvi_watertight: 'na' }).filter(([c]) => /PVI_(FIXED|WATERTIGHT)/.test(c)), []);
 eq('the DC limit is the highest string Voc × 1.25', PVI.dcVoltageLimit(cFull).limit, 494);

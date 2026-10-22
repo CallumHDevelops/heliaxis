@@ -309,7 +309,7 @@ db.rows('site_devices').push(device);
 process.env.SITE_LINK_SECRET = 'a-test-key-for-site-links-0123456789abcdef';
 
 const wrap = (vals) => Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, { v, src: 'typed', at: '2026-11-03T10:00:00Z' }]));
-const roofDone = { RF5: 'no', RF13: 'Aiko Neostar 2P 450W', RF14: 49.6, RX1: 'yes', RF10: 2, RF11: [8, 8], RX5: 16, RF6: 'yes', RF7: 'no', RF8: 'yes', RF9: true, RX4: 'yes', RF4: 'no', RX2: 'yes', RX3: 'no', RX6: 'no', RX8: 'yes', RX9: 'no' };
+const roofDone = { RF5: 'no', RF13: 'Aiko Neostar 2P 450W', RF14: 49.6, RX1: 'yes', RF10: 2, RF11: [8, 8], RX5: 16, RF6: 'yes', RF7: 'no', RF8: 'yes', RF9: true, RX4: 'yes', RF4: 'no', RX2: 'yes', RX3: 'no', RX6: 'no', RX8: 'yes', RX9: 'no', RX10: 'on_roof', RX11: 'yes', RX12: 'yes', RX13: 'yes', RX14: 'yes' };
 const roofPhotos = { RF1: 2, RF12: 1, RF2: 2, RX4p: 1, RF3: 3 };
 const roof = {
   id: randomUUID(), project_id: project.id, contact_id: contact.id, trade: 'roofer', trade_label: null, scope: null, forms: [], cert_route: 'eic', starts_on: '2026-11-03', days: 1,
