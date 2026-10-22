@@ -137,7 +137,7 @@ const ALLOWED_LITERALS = {
   'src/app/admin/analytics/HeatmapViewer.tsx': ['#fff', 'rgb(0, 180, 255)', 'rgb(0, 220, 120)', 'rgb(255, 220, 0)', 'rgb(255, 120, 0)', 'rgb(220, 0, 40)'],
 };
 /** Area A, the CRM: home, board and list, the job record (all its tabs, sheets, fabs and the merge sheet),
-    customers, projects, purchase orders, reports and the surveys tool. */
+    customers, organisations, projects, purchase orders, reports and the surveys tool. */
 const CONVERTED_CRM = [
   'src/app/admin/crm/crm.css',
   'src/app/admin/crm/merge.css',
@@ -147,13 +147,15 @@ const CONVERTED_CRM = [
   'src/app/admin/crm/[id]/site-eic.css',
   'src/app/admin/crm/reports/reports.css',
   'src/app/admin/crm/settings/handover-settings.css',
+  'src/app/admin/crm/organisations/orgs.css',
   'src/app/admin/enquiries/enquiries.css',
   'src/app/admin/projects/projects.css',
   'src/app/admin/projects/orders/orders.css',
   'src/app/admin/surveys/diary.css',
   'src/app/admin/surveys/surveys.css',
   ...['CrmBoard', 'CrmBoardView', 'CrmCard', 'CrmHome', 'CrmListView', 'CrmSearch', 'CrmUi', 'LatestNotes', 'MergeSheet', 'MyWork', 'NeedsReply', 'page'].map((f) => `src/app/admin/crm/${f}.tsx`),
-  ...['ActivityTab', 'AssignmentSheet', 'CustomerColumn', 'HandoverCard', 'HandoverSheets', 'HandoverTab', 'PhotosTab', 'ProjectExtras', 'ProjectView', 'RecordFabs', 'RecordHeader', 'RecordSheets', 'ReviewDrawer', 'SiteEic', 'SiteElectrician', 'SitePeople', 'SiteReviewPanel', 'SiteTab', 'TasksCard', 'page', 'record-page'].map((f) => `src/app/admin/crm/[id]/${f}.tsx`),
+  ...['ActivityTab', 'AssignmentSheet', 'CustomerColumn', 'HandoverCard', 'HandoverSheets', 'HandoverTab', 'PhotosTab', 'ProjectExtras', 'ProjectView', 'RecordFabs', 'RecordHeader', 'RecordSheets', 'ReviewDrawer', 'SiteEic', 'SiteElectrician', 'SitePeople', 'SiteReviewPanel', 'SiteTab', 'TasksCard', 'OrganisationCard', 'page', 'record-page'].map((f) => `src/app/admin/crm/[id]/${f}.tsx`),
+  ...['OrganisationsList', 'OrgForms', 'page', '[id]/OrganisationView', '[id]/page'].map((f) => `src/app/admin/crm/organisations/${f}.tsx`),
   ...['reports/CrmReports', 'reports/page', 'settings/CrmSettingsView', 'settings/HandoverSettings', 'settings/page'].map((f) => `src/app/admin/crm/${f}.tsx`),
   ...['DeleteCustomers', 'EnquiriesCrm', 'page'].map((f) => `src/app/admin/enquiries/${f}.tsx`),
   ...['NewProjectSheet', 'NewProjectTrades', 'ProjectsBoard', 'page', '[id]/ProjectOverview', '[id]/page'].map((f) => `src/app/admin/projects/${f}.tsx`),

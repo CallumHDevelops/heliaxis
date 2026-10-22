@@ -319,6 +319,7 @@ export async function AdminShell({
       label: 'CRM',
       items: [
         { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
+        { href: '/admin/crm/organisations', label: 'Organisations', icon: <svg {...ICON}><path d="M4 21V4l9-1v18M13 8h7v13M7.5 8h2M7.5 12h2M7.5 16h2M16 12h1.5M16 16h1.5M2 21h20" /></svg>, show: can('crm') },
         // Projects pages light up the CRM tab (they use active="crm"), so this tile never does.
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         { href: '/admin/projects/orders', label: 'Purchase orders', short: 'Orders', icon: icons.orders, show: orders },

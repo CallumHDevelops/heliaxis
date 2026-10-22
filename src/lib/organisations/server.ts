@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { logActivity } from '@/lib/crm/server';
 import { schemaReady } from '@/lib/schema-ready';
 import { everyGroup, searchWords } from '@/lib/search-words';
+import { toWaId } from '@/lib/whatsapp/shared';
 import { nextPrimary, orgWordFilter, sortContacts, type JobOrganisation, type OrgContact, type Organisation, type OrgJob, type OrgListRow } from './shared';
 
 /**
@@ -93,7 +94,20 @@ export async function readOrganisation(db: Db, id: string): Promise<{ organisati
       created_at: String(j.created_at),
     }))
     .sort((a, b) => Number(isOpen(b.stage)) - Number(isOpen(a.stage)) || b.created_at.localeCompare(a.created_at));
-  return { organisation: org as Organisation, contacts: sortContacts((contacts ?? []) as OrgContact[]), jobs };
+  return { organisation: org as Organisation, contacts: await withChats(db, sortContacts((contacts ?? []) as OrgContact[])), jobs };
+}
+
+/**
+ * Each contact's WhatsApp chat in the CRM, when their number has one (it's on a customer record:
+ * WhatsApp is matched on the number, as everywhere). The newest chat on that number wins.
+ */
+async function withChats(db: Db, contacts: OrgContact[]): Promise<OrgContact[]> {
+  const ids = [...new Set(contacts.map((c) => toWaId(c.mobile)).filter((x): x is string => !!x))];
+  if (!ids.length) return contacts.map((c) => ({ ...c, chat_id: null }));
+  const { data } = await db.from('enquiries').select('id, wa_id, wa_last_message_at').in('wa_id', ids).order('wa_last_message_at', { ascending: false, nullsFirst: false }).limit(200);
+  const chatOf = new Map<string, string>();
+  for (const e of (data ?? []) as Row[]) if (!chatOf.has(String(e.wa_id))) chatOf.set(String(e.wa_id), String(e.id));
+  return contacts.map((c) => ({ ...c, chat_id: chatOf.get(toWaId(c.mobile) ?? '') ?? null }));
 }
 
 /**

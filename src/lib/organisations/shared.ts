@@ -52,6 +52,8 @@ export type OrgContact = {
   notes: string | null;
   is_primary: boolean;
   created_at: string;
+  /** On an organisation's page: the customer record whose WhatsApp chat is on this contact's number, if there is one. */
+  chat_id?: string | null;
 };
 
 /** A row on the Organisations list. `people` is every contact's name, role and email, for the search box. */

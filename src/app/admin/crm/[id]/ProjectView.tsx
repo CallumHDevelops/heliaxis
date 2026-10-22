@@ -665,6 +665,7 @@ export function ProjectView({
             // Docked open with no Tasks space in the dock yet: there's no right-hand column either, so the
             // card comes here meanwhile and Tasks are never missing.
             tasksElsewhere={tasksInDockTab ? tasksCard('page') : null}
+            organisation={rec.organisation}
           />
         </aside>
 
