@@ -10,12 +10,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function AssistantPage() {
+export default async function AssistantPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+  const { q } = await searchParams;
   const { profile } = await getSessionProfile();
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
   return (
     <AdminShell active="assistant">
-      <AssistantView firstName={firstName} />
+      {/* ?q=: something to ask, put in the box but not sent (Help's "Ask Metis" links). */}
+      <AssistantView firstName={firstName} initialText={typeof q === 'string' ? q.slice(0, 2000) : ''} />
     </AdminShell>
   );
 }

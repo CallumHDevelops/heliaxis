@@ -145,6 +145,7 @@ const FOLDED_SECTIONS = [
   '/admin/assistant',
   '/admin/sso',
   '/admin/app',
+  '/admin/help',
 ];
 /** The chat already fills these pages. */
 const HIDDEN_SECTIONS = ['/admin/enquiries/inbox', '/admin/crm/chats'];

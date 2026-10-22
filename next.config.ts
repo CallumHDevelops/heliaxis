@@ -57,6 +57,10 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/setup/file': ['./supabase/*.sql'],
     '/admin/setup/**': ['./supabase/*.sql', './*.md'],
+    // The Help articles (src/lib/help/server.ts): its pages, and Metis's search_help tool (/api/assistant).
+    '/admin/help': ['./src/content/help/**/*.md'],
+    '/admin/help/**': ['./src/content/help/**/*.md'],
+    '/api/assistant': ['./src/content/help/**/*.md'],
     // The logos and fonts of the document kit (src/lib/documents/pdf-kit.ts) wherever a document is made:
     // purchase orders, site paperwork, certificates, reports, the handover pack, and the print versions
     // made on request (the CRM's and the customer portal's document links). heliaxis-logo-doc.png on

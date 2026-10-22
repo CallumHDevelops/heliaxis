@@ -206,6 +206,18 @@ CONVERTED.push(
   'src/app/admin/crm/whatsapp-permission/page.tsx'
 );
 
+/** Help (/admin/help): its pages, and the Help links in the shell. */
+CONVERTED.push(
+  'src/app/admin/help/help.css',
+  'src/app/admin/help/page.tsx',
+  'src/app/admin/help/[section]/page.tsx',
+  'src/app/admin/help/[section]/[slug]/page.tsx',
+  'src/app/admin/help/HelpSearch.tsx',
+  'src/app/admin/help/HelpBody.tsx',
+  'src/app/admin/help/parts.tsx',
+  'src/components/admin/HelpLinks.tsx'
+);
+
 const files = [];
 (function walk(dir) {
   for (const name of readdirSync(join(ROOT, dir))) {

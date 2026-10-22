@@ -121,6 +121,8 @@
 }
 .as-msg { max-width: 88%; padding: 0.65rem 0.85rem; border-radius: 14px; line-height: 1.45; font-size: 0.95rem; }
 .as-msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The app's pages Metis names (a Help article): links. */
+.as-link { color: var(--accent-text); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .as-msg.is-user { align-self: flex-end; background: var(--as-me); color: var(--as-me-text); border-bottom-right-radius: 4px; }
 .as-msg.is-assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .as-msg.is-error { border-color: var(--danger-line); color: var(--danger); }
