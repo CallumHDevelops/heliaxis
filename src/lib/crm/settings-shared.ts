@@ -41,6 +41,12 @@ export type CrmSettings = {
   /** Follow-up sequence for new leads; stops when they reply or the stage moves past Contacted. */
   sequenceEnabled: boolean;
   sequence: SequenceStep[];
+  /**
+   * When the sequence was last switched on or given a step at a new time (set by the server on save, see
+   * sequenceFromAfter): a step that fell due before then is skipped, not sent late. Null on settings saved
+   * before this, and then nothing is skipped.
+   */
+  sequenceFrom: string | null;
   /** Where purchase orders can be delivered instead of the site (blank until set: "To the office" waits for it). */
   officeAddress: string;
   officePostcode: string;
@@ -77,6 +83,7 @@ export const DEFAULT_CRM_SETTINGS: CrmSettings = {
       text: 'Hi {first_name},\n\nThanks again for your enquiry. If you’d like to book a free survey, just reply with a couple of days and times that suit you.\n\nAny questions, just reply to this email.\n\nThe Heliaxis team',
     },
   ],
+  sequenceFrom: null,
   officeAddress: '',
   officePostcode: '',
 };
@@ -129,6 +136,7 @@ export function cleanCrmSettings(b: Partial<Record<keyof CrmSettings, unknown>>)
     bookingHorizonDays: num(b.bookingHorizonDays, 1, 90, d.bookingHorizonDays),
     sequenceEnabled: !!b.sequenceEnabled,
     sequence: seq,
+    sequenceFrom: typeof b.sequenceFrom === 'string' && !Number.isNaN(Date.parse(b.sequenceFrom)) ? new Date(b.sequenceFrom).toISOString() : null,
     officeAddress: String(b.officeAddress ?? '')
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -149,4 +157,29 @@ export function fillText(text: string, v: { name?: string | null; portalLink?: s
     .replace(/\{portal_link\}/g, v.portalLink || '')
     .replace(/\{booking_link\}/g, v.bookingLink || '')
     .replace(/[ \t]+$/gm, '');
+}
+
+const stepKey = (x: SequenceStep) => `${x.afterHours}:${x.channel}`;
+
+/**
+ * sequenceFrom after a save: now, when the sequence has just been switched on or given a step at a new time
+ * (or a step moved to a new time or channel); otherwise as it was. Switching it off keeps it.
+ */
+export function sequenceFromAfter(prev: CrmSettings, next: CrmSettings, now: Date): string | null {
+  if (!next.sequenceEnabled) return prev.sequenceFrom;
+  const had = new Set(prev.sequence.map(stepKey));
+  return !prev.sequenceEnabled || next.sequence.some((x) => !had.has(stepKey(x))) ? now.toISOString() : prev.sequenceFrom;
+}
+
+/**
+ * The step a lead is on, past any that fell due before the sequence was switched on (or the step added):
+ * those are skipped, not sent late. `at` is the lead's sequence_step.
+ */
+export function stepAfterSkipped(sequence: SequenceStep[], createdAt: string, at: number, sequenceFrom: string | null): number {
+  const since = sequenceFrom ? Date.parse(sequenceFrom) : NaN;
+  const born = Date.parse(createdAt);
+  if (Number.isNaN(since) || Number.isNaN(born)) return at;
+  let i = at;
+  while (i < sequence.length && born + sequence[i].afterHours * 3_600_000 < since) i++;
+  return i;
 }

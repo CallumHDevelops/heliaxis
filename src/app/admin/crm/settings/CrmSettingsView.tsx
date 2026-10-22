@@ -170,6 +170,7 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
               <input type="checkbox" checked={s.sequenceEnabled} onChange={(e) => set('sequenceEnabled', e.target.checked)} /> On — stops the moment they reply, or when the
               opportunity moves past Contacted
             </label>
+            <p className="crm-muted crm-small">When you switch it on or add a step, leads already in the CRM only get the steps that fall due from then on. Earlier ones are skipped, not sent late.</p>
             {s.sequence.map((st, i) => (
               <div key={i} className="crm-step">
                 <div className="crm-step-head">

@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, json } from '@/lib/crm/server';
 import { getCrmSettings, saveCrmSettings } from '@/lib/crm/crm-settings';
-import { cleanCrmSettings } from '@/lib/crm/settings-shared';
+import { cleanCrmSettings, sequenceFromAfter } from '@/lib/crm/settings-shared';
 import { canAccess } from '@/lib/portals';
 import { msConfigured, mailbox } from '@/lib/ms365';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
@@ -32,6 +32,8 @@ export async function PUT(req: Request) {
   if (s.profile.role !== 'admin') return json({ error: 'Only admins can change CRM settings.' }, 403);
   const current = await getCrmSettings();
   const next = cleanCrmSettings({ ...current, ...(await req.json().catch(() => ({}))), rotationIndex: current.rotationIndex });
+  // Switched on or a step added: only steps that fall due from now on are sent (automation.ts).
+  next.sequenceFrom = sequenceFromAfter(current, next, new Date());
   try {
     await saveCrmSettings(next);
   } catch (e) {

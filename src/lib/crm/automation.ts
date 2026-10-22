@@ -8,7 +8,7 @@ import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { isQuiet } from '@/lib/whatsapp/schedule';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { getCrmSettings } from './crm-settings';
-import { fillText } from './settings-shared';
+import { fillText, stepAfterSkipped } from './settings-shared';
 import { daysWord } from './tracker';
 import { ensurePortalToken, logActivity, portalUrl } from './server';
 import { bookingUrl, ensureBookingToken } from './booking-link';
@@ -435,6 +435,12 @@ export async function runCrmAutomations() {
     for (const p of (seq ?? []) as Proj[]) {
       const step = s.sequence[p.sequence_step];
       if (!step || seqHeld.has(p.id) || now.getTime() < new Date(p.created_at).getTime() + step.afterHours * 3_600_000) continue;
+      // Steps that fell due before the sequence was switched on (or the step added) are skipped quietly, not sent late.
+      const next = stepAfterSkipped(s.sequence, p.created_at, p.sequence_step, s.sequenceFrom);
+      if (next > p.sequence_step) {
+        await db.from('crm_projects').update({ sequence_step: next }).eq('id', p.id);
+        continue;
+      }
       const c = await customer(p.enquiry_id);
       const token = step.text.includes('{portal_link}') ? await ensurePortalToken(p.id) : null;
       const link = token ? portalUrl(token) : null;
