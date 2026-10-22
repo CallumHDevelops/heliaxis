@@ -38,7 +38,7 @@ const STATIC_IN_HTML = new RegExp(${JSON.stringify(STATIC_IN_HTML)}, 'g');
 const OFFLINE_URL = '/offline.html';
 
 // Both wordmarks (light and dark theme), so the offline page and kept pages show a logo either way.
-const LOGOS = ['/assets/heliaxis-logo.png', '/assets/heliaxis-logo-light.png'];
+const LOGOS = ['/assets/heliaxis-logo-doc.png', '/assets/heliaxis-logo-light.png', '/assets/heliaxis-logo.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

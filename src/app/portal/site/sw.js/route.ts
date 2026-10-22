@@ -25,7 +25,7 @@ const STATIC = 'hxsite-static-' + VERSION;
 const PAGES = 'hxsite-pages-' + VERSION;
 const SHELL = '/portal/site/shell';
 const KEPT = ['/portal/site', SHELL];
-const FILES = ['/portal/site/zxing_reader.wasm', '/portal/site/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/assets/heliaxis-logo-light.png', '/assets/heliaxis-logo.png'];
+const FILES = ['/portal/site/zxing_reader.wasm', '/portal/site/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/assets/heliaxis-logo-light.png', '/assets/heliaxis-logo-doc.png', '/assets/heliaxis-logo.png'];
 const STATIC_IN_HTML = new RegExp(${JSON.stringify(STATIC_IN_HTML)}, 'g');
 
 self.addEventListener('install', (event) => {

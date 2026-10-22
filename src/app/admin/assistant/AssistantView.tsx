@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AssistantAction } from '@/lib/assistant/tools';
 import { atWords } from '@/lib/whatsapp/schedule';
 import { MetisIcon } from '@/components/admin/MetisIcon';
@@ -51,6 +51,12 @@ function hush(m: Mic | null) {
     m.r.abort();
   } catch {}
 }
+/** Whether this browser has speech-to-text. False on the server, so the first render matches it. */
+const noSubscribe = () => () => {};
+function hasSpeech() {
+  const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+  return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+}
 function makeRecognition(): Recognition | null {
   if (typeof window === 'undefined') return null;
   const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
@@ -66,7 +72,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
   const [busy, setBusy] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [listening, setListening] = useState(false);
-  const [canListen] = useState(() => !!makeRecognition());
+  const canListen = useSyncExternalStore(noSubscribe, hasSpeech, () => false);
   const mic = useRef<Mic | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
