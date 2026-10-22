@@ -3,18 +3,30 @@
 // being published goes live. Draft pages and Draft, Scheduled and Unpublished articles stay off the
 // website; articles keep the status the server has (Schedule, Unschedule, Unpublish and the scheduled-publish
 // job set it), so an editor tab opened before one of those can't undo it by saving or publishing; and
-// only live articles are in the published copy and the rendered pages.
+// only live articles are in the published copy and the rendered pages. And scheduled articles go live
+// by themselves: the every-minute job (/api/cron/whatsapp-outbox) runs publishDueScheduledBlogs
+// (src/lib/blog/cms-blog-schedule.ts), harmlessly alongside an outside ping of its own route.
 // Usage: node --experimental-strip-types scripts/test-cms-publish.mjs
 import { readFileSync } from 'node:fs';
 import * as kit from './site-test-kit.mjs';
 
 const db = kit.setup({
   'next/server': `${kit.STUBS['next/server']}\nexport class NextRequest extends Request {}`,
+  // The every-minute job's other work isn't what's tested here.
+  '@/lib/whatsapp/inbox': 'export async function processOutbox() { return { sent: 0 }; } export async function remindUnanswered() { return 0; } export async function notifyEnquiryTeam() {}',
+  '@/lib/crm/server': `${kit.STUBS['@/lib/crm/server']}\nexport async function remindNextSteps() { return 0; }`,
+  '@/lib/crm/automation': 'export async function runCrmAutomations() { return {}; }',
+  '@/lib/tasks-server': 'export async function remindDueTasks() { return 0; }',
+  '@/lib/booking/jobs': 'export async function runBookingJobs() { return {}; }',
+  '@/lib/ms365': 'export async function pollMailbox() { return 0; }',
+  '@/lib/crm/merge': 'export async function finishMergeFiles() { return 0; }',
 });
 const { eq } = kit;
 const R = await import('../src/lib/blog/cms-publish-rules.ts');
 const publishRoute = await import('../src/app/api/cms/publish/route.ts');
 const saveRoute = await import('../src/app/api/cms/route.ts');
+const minuteRoute = await import('../src/app/api/cron/whatsapp-outbox/route.ts');
+const blogCronRoute = await import('../src/app/api/cron/publish-scheduled-blogs/route.ts');
 
 const DRAFT = 'heliaxis-cms-v1';
 const PUBLISHED = 'heliaxis-cms-published';
@@ -141,5 +153,53 @@ eq('doPublish no longer marks every article Live', /\(STATE\.pages\|\|\[\]\)\.fo
 eq('…it marks only the article being published, and tells the server which one', [/if\(curBlog\)\{cur\.blogStatus='published'/.test(doPublish), /publishBlogId:curBlog\?cur\.id:null/.test(doPublish)], [true, true]);
 eq('…draft pages other than the one being published aren’t rendered', /\.filter\(function\(pg\)\{return isCmsBlogPage\(pg\)\|\|!pg\._draft\|\|pg===cur;\}\)/.test(doPublish), true);
 eq('…and only that page stops being a draft', [/STATE\.pages\.forEach\(function\(p\)\{if\(p&&p\._draft\)\{delete p\._draft/.test(doPublish), /if\(cur&&cur\._draft\)\{delete cur\._draft/.test(doPublish)], [false, true]);
+
+/* ── Scheduled articles go live by themselves ──────────────────────────────── */
+
+const due = new Date(Date.now() - 2 * 60_000).toISOString();
+const dueRender = { slug: '/blog/due', name: 'Due', html: '<div class="pv-page">due, as scheduled</div>' };
+const SCHEDULED = {
+  pages: [
+    { id: 'home', name: 'Home', slug: '/', type: 'page', blocks: [] },
+    blog('due', '/blog/due', { blogStatus: 'scheduled', publishAt: due, scheduledRender: dueRender }),
+    blog('later', '/blog/later', { blogStatus: 'scheduled', publishAt: future, scheduledRender: { ...dueRender, slug: '/blog/later' } }),
+    blog('draft', '/blog/draft'),
+  ],
+};
+setKv(DRAFT, SCHEDULED);
+setKv(PUBLISHED, { pages: [SCHEDULED.pages[0]] });
+setKv(RENDERED, { css: '.site{}', pages: [{ slug: '/', html: 'home' }] });
+const minute = () => kit.call(minuteRoute, '/api/cron/whatsapp-outbox', { method: 'GET' });
+const m1 = await minute();
+eq('the every-minute job publishes the article whose time has come', [m1.status, m1.body.ok, m1.body.blogs], [200, true, { published: 1, slugs: ['/blog/due'] }]);
+eq('…it’s on the website as it was when scheduled', kv(RENDERED).pages.find((p) => p.slug === '/blog/due')?.html, dueRender.html);
+eq('…Live in the saved site and the published copy', [byId(kv(DRAFT), 'due').blogStatus, byId(kv(DRAFT), 'due').publishAt, kv(PUBLISHED).pages.some((p) => p.id === 'due')], ['published', due, true]);
+eq('…the one for later and the draft are left alone', [byId(kv(DRAFT), 'later').blogStatus, byId(kv(DRAFT), 'draft').blogStatus, kv(RENDERED).pages.map((p) => p.slug)], ['scheduled', undefined, ['/', '/blog/due']]);
+eq('…the rest of the job still runs', [m1.body.sent, m1.body.crm, m1.body.booking], [0, {}, {}]);
+// Nothing due: only the saved site is read.
+const reads = [];
+const from = db.from;
+db.from = (table) => {
+  const b = from(table);
+  const eqKey = b.eq;
+  b.eq = (c, v) => (table === 'cms_kv' && c === 'key' && reads.push(v), eqKey(c, v));
+  return b;
+};
+const m2 = await minute();
+eq('next minute: nothing more to publish (running twice is harmless)', m2.body.blogs, { published: 0, slugs: [] });
+eq('…and only the saved site was read', reads.filter((k) => k.startsWith('heliaxis-cms')), [DRAFT]);
+db.from = from;
+eq('an outside ping of the old route finds nothing left either', (await kit.call(blogCronRoute, '/api/cron/publish-scheduled-blogs', { method: 'GET' })).body, { ok: true, published: 0, slugs: [] });
+// A write that fails is reported, and the rest of the job carries on.
+Object.assign(byId(SCHEDULED, 'later'), { publishAt: due });
+setKv(DRAFT, SCHEDULED);
+db.from = (table) => {
+  const b = from(table);
+  if (table === 'cms_kv') b.upsert = (r) => ({ then: (res) => res({ data: null, error: { message: `couldn’t write ${r.key}` } }) });
+  return b;
+};
+const m3 = await minute();
+db.from = from;
+eq('a failed write shows in the job’s reply, and the job still answers', [m3.status, m3.body.ok, /couldn’t write/.test(m3.body.blogs?.error ?? '')], [200, true, true]);
 
 kit.done();

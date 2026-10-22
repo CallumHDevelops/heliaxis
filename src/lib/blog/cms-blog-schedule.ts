@@ -287,26 +287,18 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
   return { ok: true, slug: publicSlug };
 }
 
-/** Publish all AI blogs whose publishAt has passed. */
+/**
+ * Publish all AI blogs whose publishAt has passed. Run every minute by the cron
+ * (/api/cron/whatsapp-outbox) and by /api/cron/publish-scheduled-blogs; it reads the
+ * published and rendered docs only when something is due, and running twice is harmless.
+ */
 export async function publishDueScheduledBlogs(now = new Date()) {
   const admin = createAdminClient();
   const nowIso = now.toISOString();
 
-  const [draftRes, pubRes, renRes] = await Promise.all([
-    admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle(),
-    admin.from('cms_kv').select('value').eq('key', PUBLISHED_KEY).maybeSingle(),
-    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
-  ]);
-
+  const draftRes = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
+  if (draftRes.error) throw new Error(draftRes.error.message);
   const draft = parseCmsState(draftRes.data?.value);
-  const published = parseCmsState(pubRes.data?.value);
-  let rendered: RenderedDoc = { css: '', pages: [] };
-  try {
-    rendered = renRes.data?.value ? (JSON.parse(renRes.data.value) as RenderedDoc) : { pages: [] };
-  } catch {
-    rendered = { pages: [] };
-  }
-  if (!rendered.css) rendered.css = buildLivePublishCss();
 
   const due = (draft.pages || []).filter((p) => {
     if (!isCmsBlogPage(p)) return false;
@@ -319,6 +311,21 @@ export async function publishDueScheduledBlogs(now = new Date()) {
   if (!due.length) {
     return { published: 0, slugs: [] as string[] };
   }
+
+  const [pubRes, renRes] = await Promise.all([
+    admin.from('cms_kv').select('value').eq('key', PUBLISHED_KEY).maybeSingle(),
+    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
+  ]);
+  const failedRead = pubRes.error || renRes.error;
+  if (failedRead) throw new Error(failedRead.message);
+  const published = parseCmsState(pubRes.data?.value);
+  let rendered: RenderedDoc = { css: '', pages: [] };
+  try {
+    rendered = renRes.data?.value ? (JSON.parse(renRes.data.value) as RenderedDoc) : { pages: [] };
+  } catch {
+    rendered = { pages: [] };
+  }
+  if (!rendered.css) rendered.css = buildLivePublishCss();
 
   const publishedPages = [...(published.pages || [])];
   const slugs: string[] = [];
@@ -363,13 +370,16 @@ export async function publishDueScheduledBlogs(now = new Date()) {
 
   published.pages = publishedPages;
 
-  await Promise.all([
+  const results = await Promise.all([
     upsertKv(admin, DRAFT_KEY, draft, nowIso),
     upsertKv(admin, PUBLISHED_KEY, published, nowIso),
     upsertKv(admin, RENDERED_KEY, rendered, nowIso),
   ]);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
 
   revalidatePath('/', 'layout');
   revalidatePath('/blog');
+  for (const slug of slugs) revalidatePath(slug);
   return { published: slugs.length, slugs };
 }

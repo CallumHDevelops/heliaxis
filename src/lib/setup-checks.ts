@@ -200,7 +200,7 @@ const MANUAL: SetupTodo[] = [
     id: 'cron-check',
     title: 'Check the every-minute job is switched on',
     detail:
-      'Smart replies, chasers, reminders, follow-ups and alerts all run from a Supabase job that calls the CRM every minute. The app can’t check it for you.',
+      'Smart replies, chasers, reminders, follow-ups, alerts and scheduled blog articles all run from a Supabase job that calls the CRM every minute. The app can’t check it for you.',
     steps: [
       'Tap **Open Supabase**, paste the check (first Copy button) and tap **Run**.',
       'You should see **whatsapp-outbox** with `* * * * *` and **active** = true. If so, tick this. You’re done.',
