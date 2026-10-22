@@ -1,35 +1,69 @@
 ---
 title: The design studio
-summary: Make a quick on-brand leaflet, card, banner or social square and download it as a PDF or PNG.
+summary: Make on-brand leaflets, business cards, banners, pop-up stands and social posts, and export print-ready files.
 order: 10
-keywords: design, leaflet, flyer, business card, banner, roller banner, poster, social post, artwork, print, PDF background, supplier template
+keywords: design, leaflet, flyer, business card, banner, roller banner, poster, pop-up stand, exhibition stand, social post, LinkedIn, artwork, print, Canva, new design, custom size, pages, shortcuts, phone
 where: Apps › Design studio
 path: /admin/design
 access: design
 ---
-**Apps › Design studio** (on a phone: **More**, then **Design**) is a simple page for making on-brand artwork with the Heliaxis logos, colours and fonts.
+**Apps › Design studio** (on a phone: **More**, then **Design**) is a design tool that knows the Heliaxis brand. The logos, colours, fonts and type styles are built in, it checks your work before you print, and it exports a print-ready PDF. You need the **Design studio** access tick (see [What each access tick allows](/admin/help/admin/access-ticks)); admins can always open it.
 
-![The design studio](/help/apps/design-studio-v1.jpg "Format and brand pieces on the left, the page in the middle, Selected on the right")
+![The design studio](/help/apps/design-studio-template.jpg "A pop-up stand designed over the printer’s template, with the template as the bottom row in Layers")
 
-## Make a design
+## Start a design
 
-1. Under **Format**, pick a size, such as **Business card (85×55)**, **A5 leaflet (148×210)**, **Roller banner (850×2000)** or **Social square (1080×1080)**. Pick the size first: changing it later doesn’t move or resize what’s already on the page.
-2. Add things with the buttons along the top: **+ Heading**, **+ Text**, **+ Box** and **+ Image**. Add a logo from **Brand logos** on the left.
-3. Click something on the page to change it under **Selected** on the right: for text, its **Text**, **Font**, **Size**, **Bold**, **Left** or **Centre**; for anything, its **Colour** and **Opacity**, and **Bring front**, **Send back**, **Duplicate** or **Delete**. Drag things on the page to move or resize them. To change the words of a heading or text, click it, click it again, and type on the page.
-4. To colour something in a brand colour, select it, then click a colour under **Brand colours**.
-5. **↶ Undo** takes back the last thing you added, moved, resized or deleted. Changes made under **Selected** or **Brand colours** can’t be undone on their own.
+When you open the studio it picks up the design you were last working on. If there isn’t one, the **New design** box opens; to start another, click **New** in the top bar.
 
-To design over a supplier’s template, click **Import PDF background**. Page 1 of the PDF is placed behind your design and locked.
+1. Pick a size. They’re grouped into **Stationery**, **Leaflets & flyers**, **Posters**, **Large format** and **Digital**, from **Business card · 85×55** to **Pop-up 3×3 straight fabric · 2960×2260** and **Social post · 1080×1080**. For anything else, click **Custom size…** and type the **Width**, **Height**, **Bleed** and **Safe** in mm.
+2. Under **Start with**, pick a ready-made layout, such as **Dark hero**, or **Blank**.
+3. Click **Create design**.
 
-## Download it
+The design is named after its size and the date, such as "A5 flyer — 22 Oct". Click the name in the top bar to change it.
 
-- **Export PDF** downloads a PDF at the format’s size.
-- **Export PNG** downloads a picture.
+Got a template PDF from the printer? Click **Start from a printer template…** instead. See [Design over a printer’s template](/admin/help/apps/design-printer-template).
 
-The logos, colours and fonts the studio uses are on [The brand guidelines page](/admin/help/apps/brand-guidelines).
+> **Watch out:** **New**, and **New design / change size** on the **Design** tab, start a fresh design: they don’t resize the one that’s open. If the open design has work that isn’t saved to the cloud, the studio asks before replacing it.
 
-> **Watch out:** After each change under **Selected** to a heading or text (a letter typed in **Text**, a new **Font** or **Size**, **Bold**, **Left**, **Centre** or a colour), its text boxes go from **Selected**. Click off it and back on it to make the next change. Typing the words on the page doesn’t do this.
+## Around the screen
 
-> **Watch out:** Designs aren’t saved. If you leave or refresh the page, your design is gone, so export before you go.
+- **Top bar:** **Designs** (your saved designs), **New**, the design’s name and save status, undo and redo, guides on or off, a preview trimmed as printed, zoom (click the percentage for actual size), **Check**, **Save** and **Export**.
+- **Left:** seven tabs. **Design** has the size, **Starting layouts**, **Printer template** and **Template library**. **Brand** has the logos, colours, backgrounds (such as **Ink · glow · grid**) and ready-made pieces such as **Gold button**, **Accreditation chips** and **Contact line**. **Text** has **Brand type styles**, **Straplines** and **Calls to action**. Then **Icons**, **Photos**, **Shapes** and **Layers**.
+- **Middle:** the page. Coloured lines show the bleed edge (backgrounds run to here), the cut line and the safe area (keep text inside). Some sizes also show hatched zones, such as the strips of a pop-up stand that wrap round the frame.
+- **Right:** the settings for whatever you’ve picked. With nothing picked, it shows the page size, a key to the guide lines and the main shortcuts.
+- **Bottom:** the pages, such as **Front** and **Back**. Double-click a page to rename it, and click **Page** to add one. The page you’re on has buttons to duplicate it and, when there’s more than one page, to delete it.
 
-> **Watch out:** The exported file is a flat picture of the page, and a PDF background you imported is included in it. The PDF has no bleed added, so check with the printer before sending it.
+## Add and change things
+
+- Click a logo, text style, icon or shape on its tab to add it. Drag it on the page to move it, or drag a corner to resize it.
+- Click something on the page to pick it. On the right, **Position · mm** takes exact sizes, **Align** lines it up with the safe area or the cut line, and the rest are its own settings, such as the font for text. See [Work with layers](/admin/help/apps/design-layers).
+- Double-click text to type into it. Highlight words and click **Gold accent on highlighted words** to make them the brand gold.
+- On **Photos**, click **Upload photos** (JPG, PNG, WebP or SVG). Uploaded photos are shared with everyone who uses the studio. To fill a photo frame, pick the frame, then click a photo.
+- You can also drag photos, SVG files or a printer’s PDF straight onto the page.
+
+## Shortcuts
+
+| Keys | What they do |
+| --- | --- |
+| Ctrl+S, Ctrl+E | Save, Export |
+| Ctrl+Z, Ctrl+Shift+Z (or Ctrl+Y) | Undo, redo (each page has its own) |
+| Ctrl+D, Ctrl+C, Ctrl+V | Duplicate, copy, paste |
+| Ctrl+G, Ctrl+Shift+G | Group, ungroup |
+| Arrow keys | Nudge 0.5 mm (with Shift, 5 mm) |
+| Delete, Esc | Delete what’s picked, pick nothing |
+| Space and drag, or scroll | Move round the page |
+| Ctrl and scroll, Ctrl+0 | Zoom, fit the page |
+
+On a Mac, use Cmd instead of Ctrl.
+
+## On a phone
+
+The page sits at the top, with the tabs in a row under it and the settings for what you’ve picked under those: scroll down to reach them. **Designs**, **New**, **Check** and **Save** are icons only; **Export** keeps its name.
+
+![The design studio on a phone](/help/apps/design-studio-phone.jpg "On a phone: the page, the tabs, and Layers with the printer template at the bottom")
+
+## Saving and exporting
+
+The studio saves as you work: see [Save and reopen designs](/admin/help/apps/design-saving). When the design is ready, click **Check**, then **Export**: see [Check and export a design](/admin/help/apps/design-export). The logos, colours and fonts are the ones on [The brand guidelines page](/admin/help/apps/brand-guidelines).
+
+> **Once switched on:** Saving designs to the cloud, and the template library, need design-studio.sql run on Setup. Until then the studio still works, but your design is kept only in this browser (the status says **Saved on this computer**). See [Switch a feature on (run a database file)](/admin/help/admin/run-a-database-file).
