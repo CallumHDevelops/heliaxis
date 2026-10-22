@@ -24,6 +24,8 @@
   flex-shrink: 0;
   /* Over the page's own floating bits (Umami button, heatmap dock) so the menus drop over them; under pop-ups (50 and up). */
   z-index: 30;
+  /* Its own width (the window less the WhatsApp dock) decides how compact the menu row gets, below. */
+  container: hx-header / inline-size;
 }
 .hx-header__logo {
   display: flex;
@@ -76,6 +78,32 @@
 .hx-nav__link:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+/* Keeping the logo and the whole menu on one row when the header is narrow (a laptop with the WhatsApp dock
+   open beside it, or a small one): the Search button goes to an icon first (global-search.css), then the
+   menu's buttons tighten, then the logo shrinks. Narrower still, the menu wraps under the logo. */
+@container hx-header (max-width: 1000px) {
+  .hx-nav__link {
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+  }
+}
+@container hx-header (max-width: 940px) {
+  .hx-header__logo {
+    width: 112px;
+  }
+}
+/* Tablets, where the WhatsApp chip joins the row (below): the menus lose their arrows, and the chip its word
+   when it's tight (its icon and count stay; it's named for screen readers). */
+@media (min-width: 761px) and (max-width: 1023px) {
+  .hx-dd__chev {
+    display: none;
+  }
+}
+@container hx-header (max-width: 980px) {
+  .hx-dockchip__label {
+    display: none;
+  }
 }
 .hx-dd {
   position: relative;

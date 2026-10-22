@@ -20,7 +20,7 @@ export async function recordPage({ params, searchParams }: RecordPageProps, area
   if (joined?.project_id) redirect(`/admin/${area === 'projects' ? 'projects' : 'crm'}/${joined.project_id}${tab ? `?tab=${tab}` : ''}`);
   const entry = typeof sp.entry === 'string' && /^[\w-]{1,64}$/.test(sp.entry) ? sp.entry : null;
   return (
-    <AdminShell active="crm" fluid>
+    <AdminShell active={area === 'projects' ? 'projects' : 'crm'} fluid>
       <ProjectView
         // A different job starts the page afresh (its tab, sheets and polling).
         key={id}

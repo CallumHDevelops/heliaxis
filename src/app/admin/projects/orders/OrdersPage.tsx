@@ -37,7 +37,7 @@ const TEST: Record<Filter, (o: PoListRow) => boolean> = {
 };
 
 /**
- * Projects → Purchase orders: every order on every job. Live (the default) puts late deliveries
+ * Finance → Purchase orders: every order on every job. Live (the default) puts late deliveries
  * first, then those due in the next 7 days, drafts still to send, later ones and ones with no date.
  * Chips by status, a supplier filter and a search (PO number, job reference, customer, supplier);
  * a row opens the order sheet. Suppliers has the supplier list (add, edit, archive).

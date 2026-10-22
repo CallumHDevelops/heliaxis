@@ -8,8 +8,9 @@ import { DOCK_EVENTS, type WaCounts } from './whatsapp/dock-shared';
 
 /**
  * The desktop header menu: a dropdown per group, from the same groups as the phone "More" sheet
- * (AdminShell passes only what this person can open). A group of one is a plain link. Dropdowns open
- * on click, or on hover with a mouse, and close on a click outside, Escape, or picking a page.
+ * (AdminShell passes only what this person can open). A group of one is a plain link, unless it's
+ * marked `dropdown`. Dropdowns open on click, or on hover with a mouse, and close on a click outside,
+ * Escape, or picking a page. The group holding this URL's page lights up.
  */
 
 /**
@@ -18,7 +19,8 @@ import { DOCK_EVENTS, type WaCounts } from './whatsapp/dock-shared';
  * from the dock's hx:wa-counts). A group's button shows the total of its items' counts.
  */
 export type MenuItem = { href: string; label: string; icon?: ReactNode; reload?: boolean; badge?: number; liveBadge?: 'wa' };
-export type MenuGroup = { id: string; label: string; items: MenuItem[] };
+/** `dropdown`: a dropdown under its own name even with one page in it (e.g. Finance → Purchase orders). */
+export type MenuGroup = { id: string; label: string; items: MenuItem[]; dropdown?: boolean };
 
 // Not a page here (e.g. /api/sso/rams): a plain link, so it's never prefetched. As the phone tab bar.
 const isPage = (href: string) => !href.startsWith('/api/') && !/^https?:/.test(href);
@@ -181,7 +183,7 @@ export function TopMenu({ groups, fallback }: { groups: MenuGroup[]; fallback?: 
       {groups.map((g) => {
         const active = g.items.some((i) => i.href === current);
         const total = g.items.reduce((n, i) => n + badgeOf(i), 0);
-        if (g.items.length === 1) {
+        if (g.items.length === 1 && !g.dropdown) {
           return (
             <li key={g.id}>
               <ItemLink item={{ ...g.items[0], icon: undefined }} className="hx-nav__link" current={active} badge={total} onKeyDown={onRowKey} />

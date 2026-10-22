@@ -20,6 +20,7 @@ type Tab =
   | 'enquiries'
   | 'crm'
   | 'projects'
+  | 'orders'
   | 'surveys'
   | 'whatsapp'
   | 'approvals'
@@ -308,7 +309,9 @@ export async function AdminShell({
   const enquiriesIsTab = !can('crm') && can('enquiries');
   // Both menus, in groups: the desktop header's dropdowns and the phone "More" sheet (less what's
   // on the bottom bar). A new page is one entry here; empty groups are left out of both.
-  const groups: { id: string; label: string; items: NavItem[] }[] = [
+  // `dropdown`: stays a dropdown under its own name even with one page in it (a group of one is
+  // otherwise a plain link named after that page).
+  const groups: { id: string; label: string; items: NavItem[]; dropdown?: boolean }[] = [
     {
       id: 'home',
       label: 'Dashboard',
@@ -319,9 +322,6 @@ export async function AdminShell({
       label: 'CRM',
       items: [
         { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
-        // Projects pages light up the CRM tab (they use active="crm"), so this tile never does.
-        { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
-        { href: '/admin/projects/orders', label: 'Purchase orders', short: 'Orders', icon: icons.orders, show: orders },
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },
@@ -334,13 +334,31 @@ export async function AdminShell({
       ],
     },
     {
+      // The jobs once they're won (Projects: list, schedule, board and each job's page) and RAMS for site.
+      id: 'operations',
+      label: 'Operations',
+      items: [
+        { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
+        // On site: one tap away on the phone's bottom bar, so not in "More".
+        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
+      ],
+    },
+    {
+      // Purchase orders only for now (once purchase-orders.sql has run); still headed Finance.
+      id: 'finance',
+      label: 'Finance',
+      dropdown: true,
+      items: [
+        { href: '/admin/projects/orders', label: 'Purchase orders', short: 'Orders', icon: icons.orders, active: active === 'orders', show: orders },
+      ],
+    },
+    {
       id: 'team',
       label: 'Team',
       items: [
         { href: '/admin/tasks', label: 'Tasks', icon: icons.tasks, active: active === 'tasks', show: can('tasks'), tab: tasksIsTab },
         { href: '/admin/subcontractors', label: 'Subcontractors', icon: icons.subcontractors, active: active === 'subcontractors', show: can('subcontractors') },
         { href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis', label: 'Our team', icon: icons.team, show: can('team') },
-        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
       ],
     },
     {

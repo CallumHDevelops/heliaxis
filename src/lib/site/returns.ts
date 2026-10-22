@@ -74,7 +74,7 @@ export async function reviewOf(db: Db, assignmentId: string): Promise<{ submissi
   return { submissions, returns };
 }
 
-/** The PO's review from the trade's submissions, kept on the PO (Orders tab, Projects → Purchase orders). */
+/** The PO's review from the trade's submissions, kept on the PO (Orders tab, Finance → Purchase orders). */
 export async function syncPoReview(db: Db, a: AssignmentRow): Promise<PoReview | null> {
   const po = await livePo(db, a.id);
   if (!po) return null;
