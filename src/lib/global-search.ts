@@ -162,16 +162,18 @@ export type SearchOption =
 
 /**
  * A person with one job opens it from their own line; with several, each job gets a line of its own.
- * Organisations come after the people.
+ * Organisations come after the people, unless an organisation's name fits what was typed better than anyone's (`q`).
  */
-export function searchOptions(people: SearchPerson[], orgs: SearchOrg[] = []): SearchOption[] {
-  return [
-    ...people.flatMap((p): SearchOption[] => [
-      { key: `p-${p.id}`, kind: 'person', person: p, job: null, href: p.href },
-      ...(p.jobs.length > 1 ? p.jobs.map((j): SearchOption => ({ key: `j-${j.id}`, kind: 'job', person: p, job: j, href: j.href })) : []),
-    ]),
-    ...orgs.map((o): SearchOption => ({ key: `o-${o.id}${o.contact ? `-${o.contact.id}` : ''}`, kind: 'org', person: null, job: null, org: o, href: o.href })),
-  ];
+export function searchOptions(people: SearchPerson[], orgs: SearchOrg[] = [], q = ''): SearchOption[] {
+  const peopleLines = people.flatMap((p): SearchOption[] => [
+    { key: `p-${p.id}`, kind: 'person', person: p, job: null, href: p.href },
+    ...(p.jobs.length > 1 ? p.jobs.map((j): SearchOption => ({ key: `j-${j.id}`, kind: 'job', person: p, job: j, href: j.href })) : []),
+  ]);
+  const orgLines = orgs.map((o): SearchOption => ({ key: `o-${o.id}${o.contact ? `-${o.contact.id}` : ''}`, kind: 'org', person: null, job: null, org: o, href: o.href }));
+  // An organisation whose name is what was typed, from its first word, comes first unless a person fits as well ("bron afon" opens Bron Afon).
+  const orgBest = orgs.length && q ? Math.min(...orgs.filter((o) => !o.contact).map((o) => nameRank(q, o.name)), 99) : 99;
+  const personBest = people.length ? Math.min(...people.map((p) => nameRank(q, p.name))) : 99;
+  return orgBest === 0 && personBest > 0 ? [...orgLines, ...peopleLines] : [...peopleLines, ...orgLines];
 }
 
 /** ↑ / ↓ from `from` (-1: nothing yet), round the ends, skipping lines that open nothing. -1 when none do. */

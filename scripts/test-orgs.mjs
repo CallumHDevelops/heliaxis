@@ -110,6 +110,7 @@ eq('WhatsApp on the device', O.waMeHref('07700 900123'), 'https://wa.me/44770090
 eq('WhatsApp: too short, no link', O.waMeHref('12345'), null);
 eq('email', [O.mailHref('a@b.co'), O.mailHref('not an email')], ['mailto:a@b.co', null]);
 eq('an email that would add headers is no link', O.mailHref('a@b.co?bcc=x@y.z,'), null);
+eq('…and can’t be saved', add({ name: 'A', email: 'x@y.com?cc=a@b.com' }).field, 'email');
 
 /* ── The list: search, order and counts ─────────────────────────────────────── */
 
@@ -167,6 +168,8 @@ eq('lines: people, then organisations (one per contact matched)', opts.map((o) =
 eq('an organisation line opens its page', opts[1].href, '/admin/crm/organisations/o2');
 eq('↑/↓ reach the organisations', stepOption(opts, 0, 1), 1);
 eq('no organisations: as before', searchOptions([person1]).map((o) => o.key), ['p-p']);
+eq('an organisation whose name is what was typed comes before half-matching people', searchOptions([{ ...person1, name: 'Mrs J Afon' }], hits.slice(0, 1), 'afon b').map((o) => o.key), ['o-o2', 'p-p']);
+eq('…but not before a person whose name fits as well', searchOptions([{ ...person1, name: 'Afon Rees' }], hits.slice(0, 1), 'afon').map((o) => o.key), ['p-p', 'o-o2']);
 
 /* ── Merging: a joined job keeps its organisation ───────────────────────────── */
 

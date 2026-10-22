@@ -337,12 +337,19 @@
 .org-contact__more {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
+  gap: 0 22px;
   margin-top: 8px;
   font-size: 13px;
 }
 .org-contact__more .crm-link {
-  min-height: 32px;
+  min-height: 44px;
+}
+.org-contact__more .org-danger {
+  margin-left: auto;
+}
+.org-act svg,
+.org-hero__acts svg {
+  flex: none;
 }
 .org-danger,
 .crm-link.org-danger {
@@ -520,4 +527,15 @@
   color: var(--accent-text);
   font-weight: 700;
   text-decoration: underline;
+}
+.org-picked {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+}
+.org-unlink {
+  margin-top: 10px;
+  flex-basis: 100%;
+  text-align: left;
 }

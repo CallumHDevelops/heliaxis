@@ -180,9 +180,9 @@ export function OrganisationsList({ ready, initial }: { ready: boolean; initial:
             initialName={shown.length ? '' : q.trim()}
             sameName={sameName}
             onCancel={() => setAdding(false)}
-            onSaved={(o) => {
+            onSaved={(o, warning) => {
               setAdding(false);
-              router.push(`/admin/crm/organisations/${o.id}`);
+              router.push(`/admin/crm/organisations/${o.id}${warning ? `?warn=${encodeURIComponent(warning)}` : ''}`);
             }}
           />
         </Sheet>

@@ -216,6 +216,8 @@ eq('…one primary contact, always', primaries(), ['Gareth Price']);
 const made2 = await call(Contact.PATCH, { method: 'PATCH', params: { id: org.id, contactId: sian.id }, body: { is_primary: true } });
 eq('make Siân primary', [made2.status, made2.body.contact.is_primary, primaries()], [200, true, ['Siân Evans']]);
 eq('unmarking the primary (false) does nothing: someone has to replace them', [(await call(Contact.PATCH, { method: 'PATCH', params: { id: org.id, contactId: sian.id }, body: { is_primary: false } })).status, primaries()], [200, ['Siân Evans']]);
+const ghost = await S.setPrimary(db, org.id, randomUUID());
+eq('making someone primary who has just been removed: said, and the primary stays who it was', [ghost.ok, primaries()], [false, ['Siân Evans']]);
 eq('edit a contact’s role', (await call(Contact.PATCH, { method: 'PATCH', params: { id: org.id, contactId: gareth.id }, body: { role: 'Senior surveyor' } })).body.contact.role, 'Senior surveyor');
 eq('an edit can’t empty a contact’s name', (await call(Contact.PATCH, { method: 'PATCH', params: { id: org.id, contactId: gareth.id }, body: { name: ' ' } })).status, 400);
 eq('adding to an organisation that isn’t there', (await call(Contacts.POST, { params: { id: randomUUID() }, body: { name: 'Nobody' } })).status, 404);

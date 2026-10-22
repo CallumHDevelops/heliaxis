@@ -43,10 +43,10 @@ const MailIcon = () => (
  * search, or unlink), the details card and notes. Phones get one column, contacts first; wider screens
  * put the details and notes beside the contacts and jobs.
  */
-export function OrganisationView({ id, initial, canInbox }: { id: string; initial: Data | null; canInbox: boolean }) {
+export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: string; initial: Data | null; canInbox: boolean; warning?: string }) {
   const router = useRouter();
   const [data, setData] = useState<Data | null>(initial);
-  const [error, setError] = useState(initial ? '' : 'Couldn’t load this organisation. Trying again…');
+  const [error, setError] = useState(initial ? warning : 'Couldn’t load this organisation. Trying again…');
   const [notice, setNotice] = useState('');
   const [gone, setGone] = useState(false);
   const [sheet, setSheet] = useState<SheetState>(null);
@@ -254,8 +254,8 @@ export function OrganisationView({ id, initial, canInbox }: { id: string; initia
                             <PhoneIcon /> Call
                           </a>
                         ) : (
-                          <span className="org-act is-off" title="No number yet">
-                            <PhoneIcon /> Call
+                          <span className="org-act is-off" title="No number yet" aria-disabled="true">
+                            <PhoneIcon /> Call<span className="org-sr"> (no number yet)</span>
                           </span>
                         )}
                         {wa ? (
@@ -267,8 +267,8 @@ export function OrganisationView({ id, initial, canInbox }: { id: string; initia
                             <WaIcon /> WhatsApp
                           </a>
                         ) : (
-                          <span className="org-act is-off" title="No mobile number yet">
-                            <WaIcon /> WhatsApp
+                          <span className="org-act is-off" title="No mobile number yet" aria-disabled="true">
+                            <WaIcon /> WhatsApp<span className="org-sr"> (no mobile yet)</span>
                           </span>
                         )}
                         {cmail ? (
@@ -276,8 +276,8 @@ export function OrganisationView({ id, initial, canInbox }: { id: string; initia
                             <MailIcon /> Email
                           </a>
                         ) : (
-                          <span className="org-act is-off" title="No email yet">
-                            <MailIcon /> Email
+                          <span className="org-act is-off" title="No email yet" aria-disabled="true">
+                            <MailIcon /> Email<span className="org-sr"> (no email yet)</span>
                           </span>
                         )}
                       </div>

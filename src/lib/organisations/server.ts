@@ -116,10 +116,17 @@ async function withChats(db: Db, contacts: OrgContact[]): Promise<OrgContact[]> 
  */
 export async function setPrimary(db: Db, orgId: string, contactId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const now = new Date().toISOString();
-  const off = await db.from('organisation_contacts').update({ is_primary: false, updated_at: now }).eq('organisation_id', orgId).eq('is_primary', true).neq('id', contactId);
+  const off = await db.from('organisation_contacts').update({ is_primary: false, updated_at: now }).eq('organisation_id', orgId).eq('is_primary', true).neq('id', contactId).select('id');
   if (off.error) return { ok: false, error: off.error.message };
-  const on = await db.from('organisation_contacts').update({ is_primary: true, updated_at: now }).eq('organisation_id', orgId).eq('id', contactId);
+  const on = await db.from('organisation_contacts').update({ is_primary: true, updated_at: now }).eq('organisation_id', orgId).eq('id', contactId).select('id');
   if (on.error) return { ok: false, error: on.error.code === '23505' ? 'Someone else changed the primary contact just now. Try again.' : on.error.message };
+  // Removed meanwhile: the one who was primary is again, so the organisation isn't left without one.
+  if (!on.data?.length) {
+    const was = off.data?.[0]?.id;
+    if (was) await db.from('organisation_contacts').update({ is_primary: true }).eq('organisation_id', orgId).eq('id', was);
+    else await promoteNext(db, orgId);
+    return { ok: false, error: 'That contact isn’t there any more.' };
+  }
   return { ok: true };
 }
 

@@ -97,7 +97,8 @@ type Clean<F> = { ok: true; fields: F } | { ok: false; error: string; field: str
 export type OrgFields = Partial<{ name: string; type: OrgType } & Record<Exclude<keyof typeof ORG_LIMITS, 'name'>, string | null>>;
 export type ContactFields = Partial<{ name: string; is_primary: boolean } & Record<Exclude<keyof typeof CONTACT_LIMITS, 'name'>, string | null>>;
 
-export const isEmail = (s: unknown): s is string => typeof s === 'string' && s.length <= 200 && /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(s);
+/** An email address; never one with a ? in it (a mailto: link would read the rest as cc, subject or body). */
+export const isEmail = (s: unknown): s is string => typeof s === 'string' && s.length <= 200 && /^[^\s@,;<>?]+@[^\s@,;<>?]+\.[^\s@,;<>?]+$/.test(s);
 
 /** One line: spaces squashed. Several (addresses, notes): each line trimmed, empty ones dropped. */
 const oneLine = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);

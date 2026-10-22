@@ -5,6 +5,10 @@
 --     Contacts are their own rows, not customer records (enquiries): they never appear in the leads
 --     lists, never get an opportunity, a reference or automatic WhatsApps (src/lib/organisations/shared.ts).
 --     Run after crm.sql. Safe to run twice. Server-only tables (RLS on, no policies).
+-- Adding the job's columns briefly locks crm_projects: if something holds it, stop after 5 seconds
+-- (nothing is changed) rather than queue every read of the jobs behind it. Just run it again.
+set lock_timeout = '5s';
+
 do $$ begin
   if not exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'crm_projects') then
     raise exception 'Run crm.sql first, then this file.';

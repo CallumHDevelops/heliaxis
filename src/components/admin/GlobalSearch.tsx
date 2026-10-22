@@ -75,7 +75,7 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
       setResults(next);
       if (enterFor.current === t) {
         enterFor.current = null;
-        const first = searchOptions(next.people, next.orgs).find((o) => o.href);
+        const first = searchOptions(next.people, next.orgs, t).find((o) => o.href);
         if (first?.href) {
           setOpen(false);
           onDone?.();
@@ -91,7 +91,7 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
 
   const fresh = results.q === t;
   // While the next answer is on its way the last one stays up (faded), so the list doesn't flicker.
-  const options = t.length >= 2 && results.q ? searchOptions(results.people, results.orgs) : [];
+  const options = t.length >= 2 && results.q ? searchOptions(results.people, results.orgs, results.q) : [];
   const showList = open && t.length >= 1;
 
   function pick(o: SearchOption) {

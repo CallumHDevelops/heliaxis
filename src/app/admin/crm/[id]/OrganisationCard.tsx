@@ -124,20 +124,22 @@ function LinkOrganisation({ projectId, current, onCancel, onDone }: { projectId:
     setBusy(true);
     try {
       const d = await orgApi<{ organisation: { id: string; name: string; type: OrgType } }>('/api/crm/organisations', 'POST', { name: q.trim(), type: newType }, 'Not added. Try again.');
+      // A new organisation has no contacts yet: link the job to it now, so nothing is left half done.
       setPicked({ ...d.organisation, contacts: [] });
       setContact('');
+      await save(d.organisation.id, '');
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not added. Try again.');
-    } finally {
       setBusy(false);
     }
   }
 
-  async function save(orgId: string | null) {
+  async function save(orgId: string | null, who = contact) {
+    if (!orgId && current && !window.confirm(`Unlink this job from ${current.name}? The job itself doesn’t change.`)) return;
     setErr('');
     setBusy(true);
     try {
-      await orgApi(`/api/crm/projects/${projectId}/organisation`, 'PUT', { organisation_id: orgId, contact_id: orgId ? contact || null : null }, 'Not saved. Try again.');
+      await orgApi(`/api/crm/projects/${projectId}/organisation`, 'PUT', { organisation_id: orgId, contact_id: orgId ? who || null : null }, 'Not saved. Try again.');
       await onDone();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved. Try again.');
@@ -153,8 +155,9 @@ function LinkOrganisation({ projectId, current, onCancel, onDone }: { projectId:
     <div className="org-form">
       {picked ? (
         <div className="crmh-picked">
-          <span>
-            <b>{picked.name}</b> <TypePill type={picked.type} />
+          <span className="org-picked">
+            <b className="org-trunc">{picked.name}</b>
+            <TypePill type={picked.type} />
           </span>
           <button
             type="button"
@@ -230,9 +233,7 @@ function LinkOrganisation({ projectId, current, onCancel, onDone }: { projectId:
               ))}
             </select>
           ) : (
-            <p className="crm-muted crm-small">
-              No contacts yet: add them on <Link href={`/admin/crm/organisations/${picked.id}`}>{picked.name}’s page</Link>.
-            </p>
+            <p className="crm-muted crm-small">No contacts yet. Save the link, then add them on {picked.name}’s page (its name on this card opens it).</p>
           )}
         </>
       )}
@@ -250,7 +251,7 @@ function LinkOrganisation({ projectId, current, onCancel, onDone }: { projectId:
           Cancel
         </button>
         {current && (
-          <button type="button" className="crm-link org-danger crmh-ml" disabled={busy} onClick={() => void save(null)}>
+          <button type="button" className="crm-link org-danger org-unlink" disabled={busy} onClick={() => void save(null)}>
             Unlink from {current.name}
           </button>
         )}

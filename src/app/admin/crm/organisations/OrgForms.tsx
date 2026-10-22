@@ -119,10 +119,43 @@ export function OrgForm({
         </p>
       )}
 
+      {!org && (
+        <fieldset className="org-first">
+          <legend>The person you deal with (optional)</legend>
+          <p className="crm-muted crm-small">They become the primary contact; add more on the organisation’s page.</p>
+          <div className="crm-grid2 org-grid">
+            <div>
+              <label className="crm-label" htmlFor="org-new-cname">
+                Name
+              </label>
+              <input id="org-new-cname" className="crm-input" value={c.name} onChange={setContact('name')} autoComplete="off" />
+            </div>
+            <div>
+              <label className="crm-label" htmlFor="org-new-crole">
+                Role
+              </label>
+              <input id="org-new-crole" className="crm-input" value={c.role} onChange={setContact('role')} placeholder="e.g. Facilities manager" autoComplete="off" />
+            </div>
+            <div>
+              <label className="crm-label" htmlFor="org-new-cmob">
+                Mobile
+              </label>
+              <input id="org-new-cmob" className="crm-input" type="tel" inputMode="tel" value={c.mobile} onChange={setContact('mobile')} aria-invalid={bad('contact.mobile')} autoComplete="off" />
+            </div>
+            <div>
+              <label className="crm-label" htmlFor="org-new-cemail">
+                Email
+              </label>
+              <input id="org-new-cemail" className="crm-input" type="email" inputMode="email" value={c.email} onChange={setContact('email')} aria-invalid={bad('contact.email')} autoComplete="off" />
+            </div>
+          </div>
+        </fieldset>
+      )}
+
       <div className="crm-grid2 org-grid">
         <div>
           <label className="crm-label" htmlFor={`org-${id}-phone`}>
-            Phone
+            Office phone
           </label>
           <input id={`org-${id}-phone`} className="crm-input" type="tel" inputMode="tel" value={f.phone} onChange={set('phone')} aria-invalid={bad('phone')} autoComplete="off" />
         </div>
@@ -168,38 +201,6 @@ export function OrgForm({
       </label>
       <textarea id={`org-${id}-notes`} className="crm-input" rows={3} value={f.notes} onChange={set('notes')} placeholder="Access, how they like to work, who signs off…" />
 
-      {!org && (
-        <fieldset className="org-first">
-          <legend>First contact (optional)</legend>
-          <p className="crm-muted crm-small">The person you deal with there. They become the primary contact; add more on the organisation’s page.</p>
-          <div className="crm-grid2 org-grid">
-            <div>
-              <label className="crm-label" htmlFor="org-new-cname">
-                Name
-              </label>
-              <input id="org-new-cname" className="crm-input" value={c.name} onChange={setContact('name')} autoComplete="off" />
-            </div>
-            <div>
-              <label className="crm-label" htmlFor="org-new-crole">
-                Role
-              </label>
-              <input id="org-new-crole" className="crm-input" value={c.role} onChange={setContact('role')} placeholder="e.g. Facilities manager" autoComplete="off" />
-            </div>
-            <div>
-              <label className="crm-label" htmlFor="org-new-cmob">
-                Mobile
-              </label>
-              <input id="org-new-cmob" className="crm-input" type="tel" inputMode="tel" value={c.mobile} onChange={setContact('mobile')} aria-invalid={bad('contact.mobile')} autoComplete="off" />
-            </div>
-            <div>
-              <label className="crm-label" htmlFor="org-new-cemail">
-                Email
-              </label>
-              <input id="org-new-cemail" className="crm-input" type="email" inputMode="email" value={c.email} onChange={setContact('email')} aria-invalid={bad('contact.email')} autoComplete="off" />
-            </div>
-          </div>
-        </fieldset>
-      )}
 
       {err && (
         <p className="crm-banner crm-banner--err" role="alert">
