@@ -476,13 +476,20 @@ export async function runCrmAutomations() {
   return out;
 }
 
-/** Give a new lead to the next person in the rotation (CRM → Settings) and tell them. */
+/**
+ * Give a new lead to the next person in the rotation (CRM → Settings) and tell them. Only people who can
+ * still open the CRM take a turn: someone rejected, set back to pending or without the CRM portal is
+ * skipped (they stay ticked, and take turns again when their access comes back).
+ */
 export async function assignNewLead(projectId: string, customerName: string, enquiryId?: string) {
   const s = await getCrmSettings();
   if (!s.leadRotation.length) return null;
-  const owner = s.leadRotation[s.rotationIndex % s.leadRotation.length];
+  const team = new Set(await crmTeam());
+  const rotation = s.leadRotation.filter((id) => team.has(id));
+  if (!rotation.length) return null;
+  const owner = rotation[s.rotationIndex % rotation.length];
   const { saveCrmSettings } = await import('./crm-settings');
-  await saveCrmSettings({ ...s, rotationIndex: (s.rotationIndex + 1) % s.leadRotation.length });
+  await saveCrmSettings({ ...s, rotationIndex: (s.rotationIndex + 1) % rotation.length });
   await createAdminClient().from('crm_projects').update({ owner_id: owner }).eq('id', projectId).is('owner_id', null);
   await notify({
     userId: owner,
