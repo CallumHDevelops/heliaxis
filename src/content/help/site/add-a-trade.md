@@ -11,7 +11,7 @@ The **Site** tab is there from Won. It replaces phoning round with dates and rat
 1. Open the job and go to **Site**. With nobody on it yet, it says “No trades on this job yet…”.
 2. Under **Add a trade**, press **+ Scaffolder**, **+ Roofer** or **+ Electrician** (whichever the job needs), or **+ Add a trade**.
 3. **Trade**: Scaffolder, Roofer, Electrician or Other trade (“Which trade? e.g. Plasterer”).
-4. **Who**: find them by name, firm or mobile, or press **+ New person** and fill in **Name**, **Company**, **Mobile**, **Email**, **VAT number (if they have one)** and **Happy to get job messages on WhatsApp** (see [Job messages to trades on WhatsApp](/admin/help/site/whatsapp-job-messages)).
+4. **Who**: find them by name, firm or mobile (a suspended firm’s people show as "Suspended: can’t be given new jobs" and can’t be picked; terminated firms aren’t listed), or press **+ New person** and fill in **Name**, **Company**, **Mobile**, **Email**, **VAT number (if they have one)** and **Happy to get job messages on WhatsApp** (see [Job messages to trades on WhatsApp](/admin/help/site/whatsapp-job-messages)).
 5. Fill in **What they’re doing (printed on the PO)**, **Start date** and **Days on site**.
 6. **Agreed rate**: the £ ex VAT and how it’s paid: **Fixed price**, **Per panel** for the roofer (“The PO uses the number of panels the roofer signs for.”), **Per day** or **Per hour**, with the days or hours agreed. **From their agreement** shows when the rate came from their subcontractor agreement.
 7. Leave **Raise a PO when they sign off (untick for Heliaxis staff)** ticked for subcontractors.

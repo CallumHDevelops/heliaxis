@@ -38,4 +38,4 @@ The buttons at the bottom add common links in one click: **+ Estimator**, **+ Bl
 
 Menu and top bar changes save as you go but only show on the website after you click **Publish** in the toolbar, then **Publish now**. The box says **Header menu published with** the number of items. If you still see an old link, hard-refresh the homepage.
 
-> **Watch out:** As with any publish, this puts every page and draft in the CMS live too. See [Preview and publish the website](/admin/help/website/preview-and-publish).
+> **Good to know:** As with any publish, saved changes to pages that are already live go live too. Draft pages and articles don’t. See [Preview and publish the website](/admin/help/website/preview-and-publish).

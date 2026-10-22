@@ -1,8 +1,8 @@
 ---
 title: Check the every-minute job is running
-summary: Smart replies, chasers, reminders, follow-ups and email pick-up all run from one job in Supabase. How to check it, and switch it on if it isn’t.
+summary: Smart replies, chasers, reminders, follow-ups, email pick-up and scheduled blog articles all run from one job in Supabase. How to check it, and switch it on if it isn’t.
 order: 110
-keywords: cron, scheduled job, pg_cron, every minute, automatic messages not sending, reminders not going, chasers not sending, smart replies not sending, emails not appearing, Send later not sending, whatsapp-outbox
+keywords: cron, scheduled job, pg_cron, every minute, automatic messages not sending, reminders not going, chasers not sending, smart replies not sending, emails not appearing, Send later not sending, scheduled blog not live, whatsapp-outbox
 where: Dashboard › From Claude › Check the every-minute job is switched on
 access: admin
 ---
@@ -15,6 +15,7 @@ A lot of what Heliaxis does by itself runs from one job that Supabase starts eve
 - Follow-up and task reminders, and the "hasn’t been contacted" alert.
 - Picking up customers’ emails from Microsoft 365, once it’s connected.
 - Survey booking jobs and the Outlook copy of dates.
+- Putting scheduled blog articles live at their time (see [Publish, schedule or take down a blog article](/admin/help/website/publish-a-blog-article)).
 
 If none of these are happening, the job probably isn’t running. The app can’t check it for you, so it’s a job you tick yourself.
 

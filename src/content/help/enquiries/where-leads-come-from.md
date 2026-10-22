@@ -29,7 +29,7 @@ For a website form, a Meta lead form or a new WhatsApp number, the app:
 
 1. Adds them to Enquiries at **New**.
 2. Makes an opportunity for them in the CRM at **Lead**, with a line on its timeline saying where they came from (for example "New enquiry via Meta ad “Video 4”").
-3. Gives the opportunity to the next person on the rota, if one is set in **CRM settings** under **Share new leads between (in turn)**. That person gets a "New lead for you" notification. See [Choose who gets new leads](/admin/help/admin/new-leads).
+3. Gives the opportunity to the next person on the rota, if one is set in **CRM settings** under **Share new leads between (in turn)**, skipping anyone who can no longer open the CRM. That person gets a "New lead for you" notification. See [Choose who gets new leads](/admin/help/admin/new-leads).
 4. Notifies everyone with Enquiries access: "New enquiry: …" for the website, "New Meta lead: …" for a lead form and "New WhatsApp lead: …" for a new WhatsApp number.
 
 Also:

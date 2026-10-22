@@ -19,6 +19,8 @@ Open **Connect Stripe for card deposits** on the From Claude card. It’s one of
 3. Copy the endpoint’s **Signing secret**.
 4. Add both as keys in Vercel, using the names in the job, and redeploy. See [The Vercel keys page](/admin/help/admin/vercel-keys).
 
+Card payments only switch on once both keys are in. With just the secret key, the app treats Stripe as not connected: customers aren’t offered **Pay by card**, so nobody can pay a deposit the CRM wouldn’t hear about.
+
 ## When a customer pays
 
 Stripe tells Heliaxis straight away. The app then:
@@ -29,7 +31,7 @@ Stripe tells Heliaxis straight away. The app then:
 
 ## Check it’s working
 
-- **CRM › CRM settings › Connections** says **Card deposits (Stripe)** "connected". This only needs the secret key, so check the next line too.
-- The **Card deposits (Stripe)** group on the Vercel keys page has two **✓**. Without the signing secret, customers can pay but the deposit is never marked as paid.
+- **CRM › CRM settings › Connections** says **Card deposits (Stripe)** "connected". It only says so once both the secret key and the signing secret are set.
+- The **Card deposits (Stripe)** group on the Vercel keys page has two **✓**. If one is missing, Connections says "not connected" and customers are told they’ll get bank details.
 
 > **Watch out:** If customers can pay but the deposit never shows as paid, the webhook isn’t reaching Heliaxis. Check the endpoint URL, the `checkout.session.completed` event and the signing secret in Vercel.

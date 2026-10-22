@@ -19,7 +19,9 @@ When a new enquiry comes in (from the website, a Meta lead form, a new WhatsApp 
 
 With nobody ticked, new leads stay unassigned and nobody gets the "for you" notification.
 
-> **Watch out:** The list only shows people who are approved and have **CRM** access. If someone leaves or loses CRM access while they’re ticked, they vanish from the list but the app can still hand them leads. Untick them here, and press **Save settings**, before you change their access on **Users**.
+The list only shows people who are approved and have **CRM** access. If someone who’s ticked is rejected, set back to pending or loses the **CRM** tick on **Users**, they drop off the list and the app skips them: new leads go to the others in turn, and only they get the notification. They stay ticked, so if their access comes back they take turns again by themselves.
+
+> **Good to know:** Leads already given to someone stay theirs when they lose access. Change the **Owner** on those jobs to hand them over (see [Job details](/admin/help/customers/job-details)).
 
 > **Good to know:** The **Choose who gets new leads** job on the **From Claude** card disappears once at least one person is ticked.
 

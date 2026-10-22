@@ -9,7 +9,7 @@ access: cms
 ---
 All of these are on **CMS › Blog**, on the article’s line.
 
-> **Watch out:** **Schedule**, **Unschedule**, **Unpublish** and **Delete** change the saved website straight away. If the CMS editor is open in another tab (yours or a colleague’s), its next save puts back what it had loaded and can quietly undo them. Close or reload any open editor first.
+> **Watch out:** **Delete** changes the saved website straight away. If the CMS editor is open in another tab (yours or a colleague’s), its next save puts the article back, as a draft. Close or reload any open editor before you delete. **Schedule**, **Unschedule** and **Unpublish** are safe: an editor that was already open can’t undo them.
 
 ## Preview
 
@@ -20,14 +20,14 @@ Click **⋯**, then **Preview**. The article opens in a new tab with a bar sayin
 1. Click **⋯**, then **Publish now**, then **Publish**.
 2. The CMS opens and publishes. Wait for **Published — live on your site**.
 
-> **Watch out:** This publishes the whole website, not just the article: every page and draft in the CMS goes live, and so does every other article. See [Preview and publish the website](/admin/help/website/preview-and-publish).
+Only this article goes live, along with any saved changes to pages and articles that are already live. Other draft and scheduled articles, and draft pages, stay as they are. See [Preview and publish the website](/admin/help/website/preview-and-publish).
 
 ## Change an article that’s already live
 
 1. Click **Edit** on the article and make your changes in the editor. They save as you go but aren’t on the website yet.
 2. Click **Publish** in the editor’s toolbar, then **Publish now**.
 
-As with **Publish now**, this publishes the whole website.
+As with **Publish now**, saved changes to other live pages and articles go live with it, but no draft page and no article that isn’t live.
 
 ## Schedule it for later
 
@@ -41,9 +41,7 @@ The time must be at least 30 seconds away.
 
 > **Watch out:** The article goes live exactly as it was when you scheduled it. If you edit it afterwards, click **Unschedule** and schedule it again, or your changes won’t be in the live version.
 
-> **Watch out:** If anyone publishes the website before the scheduled time, the article goes live with it, early.
-
-> **Good to know:** Scheduled articles go live when the app’s scheduled-publish check next runs, so one can appear a little after its time. If an article is still **Scheduled** well after its time, tell an admin.
+> **Good to know:** The app puts it live by itself within a minute or so of the time, from its every-minute job. Publishing the website before then doesn’t put it live early. If an article is still **Scheduled** well after its time, ask an admin to [check the every-minute job is running](/admin/help/admin/every-minute-job).
 
 ## Cancel a schedule
 
@@ -53,7 +51,7 @@ Click **Unschedule**, then **Unschedule** again. The article goes back to being 
 
 Click **⋯**, then **Unpublish**, then **Unpublish**. It leaves the website and becomes a draft you can edit and publish again later.
 
-> **Watch out:** The next time anyone publishes the website, every article goes live again, including ones you unpublished. To keep an article off the website for good, delete it.
+It stays off the website until it’s published again, with **Publish now** or from its editor. Publishing the website for anything else doesn’t bring it back.
 
 ## Delete an article
 

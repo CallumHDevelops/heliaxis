@@ -17,7 +17,7 @@ While suspended:
 - RAMS no longer sees the firm or its team: RAMS only sees **Active** firms.
 - They can still sign in to their portal, where the top says "Your account is suspended. Please contact Heliaxis."
 - They still get the daily reminder emails. Use **Pause reminders** if you don’t want that.
-- They still appear when putting a trade on a job, so check before you do.
+- They can’t be put on a new job. When putting a trade on a job, they and their people still show in the list, marked "Suspended: can’t be given new jobs", but they can’t be picked. Jobs they’re already on carry on as they are.
 
 ## Reinstate
 
@@ -33,7 +33,7 @@ Use this when you’ve stopped working with a firm for good.
 Their status becomes **Terminated**, and:
 
 - their portal link stops working and they’re signed out of every device, so they can’t get in at all,
-- they can’t be put on a job ("That subcontractor can’t be given work."),
+- they can’t be put on a new job: they and their people no longer show when putting a trade on a job,
 - they’re never sent reminders, and
 - everything on their page stays, for your records.
 
