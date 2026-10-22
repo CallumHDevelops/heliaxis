@@ -63,6 +63,8 @@ export function Inspector({ s }: { s: StudioApi }) {
   const list = e.activeList();
   const o = e.active();
   const [alignTo, setAlignTo] = useState<'safe' | 'trim'>('safe');
+  /** Per object: W and H change together? (Shapes default to no, so a panel can be typed exactly.) */
+  const [ratioFor, setRatioFor] = useState<Record<string, boolean>>({});
 
   if (!o) return <aside className="ds2-right"><PageProps s={s} /></aside>;
 
@@ -70,6 +72,9 @@ export function Inspector({ s }: { s: StudioApi }) {
   const isText = e.isText(o);
   const box = e.boxMm(o);
   const kind = multi ? `${list.length} selected` : o.name || o.type;
+  const fixedRatio = o.role === 'logo' || o.role === 'spark' || o.role === 'icon';
+  const shape = ['rect', 'ellipse', 'circle', 'line', 'polygon', 'path', 'brandbg'].includes(o.type) || o.role === 'photo-slot';
+  const keepRatio = fixedRatio || (ratioFor[o.id ?? ''] ?? !shape);
 
   return (
     <aside className="ds2-right">
@@ -87,11 +92,17 @@ export function Inspector({ s }: { s: StudioApi }) {
         <div className="ds2-grid2">
           <Num label="X" value={box.x} onCommit={(v) => e.moveTo(v, null)} />
           <Num label="Y" value={box.y} onCommit={(v) => e.moveTo(null, v)} />
-          <Num label="W" value={box.w} onCommit={(v) => e.resizeTo(v, null)} min={0.5} />
-          <Num label="H" value={box.h} onCommit={(v) => e.resizeTo(null, v)} min={0.5} />
+          <Num label="W" value={box.w} onCommit={(v) => e.resizeTo(v, null, keepRatio)} min={0.5} />
+          <Num label="H" value={box.h} onCommit={(v) => e.resizeTo(null, v, keepRatio)} min={0.5} />
           {!multi && <Num label="↻" value={o.angle || 0} unit="°" onCommit={(v) => e.rotateTo(v)} />}
           <Num label="Op" value={Math.round((o.opacity ?? 1) * 100)} unit="%" min={0} max={100} onCommit={(v) => e.set({ opacity: v / 100 })} />
         </div>
+        {!multi && (
+          <label className="ds2-check">
+            <input type="checkbox" checked={keepRatio} disabled={fixedRatio} onChange={(ev) => setRatioFor({ ...ratioFor, [o.id ?? '']: ev.target.checked })} />
+            <span>Keep proportions{fixedRatio ? ' (logos and icons always do)' : ''}</span>
+          </label>
+        )}
       </section>
 
       <section className="ds2-sec">
@@ -163,7 +174,7 @@ function PageProps({ s }: { s: StudioApi }) {
         </div>
         <div className="ds2-grid2">
           <Num label="Bleed" unit="mm" value={bleed} min={0} max={50} onCommit={(v) => (s.engine.template ? s.toast('The bleed comes from the printer template.') : setBleed(v))} />
-          <Num label="Safe" unit="mm" value={g.safe} min={0} max={200} onCommit={(v) => s.setGeometry({ ...g, safe: v })} />
+          <Num label="Safe" unit="mm" value={g.safe} min={0} max={Math.max(0, Math.floor((Math.min(g.trim.w, g.trim.h) / 2 - 0.5) * 10) / 10)} onCommit={(v) => s.setGeometry({ ...g, safe: v })} />
         </div>
         {!custom && <p className="ds2-hint">Standard sizes use 3 mm bleed. Use your printer’s template if they specify more.</p>}
       </section>
@@ -312,7 +323,7 @@ function ImageProps({ s, o }: { s: StudioApi; o: any }) {
   const m = o.calcTransformMatrix();
   const sc = Math.max(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3]));
   const ppi = Math.round(72 / sc);
-  const target = s.fmt?.dpi ?? 300;
+  const target = s.dpi;
   const tone = s.digital ? 'ok' : ppi >= target * 0.8 ? 'ok' : ppi >= target * 0.5 ? 'warn' : 'bad';
   const cropped = o.cropX > 0 || o.cropY > 0 || (o.getElement && o.width < (o.getElement().naturalWidth || o.width) - 1) || (o.getElement && o.height < (o.getElement().naturalHeight || o.height) - 1);
   return (

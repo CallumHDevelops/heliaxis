@@ -67,6 +67,12 @@ export function runPreflight(engine: StudioEngine, opts: { targetDpi: number; di
     const b = isText ? inkBounds(engine, o) : o.getBoundingRect();
     const important = isText || o.role === 'logo' || o.role === 'spark' || o.role === 'icon';
 
+    // Anything wholly off the sheet isn't exported at all (boxes and photos included, not just text).
+    if (b.left + b.width <= 0 || b.top + b.height <= 0 || b.left >= engine.W || b.top >= engine.H) {
+      add(opts.digital ? 'warn' : 'error', 'print', `${name(o)} is off the page — it won’t be in your ${opts.digital ? 'image' : 'PDF'}. Move it back or delete it.`, o);
+      continue;
+    }
+
     // --- trim / safe / zones (print) ---
     if (!opts.digital && important) {
       const outsideTrim = b.left < tr.x - 0.5 || b.top < tr.y - 0.5 || b.left + b.width > tr.x + tr.w + 0.5 || b.top + b.height > tr.y + tr.h + 0.5;

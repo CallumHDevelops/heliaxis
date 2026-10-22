@@ -70,6 +70,8 @@
 .ds2-save.is-dirty, .ds2-save.is-saving { color: var(--ds-sub); }
 .ds2-save.is-saved { color: var(--ok); }
 .ds2-save.is-error { color: var(--danger); }
+/* Saved on another computer since: a button that keeps this computer's work as a copy. */
+.ds2-save.is-conflict { padding: 0; border: 0; background: none; color: var(--warn); font: inherit; font-size: 11px; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .ds2-sep { width: 1px; height: 22px; background: var(--ds-line); margin: 0 4px; }
 .ds2-zoom { min-width: 54px; height: 28px; border: 1px solid var(--ds-line); background: transparent; color: var(--ds-sub); border-radius: 6px; font: inherit; font-family: 'HX Mono', monospace; font-size: 11px; cursor: pointer; }
 
@@ -171,6 +173,13 @@
 .ds2-layer .grow { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 6px 7px; background: transparent; border: 0; color: var(--ds-text); font: inherit; font-size: 12px; text-align: left; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 7px; }
 .ds2-layer .grow:hover { background: var(--ds-panel-2); }
 .ds2-layer-k { flex: none; font-family: 'HX Mono', monospace; font-size: 9px; letter-spacing: .06em; color: var(--ds-dim); width: 38px; }
+/* The printer template's row: always locked (a guide), at the bottom (or the top when it's drawn on top). */
+.ds2-layer.tpl { border: 1px dashed var(--ds-line-2); background: rgb(var(--accent-rgb) / 0.05); }
+.ds2-layer.tpl .grow { cursor: default; }
+.ds2-layer.tpl .grow:hover { background: transparent; }
+.ds2-layer.tpl.off .grow { color: var(--ds-dim); }
+.ds2-layer-lock { color: var(--ds-dim); cursor: default; }
+.ds2-layer-lock:hover { background: transparent !important; border-color: transparent !important; }
 
 /* stage: the canvas draws its own pasteboard and the paper (an .hx-light island) */
 .ds2-stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: hidden; background: var(--ds-pasteboard); }
@@ -219,7 +228,8 @@
 .ds2-page-add { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border: 1px dashed var(--ds-line-2); background: transparent; color: var(--ds-dim); border-radius: 7px; font: inherit; font-size: 12px; cursor: pointer; }
 .ds2-meta { font-family: 'HX Mono', monospace; font-size: 10.5px; color: var(--ds-dim); white-space: nowrap; }
 
-.ds2-toast { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); max-width: min(560px, 90%); padding: 10px 16px; background: var(--raised); border: 1px solid var(--accent-line); color: var(--ds-text); border-radius: 10px; box-shadow: var(--shadow); font-size: 12.5px; z-index: 40; }
+.ds2-toast { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(560px, 90%); padding: 10px 16px; background: var(--raised); border: 1px solid var(--accent-line); color: var(--ds-text); border-radius: 10px; box-shadow: var(--shadow); font-size: 12.5px; z-index: 40; }
+.ds2-toast .ds2-btn { flex: none; height: 28px; }
 
 /* modals */
 .ds2-modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: var(--scrim); backdrop-filter: blur(3px); }
@@ -306,4 +316,12 @@
   .ds2-stage { order: 1; min-height: 44vh; }
   .ds2-new, .ds2-tpl { grid-template-columns: 1fr; }
   .ds2-starters { border-left: 0; padding-left: 0; }
+  /* Phones: the top bar wraps (Check, Save and Export onto a row of their own) instead of running off
+     the screen; the stacked stage, panel and inspector scroll inside the body, so the inspector under
+     the panel can be reached; the rail keeps its height (icons); dialog buttons wrap, not clip. */
+  .ds2-top { flex-wrap: wrap; height: auto; min-height: 50px; padding: 6px 10px; }
+  .ds2-body { overflow-y: auto; }
+  .ds2-rail { flex: none; }
+  .ds2-modal-f { flex-wrap: wrap; }
+  .ds2-toast { bottom: 54px; }
 }

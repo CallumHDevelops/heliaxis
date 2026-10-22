@@ -53,6 +53,8 @@ import { PT_PER_MM } from '@/lib/design/types';
 import { hexToCmyk, matchBrand, type CMYK } from './brand';
 import { fontChain, fontFor, normWeight } from './fonts';
 import { LABEL_BASELINE, gridMask, gridPitch, type FabricNS } from './engine';
+import { pageFrame } from './template';
+import { jpegOrientation, withDpi } from './image-meta';
 
 export type ExportOptions = {
   cmyk: boolean;
@@ -77,6 +79,9 @@ const KAPPA = 0.5522847498;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 type Op = PDFOperator;
 type M6 = [number, number, number, number, number, number];
+
+/** PDF viewers (Acrobat) refuse pages over 14,400 pt (200 in, 5.08 m) unless /UserUnit scales them. */
+const MAX_PAGE_PT = 14400;
 
 function parseColour(f: FabricNS, v: unknown): { r: number; g: number; b: number; a: number; hex: string } | null {
   if (typeof v !== 'string' || !v || v === 'none' || v === 'transparent') return null;
@@ -152,30 +157,53 @@ export async function exportPdf(
   const markLen = 5 * PT;
   const slug = opts.cropMarks ? markOff + markLen + 4 * PT : 0;
 
+  // Over 5.08 m a side, the page is written in bigger units (/UserUnit), drawn at the same size.
+  const unit = Math.max(1, Math.ceil(((Math.max(W, H) + 2 * slug) / MAX_PAGE_PT) * 1000) / 1000);
   const pdf = await PDFDocument.create();
   pdf.setTitle(opts.title || 'Heliaxis design');
   pdf.setCreator('Heliaxis Design Studio');
   pdf.setProducer('Heliaxis Design Studio');
   pdf.setCreationDate(new Date());
 
-  // Optional: the printer template itself, embedded as vector.
-  let tpl: any = null;
+  // Optional: the printer template itself, embedded as vector — exactly the part of its page that
+  // lies under the sheet (as the canvas shows it: turned by its /Rotate, scaled up from 25%…).
+  let tpl: { page: any; cm: (X: number, Y: number) => M6 } | null = null;
   if (opts.includeTemplate && opts.templateBytes && doc.template) {
     try {
       const src = await PDFDocument.load(opts.templateBytes, { ignoreEncryption: true });
-      const sp = src.getPage(Math.max(0, (doc.template.page ?? 1) - 1));
-      const mb = sp.getMediaBox();
-      tpl = await pdf.embedPage(sp, { left: mb.x, bottom: mb.y, right: mb.x + mb.width, top: mb.y + mb.height });
-    } catch {
-      warnings.add('The template PDF couldn’t be embedded, so it was left out.');
+      // a locked (encrypted) PDF's drawing can't be copied: say so, and export the artwork alone
+      if (src.isEncrypted) throw new Error('locked');
+      const sp = src.getPage(Math.max(0, Math.min(src.getPageCount(), doc.template.page ?? 1) - 1));
+      const fr = pageFrame(sp, PDFName);
+      const tb = g.tplBox ?? { x: 0, y: 0, w: g.mediaW, h: g.mediaH }; // where the template's page lands, design mm
+      const k = tb.w / fr.wMm; // design mm per template mm
+      const u = fr.toUser({ x: -tb.x / k, y: -tb.y / k, w: g.mediaW / k, h: g.mediaH / k }); // the sheet, in the template's own space
+      const embedded = await pdf.embedPage(sp, { left: u.x, bottom: u.y, right: u.x + u.width, top: u.y + u.height });
+      const rot = fr.rot;
+      const s = W / (rot === 90 || rot === 270 ? u.height : u.width);
+      // the form's (0,0)–(w,h) onto the sheet's rectangle, turned the way the template is shown
+      const cm = (X: number, Y: number): M6 =>
+        rot === 90 ? [0, -s, s, 0, X, Y + H] : rot === 180 ? [-s, 0, 0, -s, X + W, Y + H] : rot === 270 ? [0, s, -s, 0, X + W, Y] : [s, 0, 0, s, X, Y];
+      tpl = { page: embedded, cm };
+    } catch (e) {
+      warnings.add(
+        e instanceof Error && e.message === 'locked'
+          ? 'The printer template is a locked PDF, so it can’t be copied into the export — it was left out (your artwork is all there).'
+          : 'The template PDF couldn’t be embedded, so it was left out.',
+      );
     }
   }
+  const drawTemplate = (page: PDFPage) => {
+    if (!tpl) return;
+    const n = page.node.newXObject('Tpl', tpl.page.ref);
+    page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...(tpl.cm(slug, slug).map(r3) as M6)), drawObject(n), popGraphicsState());
+  };
 
   /* ---------- colour ---------- */
   type Paint = { color: Color; alpha: number; overprint: boolean };
   const toPaint = (
     v: unknown,
-    ctx: { kind: 'fill' | 'stroke' | 'text'; areaMm2?: number; sizePt?: number },
+    ctx: { kind: 'fill' | 'stroke' | 'text'; areaMm2?: number; sizePt?: number; artwork?: boolean },
   ): Paint | null => {
     const c = parseColour(f, v);
     if (!c) return null;
@@ -187,7 +215,8 @@ export async function exportPdf(
     if (ctx.kind === 'text' && opts.blackText && darkInk && (ctx.sizePt ?? 99) < 12) {
       k = [0, 0, 0, 100];
       overprint = true;
-    } else if (ctx.kind === 'fill' && opts.richBlack && brand?.id === 'ink' && (ctx.areaMm2 ?? 0) > 2500) {
+    } else if (ctx.kind === 'fill' && opts.richBlack && !ctx.artwork && brand?.id === 'ink' && (ctx.areaMm2 ?? 0) > 2500) {
+      // big Ink areas (backgrounds, panels) only: logo, spark and icon artwork keeps its own ink at any size
       k = opts.richBlackCmyk;
     }
     return { color: cmyk(k[0] / 100, k[1] / 100, k[2] / 100, k[3] / 100), alpha: c.a, overprint };
@@ -213,9 +242,14 @@ export async function exportPdf(
           } catch {
             bytes = null;
           }
-          if (bytes && bytes[0] === 0xff && bytes[1] === 0xd8) return pdf.embedJpg(bytes);
+          const jpeg = !!bytes && bytes[0] === 0xff && bytes[1] === 0xd8;
+          const orient = jpeg ? jpegOrientation(bytes!) : 1;
+          const turned = orient >= 2 && orient <= 8;
+          if (jpeg && !turned) return pdf.embedJpg(bytes!);
           if (bytes && bytes[0] === 0x89 && bytes[1] === 0x50) return pdf.embedPng(bytes);
-          // WebP / GIF / anything else: re-encode losslessly via a canvas at native size.
+          // WebP / GIF / anything else: re-encode losslessly via a canvas at native size. An
+          // EXIF-rotated JPEG (a phone photo) comes this way too: the canvas turns it upright, as the
+          // studio shows it (cropX/cropY are measured on that), and it stays a JPEG.
           const el: HTMLImageElement | HTMLCanvasElement = o.getElement();
           const nw = (el as HTMLImageElement).naturalWidth || el.width;
           const nh = (el as HTMLImageElement).naturalHeight || el.height;
@@ -223,6 +257,7 @@ export async function exportPdf(
           cv.width = nw;
           cv.height = nh;
           cv.getContext('2d')!.drawImage(el, 0, 0, nw, nh);
+          if (turned) return pdf.embedJpg(cv.toDataURL('image/jpeg', 0.95));
           return pdf.embedPng(cv.toDataURL('image/png'));
         })(),
       );
@@ -340,13 +375,20 @@ export async function exportPdf(
 
   /* ---------- per page ---------- */
   for (let pi = 0; pi < pageJsons.length; pi++) {
-    const page = pdf.addPage([W + 2 * slug, H + 2 * slug]);
-    page.setBleedBox(slug, slug, W, H);
+    const u = unit;
+    const page = pdf.addPage([(W + 2 * slug) / u, (H + 2 * slug) / u]);
+    page.setBleedBox(slug / u, slug / u, W / u, H / u);
     const trimPdfY = slug + H - (g.trim.y + g.trim.h) * PT;
-    page.setTrimBox(slug + g.trim.x * PT, trimPdfY, g.trim.w * PT, g.trim.h * PT);
+    page.setTrimBox((slug + g.trim.x * PT) / u, trimPdfY / u, (g.trim.w * PT) / u, (g.trim.h * PT) / u);
+    if (u > 1) {
+      page.node.set(PDFName.of('UserUnit'), pdf.context.obj(u));
+      // everything below is drawn in points, as on every other page
+      page.pushOperators(concatTransformationMatrix(r3(1 / u), 0, 0, r3(1 / u), 0, 0));
+      warnings.add(`The page is over 5 m, so the PDF uses large units (UserUnit ${u}) — check your printer’s software opens it at ${round(g.mediaW)} × ${round(g.mediaH)} mm.`);
+    }
     const pc = new PageCtx(pdf, page);
 
-    if (tpl && doc.template?.mode !== 'over') page.drawPage(tpl, { x: slug, y: slug, width: W, height: H });
+    if (doc.template?.mode !== 'over') drawTemplate(page);
 
     // Design space: flip y, origin at the media top-left; clip to the bleed box.
     pc.ops.push(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, -1, slug, slug + H), rectangle(0, 0, r3(W), r3(H)), clip(), endPath());
@@ -536,14 +578,15 @@ export async function exportPdf(
       pc.ops.push(popGraphicsState());
     };
 
-    const renderObj = async (o: any, inherited: number): Promise<void> => {
+    const renderObj = async (o: any, inherited: number, inArtwork = false): Promise<void> => {
       if (!o || o.visible === false) return;
       const opacity = inherited * (o.opacity ?? 1);
       if (opacity <= 0.001) return;
       const t = o.type;
+      const artwork = inArtwork || o.role === 'logo' || o.role === 'spark' || o.role === 'icon';
       if (o.getObjects && t !== 'textbox' && t !== 'i-text' && t !== 'text') {
         if (o.clipPath) return rasterise(o, 'it uses a clipping mask');
-        for (const c of o.getObjects()) await renderObj(c, opacity);
+        for (const c of o.getObjects()) await renderObj(c, opacity, artwork);
         return;
       }
       if (o.clipPath) return rasterise(o, 'it uses a clipping mask');
@@ -597,7 +640,7 @@ export async function exportPdf(
         }
         return;
       }
-      const fillKind = { kind: 'fill' as const, areaMm2: areaMm2(o) };
+      const fillKind = { kind: 'fill' as const, areaMm2: areaMm2(o), artwork };
       const fillP = toPaint(o.fill, fillKind);
       const strokeP = o.strokeWidth > 0 ? toPaint(o.stroke, { kind: 'stroke' }) : null;
       let ops: Op[] | null = null;
@@ -630,7 +673,7 @@ export async function exportPdf(
     pc.flush();
     sc.dispose();
 
-    if (tpl && doc.template?.mode === 'over') page.drawPage(tpl, { x: slug, y: slug, width: W, height: H });
+    if (doc.template?.mode === 'over') drawTemplate(page);
 
     if (opts.cropMarks) {
       const reg = opts.cmyk ? cmyk(1, 1, 1, 1) : rgb(0, 0, 0);
@@ -680,13 +723,13 @@ export async function exportPdf(
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-/** PNG/JPG of the trim area — exact pixels for digital formats, else at `dpi`. */
+/** PNG/JPG of the trim area — exact pixels for digital formats, else at `dpi` (capped for huge pages). */
 export async function exportRaster(
   f: FabricNS,
   doc: DesignDoc,
   pageJson: Record<string, unknown>,
   opts: { format: 'png' | 'jpeg'; dpi: number; px?: { w: number; h: number } | null },
-): Promise<string> {
+): Promise<{ url: string; dpi: number; capped: boolean; w: number; h: number }> {
   const PT = PT_PER_MM;
   const g = doc.geometry;
   const W = g.mediaW * PT, H = g.mediaH * PT;
@@ -696,9 +739,14 @@ export async function exportRaster(
   sc.backgroundColor = '#ffffff';
   const t = { x: g.trim.x * PT, y: g.trim.y * PT, w: g.trim.w * PT, h: g.trim.h * PT };
   let mult = opts.px ? opts.px.w / t.w : opts.dpi / 72;
+  // Browsers can't hold a canvas much bigger than this: a banner or pop-up comes out at less than the dpi asked for.
   const max = 12000;
-  if (Math.max(t.w, t.h) * mult > max) mult = max / Math.max(t.w, t.h);
-  const url = sc.toDataURL({ format: opts.format, quality: 0.92, multiplier: mult, left: t.x, top: t.y, width: t.w, height: t.h, enableRetinaScaling: false });
+  const capped = !opts.px && Math.max(t.w, t.h) * mult > max;
+  if (capped) mult = max / Math.max(t.w, t.h);
+  let url = sc.toDataURL({ format: opts.format, quality: 0.92, multiplier: mult, left: t.x, top: t.y, width: t.w, height: t.h, enableRetinaScaling: false });
   sc.dispose();
-  return url;
+  const dpi = Math.round(mult * 72);
+  // Write the resolution into the file, so print software opens it at its real size (not 72 dpi).
+  if (!opts.px) url = withDpi(url, dpi);
+  return { url, dpi, capped, w: Math.round(t.w * mult), h: Math.round(t.h * mult) };
 }

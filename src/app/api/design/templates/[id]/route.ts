@@ -23,7 +23,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     .from('design_templates')
     .update(u)
     .eq('id', id)
-    .select('id, name, title, storage_path, size, geometry, created_at')
+    .select('id, name, title, storage_path, size, geometry, page, created_at')
     .maybeSingle();
   if (error) return json({ error: error.message }, 500);
   if (!data) return json({ error: 'That template isn’t there any more.' }, 404);

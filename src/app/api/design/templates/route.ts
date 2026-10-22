@@ -10,6 +10,7 @@ import {
   designSession,
   ensureDesignBucket,
   json,
+  okPath,
   safeName,
 } from '@/lib/design/server';
 
@@ -21,7 +22,7 @@ export async function GET() {
   if (!(await designReady())) return json({ ready: false, items: [] });
   const { data, error } = await createAdminClient()
     .from('design_templates')
-    .select('id, name, title, storage_path, size, geometry, created_at')
+    .select('id, name, title, storage_path, size, geometry, page, created_at')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .limit(300);
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
   if (b.action === 'save') {
     if (!(await designReady())) return json({ error: NOT_READY }, 409);
     const path = String(b.path || '');
-    if (!path.startsWith('templates/') || path.includes('..')) return json({ error: 'Bad file' }, 400);
+    if (!okPath(path) || !path.startsWith('templates/')) return json({ error: 'Bad file' }, 400);
     const geometry = cleanGeometry(b.geometry);
     if (!geometry) return json({ error: 'The template’s page size looks wrong.' }, 400);
     const { data, error } = await db
@@ -65,9 +66,10 @@ export async function POST(req: Request) {
         storage_path: path,
         size: Number(b.size) || null,
         geometry,
+        page: Math.min(Math.max(Math.floor(Number(b.page)) || 1, 1), 999),
         created_by: s.user.id,
       })
-      .select('id, name, title, storage_path, size, geometry, created_at')
+      .select('id, name, title, storage_path, size, geometry, page, created_at')
       .single();
     if (error) return json({ error: error.code === '23505' ? 'That template is already in the library.' : error.message }, error.code === '23505' ? 409 : 500);
     return json({ item: data });

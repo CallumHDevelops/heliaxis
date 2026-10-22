@@ -312,6 +312,8 @@ export class StudioEngine {
       else c.requestRenderAll();
     });
     this.ro.observe(stage);
+    stage.addEventListener('pointerenter', () => { this.pointerOnStage = true; });
+    stage.addEventListener('pointerleave', () => { this.pointerOnStage = false; });
 
     this.keyHandler = (e) => this.onKey(e);
     this.keyUpHandler = (e) => {
@@ -337,15 +339,32 @@ export class StudioEngine {
   /** Hook for app-level shortcuts (save, export) — set by the React shell. */
   onShortcut: ((k: 'save' | 'export') => void) | null = null;
 
-  private onKey(e: KeyboardEvent) {
+  /**
+   * Is this key for the canvas? Not while a studio dialog is open, not in a field, and not for the
+   * app's own header, menus and links (the avatar menu's theme radios, the nav).
+   */
+  private keyIsOurs(e: KeyboardEvent) {
     const t = e.target as HTMLElement | null;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    if (!t || typeof t.closest !== 'function') return true;
+    if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return false;
+    if (document.querySelector('.ds2-modal')) return false;
+    if (t.closest('[role="menu"], [role="menuitem"], [role="menuitemradio"], [role="radio"], [role="radiogroup"], [role="dialog"], [role="listbox"], [role="option"]')) return false;
+    if (!t.closest('.ds2') && t !== document.body && t.closest('button, a[href], summary, [tabindex]')) return false;
+    return true;
+  }
+  /** The pointer is over the stage: only then does Space pan (elsewhere it presses the focused button). */
+  private pointerOnStage = false;
+
+  private onKey(e: KeyboardEvent) {
+    if (!this.keyIsOurs(e)) return;
     const c = this.canvas;
     const active = c.getActiveObject();
     if (active?.isEditing) return; // typing inside a text box
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (e.code === 'Space' && !this.spaceDown) {
+      const t = e.target as HTMLElement | null;
+      if (!this.pointerOnStage && t?.closest?.('button, a[href]')) return;
       this.spaceDown = true;
       c.defaultCursor = 'grab';
       c.setCursor('grab');
@@ -443,11 +462,24 @@ export class StudioEngine {
     ctx.fillRect(0, 0, this.W, this.H);
     ctx.shadowColor = 'transparent';
     const t = this.template;
-    if (t?.image && t.ref.mode === 'under') {
-      ctx.globalAlpha = t.ref.opacity;
-      ctx.drawImage(t.image, 0, 0, this.W, this.H);
-      ctx.globalAlpha = 1;
-    }
+    if (t?.image && t.ref.mode === 'under') this.drawTemplate(ctx, t.image, t.ref.opacity);
+    ctx.restore();
+  }
+
+  /**
+   * The printer template's page where it lands on the sheet: stretched over the whole sheet, or
+   * at geometry.tplBox when the sheet is only part of its page (a slug with crop marks, a margin).
+   * Clipped to the sheet. Lengths in the design's own (real) mm, so a 25% template is scaled up.
+   */
+  private drawTemplate(ctx: CanvasRenderingContext2D, img: CanvasImageSource, opacity: number) {
+    const b = this.g.tplBox;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.beginPath();
+    ctx.rect(0, 0, this.W, this.H);
+    ctx.clip();
+    if (b) ctx.drawImage(img, mm(b.x), mm(b.y), mm(b.w), mm(b.h));
+    else ctx.drawImage(img, 0, 0, this.W, this.H);
     ctx.restore();
   }
 
@@ -458,12 +490,8 @@ export class StudioEngine {
     const t = this.template;
     ctx.save();
     ctx.transform(v[0], v[1], v[2], v[3], v[4], v[5]);
-    if (t?.image && t.ref.mode === 'over' && !this.trimPreview) {
-      // the template's white is already knocked out (renderTemplate), so draw it straight on top
-      ctx.globalAlpha = t.ref.opacity;
-      ctx.drawImage(t.image, 0, 0, this.W, this.H);
-      ctx.globalAlpha = 1;
-    }
+    // the template's white is already knocked out (renderTemplate), so draw it straight on top
+    if (t?.image && t.ref.mode === 'over' && !this.trimPreview) this.drawTemplate(ctx, t.image, t.ref.opacity);
     ctx.restore();
 
     // Dim (or, in trim preview, hide) everything off the sheet.
@@ -621,6 +649,7 @@ export class StudioEngine {
     if (this.suspended) return;
     clearTimeout(this.histTimer);
     this.histTimer = setTimeout(() => {
+      this.histTimer = undefined;
       const snap = JSON.stringify(this.serialize());
       if (this.undoStack[this.undoStack.length - 1] === snap) return;
       this.undoStack.push(snap);
@@ -630,9 +659,40 @@ export class StudioEngine {
       this.emit('change');
     }, 220);
   }
-  canUndo() { return this.undoStack.length > 1; }
+  canUndo() { return this.undoStack.length > 1 || this.histTimer !== undefined; }
   canRedo() { return this.redoStack.length > 0; }
+  /** A change made within the snapshot debounce: record it now (so undo takes back IT, not the step before). */
+  private flushHistory() {
+    if (this.histTimer === undefined) return;
+    clearTimeout(this.histTimer);
+    this.histTimer = undefined;
+    const snap = JSON.stringify(this.serialize());
+    if (this.undoStack[this.undoStack.length - 1] !== snap) {
+      this.undoStack.push(snap);
+      if (this.undoStack.length > 80) this.undoStack.shift();
+      this.redoStack = [];
+    }
+  }
+  /** Each page keeps its own undo history across page switches. */
+  private histories = new Map<string, { undo: string[]; redo: string[] }>();
+  stashHistory(key: string) {
+    this.flushHistory();
+    this.histories.set(key, { undo: this.undoStack, redo: this.redoStack });
+  }
+  restoreHistory(key: string) {
+    const h = this.histories.get(key);
+    if (!h || !h.undo.length) return;
+    // the page as it is now must be the top of its stack
+    const now = JSON.stringify(this.serialize());
+    this.undoStack = h.undo[h.undo.length - 1] === now ? h.undo : [...h.undo, now];
+    this.redoStack = h.undo[h.undo.length - 1] === now ? h.redo : [];
+    this.emit('history');
+  }
+  forgetHistories() {
+    this.histories.clear();
+  }
   async undo() {
+    this.flushHistory();
     if (this.undoStack.length < 2) return;
     this.redoStack.push(this.undoStack.pop()!);
     await this.loadJson(JSON.parse(this.undoStack[this.undoStack.length - 1]), false);
@@ -640,6 +700,7 @@ export class StudioEngine {
     this.emit('change');
   }
   async redo() {
+    this.flushHistory();
     const s = this.redoStack.pop();
     if (!s) return;
     this.undoStack.push(s);
@@ -650,6 +711,8 @@ export class StudioEngine {
 
   /** Replace the canvas contents. resetHistory=true starts a fresh undo stack (page switch / open). */
   async loadJson(json: Record<string, unknown>, resetHistory = true) {
+    clearTimeout(this.histTimer);
+    this.histTimer = undefined;
     this.suspended++;
     try {
       const c = this.canvas;
@@ -813,7 +876,8 @@ export class StudioEngine {
   /** A CTA button ('solid') or an accreditation-style chip ('chip'). */
   addButton(label: string, variant: 'solid' | 'dark' | 'chip' | 'chip-dark' = 'solid', select = true) {
     const BrandButton = BrandButtonClass;
-    const scale = Math.max(0.6, Math.min(4, Math.sqrt(this.safePt().w * this.safePt().h) / Math.sqrt(mm(148) * mm(210))));
+    // (up to 16× an A5's: a pop-up stand or banner is set up at full size, so its buttons scale with it)
+    const scale = Math.max(0.6, Math.min(16, Math.sqrt(this.safePt().w * this.safePt().h) / Math.sqrt(mm(148) * mm(210))));
     const chip = variant === 'chip' || variant === 'chip-dark';
     const size = chip ? Math.max(6, 7 * scale) : Math.max(7, 11 * scale);
     const o = new BrandButton({
@@ -1269,11 +1333,13 @@ export class StudioEngine {
   thumbnail(maxPx = 480, quality = 0.82) {
     const c = this.canvas;
     const vpt = c.viewportTransform.slice();
-    const active = c.getActiveObject();
-    c.discardActiveObject();
-    const prevGuides = this.showGuides, prevTrim = this.trimPreview;
+    // Never deselect here: fabric's onDeselect ends text editing (the next Backspace would delete
+    // the whole box), cuts a drag short and empties a multi-selection. toDataURL never draws
+    // selection controls anyway (skipControlsDrawing); snap lines are drawn by the overlay, so clear them.
+    const prevGuides = this.showGuides, prevTrim = this.trimPreview, prevSnaps = this.snapLines;
     this.showGuides = false;
     this.trimPreview = false;
+    this.snapLines = [];
     c.setViewportTransform([1, 0, 0, 1, 0, 0]);
     const tr = this.trimPt();
     const mult = maxPx / Math.max(tr.w, tr.h);
@@ -1286,7 +1352,7 @@ export class StudioEngine {
     c.setViewportTransform(vpt);
     this.showGuides = prevGuides;
     this.trimPreview = prevTrim;
-    if (active) c.setActiveObject(active);
+    this.snapLines = prevSnaps;
     c.requestRenderAll();
     return url;
   }

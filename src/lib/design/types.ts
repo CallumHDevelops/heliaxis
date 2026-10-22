@@ -24,8 +24,14 @@ export type PageGeometry = {
   safe: number;
   folds?: Fold[];
   zones?: Zone[];
-  /** Printer note shown in the UI, e.g. "Set up at 25% scale". */
+  /** Printer note shown in the UI, e.g. "Printer template drawn at 25% — set up at full size". */
   note?: string | null;
+  /**
+   * Where a printer template's page image lands on this sheet, in mm (absent = stretched over the
+   * whole sheet). Set when the sheet is only part of the template's page: a press PDF whose slug
+   * (crop marks) runs round its BleedBox, or a template with a margin round its artwork.
+   */
+  tplBox?: Box;
 };
 
 /** A printer's PDF template the design sits on. The PDF itself lives in storage. */
@@ -77,6 +83,8 @@ export type TemplateSummary = {
   storage_path: string;
   size: number | null;
   geometry: PageGeometry;
+  /** 1-based page of the PDF the geometry was read from. */
+  page?: number;
   created_at: string;
 };
 

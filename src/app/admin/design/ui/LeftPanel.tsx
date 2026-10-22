@@ -65,9 +65,10 @@ function DesignTab({ s }: { s: StudioApi }) {
   const [lib, setLib] = useState<{ ready: boolean; items: TemplateSummary[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const load = () => api.listTemplates().then(setLib).catch(() => setLib({ ready: false, items: [] }));
+  // reloads when a template is saved to the library (libTick)
   useEffect(() => {
     void load();
-  }, []);
+  }, [s.libTick]);
   const starters = startersFor(s.doc.formatId, s.digital);
   const t = s.engine.template;
   return (
@@ -122,6 +123,7 @@ function DesignTab({ s }: { s: StudioApi }) {
               Opacity <input type="range" min={0.1} max={1} step={0.05} value={t.ref.opacity} onChange={(e) => s.setTemplateRef({ opacity: Number(e.target.value) })} />
             </label>
             <button className="ds2-link danger" onClick={s.removeTemplate}>Remove template</button>
+            <span className="ds2-dim">It’s also the bottom row in Layers.</span>
           </div>
         ) : (
           <p className="ds2-hint">Got a template from your printer (business cards, folders, pop-ups)? Import the PDF and design over it — the studio matches its size, bleed and safe area.</p>
@@ -407,10 +409,30 @@ function LayersTab({ s }: { s: StudioApi }) {
   const objs = [...e.objects()].reverse();
   const active = new Set(e.activeList());
   const label = (o: any) => o.name || (e.isText(o) ? String(o.text).slice(0, 28) : o.type);
+  const t = e.template;
+  // The printer template is a layer too: the bottom one (Behind / Hidden), or over everything (On top,
+  // set in Design → Printer template). Always locked — it's a guide, never moved or printed.
+  const tplRow = t ? (
+    <div className={`ds2-layer tpl${t.ref.mode === 'off' ? ' off' : ''}`} key="printer-template">
+      <span className="grow" title={`${t.ref.name}${t.ref.title ? ` — ${t.ref.title}` : ''}`}>
+        <span className="ds2-layer-k">GUIDE</span> Printer template
+      </span>
+      <button className="ds2-icon sm" title={t.ref.mode === 'off' ? 'Show the template' : 'Hide the template'} aria-label={t.ref.mode === 'off' ? 'Show the printer template' : 'Hide the printer template'} onClick={s.toggleTemplate}>
+        <Ico n={t.ref.mode === 'off' ? 'eyeOff' : 'eye'} size={14} />
+      </button>
+      <span className="ds2-icon sm ds2-layer-lock" role="img" title="Locked — the template is a guide, never moved or printed" aria-label="Locked">
+        <Ico n="lock" size={14} />
+      </span>
+      <button className="ds2-icon sm" title="Remove the template (Undo in the message that follows)" aria-label="Remove the printer template" onClick={s.removeTemplate}>
+        <Ico n="trash" size={14} />
+      </button>
+    </div>
+  ) : null;
   return (
-    <Sec title={`Layers (${objs.length})`}>
-      {!objs.length && <p className="ds2-hint">Nothing on this page yet.</p>}
+    <Sec title={`Layers (${objs.length + (t ? 1 : 0)})`}>
+      {!objs.length && <p className="ds2-hint">{t ? 'Nothing on the template yet — add text, shapes, photos or the logo.' : 'Nothing on this page yet.'}</p>}
       <div className="ds2-layers">
+        {t?.ref.mode === 'over' && tplRow}
         {objs.map((o: any, idx: number) => (
           <div key={o.id ?? `layer-${idx}`} className={`ds2-layer${active.has(o) ? ' on' : ''}`}>
             <button className="grow" onClick={() => e.select(o)}>
@@ -424,7 +446,9 @@ function LayersTab({ s }: { s: StudioApi }) {
             </button>
           </div>
         ))}
+        {t?.ref.mode !== 'over' && tplRow}
       </div>
+      {t && <p className="ds2-hint">The printer template is a guide: it’s left out of your PDF unless you tick “Include the printer template” when you export.</p>}
     </Sec>
   );
 }

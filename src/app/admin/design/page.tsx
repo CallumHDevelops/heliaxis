@@ -21,7 +21,7 @@ export default async function DesignPage({ searchParams }: { searchParams: Promi
 
   return (
     <AdminShell active="design" flush>
-      <DesignStudio cloudReady={schema.design} isAdmin={session.profile.role === 'admin'} projectId={projectId} />
+      <DesignStudio cloudReady={schema.design} isAdmin={session.profile.role === 'admin'} projectId={projectId} userId={session.user.id} />
     </AdminShell>
   );
 }

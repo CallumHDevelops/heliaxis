@@ -60,14 +60,15 @@ export const FORMATS: FormatDef[] = [
   { id: 'a1', label: 'A1 poster · 594×841', group: 'Posters', trimW: 594, trimH: 841, bleed: 3, safe: 15, pages: ['Poster'], dpi: 150 },
 
   {
-    id: 'popup33', label: 'Pop-up 3×3 straight fabric (25% scale)', group: 'Large format',
-    // Measured from the instantprint "Straight Fabric Pop-Up 3 x 3" artwork template.
-    trimW: 740, trimH: 565, bleed: 7.5, safe: 7.5, pages: ['Graphic'], dpi: 300,
+    id: 'popup33', label: 'Pop-up 3×3 straight fabric · 2960×2260', group: 'Large format',
+    // instantprint "Straight Fabric Pop-Up 3 x 3", at full size (their artwork template is drawn at 25%).
+    // The wrap-round panels: 97.38 mm a side on that 25% template, so 389.52 mm here.
+    trimW: 2960, trimH: 2260, bleed: 30, safe: 30, pages: ['Graphic'], dpi: 75,
     zones: [
-      { label: 'Wraps round the frame side — not seen from the front', kind: 'wrap', box: { x: 0, y: 0, w: 97.38, h: 565 } },
-      { label: 'Wraps round the frame side — not seen from the front', kind: 'wrap', box: { x: 642.62, y: 0, w: 97.38, h: 565 } },
+      { label: 'Wraps round the frame side — not seen from the front', kind: 'wrap', box: { x: 0, y: 0, w: 389.52, h: 2260 } },
+      { label: 'Wraps round the frame side — not seen from the front', kind: 'wrap', box: { x: 2570.48, y: 0, w: 389.52, h: 2260 } },
     ],
-    note: '25% scale: 2960×2260 mm finished (3020×2320 mm with bleed). Supply at this size; photos 300 dpi at this size.',
+    note: '2960×2260 mm finished (3020×2320 mm with bleed). Photos 75 dpi at full size (that’s 300 dpi on instantprint’s 25% template).',
   },
   {
     id: 'rollup', label: 'Roller banner · 850×2000', group: 'Large format', trimW: 850, trimH: 2000, bleed: 5, safe: 25, pages: ['Banner'], dpi: 100,
@@ -111,6 +112,16 @@ export function matchFormat(g: PageGeometry): FormatDef | undefined {
 /** A format's zones placed on another geometry's trim (e.g. a printer template with a different bleed). */
 export function zonesOnTrim(f: FormatDef, trim: Box): Zone[] | undefined {
   return f.zones?.map((z) => ({ label: z.label, kind: z.kind, box: { ...z.box, x: z.box.x + trim.x, y: z.box.y + trim.y } }));
+}
+
+/**
+ * The photo resolution to aim for at the placed size: the format's own, else by the print's size
+ * (a banner or pop-up is seen from metres away — 300 dpi at 3 m would fail every real photo).
+ */
+export function targetDpi(f: FormatDef | undefined, g: PageGeometry) {
+  if (f) return f.dpi;
+  const long = Math.max(g.trim.w, g.trim.h);
+  return long >= 1500 ? 75 : long >= 1000 ? 100 : long >= 500 ? 150 : 300;
 }
 
 /** A custom size. */

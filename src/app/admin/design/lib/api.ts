@@ -1,9 +1,18 @@
 /** Client calls for the Design studio API (projects, templates, uploads). */
 import type { DesignDoc, PageGeometry, ProjectSummary, TemplateSummary, UploadItem } from '@/lib/design/types';
 
+/** A request the server refused: `conflict` = saved elsewhere since (409), `gone` = deleted (404). */
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public conflict = false, public gone = false) {
+    super(message);
+  }
+}
 async function j<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((body as { error?: string }).error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    const b = body as { error?: string; conflict?: boolean; gone?: boolean };
+    throw new ApiError(b.error || `Request failed (${res.status})`, res.status, !!b.conflict, !!b.gone);
+  }
   return body as T;
 }
 const post = (url: string, body: unknown, method = 'POST') =>
@@ -23,7 +32,8 @@ export async function getProject(id: string) {
 export async function createProject(name: string, doc: DesignDoc, thumb?: string) {
   return j<{ item: { id: string; name: string; updated_at: string } }>(await post('/api/design/projects', { name, doc, thumb }));
 }
-export async function saveProject(id: string, patch: { name?: string; doc?: DesignDoc; thumb?: string; archived?: boolean }) {
+/** `base`: the updated_at this copy was opened or last saved at — the server refuses (409) if it's been saved since. */
+export async function saveProject(id: string, patch: { name?: string; doc?: DesignDoc; thumb?: string; archived?: boolean; base?: string | null }) {
   return j<{ item: { id: string; name: string; updated_at: string } }>(await post(`/api/design/projects/${id}`, patch, 'PATCH'));
 }
 export async function deleteProject(id: string) {
@@ -48,8 +58,8 @@ export async function listTemplates() {
 export function uploadTemplatePdf(file: File) {
   return directUpload('/api/design/templates', file);
 }
-export async function saveTemplate(path: string, name: string, title: string | null, size: number, geometry: PageGeometry) {
-  return j<{ item: TemplateSummary }>(await post('/api/design/templates', { action: 'save', path, name, title, size, geometry }));
+export async function saveTemplate(path: string, name: string, title: string | null, size: number, geometry: PageGeometry, page = 1) {
+  return j<{ item: TemplateSummary }>(await post('/api/design/templates', { action: 'save', path, name, title, size, geometry, page }));
 }
 export async function patchTemplate(id: string, patch: { name?: string; geometry?: PageGeometry }) {
   return j<{ item: TemplateSummary }>(await post(`/api/design/templates/${id}`, patch, 'PATCH'));
@@ -71,20 +81,31 @@ export function uploadImage(file: File) {
   return directUpload('/api/design/uploads', file);
 }
 
-/* local crash-recovery draft */
-const DRAFT_KEY = 'hx-design:draft:v2';
-export type LocalDraft = { doc: DesignDoc; name: string; projectId: string | null; at: number; page: number };
+/* local crash-recovery draft — one per signed-in user, cleared on sign-out (AppRuntime) */
+export const DRAFT_PREFIX = 'hx-design:draft:v2';
+let draftKey = DRAFT_PREFIX;
+/** Key the draft by user, so the next person on this computer never picks up someone else's design. */
+export function setDraftOwner(userId: string | null) {
+  draftKey = userId ? `${DRAFT_PREFIX}:${userId}` : DRAFT_PREFIX;
+}
+/**
+ * `base`: the cloud updated_at this copy builds on (null for a design never saved to the cloud).
+ * `unsaved`: it holds changes the cloud copy doesn't have (a save that failed, or hadn't run yet).
+ */
+export type LocalDraft = { doc: DesignDoc; name: string; projectId: string | null; at: number; page: number; base?: string | null; unsaved?: boolean };
+/** Kept well under the browser's ~5 MB per site, so the rest of the staff app still has room. */
+const MAX_DRAFT_CHARS = 2_000_000;
 export function writeDraft(d: LocalDraft) {
   try {
     const s = JSON.stringify(d);
-    if (s.length < 4_500_000) localStorage.setItem(DRAFT_KEY, s);
+    if (s.length < MAX_DRAFT_CHARS) localStorage.setItem(draftKey, s);
   } catch {
     /* private window / full storage — the cloud save still works */
   }
 }
 export function readDraft(): LocalDraft | null {
   try {
-    const s = localStorage.getItem(DRAFT_KEY);
+    const s = localStorage.getItem(draftKey);
     return s ? (JSON.parse(s) as LocalDraft) : null;
   } catch {
     return null;
@@ -92,7 +113,7 @@ export function readDraft(): LocalDraft | null {
 }
 export function clearDraft() {
   try {
-    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(draftKey);
   } catch {
     /* ignore */
   }

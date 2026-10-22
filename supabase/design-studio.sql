@@ -10,12 +10,14 @@ create table if not exists public.design_templates (
   title         text,                                  -- the PDF's own title, if it has one
   storage_path  text not null unique,                  -- the template PDF in 'design-files'
   size          int,
-  geometry      jsonb not null,                        -- page/trim/bleed/safe in mm (see src/lib/design/types.ts)
+  geometry      jsonb not null,                        -- page/trim/bleed/safe in mm, at full size (see src/lib/design/types.ts)
+  page          int not null default 1,                -- the PDF page that geometry was read from
   archived_at   timestamptz,
   created_by    uuid references public.profiles(id) on delete set null,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
+alter table public.design_templates add column if not exists page int not null default 1;
 create index if not exists design_templates_live_idx on public.design_templates (created_at desc) where archived_at is null;
 
 create table if not exists public.design_projects (

@@ -10,12 +10,13 @@ import { startersFor } from '../lib/starters';
 import { BRAND_COLOURS, hexToCmyk, type CMYK } from '../lib/brand';
 import { exportPdf, exportRaster } from '../lib/export';
 import { runPreflight, type Issue } from '../lib/preflight';
-import { renderTemplate, type TemplateInfo } from '../lib/template';
+import { TemplateError, readTemplate, renderTemplate, type TemplateInfo } from '../lib/template';
 import * as api from '../lib/api';
 import { Ico } from './icons';
 
 export type DialogKind = 'new' | 'template' | 'export' | 'projects' | 'checks' | 'print';
-export type PendingTemplate = { file: File | null; bytes: Uint8Array; info: TemplateInfo; name: string; library: TemplateSummary | null };
+/** `page`: the PDF page `info` was read from (1-based). */
+export type PendingTemplate = { file: File | null; bytes: Uint8Array; info: TemplateInfo; page: number; name: string; library: TemplateSummary | null };
 
 type Props = {
   s: StudioApi;
@@ -151,82 +152,117 @@ function NewDesign({ s, close, startNew }: Props) {
 /* ---------------- template setup ---------------- */
 
 function TemplateSetup({ s, close, pending, applyTemplate }: Props & { pending: PendingTemplate }) {
-  const g0 = pending.info.geometry;
+  // Each page of a PDF can be a different size (an instructions sheet, then the template), so the
+  // geometry is re-read from whichever page is picked.
+  const [info, setInfo] = useState(pending.info);
+  const g0 = info.geometry;
   const [name, setName] = useState(pending.name);
   const [bleed, setBleed] = useState(round2(g0.trim.x));
   const [safe, setSafe] = useState(round2(g0.safe));
-  const [pageNo, setPageNo] = useState(1);
-  const [mode, setMode] = useState<TemplateRef['mode']>('over');
+  const [pageNo, setPageNo] = useState(pending.page);
+  const [reading, setReading] = useState(false);
+  const wantPage = useRef(pending.page);
+  const pickPage = (n: number) => {
+    setPageNo(n);
+    wantPage.current = n;
+    setReading(true);
+    readTemplate(pending.bytes, n)
+      .then((i) => {
+        if (wantPage.current !== n) return;
+        setInfo(i);
+        setBleed(round2(i.geometry.trim.x));
+        setSafe(round2(i.geometry.safe));
+      })
+      .catch((e) => s.toast(e instanceof TemplateError ? e.message : 'That page couldn’t be read.'))
+      .finally(() => wantPage.current === n && setReading(false));
+  };
+  // The template is the bottom layer: behind the artwork, its lines showing through (Layers can put it on top).
+  const [mode, setMode] = useState<TemplateRef['mode']>('under');
   const [opacity, setOpacity] = useState(0.85);
   const [saveLib, setSaveLib] = useState(!pending.library && s.cloudReady);
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ page: number; url: string | null } | null>(null);
   useEffect(() => {
     let live = true;
-    renderTemplate(pending.bytes, pageNo, 900).then((cv) => live && setPreview(cv.toDataURL('image/png'))).catch(() => setPreview(null));
+    renderTemplate(pending.bytes, pageNo, 900)
+      .then((cv) => live && setPreview({ page: pageNo, url: cv.toDataURL('image/png') }))
+      .catch(() => live && setPreview({ page: pageNo, url: null }));
     return () => { live = false; };
   }, [pending.bytes, pageNo]);
 
   const geometry: PageGeometry = useMemo(() => {
-    const trimSet = pending.info.confidence === 'high' && (g0.trim.x > 0 || g0.trim.y > 0);
-    if (trimSet && Math.abs(bleed - g0.trim.x) < 0.01) return { ...g0, safe };
+    const maxSafe = Math.max(0, Math.floor((Math.min(g0.trim.w, g0.trim.h) / 2 - 0.5) * 10) / 10);
+    const sf = Math.min(Math.max(0, safe), maxSafe);
+    const b = Math.max(0, bleed);
+    if (Math.abs(b - g0.trim.x) < 0.01 && Math.abs(b - g0.trim.y) < 0.01) return { ...g0, safe: sf };
     // zones are measured from the trim, so they move with it
-    const dx = bleed - g0.trim.x, dy = bleed - g0.trim.y;
+    const dx = b - g0.trim.x, dy = b - g0.trim.y;
     const zones = g0.zones?.map((z) => ({ ...z, box: { ...z.box, x: z.box.x + dx, y: z.box.y + dy } }));
-    return { ...g0, trim: { x: bleed, y: bleed, w: round2(g0.mediaW - 2 * bleed), h: round2(g0.mediaH - 2 * bleed) }, safe, zones };
-  }, [g0, bleed, safe, pending.info.confidence]);
+    if (info.confidence === 'high') {
+      // the printer's finished size is known: keep it, and grow or shrink the sheet (and move the template) round it
+      const tb = g0.tplBox ?? { x: 0, y: 0, w: g0.mediaW, h: g0.mediaH };
+      return { ...g0, mediaW: round2(g0.trim.w + 2 * b), mediaH: round2(g0.trim.h + 2 * b), trim: { ...g0.trim, x: b, y: b }, tplBox: { ...tb, x: round2(tb.x + dx), y: round2(tb.y + dy) }, safe: sf, zones };
+    }
+    // not detected: the page is the sheet, and the bleed comes off it
+    return { ...g0, trim: { x: b, y: b, w: round2(g0.mediaW - 2 * b), h: round2(g0.mediaH - 2 * b) }, safe: Math.min(sf, Math.max(0, Math.floor((Math.min(g0.mediaW - 2 * b, g0.mediaH - 2 * b) / 2 - 0.5) * 10) / 10)), zones };
+  }, [g0, bleed, safe, info.confidence]);
+  const bad = geometry.trim.w < 1 || geometry.trim.h < 1;
 
   const go = async (newDesign: boolean) => {
     setBusy(true);
     try {
-      await applyTemplate({ pending: { ...pending, name: name.trim() || pending.name }, geometry, pageNo, mode, opacity, saveToLibrary: saveLib, newDesign });
+      await applyTemplate({ pending: { ...pending, info, page: pageNo, name: name.trim() || pending.name }, geometry, pageNo, mode, opacity, saveToLibrary: saveLib, newDesign });
     } finally {
       setBusy(false);
     }
   };
+  const pct = info.scale < 0.99 ? `${Math.round(info.scale * 1000) / 10}%` : null;
   return (
     <Modal title="Printer template" close={close} wide footer={
       <>
         <span className="sp" />
         <button className="ds2-btn" onClick={close}>Cancel</button>
-        <button className="ds2-btn" disabled={busy} onClick={() => void go(false)}>Use on this design</button>
-        <button className="ds2-btn solar" disabled={busy} onClick={() => void go(true)}>{busy ? 'Setting up…' : 'New design on this template'}</button>
+        <button className="ds2-btn" disabled={busy || reading || bad} onClick={() => void go(false)}>Use on this design</button>
+        <button className="ds2-btn solar" disabled={busy || reading || bad} onClick={() => void go(true)}>{busy ? 'Setting up…' : 'New design on this template'}</button>
       </>
     }>
       <div className="ds2-tpl">
         <div className="ds2-tpl-prev hx-light">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {preview ? <img src={preview} alt="Template preview" /> : <div className="ds2-dim">Rendering…</div>}
+          {preview?.page === pageNo && preview.url ? <img src={preview.url} alt="Template preview" /> : <div className="ds2-dim">{preview?.page === pageNo ? 'This page couldn’t be shown — the sizes below still work.' : 'Rendering…'}</div>}
         </div>
         <div className="ds2-tpl-form">
           <label className="ds2-field"><span>Name</span><input className="ds2-input" value={name} onChange={(e) => setName(e.target.value)} /></label>
-          {pending.info.title && <p className="ds2-dim">PDF title: {pending.info.title}</p>}
-          <div className={`ds2-detect ${pending.info.confidence}`}>
-            <b>{pending.info.confidence === 'high' ? 'Detected from the template' : pending.info.confidence === 'medium' ? 'Partly detected — check the numbers' : 'Couldn’t detect the trim — please check'}</b>
-            <ul>{pending.info.detected.map((d) => <li key={d}>{d}</li>)}</ul>
+          {info.title && <p className="ds2-dim">PDF title: {info.title}</p>}
+          <div className={`ds2-detect ${info.confidence}`}>
+            <b>{reading ? 'Reading that page…' : info.confidence === 'high' ? 'Detected from the template' : info.confidence === 'medium' ? 'Partly detected — check the numbers' : 'Couldn’t detect the trim — please check'}</b>
+            <ul>{info.detected.map((d) => <li key={d}>{d}</li>)}</ul>
           </div>
           <div className="ds2-grid2">
             <label className="ds2-num"><span>Bleed</span><input inputMode="decimal" value={bleed} onChange={(e) => setBleed(Number(e.target.value) || 0)} /><em>mm</em></label>
             <label className="ds2-num"><span>Safe</span><input inputMode="decimal" value={safe} onChange={(e) => setSafe(Number(e.target.value) || 0)} /><em>mm</em></label>
           </div>
-          <p className="ds2-hint">Sheet {round2(geometry.mediaW)} × {round2(geometry.mediaH)} mm → finished {round2(geometry.trim.w)} × {round2(geometry.trim.h)} mm. Your PDF will be exactly this size.</p>
+          <p className="ds2-hint">
+            {pct ? <><b>Real size</b> (the printer’s template is drawn at {pct}): </> : null}
+            Sheet {round2(geometry.mediaW)} × {round2(geometry.mediaH)} mm → finished {round2(geometry.trim.w)} × {round2(geometry.trim.h)} mm. Your PDF will be exactly this size.
+          </p>
           {pending.info.pages > 1 && (
             <label className="ds2-num wide"><span>Page</span>
-              <select value={pageNo} onChange={(e) => setPageNo(Number(e.target.value))}>
+              <select value={pageNo} onChange={(e) => pickPage(Number(e.target.value))}>
                 {Array.from({ length: pending.info.pages }, (_, i) => <option key={i} value={i + 1}>Page {i + 1}</option>)}
               </select>
             </label>
           )}
           <h3>Show the template</h3>
           <div className="ds2-seg">
+            <button className={mode === 'under' ? 'on' : ''} onClick={() => setMode('under')}>Behind (bottom layer)</button>
             <button className={mode === 'over' ? 'on' : ''} onClick={() => setMode('over')}>On top (die-lines)</button>
-            <button className={mode === 'under' ? 'on' : ''} onClick={() => setMode('under')}>Behind (guide sheet)</button>
           </div>
           <label className="ds2-range">Opacity <input type="range" min={0.1} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label>
           {!pending.library && (
             <label className="ds2-check"><input type="checkbox" checked={saveLib} disabled={!s.cloudReady} onChange={(e) => setSaveLib(e.target.checked)} /> Save to the template library{!s.cloudReady ? ' (needs design-studio.sql)' : ''}</label>
           )}
-          <p className="ds2-hint">The template is a guide only — it’s left out of your export unless you choose otherwise.</p>
+          <p className="ds2-hint">The template is a guide only — it’s left out of your export unless you choose otherwise. Hide or remove it any time in Layers.</p>
         </div>
       </div>
     </Modal>
@@ -251,7 +287,7 @@ function ExportDialog({ s, close, project, fabric, flushPage, templateBytes, ope
   const [busy, setBusy] = useState(false);
   const [warnings, setWarnings] = useState<string[] | null>(null);
   const [settings, setSettings] = useState<PrintSettings>({ colours: {}, richBlack: null });
-  const issues = useMemo(() => runPreflight(s.engine, { targetDpi: s.fmt?.dpi ?? 300, digital }), [s.engine, s.fmt, digital]);
+  const issues = useMemo(() => runPreflight(s.engine, { targetDpi: s.dpi, digital }), [s.engine, s.dpi, digital]);
   const errs = issues.filter((i) => i.level === 'error').length;
   const warns = issues.filter((i) => i.level === 'warn').length;
   useEffect(() => {
@@ -276,7 +312,7 @@ function ExportDialog({ s, close, project, fabric, flushPage, templateBytes, ope
       if (kind === 'pdf') {
         const res = await exportPdf(fabric, d, d.pages.map((pg) => pg.json), {
           cmyk, cropMarks: marks, richBlack: rich, richBlackCmyk: settings.richBlack ?? DEFAULT_RICH, blackText,
-          printColours: settings.colours, includeTemplate: incTpl, templateBytes, title: project.name, rasterDpi: Math.max(300, s.fmt?.dpi ?? 300),
+          printColours: settings.colours, includeTemplate: incTpl, templateBytes, title: project.name, rasterDpi: Math.max(300, s.dpi),
         });
         const url = URL.createObjectURL(new Blob([res.bytes as any], { type: 'application/pdf' }));
         download(url, file('pdf'));
@@ -284,11 +320,13 @@ function ExportDialog({ s, close, project, fabric, flushPage, templateBytes, ope
         setWarnings(res.warnings);
       } else {
         const pages = all ? d.pages.map((_, i) => i) : [s.page];
+        const notes = new Set<string>();
         for (const i of pages) {
-          const url = await exportRaster(fabric, d, d.pages[i].json, { format: kind, dpi, px: s.fmt?.px ?? null });
-          download(url, file(kind === 'jpeg' ? 'jpg' : 'png', pages.length > 1 ? `-${d.pages[i].name.toLowerCase().replace(/\s+/g, '-')}` : ''));
+          const r = await exportRaster(fabric, d, d.pages[i].json, { format: kind, dpi, px: s.fmt?.px ?? null });
+          download(r.url, file(kind === 'jpeg' ? 'jpg' : 'png', pages.length > 1 ? `-${d.pages[i].name.toLowerCase().replace(/\s+/g, '-')}` : ''));
+          if (r.capped) notes.add(`This page is too big for a ${dpi} dpi image in a browser: it came out at ${r.dpi} dpi (${r.w} × ${r.h} px). For print, use the Print PDF — it keeps full resolution.`);
         }
-        setWarnings([]);
+        setWarnings([...notes]);
       }
     } catch (e) {
       setWarnings([`Export failed: ${e instanceof Error ? e.message : String(e)}`]);
@@ -464,7 +502,7 @@ function Projects({ s, close, openProject, currentProjectId, onProjectDeleted }:
 /* ---------------- checks ---------------- */
 
 function Checks({ s, close }: Props) {
-  const [issues, setIssues] = useState<Issue[]>(() => runPreflight(s.engine, { targetDpi: s.fmt?.dpi ?? 300, digital: s.digital }));
+  const [issues, setIssues] = useState<Issue[]>(() => runPreflight(s.engine, { targetDpi: s.dpi, digital: s.digital }));
   const select = (id?: string) => {
     if (!id) return;
     const o = s.engine.objects().find((x: any) => x.id === id);
@@ -476,7 +514,7 @@ function Checks({ s, close }: Props) {
   };
   const groups: [Issue['level'], string][] = [['error', 'Fix before printing'], ['warn', 'Worth checking'], ['info', 'Notes']];
   return (
-    <Modal title={`${s.digital ? 'Brand check' : 'Brand & print check'} · ${s.doc.pages[s.page]?.name ?? 'Page'}`} close={close} footer={<><button className="ds2-btn" onClick={() => setIssues(runPreflight(s.engine, { targetDpi: s.fmt?.dpi ?? 300, digital: s.digital }))}>Re-check</button><span className="sp" /><button className="ds2-btn solar" onClick={close}>Done</button></>}>
+    <Modal title={`${s.digital ? 'Brand check' : 'Brand & print check'} · ${s.doc.pages[s.page]?.name ?? 'Page'}`} close={close} footer={<><button className="ds2-btn" onClick={() => setIssues(runPreflight(s.engine, { targetDpi: s.dpi, digital: s.digital }))}>Re-check</button><span className="sp" /><button className="ds2-btn solar" onClick={close}>Done</button></>}>
       {groups.map(([lvl, title]) => {
         const list = issues.filter((i) => i.level === lvl);
         if (!list.length) return null;

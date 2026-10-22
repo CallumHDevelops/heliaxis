@@ -39,13 +39,19 @@ export async function ensureDesignBucket() {
 }
 
 export function safeName(name: string) {
-  return (name || 'file').replace(/[^\w.\- ]+/g, '').replace(/\s+/g, '-').slice(0, 80) || 'file';
+  // (no ".." either: okPath refuses it, so a name like "Pop-up...pdf" could never be read back)
+  return (name || 'file').replace(/[^\w.\- ]+/g, '').replace(/\s+/g, '-').replace(/\.{2,}/g, '.').slice(0, 80) || 'file';
 }
 
-/** Only these folders can be read back through /api/design/file. */
-const PREFIXES = ['templates/', 'uploads/', 'thumbs/'];
+/**
+ * Only these folders can be read back through /api/design/file, and only names the server itself
+ * makes (`<Date.now()>-<safeName>`, `<uuid>.jpg`). storage-js puts the path into the request URL
+ * unencoded, and fetch's URL parser reads `%2e%2e`, `.%2e` or `.<tab>.` as `..`: anything else
+ * (`%`, `\`, whitespace, a second `/`) could walk out of this bucket with the service-role key.
+ */
+const PATH_RE = /^(templates|uploads|thumbs)\/[A-Za-z0-9_][A-Za-z0-9_.-]{0,200}$/;
 export function okPath(p: unknown): p is string {
-  return typeof p === 'string' && p.length < 300 && !p.includes('..') && !p.startsWith('/') && PREFIXES.some((x) => p.startsWith(x));
+  return typeof p === 'string' && PATH_RE.test(p) && !p.includes('..');
 }
 
 export async function signedFile(path: string, seconds = 600) {
@@ -76,7 +82,10 @@ export function cleanGeometry(g: unknown): PageGeometry | null {
   const t = o.trim as Record<string, unknown> | undefined;
   if (!num(o.mediaW, 1, 20000) || !num(o.mediaH, 1, 20000) || !t) return null;
   if (!num(t.x, 0, 20000) || !num(t.y, 0, 20000) || !num(t.w, 1, 20000) || !num(t.h, 1, 20000)) return null;
-  if (!num(o.safe, 0, 2000)) return null;
+  // a safe area as deep as half the page leaves nothing inside it
+  if (!num(o.safe, 0, 2000) || (o.safe as number) >= Math.min(t.w as number, t.h as number) / 2) return null;
+  const tb = o.tplBox as Record<string, unknown> | undefined;
+  if (tb !== undefined && !(tb && num(tb.x, -40000, 40000) && num(tb.y, -40000, 40000) && num(tb.w, 0.1, 80000) && num(tb.h, 0.1, 80000))) return null;
   return o as unknown as PageGeometry;
 }
 
