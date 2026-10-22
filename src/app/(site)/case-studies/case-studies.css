@@ -1,0 +1,43 @@
+/* Public /case-studies index. Brand tokens come from the .site scope (site.css). */
+
+.cs-hero{background:var(--ink);color:var(--paper);padding:84px 0 72px;position:relative;overflow:hidden}
+.cs-hero::after{content:"";position:absolute;right:-120px;top:-160px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(248,188,30,.22),transparent 65%);pointer-events:none}
+.cs-hero h1{font-size:clamp(2.2rem,4.6vw,3.5rem);font-weight:900;margin-top:14px;letter-spacing:-.02em;max-width:18ch}
+.cs-hero h1 .y{color:var(--solar)}
+.cs-hero .lead{margin-top:18px;font-size:1.12rem;max-width:58ch;color:#E9E3D4;line-height:1.6}
+.cs-hero-btns{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+
+.cs-list{padding:64px 0 40px}
+.cs-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.cs-card{display:flex;flex-direction:column;height:100%;background:var(--card);border:1px solid var(--line);border-radius:3px;overflow:hidden;color:var(--ink);text-decoration:none;transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}
+.cs-card:hover{border-color:var(--ink);box-shadow:0 18px 40px -26px rgba(33,31,24,.55);transform:translateY(-2px)}
+.cs-card:focus-visible{outline:2px solid var(--amber-2);outline-offset:3px}
+.cs-card-media{position:relative;aspect-ratio:16/10;background:linear-gradient(135deg,#26324c,#171d2b)}
+.cs-card-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.cs-card-ph{position:absolute;inset:0}
+.cs-card-body{display:flex;flex-direction:column;gap:10px;padding:20px 20px 22px;flex:1}
+.cs-card-body h2{font-size:1.22rem;font-weight:700;line-height:1.2}
+.cs-card-body p{color:var(--muted);font-size:.95rem;line-height:1.55;margin:0}
+.cs-card-more{margin-top:auto;padding-top:6px;font-family:var(--display);font-weight:700;color:var(--amber-2)}
+.cs-tags{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.cs-tags li{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:2px;padding:3px 7px}
+
+.cs-empty{max-width:640px;margin:0 auto;text-align:center;padding:24px 0}
+.cs-empty h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800}
+.cs-empty p{color:var(--muted);margin:14px 0 24px;line-height:1.6}
+.cs-note{max-width:760px;margin:40px auto 0;text-align:center;color:var(--muted);font-size:.86rem;line-height:1.6}
+
+.cs-cta{background:var(--ink);color:var(--paper);padding:64px 0;text-align:center}
+.cs-cta h2{font-size:clamp(1.6rem,3.2vw,2.4rem);font-weight:800;max-width:24ch;margin:0 auto}
+.cs-cta p{color:#E9E3D4;margin-top:12px}
+.cs-cta .cs-hero-btns{justify-content:center}
+.cs-ghost{border-color:var(--paper);color:var(--paper)}
+.cs-ghost:hover{border-color:var(--solar);color:var(--solar)}
+
+@media (max-width:960px){.cs-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){
+  .cs-hero{padding:60px 0 52px}
+  .cs-grid{grid-template-columns:1fr}
+  .cs-list{padding:44px 0 28px}
+  .cs-hero-btns .btn{flex:1 1 100%}
+}

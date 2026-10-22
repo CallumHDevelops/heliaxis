@@ -1,5 +1,7 @@
 /** Shared CMS contact-form behaviour for published pages + admin preview. */
 
+import { trackConversion } from '@/lib/conversion-events';
+
 const OPT_IN_LABEL = 'OK to message me on WhatsApp about my enquiry';
 const OPT_IN_LABEL_CSS = 'display:flex;align-items:flex-start;gap:.55rem;margin:.25rem 0 .9rem;font-size:.9rem;line-height:1.35;cursor:pointer;text-align:left;text-transform:none;letter-spacing:normal';
 const OPT_IN_BOX_CSS = 'width:20px;height:20px;min-width:20px;padding:0;margin:1px 0 0;border:0;box-shadow:none;flex:0 0 auto;appearance:auto;-webkit-appearance:checkbox;accent-color:#C77F04';
@@ -74,6 +76,8 @@ async function submitCmsForm(form: HTMLFormElement) {
   const organization = String(fd.get('organization') || '').trim();
   const message = String(fd.get('message') || '').trim();
   const interestField = String(fd.get('interest') || '').trim();
+  const roofType = String(fd.get('roofType') || '').trim();
+  const extras = fd.getAll('extras').map((v) => String(v).trim()).filter(Boolean);
   const whatsappOptIn = fd.get('whatsappOptIn') === 'on';
   const sector = collectSector(form);
   const interests = collectInterests(form);
@@ -125,6 +129,8 @@ async function submitCmsForm(form: HTMLFormElement) {
           : sector
             ? 'business'
             : ''),
+        roofType,
+        extras,
         source: 'cms-form',
         whatsappOptIn,
       }),
@@ -132,6 +138,7 @@ async function submitCmsForm(form: HTMLFormElement) {
     const d = await r.json().catch(() => ({}));
     if (r.ok && d.success) {
       setMsg(form, d.message || "Thank you — we've received your enquiry and will be in touch shortly.", true);
+      trackConversion('quote-submit', { form: form.closest('.pv-quote')?.id || 'quote', propertyType: propertyType || 'unknown' });
       form.reset();
       form.querySelectorAll('.pv-tile.on').forEach((el) => el.classList.remove('on'));
       if (btn) btn.style.display = 'none';
@@ -239,6 +246,8 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
     var organization=String(fd.get('organization')||'').trim();
     var message=String(fd.get('message')||'').trim();
     var interestField=String(fd.get('interest')||'').trim();
+    var roofType=String(fd.get('roofType')||'').trim();
+    var extras=fd.getAll('extras').map(function(v){return String(v).trim();}).filter(Boolean);
     var waOptIn=fd.get('whatsappOptIn')==='on';
     var sec=sector(form);var ints=interests(form);var ptype=propType(form);
     if(!name){setMsg(form,'Please enter your name.',false);return;}
@@ -251,7 +260,7 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
     setMsg(form,'',true);
     fetch('/api/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name:name,email:email,phone:phone,postcode:postcode,organization:organization,message:message,sector:sec,interests:ints,
-      interest:interestField||ints.join(', ')||message,propertyType:ptype||(/residential/i.test(sec)?'home':(sec?'business':'')),source:'cms-form',whatsappOptIn:waOptIn
+      interest:interestField||ints.join(', ')||message,propertyType:ptype||(/residential/i.test(sec)?'home':(sec?'business':'')),roofType:roofType,extras:extras,source:'cms-form',whatsappOptIn:waOptIn
     })}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});}).then(function(x){
       if(x.ok&&x.d.success){setMsg(form,x.d.message||"Thank you — we've received your enquiry and will be in touch shortly.",true);form.reset();form.querySelectorAll('.pv-tile.on').forEach(function(el){el.classList.remove('on');});if(btn)btn.style.display='none';}
       else{setMsg(form,(x.d&&x.d.error)||'Something went wrong. Please try again.',false);if(btn){btn.removeAttribute('aria-disabled');btn.classList.remove('busy');var lab2=btn.querySelector('[data-btn-label]')||btn;lab2.textContent=(prev||'Send Enquiry').replace(/Sending…/,'').trim()||'Send Enquiry';}}

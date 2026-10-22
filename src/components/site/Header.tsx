@@ -10,7 +10,7 @@ import styles from './Header.module.css';
 const DEFAULT_TOPBAR: SiteTopbar = {
   show: true,
   accreditationText: 'MCS · RECC · NICEIC · TrustMark certified installer',
-  ratingValue: '4.9',
+  ratingValue: '',
   hoursText: 'Mon–Sat 8am–6pm',
   phone: '01633 965205',
   phoneHref: 'tel:01633965205',
@@ -82,7 +82,7 @@ const DEFAULT_MENU: MenuTop[] = [
         items: [
           { icon: 'estimator', label: 'Savings estimator', href: '/solar-estimator', desc: 'See your savings in 20 seconds' },
           { icon: 'roof', label: 'Roof designer', href: '/roof-designer', desc: 'Draw your roof, place the panels' },
-          { icon: 'fund', label: 'Funding & 0% VAT', href: '/#quote', desc: '0% VAT on home solar to 2027' },
+          { icon: 'fund', label: 'Funding & 0% VAT', href: '/#quote', desc: '0% VAT on qualifying home solar to Mar 2027' },
           { icon: 'phone', label: 'Book a free survey', href: '/#quote', desc: 'No obligation, no hard sell' },
         ],
       },
@@ -191,7 +191,13 @@ export default function Header({ menu, topbar }: { menu?: MenuTop[]; topbar?: Si
           <div className={styles.wrap}>
             <span className={styles.tl}>{tb.accreditationText}</span>
             <span className={styles.tr}>
-              <span className={styles.stars}>★★★★★</span> {tb.ratingValue} rated · {tb.hoursText} ·{' '}
+              {/* Only a rating the CMS editor has entered (and can evidence) is shown. */}
+              {tb.ratingValue?.trim() ? (
+                <>
+                  <span className={styles.stars}>★★★★★</span> {tb.ratingValue} rated ·{' '}
+                </>
+              ) : null}
+              {tb.hoursText} ·{' '}
               <a href={tb.phoneHref}>{tb.phone}</a>
             </span>
           </div>

@@ -21,8 +21,8 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
   stats: { items: [{ n: '100+', k: 'Installs' }] },
   grid: { eyebrow: 'Section', title: 'Section title', anchor: '', cols: 3, fill: 'none', items: [{ icon: 'solar', title: 'Item one', desc: 'Description.' }] },
   split: { lIcon: 'home', lt: 'For your home', ld: 'Text.', lb: ['Point one', 'Point two'], lc: 'Home quote', lcHref: '#quote', rIcon: 'building', rt: 'For your business', rd: 'Text.', rb: ['Point one', 'Point two'], rc: 'Business quote', rcHref: '/commercial-funding' },
-  media: { img: '', side: 'right', eyebrow: 'Why choose us', title: 'A section title', text: 'Describe the benefit here.', cta: 'Learn more', ctaHref: '#quote', ctaDisabled: false, textWide: false, fit: 'cover' },
-  steps: { eyebrow: 'How it works', title: 'From enquiry to switch-on', items: [{ title: 'Step', text: 'Detail.' }] },
+  media: { img: '', side: 'right', eyebrow: 'Why choose us', title: 'A section title', text: 'Describe the benefit here.', cta: 'Learn more', ctaHref: '#quote', ctaDisabled: false, textWide: false, fit: 'cover', _anchor: '' },
+  steps: { eyebrow: 'How it works', title: 'From enquiry to switch-on', items: [{ title: 'Step', text: 'Detail.' }], _anchor: '' },
   funding: { eyebrow: 'Funding & finance', title: 'Solar within reach, whatever your budget', sub: '', items: [{ title: 'Option', text: 'Detail.' }], cta: '', ctaHref: '/commercial-funding', ctaDisabled: false },
   explorer: { eyebrow: 'Mounting systems', title: 'One roof, every way to mount it', sub: '', items: [{ title: 'Option', text: 'Detail.', img: '', cta: '', ctaHref: '#quote' }] },
   faq: { eyebrow: 'Good to know', title: 'Your questions, answered', anchor: 'faq', items: [{ q: 'A question?', a: 'An answer.' }] },
@@ -30,7 +30,9 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
   rich: { html: '<p>Write anything here…</p>' },
   testi: { eyebrow: 'Real customers', title: 'Trusted across South Wales', footnote: '', speed: 36, items: [{ stars: 5, quote: 'Great service.', name: 'Name', loc: 'Town · Solar' }] },
   pricing: { eyebrow: 'Options', title: 'Choose how you fund it', plans: [{ name: 'Plan', price: 'From £0', per: 'one-off', feats: ['Feature one'], cta: 'Get a quote', ctaHref: '#quote', hl: false }] },
-  casestudy: { eyebrow: 'Our work', title: 'Recent projects', items: [{ img: '', loc: 'Location', title: 'Project', stat: '00%', statlabel: 'Result' }] },
+  casestudy: { eyebrow: 'Our work', title: 'Recent projects', sub: '', items: [{ img: '', loc: '[Town · type]', title: '[Project title]', sum: '', stat: '', statlabel: '', basis: '', href: '', cta: 'Read the case study' }], allLabel: 'View all case studies', allHref: '/case-studies', allDisabled: false, _anchor: '' },
+  anchornav: { label: 'On this page', items: [{ label: 'Section', href: '#section' }], cta: 'Get a quote', ctaHref: '#quote', ctaDisabled: false },
+  notice: { tone: 'info', title: '', text: '', reviewedLabel: 'Last reviewed', reviewed: '', linkLabel: '', linkHref: '', _anchor: '' },
   gallery: { eyebrow: 'Recent work', title: 'Installs across South Wales', sub: '', featuredLabel: 'Featured install', footnote: '', featuredIndex: 0, items: [{ img: '', loc: 'Location', featured: true }] },
 };
 
@@ -163,7 +165,10 @@ function normalizeBlock(raw: unknown): CmsBlock | null {
   if (t === 'media') p.img = '';
   if (t === 'rich') p.html = sanitizeRich(p.html);
   if (t === 'testi') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.stars = clampInt(it.stars, 1, 5, 5); });
-  if (t === 'casestudy') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.img = ''; });
+  // Case-study cards are placeholders: the model never has real project results, so strip any figure it adds.
+  if (t === 'casestudy') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.img = ''; it.stat = ''; it.statlabel = ''; it.basis = ''; });
+  if (t === 'anchornav') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.href = '#' + String(it.href || '').replace(/[^a-zA-Z0-9_-]/g, ''); });
+  if (typeof p._anchor === 'string') p._anchor = p._anchor.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
   if (t === 'explorer') (p.items as Array<Record<string, unknown>>).forEach((it) => { it.img = ''; });
   if (t === 'gallery') {
     const items = p.items as Array<Record<string, unknown>>;
@@ -333,6 +338,9 @@ GOAL: write a page that OUTRANKS and OUT-HELPS the competitor pages provided in 
 
 Write plain, authoritative British English. No hype, no filler, no purple prose. Never invent statistics, prices, percentages, certifications, grants, phone numbers, emails, dates or customer names — if a figure is not established, keep the claim qualitative. Use the research ONLY for topic coverage and structure, never to copy wording or lift unverified numbers.
 
+CLAIMS THAT NEED EVIDENCE (from Heliaxis' content review): unless the brief supplies the evidence, never state as fact — panel warranty lengths (e.g. 25- or 30-year), "Tier-1" panels, in-house MCS design, that G98/G99 is handled on every job, heat pump COP figures, payback periods, named grants (e.g. Newport SME grants), OZEV or workplace-charging compliance, full-home backup or off-grid capability. Never guarantee savings or a payback date; separate bill savings from export earnings.
+UK POLICY WORDING: VAT — "qualifying residential solar and battery installations may benefit from 0% VAT until 31 March 2027, subject to HMRC rules" (never a blanket rule, and not for commercial projects). SEG — eligible generators can be paid for exports; suppliers set rates and terms. G98/G99 — the DNO connection process depends on the system and network; never imply every system follows the same one.
+
 WRITE FOR THE READER (audience-first — this matters most; earlier drafts were too generic and textbook):
 - Work out WHO the page is for from the brief (e.g. business owners / facilities managers, or homeowners) and write to their actual priorities: cost, payback drivers, disruption, reliability, warranties, and the practical next step.
 - Lead with the reader's outcome and concrete specifics, NOT a dictionary definition. NEVER open a section with "X refers to…", "X is the installation of…", "X is a system that…", or "Understanding X". Assume they already know what solar is — tell them what it means for THEIR site and why it's worth their time.
@@ -377,12 +385,16 @@ steps { eyebrow, title, items:[{ title, text }] }  // numbered process, 3-8 step
 funding { eyebrow, title, sub, items:[{ title, text }], cta, ctaHref }  // finance/grant cards.
 explorer { eyebrow, title, sub, items:[{ title, text, cta, ctaHref }] }  // dark interactive "feature explorer": 3-6 options a visitor clicks to expand; leave images out.
 faq   { eyebrow, title, items:[{ q, a }] }  // Q&A accordion.
-testi { eyebrow, title, items:[{ stars:5, quote, name, loc }] }  // testimonials. Mark quotes as illustrative in footnote if invented.
+testi { eyebrow, title, items:[{ stars:5, quote, name, loc }] }  // testimonials. ONLY when the brief supplies real, approved customer quotes — never invent a quote, name or rating.
 pricing { eyebrow, title, plans:[{ name, price, per, feats:[".."], cta, ctaHref, hl:false }] }  // set hl:true on one recommended plan.
-casestudy { eyebrow, title, items:[{ loc, title, stat, statlabel }] }  // project cards with a headline stat.
+casestudy { eyebrow, title, sub, items:[{ loc, title, sum, href }], allLabel, allHref:"/case-studies" }  // real-project cards (one card = a wide featured band). Placeholders in [brackets] only; never invent a project, customer or result.
+anchornav { label, items:[{ label, href:"#anchor" }], cta, ctaHref }  // sticky in-page section nav. Place it straight after the hero on long pages (8+ blocks); 4–7 short links, each pointing at a section's anchor.
+notice { tone:"info"|"warn", title, text, reviewedLabel, reviewed, linkLabel, linkHref }  // eligibility / policy note (VAT, export tariffs, grants). Link the official source; leave reviewed empty (the editor fills the date).
 gallery { eyebrow, title, sub, items:[{ loc }] }  // photo grid (captions only).
 cta   { headline, sub, btn, btnHref }  // closing call-to-action band.
 rich  { html }  // long-form prose. Allowed HTML only: <p> <strong> <em> <a> <br> <ul> <ol> <li> <h3> <h4> <blockquote>. No inline styles, images or scripts.
+
+ANCHORS: grid and faq take "anchor"; media, steps, casestudy and notice take "_anchor" (kebab-case). Every anchornav link must match one of these anchors, "#faq" or "#quote".
 
 Hrefs: use "#quote" for quote CTAs, "/commercial-funding" for business/funding, or a real internal path. Keep the JSON compact and valid.`;
 

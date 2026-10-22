@@ -965,6 +965,82 @@ button.pv-seg{font:inherit}
 .pvlink-actions{display:flex;gap:6px;margin-top:2px}
 .pvlink-save{flex:1;padding:8px;border:0;border-radius:5px;background:var(--solar,#F8BC1E);color:var(--ink,#211F18);font-weight:700;cursor:pointer;font-size:.82rem}
 .pvlink-cancel{padding:8px 12px;border:1px solid var(--line,rgba(33,31,24,.18));border-radius:5px;background:transparent;color:var(--ink,#211F18);cursor:pointer;font-size:.82rem}
+/* ---------- Mobile: multi-column sections ----------
+   Grid, stat and pricing sections set their column count inline (repeat(n,1fr)), which kept 3–4
+   columns on phones and pushed cards off-screen. Step them down on narrow screens. */
+@media(max-width:900px){
+  .pv-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .pv-grid > .pv-contact{grid-column:1 / -1!important}
+  .pv-sec > div[style*="grid-template-columns"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:560px){
+  .pv-grid,.pv-sec > div[style*="grid-template-columns"]{grid-template-columns:1fr!important}
+  .pv-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+/* ---------- Section anchors + sticky section nav ---------- */
+.pv-anchor{display:block;height:0;scroll-margin-top:calc(var(--hx-hdr,0px) + 72px)}
+.pv-page [id]{scroll-margin-top:calc(var(--hx-hdr,0px) + 72px)}
+.pv-page > div:has(> .pv-anav){position:sticky;top:var(--hx-hdr,0px);z-index:40}
+.pv-anav{background:rgba(247,242,231,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);box-shadow:0 10px 24px -22px rgba(33,31,24,.6)}
+.pv-anav-in{max-width:var(--pv-max,1160px);margin:0 auto;padding:0 var(--pv-gutter,24px);display:flex;align-items:center;gap:16px;min-height:56px}
+.pv-anav-links{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;-webkit-overflow-scrolling:touch}
+.pv-anav-links::-webkit-scrollbar{display:none}
+.pv-anav-links a{flex:0 0 auto;font-family:var(--mono);font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:10px 12px;border-radius:2px;border-bottom:2px solid transparent;white-space:nowrap}
+.pv-anav-links a:hover{color:var(--ink)}
+.pv-anav-links a.is-on,.pv-anav-links a[aria-current="true"]{color:var(--ink);border-bottom-color:var(--solar)}
+.pv-anav-cta{flex:0 0 auto}
+.pv-anav-cta .pv-btn{padding:9px 16px;font-size:.88rem}
+.dk .pv-anav{background:rgba(23,29,43,.94);border-bottom-color:var(--line-d,rgba(247,242,231,.16))}
+@media(max-width:640px){.pv-anav-cta{display:none}.pv-anav-in{min-height:48px;padding:0 12px}}
+
+/* ---------- Notice / disclaimer ---------- */
+.pv-notice-wrap{padding:18px var(--pv-pad,24px);width:100%;box-sizing:border-box}
+.pv-notice{max-width:900px;margin:0 auto;display:grid;grid-template-columns:30px 1fr;gap:14px;align-items:start;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--solar);border-radius:3px;padding:18px 20px}
+.pv-notice.is-warn{border-left-color:var(--amber-2);background:#FFF6DE}
+.pv-notice-ic{width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--solar);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:.9rem;font-style:italic}
+.pv-notice-body h3{font-size:1.04rem;font-weight:700;margin:2px 0 6px}
+.pv-notice-body p{margin:0;color:var(--ink);font-size:.95rem;line-height:1.6}
+.pv-notice-meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-family:var(--mono);font-size:.68rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.pv-notice-link{color:var(--amber-2);text-decoration:underline;text-underline-offset:2px}
+.dk .pv-notice.is-warn{background:var(--card)}
+
+/* ---------- Case-study cards / featured band ---------- */
+.pv-cs .shead p{margin-top:14px;color:var(--muted);font-size:1.06rem}
+.pv-cs-grid{display:grid;grid-template-columns:repeat(var(--cs-cols,3),minmax(0,1fr));gap:16px}
+.pv-cs-card{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.pv-cs-media{position:relative;height:170px;background:linear-gradient(135deg,#26324c,#171d2b)}
+.pv-cs-media img,.pv-cs-media .pv-img-hit{position:absolute;inset:0;width:100%;height:100%}
+.pv-cs-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;color:var(--muted-d,#A69F8E)}
+.pv-cs-empty.is-pick{cursor:pointer}
+.pv-cs-body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:6px;flex:1}
+.pv-cs-loc{font-family:var(--mono);font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.pv-cs-body h3{font-size:1.08rem;font-weight:700}
+.pv-cs-sum{margin:2px 0 0;color:var(--muted);font-size:.92rem;line-height:1.55}
+.pv-cs-stat{font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:8px}
+.pv-cs-statlabel{font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pv-cs-basis{font-family:var(--mono);font-size:.58rem;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:2px;padding:2px 6px;color:var(--ink)}
+.pv-cs-more{margin-top:auto;padding-top:10px;font-family:var(--display);font-weight:700;color:var(--amber-2);text-decoration:none}
+.pv-cs-more:hover{text-decoration:underline;text-underline-offset:3px}
+.pv-cs-all{margin-top:24px}
+.pv-cs.is-feature .pv-cs-grid{grid-template-columns:1fr}
+.pv-cs.is-feature .pv-cs-card{display:grid;grid-template-columns:1.1fr 1fr}
+.pv-cs.is-feature .pv-cs-media{height:auto;min-height:280px}
+.pv-cs.is-feature .pv-cs-body{padding:30px 32px;justify-content:center}
+.pv-cs.is-feature .pv-cs-body h3{font-size:clamp(1.3rem,2.2vw,1.7rem)}
+@media(max-width:900px){.pv-cs-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.pv-cs-grid{grid-template-columns:1fr}.pv-cs.is-feature .pv-cs-card{grid-template-columns:1fr}.pv-cs.is-feature .pv-cs-media{min-height:200px}.pv-cs.is-feature .pv-cs-body{padding:20px}}
+
+/* ---------- Quote form: roof type + battery / EV / heat pump options ---------- */
+.pv-qfield select{width:100%;box-sizing:border-box;font-family:var(--body);font-size:1rem;padding:12px 14px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);appearance:auto}
+.pv-qfield select:focus{outline:none;border-color:var(--solar);box-shadow:0 0 0 3px rgba(248,188,30,.18)}
+.pv-qlabel{display:block;font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.pv-qchips{display:flex;flex-wrap:wrap;gap:8px}
+.pv-qfield .pv-qchip{position:relative;display:inline-flex;cursor:pointer;margin:0;font-family:var(--body);font-size:inherit;letter-spacing:normal;text-transform:none;color:var(--ink)}
+.pv-qfield .pv-qchip input{position:absolute;opacity:0;width:1px;height:1px;padding:0;margin:0;border:0}
+.pv-qchip span{display:inline-block;font-family:var(--body);padding:8px 13px;border:1px solid var(--line);border-radius:999px;background:var(--paper);font-size:.9rem;color:var(--ink);transition:background .15s ease,border-color .15s ease}
+.pv-qchip:hover span{border-color:var(--ink)}
+.pv-qchip input:checked + span{background:var(--solar);border-color:var(--solar);font-weight:600}
+.pv-qchip input:focus-visible + span{outline:2px solid var(--amber-2);outline-offset:2px}
 .modal{position:fixed;inset:0;background:rgba(33,31,24,.72);display:none;place-items:center;z-index:100;padding:16px}
 .modal.show{display:grid}
 .modalbox{background:#fff;border:1px solid var(--line);border-radius:8px;max-width:560px;width:min(560px,100%);max-height:86vh;overflow:auto;padding:24px;box-shadow:0 24px 56px -28px rgba(33,31,24,.55);color:var(--ink)}

@@ -24,6 +24,11 @@ export async function POST(request: NextRequest) {
       ? body.interests.map((x: unknown) => String(x || '').trim()).filter(Boolean)
       : [];
     const interestFromArr = interestsArr.join(', ');
+    // Optional quote-form extras: roof type and battery / EV / heat pump interest (capped, plain text).
+    const extrasArr: string[] = Array.isArray(body.extras)
+      ? body.extras.map((x: unknown) => String(x || '').trim().slice(0, 40)).filter(Boolean).slice(0, 6)
+      : [];
+    const roofType = (body.roofType || '').toString().trim().slice(0, 60);
 
     const data = {
       name: (body.name || '').toString().trim(),
@@ -54,9 +59,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store interests cleanly for CRM icons; fold org/message into parseable suffixes.
+    // Store interests cleanly for CRM icons; fold roof/org/message into parseable suffixes
+    // (Message stays last: parseMessage reads it to the end of the string).
+    const interestCore = [data.interest || interestFromArr, extrasArr.join(', ')].filter(Boolean).join(', ');
     const interestParts = [
-      data.interest || interestFromArr,
+      interestCore,
+      roofType ? `Roof: ${roofType}` : '',
       data.organization ? `Org: ${data.organization}` : '',
       data.message ? `Message: ${data.message}` : '',
     ].filter(Boolean);
@@ -94,7 +102,7 @@ export async function POST(request: NextRequest) {
             await ensureOpportunity(row.id, data.source);
           });
           after(() =>
-            notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', `/admin/enquiries?enquiry=${row.id}`, {
+            notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, interestCore || data.message || 'From the website', `/admin/enquiries?enquiry=${row.id}`, {
               tag: `enq-${row.id}`,
               ref: leadRef(row.id),
             }).catch(() => {})
@@ -148,7 +156,8 @@ export async function POST(request: NextRequest) {
               <div class="row"><div class="label">Phone</div><div class="value">${escHtml(data.phone || 'Not provided')}</div></div>
               <div class="row"><div class="label">WhatsApp</div><div class="value">${data.whatsappOptIn ? 'Happy to be messaged on WhatsApp' : 'Didn’t tick the WhatsApp box'}</div></div>
               <div class="row"><div class="label">Postcode</div><div class="value">${escHtml(data.postcode || 'Not provided')}</div></div>
-              <div class="row"><div class="label">Interested in</div><div class="value">${escHtml(data.interest || 'Not specified')}</div></div>
+              <div class="row"><div class="label">Interested in</div><div class="value">${escHtml(interestCore || 'Not specified')}</div></div>
+              ${roofType ? `<div class="row"><div class="label">Roof type</div><div class="value">${escHtml(roofType)}</div></div>` : ''}
               ${data.message ? `<div class="row"><div class="label">Message</div><div class="value">${escHtml(data.message)}</div></div>` : ''}
               <div class="row"><div class="label">Source</div><div class="value">${escHtml(data.source)}</div></div>
             </div>

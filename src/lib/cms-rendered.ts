@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 export type CmsRenderedPage = {
   slug: string;
   name: string;
+  /** CMS page type (page, landing, casestudy, blog…) — present on pages published since it was added. */
+  type?: string;
   theme?: string;
   seo?: { title?: string; desc?: string; noindex?: boolean };
   html: string;

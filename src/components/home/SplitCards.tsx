@@ -16,7 +16,7 @@ export function SplitCards() {
             <p>Cut your bills, add battery backup and go greener — with a system designed around your household.</p>
             <ul>
               <li>Free, no-obligation home survey</li>
-              <li>0% VAT on residential solar until 2027</li>
+              <li>0% VAT on qualifying home solar &amp; batteries to 31 March 2027</li>
               <li>Finance options to spread the cost</li>
             </ul>
             <a className="btn btn-dark" href="#quote">Get my home quote</a>
@@ -36,7 +36,7 @@ export function SplitCards() {
             <ul>
               <li>Free commercial energy assessment</li>
               <li>Grants, finance &amp; PPA / Solar-as-a-Service</li>
-              <li>Typical 3–6 year payback</li>
+              <li>Payback modelled on your site&rsquo;s real demand</li>
             </ul>
             <a className="btn btn-solar" href="/commercial-funding">Explore business funding</a>
           </div>

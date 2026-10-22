@@ -29,6 +29,10 @@
 .site > .pv-live{flex:1 0 auto;display:flex;flex-direction:column}
 .pv-live > .pv-page{flex:1 0 auto;display:flex;flex-direction:column}
 .pv-live > .pv-page > div:has(> .pv-footer){margin-top:auto}
+/* The published CMS stylesheet sets html,body{overflow:auto} (for standalone exports). On the live site
+   that makes <body> a scroll container that never scrolls, which stops position:sticky working: the
+   header and the CMS section nav would scroll away. Restore normal page scrolling. */
+html:has(body .site),html:has(body .site) > body{overflow:visible}
 /* Blog posts (CMS-rendered) — anchor the SiteFooter to the bottom on short posts */
 .site:has(> .blog-live-body){display:flex;flex-direction:column;min-height:100vh}
 .site > .blog-live-body{flex:1 0 auto}

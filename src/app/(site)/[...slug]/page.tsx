@@ -40,6 +40,7 @@ export default async function CmsCatchAllPage({
       <style dangerouslySetInnerHTML={{ __html: rendered.css }} />
       <div
         className={'pv-live' + (page.theme === 'dark' ? ' dk' : '')}
+        data-page-type={page.type || 'page'}
         dangerouslySetInnerHTML={{ __html: page.html }}
       />
       <CmsFormRuntime />

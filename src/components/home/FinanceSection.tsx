@@ -12,8 +12,15 @@ export function FinanceSection() {
         </div>
         <div className="fgrid">
           <div className="fcard reveal">
-            <h3>0% VAT on home solar</h3>
-            <p>Residential installs carry 0% VAT until 31 March 2027 — a saving worth locking in.</p>
+            <h3>0% VAT on qualifying home solar</h3>
+            <p>
+              Qualifying residential solar and battery installations may benefit from 0% VAT until 31 March 2027,
+              subject to{' '}
+              <a href="https://www.gov.uk/guidance/vat-rates-on-different-goods-and-services" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--solar)' }}>
+                HMRC rules
+              </a>
+              . We confirm eligibility in your quote.
+            </p>
           </div>
           <div className="fcard reveal d1">
             <h3>Finance &amp; PPA options</h3>
@@ -21,12 +28,12 @@ export function FinanceSection() {
           </div>
           <div className="fcard reveal d2">
             <h3>Welsh &amp; local grants</h3>
-            <p>From the Nest scheme to Newport&rsquo;s SME decarbonisation grant — we&rsquo;ll help you find and time it.</p>
+            <p>Grant schemes open and close. We check what&rsquo;s currently available for your home or business, and whether you&rsquo;re eligible.</p>
           </div>
         </div>
         <a className="urgency reveal" href="/commercial-funding">
           <span className="dot" />
-          0% VAT ends March 2027 — see all funding routes →
+          See all funding routes →
         </a>
       </div>
     </section>

@@ -41,7 +41,7 @@ export function ValueGrid() {
               </svg>
             </span>
             <h3>Fully guaranteed</h3>
-            <p>Insurance-backed workmanship and 25-year panel warranties as standard.</p>
+            <p>Insurance-backed workmanship cover, plus the manufacturer&rsquo;s product and performance warranties on your kit.</p>
           </div>
           <div className="vcard reveal d3">
             <span className="ic">

@@ -125,34 +125,36 @@ GUARDRAILS: Qualitative only - no invented savings, prices, percentages, grants,
     slug: "/solar-panels",
     keywords: "solar panel installation South Wales; solar panels South Wales; solar panel installers Wales",
     audience: "Homeowners researching whether solar PV is right for their property",
-    goal: "Book a free solar survey",
-    ctaText: "Book a solar survey",
+    goal: "Get a quote (free solar survey)",
+    ctaText: "Get a quote",
     ctaLink: "#quote",
-    words: "1,300–1,700",
-    prompt: `Build the residential page "Solar panel installation South Wales" for homeowners deciding whether solar PV suits their home.
+    words: "1,500–2,000",
+    prompt: `Build the residential page "Solar panel installation South Wales": a customer decision-making resource, not a product list. Help homeowners judge suitability, understand how a system works, what drives savings, how export works, how installation and grid connection work, and what support they get after switch-on.
 
-POSITIONING: A plain, authoritative guide that turns "will solar work on my roof in our weather?" into a booked, no-obligation survey with a local MCS-certified installer.
+POSITIONING: Solar panels designed around your home, energy use and budget. Plain-English, transparent figures, honest about weather and seasons, backed by real project evidence and clear aftercare.
 
-KEYWORDS & INTENT: Primary: solar panel installation South Wales. Secondary: solar panels South Wales; solar panel installers Wales; home solar PV. Intent: homeowner researching suitability before committing; keyword in H1 and intro. Priorities: real performance (not hype), roof suitability, disruption/process, kit quality, warranties/aftercare, a low-risk next step.
+KEYWORDS & INTENT: Primary: solar panel installation South Wales. Secondary: solar panels South Wales; solar panel installers Wales; home solar PV; solar Smart Export Guarantee. Keyword in H1 and intro. Priorities: real performance (cloud, winter, roof direction, shading), cost and savings drivers, SEG export, battery/EV/heat-pump fit, installation and DNO process, credentials and warranties, aftercare.
 
-SECTION PLAN (in order; no two dark sections adjacent):
-1. hero (dark): H1 with keyword; GEO direct-answer lead — what home solar does, that it suits many Welsh roofs, and that it starts with a free survey. CTA.
-2. grid: How solar PV works + Welsh-climate performance — generates from daylight not heat; works under UK cloud; quiet, low-maintenance. Outcome-led, no figures.
-3. explorer (dark): Is your roof suitable? — clickable roof types slate, tile, metal, flat; plus on-roof vs in-roof mounting.
-4. media: Orientation, pitch, shading & usable area — south-facing vs east/west arrays, shading, pitch, available roof area; image blank.
-5. split: Self-consumption vs export — using power as generated vs sending surplus to the grid under the Smart Export Guarantee (high level, no rates).
-6. grid: Kit & sizing — panels, inverter basics, matching system size to property and consumption, monitoring.
-7. steps: Survey to switch-on — survey, design, DNO notification/application (homeowner level), MCS install, commissioning, handover, monitoring.
-8. grid: Accreditations — 4 cards on what MCS, RECC, NICEIC and TrustMark each mean in practice.
-9. grid: Complete home energy system — add battery storage, EV charging, heat pump (3 cards).
-10. faq.
-11. cta (dark).
+SECTION PLAN (in order; no two dark sections adjacent; give each section the anchor shown):
+1. hero (dark): H1 "Solar Panels Designed Around Your Home, Energy Use and Budget" (keep the keyword in the sub). GEO direct answer: what home solar does and that it starts with a free survey. Primary CTA "Get a quote" -> #quote; cta2 "View case studies" -> /case-studies.
+2. anchornav: Why solar (#why-solar), How it works (#how-it-works), Costs & savings (#costs), Installation (#installation), Aftercare (#aftercare), Case studies (#case-studies), FAQs (#faq). Button "Get a quote" -> #quote.
+3. grid(4) anchor why-solar: "Why choose solar in South Wales?" — generates from daylight not heat; works under cloud but lower output; seasonal generation (most output spring–early autumn, little in midwinter); roof orientation/pitch/shading/area; usage pattern. Say any seasonal figures are illustrative and property-specific.
+4. media _anchor how-it-works: how the system works — panels -> inverter -> home appliances -> optional battery / EV / hot-water diverter -> grid export; what happens when generation is lower than demand (battery if fitted, then grid, automatically).
+5. grid(4) anchor integration: solar + battery (evening use, time-of-use charging, not every home needs one); EV charging from surplus solar; solar + heat pump with seasonal limits; hybrid inverter vs AC-coupled battery. Benefits depend on compatibility, demand, weather and tariff terms.
+6. grid(3) anchor costs: "Costs, savings and export tariffs" — what affects price (size, roof, scaffold, inverter, battery, electrical work); bill savings vs export earnings kept separate; SEG (suppliers set rates and terms — compare); self-consumption vs export; time-of-use tariffs with a battery; payback shown with assumptions, never promised.
+7. notice: 0% VAT — "Qualifying residential solar and battery installations may benefit from 0% VAT until 31 March 2027, subject to HMRC rules." Not a blanket rule; we confirm eligibility in the quote. Link "HMRC VAT guidance" https://www.gov.uk/guidance/vat-rates-on-different-goods-and-services. Leave the review date empty for the editor.
+8. notice: SEG — licensed suppliers offer export tariffs to eligible generators; rates, terms and eligibility vary. Link "Ofgem SEG guidance" https://www.ofgem.gov.uk/environmental-and-social-schemes/smart-export-guarantee-seg/smart-export-guarantee-seg-generators
+9. steps _anchor installation: survey; system design; quotation; permissions where required (permitted development has exceptions); DNO notification or application (G98 usually for smaller systems, G99 for larger — depends on the system); installation; commissioning; handover (certificates, warranties, DNO paperwork, monitoring walkthrough).
+10. grid(3) anchor aftercare: certifications (placeholder: "[current certifications, scope and certificate numbers]"); manufacturer vs workmanship warranties explained separately (no year counts); monitoring; what to do if generation drops, the inverter shows an error or monitoring stops (call 01633 965205); low maintenance.
+11. casestudy _anchor case-studies: "Real customer projects" — ONE placeholder card (featured band) "[Featured case study]" linking /case-studies, allLabel "View all case studies". No figures.
+12. faq.
+13. cta (dark): "Get a quote" -> #quote; second button "View case studies" -> /case-studies.
 
-FAQ (keep all): Do I need planning permission? Do solar panels work in cloudy weather? Will solar keep my power on in a power cut? Is my roof suitable for solar? How long do solar panels last? What maintenance do panels need? Do I need a battery with solar?
+FAQ (keep all): Do solar panels work in cloudy weather in the UK? How much can solar panels save each year? How many panels will my home need? Do I need a battery? Can I get paid for exported electricity? What are G98 and G99? How long do panels last, and what warranties apply? Will solar work with my EV charger or heat pump? Will solar keep my power on in a power cut? Do I need planning permission? How much does installation cost? What happens after installation?
 
-CTA & LINKS: Button "Book a solar survey" -> #quote; reuse in hero, mid-page and closing cta. Use only real Heliaxis internal links; link battery/EV/heat-pump mentions to their pages only if those exist.
+CTA & LINKS: "Get a quote" -> #quote (hero, nav, closing cta); "View case studies" -> /case-studies; "Try the solar estimator" -> /solar-estimator where savings are discussed. Use only real Heliaxis internal links.
 
-GUARDRAILS: Qualitative only — never invent prices, savings, generation, payback or percentages; say these depend on the property and consumption. Accreditations stay a grid explaining each, not a stats brag. No testimonials block. Power cuts: grid-tied solar shuts off; backup needs a specifically designed battery/islanding setup. Don't claim solar covers all a home's electricity. Keep warranty/lifespan claims qualitative.`,
+GUARDRAILS: Qualitative only — never invent prices, savings, generation, payback, percentages, ratings or project counts; say these depend on the property, usage and tariff. Never guarantee a payback date. VAT, SEG and G98/G99 exactly as above. No warranty year counts, "Tier-1", "in-house MCS design" or "we handle G98/G99" claims unless supplied. No testimonials. Power cuts: grid-tied solar shuts off; backup needs a specifically designed battery/backup setup. Don't claim solar covers all a home's electricity.`,
   },
   {
     priority: 4,

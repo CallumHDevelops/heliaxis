@@ -178,6 +178,9 @@ const QUOTE_CHECK_SVG =
 const QUOTE_SHIELD_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="f" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" fill="var(--solar)" stroke="none"/><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>';
 
+const QUOTE_ROOF_OPTIONS = ['Pitched – tiles', 'Pitched – slate', 'Flat roof', 'Metal / industrial roof', 'Ground mount / land', 'Not sure'];
+const QUOTE_EXTRA_OPTIONS = ['Battery storage', 'EV charging', 'Heat pump'];
+
 function formVariant(p: Record<string, unknown>): 'quote' | 'contact' {
   if (p.variant === 'contact') return 'contact';
   if (p.variant === 'quote') return 'quote';
@@ -220,11 +223,17 @@ function renderBlock(b: LooseBlock): string {
       !p.hideMicrotrust && mt.trim()
         ? `<p class="microtrust">${esc(mt)}</p>`
         : '';
-    const rtVal = String(p.ratingValue || '4.9');
-    const rtInst = String(p.ratingInstalls || '1200');
-    const rthtml = !p.hideRating
-      ? `<div class="rating"><div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">★★★★★</span><span>Google &amp; Trustpilot</span></div><div class="r"><span class="big"><span>${esc(rtInst)}</span>+</span><span>installs across South Wales</span></div></div>`
-      : '';
+    // No built-in rating or install count: only figures an editor has entered are shown.
+    const rtVal = String(p.ratingValue || '').trim();
+    const rtInst = String(p.ratingInstalls || '').trim();
+    const rtParts =
+      (rtVal
+        ? `<div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">★★★★★</span><span>${esc(p.ratingSource || 'Google & Trustpilot')}</span></div>`
+        : '') +
+      (rtInst
+        ? `<div class="r"><span class="big"><span>${esc(rtInst)}</span>+</span><span>installs across South Wales</span></div>`
+        : '');
+    const rthtml = !p.hideRating && rtParts ? `<div class="rating">${rtParts}</div>` : '';
     const eyebrowHtml = p.eyebrow
       ? `<span class="eyebrow on-dark">${SPARK.replace('<svg ', '<svg class="spark-ico" ')}${esc(p.eyebrow)}</span>`
       : '';
@@ -446,6 +455,21 @@ function renderBlock(b: LooseBlock): string {
     if (p.fPhone !== false) rows += qfld(String(p.phoneLabel || 'Phone'), false, String(p.phonePh || 'Mobile or landline'), 'tel', 'phone');
     if (p.fEmail !== false) rows += qfld(String(p.emailLabel || 'Email'), true, String(p.emailPh || 'you@email.com'), 'email', 'email');
     if (p.fPost !== false) rows += qfld(String(p.postLabel || 'Postcode'), false, String(p.postPh || 'e.g. CF10 1AA'), 'text', 'postcode');
+    if (p.fRoof !== false) {
+      rows +=
+        `<div class="pv-qfield"><label for="pv-roofType">${esc(p.roofLabel || 'Roof type (optional)')}</label><select id="pv-roofType" name="roofType"><option value="">Select…</option>` +
+        QUOTE_ROOF_OPTIONS.map((o) => `<option>${esc(o)}</option>`).join('') +
+        '</select></div>';
+    }
+    if (p.fExtras !== false) {
+      const lbl = String(p.extrasLabel || 'Also interested in (optional)');
+      rows +=
+        `<div class="pv-qfield pv-qextras"><span class="pv-qlabel">${esc(lbl)}</span><div class="pv-qchips" role="group" aria-label="${esc(lbl)}">` +
+        QUOTE_EXTRA_OPTIONS.map(
+          (o) => `<label class="pv-qchip"><input type="checkbox" name="extras" value="${esc(o)}"><span>${esc(o)}</span></label>`,
+        ).join('') +
+        '</div></div>';
+    }
     if (p.fInterest !== false) {
       rows += qfld(
         String(p.interestLabel || 'What are you interested in? (optional)'),
@@ -776,29 +800,76 @@ function renderBlock(b: LooseBlock): string {
     );
   }
 
+  if (t === 'anchornav') {
+    const items = Array.isArray(p.items) ? (p.items as Array<{ label?: string; href?: string }>) : [];
+    const links = items.map((it) => `<a href="${esc(it.href || '#')}"><span>${esc(it.label)}</span></a>`).join('');
+    const cta =
+      !p.ctaDisabled && p.cta && String(p.cta).trim()
+        ? `<div class="pv-anav-cta">${btn(p.cta, 'solar', false, p.ctaHref || '#quote', true)}</div>`
+        : '';
+    return `<nav class="pv-anav" aria-label="${esc(p.label || 'On this page')}"><div class="pv-anav-in"><div class="pv-anav-links">${links}</div>${cta}</div></nav>`;
+  }
+
+  if (t === 'notice') {
+    const rev =
+      p.reviewed && String(p.reviewed).trim()
+        ? `<span class="pv-notice-rev">${esc(p.reviewedLabel || 'Last reviewed')}: <span>${esc(p.reviewed)}</span></span>`
+        : '';
+    const link =
+      p.linkLabel && p.linkHref
+        ? `<a class="pv-notice-link" href="${esc(p.linkHref)}" target="_blank" rel="noopener">${esc(p.linkLabel)} ↗</a>`
+        : '';
+    return (
+      `<div class="pv-notice-wrap"><aside class="pv-notice${p.tone === 'warn' ? ' is-warn' : ''}" role="note"><span class="pv-notice-ic" aria-hidden="true">i</span><div class="pv-notice-body">` +
+      (p.title ? `<h3>${accentText(p.title)}</h3>` : '') +
+      `<p>${esc(p.text).replace(/\n/g, '<br>')}</p>` +
+      (rev || link ? `<div class="pv-notice-meta">${rev}${link}</div>` : '') +
+      '</div></aside></div>'
+    );
+  }
+
   if (t === 'casestudy') {
     const items = Array.isArray(p.items)
-      ? (p.items as Array<{ img?: unknown; loc?: string; title?: string; stat?: string; statlabel?: string }>)
+      ? (p.items as Array<{
+          img?: unknown;
+          loc?: string;
+          title?: string;
+          sum?: string;
+          stat?: string;
+          statlabel?: string;
+          basis?: string;
+          href?: string;
+          cta?: string;
+        }>)
       : [];
+    const basisLabel = (v?: string) => (v === 'measured' ? 'Measured' : v === 'estimated' ? 'Estimated' : '');
+    const cards = items
+      .map((cs) => {
+        const src = imgSrc(cs.img);
+        const media = src
+          ? `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block">`
+          : '<div class="pv-cs-empty" aria-hidden="true"></div>';
+        const bl = basisLabel(cs.basis);
+        const stat =
+          cs.stat && String(cs.stat).trim()
+            ? `<div class="pv-cs-stat">${esc(cs.stat)}</div><div class="pv-cs-statlabel"><span>${esc(cs.statlabel)}</span>${bl ? `<span class="pv-cs-basis">${bl}</span>` : ''}</div>`
+            : '';
+        const sum = cs.sum && String(cs.sum).trim() ? `<p class="pv-cs-sum">${esc(cs.sum)}</p>` : '';
+        const more =
+          cs.href && String(cs.href).trim()
+            ? `<a class="pv-cs-more" href="${esc(cs.href)}">${esc(cs.cta || 'Read the case study')} →</a>`
+            : '';
+        return `<article class="pv-card pv-cs-card"><div class="pv-cs-media">${media}</div><div class="pv-cs-body"><div class="pv-cs-loc">${esc(cs.loc)}</div><h3>${accentText(cs.title)}</h3>${sum}${stat}${more}</div></article>`;
+      })
+      .join('');
+    const all =
+      !p.allDisabled && p.allLabel && String(p.allLabel).trim()
+        ? `<div class="pv-btnrow pv-cs-all">${btn(p.allLabel, 'dark ghost', false, p.allHref || '/case-studies')}</div>`
+        : '';
+    const sub = p.sub && String(p.sub).trim() ? `<p>${esc(p.sub)}</p>` : '';
     return (
-      `<div class="pv-sec"><div class="shead">${eyebrow(p.eyebrow || 'Our work')}<h2>${accentText(p.title)}</h2></div>` +
-      `<div style="display:grid;grid-template-columns:repeat(${Math.min(items.length || 1, 3)},1fr);gap:14px">` +
-      items
-        .map((cs) => {
-          const src = imgSrc(cs.img);
-          const media = src
-            ? `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" style="width:100%;height:150px;object-fit:cover;display:block">`
-            : '<div style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b)"></div>';
-          return (
-            `<div class="pv-card" style="padding:0;overflow:hidden">${media}<div style="padding:18px">` +
-            `<div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)">${esc(cs.loc)}</div>` +
-            `<h3 style="font-size:1.02rem;font-weight:600;margin-top:4px">${accentText(cs.title)}</h3>` +
-            `<div style="font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:10px">${esc(cs.stat)}</div>` +
-            `<div style="font-size:.76rem;color:var(--muted)">${esc(cs.statlabel)}</div></div></div>`
-          );
-        })
-        .join('') +
-      '</div></div>'
+      `<div class="pv-sec pv-cs${items.length === 1 ? ' is-feature' : ''}"><div class="shead">${eyebrow(p.eyebrow || 'Our work')}<h2>${accentText(p.title)}</h2>${sub}</div>` +
+      `<div class="pv-cs-grid" style="--cs-cols:${Math.max(1, Math.min(items.length, 3))}">${cards}</div>${all}</div>`
     );
   }
 
@@ -854,7 +925,9 @@ export function renderCmsPageHtml(
       .map((b) => {
         const html = renderBlock(b);
         if (!html) return '';
-        return `<div style="${spacingStyle(b.p)}">${html}</div>`;
+        const anchor = String(b.p?._anchor || '').trim().replace(/^#/, '').replace(/[^a-zA-Z0-9_-]/g, '');
+        const anchorHtml = anchor ? `<span class="pv-anchor" id="${anchor}" aria-hidden="true"></span>` : '';
+        return `<div style="${spacingStyle(b.p)}">${anchorHtml}${html}</div>`;
       })
       .filter(Boolean)
       .join('\n');
