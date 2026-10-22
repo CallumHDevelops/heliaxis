@@ -23,6 +23,13 @@ export const STATUS_LABEL: Record<AssignmentStatus, string> = {
   done: 'Done',
   cancelled: 'Cancelled',
 };
+/** A subcontractor firm that can't be given new jobs (suspended or terminated), in words; null when it can. */
+export function firmBlockedWords(status: string | null | undefined): string | null {
+  if (status === 'suspended') return 'Suspended: can’t be given new jobs';
+  if (status === 'terminated') return 'Terminated: can’t be given new jobs';
+  return null;
+}
+
 /** Still on the job (not cancelled). */
 export const isLive = (s: string) => s !== 'cancelled';
 /** Answers can still come in (the form isn't signed off). */

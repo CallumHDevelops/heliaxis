@@ -13,7 +13,7 @@ import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
 import { heldWords, snapshotOf, type HeldReason } from './po-shared';
 import { returnView, stageStates, type PoReview, type ReturnView, type ReviewState, type ReviewStatus } from './review-shared';
-import { STATUS_LABEL, TRADE_LABEL, yesNo, type Answers, type AssignmentStatus, type Flag, type Stage, type Trade } from './types';
+import { firmBlockedWords, STATUS_LABEL, TRADE_LABEL, yesNo, type Answers, type AssignmentStatus, type Flag, type Stage, type Trade } from './types';
 import { valuesOf } from './values';
 
 /**
@@ -175,7 +175,11 @@ const matches = (hay: (string | null | undefined)[], q: string) => {
   return words(q).every((w) => h.includes(w));
 };
 
-/** Search the people who go to site: their own site contacts and subcontractor firms (not terminated), the asked-for trade first. */
+/**
+ * Search the people who go to site: their own site contacts and subcontractor firms (not terminated, nor
+ * their people), the asked-for trade first. A suspended firm's people are listed, marked (firm_status), so
+ * the office sees why they can't be picked.
+ */
 export async function searchPeople(db: Db, q: string, trade: Trade | null): Promise<PickRow[]> {
   const [{ data: contacts }, { data: firms }] = await Promise.all([
     db.from('site_contacts').select('*').is('archived_at', null).order('name').limit(1000),
@@ -186,6 +190,8 @@ export async function searchPeople(db: Db, q: string, trade: Trade | null): Prom
   const hasMain = new Set<string>();
   for (const c of (contacts ?? []) as ContactRow[]) {
     const firm = c.subcontractor_id ? (firmMap.get(c.subcontractor_id) ?? null) : null;
+    // A terminated firm's people (its firm isn't in the list) aren't quick contacts either.
+    if (c.subcontractor_id && !firm) continue;
     if (firm && !c.operative_id) hasMain.add(firm.id);
     const company = firm?.company_name ?? c.company;
     const trades = c.trades?.length ? c.trades : firm ? [tradeKeyOf(firm.trade) ?? 'other'] : [];
@@ -395,12 +401,14 @@ export async function createAssignments(
       firm = contact.subcontractor_id ? (firms.get(contact.subcontractor_id) ?? null) : null;
     } else if (typeof input.firm_id === 'string' && input.firm_id) {
       firm = firms.get(input.firm_id) ?? null;
-      if (!firm || firm.status === 'terminated') return { ok: false, status: 422, error: `${at}That subcontractor can’t be given work.` };
+      if (!firm) return { ok: false, status: 422, error: `${at}That subcontractor can’t be given work.` };
     } else if (input.new_contact && typeof input.new_contact === 'object') {
       const c = cleanContact(input.new_contact as Record<string, unknown>);
       if (!c.ok) return { ok: false, status: 422, error: at + c.error };
       fresh = { ...c.fields, trades: [clean.fields.trade] };
     } else return { ok: false, status: 400, error: `${at}Choose who’s doing it.` };
+    // Picked as the firm or as one of its people: a suspended or terminated firm gets no new jobs.
+    if (firm && firmBlockedWords(firm.status)) return { ok: false, status: 422, error: `${at}${firm.company_name} is ${firm.status}, so they can’t be given new jobs.` };
     const facts = moneyFacts(
       contact ?? { vat_number: (fresh?.vat_number as string | null) ?? null, cis_rate: null, cis_verified_on: null },
       firm
