@@ -164,7 +164,7 @@ const CONVERTED_CRM = [
 CONVERTED.push(...CONVERTED_CRM);
 // Mark-up drawn onto survey photos (saved into the image and the report): the same in both themes.
 ALLOWED_LITERALS['src/app/admin/surveys/[id]/MarkupEditor.tsx'] = ['#F8BC1E', '#E02424', '#111'];
-ALLOWED_LITERALS['src/app/admin/surveys/[id]/PhotoSlot.tsx'] = ['rgba(0'];
+ALLOWED_LITERALS['src/app/admin/surveys/[id]/PhotoSlot.tsx'] = ['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.75)'];
 /** Area C, the trades: the site app (/portal/site), the subcontractor onboarding portal and its documents
     (agreement, NTP, the document viewer, the signature pad), and the office's subcontractor pages. */
 const CONVERTED_TRADES = [
@@ -237,7 +237,8 @@ for (const p of files.filter(themed)) {
   const src = stripComments(read(p));
   for (const m of src.matchAll(/(--[\w-]+)\s*:\s*var\(\s*(--[\w-]+)\s*\)/g)) if (m[1] === m[2]) fail(`${p}: ${m[1]}: var(${m[2]}) refers to itself`);
   if (p.endsWith('.css') && /prefers-color-scheme/.test(src) && !LEFTOVERS.includes(p)) fail(`${p}: keys on prefers-color-scheme; use :root[data-theme='dark'] (src/app/theme.css)`);
-  if (/(?::root|html)[^{}]*\{[^}]*color-scheme\s*:\s*light\s*[;}]/.test(src)) fail(`${p}: declares plain "color-scheme: light" on the page; Chrome still auto-darkens it (use "only light")`);
+  // On the page or on an island (.hx-light): plain `light` is still auto-darkened by Chrome on a dark phone.
+  if (/color-scheme\s*:\s*light\s*[;}]/.test(src)) fail(`${p}: declares plain "color-scheme: light"; Chrome still auto-darkens it (use "only light")`);
 }
 for (const p of LEFTOVERS) if (!/prefers-color-scheme/.test(stripComments(read(p)))) console.log(`note: ${p} no longer uses prefers-color-scheme — take it off LEFTOVERS`);
 // Nested layouts must not set their own color-scheme (it would override the person's choice), nor a

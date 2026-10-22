@@ -177,6 +177,8 @@ function inPage(expectDark) {
   const ui = [];
   for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea, [role=checkbox], [role=radio], [role=switch]')) {
     if (!visible(el) || el.closest(':disabled, [aria-disabled="true"]')) continue;
+    // Off the page and hidden from everyone (a form's anti-bot field): nobody sees or reaches its edge.
+    if (el.closest('[aria-hidden="true"]') && el.getBoundingClientRect().right <= 0) continue;
     if (/^(checkbox|radio|switch)$/.test(el.getAttribute('role') || '') && el.textContent.trim()) continue;
     // A native checkbox or radio (appearance auto) is painted by the browser in the page's color-scheme with its
     // own edge (Chrome: #767676 on light, #858585 on dark, over 4:1 on every surface here); its CSS border and
@@ -321,6 +323,43 @@ for (const mode of MODES) {
           rec.probe = { want, got: px };
           if (off > 6) rec.problems.push(`auto-darkened by Chrome: --bg ${probe} painted as rgb(${px.join(', ')})`);
           await page.evaluate(() => document.getElementById('hx-probe')?.remove());
+          // The paper islands (.hx-light: documents, signature pads, QR codes) too: Chrome decides per element
+          // (from its color-scheme), so a page it leaves alone can still have an island it repaints. The probe is
+          // a child of the island (it inherits the island's scheme), fixed at the top left: no scrolling needed.
+          const islands = await page.evaluate(() => document.querySelectorAll('.hx-light').length);
+          for (let i = 0; i < Math.min(islands, 4); i++) {
+            const spot = await page.evaluate((n) => {
+              const el = [...document.querySelectorAll('.hx-light')][n];
+              const box = el.getBoundingClientRect();
+              if (box.width < 12 || box.height < 12 || getComputedStyle(el).visibility === 'hidden') return null;
+              const d = document.createElement('div');
+              d.id = 'hx-probe';
+              d.style.cssText = 'position:fixed;left:0;top:0;width:24px;height:24px;z-index:2147483647;pointer-events:none;background:var(--bg)';
+              el.appendChild(d);
+              const r = d.getBoundingClientRect();
+              const inView = r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && scrollX === 0 && scrollY === 0;
+              return inView ? { x: r.left + 4, y: r.top + 4, color: getComputedStyle(d).backgroundColor, cls: el.className } : null;
+            }, i);
+            if (!spot) {
+              await page.evaluate(() => document.getElementById('hx-probe')?.remove());
+              continue;
+            }
+            await page.waitForTimeout(100);
+            const shot = await page.screenshot({ clip: { x: Math.floor(spot.x), y: Math.floor(spot.y), width: 1, height: 1 } });
+            const got = await page.evaluate(async (b64) => {
+              const img = new Image();
+              img.src = `data:image/png;base64,${b64}`;
+              await img.decode();
+              const c = document.createElement('canvas');
+              c.width = c.height = 1;
+              const g = c.getContext('2d');
+              g.drawImage(img, 0, 0);
+              return [...g.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+            }, shot.toString('base64'));
+            const want = spot.color.match(/\d+/g).slice(0, 3).map(Number);
+            if (Math.max(...want.map((v, k) => Math.abs(v - got[k]))) > 6) rec.problems.push(`auto-darkened by Chrome: paper island .${String(spot.cls).trim().split(/\s+/).join('.')} (${spot.color}) painted as rgb(${got.join(', ')})`);
+            await page.evaluate(() => document.getElementById('hx-probe')?.remove());
+          }
         }
         if (r.light.length) {
           rec.leftovers = r.light;

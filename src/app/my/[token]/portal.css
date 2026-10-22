@@ -379,12 +379,8 @@
   flex-direction: column;
   gap: 10px;
 }
-/* The signature pad's white sheet (.hx-light round SignaturePad): "only light", because with plain
-   "light" Chrome's auto-dark (a dark phone with "dark mode for web contents" on) still repaints the pad
-   near-black, and the ink drawn on it all but disappears. */
-.pt .hx-light {
-  color-scheme: only light;
-}
+/* The signature pad's white sheet is an .hx-light island: theme.css declares it "only light", so Chrome's
+   auto-dark (a dark phone with "dark mode for web contents" on) never repaints it near-black. */
 .pt-cancel {
   margin: 0;
   padding: 10px 12px;

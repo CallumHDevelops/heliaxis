@@ -186,12 +186,14 @@
     color: var(--text);
   }
 }
-/* "only": with plain `light` Chrome still auto-darkens the page on a phone in dark mode. */
+/* "only": with plain `light` Chrome still auto-darkens the page on a phone in dark mode. The paper
+   islands too (documents, signature pads, QR codes): with plain `light`, a dark phone with Chrome's
+   "dark mode for web contents" repaints them near-black inside a dark page. */
 :root[data-theme='light'] {
   color-scheme: only light;
 }
 .hx-light {
-  color-scheme: light;
+  color-scheme: only light;
   color: var(--text);
 }
 
