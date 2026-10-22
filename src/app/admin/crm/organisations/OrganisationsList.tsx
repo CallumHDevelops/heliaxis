@@ -73,8 +73,8 @@ export function OrganisationsList({ ready, initial }: { ready: boolean; initial:
         </div>
         {ready && (
           <div className="crmh-head__r">
-            <button type="button" className="crm-btn crm-btn--solar org-add" onClick={() => setAdding(true)}>
-              <Icon k="plus" /> Add organisation
+            <button type="button" className="crm-btn crm-btn--solar org-add" aria-label="Add organisation" onClick={() => setAdding(true)}>
+              <Icon k="plus" /> Add<span className="org-hide-sm"> organisation</span>
             </button>
           </div>
         )}

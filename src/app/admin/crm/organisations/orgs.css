@@ -56,7 +56,14 @@
 }
 
 /* ── The list ── */
+.crmh-head.org-head {
+  flex-wrap: nowrap;
+}
+.org-head .crmh-head__l {
+  min-width: 0;
+}
 .org-head .org-add {
+  flex: none;
   min-height: 40px;
   gap: 6px;
 }
@@ -202,7 +209,7 @@
 .org-hero__acts {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 8px;
 }
 .org-hero__acts .crm-btn {
@@ -508,4 +515,9 @@
 }
 .org-card__none {
   margin: 0;
+}
+.org-twin a {
+  color: var(--accent-text);
+  font-weight: 700;
+  text-decoration: underline;
 }
