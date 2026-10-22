@@ -198,8 +198,10 @@ export type LightData = {
   timeline: Entry[];
 };
 
-export type Tab = 'overview' | 'activity' | 'photos' | 'docs' | 'orders' | 'surveys' | 'details';
-export const TABS: Tab[] = ['overview', 'activity', 'photos', 'docs', 'orders', 'surveys', 'details'];
+export type Tab = 'overview' | 'activity' | 'photos' | 'docs' | 'orders' | 'site' | 'handover' | 'surveys' | 'details';
+export const TABS: Tab[] = ['overview', 'activity', 'photos', 'docs', 'orders', 'site', 'handover', 'surveys', 'details'];
+/** The Handover tab's stages (handover.sql): from Ready, so the prep before the install day has a home. */
+export const HANDOVER_STAGES = ['ready', 'install_booked', 'installing', 'commissioning', 'handover', 'complete'];
 export type Area = 'crm' | 'projects';
 
 /** The tab a job opens on (spec 4.3): Overview for projects, Activity for opportunities (and Lost jobs). */

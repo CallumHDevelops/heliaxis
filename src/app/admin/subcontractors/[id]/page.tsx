@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getSessionProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { schemaReady } from '@/lib/schema-ready';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { agreementIntact } from '@/lib/subcontractors/hashing';
 import { chasesFor } from '@/lib/subcontractors/reminders';
@@ -108,6 +109,7 @@ export default async function SubcontractorPage({ params }: { params: Promise<{ 
         ntps={(ntps ?? []) as NtpRow[]}
         requests={requests}
         reminders={{ paused: !!subRow.reminders_paused, outstanding }}
+        siteContacts={(await schemaReady()).site}
       />
     </AdminShell>
   );

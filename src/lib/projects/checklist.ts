@@ -29,6 +29,10 @@ export type CheckCtx = {
   photoCounts: Record<string, number>;
   surveys: { type: 'solar' | 'ashp'; status: string; simpliheat_url: string | null; hasDoc: boolean }[];
   subcontracts: { status: string }[];
+  /** The trades on the job from the site app (site-commissioning.sql; empty before it), and their photos synced. */
+  site?: { trade: string; status: string; photos: number }[];
+  /** The handover pack has gone to the customer (handover_packs.sent_at, Unit 4). */
+  handoverSent?: boolean;
   /** Microsoft 365 is connected, so installs can be in Outlook. */
   outlook: boolean;
   /** YYYY-MM-DD, UK. */
@@ -117,8 +121,17 @@ function kitKnown(c: CheckCtx): boolean {
 /** Booked with RAMS, and every firm on it (apart from cancelled bookings) has confirmed its crew. */
 function tradesConfirmed(c: CheckCtx): boolean {
   const live = c.subcontracts.filter((s) => s.status !== 'cancelled');
-  return !!field(c, 'rams_project_id') && live.length > 0 && live.every((s) => s.status === 'crew_confirmed');
+  if (!!field(c, 'rams_project_id') && live.length > 0 && live.every((s) => s.status === 'crew_confirmed')) return true;
+  // Or every trade on the job in the site app has had their job pack.
+  const trades = (c.site ?? []).filter((s) => s.status !== 'cancelled');
+  return trades.length > 0 && trades.every((s) => s.status !== 'draft');
 }
+
+const SIGNED = ['signed', 'done'];
+/** Progress photos taken, or any trade's photos synced from the site app. */
+const progressPhotos = (c: CheckCtx) => (c.photoCounts.progress ?? 0) >= 1 || (c.site ?? []).some((s) => s.photos > 0);
+/** Completion photos taken, or the electrician has signed off (their photo stages are part of it). */
+const completionPhotos = (c: CheckCtx) => (c.photoCounts.completion ?? 0) >= 1 || (c.site ?? []).some((s) => s.trade === 'electrician' && SIGNED.includes(s.status));
 
 const SOLAR_BATTERY = ['solar', 'battery'];
 const HEAT = ['heatpump'];
@@ -198,7 +211,7 @@ export const CHECKLIST: CheckItem[] = [
   { key: 'i_access', stage: 'install_booked', label: 'Access and parking notes checked (from the survey)' },
 
   // Installing
-  { key: 'n_progress', stage: 'installing', label: 'Progress photos', auto: (c) => (c.photoCounts.progress ?? 0) >= 1 },
+  { key: 'n_progress', stage: 'installing', label: 'Progress photos', auto: progressPhotos },
   { key: 'n_snags', stage: 'installing', label: 'Snags logged (or none)' },
   { key: 'n_checks', stage: 'installing', label: 'Install-day checks: isolation, labels, cable route as surveyed' },
 
@@ -220,7 +233,7 @@ export const CHECKLIST: CheckItem[] = [
     help: 'G98: within 28 days of switching on.',
     products: SOLAR_BATTERY,
   },
-  { key: 'c_photos', stage: 'commissioning', label: 'Completion photos', auto: (c) => (c.photoCounts.completion ?? 0) >= 1 },
+  { key: 'c_photos', stage: 'commissioning', label: 'Completion photos', auto: completionPhotos },
 
   // Paperwork & handover
   {
@@ -239,7 +252,7 @@ export const CHECKLIST: CheckItem[] = [
     label: 'Warranties and insurance-backed guarantee registered',
     auto: (c) => !!paper(c, 'ibg_registered_on') && !!paper(c, 'warranties_registered_on'),
   },
-  { key: 'h_pack', stage: 'handover', label: 'Handover pack in the customer’s portal', auto: (c) => c.docs.some((d) => d.category === 'handover' && d.visible) },
+  { key: 'h_pack', stage: 'handover', label: 'Handover pack in the customer’s portal', auto: (c) => !!c.handoverSent || c.docs.some((d) => d.category === 'handover' && d.visible) },
   { key: 'h_seg', stage: 'handover', label: 'Smart Export Guarantee guidance sent', products: ['solar'], auto: (c) => !!paper(c, 'seg_info_sent_on') },
   { key: 'h_bus_redeemed', stage: 'handover', label: 'BUS voucher redeemed', products: HEAT, auto: (c) => !!paper(c, 'bus_redeemed_on'), key_item: true },
 

@@ -1,0 +1,275 @@
+/*
+ * Light and dark themes: the staff app, the trades' and customers' pages and the sign-in pages.
+ * Not the public website: it never gets data-theme, so it never sees the dark values.
+ *
+ * - Light is the default everywhere; dark applies under html[data-theme='dark'], on screen only, so
+ *   anything printed is always light. src/lib/theme/shared.ts sets the attribute (cookie + boot script).
+ * - .hx-light and .hx-dark are islands: a paper document or signature pad inside a dark page, an ink
+ *   band inside a light one. Ordinary tokens work inside them.
+ * - .hx-moment goes on a --moment band (ink in both themes) that holds links or buttons: their focus
+ *   ring turns gold, which shows on ink (light's own --focus is a dark amber, made for paper).
+ * - Use these names in page CSS (scripts/test-theme-tokens.mjs checks the rules):
+ *     surfaces  --bg (page) --surface (cards, header, tab bar) --surface-2 (wells, chips, icon tiles)
+ *               --raised (menus, sheets, dialogs: with --shadow) --field (inputs)
+ *     text      --text --text-2 --muted (all AA on every surface and on the *-soft tints)
+ *     lines     --border (hairlines) --border-soft --border-strong (inputs, checkboxes: 3:1)
+ *     accent    --accent (gold fills, never text on light) --accent-ink (text on gold)
+ *               --accent-text (gold-family text: eyebrows, links) --accent-soft --accent-line --accent-hover
+ *     status    --ok --warn --danger --info (+ -soft tints, -line borders); --on-solid is text on a solid fill
+ *     brand     --wa --wa-text --wa-soft (WhatsApp), --claude (Metis/From Claude)
+ *     inverse   --inverse/--inverse-text (the brand's "dark" button; paper on dark), --inverse-accent (the
+ *               gold-on-ink button's text: gold on light, ink on the paper button on dark),
+ *               --moment* (bands that stay ink in both themes)
+ *     focus     --focus (outline colour), --focus-ring (box-shadow ring for clipped elements)
+ *     depth     --shadow-sm --shadow --shadow-up (bottom sheets) --scrim --glow
+ *     channels  --fg-rgb --bg-rgb --surface-rgb --accent-rgb --ok-rgb --danger-rgb --info-rgb --wa-rgb:
+ *               tints at any strength, as rgb(var(--fg-rgb) / .06)
+ *     stages    --ph-* (CRM phase pills and dots)
+ * - Never write `--x: var(--x)` (a cycle) and never re-declare these names in page CSS: point a unit's
+ *   own aliases at them instead (`.crm { --ink: var(--text) }`).
+ * - No @media (prefers-color-scheme) in themed CSS: it would ignore the person's choice.
+ */
+:root,
+.hx-light {
+  --bg: #f7f2e7;
+  --bg-rgb: 247 242 231;
+  --surface: #fffdf8;
+  --surface-rgb: 255 253 248;
+  --surface-2: #efe8d8;
+  --raised: #fffdf8;
+  --field: #ffffff;
+  --text: #211f18;
+  --text-2: #4a463b;
+  --muted: #635e51;
+  --fg-rgb: 33 31 24;
+  --border: rgba(33, 31, 24, 0.14);
+  --border-soft: rgba(33, 31, 24, 0.08);
+  --border-strong: rgba(33, 31, 24, 0.56);
+  --accent: #f8bc1e;
+  --accent-rgb: 248 188 30;
+  --accent-hover: #e39a0c;
+  --accent-ink: #211f18;
+  --accent-text: #805400;
+  --accent-soft: rgba(248, 188, 30, 0.16);
+  --accent-line: rgba(199, 127, 4, 0.45);
+  --ok: #2b6338;
+  --ok-rgb: 63 125 78;
+  --ok-soft: rgba(63, 125, 78, 0.12);
+  --ok-line: rgba(63, 125, 78, 0.4);
+  --warn: #805400;
+  --warn-soft: rgba(248, 188, 30, 0.18);
+  --warn-line: rgba(199, 127, 4, 0.45);
+  --danger: #b3261e;
+  --danger-rgb: 179 38 30;
+  --danger-soft: rgba(179, 38, 30, 0.1);
+  --danger-line: rgba(179, 38, 30, 0.35);
+  --info: #2c5f99;
+  --info-rgb: 44 110 180;
+  --info-soft: rgba(44, 110, 180, 0.12);
+  --info-line: rgba(44, 110, 180, 0.3);
+  --wa: #1f7a4d;
+  --wa-rgb: 31 122 77;
+  --wa-text: #1a6b43;
+  --wa-soft: #e3f4d8;
+  --claude: #a34b2a;
+  --on-solid: #ffffff;
+  --inverse: #211f18;
+  --inverse-text: #f7f2e7;
+  --inverse-accent: #f8bc1e;
+  --moment: #211f18;
+  --moment-text: #f7f2e7;
+  --moment-muted: #a69f8e;
+  --moment-line: rgba(247, 242, 231, 0.16);
+  --focus: #805400;
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
+  --shadow-sm: 0 1px 2px rgba(33, 31, 24, 0.08);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  --shadow-up: 0 -10px 30px rgba(20, 18, 12, 0.16);
+  --scrim: rgba(20, 18, 12, 0.42);
+  --glow: rgba(248, 188, 30, 0.13);
+  --fill-texture: url(/assets/heliaxis-card-fill-light.svg);
+  /* CRM phases: gold, blue, green, red and a solid "done". Every pill and dot also carries its name. */
+  --ph-y: #f8bc1e;
+  --ph-y-bg: rgba(248, 188, 30, 0.22);
+  --ph-y-text: #805400;
+  --ph-b: #2c5f99;
+  --ph-b-bg: rgba(44, 110, 180, 0.12);
+  --ph-b-text: #2c5f99;
+  --ph-g: #3f7d4e;
+  --ph-g-bg: rgba(63, 125, 78, 0.15);
+  --ph-g-text: #2b6338;
+  --ph-done: #2b6338;
+  --ph-done-text: #ffffff;
+  --ph-lost: #b3261e;
+  --ph-lost-bg: rgba(179, 38, 30, 0.1);
+  --ph-lost-text: #b3261e;
+}
+
+@media screen {
+  :root[data-theme='dark'],
+  .hx-dark {
+    --bg: #171510;
+    --bg-rgb: 23 21 16;
+    --surface: #211f18;
+    --surface-rgb: 33 31 24;
+    --surface-2: #2c2820;
+    --raised: #332e25;
+    --field: #14120e;
+    --text: #f7f2e7;
+    --text-2: #d9d1bf;
+    --muted: #bbb4a2;
+    --fg-rgb: 247 242 231;
+    --border: rgba(247, 242, 231, 0.16);
+    --border-soft: rgba(247, 242, 231, 0.09);
+    --border-strong: rgba(247, 242, 231, 0.5);
+    --accent: #f8bc1e;
+    --accent-rgb: 248 188 30;
+    --accent-hover: #ffcb45;
+    --accent-ink: #211f18;
+    --accent-text: #f8bc1e;
+    --accent-soft: rgba(248, 188, 30, 0.16);
+    --accent-line: rgba(248, 188, 30, 0.5);
+    --ok: #7cc28f;
+    --ok-rgb: 124 194 143;
+    --ok-soft: rgba(124, 194, 143, 0.16);
+    --ok-line: rgba(124, 194, 143, 0.45);
+    --warn: #f2b544;
+    --warn-soft: rgba(242, 181, 68, 0.16);
+    --warn-line: rgba(242, 181, 68, 0.45);
+    --danger: #f4978e;
+    --danger-rgb: 244 151 142;
+    --danger-soft: rgba(244, 151, 142, 0.16);
+    --danger-line: rgba(244, 151, 142, 0.45);
+    --info: #8fb8ee;
+    --info-rgb: 143 184 238;
+    --info-soft: rgba(143, 184, 238, 0.16);
+    --info-line: rgba(143, 184, 238, 0.4);
+    --wa: #4cc38a;
+    --wa-rgb: 76 195 138;
+    --wa-text: #4cc38a;
+    --wa-soft: #1f3a2b;
+    --claude: #e8916f;
+    --on-solid: #171510;
+    --inverse: #f7f2e7;
+    --inverse-text: #211f18;
+    --inverse-accent: #211f18;
+    /* --moment* stay ink: dark bands keep their colour and take a --border hairline to stand off --bg. */
+    --focus: #f8bc1e;
+    /* Re-declared so an .hx-dark island resolves it with its own --bg and --focus. */
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --shadow-up: 0 -10px 30px rgba(0, 0, 0, 0.5);
+    --scrim: rgba(0, 0, 0, 0.6);
+    --glow: rgba(248, 188, 30, 0.07);
+    --fill-texture: url(/assets/heliaxis-card-fill-dark.svg);
+    --ph-y: #f8bc1e;
+    --ph-y-bg: rgba(248, 188, 30, 0.16);
+    --ph-y-text: #f8bc1e;
+    --ph-b: #8fb8ee;
+    --ph-b-bg: rgba(143, 184, 238, 0.16);
+    --ph-b-text: #8fb8ee;
+    --ph-g: #7cc28f;
+    --ph-g-bg: rgba(124, 194, 143, 0.16);
+    --ph-g-text: #7cc28f;
+    --ph-done: #7cc28f;
+    --ph-done-text: #171510;
+    --ph-lost: #f4978e;
+    --ph-lost-bg: rgba(244, 151, 142, 0.16);
+    --ph-lost-text: #f4978e;
+    /* Tailwind/shadcn's default border colour (globals.css) follows the theme too. */
+    --sc-border: var(--border);
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+  }
+  .hx-dark {
+    color-scheme: dark;
+    color: var(--text);
+  }
+}
+/* "only": with plain `light` Chrome still auto-darkens the page on a phone in dark mode. The paper
+   islands too (documents, signature pads, QR codes): with plain `light`, a dark phone with Chrome's
+   "dark mode for web contents" repaints them near-black inside a dark page. */
+:root[data-theme='light'] {
+  color-scheme: only light;
+}
+.hx-light {
+  color-scheme: only light;
+  color: var(--text);
+}
+/* An ink band ("moment") on the page, in either theme: gold focus rings (9:1 on ink, where light's
+   #805400 is 2.5:1). On the band, not on a control: a ring drawn outside the band sits on the page. */
+.hx-moment {
+  --focus: var(--accent);
+  --focus-ring: 0 0 0 2px var(--moment), 0 0 0 4px var(--accent);
+}
+
+/* The page canvas and defaults on themed pages (the CMS editor, pinned light, keeps its own look).
+   Zero specificity (:where), so every page's own rule still wins. */
+:where(:root[data-theme-scope='app']) {
+  background-color: var(--bg);
+}
+:where(:root[data-theme-scope='app']) body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+:where(:root[data-theme-scope='app']) :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+:where(:root[data-theme-scope='app']) ::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+:where(:root[data-theme-scope='app']) input:-webkit-autofill {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--field) inset;
+}
+/* No transitions while the colours flip (set for two frames by setTheme). */
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition: none !important;
+}
+
+/* The wordmark (BrandLogo): the ink one on light, the cream one with the gold spark on dark. */
+.hx-logo {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+.hx-logo > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hx-logo > .hx-logo--light {
+  display: none;
+}
+@media screen {
+  :root[data-theme='dark'] .hx-logo > .hx-logo--ink,
+  .hx-dark .hx-logo > .hx-logo--ink {
+    display: none;
+  }
+  :root[data-theme='dark'] .hx-logo > .hx-logo--light,
+  .hx-dark .hx-logo > .hx-logo--light {
+    display: block;
+  }
+  /* A paper island in a dark page keeps the ink one (as specific as the rules above, and later). */
+  :root .hx-light .hx-logo > .hx-logo--ink {
+    display: block;
+  }
+  :root .hx-light .hx-logo > .hx-logo--light {
+    display: none;
+  }
+}
+
+/* Metis's tile is ink in both themes; on dark it gets a hairline so it doesn't sink into the page. */
+@media screen {
+  :root[data-theme='dark'] .hx-metis {
+    border-radius: 23%;
+    box-shadow: 0 0 0 1px rgb(var(--fg-rgb) / 0.22);
+  }
+}

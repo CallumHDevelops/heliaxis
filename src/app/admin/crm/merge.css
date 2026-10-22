@@ -47,8 +47,8 @@
   border: 0;
   border-radius: 999px;
   padding: 1px 8px;
-  background: var(--blue, #2c5f99);
-  color: #fff;
+  background: var(--info);
+  color: var(--on-solid);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
@@ -97,7 +97,7 @@
   transition: opacity 0.15s;
 }
 .mrg-sec {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
   padding: 0.8rem 0 0.4rem;
 }
 .mrg-sec:first-child {
@@ -132,19 +132,19 @@
   gap: 0.6rem;
   align-items: flex-start;
   padding: 0.7rem 0.75rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--card);
+  background: var(--surface);
   cursor: pointer;
 }
 .mrg-card.on {
-  border-color: var(--amber-2);
-  box-shadow: 0 0 0 1px var(--amber-2) inset;
-  background: rgba(248, 188, 30, 0.07);
+  border-color: var(--accent-text);
+  box-shadow: 0 0 0 1px var(--accent-text) inset;
+  background: rgb(var(--accent-rgb) / 0.07);
 }
 .mrg-card input {
   margin-top: 0.2rem;
-  accent-color: var(--amber-2);
+  accent-color: var(--accent-text);
 }
 .mrg-card__b {
   display: flex;
@@ -164,8 +164,8 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ink);
-  background: var(--solar);
+  color: var(--accent-ink);
+  background: var(--accent);
   border-radius: 99px;
   padding: 0.05rem 0.45rem;
 }
@@ -223,9 +223,9 @@
   gap: 0.45rem;
   align-items: flex-start;
   padding: 0.45rem 0.55rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--card);
+  background: var(--surface);
   font-size: 0.88rem;
   overflow-wrap: anywhere;
   cursor: pointer;
@@ -237,12 +237,12 @@
   grid-area: b;
 }
 .mrg-opt.on {
-  border-color: var(--amber-2);
-  background: rgba(248, 188, 30, 0.07);
+  border-color: var(--accent-text);
+  background: rgb(var(--accent-rgb) / 0.07);
 }
 .mrg-opt input {
   margin-top: 0.15rem;
-  accent-color: var(--amber-2);
+  accent-color: var(--accent-text);
 }
 .mrg-opt i {
   color: var(--muted);
@@ -250,9 +250,9 @@
 
 /* Jobs */
 .mrg-job {
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--card);
+  background: var(--surface);
   padding: 0.65rem 0.75rem;
   margin-bottom: 0.5rem;
 }
@@ -270,7 +270,7 @@
   margin: 0.5rem 0 0;
   padding: 0.45rem 0.6rem;
   border-radius: 6px;
-  background: rgba(44, 110, 180, 0.07);
+  background: rgb(var(--info-rgb) / 0.07);
   font-size: 0.82rem;
   line-height: 1.45;
 }
@@ -289,15 +289,15 @@
   align-items: flex-start;
   margin-top: 0.55rem;
   padding: 0.55rem 0.65rem;
-  border: 1px solid rgba(199, 127, 4, 0.35);
+  border: 1px solid var(--accent-line);
   border-radius: 6px;
-  background: rgba(248, 188, 30, 0.1);
+  background: rgb(var(--accent-rgb) / 0.1);
   font-size: 0.86rem;
   cursor: pointer;
 }
 .mrg-tick input {
   margin-top: 0.2rem;
-  accent-color: var(--amber-2);
+  accent-color: var(--accent-text);
 }
 .mrg-tick b {
   display: block;
@@ -338,8 +338,8 @@
   .mrg-foot {
     position: sticky;
     bottom: 0;
-    background: var(--paper);
+    background: var(--bg);
     padding: 0.6rem 0 calc(0.6rem + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--border);
   }
 }

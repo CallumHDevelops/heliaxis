@@ -1,0 +1,869 @@
+/* The job record's Site tab (SiteTab.tsx) and the trade sheet (AssignmentSheet.tsx). Inside .crm.
+   Colours: the theme's tokens (src/app/theme.css). Signatures are ink on a see-through image, so on
+   dark they sit on a paper strip; the photo viewer is dark in both themes. */
+
+.sx {
+  display: grid;
+  gap: 1rem;
+}
+.sxr-sig,
+.sxr-viewer {
+  --sxr-sig-paper: transparent;
+  --sxr-viewer: rgba(16, 14, 10, 0.92);
+  --sxr-viewer-bar: #fff;
+}
+@media screen {
+  :root[data-theme='dark'] .sxr-sig,
+  :root[data-theme='dark'] .sxr-viewer {
+    --sxr-sig-paper: #fffdf8;
+    --sxr-viewer: rgba(0, 0, 0, 0.92);
+    --sxr-viewer-bar: var(--raised);
+  }
+}
+
+/* The job strip: Scaffold up ✓ → Roof ✓ → Electrics → Handover. */
+.sx-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sx-strip li {
+  position: relative;
+  padding: 0.45rem 0.8rem 0.45rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.sx-strip li + li::before {
+  content: '→';
+  position: absolute;
+  left: -0.62rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-weight: 400;
+}
+.sx-strip li.is-done {
+  background: rgb(var(--ok-rgb) / 0.1);
+  border-color: rgb(var(--ok-rgb) / 0.35);
+  color: var(--ok);
+}
+.sx-strip li.is-now {
+  background: rgb(var(--accent-rgb) / 0.18);
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+.sx-strip li.is-warn {
+  background: rgb(var(--danger-rgb) / 0.08);
+  border-color: rgb(var(--danger-rgb) / 0.4);
+  color: var(--danger);
+}
+
+.sx-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 1023px) {
+  .sx-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sx-main,
+.sx-side {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.sx-empty,
+.sx-panel,
+.sx-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+.sx-empty p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+.sx-panel h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sx-addrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.sx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+}
+.sx-list small {
+  display: block;
+  color: var(--muted);
+}
+
+.sx-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.sx-card h4 {
+  margin: 0.1rem 0 0.1rem;
+  font-size: 1.05rem;
+}
+.sx-card header small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.sx-trade {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.sx-card--cancelled {
+  opacity: 0.6;
+}
+
+.sx-pill {
+  flex: none;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sx-pill--sent,
+.sx-pill--opened {
+  color: var(--text);
+  border-color: var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.14);
+}
+.sx-pill--started {
+  color: var(--text);
+  background: rgb(var(--accent-rgb) / 0.3);
+  border-color: var(--accent-line);
+}
+.sx-pill--signed,
+.sx-pill--done {
+  color: var(--ok);
+  background: rgb(var(--ok-rgb) / 0.1);
+  border-color: rgb(var(--ok-rgb) / 0.35);
+}
+
+.sx-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.8rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.88rem;
+}
+.sx-facts dt {
+  color: var(--muted);
+}
+.sx-facts dd {
+  margin: 0;
+}
+.sx-preview {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: rgb(var(--accent-rgb) / 0.16);
+  border-left: 3px solid var(--accent);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.sx-preview.is-wait {
+  background: var(--bg);
+  border-left-color: var(--border);
+  font-weight: 600;
+  color: var(--muted);
+}
+.sx-meta {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.sx-meta:empty {
+  display: none;
+}
+.sx-warnline {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+/* The labour PO on a trade's card: held (amber, with what it needs) or issued. */
+.sx-po {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--bg);
+  border-left: 3px solid var(--border);
+  font-size: 0.86rem;
+}
+.sx-po p {
+  margin: 0;
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.sx-po.is-held {
+  background: rgb(var(--accent-rgb) / 0.16);
+  border-left-color: var(--accent-text);
+}
+/* The office's review after the PO: on hold while a return to site is open, green once it's had the green light. */
+.sx-po.is-onhold {
+  background: rgb(var(--danger-rgb) / 0.07);
+  border-left-color: var(--danger);
+}
+.sx-po.is-green {
+  border-left-color: var(--ok);
+}
+.sx-reviews {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.sx-review {
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  background: rgb(var(--accent-rgb) / 0.14);
+  border-left: 3px solid var(--accent-text);
+}
+.sx-review--open {
+  background: rgb(var(--danger-rgb) / 0.07);
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+.sx-review--green {
+  background: rgb(var(--ok-rgb) / 0.1);
+  border-left-color: var(--ok);
+  color: var(--ok);
+}
+.sx-flags {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.sx-flag {
+  font-size: 0.84rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  background: rgb(var(--accent-rgb) / 0.14);
+  border-left: 3px solid var(--accent-text);
+}
+.sx-flag--stop,
+.sx-flag--urgent {
+  background: rgb(var(--danger-rgb) / 0.07);
+  border-left-color: var(--danger);
+}
+.sx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+.sx-gone summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.sx-gone ul {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* The sheet */
+.sx-fs {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.sx-fs legend {
+  padding: 0;
+}
+.sx-rate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+.sx-money {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 9rem;
+}
+.sx-money > span {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.sx-money .crm-input {
+  padding-left: 1.5rem;
+}
+.sx-rate select {
+  flex: 1 1 10rem;
+  width: auto;
+}
+.sx-qty {
+  flex: 0 1 6rem;
+}
+.sx-chip {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgb(var(--ok-rgb) / 0.1);
+  color: var(--ok);
+}
+.sx-locked {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--bg);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.sx-line {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.sx-picked {
+  margin-bottom: 0.25rem;
+}
+.sx-newperson {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.sx-msgs {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.sx-msgs li::before {
+  content: '✉ ';
+}
+.sx-msgs li.is-bad {
+  color: var(--danger);
+}
+.sx-tell,
+.sx-record {
+  margin-top: 0.6rem;
+}
+
+/* A flag in the side list opens the trade's review. */
+.sx-flaglink {
+  display: grid;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ── The review drawer (D4) ─────────────────────────────────────────────────── */
+.sxr {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.sxr-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sxr-tabs::-webkit-scrollbar {
+  display: none;
+}
+.sxr-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 44px;
+  margin-bottom: -1px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sxr-tabs button.on {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+.sxr-tabs em {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--inverse);
+  font-style: normal;
+  font-size: 11px;
+  color: var(--inverse-text);
+}
+.sxr h4 {
+  margin: 0.4rem 0 0.35rem;
+  font-size: 0.95rem;
+}
+.sxr-tag {
+  margin-left: 0.35rem;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(var(--ok-rgb) / 0.14);
+  color: var(--ok);
+  font-size: 0.75rem;
+}
+.sxr-rows {
+  margin: 0;
+  display: grid;
+}
+.sxr-rows > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+.sxr-rows > div.is-flagged {
+  background: rgb(var(--accent-rgb) / 0.1);
+}
+.sxr-rows dt {
+  color: var(--muted);
+}
+.sxr-rows dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sxr-src {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgb(var(--fg-rgb) / 0.07);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.sxr-flag {
+  display: block;
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.45rem;
+  border-left: 3px solid var(--accent-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.sxr-flag--stop,
+.sxr-flag--urgent {
+  border-left-color: var(--danger);
+}
+.sxr-flag.is-done {
+  opacity: 0.7;
+}
+.sxr-open {
+  display: grid;
+  gap: 0.4rem;
+}
+.sxr-flagrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--accent-text);
+  background: rgb(var(--accent-rgb) / 0.14);
+  font-size: 0.86rem;
+}
+.sxr-flagrow.sxr-flag--stop,
+.sxr-flagrow.sxr-flag--urgent {
+  border-left-color: var(--danger);
+  background: rgb(var(--danger-rgb) / 0.07);
+}
+.sxr-flagrow > span:first-child {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.sxr-resolve {
+  display: flex;
+  gap: 0.4rem;
+  flex: 1 1 18rem;
+}
+.sxr-resolve .crm-input {
+  flex: 1;
+  min-width: 0;
+}
+.sxr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+.sxr-thumb {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: zoom-in;
+}
+.sxr-thumb img,
+.sxr-thumb > span {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg);
+}
+.sxr-thumb small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.sxr-read {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.sxr-read img,
+.sxr-read__noimg {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg);
+}
+.sxr-read p {
+  margin: 0.15rem 0;
+  font-size: 0.88rem;
+}
+.sxr-signoff {
+  padding-bottom: 0.6rem;
+}
+.sxr-hash {
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem !important;
+  font-weight: 500 !important;
+}
+.sxr-sig {
+  display: block;
+  max-width: 280px;
+  max-height: 110px;
+  margin-top: 0.5rem;
+  border-bottom: 1px solid var(--text);
+  border-radius: 2px;
+  background: var(--sxr-sig-paper);
+}
+.sxr-total {
+  font-size: 1rem !important;
+}
+.sxr-docs {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.sxr-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.sxr-events li {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+}
+.sxr-events time {
+  grid-row: span 3;
+  color: var(--muted);
+}
+.sxr-events span {
+  overflow-wrap: anywhere;
+}
+.sxr-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem 1rem 4.5rem;
+  background: var(--sxr-viewer);
+}
+.sxr-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.sxr-viewer__bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--sxr-viewer-bar);
+}
+.sxr-viewer__bar span {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+}
+@media (max-width: 760px) {
+  .sxr-rows > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+  .sxr-events li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sxr-events time {
+    grid-row: auto;
+  }
+  .sxr-read {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+  .sxr-read .crm-btn {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Your review (SiteReviewPanel): each signed submission with Green light / Return to site required,
+   the Return to site form, and every return to site with its notice and put right. */
+.sxr-review {
+  margin: 0 0 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.sxr-review > h4 {
+  margin: 0 0 0.2rem;
+}
+.sxr-review > p {
+  margin: 0 0 0.5rem;
+}
+.sxr-sub {
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border-left: 4px solid var(--accent-text);
+}
+.sxr-sub--bad {
+  border-left-color: var(--danger);
+}
+.sxr-sub--ok {
+  border-left-color: var(--ok);
+}
+.sxr-sub__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+.sxr-sub__head > div:first-child {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+.sxr-sub__head .sx-actions {
+  margin-top: 0;
+}
+.sxr-state {
+  justify-self: start;
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgb(var(--accent-rgb) / 0.2);
+  color: var(--text);
+}
+.sxr-sub__head .sxr-state {
+  margin-left: 0;
+}
+.sxr-state--bad {
+  background: rgb(var(--danger-rgb) / 0.1);
+  color: var(--danger);
+}
+.sxr-state--ok {
+  background: rgb(var(--ok-rgb) / 0.12);
+  color: var(--ok);
+}
+.crm-btn.sxr-green {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--on-solid);
+}
+.crm-btn.sxr-return {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-solid);
+}
+.sxr-putright {
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+}
+.sxr-putright p {
+  margin: 0.2rem 0;
+}
+.sxr-grid--small {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  margin-top: 0.4rem;
+}
+.sxr-returnform {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.4rem;
+}
+.sxr-returnform textarea {
+  width: 100%;
+  resize: vertical;
+}
+.sxr-returnform__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem 1.2rem;
+}
+.sxr-returnform__row .crm-label {
+  display: grid;
+  gap: 0.25rem;
+}
+.sxr-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  min-height: 2.5rem;
+}
+.sxr-pick {
+  position: relative;
+  cursor: pointer;
+  border-radius: 8px;
+  outline: 2px solid transparent;
+}
+.sxr-pick.is-on {
+  outline-color: var(--danger);
+}
+.sxr-pick.is-on::after {
+  content: '✓';
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--danger);
+  color: var(--on-solid);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.sxr-pick small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sxr-history {
+  margin-top: 0.7rem;
+}
+.sxr-history > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.sxr-hist {
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.86rem;
+}
+.sxr-hist p {
+  margin: 0.15rem 0;
+}
+.sxr-hist__state {
+  font-weight: 700;
+}
+.sxr-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sxr-notice {
+  margin-top: 0.3rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--border);
+  font-size: 0.84rem;
+}

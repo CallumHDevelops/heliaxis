@@ -18,6 +18,8 @@ import {
   type PoStatus,
 } from '@/lib/purchase-orders/money';
 import { deliveryFor, logOrder, NOT_READY, orderWords, ordersReady, readOrder, sameLines, saveLines } from '@/lib/purchase-orders/server';
+import { labourWho } from '@/lib/purchase-orders/shared';
+import { issueLabourPo } from '@/lib/site/labour-po';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -25,7 +27,7 @@ type Ctx = { params: Promise<{ id: string }> };
 const NOTE_MAX = 2000;
 const note = (v: unknown) => String(v ?? '').trim().slice(0, NOTE_MAX) || null;
 const STALE = 'Someone else changed this order a moment ago. Close it and open it again to see their changes.';
-const VERB: Record<string, string> = { mark_sent: 'marked as sent', confirm: 'confirmed', deliver: 'marked as delivered', undeliver: 'changed back', cancel: 'cancelled' };
+const VERB: Record<string, string> = { mark_sent: 'marked as sent', confirm: 'confirmed', deliver: 'marked as delivered', undeliver: 'changed back', cancel: 'cancelled', issue: 'issued' };
 const statusWord = (s: string) => STATUS_LABEL[s as PoStatus]?.toLowerCase() ?? s;
 
 /** One order with its lines, supplier, job and the office address (for the sheet). */
@@ -59,7 +61,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const o = cur.order;
   if (b.expect_updated_at && Date.parse(String(b.expect_updated_at)) !== Date.parse(o.updated_at)) return json({ error: STALE, stale: true }, 409);
   const now = new Date().toISOString();
-  const supplier = cur.supplier?.name ?? 'the supplier';
+  const labour = o.kind === 'labour';
+  const supplier = labour ? labourWho(o) : (cur.supplier?.name ?? 'the supplier');
 
   // Quantities received, by line: { lineId: qty } (blank clears one).
   let received: Map<string, number | null> | null = null;
@@ -88,7 +91,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (b.action) {
     const action = String(b.action) as PoAction;
     if (!(action in VERB)) return json({ error: 'Unknown action' }, 400);
-    if (!canDo(o.status, action)) return json({ error: `This order is ${statusWord(o.status)}, so it can’t be ${VERB[action]}.` }, 409);
+    if (!canDo(o.status, action, o.kind)) return json({ error: `This ${labour ? 'PO' : 'order'} is ${statusWord(o.status)}, so it can’t be ${VERB[action]}.` }, 409);
+    // A labour PO is issued (or issued again) as the trade's sign-off says: frozen, PDF, email and WhatsApp.
+    if (action === 'issue') {
+      const r = await issueLabourPo(db, id, { by: s.user.id, override: true, origin: new URL(req.url).origin });
+      if (!r.ok) return json({ error: r.words?.length ? r.words.join('. ') : r.error }, 409);
+      return json(await readOrder(db, id));
+    }
     let u: Record<string, unknown> = {};
     let log: { event: 'sent' | 'confirmed' | 'delivered' | 'undelivered' | 'cancelled'; body: string } | null = null;
     switch (action) {
@@ -138,6 +147,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
       .select('id');
     if (error) return json({ error: error.message }, 500);
     if (!moved?.length) return json({ error: STALE, stale: true }, 409);
+    // A cancelled labour PO's messages still waiting (the evening rule) don't go.
+    if (action === 'cancel' && labour) await db.from('site_messages').update({ status: 'cancelled' }).like('dedupe_key', `po:${id}:%`).eq('status', 'queued');
     if (action === 'deliver') {
       const failed = await saveReceived();
       if (failed) return json({ error: `Marked as delivered, but the quantities received weren’t saved: ${failed}` }, 500);
@@ -201,9 +212,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (received?.size && cur.lines.some((l) => received!.has(l.id!) && received!.get(l.id!) !== l.received_qty)) changed.push('received');
 
   if (!changed.length) return json(cur);
-  const block = checkChange(o.status, changed);
+  const block = checkChange(o.status, changed, o.kind);
   if (block) return json({ error: block }, 409);
-  if (marksChanged(o.status, changed)) u.changed_since_sent = true;
+  if (!labour && marksChanged(o.status, changed)) u.changed_since_sent = true;
 
   // The order first, only if nobody else saved meanwhile; then its lines.
   const { data: saved, error } = await db
@@ -233,11 +244,14 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const db = createAdminClient();
-  const { data: o } = await db.from('purchase_orders').select('id, po_number, project_id, status').eq('id', id).maybeSingle();
+  const { data: o } = await db.from('purchase_orders').select('*').eq('id', id).maybeSingle();
   if (!o) return json({ ok: true });
-  if (!canDo(o.status, 'delete')) return json({ error: `Only drafts can be deleted. This one has gone to the supplier: cancel it instead.` }, 409);
+  const labour = o.kind === 'labour';
+  if (!canDo(o.status, 'delete', labour ? 'labour' : 'supply') || (labour && Number(o.labour?.version) > 0)) {
+    return json({ error: labour ? 'This PO has been issued: cancel it instead, so there’s a record.' : `Only drafts can be deleted. This one has gone to the supplier: cancel it instead.` }, 409);
+  }
   const { error } = await db.from('purchase_orders').delete().eq('id', id).eq('status', 'draft');
   if (error) return json({ error: error.message }, 500);
-  await logOrder(db, o, 'deleted', `Draft purchase order ${o.po_number} deleted`, s.user.id);
+  await logOrder(db, o, 'deleted', `${labour ? 'Held labour PO' : 'Draft purchase order'} ${o.po_number} deleted`, s.user.id);
   return json({ ok: true });
 }

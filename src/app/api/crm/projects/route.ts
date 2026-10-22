@@ -4,6 +4,7 @@ import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { isProjectStage, PRODUCT_KEYS, PROJECT_START_STAGES, type StageKey } from '@/lib/crm/stages';
 import { sendStageToMeta } from '@/lib/meta-capi';
 import { pipeline, projectsList, syncEnquiryStatus } from '@/lib/projects/server';
+import { createAssignments, siteReady, type NewAssignment } from '@/lib/site/server';
 import { toWaId } from '@/lib/whatsapp/shared';
 
 export const dynamic = 'force-dynamic';
@@ -119,5 +120,11 @@ export async function POST(req: Request) {
   if (startStage !== 'lead') await syncEnquiryStatus(db, enquiryId).catch(() => null);
   // A job loaded straight in at Won or later is still a sale for Meta (sent once per job).
   if (delivery) after(() => sendStageToMeta(project.id, startStage).catch(() => {}));
+  // Who's doing the work (New project, once site-commissioning.sql has run): made after the job.
+  const trades = (Array.isArray(b.assignments) ? b.assignments : []) as NewAssignment[];
+  if (delivery && trades.length && (await siteReady())) {
+    const r = await createAssignments(db, project.id, trades, s.user.id);
+    if (!r.ok) return json({ id: project.id, warning: `The job is made, but the trades weren’t added: ${r.error} Add them on the job’s Site tab.` });
+  }
   return json({ id: project.id });
 }

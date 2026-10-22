@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { requestPasswordReset } from '@/lib/auth-actions';
 import { AuthShell } from '@/components/auth/AuthShell';
-import { field } from '@/components/auth/authStyles';
+import { brand, field } from '@/components/auth/authStyles';
 
 function ForgotForm() {
   const expired = useSearchParams().get('expired');
@@ -16,7 +16,7 @@ function ForgotForm() {
       title="Reset your password"
       subtitle="We'll email you a link to set a new one."
       footer={
-        <Link href="/login" style={{ color: '#C77F04', fontWeight: 600 }}>
+        <Link href="/login" style={{ color: brand.link, fontWeight: 600 }}>
           ← Back to sign in
         </Link>
       }

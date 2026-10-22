@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
  */
 
 type Counts = { opportunities: number; tasks: number; photos: number; documents: number; signatures: number; messages: number; emails: number };
-type Person = { id: string; name: string; signed: boolean; paid: boolean; ordered?: boolean };
+type Person = { id: string; name: string; signed: boolean; paid: boolean; ordered?: boolean; signed_off?: boolean };
 type Preview = {
   customers: Person[];
   gone: number;
@@ -28,9 +28,10 @@ const SHOW = 8; // names listed before "and n more"
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 const first = (name: string) => name.trim().split(/\s+/)[0] || name;
 const list = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`);
-const what = (p: Person) => list([p.signed && 'a signed quote', p.paid && 'a paid deposit', p.ordered && 'a purchase order sent to a supplier'].filter((x): x is string => !!x));
-/** Kept unless ticked: a signed quote, a paid deposit or kit ordered for them. */
-const isHeld = (p: Person) => p.signed || p.paid || !!p.ordered;
+const what = (p: Person) =>
+  list([p.signed && 'a signed quote', p.paid && 'a paid deposit', p.ordered && 'a purchase order sent to a supplier', p.signed_off && 'trade sign-offs and certificates'].filter((x): x is string => !!x));
+/** Kept unless ticked: a signed quote, a paid deposit, kit ordered for them, or a trade's signed work on site. */
+const isHeld = (p: Person) => p.signed || p.paid || !!p.ordered || !!p.signed_off;
 
 async function send(url: string, init: RequestInit): Promise<{ ok: boolean; d: Record<string, unknown> }> {
   try {

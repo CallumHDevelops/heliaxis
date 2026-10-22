@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Fragment, useRef, useState, type ReactNode } from 'react';
 import type { SetupPerson, SetupTodo } from '@/lib/setup-checks';
+import { isPinnedLight } from '@/lib/theme/routes';
 import { CopyButton } from './CopyButton';
 import './from-claude.css';
 
@@ -229,6 +230,11 @@ function Steps({
           (external ? (
             <a href={t.href} target="_blank" rel="noopener noreferrer" className={t.sql ? 'fc-ghost' : 'fc-go'}>
               {t.hrefLabel || 'Open'} ↗
+            </a>
+          ) : isPinnedLight(t.href) ? (
+            // A full load: the CMS editor is pinned light (src/lib/theme/routes.ts).
+            <a href={t.href} className="fc-go">
+              {t.hrefLabel || 'Open'}
             </a>
           ) : (
             <Link href={t.href} className="fc-go">

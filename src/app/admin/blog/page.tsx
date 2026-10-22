@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { getSessionProfile } from '@/lib/auth';
 import { isAiConfigured } from '@/lib/blog/ai';
@@ -32,9 +31,10 @@ export default async function AdminBlogPage() {
             <h1 className="blog-admin__title">AI Blog</h1>
             <p className="blog-admin__lede">
               Manage AI articles separately from website pages in the{' '}
-              <Link href="/admin/cms" style={{ color: '#211F18', fontWeight: 600 }}>
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full load: the CMS editor is pinned light (src/lib/theme/routes.ts) */}
+              <a href="/admin/cms" style={{ color: 'var(--text)', fontWeight: 600 }}>
                 CMS
-              </Link>
+              </a>
               . Publish now, or schedule to go live automatically.
             </p>
           </div>
@@ -54,7 +54,7 @@ export default async function AdminBlogPage() {
         {profile?.role === 'admin' ? (
           <BlogAdminCreate aiReady={aiReady} />
         ) : (
-          <p style={{ color: '#6E6A5E', margin: 0 }}>Only admins can create posts.</p>
+          <p style={{ color: 'var(--muted)', margin: 0 }}>Only admins can create posts.</p>
         )}
 
         <BlogAdminList posts={posts} />

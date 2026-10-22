@@ -2,11 +2,20 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
- * Which of the Projects / Surveys / Booking / Purchase orders SQL files have been run, so new
- * screens and sections can stay hidden until their tables exist. Server pages pass the result to
- * client components as a prop.
+ * Which of the Projects / Surveys / Booking / Purchase orders / Site / Handover SQL files have been
+ * run, so new screens and sections can stay hidden until their tables exist. Server pages pass the
+ * result to client components as a prop.
  */
-export type SchemaReady = { crmV3: boolean; surveys: boolean; booking: boolean; purchaseOrders: boolean };
+export type SchemaReady = {
+  crmV3: boolean;
+  surveys: boolean;
+  booking: boolean;
+  purchaseOrders: boolean;
+  /** site-commissioning.sql: trades on jobs, the site app, sign-offs, labour POs, the job document registry. */
+  site: boolean;
+  /** handover.sql: the Handover tab and the customer's handover pack. */
+  handover: boolean;
+};
 
 const TTL = 60_000;
 let cached: { at: number; value: SchemaReady } | null = null;
@@ -26,14 +35,19 @@ async function has(table: string, column = 'id') {
 }
 
 async function check(): Promise<SchemaReady> {
-  const [crmV3, surveys, bookings, diary, purchaseOrders] = await Promise.all([
+  const [crmV3, surveys, bookings, diary, purchaseOrders, siteMessages, docSlots, siteReview, handover] = await Promise.all([
     has('crm_projects', 'project_ref'), // crm-v3.sql
     has('crm_surveys'), // surveys.sql
     has('survey_bookings'), // survey-booking.sql
     has('diary_entries'),
     has('purchase_order_lines'), // purchase-orders.sql (its last table)
+    has('site_messages'), // site-commissioning.sql (its last table)
+    has('crm_documents', 'handover_slot'), // and its document columns
+    has('purchase_orders', 'review_status'), // and the office's review (site_returns, the PO's review)
+    has('handover_packs', 'project_id'), // handover.sql
   ]);
-  return { crmV3, surveys, booking: bookings && diary, purchaseOrders };
+  const site = siteMessages && docSlots && siteReview;
+  return { crmV3, surveys, booking: bookings && diary, purchaseOrders, site, handover: site && handover };
 }
 
 /** Cached in memory for 60 s, so a `false` is checked again a minute after the SQL is run. Never throws. */

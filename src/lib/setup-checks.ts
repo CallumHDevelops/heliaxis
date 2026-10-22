@@ -461,9 +461,21 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     sql('survey-booking.sql', 'Online survey booking, your diary, and the Outlook copy of surveys, installs and diary entries.', 5, 'surveys.sql')
   );
   // Purchase orders against jobs: every PO screen stays hidden until this has been run.
+  const purchaseOrders = crmV3 && (await has('purchase_order_lines'));
   add(
-    crmV3 && !(await has('purchase_order_lines')),
+    crmV3 && !purchaseOrders,
     sql('purchase-orders.sql', 'Purchase orders: order the kit for a job from your suppliers, email them the PO as a PDF, and track it to delivery.', 5, 'crm-v3.sql')
+  );
+  // The site app (trades' job packs, sign-offs, labour POs) and then the handover pack: their tabs and
+  // the /portal/site app stay hidden until each has been run (src/lib/schema-ready.ts).
+  const site = purchaseOrders && (await has('site_messages')) && (await has('crm_documents', 'handover_slot')) && (await has('purchase_orders', 'review_status'));
+  add(
+    purchaseOrders && !site,
+    sql('site-commissioning.sql', 'Site app: send trades a job pack, collect their sign-offs, raise their POs and review their work.', 5, 'purchase-orders.sql')
+  );
+  add(
+    site && !(await has('handover_packs', 'project_id')),
+    sql('handover.sql', 'Handover pack: every document for the customer in one place, and uploads straight into their portal.', 5, 'site-commissioning.sql')
   );
   // Merging duplicate customers and jobs: the Merge buttons say this is needed until it's run.
   add(
@@ -505,6 +517,14 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     optional: true,
     manual: true,
   });
+  // Light / dark: optional. Without it each device remembers its own choice (src/lib/theme).
+  add(
+    !(await has('profiles', 'theme_at')),
+    {
+      ...sql('theme.sql', 'Light and dark mode: each person’s choice (Light, Dark or Match phone) follows them to all their devices. Until it’s run, each device remembers its own.', 40),
+      optional: true,
+    }
+  );
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

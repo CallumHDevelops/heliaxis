@@ -1,6 +1,11 @@
-/* Signature pad — shared by the portal and admin countersign. */
-.sigpad { border: 1px solid rgba(33, 31, 24, 0.14); background: #fff; border-radius: 2px; }
-.sigpad canvas { border-bottom: 1px dashed rgba(33, 31, 24, 0.14); }
-.sigpad-foot { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; font-size: 0.78rem; color: #6e6a5e; }
-.sigpad-foot button { background: none; border: 0; font: inherit; font-weight: 600; cursor: pointer; color: #211f18; }
+/* Signature pad — shared by the portals, the site app and the office. A field: white with dark ink on
+   light; on dark the theme's field with the text colour for ink (the canvas's `color`, which
+   SignaturePad.tsx draws with). What's saved is always the dark ink, so documents never change. */
+.sigpad { --sigpad-ink: #1a1a3a; border: 1px solid var(--border-strong); background: var(--field); border-radius: 2px; }
+.sigpad canvas { color: var(--sigpad-ink); border-bottom: 1px dashed var(--border); }
+.sigpad-foot { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; font-size: 0.78rem; color: var(--muted); }
+.sigpad-foot button { background: none; border: 0; font: inherit; font-weight: 600; cursor: pointer; color: var(--text); }
 .sigpad-foot button:disabled { opacity: 0.4; cursor: default; }
+@media screen {
+  :root[data-theme='dark'] .sigpad { --sigpad-ink: var(--text); }
+}

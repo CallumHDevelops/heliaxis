@@ -6,11 +6,11 @@
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.4;
-  color: var(--ok, #3f7d4e);
+  color: var(--ok);
   font-weight: 600;
 }
 .qx-signed small {
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
   font-weight: 400;
 }
 .qx-markform {
@@ -19,15 +19,15 @@
   gap: 0.45rem;
   padding: 0.6rem;
   border-radius: 8px;
-  background: var(--paper, #f7f2e7);
-  border: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  background: var(--bg);
+  border: 1px solid var(--border);
 }
 .qx-markform p {
   margin: 0;
 }
 /* "+ Add" from elsewhere on the page: show where the upload is. */
 .crm-doc-upload.qx-flash {
-  outline: 2px solid var(--solar, #f8bc1e);
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
   border-radius: 8px;
   transition: outline-color 0.3s;
@@ -36,19 +36,33 @@
   min-height: 32px;
 }
 
-/* Customer portal card (dark) */
+/* Customer portal card (an ink band in both themes: crm.css .crm-portal) */
+.crm-portal {
+  --qx-pick-on: #fef5de;
+  /* Light green on the band, in both themes. */
+  --qx-ok: #7cc28f;
+}
 .crm-portal .qx-light {
-  color: #fffdf8;
+  color: var(--moment-text);
 }
 .crm-portal .qx-dim {
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
 }
 .crm-portal .crm-docpick label {
-  color: var(--ink, #211f18);
+  color: var(--text);
 }
 /* Solid, so the chosen quote stays readable on the dark card (the see-through amber matches it on light). */
 .crm-portal .crm-docpick label.on {
-  background: #fef5de;
+  background: var(--qx-pick-on);
+}
+/* On dark the quotes are raised tiles on the band, the chosen one tinted gold. */
+@media screen {
+  :root[data-theme='dark'] .crm-portal {
+    --qx-pick-on: rgb(var(--accent-rgb) / 0.22);
+  }
+  :root[data-theme='dark'] .crm-portal .crm-docpick label:not(.on) {
+    background: var(--raised);
+  }
 }
 .crm-portal .qx-pick {
   display: flex;
@@ -56,23 +70,35 @@
   gap: 0.45rem;
 }
 .crm-portal .qx-pick > .qx-dim {
-  color: rgba(255, 253, 248, 0.65);
+  color: var(--moment-muted);
   margin: 0;
 }
 .qx-note {
   margin: 0;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #7cc28f;
+  color: var(--qx-ok);
 }
 .qx-hash {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 0.72rem;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
   cursor: help;
 }
 
 /* Home → Today: surveys, installs and diary entries */
+.hub-today {
+  --hub-tag-gold: #6b4b00;
+  --hub-tag-green: #2f5e3a;
+  --hub-btn: #fff;
+}
+@media screen {
+  :root[data-theme='dark'] .hub-today {
+    --hub-tag-gold: var(--ph-y-text);
+    --hub-tag-green: var(--ph-g-text);
+    --hub-btn: var(--surface-2);
+  }
+}
 .hub-today .hub-row {
   align-items: flex-start;
   flex-wrap: wrap;
@@ -98,17 +124,17 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  background: rgba(248, 188, 30, 0.22);
-  color: #6b4b00;
+  background: rgb(var(--accent-rgb) / 0.22);
+  color: var(--hub-tag-gold);
   vertical-align: 1px;
 }
 .hub-today-tag.is-install {
-  background: rgba(63, 125, 78, 0.16);
-  color: #2f5e3a;
+  background: rgb(var(--ok-rgb) / 0.16);
+  color: var(--hub-tag-green);
 }
 .hub-today-tag.is-diary {
-  background: rgba(33, 31, 24, 0.08);
-  color: #4a463b;
+  background: rgb(var(--fg-rgb) / 0.08);
+  color: var(--text-2);
 }
 .hub-today-actions {
   flex: 1 0 100%;
@@ -124,22 +150,22 @@
   min-height: 44px;
   padding: 0 0.9rem;
   border-radius: 10px;
-  border: 1px solid rgba(33, 31, 24, 0.18);
-  background: #fff;
+  border: 1px solid rgb(var(--fg-rgb) / 0.18);
+  background: var(--hub-btn);
   color: inherit;
   font-weight: 700;
   font-size: 0.85rem;
   text-decoration: none;
 }
 .hub-today-btn.is-primary {
-  background: #211f18;
-  border-color: #211f18;
-  color: #f8bc1e;
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-accent);
 }
 .hub-today-empty {
   padding: 0.85rem 0.9rem;
   margin: 0;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
   font-size: 0.9rem;
 }
 .hub-today-add {
@@ -149,7 +175,7 @@
   margin-top: 0.4rem;
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--amber, #c77f04);
+  color: var(--accent-text);
   text-decoration: none;
 }
 @media (max-width: 420px) {
@@ -160,4 +186,18 @@
     flex: 1 1 auto;
     min-height: 48px;
   }
+}
+
+/* "Add it to the handover pack as …" under the upload (handover.sql). */
+.crm-doc-pack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.4rem 0;
+}
+.crm-doc-pack .crm-input {
+  width: auto;
+  flex: 1;
+  min-width: 12rem;
 }

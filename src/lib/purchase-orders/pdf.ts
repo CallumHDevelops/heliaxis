@@ -1,20 +1,20 @@
 import 'server-only';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
+import { PDFDocument, rgb, type PDFPage, type RGB } from 'pdf-lib';
 import { ukDay } from '@/lib/bank-holidays';
+import { A4, BANNER_H, dayDate, fillOf, INK, LABEL, LINE, longDate, MARGIN, MUTED, pageKit, RED, SOLAR, TRACK, type MastLine, type TextOpt, type Variant } from '@/lib/documents/pdf-kit';
 import { HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { formatPence, formatQty, lineNet, totals } from './money';
 import { addressLine, type PoLine, type PurchaseOrder, type Supplier } from './shared';
 
 /**
- * The purchase order as a branded A4 PDF (pdf-lib, the library the subcontractor documents use):
- * the Heliaxis logo, the order's number, date and our job reference, the supplier and where it's
- * delivered, the lines with part numbers, net / VAT per rate / total, the notes, "please quote …",
- * and the legal line on every page. Long orders run onto more pages, the table's headings repeated.
- *
- * Helvetica (built into every PDF reader) is used, so text is kept to the characters it has:
- * anything else (an emoji in a note) becomes "?".
+ * The purchase order as a branded A4 PDF (pdf-lib, the library the subcontractor documents use), in
+ * the document kit's style (src/lib/documents/pdf-kit.ts): the ink header band with the order's
+ * number, date, our job reference and the day it's needed on the right, our name and address under it,
+ * the supplier and where it's delivered on a card, the lines with part numbers in a ruled table, net /
+ * VAT per rate, the total on an ink bar, the notes, "please quote …", and the kit's page with its dark
+ * banner and the legal line on every page. Long orders run onto more pages (each with the kit's slim
+ * strip), the table's headings repeated. The kit's fonts draw any character a note has. `variant`:
+ * the kit's 'digital' (the default, what's emailed) or 'print' (the ink saver).
  */
 
 export type PoPdfInput = {
@@ -31,114 +31,26 @@ export type PoPdfInput = {
   orderedBy?: string | null;
   /** Where questions and replies go (the shared mailbox). */
   contactEmail: string;
+  /** 'digital' (the default: what's emailed) or 'print' (the ink saver). */
+  variant?: Variant;
 };
 
-const A4: [number, number] = [595.28, 841.89];
-const M = 42; // page margin
-const W = A4[0] - 2 * M;
-const FOOT = 64; // room kept for the footer
-
-const INK = rgb(33 / 255, 31 / 255, 24 / 255);
-const MUTED = rgb(110 / 255, 106 / 255, 94 / 255);
-const AMBER = rgb(199 / 255, 127 / 255, 4 / 255);
-const SOLAR = rgb(248 / 255, 188 / 255, 30 / 255);
-const PAPER = rgb(247 / 255, 242 / 255, 231 / 255);
-const LINE = rgb(0.86, 0.85, 0.82);
-const RED = rgb(179 / 255, 38 / 255, 30 / 255);
-
-/* ── Text ────────────────────────────────────────────────────────────────────── */
-
-// What Helvetica can show (WinAnsi): printable ASCII, Latin-1 and the extra punctuation in 0x80–0x9F.
-const EXTRA = new Set('€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ');
-const showable = (ch: string) => {
-  const c = ch.codePointAt(0) ?? 0;
-  return (c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0xff) || EXTRA.has(ch);
-};
-/** Text Helvetica can draw: tabs to spaces, anything it hasn't got to "?". */
-export function pdfText(s: string | null | undefined): string {
-  return [...String(s ?? '').replace(/\t/g, ' ').replace(/ /g, ' ')].map((ch) => (ch === '\n' || showable(ch) ? ch : '?')).join('');
-}
-
-/** Lines no wider than `max`, breaking at spaces (and inside a word too long for a line). Keeps the text's own line breaks. */
-function wrap(text: string, font: PDFFont, size: number, max: number): string[] {
-  const out: string[] = [];
-  for (const para of pdfText(text).split('\n')) {
-    let line = '';
-    for (const word of para.split(/ +/)) {
-      const tryLine = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(tryLine, size) <= max) {
-        line = tryLine;
-        continue;
-      }
-      if (line) out.push(line);
-      // A word wider than the line on its own (a long part number): split it, after a "-" or "/" where one fits.
-      let rest = word;
-      while (font.widthOfTextAtSize(rest, size) > max) {
-        let n = rest.length - 1;
-        while (n > 1 && font.widthOfTextAtSize(rest.slice(0, n), size) > max) n--;
-        const soft = Math.max(rest.lastIndexOf('-', n - 1), rest.lastIndexOf('/', n - 1));
-        if (soft >= Math.floor(n / 2)) n = soft + 1;
-        out.push(rest.slice(0, n));
-        rest = rest.slice(n);
-      }
-      line = rest;
-    }
-    out.push(line);
-  }
-  return out;
-}
-
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const noon = (ymd: string) => new Date(`${ymd}T12:00:00Z`);
-/** "20 October 2026". */
-export const longDate = (ymd: string) => {
-  const d = noon(ymd);
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
-};
-/** "Tuesday 3 November 2026". */
-export const dayDate = (ymd: string) => `${DAYS[noon(ymd).getUTCDay()]} ${longDate(ymd)}`;
-
-/* ── The logo ────────────────────────────────────────────────────────────────── */
-
-let logoBytes: Uint8Array | null = null;
-let logoMissedAt = 0;
-/**
- * public/assets/heliaxis-logo.png (bundled with the routes: next.config.ts), else the live site's
- * copy, else none (the name in type instead). A miss is tried again after 10 minutes.
- */
-async function logo(): Promise<Uint8Array | null> {
-  if (logoBytes) return logoBytes;
-  if (Date.now() - logoMissedAt < 10 * 60_000) return null;
-  try {
-    logoBytes = new Uint8Array(await readFile(path.join(process.cwd(), 'public', 'assets', 'heliaxis-logo.png')));
-  } catch {
-    try {
-      const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
-      const r = await fetch(`${site}/assets/heliaxis-logo.png`, { signal: AbortSignal.timeout(4000) });
-      if (r.ok) logoBytes = new Uint8Array(await r.arrayBuffer());
-    } catch {
-      // No logo this time.
-    }
-  }
-  if (!logoBytes) logoMissedAt = Date.now();
-  return logoBytes;
-}
+const X = MARGIN.l;
+const W = A4[0] - MARGIN.l - MARGIN.r;
+const FOOT = BANNER_H + 16; // room kept for the banner
 
 /* ── The document ────────────────────────────────────────────────────────────── */
-
-type Fonts = { r: PDFFont; b: PDFFont };
 
 /** Column layout of the lines table: left edges and widths, numbers right-aligned. */
 const COLS = (() => {
   const no = 18;
-  const part = 84;
-  const qty = 40;
-  const unit = 70;
-  const vat = 34;
-  const net = 72;
+  const part = 86;
+  const qty = 30;
+  const unit = 60;
+  const vat = 30;
+  const net = 64;
   const desc = W - (no + part + qty + unit + vat + net);
-  let x = M;
+  let x = X;
   const at = (w: number) => {
     const c = { x, w };
     x += w;
@@ -146,7 +58,7 @@ const COLS = (() => {
   };
   return { no: at(no), part: at(part), desc: at(desc), qty: at(qty), unit: at(unit), vat: at(vat), net: at(net) };
 })();
-const PAD = 4;
+const PAD = 5;
 
 export async function purchaseOrderPdf(input: PoPdfInput): Promise<Uint8Array> {
   const { order: o, lines, supplier } = input;
@@ -155,78 +67,44 @@ export async function purchaseOrderPdf(input: PoPdfInput): Promise<Uint8Array> {
   doc.setAuthor(HELIAXIS_PARTY.name);
   doc.setCreator('Heliaxis');
   doc.setProducer('Heliaxis');
-  const f: Fonts = { r: await doc.embedFont(StandardFonts.Helvetica), b: await doc.embedFont(StandardFonts.HelveticaBold) };
-  const logoPng = await logo();
-  let image: PDFImage | null = null;
-  if (logoPng) image = await doc.embedPng(logoPng).catch(() => null);
+  const pk = await pageKit(doc, { variant: input.variant });
+  const look = pk.look;
 
   let page: PDFPage = doc.addPage(A4);
-  let y = A4[1] - M;
-  const text = (s: string, x: number, yy: number, size: number, font: PDFFont = f.r, color = INK) => page.drawText(pdfText(s), { x, y: yy, size, font, color });
-  const right = (s: string, xRight: number, yy: number, size: number, font: PDFFont = f.r, color = INK) =>
-    text(s, xRight - font.widthOfTextAtSize(pdfText(s), size), yy, size, font, color);
-  const rule = (yy: number, color = LINE, thickness = 0.6) => page.drawLine({ start: { x: M, y: yy }, end: { x: M + W, y: yy }, thickness, color });
+  pk.paint(page);
+  let y = A4[1] - MARGIN.t;
+  const text = (s: string, x: number, yy: number, size: number, opt: TextOpt = {}) => pk.text(page, s, x, yy, size, opt);
+  const right = (s: string, xRight: number, yy: number, size: number, opt: TextOpt = {}) => text(s, xRight - pk.width(s, size, opt.style ?? 'regular', opt.track ?? 0), yy, size, opt);
+  const rule = (yy: number, color: RGB = LINE, thickness = 0.5, x0 = X, x1 = X + W) => pk.hair(page, x0, x1, yy, color, thickness);
+  const vline = (x: number, y0: number, y1: number, t = 0.4) => page.drawLine({ start: { x, y: y0 }, end: { x, y: y1 }, thickness: t, color: LINE });
 
-  /* Header: logo and our details on the left, the order's own details on the right. */
-  const logoW = 150;
-  const logoH = image ? (image.height / image.width) * logoW : 0;
-  if (image) page.drawImage(image, { x: M, y: y - logoH, width: logoW, height: logoH });
-  else text('HELIAXIS', M, y - 22, 24, f.b);
-  let ly = y - (image ? logoH : 26) - 14;
-  text(HELIAXIS_PARTY.name, M, ly, 9, f.b);
-  ly -= 11;
-  for (const l of wrap(HELIAXIS_PARTY.registeredAddress, f.r, 8.5, 230)) {
-    text(l, M, ly, 8.5, f.r, MUTED);
-    ly -= 10.5;
-  }
-  text(input.contactEmail, M, ly, 8.5, f.r, MUTED);
-  ly -= 10.5;
-
-  const rx = M + W;
-  right('PURCHASE ORDER', rx, y - 16, 17, f.b);
-  right(o.po_number, rx, y - 36, 15, f.b, AMBER);
+  /* The masthead: the order's own details on the right of the ink band, our name and address under it. */
+  const under: MastLine[] = [{ s: HELIAXIS_PARTY.name, bold: true }, { s: HELIAXIS_PARTY.registeredAddress, muted: true }, { s: input.contactEmail, muted: true }];
   const meta: [string, string][] = [
+    ['PO number', o.po_number],
     ['Date', longDate(input.issued)],
     ['Our job reference', input.jobRef || '-'],
     ['Required by', o.required_by ? dayDate(o.required_by) : 'Not set'],
   ];
-  let my = y - 56;
-  for (const [k, v] of meta) {
-    right(v, rx, my, 9, f.b);
-    right(k, rx - f.b.widthOfTextAtSize(pdfText(v), 9) - 8, my, 8.5, f.r, MUTED);
-    my -= 12.5;
-  }
+  y = pk.masthead(page, { x: X, w: W, meta, under, eyebrow: `${o.po_number} · ${input.jobRef ? `Project ${input.jobRef}` : 'Heliaxis'}`, title: 'Purchase order' });
+
   if (input.replaces) {
-    right(`Revised: this replaces the order sent on ${longDate(input.replaces)}.`, rx, my, 8.5, f.b, AMBER);
-    my -= 12.5;
+    page.drawRectangle({ x: X, y: y - 22, width: W, height: 22, ...fillOf(look.cell), borderColor: SOLAR, borderWidth: 1.4 });
+    text(`Revised: this replaces the order sent on ${longDate(input.replaces)}.`, X + 10, y - 15, 9.5, { style: 'bold', color: look.flag });
+    y -= 32;
   }
-  y = Math.min(ly, my) - 8;
-  page.drawRectangle({ x: M, y: y - 2.5, width: W, height: 2.5, color: SOLAR });
-  y -= 16;
-
   if (o.status === 'cancelled') {
-    page.drawRectangle({ x: M, y: y - 26, width: W, height: 26, color: rgb(1, 0.95, 0.94), borderColor: RED, borderWidth: 0.8 });
+    page.drawRectangle({ x: X, y: y - 26, width: W, height: 26, ...fillOf(look.cell && rgb(1, 0.95, 0.94)), borderColor: RED, borderWidth: 0.8 });
     const when = o.cancelled_at ? ` on ${longDate(ukDay(o.cancelled_at))}` : '';
-    text(`CANCELLED${when}. Please don’t supply this order.`, M + 10, y - 17, 10, f.b, RED);
-    y -= 46;
+    text(`CANCELLED${when}. Please don’t supply this order.`, X + 10, y - 17, 10, { style: 'bold', color: RED });
+    y -= 36;
   }
 
-  /* Supplier | Deliver to */
-  const colW = (W - 24) / 2;
-  const block = (x: number, label: string, rows: { s: string; bold?: boolean; muted?: boolean }[]) => {
-    let by = y;
-    text(label.toUpperCase(), x, by, 7.5, f.b, MUTED);
-    by -= 13;
-    for (const r of rows) {
-      for (const l of wrap(r.s, r.bold ? f.b : f.r, r.bold ? 10 : 9, colW)) {
-        text(l, x, by, r.bold ? 10 : 9, r.bold ? f.b : f.r, r.muted ? MUTED : INK);
-        by -= r.bold ? 13 : 11.5;
-      }
-    }
-    return by;
-  };
+  /* Supplier | Delivery, on a card */
+  const colW = W / 2;
+  type BlockRow = { s: string; bold?: boolean; muted?: boolean };
   const sup = supplier;
-  const supRows = sup
+  const supRows: BlockRow[] = sup
     ? [
         { s: sup.name, bold: true },
         ...(sup.contact_name ? [{ s: `For the attention of ${sup.contact_name}` }] : []),
@@ -236,7 +114,7 @@ export async function purchaseOrderPdf(input: PoPdfInput): Promise<Uint8Array> {
         ...(sup.account_number ? [{ s: `Our account number: ${sup.account_number}`, muted: true }] : []),
       ]
     : [{ s: 'Supplier not found', muted: true }];
-  const where =
+  const where: BlockRow[] =
     o.deliver_to === 'collect'
       ? [{ s: 'Collection', bold: true }, { s: 'We’ll collect it from you. Please let us know when it’s ready.' }]
       : [
@@ -245,28 +123,55 @@ export async function purchaseOrderPdf(input: PoPdfInput): Promise<Uint8Array> {
           ...(o.deliver_postcode && !(o.deliver_address ?? '').toUpperCase().includes(o.deliver_postcode.toUpperCase()) ? [{ s: o.deliver_postcode }] : []),
         ];
   const contact = [input.orderedBy, input.contactEmail].filter(Boolean).join(', ');
-  const whereRows = [...where, ...(contact ? [{ s: `Questions: ${contact}`, muted: true }] : [])];
-  y = Math.min(block(M, 'Supplier', supRows), block(M + colW + 24, 'Delivery', whereRows)) - 12;
+  const whereRows: BlockRow[] = [...where, ...(contact ? [{ s: `Questions: ${contact}`, muted: true }] : [])];
+  const blockLines = (rows: BlockRow[]) => rows.flatMap((r) => pk.lines(r.s, r.bold ? 9.5 : 8.8, colW - 22, r.bold ? 'bold' : 'regular').map((l) => ({ l, r })));
+  const lead = (x: { r: BlockRow }) => (x.r.bold ? 13 : 11.4);
+  const blocks = [
+    { label: 'Supplier', ls: blockLines(supRows) },
+    { label: 'Delivery', ls: blockLines(whereRows) },
+  ];
+  const cardH = Math.max(...blocks.map((b) => 26 + b.ls.reduce((a, x) => a + lead(x), 0))) + 2;
+  pk.card(page, X, y, W, cardH);
+  vline(X + colW, y, y - cardH, 0.6);
+  blocks.forEach((b, j) => {
+    const bx = X + 10 + j * colW;
+    pk.label(page, b.label, bx, y - 12.2, 6.6);
+    let by = y - 26;
+    for (const x of b.ls) {
+      text(x.l, bx, by, x.r.bold ? 9.5 : 8.8, { style: x.r.bold ? 'bold' : 'regular', color: x.r.muted ? MUTED : INK });
+      by -= lead(x);
+    }
+  });
+  y -= cardH + 18;
 
-  /* The lines */
+  /* The lines: mono headings on a paper band, the rows on card */
   const tableHead = () => {
-    page.drawRectangle({ x: M, y: y - 18, width: W, height: 18, color: PAPER });
-    const ty = y - 12;
-    text('#', COLS.no.x + PAD, ty, 7.5, f.b, MUTED);
-    text('PART NO.', COLS.part.x + PAD, ty, 7.5, f.b, MUTED);
-    text('DESCRIPTION', COLS.desc.x + PAD, ty, 7.5, f.b, MUTED);
-    right('QTY', COLS.qty.x + COLS.qty.w - PAD, ty, 7.5, f.b, MUTED);
-    right('UNIT EX VAT', COLS.unit.x + COLS.unit.w - PAD, ty, 7.5, f.b, MUTED);
-    right('VAT', COLS.vat.x + COLS.vat.w - PAD, ty, 7.5, f.b, MUTED);
-    right('NET', COLS.net.x + COLS.net.w - PAD, ty, 7.5, f.b, MUTED);
-    y -= 18;
+    const h = 19;
+    if (look.head) page.drawRectangle({ x: X, y: y - h, width: W, height: h, color: look.head });
+    rule(y, INK, 0.8);
+    const ty = y - 12.2;
+    const lab = (s: string, x: number, right = false) => pk.label(page, s, x, ty, 6.4, { bold: true, right });
+    lab('#', COLS.no.x + PAD);
+    lab('Part no.', COLS.part.x + PAD);
+    lab('Description', COLS.desc.x + PAD);
+    lab('Qty', COLS.qty.x + COLS.qty.w - PAD, true);
+    lab('Unit ex VAT', COLS.unit.x + COLS.unit.w - PAD, true);
+    lab('VAT', COLS.vat.x + COLS.vat.w - PAD, true);
+    lab('Net', COLS.net.x + COLS.net.w - PAD, true);
+    cols(y, y - h);
+    y -= h;
+    rule(y, LINE, 0.6);
+  };
+  const cols = (y0: number, y1: number) => {
+    vline(X, y0, y1, 0.6);
+    vline(X + W, y0, y1, 0.6);
+    for (const c of [COLS.part, COLS.desc, COLS.qty, COLS.unit, COLS.vat, COLS.net]) vline(c.x, y0, y1);
   };
   const newPage = () => {
     page = doc.addPage(A4);
-    y = A4[1] - M;
-    text(`Purchase order ${o.po_number} (continued)`, M, y - 10, 10, f.b);
-    if (input.jobRef) right(`Our job reference ${input.jobRef}`, M + W, y - 10, 9, f.r, MUTED);
-    y -= 26;
+    pk.paint(page);
+    const what = `Purchase order ${o.po_number}`;
+    y = pk.strip(page, { x: X, w: W, what: `${what}${input.jobRef ? ` · Our job reference ${input.jobRef}` : ''} (continued)`, short: `${what} (continued)` });
   };
   /** Room for `h` more on this page, else a new one (with the table's headings again when it's the table). */
   const need = (h: number, inTable = false) => {
@@ -275,88 +180,86 @@ export async function purchaseOrderPdf(input: PoPdfInput): Promise<Uint8Array> {
     if (inTable) tableHead();
   };
 
+  need(60);
   tableHead();
   if (!lines.length) {
-    text('No lines yet.', COLS.desc.x + PAD, y - 14, 9, f.r, MUTED);
+    if (look.cell) page.drawRectangle({ x: X, y: y - 22, width: W, height: 22, color: look.cell });
+    cols(y, y - 22);
+    text('No lines yet.', COLS.desc.x + PAD, y - 14, 9, { color: MUTED });
     y -= 22;
+    rule(y);
   }
   lines.forEach((l, i) => {
-    const size = 9;
-    const desc = wrap(l.description, f.r, size, COLS.desc.w - 2 * PAD);
-    const part = wrap(l.part_number || '', f.r, 8.5, COLS.part.w - 2 * PAD);
-    const rowH = Math.max(desc.length, part.length, 1) * 11 + 9;
+    const size = 8.8;
+    const desc = pk.lines(l.description, size, COLS.desc.w - 2 * PAD);
+    const part = pk.lines(l.part_number || '', 7.4, COLS.part.w - 2 * PAD, 'mono');
+    const rowH = Math.max(desc.length * 11, part.length * 9.6, 11) + 9;
     need(rowH, true);
+    if (look.cell) page.drawRectangle({ x: X, y: y - rowH, width: W, height: rowH, color: look.cell });
+    cols(y, y - rowH);
     const ty = y - 13;
-    text(String(i + 1), COLS.no.x + PAD, ty, 8.5, f.r, MUTED);
-    part.forEach((s, k) => text(s, COLS.part.x + PAD, ty - k * 11, 8.5));
+    text(String(i + 1), COLS.no.x + PAD, ty, 7.6, { style: 'mono', color: LABEL });
+    part.forEach((s, k) => text(s, COLS.part.x + PAD, ty - k * 9.6, 7.4, { style: 'mono' }));
     desc.forEach((s, k) => text(s, COLS.desc.x + PAD, ty - k * 11, size));
     right(formatQty(l.qty), COLS.qty.x + COLS.qty.w - PAD, ty, size);
     const priced = l.unit_cost_pence != null;
-    right(priced ? formatPence(l.unit_cost_pence!) : 'TBC', COLS.unit.x + COLS.unit.w - PAD, ty, size, f.r, priced ? INK : AMBER);
-    right(`${l.vat_rate}%`, COLS.vat.x + COLS.vat.w - PAD, ty, size, f.r, MUTED);
-    right(priced ? formatPence(lineNet(l)) : 'TBC', COLS.net.x + COLS.net.w - PAD, ty, size, f.b, priced ? INK : AMBER);
+    right(priced ? formatPence(l.unit_cost_pence!) : 'TBC', COLS.unit.x + COLS.unit.w - PAD, ty, size, priced ? {} : { style: 'bold', color: look.flag });
+    right(`${l.vat_rate}%`, COLS.vat.x + COLS.vat.w - PAD, ty, size, { color: MUTED });
+    right(priced ? formatPence(lineNet(l)) : 'TBC', COLS.net.x + COLS.net.w - PAD, ty, size, { style: 'bold', color: priced ? INK : look.flag });
     y -= rowH;
     rule(y);
   });
 
-  /* Totals */
+  /* Totals: the net and VAT per rate on hairlines, the total on an ink band (a gold-edged bar on a print) */
   const t = totals(lines);
-  const rows: [string, string, boolean][] = [
-    ['Net (ex VAT)', formatPence(t.net), false],
-    ...t.vat.map((g): [string, string, boolean] => [`VAT at ${g.rate}% on ${formatPence(g.net)}`, formatPence(g.vat), false]),
-  ];
+  const rows: [string, string][] = [['Net (ex VAT)', formatPence(t.net)], ...t.vat.map((g): [string, string] => [`VAT at ${g.rate}% on ${formatPence(g.net)}`, formatPence(g.vat)])];
   const boxW = 250;
-  const bx = M + W - boxW;
-  need(rows.length * 15 + 34 + (t.unpriced ? 14 : 0));
-  y -= 8;
+  const bx = X + W - boxW;
+  need(rows.length * 17 + 50 + (t.unpriced ? 14 : 0));
+  y -= 6;
   for (const [k, v] of rows) {
-    text(k, bx + 8, y - 11, 9, f.r, MUTED);
-    right(v, M + W - 8, y - 11, 9.5);
-    y -= 15;
+    text(k, bx + 10, y - 12, 7.8, { style: 'mono', color: LABEL });
+    right(v, X + W - 10, y - 12.4, 9, { style: 'bold' });
+    y -= 17;
+    rule(y + 0.5, LINE, 0.5, bx, X + W);
   }
-  page.drawRectangle({ x: bx, y: y - 22, width: boxW, height: 22, color: SOLAR });
-  text('Total (inc VAT)', bx + 8, y - 15, 10.5, f.b);
-  right(formatPence(t.gross), M + W - 8, y - 15, 11, f.b);
-  y -= 30;
+  y -= 5;
+  const bar = pk.figure(page, bx, y, boxW, 30);
+  text('Total (inc VAT)', bx + 11, y - 19.2, 11.5, { style: 'display', color: bar.words });
+  right(formatPence(t.gross), X + W - 11, y - 20, 14, { style: 'display', color: bar.figure });
+  y -= 36;
   if (t.unpriced) {
-    right(`${t.unpriced} line${t.unpriced === 1 ? '' : 's'} marked TBC: price to be confirmed, not in the totals.`, M + W, y - 4, 8, f.r, AMBER);
+    right(`${t.unpriced} line${t.unpriced === 1 ? '' : 's'} marked TBC: price to be confirmed, not in the totals.`, X + W, y - 5, 7.8, { color: look.flag });
     y -= 14;
   }
 
   /* Notes to the supplier */
   if (o.notes?.trim()) {
-    const notes = wrap(o.notes, f.r, 9, W);
-    need(Math.min(notes.length, 3) * 12 + 24);
-    y -= 8;
-    text('NOTES', M, y - 8, 7.5, f.b, MUTED);
-    y -= 22;
+    const notes = pk.lines(o.notes, 9, W);
+    need(Math.min(notes.length, 3) * 12 + 26);
+    y -= 10;
+    pk.label(page, 'Notes', X, y - 8, 6.6);
+    rule(y - 13, INK, 0.6, X + pk.width('NOTES', 6.6, 'mono', TRACK) + 8);
+    y -= 26;
     for (const l of notes) {
       need(12);
-      text(l, M, y, 9);
+      text(l, X, y, 9);
       y -= 12;
     }
   }
 
   /* Please quote … */
-  need(42);
+  need(30);
   y -= 12;
-  page.drawRectangle({ x: M, y: y - 28, width: W, height: 28, color: PAPER });
-  page.drawRectangle({ x: M, y: y - 28, width: 3, height: 28, color: SOLAR });
-  text(`Please quote ${o.po_number} on your delivery note and invoice.`, M + 12, y - 18, 10.5, f.b);
-  y -= 28;
+  text(`Please quote ${o.po_number} on your delivery note and invoice.`, X, y - 10, 9.5, { style: 'bold' });
+  y -= 18;
 
-  /* Footer on every page: the legal line and the page number. */
+  /* The banner on every page: the legal line and the page number. */
   const pages = doc.getPages();
-  const legal = [
-    `${HELIAXIS_PARTY.name} · Company number ${HELIAXIS_PARTY.companyNumber} · VAT number ${HELIAXIS_PARTY.vatNumber}`,
-    `Registered office: ${HELIAXIS_PARTY.registeredAddress}`,
-  ];
-  pages.forEach((p, i) => {
-    page = p;
-    p.drawLine({ start: { x: M, y: 46 }, end: { x: M + W, y: 46 }, thickness: 0.6, color: LINE });
-    legal.forEach((l, k) => text(l, M, 34 - k * 9.5, 7.5, f.r, MUTED));
-    right(`${o.po_number} · Page ${i + 1} of ${pages.length}`, M + W, 34, 7.5, f.r, MUTED);
-  });
+  const legal = `${HELIAXIS_PARTY.name} · Company number ${HELIAXIS_PARTY.companyNumber} · VAT number ${HELIAXIS_PARTY.vatNumber} · Registered office: ${HELIAXIS_PARTY.registeredAddress}`;
+  const tag = (i: number) => `${o.po_number} · Page ${i + 1} of ${pages.length}`;
+  const tagRoom = Math.max(...pages.map((_, i) => pk.width(tag(i), 6.8, 'monoBold')));
+  pages.forEach((p, i) => pk.banner(p, { tag: tag(i), tagRoom, legal }));
 
   return doc.save();
 }

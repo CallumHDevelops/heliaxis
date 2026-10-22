@@ -20,7 +20,7 @@ export default async function AdminHeatmapPage() {
     <AdminShell active="heatmap" isAdmin={isAdmin} flush>
       <Suspense
         fallback={
-          <div className="hm" style={{ padding: '2rem', color: '#6e6a5e' }}>
+          <div className="hm" style={{ padding: '2rem', color: 'var(--moment-muted)' }}>
             Loading heatmap…
           </div>
         }

@@ -2,6 +2,9 @@
 <resources>
     <color name="statusBar">#FFFDF8</color>
     <color name="navigationBar">#FFFDF8</color>
+    <!-- When the phone is in dark mode (androidbrowserhelper's *_COLOR_DARK): the dark theme's header and tab bar. -->
+    <color name="statusBarDark">#211F18</color>
+    <color name="navigationBarDark">#211F18</color>
     <color name="splashBackground">#211F18</color>
     <!-- Tint for the small icon on native notifications (dark gold reads on light and dark shades). -->
     <color name="notificationAccent">#C77F04</color>

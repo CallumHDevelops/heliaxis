@@ -6,20 +6,61 @@
 
 .svl,
 .svf,
-.svr {
+.svr,
+.svm {
   --sv-ink: #14130f;
+  --sv-on-ink: #fff;
   --sv-text: #1f1d18;
   --sv-help: #38352d;
   --sv-line: #2b2924;
   --sv-soft: #d6d1c4;
-  --sv-bg: #ffffff;
+  --sv-card: #fff;
+  --sv-field: #fff;
+  --sv-disabled: #f4f2ec;
+  --sv-well: #eee9dd;
   --sv-solar: #f8bc1e;
+  /* Words on the gold: ink in both themes. */
+  --sv-on-solar: #14130f;
   --sv-solar-soft: #fff3c7;
   --sv-red: #a8231b;
   --sv-red-soft: #fdecea;
   --sv-green: #18602f;
   --sv-green-soft: #e4f2e8;
+  --sv-scrim: rgba(10, 10, 8, 0.55);
+  --sv-shadow: rgba(0, 0, 0, 0.3);
+  /* Over a photo: dark in both themes. */
+  --sv-over-photo: rgba(10, 10, 8, 0.82);
+  --sv-on-photo: #fff;
+  /* Signatures are dark strokes on a see-through image: on dark they sit on a paper strip. */
+  --sv-sig-paper: transparent;
   color: var(--sv-text);
+}
+/* Dark: the same strength the other way round — cream text and strong cream lines on ink, the
+   cream "ink" buttons with dark words, and status colours light enough to read on the dark fills. */
+@media screen {
+  :root[data-theme='dark'] .svl,
+  :root[data-theme='dark'] .svf,
+  :root[data-theme='dark'] .svr,
+  :root[data-theme='dark'] .svm {
+    --sv-ink: #f7f2e7;
+    --sv-on-ink: #14130f;
+    --sv-text: #f7f2e7;
+    --sv-help: #d9d1bf;
+    --sv-line: #cfc7b4;
+    --sv-soft: #4a4438;
+    --sv-card: var(--surface);
+    --sv-field: var(--field);
+    --sv-disabled: var(--surface-2);
+    --sv-well: var(--surface-2);
+    --sv-solar-soft: #3d3318;
+    --sv-red: #f4978e;
+    --sv-red-soft: #3a201c;
+    --sv-green: #7cc28f;
+    --sv-green-soft: #1d3324;
+    --sv-scrim: rgba(0, 0, 0, 0.7);
+    --sv-shadow: rgba(0, 0, 0, 0.6);
+    --sv-sig-paper: #fffdf8;
+  }
 }
 
 /* ── Buttons, used everywhere ─────────────────────────────────────────────────── */
@@ -32,9 +73,9 @@
   min-height: 48px;
   padding: 0.55rem 1.05rem;
   border-radius: 12px;
-  border: 2px solid var(--sv-ink, #14130f);
-  background: var(--sv-ink, #14130f);
-  color: #fff;
+  border: 2px solid var(--sv-ink);
+  background: var(--sv-ink);
+  color: var(--sv-on-ink);
   font: inherit;
   font-size: 1rem;
   font-weight: 700;
@@ -49,17 +90,18 @@
   cursor: default;
 }
 .svf-btn--solar {
-  background: var(--sv-solar, #f8bc1e);
-  color: var(--sv-ink, #14130f);
+  background: var(--sv-solar);
+  border-color: var(--sv-on-solar);
+  color: var(--sv-on-solar);
 }
 .svf-btn--ghost {
-  background: #fff;
-  color: var(--sv-ink, #14130f);
+  background: var(--sv-card);
+  color: var(--sv-ink);
 }
 .svf-btn--danger {
-  background: #fff;
-  color: var(--sv-red, #a8231b);
-  border-color: var(--sv-red, #a8231b);
+  background: var(--sv-card);
+  color: var(--sv-red);
+  border-color: var(--sv-red);
 }
 .svf-btn--wide {
   width: 100%;
@@ -79,7 +121,7 @@
   min-height: 48px;
   font: inherit;
   font-weight: 700;
-  color: var(--sv-ink, #14130f);
+  color: var(--sv-ink);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -115,7 +157,7 @@
 .svl-empty {
   font-size: 1rem;
   line-height: 1.5;
-  color: var(--sv-help, #38352d);
+  color: var(--sv-help);
   margin: 1rem 0;
 }
 .svl-group {
@@ -132,7 +174,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  background: #fff;
+  background: var(--sv-card);
   border: 1px solid var(--sv-soft);
   border-radius: 12px;
 }
@@ -204,7 +246,7 @@
 }
 .svl-pick__customer {
   padding: 8px 0 10px;
-  border-bottom: 1px solid var(--sv-soft, #d6d1c4);
+  border-bottom: 1px solid var(--sv-soft);
 }
 .svl-pick__name {
   margin: 0 0 4px;
@@ -239,7 +281,7 @@
 }
 
 .svf-head {
-  background: #fff;
+  background: var(--sv-card);
   border: 2px solid var(--sv-line);
   border-radius: 14px;
   padding: 12px 14px;
@@ -291,8 +333,8 @@
 }
 
 .svf-banner {
-  border: 2px solid var(--sv-line, #2b2924);
-  background: var(--sv-solar-soft, #fff3c7);
+  border: 2px solid var(--sv-line);
+  background: var(--sv-solar-soft);
   border-radius: 12px;
   padding: 10px 12px;
   margin: 0 0 12px;
@@ -305,19 +347,19 @@
 .svf-banner p:last-child {
   margin-bottom: 0;
 }
-.svf-banner a {
+.svf-banner a:not(.svf-btn) {
   color: inherit;
   font-weight: 800;
 }
 .svf-banner--err {
-  border-color: var(--sv-red, #a8231b);
-  background: var(--sv-red-soft, #fdecea);
-  color: var(--sv-red, #a8231b);
+  border-color: var(--sv-red);
+  background: var(--sv-red-soft);
+  color: var(--sv-red);
 }
 .svf-banner--ok {
-  border-color: var(--sv-green, #18602f);
-  background: var(--sv-green-soft, #e4f2e8);
-  color: var(--sv-ink, #14130f);
+  border-color: var(--sv-green);
+  background: var(--sv-green-soft);
+  color: var(--sv-ink);
 }
 
 /* Where you are: sticks to the top while you scroll. */
@@ -329,7 +371,7 @@
   grid-template-columns: minmax(0, 1fr) auto 48px;
   align-items: center;
   gap: 8px;
-  background: #fff;
+  background: var(--sv-card);
   border-bottom: 2px solid var(--sv-line);
   padding: 6px 0 4px;
 }
@@ -342,7 +384,7 @@
   padding: 0 10px;
   border: 2px solid var(--sv-line);
   border-radius: 12px;
-  background: #fff;
+  background: var(--sv-card);
   color: var(--sv-ink);
   font: inherit;
   font-weight: 800;
@@ -354,7 +396,7 @@
   padding: 2px 6px;
   border-radius: 6px;
   background: var(--sv-ink);
-  color: #fff;
+  color: var(--sv-on-ink);
 }
 .svf-nav__title {
   overflow: hidden;
@@ -372,7 +414,7 @@
   height: 48px;
   border: 2px solid var(--sv-line);
   border-radius: 12px;
-  background: #fff;
+  background: var(--sv-card);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -443,7 +485,7 @@
   padding: 6px 14px;
   border-radius: 12px;
   border: 2px solid var(--sv-line);
-  background: #fff;
+  background: var(--sv-card);
   color: var(--sv-ink);
   font: inherit;
   font-weight: 700;
@@ -451,7 +493,7 @@
 }
 .svf-roof.is-on {
   background: var(--sv-ink);
-  color: #fff;
+  color: var(--sv-on-ink);
 }
 .svf-roof--add {
   border-style: dashed;
@@ -490,39 +532,40 @@
   align-items: center;
   padding: 2px 8px;
   border-radius: 6px;
-  border: 2px solid var(--sv-ink, #14130f);
+  border: 2px solid var(--sv-ink);
   font-size: 0.85rem;
   font-weight: 800;
   white-space: nowrap;
 }
 .svf-badge--need {
-  background: var(--sv-solar, #f8bc1e);
-  color: var(--sv-ink, #14130f);
+  background: var(--sv-solar);
+  border-color: var(--sv-on-solar);
+  color: var(--sv-on-solar);
 }
 .svf-badge--done {
-  background: var(--sv-green-soft, #e4f2e8);
-  border-color: var(--sv-green, #18602f);
-  color: var(--sv-green, #18602f);
+  background: var(--sv-green-soft);
+  border-color: var(--sv-green);
+  color: var(--sv-green);
 }
 .svf-badge--plain {
-  background: #fff;
-  color: var(--sv-ink, #14130f);
+  background: var(--sv-card);
+  color: var(--sv-ink);
 }
 .svf-help {
   margin: 0 0 8px;
   font-size: 1rem;
-  color: var(--sv-help, #38352d);
+  color: var(--sv-help);
 }
 .svf-note {
   margin: 0 0 8px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: var(--sv-solar-soft, #fff3c7);
+  background: var(--sv-solar-soft);
   font-size: 1rem;
 }
 .svf-note--ok {
-  background: var(--sv-green-soft, #e4f2e8);
-  color: var(--sv-ink, #14130f);
+  background: var(--sv-green-soft);
+  color: var(--sv-ink);
   font-weight: 600;
 }
 .svf-warn,
@@ -540,9 +583,9 @@
 }
 .svf-block,
 .svf-error {
-  background: var(--sv-red-soft, #fdecea);
-  border: 2px solid var(--sv-red, #a8231b);
-  color: var(--sv-red, #a8231b);
+  background: var(--sv-red-soft);
+  border: 2px solid var(--sv-red);
+  color: var(--sv-red);
 }
 
 /* Big tap targets for gloves. */
@@ -556,9 +599,9 @@
   min-height: 48px;
   padding: 0.5rem 0.95rem;
   border-radius: 12px;
-  border: 2px solid var(--sv-line, #2b2924);
-  background: #fff;
-  color: var(--sv-ink, #14130f);
+  border: 2px solid var(--sv-line);
+  background: var(--sv-card);
+  color: var(--sv-ink);
   font: inherit;
   font-size: 1rem;
   font-weight: 600;
@@ -569,15 +612,15 @@
   touch-action: manipulation;
 }
 .svf-pill.is-on {
-  background: var(--sv-ink, #14130f);
-  color: #fff;
+  background: var(--sv-ink);
+  color: var(--sv-on-ink);
 }
 .svf-pill.is-bad:not(.is-on) {
   border-style: dashed;
 }
 .svf-pill.is-suggested {
   border-style: dashed;
-  background: var(--sv-solar-soft, #fff3c7);
+  background: var(--sv-solar-soft);
 }
 .svf-pill:disabled {
   opacity: 0.6;
@@ -588,19 +631,19 @@
   box-sizing: border-box;
   min-height: 52px;
   padding: 0.65rem 0.8rem;
-  border: 2px solid var(--sv-line, #2b2924);
+  border: 2px solid var(--sv-line);
   border-radius: 12px;
-  background: #fff;
-  color: var(--sv-ink, #14130f);
+  background: var(--sv-field);
+  color: var(--sv-ink);
   font: inherit;
   font-size: 1.0625rem;
 }
 .svf-input:focus {
-  outline: 3px solid var(--sv-solar, #f8bc1e);
+  outline: 3px solid var(--focus);
   outline-offset: 1px;
 }
 .svf-input:disabled {
-  background: #f4f2ec;
+  background: var(--sv-disabled);
 }
 .svf-input--num {
   width: 8.5rem;
@@ -658,7 +701,7 @@
   min-height: 56px;
   border-radius: 999px;
   border: 2px dashed var(--sv-line);
-  background: #fff;
+  background: var(--sv-card);
   font: inherit;
   font-size: 1.3rem;
   display: flex;
@@ -711,7 +754,7 @@
   padding: 0 12px;
   border: 2px dashed var(--sv-line);
   border-radius: 12px;
-  background: #fff;
+  background: var(--sv-card);
   color: var(--sv-ink);
   font: inherit;
   font-weight: 700;
@@ -741,7 +784,7 @@
   border: 2px solid var(--sv-line);
   border-radius: 14px;
   padding: 12px;
-  background: #fff;
+  background: var(--sv-card);
   margin: 0;
 }
 .svf-card h3 {
@@ -816,9 +859,9 @@
   margin: 6px 0;
   padding: 8px 12px;
   border-radius: 12px;
-  border: 2px solid var(--sv-line, #2b2924);
-  background: #fff;
-  color: var(--sv-ink, #14130f);
+  border: 2px solid var(--sv-line);
+  background: var(--sv-card);
+  color: var(--sv-ink);
   font: inherit;
   font-size: 1rem;
   font-weight: 700;
@@ -826,7 +869,7 @@
   cursor: pointer;
 }
 .svf-list__btn.is-on {
-  background: var(--sv-solar-soft, #fff3c7);
+  background: var(--sv-solar-soft);
 }
 .svf-list__btn--new {
   border-style: dashed;
@@ -848,7 +891,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
   gap: 8px;
   padding: 8px max(8px, calc((100vw - 720px) / 2)) calc(8px + env(safe-area-inset-bottom));
-  background: #fff;
+  background: var(--sv-card);
   border-top: 2px solid var(--sv-line);
 }
 .svf-bar__btn {
@@ -856,7 +899,7 @@
   min-width: 0;
   border-radius: 12px;
   border: 2px solid var(--sv-line);
-  background: #fff;
+  background: var(--sv-card);
   color: var(--sv-ink);
   font: inherit;
   font-size: 1.05rem;
@@ -874,6 +917,7 @@
   align-items: center;
   justify-content: center;
   background: var(--sv-solar);
+  color: var(--sv-on-solar);
   padding: 2px 6px;
   line-height: 1.15;
 }
@@ -887,7 +931,7 @@
 }
 .svf-bar__next {
   background: var(--sv-ink);
-  color: #fff;
+  color: var(--sv-on-ink);
 }
 .svf-said {
   position: fixed;
@@ -897,13 +941,13 @@
   min-height: 52px;
   padding: 0 18px;
   border-radius: 999px;
-  border: 2px solid #fff;
+  border: 2px solid var(--sv-on-ink);
   background: var(--sv-ink);
-  color: #fff;
+  color: var(--sv-on-ink);
   font: inherit;
   font-size: 1rem;
   font-weight: 800;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 20px var(--sv-shadow);
   cursor: pointer;
 }
 .svf-toast {
@@ -915,11 +959,11 @@
   max-width: calc(100vw - 32px);
   padding: 12px 16px;
   border-radius: 12px;
-  background: var(--sv-ink, #14130f);
-  color: #fff;
+  background: var(--sv-ink);
+  color: var(--sv-on-ink);
   font-weight: 700;
   font-size: 1rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px var(--sv-shadow);
 }
 
 /* Bottom sheets. */
@@ -930,7 +974,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgba(10, 10, 8, 0.55);
+  background: var(--sv-scrim);
 }
 .svf-sheet__panel {
   width: 100%;
@@ -938,8 +982,8 @@
   max-height: 88vh;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  color: var(--sv-text, #1f1d18);
+  background: var(--sv-card);
+  color: var(--sv-text);
   border-radius: 18px 18px 0 0;
   padding-bottom: env(safe-area-inset-bottom);
   font-size: 1.0625rem;
@@ -950,7 +994,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 10px 14px;
-  border-bottom: 2px solid var(--sv-line, #2b2924);
+  border-bottom: 2px solid var(--sv-line);
   font-size: 1.15rem;
 }
 .svf-sheet__body {
@@ -972,6 +1016,8 @@
   object-fit: contain;
   align-self: flex-start;
   border-bottom: 2px solid var(--sv-line);
+  border-radius: 2px;
+  background: var(--sv-sig-paper);
 }
 .svf-docs {
   list-style: none;
@@ -1007,8 +1053,8 @@
   z-index: 45;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  color: var(--sv-text, #1f1d18);
+  background: var(--sv-card);
+  color: var(--sv-text);
   font-size: 1.0625rem;
 }
 .svf-full__bar {
@@ -1016,7 +1062,7 @@
   align-items: center;
   gap: 12px;
   padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
-  border-bottom: 2px solid var(--sv-line, #2b2924);
+  border-bottom: 2px solid var(--sv-line);
 }
 .svf-full__title {
   font-weight: 800;
@@ -1037,7 +1083,7 @@
   display: flex;
   gap: 8px;
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  border-top: 2px solid var(--sv-line, #2b2924);
+  border-top: 2px solid var(--sv-line);
 }
 .svf-full__foot .svf-btn {
   min-height: 56px;
@@ -1073,8 +1119,8 @@
   aspect-ratio: 1;
   padding: 0;
   border-radius: 10px;
-  border: 2px solid var(--sv-line, #2b2924);
-  background: #eee9dd;
+  border: 2px solid var(--sv-line);
+  background: var(--sv-well);
   overflow: hidden;
   cursor: pointer;
 }
@@ -1085,7 +1131,7 @@
   display: block;
 }
 .svp-thumb.is-failed {
-  border-color: var(--sv-red, #a8231b);
+  border-color: var(--sv-red);
   border-width: 3px;
 }
 .svp-thumb__none {
@@ -1094,7 +1140,7 @@
   height: 100%;
   font-weight: 700;
   font-size: 0.9rem;
-  color: var(--sv-ink, #14130f);
+  color: var(--sv-ink);
 }
 .svp-thumb__state {
   position: absolute;
@@ -1102,14 +1148,14 @@
   right: 0;
   bottom: 0;
   padding: 3px 4px;
-  background: rgba(10, 10, 8, 0.82);
-  color: #fff;
+  background: var(--sv-over-photo);
+  color: var(--sv-on-photo);
   font-size: 0.85rem;
   font-weight: 800;
   text-align: center;
 }
 .svp-thumb.is-failed .svp-thumb__state {
-  background: var(--sv-red, #a8231b);
+  background: var(--sv-red);
 }
 .svp-actions {
   display: flex;
@@ -1128,8 +1174,8 @@
   margin: 0 0 10px;
   padding: 8px 10px;
   border-radius: 10px;
-  border: 2px dashed var(--sv-line, #2b2924);
-  background: var(--sv-solar-soft, #fff3c7);
+  border: 2px dashed var(--sv-line);
+  background: var(--sv-solar-soft);
   font-weight: 700;
 }
 .svp-view {
@@ -1159,7 +1205,7 @@
   padding: 16px;
   box-sizing: border-box;
   border-radius: 10px;
-  background: #eee9dd;
+  background: var(--sv-well);
   line-height: 1.4;
   font-weight: 700;
 }
@@ -1174,13 +1220,21 @@
 /* ── Drawing tool ─────────────────────────────────────────────────────────────── */
 
 .svm {
+  /* Dark in both themes (the photo is the light thing here). */
+  --svm-bg: #111;
+  --svm-bar: #1d1d1b;
+  --svm-fg: #fff;
+  --svm-on-fg: #14130f;
+  --svm-gold: #f8bc1e;
+  --svm-red: #a8231b;
+  --svm-shade: rgba(0, 0, 0, 0.75);
   position: fixed;
   inset: 0;
   z-index: 55;
   display: flex;
   flex-direction: column;
-  background: #111;
-  color: #fff;
+  background: var(--svm-bg);
+  color: var(--svm-fg);
   font-size: 1rem;
   touch-action: none;
   overscroll-behavior: contain;
@@ -1190,7 +1244,7 @@
   align-items: center;
   gap: 8px;
   padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
-  background: #1d1d1b;
+  background: var(--svm-bar);
 }
 .svm-title {
   flex: 1;
@@ -1206,18 +1260,18 @@
   min-width: 48px;
   padding: 0 12px;
   border-radius: 12px;
-  border: 2px solid #fff;
+  border: 2px solid var(--svm-fg);
   background: transparent;
-  color: #fff;
+  color: var(--svm-fg);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
   touch-action: manipulation;
 }
 .svm-btn--save {
-  background: #f8bc1e;
-  border-color: #f8bc1e;
-  color: #14130f;
+  background: var(--svm-gold);
+  border-color: var(--svm-gold);
+  color: var(--svm-on-fg);
 }
 .svm-btn:disabled,
 .svm-tool:disabled {
@@ -1244,7 +1298,7 @@
   margin: 0;
   padding: 8px 12px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.75);
+  background: var(--svm-shade);
   font-weight: 700;
   text-align: center;
   max-width: calc(100% - 32px);
@@ -1254,7 +1308,7 @@
   top: 40%;
 }
 .svm-msg--err {
-  background: #a8231b;
+  background: var(--svm-red);
 }
 .svm-tip {
   bottom: 12px;
@@ -1265,11 +1319,11 @@
   gap: 8px;
   justify-content: center;
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-  background: #1d1d1b;
+  background: var(--svm-bar);
 }
 .svm-tool.is-on {
-  background: #fff;
-  color: #14130f;
+  background: var(--svm-fg);
+  color: var(--svm-on-fg);
 }
 .svm-colour {
   display: inline-flex;
@@ -1280,10 +1334,10 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 2px solid var(--svm-fg);
 }
 .svm-tool.is-on .svm-swatch {
-  border-color: #14130f;
+  border-color: var(--svm-on-fg);
 }
 .svm-text {
   position: absolute;
@@ -1295,8 +1349,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
-  background: #fff;
-  color: #14130f;
+  background: var(--sv-card);
+  color: var(--sv-text);
   border-radius: 18px 18px 0 0;
   touch-action: auto;
 }
@@ -1306,7 +1360,7 @@
 .svr {
   max-width: 900px;
   margin: 0 auto;
-  background: #fff;
+  background: var(--sv-card);
   padding: 16px;
   border-radius: 12px;
   font-size: 1rem;
@@ -1403,7 +1457,7 @@
   white-space: pre-wrap;
 }
 .svr-none {
-  color: #6b675d;
+  color: var(--muted);
   font-style: italic;
 }
 .svr-tag--need {
@@ -1474,6 +1528,8 @@
   max-height: 140px;
   object-fit: contain;
   border-bottom: 2px solid var(--sv-line);
+  border-radius: 2px;
+  background: var(--sv-sig-paper);
   margin: 8px 0;
 }
 
@@ -1516,12 +1572,16 @@
 /* ── Printing the report (A4) ─────────────────────────────────────────────────── */
 
 @media print {
+  :root {
+    --sv-print-paper: #fff;
+    --sv-print-ink: #000;
+  }
   @page {
     size: A4;
     margin: 12mm;
   }
   .admin-shell {
-    background: #fff !important;
+    background: var(--sv-print-paper) !important;
     min-height: 0 !important;
   }
   .hx-header,
@@ -1540,7 +1600,7 @@
     padding: 0;
     border-radius: 0;
     font-size: 10.5pt;
-    color: #000;
+    color: var(--sv-print-ink);
   }
   .svr-head h1 {
     font-size: 18pt;
@@ -1563,7 +1623,7 @@
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   }
   a {
-    color: #000;
+    color: var(--sv-print-ink);
     text-decoration: none;
   }
 }

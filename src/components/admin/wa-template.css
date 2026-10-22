@@ -1,6 +1,14 @@
-/* A WhatsApp template as the customer sees it (WhatsApp templates page and the Send template pickers). */
+/* A WhatsApp template as the customer sees it (WhatsApp templates page and the Send template pickers).
+   WhatsApp's own light colours; on dark, ours (WhatsApp's dark look, near enough). */
 .wap {
-  background: #efeae2;
+  --wap-wall: #efeae2;
+  --wap-bubble: #fff;
+  --wap-text: #111b21;
+  --wap-meta: #667781;
+  --wap-link: #027eb5;
+  --wap-shadow: rgba(11, 20, 26, 0.13);
+  --wap-blank: rgb(var(--accent-rgb) / 0.28);
+  background: var(--wap-wall);
   border-radius: 8px;
   padding: 0.7rem;
   min-width: 0;
@@ -13,10 +21,10 @@
   max-width: 100%;
 }
 .wap-bubble {
-  background: #fff;
+  background: var(--wap-bubble);
   border-radius: 0 8px 8px 8px;
   padding: 0.45rem 0.6rem 0.3rem;
-  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  box-shadow: 0 1px 0.5px var(--wap-shadow);
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -24,7 +32,7 @@
 }
 .wap-header {
   font-size: 0.92rem;
-  color: #111b21;
+  color: var(--wap-text);
 }
 .wap-body {
   margin: 0;
@@ -32,11 +40,11 @@
   overflow-wrap: anywhere;
   font-size: 0.92rem;
   line-height: 1.38;
-  color: #111b21;
+  color: var(--wap-text);
 }
 .wap-blank {
-  background: rgba(248, 188, 30, 0.28);
-  color: #7a4f00;
+  background: var(--wap-blank);
+  color: var(--accent-text);
   border-radius: 3px;
   padding: 0 3px;
   font-size: 0.85em;
@@ -44,12 +52,12 @@
 }
 .wap-footer {
   font-size: 0.78rem;
-  color: #667781;
+  color: var(--wap-meta);
 }
 .wap-time {
   align-self: flex-end;
   font-size: 0.66rem;
-  color: #667781;
+  color: var(--wap-meta);
 }
 .wap-buttons {
   display: flex;
@@ -57,10 +65,10 @@
   gap: 2px;
 }
 .wap-button {
-  background: #fff;
+  background: var(--wap-bubble);
   border-radius: 8px;
-  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
-  color: #027eb5;
+  box-shadow: 0 1px 0.5px var(--wap-shadow);
+  color: var(--wap-link);
   font-size: 0.88rem;
   font-weight: 500;
   text-align: center;
@@ -70,6 +78,17 @@
 
 .wap--compact {
   padding: 0.45rem;
+}
+@media screen {
+  :root[data-theme='dark'] .wap {
+    --wap-wall: var(--bg);
+    --wap-bubble: var(--surface-2);
+    --wap-text: var(--text);
+    --wap-meta: var(--muted);
+    --wap-link: var(--info);
+    --wap-shadow: rgba(0, 0, 0, 0.4);
+    --wap-blank: var(--accent-soft);
+  }
 }
 .wap--compact .wap-msg {
   width: auto;
@@ -98,7 +117,7 @@
 .wts-label {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #6e6a5e;
+  color: var(--muted);
 }
 .wts-label small {
   font-weight: 500;
@@ -110,6 +129,6 @@
 .wts-manage {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #c77f04;
+  color: var(--accent-text);
   text-decoration: none;
 }

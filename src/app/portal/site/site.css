@@ -1,0 +1,477 @@
+/* The site app (src/app/portal/site): one column for a phone in sunlight. 18 px text, ink on white,
+   touch targets 48 px and more, the primary in Heliaxis gold. Everything is scoped under .sa so
+   nothing here reaches the rest of the site.
+
+   Light and dark (src/app/theme.css): the light palette below is the sunlight one, kept exactly; on
+   dark its names point at the theme's tokens (the block after it). Rules use only these names and the
+   tokens, never colours of their own. form.css, electrician.css and eic.css share them.
+   - Text and edges: --sa-ink (text), --sa-edge (the 2 px edge of tiles, boxes and buttons: ink on
+     light, the theme's strong edge on dark), --sa-muted, --sa-line (hairlines), --sa-soft (wells).
+   - Surfaces: --sa-bg (the page and what sticks to it), --sa-card, --sa-tile (answer tiles, chips,
+     small buttons), --sa-field (inputs), --sa-sheet (the sending sheet), --sa-bar (the bottom bar).
+   - Selected (a tile, chip or box that's on): --sa-sel / --sa-sel-text: ink with white on light, the
+     theme's paper button on dark. Never colour alone: a selected tile also gets a tick.
+   - Status: --sa-ok, --sa-bad, --sa-amber (+ -bg tints); --sa-on-solid is text on a solid fill.
+   - Links and "from the design" hints: --sa-link, --sa-info-*. Focus: --sa-focus.
+   - The camera, the photo viewer and paper (a saved signature): the same in both themes (--sa-cam-*,
+     --sa-paper*). The top bar stays ink in both (--moment) under its gold rule. */
+
+.sa {
+  --sa-ink: var(--text);
+  --sa-edge: var(--text);
+  --sa-muted: #5d594e;
+  --sa-line: #dcd7cb;
+  --sa-soft: #f5f2ea;
+  --sa-gold-rule: #e2a400;
+  --sa-ok: #2f6b3d;
+  --sa-ok-bg: #e7f2e8;
+  --sa-bad: #a3322a;
+  --sa-bad-bg: #fbe9e7;
+  --sa-amber: #8a5a00;
+  --sa-amber-bg: #fff4d6;
+  --sa-bg: #fff;
+  --sa-card: #fff;
+  --sa-tile: #fff;
+  --sa-field: #fff;
+  --sa-sheet: #fff;
+  --sa-bar: #fff;
+  --sa-sel: var(--inverse);
+  --sa-sel-text: #fff;
+  --sa-sel-muted: #d9d4c7;
+  --sa-band: var(--moment);
+  --sa-band-text: #fff;
+  --sa-on-solid: #fff;
+  --sa-link: #1f5fbf;
+  --sa-info-text: #1f4fa0;
+  --sa-info-bg: #e8eefb;
+  --sa-info-tint: #f1f5fd;
+  --sa-info-wash: #f7f9fe;
+  --sa-focus: #1f5fbf;
+  --sa-install-bg: #fffbea;
+  --sa-shade: rgba(0, 0, 0, 0.45);
+  --sa-dash: #b9b4a6;
+  --sa-thumb-wait: rgba(255, 255, 255, 0.9);
+  /* The same in both themes: the top bar's words, the camera and the photo viewer (always black), and
+     paper (a saved signature is dark ink on white). iOS's own blue for its Share icon. */
+  --sa-on-bar: #fff;
+  --sa-bar-press: rgba(255, 255, 255, 0.12);
+  --sa-cam: #000;
+  --sa-cam-text: #fff;
+  --sa-cam-btn: #fff;
+  --sa-cam-btn-text: #211f18;
+  --sa-cam-dim: rgba(0, 0, 0, 0.35);
+  --sa-cam-fade: rgba(0, 0, 0, 0.75);
+  --sa-paper: #fff;
+  --sa-paper-muted: #5d594e;
+  --sa-ios-blue: #0a84ff;
+  --sa-top: 56px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--sa-bg);
+  color: var(--sa-ink);
+  font-family: var(--font-outfit), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+@media screen {
+  :root[data-theme='dark'] .sa {
+    --sa-edge: var(--border-strong);
+    --sa-muted: var(--muted);
+    --sa-line: var(--border);
+    --sa-soft: var(--surface-2);
+    --sa-gold-rule: var(--accent);
+    --sa-ok: var(--ok);
+    --sa-ok-bg: var(--ok-soft);
+    --sa-bad: var(--danger);
+    --sa-bad-bg: var(--danger-soft);
+    --sa-amber: var(--warn);
+    --sa-amber-bg: var(--warn-soft);
+    --sa-bg: var(--bg);
+    --sa-card: var(--surface);
+    --sa-tile: var(--surface);
+    --sa-field: var(--field);
+    --sa-sheet: var(--raised);
+    --sa-bar: var(--surface);
+    --sa-sel-text: var(--inverse-text);
+    /* Small print on the selected (paper) fill. */
+    --sa-sel-muted: rgb(var(--bg-rgb) / 0.72);
+    --sa-band: var(--surface-2);
+    --sa-band-text: var(--text);
+    --sa-on-solid: var(--on-solid);
+    --sa-link: var(--info);
+    --sa-info-text: var(--info);
+    --sa-info-bg: var(--info-soft);
+    --sa-info-tint: var(--info-soft);
+    --sa-info-wash: rgb(var(--info-rgb) / 0.1);
+    --sa-focus: var(--focus);
+    --sa-install-bg: var(--accent-soft);
+    --sa-shade: var(--scrim);
+    --sa-dash: var(--border-strong);
+    --sa-thumb-wait: rgb(var(--bg-rgb) / 0.9);
+  }
+}
+/* Behind the page (a phone's overscroll): the page's own colour. */
+:root:has(.sa) {
+  --sa-canvas: #fff;
+  background-color: var(--sa-canvas);
+}
+:root:has(.sa) body {
+  background-color: var(--sa-canvas);
+}
+@media screen {
+  :root[data-theme='dark']:has(.sa) {
+    --sa-canvas: var(--bg);
+  }
+}
+/* The reset has no specificity (:where), so every single-class rule below beats it. */
+:where(.sa) *,
+:where(.sa) *::before,
+:where(.sa) *::after { box-sizing: border-box; }
+:where(.sa) :where(h1, h2, h3, p, ul, ol, dl, dd) { margin: 0; }
+:where(.sa) :where(ul, ol) { padding: 0; list-style: none; }
+:where(.sa) :where(button) { font: inherit; color: inherit; }
+:where(.sa) :where(a) { color: inherit; }
+:where(.sa) :focus-visible { outline: 3px solid var(--sa-focus); outline-offset: 2px; }
+/* One plain face for headings too (the site's display face is hard to read in sunlight). */
+.sa :is(h1, h2, h3) { font-family: inherit; letter-spacing: normal; }
+
+/* ── Top bar (56 px): back · title · sync pill ─────────────────────────────── */
+.sa-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: calc(var(--sa-top) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 12px 0 8px;
+  background: var(--moment);
+  color: var(--sa-on-bar);
+  border-bottom: 3px solid var(--accent);
+  /* Ink in both themes: a gold focus ring, which shows on it (the light theme's blue doesn't, 2.7:1). */
+  --sa-focus: var(--accent);
+}
+.sa-back {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sa-on-bar);
+}
+.sa-back:active { background: var(--sa-bar-press); }
+.sa-logo { flex: none; margin-left: 8px; width: 96px; height: auto; }
+.sa-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sa-pill {
+  flex: none;
+  min-height: 36px;
+  max-width: 46%;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sa-pill-ok { background: var(--sa-ok-bg); color: var(--sa-ok); }
+.sa-pill-wait { background: var(--sa-amber-bg); color: var(--sa-amber); }
+.sa-pill-bad { background: var(--sa-bad-bg); color: var(--sa-bad); }
+
+.sa-syncline {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--sa-line);
+  text-align: left;
+  font-size: 16px;
+}
+.sa-syncline-wait { background: var(--sa-amber-bg); color: var(--sa-amber); }
+.sa-syncline-bad { background: var(--sa-bad-bg); color: var(--sa-bad); font-weight: 600; }
+.sa-warn {
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--sa-amber-bg);
+  color: var(--sa-amber);
+  font-size: 16px;
+}
+
+.sa-update {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+.sa-main {
+  padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+  max-width: 560px;
+  margin: 0 auto;
+}
+.sa-hello { font-size: 22px; font-weight: 700; margin-bottom: 16px; }
+.sa-empty { padding: 24px 0; color: var(--sa-muted); }
+.sa-muted { color: var(--sa-muted); font-size: 16px; }
+.sa-kicker { font-size: 15px; font-weight: 600; color: var(--sa-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.sa-pre { white-space: pre-wrap; }
+
+.sa-group { margin-bottom: 22px; }
+.sa-group > h2 { font-size: 15px; font-weight: 700; color: var(--sa-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+
+.sa-card {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--sa-line);
+  border-radius: 12px;
+  background: var(--sa-card);
+  text-align: left;
+}
+.sa-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+
+.sa-jobcard { display: flex; flex-direction: column; gap: 2px; min-height: 88px; }
+.sa-jobcard:active { background: var(--sa-soft); }
+.sa-jobcard-site { font-size: 19px; font-weight: 700; }
+.sa-jobcard-meta { color: var(--sa-muted); font-size: 16px; }
+.sa-jobcard-state { font-size: 16px; }
+.sa-jobcard-po { font-size: 16px; font-weight: 600; }
+.sa-jobcard-bad { color: var(--sa-bad); font-size: 16px; font-weight: 600; }
+.sa-jobcard-sync { color: var(--sa-amber); font-size: 15px; }
+
+.sa-pos { padding: 4px 16px; }
+.sa-po-row { display: flex; justify-content: space-between; gap: 12px; width: 100%; min-height: 56px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--sa-line); background: none; text-align: left; }
+.sa-po-row:last-child { border-bottom: 0; }
+.sa-po-row > div { display: flex; flex-direction: column; min-width: 0; }
+.sa-po-amount { align-items: flex-end; text-align: right; flex: none; }
+
+/* Light / Dark / Match phone, at the foot of the home list (kept on this phone). */
+.sa-appearance { margin-top: 28px; }
+.sa-appearance .hx-tc { max-width: none; }
+
+/* ── Job (P4) ──────────────────────────────────────────────────────────────── */
+.sa-job-head { margin: 4px 0 16px; }
+.sa-address { font-size: 22px; font-weight: 700; line-height: 1.25; margin: 2px 0 6px; }
+.sa-maplink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  font-weight: 600;
+  color: var(--sa-link);
+}
+
+.sa-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.sa-strip li {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--sa-soft);
+  color: var(--sa-muted);
+}
+.sa-strip .sa-strip-done { background: var(--sa-ok-bg); color: var(--sa-ok); }
+.sa-strip .sa-strip-now { background: var(--sa-amber-bg); color: var(--sa-amber); }
+.sa-strip .sa-strip-warn { background: var(--sa-bad-bg); color: var(--sa-bad); }
+
+.sa-rows .sa-row { display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid var(--sa-line); }
+.sa-rows h3 + .sa-row { border-top: 0; padding-top: 0; }
+.sa-row-label { flex: 0 0 38%; color: var(--sa-muted); font-size: 16px; }
+.sa-row-value { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.sa-row-value a { font-weight: 600; color: var(--sa-link); }
+
+.sa-files li + li { border-top: 1px solid var(--sa-line); }
+.sa-file {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.sa-file-kind { font-size: 14px; color: var(--sa-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.sa-file-name { font-weight: 600; color: var(--sa-link); overflow-wrap: anywhere; }
+
+.sa-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--sa-amber-bg);
+  color: var(--sa-amber);
+  font-size: 16px;
+}
+.sa-alert > span { flex: 1; }
+.sa-alert-bad { flex-direction: column; align-items: flex-start; gap: 4px; background: var(--sa-bad-bg); color: var(--sa-bad); }
+
+.sa-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--sa-cam);
+}
+.sa-viewer img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.sa-viewer-close {
+  align-self: flex-end;
+  min-height: 48px;
+  margin: calc(8px + env(safe-area-inset-top)) 8px 8px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--sa-cam-btn);
+  color: var(--sa-cam-btn-text);
+  font-weight: 600;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+.sa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 56px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--sa-edge);
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+.sa-btn-1 { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.sa-btn-2 { background: var(--sa-tile); color: var(--sa-ink); }
+.sa-btn:disabled { opacity: 0.55; }
+.sa-link {
+  min-height: 48px;
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--sa-link);
+  font-weight: 600;
+  text-decoration: underline;
+}
+.sa-small {
+  flex: none;
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1.5px solid currentColor;
+  background: var(--sa-tile);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ── Opening a link (P1, P2), problems (P17), splash ───────────────────────── */
+.sa-landing,
+.sa-problem,
+.sa-splash {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: calc(28px + env(safe-area-inset-top)) 16px calc(32px + env(safe-area-inset-bottom));
+}
+.sa-landing h1,
+.sa-problem h1 { font-size: 24px; line-height: 1.25; font-weight: 700; margin: 22px 0 10px; }
+.sa-splash { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-height: 70vh; text-align: center; }
+.sa-splash p { color: var(--sa-muted); }
+.sa-later { display: block; margin: 14px auto 0; }
+.sa-problem p { margin-bottom: 10px; }
+.sa-keep { padding: 10px 12px; border-radius: 10px; background: var(--sa-amber-bg); color: var(--sa-amber); font-size: 16px; }
+
+.sa-install {
+  margin-top: 18px;
+  padding: 18px 16px;
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  background: var(--sa-install-bg);
+}
+.sa-install h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.sa-install p { margin-top: 8px; }
+.sa-steps { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 4px; counter-reset: step; }
+.sa-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--sa-card);
+  border: 1px solid var(--sa-line);
+}
+.sa-step-icon { flex: none; width: 36px; height: 36px; }
+/* iOS's own Share (blue) and Add to Home Screen (in the text colour) icons, as Safari draws them. */
+.sa-step-share { color: var(--sa-ios-blue); }
+.sa-step-add { flex: none; width: 36px; text-align: center; color: var(--sa-ios-blue); font-weight: 700; font-size: 16px; }
+
+.sa-ticks { margin: 18px 0; display: flex; flex-direction: column; gap: 10px; }
+.sa-tick { display: flex; align-items: center; gap: 12px; font-size: 18px; color: var(--sa-muted); }
+.sa-tick.is-done { color: var(--sa-ink); }
+.sa-tick-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--sa-line);
+  font-weight: 700;
+}
+.sa-tick.is-done .sa-tick-mark { background: var(--sa-ok); border-color: var(--sa-ok); color: var(--sa-on-solid); }
+
+/* ── Sync sheet (P12) ──────────────────────────────────────────────────────── */
+.sa-sheet-wrap { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; justify-content: flex-end; }
+.sa-sheet-shade { position: absolute; inset: 0; border: 0; background: var(--sa-shade); }
+.sa-sheet {
+  position: relative;
+  max-height: 88vh;
+  overflow: auto;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 18px 18px 0 0;
+  background: var(--sa-sheet);
+}
+@media screen {
+  :root[data-theme='dark'] .sa-sheet {
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-up);
+  }
+}
+.sa-sheet-head { display: flex; align-items: center; justify-content: space-between; }
+.sa-sheet-head h2 { font-size: 20px; font-weight: 700; }
+.sa-sheet-state { margin: 6px 0 12px; font-weight: 600; }
+.sa-tone-ok { color: var(--sa-ok); }
+.sa-tone-wait { color: var(--sa-amber); }
+.sa-tone-bad { color: var(--sa-bad); }
+.sa-counts > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--sa-line); }
+.sa-counts dt { flex: none; color: var(--sa-muted); }
+.sa-counts dd { font-weight: 600; text-align: right; }
+.sa-failed { margin-top: 14px; padding: 12px; border-radius: 12px; background: var(--sa-bad-bg); }
+.sa-failed h3 { font-size: 17px; color: var(--sa-bad); margin-bottom: 6px; }
+.sa-failed-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 16px; }
+.sa-failed-row span { flex: 1; min-width: 0; }

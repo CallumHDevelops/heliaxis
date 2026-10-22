@@ -1,0 +1,95 @@
+/* The certificate's screens on the phone (P16): boards and circuits as cards, a circuit full screen
+   with its Details and Test results tabs, the instruments and the signatures. Same palette and scope
+   as site.css (its --sa-* names, light and dark); targets 48 px and more, tiles 56 px. */
+
+.sa-eic { margin-top: 8px; }
+.sa-eic-board { margin-top: 12px; padding: 4px 12px 12px; border: 2px solid var(--sa-edge); border-radius: 14px; background: var(--sa-card); }
+.sa-eic-board + .sa-eic-board { margin-top: 16px; }
+.sa-eic-boardhead {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 2px 10px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--sa-line);
+  background: none;
+  text-align: left;
+}
+.sa-eic-boardname { font-size: 22px; font-weight: 700; }
+.sa-eic-boardloc { color: var(--sa-muted); font-size: 16px; overflow-wrap: anywhere; }
+.sa-eic-boardhead .sa-eic-state { grid-column: 1 / -1; justify-self: start; }
+.sa-eic-state { padding: 2px 10px; border-radius: 999px; background: var(--sa-amber-bg); color: var(--sa-amber); font-size: 14px; font-weight: 700; white-space: nowrap; }
+.sa-eic-state.is-done { background: var(--sa-ok-bg); color: var(--sa-ok); }
+.sa-eic-circuits li + li { border-top: 1px solid var(--sa-line); }
+.sa-eic-circuit {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 4px 10px;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.sa-eic-num {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--sa-soft);
+  font-size: 18px;
+  font-weight: 700;
+}
+.sa-eic-circuit.is-done .sa-eic-num { background: var(--sa-ok-bg); color: var(--sa-ok); }
+.sa-eic-desc { display: flex; flex-direction: column; min-width: 0; }
+.sa-eic-desc b { overflow-wrap: anywhere; }
+.sa-eic-desc .sa-muted { font-size: 15px; }
+.sa-eic-circuit .sa-eic-state { justify-self: start; }
+.sa-eic-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 2px dashed var(--sa-dash);
+  border-radius: 12px;
+  background: var(--sa-soft);
+  color: var(--sa-muted);
+}
+.sa-eic-suggest > div:first-child { display: flex; flex-direction: column; min-width: 0; }
+.sa-eic-suggest b { color: var(--sa-ink); opacity: 0.75; }
+.sa-eic-suggest-actions { display: flex; align-items: center; gap: 8px; }
+.sa-eic-add { margin-top: 12px; }
+
+/* A circuit or board, full screen over the step, with its own bars. */
+.sa-eic-sheet { position: fixed; inset: 0; z-index: 30; overflow-y: auto; overscroll-behavior: contain; background: var(--sa-bg); }
+.sa-eic-sheet .sa-bottom { z-index: 31; }
+.sa-eic-tabs { position: sticky; top: calc(var(--sa-top) + env(safe-area-inset-top)); z-index: 19; display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--sa-bg); border-bottom: 1px solid var(--sa-line); }
+.sa-eic-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; border: 0; border-bottom: 4px solid transparent; background: none; font-size: 18px; font-weight: 600; color: var(--sa-muted); }
+.sa-eic-tabs button.is-on { color: var(--sa-ink); border-bottom-color: var(--sa-gold-rule); }
+.sa-eic-left { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; background: var(--sa-amber-bg); color: var(--sa-amber); font-size: 14px; font-weight: 700; }
+.sa-col { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--sa-soft); color: var(--sa-muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.sa-eic-more { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding-top: 18px; }
+.sa-eic-remove { color: var(--sa-bad); align-self: center; }
+
+/* Other sources, instruments, signatures. */
+.sa-eic-list { margin-top: 10px; }
+.sa-eic-inst { margin-top: 6px; }
+.sa-eic-instrow + .sa-eic-instrow { margin-top: 10px; }
+.sa-eic-instrow .sa-label { margin-top: 6px; }
+.sa-eic-sign { margin-top: 10px; }
+.sa-eic-decl { font-weight: 400; font-size: 15px; line-height: 1.45; }
+.sa-eic-signed { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+/* A saved signature: dark ink on paper, as it goes on the certificate, in both themes. */
+.sa-eic-sigimg { display: grid; place-items: center; width: 100%; min-height: 96px; padding: 8px; border: 1px solid var(--sa-line); border-radius: 12px; background: var(--sa-paper); }
+.sa-eic-sigimg .sa-muted { color: var(--sa-paper-muted); }
+.sa-eic-sigimg img { max-width: 100%; max-height: 110px; }

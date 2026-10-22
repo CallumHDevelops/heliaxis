@@ -18,12 +18,14 @@ import {
 import { checkGroupFor, type CheckView } from '@/lib/projects/checklist';
 import type { EnaInfo } from '@/lib/projects/ena';
 import type { TeamMember } from '@/lib/projects/server';
+import { cleanDesign, DESIGN_FIELDS, designInput } from '@/lib/site/design';
+import { HandoverCard } from '../../crm/[id]/HandoverCard';
 import { DOC_LABEL } from '../../crm/[id]/ProjectExtras';
 import { londonIso, shortDate, ukDayOf, ukTime } from '../../crm/crm-shared';
 import { useMedia } from '../../crm/use-stored';
-import type { RecordData, SurveyItem, Tab } from '../../crm/[id]/record-shared';
+import { HANDOVER_STAGES, type RecordData, type SurveyItem, type Tab } from '../../crm/[id]/record-shared';
 import { askNewOrder } from '../orders/OrdersTab';
-import { KitOrdered } from '../orders/OrdersUi';
+import { KitOrdered, ordersCount } from '../orders/OrdersUi';
 
 /** Opens RAMS already signed in (src/lib/sso.ts). Not a page here: a plain link, so it's never prefetched. */
 const RAMS_URL = '/api/sso/rams';
@@ -66,6 +68,7 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
   return (
     <div className="crmr-ov">
       <JobFile rec={rec} today={today} actions={actions} />
+      {rec.schema.handover && HANDOVER_STAGES.includes(p.stage) && <HandoverCard projectId={p.id} version={p.updated_at} onOpen={() => actions.openTab('handover')} />}
       {v3 ? (
         <Checklist rec={rec} actions={actions} />
       ) : (
@@ -90,6 +93,14 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
             </summary>
             <SystemDetails key={p.id} rec={rec} actions={actions} />
           </details>
+          {delivery && (
+            <details className="crmh-card crmr-ovsec" open={false} key={`design-${wide}`}>
+              <summary>
+                <h3>Design details for site paperwork</h3>
+              </summary>
+              <DesignDetails key={p.id} rec={rec} actions={actions} />
+            </details>
+          )}
           <details className="crmh-card crmr-ovsec" open={wide && delivery} key={`paper-${wide}`}>
             <summary>
               <h3>Paperwork</h3>
@@ -244,17 +255,17 @@ function JobFile({ rec, today, actions }: { rec: RecordData; today: string; acti
           </Tile>
         )}
         {/* Purchase orders (purchase-orders.sql): the kit ordered beside the job's value. */}
-        {rec.orders && (isProjectStage(p.stage) || rec.orders.count > 0) && (
+        {rec.orders && (isProjectStage(p.stage) || ordersCount(rec.orders) > 0) && (
           <Tile
             title="Purchase orders"
-            count={rec.orders.count}
+            count={ordersCount(rec.orders)}
             onOpen={() => actions.openTab('orders')}
             onAdd={() => {
               askNewOrder(p.id);
               actions.openTab('orders');
             }}
           >
-            {rec.orders.count ? (
+            {ordersCount(rec.orders) ? (
               <KitOrdered s={rec.orders} today={today} value={p.value} />
             ) : (
               <span className="crm-muted">No orders yet{p.value ? ` · job value ${money(p.value)} inc VAT` : ''}</span>
@@ -611,7 +622,7 @@ const SYSTEM_FIELDS: { key: string; label: string; for: string[]; num?: boolean 
   { key: 'inverter_model', label: 'Inverter', for: ['solar', 'battery'] },
   { key: 'inverter_kw', label: 'Inverter (kW)', for: ['solar', 'battery'], num: true },
   { key: 'battery_model', label: 'Battery', for: ['battery'] },
-  { key: 'battery_kwh', label: 'Battery (kWh)', for: ['battery'], num: true },
+  { key: 'battery_kwh', label: 'Battery usable capacity (kWh)', for: ['battery'], num: true },
   { key: 'heat_pump_model', label: 'Heat pump', for: ['heatpump'] },
   { key: 'heat_pump_kw', label: 'Heat pump (kW)', for: ['heatpump'], num: true },
   { key: 'ev_charger_model', label: 'EV charger', for: ['ev'] },
@@ -662,6 +673,90 @@ function SystemDetails({ rec, actions }: { rec: RecordData; actions: OverviewAct
   );
 }
 
+/* ── Design details for site paperwork (src/lib/site/design.ts) ─────────────── */
+
+/**
+ * What the designer or office records for the trades' forms and the documents made from them:
+ * strings, optimisers, mounting, the battery's class and back-up, and so on. Empty stays empty: the
+ * site app and the documents never guess one.
+ */
+function DesignDetails({ rec, actions }: { rec: RecordData; actions: OverviewActions }) {
+  const p = rec.project;
+  const sys = (p.system ?? {}) as Record<string, unknown>;
+  const fields = DESIGN_FIELDS.filter((x) => !x.for.length || !p.products.length || x.for.some((k) => p.products.includes(k)) || sys[x.key] != null);
+  const init = Object.fromEntries(fields.map((x) => [x.key, designInput(x.key, sys[x.key])]));
+  const [f, setF, sent] = useDraft<Record<string, string>>(init);
+  const [busy, setBusy] = useState(false);
+  const dirty = JSON.stringify(f) !== JSON.stringify(init);
+  const problems = Object.fromEntries(
+    fields.map((x) => {
+      const c = cleanDesign(x.key, f[x.key]);
+      return [x.key, c.ok ? '' : c.error];
+    })
+  );
+  const blocked = Object.values(problems).some(Boolean);
+  return (
+    <form
+      className="crmh-card__b"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (blocked) return;
+        setBusy(true);
+        if (await actions.patch({ system: Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== init[k])) })) sent(f);
+        setBusy(false);
+      }}
+    >
+      <div className="crmr-grid3">
+        {fields.map((x) => (
+          <div key={x.key}>
+            <label className="crm-label" htmlFor={`rec-design-${x.key}`}>
+              {x.label}
+            </label>
+            {x.kind === 'bool' || x.kind === 'enum' ? (
+              <select id={`rec-design-${x.key}`} className="crm-input" value={f[x.key] ?? ''} onChange={(e) => setF({ ...f, [x.key]: e.target.value })}>
+                <option value="">Not set</option>
+                {x.kind === 'bool' ? (
+                  <>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </>
+                ) : (
+                  x.options?.map((o) => (
+                    <option key={String(o.value)} value={String(o.value)}>
+                      {o.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            ) : (
+              <input
+                id={`rec-design-${x.key}`}
+                className="crm-input"
+                inputMode={x.kind === 'number' ? 'decimal' : undefined}
+                placeholder={x.placeholder}
+                value={f[x.key] ?? ''}
+                onChange={(e) => setF({ ...f, [x.key]: e.target.value })}
+                aria-invalid={!!problems[x.key]}
+              />
+            )}
+            {problems[x.key] ? <small className="crm-err">{problems[x.key]}</small> : x.hint ? <small className="crm-muted">{x.hint}</small> : null}
+          </div>
+        ))}
+      </div>
+      {dirty && (
+        <div className="crmr-savebar">
+          <button type="submit" className="crm-btn crm-btn--solar" disabled={busy || blocked}>
+            {busy ? 'Saving…' : 'Save design details'}
+          </button>
+          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setF(init)}>
+            Cancel
+          </button>
+        </div>
+      )}
+    </form>
+  );
+}
+
 /* ── Paperwork ───────────────────────────────────────────────────────────────── */
 
 type PaperField = { key: string; label: string; date?: boolean; heat?: boolean; solar?: boolean };
@@ -683,6 +778,7 @@ const PAPER_GROUPS: { title: string; fields: PaperField[]; heat?: boolean }[] = 
   {
     title: 'Guarantees',
     fields: [
+      { key: 'ibg_provider', label: 'Guarantee provider' },
       { key: 'ibg_ref', label: 'Insurance-backed guarantee ref' },
       { key: 'ibg_registered_on', label: 'Guarantee registered', date: true },
       { key: 'warranties_registered_on', label: 'Warranties registered', date: true },

@@ -1,0 +1,68 @@
+import 'server-only';
+import { designOf } from './design';
+import { electricianPack } from './electrician';
+import { withFiles } from './electrician-shared';
+import { eicFacts } from './eic/facts';
+import type { FormCtx, LabelReadResult } from './forms/types';
+import { makeCtx } from './rules';
+import type { AssignmentRow, Db } from './server';
+import type { Stage } from './types';
+
+const SIDES = ['front', 'rear', 'left', 'right'];
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/**
+ * The site's address as the trade's job pack gives it (pack.ts): the job's lines and its postcode, or
+ * the customer's when the job has none. The declarations are worded on the server from it, so an
+ * honest phone's words (made from the pack) match them.
+ */
+export async function siteAddress(db: Db, project: { address?: unknown; postcode?: unknown; enquiry_id?: unknown } | null | undefined): Promise<string> {
+  const lines = String(project?.address ?? '')
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  let postcode = str(project?.postcode);
+  if (!postcode && typeof project?.enquiry_id === 'string' && project.enquiry_id) {
+    const { data: c } = await db.from('enquiries').select('postcode').eq('id', project.enquiry_id).maybeSingle();
+    postcode = str((c as { postcode?: unknown } | null)?.postcode);
+  }
+  return [...lines, postcode].filter(Boolean).join(', ');
+}
+
+/**
+ * The rules' context from what the server holds (photos that have arrived, not the phone's queue),
+ * so the gate at sign-off and the flags can't count anything that isn't there.
+ */
+export async function serverCtx(db: Db, a: AssignmentRow): Promise<FormCtx> {
+  const [{ data: p }, { data: surveys }, { data: photos }, { data: reads }, { data: signoffs }] = await Promise.all([
+    db.from('crm_projects').select('*').eq('id', a.project_id).maybeSingle(),
+    db.from('crm_surveys').select('answers').eq('project_id', a.project_id).eq('type', 'solar').neq('status', 'cancelled').order('updated_at', { ascending: false }).limit(1),
+    db.from('crm_photos').select('slot').eq('assignment_id', a.id),
+    db.from('site_reads').select('key, status, result').eq('assignment_id', a.id),
+    db.from('site_signoffs').select('stage').eq('assignment_id', a.id),
+  ]);
+  const project = (p ?? {}) as Record<string, unknown>;
+  const sys = (project.system ?? {}) as Record<string, unknown>;
+  const surveyAnswers = (surveys?.[0] as { answers?: Record<string, unknown> } | undefined)?.answers ?? {};
+  const s1 = surveyAnswers.S1;
+  const counts: Record<string, number> = {};
+  for (const ph of (photos ?? []) as { slot: string | null }[]) if (ph.slot) counts[ph.slot] = (counts[ph.slot] ?? 0) + 1;
+  const address = await siteAddress(db, project);
+  // The electrician's forms read the roofer, the job's paperwork and their uploaded certificate too.
+  const el = a.trade === 'electrician' ? await electricianPack(db, a, project, surveyAnswers) : null;
+  return makeCtx({
+    trade: a.trade,
+    answers: a.answers,
+    design: designOf(sys),
+    system: { kwp: num(sys.kwp), panel_count: num(sys.panel_count), panel_model: str(sys.panel_model), inverter_model: str(sys.inverter_model), battery_model: str(sys.battery_model) },
+    products: (Array.isArray(project.products) ? project.products : []) as string[],
+    sides: Array.isArray(s1) ? (s1 as string[]).filter((x) => SIDES.includes(x)) : [],
+    photos: el ? withFiles(counts, el.uploads) : counts,
+    reads: ((reads ?? []) as { key: string; status: string; result: LabelReadResult | null }[]).map((r) => ({ key: r.key, status: r.status, result: r.result })),
+    address,
+    signed: ((signoffs ?? []) as { stage: Stage }[]).map((x) => x.stage),
+    ...(el ? { el: { ...el.facts, cert_route: a.cert_route } } : {}),
+    eic: await eicFacts(db, a, project),
+  });
+}

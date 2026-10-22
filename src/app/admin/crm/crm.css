@@ -1,18 +1,55 @@
-/* CRM — phone first. */
+/* CRM — phone first.
+ * Colours: the theme's tokens (src/app/theme.css), light and dark. The CRM's own names point at them;
+ * --muted, --ok and --wa are the tokens themselves (--wa-text for green words). An ink fill is the
+ * brand's "dark" button (--inverse: paper on dark) or a band that stays ink (--moment). */
 .crm {
-  --ink: #211f18;
-  --muted: #6e6a5e;
-  --line: rgba(33, 31, 24, 0.14);
-  --card: #fffdf8;
-  --paper: #f7f2e7;
-  --solar: #f8bc1e;
-  --amber-2: #c77f04;
-  --ok: #3f7d4e;
-  --err: #b3261e;
-  --wa: #1f7a4d;
+  --ink: var(--text);
+  --line: var(--border);
+  --card: var(--surface);
+  --paper: var(--bg);
+  --solar: var(--accent);
+  --amber-2: var(--accent-text);
+  --err: var(--danger);
+  /* Tuned on purpose, with their dark values below: shadows (ink on light, black on dark), the
+     WhatsApp button's hover, white switch knobs, and what sits over a photo (dark in both themes). */
+  --crm-shadow-fab: rgba(33, 31, 24, 0.28);
+  --crm-shadow-pop: rgba(33, 31, 24, 0.35);
+  --crm-shadow-soft: rgba(33, 31, 24, 0.12);
+  --crm-wa-hover: #17633e;
+  --crm-knob: #fff;
+  --crm-over-photo: rgba(33, 31, 24, 0.75);
+  --crm-on-photo: #fff;
+  --crm-viewer: rgba(20, 18, 14, 0.75);
+  --crm-viewer-img: #111;
+  /* Report bars: deep amber on light, gold on dark. */
+  --crm-bar: #c77f04;
+  /* On an ink band (--moment): the same in both themes. */
+  --crm-moment-ok: #7cc28f;
+  --crm-moment-track: rgba(255, 253, 248, 0.18);
   color: var(--ink);
   /* As wide as the page (AdminShell sets it: fluid for the board, record and reports). */
   margin: 0 auto;
+}
+/* Sheets, the photo viewer and the + button can sit outside .crm: their own colours come from here too. */
+.crm-sheet,
+.crm-viewer,
+.crm-fab {
+  --crm-shadow-fab: rgba(33, 31, 24, 0.28);
+  --crm-viewer: rgba(20, 18, 14, 0.75);
+  --crm-viewer-img: #111;
+}
+@media screen {
+  :root[data-theme='dark'] .crm,
+  :root[data-theme='dark'] .crm-sheet,
+  :root[data-theme='dark'] .crm-viewer,
+  :root[data-theme='dark'] .crm-fab {
+    --crm-shadow-fab: rgba(0, 0, 0, 0.55);
+    --crm-shadow-pop: rgba(0, 0, 0, 0.6);
+    --crm-shadow-soft: rgba(0, 0, 0, 0.45);
+    --crm-wa-hover: #6fd3a2;
+    --crm-viewer: rgba(0, 0, 0, 0.78);
+    --crm-bar: var(--accent);
+  }
 }
 .crm-head {
   display: flex;
@@ -39,6 +76,13 @@
 .crm-small {
   font-size: 0.78rem;
 }
+/* A problem with one field, under it ("Numbers only, e.g. 8 + 8"). */
+.crm-err {
+  display: block;
+  color: var(--err);
+  font-size: 0.8rem;
+  margin-top: 0.2rem;
+}
 .crm-back {
   display: inline-block;
   font-size: 0.85rem;
@@ -48,16 +92,16 @@
   margin-bottom: 0.5rem;
 }
 .crm-banner {
-  background: rgba(248, 188, 30, 0.14);
-  border: 1px solid rgba(199, 127, 4, 0.3);
+  background: rgb(var(--accent-rgb) / 0.14);
+  border: 1px solid var(--accent-line);
   border-radius: 6px;
   padding: 0.55rem 0.75rem;
   font-size: 0.85rem;
   margin: 0.6rem 0;
 }
 .crm-banner--err {
-  background: rgba(179, 38, 30, 0.07);
-  border-color: rgba(179, 38, 30, 0.3);
+  background: rgb(var(--danger-rgb) / 0.07);
+  border-color: rgb(var(--danger-rgb) / 0.3);
   color: var(--err);
 }
 .crm-btn {
@@ -66,9 +110,9 @@
   font-weight: 700;
   border-radius: 6px;
   padding: 0.6rem 1rem;
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: var(--solar);
+  border: 1px solid var(--inverse);
+  background: var(--inverse);
+  color: var(--inverse-accent);
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
@@ -84,7 +128,7 @@
 .crm-btn--solar {
   background: var(--solar);
   border-color: var(--solar);
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 .crm-btn--ghost {
   background: var(--card);
@@ -118,9 +162,9 @@
 .crm-input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: var(--card);
+  background: var(--field);
   padding: 0.6rem 0.7rem;
   font: inherit;
   font-size: 0.95rem;
@@ -167,8 +211,8 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crm-checks label.on {
-  background: rgba(248, 188, 30, 0.22);
-  border-color: rgba(199, 127, 4, 0.45);
+  background: rgb(var(--accent-rgb) / 0.22);
+  border-color: var(--accent-line);
   font-weight: 700;
 }
 .crm-checks input {
@@ -195,9 +239,9 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crm-stages button.on {
-  background: var(--ink);
-  color: var(--solar);
-  border-color: var(--ink);
+  background: var(--inverse);
+  color: var(--inverse-accent);
+  border-color: var(--inverse);
 }
 .crm-stages button span {
   opacity: 0.65;
@@ -250,7 +294,7 @@ textarea.crm-input {
 }
 .crm-chip--wa {
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
   border-color: var(--wa);
 }
 .crm-stage {
@@ -260,22 +304,23 @@ textarea.crm-input {
   letter-spacing: 0.03em;
   border-radius: 3px;
   padding: 2px 7px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
 }
+/* Stage pills: the theme's phase colours (gold, blue, green, a solid done, red); each also says its name. */
 .st-lead,
-.st-contacted { background: rgba(248, 188, 30, 0.2); color: var(--amber-2); }
+.st-contacted { background: var(--ph-y-bg); color: var(--ph-y-text); }
 .st-survey_booked,
 .st-surveyed,
-.st-quote_sent { background: rgba(44, 110, 180, 0.12); color: #2c5f99; }
+.st-quote_sent { background: var(--ph-b-bg); color: var(--ph-b-text); }
 .st-won,
 .st-design,
 .st-ready,
 .st-install_booked,
 .st-installing,
 .st-commissioning,
-.st-handover { background: rgba(63, 125, 78, 0.15); color: var(--ok); }
-.st-complete { background: var(--ok); color: #fff; }
-.st-lost { background: rgba(179, 38, 30, 0.1); color: var(--err); }
+.st-handover { background: var(--ph-g-bg); color: var(--ph-g-text); }
+.st-complete { background: var(--ph-done); color: var(--ph-done-text); }
+.st-lost { background: var(--ph-lost-bg); color: var(--ph-lost-text); }
 
 /* Record page photos, sheets and the photo viewer */
 .crm-photo-actions {
@@ -295,7 +340,7 @@ textarea.crm-input {
   padding: 0;
   border-radius: 6px;
   overflow: hidden;
-  background: #e9e3d4;
+  background: var(--surface-2);
   cursor: pointer;
 }
 .crm-photo img {
@@ -317,9 +362,9 @@ textarea.crm-input {
   align-items: center;
   gap: 10px;
   padding: 8px;
-  border: 1px solid rgba(179, 38, 30, 0.3);
+  border: 1px solid rgb(var(--danger-rgb) / 0.3);
   border-radius: 8px;
-  background: rgba(179, 38, 30, 0.05);
+  background: rgb(var(--danger-rgb) / 0.05);
 }
 .crmr-failed img,
 .crmr-failed li > span[aria-hidden] {
@@ -330,7 +375,7 @@ textarea.crm-input {
   object-fit: cover;
   display: grid;
   place-items: center;
-  background: #e9e3d4;
+  background: var(--surface-2);
 }
 .crmr-failed p {
   flex: 1;
@@ -374,8 +419,8 @@ textarea.crm-input {
   bottom: 4px;
   font-size: 0.6rem;
   font-weight: 700;
-  background: rgba(33, 31, 24, 0.75);
-  color: #fff;
+  background: var(--crm-over-photo);
+  color: var(--crm-on-photo);
   border-radius: 3px;
   padding: 1px 5px;
 }
@@ -384,7 +429,7 @@ textarea.crm-input {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(20, 18, 14, 0.75);
+  background: var(--crm-viewer);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -402,7 +447,7 @@ textarea.crm-input {
   width: 100%;
   max-height: 62vh;
   object-fit: contain;
-  background: #111;
+  background: var(--crm-viewer-img);
 }
 .crm-viewer-meta {
   padding: 0.75rem;
@@ -411,13 +456,19 @@ textarea.crm-input {
   gap: 0.5rem;
 }
 .crm-sheet-box {
-  background: var(--paper, #f7f2e7);
-  color: var(--ink, #211f18);
+  background: var(--bg);
+  color: var(--text);
   border-radius: 12px;
   padding: 1rem 1rem 1.2rem;
   width: min(560px, 100%);
   max-height: 92vh;
   overflow: auto;
+}
+/* On dark the sheet is the page's colour over a black scrim: a hairline draws its edge. */
+@media screen {
+  :root[data-theme='dark'] .crm-sheet-box {
+    box-shadow: 0 0 0 1px var(--border);
+  }
 }
 .crm-sheet-box h2 {
   margin: 0 0 0.25rem;
@@ -466,13 +517,13 @@ textarea.crm-input {
 }
 .crm-bubble.out {
   margin-left: auto;
-  background: #e3f4d8;
-  border-color: rgba(31, 122, 77, 0.2);
+  background: var(--wa-soft);
+  border-color: rgb(var(--wa-rgb) / 0.2);
 }
 .crm-bubble-by {
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--wa);
+  color: var(--wa-text);
 }
 .crm-bubble-text,
 .crm-bubble .wa-text {
@@ -498,7 +549,7 @@ textarea.crm-input {
   white-space: nowrap;
 }
 .crm-wa-tick.read {
-  color: #2c8bd6;
+  color: var(--info);
 }
 .crm-wa-tick.failed {
   color: var(--err);
@@ -513,12 +564,12 @@ textarea.crm-input {
   height: 58px;
   border-radius: 50%;
   border: 0;
-  background: var(--solar, #f8bc1e);
-  color: var(--ink, #211f18);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 2rem;
   font-weight: 400;
   line-height: 1;
-  box-shadow: 0 8px 22px rgba(33, 31, 24, 0.28);
+  box-shadow: 0 8px 22px var(--crm-shadow-fab);
   cursor: pointer;
 }
 .crm-menu {
@@ -561,7 +612,7 @@ textarea.crm-input {
 .crm-btn--wa {
   background: var(--wa);
   border-color: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .crm-check {
   display: flex;
@@ -617,8 +668,8 @@ textarea.crm-input {
   color: var(--muted);
 }
 .crm-viewtoggle button.on {
-  background: var(--ink);
-  color: var(--solar);
+  background: var(--inverse);
+  color: var(--inverse-accent);
 }
 .crm-stages button.warn span {
   color: var(--err);
@@ -652,7 +703,7 @@ textarea.crm-input {
   font-style: italic;
 }
 .crm-chip--quiet {
-  background: rgba(33, 31, 24, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
   color: var(--muted);
 }
 .crm-owner {
@@ -660,12 +711,19 @@ textarea.crm-input {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--ink);
-  color: var(--solar);
+  /* The avatar: gold initials on ink (on dark, on a raised disc with an edge, as in the header). */
+  background: var(--moment);
+  color: var(--accent);
   font-size: 0.6rem;
   font-weight: 800;
   display: grid;
   place-items: center;
+}
+@media screen {
+  :root[data-theme='dark'] .crm-owner {
+    background: var(--raised);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
 }
 .crm-card-mid {
   align-items: center;
@@ -772,13 +830,15 @@ textarea.crm-input {
   color: var(--ink);
 }
 .crm-chipbtn.on {
-  background: rgba(63, 125, 78, 0.12);
-  border-color: rgba(63, 125, 78, 0.35);
+  background: rgb(var(--ok-rgb) / 0.12);
+  border-color: rgb(var(--ok-rgb) / 0.35);
   color: var(--ok);
 }
+/* The customer portal card: an ink band in both themes (on dark, with a hairline to stand off the page). */
 .crm-portal {
-  background: var(--ink);
-  color: #fffdf8;
+  --crm-moment-danger: #f4978e;
+  background: var(--moment);
+  color: var(--moment-text);
   border-radius: 12px;
   padding: 0.8rem;
   margin-bottom: 1rem;
@@ -787,12 +847,24 @@ textarea.crm-input {
   gap: 0.5rem;
 }
 .crm-portal .crm-muted {
-  color: rgba(255, 253, 248, 0.65);
+  color: var(--moment-muted);
 }
 .crm-portal .crm-btn--ghost {
   background: transparent;
-  color: #fffdf8;
-  border-color: rgba(255, 253, 248, 0.25);
+  color: var(--moment-text);
+  border-color: var(--moment-line);
+}
+.crm-portal .crm-link {
+  color: var(--accent);
+}
+.crm-portal .crm-banner--err {
+  color: var(--crm-moment-danger);
+  border-color: var(--crm-moment-danger);
+}
+@media screen {
+  :root[data-theme='dark'] .crm-portal {
+    box-shadow: 0 0 0 1px var(--border);
+  }
 }
 .crm-portal-head {
   display: flex;
@@ -811,10 +883,10 @@ textarea.crm-input {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 253, 248, 0.18);
+  background: var(--crm-moment-track);
 }
 .crm-minitrack li.done {
-  background: #7cc28f;
+  background: var(--crm-moment-ok);
 }
 .crm-minitrack li.current {
   background: var(--solar);
@@ -874,8 +946,8 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crm-docpick label.on {
-  border-color: rgba(199, 127, 4, 0.5);
-  background: rgba(248, 188, 30, 0.12);
+  border-color: var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.12);
 }
 
 /* Settings */
@@ -1045,14 +1117,14 @@ textarea.crm-input {
 }
 .crm-funnel-bar {
   height: 14px;
-  background: rgba(33, 31, 24, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
   border-radius: 4px;
   overflow: hidden;
 }
 .crm-funnel-bar i {
   display: block;
   height: 100%;
-  background: var(--amber-2);
+  background: var(--crm-bar);
   border-radius: 0 4px 4px 0;
 }
 .crm-funnel-n {
@@ -1071,9 +1143,9 @@ textarea.crm-input {
  * the layout so the first paint is right. Phones are under 761px, as the admin shell.
  */
 .crmh {
-  --blue: #2c5f99;
-  --line2: rgba(33, 31, 24, 0.08);
-  --avatar: #ebe3d1;
+  --blue: var(--info);
+  --line2: var(--border-soft);
+  --avatar: var(--surface-2);
   font-size: 14px;
   line-height: 1.4;
 }
@@ -1202,12 +1274,12 @@ textarea.crm-input {
 }
 .crmh-seg a.on,
 .crmh-seg button.on {
-  background: var(--ink);
-  color: var(--solar);
+  background: var(--inverse);
+  color: var(--inverse-accent);
 }
 .crmh-seg a:focus-visible,
 .crmh-seg button:focus-visible {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 @media (max-width: 1023px) {
@@ -1227,15 +1299,15 @@ textarea.crm-input {
   gap: 8px;
   height: 40px;
   padding: 0 10px 0 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: var(--card);
+  background: var(--field);
   color: var(--muted);
   cursor: text;
 }
 .crmh-searchbox__field:focus-within {
-  border-color: rgba(199, 127, 4, 0.6);
-  box-shadow: 0 0 0 3px rgba(248, 188, 30, 0.2);
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.2);
 }
 .crmh-searchbox input {
   flex: 1;
@@ -1265,10 +1337,10 @@ textarea.crm-input {
   list-style: none;
   margin: 0;
   padding: 6px;
-  background: var(--card);
+  background: var(--raised);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 14px 34px -12px rgba(33, 31, 24, 0.35);
+  box-shadow: 0 14px 34px -12px var(--crm-shadow-pop);
 }
 .crmh-searchbox__list button {
   display: flex;
@@ -1287,7 +1359,7 @@ textarea.crm-input {
 }
 .crmh-searchbox__list button.on,
 .crmh-searchbox__list button:hover {
-  background: rgba(248, 188, 30, 0.14);
+  background: rgb(var(--accent-rgb) / 0.14);
 }
 .crmh-searchbox__main {
   display: flex;
@@ -1347,10 +1419,10 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crmh-count:hover {
-  border-color: rgba(33, 31, 24, 0.3);
+  border-color: rgb(var(--fg-rgb) / 0.3);
 }
 .crmh-count:focus-visible {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-count__lab {
@@ -1385,14 +1457,14 @@ textarea.crm-input {
   line-clamp: 2;
 }
 .crmh-count--hot {
-  border-color: rgba(179, 38, 30, 0.32);
+  border-color: rgb(var(--danger-rgb) / 0.32);
 }
 .crmh-count--hot .crmh-count__sub {
   color: var(--err);
 }
 .crmh-count--wa b,
 .crmh-count--wa .crmh-count__sub {
-  color: var(--wa);
+  color: var(--wa-text);
 }
 
 /* Stage strip */
@@ -1430,7 +1502,7 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crmh-strip__seg button:hover {
-  background: rgba(33, 31, 24, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
 }
 .crmh-strip__seg b {
   font-weight: 800;
@@ -1456,20 +1528,20 @@ textarea.crm-input {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(33, 31, 24, 0.25);
+  background: rgb(var(--fg-rgb) / 0.25);
 }
 .crmh-dot.ph-y {
-  background: var(--solar);
+  background: var(--ph-y);
 }
 .crmh-dot.ph-b {
-  background: var(--blue);
+  background: var(--ph-b);
 }
 .crmh-dot.ph-g,
 .crmh-dot.ph-done {
-  background: var(--ok);
+  background: var(--ph-g);
 }
 .crmh-dot.ph-lost {
-  background: var(--err);
+  background: var(--ph-lost);
 }
 .crmh-tosort,
 .crmh-hint {
@@ -1495,28 +1567,28 @@ textarea.crm-input {
   border-radius: 3px;
   padding: 2px 6px;
   white-space: nowrap;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   color: var(--muted);
 }
 .crmh-stage.ph-y {
-  background: rgba(248, 188, 30, 0.22);
-  color: var(--amber-2);
+  background: var(--ph-y-bg);
+  color: var(--ph-y-text);
 }
 .crmh-stage.ph-b {
-  background: rgba(44, 110, 180, 0.12);
-  color: var(--blue);
+  background: var(--ph-b-bg);
+  color: var(--ph-b-text);
 }
 .crmh-stage.ph-g {
-  background: rgba(63, 125, 78, 0.15);
-  color: var(--ok);
+  background: var(--ph-g-bg);
+  color: var(--ph-g-text);
 }
 .crmh-stage.ph-done {
-  background: var(--ok);
-  color: #fff;
+  background: var(--ph-done);
+  color: var(--ph-done-text);
 }
 .crmh-stage.ph-lost {
-  background: rgba(179, 38, 30, 0.1);
-  color: var(--err);
+  background: var(--ph-lost-bg);
+  color: var(--ph-lost-text);
 }
 
 /* Home: My work | Latest notes (the dock is the third column) */
@@ -1595,7 +1667,7 @@ textarea.crm-input {
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.08);
+  background: rgb(var(--fg-rgb) / 0.08);
   font-size: 11.5px;
   font-weight: 800;
   color: var(--ink);
@@ -1619,8 +1691,8 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crmh-tog button.on {
-  background: var(--ink);
-  color: var(--solar);
+  background: var(--inverse);
+  color: var(--inverse-accent);
 }
 
 /* My work */
@@ -1631,8 +1703,8 @@ textarea.crm-input {
   gap: 6px 10px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(44, 110, 180, 0.07);
-  border: 1px solid rgba(44, 110, 180, 0.2);
+  background: rgb(var(--info-rgb) / 0.07);
+  border: 1px solid rgb(var(--info-rgb) / 0.2);
   font-size: 13px;
 }
 .crmh-waiting b {
@@ -1753,14 +1825,14 @@ textarea.crm-input {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 2px solid rgba(33, 31, 24, 0.32);
+  border: 2px solid rgb(var(--fg-rgb) / 0.32);
   background: var(--card);
   transition: border-color 0.15s, background 0.15s;
 }
 .crmh-tick:hover span,
 .crmh-tick:focus-visible span {
   border-color: var(--ok);
-  background: rgba(63, 125, 78, 0.12);
+  background: rgb(var(--ok-rgb) / 0.12);
 }
 .crmh-task__b {
   flex: 1;
@@ -1806,7 +1878,7 @@ textarea.crm-input {
   gap: 3px;
   padding: 1px 6px;
   border-radius: 3px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   font-size: 10.5px;
   font-weight: 800;
   text-transform: uppercase;
@@ -1814,7 +1886,7 @@ textarea.crm-input {
   color: var(--muted);
 }
 .crmh-tag--deadline {
-  background: rgba(179, 38, 30, 0.08);
+  background: rgb(var(--danger-rgb) / 0.08);
   color: var(--err);
 }
 .crmh-due {
@@ -1854,8 +1926,8 @@ textarea.crm-input {
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--card);
-  box-shadow: 0 4px 12px rgba(33, 31, 24, 0.12);
+  background: var(--raised);
+  box-shadow: 0 4px 12px var(--crm-shadow-soft);
 }
 .crmh-task:hover .crmh-task__acts,
 .crmh-task:focus-within .crmh-task__acts {
@@ -1874,14 +1946,14 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crmh-act:hover {
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
 }
 .crmh-act--wa {
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmh-act--wa:hover {
-  background: #17633e;
+  background: var(--crm-wa-hover);
 }
 /* Touch screens have no hover: the actions stay in the row. */
 @media (hover: none) {
@@ -1898,11 +1970,11 @@ textarea.crm-input {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: rgba(33, 31, 24, 0.05);
+    background: rgb(var(--fg-rgb) / 0.05);
   }
   .crmh-act--wa {
-    background: rgba(31, 122, 77, 0.12);
-    color: var(--wa);
+    background: rgb(var(--wa-rgb) / 0.12);
+    color: var(--wa-text);
   }
   .crmh-task__acts a.crmh-act {
     display: none;
@@ -1942,7 +2014,7 @@ textarea.crm-input {
   margin: 8px 0 0;
   padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(248, 188, 30, 0.14);
+  background: rgb(var(--accent-rgb) / 0.14);
   font-size: 13px;
 }
 .crmh-duebar .crm-link {
@@ -1974,7 +2046,7 @@ textarea.crm-input {
 .crmh-nudge {
   margin: 0;
   padding: 12px 14px;
-  border: 1px dashed rgba(33, 31, 24, 0.25);
+  border: 1px dashed rgb(var(--fg-rgb) / 0.25);
   border-radius: 12px;
   font-size: 13.5px;
   color: var(--muted);
@@ -2017,7 +2089,7 @@ textarea.crm-input {
 }
 .crmh-picker__list button:hover,
 .crmh-picker__list button:focus-visible {
-  background: rgba(248, 188, 30, 0.14);
+  background: rgb(var(--accent-rgb) / 0.14);
 }
 .crmh-picker__list span,
 .crmh-picked > span {
@@ -2087,9 +2159,9 @@ textarea.crm-input {
   cursor: pointer;
 }
 .crmh-chipf.on {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--solar);
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-accent);
 }
 .crmh-switch {
   position: relative;
@@ -2113,7 +2185,7 @@ textarea.crm-input {
   width: 28px;
   height: 16px;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.25);
+  background: rgb(var(--fg-rgb) / 0.25);
   transition: background 0.15s;
 }
 .crmh-switch span::after {
@@ -2124,18 +2196,18 @@ textarea.crm-input {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--crm-knob);
   transition: transform 0.15s;
 }
 .crmh-switch input:checked + span {
-  background: var(--ink);
+  background: var(--inverse);
 }
 .crmh-switch input:checked + span::after {
   transform: translateX(12px);
-  background: var(--solar);
+  background: var(--inverse-accent);
 }
 .crmh-switch input:focus-visible + span {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-day__h {
@@ -2162,7 +2234,7 @@ textarea.crm-input {
   padding: 10px 16px;
 }
 .crmh-note:hover {
-  background: rgba(33, 31, 24, 0.025);
+  background: rgb(var(--fg-rgb) / 0.025);
 }
 .crmh-av {
   display: grid;
@@ -2178,13 +2250,13 @@ textarea.crm-input {
 }
 .crmh-av--sys {
   background: transparent;
-  border: 1.5px dashed rgba(33, 31, 24, 0.25);
+  border: 1.5px dashed rgb(var(--fg-rgb) / 0.25);
   color: var(--muted);
 }
 .crmh-av--ok {
   border: 0;
   background: var(--ok);
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmh-note__b {
   flex: 1;
@@ -2212,7 +2284,7 @@ textarea.crm-input {
   font-weight: 800;
   color: var(--ink);
   text-decoration: underline;
-  text-decoration-color: rgba(33, 31, 24, 0.25);
+  text-decoration-color: rgb(var(--fg-rgb) / 0.25);
   text-underline-offset: 3px;
 }
 /* The whole note opens the job at that entry. */
@@ -2222,7 +2294,7 @@ a.crmh-cust::after {
   inset: 0;
 }
 a.crmh-cust:focus-visible {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-ref {
@@ -2266,11 +2338,11 @@ a.crmh-cust:focus-visible {
 }
 /* A WhatsApp chat's busy day. */
 .crmh-av--wa {
-  background: rgba(31, 122, 77, 0.12);
-  color: var(--wa);
+  background: rgb(var(--wa-rgb) / 0.12);
+  color: var(--wa-text);
 }
 .crmh-kind--wa {
-  color: var(--wa);
+  color: var(--wa-text);
 }
 .crmh-imported {
   font-size: 10.5px;
@@ -2329,7 +2401,7 @@ a.crmh-cust:focus-visible {
   height: 28px;
   border-radius: 50%;
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmh-pill {
   display: inline-flex;
@@ -2342,7 +2414,7 @@ a.crmh-cust:focus-visible {
 }
 .crmh-pill--wa {
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmh-chats {
   list-style: none;
@@ -2353,7 +2425,7 @@ a.crmh-cust:focus-visible {
   border-top: 1px solid var(--line2);
 }
 .crmh-chats li.is-unread {
-  background: rgba(31, 122, 77, 0.08);
+  background: rgb(var(--wa-rgb) / 0.08);
 }
 .crmh-chats a {
   display: flex;
@@ -2405,7 +2477,7 @@ a.crmh-cust:focus-visible {
   white-space: nowrap;
 }
 .is-unread .crmh-chat__h time {
-  color: var(--wa);
+  color: var(--wa-text);
   font-weight: 800;
 }
 .crmh-chat__p {
@@ -2429,15 +2501,15 @@ a.crmh-cust:focus-visible {
 .crmh-win {
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   font-size: 11px;
   font-weight: 800;
   color: var(--muted);
   white-space: nowrap;
 }
 .crmh-win.ok {
-  background: rgba(31, 122, 77, 0.13);
-  color: var(--wa);
+  background: rgb(var(--wa-rgb) / 0.13);
+  color: var(--wa-text);
 }
 .crmh-unread {
   display: inline-grid;
@@ -2449,7 +2521,7 @@ a.crmh-cust:focus-visible {
   padding: 0 6px;
   border-radius: 999px;
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
   font-size: 11px;
   font-weight: 800;
 }
@@ -2493,7 +2565,7 @@ a.crmh-cust:focus-visible {
   gap: 6px;
   padding: 4px 4px 4px 10px;
   border-radius: 999px;
-  background: rgba(248, 188, 30, 0.18);
+  background: rgb(var(--accent-rgb) / 0.18);
   font-size: 13px;
 }
 .crmh-qchip button {
@@ -2539,7 +2611,7 @@ a.crmh-cust:focus-visible {
   max-width: 320px;
   min-height: 0;
   border-radius: 10px;
-  background: rgba(33, 31, 24, 0.045);
+  background: rgb(var(--fg-rgb) / 0.045);
   transition: background 0.15s;
 }
 .crmb-col__h {
@@ -2571,8 +2643,8 @@ a.crmh-cust:focus-visible {
 }
 .crmb-col.is-over,
 .crmb-rail.is-over {
-  background: rgba(248, 188, 30, 0.14);
-  outline: 1px dashed rgba(199, 127, 4, 0.45);
+  background: rgb(var(--accent-rgb) / 0.14);
+  outline: 1px dashed var(--accent-line);
 }
 .crmb-col.is-flash {
   animation: crmb-flash 1.6s ease-out;
@@ -2580,7 +2652,7 @@ a.crmh-cust:focus-visible {
 @keyframes crmb-flash {
   0%,
   40% {
-    background: rgba(248, 188, 30, 0.25);
+    background: rgb(var(--accent-rgb) / 0.25);
   }
 }
 .crmb-rail {
@@ -2592,7 +2664,7 @@ a.crmh-cust:focus-visible {
   padding: 12px 0;
   border: 0;
   border-radius: 10px;
-  background: rgba(33, 31, 24, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
   font: inherit;
   color: var(--muted);
 }
@@ -2625,7 +2697,7 @@ button.crmb-rail {
   position: relative;
 }
 .crmh-card2:hover {
-  border-color: rgba(33, 31, 24, 0.3);
+  border-color: rgb(var(--fg-rgb) / 0.3);
 }
 .crmh-card2.is-dragging {
   opacity: 0.45;
@@ -2652,7 +2724,7 @@ button.crmb-rail {
   outline: none;
 }
 .crmh-card2__link:focus-visible::after {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .crmh-card2__wa {
@@ -2661,7 +2733,7 @@ button.crmb-rail {
   gap: 6px;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--wa);
+  color: var(--wa-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2687,12 +2759,12 @@ button.crmb-rail {
   white-space: nowrap;
 }
 .crmh-chip--dup {
-  background: rgba(179, 38, 30, 0.07);
-  border-color: rgba(179, 38, 30, 0.25);
+  background: rgb(var(--danger-rgb) / 0.07);
+  border-color: rgb(var(--danger-rgb) / 0.25);
   color: var(--err);
 }
 .crmh-chip--hold {
-  background: rgba(44, 110, 180, 0.1);
+  background: rgb(var(--info-rgb) / 0.1);
   color: var(--blue);
 }
 .crmh-card2__end {
@@ -2719,7 +2791,7 @@ button.crmb-rail {
 }
 .crmh-movebtn:hover {
   color: var(--ink);
-  border-color: rgba(33, 31, 24, 0.3);
+  border-color: rgb(var(--fg-rgb) / 0.3);
 }
 
 /* Sheets */
@@ -3035,6 +3107,73 @@ button.crmb-rail {
   text-decoration: none;
 }
 
+/* New project's "Who's doing the work" (NewProjectTrades.tsx) */
+.nps-trades {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.nps-trades legend {
+  padding: 0;
+}
+.nps-trades > p {
+  margin: 0;
+}
+.nps-trade {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.nps-trade__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.nps-trade__head select {
+  width: auto;
+  font-weight: 700;
+}
+.nps-trade__money {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.nps-trade__money > * {
+  flex: 1 1 8rem;
+  width: auto;
+}
+.nps-pounds {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.nps-pounds > span {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.nps-pounds .crm-input {
+  padding-left: 1.5rem;
+}
+.nps-trade__money .nps-qty {
+  flex: 0 1 5rem;
+}
+.nps-novat {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 /* New project / new opportunity sheet */
 .nps-fresh {
   display: flex;
@@ -3076,8 +3215,8 @@ button.crmb-rail {
   cursor: pointer;
 }
 .nps-starts label.on {
-  background: rgba(248, 188, 30, 0.22);
-  border-color: rgba(199, 127, 4, 0.45);
+  background: rgb(var(--accent-rgb) / 0.22);
+  border-color: var(--accent-line);
   font-weight: 700;
 }
 .nps-starts input {
@@ -3087,7 +3226,7 @@ button.crmb-rail {
   height: 1px;
 }
 .nps-starts label:has(input:focus-visible) {
-  outline: 2px solid var(--solar);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 @media (max-width: 760px) {
@@ -3196,9 +3335,9 @@ button.crmb-rail {
   gap: 6px;
   height: 38px;
   padding: 0 12px;
-  border: 1px solid rgba(33, 31, 24, 0.18);
+  border: 1px solid rgb(var(--fg-rgb) / 0.18);
   border-radius: 6px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   font: inherit;
   font-size: 13px;
   font-weight: 800;
@@ -3209,29 +3348,29 @@ button.crmb-rail {
   cursor: pointer;
 }
 .crmr-stagebtn.ph-y {
-  background: rgba(248, 188, 30, 0.22);
-  border-color: rgba(199, 127, 4, 0.35);
-  color: var(--amber-2);
+  background: var(--ph-y-bg);
+  border-color: var(--accent-line);
+  color: var(--ph-y-text);
 }
 .crmr-stagebtn.ph-b {
-  background: rgba(44, 110, 180, 0.12);
-  border-color: rgba(44, 110, 180, 0.3);
-  color: var(--blue);
+  background: var(--ph-b-bg);
+  border-color: rgb(var(--info-rgb) / 0.3);
+  color: var(--ph-b-text);
 }
 .crmr-stagebtn.ph-g {
-  background: rgba(63, 125, 78, 0.15);
-  border-color: rgba(63, 125, 78, 0.3);
-  color: var(--ok);
+  background: var(--ph-g-bg);
+  border-color: rgb(var(--ok-rgb) / 0.3);
+  color: var(--ph-g-text);
 }
 .crmr-stagebtn.ph-done {
-  background: var(--ok);
-  border-color: var(--ok);
-  color: #fff;
+  background: var(--ph-done);
+  border-color: var(--ph-done);
+  color: var(--ph-done-text);
 }
 .crmr-stagebtn.ph-lost {
-  background: rgba(179, 38, 30, 0.1);
-  border-color: rgba(179, 38, 30, 0.3);
-  color: var(--err);
+  background: var(--ph-lost-bg);
+  border-color: rgb(var(--danger-rgb) / 0.3);
+  color: var(--ph-lost-text);
 }
 .crmr-primary {
   min-width: 0;
@@ -3262,8 +3401,8 @@ button.crmb-rail {
   list-style: none;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--card);
-  box-shadow: 0 10px 28px rgba(33, 31, 24, 0.16);
+  background: var(--raised);
+  box-shadow: var(--shadow);
 }
 .crmr-more__list button {
   display: block;
@@ -3282,7 +3421,7 @@ button.crmb-rail {
 }
 .crmr-more__list button:hover,
 .crmr-more__list button:focus-visible {
-  background: rgba(33, 31, 24, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
 }
 .crmr-more__list button.danger {
   color: var(--err);
@@ -3316,15 +3455,15 @@ button.crmb-rail {
   text-decoration: none;
 }
 .crmr-badge--hold {
-  background: rgba(248, 188, 30, 0.22);
+  background: rgb(var(--accent-rgb) / 0.22);
   color: var(--amber-2);
 }
 .crmr-badge--lost {
-  background: rgba(179, 38, 30, 0.1);
+  background: rgb(var(--danger-rgb) / 0.1);
   color: var(--err);
 }
 .crmr-badge--dupe {
-  background: rgba(44, 110, 180, 0.1);
+  background: rgb(var(--info-rgb) / 0.1);
   color: var(--blue);
 }
 
@@ -3390,8 +3529,8 @@ button.crmb-rail {
   list-style: none;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--card);
-  box-shadow: 0 10px 28px rgba(33, 31, 24, 0.16);
+  background: var(--raised);
+  box-shadow: var(--shadow);
 }
 .crmr-others li a,
 .crmr-others__list li a {
@@ -3406,7 +3545,7 @@ button.crmb-rail {
 }
 .crmr-others li a:hover,
 .crmr-others__list li a:hover {
-  background: rgba(33, 31, 24, 0.05);
+  background: rgb(var(--fg-rgb) / 0.05);
 }
 .crmr-others li a > span:nth-last-child(2),
 .crmr-others__t {
@@ -3461,7 +3600,7 @@ button.crmb-rail {
   height: 34px;
   padding: 0 18px 0 24px;
   border: 0;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   font: inherit;
   font-size: 12.5px;
   font-weight: 700;
@@ -3476,7 +3615,7 @@ button.crmb-rail {
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
 }
 .crmr-path button:hover:not(:disabled) {
-  background: rgba(33, 31, 24, 0.12);
+  background: rgb(var(--fg-rgb) / 0.12);
   color: var(--ink);
 }
 .crmr-path li.done button {
@@ -3484,11 +3623,11 @@ button.crmb-rail {
 }
 .crmr-path li.cur button {
   background: var(--solar);
-  color: var(--ink);
+  color: var(--accent-ink);
   cursor: default;
 }
 .crmr-path li.cur.lost button {
-  background: rgba(179, 38, 30, 0.14);
+  background: rgb(var(--danger-rgb) / 0.14);
   color: var(--err);
 }
 .crmr-path__x {
@@ -3717,7 +3856,7 @@ button.crmb-rail {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.22);
+  background: rgb(var(--fg-rgb) / 0.22);
   cursor: pointer;
 }
 .crmr-switch::after {
@@ -3728,7 +3867,7 @@ button.crmb-rail {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--crm-knob);
   transition: left 0.15s;
 }
 .crmr-switch.on {
@@ -3745,7 +3884,7 @@ button.crmb-rail {
 .crmr-tag {
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   font-size: 12px;
   font-weight: 700;
 }
@@ -3761,7 +3900,7 @@ button.crmb-rail {
 .crmr-grey {
   margin: 0;
   padding: 11px 14px;
-  border: 1px dashed rgba(33, 31, 24, 0.22);
+  border: 1px dashed rgb(var(--fg-rgb) / 0.22);
   border-radius: 12px;
   font-size: 13px;
   color: var(--muted);
@@ -3773,9 +3912,9 @@ button.crmb-rail {
   margin: 0;
 }
 .crmr-important {
-  border-color: rgba(179, 38, 30, 0.35);
+  border-color: rgb(var(--danger-rgb) / 0.35);
   border-left: 4px solid var(--err);
-  background: rgba(179, 38, 30, 0.04);
+  background: rgb(var(--danger-rgb) / 0.04);
 }
 .crmr-important p {
   margin: 8px 0 0;
@@ -3830,12 +3969,12 @@ button.crmb-rail {
   background: var(--card);
 }
 .crmr-nextbar.is-today {
-  border-color: rgba(199, 127, 4, 0.4);
-  background: rgba(248, 188, 30, 0.12);
+  border-color: var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.12);
 }
 .crmr-nextbar.is-late {
-  border-color: rgba(179, 38, 30, 0.38);
-  background: rgba(179, 38, 30, 0.05);
+  border-color: rgb(var(--danger-rgb) / 0.38);
+  background: rgb(var(--danger-rgb) / 0.05);
 }
 .crmr-nextbar.is-empty {
   width: 100%;
@@ -3903,8 +4042,8 @@ button.crmb-rail {
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--card);
-  box-shadow: 0 10px 28px rgba(33, 31, 24, 0.16);
+  background: var(--raised);
+  box-shadow: var(--shadow);
 }
 .crmr-snooze__list button {
   min-height: 38px;
@@ -3920,7 +4059,7 @@ button.crmb-rail {
   cursor: pointer;
 }
 .crmr-snooze__list button:hover {
-  background: rgba(33, 31, 24, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
 }
 
 /* Tabs */
@@ -3967,7 +4106,7 @@ button.crmb-rail {
   font-style: normal;
   font-size: 11px;
   font-weight: 800;
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmr-tabs i {
   font-style: normal;
@@ -4015,15 +4154,15 @@ button.crmb-rail {
   border: 0;
   border-radius: 50%;
   background: var(--solar);
-  color: var(--ink);
-  box-shadow: 0 8px 22px rgba(33, 31, 24, 0.28);
+  color: var(--accent-ink);
+  box-shadow: 0 8px 22px var(--crm-shadow-fab);
   cursor: pointer;
 }
 .crmr-fab--wa {
   width: 52px;
   height: 52px;
   background: var(--wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmr-fab:focus-visible {
   outline: 3px solid var(--ink);
@@ -4043,7 +4182,7 @@ button.crmb-rail {
   background: var(--err);
   font-size: 11.5px;
   font-weight: 800;
-  color: #fff;
+  color: var(--on-solid);
 }
 /* From 1280px: pinned to the bottom right of the centre column, not the window. */
 @media (min-width: 1280px) {
@@ -4127,11 +4266,11 @@ button.crmb-rail {
   font-weight: 800;
 }
 .crmr-act.k-whatsapp .crmr-act__ic {
-  background: rgba(31, 122, 77, 0.13);
-  color: var(--wa);
+  background: rgb(var(--wa-rgb) / 0.13);
+  color: var(--wa-text);
 }
 .crmr-act.is-sys .crmr-act__ic {
-  border: 1.5px dashed rgba(33, 31, 24, 0.25);
+  border: 1.5px dashed rgb(var(--fg-rgb) / 0.25);
   background: transparent;
   color: var(--muted);
 }
@@ -4175,7 +4314,7 @@ button.crmb-rail {
   margin: -4px -8px;
   padding: 4px 8px;
   border-radius: 8px;
-  background: rgba(248, 188, 30, 0.18);
+  background: rgb(var(--accent-rgb) / 0.18);
 }
 .crm-bubble.is-hl {
   outline: 2px solid var(--solar);
@@ -4191,14 +4330,14 @@ button.crmb-rail {
   padding: 8px 10px;
   border: 0;
   border-radius: 10px;
-  background: rgba(31, 122, 77, 0.08);
+  background: rgb(var(--wa-rgb) / 0.08);
   font: inherit;
   text-align: left;
   color: var(--ink);
   cursor: pointer;
 }
 .crmr-warun .crmr-act__b:hover {
-  background: rgba(31, 122, 77, 0.13);
+  background: rgb(var(--wa-rgb) / 0.13);
 }
 .crmr-act__p {
   font-size: 13.5px;
@@ -4276,7 +4415,7 @@ button.crmb-rail {
   cursor: pointer;
 }
 .crmr-tile__main:hover {
-  background: rgba(33, 31, 24, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
 }
 .crmr-tile__h {
   display: flex;
@@ -4338,18 +4477,18 @@ button.crmb-rail {
 .crmr-check__stages li {
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(33, 31, 24, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
   font-size: 11.5px;
   font-weight: 700;
   color: var(--muted);
 }
 .crmr-check__stages li.done {
-  background: rgba(63, 125, 78, 0.14);
+  background: rgb(var(--ok-rgb) / 0.14);
   color: var(--ok);
 }
 .crmr-check__stages li.cur {
   background: var(--solar);
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 .crmr-check__list {
   margin: 0;
@@ -4375,7 +4514,7 @@ button.crmb-rail {
   place-items: center;
   font-size: 13px;
   font-weight: 900;
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmr-check__list li.done .crmh-tick span,
 .crmr-task .crmh-tick.is-done span {
@@ -4383,8 +4522,8 @@ button.crmb-rail {
   background: var(--ok);
 }
 .crmr-check__list li.na .crmh-tick span {
-  border-color: rgba(33, 31, 24, 0.25);
-  background: rgba(33, 31, 24, 0.25);
+  border-color: rgb(var(--fg-rgb) / 0.25);
+  background: rgb(var(--fg-rgb) / 0.25);
 }
 .crmh-tick:disabled {
   cursor: default;
@@ -4553,7 +4692,7 @@ button.crmb-rail {
   aspect-ratio: 4 / 3;
   object-fit: cover;
   border-radius: 8px;
-  background: #e9e3d4;
+  background: var(--surface-2);
   display: grid;
   place-items: center;
 }
@@ -4651,8 +4790,8 @@ button.crmb-rail {
 
 /* Sheets and bits */
 .crmr-menu-tile {
-  border-color: rgba(199, 127, 4, 0.45) !important;
-  background: rgba(248, 188, 30, 0.16) !important;
+  border-color: var(--accent-line) !important;
+  background: rgb(var(--accent-rgb) / 0.16) !important;
 }
 .crmr-stagego {
   width: 100%;
@@ -4665,7 +4804,7 @@ button.crmb-rail {
 .crmr-btn--danger {
   border-color: var(--err);
   background: var(--err);
-  color: #fff;
+  color: var(--on-solid);
 }
 .crmr-linkbox {
   padding: 8px 10px;
@@ -4693,9 +4832,9 @@ button.crmb-rail {
 }
 .crmr-callbar {
   padding: 10px 14px;
-  border: 1px solid rgba(199, 127, 4, 0.35);
+  border: 1px solid var(--accent-line);
   border-radius: 10px;
-  background: rgba(248, 188, 30, 0.14);
+  background: rgb(var(--accent-rgb) / 0.14);
   font-weight: 700;
 }
 .crmr-callbar .crm-link,
@@ -4789,8 +4928,8 @@ button.crmb-rail {
   .crmr-tabs {
     margin: 0 -16px 12px;
     padding: 0 16px;
-    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
-    mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent);
   }
   .crmr-tabs button {
     min-height: 48px;

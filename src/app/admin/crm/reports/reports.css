@@ -1,15 +1,21 @@
 /* Reports: the source table with Meta ad spend (CrmReports.tsx). Builds on crm.css's .crm-table. */
 .rp-table {
+  /* Solid (the sticky name column sits on it): a gold wash on the card, in each theme. */
   --rp-tint: #fbf3dc;
   min-width: 1000px;
+}
+@media screen {
+  :root[data-theme='dark'] .rp-table {
+    --rp-tint: #372f19;
+  }
 }
 /* The name stays in view while the numbers scroll sideways (phones). Solid backgrounds, so nothing shows through. */
 .rp-table th:first-child {
   position: sticky;
   left: 0;
   z-index: 1;
-  background: var(--card);
-  box-shadow: 1px 0 0 var(--line);
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--border);
 }
 .rp-table tbody th small {
   display: block;
@@ -34,7 +40,7 @@
   padding-left: 2rem;
 }
 .rp-table tr.rp-item td {
-  color: #45423a;
+  color: var(--text-2);
 }
 .rp-table tr.rp-item td b {
   font-weight: 600;
@@ -63,7 +69,7 @@
   margin-top: 0.2rem;
 }
 .rp-setup a {
-  color: var(--ink);
+  color: var(--text);
   font-weight: 700;
   text-decoration: underline;
 }

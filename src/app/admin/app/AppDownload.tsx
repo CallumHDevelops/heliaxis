@@ -81,9 +81,12 @@ function IphoneSteps({ installed }: { installed: boolean }) {
 export function AppDownload({
   release,
   sendToPhone,
+  appearance,
 }: {
   release: Release;
   sendToPhone?: React.ReactNode;
+  /** Light / Dark / Match phone for this person (the page's first card). */
+  appearance?: React.ReactNode;
 }) {
   const android = useSyncExternalStore(
     noop,
@@ -115,6 +118,7 @@ export function AppDownload({
           Add Heliaxis to your Home Screen and it works like an app: full
           screen, its own icon, notifications and an unread count on the icon.
         </p>
+        {appearance}
         <IphoneSteps installed={homeScreen} />
         <AppStyles />
       </div>
@@ -129,6 +133,8 @@ export function AppDownload({
         phone or tablet. Tasks keeps working offline and syncs when you&apos;re
         back online.
       </p>
+
+      {appearance}
 
       <section className="ad-card">
         <div className="ad-ver">
@@ -226,24 +232,26 @@ export function AppDownload({
 function AppStyles() {
   return (
     <style>{`
-        .ad-page { max-width: 640px; color: #211f18; }
+        .ad-page { max-width: 640px; color: var(--text); }
         .ad-page h1 { font-size: 1.5rem; font-weight: 800; margin: 0; }
-        .ad-lede { color: #6e6a5e; margin: .35rem 0 1.25rem; line-height: 1.5; }
-        .ad-card { background: #fffdf8; border: 1px solid rgba(33,31,24,.14); border-radius: 4px; padding: 18px; margin-bottom: 16px; }
+        .ad-lede { color: var(--muted); margin: .35rem 0 1.25rem; line-height: 1.5; }
+        .ad-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 18px; margin-bottom: 16px; }
         .ad-card h2 { font-size: 1rem; margin: 1.1rem 0 .4rem; }
-        .ad-card p, .ad-card li { color: #4a473e; line-height: 1.55; font-size: .92rem; }
+        .ad-card p, .ad-card li { color: var(--text-2); line-height: 1.55; font-size: .92rem; }
         .ad-card ol, .ad-card ul { padding-left: 1.2rem; margin: 0; }
         .ad-ver { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
         .ad-ver b { display: block; font-size: 1.05rem; }
-        .ad-ver span { color: #6e6a5e; font-size: .85rem; }
+        .ad-ver span { color: var(--muted); font-size: .85rem; }
         .ad-status { font-family: ui-monospace, Menlo, monospace; font-size: .7rem !important; text-transform: uppercase;
-          font-weight: 700; padding: 4px 8px; border-radius: 2px; background: rgba(248,188,30,.2); color: #c77f04 !important; }
-        .ad-status.is-ok { background: rgba(63,125,78,.14); color: #3f7d4e !important; }
-        .ad-btn { display: block; text-align: center; background: #f8bc1e; color: #211f18; font-weight: 800; font-size: 1rem;
+          font-weight: 700; padding: 4px 8px; border-radius: 2px; background: var(--warn-soft); color: var(--warn) !important; }
+        .ad-status.is-ok { background: var(--ok-soft); color: var(--ok) !important; }
+        .ad-btn { display: block; text-align: center; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 1rem;
           padding: .85rem 1rem; border-radius: 2px; text-decoration: none; }
-        .ad-hint { font-size: .82rem !important; color: #6e6a5e !important; margin: .75rem 0 0; overflow-wrap: anywhere; }
+        .ad-hint { font-size: .82rem !important; color: var(--muted) !important; margin: .75rem 0 0; overflow-wrap: anywhere; }
         .ad-sub { font-size: 1.1rem; margin: 1.5rem 0 .6rem; }
-        .ad-ok { color: #3f7d4e !important; font-weight: 700; margin: 0; }
+        .ad-ok { color: var(--ok) !important; font-weight: 700; margin: 0; }
+        .ad-appearance h2 { margin-top: 0; }
+        .ad-appearance p { margin: 0 0 12px; }
       `}</style>
   );
 }

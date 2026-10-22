@@ -1,7 +1,7 @@
 /*
  * "+ Add task" in a WhatsApp chat (ChatTasks.tsx): the button under Smart replies (the page's header) or
  * at the top of the dock's chat, its menu, a message's ⋯ menu, the "Reminder set" line, and the sheet's
- * job line. The colours are the chat's own (.wa-page) and, in the sheets, the CRM's (.crm).
+ * job line. Colours: src/app/theme.css.
  */
 
 /* The page's header: Smart replies with + Add task under it, both as wide as the wider one. */
@@ -21,9 +21,9 @@
 .wa-addtask__btn {
   font-size: 0.7rem;
   font-weight: 700;
-  border: 1px solid rgba(199, 127, 4, 0.42);
-  color: #85570a;
-  background: rgba(248, 188, 30, 0.14);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-text);
+  background: rgb(var(--accent-rgb) / 0.14);
   border-radius: 999px;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
@@ -31,14 +31,14 @@
 }
 .wa-addtask__btn:hover,
 .wa-addtask__btn[aria-expanded='true'] {
-  background: rgba(248, 188, 30, 0.26);
+  background: rgb(var(--accent-rgb) / 0.26);
 }
 .wa-addtask__btn:focus-visible,
 .wa-addtask__menu button:focus-visible,
 .wa-msgacts__btn:focus-visible,
 .wa-msgmenu button:focus-visible,
 .wa-tasknote :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -53,10 +53,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--raised);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 14px 30px -14px rgba(33, 31, 24, 0.38);
+  box-shadow: var(--shadow);
   -webkit-user-select: none;
   user-select: none;
 }
@@ -75,7 +75,7 @@
   border: 0;
   border-radius: 6px;
   background: none;
-  color: var(--ink);
+  color: var(--text);
   text-align: left;
   font-size: 0.88rem;
   line-height: 1.25;
@@ -93,7 +93,7 @@
 }
 .wa-addtask__menu button:hover,
 .wa-msgmenu button:hover {
-  background: rgba(248, 188, 30, 0.16);
+  background: rgb(var(--accent-rgb) / 0.16);
 }
 
 /* The dock: a slim strip at the top of the chat, the button on the right. */
@@ -133,10 +133,10 @@
   gap: 4px 10px;
   margin: 0;
   padding: 6px 8px 6px 10px;
-  border: 1px solid rgba(31, 122, 77, 0.28);
+  border: 1px solid rgb(var(--wa-rgb) / 0.28);
   border-radius: 8px;
-  background: rgba(31, 122, 77, 0.09);
-  color: #175c3b;
+  background: rgb(var(--wa-rgb) / 0.09);
+  color: var(--wa-text);
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.35;
@@ -181,9 +181,9 @@
   padding: 0;
   display: grid;
   place-items: center;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 50%;
-  background: var(--card);
+  background: var(--surface);
   color: var(--muted);
   font-size: 15px;
   line-height: 1;
@@ -218,10 +218,11 @@
   display: block;
   font-weight: 600;
 }
-/* Phones: no hover, so the ⋯ always shows, faintly; a long press stays the phone's own text selection. */
+/* Phones: no hover, so the ⋯ always shows (in the quiet muted colour, which reads on any bubble); a long
+   press stays the phone's own text selection. */
 @media (hover: none) {
   .wa-msgacts__btn {
-    opacity: 0.75;
+    opacity: 1;
   }
 }
 
@@ -230,13 +231,13 @@
   margin: 0 0 0.7rem;
   padding: 0.45rem 0.7rem;
   border-radius: 8px;
-  background: rgba(33, 31, 24, 0.05);
-  color: var(--ink);
+  background: rgb(var(--fg-rgb) / 0.05);
+  color: var(--text);
   font-size: 0.85rem;
   line-height: 1.4;
 }
 .wa-tasksheet__job.is-new {
-  background: rgba(248, 188, 30, 0.18);
+  background: rgb(var(--accent-rgb) / 0.18);
 }
 .wa-tasksheet q {
   font-style: italic;

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { refreshHeldPos } from '@/lib/site/labour-po';
 import {
   clientIp,
   emailShell,
@@ -722,6 +723,8 @@ export async function setCisVerification(
     input.verified ? 'cis_verified' : 'cis_verification_removed',
     input.verified ? { rate: update.cis_rate, ref: update.cis_verification_ref || undefined, on: update.cis_verified_on } : null
   );
+  // Their labour POs still waiting to go take the new CIS rate.
+  await refreshHeldPos(createAdminClient(), { firmId: subId }).catch((e) => console.error('[subcontractors] held POs', e));
   revalidatePath(`/admin/subcontractors/${subId}`);
   revalidatePath('/admin/subcontractors');
   return { ok: true, cis: update };

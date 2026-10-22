@@ -104,7 +104,7 @@ export function CookieBanner({ consent }: { consent: Consent }) {
   };
 
   return (
-    <div className="hxc" role="region" aria-label="Cookie choice">
+    <div className="hxc hx-moment" role="region" aria-label="Cookie choice">
       <style>{CSS}</style>
       <h2>Cookies</h2>
       <p>

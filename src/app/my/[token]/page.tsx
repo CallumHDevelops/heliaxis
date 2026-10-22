@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { loadPortal } from '@/lib/crm/portal';
+import { themeContext } from '@/lib/theme/server';
 import { PortalView } from './PortalView';
 
 export const dynamic = 'force-dynamic';
@@ -24,5 +25,7 @@ export default async function CustomerPortal({
   const { paid } = await searchParams;
   const data = await loadPortal(token);
   if (!data) notFound();
-  return <PortalView data={data} paid={paid !== undefined} />;
+  // Their Light / Dark / Match phone from this phone's cookie, so the toggle's first paint is right.
+  const { pref } = await themeContext();
+  return <PortalView data={data} paid={paid !== undefined} themePref={pref} />;
 }

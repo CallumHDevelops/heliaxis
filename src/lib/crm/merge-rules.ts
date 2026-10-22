@@ -74,6 +74,14 @@ export const MERGE_TABLES: Record<string, MergeTable> = {
   'survey_bookings.duplicate_of': { to: 'customer' },
   'diary_entries.project_id': { to: 'job', label: ['diary entry', 'diary entries'] },
   'purchase_orders.project_id': { to: 'job', label: ['purchase order', 'purchase orders'] },
+  // The site app: a trade on the job moves with everything of theirs (sign-offs, photos, POs). Their
+  // signatures are in the job's signatures folder, named in rows of their own (site/merge-paths.ts).
+  'site_assignments.project_id': { to: 'job', label: ['trade on the site app', 'trades on the site app'] },
+  // The handover pack: one row per item and one pack per job. Only a project has them, and two projects
+  // can't be joined, so a clash means something unexpected: refused, never one of them dropped.
+  'handover_slots.project_id': { to: 'job', label: ['handover pack item', 'handover pack items'], clash: 'block' },
+  'handover_packs.project_id': { to: 'job', label: ['handover pack', 'handover packs'], clash: 'block' },
+  'crm_payments.project_id': { to: 'job', label: ['payment', 'payments'] },
   'assistant_drafts.enquiry_id': { to: 'customer', label: ['draft from Metis', 'drafts from Metis'] },
   'assistant_drafts.project_id': { to: 'job', label: ['draft from Metis', 'drafts from Metis'] },
   'crm_aliases.enquiry_id': { to: 'customer', internal: true },

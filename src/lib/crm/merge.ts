@@ -8,6 +8,7 @@ import { postcodeKey } from '@/lib/crm/site-postcode';
 import { syncEnquiryStatus } from '@/lib/projects/server';
 import { resetDuplicateIndex } from '@/lib/projects/duplicates';
 import { isOrdered } from '@/lib/purchase-orders/money';
+import { moveSitePaths } from '@/lib/site/merge-paths';
 import { chunks, notThere } from './delete-customer';
 import {
   checkInput,
@@ -57,7 +58,14 @@ const PLAIN: Record<string, string> = {
   'merge:left': 'Something still pointed at the merged-away record, so nothing was changed. Try again; if it happens again, tell Claude.',
   'merge:bad-plan': 'That merge didn’t make sense to the database. Nothing was changed.',
 };
-const TABLE_WORDS: Record<string, string> = { tasks: 'a task', crm_surveys: 'an open survey', survey_bookings: 'a survey booking', crm_lead_origins: 'a lead' };
+const TABLE_WORDS: Record<string, string> = {
+  tasks: 'a task',
+  crm_surveys: 'an open survey',
+  survey_bookings: 'a survey booking',
+  crm_lead_origins: 'a lead',
+  handover_slots: 'handover pack details',
+  handover_packs: 'a handover pack',
+};
 
 export class MergeError extends Error {
   status: number;
@@ -390,6 +398,8 @@ export async function moveFolder(db: Db, m: { bucket: string; from: string; to: 
       if (failed) stuck.add(path); // tried again by the every-minute job
     }
   }
+  // The site app's and the handover pack's signatures, named inside their own rows: once every file is across.
+  if (!stuck.size) return moveSitePaths(db, m);
   return stuck.size;
 }
 

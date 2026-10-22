@@ -438,11 +438,13 @@ function BlanksEditor({ t, busy, onSave, onCancel }: { t: WaTemplate; busy: bool
             value={b.field}
             onChange={(e) => set(i, e.target.value === 'custom' ? { field: 'custom', label: '' } : { field: e.target.value as FieldKey })}
           >
-            {(Object.keys(FIELDS) as FieldKey[]).map((k) => (
-              <option key={k} value={k}>
-                {FIELDS[k].label}
-              </option>
-            ))}
+            {(Object.keys(FIELDS) as FieldKey[])
+              .filter((k) => !FIELDS[k].auto || b.field === k)
+              .map((k) => (
+                <option key={k} value={k}>
+                  {FIELDS[k].label}
+                </option>
+              ))}
             <option value="custom">Something else (typed in when sending)</option>
           </select>
           {b.field === 'custom' && (

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { login } from '@/lib/auth-actions';
 import { AuthShell } from '@/components/auth/AuthShell';
-import { field } from '@/components/auth/authStyles';
+import { brand, field } from '@/components/auth/authStyles';
 import { safeAdminPath } from '@/lib/auth-utils';
 
 export default function LoginForm() {
@@ -20,7 +20,7 @@ export default function LoginForm() {
       footer={
         <>
           Need an account?{' '}
-          <Link href="/register" style={{ color: '#C77F04', fontWeight: 600 }}>
+          <Link href="/register" style={{ color: brand.link, fontWeight: 600 }}>
             Request access
           </Link>
         </>
@@ -55,7 +55,7 @@ export default function LoginForm() {
         >
           {pending ? 'Signing in…' : 'Sign in'}
         </button>
-        <Link href="/forgot-password" style={{ fontSize: '.85rem', color: '#C77F04', fontWeight: 600, justifySelf: 'start' }}>
+        <Link href="/forgot-password" style={{ fontSize: '.85rem', color: brand.link, fontWeight: 600, justifySelf: 'start' }}>
           Forgot your password?
         </Link>
       </form>

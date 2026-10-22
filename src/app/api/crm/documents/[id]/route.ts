@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { crmSession, DOC_CATEGORIES, DOCS_BUCKET, isUuid, json, logActivity, signedDoc } from '@/lib/crm/server';
+import { crmSession, docCategoryOf, DOCS_BUCKET, isUuid, json, logActivity, signedDoc } from '@/lib/crm/server';
 import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
+import { printResponse, printVersion, type PrintDoc } from '@/lib/documents/print';
+import { refreshHandover } from '@/lib/handover/server';
 
 export const dynamic = 'force-dynamic';
+// A print version of the combined handover pack is built again on request.
+export const maxDuration = 60;
 type Ctx = { params: Promise<{ id: string }> };
 
 const SIGNED_QUOTE = 'This is the signed quote. It’s the evidence of the contract, so it can’t be deleted or changed.';
@@ -19,14 +23,24 @@ async function docAndJob(id: string) {
   return { d, p, signedQuote: !!p && p.accepted_document_id === id };
 }
 
-/** Open the file (short-lived signed link). */
+/**
+ * Open the file (short-lived signed link). ?variant=print: the print version of a document the app
+ * makes (documents/print.ts), made now from what this copy was made from, never stored.
+ */
 export async function GET(req: Request, { params }: Ctx) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
-  const { data } = await createAdminClient().from('crm_documents').select('storage_path, name').eq('id', id).maybeSingle();
+  const q = new URL(req.url).searchParams;
+  const db = createAdminClient();
+  if (q.get('variant') === 'print') {
+    const { data: doc } = await db.from('crm_documents').select('*').eq('id', id).maybeSingle();
+    if (!doc) return json({ error: 'Not found' }, 404);
+    return printResponse(await printVersion(db, doc as PrintDoc), q.has('download'));
+  }
+  const { data } = await db.from('crm_documents').select('storage_path, name').eq('id', id).maybeSingle();
   if (!data) return json({ error: 'Not found' }, 404);
-  const dl = new URL(req.url).searchParams.has('download') ? data.name : undefined;
+  const dl = q.has('download') ? data.name : undefined;
   const url = await signedDoc(data.storage_path, 300, dl);
   return url ? NextResponse.redirect(url) : json({ error: 'File missing' }, 404);
 }
@@ -46,15 +60,24 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const { d, p, signedQuote } = found;
   const b = await req.json().catch(() => ({}));
   const u: Record<string, unknown> = {};
-  if ('visible' in b) u.visible = !!b.visible;
+  if ('visible' in b) {
+    u.visible = !!b.visible;
+    // A handover item shown or hidden by hand stays as set (it isn't released over later), as on the Handover tab.
+    if (d.handover_slot && d.handover_slot !== 'PACK') u.release = 'now';
+  }
   if ('name' in b) u.name = String(b.name || '').trim().slice(0, 140) || 'Document';
-  if ('category' in b && (DOC_CATEGORIES as readonly string[]).includes(b.category)) u.category = b.category;
+  if ('category' in b) {
+    const c = await docCategoryOf(b.category, '');
+    if (c) u.category = c;
+  }
   if ('needs_signature' in b) u.needs_signature = !!b.needs_signature && SIGNABLE_CATEGORIES.includes(String(u.category ?? d.category));
   if (signedQuote && Object.keys(u).some((k) => k !== 'visible')) return json({ error: SIGNED_QUOTE }, 409);
   const db = createAdminClient();
   if (Object.keys(u).length) {
     const { error } = await db.from('crm_documents').update(u).eq('id', id);
     if (error) return json({ error: error.message }, 500);
+    // The handover pack's combined PDF follows what the customer may see.
+    if ('visible' in u && d.handover_slot && d.project_id) await refreshHandover(db, String(d.project_id), { by: s.user.id }).catch((e) => console.error('[documents] handover', e));
   }
 
   if ('signed_outside' in b) {

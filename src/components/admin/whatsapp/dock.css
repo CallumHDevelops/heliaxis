@@ -9,22 +9,35 @@
   display: contents;
   /* What the dock takes from the page right now. AdminShell (and the CMS) make room for it. */
   --hx-dock: 0px;
-  --hxd-ink: #211f18;
-  --hxd-muted: #6e6a5e;
-  --hxd-line: rgba(33, 31, 24, 0.14);
-  --hxd-line2: rgba(33, 31, 24, 0.08);
-  --hxd-card: #fffdf8;
-  --hxd-paper: #f7f2e7;
-  --hxd-head: #fdfaf3;
-  --hxd-solar: #f8bc1e;
-  --hxd-amber: #c77f04;
-  --hxd-wa: #1f7a4d;
-  --hxd-wa-wash: rgba(31, 122, 77, 0.1);
-  --hxd-ok: #3f7d4e;
-  --hxd-err: #b3261e;
-  --hxd-blue: #2c5f99;
-  --hxd-avatar: #ebe3d1;
+  /* Colours: the light/dark theme tokens (src/app/theme.css). */
+  --hxd-ink: var(--text);
+  --hxd-muted: var(--muted);
+  --hxd-line: var(--border);
+  --hxd-line2: var(--border-soft);
+  --hxd-card: var(--surface);
+  --hxd-paper: var(--bg);
+  /* Between the card and the page, like the app header beside it. */
+  --hxd-head: color-mix(in srgb, var(--surface) 70%, var(--bg));
+  --hxd-solar: var(--accent);
+  --hxd-amber: var(--accent-text);
+  --hxd-wa: var(--wa);
+  --hxd-wa-text: var(--wa-text);
+  --hxd-wa-wash: rgb(var(--wa-rgb) / 0.1);
+  --hxd-ok: var(--ok);
+  --hxd-err: var(--danger);
+  --hxd-blue: var(--info);
+  --hxd-avatar: var(--surface-2);
+  --hxd-shadow: rgba(33, 31, 24, 0.28);
+  --hxd-shadow-over: rgba(33, 31, 24, 0.38);
+  --hxd-scrim: rgba(20, 18, 12, 0.24);
   --hxd-font: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+}
+@media screen {
+  :root[data-theme='dark'] .hx-frame {
+    --hxd-shadow: rgba(0, 0, 0, 0.55);
+    --hxd-shadow-over: rgba(0, 0, 0, 0.7);
+    --hxd-scrim: rgba(0, 0, 0, 0.45);
+  }
 }
 /* Also on the root, for things a page puts straight into <body> (pop-ups, the CMS's Report button). */
 @media (min-width: 1024px) {
@@ -89,7 +102,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
 }
 .hxd :focus-visible,
 .hxd-list :focus-visible {
-  outline: 2px solid var(--hxd-ink);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -129,7 +142,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   display: grid;
   place-items: center;
   background: var(--hxd-wa);
-  color: #fff;
+  color: var(--on-solid);
   cursor: pointer;
 }
 .hxd__heads {
@@ -175,7 +188,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   box-sizing: border-box;
   border-radius: 999px;
   background: var(--hxd-wa);
-  color: #fff;
+  color: var(--on-solid);
   font-size: 10.5px;
   display: grid;
   place-items: center;
@@ -191,7 +204,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
 .hxd__total {
   font-size: 11px;
   font-weight: 800;
-  color: var(--hxd-wa);
+  color: var(--hxd-wa-text);
   text-align: center;
   line-height: 1.2;
 }
@@ -212,7 +225,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
 .hxd__toggle:hover,
 .hxd__fold:hover {
   color: var(--hxd-ink);
-  background: rgba(33, 31, 24, 0.05);
+  background: rgb(var(--fg-rgb) / 0.05);
 }
 
 /* The panel: docked open from 1280px, or over the page (the overlay) below that. */
@@ -233,7 +246,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
     bottom: 0;
     z-index: 26;
     width: var(--hx-dock);
-    box-shadow: -10px 0 26px -18px rgba(33, 31, 24, 0.28);
+    box-shadow: -10px 0 26px -18px var(--hxd-shadow);
   }
 }
 .hx-frame[data-dock-overlay] .hxd__panel {
@@ -244,7 +257,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   right: var(--hx-dock);
   z-index: 46;
   width: min(400px, calc(100vw - var(--hx-dock) - 48px));
-  box-shadow: -18px 0 44px -12px rgba(33, 31, 24, 0.38);
+  box-shadow: -18px 0 44px -12px var(--hxd-shadow-over);
   animation: hxd-in 0.16s ease-out;
 }
 .hxd__scrim {
@@ -254,7 +267,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   left: 0;
   right: var(--hx-dock);
   z-index: 45;
-  background: rgba(20, 18, 12, 0.24);
+  background: var(--hxd-scrim);
   animation: hxd-fade 0.16s ease-out;
 }
 @keyframes hxd-in {
@@ -299,7 +312,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   display: grid;
   place-items: center;
   background: var(--hxd-wa);
-  color: #fff;
+  color: var(--on-solid);
 }
 .hxd__waic svg {
   width: 16px;
@@ -311,7 +324,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   gap: 2px;
   padding: 3px;
   border-radius: 8px;
-  background: rgba(33, 31, 24, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
 }
 .hxd__tabs button {
   min-width: 0;
@@ -333,7 +346,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
 .hxd__tabs button.on {
   background: var(--hxd-card);
   color: var(--hxd-ink);
-  box-shadow: 0 1px 2px rgba(33, 31, 24, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 .hxd__tabs em,
 .hxd-count {
@@ -345,7 +358,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   padding: 0 5px;
   border-radius: 999px;
   background: var(--hxd-wa);
-  color: #fff;
+  color: var(--on-solid);
   font-size: 10.5px;
   font-weight: 800;
   display: inline-grid;
@@ -413,8 +426,8 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   margin: 10px 12px 0;
   padding: 8px 10px;
   border-radius: 6px;
-  background: rgba(248, 188, 30, 0.16);
-  border: 1px solid rgba(199, 127, 4, 0.3);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
   font-size: 12.5px;
   line-height: 1.4;
 }
@@ -431,10 +444,10 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   color: var(--hxd-err);
 }
 .hxd-btn {
-  border: 1px solid var(--hxd-ink);
+  border: 1px solid var(--inverse);
   border-radius: 6px;
-  background: var(--hxd-ink);
-  color: var(--hxd-solar);
+  background: var(--inverse);
+  color: var(--inverse-accent);
   font-weight: 700;
   font-size: 13px;
   padding: 8px 14px;
@@ -442,7 +455,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
 }
 .hxd-nomobile {
   padding: 24px 16px;
-  border: 1px dashed rgba(33, 31, 24, 0.22);
+  border: 1px dashed rgb(var(--fg-rgb) / 0.22);
   border-radius: 12px;
   text-align: center;
   font-size: 13.5px;
@@ -495,18 +508,18 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   opacity: 0.65;
 }
 .hxd-filters button.on {
-  background: var(--hxd-ink);
-  border-color: var(--hxd-ink);
-  color: var(--hxd-solar);
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-accent);
 }
 .hxd-search {
   width: 100%;
   box-sizing: border-box;
   height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--hxd-line);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: #fff;
+  background: var(--field);
   font: inherit;
   font-size: 13.5px;
   color: var(--hxd-ink);
@@ -542,7 +555,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   text-decoration: none;
 }
 .hxd-row__link:hover {
-  background: rgba(33, 31, 24, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
 }
 .hxd-row__link:focus-visible {
   outline-offset: -2px;
@@ -589,7 +602,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   white-space: nowrap;
 }
 .is-unread .hxd-row__h time {
-  color: var(--hxd-wa);
+  color: var(--hxd-wa-text);
   font-weight: 800;
 }
 .hxd-row__p {
@@ -625,12 +638,12 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   padding: 2px 8px;
   border-radius: 999px;
   white-space: nowrap;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
   color: var(--hxd-muted);
 }
 .hxd-win--ok {
-  background: rgba(31, 122, 77, 0.13);
-  color: var(--hxd-wa);
+  background: rgb(var(--wa-rgb) / 0.13);
+  color: var(--hxd-wa-text);
 }
 .hxd-chip {
   font-size: 11px;
@@ -638,18 +651,18 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   padding: 2px 6px;
   border-radius: 3px;
   white-space: nowrap;
-  background: rgba(248, 188, 30, 0.2);
+  background: rgb(var(--accent-rgb) / 0.2);
   color: var(--hxd-amber);
 }
 .hxd-chip--chase {
-  background: rgba(31, 122, 77, 0.12);
-  color: var(--hxd-wa);
+  background: rgb(var(--wa-rgb) / 0.12);
+  color: var(--hxd-wa-text);
 }
 /* A message someone has scheduled (Send later): "Scheduled 07:00". */
 .hxd-chip--later {
-  background: rgba(31, 122, 77, 0.08);
-  color: var(--hxd-wa);
-  box-shadow: inset 0 0 0 1px rgba(31, 122, 77, 0.35);
+  background: rgb(var(--wa-rgb) / 0.08);
+  color: var(--hxd-wa-text);
+  box-shadow: inset 0 0 0 1px rgb(var(--wa-rgb) / 0.35);
 }
 .hxd-nocrm {
   font-size: 11.5px;
@@ -705,19 +718,19 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   padding: 2px 6px;
   border-radius: 3px;
   white-space: nowrap;
-  background: rgba(33, 31, 24, 0.07);
+  background: rgb(var(--fg-rgb) / 0.07);
 }
 /* One colour per phase: early sales, survey and quote, delivery, done. */
 .hxd-st-lead,
 .hxd-st-contacted {
-  background: rgba(248, 188, 30, 0.22);
-  color: var(--hxd-amber);
+  background: var(--ph-y-bg);
+  color: var(--ph-y-text);
 }
 .hxd-st-survey_booked,
 .hxd-st-surveyed,
 .hxd-st-quote_sent {
-  background: rgba(44, 110, 180, 0.12);
-  color: var(--hxd-blue);
+  background: var(--ph-b-bg);
+  color: var(--ph-b-text);
 }
 .hxd-st-won,
 .hxd-st-design,
@@ -726,16 +739,16 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
 .hxd-st-installing,
 .hxd-st-commissioning,
 .hxd-st-handover {
-  background: rgba(63, 125, 78, 0.15);
-  color: var(--hxd-ok);
+  background: var(--ph-g-bg);
+  color: var(--ph-g-text);
 }
 .hxd-st-complete {
-  background: var(--hxd-ok);
-  color: #fff;
+  background: var(--ph-done);
+  color: var(--ph-done-text);
 }
 .hxd-st-lost {
-  background: rgba(179, 38, 30, 0.08);
-  color: var(--hxd-err);
+  background: var(--ph-lost-bg);
+  color: var(--ph-lost-text);
 }
 .hxd-ref {
   flex: none;
@@ -793,7 +806,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   overflow: hidden;
 }
 .hxd-rows--page .hxd-row.is-unread {
-  background: #f1f6ef;
+  background: color-mix(in srgb, var(--wa) 7%, var(--surface));
 }
 .hxd-list--page .hxd-empty {
   text-align: left;
@@ -881,7 +894,7 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   padding: 7px 12px;
   font-size: 12.5px;
   font-weight: 700;
-  color: var(--hxd-wa);
+  color: var(--hxd-wa-text);
   background: var(--hxd-wa-wash);
   border-bottom: 1px solid var(--hxd-line2);
 }
@@ -902,8 +915,8 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   gap: 6px 10px;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(199, 127, 4, 0.45);
-  background: rgba(248, 188, 30, 0.22);
+  border: 1px solid var(--accent-line);
+  background: rgb(var(--accent-rgb) / 0.22);
   font-size: 12.5px;
   line-height: 1.35;
 }
@@ -911,10 +924,10 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   flex: 1 1 180px;
 }
 .hxd-wrong button {
-  border: 1px solid var(--hxd-ink);
+  border: 1px solid var(--inverse);
   border-radius: 6px;
-  background: var(--hxd-ink);
-  color: var(--hxd-solar);
+  background: var(--inverse);
+  color: var(--inverse-accent);
   font-weight: 700;
   font-size: 12px;
   padding: 5px 10px;

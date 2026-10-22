@@ -2,15 +2,16 @@ import type * as Days from '../bank-holidays';
 import type { ProjectRow } from './checklist';
 
 /**
- * Paperwork deadlines after an install (spec 4.7): MCS, the DNO, Building Regs, the BUS voucher and
- * chasing a G99 application. Each one also becomes a task (ensureDeadlineTasks in server.ts).
+ * Paperwork deadlines after an install (spec 4.7): MCS, the DNO, Building Regs, the BUS voucher,
+ * chasing a G99 application, and buying the guarantee once the MCS certificate exists (site SPEC D8).
+ * Each one also becomes a task (ensureDeadlineTasks in server.ts).
  *
  * Pure apart from types, so scripts/test-projects.mjs loads it straight into node. The working-day
  * maths comes in through `cal` (src/lib/bank-holidays.ts on the server), with that year's bank holidays.
  */
 
 export type Deadline = {
-  key: 'mcs' | 'g98' | 'regs' | 'bus' | 'g99';
+  key: 'mcs' | 'g98' | 'regs' | 'bus' | 'g99' | 'cc16';
   label: string;
   /** YYYY-MM-DD, UK. */
   due: string;
@@ -96,6 +97,15 @@ export function deadlinesFor(p: ProjectRow, cal: DeadlineCal): Deadline[] {
       add('g98', 'Tell the DNO (G98) about the new system', addDays(commissioned, 28), !!(mark?.done_at || mark?.na));
     }
     add('regs', 'Notify Building Regs (NICEIC / NAPIT)', addDays(commissioned, 30), !!text(p.paperwork?.building_regs_ref));
+  }
+
+  // The insurance-backed guarantee (MCS financial protection) is bought within 7 calendar days of
+  // creating the MCS certificate; done once its reference or the date it was registered is saved
+  // (Paperwork's "Guarantee registered", which ticks the checklist's warranties item too).
+  const mcsOn = text(p.paperwork?.mcs_registered_on);
+  if (isYmd(mcsOn) && products.some((x) => x === 'solar' || x === 'battery' || x === 'heatpump')) {
+    const bought = !!text(p.paperwork?.ibg_ref) || isYmd(text(p.paperwork?.ibg_registered_on));
+    add('cc16', 'Buy the insurance-backed guarantee', addDays(mcsOn, 7), bought, cal.addWorkingDays(addDays(mcsOn, 7), -2, cal.hols));
   }
 
   const expiry = products.includes('heatpump') ? busExpiry(p.paperwork) : null;

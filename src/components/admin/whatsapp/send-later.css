@@ -1,5 +1,18 @@
 /* Send later and the late-night rule (SendLater.tsx): in the chat (inbox, phone chat page, dock) and
-   the job's WhatsApp sheet. Both set the same tokens (--wa, --ink, --line …); the fallbacks are those. */
+   the job's WhatsApp sheet. Colours: src/app/theme.css. */
+:root {
+  /* The panel's tint, and its buttons: white on light, a step up from the panel on dark. */
+  --wsl-panel: #f3faf5;
+  --wsl-panel-warn: #fff8e8;
+  --wsl-btn: var(--field);
+}
+@media screen {
+  :root[data-theme='dark'] {
+    --wsl-panel: rgb(var(--wa-rgb) / 0.1);
+    --wsl-panel-warn: var(--warn-soft);
+    --wsl-btn: var(--surface-2);
+  }
+}
 
 /* The clock beside Send: the right half of a split button. */
 .wsl-sendgroup {
@@ -19,14 +32,15 @@
   min-width: 40px;
   padding: 0 0.55rem;
   border: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  border-left: 1px solid color-mix(in srgb, var(--on-solid) 35%, transparent);
   border-radius: 0 4px 4px 0;
-  background: var(--wa, #1f7a4d);
-  color: #fff;
+  background: var(--wa);
+  color: var(--on-solid);
   cursor: pointer;
 }
+/* Open: the green pressed in, towards the text colour (darker on light, lighter on dark). */
 .wsl-clock.is-open {
-  background: #165c3a;
+  background: color-mix(in srgb, var(--wa) 75%, var(--text));
 }
 .wsl-clock:disabled {
   opacity: 0.45;
@@ -36,7 +50,7 @@
 .wsl-choice:focus-visible,
 .wsl-btn:focus-visible,
 .wsl-link:focus-visible {
-  outline: 2px solid var(--ink, #211f18);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 /* In the dock the Send button is a rounded box with "Ctrl/⌘ + Enter" (late at night "at 07:00") under
@@ -59,15 +73,15 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid rgba(31, 122, 77, 0.35);
+  border: 1px solid rgb(var(--wa-rgb) / 0.35);
   border-radius: 8px;
-  background: #f3faf5;
+  background: var(--wsl-panel);
   font-size: 0.82rem;
-  color: var(--ink, #211f18);
+  color: var(--text);
 }
 .wsl-panel--warn {
-  border-color: rgba(199, 127, 4, 0.55);
-  background: #fff8e8;
+  border-color: var(--accent-line);
+  background: var(--wsl-panel-warn);
 }
 .wsl-head {
   display: flex;
@@ -85,7 +99,7 @@
   background: none;
   font-size: 1.2rem;
   line-height: 1;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
   cursor: pointer;
 }
 .wsl-choices {
@@ -100,28 +114,28 @@
   gap: 1px;
   min-height: 36px;
   padding: 6px 12px;
-  border: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fff;
+  background: var(--wsl-btn);
   font: inherit;
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--ink, #211f18);
+  color: var(--text);
   text-align: left;
   cursor: pointer;
 }
 .wsl-choice small {
   font-size: 0.66rem;
   font-weight: 600;
-  color: var(--amber-2, #c77f04);
+  color: var(--accent-text);
 }
 /* When its chaser would go, sent at that time. */
 .wsl-choice small.wsl-chased {
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
 }
 .wsl-choice.is-on {
-  border-color: var(--wa, #1f7a4d);
-  box-shadow: inset 0 0 0 1px var(--wa, #1f7a4d);
+  border-color: var(--wa);
+  box-shadow: inset 0 0 0 1px var(--wa);
 }
 .wsl-choice:disabled {
   opacity: 0.5;
@@ -137,12 +151,12 @@
   min-height: 36px;
   min-width: 0;
   padding: 4px 8px;
-  border: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  background: #fff;
+  background: var(--field);
   font: inherit;
   font-size: 0.85rem;
-  color: var(--ink, #211f18);
+  color: var(--text);
 }
 .wsl-actions {
   display: flex;
@@ -152,24 +166,24 @@
 .wsl-btn {
   min-height: 36px;
   padding: 6px 12px;
-  border: 1px solid var(--line, rgba(33, 31, 24, 0.14));
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--wsl-btn);
   font: inherit;
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--ink, #211f18);
+  color: var(--text);
   cursor: pointer;
 }
 .wsl-btn--go {
-  border-color: var(--wa, #1f7a4d);
-  background: var(--wa, #1f7a4d);
-  color: #fff;
+  border-color: var(--wa);
+  background: var(--wa);
+  color: var(--on-solid);
 }
 .wsl-btn--ghost {
   border-color: transparent;
   background: none;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
 }
 .wsl-btn:disabled {
   opacity: 0.5;
@@ -179,13 +193,13 @@
 .wsl-small {
   margin: 0;
   font-size: 0.74rem;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
 }
 .wsl-err {
   margin: 0;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--err, #b3261e);
+  color: var(--danger);
 }
 .wsl-warn {
   margin: 0;
@@ -195,7 +209,7 @@
 .wsl-warn--small {
   margin: 0.3rem 0 0;
   font-size: 0.76rem;
-  color: #8a5300;
+  color: var(--accent-text);
 }
 
 /* "It's late, so this goes at 07:00 tomorrow. Send now instead" under the reply box. */
@@ -206,7 +220,7 @@
   gap: 2px 8px;
   margin: 0;
   font-size: 0.76rem;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
 }
 .wsl-link {
   padding: 4px 0;
@@ -214,7 +228,7 @@
   background: none;
   font: inherit;
   font-weight: 700;
-  color: var(--wa, #1f7a4d);
+  color: var(--wa-text);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -226,18 +240,18 @@
 
 /* A scheduled message waiting in the chat: the author's own green, dashed until it goes. */
 .wa-queued.wsl-bubble {
-  border-color: rgba(31, 122, 77, 0.55);
-  background: rgba(31, 122, 77, 0.06);
+  border-color: rgb(var(--wa-rgb) / 0.55);
+  background: rgb(var(--wa-rgb) / 0.06);
 }
 .wa-queued.wsl-bubble .wa-queued-head {
-  color: var(--wa, #1f7a4d);
+  color: var(--wa-text);
 }
 .wa-queued.wsl-bubble.failed {
-  border-color: rgba(179, 38, 30, 0.45);
-  background: rgba(179, 38, 30, 0.05);
+  border-color: rgb(var(--danger-rgb) / 0.45);
+  background: rgb(var(--danger-rgb) / 0.05);
 }
 .wa-queued.wsl-bubble.failed .wa-queued-head {
-  color: var(--err, #b3261e);
+  color: var(--danger);
 }
 .wsl-bubble .wa-queued-head {
   display: flex;
@@ -250,11 +264,11 @@
 }
 .wsl-by {
   font-weight: 600;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
   white-space: nowrap;
 }
 .wa-queued.wsl-bubble.failed .wsl-warn--small {
-  color: var(--err, #b3261e);
+  color: var(--danger);
 }
 .wsl-edit {
   display: flex;
@@ -269,7 +283,7 @@
   gap: 4px 8px;
   font-size: 0.76rem;
   font-weight: 700;
-  color: var(--muted, #6e6a5e);
+  color: var(--muted);
 }
 
 /* The chat page's reply box: the panel, then the box and Send, then the late-night line. */
@@ -298,10 +312,10 @@
   gap: 1px;
   line-height: 1.1;
 }
+/* Smaller, at full strength (faded, "at 07:00" fell below AA on the green). */
 .wsl-row .wa-send small {
   font-size: 0.66rem;
   font-weight: 600;
-  opacity: 0.85;
 }
 /* A template's Send button spans the box, as before. */
 .wsl-sendgroup--wide > .wa-send {

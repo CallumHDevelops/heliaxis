@@ -559,5 +559,45 @@ eq('two mobiles: replies to the one he messaged from, his main phone another num
 ]);
 eq('…so a WhatsApp from his main phone lands in his chat, not a new customer', enquiryForNumber(mob.d, '447791120089'), { id: W3.id, how: 'an other number' });
 
+// The site app and the handover pack (site-commissioning.sql, handover.sql): their rows move with a joined
+// job, and two handover packs can't become one (refused, nothing dropped).
+UNIQUE.handover_slots = [{ cols: ['slot'], where: () => true }];
+UNIQUE.handover_packs = [{ cols: [], where: () => true }];
+function siteJobs(extra) {
+  const w = customer();
+  const m = customer({ phone: '07700 900123', wa_id: '447700900123', customer_ref: 'HX-0071' });
+  const jw = job(w, { stage: 'surveyed' });
+  const jm = job(m, { project_ref: 'HX-0071' });
+  const d = {
+    enquiries: [w, m],
+    crm_projects: [jw, jm],
+    site_assignments: [{ id: uuid(), project_id: jm.id, trade: 'roofer', status: 'sent' }],
+    handover_slots: [{ project_id: jm.id, slot: 'HX-HO-03', na: false }],
+    crm_payments: [{ id: uuid(), project_id: jm.id, kind: 'deposit', amount_pence: 50000 }],
+    crm_aliases: [],
+    crm_lead_origins: [],
+    crm_merges: [],
+    ...extra(jw, jm),
+  };
+  const p = R.planMerge({ a: sideOf(d, w.id), b: sideOf(d, m.id), choices: { keep: 'a' }, by: { id: null, name: 'Callum' }, now: NOW });
+  return { d, p, jw };
+}
+const site = siteJobs(() => ({}));
+const siteDone = crmMerge(site.d, site.p.plan);
+eq('a joined job brings its trades, handover items and payments', [
+  site.d.site_assignments.every((x) => x.project_id === site.jw.id),
+  site.d.handover_slots.map((x) => x.project_id === site.jw.id),
+  site.d.crm_payments.every((x) => x.project_id === site.jw.id),
+  R.summaryWords(siteDone.summary),
+], [true, [true], true, '1 trade on the site app, 1 handover pack item, 1 payment']);
+const packs = siteJobs((jw, jm) => ({ handover_packs: [{ project_id: jw.id, version: 1 }, { project_id: jm.id, version: 2 }] }));
+let packClash = null;
+try {
+  crmMerge(packs.d, packs.p.plan);
+} catch (e) {
+  packClash = [e.message, e.detail];
+}
+eq('two handover packs: refused, naming the table, and both still there', [packClash, packs.d.handover_packs.length, R.clashPolicies().handover_packs], [['merge:clash', 'handover_packs'], 2, 'block']);
+
 console.log(failed ? `\n${failed} FAILED` : '\nAll passed.');
 process.exit(failed ? 1 : 0);

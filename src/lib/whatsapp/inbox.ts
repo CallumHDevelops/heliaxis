@@ -25,6 +25,7 @@ import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waP
 import { templateText } from './template-text';
 import { saveAdIds } from '@/lib/meta-ads';
 import { mergedInto, replyNumberFromAlias } from '@/lib/crm/aliases';
+import { tradeEcho, tradeReply } from '@/lib/site/trade-reply';
 
 /**
  * The WhatsApp inbox: inbound messages from the webhook, delivery statuses, smart replies
@@ -137,6 +138,9 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   const db = createAdminClient();
   const { data: dup } = await db.from('whatsapp_messages').select('id').eq('wa_message_id', m.id).maybeSingle();
   if (dup) return; // Meta retries webhooks
+  // A trade answering a site message (job pack, PO, return to site) goes on their job, not into the
+  // leads (SPEC D20, src/lib/site/trade-reply.ts). If that can't be checked, the message isn't lost.
+  if (await tradeReply(db, m, notifyEnquiryTeam).catch(() => false)) return;
 
   const found = await enquiryForNumber(db, m.from, profileName, m.referral ?? null);
   const created = found.created;
@@ -838,6 +842,8 @@ export async function handleEcho(m: MessageEcho) {
   const db = createAdminClient();
   const { data: dup } = await db.from('whatsapp_messages').select('id').eq('wa_message_id', m.id).maybeSingle();
   if (dup) return;
+  // Typed to a trade: on their job's history, not a new customer (SPEC D20).
+  if (await tradeEcho(db, m).catch(() => false)) return;
   let { enquiry } = await enquiryForNumber(db, m.to, '', null, false);
   const { kind, body } = describe(m);
   const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();

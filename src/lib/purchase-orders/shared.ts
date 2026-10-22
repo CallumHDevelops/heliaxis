@@ -1,4 +1,7 @@
 import { refMatches } from '@/lib/projects/refs';
+import type { LabourSnapshot } from '@/lib/site/po-shared';
+import type { PoReview } from '@/lib/site/review-shared';
+import type { PoKind } from './money';
 
 /**
  * Purchase orders as the API sends them (/api/crm/purchase-orders, /api/crm/suppliers). Types and
@@ -40,7 +43,9 @@ export type PurchaseOrder = {
   id: string;
   po_number: string;
   project_id: string;
-  supplier_id: string;
+  /** 'labour': a trade's PO, raised by their sign-off (no supplier; frozen in `labour`). */
+  kind: PoKind;
+  supplier_id: string | null;
   status: string;
   deliver_to: DeliverTo;
   deliver_address: string | null;
@@ -64,6 +69,14 @@ export type PurchaseOrder = {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Labour POs (site-commissioning.sql): the trade, the sign-off, CIS, what they're paid, and everything printed. */
+  assignment_id?: string | null;
+  signoff_id?: string | null;
+  cis_pence?: number | null;
+  payable_pence?: number | null;
+  labour?: LabourSnapshot | null;
+  /** The office's review of the work (site/review-shared.ts): waiting, hold (return to site required), green. */
+  review_status?: PoReview | null;
 };
 
 /** The job an order is for: its reference (HX-0042-2, or the customer's before customer-refs.sql), customer and site. */
@@ -100,8 +113,9 @@ export type PoFull = {
 
 export type Office = { address: string; postcode: string | null };
 
-/** A job's orders at a glance (the Overview's "Kit ordered"). */
+/** A job's orders at a glance (the Overview's "Kit ordered", and its labour POs apart). */
 export type OrdersSummary = {
+  /** Kit orders (labour POs are counted under `labour`). */
   count: number;
   drafts: number;
   /** Sent or confirmed: ordered, not delivered yet. */
@@ -110,6 +124,8 @@ export type OrdersSummary = {
   orderedNet: number;
   /** The earliest required-by date of the open orders (it may be past: late). */
   nextDelivery: string | null;
+  /** Labour POs: how many (not cancelled), held for the office, and what they pay out once issued. */
+  labour: { count: number; held: number; payable: number };
 };
 
 /** What a new order on this job starts with: lines from the job (no prices), and where it can go. */
@@ -123,17 +139,21 @@ export type PoSuggestion = {
 };
 
 /** A search: the PO number ("PO-12", "12"), the job's reference ("HX-0042-2", "hx42"), or the customer or supplier's name. */
-export function matchesOrder(o: Pick<PoListRow, 'po_number' | 'job' | 'supplier'>, q: string): boolean {
+export function matchesOrder(o: Pick<PoListRow, 'po_number' | 'job' | 'supplier' | 'labour'>, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
   const po = o.po_number.toLowerCase();
   if (po.includes(s) || (/^\d+$/.test(s) && Number(po.replace(/\D/g, '')) === Number(s))) return true;
   if (o.job?.ref && (refMatches(s, o.job.ref) || o.job.ref.toLowerCase().includes(s))) return true;
-  return [o.job?.customer, o.supplier?.name, o.job?.title].some((x) => !!x && x.toLowerCase().includes(s));
+  return [o.job?.customer, o.supplier?.name, o.job?.title, o.labour?.sub.contact, o.labour?.sub.company].some((x) => !!x && x.toLowerCase().includes(s));
 }
 
 /** The summary from a job's orders (the server's and the Orders tab's, so they always agree). */
-export function summariseOrders(rows: { status: string; net_pence: number | string | null; required_by: string | null }[]): OrdersSummary {
+export function summariseOrders(
+  all: { status: string; net_pence: number | string | null; required_by: string | null; kind?: string | null; payable_pence?: number | string | null }[]
+): OrdersSummary {
+  const rows = all.filter((r) => r.kind !== 'labour');
+  const labour = all.filter((r) => r.kind === 'labour' && r.status !== 'cancelled');
   const open = rows.filter((r) => r.status === 'sent' || r.status === 'confirmed');
   const dates = open.map((r) => r.required_by).filter((d): d is string => !!d).sort();
   return {
@@ -142,8 +162,16 @@ export function summariseOrders(rows: { status: string; net_pence: number | stri
     open: open.length,
     orderedNet: rows.filter((r) => r.status === 'sent' || r.status === 'confirmed' || r.status === 'delivered').reduce((n, r) => n + (Number(r.net_pence) || 0), 0),
     nextDelivery: dates[0] ?? null,
+    labour: {
+      count: labour.length,
+      held: labour.filter((r) => r.status === 'draft').length,
+      payable: labour.filter((r) => r.status !== 'draft').reduce((n, r) => n + (Number(r.payable_pence) || 0), 0),
+    },
   };
 }
+
+/** Who a labour PO is for, from what it froze: "Dave Price · Price Roofing". */
+export const labourWho = (o: Pick<PurchaseOrder, 'labour'>) => [o.labour?.sub.contact, o.labour?.sub.company].filter(Boolean).join(' · ') || 'Trade';
 
 export const DELIVER_LABEL: Record<DeliverTo, string> = { site: 'To the site', office: 'To the office', collect: 'We’ll collect' };
 

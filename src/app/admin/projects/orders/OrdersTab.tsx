@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { formatPence, isLate } from '@/lib/purchase-orders/money';
-import { summariseOrders, type PoListRow } from '@/lib/purchase-orders/shared';
+import { labourWho, summariseOrders, type PoListRow } from '@/lib/purchase-orders/shared';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
-import { api, KitOrdered, neededWords, StatusChip } from './OrdersUi';
+import { api, KitOrdered, labourWhen, neededWords, ordersCount, ReviewLine, StatusChip } from './OrdersUi';
 import { OrderSheet } from './OrderSheet';
 import './orders.css';
 
@@ -60,7 +60,7 @@ export function OrdersTab({ projectId, today, myName, onChanged }: { projectId: 
   return (
     <div className="po-tab">
       <div className="po-tab__head">
-        <div>{summary && summary.count > 0 ? <KitOrdered s={summary} today={today} /> : <span className="crm-muted">Order the kit for this job from your suppliers.</span>}</div>
+        <div>{summary && ordersCount(summary) > 0 ? <KitOrdered s={summary} today={today} /> : <span className="crm-muted">Order the kit for this job from your suppliers.</span>}</div>
         <button type="button" className="crm-btn crm-btn--solar" onClick={() => setOpen({ id: null })}>
           + New purchase order
         </button>
@@ -80,21 +80,25 @@ export function OrdersTab({ projectId, today, myName, onChanged }: { projectId: 
             <span className="po-amt">Total ex VAT</span>
           </div>
           {rows.map((o) => {
-            const late = isLate(o, today);
+            const labour = o.kind === 'labour';
+            const late = !labour && isLate(o, today);
             return (
               <button key={o.id} type="button" role="listitem" className={`po-row${late ? ' is-late' : ''}`} onClick={() => setOpen({ id: o.id })}>
                 <span className="po-no">{o.po_number}</span>
                 <span className="po-who">
-                  <b>{o.supplier?.name ?? 'Supplier'}</b>
-                  {o.changed_since_sent && <small className="po-late">Changed since sent: send it again</small>}
+                  <b>
+                    {labour && <span className="po-chip po-chip--labour">Labour</span>} {labour ? labourWho(o) : (o.supplier?.name ?? 'Supplier')}
+                  </b>
+                  {o.changed_since_sent && <small className="po-late">Changed since sent: {labour ? 'issue it again' : 'send it again'}</small>}
+                  <ReviewLine o={o} />
                 </span>
                 <span className="po-chipcell">
-                  <StatusChip status={o.status} late={late} />
+                  <StatusChip status={o.status} late={late} labour={labour} />
                 </span>
-                <span className={`po-when${late ? ' po-late' : ''}`}>{neededWords(o, today)}</span>
+                <span className={`po-when${late ? ' po-late' : ''}`}>{labour ? labourWhen(o) : neededWords(o, today)}</span>
                 <span className="po-amt">
-                  {formatPence(o.net_pence)}
-                  <small>{formatPence(o.gross_pence)} inc VAT</small>
+                  {labour ? formatPence(o.payable_pence ?? 0) : formatPence(o.net_pence)}
+                  <small>{labour ? 'to pay' : `${formatPence(o.gross_pence)} inc VAT`}</small>
                 </span>
               </button>
             );

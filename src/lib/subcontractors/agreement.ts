@@ -12,10 +12,17 @@ export const AGREEMENT_VERSION = 'HLX-SCFA-2026.04';
 export const AGREEMENT_TITLE = 'Subcontractor Framework Agreement';
 export const AGREEMENT_SUBTITLE = 'Master Agreement for the Supply of Specialist Labour Services';
 
-/** Heliaxis's own Schedule B details. Review before going live. */
+/**
+ * Heliaxis's own Schedule B details. Review before going live.
+ *
+ * Change values only, never the keys or their order: agreements signed before canonical hashing
+ * are checked by rebuilding their snapshot in this key order (hashing.ts). Every signed snapshot
+ * keeps its own copy of these details, so a new value (the address, 21 Oct 2026) only reaches new
+ * signatures.
+ */
 export const HELIAXIS_PARTY = {
   name: 'Heliaxis Limited',
-  registeredAddress: 'Current Electrical, Turner Street, Newport, NP19 7AZ',
+  registeredAddress: '9 Turner Street, Newport, Gwent, NP19 7AZ',
   companyNumber: '16734783',
   vatNumber: 'GB507431316',
   utr: '',
@@ -23,6 +30,22 @@ export const HELIAXIS_PARTY = {
   accountsEmail: 'hello@heliaxis.co.uk',
   primaryContact: 'Callum Hiscott',
 };
+
+/**
+ * How Heliaxis appears on the documents it makes (site paperwork, labour POs, the handover pack):
+ * the trading name and address, the office phone and email, and the MCS number. A separate constant,
+ * so HELIAXIS_PARTY (part of every signed agreement) keeps its keys.
+ */
+export const HELIAXIS_COMPANY = {
+  legalName: HELIAXIS_PARTY.name,
+  tradingName: 'Heliaxis Ltd',
+  addressLines: ['9 Turner Street', 'Newport', 'Gwent', 'NP19 7AZ'],
+  phone: '01633 965205',
+  email: 'hello@heliaxis.co.uk',
+  mcsNumber: 'NAP-82308',
+  companyNumber: HELIAXIS_PARTY.companyNumber,
+  vatNumber: HELIAXIS_PARTY.vatNumber,
+} as const;
 
 export type Block =
   | { p: string }

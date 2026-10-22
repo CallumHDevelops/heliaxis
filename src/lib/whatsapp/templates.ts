@@ -9,6 +9,7 @@ import {
   checkTemplate,
   cleanBlanks,
   FIELDS,
+  customerSendable,
   forUk,
   readyMade,
   READY_MADE,
@@ -224,7 +225,8 @@ export async function sendableTemplates(): Promise<WaTemplate[]> {
       },
     ];
   }
-  return forUk(r.items.filter((t) => t.status === 'APPROVED' && t.sendable));
+  // The site app's trade templates (site_*) never appear in a customer's chat.
+  return forUk(customerSendable(r.items));
 }
 
 /* ── Creating and deleting ───────────────────────────────────────────────────── */
@@ -239,7 +241,7 @@ export function readyDraft(name: string): NewTemplate | null {
     name: t.name,
     category: t.category,
     body: t.body,
-    examples: t.fields.map((f) => FIELDS[f].example),
+    examples: t.examples ?? t.fields.map((f) => FIELDS[f].example),
     buttons: t.buttons,
     blanks: t.fields.map((field) => ({ field })),
   };

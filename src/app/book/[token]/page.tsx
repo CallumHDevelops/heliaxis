@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import { schemaReady } from '@/lib/schema-ready';
 import { OFFICE_PHONE, tokenView, type TokenView } from '@/lib/booking/book';
 import { getBookingSettings } from '@/lib/booking/settings-server';
 import { BookingFlow } from '@/components/booking/BookingFlow';
+import { BrandLogo } from '@/components/theme/BrandLogo';
+import { ThemeChoice } from '@/components/theme/ThemeChoice';
+import { themeContext } from '@/lib/theme/server';
+import { THEME_GROUP_LABEL } from '@/lib/theme/shared';
 import '@/components/booking/booking.css';
 
 export const dynamic = 'force-dynamic';
@@ -26,11 +29,13 @@ export default async function BookWithLink({ params }: { params: Promise<{ token
     view = await tokenView(token).catch(() => null);
   }
   const s = view ? await getBookingSettings() : null;
+  // Their Light / Dark / Match phone from this phone's cookie, so the toggle's first paint is right.
+  const { pref } = await themeContext();
 
   return (
     <div className="bk-page">
       <header className="bk-head">
-        <Image src="/assets/heliaxis-logo.png" alt="Heliaxis" width={128} height={29} style={{ width: 128, height: 'auto' }} priority />
+        <BrandLogo width={128} priority />
         <span className="bk-head-tag">Your survey</span>
       </header>
       <main className="bk-main">
@@ -90,6 +95,13 @@ export default async function BookWithLink({ params }: { params: Promise<{ token
             />
           </>
         )}
+        {/* Light / Dark / Match phone: kept on this phone (cookie and storage), no account needed. */}
+        <div className="bk-theme">
+          <span className="bk-theme-label" aria-hidden="true">
+            {THEME_GROUP_LABEL}
+          </span>
+          <ThemeChoice size="sm" serverPref={pref} />
+        </div>
       </main>
     </div>
   );

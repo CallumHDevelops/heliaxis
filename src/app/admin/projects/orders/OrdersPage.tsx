@@ -3,14 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { formatPence, isLate, isOpen } from '@/lib/purchase-orders/money';
-import { matchesOrder, type PoListRow, type Supplier } from '@/lib/purchase-orders/shared';
+import { labourWho, matchesOrder, type PoListRow, type Supplier } from '@/lib/purchase-orders/shared';
 import { plusDays } from '@/lib/projects/feed';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { useNow } from '@/lib/use-now';
 import { Icon, Sheet } from '../../crm/CrmUi';
 import { rememberView, shortDate, ukDayOf } from '../../crm/crm-shared';
 import { OrderSheet } from './OrderSheet';
-import { api, neededWords, StatusChip } from './OrdersUi';
+import { api, labourWhen, neededWords, ReviewLine, StatusChip } from './OrdersUi';
 import { SupplierForm } from './SupplierForm';
 import '../../crm/crm.css';
 import '../projects.css';
@@ -99,7 +99,7 @@ export function OrdersPage({
   const searched = orders.filter((o) => (!supplier || o.supplier_id === supplier) && matchesOrder(o, q));
   const shown = searched.filter(TEST[filter]);
   const open7 = plusDays(today, 6);
-  const openOrders = orders.filter((o) => isOpen(o.status));
+  const openOrders = orders.filter((o) => o.kind !== 'labour' && isOpen(o.status));
   const due = openOrders.filter((o) => o.required_by && o.required_by <= open7).length;
   const summary = [
     `${openOrders.length} open`,
@@ -242,7 +242,8 @@ function OrdersList({ rows, filter, today, onOpen, empty }: { rows: PoListRow[];
             </h2>
           )}
           {s.rows.map((o) => {
-            const late = isLate(o, today);
+            const labour = o.kind === 'labour';
+            const late = !labour && isLate(o, today);
             return (
               <button key={o.id} type="button" className={`po-row${late ? ' is-late' : ''}`} onClick={() => onOpen(o.id)}>
                 <span className="po-no">{o.po_number}</span>
@@ -250,22 +251,34 @@ function OrdersList({ rows, filter, today, onOpen, empty }: { rows: PoListRow[];
                   <b>{o.job?.customer || o.job?.title || 'Job'}</b>
                   <small>
                     {o.job?.ref}
-                    {o.supplier && <span className="po-who__sup">{o.job?.ref ? ' · ' : ''}{o.supplier.name}</span>}
+                    {(o.supplier || labour) && (
+                      <span className="po-who__sup">
+                        {o.job?.ref ? ' · ' : ''}
+                        {labour ? labourWho(o) : o.supplier!.name}
+                      </span>
+                    )}
                     {o.changed_since_sent ? ' · changed since sent' : ''}
                   </small>
+                  <ReviewLine o={o} />
                 </span>
-                <span className="po-supplier">{o.supplier?.name}</span>
+                <span className="po-supplier">
+                  {labour ? (
+                    <>
+                      <span className="po-chip po-chip--labour">Labour</span> {labourWho(o)}
+                    </>
+                  ) : (
+                    o.supplier?.name
+                  )}
+                </span>
                 <span className="po-chipcell">
-                  <StatusChip status={o.status} late={late} />
+                  <StatusChip status={o.status} late={late} labour={labour} />
                 </span>
                 <span className={`po-when${late ? ' po-late' : ''}`}>
-                  {o.status === 'delivered' && o.delivered_at ? `Delivered ${shortDate(ukDayOf(o.delivered_at))}` : neededWords(o, today)}
+                  {labour ? labourWhen(o) : o.status === 'delivered' && o.delivered_at ? `Delivered ${shortDate(ukDayOf(o.delivered_at))}` : neededWords(o, today)}
                 </span>
                 <span className="po-amt">
-                  {formatPence(o.net_pence)}
-                  <small>
-                    {o.lines} line{o.lines === 1 ? '' : 's'}
-                  </small>
+                  {labour ? formatPence(o.payable_pence ?? 0) : formatPence(o.net_pence)}
+                  <small>{labour ? 'to pay' : `${o.lines} line${o.lines === 1 ? '' : 's'}`}</small>
                 </span>
               </button>
             );
