@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from 'react';
 import {
   colorSchemeFor,
+  DEFAULT_PREF,
   parsePref,
   parseScheme,
   SCHEME_COOKIE,
@@ -126,10 +127,10 @@ function subscribe(onChange: () => void) {
 }
 
 /** The person's choice, kept up to date. `serverPref` is what the server rendered with (so hydration matches). */
-export function useThemePref(serverPref: ThemePref = 'system'): ThemePref {
+export function useThemePref(serverPref: ThemePref = DEFAULT_PREF): ThemePref {
   return useSyncExternalStore(
     subscribe,
-    () => parsePref(document.documentElement.getAttribute('data-theme-pref')) ?? 'system',
+    () => parsePref(document.documentElement.getAttribute('data-theme-pref')) ?? DEFAULT_PREF,
     () => serverPref
   );
 }

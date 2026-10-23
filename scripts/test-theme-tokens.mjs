@@ -257,7 +257,9 @@ for (const name of ['--muted', '--accent', '--border']) {
 for (const p of files.filter(themed)) {
   const src = stripComments(read(p));
   for (const m of src.matchAll(/(--[\w-]+)\s*:\s*var\(\s*(--[\w-]+)\s*\)/g)) if (m[1] === m[2]) fail(`${p}: ${m[1]}: var(${m[2]}) refers to itself`);
-  if (p.endsWith('.css') && /prefers-color-scheme/.test(src) && !LEFTOVERS.includes(p)) fail(`${p}: keys on prefers-color-scheme; use :root[data-theme='dark'] (src/app/theme.css)`);
+  // The one media query allowed: theme.css restating Light when Light is chosen on a dark phone (it keys on the choice).
+  const media = p === 'src/app/theme.css' ? src.replace(/@media \(prefers-color-scheme: dark\) \{\s*:root\[data-theme='light'\] \{\s*color-scheme: only light;\s*\}\s*\}/, '') : src;
+  if (p.endsWith('.css') && /prefers-color-scheme/.test(media) && !LEFTOVERS.includes(p)) fail(`${p}: keys on prefers-color-scheme; use :root[data-theme='dark'] (src/app/theme.css)`);
   // On the page or on an island (.hx-light): plain `light` is still auto-darkened by Chrome on a dark phone.
   if (/color-scheme\s*:\s*light\s*[;}]/.test(src)) fail(`${p}: declares plain "color-scheme: light"; Chrome still auto-darkens it (use "only light")`);
 }

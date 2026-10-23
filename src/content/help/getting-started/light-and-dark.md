@@ -7,9 +7,9 @@ access: everyone
 ---
 The staff app comes in a light and a dark version. You choose under **Appearance**:
 
-- **Light**: always light.
+- **Light**: always light. This is where everyone starts.
 - **Dark**: always dark.
-- **Match phone**: follows your phone’s (or computer’s) own light or dark setting. This is where everyone starts.
+- **Match phone**: follows your phone’s (or computer’s) own light or dark setting.
 
 ## Change it
 
@@ -25,5 +25,8 @@ The colours change straight away, and the menu stays open so you can see the dif
 - The sign-in pages follow the same choice.
 - The CMS page editor (**Manage CMS**) and its previews always stay light.
 - The public website isn’t affected.
+- The trades’ site app starts in Light too. It’s on its own address, so a choice made in the staff app doesn’t carry over to it.
+
+> **Good to know:** Light stays light on a phone set to dark mode. If your phone’s browser still repaints it dark, open **/get-app/check** and send the screenshot to whoever looks after the app.
 
 > **Once switched on:** Following you between devices needs theme.sql. Until it has been run, each device keeps its own choice.

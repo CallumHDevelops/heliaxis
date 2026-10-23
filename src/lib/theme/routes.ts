@@ -78,19 +78,20 @@ export function decodeThemeRoute(header: string | null | undefined): ThemeRoute 
 }
 
 export type ThemeViewport = {
-  colorScheme?: 'only light' | 'dark' | 'light dark';
+  colorScheme?: 'dark' | 'light dark';
   themeColor?: string | { media: string; color: string }[];
 };
 
 /**
  * The page's `color-scheme` and `theme-color` metas. An explicit choice gets one bar colour; "Match
  * phone" gets a pair keyed to the phone's setting. `route === undefined`: a page built ahead of time,
- * where the server can't tell; the page's own layout and the browser-side scripts see to it.
+ * where the server can't tell the choice: the meta names dark as every themed page's does (its CSS
+ * holds the theme), and the page's own layout and the browser-side scripts see to the rest.
  */
 export function themeViewportFor(route: ThemeRoute | null | undefined, pref: ThemePref): ThemeViewport {
-  if (route === undefined) return {};
+  if (route === undefined) return { colorScheme: colorSchemeFor('system') };
   if (!route) return { themeColor: SITE_THEME_COLOR };
-  if (route.scope === 'light') return { colorScheme: 'only light', themeColor: route.bar[0] };
+  if (route.scope === 'light') return { colorScheme: colorSchemeFor('light'), themeColor: route.bar[0] };
   const colorScheme = colorSchemeFor(pref);
   if (pref !== 'system') return { colorScheme, themeColor: pref === 'dark' ? route.bar[1] : route.bar[0] };
   if (route.bar[0] === route.bar[1]) return { colorScheme, themeColor: route.bar[0] };

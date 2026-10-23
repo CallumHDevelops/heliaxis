@@ -4,7 +4,8 @@
  * TypeScript only, so the tests run it with `node --experimental-strip-types`.
  *
  * How it fits together (see src/app/theme.css for the colours):
- * - The person's choice is `light`, `dark` or `system` ("Match phone", the default). It lives in the
+ * - The person's choice is `light` (the default, as the app always looked), `dark` or `system`
+ *   ("Match phone"). It lives in the
  *   hx-theme cookie (so the server paints the right theme first time) and in localStorage (so a
  *   page cached by a service worker, or a lost cookie, still comes back right).
  * - hx-scheme remembers what the phone was last seen set to, so the server can resolve "Match phone"
@@ -23,6 +24,8 @@ export const THEME_PREFS: readonly ThemePref[] = ['light', 'dark', 'system'];
 /** What the toggle says (UK English). */
 export const THEME_LABELS: Record<ThemePref, string> = { light: 'Light', dark: 'Dark', system: 'Match phone' };
 export const THEME_GROUP_LABEL = 'Appearance';
+/** Before anyone chooses: Light, white and cream as the app always was (owner, 23 Oct). Dark or Match phone only by choice. */
+export const DEFAULT_PREF: ThemePref = 'light';
 
 export const THEME_COOKIE = 'hx-theme';
 export const SCHEME_COOKIE = 'hx-scheme';
@@ -49,9 +52,14 @@ export function resolveTheme(pref: ThemePref, scheme: ResolvedTheme | null | und
   return scheme ?? undefined;
 }
 
-/** The `color-scheme` to declare. Explicit Light is `only light`: plain `light` still gets auto-darkened by Chrome. */
-export function colorSchemeFor(pref: ThemePref): 'only light' | 'dark' | 'light dark' {
-  return pref === 'light' ? 'only light' : pref === 'dark' ? 'dark' : 'light dark';
+/**
+ * The `color-scheme` meta to declare. Every choice names dark, Light included, so a browser that darkens
+ * pages by itself sees the page has its own dark mode and leaves it alone (some, such as Samsung
+ * Internet, decide from that). Light itself is held by the CSS: the light root is `only light`
+ * (theme.css), which Chrome honours element by element, and which wins over this meta on screen.
+ */
+export function colorSchemeFor(pref: ThemePref): 'dark' | 'light dark' {
+  return pref === 'dark' ? 'dark' : 'light dark';
 }
 
 /** Cookie options for the theme cookies set by the server (/api/theme, the middleware). Readable by scripts on purpose. */
@@ -97,7 +105,7 @@ function ok(v){return v==='light'||v==='dark'||v==='system'}
 function pref(){if(s!=='app')return 'light';var p=g(K),l=null;try{l=localStorage.getItem(K)}catch(e){}
 if(!ok(p)&&ok(l)){p=l;document.cookie=K+'='+p+A}
 if(ok(p)&&l!==p){try{localStorage.setItem(K,p)}catch(e){}}
-return ok(p)?p:'system'}
+return ok(p)?p:'${DEFAULT_PREF}'}
 function apply(){var p=pref(),y=q&&q.matches?'dark':'light',t=p==='system'?y:p;
 if(s==='app'&&g('${SCHEME_COOKIE}')!==y)document.cookie='${SCHEME_COOKIE}='+y+A;
 if(d.getAttribute('data-theme')!==t){d.setAttribute('data-theme',t);window.__hxThemeFixed=1}
