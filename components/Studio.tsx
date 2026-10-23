@@ -182,6 +182,12 @@ export default function Studio({
     { id: string; name: string; description: string; data_url: string }[]
   >([]);
   const [imageMsg, setImageMsg] = useState('');
+  // photos uploaded to Projects (modal or Telegram), grouped per project, so the
+  // library picker always offers every install photo — not just the shared uploads
+  const [projectPhotoLib, setProjectPhotoLib] = useState<
+    { projectId: string; projectName: string; photos: { id: string; name: string; data_url: string }[] }[]
+  >([]);
+  const [projectPhotoBusy, setProjectPhotoBusy] = useState(false);
   const [editImage, setEditImage] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
@@ -418,10 +424,42 @@ export default function Studio({
         data as { id: string; name: string; description: string; data_url: string }[]
       );
   }
+  // every photo on every project (ProjectsModal uploads and Telegram ingests both
+  // land in project_images) — two plain queries joined here, newest project first
+  async function loadProjectPhotos() {
+    setProjectPhotoBusy(true);
+    const [{ data: projs }, { data: imgs }] = await Promise.all([
+      supabase.from('projects').select('id, name, location').order('updated_at', { ascending: false }),
+      supabase
+        .from('project_images')
+        .select('id, name, data_url, project_id')
+        .order('created_at', { ascending: true }),
+    ]);
+    const byProject = new Map<string, { id: string; name: string; data_url: string }[]>();
+    ((imgs as { id: string; name: string; data_url: string; project_id: string }[]) || []).forEach(
+      (im) => {
+        if (!im.project_id) return;
+        const list = byProject.get(im.project_id) || [];
+        list.push({ id: im.id, name: im.name, data_url: im.data_url });
+        byProject.set(im.project_id, list);
+      }
+    );
+    setProjectPhotoLib(
+      (((projs as { id: string; name: string; location: string }[]) || [])
+        .map((p) => ({
+          projectId: p.id,
+          projectName: p.name || p.location || 'Untitled project',
+          photos: byProject.get(p.id) || [],
+        }))
+        .filter((g) => g.photos.length > 0))
+    );
+    setProjectPhotoBusy(false);
+  }
   function openImages() {
     setImageMsg('');
     setEditImage(null);
     loadImages();
+    loadProjectPhotos();
     setImageOpen(true);
   }
   function startEditImage(l: { id: string; name: string; description: string }) {
@@ -2656,11 +2694,12 @@ export default function Studio({
             </h2>
             <p className={styles.msub}>
               Pick a background image, or upload a new one (applied instantly and saved to the shared
-              library).
+              library). Photos added to Projects — here or via the Telegram bot — appear below
+              automatically.
             </p>
             <div className={styles.logoGrid}>
               {imageLibrary.length === 0 && (
-                <div className={styles.histempty}>No images yet — upload one below.</div>
+                <div className={styles.histempty}>No shared uploads yet — upload one below.</div>
               )}
               {imageLibrary.map((l) => (
                 <div className={styles.logoCell} key={l.id}>
@@ -2698,6 +2737,43 @@ export default function Studio({
                 </div>
               ))}
             </div>
+            <div className={styles.libLabel}>From projects</div>
+            {projectPhotoBusy && projectPhotoLib.length === 0 && (
+              <div className={styles.histempty}>Loading project photos…</div>
+            )}
+            {!projectPhotoBusy && projectPhotoLib.length === 0 && (
+              <div className={styles.histempty}>
+                No project photos yet — add some in Projects, or send them to the Telegram bot.
+              </div>
+            )}
+            {projectPhotoLib.map((g) => (
+              <div key={g.projectId}>
+                <p className={styles.msub} style={{ marginBottom: 6 }}>
+                  {g.projectName}
+                </p>
+                <div className={styles.logoGrid}>
+                  {g.photos.map((im) => (
+                    <div className={styles.logoCell} key={im.id}>
+                      <button
+                        className={styles.imgPick}
+                        onClick={() => {
+                          selectImageUrl(im.data_url);
+                          setImageOpen(false);
+                        }}
+                        title={im.name || 'Use as background'}
+                      >
+                        <img src={im.data_url} alt={im.name} loading="lazy" decoding="async" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {projectPhotoLib.length > 0 && (
+              <p className={styles.msub}>
+                Project photos are managed in Projects — delete or add them there.
+              </p>
+            )}
             {editImage && (
               <div className={styles.detailEditor}>
                 <div className={styles.libLabel}>Image details</div>
