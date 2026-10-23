@@ -530,6 +530,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     !(await has('geo_suggestions')),
     sql('geo.sql', 'AI search visibility: checks whether ChatGPT, Perplexity and Claude name Heliaxis when customers ask them, and suggests website changes so they do.', 30)
   );
+  // The CMS report (/admin/cms-report): its screen says this is needed until it's run.
+  add(
+    !(await has('seo_reports')),
+    sql('seo-report.sql', 'The CMS report: what the website ranks for in Google and where, who beats it and why, and how often AI assistants name Heliaxis.', 30)
+  );
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

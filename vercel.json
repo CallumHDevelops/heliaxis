@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/cron/subcontractor-expiry", "schedule": "0 7 * * *" },
     { "path": "/api/cron/site", "schedule": "5 7 * * *" },
-    { "path": "/api/cron/geo", "schedule": "20 6 * * *" }
+    { "path": "/api/cron/geo", "schedule": "20 6 * * *" },
+    { "path": "/api/cron/seo-report", "schedule": "40 6 * * *" }
   ]
 }

@@ -33,6 +33,17 @@ export const ENV_GROUPS: EnvGroup[] = [
     vars: [{ name: 'ANTHROPIC_API_KEY', secret: true, hint: 'console.anthropic.com → API keys' }],
   },
   {
+    title: 'CMS report and AI search',
+    what: 'Rankings, competitors and AI-assistant visibility (/admin/cms-report and /admin/geo). Each source is optional.',
+    vars: [
+      { name: 'DATAFORSEO_LOGIN', secret: false, optional: true, hint: 'app.dataforseo.com → API access (the API login, not your email)' },
+      { name: 'DATAFORSEO_PASSWORD', secret: true, optional: true, hint: 'app.dataforseo.com → API access → API password' },
+      { name: 'GSC_SERVICE_ACCOUNT', secret: true, optional: true, hint: 'Google Cloud service-account JSON with the Search Console API on (falls back to FIREBASE_SERVICE_ACCOUNT)' },
+      { name: 'GSC_SITE_URL', secret: false, optional: true, hint: 'Defaults to sc-domain:heliaxis.co.uk' },
+      { name: 'GEO_OPENROUTER_MODELS', secret: false, optional: true, hint: 'Defaults to perplexity/sonar,openai/gpt-4o-search-preview; "none" turns them off' },
+    ],
+  },
+  {
     title: 'Phone notifications',
     what: 'Push notifications to the app.',
     vars: [
