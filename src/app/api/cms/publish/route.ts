@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { faqsForRendered } from '@/lib/geo/site';
 
 const DRAFT_KEY = 'heliaxis-cms-v1';
 const PUBLISHED_KEY = 'heliaxis-cms-published';
@@ -37,6 +38,15 @@ export async function POST(req: Request) {
   }
 
   if (body?.rendered) {
+    // Each page's FAQ questions and answers ride along, for its FAQPage structured data (cms-rendered.ts).
+    try {
+      const state = snapshot ? JSON.parse(snapshot) : null;
+      for (const pg of Array.isArray(body.rendered.pages) ? body.rendered.pages : []) {
+        if (pg && typeof pg === 'object') pg.faq = faqsForRendered(state, String(pg.slug || ''));
+      }
+    } catch {
+      /* non-fatal: pages publish without it */
+    }
     await admin
       .from('cms_kv')
       .upsert({ key: RENDERED_KEY, value: JSON.stringify(body.rendered), updated_at: now });

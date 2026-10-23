@@ -19,7 +19,7 @@ import {
   ScrollReveal,
   AnimatedCounters,
 } from '@/components/home';
-import { findCmsPage, getCmsRendered, hasCmsHomeContent } from '@/lib/cms-rendered';
+import { cmsFaqJsonLd, findCmsPage, getCmsRendered, hasCmsHomeContent } from '@/lib/cms-rendered';
 import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
 
 export const dynamic = 'force-dynamic';
@@ -70,8 +70,10 @@ export default async function HomePage() {
   const page = findCmsPage(rendered, '/');
 
   if (rendered && hasCmsHomeContent(page) && page) {
+    const faqLd = cmsFaqJsonLd(page);
     return (
       <>
+        {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: faqLd }} />}
         <style dangerouslySetInnerHTML={{ __html: rendered.css }} />
         <div
           className={page.theme === 'dark' ? 'dk' : ''}

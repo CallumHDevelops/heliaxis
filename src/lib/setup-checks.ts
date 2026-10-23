@@ -525,6 +525,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       optional: true,
     }
   );
+  // The GEO bot (/admin/geo): its screen says this is needed until it's run.
+  add(
+    !(await has('geo_suggestions')),
+    sql('geo.sql', 'AI search visibility: checks whether ChatGPT, Perplexity and Claude name Heliaxis when customers ask them, and suggests website changes so they do.', 30)
+  );
   // Needed by one-tap sign-in to either app (one email check covers both).
   const ssoApps = [
     env('RAMS_SUPABASE_URL', 'RAMS_SUPABASE_SERVICE_ROLE_KEY') && 'RAMS',

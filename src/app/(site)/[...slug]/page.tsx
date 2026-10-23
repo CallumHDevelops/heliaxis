@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { findCmsPage, getCmsRendered } from '@/lib/cms-rendered';
+import { cmsFaqJsonLd, findCmsPage, getCmsRendered } from '@/lib/cms-rendered';
 import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
 
 export const dynamic = 'force-dynamic';
@@ -34,9 +34,11 @@ export default async function CmsCatchAllPage({
   const rendered = await getCmsRendered();
   const page = findCmsPage(rendered, pathFromSlug(slug));
   if (!rendered || !page) notFound();
+  const faqLd = cmsFaqJsonLd(page);
 
   return (
     <>
+      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: faqLd }} />}
       <style dangerouslySetInnerHTML={{ __html: rendered.css }} />
       <div
         className={'pv-live' + (page.theme === 'dark' ? ' dk' : '')}

@@ -27,6 +27,7 @@ type Tab =
   | 'blog'
   | 'analytics'
   | 'heatmap'
+  | 'geo'
   | 'subcontractors'
   | 'tasks'
   | 'assistant'
@@ -166,6 +167,12 @@ const icons = {
     <svg {...ICON}>
       <path d="M3 17l6-6 4 4 8-8" />
       <path d="M15 7h6v6" />
+    </svg>
+  ),
+  geo: (
+    <svg {...ICON}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5M11 7.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z" />
     </svg>
   ),
   heatmap: (
@@ -349,6 +356,7 @@ export async function AdminShell({
       items: [
         { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true },
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms') },
+        { href: '/admin/geo', label: 'AI search visibility', short: 'AI search', icon: icons.geo, active: active === 'geo', show: admin && can('cms') },
         { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics') },
         { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics') },
       ],

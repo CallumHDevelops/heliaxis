@@ -6,6 +6,8 @@ export type CmsRenderedPage = {
   theme?: string;
   seo?: { title?: string; desc?: string; noindex?: boolean };
   html: string;
+  /** The page's FAQ section, stored at publish (src/app/api/cms/publish). */
+  faq?: { q: string; a: string }[];
 };
 
 export type CmsRendered = { css: string; pages: CmsRenderedPage[] };
@@ -44,4 +46,17 @@ export function findCmsPage(
 
 export function hasCmsHomeContent(page: CmsRenderedPage | undefined): boolean {
   return Boolean(page && (page.html || '').trim());
+}
+
+/** schema.org FAQPage for a page's FAQ section, for search engines and AI assistants. Null when it has none. */
+export function cmsFaqJsonLd(page: CmsRenderedPage | undefined): string | null {
+  const faq = (page?.faq ?? []).filter((f) => f?.q && f?.a);
+  if (!faq.length) return null;
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+  };
+  // Safe inside <script>: no "</script>" or HTML comment can close it early.
+  return JSON.stringify(data).replace(/</g, '\\u003c');
 }
