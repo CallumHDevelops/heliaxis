@@ -8,10 +8,11 @@ import { notify } from '@/lib/notify';
 import { todayISO } from '@/lib/tasks';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
+import { searchHelp } from '@/lib/help/server';
 
 /**
  * What the assistant can do. It never contacts a customer: emails and WhatsApps are saved as
- * drafts for a person to check and send.
+ * drafts for a person to check and send. search_help answers "how do I…" from the Help section.
  */
 
 export type Actor = { id: string; name: string };
@@ -93,6 +94,12 @@ export const TOOLS: Anthropic.Tool[] = [
     description:
       'Write a WhatsApp message to the customer and save it as a draft for the user to check and send. Short, friendly, no markdown.',
     input_schema: obj({ project_id: str, body: str }),
+  },
+  {
+    name: 'search_help',
+    description:
+      'Search the Help section: how-to articles on using this system (adding customers, the pipeline, WhatsApp chats and templates, smart replies, reports, projects, surveys, settings, who can see what). Returns the best 3 articles, each with its title, link and the passages that match. Use it first for any question about how to do something here, where something is, or what a label or status means.',
+    input_schema: obj({ query: { ...str, description: 'What they want to know, in a few words, e.g. "add a WhatsApp template" or "what does On hold mean".' } }),
   },
   {
     name: 'create_opportunity',
@@ -295,6 +302,20 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
       if (error || !d) return `Not saved: ${error?.message}`;
       actions.push({ kind: 'draft', label: `${email ? 'Email' : 'WhatsApp'} draft — ${c?.name || p.title}`, href: `/admin/assistant#draft-${d.id}` });
       return 'Draft saved. The user will check and send it.';
+    }
+
+    case 'search_help': {
+      const q = s(input.query).slice(0, 200);
+      if (!q) return 'Say what to look for.';
+      const { results, matched } = searchHelp(q, 3);
+      if (!results.length) return JSON.stringify({ results: [], note: 'No Help article matches. Say the Help section does not cover this yet; do not guess the steps.' });
+      return JSON.stringify({
+        results,
+        note:
+          matched === 'all'
+            ? 'Answer only from these passages and link the article by its url.'
+            : 'None of these has every word asked about: use one only if it really answers the question; otherwise say Help does not cover it yet.',
+      });
     }
 
     case 'create_opportunity': {

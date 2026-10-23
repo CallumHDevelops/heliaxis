@@ -11,6 +11,9 @@ export const BRAND_ASSET_NAMES = new Set([
   'heliaxis-lockup-light.png',
   'heliaxis-logo-light.png',
   'heliaxis-logo.png',
+  // Print vectors traced from heliaxis-logo.png (no master vector exists yet).
+  'heliaxis-logo-vector.svg',
+  'heliaxis-logo-vector-light.svg',
   'heliaxis-post-estimator.png',
   'heliaxis-post-savings.png',
   'heliaxis-post-vat.png',

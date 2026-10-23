@@ -363,8 +363,10 @@ A **project** is the job once the customer says yes. It's the same record as the
 nothing is copied: the signed quote, deposit, survey, designs, photos, documents, WhatsApp and
 emails are already there. Every job from **Won** to **Complete** is a project.
 
-- **Where**: **Projects** in the CRM menu (on a phone: **More → Projects**), or the **Sales |
-  Projects** switch at the top of the CRM.
+- **Where**: **Projects** in the Operations menu (on a phone: **More → Projects**), or the **Sales |
+  Projects** switch at the top of the CRM. **RAMS** is in the Operations menu too (on a phone, it's
+  on the bottom bar). **Purchase orders** are in the Finance menu (on a phone: **More → Orders**),
+  or the **Purchase orders** button on the Projects page.
 - **List** (where it opens): jobs that need attention first (overdue paperwork, a deposit unpaid 7
   days after the job started, the DNO quiet for 45 working days, a BUS voucher about to run out),
   then the rest by their next date, then those not booked yet. Filters: Live, Needs attention, On

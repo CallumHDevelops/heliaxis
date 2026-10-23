@@ -6,11 +6,14 @@ import { ThemeChoice } from '@/components/theme/ThemeChoice';
 import { isChatNotification, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { enablePush as subscribePush, PUSH_CHANGED, readNative, shownNotifications, VAPID, type PushState } from '@/lib/push-client';
 import { THEME_GROUP_LABEL } from '@/lib/theme/shared';
+import { useHelpLink } from './HelpLinks';
 
 /**
  * Top-right of the admin header: the notifications bell and the signed-in user's
- * initials (menu with sign-out). The bell lists /api/notifications and can turn on
- * Web Push for this device (see src/lib/notify.ts and the service worker).
+ * initials (menu with Help for this page and sign-out). The bell lists
+ * /api/notifications and can turn on Web Push for this device (see src/lib/notify.ts and
+ * the service worker). There's no Help button on the row itself: it would push the menu
+ * onto a second row beside the open WhatsApp dock (1280px wide).
  */
 
 type Notification = {
@@ -69,6 +72,7 @@ export function HeaderUser({
   const [menuOpen, setMenuOpen] = useState(false);
   const [push, setPush] = useState<PushState>('unsupported');
   const lastLoad = useRef(0);
+  const help = useHelpLink();
 
   const load = useCallback(async () => {
     lastLoad.current = Date.now();
@@ -301,6 +305,17 @@ export function HeaderUser({
               </span>
               <ThemeChoice variant="menu" size="sm" />
             </div>
+            <Link
+              href={help.href}
+              className="hu-item"
+              role="menuitem"
+              onClick={(e) => {
+                closeMenu();
+                help.onClick(e, true);
+              }}
+            >
+              Help
+            </Link>
             <Link href="/admin/app" className="hu-item" role="menuitem" onClick={closeMenu}>
               Android app
             </Link>

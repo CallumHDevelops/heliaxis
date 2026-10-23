@@ -2,6 +2,9 @@
  * The roofer's form (FORMS 2): the owner's questions in his order and the recommended extras RX1–RX9,
  * laid out by time on site (FORMS 2.3), and the flags they raise (FORMS 5.1). No panel serials: the
  * owner doesn't need the roofer to scan them (21 Oct); the data badge photo, model and Voc stay.
+ * The roof checks are the roofer's alone (owner, 22 Oct): how the panels are mounted, a solid frame,
+ * fixings made for outdoors, air behind the panels and the kit's fire rating (RX10–RX14) are asked
+ * here, not on the electrician's PV inspection, whose record takes them from this sign-off.
  * Solar jobs only. Keys never change once used. Type-only imports, and the declaration's words.
  */
 import { tradeDeclaration } from '../declaration';
@@ -33,6 +36,18 @@ const panelsFitted = (c: FormCtx) => num(c.values.RX5) ?? c.system.panel_count;
 const stringsNow = (c: FormCtx) => num(c.values.RF10) ?? c.design.strings_design?.length ?? 1;
 
 const FIX = 'Please put this right before you come down.';
+
+/** How the panels are mounted (the design's mounting keys). */
+export const MOUNTINGS = [
+  { key: 'on_roof', label: 'On-roof, above the tiles' },
+  { key: 'in_roof', label: 'In-roof, in place of the tiles' },
+  { key: 'flat', label: 'Flat roof' },
+  { key: 'ground', label: 'Ground mount' },
+];
+/** The mounting: the roofer's answer, else the design's. */
+const mounting = (c: FormCtx) => (typeof c.values.RX10 === 'string' ? c.values.RX10 : c.design.mounting);
+const onRoof = (c: FormCtx) => mounting(c) !== 'ground';
+const why = (key: string, label = 'What’s wrong?'): Field => ({ key: `${key}n`, type: 'TEXT', label, level: 'must', parent: key, show: (c) => is(c, key, 'no') });
 const yn = (key: string, label: string, extra: Partial<Field> = {}): Field => ({ key, type: 'YN', label, level: 'must', ...extra });
 
 const fields = {
@@ -80,6 +95,17 @@ const fields = {
   ],
   fixings: [
     {
+      key: 'RX10',
+      type: 'SEL',
+      label: 'How are the panels mounted?',
+      level: 'must',
+      options: MOUNTINGS,
+      suggest: (c) => {
+        const m = MOUNTINGS.find((x) => x.key === c.design.mounting);
+        return m ? { v: m.key, src: 'design', text: m.label } : null;
+      },
+    },
+    {
       key: 'RF2',
       type: 'PHOTOS',
       label: 'After the roof hooks or brackets and rails are on, before the panels go on',
@@ -91,6 +117,17 @@ const fields = {
     yn('RX1', 'Are all the roof hooks fixed into rafters (not battens) at the spacing the design or kit instructions give?'),
     { key: 'RX1n', type: 'TEXT', label: 'What’s different, and why?', level: 'must', parent: 'RX1', show: (c) => is(c, 'RX1', 'no') },
     { key: 'RX1p', type: 'PHOTOS', label: 'A photo of it', level: 'should', need: 1, parent: 'RX1', show: (c) => is(c, 'RX1', 'no') },
+    yn('RX11', 'Is the frame solid, with no movement in the rails?', { fix: { when: 'no', text: FIX } }),
+    why('RX11', 'If it still can’t be done: why not?'),
+    yn('RX12', 'Are the rails, hooks, clamps and bolts all made for outdoor use, with no metals touching that react with each other?', {
+      hint: 'Aluminium, stainless steel or similar, as the kit supplies them.',
+    }),
+    why('RX12'),
+    yn('RX14', 'Does the mounting kit’s fire rating suit this roof?', {
+      hint: 'Check the kit’s paperwork. This matters most for in-roof kits, which take the place of the tiles.',
+      show: onRoof,
+    }),
+    { ...why('RX14'), show: (c) => onRoof(c) && is(c, 'RX14', 'no') },
   ],
   panels: [
     {
@@ -169,6 +206,11 @@ const fields = {
     { key: 'RX4p', type: 'PHOTOS', label: 'Photo of the cable entry', level: 'must', need: 1 },
     yn('RX7', 'Is the bird mesh fitted all the way round?', { show: (c) => c.design.bird_mesh === true }),
     { key: 'RX7p', type: 'PHOTOS', label: 'Photo of the bird mesh', level: 'should', need: 1, show: (c) => c.design.bird_mesh === true },
+    yn('RX13', 'Can air get behind the panels to keep them cool?', {
+      hint: 'On-roof: a clear gap between the panels and the tiles. In-roof: the kit’s own ventilation fitted as its instructions say. Trapped heat is a fire risk.',
+      fix: { when: 'no', text: FIX },
+    }),
+    why('RX13', 'If it still can’t be done: why not?'),
   ],
   finished: [
     { key: 'RF3', type: 'PHOTOS', label: 'When you’ve finished', hint: 'The whole array, the edges, and where the cable goes into the roof.', level: 'must', need: 3 },
@@ -272,6 +314,10 @@ const flags: FlagRule[] = [
   { code: 'RX2', key: 'RX2', severity: 'urgent', when: (c) => is(c, 'RX2', 'no'), text: (c) => `Tiles not dressed flat${text(c, 'RX2n') ? `: ${text(c, 'RX2n')}` : ''}` },
   { code: 'RX3', key: 'RX3', severity: 'review', when: (c) => is(c, 'RX3', 'yes') && is(c, 'RX3r', 'no'), text: (c) => `${num(c.values.RX3c) ?? 'Some'} tiles broken during the works and not replaced` },
   { code: 'RX4', key: 'RX4', severity: 'urgent', when: (c) => is(c, 'RX4', 'no'), text: () => 'Cable entry through the roof not weather-sealed' },
+  { code: 'RX11', key: 'RX11', severity: 'urgent', when: (c) => is(c, 'RX11', 'no'), text: (c) => `Frame not solid: the rails move${text(c, 'RX11n') ? `: ${text(c, 'RX11n')}` : ''}` },
+  { code: 'RX12', key: 'RX12', severity: 'urgent', when: (c) => is(c, 'RX12', 'no'), text: (c) => `Fixings not all made for outdoor use${text(c, 'RX12n') ? `: ${text(c, 'RX12n')}` : ''}` },
+  { code: 'RX13', key: 'RX13', severity: 'urgent', when: (c) => is(c, 'RX13', 'no'), text: (c) => `No air gap behind the panels${text(c, 'RX13n') ? `: ${text(c, 'RX13n')}` : ''}` },
+  { code: 'RX14', key: 'RX14', severity: 'urgent', when: (c) => onRoof(c) && is(c, 'RX14', 'no'), text: (c) => `Mounting kit’s fire rating may not suit this roof${text(c, 'RX14n') ? `: ${text(c, 'RX14n')}` : ''}` },
   { code: 'RX6', key: 'RX6', severity: 'urgent', when: (c) => is(c, 'RX6', 'yes'), text: (c) => `Different from the design${text(c, 'RX6n') ? `: ${text(c, 'RX6n')}` : ''}` },
   { code: 'RX7', key: 'RX7', severity: 'review', when: (c) => is(c, 'RX7', 'no'), text: () => 'Bird mesh not fitted all the way round' },
   { code: 'RX8', key: 'RX8', severity: 'review', when: (c) => is(c, 'RX8', 'no'), text: (c) => `Site not left tidy${text(c, 'RX8n') ? `: ${text(c, 'RX8n')}` : ''}` },

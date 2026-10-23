@@ -449,7 +449,7 @@ a.hub-row:hover {
   place-items: center;
 }
 
-/* New Meta leads: the count and "3 today" beside the heading; each lead with Open, WhatsApp and Call. */
+/* New Meta leads: the count and "3 today" beside the heading; each lead with why, Open, WhatsApp and Call. */
 .hub-meta-head {
   display: flex;
   align-items: center;
@@ -524,6 +524,29 @@ a.hub-meta-main:hover b {
 .hub-meta-ad {
   color: var(--ink);
   font-weight: 600;
+}
+/* Why they're on the list: free chat ending (warning), not contacted, gone quiet. */
+.hub-meta-why {
+  align-self: flex-start;
+  margin: 2px 0 1px;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.hub-meta-why.is-closing {
+  border-color: var(--warn-line);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.hub-meta-why.is-new {
+  border-color: var(--info-line);
+  background: var(--info-soft);
+  color: var(--info);
 }
 /* Each button keeps its column, so Open lines up down the list when someone has no phone number. */
 .hub-meta-actions {

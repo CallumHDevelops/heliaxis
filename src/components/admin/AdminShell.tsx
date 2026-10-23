@@ -10,6 +10,7 @@ import { unreadPeople } from '@/lib/whatsapp/active';
 import { AppRuntime } from './AppRuntime';
 import { HeaderSearch } from './GlobalSearch';
 import { HeaderUser } from './HeaderUser';
+import { HelpTile } from './HelpLinks';
 import { MoreMenu } from './MoreMenu';
 import { TopMenu } from './TopMenu';
 import { DockChip } from './whatsapp/DockChip';
@@ -20,6 +21,7 @@ type Tab =
   | 'enquiries'
   | 'crm'
   | 'projects'
+  | 'orders'
   | 'surveys'
   | 'whatsapp'
   | 'approvals'
@@ -31,14 +33,16 @@ type Tab =
   | 'tasks'
   | 'assistant'
   | 'design'
-  | 'app';
+  | 'app'
+  | 'help';
 
 // Open RAMS and the social studio already signed in when they can (src/lib/sso.ts).
 const RAMS_URL = '/api/sso/rams';
 const SOCIAL_URL = '/api/sso/social';
 
 const ICON = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
-const icons = {
+/** The app's icons: the menus' and the Help sections' (a section's `icon`, src/content/help). */
+export const icons = {
   home: (
     <svg {...ICON}>
       <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
@@ -195,7 +199,15 @@ const icons = {
       <path d="m13.5 6.5 3.1 3.1M4.9 15.7 8 18.8" />
     </svg>
   ),
+  help: (
+    <svg {...ICON}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.4a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 4" />
+      <path d="M12 17.3h.01" />
+    </svg>
+  ),
 };
+export type IconName = keyof typeof icons;
 
 /** Phone bottom bar: one tab, icon over label. */
 function TabLink({
@@ -308,7 +320,9 @@ export async function AdminShell({
   const enquiriesIsTab = !can('crm') && can('enquiries');
   // Both menus, in groups: the desktop header's dropdowns and the phone "More" sheet (less what's
   // on the bottom bar). A new page is one entry here; empty groups are left out of both.
-  const groups: { id: string; label: string; items: NavItem[] }[] = [
+  // `dropdown`: stays a dropdown under its own name even with one page in it (a group of one is
+  // otherwise a plain link named after that page).
+  const groups: { id: string; label: string; items: NavItem[]; dropdown?: boolean }[] = [
     {
       id: 'home',
       label: 'Dashboard',
@@ -319,9 +333,6 @@ export async function AdminShell({
       label: 'CRM',
       items: [
         { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
-        // Projects pages light up the CRM tab (they use active="crm"), so this tile never does.
-        { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
-        { href: '/admin/projects/orders', label: 'Purchase orders', short: 'Orders', icon: icons.orders, show: orders },
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },
@@ -334,13 +345,34 @@ export async function AdminShell({
       ],
     },
     {
+      // The jobs once they're won (Projects: list, schedule, board and each job's page) and RAMS for site.
+      // Always "Operations", even for someone with only one of the two (CRM staff without RAMS access,
+      // or RAMS only), so "Operations › Projects" is the way there for everyone.
+      id: 'operations',
+      label: 'Operations',
+      dropdown: true,
+      items: [
+        { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
+        // On site: one tap away on the phone's bottom bar, so not in "More".
+        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
+      ],
+    },
+    {
+      // Purchase orders only for now (once purchase-orders.sql has run); still headed Finance.
+      id: 'finance',
+      label: 'Finance',
+      dropdown: true,
+      items: [
+        { href: '/admin/projects/orders', label: 'Purchase orders', short: 'Orders', icon: icons.orders, active: active === 'orders', show: orders },
+      ],
+    },
+    {
       id: 'team',
       label: 'Team',
       items: [
         { href: '/admin/tasks', label: 'Tasks', icon: icons.tasks, active: active === 'tasks', show: can('tasks'), tab: tasksIsTab },
         { href: '/admin/subcontractors', label: 'Subcontractors', icon: icons.subcontractors, active: active === 'subcontractors', show: can('subcontractors') },
         { href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis', label: 'Our team', icon: icons.team, show: can('team') },
-        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
       ],
     },
     {
@@ -381,7 +413,7 @@ export async function AdminShell({
   const tiles = sheet.flatMap((g) => g.items);
   // Two rows or fewer need no headings: one grid.
   const more = tiles.length > 6 ? sheet : [{ id: 'all', label: '', items: tiles }];
-  const moreActive = tiles.some((i) => i.active);
+  const moreActive = tiles.some((i) => i.active) || active === 'help';
   return (
     <div
       className={flush ? 'admin-shell admin-shell--flush' : 'admin-shell'}
@@ -464,42 +496,53 @@ export async function AdminShell({
         )}
         {/* On site: RAMS one tap away. */}
         {can('rams') && <TabLink href={RAMS_URL} label="RAMS" icon={icons.rams} active={false} />}
-        {tiles.length > 0 && (
-          <MoreMenu>
-            {/* Turns into "Close" while the sheet is open. */}
-            <summary className={moreActive ? 'hx-tab is-active' : 'hx-tab'}>
-              <span className="hx-tab__icon">
-                <span className="hx-more__shut">{icons.more}</span>
-                <span className="hx-more__open">{icons.close}</span>
-              </span>
-              <span className="hx-tab__label">
-                <span className="hx-more__shut">More</span>
-                <span className="hx-more__open">Close</span>
-              </span>
-            </summary>
-            <div className="hx-more__sheet">
-              {more.map((g) => (
-                <div
-                  key={g.id}
-                  className="hx-more__group"
-                  role={g.label ? 'group' : undefined}
-                  aria-labelledby={g.label ? `hx-more-${g.id}` : undefined}
-                >
-                  {g.label && (
-                    <p id={`hx-more-${g.id}`} className="hx-more__title">
-                      {g.label}
-                    </p>
-                  )}
-                  <div className="hx-more__grid">
-                    {g.items.map((i) => (
-                      <MoreTile key={i.href} {...i} />
-                    ))}
-                  </div>
+        {/* Always there: Help (for the page you're on) is the sheet's last tile. */}
+        <MoreMenu>
+          {/* Turns into "Close" while the sheet is open. */}
+          <summary className={moreActive ? 'hx-tab is-active' : 'hx-tab'}>
+            <span className="hx-tab__icon">
+              <span className="hx-more__shut">{icons.more}</span>
+              <span className="hx-more__open">{icons.close}</span>
+            </span>
+            <span className="hx-tab__label">
+              <span className="hx-more__shut">More</span>
+              <span className="hx-more__open">Close</span>
+            </span>
+          </summary>
+          <div className="hx-more__sheet">
+            {more.map((g) => (
+              <div
+                key={g.id}
+                // A headed group of one tile takes one column, so Operations and Finance sit side by side.
+                className={g.label && g.items.length === 1 ? 'hx-more__group hx-more__group--one' : 'hx-more__group'}
+                role={g.label ? 'group' : undefined}
+                aria-labelledby={g.label ? `hx-more-${g.id}` : undefined}
+              >
+                {g.label && (
+                  <p id={`hx-more-${g.id}`} className="hx-more__title">
+                    {g.label}
+                  </p>
+                )}
+                <div className="hx-more__grid">
+                  {g.items.map((i) => (
+                    <MoreTile key={i.href} {...i} />
+                  ))}
+                  {!g.label && <HelpTile icon={icons.help} />}
                 </div>
-              ))}
-            </div>
-          </MoreMenu>
-        )}
+              </div>
+            ))}
+            {more.some((g) => g.label) && (
+              <div className="hx-more__group hx-more__group--one" role="group" aria-labelledby="hx-more-help">
+                <p id="hx-more-help" className="hx-more__title">
+                  Help
+                </p>
+                <div className="hx-more__grid">
+                  <HelpTile icon={icons.help} />
+                </div>
+              </div>
+            )}
+          </div>
+        </MoreMenu>
       </nav>
       <AppRuntime surveys={can('crm')} />
     </div>

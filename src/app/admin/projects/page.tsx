@@ -22,7 +22,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const view = VIEWS.find((v) => v === sp.view) ?? 'list';
   const data = schema.crmV3 ? await projectsList() : { ready: false, projects: [] };
   return (
-    <AdminShell active="crm" fluid>
+    <AdminShell active="projects" fluid>
       <ProjectsBoard key={view} me={session.user.id} initialView={view} initial={data} team={team} today={ukToday()} orders={schema.purchaseOrders} site={schema.site} />
     </AdminShell>
   );

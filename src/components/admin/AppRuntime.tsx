@@ -168,6 +168,13 @@ export function AppRuntime({ surveys = false }: { /** Can use the CRM: keep the 
         }
       }
       clearTaskStorage();
+      // Design studio drafts (keys from src/app/admin/design/lib/api.ts DRAFT_PREFIX): the next person
+      // on this computer must never pick up someone else's design.
+      try {
+        for (const k of Object.keys(localStorage)) if (k.startsWith('hx-design:draft')) localStorage.removeItem(k);
+      } catch {
+        /* storage blocked */
+      }
       // Wipes surveys from the phone unless some haven't uploaded (those stay).
       void clearSurveyStorage().catch(() => 0);
       // Runs before React reads the form, so signOut() gets the token and unregisters it.

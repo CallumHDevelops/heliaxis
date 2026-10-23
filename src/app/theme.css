@@ -27,7 +27,8 @@
  *     stages    --ph-* (CRM phase pills and dots)
  * - Never write `--x: var(--x)` (a cycle) and never re-declare these names in page CSS: point a unit's
  *   own aliases at them instead (`.crm { --ink: var(--text) }`).
- * - No @media (prefers-color-scheme) in themed CSS: it would ignore the person's choice.
+ * - No @media (prefers-color-scheme) in themed CSS: it would ignore the person's choice. The one
+ *   exception is below the light root: it only restates Light when Light is chosen on a dark phone.
  */
 :root,
 .hx-light {
@@ -193,6 +194,14 @@
    "dark mode for web contents" repaints them near-black inside a dark page. */
 :root[data-theme='light'] {
   color-scheme: only light;
+}
+/* Light chosen on a phone set to dark: said again where browsers that darken pages by themselves look
+   (some, such as Samsung Internet, leave a page alone once its CSS answers a dark phone). It keys on
+   the choice, so it never paints Dark over Light. */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='light'] {
+    color-scheme: only light;
+  }
 }
 .hx-light {
   color-scheme: only light;

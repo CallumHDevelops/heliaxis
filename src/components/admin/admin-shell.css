@@ -24,6 +24,8 @@
   flex-shrink: 0;
   /* Over the page's own floating bits (Umami button, heatmap dock) so the menus drop over them; under pop-ups (50 and up). */
   z-index: 30;
+  /* Its own width (the window less the WhatsApp dock) decides how compact the menu row gets, below. */
+  container: hx-header / inline-size;
 }
 .hx-header__logo {
   display: flex;
@@ -76,6 +78,32 @@
 .hx-nav__link:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+/* Keeping the logo and the whole menu on one row when the header is narrow (a laptop with the WhatsApp dock
+   open beside it, or a small one): the Search button goes to an icon first (global-search.css), then the
+   menu's buttons tighten, then the logo shrinks. Narrower still, the menu wraps under the logo. */
+@container hx-header (max-width: 1000px) {
+  .hx-nav__link {
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+  }
+}
+@container hx-header (max-width: 940px) {
+  .hx-header__logo {
+    width: 112px;
+  }
+}
+/* Tablets, where the WhatsApp chip joins the row (below): the menus lose their arrows, and the chip its word
+   when it's tight (its icon and count stay; it's named for screen readers). */
+@media (min-width: 761px) and (max-width: 1023px) {
+  .hx-dd__chev {
+    display: none;
+  }
+}
+@container hx-header (max-width: 980px) {
+  .hx-dockchip__label {
+    display: none;
+  }
 }
 .hx-dd {
   position: relative;
@@ -389,6 +417,27 @@
     border-radius: 16px 16px 0 0;
     box-shadow: var(--shadow-up);
     animation: hx-sheet-up 0.2s ease-out;
+    /* The tile grid's columns: a group spans them all, a headed group of one tile takes one column, so
+       one-tile groups in a row (Operations, Finance) share a row, each under its own heading. */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 4px;
+    align-content: start;
+  }
+  .hx-more__group {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .hx-more__group--one {
+    grid-column: auto;
+  }
+  .hx-more__group--one .hx-more__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hx-more__group--one .hx-more__title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .hx-more__title {
     margin: 0.75rem 0.25rem 0.35rem;
@@ -456,7 +505,8 @@
   }
 }
 @media (max-width: 340px) {
-  .hx-more__grid {
+  .hx-more__grid,
+  .hx-more__sheet {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

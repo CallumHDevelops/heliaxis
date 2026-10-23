@@ -104,6 +104,11 @@ const CONVERTED = [
   'src/app/admin/sso/page.tsx',
   'src/app/admin/design/page.tsx',
   'src/app/admin/design/DesignStudio.tsx',
+  // Design studio v2's panels and dialogs (its engine, src/app/admin/design/lib, draws on the canvas only).
+  'src/app/admin/design/ui/LeftPanel.tsx',
+  'src/app/admin/design/ui/Inspector.tsx',
+  'src/app/admin/design/ui/Dialogs.tsx',
+  'src/app/admin/design/ui/icons.tsx',
   'src/components/admin/ContactedCatchUp.tsx',
   'src/components/admin/CopyButton.tsx',
   'src/components/admin/FromClaude.tsx',
@@ -130,8 +135,12 @@ const ALLOWED_LITERALS = {
   'src/components/admin/MetisIcon.tsx': ['#ffd35c', '#e3a014', '#211f18'],
   // The photo viewer's backdrop: ::backdrop doesn't inherit custom properties in older browsers; black in both themes.
   'src/components/admin/whatsapp/media.css': ['rgba(20, 18, 12, 0.88)'],
-  // What's drawn on the canvas (the design itself), not the studio's chrome.
-  'src/app/admin/design/DesignStudio.tsx': ['#ffffff', '#211f18', '#f8bc1e'],
+  // What's put on the design (the brand's colours: backgrounds, shapes, the type styles' samples), not the studio's chrome.
+  'src/app/admin/design/ui/LeftPanel.tsx': ['#211f18', '#f7f2e7', '#fffdf8', '#f8bc1e', '#e39a0c', '#a69f8e', 'rgba(33,31,24,0.14)'],
+  // The guides' legend in the canvas's own guide colours, the colour picker's starting value, the default ink background.
+  'src/app/admin/design/ui/Inspector.tsx': ['#e5484d', '#16a6c9', '#d6409f', '#8f63ff', 'rgba(22,166,201,.4)', '#000000', '#211f18'],
+  // The rich black swatch in the print colours table (a print ink, not chrome).
+  'src/app/admin/design/ui/Dialogs.tsx': ['#111'],
   // Written into the previewed public page (the iframe), which stays white.
   // and the heat scale drawn over it (a data colour ramp, the same in both themes).
   'src/app/admin/analytics/HeatmapViewer.tsx': ['#fff', 'rgb(0, 180, 255)', 'rgb(0, 220, 120)', 'rgb(255, 220, 0)', 'rgb(255, 120, 0)', 'rgb(220, 0, 40)'],
@@ -206,6 +215,18 @@ CONVERTED.push(
   'src/app/admin/crm/whatsapp-permission/page.tsx'
 );
 
+/** Help (/admin/help): its pages, and the Help links in the shell. */
+CONVERTED.push(
+  'src/app/admin/help/help.css',
+  'src/app/admin/help/page.tsx',
+  'src/app/admin/help/[section]/page.tsx',
+  'src/app/admin/help/[section]/[slug]/page.tsx',
+  'src/app/admin/help/HelpSearch.tsx',
+  'src/app/admin/help/HelpBody.tsx',
+  'src/app/admin/help/parts.tsx',
+  'src/components/admin/HelpLinks.tsx'
+);
+
 const files = [];
 (function walk(dir) {
   for (const name of readdirSync(join(ROOT, dir))) {
@@ -236,7 +257,9 @@ for (const name of ['--muted', '--accent', '--border']) {
 for (const p of files.filter(themed)) {
   const src = stripComments(read(p));
   for (const m of src.matchAll(/(--[\w-]+)\s*:\s*var\(\s*(--[\w-]+)\s*\)/g)) if (m[1] === m[2]) fail(`${p}: ${m[1]}: var(${m[2]}) refers to itself`);
-  if (p.endsWith('.css') && /prefers-color-scheme/.test(src) && !LEFTOVERS.includes(p)) fail(`${p}: keys on prefers-color-scheme; use :root[data-theme='dark'] (src/app/theme.css)`);
+  // The one media query allowed: theme.css restating Light when Light is chosen on a dark phone (it keys on the choice).
+  const media = p === 'src/app/theme.css' ? src.replace(/@media \(prefers-color-scheme: dark\) \{\s*:root\[data-theme='light'\] \{\s*color-scheme: only light;\s*\}\s*\}/, '') : src;
+  if (p.endsWith('.css') && /prefers-color-scheme/.test(media) && !LEFTOVERS.includes(p)) fail(`${p}: keys on prefers-color-scheme; use :root[data-theme='dark'] (src/app/theme.css)`);
   // On the page or on an island (.hx-light): plain `light` is still auto-darkened by Chrome on a dark phone.
   if (/color-scheme\s*:\s*light\s*[;}]/.test(src)) fail(`${p}: declares plain "color-scheme: light"; Chrome still auto-darkens it (use "only light")`);
 }

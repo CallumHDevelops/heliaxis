@@ -19,6 +19,8 @@ import { atWords, freeAt, holdUntil, isQuiet, nextAwake, planChase, scheduledAns
 import { LATER_COLS, LATER_SETUP, sendLaterReady } from './send-later';
 import { ensureOpportunity, logActivity, markContacted } from '@/lib/crm/server';
 import { getSettings } from './settings';
+import { adMessageFor, type LeadAd } from './first-messages-shared';
+import { getFirstMessages, sendsByItself } from './first-messages';
 import { autoParams } from './templates';
 import { describeMessage as describe, type InboundMessage } from './describe';
 import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waPermission } from './permission';
@@ -369,16 +371,21 @@ async function queueSmartReply(db: Db, enquiry: EnquiryWa, text: string, replyTo
 }
 
 /**
- * Opening message to a new Meta lead who opted in, a few minutes later: the template picked in
- * WhatsApp templates → Use for, else WHATSAPP_DEFAULT_TEMPLATE.
+ * Opening message to a new Meta lead who opted in, 8–13 minutes later (WhatsApp templates → First
+ * messages): the template chosen for the ad they came from, else the one picked in WhatsApp
+ * templates → Use for, else WHATSAPP_DEFAULT_TEMPLATE. Only while first messages go by themselves
+ * (switched on there, or WHATSAPP_AUTO_FIRST_MESSAGE in Vercel). It waits in their chat until then,
+ * with Send now and Cancel. Null when nothing was queued.
  */
-export async function queueFirstContact(enquiryId: string, name: string) {
-  if (process.env.WHATSAPP_AUTO_FIRST_MESSAGE !== 'true') return false;
+export async function queueFirstContact(enquiryId: string, name: string, ad: LeadAd = { names: [] }) {
+  const first = await getFirstMessages();
+  if (!sendsByItself(first)) return null;
   const settings = await getSettings();
-  const t = { ...defaultTemplate(), name: settings.firstContactTemplate || defaultTemplate().name };
-  if (!t.name) return false;
+  const own = adMessageFor(first.byAd, ad);
+  const t = { ...defaultTemplate(), name: own?.template || settings.firstContactTemplate || defaultTemplate().name };
+  if (!t.name) return null;
   const db = createAdminClient();
-  let at = new Date(Date.now() + pickDelaySeconds(180, 360) * 1000);
+  let at = new Date(Date.now() + pickDelaySeconds(first.minMinutes * 60, first.maxMinutes * 60) * 1000);
   // Enquired in quiet hours: held until the morning, if that's switched on (Smart replies → Chasers).
   if (settings.firstContactQuietHours) at = nextAwake(at, settings);
   const { error } = await db.from('whatsapp_outbox').insert({
@@ -389,7 +396,7 @@ export async function queueFirstContact(enquiryId: string, name: string) {
     body: (name || '').trim().split(/\s+/)[0] || 'there', // the template's {{1}}
     send_after: at.toISOString(),
   });
-  return !error;
+  return error ? null : { at, template: t.name, ad: own?.name ?? null };
 }
 
 type Status = { id: string; status: string; timestamp?: string; errors?: { title?: string; message?: string; error_data?: { details?: string } }[] };

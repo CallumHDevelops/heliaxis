@@ -207,7 +207,7 @@ const settings = (s) => {
 };
 
 const wrap = (vals) => Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, { v, src: 'typed', at: '2026-11-03T10:00:00Z' }]));
-const roofDone = { RF5: 'no', RF13: 'Aiko Neostar 2P 450W', RF14: 49.6, RX1: 'yes', RF10: 2, RF11: [8, 8], RX5: 16, RF6: 'yes', RF7: 'no', RF8: 'yes', RF9: true, RX4: 'yes', RF4: 'no', RX2: 'yes', RX3: 'no', RX6: 'no', RX8: 'yes', RX9: 'no' };
+const roofDone = { RF5: 'no', RF13: 'Aiko Neostar 2P 450W', RF14: 49.6, RX1: 'yes', RF10: 2, RF11: [8, 8], RX5: 16, RF6: 'yes', RF7: 'no', RF8: 'yes', RF9: true, RX4: 'yes', RF4: 'no', RX2: 'yes', RX3: 'no', RX6: 'no', RX8: 'yes', RX9: 'no', RX10: 'on_roof', RX11: 'yes', RX12: 'yes', RX13: 'yes', RX14: 'yes' };
 const roofPhotos = { RF1: 2, RF12: 1, RF2: 2, RX4p: 1, RF3: 3 };
 const scaffUp = { SC1: 'no', SC2: 'yes', SC3: 'yes', SC4: 'yes', SCX2: 'no', SCX3: 'no', SCX4: 'yes' };
 const scaffUpPhotos = { 'SCX1:front': 1, 'SCX1:rear': 1, SC3p: 1 };
