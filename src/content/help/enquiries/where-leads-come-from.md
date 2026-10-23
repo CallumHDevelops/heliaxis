@@ -35,7 +35,7 @@ For a website form, a Meta lead form or a new WhatsApp number, the app:
 Also:
 
 - **Website forms** email the details to the office inbox as well (hello@heliaxis.co.uk, unless an admin has set another address). If they ticked the WhatsApp box on the form, that permission is recorded.
-- **Meta lead forms** can start a WhatsApp intro a few minutes later, when the automatic first message is switched on and the lead agreed to WhatsApp. The notification then says "WhatsApp intro sends in a few minutes."
+- **Meta lead forms** can start a first WhatsApp 8–13 minutes later (the template for the ad they came from), when first messages are switched on to go by themselves and the lead agreed to WhatsApp. The notification then says when: "WhatsApp first message (“…”) goes at 10:42 today." See [First messages by video](/admin/help/whatsapp/first-messages-by-video).
 - **A first WhatsApp message** from a new number makes a new lead named from their WhatsApp profile. A number already in the CRM goes on that customer’s chat instead.
 - **A survey booked online** also lands on Enquiries, as **Website booking**, with its job already made. The booking itself is handled in Surveys and diary. See [Confirm or turn down a survey request](/admin/help/surveys/confirm-a-request) and [What the customer sees when they book](/admin/help/surveys/customer-booking-page).
 

@@ -24,7 +24,7 @@ WhatsApp also needs connecting to Meta, which an admin does once (the **From Cla
 
 > **Admins only:** **Check the WhatsApp connection →** on **WhatsApp templates** (when it can’t see the templates) opens the setup page, whose **Live check with Meta** checks the number. **WhatsApp setup guide** has the steps. See [Check the WhatsApp connection](/admin/help/admin/whatsapp-connection).
 
-Automatic first messages to new Meta leads also have to be switched on in Vercel by an admin. See [Templates the app sends by itself](/admin/help/whatsapp/templates-the-app-uses).
+Automatic first messages to new Meta leads also have to be switched on by an admin, under **WhatsApp templates › First messages**. See [First messages by video](/admin/help/whatsapp/first-messages-by-video).
 
 ## The every-minute job
 

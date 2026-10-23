@@ -35,7 +35,7 @@ Anything that hasn’t gone yet sits below the last message:
 | Box | What it is | Buttons |
 | --- | --- | --- |
 | ⏱ Smart reply “Battery storage” sends in 3:12 | A smart reply | **Send now**, **Edit**, **Cancel** |
-| ⏱ Intro template “…” sends … | The first message to a new Meta lead | **Send now**, **Cancel** |
+| ⏱ First message “…” sends … | The first message to a new Meta lead, shown as they’ll see it | **Send now**, **Cancel** |
 | ↻ Chaser if they don’t reply — sends … · free message (or · as a template (paid)) | A chaser; the second one says **Final nudge** | **Send now**, **Edit**, **Cancel** |
 | 🕐 Scheduled for 07:00 tomorrow | A message someone scheduled | See [Send a WhatsApp later](/admin/help/whatsapp/send-later) |
 | ⚠ … failed: … | It couldn’t go | **Retry**, **Cancel** |

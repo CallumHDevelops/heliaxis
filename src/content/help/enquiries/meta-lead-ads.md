@@ -20,11 +20,11 @@ When someone fills in one of your Facebook or Instagram lead forms, Meta tells t
 
 Then the app does what it does for every new lead: an opportunity at **Lead**, the "New Meta lead: …" notification to everyone with Enquiries access, and the lead shared to the next person on the rota. See [Where leads come from, and what happens next](/admin/help/enquiries/where-leads-come-from).
 
-New Meta leads also show on the dashboard’s **New Meta leads** card until someone moves them on from **New**. See [New Meta leads on the dashboard](/admin/help/dashboard/new-meta-leads).
+New Meta leads also show on the dashboard’s **New Meta leads** card while nobody has contacted them and nothing is lined up to go to them. See [New Meta leads on the dashboard](/admin/help/dashboard/new-meta-leads).
 
-## The WhatsApp intro
+## The first WhatsApp
 
-If an admin has switched on the automatic first WhatsApp, and the lead gave a phone number and agreed to WhatsApp, the app sends them the intro template 3 to 6 minutes after they come in. The notification then ends "WhatsApp intro sends in a few minutes." and opens their chat. If **Hold the first message to new leads who enquire in quiet hours until the morning** is ticked in Smart replies & chasers, a lead who comes in during quiet hours gets it in the morning instead.
+If an admin has switched on **Send it by itself** under **WhatsApp templates › First messages**, and the lead gave a phone number and agreed to WhatsApp, the app sends them a first message 8 to 13 minutes after they come in: the template chosen for the ad (video) they came from, else the general first message. The notification then ends "WhatsApp first message (“…”) goes at 10:42 today." and opens their chat. If **Hold the first message to new leads who enquire in quiet hours until the morning** is ticked in Smart replies & chasers, a lead who comes in during quiet hours gets it in the morning instead. See [First messages by video](/admin/help/whatsapp/first-messages-by-video).
 
 ## Test leads
 

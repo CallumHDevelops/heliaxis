@@ -10,7 +10,7 @@ Nothing goes live until the env vars below are set, so the code is safe to deplo
 
 ```
 Meta Lead Ad form ──webhook──▶ /api/meta/webhook ──▶ enquiries (source "meta: <ad name>")
-                                                      └─ opted in? → intro template, 3–6 min later
+                                                      └─ opted in? → first message, 8–13 min later
 Customer WhatsApp ──webhook──▶ /api/meta/webhook ──▶ whatsapp_messages + push to the team
                                                       └─ keyword match? → whatsapp_outbox (send in 4–5 min)
 You in the WhatsApp Business app ──echo──▶ /api/meta/webhook ──▶ same chat in Heliaxis (coexistence)
@@ -85,7 +85,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
 | `META_PAGE_ACCESS_TOKEN` | Optional. A Page token for fetching leads, if the system-user token doesn't cover the Page |
 | `WHATSAPP_DEFAULT_TEMPLATE` | e.g. `enquiry_intro`. Its `{{1}}` is filled with the lead's first name. Optional: *Use for → First message to new Meta leads* on the templates page overrides it |
 | `WHATSAPP_TEMPLATE_LANG` | Default `en_GB` |
-| `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = send the default template to opted-in Meta leads 3–6 min after they submit. In quiet hours it waits for the morning while *Hold the first message to new leads who enquire in quiet hours* is ticked (the default; Smart replies → Chasers) |
+| `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = first messages to opted-in Meta leads always go by themselves (the same as ticking *Send it by itself* in WhatsApp templates → First messages, which admins can do without this). They go 8–13 min after the lead submits (changeable there), as the template chosen for their ad, else the general one. In quiet hours it waits for the morning while *Hold the first message to new leads who enquire in quiet hours* is ticked (the default; Smart replies → Chasers) |
 | `META_LEADS_WHATSAPP_OPT_IN` | `true` = treat every Meta lead as opted in (only if the form itself says you'll contact them on WhatsApp) |
 | `META_GRAPH_VERSION` | Optional, default `v23.0` |
 | `CRON_SECRET` | Already used by the other crons; the pg_cron job sends it |

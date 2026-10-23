@@ -2,12 +2,13 @@ import Link from 'next/link';
 import type { HubMetaLeads as Data } from './meta-leads';
 
 /**
- * Dashboard → New Meta leads: how many are waiting and how many came in today, the newest few with
- * Open, WhatsApp and Call, and a link to all of them on Enquiries. Times come from the server, so the
- * page shows them as it was given them.
+ * Dashboard → New Meta leads: the ones someone needs to get to (free chat ending, not contacted, gone
+ * quiet; never one with a message lined up), how many came in today, the most urgent few with why,
+ * Open, WhatsApp and Call, and a link to everyone not contacted on Enquiries. Times come from the
+ * server, so the page shows them as it was given them.
  */
 export function HubMetaLeads({ data }: { data: Data }) {
-  const { count, more, today, rows, last, seeAll } = data;
+  const { count, more, today, rows, last, notContacted, seeAll } = data;
   return (
     <section className="hub-section hub-meta" aria-labelledby="hub-meta-h">
       <div className="hub-meta-head">
@@ -25,7 +26,8 @@ export function HubMetaLeads({ data }: { data: Data }) {
       {rows.length === 0 ? (
         <div className="hub-list">
           <p className="hub-meta-empty">
-            No new Meta leads. {last ? `The last one came in ${last}.` : 'None have come in from Meta yet.'}
+            Nobody to get to: every Meta lead has been contacted or has a message lined up.{' '}
+            {last ? `The last one came in ${last}.` : 'None have come in from Meta yet.'}
           </p>
         </div>
       ) : (
@@ -37,6 +39,7 @@ export function HubMetaLeads({ data }: { data: Data }) {
                   {r.name}
                   {r.ref && <span className="hub-meta-ref">{r.ref}</span>}
                 </b>
+                <span className={`hub-meta-why is-${r.why.key}`}>{r.why.label}</span>
                 <small>
                   <span className="hub-meta-ad" title={r.note ?? undefined}>
                     {r.ad}
@@ -81,7 +84,7 @@ export function HubMetaLeads({ data }: { data: Data }) {
       )}
       {seeAll && count > 0 && (
         <Link href={seeAll} className="hub-more">
-          See all new Meta leads →
+          {notContacted === 1 ? 'See the 1 not contacted →' : `See all ${notContacted} not contacted →`}
         </Link>
       )}
     </section>

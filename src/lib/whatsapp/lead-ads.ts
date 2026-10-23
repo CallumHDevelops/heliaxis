@@ -10,6 +10,7 @@ import { leadRef } from '@/lib/notification-refs';
 import { isTestLead } from '@/lib/meta-leads-csv';
 import { saveAdIds } from '@/lib/meta-ads';
 import { mergedInto } from '@/lib/crm/aliases';
+import { atWords } from './schedule';
 
 /** A Lead Ads webhook ping → fetch the answers → an enquiry (once, however often Meta retries). */
 export async function ingestLead(leadgenId: string) {
@@ -69,10 +70,13 @@ export async function ingestLead(leadgenId: string) {
   // When and how they agreed (crm-v3.sql columns; a separate step so the lead is saved without them).
   if (optInSource) await grantPermission(row.id, optInSource, { at: r.data.created_time ? new Date(r.data.created_time).toISOString() : undefined });
   await ensureOpportunity(row.id, r.data.ad_name ? `Meta ad “${r.data.ad_name}”` : 'Meta lead form');
-  const queued = optIn && toWaId(lead.phone) ? await queueFirstContact(row.id, lead.name) : false;
+  // Their first WhatsApp, by the ad (video) they came from: Meta's id for it and its name now.
+  const queued = optIn && toWaId(lead.phone) ? await queueFirstContact(row.id, lead.name, { id: r.data.ad_id, names: [r.data.ad_name] }) : null;
   await notifyEnquiryTeam(
     `New Meta lead: ${lead.name || 'unnamed'}`,
-    [lead.interest, lead.postcode, queued ? 'WhatsApp intro sends in a few minutes.' : ''].filter(Boolean).join(' · '),
+    [lead.interest, lead.postcode, queued ? `WhatsApp first message (“${queued.template}”) goes at ${atWords(queued.at, new Date())}.` : '']
+      .filter(Boolean)
+      .join(' · '),
     optIn ? inboxHref(row.id) : '/admin/enquiries',
     { ref: leadRef(row.id) }
   );

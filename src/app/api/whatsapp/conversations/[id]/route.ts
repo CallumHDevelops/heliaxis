@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { defaultTemplate, whatsappConfigured } from '@/lib/whatsapp/api';
 import { markChatRead, processOutbox, scheduleManual, sendManual, type SendInput } from '@/lib/whatsapp/inbox';
 import { getSettings } from '@/lib/whatsapp/settings';
+import { firstTemplateFor } from '@/lib/whatsapp/first-messages';
 import { chaseView, lateSendAt } from '@/lib/whatsapp/schedule';
 import { LATER_COLS, mayChangeQueued, parseSendAt, sendLaterReady } from '@/lib/whatsapp/send-later';
 import { mediaVersion, withChatMedia } from '@/lib/whatsapp/media';
@@ -121,11 +122,13 @@ export async function GET(req: Request, { params }: Ctx) {
   ]);
   const personName = new Map((people ?? []).map((p) => [p.id, p.full_name || p.email || 'Team']));
   const ruleName = new Map((rules ?? []).map((r) => [r.id, r.name]));
+  // Offered first in the template box: the one chosen for the ad (video) they came from, else the general one.
+  const offered = await firstTemplateFor(enquiry, settings.firstContactTemplate || defaultTemplate().name || null);
 
   return json({
     v,
     configured: whatsappConfigured(),
-    defaultTemplate: settings.firstContactTemplate || defaultTemplate().name || null,
+    defaultTemplate: offered,
     // `view`: so the reply box can say when a chaser would actually go (quiet hours, the evening rule),
     // and when a message typed now goes (the late-night rule; only once Send later can hold it).
     chase: {
