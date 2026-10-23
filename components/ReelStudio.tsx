@@ -343,11 +343,34 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
   }, [scenes, size]);
 
   async function loadImages() {
-    const { data } = await supabase
-      .from('image_library')
-      .select('id, name, data_url')
-      .order('created_at', { ascending: false });
-    if (data) setImages(data as { id: string; name: string; data_url: string }[]);
+    // shared library uploads plus every photo on every project (ProjectsModal and
+    // Telegram both write project_images), so no install photo is missing here
+    const [{ data: lib }, { data: projs }, { data: projImgs }] = await Promise.all([
+      supabase
+        .from('image_library')
+        .select('id, name, data_url')
+        .order('created_at', { ascending: false }),
+      supabase.from('projects').select('id, name, location').order('updated_at', { ascending: false }),
+      supabase
+        .from('project_images')
+        .select('id, name, data_url, project_id')
+        .order('created_at', { ascending: true }),
+    ]);
+    const projName = new Map(
+      (((projs as { id: string; name: string; location: string }[]) || []).map((p) => [
+        p.id,
+        p.name || p.location || 'Untitled project',
+      ])) as [string, string][]
+    );
+    const fromProjects = (
+      (projImgs as { id: string; name: string; data_url: string; project_id: string }[]) || []
+    )
+      .filter((im) => im.project_id && projName.has(im.project_id))
+      .map((im) => ({ id: im.id, name: projName.get(im.project_id)!, data_url: im.data_url }));
+    setImages([
+      ...(((lib as { id: string; name: string; data_url: string }[]) || [])),
+      ...fromProjects,
+    ]);
   }
   async function loadCtas() {
     const { data } = await supabase
@@ -942,7 +965,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
                 </button>
               ))}
             </div>
-            <div className={styles.hint}>From your post Image library.</div>
+            <div className={styles.hint}>From your post Image library and project photos.</div>
           </div>
         )}
 
