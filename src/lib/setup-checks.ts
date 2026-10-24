@@ -917,7 +917,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     detail: 'Leads from Meta forms are marked as agreed only if the form asks.',
     steps: [
       'In Meta Ads Manager, open each lead form → **Privacy policy / Custom disclaimer** and check there’s a WhatsApp consent line.',
-      'If not, remove `META_LEADS_WHATSAPP_OPT_IN` from Vercel (or set it to `false`) until there is.',
+      'If not, remove `META_LEADS_WHATSAPP_OPT_IN` from Vercel (or set it to `false`) until there is. To cover only forms that do ask, list their ids in `META_LEADS_WHATSAPP_OPT_IN_FORMS` instead.',
     ],
     href: 'https://adsmanager.facebook.com',
     hrefLabel: 'Open Ads Manager',

@@ -480,6 +480,20 @@ export async function saveAdIds(enquiryId: string, lead: LeadAdIds, onlyIfMissin
   }
 }
 
+/**
+ * A click-to-WhatsApp ad's click id (the referral's ctwa_clid) on its enquiry, for sending conversions
+ * back to Meta (ad-spend.sql; a no-op before it's run). The first click is kept. Never throws.
+ */
+export async function saveCtwaClid(enquiryId: string, clid: string | null | undefined) {
+  const v = (clid ?? '').trim();
+  if (!v || v.length > 500) return;
+  try {
+    await createAdminClient().from('enquiries').update({ meta_ctwa_clid: v }).eq('id', enquiryId).is('meta_ctwa_clid', null);
+  } catch {
+    // Conversions just can't be matched to this click.
+  }
+}
+
 /** Just the ids (saveAdIds without the names: src/lib/meta-ad-ids.ts keeps a batch's names in one go). Only ever these three columns. */
 export async function updateAdIds(enquiryId: string, lead: LeadAdIds, onlyIfMissing = false) {
   const id = (v: string | null | undefined) => (v && /^\d{1,30}$/.test(String(v).trim()) ? String(v).trim() : null);

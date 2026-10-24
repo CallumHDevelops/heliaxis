@@ -16,7 +16,7 @@ When someone fills in one of your Facebook or Instagram lead forms, Meta tells t
 - Their company, if the form asked.
 - Every other answer, in **Message** ("Roof type: Tiles · Best time to call: Evenings").
 - The ad it came from, shown as **Meta ad · Video 4**. A form that wasn’t on an ad shows as **Meta (organic)**. See [Lead sources and ad names](/admin/help/enquiries/lead-sources).
-- Their WhatsApp permission: yes if they said yes to a WhatsApp question on the form, or for every Meta lead once an admin has confirmed the forms all ask for it.
+- Their WhatsApp permission: yes if they said yes to a WhatsApp question on the form, or for every lead from a form an admin has listed as asking for WhatsApp permission (or for every Meta lead, if the forms all ask).
 
 Then the app does what it does for every new lead: an opportunity at **Lead**, the "New Meta lead: …" notification to everyone with Enquiries access, and the lead shared to the next person on the rota. See [Where leads come from, and what happens next](/admin/help/enquiries/where-leads-come-from).
 

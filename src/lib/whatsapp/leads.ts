@@ -60,6 +60,16 @@ export function mapLeadFields(fields: LeadField[]): MappedLead {
  * ask for WhatsApp permission). `optInSource` is how the permission is recorded on the enquiry.
  * `organic`: Meta's is_organic, a form from a shared post or not on an ad, so no ad spend is behind it.
  */
+/**
+ * Forms whose disclaimer asks for WhatsApp permission: META_LEADS_WHATSAPP_OPT_IN_FORMS, a comma- or
+ * space-separated list of Meta form ids. Every lead from one counts as agreed; a form not listed still
+ * counts when the lead answered a WhatsApp question with yes. Safer than the all-forms flag.
+ */
+export function formAsksWhatsApp(formId: string | null | undefined, list: string | null | undefined) {
+  const id = (formId ?? '').trim();
+  return !!id && (list ?? '').split(/[\s,]+/).filter(Boolean).includes(id);
+}
+
 export function leadToEnquiry(fields: LeadField[], adName: string | null | undefined, optInAll: boolean, organic = false) {
   const lead = mapLeadFields(fields);
   const interest =

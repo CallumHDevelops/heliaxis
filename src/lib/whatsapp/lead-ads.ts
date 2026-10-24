@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchLead } from './api';
 import { inboxHref, notifyEnquiryTeam, queueFirstContact } from './inbox';
-import { leadToEnquiry } from './leads';
+import { formAsksWhatsApp, leadToEnquiry } from './leads';
 import { grantPermission } from './permission';
 import { toWaId } from './shared';
 import { ensureOpportunity } from '@/lib/crm/server';
@@ -40,7 +40,7 @@ export async function ingestLead(leadgenId: string) {
   const { lead, interest, source, whatsappOptIn: optIn, optInSource } = leadToEnquiry(
     r.data.field_data ?? [],
     r.data.ad_name,
-    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true',
+    process.env.META_LEADS_WHATSAPP_OPT_IN === 'true' || formAsksWhatsApp(r.data.form_id, process.env.META_LEADS_WHATSAPP_OPT_IN_FORMS),
     r.data.is_organic === true
   );
 

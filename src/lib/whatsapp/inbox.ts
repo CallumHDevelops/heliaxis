@@ -25,7 +25,7 @@ import { autoParams } from './templates';
 import { describeMessage as describe, type InboundMessage } from './describe';
 import { applyStopReply, grantPermission, START_REPLY, STOP_REPLY, stopWord, waPermission } from './permission';
 import { templateText } from './template-text';
-import { saveAdIds } from '@/lib/meta-ads';
+import { saveAdIds, saveCtwaClid } from '@/lib/meta-ads';
 import { mergedInto, replyNumberFromAlias } from '@/lib/crm/aliases';
 import { tradeEcho, tradeReply } from '@/lib/site/trade-reply';
 
@@ -120,8 +120,6 @@ async function enquiryForNumber(
     .select(ENQ_COLS)
     .single();
   if (error || !row) throw new Error(error?.message || 'Could not create enquiry');
-  // The ad they tapped, for the ad spend in Reports (ad-spend.sql; a no-op before it's run).
-  if (referral?.source_type === 'ad' && referral.source_id) await saveAdIds(row.id as string, { ad_id: referral.source_id });
   return { enquiry: row as EnquiryWa, created: true };
 }
 
@@ -148,6 +146,12 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   const created = found.created;
   let enquiry = found.enquiry;
   if (created) await ensureOpportunity(enquiry.id, m.referral ? 'WhatsApp ad' : 'WhatsApp');
+  // The ad they tapped, new lead or not, for the ad spend in Reports and Meta conversions (ad-spend.sql;
+  // a no-op before it's run). An existing lead keeps the ad they first came from.
+  if (m.referral) {
+    if (m.referral.source_type === 'ad' && m.referral.source_id) await saveAdIds(enquiry.id, { ad_id: m.referral.source_id }, true);
+    await saveCtwaClid(enquiry.id, m.referral.ctwa_clid);
+  }
   const { kind, body } = describe(m);
   const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
   const media = await inboundMediaColumns(m); // a photo, voice note or file to fetch (whatsapp-media.sql)

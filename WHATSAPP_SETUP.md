@@ -87,6 +87,7 @@ with your `CRON_SECRET` filled in. That's what sends delayed replies when nobody
 | `WHATSAPP_TEMPLATE_LANG` | Default `en_GB` |
 | `WHATSAPP_AUTO_FIRST_MESSAGE` | `true` = first messages to opted-in Meta leads always go by themselves (the same as ticking *Send it by itself* in WhatsApp templates → First messages, which admins can do without this). They go 8–13 min after the lead submits (changeable there), as the template chosen for their ad, else the general one. In quiet hours it waits for the morning while *Hold the first message to new leads who enquire in quiet hours* is ticked (the default; Smart replies → Chasers) |
 | `META_LEADS_WHATSAPP_OPT_IN` | `true` = treat every Meta lead as opted in (only if the form itself says you'll contact them on WhatsApp) |
+| `META_LEADS_WHATSAPP_OPT_IN_FORMS` | Safer than the one above: Meta form ids (comma-separated) whose disclaimer asks for WhatsApp permission. Every lead from those forms counts as agreed; other forms only when the lead answers a WhatsApp question with yes |
 | `META_GRAPH_VERSION` | Optional, default `v23.0` |
 | `CRON_SECRET` | Already used by the other crons; the pg_cron job sends it |
 
