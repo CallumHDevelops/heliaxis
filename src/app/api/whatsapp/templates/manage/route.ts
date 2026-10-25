@@ -1,6 +1,7 @@
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { defaultTemplate } from '@/lib/whatsapp/api';
 import { getSettings } from '@/lib/whatsapp/settings';
+import { getFirstMessages, sendsByItself } from '@/lib/whatsapp/first-messages';
 import { deleteTemplate, fetchTemplates, readyDraft, saveBlanks, submitTemplate, type NewTemplate } from '@/lib/whatsapp/templates';
 import { cleanBlanks, INSERTABLE, readyMade, type JobKey } from '@/lib/whatsapp/templates-shared';
 import { json, session } from '@/lib/whatsapp/routes';
@@ -22,7 +23,7 @@ async function adminOnly() {
 export async function GET() {
   const s = await session();
   if (!s) return json({ error: 'unauthorized' }, 401);
-  const [list, wa, crm] = await Promise.all([fetchTemplates(), getSettings(), getCrmSettings()]);
+  const [list, wa, crm, first] = await Promise.all([fetchTemplates(), getSettings(), getCrmSettings(), getFirstMessages()]);
   const def = defaultTemplate();
   const usage: Record<JobKey, { name: string; fallback: string }> = {
     firstContact: { name: wa.firstContactTemplate, fallback: def.name },
@@ -36,7 +37,7 @@ export async function GET() {
     items: list.ok ? list.items : [],
     problem: list.ok ? null : list.problem,
     lang: def.lang,
-    autoFirst: process.env.WHATSAPP_AUTO_FIRST_MESSAGE === 'true',
+    autoFirst: sendsByItself(first),
     usage,
   });
 }

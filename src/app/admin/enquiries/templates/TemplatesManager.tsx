@@ -30,14 +30,16 @@ import {
   type TemplateCategory,
   type WaTemplate,
 } from '@/lib/whatsapp/templates-shared';
+import { FirstMessages } from './FirstMessages';
 import '../whatsapp.css';
 import './templates.css';
 
 /**
  * WhatsApp templates: everything on the WhatsApp Business Account with its status, Heliaxis's
- * ready-made templates (one tap sends one to Meta), a New template form, what fills each blank,
- * and which template each automatic message uses. Everyone with Enquiries can look; the server
- * only lets admins change anything.
+ * ready-made templates (one tap sends one to Meta), the first message to new Meta leads by the video
+ * they came from (FirstMessages.tsx), a New template form, what fills each blank, and which template
+ * each automatic message uses. Everyone with Enquiries can look; the server only lets admins change
+ * anything.
  */
 
 const MANAGE = '/api/whatsapp/templates/manage';
@@ -51,7 +53,9 @@ type Data = {
   autoFirst: boolean;
   usage: Record<JobKey, { name: string; fallback: string }>;
 };
-type Tab = 'yours' | 'ready' | 'new';
+type Tab = 'yours' | 'ready' | 'first' | 'new';
+/** A new template started from First messages → Write one for this video. */
+type Start = { key: number; ad: string };
 type Say = (key: string, text: string, bad?: boolean) => void;
 
 const LANGS: Record<string, string> = { en_GB: 'English (UK)', en: 'English', en_US: 'English (US)' };
@@ -79,6 +83,7 @@ export function TemplatesManager() {
   const [busy, setBusy] = useState('');
   const [msgs, setMsgs] = useState<Record<string, { text: string; bad: boolean }>>({});
   const [open, setOpen] = useState<{ key: string; panel: 'use' | 'blanks' } | null>(null);
+  const [start, setStart] = useState<Start | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -157,7 +162,11 @@ export function TemplatesManager() {
   }
 
   function created(name: string, status: string) {
-    setNote(status === 'APPROVED' ? `“${name}” is approved ✓` : `“${name}” sent to Meta ✓ It usually takes a few minutes, and this page updates by itself.`);
+    const then = start ? ` Once it’s approved, choose it for “${start.ad}” on First messages.` : '';
+    setNote(
+      (status === 'APPROVED' ? `“${name}” is approved ✓` : `“${name}” sent to Meta ✓ It usually takes a few minutes, and this page updates by itself.`) + then
+    );
+    setStart(null);
     setTab('yours');
     window.scrollTo({ top: 0 });
     load();
@@ -194,8 +203,20 @@ export function TemplatesManager() {
           <button type="button" role="tab" aria-selected={tab === 'ready'} className={tab === 'ready' ? 'on' : ''} onClick={() => setTab('ready')}>
             Ready-made <span>{READY_MADE.length}</span>
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'first'} className={tab === 'first' ? 'on' : ''} onClick={() => setTab('first')}>
+            First messages
+          </button>
           {isAdmin && (
-            <button type="button" role="tab" aria-selected={tab === 'new'} className={tab === 'new' ? 'on' : ''} onClick={() => setTab('new')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'new'}
+              className={tab === 'new' ? 'on' : ''}
+              onClick={() => {
+                setStart(null);
+                setTab('new');
+              }}
+            >
               + New template
             </button>
           )}
@@ -250,7 +271,21 @@ export function TemplatesManager() {
         </div>
       )}
 
-      {data && tab === 'new' && isAdmin && <NewTemplate taken={new Set(yours.map((t) => t.name))} disabled={!!data.problem} onCreated={created} />}
+      {data && tab === 'first' && (
+        <FirstMessages
+          items={yours}
+          lang={data.lang}
+          onWrite={(ad) => {
+            setStart({ key: Date.now(), ad });
+            setTab('new');
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      )}
+
+      {data && tab === 'new' && isAdmin && (
+        <NewTemplate key={start?.key ?? 0} start={start} taken={new Set(yours.map((t) => t.name))} disabled={!!data.problem} onCreated={created} />
+      )}
 
       <CategoryGuide />
     </div>
@@ -399,7 +434,7 @@ function UseFor({ t, data, busy, onJob }: { t: WaTemplate; data: Data; busy: boo
               <small>{here ? `Using this one${from}` : inUse(data, job) ? `Now: ${inUse(data, job)}${from}` : 'Nothing set yet'}</small>
               {problem && <small className="why">{problem}</small>}
               {job.key === 'firstContact' && !data.autoFirst && (
-                <small>Automatic first messages are off (WHATSAPP_AUTO_FIRST_MESSAGE in Vercel isn’t “true”). It’s still the one offered first in a new chat.</small>
+                <small>First messages don’t go by themselves (switch it on under First messages). It’s still the one offered first in a new chat.</small>
               )}
             </div>
             {here && u.name ? (
@@ -535,6 +570,9 @@ function ReadyCard({
 }
 
 const START = 'Hi {first_name}, ';
+/** A first message for one video starts from the ready-made welcome, ready to make its own. */
+const WELCOME = readyMade('new_enquiry_welcome')!;
+const FIRST_START = 'Hi {first_name}, thanks for your enquiry about {asked_about} with Heliaxis. When’s a good time for a quick call? Or just reply here with any questions.';
 /** Template names as they're typed: lowercase, anything else becomes _. */
 const typedName = (v: string) =>
   v
@@ -542,13 +580,23 @@ const typedName = (v: string) =>
     .replace(/[^a-z0-9_]+/g, '_')
     .slice(0, 60);
 
-function NewTemplate({ taken, disabled, onCreated }: { taken: Set<string>; disabled: boolean; onCreated: (name: string, status: string) => void }) {
-  const [title, setTitle] = useState('');
+function NewTemplate({
+  start,
+  taken,
+  disabled,
+  onCreated,
+}: {
+  start: Start | null;
+  taken: Set<string>;
+  disabled: boolean;
+  onCreated: (name: string, status: string) => void;
+}) {
+  const [title, setTitle] = useState(start ? `First message ${start.ad}` : '');
   const [typed, setTyped] = useState<string | null>(null);
-  const [category, setCategory] = useState<TemplateCategory>('UTILITY');
-  const [text, setText] = useState(START);
+  const [category, setCategory] = useState<TemplateCategory>(start ? WELCOME.category : 'UTILITY');
+  const [text, setText] = useState(start ? FIRST_START : START);
   const [examples, setExamples] = useState<Partial<Record<FieldKey, string>>>({});
-  const [buttons, setButtons] = useState<string[]>([]);
+  const [buttons, setButtons] = useState<string[]>(start ? WELCOME.buttons : []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const area = useRef<HTMLTextAreaElement>(null);
@@ -564,7 +612,7 @@ function NewTemplate({ taken, disabled, onCreated }: { taken: Set<string>; disab
     ...(readyMade(name) ? [`“${name}” is kept for a ready-made template. Send that one from the Ready-made tab.`] : []),
     ...checkTemplate({ name, category, body: compiled.body, examples: exampleList, buttons }),
   ];
-  const touched = !!title || text !== START;
+  const touched = !!title || text !== (start ? FIRST_START : START);
 
   function insert(f: FieldKey) {
     const tok = `{${FIELDS[f].token}}`;
@@ -600,6 +648,11 @@ function NewTemplate({ taken, disabled, onCreated }: { taken: Set<string>; disab
 
   return (
     <div className="wa-card wa-edit">
+      {start && (
+        <p className="wat-note wa-muted">
+          For leads from “{start.ad}”. It starts from the ready-made welcome: change the words so they follow on from that video.
+        </p>
+      )}
       <label className="wa-label" htmlFor="tpl-title">
         What’s it for?
       </label>

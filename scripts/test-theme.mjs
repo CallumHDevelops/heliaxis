@@ -26,6 +26,7 @@ const routes = await import('../src/lib/theme/routes.ts');
 const {
   BOOT_SCRIPT,
   colorSchemeFor,
+  DEFAULT_PREF,
   parsePref,
   parseScheme,
   profileThemeToAdopt,
@@ -109,10 +110,16 @@ await test('an explicit choice wins; Match phone uses the phone, or waits for th
   assert.equal(resolveTheme('system', 'light'), 'light');
   assert.equal(resolveTheme('system', null), undefined);
 });
-await test('explicit Light declares "only light" (plain "light" is still auto-darkened)', () => {
-  assert.equal(colorSchemeFor('light'), 'only light');
+await test('every choice names dark in its meta (the CSS holds Light: the light root is "only light")', () => {
+  assert.equal(colorSchemeFor('light'), 'light dark');
   assert.equal(colorSchemeFor('dark'), 'dark');
   assert.equal(colorSchemeFor('system'), 'light dark');
+  const css = readFileSync(new URL('../src/app/theme.css', import.meta.url), 'utf8');
+  assert.match(css, /:root\[data-theme='light'\] \{\s*color-scheme: only light;/);
+  assert.match(css, /@media \(prefers-color-scheme: dark\) \{\s*:root\[data-theme='light'\] \{\s*color-scheme: only light;/);
+});
+await test('before anyone chooses: Light (as the app always looked)', () => {
+  assert.equal(DEFAULT_PREF, 'light');
 });
 await test('the toggle says Light / Dark / Match phone', () => {
   assert.deepEqual(THEME_LABELS, { light: 'Light', dark: 'Dark', system: 'Match phone' });
@@ -123,8 +130,8 @@ await test('viewport: website, pinned light, and each choice', () => {
   const admin = themeRouteFor('/admin');
   const site = themeRouteFor('/portal/site');
   assert.deepEqual(themeViewportFor(null, 'dark'), { themeColor: SITE_THEME_COLOR });
-  assert.deepEqual(themeViewportFor(themeRouteFor('/admin/cms'), 'light'), { colorScheme: 'only light', themeColor: '#FFFDF8' });
-  assert.deepEqual(themeViewportFor(admin, 'light'), { colorScheme: 'only light', themeColor: '#FFFDF8' });
+  assert.deepEqual(themeViewportFor(themeRouteFor('/admin/cms'), 'light'), { colorScheme: 'light dark', themeColor: '#FFFDF8' });
+  assert.deepEqual(themeViewportFor(admin, 'light'), { colorScheme: 'light dark', themeColor: '#FFFDF8' });
   assert.deepEqual(themeViewportFor(admin, 'dark'), { colorScheme: 'dark', themeColor: '#211F18' });
   assert.deepEqual(themeViewportFor(admin, 'system'), {
     colorScheme: 'light dark',
@@ -248,10 +255,10 @@ await test('boot script: ES5 only, never throws', () => {
   const ctx = vm.createContext({ document: {}, window: {} });
   vm.runInContext(BOOT_SCRIPT, ctx);
 });
-await test('boot script: first visit on a dark phone paints dark and remembers the phone', () => {
+await test('boot script: first visit on a dark phone paints Light (the default) and remembers the phone', () => {
   const p = fakePage({ pref: 'system', dark: true });
-  assert.equal(p.attr('data-theme'), 'dark');
-  assert.equal(p.attr('data-theme-pref'), 'system');
+  assert.equal(p.attr('data-theme'), 'light');
+  assert.equal(p.attr('data-theme-pref'), 'light');
   assert.equal(p.jar.get('hx-scheme'), 'dark');
   assert.equal(p.jar.has('hx-theme'), false, 'no choice is invented');
   assert.equal(p.fixed(), 1, 'the server could not know: ThemeSync updates the bar');
@@ -289,12 +296,14 @@ await test('boot script: the cookie wins over this device, which catches up (the
   assert.equal(p.attr('data-theme'), 'light');
   assert.equal(p.store.get('hx-theme'), 'light');
 });
-await test('boot script: junk values mean Match phone; blocked storage is survived', () => {
+await test('boot script: junk values mean the default, Light; blocked storage is survived', () => {
   const p = fakePage({ cookies: { 'hx-theme': 'blue' }, ls: { 'hx-theme': 'sepia' }, dark: true });
-  assert.equal(p.attr('data-theme'), 'dark');
-  assert.equal(p.attr('data-theme-pref'), 'system');
+  assert.equal(p.attr('data-theme'), 'light');
+  assert.equal(p.attr('data-theme-pref'), 'light');
   const q = fakePage({ lsThrows: true, dark: true });
-  assert.equal(q.attr('data-theme'), 'dark');
+  assert.equal(q.attr('data-theme'), 'light');
+  const r = fakePage({ cookies: { 'hx-theme': 'system' }, lsThrows: true, dark: true });
+  assert.equal(r.attr('data-theme'), 'dark', 'Match phone, chosen, still follows a dark phone');
 });
 await test('boot script: pinned-light pages stay light and write nothing', () => {
   const p = fakePage({ scope: 'light', theme: 'light', pref: 'light', cookies: { 'hx-theme': 'dark' }, dark: true });
@@ -311,7 +320,7 @@ await test('boot script: Secure cookies on https', () => {
   assert.match(p.writes[0], /; Secure$/);
 });
 await test('boot script: the phone flipping while open follows Match phone, and moves the bar', () => {
-  const p = fakePage({ pref: 'system', dark: false });
+  const p = fakePage({ cookies: { 'hx-theme': 'system' }, pref: 'system', dark: false });
   p.flipPhone(true);
   assert.equal(p.attr('data-theme'), 'dark');
   assert.equal(p.jar.get('hx-scheme'), 'dark');
@@ -342,7 +351,7 @@ await test('prerendered pages (site app home and shell) work out their own scope
   assert.equal(site.attr('data-theme'), 'dark');
   assert.equal(site.fixed(), 1, 'ThemeSync updates the bar after load');
   const home = fakePage({ scope: null, bar: null, path: '/portal/site/', script: both, dark: true });
-  assert.equal(home.attr('data-theme'), 'dark');
+  assert.equal(home.attr('data-theme'), 'light', 'a trade who never chose: Light, even on a dark phone');
   // Every address the table knows gets what themeRouteFor says.
   for (const p of ['/admin', '/admin/cms/x', '/my/abc', '/book/x', '/login', '/', '/blog', '/book-a-survey', '/branding']) {
     const page = fakePage({ scope: null, bar: null, path: p, script: SELF_ROUTE_SCRIPT });
@@ -354,7 +363,7 @@ await test('prerendered pages (site app home and shell) work out their own scope
   const known = fakePage({ scope: 'light', bar: '#FFFDF8 #FFFDF8', path: '/admin', script: SELF_ROUTE_SCRIPT });
   assert.equal(known.attr('data-theme-scope'), 'light');
   // The server can't tell what to declare there: the layout and the scripts do.
-  assert.deepEqual(themeViewportFor(undefined, 'system'), {});
+  assert.deepEqual(themeViewportFor(undefined, 'system'), { colorScheme: 'light dark' });
 });
 await test('boot script: back/forward cache re-checks', () => {
   const p = fakePage({ cookies: { 'hx-theme': 'light' }, theme: 'light', pref: 'light' });
@@ -439,7 +448,7 @@ await test('boot script: back/forward cache re-checks', () => {
     assert.equal(metas['color-scheme'][0].content, 'light dark');
     setTheme('light');
     assert.equal(attrs.get('data-theme'), 'light');
-    assert.equal(metas['color-scheme'][0].content, 'only light');
+    assert.equal(metas['color-scheme'][0].content, 'light dark');
   });
   await test('setTheme: one account save, the latest choice, after the changes stop; one at a time', async () => {
     assert.equal(posts.length, 0, 'not straight away');

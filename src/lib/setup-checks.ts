@@ -487,8 +487,23 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     (await customerRefs) && !(await has('crm_merges')),
     sql('merge.sql', 'Merge duplicate customers (someone who came in twice, say from the website and a Meta ad) and their jobs for the same work.', 6, 'customer-refs.sql')
   );
+  // Design studio: works without it, but designs and templates can't be saved until it's run.
+  add(
+    !(await has('design_projects')),
+    sql('design-studio.sql', 'Lets the Design studio save your leaflets, cards and banners, and keep a library of printer templates.', 5)
+  );
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
+  // Social Monitoring: its menu item and page stay hidden until this has been run (src/lib/schema-ready.ts).
+  add(
+    notifications && !(await has('social_mention')),
+    sql('social-monitoring.sql', 'Social monitoring: comments and reviews about Heliaxis, urgent ones flagged to everyone with access, replies drafted for you to copy and post.', 6, 'notifications.sql')
+  );
+  // Its marketing numbers and competitor tracking tables (used by the Insights and Competitors screens, built later). Safe to run now.
+  add(
+    (await has('social_mention')) && !(await has('social_metric_snapshot')),
+    sql('social-insights.sql', 'Social monitoring: the tables for marketing numbers (followers, reach, engagement) and competitor tracking. Nothing uses them yet, so there is no hurry, but it is safe to run now.', 7, 'social-monitoring.sql')
+  );
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
   add(
     notifications && !(await notificationRefs),
@@ -645,6 +660,125 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     href: VERCEL_ENV,
     hrefLabel: 'Open Vercel',
     order: 10,
+  });
+  // ── Social monitoring: what only the owner can set up. Shown once social-monitoring.sql has been run. ──
+  const socialSql = await has('social_mention');
+  add(socialSql && !env('META_SOCIAL_TOKEN', 'META_PAGE_ID', 'META_IG_USER_ID', 'META_IG_TOKEN', 'META_IG_APP_SECRET', 'SOCIAL_AUTHOR_PEPPER'), {
+    id: 'env-social-meta',
+    title: 'Social monitoring: connect Facebook and Instagram',
+    detail:
+      'Lets the app read comments on your Facebook Page and Instagram posts (read only: it can never reply, hide or delete). Uses the same Meta app as WhatsApp and lead ads.',
+    steps: [
+      '**Facebook first.** Open your [Meta app](https://developers.facebook.com/apps) (the one WhatsApp uses) and add the use case **Manage everything on your Page**. Under **Customize** add `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_metadata` and `read_insights`.',
+      'Open [Meta Business settings → System users](https://business.facebook.com/settings/system-users). Use the system user WhatsApp already uses, or add one named `Heliaxis social`. Tap **Add assets** and add the **Facebook Page** (full control, or at least read access to content and insights).',
+      'Tap **Generate token**, choose your Meta app, tick the five Page permissions above, set it to **never expire** if offered, then copy it. It is shown once. This is `META_SOCIAL_TOKEN`.',
+      'Find the **Page ID**: open the [Graph API Explorer](https://developers.facebook.com/tools/explorer), paste the new token in **Access Token**, and run `me/accounts?fields=id,name`. The `id` next to your Page is `META_PAGE_ID`.',
+      '**Now Instagram.** In the same Meta app, add the use case **Manage messaging & content on Instagram**, then open **Instagram → API setup with Instagram login** in the left menu. **1. Add required permissions** should show a green tick (it lists `instagram_business_basic`, `instagram_business_manage_comments` and `instagram_business_manage_messages`). Heliaxis only ever reads comments: the messages permission is unavoidable on that screen and is never used.',
+      'At the top of that page, next to **Instagram app secret**, tap **Show** and copy it. This is `META_IG_APP_SECRET` (a password: tick **Sensitive** in Vercel). It is not the same as the main Meta app secret.',
+      'Scroll to **2. Generate access tokens**. Tap **Add account**, sign in to the Heliaxis Instagram account (it must be a professional account) and accept. Then tap **Generate token** next to it and copy the token. This is `META_IG_TOKEN`. It lasts 60 days; the app refreshes it by itself once that part is built, so tell Claude if it gets close to expiring.',
+      'The long number shown against the account is the Instagram account ID. This is `META_IG_USER_ID`.',
+      '**Skip step 3 (webhooks) for now.** The part of the app that receives them is still being built. A new to-do appears here when it is ready.',
+      'Make up a long random password-like text for `SOCIAL_AUTHOR_PEPPER` (30+ letters and numbers). It scrambles commenter IDs, so keep it secret and never change it later.',
+      'If Meta says a permission needs **App Review** or **Advanced access**: it is for reading comments on your own accounts. Tell Claude what Meta says and we will sort it out.',
+      'Add the six keys below in Vercel (tick **Sensitive** on the tokens, the secret and the pepper).',
+      ...VERCEL_STEPS,
+    ],
+    copies: [
+      { label: 'Key', value: 'META_SOCIAL_TOKEN' },
+      { label: 'Key', value: 'META_PAGE_ID' },
+      { label: 'Key', value: 'META_IG_APP_SECRET' },
+      { label: 'Key', value: 'META_IG_TOKEN' },
+      { label: 'Key', value: 'META_IG_USER_ID' },
+      { label: 'Key', value: 'SOCIAL_AUTHOR_PEPPER' },
+    ],
+    href: 'https://developers.facebook.com/apps',
+    hrefLabel: 'Open Meta apps',
+    order: 11,
+  });
+  add(socialSql && !env('GOOGLE_BP_CLIENT_ID', 'GOOGLE_BP_CLIENT_SECRET', 'GOOGLE_BP_REFRESH_TOKEN', 'GOOGLE_BP_LOCATION'), {
+    id: 'env-social-google',
+    title: 'Social monitoring: ask Google for review access (start now, it can take weeks)',
+    detail:
+      'Google’s Business Profile API lets the app see new reviews of Heliaxis on Google as they arrive, with their star rating. Google has to approve you first, so apply early. Until then, the review-email route (next to-do) covers Google.',
+    steps: [
+      'Sign in to Google with the account that **owns or manages** the Heliaxis Business Profile (check at [business.google.com](https://business.google.com)). Your Business Profile must be verified, and Google expects it to have been active for a while.',
+      'Open the [Google Cloud console](https://console.cloud.google.com), tap the project picker → **New project** → name it `Heliaxis` → **Create**. Note the **project number** (Project settings).',
+      'Open Google’s [Business Profile API access request](https://developers.google.com/my-business/content/prereqs#request-access) and fill in the form. Use your Heliaxis email, the project number, and say: “Read the reviews on our own Business Profile so our team is notified and can reply by hand.”',
+      'Wait for the approval email (several days to a few weeks). Rejections are common if the reason is vague. If it is rejected, reply with the same explanation and mention it is for your own single business.',
+      'After approval: in the Cloud console → **APIs & Services → Library**, enable **My Business Account Management API** and **My Business Business Information API**. Google’s own page lists which ones you need for reviews, so follow its list if it differs.',
+      'Then tell Claude. The one-off “Connect Google” button will be added in the next build, and it gives you the last values (client ID, secret, refresh token and location) to paste into Vercel.',
+    ],
+    copies: [
+      { label: 'Key', value: 'GOOGLE_BP_CLIENT_ID' },
+      { label: 'Key', value: 'GOOGLE_BP_CLIENT_SECRET' },
+      { label: 'Key', value: 'GOOGLE_BP_REFRESH_TOKEN' },
+      { label: 'Key', value: 'GOOGLE_BP_LOCATION' },
+    ],
+    href: 'https://developers.google.com/my-business/content/prereqs',
+    hrefLabel: 'Open Google’s access page',
+    order: 12,
+    optional: true,
+  });
+  add(socialSql && !env('TRUSTPILOT_API_KEY', 'TRUSTPILOT_API_SECRET', 'TRUSTPILOT_BUSINESS_UNIT_ID'), {
+    id: 'env-social-trustpilot',
+    title: 'Social monitoring: get your Trustpilot API key',
+    detail: 'Lets the app read your Trustpilot reviews every 15 minutes. Needs a Trustpilot Business account that includes API access.',
+    steps: [
+      'Sign in to [Trustpilot Business](https://businessapp.b2b.trustpilot.com) with the Heliaxis account.',
+      'Go to **Integrations → Developers → APIs** (the menu names can move). Tap **Create application**, name it `Heliaxis monitoring`, and save. It shows an **API key** and an **API secret**.',
+      'If you cannot see an API area, your Trustpilot plan may not include API access. Ask Trustpilot support, or tell Claude: the review-email route (next to-do) works instead.',
+      'Find your **business unit ID**: open this address in a browser, replacing `YOUR_API_KEY`: `https://api.trustpilot.com/v1/business-units/find?name=heliaxis.co.uk&apikey=YOUR_API_KEY`. Copy the `id` in the reply.',
+      'The developer documentation is at [developers.trustpilot.com](https://developers.trustpilot.com) (see **Authentication** and **Business Units API**).',
+      'Add the three keys below in Vercel (tick **Sensitive** on the secret).',
+      ...VERCEL_STEPS,
+    ],
+    copies: [
+      { label: 'Key', value: 'TRUSTPILOT_API_KEY' },
+      { label: 'Key', value: 'TRUSTPILOT_API_SECRET' },
+      { label: 'Key', value: 'TRUSTPILOT_BUSINESS_UNIT_ID' },
+    ],
+    href: 'https://developers.trustpilot.com',
+    hrefLabel: 'Open Trustpilot developers',
+    order: 13,
+    optional: true,
+  });
+  add(socialSql && !env('SOCIAL_REVIEW_MAILBOX'), {
+    id: 'env-social-mailbox',
+    title: 'Social monitoring: set up a mailbox for review emails (backup for Google and Trustpilot)',
+    detail:
+      'Google and Trustpilot email you when a review arrives. A shared mailbox lets the app read those emails, so reviews are caught even before API access is approved.',
+    steps: [
+      'In the [Microsoft 365 admin centre](https://admin.microsoft.com) → **Teams & groups → Shared mailboxes** → **Add a shared mailbox**: name it `Reviews`, address `reviews@heliaxis.co.uk`.',
+      'In Google Business Profile → **Settings → Notifications** (or [business.google.com](https://business.google.com)), set the notification email for **Reviews** to `reviews@heliaxis.co.uk`.',
+      'In Trustpilot Business → **Settings → Notifications**, add `reviews@heliaxis.co.uk` for **new reviews**.',
+      'Forward a couple of real notification emails to Claude (or paste them into the chat) so the reader can be built from the real wording.',
+      'Add the key below in Vercel with the mailbox address as its value.',
+      ...VERCEL_STEPS,
+    ],
+    copies: [
+      { label: 'Key', value: 'SOCIAL_REVIEW_MAILBOX' },
+      { label: 'Value', value: 'reviews@heliaxis.co.uk' },
+    ],
+    href: 'https://admin.microsoft.com',
+    hrefLabel: 'Open Microsoft 365 admin',
+    order: 14,
+    optional: true,
+  });
+  add(socialSql, {
+    id: 'social-people-notifications',
+    title: 'Social monitoring: choose who gets the urgent alerts',
+    detail:
+      'Everyone with the Social monitoring tick (and every admin) gets a notification when a comment is urgent. Give the tick to the right people, then each person turns notifications on their phone.',
+    steps: [
+      'Open **Users** (your initials, top right), find each person who should get urgent social alerts, tick **Social monitoring**, and **Save**.',
+      'Each of them opens the Heliaxis app on their phone and taps **Turn on** in the notifications banner on the dashboard (iPhone: add the app to the Home Screen first, then open it from there).',
+      'Tick this off when that is done.',
+    ],
+    href: '/admin/users',
+    hrefLabel: 'Open Users',
+    order: 15,
+    manual: true,
+    kind: 'tip',
   });
   if (settings) {
     add(!settings.leadRotation.length, {

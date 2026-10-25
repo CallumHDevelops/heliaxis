@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import type { CrmDoc } from '@/app/admin/crm/[id]/ProjectExtras';
-import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
+import { blankLabels, prefill, TemplateSendFields, useTemplateSend, WaTemplatePreview, type Values } from '@/components/admin/TemplateSend';
 import { stageLabel } from '@/lib/crm/stages';
 import { chatRef, chatTag, NOTIFICATIONS_CHANGED } from '@/lib/notification-refs';
 import { closeShownNotifications } from '@/lib/push-client';
@@ -14,6 +14,7 @@ import { atWords, chaseTime, chaseWhen, type ChaseView } from '@/lib/whatsapp/sc
 import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
+import type { WaTemplate } from '@/lib/whatsapp/templates-shared';
 import { useChatTasks } from './ChatTasks';
 import { MediaBubble } from './MediaBubble';
 import { ScheduledBubble, useSendLater } from './SendLater';
@@ -127,6 +128,13 @@ function dayLabel(iso: string) {
   const year = d.getFullYear() !== today.getFullYear() ? ({ year: 'numeric' } as const) : {};
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', ...year });
 }
+/** A queued template as it'll go: its words, with the blanks filled from their details as far as they go. */
+function QueuedTemplate({ t, values }: { t: WaTemplate; values: Values | null }) {
+  return (
+    <WaTemplatePreview compact header={t.header} body={t.body} footer={t.footer} buttons={t.buttons} values={prefill(t, values ?? {})} labels={blankLabels(t)} />
+  );
+}
+
 function countdown(iso: string, now: number) {
   const s = Math.max(0, Math.round((new Date(iso).getTime() - now) / 1000));
   if (s === 0) return 'any moment';
@@ -548,6 +556,8 @@ export function ChatPane({
   }
 
   const windowCloses = enquiry.wa_last_inbound_at ? new Date(enquiry.wa_last_inbound_at).getTime() + SERVICE_WINDOW_MS : 0;
+  // Queued templates are shown as they'll go once the chat's template list has loaded (it does while only a template can be sent).
+  const tplByName = new Map((tplSend.templates ?? []).map((t) => [t.name, t]));
   const chasePicker = (message: string, isTemplate = false, sendAt: Date | null = null) => {
     const h = chaseHoursFor(message, isTemplate);
     // When it would really go: quiet hours and the evening rule can move it ("tomorrow about 10:00"),
@@ -636,7 +646,7 @@ export function ChatPane({
                   ? `↻ ${o.chase_step > 1 ? 'Final nudge' : 'Chaser'} if they don’t reply — sends ${countdown(o.send_after, now)} · ${
                       new Date(o.send_after).getTime() < windowCloses ? 'free message' : 'as a template (paid)'
                     }`
-                  : `⏱ ${o.rule ? `Smart reply “${o.rule}”` : `Intro template “${o.template_name}”`} sends ${countdown(o.send_after, now)}`}
+                  : `⏱ ${o.rule ? `Smart reply “${o.rule}”` : o.kind === 'intro' ? `First message “${o.template_name}”` : `Template “${o.template_name}”`} sends ${countdown(o.send_after, now)}`}
           </div>
           {editing?.id === o.id ? (
             <>
@@ -648,13 +658,18 @@ export function ChatPane({
             </>
           ) : (
             <>
-              <p className="wa-queued-body">
-                {o.template_name
-                  ? `Template, {{1}} = ${o.body}`
-                  : o.kind === 'chase' && new Date(o.send_after).getTime() >= windowCloses
-                    ? `The free window will have closed by then, so your chase template goes instead of: “${o.body}”`
-                    : o.body}
-              </p>
+              {o.template_name && tplByName.get(o.template_name) ? (
+                // The template as it'll go, filled from their details: the draft of their first message.
+                <QueuedTemplate t={tplByName.get(o.template_name)!} values={tplSend.values} />
+              ) : (
+                <p className="wa-queued-body">
+                  {o.template_name
+                    ? `Template, {{1}} = ${o.body}`
+                    : o.kind === 'chase' && new Date(o.send_after).getTime() >= windowCloses
+                      ? `The free window will have closed by then, so your chase template goes instead of: “${o.body}”`
+                      : o.body}
+                </p>
+              )}
               {o.status !== 'sending' && (
                 <div className="wa-queued-actions">
                   <button type="button" onClick={() => outboxAction(o.id, 'send-now')}>

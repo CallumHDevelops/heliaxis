@@ -25,7 +25,7 @@ export function DockChip({ initial }: { initial: number }) {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M12 2.2a9.7 9.7 0 0 0-8.3 14.8L2.3 21.8l4.9-1.3A9.7 9.7 0 1 0 12 2.2zm0 17.7a8 8 0 0 1-4.1-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8 8 0 1 1 12 19.9z" />
       </svg>
-      WhatsApp
+      <span className="hx-dockchip__label">WhatsApp</span>
       {n > 0 && <span className="hx-badge">{n > 99 ? '99+' : n}</span>}
     </button>
   );

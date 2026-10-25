@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { AssistantAction } from '@/lib/assistant/tools';
 import { atWords } from '@/lib/whatsapp/schedule';
 import { MetisIcon } from '@/components/admin/MetisIcon';
@@ -64,11 +64,47 @@ function makeRecognition(): Recognition | null {
   return C ? new C() : null;
 }
 
-export function AssistantView({ firstName }: { firstName: string }) {
+/**
+ * Metis's words with the app's pages it names (/admin/…, e.g. a Help article) as links: a bare path, or
+ * [words](/admin/…). Anything else stays text.
+ */
+export function withLinks(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\[([^\]\n]{1,120})\]\((\/admin(?:\/[^\s)]*)?)\)|(\/admin(?![\w-])(?:\/[^\s)\]]*)?)/g;
+  let at = 0;
+  for (const m of text.matchAll(re)) {
+    const start = m.index ?? 0;
+    let href = m[2] ?? m[3];
+    let label = m[1] ?? href;
+    let end = start + m[0].length;
+    // A bare path inside a longer address (https://…/admin/…) or a word is left as it is.
+    if (!m[2] && start > 0 && !/[\s(["'“‘]/.test(text[start - 1])) continue;
+    if (!m[2]) {
+      // A bare path: full stops, commas and closing quotes after it aren't part of it.
+      const tail = /[.,;:!?'"’”)]+$/.exec(href)?.[0] ?? '';
+      href = href.slice(0, href.length - tail.length);
+      label = href;
+      end -= tail.length;
+    }
+    if (start > at) out.push(text.slice(at, start));
+    out.push(
+      <Link key={start} href={href} className="as-link">
+        {label}
+      </Link>,
+    );
+    at = end;
+  }
+  if (at < text.length) out.push(text.slice(at));
+  return out;
+}
+
+/** `initialText`: already in the box, not sent (/admin/assistant?q=…, e.g. "Ask Metis" in Help). */
+export function AssistantView({ firstName, initialText = '' }: { firstName: string; initialText?: string }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [configured, setConfigured] = useState(true);
   const [loaded, setLoaded] = useState(false);
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
+  const box = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [listening, setListening] = useState(false);
@@ -103,6 +139,18 @@ export function AssistantView({ firstName }: { firstName: string }) {
 
   // Leaving the page mid-dictation switches the mic off.
   useEffect(() => () => hush(mic.current), []);
+
+  // Arrived with a question in the box (?q=): the cursor at its end, ready to finish or send. The address
+  // loses the ?q= so a reload doesn't put it back after it's sent.
+  useEffect(() => {
+    if (!initialText) return;
+    const el = box.current;
+    el?.focus();
+    el?.setSelectionRange(el.value.length, el.value.length);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('q');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [initialText]);
 
   function listen() {
     if (mic.current) {
@@ -239,7 +287,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
         {lines.map((l, i) => (
           <div key={i} className={`as-msg is-${l.role}${l.error ? ' is-error' : ''}`}>
             {l.role === 'assistant' && <MetisIcon size={22} className="as-avatar" />}
-            <p>{l.text}</p>
+            <p>{l.role === 'assistant' ? withLinks(l.text) : l.text}</p>
             {l.actions && l.actions.length > 0 && (
               <ul className="as-actions">
                 {l.actions.map((a, j) => (
@@ -272,6 +320,7 @@ export function AssistantView({ firstName }: { firstName: string }) {
         }}
       >
         <textarea
+          ref={box}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

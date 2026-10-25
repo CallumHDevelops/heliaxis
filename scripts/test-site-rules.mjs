@@ -70,12 +70,21 @@ const clean = {
   RX6: 'no',
   RX8: 'yes',
   RX9: 'no',
+  RX10: 'on_roof',
+  RX11: 'yes',
+  RX12: 'yes',
+  RX13: 'yes',
+  RX14: 'yes',
 };
 let c = ctx(clean, photosDone);
 let s = R.signCheck(ROOFER, c);
 eq('a complete roofer form can be signed, with no flags', [s.ok, s.flags.length, s.must.length, s.should.length], [true, 0, 0, 0]);
 eq('progress: every step done', R.formProgress(ROOFER, c).done === R.formProgress(ROOFER, c).total, true);
-eq('the job screen line', R.summaryLine(ROOFER, ctx({})), '18 questions, 9 photos, about 10 minutes');
+eq('the job screen line', R.summaryLine(ROOFER, ctx({})), '23 questions, 9 photos, about 10 minutes');
+// The roof checks moved from the electrician (owner, 22 Oct): a No is Urgent, in the roofer's words.
+eq('no air behind the panels: Urgent, with the note', R.flagsFor(ROOFER, ctx({ ...clean, RX13: 'no', RX13n: 'Tight to the tiles at the top' }, photosDone)).map((f) => [f.code, f.severity, f.text]), [['RX13', 'urgent', 'No air gap behind the panels: Tight to the tiles at the top']]);
+eq('a ground mount: no fire-rating question, and no flag for it', [R.allVisible(ROOFER, ctx({ ...clean, RX10: 'ground' })).some(({ f }) => f.key === 'RX14'), R.flagsFor(ROOFER, ctx({ ...clean, RX10: 'ground', RX14: 'no' }, photosDone)).length], [false, 0]);
+eq('the mounting offered from the design', ROOFER.steps.flatMap((x) => x.fields).find((f) => f.key === 'RX10').suggest(ctx({}))?.v ?? null, ctx({}).design.mounting ?? null);
 
 /* ── An empty form: the gate lists every must, photos with their counts ───── */
 s = R.signCheck(ROOFER, ctx({}, { RF1: 1 }));
@@ -153,11 +162,11 @@ eq('strike damage with marks before: Review', R.flagsFor(SCAFFOLD_DOWN, sc({ ...
 const all = [ROOFER, SCAFFOLD_UP, SCAFFOLD_DOWN].flatMap((form) => [...form.steps.flatMap((x) => x.fields), form.sig]).map((x) => x.key);
 eq('every key is unique across the forms', all.length === new Set(all).size, true);
 eq('roofer keys (a change here means a key was renamed: add a new one instead)', [...ROOFER.steps.flatMap((x) => x.fields), ROOFER.sig].map((x) => x.key).join(' '),
-  'RF1 RF5 RF5p RF5n RF12 RF13 RF14 RF2 RX1 RX1n RX1p RF10 RF11 RX5 RF6 RF6n RF6p RF7 RF7a RF7b RF8 RF8n RF9 RF9n RX4 RX4p RX7 RX7p RF3 RF4 RF4n RF4p RX2 RX2n RX2p RX3 RX3c RX3r RX3p RX6 RX6n RX6p RX8 RX8n RX9 RX9n RF_SIG');
+  'RF1 RF5 RF5p RF5n RF12 RF13 RF14 RX10 RF2 RX1 RX1n RX1p RX11 RX11n RX12 RX12n RX14 RX14n RF10 RF11 RX5 RF6 RF6n RF6p RF7 RF7a RF7b RF8 RF8n RF9 RF9n RX4 RX4p RX7 RX7p RX13 RX13n RF3 RF4 RF4n RF4p RX2 RX2n RX2p RX3 RX3c RX3r RX3p RX6 RX6n RX6p RX8 RX8n RX9 RX9n RF_SIG');
 eq('scaffold keys', [SCAFFOLD_UP, SCAFFOLD_DOWN].flatMap((form) => [...form.steps.flatMap((x) => x.fields), form.sig]).map((x) => x.key).join(' '),
   'SC1 SC1p SC1n SC2 SC2n SCX1 SC3 SC3p SC4 SCX2 SCX2p SCX2n SCX3 SCX3a SCX4 SC5 SC_SIG SS1 SS1n SS2 SS3 SS3p SS3n SS4 SS4n SS5 SS_SIG');
 eq('schemaFor: the roofer gets the roof checks; the scaffolder up then down', [F.schemaFor({ trade: 'roofer' }).map((x) => x.id), F.schemaFor({ trade: 'scaffolder' }).map((x) => x.id)], [['roofer'], ['scaffold-erection', 'scaffold-strike']]);
-eq('the schema version (4: the records in Heliaxis’s own words, after 3: the EIC to the IET A4:2026 form)', F.SITE_SCHEMA_VERSION, 4);
+eq('the schema version (5: the roof checks are the roofer’s, after 4: the records in Heliaxis’s own words)', F.SITE_SCHEMA_VERSION, 5);
 
 /* ── Derived values ────────────────────────────────────────────────────────── */
 eq('expected string Voc: panels × Voc', R.expectedStringVoc(8, 49.6, false), 396.8);

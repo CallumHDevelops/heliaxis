@@ -296,7 +296,7 @@ export const SIG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAA
 /** Answers as the phone saves them. */
 export const wrap = (vals) => Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, { v, src: 'typed', at: '2026-11-03T10:00:00Z' }]));
 /** The roofer's form, every must answered, for a 16-panel design strung 8 + 8; and its photos. */
-export const ROOF_DONE = { RF5: 'no', RF13: 'Aiko Neostar 2P 450W', RF14: 49.6, RX1: 'yes', RF10: 2, RF11: [8, 8], RX5: 16, RF6: 'yes', RF7: 'no', RF8: 'yes', RF9: true, RX4: 'yes', RF4: 'no', RX2: 'yes', RX3: 'no', RX6: 'no', RX8: 'yes', RX9: 'no' };
+export const ROOF_DONE = { RF5: 'no', RF13: 'Aiko Neostar 2P 450W', RF14: 49.6, RX1: 'yes', RF10: 2, RF11: [8, 8], RX5: 16, RF6: 'yes', RF7: 'no', RF8: 'yes', RF9: true, RX4: 'yes', RF4: 'no', RX2: 'yes', RX3: 'no', RX6: 'no', RX8: 'yes', RX9: 'no', RX10: 'on_roof', RX11: 'yes', RX12: 'yes', RX13: 'yes', RX14: 'yes' };
 export const ROOF_PHOTOS = { RF1: 2, RF12: 1, RF2: 2, RX4p: 1, RF3: 3 };
 
 /** A job (16 panels in the design, strung 8 + 8) with its customer. */

@@ -325,7 +325,7 @@ export function SmartReplies() {
           </label>
           <label className="wa-check">
             <input type="checkbox" checked={settings.firstContactQuietHours} onChange={(e) => set('firstContactQuietHours', e.target.checked)} />
-            <span>Hold the first message to new leads who enquire in quiet hours until the morning (otherwise it goes 3–6 minutes after they enquire, whatever the time)</span>
+            <span>Hold the first message to new leads who enquire in quiet hours until the morning (otherwise it goes the usual few minutes after they enquire, whatever the time: WhatsApp templates → First messages)</span>
           </label>
           <div className="wa-queued-actions">
             <button type="button" onClick={saveSettings}>Save chaser settings</button>

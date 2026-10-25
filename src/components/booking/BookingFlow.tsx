@@ -55,6 +55,10 @@ export type BookingFlowProps = {
   /** Link only: their own details, to pre-fill "Is this right?". */
   person?: { name: string; email: string; phone: string };
   initialType: SurveyTypeKey | null;
+  /** Website form only: which way of speaking to us is selected to begin with (default: in person). */
+  initialMode?: Mode | null;
+  /** ?reason=quote: they came from a "quote consultation" link. */
+  initialReason?: 'quote' | null;
   initialPostcode: string;
   initialAddress?: string;
   /** Link only: the survey they've already booked or asked for. */
@@ -71,6 +75,20 @@ export type BookingFlowProps = {
   phone: string;
   year: number;
 };
+
+/** How the customer wants to speak to us. In person is the existing survey booking; phone and video are callback requests. */
+type Mode = 'visit' | 'phone' | 'video';
+const MODE_CHOICES: { key: Mode; label: string; blurb: string }[] = [
+  { key: 'visit', label: 'In-person consultation', blurb: 'A free survey at your home' },
+  { key: 'phone', label: 'Phone call', blurb: 'We ring you at a time that suits' },
+  { key: 'video', label: 'Video call', blurb: 'We send you a link to join' },
+];
+const WHEN_CHOICES = [
+  { key: 'any', label: 'Any time' },
+  { key: 'morning', label: 'Morning' },
+  { key: 'afternoon', label: 'Afternoon' },
+  { key: 'evening', label: 'Evening' },
+] as const;
 
 const TYPE_CHOICES: { key: SurveyTypeKey; label: string }[] = [
   { key: 'solar', label: 'Solar panels (and battery)' },
@@ -145,6 +163,10 @@ export function BookingFlow(p: BookingFlowProps) {
     company_website: '',
   });
   const [cb, setCb] = useState({ name: '', phone: '', email: '' });
+  const [mode, setMode] = useState<Mode>(p.initialMode ?? 'visit');
+  const [when, setWhen] = useState<(typeof WHEN_CHOICES)[number]['key']>('any');
+  /** Set once a phone or video call has been requested, for the thank-you message. */
+  const [requested, setRequested] = useState<'phone' | 'video' | null>(null);
 
   // Bots fill the form in within moments of the page loading; people don't.
   const loadedAt = useRef(0);
@@ -328,6 +350,25 @@ export function BookingFlow(p: BookingFlowProps) {
     const r = await post('/api/book/callback', { ...cb, postcode, type: type ?? 'solar', company_website: d.company_website });
     setBusy(false);
     if (r.ok && r.data.ok) return go('callbackDone');
+    setError(r.data.error || 'Something went wrong. Please call us instead.');
+  }
+
+  /** Phone or video call: no times to pick, so it goes straight to the team as a request. */
+  async function onRequest() {
+    if (mode === 'visit') return;
+    if (!type) return setError('Please choose what it’s for.');
+    if (cb.name.trim().length < 2) return setError('Please enter your name.');
+    if (cb.phone.replace(/\D/g, '').length < 10) return setError('Please check your phone number.');
+    if (mode === 'video' && !/^\S+@\S+\.\S+$/.test(cb.email.trim())) return setError('Please enter your email so we can send the video link.');
+    if (postcode.replace(/\s/g, '').length < 5) return setError('Please enter your postcode.');
+    setError('');
+    setBusy(true);
+    const r = await post('/api/book/callback', { ...cb, postcode, type, mode, when, reason: p.initialReason ?? undefined, company_website: d.company_website });
+    setBusy(false);
+    if (r.ok && r.data.ok) {
+      setRequested(mode);
+      return go('callbackDone');
+    }
     setError(r.data.error || 'Something went wrong. Please call us instead.');
   }
 
@@ -517,47 +558,149 @@ export function BookingFlow(p: BookingFlowProps) {
 
       {step === 'start' && (
         <section className="bk-card">
+          {!isLink && !moving && (
+            <>
+              <h2 className="bk-h" id="bk-mode-h">
+                How would you like to speak to us?
+              </h2>
+              <div className="bk-types" role="group" aria-labelledby="bk-mode-h">
+                {MODE_CHOICES.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    aria-pressed={mode === m.key}
+                    className={mode === m.key ? 'bk-type is-on' : 'bk-type'}
+                    onClick={() => {
+                      setMode(m.key);
+                      setError('');
+                    }}
+                  >
+                    <b>{m.label}</b>
+                    <span>{m.blurb}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {mode === 'visit' || isLink || moving ? (
+            <>
           {heading('What’s the survey for?')}
-          <div className="bk-types" role="group" aria-label="What’s the survey for?">
-            {TYPE_CHOICES.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                aria-pressed={type === t.key}
-                className={type === t.key ? 'bk-type is-on' : 'bk-type'}
-                onClick={() => setType(t.key)}
+              <div className="bk-types" role="group" aria-label="What’s the survey for?">
+                {TYPE_CHOICES.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    aria-pressed={type === t.key}
+                    className={type === t.key ? 'bk-type is-on' : 'bk-type'}
+                    onClick={() => setType(t.key)}
+                  >
+                    <b>{t.label}</b>
+                    <span>{minutesWords(p.durations[t.key])}</span>
+                  </button>
+                ))}
+              </div>
+              <label className="bk-label" htmlFor="bk-pc">
+                Your postcode
+              </label>
+              <form
+                className="bk-pcrow"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void findTimes();
+                }}
               >
-                <b>{t.label}</b>
-                <span>{minutesWords(p.durations[t.key])}</span>
-              </button>
-            ))}
-          </div>
-          <label className="bk-label" htmlFor="bk-pc">
-            Your postcode
-          </label>
-          <form
-            className="bk-pcrow"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void findTimes();
-            }}
-          >
-            <input
-              id="bk-pc"
-              className="bk-input bk-input--pc"
-              value={postcode}
-              onChange={(e) => setPostcode(e.target.value)}
-              autoComplete="postal-code"
-              autoCapitalize="characters"
-              placeholder="NP20 4AB"
-              inputMode="text"
-              maxLength={10}
-            />
-            <button type="submit" className="bk-btn" disabled={busy}>
-              {busy ? 'Finding…' : 'Find times'}
-            </button>
-          </form>
+                <input
+                  id="bk-pc"
+                  className="bk-input bk-input--pc"
+                  value={postcode}
+                  onChange={(e) => setPostcode(e.target.value)}
+                  autoComplete="postal-code"
+                  autoCapitalize="characters"
+                  placeholder="NP20 4AB"
+                  inputMode="text"
+                  maxLength={10}
+                />
+                <button type="submit" className="bk-btn" disabled={busy}>
+                  {busy ? 'Finding…' : 'Find times'}
+                </button>
+              </form>
           {err}
+            </>
+          ) : (
+            <form
+              className="bk-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void onRequest();
+              }}
+            >
+              {heading(mode === 'video' ? 'Tell us about your video call' : 'Tell us about your phone call')}
+              <div className="bk-types" role="group" aria-label="What’s it for?">
+                {TYPE_CHOICES.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    aria-pressed={type === t.key}
+                    className={type === t.key ? 'bk-type is-on' : 'bk-type'}
+                    onClick={() => setType(t.key)}
+                  >
+                    <b>{t.label}</b>
+                  </button>
+                ))}
+              </div>
+              <label className="bk-label" htmlFor="rq-name">
+                Your name
+              </label>
+              <input id="rq-name" className="bk-input" value={cb.name} onChange={(e) => setCb({ ...cb, name: e.target.value })} autoComplete="name" required />
+              <label className="bk-label" htmlFor="rq-phone">
+                Phone number
+              </label>
+              <input id="rq-phone" className="bk-input" type="tel" value={cb.phone} onChange={(e) => setCb({ ...cb, phone: e.target.value })} autoComplete="tel" inputMode="tel" required />
+              <label className="bk-label" htmlFor="rq-email">
+                {mode === 'video' ? 'Email (we’ll send the video link here)' : 'Email (optional)'}
+              </label>
+              <input id="rq-email" className="bk-input" type="email" value={cb.email} onChange={(e) => setCb({ ...cb, email: e.target.value })} autoComplete="email" required={mode === 'video'} />
+              <label className="bk-label" htmlFor="rq-pc">
+                Your postcode
+              </label>
+              <input
+                id="rq-pc"
+                className="bk-input bk-input--pc"
+                value={postcode}
+                onChange={(e) => setPostcode(e.target.value)}
+                autoComplete="postal-code"
+                autoCapitalize="characters"
+                placeholder="NP20 4AB"
+                maxLength={10}
+                required
+              />
+              <label className="bk-label" htmlFor="rq-when">
+                Best time to {mode === 'video' ? 'arrange it' : 'ring you'}
+              </label>
+              <select id="rq-when" className="bk-input" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
+                {WHEN_CHOICES.map((w) => (
+                  <option key={w.key} value={w.key}>
+                    {w.label}
+                  </option>
+                ))}
+              </select>
+              <div className="bk-hp" aria-hidden="true">
+                <label htmlFor="rq-cw">Company website</label>
+                <input id="rq-cw" tabIndex={-1} autoComplete="off" value={d.company_website} onChange={field('company_website')} />
+              </div>
+              <p className="bk-small">
+                We’ll be in touch within a working day. See our{' '}
+                <a href="/privacy-policy" target="_blank" rel="noreferrer">
+                  privacy policy
+                </a>
+                .
+              </p>
+              {err}
+              <button type="submit" className="bk-btn bk-btn--wide" disabled={busy}>
+                {busy ? 'Sending…' : mode === 'video' ? 'Request a video call' : 'Request a phone call'}
+              </button>
+            </form>
+          )}
         </section>
       )}
 
@@ -884,7 +1027,13 @@ export function BookingFlow(p: BookingFlowProps) {
       {step === 'callbackDone' && (
         <section className="bk-card bk-card--done">
           {heading(<>Thanks{cb.name.trim() ? `, ${cb.name.trim().split(/\s+/)[0]}` : ''}. We’ll call you soon</>)}
-          <p>We’ll ring you to arrange your free survey, usually within a working day.</p>
+          {requested === 'video' ? (
+            <p>We’ll email you a link and arrange a time for your video call, usually within a working day.</p>
+          ) : requested === 'phone' ? (
+            <p>We’ll ring you{when === 'any' ? '' : ` in the ${when}`}, usually within a working day.</p>
+          ) : (
+            <p>We’ll ring you to arrange your free survey, usually within a working day.</p>
+          )}
         </section>
       )}
 

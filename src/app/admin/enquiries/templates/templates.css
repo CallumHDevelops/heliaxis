@@ -271,3 +271,52 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* First messages: sending by itself and when, then each ad (video) with the template its leads get. */
+.wat-first {
+  margin: 0.75rem 0;
+}
+.wat-h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.wat-times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+}
+.wat-times .wa-input.wa-time {
+  width: 4.5rem;
+  min-width: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.wat-ad {
+  align-items: flex-start;
+}
+.wat-ad > div {
+  flex: 1;
+}
+.wat-ad-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.wat-ad select {
+  margin-top: 0.3rem;
+  max-width: 28rem;
+}
+.wat-ad small.wat-ad-words {
+  color: var(--text-2);
+  font-style: italic;
+}
+/* Phones: the template box gets the full width, with Write one for this video under it. */
+@media (max-width: 560px) {
+  .wat-ad {
+    flex-wrap: wrap;
+  }
+  .wat-ad > div {
+    flex-basis: 100%;
+  }
+}

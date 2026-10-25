@@ -1,0 +1,36 @@
+# Checks every pull request: type-check, the Social monitoring lint, and the tests.
+#
+# The rest of the app has lint errors from before this workflow existed (npm run lint reports ~140),
+# so lint is checked only for the new Social monitoring code (npm run lint:social). Widen it as the
+# older code is cleaned up.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Lint (Social monitoring code)
+        run: npm run lint:social
+      - name: Tests
+        run: npm test

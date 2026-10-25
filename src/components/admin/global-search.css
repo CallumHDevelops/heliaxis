@@ -286,7 +286,8 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-@media (max-width: 1180px) {
+/* An icon when the header is narrow: the window, or the room left beside the open WhatsApp dock (admin-shell.css). */
+@container hx-header (max-width: 1120px) {
   .hx-search {
     width: 36px;
     padding: 0;

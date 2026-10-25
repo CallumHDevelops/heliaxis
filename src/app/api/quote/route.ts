@@ -20,6 +20,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // The hidden "company website" box: only bots fill it in. Say thanks and do nothing.
+    if (typeof body.company_website === 'string' && body.company_website.trim()) {
+      return NextResponse.json({ success: true, message: 'Thank you.' });
+    }
+
     const interestsArr = Array.isArray(body.interests)
       ? body.interests.map((x: unknown) => String(x || '').trim()).filter(Boolean)
       : [];

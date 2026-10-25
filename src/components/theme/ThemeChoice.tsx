@@ -2,7 +2,7 @@
 
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { setTheme, useThemePref } from '@/lib/theme/client';
-import { THEME_GROUP_LABEL, THEME_LABELS, THEME_PREFS, type ThemePref } from '@/lib/theme/shared';
+import { DEFAULT_PREF, THEME_GROUP_LABEL, THEME_LABELS, THEME_PREFS, type ThemePref } from '@/lib/theme/shared';
 import './theme-choice.css';
 
 const SVG = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
@@ -35,7 +35,7 @@ const ICONS: Record<ThemePref, ReactNode> = {
 export function ThemeChoice({
   variant = 'inline',
   size = 'md',
-  serverPref = 'system',
+  serverPref = DEFAULT_PREF,
   className,
 }: {
   variant?: 'inline' | 'menu';

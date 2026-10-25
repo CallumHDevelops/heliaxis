@@ -17,7 +17,7 @@ import './wa-template.css';
  * knows (WhatsApp templates saves which field fills which blank). Everything stays editable.
  */
 
-type Values = Partial<Record<FieldKey, string>>;
+export type Values = Partial<Record<FieldKey, string>>;
 export type TemplatePick = { name: string; lang: string; params: string[] };
 
 /** What each blank is for. Templates nobody has described keep the old guess: {{1}} = first name. */
@@ -29,7 +29,8 @@ export function blankLabels(t: WaTemplate): string[] {
   });
 }
 
-function prefill(t: WaTemplate, values: Values): string[] {
+/** A template's blanks filled from the customer's details, as far as they go (the rest left for typing). */
+export function prefill(t: WaTemplate, values: Values): string[] {
   return Array.from({ length: t.params }, (_, i) => {
     if (!t.blanks) return i === 0 ? values.first_name || '' : '';
     const b = t.blanks[i];
@@ -67,6 +68,8 @@ export function useTemplateSend(enquiryId: string, enabled: boolean, preferred?:
   const selected = data?.items.find((t) => t.name === pick?.name && t.language === pick?.lang) ?? null;
   return {
     templates: data?.items ?? null,
+    /** The customer's details the blanks are filled from. */
+    values: data?.values ?? null,
     pick,
     selected,
     choose(key: string) {

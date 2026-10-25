@@ -3,7 +3,7 @@ import type { Viewport } from 'next';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
 import { decodeThemeRoute, themeViewportFor, type ThemeRoute } from './routes';
-import { parsePref, parseScheme, resolveTheme, SCHEME_COOKIE, THEME_COOKIE, THEME_ROUTE_HEADER, type ResolvedTheme, type ThemePref } from './shared';
+import { DEFAULT_PREF, parsePref, parseScheme, resolveTheme, SCHEME_COOKIE, THEME_COOKIE, THEME_ROUTE_HEADER, type ResolvedTheme, type ThemePref } from './shared';
 
 export type ThemeContext = {
   /**
@@ -22,11 +22,11 @@ export const themeContext = cache(async (): Promise<ThemeContext> => {
   const [h, jar] = await Promise.all([headers(), cookies()]);
   const header = h.get(THEME_ROUTE_HEADER);
   // The middleware sets the header on every page request (empty for the website); none means prerendered.
-  if (header === null) return { route: undefined, pref: 'system', resolved: undefined };
+  if (header === null) return { route: undefined, pref: DEFAULT_PREF, resolved: undefined };
   const route = decodeThemeRoute(header);
-  if (!route) return { route: null, pref: 'system', resolved: undefined };
+  if (!route) return { route: null, pref: DEFAULT_PREF, resolved: undefined };
   if (route.scope === 'light') return { route, pref: 'light', resolved: 'light' };
-  const pref = parsePref(jar.get(THEME_COOKIE)?.value) ?? 'system';
+  const pref = parsePref(jar.get(THEME_COOKIE)?.value) ?? DEFAULT_PREF;
   return { route, pref, resolved: resolveTheme(pref, parseScheme(jar.get(SCHEME_COOKIE)?.value)) };
 });
 

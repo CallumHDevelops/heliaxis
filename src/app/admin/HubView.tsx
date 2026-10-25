@@ -5,7 +5,6 @@ import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import { HubMetaLeads } from './HubMetaLeads';
 import { HubSearch } from '@/components/admin/GlobalSearch';
-import { isPinnedLight } from '@/lib/theme/routes';
 import type { HubMetaLeads as MetaLeads } from './meta-leads';
 import './hub.css';
 
@@ -40,6 +39,7 @@ const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   analytics: '<path d="M5 19V10M10 19V5M15 19v-6M20 19v-9"/>',
   subcontractors: '<circle cx="9" cy="8" r="3"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="m15.5 10.5 2 2 3.5-4"/>',
   social: '<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="12" cy="12" r="3.5"/><circle cx="16.8" cy="7.2" r=".6" fill="currentColor"/>',
+  social_monitoring: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8.5 10h7M8.5 13h4"/>',
   team: '<circle cx="8" cy="8" r="2.6"/><circle cx="16" cy="8" r="2.6"/><path d="M3 19c0-2.8 2.2-4.8 5-4.8s5 2 5 4.8"/><path d="M11 19c0-2.8 2.2-4.8 5-4.8s5 2 5 4.8"/>',
   rams: '<path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
   users: '<circle cx="9" cy="8" r="3"/><path d="M3 19c0-3 2.5-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M21 19c0-2.2-1.5-3.8-4-4.2"/>',
@@ -70,57 +70,6 @@ function WaIcon() {
       <path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.4L3.5 20.5l1.5-4.3A8.5 8.5 0 1 1 20.5 11.6z" />
       <path d="M9 9.5c.3 1.8 1.7 3.6 3.6 4.4l1.2-1 1.7.8-.4 1.3c-2.9.3-6.4-2.8-6.6-5.8l1.3-.4.8 1.7z" />
     </svg>
-  );
-}
-
-function Card({
-  href,
-  icon,
-  label,
-  description,
-  badge,
-  external,
-  variant,
-  desktopOnly,
-}: {
-  href: string;
-  icon: keyof typeof ICONS;
-  label: string;
-  description: string;
-  badge?: string | null;
-  external?: boolean;
-  variant?: 'admin';
-  /** Shown on phones: this one needs a bigger screen. */
-  desktopOnly?: boolean;
-}) {
-  const body = (
-    <>
-      <span className="hub-card-top">
-        <span className="hub-icon"><Icon k={icon} /></span>
-        <span className="hub-title">{label}</span>
-      </span>
-      <span className="hub-desc">{description}</span>
-      {desktopOnly && <span className="hub-desktop">Best on a tablet or computer</span>}
-      <span className="hub-card-foot">
-        {badge ? <span className="hub-badge">{badge}</span> : <span />}
-        <span className="hub-open">{external ? 'Open app ↗' : 'Open →'}</span>
-      </span>
-    </>
-  );
-  const cls = `hub-card${variant ? ` is-${variant}` : ''}${badge ? ' has-badge' : ''}`;
-  // Our own /api/sso/… links stay in this window: on an iPhone Home Screen app a new window is
-  // Safari, which doesn't have this sign-in.
-  return external ? (
-    href.startsWith('/') ? (
-      <a className={cls} href={href}>{body}</a>
-    ) : (
-      <a className={cls} href={href} target="_blank" rel="noopener noreferrer">{body}</a>
-    )
-  ) : isPinnedLight(href) ? (
-    // The CMS editor is pinned light: a full load, so it never starts in this page's dark theme.
-    <a className={cls} href={href}>{body}</a>
-  ) : (
-    <Link className={cls} href={href}>{body}</Link>
   );
 }
 
@@ -161,8 +110,6 @@ export function HubView({
   search?: boolean;
 }) {
   const isAdmin = usersBadge !== undefined;
-  const internal = portals.filter((p) => !p.external);
-  const apps = portals.filter((p) => p.external);
   // One even row per area that needs someone: icon, name, a big number.
   const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' | 'metis' }[] = [
     { key: 'whatsapp', label: 'WhatsApp', href: '/admin/enquiries/inbox', icon: 'whatsapp' },
@@ -198,8 +145,10 @@ export function HubView({
         <p className="hub-banner">You don&apos;t have access to that area. Ask an admin to add it to your account.</p>
       )}
 
+      <div className="hub-cols">
+        <div className="hub-col-needs">
       {attention.length > 0 && (
-        <section className="hub-needs hx-moment" aria-label="Needs your attention">
+        <section className="hub-needs hub-col hx-moment" aria-label="Needs your attention">
           <h2 className="hub-needs-h">Needs you</h2>
           <ul>
             {attention.map((a) => (
@@ -220,7 +169,16 @@ export function HubView({
         </section>
       )}
 
+        </div>
+        <div className="hub-col-leads">
       {metaLeads && <HubMetaLeads data={metaLeads} />}
+
+        </div>
+        <div className="hub-col-tasks">
+      <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} todayList={todayList} />
+
+        </div>
+      </div>
 
       {assistant && (
         <Link href="/admin/assistant" className="hub-claude">
@@ -240,70 +198,8 @@ export function HubView({
 
       <FromClaude {...setup} />
 
-      <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} todayList={todayList} />
-
-      {portals.length === 0 && !isAdmin ? (
+      {portals.length === 0 && !isAdmin && (
         <p className="hub-banner">No portals have been added to your account yet. Ask an admin to give you access.</p>
-      ) : (
-        <>
-          {internal.length > 0 && (
-            <section className="hub-section">
-              <h2 className="hub-h2">Workspace</h2>
-              <div className="hub-grid">
-                {internal.map((p) => (
-                  <Card
-                    key={p.key}
-                    href={p.href}
-                    icon={p.key}
-                    label={p.label}
-                    description={p.description}
-                    badge={p.badge}
-                    desktopOnly={p.key === 'cms'}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {apps.length > 0 && (
-            <section className="hub-section">
-              <h2 className="hub-h2">Apps</h2>
-              <div className="hub-grid">
-                {apps.map((p) => (
-                  <Card key={p.key} href={p.href} icon={p.key} label={p.label} description={p.description} badge={p.badge} external />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className="hub-section">
-            <h2 className="hub-h2">On your phone</h2>
-            <div className="hub-grid">
-              <Card
-                href="/admin/app"
-                icon="app"
-                label="Android app"
-                description="Install Heliaxis on your phone or tablet. Tasks work offline."
-              />
-            </div>
-          </section>
-
-          {isAdmin && (
-            <section className="hub-section">
-              <h2 className="hub-h2">Admin</h2>
-              <div className="hub-grid">
-                <Card
-                  href="/admin/users"
-                  icon="users"
-                  label="Users & access"
-                  description="Approve sign-ups and choose which portals each person can open."
-                  badge={usersBadge}
-                  variant="admin"
-                />
-              </div>
-            </section>
-          )}
-        </>
       )}
     </div>
   );

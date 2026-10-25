@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 const ukToday = () => ukDay(Date.now());
 
 /**
- * Projects → Purchase orders: every order on every job (deliveries due soonest first), and the
+ * Finance → Purchase orders: every order on every job (deliveries due soonest first), and the
  * suppliers (?view=suppliers). ?po= opens one. Read here too, so the first paint has them.
  */
 export default async function PurchaseOrdersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -25,7 +25,7 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
   const view: OrdersView = sp.view === 'suppliers' ? 'suppliers' : 'orders';
   const po = typeof sp.po === 'string' && isUuid(sp.po) ? sp.po : null;
   return (
-    <AdminShell active="crm" fluid>
+    <AdminShell active="orders" fluid>
       <OrdersPage ready={ready} initial={orders} today={ukToday()} initialView={view} openId={po} myName={session.profile.full_name ?? null} />
     </AdminShell>
   );

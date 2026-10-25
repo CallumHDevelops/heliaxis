@@ -1,0 +1,90 @@
+{
+  "_stored_in": "cms_kv, key 'social-monitoring'. Admins edit these on Social Monitoring › Settings.",
+  "booking.links": {
+    "survey": "https://heliaxis.co.uk/book-a-survey",
+    "call": "https://heliaxis.co.uk/book-a-call",
+    "quote": "https://heliaxis.co.uk/book-a-call?reason=quote"
+  },
+  "booking.review_short_link": "heliaxis.co.uk/book",
+  "booking.utm_sources": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+  ],
+  "office_phone": "01633 965205",
+  "signoff_default": "The Heliaxis team",
+  "quiet_hours": {
+    "start": "21:00",
+    "end": "07:30",
+    "tz": "Europe/London",
+    "applies_to": [
+      "high"
+    ]
+  },
+  "business_hours": {
+    "days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri",
+      "sat"
+    ],
+    "start": "08:00",
+    "end": "20:00",
+    "tz": "Europe/London"
+  },
+  "sla_minutes": {
+    "critical": 60,
+    "high": 240,
+    "medium": 360,
+    "low": 360,
+    "positive": 360
+  },
+  "sla_clock": {
+    "critical": "24x7",
+    "high": "business_hours",
+    "medium": "business_hours",
+    "low": "business_hours",
+    "positive": "business_hours"
+  },
+  "digest_time": "08:30",
+  "heartbeat": {
+    "time": "10:05",
+    "recipient": "first_admin"
+  },
+  "push_show_excerpt": true,
+  "approved_offers": [
+    "free survey",
+    "free, no-obligation survey",
+    "free no-obligation survey",
+    "book a free survey"
+  ],
+  "local_area": {
+    "postcode_areas": [
+      "CF",
+      "NP",
+      "SA"
+    ],
+    "postcode_districts": [
+      "LD3",
+      "NP22",
+      "NP23"
+    ],
+    "base_postcode": null,
+    "radius_km": 60
+  },
+  "vendor_caps_pence_per_month": {
+    "google_places": 0,
+    "ai_answer_check": 500,
+    "total": 1000,
+    "note": "Places stays inside Google's free allowance; the AI-answer check is the only paid item. No paid rank tracking."
+  },
+  "retention": {
+    "raw_payload_days": 90,
+    "mention_months_after_close": 24,
+    "audit_years": 6
+  }
+}

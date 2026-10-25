@@ -6,7 +6,7 @@
  * (profiles.portals). Safe to import from middleware, server and client code.
  */
 
-export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'team' | 'social' | 'rams';
+export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'social_monitoring' | 'team' | 'social' | 'rams';
 
 export type Portal = {
   key: PortalKey;
@@ -77,6 +77,14 @@ export const PORTALS: Portal[] = [
     paths: ['/admin/subcontractors'],
   },
   {
+    key: 'social_monitoring',
+    label: 'Social monitoring',
+    description: 'Comments and reviews about Heliaxis on Facebook, Instagram, Trustpilot and Google: urgent ones flagged, replies drafted for you to copy and post.',
+    href: '/admin/social',
+    // Not the Social media studio ('social', a separate app). Everyone with this tick is notified of urgent comments.
+    paths: ['/admin/social'],
+  },
+  {
     key: 'team',
     label: 'Our team',
     description: 'Heliaxis’s own operatives — cards, qualifications and expiry dates (kept in RAMS).',
@@ -123,6 +131,9 @@ export const HUB_PATH = '/admin';
 /** Also open to every approved user: the Android app download page. */
 export const APP_PATH = '/admin/app';
 
+/** Help (how to use every part of the app): open to every approved user. */
+export const HELP_PATH = '/admin/help';
+
 /** Confirming your email before one-tap sign-in to RAMS or the social studio (src/lib/sso.ts): open to any approved user. */
 export const SSO_PATH = '/admin/sso';
 
@@ -150,13 +161,14 @@ export function canAccess(profile: AccessProfile | null | undefined, key: Portal
 }
 
 /**
- * Which portal an /admin path belongs to: null = open to any approved user (the hub, setup guides),
+ * Which portal an /admin path belongs to: null = open to any approved user (the hub, setup guides, Help),
  * 'admin' = admin only. Unknown /admin/<x> paths are old CMS page-editor links
  * (now /admin/cms/<x>) and are redirected there, so they count as the CMS.
  */
 export function portalForPath(pathname: string): PortalKey | 'admin' | null {
   const p = pathname.replace(/\/$/, '') || '/';
   if (p === HUB_PATH || p === APP_PATH || p === SSO_PATH || p.startsWith(`${SSO_PATH}/`)) return null;
+  if (p === HELP_PATH || p.startsWith(`${HELP_PATH}/`)) return null;
   if (OPEN_SETUP_PATHS.some((a) => p.startsWith(`${a}/`))) return null;
   if (ADMIN_ONLY_PATHS.some((a) => p === a || p.startsWith(`${a}/`))) return 'admin';
   for (const portal of PORTALS) {

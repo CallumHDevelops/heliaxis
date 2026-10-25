@@ -19,8 +19,8 @@ export const metadata: Metadata = {
 const WHATSAPP = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '441633965439').replace(/\D/g, '');
 const YEAR = new Date().getFullYear();
 
-/** The public booking form. ?type=solar|ashp|solar_ashp and ?postcode= pre-fill it (from website buttons and ads). */
-export default async function BookASurvey({ searchParams }: { searchParams: Promise<{ type?: string; postcode?: string }> }) {
+/** The public booking form. ?type=solar|ashp|solar_ashp and ?postcode= pre-fill it (from website buttons and ads); ?mode=phone|video starts on a phone or video call request; ?reason=quote marks it a quote consultation. */
+export default async function BookASurvey({ searchParams }: { searchParams: Promise<{ type?: string; postcode?: string; mode?: string; reason?: string }> }) {
   const q = await searchParams;
   const [ready, s] = await Promise.all([schemaReady(), getBookingSettings()]);
   const enabled = ready.booking && s.enabled && s.surveyors.length > 0;
@@ -38,6 +38,8 @@ export default async function BookASurvey({ searchParams }: { searchParams: Prom
           <BookingFlow
             enabled={enabled}
             initialType={isSurveyType(q.type) ? q.type : null}
+            initialMode={q.mode === 'phone' || q.mode === 'video' ? q.mode : null}
+            initialReason={q.reason === 'quote' ? 'quote' : null}
             initialPostcode={postcode}
             durations={s.durations}
             intro={s.advanced.intro}

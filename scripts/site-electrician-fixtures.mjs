@@ -5,7 +5,7 @@
 
 export const SYSTEM = { kwp: 7.2, panel_count: 16, panel_model: 'Aiko Neostar 2P 450W', inverter_model: 'Sigenergy SigenStor EC 6.0 SP', battery_model: 'Sigenergy SigenStor BAT 8.0' };
 export const DESIGN = { strings_design: [8, 8], optimisers: false, mounting: 'on_roof', roof_faces: 'Rear roof', battery_backup: false };
-export const ROOFER = { RF10: 2, RF11: [8, 8], RF13: 'Aiko Neostar 2P 450W', RF14: 49.4, RF7: 'no', RX5: 16, RX1: 'yes', RX2: 'yes', RX4: 'yes' };
+export const ROOFER = { RF10: 2, RF11: [8, 8], RF13: 'Aiko Neostar 2P 450W', RF14: 49.4, RF7: 'no', RX5: 16, RX1: 'yes', RX2: 'yes', RX3: 'no', RX4: 'yes', RX10: 'on_roof', RX11: 'yes', RX12: 'yes', RX13: 'yes', RX14: 'yes' };
 export const wrap = (vals, src = 'typed') => Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, { v, src, at: '2026-11-03T10:00:00Z' }]));
 export const PNG = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
 

@@ -13,6 +13,8 @@ import {
   FinanceSection,
   FaqAccordion,
   QuoteForm,
+  CtaBand,
+  TALK_LINKS,
   FinalCta,
   SiteFooter,
   MobileCta,
@@ -51,10 +53,27 @@ function MarketingHome() {
       <SplitCards />
       <EstimatorBand />
       <ProcessSteps />
+      <CtaBand
+        variant="solar"
+        eyebrow="Step one is free"
+        title="Book your free home survey"
+        text="Pick a time that suits you. We come to you, look at your home and give honest figures. No obligation."
+        primary={{ label: 'Book a free survey', href: '/book-a-survey' }}
+        secondary={{ label: 'Get a quote in a minute', href: '/get-a-quote' }}
+      />
       <Testimonials />
       <Gallery />
       <FinanceSection />
       <FaqAccordion />
+      <CtaBand
+        variant="paper"
+        eyebrow="Still got a question?"
+        title="Talk to a real person"
+        text="Ring us, book a call or a video chat, or message us on WhatsApp. No pressure, no sales scripts."
+        primary={{ label: 'Book a call', href: '/book-a-call' }}
+        secondary={{ label: 'Get my free quote', href: '/get-a-quote' }}
+        links={TALK_LINKS}
+      />
       <QuoteForm />
       <FinalCta />
       <SiteFooter />

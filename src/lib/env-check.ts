@@ -66,6 +66,26 @@ export const ENV_GROUPS: EnvGroup[] = [
     ],
   },
   {
+    title: 'Social monitoring',
+    what: 'Comments and reviews about Heliaxis on Facebook, Instagram, Trustpilot and Google. It reuses the Meta, Anthropic and notification keys above. Everything here is optional until its source is switched on.',
+    vars: [
+      { name: 'META_SOCIAL_TOKEN', secret: true, optional: true, hint: 'Business settings → System users → Generate token (comment, Page and Instagram read permissions)' },
+      { name: 'META_PAGE_ID', secret: false, optional: true, hint: 'The Facebook Page to watch (Page → About → Page ID)' },
+      { name: 'META_IG_USER_ID', secret: false, optional: true, hint: 'The linked Instagram professional account ID' },
+      { name: 'META_IG_TOKEN', secret: true, optional: true, hint: 'Meta app → Instagram → API setup with Instagram login → Generate token (lasts 60 days)' },
+      { name: 'META_IG_APP_SECRET', secret: true, optional: true, hint: 'Meta app → Instagram → API setup with Instagram login → Instagram app secret' },
+      { name: 'GOOGLE_BP_CLIENT_ID', secret: false, optional: true, hint: 'Google Cloud → APIs & Services → Credentials (Business Profile API)' },
+      { name: 'GOOGLE_BP_CLIENT_SECRET', secret: true, optional: true, hint: 'Same page as the client ID' },
+      { name: 'GOOGLE_BP_REFRESH_TOKEN', secret: true, optional: true, hint: 'Created once with the admin-only Connect Google button in Social monitoring settings' },
+      { name: 'GOOGLE_BP_LOCATION', secret: false, optional: true, hint: 'The Business Profile location, e.g. accounts/123/locations/456' },
+      { name: 'TRUSTPILOT_API_KEY', secret: true, optional: true, hint: 'Trustpilot Business → Integrations → API' },
+      { name: 'TRUSTPILOT_API_SECRET', secret: true, optional: true, hint: 'Same page as the API key' },
+      { name: 'TRUSTPILOT_BUSINESS_UNIT_ID', secret: false, optional: true, hint: 'Trustpilot Business → your business unit ID' },
+      { name: 'SOCIAL_REVIEW_MAILBOX', secret: false, optional: true, hint: 'The Microsoft 365 mailbox that gets Google and Trustpilot review emails, e.g. reviews@heliaxis.co.uk' },
+      { name: 'SOCIAL_AUTHOR_PEPPER', secret: true, optional: true, hint: 'Any long random text. Used to hash commenter ids so repeat commenters can be spotted without storing who they are' },
+    ],
+  },
+  {
     title: 'Android app notifications',
     what: 'Native notifications in the Android app (Firebase). Without it the app falls back to the phone notifications above.',
     vars: [
