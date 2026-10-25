@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
 import { TodayList } from './HubMyDay';
-import { NextUp } from './NextUp';
+import { MetaLeadsPanel, TodoPanel } from './DashPanels';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import { HubSearch } from '@/components/admin/GlobalSearch';
@@ -168,12 +168,11 @@ export function HubView({
       )}
 
       <div className="hub-work">
-        <NextUp leads={metaLeads} tasks={tasks} followUps={followUps} today={todayIso} />
-        {todayList && (
-          <div className="hub-work-side">
-            <TodayList today={todayList} />
-          </div>
-        )}
+        {metaLeads && <MetaLeadsPanel leads={metaLeads} />}
+        <div className="hub-work-side">
+          {todayList && todayList.items.length > 0 && <TodayList today={todayList} />}
+          <TodoPanel tasks={tasks} followUps={followUps} today={todayIso} />
+        </div>
       </div>
 
       {assistant && (
