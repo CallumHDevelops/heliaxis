@@ -22,6 +22,9 @@ export async function POST(req: Request) {
     email: str('email', 200) || undefined,
     postcode: str('postcode', 12),
     type: isSurveyType(b.type) ? b.type : 'solar',
+    mode: b.mode === 'phone' || b.mode === 'video' ? b.mode : undefined,
+    when: b.when === 'morning' || b.when === 'afternoon' || b.when === 'evening' ? b.when : undefined,
+    reason: b.reason === 'quote' ? 'quote' : undefined,
     source: sourceLabel(parseAttribution((await cookies()).get(ATTR_COOKIE)?.value)),
   });
   return publicJson(o.body, o.status);

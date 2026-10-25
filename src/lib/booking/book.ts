@@ -1519,10 +1519,26 @@ export async function bookingForToken(token: string): Promise<{ b: BookingRow } 
 }
 
 /** "Too far for online booking: call me." A new customer and job with a next step to call them. */
-export async function requestCallback(x: { name: string; phone: string; email?: string; postcode: string; type: SurveyTypeKey; source: string | null }): Promise<Outcome> {
+/**
+ * A callback request. With no `mode` it is the old "you're outside the online booking area, call me" request.
+ * With mode 'phone' or 'video' it is a customer choosing to speak to us that way instead of a home survey (the
+ * website form's "How would you like to speak to us?"): no time slots, the team arranges it.
+ */
+export async function requestCallback(x: {
+  name: string;
+  phone: string;
+  email?: string;
+  postcode: string;
+  type: SurveyTypeKey;
+  source: string | null;
+  mode?: 'phone' | 'video';
+  when?: 'morning' | 'afternoon' | 'evening';
+  reason?: 'quote';
+}): Promise<Outcome> {
   if (x.name.trim().length < 2) return { status: 400, body: { error: 'Please enter your name.' } };
   if (!toWaId(x.phone)) return { status: 400, body: { error: 'Please check your phone number.' } };
   if (x.email && !EMAIL.test(x.email)) return { status: 400, body: { error: 'Please check your email address.' } };
+  if (x.mode === 'video' && !x.email) return { status: 400, body: { error: 'Please enter your email so we can send the video link.' } };
   if (!normPostcode(x.postcode)) return { status: 400, body: { error: 'Please check your postcode.' } };
   const made = await createWebsiteCustomer(
     { name: x.name, email: x.email || '', phone: x.phone, address: '', postcode: x.postcode, optIn: false },
@@ -1530,9 +1546,24 @@ export async function requestCallback(x: { name: string; phone: string; email?: 
     x.source
   );
   if (!made) return UNAVAILABLE;
-  await logActivity({ enquiryId: made.enquiryId, projectId: made.projectId, kind: 'system', body: `Asked us to call to arrange a ${typeShort(x.type)} survey (outside the online booking area)` }).catch(() => null);
-  await setNextStep(made.projectId, 'Call to arrange survey (outside online booking area)');
-  await pushStaff({ projectId: made.projectId, title: `Call ${x.name} to arrange a survey`, body: `${spacedPostcode(normPostcode(x.postcode) as string)}: outside the online booking area`, href: `/admin/crm/${made.projectId}` });
+  const pc = spacedPostcode(normPostcode(x.postcode) as string);
+  if (x.mode) {
+    const way = x.mode === 'video' ? 'a video call' : 'a phone call';
+    const quote = x.reason === 'quote' ? ' (quote consultation)' : '';
+    const best = x.when ? `, best in the ${x.when}` : '';
+    await logActivity({ enquiryId: made.enquiryId, projectId: made.projectId, kind: 'system', body: `Asked for ${way}${quote} about ${typeShort(x.type)}${best}` }).catch(() => null);
+    await setNextStep(made.projectId, x.mode === 'video' ? `Arrange video call and email them the link${best}` : `Call them${best}`);
+    await pushStaff({
+      projectId: made.projectId,
+      title: x.mode === 'video' ? `Arrange a video call with ${x.name}` : `Call ${x.name}`,
+      body: `${pc}: asked for ${way}${quote}${best}`,
+      href: `/admin/crm/${made.projectId}`,
+    });
+  } else {
+    await logActivity({ enquiryId: made.enquiryId, projectId: made.projectId, kind: 'system', body: `Asked us to call to arrange a ${typeShort(x.type)} survey (outside the online booking area)` }).catch(() => null);
+    await setNextStep(made.projectId, 'Call to arrange survey (outside online booking area)');
+    await pushStaff({ projectId: made.projectId, title: `Call ${x.name} to arrange a survey`, body: `${pc}: outside the online booking area`, href: `/admin/crm/${made.projectId}` });
+  }
   if (made.duplicateOf) {
     const { data: dup } = await createAdminClient().from('enquiries').select('name').eq('id', made.duplicateOf).maybeSingle();
     await logActivity({ enquiryId: made.enquiryId, projectId: made.projectId, kind: 'system', body: `Possible duplicate of ${dup?.name || 'another customer'}`, meta: { duplicate_of: made.duplicateOf } }).catch(() => null);

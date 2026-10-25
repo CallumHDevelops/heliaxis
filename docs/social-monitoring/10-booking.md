@@ -27,15 +27,19 @@ The booking portal already exists in the app, so this is an adaptation, not a ne
   (`utm_source`: facebook | instagram | trustpilot | google | manual).
 - The three destination URLs live in Social Monitoring settings (`cms_kv` key `social-monitoring`). An admin can change them without a code release.
 
-## 2. The three booking types
+## 2. How people choose to speak to us (built, 25 Oct)
 
-| Type | Today | Change needed |
-|---|---|---|
-| **Survey** | `/book-a-survey` | None. Linked directly with UTM tags |
-| **Phone call** | A callback request only appears when a postcode is too far to book online | Add a page **`/book-a-call`**: the same form as the callback request (name, phone, email, postcode, interest), creating the same callback record and the same CRM lead, with the UTM source kept. No time slots: the team calls back (keeps the existing "we call them" process) |
-| **Quote consultation** | Doesn't exist | **Option A (recommended)**: `/book-a-call?reason=quote`, a callback flagged "Quote consultation" on the lead. **Option B**: bookable slots in the diary. Needs Cal's decision; Option A is the default |
+The website form `/book-a-survey` now opens with **"How would you like to speak to us?"** and three choices:
 
-Requirements for the new pages: reuse `publicGuard`, `rateHit`, the honeypot and Turnstile from `src/lib/booking/rate-limit.ts`; reuse the existing confirmation email style through Resend; create the lead through the same code path as `/api/book/callback`, so Operations sees it the way it sees callbacks today.
+| Choice | What happens |
+|---|---|
+| **In-person consultation** (default) | The existing flow, unchanged: what it's for, postcode, pick a time, details, confirmation. A free survey at the customer's home |
+| **Phone call** | A short request form (what it's for, name, phone, email optional, postcode, best time: any / morning / afternoon / evening). It becomes a lead in the CRM with the next step "Call them", and staff get a notification |
+| **Video call** | The same form with email required. Next step "Arrange video call and email them the link"; staff get a notification |
+
+Phone and video go through `/api/book/callback` (same spam protection, rate limit and honeypot as before) with `mode`, `when` and `reason`. No time slots are offered for them: the team arranges the time. If Cal later wants bookable phone or video slots, that is a separate piece of work.
+
+Short links: **`/book-a-call`** opens the form on Phone call and keeps `utm_` tags (`?reason=quote` marks a quote consultation). `/book-a-survey?mode=video` opens on Video call. A customer's own booking link (`/book/{token}`) is unchanged and does not show the choice.
 
 ## 3. Booking links inside reply drafts
 
