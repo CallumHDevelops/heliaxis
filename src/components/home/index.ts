@@ -10,6 +10,7 @@ export { Gallery } from './Gallery';
 export { FinanceSection } from './FinanceSection';
 export { FaqAccordion } from './FaqAccordion';
 export { QuoteForm } from './QuoteForm';
+export { CtaBand, TALK_LINKS } from './CtaBand';
 export { FinalCta } from './FinalCta';
 export { SiteFooter } from './SiteFooter';
 export { MobileCta } from './MobileCta';

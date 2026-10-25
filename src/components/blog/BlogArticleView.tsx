@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { BlogBodyBlock, BlogPost } from '@/lib/blog/types';
 import { formatPostDate } from '@/lib/blog/visibility';
+import { CtaBand, TALK_LINKS } from '@/components/home/CtaBand';
 
 function BodyBlocks({ blocks }: { blocks: BlogBodyBlock[] }) {
   return (
@@ -80,6 +81,16 @@ export function BlogArticleView({
       </div>
 
       <BodyBlocks blocks={post.body} />
+
+      <CtaBand
+        variant="dark"
+        eyebrow="Free, no obligation"
+        title="Thinking about solar, a battery or a heat pump?"
+        text="Answer a few quick questions and we’ll call within 1 working day, or book a free survey at a time that suits you."
+        primary={{ label: 'Get my free quote', href: '/get-a-quote' }}
+        secondary={{ label: 'Book a free survey', href: '/book-a-survey' }}
+        links={TALK_LINKS}
+      />
 
       {related.length > 0 && (
         <section className="blog-related">

@@ -17,7 +17,8 @@ const tick = (
 );
 
 /** The quote form on its own page: a few quick questions, one at a time. Link ads and buttons here. */
-export default function GetAQuote() {
+export default async function GetAQuote({ searchParams }: { searchParams: Promise<{ for?: string }> }) {
+  const q = await searchParams;
   return (
     <>
       <main className="sqp">
@@ -47,7 +48,7 @@ export default function GetAQuote() {
           </div>
         </aside>
         <section className="sqp-form" aria-label="Quote request">
-          <StepQuoteForm variant="page" />
+          <StepQuoteForm variant="page" initialWho={q.for === 'business' || q.for === 'home' ? q.for : undefined} />
         </section>
       </main>
       <SiteFooter />

@@ -38,9 +38,10 @@ function track(step: number) {
   }
 }
 
-export function StepQuoteForm({ variant = 'card' }: { variant?: 'card' | 'page' }) {
-  const [step, setStep] = useState<Step>(1);
-  const [who, setWho] = useState<Who>('');
+export function StepQuoteForm({ variant = 'card', initialWho }: { variant?: 'card' | 'page'; initialWho?: 'home' | 'business' }) {
+  // ?for=business (or home) on /get-a-quote answers the first question for them.
+  const [step, setStep] = useState<Step>(initialWho ? 2 : 1);
+  const [who, setWho] = useState<Who>(initialWho ?? '');
   const [picks, setPicks] = useState<string[]>([]);
   const [site, setSite] = useState('');
   const [postcode, setPostcode] = useState('');

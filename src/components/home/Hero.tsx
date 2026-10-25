@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Eyebrow } from './Eyebrow';
 import { SparkIcon } from './Spark';
 
@@ -26,6 +27,10 @@ export function Hero() {
               </a>
               <a className="btn btn-light" href="/solar-estimator">Estimate my savings</a>
             </div>
+            <p className="microtrust" style={{ marginTop: 14 }}>
+              Prefer to talk? <Link href="/book-a-call" style={{ color: 'var(--solar)', fontWeight: 600 }}>Book a call</Link> or{' '}
+              <Link href="/book-a-survey?mode=video" style={{ color: 'var(--solar)', fontWeight: 600 }}>a video chat</Link>
+            </p>
             <p className="microtrust">
               <b>Free survey</b> · <b>No obligation</b> · <b>No salespeople</b> · Insurance-backed guarantees
             </p>

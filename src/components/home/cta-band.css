@@ -1,0 +1,42 @@
+/* Call-to-action band (src/components/home/CtaBand.tsx). Uses the site tokens, none of home.css. */
+.ctab{position:relative;overflow:hidden;font-family:var(--body)}
+.ctab-in{max-width:1160px;margin:0 auto;padding:44px 24px;display:grid;grid-template-columns:1fr auto;gap:20px 40px;align-items:center}
+.ctab-eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase}
+.ctab h2{font-family:var(--display);font-weight:800;font-size:clamp(1.5rem,3vw,2.1rem);line-height:1.1;letter-spacing:-.015em;margin:8px 0 6px;max-width:26ch}
+.ctab p{margin:0;font-size:1.04rem;max-width:56ch}
+.ctab-actions{display:flex;flex-wrap:wrap;gap:12px}
+.ctab-btn{font-family:var(--display);font-weight:700;font-size:1rem;padding:.9rem 1.4rem;border-radius:2px;border:1.5px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;text-decoration:none;transition:background .2s,transform .2s,border-color .2s}
+.ctab-btn:hover{transform:translateY(-1px)}
+.ctab-links{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 22px;list-style:none;margin:0;padding:14px 0 0;border-top:1px solid currentColor;border-top-color:color-mix(in srgb,currentColor 18%,transparent);font-size:.95rem}
+.ctab-links a{text-decoration:underline;text-underline-offset:3px;font-weight:600}
+.ctab a:focus-visible{outline:3px solid currentColor;outline-offset:3px}
+
+.ctab--dark{background:var(--ink);color:var(--paper)}
+.ctab--dark .ctab-eyebrow{color:var(--solar)}
+.ctab--dark p{color:#C9C2B0}
+.ctab--dark .ctab-btn--primary{background:var(--solar);color:var(--ink)}
+.ctab--dark .ctab-btn--primary:hover{background:var(--amber)}
+.ctab--dark .ctab-btn--ghost{border-color:var(--paper);color:var(--paper)}
+.ctab--dark a{color:inherit}
+
+.ctab--paper{background:var(--paper-2);color:var(--ink)}
+.ctab--paper .ctab-eyebrow{color:#8A5600}
+.ctab--paper p{color:var(--muted)}
+.ctab--paper .ctab-btn--primary{background:var(--ink);color:var(--paper)}
+.ctab--paper .ctab-btn--primary:hover{background:var(--ink-2)}
+.ctab--paper .ctab-btn--ghost{border-color:var(--ink);color:var(--ink)}
+.ctab--paper a{color:inherit}
+
+.ctab--solar{background:var(--solar);color:var(--ink)}
+.ctab--solar .ctab-eyebrow{color:var(--ink)}
+.ctab--solar p{color:rgba(33,31,24,.82)}
+.ctab--solar .ctab-btn--primary{background:var(--ink);color:var(--paper)}
+.ctab--solar .ctab-btn--primary:hover{background:var(--ink-2)}
+.ctab--solar .ctab-btn--ghost{border-color:var(--ink);color:var(--ink)}
+.ctab--solar a{color:inherit}
+
+@media (max-width:760px){
+  .ctab-in{grid-template-columns:1fr;padding:34px 20px}
+  .ctab-btn{flex:1 1 100%}
+}
+@media (prefers-reduced-motion:reduce){.ctab-btn{transition:none}.ctab-btn:hover{transform:none}}
