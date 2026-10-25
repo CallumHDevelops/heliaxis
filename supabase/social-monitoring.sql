@@ -127,6 +127,12 @@ create table if not exists public.social_classification (
 );
 create index if not exists social_classification_mention on public.social_classification (mention_id, created_at desc);
 
+-- What kind of comment it is (set by the AI step): shown as a label and used to filter the Inbox.
+alter table public.social_classification add column if not exists comment_type text
+  check (comment_type in ('quote_request','question','positive','complaint','general','spam'));
+alter table public.social_mention add column if not exists comment_type text
+  check (comment_type in ('quote_request','question','positive','complaint','general','spam'));
+
 create table if not exists public.social_severity_override (
   id          bigint generated always as identity primary key,
   mention_id  uuid not null references public.social_mention(id) on delete cascade,

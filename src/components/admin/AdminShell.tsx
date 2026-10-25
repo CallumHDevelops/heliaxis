@@ -318,10 +318,10 @@ export async function AdminShell({
   // People with unread WhatsApp messages, once per number: every chat for Enquiries staff, chats with
   // a job for CRM staff (who use /admin/crm/chats instead of the inbox).
   const chats = can('enquiries') || can('crm');
-  const waUnread = chats ? await unreadPeople(can('enquiries') ? 'all' : 'linked') : 0;
+  // Fetched together: they don't depend on each other, and every admin page waits for both.
+  const [waUnread, ready] = await Promise.all([chats ? unreadPeople(can('enquiries') ? 'all' : 'linked') : 0, schemaReady()]);
   const waHref = can('enquiries') ? '/admin/enquiries/inbox' : '/admin/crm/chats';
   // Purchase orders: once purchase-orders.sql has been run (checked once a minute).
-  const ready = await schemaReady();
   const orders = can('crm') && ready.purchaseOrders;
   // Social Monitoring: once social-monitoring.sql has been run.
   const socialMonitoring = can('social_monitoring') && ready.social;

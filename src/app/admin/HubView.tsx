@@ -74,57 +74,6 @@ function WaIcon() {
   );
 }
 
-function Card({
-  href,
-  icon,
-  label,
-  description,
-  badge,
-  external,
-  variant,
-  desktopOnly,
-}: {
-  href: string;
-  icon: keyof typeof ICONS;
-  label: string;
-  description: string;
-  badge?: string | null;
-  external?: boolean;
-  variant?: 'admin';
-  /** Shown on phones: this one needs a bigger screen. */
-  desktopOnly?: boolean;
-}) {
-  const body = (
-    <>
-      <span className="hub-card-top">
-        <span className="hub-icon"><Icon k={icon} /></span>
-        <span className="hub-title">{label}</span>
-      </span>
-      <span className="hub-desc">{description}</span>
-      {desktopOnly && <span className="hub-desktop">Best on a tablet or computer</span>}
-      <span className="hub-card-foot">
-        {badge ? <span className="hub-badge">{badge}</span> : <span />}
-        <span className="hub-open">{external ? 'Open app ↗' : 'Open →'}</span>
-      </span>
-    </>
-  );
-  const cls = `hub-card${variant ? ` is-${variant}` : ''}${badge ? ' has-badge' : ''}`;
-  // Our own /api/sso/… links stay in this window: on an iPhone Home Screen app a new window is
-  // Safari, which doesn't have this sign-in.
-  return external ? (
-    href.startsWith('/') ? (
-      <a className={cls} href={href}>{body}</a>
-    ) : (
-      <a className={cls} href={href} target="_blank" rel="noopener noreferrer">{body}</a>
-    )
-  ) : isPinnedLight(href) ? (
-    // The CMS editor is pinned light: a full load, so it never starts in this page's dark theme.
-    <a className={cls} href={href}>{body}</a>
-  ) : (
-    <Link className={cls} href={href}>{body}</Link>
-  );
-}
-
 /** The /admin landing page: every portal this user can open, grouped, with "needs you" counts. */
 export function HubView({
   firstName,
@@ -162,8 +111,6 @@ export function HubView({
   search?: boolean;
 }) {
   const isAdmin = usersBadge !== undefined;
-  const internal = portals.filter((p) => !p.external);
-  const apps = portals.filter((p) => p.external);
   // One even row per area that needs someone: icon, name, a big number.
   const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' | 'metis' }[] = [
     { key: 'whatsapp', label: 'WhatsApp', href: '/admin/enquiries/inbox', icon: 'whatsapp' },
@@ -199,8 +146,28 @@ export function HubView({
         <p className="hub-banner">You don&apos;t have access to that area. Ask an admin to add it to your account.</p>
       )}
 
+      {assistant && (
+        <Link href="/admin/assistant" className="hub-claude">
+          <MetisIcon size={42} className="hub-claude-mark" />
+          <span className="hub-claude-main">
+            <b>Talk to Metis</b>
+            <small>Just finished a meeting? Say what happened — notes, tasks and drafts done for you.</small>
+          </span>
+          <span className="hub-claude-mic" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <rect x="9" y="3" width="6" height="12" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+            </svg>
+          </span>
+        </Link>
+      )}
+
+      <FromClaude {...setup} />
+
+      <div className="hub-cols">
+        <div className="hub-col-needs">
       {attention.length > 0 && (
-        <section className="hub-needs hx-moment" aria-label="Needs your attention">
+        <section className="hub-needs hub-col hx-moment" aria-label="Needs your attention">
           <h2 className="hub-needs-h">Needs you</h2>
           <ul>
             {attention.map((a) => (
@@ -221,90 +188,19 @@ export function HubView({
         </section>
       )}
 
+        </div>
+        <div className="hub-col-leads">
       {metaLeads && <HubMetaLeads data={metaLeads} />}
 
-      {assistant && (
-        <Link href="/admin/assistant" className="hub-claude">
-          <MetisIcon size={42} className="hub-claude-mark" />
-          <span className="hub-claude-main">
-            <b>Talk to Metis</b>
-            <small>Just finished a meeting? Say what happened — notes, tasks and drafts done for you.</small>
-          </span>
-          <span className="hub-claude-mic" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
-              <rect x="9" y="3" width="6" height="12" rx="3" />
-              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-            </svg>
-          </span>
-        </Link>
-      )}
-
-      <FromClaude {...setup} />
-
+        </div>
+        <div className="hub-col-tasks">
       <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} todayList={todayList} />
 
-      {portals.length === 0 && !isAdmin ? (
+        </div>
+      </div>
+
+      {portals.length === 0 && !isAdmin && (
         <p className="hub-banner">No portals have been added to your account yet. Ask an admin to give you access.</p>
-      ) : (
-        <>
-          {internal.length > 0 && (
-            <section className="hub-section">
-              <h2 className="hub-h2">Workspace</h2>
-              <div className="hub-grid">
-                {internal.map((p) => (
-                  <Card
-                    key={p.key}
-                    href={p.href}
-                    icon={p.key}
-                    label={p.label}
-                    description={p.description}
-                    badge={p.badge}
-                    desktopOnly={p.key === 'cms'}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {apps.length > 0 && (
-            <section className="hub-section">
-              <h2 className="hub-h2">Apps</h2>
-              <div className="hub-grid">
-                {apps.map((p) => (
-                  <Card key={p.key} href={p.href} icon={p.key} label={p.label} description={p.description} badge={p.badge} external />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className="hub-section">
-            <h2 className="hub-h2">On your phone</h2>
-            <div className="hub-grid">
-              <Card
-                href="/admin/app"
-                icon="app"
-                label="Android app"
-                description="Install Heliaxis on your phone or tablet. Tasks work offline."
-              />
-            </div>
-          </section>
-
-          {isAdmin && (
-            <section className="hub-section">
-              <h2 className="hub-h2">Admin</h2>
-              <div className="hub-grid">
-                <Card
-                  href="/admin/users"
-                  icon="users"
-                  label="Users & access"
-                  description="Approve sign-ups and choose which portals each person can open."
-                  badge={usersBadge}
-                  variant="admin"
-                />
-              </div>
-            </section>
-          )}
-        </>
       )}
     </div>
   );

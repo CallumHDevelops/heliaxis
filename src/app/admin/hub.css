@@ -621,3 +621,25 @@ a.hub-meta-main:hover b {
     min-height: 44px;
   }
 }
+
+/* Dashboard: Needs you on the left, new Meta leads in the middle, tasks on the right. Stacks on narrower screens. */
+.hub-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.hub-cols > div {
+  min-width: 0;
+}
+@media (min-width: 1100px) {
+  .hub-cols {
+    grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+  }
+}
+.hub-cols .hub-needs {
+  margin-bottom: 0;
+}
+.hub-cols .hub-needs ul {
+  grid-template-columns: minmax(0, 1fr);
+}
