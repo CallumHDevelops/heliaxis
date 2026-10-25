@@ -1,0 +1,79 @@
+/* The step-by-step quote form (src/components/quote/StepQuoteForm.tsx). Uses the site tokens from home.css. */
+
+.sq{position:relative;display:flex;flex-direction:column;min-height:420px;color:var(--ink);font-family:var(--body)}
+.sq-top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}
+.sq-count{font-family:var(--mono);font-size:.8rem;letter-spacing:.14em;color:#8A5600}
+.sq-bar{display:flex;gap:6px}
+.sq-bar span{width:34px;height:4px;border-radius:2px;background:rgba(33,31,24,.16);transition:background .3s}
+.sq-bar span.is-done{background:var(--solar)}
+.sq-bar span.is-now{background:var(--ink)}
+
+.sq-body{flex:1;display:flex;flex-direction:column;justify-content:center}
+.sq-q{font-family:var(--display);font-weight:800;font-size:clamp(1.55rem,3.2vw,2.3rem);line-height:1.08;letter-spacing:-.015em;margin:0 0 8px;outline:none}
+.sq-hint{margin:0 0 22px;font-size:1.04rem;line-height:1.45;color:var(--muted)}
+
+.sq-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sq-tiles--col{grid-template-columns:1fr}
+.sq-tile{display:flex;align-items:center;gap:14px;text-align:left;width:100%;min-height:58px;box-sizing:border-box;padding:12px 16px;border-radius:2px;cursor:pointer;font-family:var(--body);font-size:1rem;color:var(--ink);background:var(--card);border:1.5px solid rgba(33,31,24,.22);transition:border-color .15s,background .15s}
+.sq-tile:hover:not(:disabled){border-color:var(--amber)}
+.sq-tile:disabled{opacity:.6;cursor:default}
+.sq-tile-text{display:flex;flex-direction:column;gap:2px}
+.sq-tile-text b{font-size:1.05rem;font-weight:600}
+.sq-tile-text span{font-size:.88rem;color:var(--muted)}
+.sq-key{min-width:28px;height:28px;display:inline-grid;place-items:center;border-radius:2px;font:600 .75rem var(--mono);border:1.5px solid rgba(33,31,24,.35);color:var(--ink)}
+.sq-tile.is-on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.sq-tile.is-on .sq-tile-text span{color:#CFC8B6}
+.sq-tile.is-on .sq-key{background:var(--solar);border-color:var(--solar)}
+
+.sq-in{width:100%;box-sizing:border-box;border:0;border-bottom:2px solid var(--ink);background:transparent;font:500 clamp(1.4rem,3vw,2rem) var(--body);padding:8px 0;color:var(--ink);border-radius:0}
+.sq-in--sm{font-size:clamp(1.15rem,2.4vw,1.6rem)}
+.sq-in::placeholder{color:#8A8576}
+.sq-in:focus{outline:none;border-bottom-color:var(--amber)}
+.sq-pair{display:grid;grid-template-columns:1fr;gap:20px}
+.sq-label{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.sq-small{margin:14px 0 0;font-size:.88rem;color:var(--muted)}
+.sq-small a{color:var(--ink)}
+.sq-err{margin:16px 0 0;font-size:1rem;font-weight:600;color:#A12A1A}
+
+.sq-actions{display:flex;align-items:center;gap:16px;margin-top:24px}
+.sq-enter{font-size:.88rem;color:var(--muted)}
+.sq-foot{margin-top:18px}
+.sq-back{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--ink);font:600 1rem var(--body);cursor:pointer;padding:10px 0}
+.sq-back:hover{color:#8A5600}
+
+.sq-done{display:flex;flex-direction:column;align-items:flex-start}
+.sq-done-tag{display:inline-flex;align-items:center;gap:8px;margin-bottom:12px;font-family:var(--mono);font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#3F7D4E}
+.sq-trap{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.sq-spark{display:none}
+
+.sq button:focus-visible,.sq input:focus-visible,.sq a:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.sq-in:focus-visible{outline:none}
+
+@media (min-width:560px){.sq-pair{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.sq-tiles{grid-template-columns:1fr}.sq-bar span{width:24px}}
+@media (prefers-reduced-motion:reduce){.sq-bar span,.sq-tile{transition:none}}
+
+/* Inside the homepage form card. */
+.sq--card{min-height:460px}
+
+/* The full-page version: dark brand panel beside the question (/get-a-quote). */
+.sqp{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);min-height:calc(100vh - 120px);background:var(--paper)}
+.sqp-brand{position:relative;overflow:hidden;background-color:var(--ink);color:var(--paper);padding:56px 48px;display:flex;flex-direction:column;justify-content:flex-end;background-image:linear-gradient(rgba(247,242,231,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(247,242,231,.05) 1px,transparent 1px);background-size:60px 60px}
+.sqp-brand .eyebrow{color:var(--solar)}
+.sqp-brand h1{font-family:var(--display);font-weight:800;font-size:clamp(1.9rem,3.4vw,2.7rem);line-height:1.05;letter-spacing:-.015em;margin:14px 0 28px}
+.sqp-point{display:flex;gap:14px;margin-bottom:18px}
+.sqp-point svg{flex:none;width:22px;height:22px;margin-top:2px;stroke:var(--solar)}
+.sqp-point b{display:block;font-size:1.05rem}
+.sqp-point span{font-size:.95rem;color:#A69F8E}
+.sqp-mark{position:absolute;right:-120px;top:40px;width:420px;height:420px;color:var(--solar);opacity:.09;pointer-events:none}
+.sqp-form{padding:48px 64px;display:flex;flex-direction:column;justify-content:center}
+.sqp-form .sq{min-height:520px}
+@media (max-width:860px){
+  .sqp{grid-template-columns:1fr;min-height:0}
+  .sqp-brand{padding:28px 20px;justify-content:flex-start}
+  .sqp-brand h1{font-size:1.7rem;margin:10px 0 0}
+  .sqp-point{display:none}
+  .sqp-mark{width:220px;height:220px;right:-60px;top:-30px}
+  .sqp-form{padding:28px 20px 40px}
+  .sqp-form .sq{min-height:0}
+}
