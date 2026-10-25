@@ -494,6 +494,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     notifications && !(await has('social_mention')),
     sql('social-monitoring.sql', 'Social monitoring: comments and reviews about Heliaxis, urgent ones flagged to everyone with access, replies drafted for you to copy and post.', 6, 'notifications.sql')
   );
+  // Its marketing numbers and competitor tracking tables (used by the Insights and Competitors screens, built later). Safe to run now.
+  add(
+    (await has('social_mention')) && !(await has('social_metric_snapshot')),
+    sql('social-insights.sql', 'Social monitoring: the tables for marketing numbers (followers, reach, engagement) and competitor tracking. Nothing uses them yet, so there is no hurry, but it is safe to run now.', 7, 'social-monitoring.sql')
+  );
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
   add(
     notifications && !(await notificationRefs),
