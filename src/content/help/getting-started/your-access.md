@@ -18,7 +18,7 @@ These are the names as they appear on the Users page.
 | **Design studio** | **Design studio** |
 | **Tasks** | **Tasks** |
 | **Enquiries** | **Enquiries**, **WhatsApp inbox**, **Smart replies & chasers** and **WhatsApp templates** |
-| **CRM** | **Pipeline**, **Surveys and diary**, **Projects**, **CRM reports**, **CRM settings** and **Metis**; **WhatsApp chats** if you don’t have Enquiries; and **Purchase orders**, once switched on |
+| **CRM** | **Opportunities**, **Organisations**, **Contacts**, **Surveys and diary**, **Projects**, **CRM reports**, **CRM settings** and **Metis**; **WhatsApp chats** if you don’t have Enquiries; and **Purchase orders**, once switched on |
 | **Analytics** | **Website analytics** and **Heatmap** |
 | **Subcontractors** | **Subcontractors** |
 | **Our team** | **Our team** (in RAMS) |

@@ -83,8 +83,12 @@
 .org-chips {
   min-width: 0;
 }
+.org-chips {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
 .org-chips button {
-  min-height: 36px;
+  min-height: 44px;
 }
 .org-list {
   list-style: none;
@@ -209,7 +213,7 @@
 .org-hero__acts {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .org-hero__acts .crm-btn {
@@ -432,6 +436,9 @@
 }
 
 @media (min-width: 600px) {
+  .org-hero__acts {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
   .org-hide-sm {
     display: inline;
   }

@@ -251,7 +251,7 @@ export function HelpSearch({
           <p className="hp-empty__title">{several ? `No article has all of “${q.trim()}”.` : `Nothing in Help mentions “${q.trim()}”.`}</p>
           <ul className="hp-empty__tips">
             <li>{several ? 'Check the spelling, or use fewer words.' : 'Check the spelling, or try another word for it.'}</li>
-            <li>Try the name on the button or menu, e.g. “templates” or “Pipeline”.</li>
+            <li>Try the name on the button or menu, e.g. “templates” or “Opportunities”.</li>
             {metis && (
               <li>
                 <Link href={metisHref(q)}>Ask Metis</Link> in your own words.

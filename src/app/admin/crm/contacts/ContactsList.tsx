@@ -93,7 +93,7 @@ export function ContactsList({ ready, initial }: { ready: boolean; initial: Pers
           <h1 className="crmh-h1">Contacts</h1>
           {ready && rows && (
             <span className="crmh-sum">
-              {all.length} contact{all.length === 1 ? '' : 's'}
+              {all.length} {all.length === 1 ? 'person' : 'people'} we deal with
             </span>
           )}
         </div>

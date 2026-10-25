@@ -163,7 +163,9 @@ function LinkSheet({
       setSolo(null);
       setOrg({ ...o, contacts: list });
       // Who it was with, if it's the same organisation; else the one picked, else its primary contact.
-      setContact(withContact ?? (current?.id === o.id && currentContact ? currentContact.id : (list.find((c) => c.is_primary)?.id ?? '')));
+      // A person on their own it is already dealt with through stays picked (they can go with any organisation).
+      const keepSolo = currentContact && !currentContact.organisation_id ? currentContact.id : '';
+      setContact(withContact ?? (current?.id === o.id && currentContact ? currentContact.id : keepSolo || (list.find((c) => c.is_primary)?.id ?? '')));
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Couldn’t load that organisation.');
     } finally {
@@ -183,7 +185,9 @@ function LinkSheet({
     setBusy(true);
     try {
       const d = await orgApi<{ organisation: { id: string; name: string; type: OrgType } }>('/api/crm/organisations', 'POST', { name: q.trim(), type: newType }, 'Not added. Try again.');
-      // A new organisation has no contacts yet: link the job to it now, so nothing is left half done.
+      // A new organisation has no contacts yet: link the job to it now. If that fails it stays picked, so trying again doesn’t add a second one.
+      setOrg({ ...d.organisation, contacts: [] });
+      setContact('');
       await save({ organisation_id: d.organisation.id, contact_id: null });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not added. Try again.');
@@ -196,6 +200,8 @@ function LinkSheet({
     setBusy(true);
     try {
       const d = await orgApi<{ contact: OrgContact }>('/api/crm/contacts', 'POST', { name: q.trim() }, 'Not added. Try again.');
+      setOrg(null);
+      setSolo({ id: d.contact.id, name: d.contact.name, role: d.contact.role });
       await save({ contact_id: d.contact.id });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not added. Try again.');

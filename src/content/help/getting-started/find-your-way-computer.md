@@ -24,7 +24,7 @@ You only see the pages your account can open, so your menu may be shorter than a
 | Menu | Pages | Needs |
 | --- | --- | --- |
 | **Dashboard** | The dashboard | Everyone |
-| **CRM** | **Pipeline**, **Surveys and diary** | CRM |
+| **CRM** | **Opportunities**, **Organisations**, **Contacts**, **Surveys and diary** | CRM |
 | | **Enquiries**, **WhatsApp inbox**, **Smart replies & chasers**, **WhatsApp templates** | Enquiries |
 | | **WhatsApp chats** (instead of **WhatsApp inbox**) | CRM without Enquiries |
 | | **CRM reports**, **CRM settings**, **Metis** | CRM |
