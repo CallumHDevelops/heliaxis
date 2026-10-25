@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { classifyMention } from './classify';
+import { draftMention } from './drafts';
 
 type Job = { id: number; kind: string; payload: Record<string, unknown>; attempts: number; max_attempts: number };
 
@@ -27,6 +28,7 @@ export async function runSocialJobs(limit = 10, until = Date.now() + 40_000): Pr
     let message = '';
     try {
       if (job.kind === 'classify') ok = await classifyMention(String(job.payload.mentionId), Number(job.payload.version));
+      else if (job.kind === 'draft') ok = (await draftMention(String(job.payload.mentionId))) !== null;
       else {
         ok = true; // an unknown kind (a later phase's job): nothing to do here
       }

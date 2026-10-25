@@ -194,6 +194,10 @@ export async function classifyMention(mentionId: string, version: number): Promi
     .from('social_mention')
     .update({ severity, comment_type: out?.result.type ?? null, updated_at: new Date().toISOString() })
     .eq('id', mentionId);
+  // A draft is made for every comment worth answering: after the AI step, so it uses the final severity.
+  if (out && severity !== 'ignore') {
+    await db.from('social_job').upsert({ kind: 'draft', dedupe_key: `draft:${mentionId}:v${version}`, payload: { mentionId, version } }, { onConflict: 'dedupe_key', ignoreDuplicates: true });
+  }
   if (severity === 'critical' || severity === 'high') {
     await alertForMention({ id: mentionId, platform: m.platform, kind: m.kind, text: m.text, version, severity });
   }

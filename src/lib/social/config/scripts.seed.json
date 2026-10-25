@@ -1,0 +1,1142 @@
+{
+ "greeting": {
+  "id": "greeting",
+  "rewording": "none",
+  "variants": [
+   "Hi {{first_name}},",
+   "Hello {{first_name}},"
+  ],
+  "variants_no_name": [
+   "Hi there,",
+   "Hello,"
+  ]
+ },
+ "signoff": {
+  "id": "signoff",
+  "rewording": "none",
+  "newline_before": true,
+  "variants": [
+   "{{signoff}}"
+  ]
+ },
+ "booking": {
+  "id": "booking",
+  "rewording": "none",
+  "variants": [
+   "{{booking}}"
+  ]
+ },
+ "scripts": [
+  {
+   "id": "safety-concern",
+   "name": "Safety concern",
+   "priority": 1,
+   "safety": true,
+   "topics": [
+    "safety",
+    "battery",
+    "panels",
+    "heat_pump",
+    "installation",
+    "other"
+   ],
+   "severities": [
+    "critical"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "call",
+    "survey"
+   ],
+   "default_booking_type": "call",
+   "allowed_claims": [],
+   "banned_phrases": [
+    "don't worry",
+    "do not worry",
+    "nothing to worry",
+    "no need to worry",
+    "rare",
+    "rarely",
+    "unlikely",
+    "very low",
+    "tiny",
+    "minimal risk",
+    "statistically",
+    "safer than",
+    "more dangerous",
+    "petrol car",
+    "phones",
+    "media",
+    "scare"
+   ],
+   "slots": {
+    "concern_phrase": {
+     "enum": [
+      "battery safety",
+      "how home batteries are installed",
+      "the safety of your system",
+      "how heat pumps are installed"
+     ]
+    }
+   },
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "none",
+     "variants": [
+      "Thank you for raising this.",
+      "Thanks for asking about this.",
+      "Thank you for asking this here."
+     ]
+    },
+    {
+     "id": "acknowledge",
+     "rewording": "none",
+     "variants": [
+      "It's a fair question, and {{concern_phrase}} is something we take seriously.",
+      "Questions about {{concern_phrase}} are fair ones to ask, and we take them seriously.",
+      "You're right to ask about {{concern_phrase}}, and we take it seriously."
+     ]
+    },
+    {
+     "id": "facts",
+     "kind": "fact_claims",
+     "max_claims": 2,
+     "not_covered_text": "That's a detailed question, and we'd rather answer it properly than guess here."
+    },
+    {
+     "id": "offer",
+     "rewording": "none",
+     "variants": [
+      "We'd much rather talk it through with you properly than in a comment.",
+      "The best way to answer this properly is a quick chat with one of our team.",
+      "If it helps, one of our team can talk it through with you."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Sarah, thank you for raising this. It's a fair question, and battery safety is something we take seriously. We'd much rather talk it through with you properly than in a comment. You can book a call with our team here: https://heliaxis.co.uk/book-a-call?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, thanks for asking about this. Questions about how home batteries are installed are fair ones to ask, and we take them seriously. The best way to answer this properly is a quick chat with one of our team. You can book a call with our team through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team",
+    "Hi Mark, thank you for asking this here. You're right to ask about the safety of your system, and we take it seriously. If it helps, one of our team can talk it through with you. You can book a call with our team at heliaxis.co.uk/book or call us on 01633 965205.\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "critical-private-followup",
+   "name": "Critical (legal, privacy or fraud): move to private",
+   "priority": 2,
+   "safety": false,
+   "requires_approval": true,
+   "topics": [
+    "legal",
+    "privacy",
+    "service",
+    "other"
+   ],
+   "severities": [
+    "critical"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "call"
+   ],
+   "default_booking_type": "call",
+   "banned_phrases": [
+    "allegation",
+    "allege",
+    "alleged",
+    "defamatory",
+    "defamation",
+    "libel",
+    "slander",
+    "our solicitor",
+    "our lawyers",
+    "legal team",
+    "remove this",
+    "take this down",
+    "delete this"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "none",
+     "variants": [
+      "Thank you for your message.",
+      "Thank you for telling us about this."
+     ]
+    },
+    {
+     "id": "acknowledge",
+     "rewording": "none",
+     "variants": [
+      "We take concerns like this seriously and want to look into it straight away.",
+      "We're sorry to hear you're unhappy, and we want to look into this straight away."
+     ]
+    },
+    {
+     "id": "move_private",
+     "rewording": "none",
+     "variants": [
+      "So that a senior member of our team can speak with you directly, please get in touch privately.",
+      "We'd like a senior member of our team to speak with you directly, so please get in touch privately."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Gareth, thank you for your message. We take concerns like this seriously and want to look into it straight away. So that a senior member of our team can speak with you directly, please get in touch privately. You can book a call with our team at heliaxis.co.uk/book or call us on 01633 965205.\nThe Heliaxis team",
+    "Hello, thank you for telling us about this. We're sorry to hear you're unhappy, and we want to look into this straight away. We'd like a senior member of our team to speak with you directly, so please get in touch privately. You can book a call with our team here: https://heliaxis.co.uk/book-a-call?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hi Rhian, thank you for your message. We take concerns like this seriously and want to look into it straight away. So that a senior member of our team can speak with you directly, please get in touch privately. You can book a call with our team through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "price-objection",
+   "name": "Price objection",
+   "priority": 20,
+   "safety": false,
+   "topics": [
+    "pricing",
+    "finance"
+   ],
+   "severities": [
+    "medium",
+    "low",
+    "high"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "quote",
+    "survey"
+   ],
+   "default_booking_type": "survey",
+   "banned_phrases": [
+    "cheap",
+    "bargain",
+    "best price",
+    "lowest price",
+    "beat any",
+    "you get what you pay for",
+    "overpriced"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "light",
+     "variants": [
+      "Thanks for asking about price.",
+      "Thanks, that's a fair question about cost.",
+      "Good question, and cost matters."
+     ]
+    },
+    {
+     "id": "explain",
+     "rewording": "light",
+     "variants": [
+      "Every home is different, so the cost depends on things like your roof, how much electricity you use and whether you want a battery.",
+      "We price each system for the home it's going on, so it's hard to give a fair figure without seeing yours.",
+      "The right system depends on your roof and how you use energy, and that's what sets the cost."
+     ]
+    },
+    {
+     "id": "no_pressure",
+     "rewording": "light",
+     "variants": [
+      "If you'd like a proper figure for your home, there's no pressure at all.",
+      "If you'd like a figure for your own home, we're happy to help with no pressure."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Emma, thanks for asking about price. Every home is different, so the cost depends on things like your roof, how much electricity you use and whether you want a battery. If you'd like a proper figure for your home, there's no pressure at all. You can book a free survey here: https://heliaxis.co.uk/book-a-survey?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, good question, and cost matters. We price each system for the home it's going on, so it's hard to give a fair figure without seeing yours. If you'd like a figure for your own home, we're happy to help with no pressure. You can book a free survey through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team",
+    "Hi Dan, thanks, that's a fair question about cost. The right system depends on your roof and how you use energy, and that's what sets the cost. If you'd like a proper figure for your home, there's no pressure at all. You can book a quote consultation here: https://heliaxis.co.uk/book-a-call?reason=quote&utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "installation-complaint",
+   "name": "Installation complaint",
+   "priority": 10,
+   "safety": false,
+   "topics": [
+    "installation",
+    "service",
+    "panels",
+    "battery",
+    "heat_pump"
+   ],
+   "severities": [
+    "high",
+    "medium"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "call"
+   ],
+   "default_booking_type": "call",
+   "banned_phrases": [
+    "put this right",
+    "make it right",
+    "fix it for free",
+    "at no cost",
+    "the installer",
+    "subcontractor",
+    "it happens",
+    "these things happen"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "sorry",
+     "rewording": "none",
+     "variants": [
+      "I'm sorry to hear about this, and thank you for letting us know.",
+      "Sorry to hear this. Thank you for telling us."
+     ]
+    },
+    {
+     "id": "action",
+     "rewording": "light",
+     "variants": [
+      "We'd like to look into this properly with you, so please get in touch privately and someone from our team will call you.",
+      "We want to understand exactly what's happened, so please get in touch privately and one of our team will call you."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Lisa, I'm sorry to hear about this, and thank you for letting us know. We'd like to look into this properly with you, so please get in touch privately and someone from our team will call you. You can book a call with our team here: https://heliaxis.co.uk/book-a-call?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, sorry to hear this. Thank you for telling us. We want to understand exactly what's happened, so please get in touch privately and one of our team will call you. You can book a call with our team at heliaxis.co.uk/book or call us on 01633 965205.\nThe Heliaxis team",
+    "Hi Owen, I'm sorry to hear about this, and thank you for letting us know. We'd like to look into this properly with you, so please get in touch privately and someone from our team will call you. You can book a call with our team through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "delayed-installation",
+   "name": "Delayed installation or slow response",
+   "priority": 11,
+   "safety": false,
+   "topics": [
+    "service",
+    "installation",
+    "booking"
+   ],
+   "severities": [
+    "high",
+    "medium"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "call"
+   ],
+   "default_booking_type": "call",
+   "banned_phrases": [
+    "supply chain",
+    "busy period",
+    "high demand",
+    "out of our hands",
+    "not our fault",
+    "be patient",
+    "bear with us",
+    "asap",
+    "by tomorrow",
+    "this week"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "sorry",
+     "rewording": "none",
+     "variants": [
+      "I'm sorry you've been left waiting, and thank you for flagging it.",
+      "Sorry for the wait, and thank you for raising it with us."
+     ]
+    },
+    {
+     "id": "action",
+     "rewording": "light",
+     "variants": [
+      "We'll check where things are up to and come back to you directly.",
+      "We'd like to find out where things stand and update you personally."
+     ]
+    },
+    {
+     "id": "ask",
+     "rewording": "none",
+     "variants": [
+      "Could you get in touch privately so we can find your booking?",
+      "Please get in touch privately so we can find your details."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Tom, I'm sorry you've been left waiting, and thank you for flagging it. We'll check where things are up to and come back to you directly. Could you get in touch privately so we can find your booking? You can book a call with our team here: https://heliaxis.co.uk/book-a-call?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, sorry for the wait, and thank you for raising it with us. We'd like to find out where things stand and update you personally. Please get in touch privately so we can find your details. You can book a call with our team at heliaxis.co.uk/book or call us on 01633 965205.\nThe Heliaxis team",
+    "Hi Bethan, sorry for the wait, and thank you for raising it with us. We'll check where things are up to and come back to you directly. Could you get in touch privately so we can find your booking? You can book a call with our team through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "warranty-question",
+   "name": "Warranty question",
+   "priority": 30,
+   "safety": false,
+   "topics": [
+    "warranty"
+   ],
+   "severities": [
+    "medium",
+    "low"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "call",
+    "quote"
+   ],
+   "default_booking_type": "call",
+   "banned_phrases": [
+    "lifetime",
+    "for life",
+    "forever",
+    "fully covered",
+    "everything is covered"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "light",
+     "variants": [
+      "Thanks for asking about warranties.",
+      "Good question, it's worth knowing before you decide."
+     ]
+    },
+    {
+     "id": "explain",
+     "rewording": "none",
+     "variants": [
+      "The warranty depends on the products in your system, and we go through the details with you before anything is agreed.",
+      "Warranties vary by product, so we take you through the details for your system before you commit to anything."
+     ]
+    },
+    {
+     "id": "offer",
+     "rewording": "light",
+     "variants": [
+      "If you'd like the details for a particular system, we're happy to talk you through them.",
+      "We're happy to go through the details for your system with you."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Chris, thanks for asking about warranties. The warranty depends on the products in your system, and we go through the details with you before anything is agreed. If you'd like the details for a particular system, we're happy to talk you through them. You can book a call with our team here: https://heliaxis.co.uk/book-a-call?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, good question, it's worth knowing before you decide. Warranties vary by product, so we take you through the details for your system before you commit to anything. We're happy to go through the details for your system with you. You can book a call with our team through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team",
+    "Hi Megan, thanks for asking about warranties. Warranties vary by product, so we take you through the details for your system before you commit to anything. If you'd like the details for a particular system, we're happy to talk you through them. You can book a quote consultation here: https://heliaxis.co.uk/book-a-call?reason=quote&utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "competitor-comparison",
+   "name": "Comparison with a competitor",
+   "priority": 25,
+   "safety": false,
+   "topics": [
+    "competitor",
+    "pricing"
+   ],
+   "severities": [
+    "medium",
+    "low"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "quote"
+   ],
+   "default_booking_type": "quote",
+   "banned_phrases": [
+    "better than",
+    "worse than",
+    "unlike them",
+    "unlike other",
+    "other companies",
+    "cowboys",
+    "they will",
+    "they don't",
+    "beat",
+    "undercut"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "light",
+     "variants": [
+      "Thanks for the question, it's sensible to compare quotes.",
+      "Comparing quotes is a good idea, thanks for asking."
+     ]
+    },
+    {
+     "id": "explain",
+     "rewording": "none",
+     "variants": [
+      "We'd suggest comparing the products, warranties and aftercare as well as the price.",
+      "Alongside price, it's worth comparing the products, the warranties and the aftercare you'll get."
+     ]
+    },
+    {
+     "id": "offer",
+     "rewording": "light",
+     "variants": [
+      "We're happy to go through our quote with you line by line.",
+      "If it helps, we can walk you through exactly what's included in ours."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Jo, thanks for the question, it's sensible to compare quotes. We'd suggest comparing the products, warranties and aftercare as well as the price. We're happy to go through our quote with you line by line. You can book a quote consultation here: https://heliaxis.co.uk/book-a-call?reason=quote&utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, comparing quotes is a good idea, thanks for asking. Alongside price, it's worth comparing the products, the warranties and the aftercare you'll get. If it helps, we can walk you through exactly what's included in ours. You can book a quote consultation through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team",
+    "Hi Alun, comparing quotes is a good idea, thanks for asking. We'd suggest comparing the products, warranties and aftercare as well as the price. We're happy to go through our quote with you line by line. You can book a quote consultation here: https://heliaxis.co.uk/book-a-call?reason=quote&utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "one-star-review",
+   "name": "One- or two-star review",
+   "priority": 5,
+   "safety": false,
+   "topics": [
+    "service",
+    "installation",
+    "pricing",
+    "other",
+    "panels",
+    "battery",
+    "heat_pump"
+   ],
+   "severities": [
+    "high"
+   ],
+   "platforms": [
+    "trustpilot",
+    "google"
+   ],
+   "booking_types": [
+    "call"
+   ],
+   "default_booking_type": "call",
+   "banned_phrases": [
+    "fake review",
+    "not a customer",
+    "can't find you",
+    "cannot find you",
+    "no record",
+    "we have no record",
+    "surprised",
+    "disappointed you"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "sorry",
+     "rewording": "none",
+     "variants": [
+      "I'm sorry to read about your experience, and thank you for taking the time to tell us.",
+      "Sorry to read this, and thank you for letting us know."
+     ]
+    },
+    {
+     "id": "acknowledge",
+     "rewording": "none",
+     "variants": [
+      "This isn't the experience we want anyone to have, and we'd like to understand what happened.",
+      "We'd like to understand what happened and talk it through with you."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Paul, I'm sorry to read about your experience, and thank you for taking the time to tell us. This isn't the experience we want anyone to have, and we'd like to understand what happened. You can book a call with our team at heliaxis.co.uk/book or call us on 01633 965205.\nThe Heliaxis team",
+    "Hello, sorry to read this, and thank you for letting us know. We'd like to understand what happened and talk it through with you. You can book a call with our team at heliaxis.co.uk/book or call us on 01633 965205.\nThe Heliaxis team",
+    "Hi Ceri, sorry to read this, and thank you for letting us know. This isn't the experience we want anyone to have, and we'd like to understand what happened. You can book a call with our team at heliaxis.co.uk/book or call us on 01633 965205.\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "five-star-thanks",
+   "name": "Five-star review or praise: thank you",
+   "priority": 50,
+   "safety": false,
+   "topics": [
+    "praise",
+    "other",
+    "service",
+    "installation",
+    "panels",
+    "battery",
+    "heat_pump"
+   ],
+   "severities": [
+    "positive"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [],
+   "banned_phrases": [
+    "refer a friend",
+    "referral",
+    "tag a friend",
+    "share this"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "light",
+     "variants": [
+      "Thank you so much for the lovely words!",
+      "Thanks for taking the time to say this, it means a lot to the team.",
+      "Thank you, this really made our day."
+     ]
+    },
+    {
+     "id": "extra",
+     "rewording": "light",
+     "variants": [
+      "We're really glad the team looked after you.",
+      "It's great to hear you're happy with everything."
+     ]
+    },
+    {
+     "id": "next_step",
+     "rewording": "none",
+     "variants": [
+      "If you ever have a question about your system, just get in touch.",
+      "Any questions in future, just get in touch."
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Sian, thank you so much for the lovely words! We're really glad the team looked after you. If you ever have a question about your system, just get in touch.\nThe Heliaxis team",
+    "Hello, thank you, this really made our day. It's great to hear you're happy with everything. Any questions in future, just get in touch.\nThe Heliaxis team",
+    "Hi Rob, thanks for taking the time to say this, it means a lot to the team. We're really glad the team looked after you. Any questions in future, just get in touch.\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "general-enquiry",
+   "name": "General enquiry or availability",
+   "priority": 40,
+   "safety": false,
+   "topics": [
+    "booking",
+    "other"
+   ],
+   "severities": [
+    "low",
+    "medium"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "survey",
+    "call"
+   ],
+   "default_booking_type": "survey",
+   "banned_phrases": [
+    "yes we cover",
+    "we cover everywhere",
+    "we can fit you in",
+    "next week",
+    "tomorrow",
+    "straight away"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "light",
+     "variants": [
+      "Thanks for getting in touch.",
+      "Thanks for your message."
+     ]
+    },
+    {
+     "id": "answer",
+     "rewording": "none",
+     "variants": [
+      "The quickest way to check what we can do for you is a short call or a free survey.",
+      "We'd be glad to help, and the easiest first step is a short call or a free survey."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Nia, thanks for getting in touch. The quickest way to check what we can do for you is a short call or a free survey. You can book a free survey here: https://heliaxis.co.uk/book-a-survey?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, thanks for your message. We'd be glad to help, and the easiest first step is a short call or a free survey. You can book a free survey through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team",
+    "Hi Steve, thanks for your message. The quickest way to check what we can do for you is a short call or a free survey. You can book a call with our team here: https://heliaxis.co.uk/book-a-call?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "product-question",
+   "name": "Product or technical question",
+   "priority": 35,
+   "safety": false,
+   "topics": [
+    "panels",
+    "battery",
+    "heat_pump",
+    "finance",
+    "other"
+   ],
+   "severities": [
+    "medium",
+    "low"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "trustpilot",
+    "google",
+    "manual"
+   ],
+   "booking_types": [
+    "call",
+    "survey"
+   ],
+   "default_booking_type": "call",
+   "banned_phrases": [
+    "it depends lol",
+    "google it"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "thanks",
+     "rewording": "light",
+     "variants": [
+      "Thanks for the question, it's a good one.",
+      "Good question, thanks for asking."
+     ]
+    },
+    {
+     "id": "explain",
+     "rewording": "none",
+     "variants": [
+      "The honest answer depends on your home, so we'd rather not guess in a comment.",
+      "It depends on your home and how you use energy, so we'd rather give you a proper answer than a guess."
+     ]
+    },
+    {
+     "id": "offer",
+     "rewording": "light",
+     "variants": [
+      "One of our team can talk you through it on a short call, in plain English.",
+      "We're happy to talk it through with you on a short call."
+     ]
+    },
+    {
+     "id": "booking",
+     "rewording": "none",
+     "variants": [
+      "{{booking}}"
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hi Huw, thanks for the question, it's a good one. The honest answer depends on your home, so we'd rather not guess in a comment. One of our team can talk you through it on a short call, in plain English. You can book a call with our team here: https://heliaxis.co.uk/book-a-call?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team",
+    "Hello, good question, thanks for asking. It depends on your home and how you use energy, so we'd rather give you a proper answer than a guess. We're happy to talk it through with you on a short call. You can book a call with our team through the link in our bio, or send us a DM and we'll get back to you.\nThe Heliaxis team",
+    "Hi Kate, good question, thanks for asking. The honest answer depends on your home, so we'd rather not guess in a comment. We're happy to talk it through with you on a short call. You can book a free survey here: https://heliaxis.co.uk/book-a-survey?utm_source=facebook&utm_medium=social-reply\nThe Heliaxis team"
+   ]
+  },
+  {
+   "id": "abusive-or-spam",
+   "name": "Abusive comment (spam gets no reply)",
+   "priority": 200,
+   "safety": false,
+   "topics": [
+    "other",
+    "service",
+    "spam"
+   ],
+   "severities": [
+    "medium",
+    "high",
+    "low"
+   ],
+   "platforms": [
+    "facebook",
+    "instagram",
+    "manual"
+   ],
+   "booking_types": [],
+   "reviewer_note_default": "Consider whether a reply is needed at all. Spam is classed Ignore and never gets a draft. Hiding or deleting a comment is a manual step on the platform under Heliaxis's moderation policy; this system never does it.",
+   "banned_phrases": [
+    "block",
+    "blocked",
+    "report you",
+    "troll",
+    "grow up",
+    "pathetic",
+    "embarrassing"
+   ],
+   "segments": [
+    {
+     "id": "greeting",
+     "rewording": "none",
+     "variants": [
+      "Hi {{first_name}},",
+      "Hello {{first_name}},"
+     ],
+     "variants_no_name": [
+      "Hi there,",
+      "Hello,"
+     ]
+    },
+    {
+     "id": "reply",
+     "rewording": "none",
+     "variants": [
+      "We're sorry you feel this way.",
+      "Sorry you feel this way."
+     ]
+    },
+    {
+     "id": "next_step",
+     "rewording": "none",
+     "variants": [
+      "If there's something we can help with, please send us a message and we'll do our best.",
+      "If we can help with anything, please send us a message."
+     ]
+    },
+    {
+     "id": "signoff",
+     "rewording": "none",
+     "newline_before": true,
+     "variants": [
+      "{{signoff}}"
+     ]
+    }
+   ],
+   "examples": [
+    "Hello, we're sorry you feel this way. If there's something we can help with, please send us a message and we'll do our best.\nThe Heliaxis team",
+    "Hi Lee, sorry you feel this way. If we can help with anything, please send us a message.\nThe Heliaxis team",
+    "Hi there, we're sorry you feel this way. If we can help with anything, please send us a message.\nThe Heliaxis team"
+   ]
+  }
+ ]
+}
