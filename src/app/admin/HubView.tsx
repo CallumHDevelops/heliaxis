@@ -5,7 +5,6 @@ import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import { HubMetaLeads } from './HubMetaLeads';
 import { HubSearch } from '@/components/admin/GlobalSearch';
-import { isPinnedLight } from '@/lib/theme/routes';
 import type { HubMetaLeads as MetaLeads } from './meta-leads';
 import './hub.css';
 
@@ -146,24 +145,6 @@ export function HubView({
         <p className="hub-banner">You don&apos;t have access to that area. Ask an admin to add it to your account.</p>
       )}
 
-      {assistant && (
-        <Link href="/admin/assistant" className="hub-claude">
-          <MetisIcon size={42} className="hub-claude-mark" />
-          <span className="hub-claude-main">
-            <b>Talk to Metis</b>
-            <small>Just finished a meeting? Say what happened — notes, tasks and drafts done for you.</small>
-          </span>
-          <span className="hub-claude-mic" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
-              <rect x="9" y="3" width="6" height="12" rx="3" />
-              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-            </svg>
-          </span>
-        </Link>
-      )}
-
-      <FromClaude {...setup} />
-
       <div className="hub-cols">
         <div className="hub-col-needs">
       {attention.length > 0 && (
@@ -198,6 +179,24 @@ export function HubView({
 
         </div>
       </div>
+
+      {assistant && (
+        <Link href="/admin/assistant" className="hub-claude">
+          <MetisIcon size={42} className="hub-claude-mark" />
+          <span className="hub-claude-main">
+            <b>Talk to Metis</b>
+            <small>Just finished a meeting? Say what happened — notes, tasks and drafts done for you.</small>
+          </span>
+          <span className="hub-claude-mic" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <rect x="9" y="3" width="6" height="12" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+            </svg>
+          </span>
+        </Link>
+      )}
+
+      <FromClaude {...setup} />
 
       {portals.length === 0 && !isAdmin && (
         <p className="hub-banner">No portals have been added to your account yet. Ask an admin to give you access.</p>

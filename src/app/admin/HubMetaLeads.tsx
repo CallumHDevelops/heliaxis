@@ -35,18 +35,23 @@ export function HubMetaLeads({ data }: { data: Data }) {
           {rows.map((r) => {
             const who = (
               <>
-                <b>
-                  {r.name}
-                  {r.ref && <span className="hub-meta-ref">{r.ref}</span>}
-                </b>
-                <span className={`hub-meta-why is-${r.why.key}`}>{r.why.label}</span>
-                <small>
+                <span className="hub-meta-top">
+                  <span className="hub-meta-avatar" aria-hidden="true">
+                    {(r.name.trim()[0] ?? '?').toUpperCase()}
+                  </span>
+                  <b>
+                    {r.name}
+                    {r.ref && <span className="hub-meta-ref">{r.ref}</span>}
+                  </b>
+                  <time dateTime={r.at}>{r.ago}</time>
+                </span>
+                <span className="hub-meta-tags">
+                  <span className={`hub-meta-why is-${r.why.key}`}>{r.why.label}</span>
                   <span className="hub-meta-ad" title={r.note ?? undefined}>
                     {r.ad}
                   </span>
-                  {r.postcode && <span>{r.postcode}</span>}
-                  <time dateTime={r.at}>{r.ago}</time>
-                </small>
+                  {r.postcode && <span className="hub-meta-pc">{r.postcode}</span>}
+                </span>
               </>
             );
             return (
