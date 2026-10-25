@@ -595,6 +595,8 @@ textarea.crm-input {
 }
 .crm-menu-icon {
   font-size: 1.4rem;
+  display: inline-flex;
+  color: var(--text);
 }
 .crm-menu small {
   font-size: 0.62rem;
