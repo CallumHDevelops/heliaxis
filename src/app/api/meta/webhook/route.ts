@@ -2,6 +2,9 @@ import { after, NextResponse } from 'next/server';
 import { validSignature } from '@/lib/whatsapp/api';
 import { handleEcho, handleInboundMessage, handleStatus, processOutbox, type InboundMessage, type MessageEcho } from '@/lib/whatsapp/inbox';
 import { ingestLead } from '@/lib/whatsapp/lead-ads';
+import crypto from 'node:crypto';
+import { normaliseMetaWebhook } from '@/lib/social/connectors/meta';
+import { ingestMention, markProcessed, storeRaw } from '@/lib/social/ingest';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -12,6 +15,8 @@ export const maxDuration = 60;
  *  - object "whatsapp_business_account", field "messages": WhatsApp messages and delivery statuses.
  *  - object "whatsapp_business_account", field "smb_message_echoes": messages you typed in the
  *    WhatsApp Business app on the same number (coexistence), so the Heliaxis chat stays complete.
+ *  - object "page" field "feed" / object "instagram" field "comments": public comments, saved and scored
+ *    by Social monitoring (src/lib/social). Read only: nothing is ever posted, hidden or deleted.
  */
 
 // Meta's one-off check when you save the callback URL.
@@ -27,9 +32,19 @@ export async function GET(req: Request) {
 type Change = { field: string; value: Record<string, unknown> };
 type Payload = { object?: string; entry?: { changes?: Change[] }[] };
 
+/** Instagram-login webhooks can be signed with the Instagram app secret instead of the Meta app secret. */
+function validInstagramSignature(raw: string, header: string | null): boolean {
+  const secret = process.env.META_IG_APP_SECRET;
+  if (!secret || !header?.startsWith('sha256=')) return false;
+  const want = crypto.createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
+  const got = header.slice(7);
+  return got.length === want.length && crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
+}
+
 export async function POST(req: Request) {
   const raw = await req.text();
-  if (!validSignature(raw, req.headers.get('x-hub-signature-256'))) {
+  const sig = req.headers.get('x-hub-signature-256');
+  if (!validSignature(raw, sig) && !validInstagramSignature(raw, sig)) {
     return NextResponse.json({ error: 'Bad signature' }, { status: 401 });
   }
   let payload: Payload;
@@ -59,6 +74,23 @@ export async function POST(req: Request) {
         for (const m of (v.message_echoes as MessageEcho[]) ?? []) jobs.push(() => handleEcho(m));
       }
     }
+  }
+
+  // Public comments (Facebook Page feed, Instagram). Saved raw first, so nothing is lost if a step fails.
+  const comments = payload.object === 'page' || payload.object === 'instagram' ? normaliseMetaWebhook(payload) : [];
+  if (comments.length) {
+    jobs.push(async () => {
+      const eventId = await storeRaw('meta-webhook', payload);
+      let failed = 0;
+      for (const c of comments) {
+        const r = await ingestMention(c).catch((e) => {
+          console.error('Social ingest failed', e);
+          return { action: 'error' as const };
+        });
+        if (r.action === 'error') failed++;
+      }
+      await markProcessed(eventId, failed ? `${failed} of ${comments.length} failed` : undefined);
+    });
   }
 
   // Answer Meta fast (it retries slow webhooks); do the work straight after.
