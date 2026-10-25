@@ -2743,6 +2743,8 @@ function renderDashboard(){var el=document.getElementById('dashboard');if(!el)re
    '<button class="dact" onclick="showLogos()"><b>Brand logos</b><span>Manufacturer banner library</span></button>'+
    '<button class="dact" onclick="showMega()"><b>Mega menu</b><span>Edit top-level items &amp; columns</span></button>'+
    '<a class="dact" href="/admin/blog" style="text-decoration:none"><b>Blog</b><span>AI fills fixed article template</span></a>'+
+   '<a class="dact" href="/admin/cms-report" style="text-decoration:none"><b>CMS report</b><span>What we rank for, who beats us &amp; why</span></a>'+
+   '<a class="dact" href="/admin/geo" style="text-decoration:none"><b>AI search visibility</b><span>Are ChatGPT, Perplexity &amp; Claude naming us?</span></a>'+
    '<a class="dact" href="/admin/analytics" style="text-decoration:none"><b>Analytics</b><span>Umami traffic &amp; engagement</span></a>'+
    '<a class="dact" href="/admin/analytics/heatmap" style="text-decoration:none"><b>Click heatmap</b><span>Free heatmap.js page overlay</span></a></div>';
  h+='</div>';el.innerHTML=h;
