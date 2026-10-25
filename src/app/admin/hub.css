@@ -1000,18 +1000,31 @@ a.nu-main:hover b {
   }
   .nu-actions {
     flex-basis: 100%;
+    margin-left: 0;
     padding-left: calc(38px + 0.75rem);
   }
 }
 
-/* In the narrower left column the lead's chip and buttons sit on a second line under the name. */
-.hub-work .nu-item:has(.nu-actions) {
+/* Lead and task rows: one line when there is room (name, status, buttons); the buttons drop under the name only when the column is narrow. */
+.hub-work .nu-item {
   flex-wrap: wrap;
+  row-gap: 0.5rem;
+  min-height: 0;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
 }
-.hub-work .nu-item:has(.nu-actions) .nu-main {
-  flex-basis: calc(100% - 140px);
+.hub-work .nu-main {
+  flex: 1 1 14rem;
 }
-.hub-work .nu-item .nu-actions {
-  flex-basis: 100%;
-  padding-left: calc(38px + 0.75rem);
+.hub-work .nu-actions {
+  margin-left: auto;
+}
+.hub-work .nu-btn {
+  min-height: 34px;
+  padding: 0 0.7rem;
+  font-size: 0.8rem;
+}
+.hub-work .nu-avatar {
+  width: 34px;
+  height: 34px;
 }
