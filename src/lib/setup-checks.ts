@@ -829,13 +829,18 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       '**Certificates & secrets → New client secret** → 24 months → **Add**, then copy the **Value** (not the Secret ID). It’s only shown once.',
       'Don’t add any **API permissions**: the PowerShell lines below give it just the two mailboxes. If you ticked Mail permissions before, remove them.',
       '**Identity → Applications → Enterprise applications** → search **Heliaxis CRM** → copy its **Object ID** (it’s different from the one on the app registration).',
-      'On a Windows PC open **PowerShell** (Start menu → type PowerShell) and paste the PowerShell lines below one at a time, pressing Enter after each. Say **Y** or **A** if it asks to install. Line 2 opens a Microsoft sign-in; line 3 asks for the two IDs.',
+      'On a Windows PC open **PowerShell** (Start menu → type PowerShell) and paste the PowerShell lines below one at a time, pressing Enter after each. Say **Y** or **A** if it asks to install. Line 2 opens a Microsoft sign-in (use the Microsoft 365 admin account); line 3 asks for the two IDs.',
+      'If line 4 says **“isn’t currently allowed in your organization”**, run **Enable once** below. Microsoft then needs **30 to 60 minutes** to switch it on. Close PowerShell, wait, open a **new** PowerShell window, run line 2 again and carry on from line 4 (line 3 is already done by then). **Check ready** should say `IsDehydrated : False`.',
+      'In a new window line 5 needs `$app` filled in: edit the **Set app** line below with your Application (client) ID and run it first.',
       'After line 6, every row should say **True** under **InScope**. If not, send Claude a screenshot.',
       ...VERCEL_STEPS,
     ],
     copies: [
       { label: 'PowerShell 1', value: 'Install-Module ExchangeOnlineManagement -Scope CurrentUser' },
       { label: 'PowerShell 2', value: 'Connect-ExchangeOnline' },
+      { label: 'Enable once', value: 'Enable-OrganizationCustomization' },
+      { label: 'Check ready', value: 'Get-OrganizationConfig | Format-List IsDehydrated' },
+      { label: 'Set app', value: '$app = "PASTE-YOUR-APPLICATION-CLIENT-ID-HERE"' },
       {
         label: 'PowerShell 3',
         value:
