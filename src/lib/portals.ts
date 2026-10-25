@@ -6,7 +6,7 @@
  * (profiles.portals). Safe to import from middleware, server and client code.
  */
 
-export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'team' | 'social' | 'rams';
+export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'social_monitoring' | 'team' | 'social' | 'rams';
 
 export type Portal = {
   key: PortalKey;
@@ -75,6 +75,14 @@ export const PORTALS: Portal[] = [
     description: 'Agreements, ID, qualifications, cards and insurance.',
     href: '/admin/subcontractors',
     paths: ['/admin/subcontractors'],
+  },
+  {
+    key: 'social_monitoring',
+    label: 'Social monitoring',
+    description: 'Comments and reviews about Heliaxis on Facebook, Instagram, Trustpilot and Google: urgent ones flagged, replies drafted for you to copy and post.',
+    href: '/admin/social',
+    // Not the Social media studio ('social', a separate app). Everyone with this tick is notified of urgent comments.
+    paths: ['/admin/social'],
   },
   {
     key: 'team',

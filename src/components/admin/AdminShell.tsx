@@ -33,6 +33,7 @@ type Tab =
   | 'tasks'
   | 'assistant'
   | 'design'
+  | 'social'
   | 'app'
   | 'help';
 
@@ -101,6 +102,12 @@ export const icons = {
     <svg {...ICON}>
       <path d="M4 4v16h16" />
       <path d="M8 8h6M10 12h7M8 16h5" />
+    </svg>
+  ),
+  socialMonitoring: (
+    <svg {...ICON}>
+      <path d="M4 5h16v11H9l-5 4z" />
+      <path d="M8.5 10h7M8.5 13h4" />
     </svg>
   ),
   orders: (
@@ -314,7 +321,10 @@ export async function AdminShell({
   const waUnread = chats ? await unreadPeople(can('enquiries') ? 'all' : 'linked') : 0;
   const waHref = can('enquiries') ? '/admin/enquiries/inbox' : '/admin/crm/chats';
   // Purchase orders: once purchase-orders.sql has been run (checked once a minute).
-  const orders = can('crm') && (await schemaReady()).purchaseOrders;
+  const ready = await schemaReady();
+  const orders = can('crm') && ready.purchaseOrders;
+  // Social Monitoring: once social-monitoring.sql has been run.
+  const socialMonitoring = can('social_monitoring') && ready.social;
 
   const tasksIsTab = !can('crm') && !can('enquiries') && can('tasks');
   const enquiriesIsTab = !can('crm') && can('enquiries');
@@ -354,6 +364,7 @@ export async function AdminShell({
       items: [
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         // On site: one tap away on the phone's bottom bar, so not in "More".
+        { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring },
         { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
       ],
     },

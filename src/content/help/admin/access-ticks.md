@@ -21,6 +21,7 @@ Every account is a **Member** or an **Admin**. A member only gets the parts of t
 | **Tasks** | **Team › Tasks**, the shared to-do list. They can also be given tasks on a job. |
 | **Enquiries** | **CRM › Enquiries**, **WhatsApp inbox**, **Smart replies & chasers** and **WhatsApp templates**. The dashboard shows them new enquiries and unread chats. (Importing older leads on Enquiries is for admins only.) |
 | **CRM** | **CRM › Pipeline**, **Surveys and diary**, **CRM reports**, **CRM settings** and **Metis**; **Operations › Projects**; **Finance › Purchase orders** once switched on; and **WhatsApp chats** (only the chats linked to a job) if they don’t also have Enquiries. They can be picked to share new leads, and they get deposit-paid notifications. |
+| **Social monitoring** | **Operations › Social monitoring**: comments and reviews about Heliaxis from Facebook, Instagram, Trustpilot and Google, with replies drafted for you to copy and post by hand (nothing is ever posted automatically). Everyone with this tick, and every admin, gets a notification when a comment is urgent. Only admins can approve replies to safety comments. It appears once **social-monitoring.sql** has been run. |
 | **Analytics** | **CMS › Website analytics** and **Heatmap**. |
 | **Subcontractors** | **Team › Subcontractors**: every subcontractor firm’s agreement, ID, bank, tax and insurance details. |
 | **Our team** | **Team › Our team**, which opens Heliaxis’s own operatives in RAMS. |

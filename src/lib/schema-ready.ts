@@ -17,6 +17,8 @@ export type SchemaReady = {
   handover: boolean;
   /** design-studio.sql: the design studio's projects, templates and settings (cloud saves). */
   design: boolean;
+  /** social-monitoring.sql: Social Monitoring (comments and reviews, drafts, notifications). Its screens stay hidden until it has run. */
+  social: boolean;
 };
 
 const TTL = 60_000;
@@ -37,7 +39,7 @@ async function has(table: string, column = 'id') {
 }
 
 async function check(): Promise<SchemaReady> {
-  const [crmV3, surveys, bookings, diary, purchaseOrders, siteMessages, docSlots, siteReview, handover, design] = await Promise.all([
+  const [crmV3, surveys, bookings, diary, purchaseOrders, siteMessages, docSlots, siteReview, handover, design, social] = await Promise.all([
     has('crm_projects', 'project_ref'), // crm-v3.sql
     has('crm_surveys'), // surveys.sql
     has('survey_bookings'), // survey-booking.sql
@@ -48,9 +50,10 @@ async function check(): Promise<SchemaReady> {
     has('purchase_orders', 'review_status'), // and the office's review (site_returns, the PO's review)
     has('handover_packs', 'project_id'), // handover.sql
     has('design_projects'), // design-studio.sql
+    has('social_mention'), // social-monitoring.sql
   ]);
   const site = siteMessages && docSlots && siteReview;
-  return { crmV3, surveys, booking: bookings && diary, purchaseOrders, site, handover: site && handover, design };
+  return { crmV3, surveys, booking: bookings && diary, purchaseOrders, site, handover: site && handover, design, social };
 }
 
 /** Cached in memory for 60 s, so a `false` is checked again a minute after the SQL is run. Never throws. */

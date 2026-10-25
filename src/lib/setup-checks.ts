@@ -489,6 +489,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   );
   add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
+  // Social Monitoring: its menu item and page stay hidden until this has been run (src/lib/schema-ready.ts).
+  add(
+    notifications && !(await has('social_mention')),
+    sql('social-monitoring.sql', 'Social monitoring: comments and reviews about Heliaxis, urgent ones flagged to everyone with access, replies drafted for you to copy and post.', 6, 'notifications.sql')
+  );
   add(!nativePush, sql('native-push.sql', 'Lets the Android app get native notifications.', 9, 'notifications.sql'));
   add(
     notifications && !(await notificationRefs),
