@@ -712,3 +712,269 @@ a.hub-meta-main:hover b {
   min-height: 42px;
   padding: 0 0.5rem;
 }
+
+/* Needs you as a dark strip across the top: icon and number on one line, label and detail under them. */
+.hub-needs.hub-strip {
+  padding: 0.9rem 0 0.2rem;
+  margin: 0 0 1.5rem;
+  overflow: hidden;
+}
+.hub-strip .hub-needs-h {
+  margin: 0 0 0.5rem 1.1rem;
+}
+.hub-strip ul {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  column-gap: 0;
+}
+.hub-strip li {
+  border-bottom: 0;
+  border-right: 1px solid var(--hub-moment-rule);
+}
+.hub-strip li:last-child {
+  border-right: 0;
+}
+.hub-strip .hub-need {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'icon n' 'main main';
+  align-items: center;
+  row-gap: 0.55rem;
+  padding: 0.35rem 1.1rem 0.9rem;
+}
+.hub-strip .hub-need-icon {
+  grid-area: icon;
+}
+.hub-strip .hub-need-n {
+  grid-area: n;
+  font-size: 2rem;
+  line-height: 1;
+}
+.hub-strip .hub-need-main {
+  grid-area: main;
+}
+@media (max-width: 700px) {
+  .hub-strip ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .hub-strip li {
+    border-bottom: 1px solid var(--hub-moment-rule);
+  }
+}
+
+/* Next up (left) and Today (right). */
+.hub-work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  margin: 0 0 1.75rem;
+}
+@media (min-width: 1100px) {
+  .hub-work {
+    grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+  }
+}
+.hub-work-side .hub-section {
+  margin-top: 0;
+}
+.nu {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.nu-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  padding: 1rem 1.1rem 0.8rem;
+}
+.nu-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.nu-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.nu-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 36px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nu-tab span {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.nu-tab.on {
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-accent);
+}
+.nu-tab.on span {
+  color: inherit;
+  opacity: 0.8;
+}
+.nu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.1rem;
+  border-top: 1px solid var(--border);
+  min-height: 64px;
+  box-sizing: border-box;
+}
+.nu-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: inherit;
+  text-decoration: none;
+}
+.nu-main b {
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.nu-main:hover b {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nu-main small {
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nu-ref {
+  margin-left: 0.45rem;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.nu-avatar,
+.nu-mark {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+.nu-avatar {
+  background: var(--inverse);
+  color: var(--inverse-accent);
+}
+.nu-mark {
+  background: var(--surface-2);
+}
+.nu-chip {
+  flex: none;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.nu-chip.is-late {
+  border-color: var(--warn-line);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.nu-chip.is-closing {
+  border-color: var(--warn-line);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.nu-chip.is-new,
+.nu-chip.is-today {
+  border-color: var(--info-line);
+  background: var(--info-soft);
+  color: var(--info);
+}
+.nu-actions {
+  flex: none;
+  display: flex;
+  gap: 0.4rem;
+}
+.nu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 0.85rem;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgb(var(--fg-rgb) / 0.18);
+  background: var(--hub-btn);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.nu-btn:hover {
+  border-color: var(--ink);
+}
+.nu-btn.is-primary {
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-accent);
+}
+.nu-empty {
+  margin: 0;
+  padding: 1rem 1.1rem 1.2rem;
+  color: var(--muted);
+}
+.nu-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  padding: 0.2rem 1.1rem 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.nu-foot .hub-more {
+  margin: 0.6rem 0 0;
+}
+/* On a phone the chip drops under the name and the buttons wrap below. */
+@media (max-width: 720px) {
+  .nu-item {
+    flex-wrap: wrap;
+  }
+  .nu-main {
+    flex-basis: calc(100% - 60px);
+  }
+  .nu-actions {
+    flex-basis: 100%;
+    padding-left: calc(38px + 0.75rem);
+  }
+}
