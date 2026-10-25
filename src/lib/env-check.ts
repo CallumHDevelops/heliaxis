@@ -72,6 +72,8 @@ export const ENV_GROUPS: EnvGroup[] = [
       { name: 'META_SOCIAL_TOKEN', secret: true, optional: true, hint: 'Business settings → System users → Generate token (comment, Page and Instagram read permissions)' },
       { name: 'META_PAGE_ID', secret: false, optional: true, hint: 'The Facebook Page to watch (Page → About → Page ID)' },
       { name: 'META_IG_USER_ID', secret: false, optional: true, hint: 'The linked Instagram professional account ID' },
+      { name: 'META_IG_TOKEN', secret: true, optional: true, hint: 'Meta app → Instagram → API setup with Instagram login → Generate token (lasts 60 days)' },
+      { name: 'META_IG_APP_SECRET', secret: true, optional: true, hint: 'Meta app → Instagram → API setup with Instagram login → Instagram app secret' },
       { name: 'GOOGLE_BP_CLIENT_ID', secret: false, optional: true, hint: 'Google Cloud → APIs & Services → Credentials (Business Profile API)' },
       { name: 'GOOGLE_BP_CLIENT_SECRET', secret: true, optional: true, hint: 'Same page as the client ID' },
       { name: 'GOOGLE_BP_REFRESH_TOKEN', secret: true, optional: true, hint: 'Created once with the admin-only Connect Google button in Social monitoring settings' },

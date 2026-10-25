@@ -658,32 +658,36 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   });
   // ── Social monitoring: what only the owner can set up. Shown once social-monitoring.sql has been run. ──
   const socialSql = await has('social_mention');
-  add(socialSql && !env('META_SOCIAL_TOKEN', 'META_PAGE_ID', 'META_IG_USER_ID', 'SOCIAL_AUTHOR_PEPPER'), {
+  add(socialSql && !env('META_SOCIAL_TOKEN', 'META_PAGE_ID', 'META_IG_USER_ID', 'META_IG_TOKEN', 'META_IG_APP_SECRET', 'SOCIAL_AUTHOR_PEPPER'), {
     id: 'env-social-meta',
     title: 'Social monitoring: connect Facebook and Instagram',
     detail:
       'Lets the app read comments on your Facebook Page and Instagram posts (read only: it can never reply, hide or delete). Uses the same Meta app as WhatsApp and lead ads.',
     steps: [
-      'Open your [Meta app](https://developers.facebook.com/apps) (the one WhatsApp uses) → **App settings → Basic**. Check **App mode** is **Live**.',
-      'Open **Business Settings → Users → System users** (in [Meta Business Suite settings](https://business.facebook.com/settings/system-users)). Use the system user WhatsApp already uses, or add one named `Heliaxis social`.',
-      'Tap **Add assets**. Add the **Facebook Page** and the **Instagram account** (give it **Full control**, or at least read access to content and insights).',
-      'Tap **Generate token**, choose your Meta app, and tick these permissions: `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_metadata`, `read_insights`, `instagram_basic`, `instagram_manage_comments`, `instagram_manage_insights`. Set the token to **never expire** if it offers it, then **Generate** and copy it. It is shown once.',
-      'Instagram only offers one comments permission, and it technically allows replying too. Heliaxis never uses that: the app can only read (it blocks every write request in code).',
-      'If Meta says a permission needs **App Review** or **Advanced access**: it is for reading comments on your own Page. Tell Claude what Meta says and we will sort it out.',
-      'Find the two IDs: open the [Graph API Explorer](https://developers.facebook.com/tools/explorer), paste your new token in the **Access Token** box, and run `me/accounts?fields=id,name,instagram_business_account`. The `id` is the Page ID. The number inside `instagram_business_account` is the Instagram ID.',
-      'Make up a long random password-like text for `SOCIAL_AUTHOR_PEPPER` (30+ letters and numbers). It is used to scramble commenter IDs, so keep it secret and never change it later.',
-      'Add the four keys below in Vercel (tick **Sensitive** on the token and the pepper).',
+      '**Facebook first.** Open your [Meta app](https://developers.facebook.com/apps) (the one WhatsApp uses) and add the use case **Manage everything on your Page**. Under **Customize** add `pages_show_list`, `pages_read_engagement`, `pages_read_user_content`, `pages_manage_metadata` and `read_insights`.',
+      'Open [Meta Business settings → System users](https://business.facebook.com/settings/system-users). Use the system user WhatsApp already uses, or add one named `Heliaxis social`. Tap **Add assets** and add the **Facebook Page** (full control, or at least read access to content and insights).',
+      'Tap **Generate token**, choose your Meta app, tick the five Page permissions above, set it to **never expire** if offered, then copy it. It is shown once. This is `META_SOCIAL_TOKEN`.',
+      'Find the **Page ID**: open the [Graph API Explorer](https://developers.facebook.com/tools/explorer), paste the new token in **Access Token**, and run `me/accounts?fields=id,name`. The `id` next to your Page is `META_PAGE_ID`.',
+      '**Now Instagram.** In the same Meta app, add the use case **Manage messaging & content on Instagram**, then open **Instagram → API setup with Instagram login** in the left menu. **1. Add required permissions** should show a green tick (it lists `instagram_business_basic`, `instagram_business_manage_comments` and `instagram_business_manage_messages`). Heliaxis only ever reads comments: the messages permission is unavoidable on that screen and is never used.',
+      'At the top of that page, next to **Instagram app secret**, tap **Show** and copy it. This is `META_IG_APP_SECRET` (a password: tick **Sensitive** in Vercel). It is not the same as the main Meta app secret.',
+      'Scroll to **2. Generate access tokens**. Tap **Add account**, sign in to the Heliaxis Instagram account (it must be a professional account) and accept. Then tap **Generate token** next to it and copy the token. This is `META_IG_TOKEN`. It lasts 60 days; the app refreshes it by itself once that part is built, so tell Claude if it gets close to expiring.',
+      'The long number shown against the account is the Instagram account ID. This is `META_IG_USER_ID`.',
+      '**Skip step 3 (webhooks) for now.** The part of the app that receives them is still being built. A new to-do appears here when it is ready.',
+      'Make up a long random password-like text for `SOCIAL_AUTHOR_PEPPER` (30+ letters and numbers). It scrambles commenter IDs, so keep it secret and never change it later.',
+      'If Meta says a permission needs **App Review** or **Advanced access**: it is for reading comments on your own accounts. Tell Claude what Meta says and we will sort it out.',
+      'Add the six keys below in Vercel (tick **Sensitive** on the tokens, the secret and the pepper).',
       ...VERCEL_STEPS,
-      '**Do not subscribe the Page or Instagram to comment notifications yet.** The part of the app that receives them is still being built. A new to-do appears here when it is ready.',
     ],
     copies: [
       { label: 'Key', value: 'META_SOCIAL_TOKEN' },
       { label: 'Key', value: 'META_PAGE_ID' },
+      { label: 'Key', value: 'META_IG_APP_SECRET' },
+      { label: 'Key', value: 'META_IG_TOKEN' },
       { label: 'Key', value: 'META_IG_USER_ID' },
       { label: 'Key', value: 'SOCIAL_AUTHOR_PEPPER' },
     ],
-    href: 'https://business.facebook.com/settings/system-users',
-    hrefLabel: 'Open Meta Business settings',
+    href: 'https://developers.facebook.com/apps',
+    hrefLabel: 'Open Meta apps',
     order: 11,
   });
   add(socialSql && !env('GOOGLE_BP_CLIENT_ID', 'GOOGLE_BP_CLIENT_SECRET', 'GOOGLE_BP_REFRESH_TOKEN', 'GOOGLE_BP_LOCATION'), {

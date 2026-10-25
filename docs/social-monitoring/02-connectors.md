@@ -71,6 +71,8 @@ Health colours: **green** = last success within 2× poll interval and token vali
 
 ## 4. Instagram Business
 
+> **Updated 25 Oct 2026:** Heliaxis's Meta app uses **Instagram API with Instagram Login** (`graph.instagram.com`), with `instagram_business_basic` and `instagram_business_manage_comments`, an Instagram token (`META_IG_TOKEN`, 60 days, refreshed with `GET /refresh_access_token`, stored in `cms_kv` after the first refresh) and the Instagram app secret (`META_IG_APP_SECRET`) for webhook signatures. This route has no hashtag or insights access; Instagram insights for Phase 3 need the Facebook-login route and are added later. The Facebook-login permission names below are kept for that case.
+
 - **Access**: Instagram professional account linked to the Facebook Page (Facebook Login path), reusing the same system-user token.
 - **Permissions (minimum)**: `instagram_basic`, `instagram_manage_comments` (**needed to read comments; it also grants write. See 01 §6**), `instagram_manage_insights`, `pages_read_engagement`, `pages_show_list`.
 - **Webhooks**: Instagram subscription fields `comments`, `mentions`. Verify `X-Hub-Signature-256`.
