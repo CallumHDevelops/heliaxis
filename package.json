@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "lint:social": "eslint src/lib/social src/app/admin/social src/components/admin/social tests vitest.config.ts --no-error-on-unmatched-pattern"
+    "lint:social": "eslint src/lib/social src/app/admin/social src/components/admin/social tests vitest.config.ts --no-error-on-unmatched-pattern",
+    "test:classifier": "vitest run tests/social/keyword-layer.test.ts tests/social/combine.test.ts",
+    "test:guardrails": "vitest run tests/social/guardrails.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -42,6 +44,7 @@
     "sharp": "0.34.5",
     "tailwind-merge": "^3.4.0",
     "web-push": "^3.6.7",
+    "yaml": "^2.9.1",
     "zod": "^4.3.2"
   },
   "devDependencies": {
