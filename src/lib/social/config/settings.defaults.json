@@ -2,8 +2,8 @@
   "_stored_in": "cms_kv, key 'social-monitoring'. Admins edit these on Social Monitoring › Settings.",
   "booking.links": {
     "survey": "https://heliaxis.co.uk/book-a-survey",
-    "call": "https://heliaxis.co.uk/book-a-survey?mode=phone",
-    "quote": "https://heliaxis.co.uk/get-a-quote"
+    "call": "https://heliaxis.co.uk/book-a-call",
+    "quote": "https://heliaxis.co.uk/book-a-call?reason=quote"
   },
   "booking.review_short_link": "heliaxis.co.uk/book",
   "booking.utm_sources": [
