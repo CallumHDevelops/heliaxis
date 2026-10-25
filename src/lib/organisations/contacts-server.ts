@@ -137,7 +137,7 @@ export async function updateContact(
   fields: ContactFields,
   move: { orgId: string | null } | null,
   byId: string
-): Promise<{ ok: true; contact: OrgContact; jobsMoved: number } | Fail> {
+): Promise<{ ok: true; contact: OrgContact; jobsMoved: number; jobsFailed: number } | Fail> {
   const { data: was } = await db.from('crm_contacts').select(CONTACT_COLS).eq('id', id).maybeSingle();
   if (!was) return NO_CONTACT;
   const before = was as OrgContact;
@@ -166,6 +166,7 @@ export async function updateContact(
   }
 
   let jobsMoved = 0;
+  let jobsFailed = 0;
   if (moved) {
     if (before.organisation_id && before.is_primary) await promoteNext(db, before.organisation_id);
     if (orgId) {
@@ -177,7 +178,10 @@ export async function updateContact(
     for (const j of (jobs ?? []) as Row[]) {
       if ((str(j.organisation_id) ?? null) === orgId) continue;
       const { error } = await db.from('crm_projects').update({ organisation_id: orgId, updated_at: new Date().toISOString() }).eq('id', String(j.id));
-      if (error) continue;
+      if (error) {
+        jobsFailed++;
+        continue;
+      }
       jobsMoved++;
       await logActivity({
         enquiryId: String(j.enquiry_id),
@@ -194,7 +198,7 @@ export async function updateContact(
   }
   for (const o of new Set([before.organisation_id, orgId])) if (o) await db.from('organisations').update({ updated_at: new Date().toISOString() }).eq('id', o);
   const { data: now } = await db.from('crm_contacts').select(CONTACT_COLS).eq('id', id).maybeSingle();
-  return { ok: true, contact: (now ?? before) as OrgContact, jobsMoved };
+  return { ok: true, contact: (now ?? before) as OrgContact, jobsMoved, jobsFailed };
 }
 
 /** Delete a contact. Jobs dealt with through them stay (and keep their organisation); if they were their organisation's primary contact, the next one takes over (that one's name, or null). */

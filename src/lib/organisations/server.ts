@@ -232,14 +232,15 @@ export async function linkJob(db: Db, projectId: string, orgIn: string | null | 
 
   if (wasOrg === orgId && wasContact === contactId) return { ok: true, ...(await jobLinks(db, job)) };
 
-  const { data: saved, error } = await db
-    .from('crm_projects')
-    .update({ organisation_id: orgId, contact_id: contactId, updated_at: new Date().toISOString() })
-    .eq('id', projectId)
-    .select('*')
-    .maybeSingle();
+  // Only if the job still has the contact it had when this started: a contact moved to another
+  // organisation meanwhile (which re-points their jobs) mustn't be overwritten by a stale read.
+  const guarded = db.from('crm_projects').update({ organisation_id: orgId, contact_id: contactId, updated_at: new Date().toISOString() }).eq('id', projectId);
+  const { data: saved, error } = await (wasContact ? guarded.eq('contact_id', wasContact) : guarded.is('contact_id', null)).select('*').maybeSingle();
   if (error) return { ok: false, status: 500, error: error.message };
-  if (!saved) return { ok: false, status: 404, error: 'That job isn’t there any more.' };
+  if (!saved) {
+    const { data: still } = await db.from('crm_projects').select('id').eq('id', projectId).maybeSingle();
+    return still ? { ok: false, status: 409, error: 'Someone changed this job just now. Try again.' } : { ok: false, status: 404, error: 'That job isn’t there any more.' };
+  }
 
   const nameOf = async (table: 'organisations' | 'crm_contacts', id: string | null) => (id ? ((await db.from(table).select('name').eq('id', id).maybeSingle()).data?.name as string | undefined) : undefined);
   let body: string;
@@ -264,7 +265,11 @@ export async function deleteOrganisation(db: Db, id: string, byId: string): Prom
   // Nobody is "primary" in no organisation: unmarked first, then the foreign key lets them go.
   const { data: people } = await db.from('crm_contacts').update({ is_primary: false, updated_at: new Date().toISOString() }).eq('organisation_id', id).select('id');
   const { error } = await db.from('organisations').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Not deleted: whoever was primary is again (the unmark above shouldn't stand).
+    await promoteNext(db, id);
+    throw new Error(error.message);
+  }
   for (const j of (jobs ?? []) as Row[]) {
     await logActivity({ enquiryId: String(j.enquiry_id), projectId: String(j.id), kind: 'system', body: `No longer linked to ${org.name} (the organisation was deleted)`, byId }).catch(() => null);
   }

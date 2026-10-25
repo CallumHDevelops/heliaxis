@@ -370,6 +370,34 @@ eq('edit just a role', (await call(Person.PATCH, { method: 'PATCH', params: { id
 eq('…a bad email is refused', (await call(Person.PATCH, { method: 'PATCH', params: { id: dai.id }, body: { email: 'nope' } })).body.field, 'email');
 eq('…a bad organisation id is refused', (await call(Person.PATCH, { method: 'PATCH', params: { id: dai.id }, body: { organisation_id: 'x' } })).status, 400);
 
+// A job that changed under a link is refused, not overwritten.
+{
+  const stale = db.rows('crm_projects').find((p) => p.id === job.id);
+  const was = stale.contact_id;
+  const real = db.from;
+  // Someone else's move lands between this call's read and its write: the write must find the job already different.
+  let first = true;
+  db.from = (table) => {
+    const b = real(table);
+    if (table === 'crm_projects' && first) {
+      const upd = b.update.bind(b);
+      b.update = (payload) => {
+        if (first && 'contact_id' in payload) {
+          first = false;
+          stale.contact_id = randomUUID();
+        }
+        return upd(payload);
+      };
+    }
+    return b;
+  };
+  const r = await call(Link.PUT, { method: 'PUT', params: { id: job.id }, body: { contact_id: null } });
+  db.from = real;
+  eq('a link whose job changed meanwhile: refused (409), nothing overwritten', [r.status, /just now/.test(r.body.error), stale.contact_id === was], [409, true, false]);
+  stale.contact_id = was;
+}
+eq('a body that isn’t an object is just refused', (await call(Link.PUT, { method: 'PUT', params: { id: job.id }, body: 5 })).status, 400);
+
 // Delete.
 const rm = await call(Person.DELETE, { method: 'DELETE', params: { id: dai.id } });
 eq('delete a contact: their job stays with its organisation, without the person', [rm.status, j.contact_id, j.organisation_id], [200, null, cefOrg]);

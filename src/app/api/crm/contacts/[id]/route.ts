@@ -43,7 +43,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const clean = cleanContact(body, false);
   if (!clean.ok) return json({ error: clean.error, field: clean.field }, 400);
   const r = await updateContact(createAdminClient(), id, clean.fields, move, s.user.id);
-  return r.ok ? json({ contact: r.contact, jobsMoved: r.jobsMoved }) : json({ error: r.error }, r.status);
+  if (!r.ok) return json({ error: r.error }, r.status);
+  return json({
+    contact: r.contact,
+    jobsMoved: r.jobsMoved,
+    ...(r.jobsFailed ? { warning: `${r.contact.name} is moved, but ${r.jobsFailed} of their jobs couldn’t be moved with them. Open each one and change its organisation.` } : {}),
+  });
 }
 
 /** Delete a contact. Jobs dealt with through them stay, keeping their organisation. */

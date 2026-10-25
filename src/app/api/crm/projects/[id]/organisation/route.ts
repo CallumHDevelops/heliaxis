@@ -18,8 +18,9 @@ export async function PUT(req: Request, { params }: Ctx) {
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const b = await req.json().catch(() => ({}));
   // Left out: as the job has it. null: cleared. An id: set.
-  const org = b && 'organisation_id' in b ? (b.organisation_id ?? null) : undefined;
-  const contact = b && 'contact_id' in b ? (b.contact_id ?? null) : undefined;
+  const body = b && typeof b === 'object' ? (b as Record<string, unknown>) : {};
+  const org = 'organisation_id' in body ? (body.organisation_id ?? null) : undefined;
+  const contact = 'contact_id' in body ? (body.contact_id ?? null) : undefined;
   if (org !== undefined && org !== null && !(typeof org === 'string' && isUuid(org))) return json({ error: 'Pick an organisation.' }, 400);
   if (contact !== undefined && contact !== null && !(typeof contact === 'string' && isUuid(contact))) return json({ error: 'Pick a contact.' }, 400);
   if (org === undefined && contact === undefined) return json({ error: 'Say what to link.' }, 400);
