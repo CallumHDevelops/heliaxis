@@ -658,7 +658,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   });
   // ── Social monitoring: what only the owner can set up. Shown once social-monitoring.sql has been run. ──
   const socialSql = await has('social_mention');
-  add(socialSql && !env('META_SOCIAL_TOKEN', 'META_PAGE_ID', 'META_IG_USER_ID', 'META_IG_TOKEN', 'META_IG_APP_SECRET', 'SOCIAL_AUTHOR_PEPPER'), {
+  add(socialSql && !env('META_SOCIAL_TOKEN', 'META_PAGE_ID', 'META_IG_USER_ID', 'META_IG_TOKEN', 'META_IG_APP_SECRET'), {
     id: 'env-social-meta',
     title: 'Social monitoring: connect Facebook and Instagram',
     detail:
@@ -758,6 +758,44 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     hrefLabel: 'Open Microsoft 365 admin',
     order: 14,
     optional: true,
+  });
+  add(socialSql, {
+    id: 'social-cron',
+    title: 'Social monitoring: switch on its every-minute job',
+    detail:
+      'Every minute this checks new comments with the AI, writes the suggested replies, and sends urgent alerts that were held back overnight. Without it you still get the instant keyword alerts, but no AI check or drafts.',
+    steps: [
+      'Tap **Open Supabase**, copy the block below, replace `YOUR_CRON_SECRET` with your `CRON_SECRET` from Vercel (Settings → Environment Variables), paste it into a new query and tap **Run**.',
+      'Run the **Check** block. You should see **heliaxis-social** with `* * * * *` and **active** = true. Then tick this.',
+    ],
+    copies: [
+      {
+        label: 'Switch on',
+        value:
+          "select cron.schedule('heliaxis-social', '* * * * *', $$ select net.http_get(url := 'https://heliaxis.co.uk/api/cron/social', headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET')); $$);",
+      },
+      { label: 'Check', value: 'select jobname, schedule, active from cron.job;' },
+    ],
+    href: sqlEditor(),
+    hrefLabel: 'Open Supabase',
+    order: 14,
+    manual: true,
+  });
+  add(socialSql, {
+    id: 'social-webhooks',
+    title: 'Social monitoring: send Facebook and Instagram comments to Heliaxis',
+    detail:
+      'Do this LAST, once the two to-dos above are ticked and the Meta keys are in Vercel (redeployed). Meta then tells Heliaxis about each new comment within seconds. It only reads: nothing is ever posted, hidden or deleted.',
+    steps: [
+      'Open your app in **developers.facebook.com**, then **Webhooks** in the left menu.',
+      'Pick **Page**. If the callback URL is not already set, use `https://heliaxis.co.uk/api/meta/webhook` and your `META_WEBHOOK_VERIFY_TOKEN` (the same ones as your lead-ads and WhatsApp webhook). Subscribe to the **feed** field.',
+      'Pick **Instagram**, set the same callback URL and verify token, and subscribe to **comments**.',
+      'Test it: from a different account (not the Heliaxis one), comment on one of your posts: "test comment". It should appear in **Operations → Social monitoring** within a minute. Delete the test comment on Facebook afterwards.',
+    ],
+    href: 'https://developers.facebook.com/apps/',
+    hrefLabel: 'Open Meta apps',
+    order: 14,
+    manual: true,
   });
   add(socialSql, {
     id: 'social-people-notifications',
