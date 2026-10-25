@@ -3,7 +3,7 @@ title: My work: your tasks and next steps
 summary: See what’s waiting for you today, tick tasks off, snooze them, and add a task from the CRM home.
 order: 20
 keywords: to do, todo, follow up, overdue, snooze, tick, done today, mine, everyone, booking requests, today’s visits, start survey, directions, no next step
-where: CRM › Pipeline › Home
+where: CRM › Opportunities › Home
 path: /admin/crm
 access: crm
 ---

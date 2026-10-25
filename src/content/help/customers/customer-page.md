@@ -3,7 +3,7 @@ title: A customer’s page
 summary: What’s on a customer’s page in the CRM: the header, the next step, the tabs, the customer cards, Tasks and the two round buttons.
 order: 70
 keywords: record page, customer record, opportunity page, job page, header, details, other projects, customer card, job details, portal card, tablet, phone layout
-where: CRM › Pipeline › a customer
+where: CRM › Opportunities › a customer
 path: /admin/crm/[id]
 access: crm
 ---
@@ -30,6 +30,7 @@ Open a customer from anywhere in the CRM (a card, the search, My work, Latest no
 
 - **Important**: shown if the job is on hold or a survey flagged something.
 - **Customer**: **Mobile**, **WhatsApp** (permission switch and whether a chat is linked), **Email**, **Site address**, **Source** (where they came from and when), **Owner**, and **Other numbers** after a merge. Press **✎ Edit** to change them: see [Change a customer’s details](/admin/help/customers/edit-customer-details).
+- **Organisation & contact** (once organisations.sql has been run): the organisation the job is for or came through, and the person it’s dealt with through, who may be at that organisation or on their own. **+ Link** or **✎ Change** opens a sheet: find an organisation or a person, or add one by name; **Unlink** takes it off. See [Organisations](/admin/help/customers/organisations) and [Contacts](/admin/help/customers/contacts).
 - **Other projects for Jane**, when they have more than one job.
 - **Job details**: products, value, job name, what they put on the form, OpenSolar and SimpliHeat links, dates and notes, with **✎ Edit**. See [Change a job’s owner, value, products or links](/admin/help/customers/job-details).
 - **Customer portal**, from Surveyed. Before that it says it appears at Surveyed. See [Send a quote for signing](/admin/help/customers/send-quote-for-signing).

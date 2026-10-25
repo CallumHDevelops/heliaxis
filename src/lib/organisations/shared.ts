@@ -44,7 +44,8 @@ export type Organisation = {
 
 export type OrgContact = {
   id: string;
-  organisation_id: string;
+  /** The organisation they're part of; null: on their own. */
+  organisation_id: string | null;
   name: string;
   role: string | null;
   mobile: string | null;
@@ -54,6 +55,42 @@ export type OrgContact = {
   created_at: string;
   /** On an organisation's page: the customer record whose WhatsApp chat is on this contact's number, if there is one. */
   chat_id?: string | null;
+};
+
+/** A contact with the organisation they're part of (null: on their own), as the Contacts list and a contact's page show them. */
+export type ContactWithOrg = Omit<OrgContact, 'organisation_id'> & {
+  organisation_id: string | null;
+  organisation: { id: string; name: string; type: OrgType } | null;
+};
+
+/**
+ * A line on the Contacts list: someone we added (kind 'contact': in an organisation or on their own) or
+ * a customer who came in as an enquiry (kind 'customer'; their page is their job's).
+ */
+export type PersonRow = {
+  kind: 'contact' | 'customer';
+  id: string;
+  name: string;
+  role: string | null;
+  mobile: string | null;
+  email: string | null;
+  postcode: string | null;
+  organisation: { id: string; name: string; type: OrgType } | null;
+  jobs: number;
+  open_jobs: number;
+  /** Where picking them goes; null when this person can open nothing for them. */
+  href: string | null;
+};
+
+/** The person a job is dealt with through (the record page's Organisation card). */
+export type JobContact = {
+  id: string;
+  name: string;
+  role: string | null;
+  mobile: string | null;
+  email: string | null;
+  organisation_id: string | null;
+  organisation_name: string | null;
 };
 
 /** A row on the Organisations list. `people` is every contact's name, role and email, for the search box. */
@@ -72,6 +109,7 @@ export type OrgJob = {
   stage: string;
   ref: string | null;
   customer: string | null;
+  /** The contact it's dealt with through. */
   contact_id: string | null;
   postcode: string | null;
   created_at: string;
@@ -301,6 +339,45 @@ export function countsLine(r: Pick<OrgListRow, 'contacts' | 'jobs' | 'open_jobs'
   const c = `${r.contacts} contact${r.contacts === 1 ? '' : 's'}`;
   if (!r.jobs) return `${c} · no jobs yet`;
   return `${c} · ${r.jobs} job${r.jobs === 1 ? '' : 's'}${r.open_jobs && r.open_jobs !== r.jobs ? ` (${r.open_jobs} open)` : ''}`;
+}
+
+/* ── The Contacts list ────────────────────────────────────────────────────────── */
+
+export type PeopleFilter = 'all' | 'org' | 'alone' | 'customer';
+
+/** Where a person sits, for the chips: someone we added in an organisation, on their own, or a customer. */
+export const personGroup = (p: Pick<PersonRow, 'kind' | 'organisation'>): Exclude<PeopleFilter, 'all'> => (p.kind === 'customer' ? 'customer' : p.organisation ? 'org' : 'alone');
+
+/** Does every word turn up on them: name, role, email, postcode, their organisation's name, or their mobile's digits however typed? */
+export function matchesPerson(p: Pick<PersonRow, 'name' | 'role' | 'email' | 'mobile' | 'postcode' | 'organisation'>, q: string): boolean {
+  const text = [p.name, p.role, p.email, p.postcode, p.organisation?.name].join(' \u0001 ');
+  const digits = (p.mobile ?? '').replace(/\D/g, '');
+  return searchWords(q).every((w) => {
+    if (hasText(text, w)) return true;
+    const squashed = fold(w).replace(/\s/g, '');
+    if (squashed.length >= 4 && fold(p.postcode).replace(/\s/g, '').includes(squashed)) return true;
+    const d = w.replace(/\D/g, '');
+    return d.length >= 4 && /^[\d\s+()-]+$/.test(w) && (digits.includes(d) || (d.startsWith('0') && digits.includes(`44${d.slice(1)}`)) || (d.startsWith('44') && digits.includes(`0${d.slice(2)}`)));
+  });
+}
+
+/** Names the words start first (nameRank), then A to Z. */
+export function sortPeople<T extends Pick<PersonRow, 'name'>>(rows: T[], q: string): T[] {
+  const t = q.trim();
+  return [...rows].sort((a, b) => (t ? nameRank(t, a.name) - nameRank(t, b.name) : 0) || a.name.localeCompare(b.name, 'en-GB'));
+}
+
+/** The chips' numbers, for the people the search found. */
+export function countPeople(rows: Pick<PersonRow, 'kind' | 'organisation'>[]): Record<PeopleFilter, number> {
+  const out: Record<PeopleFilter, number> = { all: rows.length, org: 0, alone: 0, customer: 0 };
+  for (const r of rows) out[personGroup(r)]++;
+  return out;
+}
+
+/** The second line of a person's row: "Facilities manager · Bron Afon", "On their own", "Customer · NP44 3HQ". */
+export function personLine(p: Pick<PersonRow, 'kind' | 'role' | 'organisation' | 'postcode'>): string {
+  if (p.kind === 'customer') return ['Customer', p.postcode].filter(Boolean).join(' · ');
+  return [p.role, p.organisation?.name ?? 'On their own'].filter(Boolean).join(' · ');
 }
 
 /* ── In the database (PostgREST filters) ──────────────────────────────────────── */

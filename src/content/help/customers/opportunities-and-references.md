@@ -3,7 +3,7 @@ title: More than one job for a customer, and HX references
 summary: How customers, opportunities and projects fit together, what HX-0042 and HX-0042-2 mean, and how to add a second job.
 order: 140
 keywords: opportunity, project, job, second job, add-on, reference, ref, HX number, customer number, job number, HX-0042-2, other projects, customer reference
-where: CRM › Pipeline › a customer
+where: CRM › Opportunities › a customer
 access: crm
 ---
 ## Customers, opportunities and projects

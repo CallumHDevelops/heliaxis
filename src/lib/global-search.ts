@@ -140,38 +140,44 @@ export function groupResults(a: { q: string; refs: string[]; people: PersonRow[]
     });
 }
 
-// ── Organisations (supabase/organisations.sql; CRM staff) ──
+// ── Organisations and contacts (supabase/organisations.sql; CRM staff) ──
 
-/** An organisation found by its own details, or by one of its contacts' (`contact`: who matched). */
-export type SearchOrg = { id: string; name: string; type: string; postcode: string | null; contact: { id: string; name: string; role: string | null } | null; href: string };
+/** An organisation or a contact found by their own details: the line the search box shows and where it opens. */
+export type SearchOrg = { key: string; kind: 'org' | 'contact'; name: string; /** Under the name: the type and postcode, or their role and organisation. */ sub: string; /** In the pill: "Organisation" or "Contact". */ hint: string; href: string };
 
-/** The organisations found (src/lib/organisations/server.ts searchOrganisations), with their type in words, names the words start first. */
-export function orgResults(q: string, hits: { id: string; name: string; type: string; postcode: string | null; contact: { id: string; name: string; role: string | null } | null }[]): SearchOrg[] {
-  const rank = (h: (typeof hits)[number]) => Math.min(nameRank(q, h.name), h.contact ? nameRank(q, h.contact.name) : 99);
+/**
+ * The organisations and contacts found (src/lib/organisations/server.ts searchOrgsAndContacts) as lines:
+ * names the words start first, then A to Z. A contact opens their own page, an organisation its page.
+ */
+export function orgResults(q: string, hits: ({ kind: 'org'; id: string; name: string; type: string; postcode: string | null } | { kind: 'contact'; id: string; name: string; role: string | null; organisation: { id: string; name: string } | null })[]): SearchOrg[] {
   return [...hits]
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'en-GB'))
-    .map((h) => ({ ...h, type: orgTypeLabel(h.type), href: `/admin/crm/organisations/${h.id}` }));
+    .sort((a, b) => nameRank(q, a.name) - nameRank(q, b.name) || Number(a.kind === 'contact') - Number(b.kind === 'contact') || a.name.localeCompare(b.name, 'en-GB'))
+    .map((h): SearchOrg =>
+      h.kind === 'org'
+        ? { key: `o-${h.id}`, kind: 'org', name: h.name, sub: [orgTypeLabel(h.type), h.postcode].filter(Boolean).join(' · '), hint: 'Organisation', href: `/admin/crm/organisations/${h.id}` }
+        : { key: `c-${h.id}`, kind: 'contact', name: h.name, sub: [h.role, h.organisation?.name ?? 'On their own'].filter(Boolean).join(' · '), hint: 'Contact', href: `/admin/crm/contacts/${h.id}` }
+    );
 }
 
 // ── The search box's list ──
 
-/** One line in the list: a person, (when they have several) one of their jobs beneath them, or an organisation. */
+/** One line in the list: a person, (when they have several) one of their jobs beneath them, or an organisation or contact. */
 export type SearchOption =
   | { key: string; kind: 'person' | 'job'; person: SearchPerson; job: SearchJob | null; org?: undefined; href: string | null }
-  | { key: string; kind: 'org'; person: null; job: null; org: SearchOrg; href: string };
+  | { key: string; kind: 'org' | 'contact'; person: null; job: null; org: SearchOrg; href: string };
 
 /**
  * A person with one job opens it from their own line; with several, each job gets a line of its own.
- * Organisations come after the people, unless an organisation's name fits what was typed better than anyone's (`q`).
+ * Organisations and contacts come after the people, unless an organisation's name fits what was typed
+ * better than anyone's (`q`).
  */
 export function searchOptions(people: SearchPerson[], orgs: SearchOrg[] = [], q = ''): SearchOption[] {
   const peopleLines = people.flatMap((p): SearchOption[] => [
     { key: `p-${p.id}`, kind: 'person', person: p, job: null, href: p.href },
     ...(p.jobs.length > 1 ? p.jobs.map((j): SearchOption => ({ key: `j-${j.id}`, kind: 'job', person: p, job: j, href: j.href })) : []),
   ]);
-  const orgLines = orgs.map((o): SearchOption => ({ key: `o-${o.id}${o.contact ? `-${o.contact.id}` : ''}`, kind: 'org', person: null, job: null, org: o, href: o.href }));
-  // An organisation whose name is what was typed, from its first word, comes first unless a person fits as well ("bron afon" opens Bron Afon).
-  const orgBest = orgs.length && q ? Math.min(...orgs.filter((o) => !o.contact).map((o) => nameRank(q, o.name)), 99) : 99;
+  const orgLines = orgs.map((o): SearchOption => ({ key: o.key, kind: o.kind, person: null, job: null, org: o, href: o.href }));
+  const orgBest = q ? Math.min(...orgs.filter((o) => o.kind === 'org').map((o) => nameRank(q, o.name)), 99) : 99;
   const personBest = people.length ? Math.min(...people.map((p) => nameRank(q, p.name))) : 99;
   return orgBest === 0 && personBest > 0 ? [...orgLines, ...peopleLines] : [...peopleLines, ...orgLines];
 }

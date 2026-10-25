@@ -8,8 +8,9 @@ import { notify } from '@/lib/notify';
 import { todayISO } from '@/lib/tasks';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { shownBody } from '@/lib/whatsapp/describe';
-import { CONTACT_COLS, NOT_READY, orgsReady, searchOrganisations, setPrimary } from '@/lib/organisations/server';
-import { cleanContact, orgTypeLabel, sortContacts, type OrgContact } from '@/lib/organisations/shared';
+import { createContact, listContacts } from '@/lib/organisations/contacts-server';
+import { NOT_READY, orgsReady, searchOrgsAndContacts } from '@/lib/organisations/server';
+import { cleanContact, matchesPerson, orgTypeLabel, sortContacts, type OrgContact } from '@/lib/organisations/shared';
 import { cleanSearch } from '@/lib/global-search';
 import { searchHelp } from '@/lib/help/server';
 
@@ -119,19 +120,26 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: 'find_organisation',
     description:
-      'Find organisations (commercial customers, landlords and housing associations, schools and the public sector, partners who refer work, suppliers) by name, postcode, phone or email, or by one of their contacts’ names. Returns each one’s id, contacts (the primary one marked) and linked jobs (project ids). Organisation contacts are not customers: search_customers does not find them.',
+      'Find organisations (commercial customers, landlords and housing associations, schools and the public sector, partners who refer work, suppliers) by name, postcode, phone or email, or by the name of someone there. Returns each one’s id, contacts (the primary one marked) and linked jobs (project ids). Organisation contacts are not customers: search_customers does not find them.',
     input_schema: obj({ query: { ...str, description: 'Organisation or contact name, postcode, phone or email (partial is fine).' } }),
   },
   {
-    name: 'add_organisation_contact',
-    description: 'Add a person to an organisation (find it with find_organisation first). The first contact an organisation has becomes its primary contact.',
+    name: 'find_contact',
+    description:
+      'Find contacts (the people the business deals with: part of an organisation, or on their own, such as a builder who works alone) by name, role, email, mobile or organisation name. Returns each one’s id, organisation and linked jobs (project ids). Customers who came in as enquiries are not contacts: use search_customers for them.',
+    input_schema: obj({ query: { ...str, description: 'Name, role, email, mobile or organisation name (partial is fine).' } }),
+  },
+  {
+    name: 'add_contact',
+    description:
+      'Add a contact: a person in an organisation (find it with find_organisation first and pass its id) or on their own (organisation_id null). The first contact an organisation has becomes its primary contact.',
     input_schema: obj({
-      organisation_id: str,
       name: str,
+      organisation_id: nullable('An organisation id from find_organisation, or null for someone on their own.'),
       role: nullable('Job title, e.g. "Facilities manager", or null.'),
       mobile: nullable('Mobile or phone number, or null.'),
       email: nullable('Email, or null.'),
-      make_primary: { type: 'boolean', description: 'True to make them the primary contact.' },
+      make_primary: { type: 'boolean', description: 'True to make them their organisation’s primary contact (ignored for someone on their own).' },
     }),
   },
 ];
@@ -368,12 +376,13 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
       if (!(await orgsReady())) return NOT_READY;
       const q = cleanSearch(s(input.query));
       if (q.length < 2) return 'Give an organisation or contact name, postcode, phone or email.';
-      const ids = [...new Set((await searchOrganisations(db, q, 8)).map((h) => h.id))];
+      const hits = await searchOrgsAndContacts(db, q, 8);
+      const ids = [...new Set(hits.map((h) => (h.kind === 'org' ? h.id : h.organisation?.id)).filter((x): x is string => !!x))];
       if (!ids.length) return 'No organisations found.';
       const [orgs, contacts, jobs] = await Promise.all([
         db.from('organisations').select('id, name, type, phone, email, postcode, notes').in('id', ids),
-        db.from('organisation_contacts').select(CONTACT_COLS).in('organisation_id', ids).limit(400),
-        db.from('crm_projects').select('id, organisation_id, organisation_contact_id, title, stage').in('organisation_id', ids).order('updated_at', { ascending: false }).limit(200),
+        db.from('crm_contacts').select('id, organisation_id, name, role, mobile, email, is_primary, created_at').in('organisation_id', ids).limit(400),
+        db.from('crm_projects').select('id, organisation_id, contact_id, title, stage').in('organisation_id', ids).order('updated_at', { ascending: false }).limit(200),
       ]);
       return JSON.stringify(
         (orgs.data ?? []).map((o) => ({
@@ -385,7 +394,7 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
           postcode: o.postcode,
           notes: o.notes?.slice(0, 400) ?? null,
           contacts: sortContacts(((contacts.data ?? []) as OrgContact[]).filter((c) => c.organisation_id === o.id)).map((c) => ({
-            id: c.id,
+            contact_id: c.id,
             name: c.name,
             role: c.role,
             mobile: c.mobile,
@@ -394,33 +403,42 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
           })),
           jobs: (jobs.data ?? [])
             .filter((j) => j.organisation_id === o.id)
-            .map((j) => ({ project_id: j.id, title: j.title, stage: stageLabel(j.stage), contact_id: j.organisation_contact_id })),
+            .map((j) => ({ project_id: j.id, title: j.title, stage: stageLabel(j.stage), contact_id: j.contact_id })),
         }))
       );
     }
 
-    case 'add_organisation_contact': {
+    case 'find_contact': {
       if (!(await orgsReady())) return NOT_READY;
-      const orgId = s(input.organisation_id);
-      const { data: org } = isUuid(orgId) ? await db.from('organisations').select('id, name').eq('id', orgId).maybeSingle() : { data: null };
-      if (!org) return 'Unknown organisation_id — use find_organisation.';
+      const q = cleanSearch(s(input.query));
+      if (q.length < 2) return 'Give a name, role, email, mobile or organisation name.';
+      const found = (await listContacts(db)).filter((p) => matchesPerson(p, q)).slice(0, 8);
+      if (!found.length) return 'No contacts found.';
+      const { data: jobs } = await db.from('crm_projects').select('id, contact_id, title, stage').in('contact_id', found.map((p) => p.id)).order('updated_at', { ascending: false }).limit(100);
+      return JSON.stringify(
+        found.map((p) => ({
+          contact_id: p.id,
+          name: p.name,
+          role: p.role,
+          mobile: p.mobile,
+          email: p.email,
+          organisation: p.organisation ? { organisation_id: p.organisation.id, name: p.organisation.name } : null,
+          jobs: (jobs ?? []).filter((j) => j.contact_id === p.id).map((j) => ({ project_id: j.id, title: j.title, stage: stageLabel(j.stage) })),
+        }))
+      );
+    }
+
+    case 'add_contact': {
+      if (!(await orgsReady())) return NOT_READY;
+      const orgId = s(input.organisation_id) || null;
+      if (orgId && !isUuid(orgId)) return 'Unknown organisation_id: use find_organisation.';
       const clean = cleanContact({ name: s(input.name), role: s(input.role), mobile: s(input.mobile), email: s(input.email) }, true);
       if (!clean.ok) return clean.error;
-      const { count } = await db.from('organisation_contacts').select('id', { count: 'exact', head: true }).eq('organisation_id', org.id).eq('is_primary', true);
-      const { data: c, error } = await db
-        .from('organisation_contacts')
-        .insert({ ...clean.fields, organisation_id: org.id, is_primary: false, created_by: me.id })
-        .select('id, name')
-        .single();
-      if (error || !c) return `Not saved: ${error?.message}`;
-      const primary = input.make_primary === true || !count;
-      if (primary) {
-        const r = await setPrimary(db, org.id, c.id);
-        if (!r.ok) return `${c.name} added, but not as the primary contact: ${r.error}`;
-      }
-      await db.from('organisations').update({ updated_at: new Date().toISOString() }).eq('id', org.id);
-      actions.push({ kind: 'contact', label: `Contact at ${org.name}: ${c.name}`, href: `/admin/crm/organisations/${org.id}` });
-      return `${c.name} added to ${org.name}${primary ? ' as the primary contact' : ''}.`;
+      const r = await createContact(db, clean.fields, orgId, !!orgId && input.make_primary === true, me.id);
+      if (!r.ok) return r.status === 404 ? 'Unknown organisation_id: use find_organisation.' : `Not saved: ${r.error}`;
+      const { data: org } = orgId ? await db.from('organisations').select('name').eq('id', orgId).maybeSingle() : { data: null };
+      actions.push({ kind: 'contact', label: org ? `Contact at ${org.name}: ${r.contact.name}` : `Contact: ${r.contact.name}`, href: `/admin/crm/contacts/${r.contact.id}` });
+      return r.warning ?? `${r.contact.name} added${org ? ` to ${org.name}${r.contact.is_primary ? ' as the primary contact' : ''}` : ', on their own'}.`;
     }
   }
   return `Unknown tool ${name}`;

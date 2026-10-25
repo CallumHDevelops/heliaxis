@@ -201,28 +201,19 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
               {status}
             </p>
           )}
-          <ul id={listId} className={fresh ? 'gs-list' : 'gs-list is-stale'} role="listbox" aria-label="Customers, projects and organisations" aria-busy={!fresh || undefined}>
+          <ul id={listId} className={fresh ? 'gs-list' : 'gs-list is-stale'} role="listbox" aria-label="Customers, projects, organisations and contacts" aria-busy={!fresh || undefined}>
             {options.map((o, i) => {
-              const firstOrg = o.kind === 'org' && options[i - 1]?.kind !== 'org';
+              const isOrg = o.kind === 'org' || o.kind === 'contact';
+              const firstOrg = isOrg && !(options[i - 1]?.kind === 'org' || options[i - 1]?.kind === 'contact');
               const body =
-                o.kind === 'org' ? (
-                  o.org.contact ? (
-                    <>
-                      <span className="gs-main">
-                        <b>{o.org.contact.name}</b>
-                        <small>{[o.org.contact.role, o.org.name].filter(Boolean).join(' · ')}</small>
-                      </span>
-                      <span className="gs-hint">Contact</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="gs-main">
-                        <b>{o.org.name}</b>
-                        <small>{[o.org.type, o.org.postcode].filter(Boolean).join(' · ')}</small>
-                      </span>
-                      <span className="gs-hint">Organisation</span>
-                    </>
-                  )
+                o.kind === 'org' || o.kind === 'contact' ? (
+                  <>
+                    <span className="gs-main">
+                      <b>{o.org.name}</b>
+                      <small>{o.org.sub}</small>
+                    </span>
+                    <span className="gs-hint">{o.org.hint}</span>
+                  </>
                 ) : o.kind === 'person' ? (
                   <>
                     <span className="gs-main">
@@ -250,8 +241,8 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
                   role="option"
                   aria-selected={i === active}
                   aria-disabled={!o.href || undefined}
-                  className={`gs-opt is-${o.kind}${firstOrg ? ' is-firstorg' : ''}${i === active ? ' on' : ''}`}
-                  data-group={firstOrg ? 'Organisations' : undefined}
+                  className={`gs-opt is-${isOrg ? 'org' : o.kind}${firstOrg ? ' is-firstorg' : ''}${i === active ? ' on' : ''}`}
+                  data-group={firstOrg ? 'Organisations and contacts' : undefined}
                 >
                   {o.href ? (
                     <Link href={o.href} className="gs-row" tabIndex={-1} onMouseEnter={() => setActive(i)} onClick={() => pick(o)}>

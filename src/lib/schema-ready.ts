@@ -53,8 +53,8 @@ async function check(): Promise<SchemaReady> {
     has('handover_packs', 'project_id'), // handover.sql
     has('design_projects'), // design-studio.sql
     has('social_mention'), // social-monitoring.sql
-    has('organisation_contacts'), // organisations.sql
-    has('crm_projects', 'organisation_contact_id'), // and the job's link
+    has('crm_contacts'), // organisations.sql
+    has('crm_projects', 'contact_id'), // and the job's link
   ]);
   const site = siteMessages && docSlots && siteReview;
   return { crmV3, surveys, booking: bookings && diary, purchaseOrders, site, handover: site && handover, design, social, organisations: orgContacts && jobOrgs };

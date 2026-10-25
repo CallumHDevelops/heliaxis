@@ -3,11 +3,11 @@ title: The CRM Pipeline page
 summary: What’s on the CRM page: the counts, the stage strip, My work, Latest notes, search, and the Home, Board and List views.
 order: 10
 keywords: CRM home, pipeline, dashboard, counts, follow-ups due, unread WhatsApp, new enquiries, surveys this week, quotes out, stage strip, view, Sales Projects switch
-where: CRM › Pipeline
+where: CRM › Opportunities
 path: /admin/crm
 access: crm
 ---
-**CRM › Pipeline** is where sales work starts. On a phone, tap **CRM** on the bottom bar. It opens on the view you picked last time (**Home**, **Board** or **List**), or **Home** the first time.
+**CRM › Opportunities** is where sales work starts. On a phone, tap **CRM** on the bottom bar. It opens on the view you picked last time (**Home**, **Board** or **List**), or **Home** the first time.
 
 ![The CRM Pipeline page on a computer, with the five counts, the stage strip, My work and Latest notes.](/help/customers/pipeline-home.jpg "The CRM Pipeline on Home: counts, stage strip, My work, Latest notes and the WhatsApp panel.")
 

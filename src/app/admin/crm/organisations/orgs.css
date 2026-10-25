@@ -539,3 +539,47 @@
   flex-basis: 100%;
   text-align: left;
 }
+
+/* ── Contacts: people on their own or in an organisation, and customers ── */
+.org-badge--person {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.org-group {
+  margin: 0 0 18px;
+}
+.org-group__h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.org-group__note {
+  margin: -4px 0 8px;
+}
+.org-contact__link {
+  color: inherit;
+  text-decoration: none;
+}
+.org-contact__link:hover b {
+  text-decoration: underline;
+}
+.org-wa {
+  background: var(--wa-soft);
+  border-color: rgb(var(--wa-rgb) / 0.35);
+  color: var(--wa-text);
+}
+.org-addnew__person {
+  margin: 10px 0 0;
+}
+.org-addnew__person .crm-link {
+  min-height: 44px;
+}
+.org-row .org-type {
+  font-weight: 700;
+}

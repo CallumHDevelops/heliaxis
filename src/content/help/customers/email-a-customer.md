@@ -3,7 +3,7 @@ title: Email a customer
 summary: Write an email to a customer from their page, with a saved reply or attachments, and see it on their timeline.
 order: 115
 keywords: email, send email, write email, Outlook, Microsoft 365, mailbox, attach, attachment, saved replies, snippet, mail app, reply by email
-where: CRM › Pipeline › a customer › Email
+where: CRM › Opportunities › a customer › Email
 access: crm
 ---
 You can email a customer straight from their page, so it’s on their timeline for everyone.

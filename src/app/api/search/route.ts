@@ -3,7 +3,7 @@ import { requireApproved } from '@/lib/auth';
 import { json } from '@/lib/crm/server';
 import { findCustomers } from '@/lib/customer-search';
 import { cleanSearch, groupResults, jobMatches, orgResults, postcodePattern, type JobRow, type PersonRow, type SearchOrg } from '@/lib/global-search';
-import { orgsReady, searchOrganisations } from '@/lib/organisations/server';
+import { orgsReady, searchOrgsAndContacts } from '@/lib/organisations/server';
 import { sourcesNow } from '@/lib/lead-source-server';
 import { canAccess } from '@/lib/portals';
 import { looksLikeRef, refOnly, refPatterns } from '@/lib/projects/refs';
@@ -47,8 +47,8 @@ async function jobsMatching(db: Db, q: string): Promise<JobRow[]> {
  * GET /api/search?q= — the dashboard's and the header's search, for Enquiries and CRM staff, word by
  * word ("rob evans", src/lib/search-words.ts): people by name, email, phone, postcode or HX reference,
  * and (CRM staff) jobs by title, site address, postcode or reference, each person with their jobs
- * (src/lib/global-search.ts). Up to 8 people, 3 jobs each, then (CRM staff) organisations found by their
- * own details or a contact's (src/lib/organisations/server.ts). It only reads: picking a result opens a
+ * (src/lib/global-search.ts). Up to 8 people, 3 jobs each, then (CRM staff) organisations and contacts
+ * (in an organisation or on their own) found by their own details (src/lib/organisations/server.ts). It only reads: picking a result opens a
  * page, it never makes an opportunity.
  */
 export async function GET(req: Request) {
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
   const db = createAdminClient();
 
   // Organisations and their contacts (CRM staff, once organisations.sql has run): never customers, so a list of their own.
-  const orgsFound: Promise<SearchOrg[]> = crm ? orgsReady().then((ready) => (ready ? searchOrganisations(db, q).then((hits) => orgResults(q, hits)) : [])) : Promise.resolve([]);
+  const orgsFound: Promise<SearchOrg[]> = crm ? orgsReady().then((ready) => (ready ? searchOrgsAndContacts(db, q).then((hits) => orgResults(q, hits)) : [])) : Promise.resolve([]);
   const [found, direct, orgs] = await Promise.all([findCustomers(db, q), crm ? jobsMatching(db, q) : Promise.resolve([] as JobRow[]), orgsFound]);
   if (found.error && !direct.length && !orgs.length) return json({ q, error: 'Search isn’t working right now. Try again in a moment.', people: [], orgs: [] }, 500);
   const ids = [...new Set([...found.customers.map((c) => c.id), ...direct.map((j) => j.enquiry_id)])];

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { jobHref, type SearchPerson } from '@/lib/global-search';
+import { jobHref } from '@/lib/global-search';
 import {
   mailHref,
   orgTypeLabel,
@@ -19,6 +19,7 @@ import {
 import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { Icon, Sheet, StageChip, WaIcon } from '../../CrmUi';
 import { initials, orgApi, ContactForm, OrgForm, TypePill } from '../OrgForms';
+import { JobFinder, type FoundJob } from '../JobFinder';
 import '../../crm.css';
 import '../orgs.css';
 
@@ -129,7 +130,7 @@ export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: 
     const next = [...others].sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
     const theirJobs = data!.jobs.filter((j) => j.contact_id === c.id).length;
     const ask = [
-      `Remove ${c.name} from ${o.name}?`,
+      `Delete ${c.name}? They’re removed from the CRM altogether (to keep them as a contact on their own, open their page and change their organisation to None).`,
       c.is_primary && next ? `${next.name} becomes the primary contact.` : '',
       theirJobs ? `${theirJobs} job${theirJobs === 1 ? '' : 's'} dealt with through them stay${theirJobs === 1 ? 's' : ''} linked to ${o.name}.` : '',
     ]
@@ -138,12 +139,12 @@ export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: 
     if (!window.confirm(ask)) return;
     void act(`rm-${c.id}`, async () => {
       const d = await orgApi<{ primary: string | null }>(`/api/crm/organisations/${id}/contacts/${c.id}`, 'DELETE');
-      return `${c.name} removed${d.primary ? `. ${d.primary} is the primary contact now.` : '.'}`;
+      return `${c.name} deleted${d.primary ? `. ${d.primary} is the primary contact now.` : '.'}`;
     });
   }
 
   function deleteOrg() {
-    const ask = `Delete ${o.name}?${contacts.length ? ` Its ${contacts.length} contact${contacts.length === 1 ? ' is' : 's are'} deleted too.` : ''}${
+    const ask = `Delete ${o.name}?${contacts.length ? ` Its ${contacts.length} contact${contacts.length === 1 ? ' stays' : 's stay'}, on their own.` : ''}${
       data!.jobs.length ? ` Its ${data!.jobs.length} job${data!.jobs.length === 1 ? ' stays' : 's stay'}, no longer linked to it.` : ''
     } This can’t be undone.`;
     if (!window.confirm(ask)) return;
@@ -236,7 +237,9 @@ export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: 
                     <li key={c.id} className={`org-contact${c.is_primary ? ' is-primary' : ''}`}>
                       <div className="org-contact__top">
                         <span className="org-contact__name">
-                          <b>{c.name}</b>
+                          <Link href={`/admin/crm/contacts/${c.id}`} className="org-contact__link">
+                            <b>{c.name}</b>
+                          </Link>
                           {c.is_primary && <span className="org-primary">Primary</span>}
                         </span>
                         {c.role && <small className="org-contact__role">{c.role}</small>}
@@ -301,7 +304,7 @@ export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: 
                           </button>
                         )}
                         <button type="button" className="crm-link org-danger" disabled={!!busy} onClick={() => removeContact(c)}>
-                          Remove
+                          Delete
                         </button>
                       </div>
                     </li>
@@ -528,9 +531,7 @@ function NotesCard({ org, onSaved }: { org: Organisation; onSaved: () => void })
   );
 }
 
-type FoundJob = { id: string; title: string; stage: string; ref: string | null; customer: string };
-
-/** Find a job by its customer's name, postcode, phone or HX-ref (the global search), and link it with the contact it's dealt with through. */
+/** Find a job (the global search) and link it, with the contact it's dealt with through. */
 function LinkJob({
   org,
   contacts,
@@ -544,33 +545,10 @@ function LinkJob({
   onCancel: () => void;
   onLinked: (words: string) => void;
 }) {
-  const [q, setQ] = useState('');
-  const [found, setFound] = useState<{ q: string; jobs: FoundJob[]; error: string } | null>(null);
   const [job, setJob] = useState<FoundJob | null>(null);
   const [contact, setContact] = useState(contacts.find((c) => c.is_primary)?.id ?? '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const t = q.trim();
-
-  useEffect(() => {
-    if (t.length < 2) return;
-    const ctl = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(t)}`, { cache: 'no-store', signal: ctl.signal });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.error || 'Search isn’t working right now.');
-        const jobs = ((d.people ?? []) as SearchPerson[]).flatMap((p) => p.jobs.map((j) => ({ id: j.id, title: j.title, stage: j.stage, ref: j.ref, customer: p.name })));
-        setFound({ q: t, jobs, error: '' });
-      } catch (e) {
-        if (!ctl.signal.aborted) setFound({ q: t, jobs: [], error: e instanceof Error ? e.message : 'Search isn’t working right now.' });
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      ctl.abort();
-    };
-  }, [t]);
 
   async function link() {
     if (!job) return;
@@ -586,58 +564,9 @@ function LinkJob({
     }
   }
 
-  const fresh = found?.q === t;
   return (
     <div className="org-form">
-      {job ? (
-        <div className="crmh-picked">
-          <span>
-            <b>{job.customer}</b>
-            <small> · {[job.ref, job.title, job.stage].filter(Boolean).join(' · ')}</small>
-          </span>
-          <button type="button" className="crm-link" onClick={() => setJob(null)}>
-            Change
-          </button>
-        </div>
-      ) : (
-        <div className="crmh-picker">
-          <label className="crm-label" htmlFor="org-link-q">
-            Find the job
-          </label>
-          <input
-            id="org-link-q"
-            className="crm-input"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Customer name, postcode, phone or HX-ref"
-            autoFocus
-            autoComplete="off"
-            enterKeyHint="search"
-          />
-          {t.length >= 2 && (
-            <ul className="crmh-picker__list" aria-label="Jobs found" aria-busy={!fresh || undefined}>
-              {!found || (!fresh && !found.jobs.length) ? (
-                <li className="crm-muted">Searching…</li>
-              ) : found.error ? (
-                <li className="crm-muted">{found.error}</li>
-              ) : !found.jobs.length ? (
-                <li className="crm-muted">No job matches “{found.q}”.</li>
-              ) : (
-                found.jobs.map((j) => (
-                  <li key={j.id}>
-                    <button type="button" onClick={() => setJob(j)} disabled={linked.has(j.id)}>
-                      <span>
-                        <b>{j.customer}</b>
-                        <small>{[j.ref, j.title, j.stage, linked.has(j.id) ? 'already linked' : null].filter(Boolean).join(' · ')}</small>
-                      </span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </div>
-      )}
+      <JobFinder linked={linked} job={job} onPick={setJob} />
       {contacts.length > 0 && (
         <>
           <label className="crm-label" htmlFor="org-link-contact">

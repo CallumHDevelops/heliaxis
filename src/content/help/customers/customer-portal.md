@@ -3,7 +3,7 @@ title: The customer portal: what the customer sees
 summary: The customer’s private link: a quote page to read and sign, then their project page with progress, documents, photos and the deposit.
 order: 170
 keywords: portal, customer link, private link, my project, quote page, tracker, progress, customer documents, reset link, what does the customer see
-where: CRM › Pipeline › a customer › Customer portal card
+where: CRM › Opportunities › a customer › Customer portal card
 access: crm
 ---
 Each job has one private link for the customer. There’s no login: anyone with the link can open it, so it’s only sent to the customer. The page says “This is your private link. Please don’t share it.”

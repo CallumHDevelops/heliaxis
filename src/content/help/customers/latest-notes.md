@@ -3,7 +3,7 @@ title: Latest notes
 summary: Read the newest notes, calls, visits and WhatsApp chats from every job, filter them, and add a note without opening the job.
 order: 30
 keywords: feed, activity, timeline, notes, calls, site visits, emails, documents, signatures, stage changes, imported chats, + Note
-where: CRM › Pipeline › Home
+where: CRM › Opportunities › Home
 path: /admin/crm
 access: crm
 ---

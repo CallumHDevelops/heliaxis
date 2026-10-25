@@ -479,7 +479,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   );
   // Organisations and their contacts: CRM › Organisations says this is needed until it's run.
   add(
-    crm && !((await has('organisation_contacts')) && (await has('crm_projects', 'organisation_contact_id'))),
+    crm && !((await has('crm_contacts')) && (await has('crm_projects', 'contact_id'))),
     sql('organisations.sql', 'Organisations: commercial customers, landlords, schools, partners and suppliers, with their contacts, linked to their jobs.', 6, 'crm.sql')
   );
   // Merging duplicate customers and jobs: the Merge buttons say this is needed until it's run.

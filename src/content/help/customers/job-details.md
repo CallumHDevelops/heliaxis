@@ -3,7 +3,7 @@ title: Change a job’s owner, value, products or links
 summary: Use Job details to change who owns a job, its value, products, name, OpenSolar or SimpliHeat link and notes.
 order: 125
 keywords: job details, owner, reassign, assign lead, hand over, change owner, value, price, quote value, products, job name, rename, OpenSolar, SimpliHeat, notes, edit job
-where: CRM › Pipeline › a customer › Job details
+where: CRM › Opportunities › a customer › Job details
 access: crm
 ---
 **Job details** is the card under **Customer** in the left column of a customer’s page (on a tablet or phone, the **Details** tab). It holds what belongs to this one job; the person’s own name, mobile, email and postcode are on the **Customer** card.

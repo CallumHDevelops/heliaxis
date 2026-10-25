@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { ORG_TYPES, orgTypeShort, type OrgContact, type Organisation, type OrgType } from '@/lib/organisations/shared';
+import { useEffect, useState } from 'react';
+import { ORG_TYPES, orgTypeShort, type ContactWithOrg, type OrgContact, type Organisation, type OrgType } from '@/lib/organisations/shared';
+
+/** A contact as the forms take them: with their organisation's name when it's known. */
+export type ContactLike = OrgContact & { organisation?: ContactWithOrg['organisation'] };
 
 /** Pieces shared by CRM › Organisations, an organisation's page and the record page's Organisation card. */
 
@@ -219,36 +222,66 @@ export function OrgForm({
   );
 }
 
-/** Add or edit one of an organisation's contacts: name, role, mobile, email, notes, and (adding) whether they're the primary contact. */
+/**
+ * Add or edit a contact: name, role, mobile, email, notes. In an organisation's page the organisation is
+ * fixed (`orgId`); elsewhere (`chooseOrg`) they pick one, or none: someone on their own. Adding to an
+ * organisation that has none yet makes them its primary contact; a tick makes a later one primary.
+ * Changing a contact's organisation takes the jobs they're dealt with through along (`jobs` says how many).
+ */
 export function ContactForm({
   orgId,
+  chooseOrg = false,
   contact,
   first,
+  jobs = 0,
+  initialName = '',
   onSaved,
   onCancel,
 }: {
-  orgId: string;
-  contact?: OrgContact | null;
+  orgId?: string | null;
+  chooseOrg?: boolean;
+  contact?: ContactLike | null;
   /** The organisation has no contacts yet: this one is the primary contact, so there's nothing to tick. */
   first?: boolean;
+  jobs?: number;
+  initialName?: string;
   onSaved: (c: OrgContact, warning?: string) => void;
   onCancel: () => void;
 }) {
-  const [f, setF] = useState({ name: contact?.name ?? '', role: contact?.role ?? '', mobile: contact?.mobile ?? '', email: contact?.email ?? '', notes: contact?.notes ?? '' });
+  const [f, setF] = useState({ name: contact?.name ?? initialName, role: contact?.role ?? '', mobile: contact?.mobile ?? '', email: contact?.email ?? '', notes: contact?.notes ?? '' });
+  const [org, setOrg] = useState<string>(contact ? (contact.organisation_id ?? '') : (orgId ?? ''));
+  const [orgs, setOrgs] = useState<{ id: string; name: string }[] | null>(null);
   const [primary, setPrimary] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ text: string; field?: string } | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
   const id = contact?.id ?? 'new';
   const bad = (field: string) => (err?.field === field ? true : undefined);
+  const wasOrg = contact?.organisation_id ?? '';
+  const moving = !!contact && chooseOrg && org !== wasOrg;
+
+  useEffect(() => {
+    if (!chooseOrg) return;
+    let live = true;
+    orgApi<{ organisations: { id: string; name: string }[] }>('/api/crm/organisations')
+      .then((d) => live && setOrgs(d.organisations.map((o) => ({ id: o.id, name: o.name })).sort((a, b) => a.name.localeCompare(b.name, 'en-GB'))))
+      .catch(() => live && setOrgs([]));
+    return () => {
+      live = false;
+    };
+  }, [chooseOrg]);
 
   async function save() {
     setBusy(true);
     setErr(null);
     try {
+      const body: Record<string, unknown> = { ...f };
+      if (!contact) body.organisation_id = org || null;
+      else if (chooseOrg) body.organisation_id = org || null;
+      if (!contact && org && primary) body.is_primary = true;
       const d = contact
-        ? await orgApi<{ contact: OrgContact; warning?: string }>(`/api/crm/organisations/${orgId}/contacts/${contact.id}`, 'PATCH', f, 'Not saved. Try again.')
-        : await orgApi<{ contact: OrgContact; warning?: string }>(`/api/crm/organisations/${orgId}/contacts`, 'POST', { ...f, is_primary: primary }, 'Not saved. Try again.');
+        ? await orgApi<{ contact: OrgContact; warning?: string }>(`/api/crm/contacts/${contact.id}`, 'PATCH', body, 'Not saved. Try again.')
+        : await orgApi<{ contact: OrgContact; warning?: string }>('/api/crm/contacts', 'POST', body, 'Not saved. Try again.');
       onSaved(d.contact, d.warning);
     } catch (e) {
       setErr({ text: e instanceof Error ? e.message : 'Not saved. Try again.', field: (e as { field?: string }).field });
@@ -290,16 +323,38 @@ export function ContactForm({
           <input id={`oc-${id}-email`} className="crm-input" type="email" inputMode="email" value={f.email} onChange={set('email')} aria-invalid={bad('email')} autoComplete="off" />
         </div>
       </div>
+      {chooseOrg && (
+        <>
+          <label className="crm-label" htmlFor={`oc-${id}-org`}>
+            Organisation
+          </label>
+          <select id={`oc-${id}-org`} className="crm-input" value={org} onChange={(e) => setOrg(e.target.value)} >
+            <option value="">None: on their own</option>
+            {(orgs ?? []).map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+            {/* Their organisation, while the list is still on its way. */}
+            {!orgs && org && <option value={org}>{contact?.organisation?.name ?? 'Loading…'}</option>}
+          </select>
+          {moving && jobs > 0 && (
+            <p className="crm-muted crm-small">
+              The {jobs} job{jobs === 1 ? '' : 's'} dealt with through {f.name.trim() || 'them'} {jobs === 1 ? 'goes' : 'go'} with them: {jobs === 1 ? 'it is' : 'they are'} linked to {org ? 'the new organisation' : 'no organisation'} from then on.
+            </p>
+          )}
+        </>
+      )}
       <label className="crm-label" htmlFor={`oc-${id}-notes`}>
         Notes
       </label>
       <textarea id={`oc-${id}-notes`} className="crm-input" rows={2} value={f.notes} onChange={set('notes')} placeholder="Best times to call, who they report to…" />
-      {!contact && !first && (
+      {!contact && org && !first && (
         <label className="crm-check">
           <input type="checkbox" checked={primary} onChange={(e) => setPrimary(e.target.checked)} /> Make them the primary contact
         </label>
       )}
-      {!contact && first && <p className="crm-muted crm-small">The first contact is the primary contact.</p>}
+      {!contact && org && first && <p className="crm-muted crm-small">The first contact is the primary contact.</p>}
       {err && (
         <p className="crm-banner crm-banner--err" role="alert">
           {err.text}

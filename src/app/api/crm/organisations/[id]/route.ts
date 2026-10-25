@@ -41,7 +41,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   return json({ organisation: data });
 }
 
-/** Delete an organisation and its contacts. Its jobs stay, unlinked (a line on each one's timeline says so). */
+/** Delete an organisation. Its contacts stay, on their own, and its jobs stay, unlinked (a line on each one's timeline says so). */
 export async function DELETE(_req: Request, { params }: Ctx) {
   const s = await crmSession();
   if (!s) return json({ error: 'unauthorized' }, 401);
@@ -50,7 +50,7 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   try {
     const r = await deleteOrganisation(createAdminClient(), id, s.user.id);
-    return r ? json({ deleted: true, jobs: r.jobs }) : json({ error: 'That organisation isn’t there any more.' }, 404);
+    return r ? json({ deleted: true, jobs: r.jobs, contacts: r.contacts }) : json({ error: 'That organisation isn’t there any more.' }, 404);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'Not deleted. Try again.' }, 500);
   }

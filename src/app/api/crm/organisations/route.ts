@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   let contact = null;
   if (first?.ok) {
     const r = await db
-      .from('organisation_contacts')
+      .from('crm_contacts')
       .insert({ ...first.fields, organisation_id: data.id, is_primary: true, created_by: s.user.id })
       .select(CONTACT_COLS)
       .single();

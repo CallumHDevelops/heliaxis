@@ -31,7 +31,7 @@ import { ordersSummary } from '@/lib/purchase-orders/server';
 import { sourceNowOf } from '@/lib/lead-source-server';
 import { cleanDesign, DESIGN_KEYS } from '@/lib/site/design';
 import { mergedInto, mergeExtras } from '@/lib/crm/aliases';
-import { jobOrganisation } from '@/lib/organisations/server';
+import { jobLinks } from '@/lib/organisations/server';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -205,8 +205,8 @@ export async function GET(req: Request, { params }: Ctx) {
         notifyChannel(project.enquiry_id ? String(project.enquiry_id) : null),
         // The Overview's "Kit ordered" and the Orders tab (null before purchase-orders.sql). Never throws.
         ordersSummary(db, id),
-        // The Organisation card: the job's organisation and its contacts (null before organisations.sql, or none linked).
-        schemaReady().then((sc) => (sc.organisations ? jobOrganisation(db, project).catch(() => null) : null)),
+        // The Organisation card: the job's organisation, its contacts, and the person it's dealt with through (null before organisations.sql).
+        schemaReady().then((sc) => (sc.organisations ? jobLinks(db, project).catch(() => null) : null)),
       ]);
 
   type Wa = { id: string; direction: string; kind: string; body: string | null; status: string; created_at: string; sent_by: string | null; via: string | null; rule_id: string | null } & MediaFields;
@@ -375,7 +375,7 @@ export async function GET(req: Request, { params }: Ctx) {
     });
   }
 
-  const [{ data: photos }, { data: docs }, othersRes, dupes, cal, schema, booking, notify, orders, organisation] = await fullReads!;
+  const [{ data: photos }, { data: docs }, othersRes, dupes, cal, schema, booking, notify, orders, links] = await fullReads!;
 
   // Signed links (1h) for each photo and its thumbnail.
   const paths = (photos ?? []).flatMap((p) => [p.storage_path, thumbPath(p.storage_path)]);
@@ -461,7 +461,8 @@ export async function GET(req: Request, { params }: Ctx) {
     ena,
     schema,
     orders,
-    organisation,
+    organisation: links?.organisation ?? null,
+    contact: links?.contact ?? null,
   });
 }
 

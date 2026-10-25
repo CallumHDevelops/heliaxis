@@ -666,6 +666,7 @@ export function ProjectView({
             // card comes here meanwhile and Tasks are never missing.
             tasksElsewhere={tasksInDockTab ? tasksCard('page') : null}
             organisation={rec.organisation}
+            contact={rec.contact}
           />
         </aside>
 

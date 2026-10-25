@@ -153,54 +153,84 @@ const { cleanSearch } = await import('../src/lib/global-search.ts');
 const sneaky = cleanSearch('acme,id.neq.0),or(name.ilike.*');
 eq('a typed comma or bracket can’t add a condition', O.orgWordFilter(sneaky, 'org').every((f) => !/[,()]/.test(f)), true);
 
-/* ── Global search: organisations after the people ──────────────────────────── */
+/* ── Global search: organisations and contacts after the people ─────────────── */
 
 const hits = orgResults('afon', [
-  { id: 'o1', name: 'Bron Afon Community Housing', type: 'landlord', postcode: 'NP44 3HQ', contact: null },
-  { id: 'o2', name: 'Afon Builders', type: 'partner', postcode: null, contact: null },
-  { id: 'o1', name: 'Bron Afon Community Housing', type: 'landlord', postcode: 'NP44 3HQ', contact: { id: 'k1', name: 'Afon Rees', role: 'Surveyor' } },
+  { kind: 'org', id: 'o1', name: 'Bron Afon Community Housing', type: 'landlord', postcode: 'NP44 3HQ' },
+  { kind: 'org', id: 'o2', name: 'Afon Builders', type: 'partner', postcode: null },
+  { kind: 'contact', id: 'k1', name: 'Afon Rees', role: 'Surveyor', organisation: { id: 'o1', name: 'Bron Afon Community Housing' } },
+  { kind: 'contact', id: 'k2', name: 'Afon Pugh', role: null, organisation: null },
 ]);
-eq('names the words start first (an org’s, or its contact’s)', hits.map((h) => `${h.name}${h.contact ? `/${h.contact.name}` : ''}`), ['Afon Builders', 'Bron Afon Community Housing/Afon Rees', 'Bron Afon Community Housing']);
-eq('type in words, and where it opens', [hits[0].type, hits[0].href], ['Partner who refers work', '/admin/crm/organisations/o2']);
+eq('names the words start first, an organisation before a person of the same rank, then A to Z', hits.map((h) => h.name), ['Afon Builders', 'Afon Pugh', 'Afon Rees', 'Bron Afon Community Housing']);
+eq('an organisation: its type in words, and where it opens', [hits[0].sub, hits[0].hint, hits[0].href], ['Partner who refers work', 'Organisation', '/admin/crm/organisations/o2']);
+eq('a contact in an organisation: role and organisation, their own page', [hits[2].sub, hits[2].hint, hits[2].href], ['Surveyor · Bron Afon Community Housing', 'Contact', '/admin/crm/contacts/k1']);
+eq('a contact on their own says so', [hits[1].sub, hits[1].href], ['On their own', '/admin/crm/contacts/k2']);
 const person1 = { id: 'p', name: 'Tom', ref: null, postcode: null, phone: null, source: '', status: 'New', created_at: '', href: '/admin/crm/j', jobs: [], more: 0 };
 const opts = searchOptions([person1], hits);
-eq('lines: people, then organisations (one per contact matched)', opts.map((o) => o.key), ['p-p', 'o-o2', 'o-o1-k1', 'o-o1']);
-eq('an organisation line opens its page', opts[1].href, '/admin/crm/organisations/o2');
-eq('↑/↓ reach the organisations', stepOption(opts, 0, 1), 1);
-eq('no organisations: as before', searchOptions([person1]).map((o) => o.key), ['p-p']);
-eq('an organisation whose name is what was typed comes before half-matching people', searchOptions([{ ...person1, name: 'Mrs J Afon' }], hits.slice(0, 1), 'afon b').map((o) => o.key), ['o-o2', 'p-p']);
+eq('lines: people, then organisations and contacts', opts.map((o) => o.key), ['p-p', 'o-o2', 'c-k2', 'c-k1', 'o-o1']);
+eq('an organisation line opens its page, a contact line theirs', [opts[1].href, opts[3].href], ['/admin/crm/organisations/o2', '/admin/crm/contacts/k1']);
+eq('↑/↓ reach them', stepOption(opts, 0, 1), 1);
+eq('nothing found: as before', searchOptions([person1]).map((o) => o.key), ['p-p']);
+const mrsAfon = { ...person1, name: 'Mrs J Afon' };
+eq('an organisation whose name is what was typed comes before half-matching people', searchOptions([mrsAfon], hits.slice(0, 1), 'afon b').map((o) => o.key), ['o-o2', 'p-p']);
 eq('…but not before a person whose name fits as well', searchOptions([{ ...person1, name: 'Afon Rees' }], hits.slice(0, 1), 'afon').map((o) => o.key), ['p-p', 'o-o2']);
+eq('a contact never jumps the people on their own', searchOptions([mrsAfon], hits.slice(1, 2), 'afon').map((o) => o.key), ['p-p', 'c-k2']);
+
+/* ── The Contacts list: people we added, and customers ──────────────────────── */
+
+const pr = (name, o = {}) => ({ kind: 'contact', id: name, name, role: null, mobile: null, email: null, postcode: null, organisation: null, jobs: 0, open_jobs: 0, href: '/x', ...o });
+const bron = { id: 'o1', name: 'Bron Afon Community Housing', type: 'landlord' };
+const crew = [
+  pr('Siân Evans', { role: 'Tenant liaison', mobile: '07700 900222', email: 'sian@bronafon.org.uk', organisation: bron }),
+  pr('Dai Builder', { role: 'Builder', mobile: '07700 900333' }),
+  pr('Tom Smith', { kind: 'customer', postcode: 'NP20 4AB', mobile: '07700 900444', email: 'tom@example.com' }),
+];
+const findP = (q) => crew.filter((p) => O.matchesPerson(p, q)).map((p) => p.name);
+eq('people: by name, accents aside', findP('sian'), ['Siân Evans']);
+eq('people: by their organisation’s name', findP('bron afon'), ['Siân Evans']);
+eq('people: by role', findP('builder'), ['Dai Builder']);
+eq('people: by mobile, typed another way', findP('+44 7700 900333'), ['Dai Builder']);
+eq('people: a customer by postcode, no space', findP('np204ab'), ['Tom Smith']);
+eq('people: two words, any order', findP('smith tom'), ['Tom Smith']);
+eq('people: nothing typed, everyone', findP('').length, 3);
+eq('groups: in an organisation, on their own, customer', crew.map(O.personGroup), ['org', 'alone', 'customer']);
+eq('chip counts', O.countPeople(crew), { all: 3, org: 1, alone: 1, customer: 1 });
+eq('second lines', crew.map(O.personLine), ['Tenant liaison · Bron Afon Community Housing', 'Builder · On their own', 'Customer · NP20 4AB']);
+eq('order: names the words start first, then A to Z', O.sortPeople(crew, '').map((p) => p.name), ['Dai Builder', 'Siân Evans', 'Tom Smith']);
+const noOrg = O.cleanContact({ name: 'Dai Builder', is_primary: true }, true);
+eq('a contact on their own is cleaned like any other (the API refuses "primary" without an organisation)', noOrg.ok, true);
 
 /* ── Merging: a joined job keeps its organisation ───────────────────────────── */
 
-const job = (id, o = {}) => ({ id, enquiry_id: 'e', title: 'Solar', stage: 'lead', products: [], created_at: '2026-10-01', organisation_id: null, organisation_contact_id: null, ...o });
-const into = combineJobs(job('k'), job('f', { organisation_id: 'org', organisation_contact_id: 'con' }), '2026-10-20T10:00:00Z');
-eq('kept job had none: both come across, together', [into.set.organisation_id?.to, into.set.organisation_contact_id?.to], ['org', 'con']);
-const keeps = combineJobs(job('k', { organisation_id: 'org2', organisation_contact_id: null }), job('f', { organisation_id: 'org', organisation_contact_id: 'con' }), '2026-10-20T10:00:00Z');
-eq('kept job has one: it stays, and no other org’s contact is put on it', [keeps.set.organisation_id, keeps.set.organisation_contact_id], [undefined, undefined]);
-const same = combineJobs(job('k', { organisation_id: 'org' }), job('f', { organisation_id: 'org', organisation_contact_id: 'con' }), '2026-10-20T10:00:00Z');
-eq('same organisation, kept job has no contact: F’s contact comes across', [same.set.organisation_id, same.set.organisation_contact_id?.to], [undefined, 'con']);
+const job = (id, o = {}) => ({ id, enquiry_id: 'e', title: 'Solar', stage: 'lead', products: [], created_at: '2026-10-01', organisation_id: null, contact_id: null, ...o });
+const into = combineJobs(job('k'), job('f', { organisation_id: 'org', contact_id: 'con' }), '2026-10-20T10:00:00Z');
+eq('kept job had none: both come across, together', [into.set.organisation_id?.to, into.set.contact_id?.to], ['org', 'con']);
+const keeps = combineJobs(job('k', { organisation_id: 'org2', contact_id: null }), job('f', { organisation_id: 'org', contact_id: 'con' }), '2026-10-20T10:00:00Z');
+eq('kept job has one: it stays, and no other org’s contact is put on it', [keeps.set.organisation_id, keeps.set.contact_id], [undefined, undefined]);
+const same = combineJobs(job('k', { organisation_id: 'org' }), job('f', { organisation_id: 'org', contact_id: 'con' }), '2026-10-20T10:00:00Z');
+eq('same organisation, kept job has no contact: F’s contact comes across', [same.set.organisation_id, same.set.contact_id?.to], [undefined, 'con']);
 const before = combineJobs({ ...job('k'), organisation_id: undefined }, job('f'), '2026-10-20T10:00:00Z');
 eq('before organisations.sql: nothing to do', 'organisation_id' in before.set, false);
 
 /* ── The SQL, Setup and the gate ────────────────────────────────────────────── */
 
 const sql = read('supabase/organisations.sql').replace(/--[^\n]*/g, '');
-eq('only additive statements (no drop, no delete, no truncate)', /\b(drop|truncate|delete\s+from)\b/i.test(sql), false);
+eq('only additive statements: nothing dropped or deleted (the one "drop not null" only loosens a column)', /\b(drop\s+(table|index|column|constraint|schema|trigger|policy)|truncate|delete\s+from)\b/i.test(sql), false);
+eq('…and the only drop is making a contact’s organisation optional', [...sql.matchAll(/\bdrop\b[^;]*/gi)].map((m) => m[0].replace(/\s+/g, ' ')), ['drop not null']);
 eq('every table and index "if not exists"', [...sql.matchAll(/create (?:unique )?(?:table|index) (?!if not exists)/gi)].length, 0);
 eq('every column "if not exists"', [...sql.matchAll(/add column (?!if not exists)/gi)].length, 0);
-eq('server-only: RLS on both tables, no policies', [/enable row level security/.test(sql) && /organisations\s+enable row level security/.test(sql), /organisation_contacts\s+enable row level security/.test(sql), /create policy/i.test(sql)], [true, true, false]);
-eq('contacts go with their organisation', /organisation_id\s+uuid not null references public\.organisations\(id\) on delete cascade/.test(sql), true);
+eq('server-only: RLS on both tables, no policies', [/enable row level security/.test(sql) && /organisations\s+enable row level security/.test(sql), /crm_contacts\s+enable row level security/.test(sql), /create policy/i.test(sql)], [true, true, false]);
+eq('a contact may be on their own, and stays (unlinked) if their organisation is deleted', [/crm_contacts \([^;]*organisation_id\s+uuid references public\.organisations\(id\) on delete set null/.test(sql), /not null references public\.organisations/.test(sql)], [true, false]);
 eq('a job is unlinked, never deleted, when its organisation or contact goes', [
   /crm_projects add column if not exists organisation_id\s+uuid references public\.organisations\(id\) on delete set null/.test(sql),
-  /crm_projects add column if not exists organisation_contact_id uuid references public\.organisation_contacts\(id\) on delete set null/.test(sql),
+  /crm_projects add column if not exists contact_id\s+uuid references public\.crm_contacts\(id\) on delete set null/.test(sql),
 ], [true, true]);
-eq('one primary contact per organisation', /unique index if not exists \w+ on public\.organisation_contacts \(organisation_id\) where is_primary/.test(sql), true);
+eq('one primary contact per organisation', /unique index if not exists \w+ on public\.crm_contacts \(organisation_id\) where is_primary/.test(sql), true);
 eq('the type check matches ORG_TYPES', sql.match(/type in \(([^)]*)\)/)[1].replace(/'/g, '').split(','), O.ORG_TYPES.map((t) => t.key));
 eq('PostgREST told to reload', /notify pgrst, 'reload schema'/.test(sql), true);
 eq('listed for Setup', read('src/lib/setup-files.ts').includes("'organisations.sql'"), true);
 eq('on the to-do list', /sql\('organisations\.sql'/.test(read('src/lib/setup-checks.ts')), true);
-eq('gated on both the contacts table and the job’s link', /has\('organisation_contacts'\)[\s\S]*has\('crm_projects', 'organisation_contact_id'\)[\s\S]*organisations: orgContacts && jobOrgs/.test(read('src/lib/schema-ready.ts')), true);
+eq('gated on both the contacts table and the job’s link', /has\('crm_contacts'\)[\s\S]*has\('crm_projects', 'contact_id'\)[\s\S]*organisations: orgContacts && jobOrgs/.test(read('src/lib/schema-ready.ts')), true);
 eq('no foreign key to a customer or a job (nothing for merge.sql to move)', /references public\.(enquiries|crm_projects)\(id\)/.test(sql), false);
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
