@@ -421,12 +421,19 @@
        one-tile groups in a row (Operations, Finance) share a row, each under its own heading. */
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    column-gap: 4px;
+    gap: 8px;
+    padding-top: 0.75rem;
+    padding-bottom: 1.25rem;
     align-content: start;
   }
+  /* Each area is its own card, so the sections read as separate blocks instead of one long list. */
   .hx-more__group {
     grid-column: 1 / -1;
     min-width: 0;
+    padding: 0.15rem 0.35rem 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
   }
   .hx-more__group--one {
     grid-column: auto;
@@ -440,12 +447,23 @@
     text-overflow: ellipsis;
   }
   .hx-more__title {
-    margin: 0.75rem 0.25rem 0.35rem;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.6rem 0.25rem 0.3rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: var(--text);
+  }
+  .hx-more__title::before {
+    content: '';
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
   }
   .hx-more__grid {
     display: grid;
@@ -454,7 +472,7 @@
   }
   /* No headings (only a few tiles). */
   .hx-more__grid:first-child {
-    margin-top: 0.6rem;
+    margin-top: 0.35rem;
   }
   .hx-tile {
     display: flex;
@@ -486,10 +504,10 @@
   .hx-tile__icon {
     display: grid;
     place-items: center;
-    width: 46px;
-    height: 30px;
-    border-radius: 999px;
-    background: rgb(var(--fg-rgb) / 0.05);
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgb(var(--fg-rgb) / 0.06);
   }
   .hx-tile.is-active .hx-tile__icon {
     background: var(--accent);
