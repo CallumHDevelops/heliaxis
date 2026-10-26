@@ -127,6 +127,8 @@ export async function loadPortal(token: string) {
       amount > 0 && (full || p.accepted_at)
         ? { amount, paidAt: p.deposit_paid_at as string | null, canPay: stripeConfigured() && hasSigned }
         : null,
+    // supabase/quotes.sql: the dates they asked for (null before it has run).
+    installPref: (p.install_pref ?? null) as { dates: string[]; flexible: boolean; notes: string; at: string } | null,
     whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || null,
     email: process.env.MS_MAILBOX || 'hello@heliaxis.co.uk',
   };

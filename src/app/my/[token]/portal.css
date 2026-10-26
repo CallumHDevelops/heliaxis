@@ -568,3 +568,5 @@
     box-shadow: inset 0 0 0 1px var(--accent-line);
   }
 }
+.pt-steps { margin: 0.8rem 0 0; padding-left: 1.2rem; color: var(--pt-muted, inherit); font-size: 0.92rem; line-height: 1.7; }
+textarea.pt-input { resize: vertical; font: inherit; }

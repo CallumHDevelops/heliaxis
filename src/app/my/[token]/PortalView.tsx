@@ -6,6 +6,7 @@ import { BrandLogo } from '@/components/theme/BrandLogo';
 import { ThemeChoice } from '@/components/theme/ThemeChoice';
 import type { PortalData } from '@/lib/crm/portal';
 import { isWonStage } from '@/lib/crm/stages';
+import { earliestInstall, latestInstall, MAX_CHOICES } from '@/lib/install-dates';
 import { useNow } from '@/lib/use-now';
 import { HandoverSection } from './HandoverSection';
 import './portal.css';
@@ -48,8 +49,8 @@ const CANCEL_NOTE = 'You can change your mind and cancel within 14 days of signi
  * their portal: progress, dates, documents, photos and the deposit. `themePref`: their Light / Dark /
  * Match phone as the server rendered it (from this phone's cookie), so the toggle hydrates as drawn.
  */
-export function PortalView({ data, paid = false, themePref = 'system' }: { data: PortalData; paid?: boolean; themePref?: ThemePref }) {
-  return data.mode === 'quote' ? <QuotePage data={data} themePref={themePref} /> : <FullPortal data={data} paid={paid} themePref={themePref} />;
+export function PortalView({ data, paid = false, justAccepted = false, themePref = 'system' }: { data: PortalData; paid?: boolean; justAccepted?: boolean; themePref?: ThemePref }) {
+  return data.mode === 'quote' ? <QuotePage data={data} themePref={themePref} /> : <FullPortal data={data} paid={paid} justAccepted={justAccepted} themePref={themePref} />;
 }
 
 function Shell({ tag, themePref, children }: { tag: string; themePref: ThemePref; children: ReactNode }) {
@@ -93,12 +94,29 @@ function Contact({ data }: { data: PortalData }) {
   );
 }
 
+/**
+ * After they accept: straight on to the card payment page for the deposit if there is one; otherwise (or if
+ * card payment isn't available) back to their portal, which shows what is left to do.
+ */
+async function afterAccept(token: string, d: { deposit?: boolean }) {
+  if (d.deposit) {
+    const r = await fetch(`/api/my/${token}/deposit`, { method: 'POST' }).catch(() => null);
+    const p = r ? await r.json().catch(() => ({})) : {};
+    if (r?.ok && p.url) {
+      window.location.href = p.url;
+      return;
+    }
+  }
+  window.location.href = `${window.location.pathname}?accepted=1`;
+}
+
 const quoteWord = (q: { category: string }) => (q.category === 'contract' ? 'contract' : 'quote');
 
 /* ── Quote sent: just the quote, to read and sign ──────────────────────────── */
 
 function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref }) {
   const q = data.quote;
+  const [signing, setSigning] = useState(false);
   return (
     <Shell tag="Your quote" themePref={themePref}>
       <section className="pt-hello">
@@ -109,27 +127,34 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
       {data.accepted ? (
         <section className="pt-card">
           <p className="pt-banner ok">
-            ✓ Signed by {data.accepted.name} on {fmtDate(data.accepted.at)}. Thank you!
+            ✓ Accepted by {data.accepted.name} on {fmtDate(data.accepted.at)}. Thank you!
           </p>
           {data.accepted.document && (
             <a className="pt-btn ghost" href={`/api/my/${data.token}/doc/${data.accepted.document.id}`} target="_blank" rel="noreferrer">
               View what you signed
             </a>
           )}
-          <p className="pt-muted">We’ll be in touch shortly about the next steps.</p>
           {data.deposit && !data.deposit.paidAt && <Deposit token={data.token} deposit={data.deposit} />}
+          <InstallDates token={data.token} pref={data.installPref} />
         </section>
       ) : q ? (
         <section className="pt-card pt-action pt-quote">
           <h2>Your {quoteWord(q)} from Heliaxis</h2>
-          <p>Have a read through. When you’re happy, sign it below and we’ll get your installation booked in.</p>
-          <a className="pt-btn ghost" href={`/api/my/${data.token}/doc/${q.id}`} target="_blank" rel="noreferrer">
-            View {quoteWord(q)}
-            {q.pdf ? ' (PDF)' : ''}
-          </a>
-          <div className="pt-sign">
-            <SignForm token={data.token} quote={q} onDone={() => window.location.reload()} />
+          <p>Have a read through. When you’re happy, press Accept quote. You will sign, then pay your deposit and choose your installation date.</p>
+          <div className="pt-row">
+            <a className="pt-btn ghost" href={`/api/my/${data.token}/doc/${q.id}`} target="_blank" rel="noreferrer">
+              View {quoteWord(q)}
+              {q.pdf ? ' (PDF)' : ''}
+            </a>
+            <button type="button" className="pt-btn" onClick={() => setSigning(true)}>
+              Accept quote
+            </button>
           </div>
+          <ol className="pt-steps">
+            <li>Accept and sign</li>
+            <li>Pay your deposit by card</li>
+            <li>Choose your installation date</li>
+          </ol>
         </section>
       ) : (
         <section className="pt-card">
@@ -139,13 +164,27 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
       )}
 
       <Contact data={data} />
+
+      {signing && q && (
+        <div className="pt-sheet" role="dialog" aria-modal="true" onClick={() => setSigning(false)}>
+          <div className="pt-sheet-box" onClick={(e) => e.stopPropagation()}>
+            <h2>Accept your {quoteWord(q)}</h2>
+            <p className="pt-muted">
+              <a href={`/api/my/${data.token}/doc/${q.id}`} target="_blank" rel="noreferrer">
+                {q.name}
+              </a>
+            </p>
+            <SignForm token={data.token} quote={q} onDone={(d) => void afterAccept(data.token, d)} onCancel={() => setSigning(false)} />
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }
 
 /* ── Won onwards: the full portal ──────────────────────────────────────────── */
 
-function FullPortal({ data, paid, themePref }: { data: PortalData; paid: boolean; themePref: ThemePref }) {
+function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData; paid: boolean; justAccepted: boolean; themePref: ThemePref }) {
   const [signing, setSigning] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const now = useNow(60_000);
@@ -170,6 +209,7 @@ function FullPortal({ data, paid, themePref }: { data: PortalData; paid: boolean
     return null;
   }, [now, data.installAt, data.quote, accepted, data.surveyAt]);
 
+  const depositLeft = !!data.deposit && !data.deposit.paidAt && !paid;
   const depositDue = data.deposit && !data.deposit.paidAt && !paid && (accepted || isWonStage(data.stage));
   // Once handover.sql has run the pack is its own section (data.handover), and the documents list is the rest.
   const pack = data.handover && (data.handover.groups.length || data.handover.signs.length) ? data.handover : null;
@@ -186,7 +226,8 @@ function FullPortal({ data, paid, themePref }: { data: PortalData; paid: boolean
         </p>
       </section>
 
-      {paid && <p className="pt-banner ok">Thank you, your deposit has been paid. We’ll be in touch to confirm your installation date.</p>}
+      {paid && <p className="pt-banner ok">Thank you, your deposit has been paid. Last step: choose your installation date below.</p>}
+      {justAccepted && !paid && <p className="pt-banner ok">Thank you, your quote is accepted. {depositLeft ? 'Next: pay your deposit, then choose your installation date.' : 'Next: choose your installation date.'}</p>}
 
       {next && (
         <section className="pt-next">
@@ -198,14 +239,14 @@ function FullPortal({ data, paid, themePref }: { data: PortalData; paid: boolean
 
       {data.quote && !accepted && (
         <section className="pt-card pt-action">
-          <h2>Sign your {quoteWord(data.quote)}</h2>
-          <p>Have a read through. When you’re happy, sign it here and we’ll get your installation booked in.</p>
+          <h2>Your {quoteWord(data.quote)}</h2>
+          <p>Have a read through. When you’re happy, press Accept quote. You will sign, then pay your deposit and choose your installation date.</p>
           <div className="pt-row">
             <a className="pt-btn ghost" href={`/api/my/${data.token}/doc/${data.quote.id}`} target="_blank" rel="noreferrer">
               View {quoteWord(data.quote)}
             </a>
             <button type="button" className="pt-btn" onClick={() => setSigning(true)}>
-              Accept and sign
+              Accept quote
             </button>
           </div>
         </section>
@@ -228,6 +269,13 @@ function FullPortal({ data, paid, themePref }: { data: PortalData; paid: boolean
         <section className="pt-card pt-action">
           <h2>Pay your deposit</h2>
           <Deposit token={data.token} deposit={data.deposit} />
+        </section>
+      )}
+
+      {accepted && !data.installAt && (
+        <section className="pt-card pt-action">
+          <h2>Choose your installation date</h2>
+          <InstallDates token={data.token} pref={data.installPref} />
         </section>
       )}
 
@@ -292,13 +340,13 @@ function FullPortal({ data, paid, themePref }: { data: PortalData; paid: boolean
       {signing && data.quote && (
         <div className="pt-sheet" role="dialog" aria-modal="true" onClick={() => setSigning(false)}>
           <div className="pt-sheet-box" onClick={(e) => e.stopPropagation()}>
-            <h2>Sign your {quoteWord(data.quote)}</h2>
+            <h2>Accept your {quoteWord(data.quote)}</h2>
             <p className="pt-muted">
               <a href={`/api/my/${data.token}/doc/${data.quote.id}`} target="_blank" rel="noreferrer">
                 {data.quote.name}
               </a>
             </p>
-            <SignForm token={data.token} quote={data.quote} onDone={() => window.location.reload()} onCancel={() => setSigning(false)} />
+            <SignForm token={data.token} quote={data.quote} onDone={(d) => void afterAccept(data.token, d)} onCancel={() => setSigning(false)} />
           </div>
         </div>
       )}
@@ -380,7 +428,7 @@ function DepositButton({ token }: { token: string }) {
 }
 
 /** Typed name, signature, the 14-day wording and the "start within 14 days" box. */
-function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Quote; onDone: () => void; onCancel?: () => void }) {
+function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Quote; onDone: (d: { deposit?: boolean }) => void; onCancel?: () => void }) {
   const [name, setName] = useState('');
   const [agree, setAgree] = useState(false);
   const [startEarly, setStartEarly] = useState(false);
@@ -398,7 +446,8 @@ function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Qu
     }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     // 409: it's already been signed (another tap or another phone), so show the signed page.
-    if (r?.ok || r?.status === 409) return onDone();
+    if (r?.ok) return onDone(d);
+    if (r?.status === 409) return onDone({});
     setBusy(false);
     setErr(d.error || 'Something went wrong. Please try again.');
   }
@@ -425,10 +474,81 @@ function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Qu
       {err && <p className="pt-err">{err}</p>}
       <div className="pt-row">
         <button type="button" className="pt-btn" disabled={busy || name.trim().length < 3 || !sig || !agree} onClick={submit}>
-          {busy ? 'Saving…' : `Sign and accept`}
+          {busy ? 'Saving…' : 'Accept quote'}
         </button>
         {onCancel && (
           <button type="button" className="pt-btn ghost" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** After accepting: up to three dates they would like the installation on. A request; the office confirms the real day. */
+function InstallDates({ token, pref }: { token: string; pref: PortalData['installPref'] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [dates, setDates] = useState<string[]>(pref?.dates?.length ? pref.dates : ['']);
+  const [flexible, setFlexible] = useState(pref?.flexible ?? false);
+  const [notes, setNotes] = useState(pref?.notes ?? '');
+  const [editing, setEditing] = useState(!pref);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(!!pref);
+  const words = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const set = (i: number, v: string) => setDates((cur) => cur.map((d, n) => (n === i ? v : d)));
+  const chosen = dates.filter(Boolean);
+  async function save() {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/my/${token}/install-dates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates: chosen, flexible, notes }) }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!r?.ok) return setErr(d.error || 'Something went wrong. Please try again.');
+    setDone(true);
+    setEditing(false);
+  }
+  if (done && !editing) {
+    return (
+      <div>
+        <p className="pt-banner ok">✓ We have your dates: {chosen.map(words).join('; ')}{flexible ? ' (flexible)' : ''}. We will check them and confirm your installation date with you.</p>
+        <button type="button" className="pt-btn ghost" onClick={() => setEditing(true)}>
+          Change my dates
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="pt-signform">
+      <p>Tell us up to {MAX_CHOICES} dates that suit you for the installation. We will check them against our installers and confirm your date. We install Monday to Friday.</p>
+      {dates.map((d, i) => (
+        <div key={i}>
+          <label className="pt-label" htmlFor={`pt-date-${i}`}>
+            {i === 0 ? 'First choice' : i === 1 ? 'Second choice' : 'Third choice'}
+          </label>
+          <input id={`pt-date-${i}`} type="date" className="pt-input" min={earliestInstall(today)} max={latestInstall(today)} value={d} onChange={(e) => set(i, e.target.value)} />
+        </div>
+      ))}
+      {dates.length < MAX_CHOICES && (
+        <button type="button" className="pt-btn ghost" onClick={() => setDates((cur) => [...cur, ''])}>
+          + Add another date
+        </button>
+      )}
+      <label className="pt-check">
+        <input type="checkbox" checked={flexible} onChange={(e) => setFlexible(e.target.checked)} /> I am flexible: a day or two either side is fine.
+      </label>
+      <label className="pt-label" htmlFor="pt-inst-notes">
+        Anything we should know? (optional)
+      </label>
+      <textarea id="pt-inst-notes" className="pt-input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. away the first week of December" />
+      {err && <p className="pt-err">{err}</p>}
+      <div className="pt-row">
+        <button type="button" className="pt-btn" disabled={busy || chosen.length === 0} onClick={() => void save()}>
+          {busy ? 'Saving…' : 'Send my dates'}
+        </button>
+        {pref && (
+          <button type="button" className="pt-btn ghost" onClick={() => setEditing(false)}>
             Cancel
           </button>
         )}

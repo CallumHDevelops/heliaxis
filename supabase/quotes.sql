@@ -23,3 +23,7 @@ create table if not exists public.crm_quotes (
 create index if not exists crm_quotes_project_idx on public.crm_quotes (project_id, created_at desc);
 create index if not exists crm_quotes_status_idx  on public.crm_quotes (status, updated_at desc);
 alter table public.crm_quotes enable row level security;
+
+-- The installation dates a customer asks for after accepting (portal: "Choose your installation date").
+-- { dates: ['2026-12-01', ...], flexible: bool, notes: text, at: iso }. The office confirms the real date.
+alter table public.crm_projects add column if not exists install_pref jsonb;
