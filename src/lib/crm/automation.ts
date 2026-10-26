@@ -8,7 +8,7 @@ import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { isQuiet } from '@/lib/whatsapp/schedule';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { getCrmSettings } from './crm-settings';
-import { fillText, sequenceHad, sequenceNext } from './settings-shared';
+import { fillText, sequenceHad, sequenceNext, type SequenceStep } from './settings-shared';
 import { daysWord } from './tracker';
 import { ensurePortalToken, logActivity, portalUrl } from './server';
 import { bookingUrl, ensureBookingToken } from './booking-link';
@@ -488,6 +488,33 @@ export async function runCrmAutomations() {
     }
   }
   return out;
+}
+
+/**
+ * After a save that added or removed a step (CRM settings): a lead whose sequence_step is at or past the new
+ * list's length, though there's a step in it the lead hasn't had (one added after a step it had was removed, or a
+ * step removed in front of the one it's waiting for), is put back to that step's place, so the runner's query
+ * finds it again. A lead from before ids has what its sequence_step counted written down by id first. The runner
+ * works out the rest by id, including skipping a step the lead was already past when it was added.
+ */
+export async function sequenceChanged(prev: SequenceStep[], next: SequenceStep[]) {
+  const ids = (l: SequenceStep[]) => l.map((x) => x.id).sort().join();
+  if (!next.length || ids(prev) === ids(next)) return;
+  const db = createAdminClient();
+  const { data } = await db
+    .from('crm_projects')
+    .select(COLS)
+    .in('stage', ['lead', 'contacted'])
+    .is('sequence_stopped_at', null)
+    .gte('sequence_step', next.length)
+    .gte('created_at', new Date(Date.now() - 45 * 86_400_000).toISOString());
+  for (const p of (data ?? []) as Proj[]) {
+    const had = sequenceHad(p.reminders_sent, p.sequence_step);
+    const at = next.findIndex((x) => !had.includes(x.id));
+    if (at < 0) continue;
+    for (const id of had) await markSent(p, `seq:${id}`);
+    await db.from('crm_projects').update({ sequence_step: at }).eq('id', p.id);
+  }
 }
 
 /**

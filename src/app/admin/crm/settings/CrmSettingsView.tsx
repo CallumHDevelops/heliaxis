@@ -171,9 +171,9 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
               opportunity moves past Contacted
             </label>
             <p className="crm-muted crm-small">
-              When you switch it on or add a step, leads already in the CRM only get the steps that fall due from then on. Earlier ones are skipped, not sent late.
-              Changing a step’s hours or Send by doesn’t change who gets it: a lead still waiting for it gets it, straight away if it’s now past its time. Nobody
-              gets the same step twice.
+              When you switch it on, leads already in the CRM only get the steps that fall due from then on. Earlier ones are skipped, not sent late. A step you
+              add only goes to leads it falls due for after you save; the other steps carry on as they were. Changing a step’s hours or Send by doesn’t change who
+              gets it: a lead still waiting for it gets it, straight away if it’s now past its time. Nobody gets the same step twice.
             </p>
             {s.sequence.map((st, i) => (
               <div key={i} className="crm-step">

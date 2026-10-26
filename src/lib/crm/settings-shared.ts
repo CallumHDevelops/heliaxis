@@ -184,6 +184,23 @@ export function storedSteps(sequence: unknown): unknown {
 }
 
 /**
+ * Steps posted by a page opened before steps had ids (a step with no id at all; one added on the page since has
+ * ''), each given the id of the saved step it is: the same hours, Send by and message. Otherwise saving anything
+ * from that page would make every step new (sequenceAfterSave), as if the sequence had been switched off and on.
+ * Null when one isn't a saved step (changed or added on that page): it can't be told from a new one.
+ */
+export function stepsWithSavedIds(posted: unknown[], saved: SequenceStep[]): unknown[] | null {
+  const left = saved.filter((y) => !posted.some((x) => (x as Partial<SequenceStep>)?.id === y.id));
+  const out = posted.map((x) => {
+    const s = x as Partial<SequenceStep>;
+    if (typeof s?.id === 'string') return s;
+    const i = left.findIndex((y) => y.afterHours === s?.afterHours && y.channel === s?.channel && y.text === s?.text);
+    return i < 0 ? null : { ...s, id: left.splice(i, 1)[0].id };
+  });
+  return out.includes(null) ? null : out;
+}
+
+/**
  * The steps after a save, each with its leadsFrom, set here on the server (never taken from the page). Switched
  * on, every step starts counting now; so does a new step (an id the saved settings didn't have). Any other step
  * keeps its own whatever its hours or Send by become, so editing one step never holds back another, and a step

@@ -3,6 +3,7 @@ import { postcodeKey, ukPostcode } from './site-postcode';
 import { toWaId } from '../whatsapp/shared';
 import { leadSourceLabel } from '../lead-source';
 import { isMetaSource } from '../ad-spend';
+import { sequenceHad } from './settings-shared';
 
 /**
  * Merging duplicates (src/lib/crm/merge.ts does the reading and writing): which customer stays, which of
@@ -587,7 +588,13 @@ export function combineJobs(K: Job, F: Job, now: string): JoinedJob {
   // Lists: both.
   const union = (a: unknown, b: unknown) => [...new Set([...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])])];
   put(set, K, 'products', union(K.products, F.products));
-  for (const col of ['reminders_sent', 'capi_sent']) if (col in K) put(set, K, col, union(K[col], F[col]));
+  // Follow-up steps had go by id ("seq:<id>"). A job from before ids has only its sequence_step: when the other
+  // has ids, its steps are written down by id too, or the join would keep only the other's and send its own again.
+  const sent = (j: Job) => (Array.isArray(j.reminders_sent) ? (j.reminders_sent as string[]) : []);
+  const byId = [K, F].some((j) => sent(j).some((k) => k.startsWith('seq:')));
+  const had = (j: Job) => (byId ? union(sent(j), sequenceHad(sent(j), Number(j.sequence_step) || 0).map((id) => `seq:${id}`)) : j.reminders_sent);
+  if ('reminders_sent' in K) put(set, K, 'reminders_sent', union(had(K), had(F)));
+  if ('capi_sent' in K) put(set, K, 'capi_sent', union(K.capi_sent, F.capi_sent));
   for (const col of ['system', 'paperwork', 'checklist']) {
     if (col in K && !emptyObj(F[col])) put(set, K, col, { ...(F[col] as object), ...((K[col] as object) ?? {}) });
   }

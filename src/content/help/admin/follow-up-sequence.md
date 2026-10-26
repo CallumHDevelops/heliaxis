@@ -46,7 +46,7 @@ When you switch it on, leads from the last 45 days that are still at **Lead** or
 
 A step you add works the same way: from when you press **Save settings**, a lead already past its hours skips it, and the others get it when it falls due. The other steps carry on as they were, including any that are due but waiting for the quiet hours to end or a job to come off hold.
 
-Changing a step’s hours, **Send by** or message doesn’t change who gets it. A lead still waiting for it gets it at its new time, or straight away if they’re already past that, so moving a step earlier never drops it. Nobody gets the same step twice, whatever you add, move or change. Switching it off and on again starts again from the moment you switch it back on.
+Changing a step’s hours, **Send by** or message doesn’t change who gets it. A lead still waiting for it gets it at its new time, or straight away if they’re already past that, so moving a step earlier never drops it. Removing a step doesn’t hold up the others either: a lead waiting for a later step still gets it. Nobody gets the same step twice, whatever you add, move, change or remove. Switching it off and on again starts again from the moment you switch it back on.
 
 ## Good to know
 

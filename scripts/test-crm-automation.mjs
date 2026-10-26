@@ -8,9 +8,13 @@
 // quietly, instead of getting every overdue step a minute apart. Steps go by id, so a step added (even
 // one at the same hours and Send by as another), moved or edited never re-sends one a lead has had, a
 // step moved earlier still goes to the leads waiting for it, and editing one step doesn't drop another
-// that's due but waiting for the quiet hours or a hold.
+// that's due but waiting for the quiet hours or a hold. A step added after one was removed still reaches
+// the leads that had finished the shorter list; two jobs joined in a merge keep what each had, one from
+// before ids too; a page opened before ids and saved after keeps every step's id; and the note on CRM
+// settings says the same.
 // Usage: node --experimental-strip-types scripts/test-crm-automation.mjs
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as kit from './site-test-kit.mjs';
 
 const db = kit.setup({
@@ -28,6 +32,7 @@ const { eq } = kit;
 const A = await import('../src/lib/crm/automation.ts');
 const S = await import('../src/lib/crm/settings-shared.ts');
 const settingsRoute = await import('../src/app/api/crm/settings/route.ts');
+const M = await import('../src/lib/crm/merge-rules.ts');
 const C = await import('../src/lib/setup-checks.ts');
 
 const person = (name, o = {}) => ({ id: randomUUID(), full_name: name, email: `${name.toLowerCase()}@heliaxis.test`, status: 'approved', role: 'member', portals: ['crm'], ...o });
@@ -263,5 +268,82 @@ await put({ ...cur, sequence: [cur.sequence[0], { ...cur.sequence[1], channel: '
 db.rows('crm_projects').find((x) => x.id === held.id).on_hold = false;
 await A.runCrmAutomations();
 eq('…another step’s Send by changed meanwhile: it goes when the hold lifts', [globalThis.__rec.whatsapp.map((m) => m.enquiryId), stepOf(held)], [[held.enquiry_id], 1]);
+
+// A step added after one was removed: leads that had finished the shorter list are found again (their
+// sequence_step was the list's length, so the runner's query had stopped looking at them).
+const hoursPass = (h) => {
+  for (const p of db.rows('crm_projects')) p.created_at = new Date(Date.parse(p.created_at) - h * HOUR).toISOString();
+  setSettings({ ...settings(), sequence: settings().sequence.map((x) => ({ ...x, leadsFrom: x.leadsFrom && new Date(Date.parse(x.leadsFrom) - h * HOUR).toISOString() })) });
+};
+const sentTo = () => globalThis.__rec.activity.filter((a) => /^Follow-up \d sent/.test(a.body)).map((a) => a.projectId);
+const replaced = async (twoSaves) => {
+  reset(240);
+  globalThis.__rec.activity.length = 0;
+  const had = lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+  const hadBefore = lead({ created_at: ago(80 * HOUR), sequence_step: 2 }); // from before ids
+  const past = lead({ created_at: ago(100 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+  const later = { id: '', afterHours: 96, channel: 'email', text: 'Hi {first_name}, one more' };
+  cur = await page();
+  if (twoSaves) {
+    await put({ ...cur, sequence: [cur.sequence[0]] });
+    await A.runCrmAutomations();
+    cur = await page();
+  }
+  await put({ ...cur, sequence: [cur.sequence[0], later] });
+  await A.runCrmAutomations();
+  const early = sentTo().length;
+  hoursPass(17);
+  await A.runCrmAutomations();
+  const quiet = globalThis.__rec.activity.filter((a) => a.projectId === past.id).length;
+  return { got: [early, sentTo().sort()], want: [0, [had.id, hadBefore.id].sort()], past: [stepOf(past), hadOf(past), quiet] };
+};
+const swapped = await replaced(false);
+eq('the 72h email swapped for a 96h one: leads 80h in that had both get it when it falls due (from before ids too)', swapped.got, swapped.want);
+eq('…a lead already past 96h skips it quietly', swapped.past, [2, 3, 0]);
+const twice = await replaced(true);
+eq('…the same with the email removed in one save and the 96h one added in another', twice.got, twice.want);
+
+reset(240);
+globalThis.__rec.activity.length = 0;
+const undone = lead({ created_at: ago(30 * HOUR), sequence_step: 1, reminders_sent: ['seq:1'] });
+cur = await page();
+await put({ ...cur, sequence: [{ id: '', afterHours: 12, channel: 'whatsapp', text: 'Hi {first_name}, an early one' }, ...cur.sequence] });
+await A.runCrmAutomations();
+cur = await page();
+await put({ ...cur, sequence: cur.sequence.filter((x) => x.afterHours !== 12) });
+hoursPass(43);
+await A.runCrmAutomations();
+eq('a 12h step added, then removed again: a lead waiting for the 72h email still gets it', [sentTo(), stepOf(undone)], [[undone.id], 2]);
+
+// Two jobs joined in a merge (src/lib/crm/merge-rules.ts), the kept one from before ids: what each had is kept.
+reset(240);
+setSettings({ ...D, sequenceEnabled: true, firstResponseMinutes: 0, sequence: [...D.sequence, { id: '3', afterHours: 120, channel: 'email', text: 'Hi {first_name}, a last one' }] });
+const kept = lead({ created_at: ago(100 * HOUR), sequence_step: 2 }); // from before ids: had the WhatsApp and the 72h email
+const joined = M.combineJobs(kept, { ...kept, id: randomUUID(), sequence_step: 1, reminders_sent: ['seq:1'] }, new Date().toISOString());
+Object.assign(db.rows('crm_projects').find((x) => x.id === kept.id), Object.fromEntries(Object.entries(joined.set).map(([c, v]) => [c, v.to])));
+await A.runCrmAutomations();
+eq('two jobs joined, one from before ids: neither’s follow-ups are sent again', [globalThis.__rec.email.length, globalThis.__rec.whatsapp.length, hadOf(kept)], [0, 0, 2]);
+
+// CRM settings open in a tab from before steps had ids, saved after.
+reset(240);
+const waitingWa = lead({ created_at: ago(30 * HOUR) }); // its 24h WhatsApp is due, waiting for the quiet hours
+const kept0 = settings().sequence.map((x) => [x.id, x.leadsFrom]);
+const oldTab = await page();
+oldTab.sequence = oldTab.sequence.map((x) => ({ ...x, id: undefined, leadsFrom: undefined })); // as that page has them: neither
+const saved = await put({ ...oldTab, reviewDelayDays: 5 });
+eq('a page opened before steps had ids saves something else: each step keeps its id and who gets it', [saved.status, settings().sequence.map((x) => [x.id, x.leadsFrom])], [200, kept0]);
+await A.runCrmAutomations();
+eq('…the lead waiting for its WhatsApp still gets it', globalThis.__rec.whatsapp.map((m) => m.enquiryId), [waitingWa.enquiry_id]);
+const changed = await put({ ...oldTab, sequence: [{ ...oldTab.sequence[0], text: 'Hi {first_name}, changed in the old tab' }, oldTab.sequence[1]] });
+eq('…a step changed on that page can’t be told from a new one: refused, nothing changed', [changed.status, changed.body.error, settings().sequence.map((x) => [x.id, x.leadsFrom])], [409, 'The app has been updated since this page was opened. Reload the page, make your changes again and save.', kept0]);
+
+// The note under the switch on CRM settings.
+const view = readFileSync(new URL('../src/app/admin/crm/settings/CrmSettingsView.tsx', import.meta.url), 'utf8');
+const note = view.slice(view.indexOf('<p', view.indexOf("set('sequenceEnabled'")), view.indexOf('</p>', view.indexOf("set('sequenceEnabled'"))).replace(/\s+/g, ' ');
+eq('CRM settings says switching on skips earlier steps, an added step goes only to leads it falls due for after the save, and the others carry on', [
+  note.includes('When you switch it on, leads already in the CRM only get the steps that fall due from then on. Earlier ones are skipped, not sent late.'),
+  note.includes('A step you add only goes to leads it falls due for after you save; the other steps carry on as they were.'),
+  /switch it on or add a step/.test(note),
+], [true, true, false]);
 
 kit.done();
