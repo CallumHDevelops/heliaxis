@@ -2,7 +2,8 @@
 // rotation (CRM → Settings → New leads) skips anyone who can no longer open the CRM (rejected, set back
 // to pending, CRM portal taken away), who stays ticked, keeps their place and takes turns again when
 // their access is back; a lead someone already has is left alone. The "Choose who gets new leads" to-do
-// (src/lib/setup-checks.ts) counts the same people. The follow-up sequence: switched on (or given a new
+// (src/lib/setup-checks.ts) counts the same people, and comes back unticked when none of them can take a
+// lead any more, whatever was ticked off before. The follow-up sequence: switched on (or given a new
 // step), it sends only the steps that fall due from then on; leads already in the CRM skip older ones
 // quietly, instead of getting every overdue step a minute apart. Steps go by id, so a step added (even
 // one at the same hours and Send by as another), moved or edited never re-sends one a lead has had, a
@@ -112,10 +113,18 @@ leaver.status = 'approved';
 setSettings({ leadRotation: [esther.id, leaver.id, callum.id], rotationIndex: 0 });
 eq('someone ticked can open the CRM: no to-do', await rotationTodo(), 'none');
 db.t.profiles = [{ ...esther, status: 'rejected' }, { ...callum, status: 'pending' }, { ...leaver, portals: ['enquiries'] }];
-eq('nobody ticked can open the CRM any more: the to-do is back, and says why', await rotationTodo(), 'Nobody ticked for new leads can open the CRM any more, so new leads stay unassigned and nobody gets a notification.');
+eq('nobody ticked can open the CRM any more: the to-do is back, and says why', await rotationTodo(), 'Nobody ticked for new leads can open the CRM any more, so new leads stay unassigned and nobody gets the “New lead for you” notification.');
 db.t.profiles = [];
 eq('…the same when they’ve been deleted', (await rotationTodo()).startsWith('Nobody ticked'), true);
+
+// Ticked off on From Claude back when people were first ticked: it still comes back as a job to do, not
+// greyed at the bottom as "waiting to confirm", as that tick can't have been about access lost since.
+const rotationTicked = async () => !!(await C.setupTodos({})).find((t) => t.id === 'crm-rotation')?.ticked;
+db.rows('cms_kv').push({ key: 'setup-done', value: JSON.stringify(['crm-rotation']) });
+eq('ticked off before, back now that nobody ticked can open the CRM: not ticked', [(await rotationTodo()).startsWith('Nobody ticked'), await rotationTicked()], [true, false]);
 setSettings({ leadRotation: [], rotationIndex: 0 });
+eq('nobody ticked: a tick still greys it, as before', await rotationTicked(), true);
+db.t.cms_kv = db.rows('cms_kv').filter((r) => r.key !== 'setup-done');
 eq('nobody ticked: the to-do, as before', await rotationTodo(), 'New leads are handed out in turn and that person gets a notification.');
 
 // People can't be looked up: it goes by the ticks, rather than nag on a guess.

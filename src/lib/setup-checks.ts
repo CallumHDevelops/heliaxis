@@ -842,7 +842,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
       id: 'crm-rotation',
       title: 'Choose who gets new leads',
       detail: settings.leadRotation.length
-        ? 'Nobody ticked for new leads can open the CRM any more, so new leads stay unassigned and nobody gets a notification.'
+        ? 'Nobody ticked for new leads can open the CRM any more, so new leads stay unassigned and nobody gets the “New lead for you” notification.'
         : 'New leads are handed out in turn and that person gets a notification.',
       steps: [
         'Tap **Open CRM settings**.',
@@ -1186,8 +1186,10 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   });
   // Copies: these are set per request below.
   for (const m of MANUAL) add(!done.includes(m.id), { ...m });
-  // Ticked but not detected yet: keep it, greyed, at the bottom.
-  for (const t of out) if (done.includes(t.id)) t.ticked = true;
+  // Ticked but not detected yet: keep it, greyed, at the bottom. Not "Choose who gets new leads" once people are
+  // ticked: it's only back because they've lost CRM access since, which no tick from before can have been about.
+  const staleTick = (id: string) => id === 'crm-rotation' && !!settings?.leadRotation.length;
+  for (const t of out) if (done.includes(t.id) && !staleTick(t.id)) t.ticked = true;
   const answers = out.some((t) => t.kind === 'question') ? await savedAnswers().catch(() => ({})) : {};
   for (const t of out) {
     const a = (answers as Record<string, SavedAnswer>)[t.id];
