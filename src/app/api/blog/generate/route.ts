@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { requirePortal } from '@/lib/auth';
 import { generateBlogPost, isAiConfigured } from '@/lib/blog/ai';
 
+export const maxDuration = 120;
+
 export async function POST(req: Request) {
   const session = await requirePortal('cms');
   if (!session || session.profile.role !== 'admin') {
@@ -10,12 +12,12 @@ export async function POST(req: Request) {
 
   if (!isAiConfigured()) {
     return NextResponse.json(
-      { error: 'AI not configured. Set OPENROUTER_API_KEY (or AI_API_KEY) and optionally AI_MODEL / AI_BASE_URL.' },
+      { error: 'AI not configured. Set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY).' },
       { status: 503 },
     );
   }
 
-  let body: { prompt?: string };
+  let body: { prompt?: string; keyword?: string; audience?: string };
   try {
     body = await req.json();
   } catch {
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const draft = await generateBlogPost(prompt);
+    const draft = await generateBlogPost(prompt, { keyword: (body.keyword || '').slice(0, 120), audience: (body.audience || '').slice(0, 200) });
     return NextResponse.json({ draft, prompt });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Generation failed';

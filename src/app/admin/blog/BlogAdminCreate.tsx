@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { BLOG_BRIEFS } from '@/lib/blog/briefs';
 import { brand } from '@/components/auth/authStyles';
 import type { CmsArticleAi } from '@/lib/blog/cms-article-template';
 
@@ -36,6 +37,7 @@ const emptyDraft = (): CmsArticleAi => ({
 
 export function BlogAdminCreate({ aiReady }: Props) {
   const [prompt, setPrompt] = useState('');
+  const [briefId, setBriefId] = useState('');
   const [draft, setDraft] = useState<CmsArticleAi | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [busy, setBusy] = useState<'idle' | 'gen' | 'create'>('idle');
@@ -62,6 +64,13 @@ export function BlogAdminCreate({ aiReady }: Props) {
     marginBottom: 6,
   };
 
+  const brief = BLOG_BRIEFS.find((b) => b.id === briefId) || null;
+  function pickBrief(id: string) {
+    setBriefId(id);
+    const b = BLOG_BRIEFS.find((x) => x.id === id);
+    if (b) setPrompt(`Title: ${b.title}\n\n${b.brief}`);
+  }
+
   async function onGenerate(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
@@ -71,7 +80,7 @@ export function BlogAdminCreate({ aiReady }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, keyword: brief?.keyword, audience: brief?.audience }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Generation failed');
@@ -127,17 +136,30 @@ export function BlogAdminCreate({ aiReady }: Props) {
 
       {!aiReady && (
         <p style={{ color: 'var(--danger)', fontSize: '0.86rem', fontWeight: 600, margin: '0 0 0.75rem' }}>
-          Set OPENROUTER_API_KEY (or AI_API_KEY) to enable generation.
+          Set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY) to enable generation.
         </p>
       )}
 
       <form onSubmit={onGenerate}>
+        <select
+          value={briefId}
+          onChange={(e) => pickBrief(e.target.value)}
+          aria-label="Start from a topic brief"
+          style={{ ...field, marginBottom: 10 }}
+        >
+          <option value="">Start from a prepared topic brief (optional)…</option>
+          {BLOG_BRIEFS.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.title}
+            </option>
+          ))}
+        </select>
         <div className="blog-admin__create-row">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            rows={3}
-            placeholder="e.g. Solar PV for Cardiff homes — practical tone, ~800 words"
+            rows={briefId ? 8 : 3}
+            placeholder="Pick a brief above, or describe your own topic, e.g. Solar PV for Cardiff homes: what it costs and whether it pays back"
             required
             aria-label="Article prompt"
           />
@@ -167,6 +189,16 @@ export function BlogAdminCreate({ aiReady }: Props) {
 
       {draft && (
         <div className="blog-admin__draft">
+          {draft.editorNotes && draft.editorNotes.length > 0 && (
+            <div style={{ background: '#FFF7DD', border: '1px solid #E8D48A', borderRadius: 6, padding: '10px 14px', marginBottom: 14 }}>
+              <strong style={{ fontSize: '0.86rem' }}>Check before publishing (not shown on the page)</strong>
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: '0.86rem', lineHeight: 1.5 }}>
+                {draft.editorNotes.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="blog-admin__draft-grid is-meta">
             <div>
               <label style={label}>Page title</label>

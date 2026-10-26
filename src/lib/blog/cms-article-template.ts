@@ -32,6 +32,8 @@ export const cmsArticleAiSchema = z.object({
   businessBtn: z.string().min(2).max(40).default('Explore business funding'),
   /** 2–6 word Unsplash search query that visually matches the article (not a sentence). */
   imageQuery: z.string().min(3).max(80).optional(),
+  /** Notes for the human editor (claims to verify, links to add, related ideas): shown in the admin, never on the page. */
+  editorNotes: z.array(z.string().max(400)).max(14).optional(),
 });
 
 export type CmsArticleAi = z.infer<typeof cmsArticleAiSchema>;
@@ -91,7 +93,7 @@ export function splitPropsFromAi(ai: CmsArticleAi) {
   };
 }
 
-const ALLOWED_TAGS = new Set(['p', 'h2', 'h3', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'br']);
+const ALLOWED_TAGS = new Set(['p', 'h2', 'h3', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'em', 'a', 'br']);
 
 function uid(): string {
   return 'b' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
