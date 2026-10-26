@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { geocodePostcodes } from '@/lib/geocode-postcode';
 import { fallbackYield } from '@/lib/estimator/calc';
 import { pvgisYield } from '@/lib/estimator/pvgis';
 import { buildingOutline } from '@/lib/estimator/osm';
@@ -60,16 +59,33 @@ async function geocode(line: string, pc: string): Promise<GeoOut> {
   const key = process.env.GOOGLE_SOLAR_API_KEY;
   if (!key) return { geo: null, why: 'No key' };
   const referer = process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk';
-  const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&region=gb&components=country:GB&key=${key}`, { headers: { Referer: referer }, signal: AbortSignal.timeout(6000) }).catch(() => null);
-  if (!r) return { geo: null, why: 'Google Geocoding did not answer' };
-  const d = (await r.json().catch(() => null)) as { status?: string; error_message?: string; results?: { geometry?: { location?: { lat: number; lng: number }; location_type?: string }; formatted_address?: string }[] } | null;
-  if (!d) return { geo: null, why: `Google Geocoding returned ${r.status} with no readable answer` };
-  if (d.status && d.status !== 'OK' && d.status !== 'ZERO_RESULTS') return { geo: null, why: clean(`Google Geocoding says ${d.status}${d.error_message ? `: ${d.error_message}` : ''}`) };
-  const g = d.results?.[0];
-  if (!g?.geometry?.location) return { geo: null, why: 'Google Geocoding found no address for that' };
-  const t = g.geometry.location_type;
-  if (t !== 'ROOFTOP' && t !== 'RANGE_INTERPOLATED' && t !== 'GEOMETRIC_CENTER') return { geo: null, why: `Google Geocoding only found the area (${t}), not the house` };
-  return { geo: { lat: g.geometry.location.lat, lng: g.geometry.location.lng, address: g.formatted_address || query }, why: 'ok' };
+  const ask = async (qs: string) => {
+    const r = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${qs}&region=gb&key=${key}`, { headers: { Referer: referer }, signal: AbortSignal.timeout(6000) }).catch(() => null);
+    if (!r) return { err: 'Google Geocoding did not answer' } as const;
+    const d = (await r.json().catch(() => null)) as { status?: string; error_message?: string; results?: { geometry?: { location?: { lat: number; lng: number }; location_type?: string }; formatted_address?: string }[] } | null;
+    if (!d) return { err: `Google Geocoding returned ${r.status} with no readable answer` } as const;
+    if (d.status && d.status !== 'OK' && d.status !== 'ZERO_RESULTS') return { err: clean(`Google Geocoding says ${d.status}${d.error_message ? `: ${d.error_message}` : ''}`) } as const;
+    return { g: d.results?.[0] } as const;
+  };
+  // Tried in turn: the whole address as text, then the house within the postcode (which stops Google settling for the area), then
+  // the house number alone within the postcode.
+  const number = line.match(/^\s*(\d+[A-Za-z]?)\b/)?.[1];
+  const tries = [
+    `address=${encodeURIComponent(query)}&components=country:GB`,
+    `address=${encodeURIComponent(line)}&components=${encodeURIComponent(`postal_code:${pc}|country:GB`)}`,
+    ...(number && number !== line.trim() ? [`address=${encodeURIComponent(number)}&components=${encodeURIComponent(`postal_code:${pc}|country:GB`)}`] : []),
+  ];
+  let why = 'Google Geocoding found no address for that';
+  for (const qs of tries) {
+    const o = await ask(qs);
+    if ('err' in o) return { geo: null, why: o.err ?? 'Google Geocoding failed' };
+    const g = o.g;
+    if (!g?.geometry?.location) continue;
+    const t = g.geometry.location_type;
+    if (t === 'ROOFTOP' || t === 'RANGE_INTERPOLATED' || t === 'GEOMETRIC_CENTER') return { geo: { lat: g.geometry.location.lat, lng: g.geometry.location.lng, address: g.formatted_address || query }, why: 'ok' };
+    why = `Google Geocoding only found the area (${t}), not the house`;
+  }
+  return { geo: null, why };
 }
 
 async function solar(lat: number, lng: number, key: string): Promise<{ b: GoogleBuilding & { imageryDate?: { year: number; month: number; day: number } } | null; error: boolean; why: string }> {
