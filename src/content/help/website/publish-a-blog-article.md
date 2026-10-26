@@ -41,7 +41,7 @@ The time must be at least 30 seconds away.
 
 > **Watch out:** The article goes live exactly as it was when you scheduled it. If you edit it afterwards, click **Unschedule** and schedule it again, or your changes won’t be in the live version.
 
-> **Good to know:** The app puts it live by itself within a minute or so of the time, from its every-minute job. Publishing the website before then doesn’t put it live early. If an article is still **Scheduled** well after its time, ask an admin to [check the every-minute job is running](/admin/help/admin/every-minute-job).
+> **Good to know:** The app puts it live by itself within a minute or so of the time, from its every-minute job. Publishing the website before then doesn’t put it live early. If the app can’t put it on the website, it stays **Scheduled** and the app tries again the next minute. If an article is still **Scheduled** well after its time, ask an admin to [check the every-minute job is running](/admin/help/admin/every-minute-job).
 
 ## Cancel a schedule
 

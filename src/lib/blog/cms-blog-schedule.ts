@@ -28,7 +28,6 @@ export {
   type ScheduledRenderPage,
 } from '@/lib/blog/cms-blog-shared';
 
-type CmsState = { pages?: CmsLoosePage[]; current?: number; [key: string]: unknown };
 type RenderedDoc = { css?: string; pages?: ScheduledRenderPage[] };
 
 function upsertKv(
@@ -390,16 +389,18 @@ export async function publishDueScheduledBlogs(now = new Date()) {
 
   published.pages = publishedPages;
 
-  // The website first, and the saved site (Live, captured page cleared) only once both are written: if
-  // a write fails, the article is still Scheduled with its captured page, and the next minute retries.
-  const results = await Promise.all([
-    upsertKv(admin, PUBLISHED_KEY, published, nowIso),
-    upsertKv(admin, RENDERED_KEY, rendered, nowIso),
-  ]);
-  const failed = results.find((r) => r.error);
-  if (failed?.error) throw new Error(failed.error.message);
-  const { error: draftErr } = await upsertKv(admin, DRAFT_KEY, draft, nowIso);
-  if (draftErr) throw new Error(draftErr.message);
+  // One after another, each checked: the website's pages, then the published copy (which the Blog list
+  // also counts as Live), then the saved site (Live, captured page cleared). If a write fails, the article
+  // is still Scheduled with its captured page and the next minute retries. It's never Live in the list
+  // without being on the website, and once it's on the website Unschedule refuses it.
+  for (const [key, value] of [
+    [RENDERED_KEY, rendered],
+    [PUBLISHED_KEY, published],
+    [DRAFT_KEY, draft],
+  ] as const) {
+    const { error } = await upsertKv(admin, key, value, nowIso);
+    if (error) throw new Error(error.message);
+  }
 
   revalidatePath('/', 'layout');
   revalidatePath('/blog');

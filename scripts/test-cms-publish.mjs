@@ -10,7 +10,9 @@
 // by themselves: the every-minute job (/api/cron/whatsapp-outbox) runs publishDueScheduledBlogs
 // (src/lib/blog/cms-blog-schedule.ts), harmlessly alongside an outside ping of its own route; a write
 // that fails leaves the article Scheduled for the next minute, and Unschedule (cancelCmsBlogSchedule)
-// won't call an article that has already gone live a draft.
+// won't call an article that has already gone live a draft. The job writes the website's pages, then the
+// published copy, then the saved site, so the Blog list (listCmsAiBlogs) never shows an article as Live
+// that isn't on the website, and an Unschedule after a failed write leaves the list and the copy agreeing.
 // Usage: node --experimental-strip-types scripts/test-cms-publish.mjs
 import { readFileSync } from 'node:fs';
 import * as kit from './site-test-kit.mjs';
@@ -33,6 +35,11 @@ const saveRoute = await import('../src/app/api/cms/route.ts');
 const minuteRoute = await import('../src/app/api/cron/whatsapp-outbox/route.ts');
 const blogCronRoute = await import('../src/app/api/cron/publish-scheduled-blogs/route.ts');
 const scheduleRoute = await import('../src/app/api/blog/schedule/route.ts');
+const { listCmsAiBlogs } = await import('../src/lib/blog/cms-ai-blogs.ts');
+const { getCmsBlogArticleBySlug } = await import('../src/lib/blog/cms-public.ts');
+// The Blog list and the public article read the database only when it's set up.
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://supabase.test';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'a-test-key';
 
 const DRAFT = 'heliaxis-cms-v1';
 const PUBLISHED = 'heliaxis-cms-published';
@@ -272,23 +279,41 @@ db.from = from;
 eq('a failed write shows in the job’s reply, and the job still answers', [m3.status, m3.body.ok, /couldn’t write/.test(m3.body.blogs?.error ?? '')], [200, true, true]);
 // Only one write fails: nothing is left half-published, and the next minute finishes the job.
 Object.assign(byId(SCHEDULED, 'later'), { publishAt: future });
-const fresh = () => (setKv(DRAFT, SCHEDULED), setKv(PUBLISHED, { pages: [SCHEDULED.pages[0]] }), setKv(RENDERED, { css: '.site{}', pages: [{ slug: '/', html: 'home' }] }));
+const resetDocs = () => (setKv(DRAFT, SCHEDULED), setKv(PUBLISHED, { pages: [SCHEDULED.pages[0]] }), setKv(RENDERED, { css: '.site{}', pages: [{ slug: '/', html: 'home' }] }));
+/** The docs the job writes, in the order it starts them; `key`'s write fails. */
+const written = [];
 const failing = (key) => {
+  written.length = 0;
   db.from = (table) => {
     const b = from(table);
     const upsert = b.upsert;
-    if (table === 'cms_kv') b.upsert = (r, o) => (r.key === key ? { then: (res) => res({ data: null, error: { message: `couldn’t write ${r.key}` } }) } : upsert(r, o));
+    if (table === 'cms_kv') b.upsert = (r, o) => (written.push(r.key), r.key === key ? { then: (res) => res({ data: null, error: { message: `couldn’t write ${r.key}` } }) } : upsert(r, o));
     return b;
   };
 };
-fresh();
+/** The article's line on the Blog list. */
+const listed = async (id) => {
+  const row = (await listCmsAiBlogs()).find((b) => b.id === id);
+  return { status: row?.status, live: row?.live };
+};
+resetDocs();
 failing(RENDERED);
 const m4 = await minute();
 db.from = from;
 eq('the website’s pages fail to write: reported, and the article is still Scheduled with its captured page', [/couldn’t write heliaxis-cms-rendered/.test(m4.body.blogs?.error ?? ''), byId(kv(DRAFT), 'due').blogStatus, byId(kv(DRAFT), 'due').scheduledRender?.html], [true, 'scheduled', dueRender.html]);
+eq('…nothing after it is written, so the Blog list shows it Scheduled (past its time), not Live', [written, kv(PUBLISHED).pages.some((p) => p.id === 'due'), await listed('due')], [[RENDERED], false, { status: 'scheduled', live: false }]);
+failing(null);
 const m5 = await minute();
+db.from = from;
 eq('…so the next minute puts it live', [m5.body.blogs, kv(RENDERED).pages.find((p) => p.slug === '/blog/due')?.html, byId(kv(DRAFT), 'due').blogStatus], [{ published: 1, slugs: ['/blog/due'] }, dueRender.html, 'published']);
-fresh();
+eq('…writing the website’s pages, then the published copy, then the saved site', written, [RENDERED, PUBLISHED, DRAFT]);
+resetDocs();
+failing(PUBLISHED);
+const m7 = await minute();
+db.from = from;
+eq('the published copy fails to write: it’s on the website, so the Blog list’s Live is right and View opens it', [/couldn’t write heliaxis-cms-published/.test(m7.body.blogs?.error ?? ''), written, await listed('due'), (await getCmsBlogArticleBySlug('due'))?.html], [true, [RENDERED, PUBLISHED], { status: 'published', live: true }, dueRender.html]);
+eq('…still Scheduled in the saved site, so the next minute finishes it', [byId(kv(DRAFT), 'due').blogStatus, (await minute()).body.blogs, kv(PUBLISHED).pages.some((p) => p.id === 'due'), byId(kv(DRAFT), 'due').blogStatus], ['scheduled', { published: 1, slugs: ['/blog/due'] }, true, 'published']);
+resetDocs();
 failing(DRAFT);
 const m6 = await minute();
 db.from = from;
@@ -306,6 +331,22 @@ eq('Unschedule on an article the job has put live is refused, and says to use Un
 eq('…it stays Live, on the website', [byId(kv(DRAFT), 'due').blogStatus, kv(RENDERED).pages.some((p) => p.slug === '/blog/due'), kv(PUBLISHED).pages.some((p) => p.id === 'due')], ['published', true, true]);
 const u3 = await unschedule('later');
 eq('Unschedule before the time still makes it a draft', [u3.status, byId(kv(DRAFT), 'later').blogStatus, byId(kv(DRAFT), 'later').publishAt, byId(kv(DRAFT), 'later').scheduledRender], [200, 'draft', null, null]);
+// The website's pages failed to write, and a Blog list loaded before the time unschedules it.
+resetDocs();
+failing(RENDERED);
+await minute();
+db.from = from;
+const u4 = await unschedule('due');
+eq('Unschedule after the website’s pages failed to write makes it a draft', [u4.status, byId(kv(DRAFT), 'due').blogStatus], [200, 'draft']);
+eq('…and the Blog list and the published copy agree: a draft, not Live', [await listed('due'), kv(PUBLISHED).pages.some((p) => p.id === 'due')], [{ status: 'draft', live: false }, false]);
+eq('…and the next minute leaves it a draft', [(await minute()).body.blogs, await listed('due')], [{ published: 0, slugs: [] }, { status: 'draft', live: false }]);
+// Only the published copy failed: it's on the website, so a stale Unschedule is refused.
+resetDocs();
+failing(PUBLISHED);
+await minute();
+db.from = from;
+const u5 = await unschedule('due');
+eq('Unschedule after only the published copy failed to write is refused (it’s on the website)', [u5.status, /already gone live/.test(u5.body.error ?? ''), byId(kv(DRAFT), 'due').blogStatus, await listed('due')], [400, true, 'scheduled', { status: 'published', live: true }]);
 const list = readFileSync(new URL('../src/app/admin/blog/BlogAdminList.tsx', import.meta.url), 'utf8');
 const runCancel = list.slice(list.indexOf('async function runCancelSchedule('), list.indexOf('async function runUnpublish('));
 eq('a refused Unschedule reloads the Blog list, so the article shows as Live with Unpublish', runCancel.slice(runCancel.indexOf('catch (e) {'), runCancel.indexOf('} finally {')).includes('router.refresh();'), true);
