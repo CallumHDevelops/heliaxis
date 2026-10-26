@@ -84,18 +84,26 @@ export function withoutOfflineBlogs(state: CmsState): CmsState {
   return { ...state, pages: state.pages.filter((p) => !isCmsBlogPage(p) || isLiveBlog(p)) };
 }
 
-/** The rendered pages that go on the website: none for an article that isn't live or a draft page (by its id). */
+/**
+ * The rendered pages that go on the website: none for an article that isn't live or a draft page (by its id, or
+ * by its address when it came without one: a tab still running the editor from before doPublish sent ids renders
+ * every page, drafts too).
+ */
 export function liveRenderedPages<T extends RenderedEntry>(rendered: T[], state: CmsState): T[] {
   const offline = new Set<string>();
   const drafts = new Set<string>();
+  const draftSlugs = new Set<string>();
   for (const p of state.pages ?? []) {
     if (!isCmsBlogPage(p)) {
       if (p._draft && p.id) drafts.add(String(p.id));
+      if (p._draft) draftSlugs.add(String(p.slug ?? ''));
       continue;
     }
     if (isLiveBlog(p)) continue;
     offline.add(normalizeCmsSlug(String(p.slug || '')));
     offline.add(toPublicBlogPath(String(p.slug || '')));
   }
-  return rendered.filter((r) => !offline.has(normalizeCmsSlug(String(r?.slug || ''))) && !(r?.id && drafts.has(String(r.id))));
+  return rendered.filter(
+    (r) => !offline.has(normalizeCmsSlug(String(r?.slug || ''))) && !(r?.id ? drafts.has(String(r.id)) : draftSlugs.has(String(r?.slug ?? ''))),
+  );
 }

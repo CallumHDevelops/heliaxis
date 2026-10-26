@@ -5,7 +5,8 @@
 // job set it), so an editor tab opened before one of those can't undo it by saving or publishing; and
 // only live articles are in the published copy and the rendered pages. Pages keep the draft flag the server
 // has too, so a tab opened while a page was a draft can't make it one again after it's published, and Publish
-// never takes a page that's live (or the one being published) off the website. And scheduled articles go live
+// never takes a page that's live (or the one being published) off the website, while a tab still running the
+// editor from before Publish sent page ids can't put a draft page live. And scheduled articles go live
 // by themselves: the every-minute job (/api/cron/whatsapp-outbox) runs publishDueScheduledBlogs
 // (src/lib/blog/cms-blog-schedule.ts), harmlessly alongside an outside ping of its own route; a write
 // that fails leaves the article Scheduled for the next minute, and Unschedule (cancelCmsBlogSchedule)
@@ -92,10 +93,11 @@ delete byId(newLive, 'new')._draft;
 const isDraft = (state, id) => '_draft' in byId(state, id);
 eq('a page the server has live loses a stale tab’s draft flag', isDraft(R.keepServerPageDraft(clone(SERVER), newLive, null), 'new'), false);
 eq('…a page the server has as a draft stays one, whatever the tab says', byId(R.keepServerPageDraft(newLive, SERVER, null), 'new')._draft, 1);
-const newPage = clone(SERVER);
-newPage.pages.push({ id: 'fresh', _draft: 1, name: 'Fresh', slug: '/fresh', type: 'page', blocks: [] });
-eq('…a new page the server hasn’t had yet keeps the tab’s flag', byId(R.keepServerPageDraft(newPage, SERVER, null), 'fresh')._draft, 1);
+const unsaved = clone(SERVER);
+unsaved.pages.push({ id: 'fresh', _draft: 1, name: 'Fresh', slug: '/fresh', type: 'page', blocks: [] });
+eq('…a new page the server hasn’t had yet keeps the tab’s flag', byId(R.keepServerPageDraft(unsaved, SERVER, null), 'fresh')._draft, 1);
 eq('the page being published goes live', isDraft(R.keepServerPageDraft(clone(SERVER), SERVER, 'new'), 'new'), false);
+eq('a page on the website now stays live (by its id), whichever page is published', isDraft(R.keepServerPageDraft(clone(SERVER), SERVER, 'home', [{ id: 'new', slug: '/half-built' }]), 'new'), false);
 eq('a page on the website now stays live (rendered before the copy had ids: by its address)', isDraft(R.keepServerPageDraft(clone(SERVER), SERVER, null, [{ slug: '/half-built' }]), 'new'), false);
 eq('…but not because another page’s copy is at that address', isDraft(R.keepServerPageDraft(clone(SERVER), SERVER, null, [{ id: 'deleted', slug: '/half-built' }]), 'new'), true);
 eq('articles aren’t touched', byId(R.keepServerPageDraft(stale, newLive, 'draft'), 'draft'), byId(stale, 'draft'));
@@ -119,6 +121,10 @@ const allRendered = SERVER.pages.map((p) => ({ id: p.id, slug: p.slug, html: `<p
 eq('the rendered pages leave out articles that aren’t live, and draft pages', slugs(R.liveRenderedPages(allRendered, kept)), ['/', '/about', '/blog/live']);
 eq('…a page that isn’t a draft is kept', slugs(R.liveRenderedPages(allRendered, newLive)).includes('/half-built'), true);
 eq('…an old root address for an article is caught too', R.liveRenderedPages([{ slug: '/blog/old-root' }], { pages: [blog('o', '/old-root')] }), []);
+// A tab still running the editor from before Publish sent ids renders every page, drafts too, without ids.
+const idless = SERVER.pages.map((p) => ({ slug: p.slug, html: `<p>${p.id}</p>` }));
+eq('rendered pages without ids: a draft page is left out by its address', slugs(R.liveRenderedPages(idless, kept)), ['/', '/about', '/blog/live']);
+eq('…a page that isn’t a draft is kept', slugs(R.liveRenderedPages(idless, newLive)).includes('/half-built'), true);
 
 /* ── Publish (the route) ───────────────────────────────────────────────────── */
 
@@ -159,6 +165,28 @@ setKv(DRAFT, SERVER);
 setKv(RENDERED, { css: '', pages: [{ id: 'deleted', slug: '/half-built', html: 'a deleted page' }] });
 await publish({ state: clone(SERVER), rendered: { css: '', pages: clientRendered(SERVER) }, publishPageId: 'home' });
 eq('…a draft at the address of a deleted page stays off', [slugs(kv(RENDERED).pages).includes('/half-built'), isDraft(kv(DRAFT), 'new')], [false, true]);
+// A page on the website by its id that the saved site has as a draft (another tab's save landed mid-publish).
+setKv(DRAFT, SERVER);
+setKv(RENDERED, { css: '', pages: [{ id: 'home', slug: '/', html: 'home' }, { id: 'new', slug: '/half-built', html: 'live' }] });
+await publish({ state: clone(SERVER), rendered: { css: '', pages: clientRendered(SERVER) }, publishPageId: 'home' });
+eq('a page on the website (by its id) stays there when another page is published, and stops being a draft', [slugs(kv(RENDERED).pages).includes('/half-built'), isDraft(kv(DRAFT), 'new')], [true, false]);
+
+// A tab still running the editor from before Publish sent ids (during the update): every page, drafts too, no ids,
+// no page named, every article marked Live; then its save with every draft flag cleared.
+const oldBundle = (state) => state.pages.map((p) => ({ slug: p.slug, name: p.name, theme: '', seo: {}, html: `<div class="pv-page">${p.name}</div>` }));
+setKv(DRAFT, SERVER);
+setKv(RENDERED, { css: '', pages: [{ slug: '/', html: 'home' }, { slug: '/about', html: 'about' }] });
+await publish({ state: stale, rendered: { css: '', pages: oldBundle(stale) } });
+eq('an old tab’s Publish doesn’t put a draft page on the website', [slugs(kv(RENDERED).pages), isDraft(kv(DRAFT), 'new')], [['/', '/about', '/blog/live'], true]);
+const cleared = clone(stale);
+for (const p of cleared.pages) delete p._draft;
+await kit.call(saveRoute, '/api/cms', { body: { key: DRAFT, value: JSON.stringify(cleared) } });
+await publish({ state: clone(SERVER), rendered: { css: '', pages: clientRendered(SERVER) }, publishPageId: 'home' });
+eq('…so a later Publish of another page doesn’t keep it there by its address either', [slugs(kv(RENDERED).pages).includes('/half-built'), isDraft(kv(DRAFT), 'new')], [false, true]);
+setKv(DRAFT, SERVER);
+setKv(RENDERED, { css: '', pages: [{ slug: '/', html: 'home' }, { slug: '/half-built', html: 'live' }] });
+await publish({ state: stale, rendered: { css: '', pages: oldBundle(stale) } });
+eq('…but a page already on the website (by its address) stays there', [slugs(kv(RENDERED).pages).includes('/half-built'), isDraft(kv(DRAFT), 'new')], [true, false]);
 
 // The menu's own Publish (state, no rendered pages) and the old no-body publish.
 setKv(DRAFT, SERVER);
