@@ -222,6 +222,9 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
                         }}
                         placeholder="Start typing your house number and postcode"
                         autoComplete="off"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
                         role="combobox"
                         aria-expanded={sugs.length > 0 && !pickedId}
                         aria-controls="est-sugs"
