@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
 import { sendToTrade } from '@/lib/site/send';
-import { notReady, readAssignment, siteReady, siteTabData, type ContactRow } from '@/lib/site/server';
+import { blockedFirmProblem, notReady, readAssignment, siteReady, siteTabData, type ContactRow } from '@/lib/site/server';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -31,6 +31,9 @@ export async function POST(req: Request, { params }: Ctx) {
   if (a.status === 'cancelled') return json({ error: 'This trade was taken off the job.' }, 409);
   const { data: c } = await db.from('site_contacts').select('*').eq('id', a.contact_id).maybeSingle();
   if (!c) return json({ error: 'That person isn’t there any more.' }, 404);
+  // Not with them yet and their firm has been suspended or terminated since: it would be a new job.
+  const blocked = await blockedFirmProblem(db, a, c as ContactRow);
+  if (blocked) return json({ error: blocked }, 422);
   try {
     const r = await sendToTrade(db, a, c as ContactRow, {
       kind,

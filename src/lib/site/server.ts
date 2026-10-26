@@ -360,6 +360,9 @@ export type NewAssignment = Record<string, unknown> & {
   forms?: unknown;
 };
 
+/** What the office is told when a suspended or terminated firm would be given a job. */
+const noNewJobs = (firm: FirmRow) => `${firm.company_name} is ${firm.status}, so they can’t be given new jobs.`;
+
 /**
  * Put trades on a job. Each gets its person (made first when it's a firm picked for the first time,
  * or a new quick contact), the agreed rate and basis, the VAT (refused when it can't be right: VAT
@@ -408,7 +411,7 @@ export async function createAssignments(
       fresh = { ...c.fields, trades: [clean.fields.trade] };
     } else return { ok: false, status: 400, error: `${at}Choose who’s doing it.` };
     // Picked as the firm or as one of its people: a suspended or terminated firm gets no new jobs.
-    if (firm && firmBlockedWords(firm.status)) return { ok: false, status: 422, error: `${at}${firm.company_name} is ${firm.status}, so they can’t be given new jobs.` };
+    if (firm && firmBlockedWords(firm.status)) return { ok: false, status: 422, error: at + noNewJobs(firm) };
     const facts = moneyFacts(
       contact ?? { vat_number: (fresh?.vat_number as string | null) ?? null, cis_rate: null, cis_verified_on: null },
       firm
@@ -458,6 +461,20 @@ export async function createAssignments(
     await logSiteEvent(db, data.id as string, byId ?? 'system', 'created', { trade: data.trade });
   }
   return { ok: true, ids };
+}
+
+/**
+ * Why nothing can be sent to this trade, or null: their firm was suspended or terminated after they
+ * were put on the job, and nothing has reached them yet (it's not sent, or it is but no message went
+ * and they haven't opened it), so sending would give them a new job. Once something has, the job
+ * carries on as it is. The send and Send again routes ask before anything goes.
+ */
+export async function blockedFirmProblem(db: Db, a: AssignmentRow, c: Pick<ContactRow, 'subcontractor_id'>): Promise<string | null> {
+  if (!c.subcontractor_id || (a.status !== 'draft' && a.status !== 'sent')) return null;
+  const firm = (await firmsById(db, [c.subcontractor_id])).get(c.subcontractor_id);
+  if (!firm || !firmBlockedWords(firm.status)) return null;
+  const { data: went } = await db.from('site_messages').select('id').eq('assignment_id', a.id).eq('status', 'sent').limit(1);
+  return went?.length ? null : noNewJobs(firm);
 }
 
 /* ── The Site tab ────────────────────────────────────────────────────────────── */

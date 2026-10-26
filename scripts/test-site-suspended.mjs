@@ -2,7 +2,10 @@
 // src/lib/site/server.ts, the picker in src/app/admin/crm/[id]/SitePeople.tsx): picked as the firm or as
 // one of its people (its main site contact or an operative), the Site tab and New project are refused with
 // a clear message; the picker leaves out a terminated firm's people and marks a suspended firm's as
-// "Suspended: can't be given new jobs". Active firms, and firms still onboarding, are unchanged.
+// "Suspended: can't be given new jobs". Active firms, and firms still onboarding, are unchanged. A trade
+// put on a job before its firm was suspended or terminated, that nothing has reached yet, can't be sent
+// (Send the job pack, Copy link, a new link) nor sent again (Send again on a message that didn't go), with
+// the same message; once something has reached them (a message went, or they opened it) it carries on.
 // Usage: node --experimental-strip-types scripts/test-site-suspended.mjs
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -12,6 +15,8 @@ const db = kit.setup();
 const { eq } = kit;
 const SV = await import('../src/lib/site/server.ts');
 const { firmBlockedWords } = await import('../src/lib/site/types.ts');
+const sendRoute = await import('../src/app/api/crm/site-assignments/[id]/send/route.ts');
+const resendRoute = await import('../src/app/api/crm/site-assignments/[id]/resend/route.ts');
 db.t.cms_kv = [{ key: 'site-settings', value: '{}' }];
 
 const project = kit.addJob(db);
@@ -59,5 +64,68 @@ eq('…active and onboarding firms as before', [row(active.contact_name)?.firm_s
 eq('the words the picker shows', [firmBlockedWords('suspended'), firmBlockedWords('terminated'), firmBlockedWords('active'), firmBlockedWords('awaiting_countersign'), firmBlockedWords(null)], ['Suspended: can’t be given new jobs', 'Terminated: can’t be given new jobs', null, null, null]);
 const picker = readFileSync(new URL('../src/app/admin/crm/[id]/SitePeople.tsx', import.meta.url), 'utf8');
 eq('the picker can’t pick a suspended firm’s people, and says why', [/disabled=\{!!firmBlockedWords\(r\.firm_status\)\}/.test(picker), (picker.match(/firmBlockedWords\(r\.firm_status\)/g) ?? []).length >= 3], [true, true]);
+
+/* ── A trade put on the job while the firm was in good standing ────────────── */
+
+// Added while active (Not sent: the table's default), so the firm hasn't heard of the job yet.
+const addedWhileActive = async (company) => {
+  const f = firm(company, 'active');
+  const c = kit.addContact(db, { subcontractor_id: f.id, name: f.contact_name, company: f.company_name });
+  const r = await assign({ contact_id: c.id });
+  const a = db.rows('site_assignments').find((x) => x.id === r.ids[0]);
+  a.status = 'draft';
+  return { f, a };
+};
+const sendTo = (a, body) => kit.call(sendRoute, `/api/crm/site-assignments/${a.id}/send`, { params: { id: a.id }, body });
+const resendTo = (a, id) => kit.call(resendRoute, `/api/crm/site-assignments/${a.id}/resend`, { params: { id: a.id }, body: { message_id: id } });
+const msgsOf = (a) => db.rows('site_messages').filter((m) => m.assignment_id === a.id);
+const went = () => globalThis.__rec.email.length + globalThis.__rec.whatsapp.length;
+
+for (const [company, label] of [['Paused Roofing', 'suspended'], ['Ended Roofing', 'terminated']]) {
+  const { f, a } = await addedWhileActive(company);
+  f.status = label;
+  const was = went();
+  const pack = await sendTo(a, { via: 'both' });
+  const link = await sendTo(a, { via: 'link' });
+  const hold = await sendTo(a, { via: 'both', kind: 'scaffold_hold' });
+  const said = `${f.company_name} is ${label}, so they can’t be given new jobs.`;
+  eq(`a Not sent trade whose firm is now ${label}: Send the job pack is refused, as when adding them`, [pack.status, pack.body.error], [422, said]);
+  eq('…and so are Copy link and any other message (each would give them the job)', [link.status, link.body.error, hold.status], [422, said, 422]);
+  eq('…nothing went, and the trade is still Not sent with no link', [went() - was, msgsOf(a).length, a.status, a.link_hash ?? null], [0, 0, 'draft', null]);
+  if (label !== 'suspended') continue;
+  f.status = 'active';
+  const back = await sendTo(a, { via: 'both' });
+  eq('…reinstated, it sends as before', [back.status, a.status, back.body.messages.map((m) => m.status)], [200, 'sent', ['sent', 'sent']]);
+}
+
+// Sent while active, but nothing reached them (both channels failed), then suspended.
+const missed = await addedWhileActive('Missed Roofing');
+globalThis.__fail.email = globalThis.__fail.whatsapp = true;
+const first = await sendTo(missed.a, { via: 'both' });
+globalThis.__fail.email = globalThis.__fail.whatsapp = false;
+eq('sent while active, but neither the email nor the WhatsApp went', [first.status, missed.a.status, msgsOf(missed.a).map((m) => m.status)], [200, 'sent', ['failed', 'failed']]);
+missed.f.status = 'suspended';
+const was = went();
+const again = await resendTo(missed.a, msgsOf(missed.a).find((m) => m.channel === 'email').id);
+const packAgain = await sendTo(missed.a, { via: 'both' });
+const newLink = await sendTo(missed.a, { via: 'link', rotate: true });
+eq('…Send again is refused once the firm is suspended: the job would still be new to them', [again.status, again.body.error], [422, 'Missed Roofing is suspended, so they can’t be given new jobs.']);
+eq('…and so are Send the job pack again and a new link', [packAgain.status, packAgain.body.error, newLink.status, newLink.body.error], [422, 'Missed Roofing is suspended, so they can’t be given new jobs.', 422, 'Missed Roofing is suspended, so they can’t be given new jobs.']);
+eq('…nothing went, and the messages are still the failed ones', [went() - was, msgsOf(missed.a).map((m) => m.status), missed.a.link_generation], [0, ['failed', 'failed'], 1]);
+
+// Already with them: the WhatsApp went and only the email failed, or they opened it. The job carries on.
+const half = await addedWhileActive('Half Roofing');
+globalThis.__fail.email = true;
+await sendTo(half.a, { via: 'both' });
+globalThis.__fail.email = false;
+half.f.status = 'suspended';
+const halfAgain = await resendTo(half.a, msgsOf(half.a).find((m) => m.channel === 'email').id);
+eq('a suspended firm whose WhatsApp went: the failed email can still be sent again (they’re on the job)', [halfAgain.status, halfAgain.body.message?.status], [200, 'sent']);
+const opened = await addedWhileActive('Opened Roofing');
+await sendTo(opened.a, { via: 'link' });
+opened.a.status = 'opened';
+opened.f.status = 'suspended';
+const openedAgain = await sendTo(opened.a, { via: 'both' });
+eq('…and one that opened their link can still be sent the job pack', [openedAgain.status, openedAgain.body.messages?.map((m) => m.status)], [200, ['sent', 'sent']]);
 
 kit.done();
