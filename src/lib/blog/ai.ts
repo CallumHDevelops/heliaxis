@@ -99,6 +99,9 @@ function extractJson(text: string): unknown {
   throw new Error('AI returned unparseable JSON');
 }
 
+/** The start of a reply, for the server log, when it is not the JSON we asked for. */
+const peek = (t: string) => String(t || '').replace(/\s+/g, ' ').slice(0, 160);
+
 function normalizeSlug(slug: string): string {
   return String(slug || '')
     .trim()
@@ -145,7 +148,7 @@ export async function generateBlogPost(prompt: string): Promise<GeneratedPost> {
   if (!candidates.includes('openai/gpt-4o-mini')) candidates.push('openai/gpt-4o-mini');
   const CREDITS_MSG =
     'AI credits are low on OpenRouter — top up at https://openrouter.ai/settings/credits, then try again.';
-  const callChat = (model: string, maxTokens: number) =>
+  const callChat = (model: string, maxTokens: number, repair = false, jsonMode = true) =>
     fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -156,42 +159,85 @@ export async function generateBlogPost(prompt: string): Promise<GeneratedPost> {
       },
       body: JSON.stringify({
         model,
-        temperature: 0.7,
+        temperature: repair ? 0.2 : 0.7,
         max_tokens: maxTokens,
+        // Ask the provider for a JSON object, so a long custom prompt cannot turn the reply into prose.
+        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
         messages: [
           { role: 'system', content: SYSTEM },
-          { role: 'user', content: userMessage },
+          {
+            role: 'user',
+            content: repair
+              ? `${userMessage}\n\nIMPORTANT: reply with ONE valid JSON object only, in the exact shape from the system message. No markdown, no commentary, nothing before or after the JSON. Keep the article within the length limits so the JSON is complete.`
+              : userMessage,
+          },
         ],
       }),
     });
 
   let content: string | undefined;
+  let finish: string | undefined;
   let lastErr = '';
-  for (const model of candidates) {
-    let res = await callChat(model, 6000);
+  let usedModel = primary;
+  const attempt = async (model: string, repair: boolean): Promise<{ text?: string; finish?: string; err?: string; fatal?: string }> => {
+    let res = await callChat(model, 6000, repair);
+    if (res.status === 400) {
+      // Some models do not accept JSON mode: ask again without it.
+      const errText = await res.text().catch(() => '');
+      if (/response_format|json_object|json mode/i.test(errText)) res = await callChat(model, 6000, repair, false);
+      else return { err: `400: ${errText.slice(0, 200)}`, fatal: `AI request failed (400: ${errText.slice(0, 200)})` };
+    }
     if (res.status === 402) {
       const errText = await res.text().catch(() => '');
       const afford = parseInt((errText.match(/afford\s+(\d+)/i) || [])[1] || '0', 10);
-      if (afford >= 900) res = await callChat(model, Math.max(900, afford - 96));
-      else throw new Error(CREDITS_MSG);
+      // A long article needs about 3,500 tokens: with less than that the JSON is cut off, so stop and say so.
+      if (afford >= 3500) res = await callChat(model, Math.max(900, afford - 96), repair);
+      else return { fatal: CREDITS_MSG };
     }
     if (res.ok) {
-      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      content = data.choices?.[0]?.message?.content;
-      if (content) break;
-      lastErr = 'empty response';
-      continue;
+      const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+      const text = data.choices?.[0]?.message?.content;
+      return text ? { text, finish: data.choices?.[0]?.finish_reason } : { err: 'empty response' };
     }
     const errText = await res.text().catch(() => '');
-    lastErr = `${res.status}: ${errText.slice(0, 200)}`;
-    if (res.status === 402) throw new Error(CREDITS_MSG);
-    const modelUnavailable =
-      res.status === 404 || /no endpoints|not a valid model|model_not_found|does not exist/i.test(errText);
-    if (!modelUnavailable) throw new Error(`AI request failed (${lastErr})`);
+    const err = `${res.status}: ${errText.slice(0, 200)}`;
+    if (res.status === 402) return { fatal: CREDITS_MSG };
+    const modelUnavailable = res.status === 404 || /no endpoints|not a valid model|model_not_found|does not exist/i.test(errText);
+    return modelUnavailable ? { err } : { err, fatal: `AI request failed (${err})` };
+  };
+  for (const model of candidates) {
+    const r = await attempt(model, false);
+    if (r.fatal) throw new Error(r.fatal);
+    if (r.text) {
+      content = r.text;
+      finish = r.finish;
+      usedModel = model;
+      break;
+    }
+    lastErr = r.err || 'no reply';
   }
   if (!content) throw new Error(`AI request failed (${lastErr || 'no usable model'})`);
 
-  const parsed = extractJson(content) as Record<string, unknown>;
+  // The reply must be one complete JSON object. If it is prose, or was cut off at the length limit, ask once more, strictly.
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    if (finish !== 'length') parsed = extractJson(content) as Record<string, unknown>;
+  } catch {
+    parsed = null;
+  }
+  if (!parsed) {
+    console.error('Blog AI: first reply was not usable JSON', { model: usedModel, finish, start: peek(content) });
+    const again = await attempt(usedModel, true);
+    if (again.fatal) throw new Error(again.fatal);
+    if (!again.text) throw new Error('AI returned unparseable JSON (no second reply). Try a shorter topic, or try again.');
+    try {
+      if (again.finish === 'length') throw new Error('cut off');
+      parsed = extractJson(again.text) as Record<string, unknown>;
+    } catch {
+      console.error('Blog AI: second reply was not usable JSON', { model: usedModel, finish: again.finish, start: peek(again.text) });
+      throw new Error(again.finish === 'length' ? 'The article was cut off before it finished. Try a narrower topic, or try again.' : 'AI returned unparseable JSON. Try a shorter, simpler topic, or try again.');
+    }
+  }
   if (parsed && typeof parsed.slug === 'string') {
     parsed.slug = normalizeSlug(parsed.slug);
   }
