@@ -3,7 +3,7 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import { requirePortal } from '@/lib/auth';
 import { schemaReady } from '@/lib/schema-ready';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { cleanContent, totalsOf } from '@/lib/quotes/types';
+import { cleanContent, profitOf, totalsOf } from '@/lib/quotes/types';
 import { QuotesList, type QuoteListRow } from './QuotesList';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +28,7 @@ export default async function QuotesPage() {
       customer: name.get(q.enquiry_id as string) ?? 'Customer',
       project_id: q.project_id as string,
       total: totalsOf(cleanContent(q.content)).gross,
+      profit: profitOf(cleanContent(q.content)),
       updated_at: q.updated_at as string,
     }));
   }

@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { money } from '@/lib/quotes/types';
+import { money, pct, type Profit } from '@/lib/quotes/types';
 import '../../crm/crm.css';
 import './quotes.css';
 
-export type QuoteListRow = { id: string; number: string; title: string; status: string; customer: string; project_id: string; total: number; updated_at: string };
+export type QuoteListRow = { id: string; number: string; title: string; status: string; customer: string; project_id: string; total: number; profit: Profit; updated_at: string };
 type Found = { id: string; name: string; email: string | null; postcode: string | null; customer_ref: string | null; projects: number };
 
 const STATUS: Record<string, string> = { draft: 'Draft', sent: 'Sent', accepted: 'Accepted', declined: 'Declined', expired: 'Expired' };
@@ -61,6 +61,7 @@ export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteL
   const rows = initial.filter((r) => filter === 'all' || r.status === filter);
   const open = initial.filter((r) => r.status === 'sent');
   const openValue = open.reduce((n, r) => n + r.total, 0);
+  const openProfit = open.reduce((n, r) => n + r.profit.profit, 0);
   return (
     <div className="crm crmh qb-page">
       <div className="crmh-head">
@@ -68,7 +69,7 @@ export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteL
           <h1 className="crmh-h1">Quotes</h1>
           {open.length > 0 && (
             <span className="crmh-sum">
-              {open.length} waiting for a signature · {money(openValue)}
+              {open.length} waiting for a signature · {money(openValue)} · {money(openProfit)} profit
             </span>
           )}
         </div>
@@ -120,6 +121,7 @@ export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteL
             <span>Customer</span>
             <span>Status</span>
             <span className="qb-total">Total</span>
+            <span className="qb-total">Profit (internal)</span>
             <span>Updated</span>
           </div>
           {rows.map((r) => (
@@ -133,6 +135,16 @@ export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteL
                 <span className={`qb-status qb-status--${r.status}`}>{STATUS[r.status] ?? r.status}</span>
               </span>
               <span className="qb-total">{r.total ? money(r.total) : '–'}</span>
+              <span className={`qb-total qb-pf${r.profit.profit < 0 ? ' neg' : ''}`}>
+                {r.profit.cost > 0 ? (
+                  <>
+                    {money(r.profit.profit)}
+                    <small>{pct(r.profit.marginPct)} margin</small>
+                  </>
+                ) : (
+                  <small>no costs yet</small>
+                )}
+              </span>
               <small className="qb-when">{new Date(r.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</small>
             </Link>
           ))}

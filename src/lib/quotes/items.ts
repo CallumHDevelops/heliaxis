@@ -1,22 +1,29 @@
 import 'server-only';
 import { parseKv, toKv } from '@/lib/kv-json';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { newId, VAT_RATES } from './types';
+import { newId, sellUnit, VAT_RATES, type PriceMode } from './types';
 
 /** Saved items: products and services you quote often, kept so a line is one click. Stored in cms_kv, no SQL needed. */
-export type SavedItem = { id: string; description: string; detail: string; unit_pence: number; vat_rate: number };
+export type SavedItem = { id: string; description: string; detail: string; unit_pence: number; vat_rate: number; cost_pence: number; mode: PriceMode; markup: number };
 const KEY = 'quote-items';
 
 const clean = (v: unknown): SavedItem[] =>
   (Array.isArray(v) ? v : [])
     .slice(0, 300)
-    .map((x: Record<string, unknown>) => ({
-      id: String(x.id || '').slice(0, 24) || newId(),
-      description: String(x.description || '').trim().slice(0, 300),
-      detail: String(x.detail || '').trim().slice(0, 600),
-      unit_pence: Math.max(-100_000_000, Math.min(1_000_000_000, Math.round(Number(x.unit_pence) || 0))),
-      vat_rate: (VAT_RATES as readonly number[]).includes(Number(x.vat_rate)) ? Number(x.vat_rate) : 0,
-    }))
+    .map((x: Record<string, unknown>) => {
+      const mode: PriceMode = x.mode === 'pct' || x.mode === 'gbp' || x.mode === 'manual' ? x.mode : 'manual';
+      const base = {
+        id: String(x.id || '').slice(0, 24) || newId(),
+        description: String(x.description || '').trim().slice(0, 300),
+        detail: String(x.detail || '').trim().slice(0, 600),
+        unit_pence: Math.max(-100_000_000, Math.min(1_000_000_000, Math.round(Number(x.unit_pence) || 0))),
+        vat_rate: (VAT_RATES as readonly number[]).includes(Number(x.vat_rate)) ? Number(x.vat_rate) : 0,
+        cost_pence: Math.max(0, Math.min(1_000_000_000, Math.round(Number(x.cost_pence) || 0))),
+        mode,
+        markup: Math.max(-100, Math.min(1_000_000_000, Number(x.markup) || 0)),
+      };
+      return { ...base, unit_pence: sellUnit(base) };
+    })
     .filter((x) => x.description);
 
 export async function readSavedItems(): Promise<SavedItem[]> {

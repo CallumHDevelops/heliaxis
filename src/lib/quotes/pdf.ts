@@ -51,7 +51,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
       kit.section(b.heading || 'Details');
       for (const p of paragraphs(b.body)) kit.paragraph(p);
     } else if (b.type === 'items') {
-      const lines = b.lines.filter((l) => l.description.trim() || l.unit_pence);
+      const lines = b.lines.filter((l) => !l.internal && (l.description.trim() || l.unit_pence));
       if (!lines.length) continue;
       kit.section(b.heading || 'Price');
       kit.grid({

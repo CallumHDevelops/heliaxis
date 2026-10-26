@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import '../../../crm/crm.css';
 import '../quotes.css';
 import type { SavedItem } from '@/lib/quotes/items';
-import { emptyLine, money, newId, penceFromText, textFromPence, totalsOf, VAT_RATES, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
+import { emptyLine, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
 type Channel = { ok: true; to?: string; via?: string } | { ok: false; error: string };
@@ -28,6 +28,27 @@ async function shrink(file: File): Promise<File> {
   const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/jpeg', 0.82));
   if (!blob) throw new Error('Couldn’t read that picture.');
   return new File([blob], 'picture.jpg', { type: 'image/jpeg' });
+}
+
+/** A pounds box: what is typed is kept as typed while it has focus, and tidied when you leave it. */
+function MoneyInput({ pence, onChange, label, disabled, placeholder }: { pence: number; onChange: (p: number) => void; label: string; disabled?: boolean; placeholder?: string }) {
+  // While it has focus the box shows exactly what was typed; otherwise it shows the saved amount.
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      className="crm-input"
+      inputMode="decimal"
+      aria-label={label}
+      placeholder={placeholder}
+      disabled={disabled}
+      value={draft ?? textFromPence(pence)}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        onChange(penceFromText(e.target.value));
+      }}
+      onBlur={() => setDraft(null)}
+    />
+  );
 }
 
 export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls, savedItems: savedIn }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string>; savedItems: SavedItem[] }) {
@@ -75,6 +96,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   }, [title, content, validUntil, deposit, save]);
 
   const totals = totalsOf(content);
+  const prof = profitOf(content);
   const edit = (fn: (c: QuoteContent) => QuoteContent) => setContent((c) => fn(c));
   const setBlock = (id: string, patch: Partial<QuoteBlock>) => edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === id ? ({ ...b, ...patch } as QuoteBlock) : b)) }));
   const move = (id: string, d: -1 | 1) =>
@@ -102,7 +124,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
       ],
     }));
   const setLine = (bid: string, lid: string, patch: Partial<QuoteLine>) =>
-    edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === bid && b.type === 'items' ? { ...b, lines: b.lines.map((l) => (l.id === lid ? { ...l, ...patch } : l)) } : b)) }));
+    edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === bid && b.type === 'items' ? { ...b, lines: b.lines.map((l) => (l.id === lid ? priced({ ...l, ...patch }) : l)) } : b)) }));
 
   async function upload(bid: string, files: FileList | null) {
     if (!files?.length) return;
@@ -158,7 +180,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   }
   const saveLineAsItem = (l: QuoteLine) => {
     if (!l.description.trim()) return setErr('Give the line a description first.');
-    void putSaved([...saved, { id: newId(), description: l.description, detail: l.detail ?? '', unit_pence: l.unit_pence, vat_rate: l.vat_rate }]);
+    void putSaved([...saved, { id: newId(), description: l.description, detail: l.detail ?? '', unit_pence: l.unit_pence, vat_rate: l.vat_rate, cost_pence: l.cost_pence, mode: l.mode, markup: l.markup }]);
   };
 
   async function preview() {
@@ -322,40 +344,69 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                     <div className="qb-line qb-line--head">
                       <span>Item</span>
                       <span>Qty</span>
-                      <span>Unit price £</span>
+                      <span>Cost £ each</span>
+                      <span>Pricing</span>
+                      <span>Markup / price</span>
                       <span>VAT</span>
-                      <span>Total</span>
+                      <span>Sell total</span>
                       <span />
                     </div>
-                    {b.lines.map((l) => (
-                      <div key={l.id} className="qb-line">
-                        <div>
-                          <input className="crm-input" placeholder="e.g. 12 × 450W solar panels" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} />
-                          <input className="crm-input qb-detail" placeholder="Optional detail" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} />
-                          {l.description.trim() && !saved.some((x) => x.description === l.description && x.unit_pence === l.unit_pence) && (
-                            <button type="button" className="crm-link qb-saveitem" disabled={locked} onClick={() => saveLineAsItem(l)}>
-                              Save as a saved item
-                            </button>
-                          )}
+                    {b.lines.map((l) => {
+                      const profit = lineProfit(l);
+                      const sell = lineNet(l);
+                      return (
+                        <div key={l.id} className={`qb-line${l.internal ? ' is-internal' : ''}`}>
+                          <div className="qb-desc">
+                            <input className="crm-input" placeholder="e.g. 12 × 450W solar panels" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} aria-label="Description" />
+                            <input className="crm-input qb-detail" placeholder="Optional detail" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} aria-label="Detail" />
+                            <div className="qb-linemeta">
+                              <label className="crm-check qb-internal">
+                                <input type="checkbox" checked={!!l.internal} disabled={locked} onChange={(e) => setLine(b.id, l.id, { internal: e.target.checked })} /> Not on the quote (our cost only)
+                              </label>
+                              {(l.cost_pence > 0 || sell > 0) && !l.internal && (
+                                <span className={`qb-profit${profit < 0 ? ' neg' : ''}`} title="Profit on this line (internal)">
+                                  Profit {money(profit)}{sell > 0 ? ` · ${pct((profit / sell) * 100)}` : ''}
+                                </span>
+                              )}
+                              {l.description.trim() && !saved.some((x) => x.description === l.description && x.unit_pence === l.unit_pence && x.cost_pence === l.cost_pence) && (
+                                <button type="button" className="crm-link qb-saveitem" disabled={locked} onClick={() => saveLineAsItem(l)}>
+                                  Save as a saved item
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <input className="crm-input" inputMode="decimal" value={String(l.qty)} onChange={(e) => setLine(b.id, l.id, { qty: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} disabled={locked} aria-label="Quantity" />
+                          <MoneyInput pence={l.cost_pence} onChange={(p) => setLine(b.id, l.id, { cost_pence: p })} label="Cost each in pounds (not shown to the customer)" disabled={locked} placeholder="Cost" />
+                          <select className="crm-input" value={l.mode} disabled={locked} aria-label="How this line is priced" onChange={(e) => setLine(b.id, l.id, { mode: e.target.value as PriceMode })}>
+                            <option value="pct">Markup %</option>
+                            <option value="gbp">Markup £</option>
+                            <option value="manual">Manual</option>
+                          </select>
+                          <div className="qb-val">
+                            {l.mode === 'pct' && (
+                              <input className="crm-input" inputMode="decimal" aria-label="Markup percent" placeholder="%" disabled={locked} value={l.markup ? String(l.markup) : ''} onChange={(e) => setLine(b.id, l.id, { markup: Number(e.target.value.replace(/[^0-9.-]/g, '')) || 0 })} />
+                            )}
+                            {l.mode === 'gbp' && <MoneyInput pence={l.markup} onChange={(p) => setLine(b.id, l.id, { markup: p })} label="Markup in pounds each" disabled={locked} placeholder="£ each" />}
+                            {l.mode === 'manual' && <MoneyInput pence={l.unit_pence} onChange={(p) => setLine(b.id, l.id, { unit_pence: p })} label="Sell price each in pounds" disabled={locked} placeholder="Sell £ each" />}
+                            {l.mode !== 'manual' && <small className="qb-sellunit">Sells at {money(l.unit_pence)} each</small>}
+                          </div>
+                          <select className="crm-input" value={l.vat_rate} onChange={(e) => setLine(b.id, l.id, { vat_rate: Number(e.target.value) })} disabled={locked} aria-label="VAT rate">
+                            {VAT_RATES.map((r) => (
+                              <option key={r} value={r}>
+                                {r}%
+                              </option>
+                            ))}
+                          </select>
+                          <span className="qb-amt">{l.internal ? '–' : money(sell)}</span>
+                          <button type="button" className="qb-icon" aria-label="Remove line" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: x.lines.filter((y) => y.id !== l.id) } : x)) }))}>
+                            ✕
+                          </button>
                         </div>
-                        <input className="crm-input" inputMode="decimal" value={String(l.qty)} onChange={(e) => setLine(b.id, l.id, { qty: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} disabled={locked} aria-label="Quantity" />
-                        <input className="crm-input" inputMode="decimal" defaultValue={textFromPence(l.unit_pence)} key={`${l.id}-${l.unit_pence === 0}`} onBlur={(e) => setLine(b.id, l.id, { unit_pence: penceFromText(e.target.value) })} disabled={locked} aria-label="Unit price in pounds" />
-                        <select className="crm-input" value={l.vat_rate} onChange={(e) => setLine(b.id, l.id, { vat_rate: Number(e.target.value) })} disabled={locked} aria-label="VAT rate">
-                          {VAT_RATES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}%
-                            </option>
-                          ))}
-                        </select>
-                        <span className="qb-amt">{money(Math.round(l.qty * l.unit_pence))}</span>
-                        <button type="button" className="qb-icon" aria-label="Remove line" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: x.lines.filter((y) => y.id !== l.id) } : x)) }))}>
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="qb-addrow">
-                    <button type="button" className="crm-link" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines, emptyLine()] } : x)) }))}>
+                    <button type="button" className="crm-link" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines, emptyLine(x.lines.at(-1))] } : x)) }))}>
                       + Add a line
                     </button>
                     {saved.length > 0 && (
@@ -366,7 +417,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                         aria-label="Add a saved item"
                         onChange={(e) => {
                           const it = saved.find((x) => x.id === e.target.value);
-                          if (it) edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines.filter((l) => l.description.trim() || l.unit_pence), { id: newId(), description: it.description, detail: it.detail || undefined, qty: 1, unit_pence: it.unit_pence, vat_rate: it.vat_rate }] } : x)) }));
+                          if (it) edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines.filter((l) => l.description.trim() || l.unit_pence), priced({ id: newId(), description: it.description, detail: it.detail || undefined, qty: 1, unit_pence: it.unit_pence, vat_rate: it.vat_rate, cost_pence: it.cost_pence, mode: it.mode, markup: it.markup })] } : x)) }));
                         }}
                       >
                         <option value="">+ Add a saved item…</option>
@@ -378,7 +429,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                       </select>
                     )}
                   </div>
-                  <p className="crm-muted crm-small">A discount is a line with a minus price, e.g. -500.</p>
+                  <p className="crm-muted crm-small">Your cost and markup are for you only: the customer sees just the sell price. A discount is a manual-price line with a minus price, e.g. -500.</p>
                 </>
               )}
 
@@ -483,6 +534,31 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
             <input className="crm-input" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} disabled={locked} placeholder="e.g. 500" />
             <label className="qb-lab">Valid until</label>
             <input className="crm-input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} disabled={locked} />
+          </section>
+          <section className="qb-card qb-profitcard" aria-label="Profit, for us only">
+            <b>Profit <span className="qb-internal-tag">internal</span></b>
+            <div className="qb-sum">
+              <span>Sell before VAT</span>
+              <span>{money(prof.sell)}</span>
+            </div>
+            <div className="qb-sum">
+              <span>Our cost</span>
+              <span>{money(prof.cost)}</span>
+            </div>
+            <div className={`qb-sum qb-sum--total${prof.profit < 0 ? ' neg' : ' pos'}`}>
+              <span>Profit</span>
+              <span>{money(prof.profit)}</span>
+            </div>
+            <div className="qb-sum">
+              <span>Margin</span>
+              <span>{pct(prof.marginPct)}</span>
+            </div>
+            <div className="qb-sum">
+              <span>Markup on cost</span>
+              <span>{pct(prof.markupPct)}</span>
+            </div>
+            {prof.uncosted > 0 && <p className="crm-small qb-warn">{prof.uncosted} priced line{prof.uncosted === 1 ? ' has' : 's have'} no cost yet, so the profit shown is too high.</p>}
+            <p className="crm-small crm-muted">Never printed on the quote or shown in the customer’s portal. VAT is passed on, so it is not counted.</p>
           </section>
           {saved.length > 0 && (
             <section className="qb-card">

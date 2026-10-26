@@ -8,7 +8,7 @@
 
 /* The list: one card, hairline rows, like Purchase orders. */
 .qb-list { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-.qb-row { display: grid; grid-template-columns: 86px minmax(0, 1.6fr) 110px 120px 70px; gap: 4px 14px; align-items: center; min-height: 54px; padding: 9px 16px; border-top: 1px solid var(--border-soft); color: var(--text); text-decoration: none; }
+.qb-row { display: grid; grid-template-columns: 86px minmax(0, 1.6fr) 100px 110px 140px 64px; gap: 4px 14px; align-items: center; min-height: 54px; padding: 9px 16px; border-top: 1px solid var(--border-soft); color: var(--text); text-decoration: none; }
 .qb-row:first-child { border-top: 0; }
 a.qb-row:hover { background: rgb(var(--accent-rgb) / 0.07); }
 a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
@@ -71,3 +71,34 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
 .qb-savedlist { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 0.85rem; }
 .qb-savedlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
 .qb-savedlist small { color: var(--muted); }
+
+/* Cost and pricing on each line */
+.qb-line { grid-template-columns: minmax(0, 1fr) 52px 84px 112px 96px 62px 88px 30px; }
+.qb-line > * { min-width: 0; }
+.qb-line select.crm-input { padding-left: 8px; padding-right: 4px; }
+.qb-desc { display: grid; gap: 4px; min-width: 0; }
+.qb-linemeta { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: 0.78rem; }
+.qb-internal { font-size: 0.78rem; color: var(--muted); }
+.qb-profit { font-weight: 700; color: var(--ok); font-variant-numeric: tabular-nums; }
+.qb-profit.neg { color: var(--danger); }
+.qb-val { display: grid; gap: 2px; min-width: 0; }
+.qb-sellunit { color: var(--muted); font-size: 0.72rem; white-space: nowrap; }
+.qb-line.is-internal { opacity: 0.85; background: rgb(var(--fg-rgb) / 0.035); border-radius: 8px; padding: 4px; }
+.qb-profitcard { border-color: var(--accent-line); background: rgb(var(--accent-rgb) / 0.06); }
+.qb-internal-tag { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 6px; margin-left: 6px; background: var(--inverse); color: var(--inverse-accent); border-radius: 3px; }
+.qb-sum--total.pos span:last-child { color: var(--ok); }
+.qb-sum--total.neg span:last-child { color: var(--danger); }
+.qb-warn { color: var(--danger); margin: 0; }
+@media (max-width: 1100px) and (min-width: 861px) { .qb-line { grid-template-columns: minmax(0, 1fr) 50px 80px 108px 90px 60px 86px 30px; } }
+@media (max-width: 860px) {
+  .qb-line { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .qb-desc { grid-column: 1 / -1; }
+  .qb-line > :nth-child(5), .qb-line > :nth-child(6) { grid-column: span 1; }
+  .qb-amt { grid-column: span 2; text-align: left; padding-top: 0; }
+}
+
+.qb-pf { display: flex; flex-direction: column; align-items: flex-end; font-weight: 800; color: var(--ok); }
+.qb-pf.neg { color: var(--danger); }
+.qb-pf small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
+@media (max-width: 860px) { .qb-row .qb-pf, .qb-row--head span:nth-child(5) { display: none; } }
+.qb-val .crm-input, .qb-line .crm-input { padding-left: 8px; padding-right: 8px; }

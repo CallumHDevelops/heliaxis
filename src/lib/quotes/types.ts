@@ -1,6 +1,13 @@
 /** The quote builder's content and its money. Pure: safe for the server, the browser and tests. Money is whole pence. */
 
-export type QuoteLine = { id: string; description: string; detail?: string; qty: number; unit_pence: number; vat_rate: number };
+/**
+ * One priced line. `cost_pence` is what it costs us each (never shown to the customer). `mode` says how the sell price is
+ * worked out: 'pct' (cost plus `markup` per cent), 'gbp' (cost plus `markup` pence), or 'manual' (the price typed in).
+ * `unit_pence` is always the sell price each, kept up to date from the cost and markup, so the quote, the PDF and the
+ * customer's totals only ever read it. `internal` lines cost us something but are not printed on the quote.
+ */
+export type PriceMode = 'pct' | 'gbp' | 'manual';
+export type QuoteLine = { id: string; description: string; detail?: string; qty: number; unit_pence: number; vat_rate: number; cost_pence: number; mode: PriceMode; markup: number; internal?: boolean };
 export type QuoteImage = { path: string; caption: string };
 export type QuoteFile = { library_id: string; name: string };
 
@@ -18,9 +25,26 @@ export const VAT_RATES = [0, 5, 20] as const;
 
 export const newId = () => 'b' + Math.random().toString(36).slice(2, 10);
 
-export const emptyLine = (): QuoteLine => ({ id: newId(), description: '', qty: 1, unit_pence: 0, vat_rate: 0 });
+export const emptyLine = (from?: Pick<QuoteLine, 'mode' | 'markup' | 'vat_rate'>): QuoteLine => ({
+  id: newId(), description: '', qty: 1, unit_pence: 0, vat_rate: from?.vat_rate ?? 0, cost_pence: 0, mode: from?.mode ?? 'pct', markup: from?.mode === 'manual' ? 0 : (from?.markup ?? 0),
+});
 
-export const lineNet = (l: Pick<QuoteLine, 'qty' | 'unit_pence'>) => Math.round((Number(l.qty) || 0) * (Number(l.unit_pence) || 0));
+/** The sell price each, from the cost and the way this line is priced. */
+export function sellUnit(l: Pick<QuoteLine, 'mode' | 'cost_pence' | 'markup' | 'unit_pence'>): number {
+  const cost = Number(l.cost_pence) || 0;
+  const m = Number(l.markup) || 0;
+  if (l.mode === 'pct') return Math.round(cost * (1 + m / 100));
+  if (l.mode === 'gbp') return Math.round(cost + m);
+  return Math.round(Number(l.unit_pence) || 0);
+}
+/** The line with its sell price brought up to date from its cost and markup. */
+export const priced = (l: QuoteLine): QuoteLine => ({ ...l, unit_pence: sellUnit(l) });
+
+/** What the customer is charged for the line, before VAT (nothing for an internal line). */
+export const lineNet = (l: Pick<QuoteLine, 'qty' | 'unit_pence'> & { internal?: boolean }) => (l.internal ? 0 : Math.round((Number(l.qty) || 0) * (Number(l.unit_pence) || 0)));
+/** What the line costs us in total. */
+export const lineCost = (l: Pick<QuoteLine, 'qty' | 'cost_pence'>) => Math.round((Number(l.qty) || 0) * (Number(l.cost_pence) || 0));
+export const lineProfit = (l: QuoteLine) => lineNet(l) - lineCost(l);
 export const lineVat = (l: QuoteLine) => Math.round((lineNet(l) * (Number(l.vat_rate) || 0)) / 100);
 
 export type Totals = { net: number; vat: number; gross: number; byRate: { rate: number; net: number; vat: number }[] };
@@ -42,6 +66,38 @@ export function totalsOf(content: QuoteContent): Totals {
   const vat = rows.reduce((a, r) => a + r.vat, 0);
   return { net, vat, gross: net + vat, byRate: rows };
 }
+
+export type Profit = {
+  /** What we charge, before VAT (VAT is passed on, so it is not profit). */
+  sell: number;
+  cost: number;
+  profit: number;
+  /** Profit as a share of the sell price (null with nothing sold). */
+  marginPct: number | null;
+  /** Profit as a share of the cost (null with no cost). */
+  markupPct: number | null;
+  /** Priced lines with no cost entered: the profit is overstated until they have one. */
+  uncosted: number;
+};
+
+/** The job's profit, from the lines' costs. For us only: never put this in anything the customer can see. */
+export function profitOf(content: QuoteContent): Profit {
+  let sell = 0;
+  let cost = 0;
+  let uncosted = 0;
+  for (const b of content.blocks) {
+    if (b.type !== 'items') continue;
+    for (const l of b.lines) {
+      sell += lineNet(l);
+      cost += lineCost(l);
+      if (!l.internal && lineNet(l) > 0 && !(Number(l.cost_pence) > 0)) uncosted++;
+    }
+  }
+  const profit = sell - cost;
+  return { sell, cost, profit, marginPct: sell > 0 ? (profit / sell) * 100 : null, markupPct: cost > 0 ? (profit / cost) * 100 : null, uncosted };
+}
+
+export const pct = (n: number | null) => (n === null ? '–' : `${(Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '')}%`);
 
 export const money = (pence: number) => {
   const neg = pence < 0;
@@ -88,14 +144,23 @@ export function cleanContent(v: unknown): QuoteContent {
         id,
         type: 'items',
         heading,
-        lines: (Array.isArray(b.lines) ? b.lines : []).slice(0, 80).map((l: Record<string, unknown>) => ({
-          id: str(l.id, 24) || newId(),
-          description: str(l.description, 300),
-          detail: str(l.detail, 600) || undefined,
-          qty: Math.max(0, Math.min(100000, num(l.qty))),
-          unit_pence: Math.max(-100_000_000, Math.min(1_000_000_000, Math.round(num(l.unit_pence)))),
-          vat_rate: (VAT_RATES as readonly number[]).includes(num(l.vat_rate)) ? num(l.vat_rate) : 0,
-        })),
+        lines: (Array.isArray(b.lines) ? b.lines : []).slice(0, 80).map((l: Record<string, unknown>) => {
+          const mode: PriceMode = l.mode === 'pct' || l.mode === 'gbp' || l.mode === 'manual' ? l.mode : 'manual';
+          const line: QuoteLine = {
+            id: str(l.id, 24) || newId(),
+            description: str(l.description, 300),
+            detail: str(l.detail, 600) || undefined,
+            qty: Math.max(0, Math.min(100000, num(l.qty))),
+            unit_pence: Math.max(-100_000_000, Math.min(1_000_000_000, Math.round(num(l.unit_pence)))),
+            vat_rate: (VAT_RATES as readonly number[]).includes(num(l.vat_rate)) ? num(l.vat_rate) : 0,
+            cost_pence: Math.max(0, Math.min(1_000_000_000, Math.round(num(l.cost_pence)))),
+            mode,
+            markup: Math.max(-100, Math.min(1_000_000_000, num(l.markup))),
+            ...(l.internal === true ? { internal: true } : {}),
+          };
+          // The sell price is worked out here too, so what is saved and sent can never disagree with the cost and markup.
+          return priced(line);
+        }),
       });
     else if (b.type === 'images')
       blocks.push({

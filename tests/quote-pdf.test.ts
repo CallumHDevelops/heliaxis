@@ -9,9 +9,10 @@ describe('quote pdf', () => {
     const items = content.blocks[0];
     if (items.type === 'items') {
       items.lines = [
-        { id: '1', description: '12 × 450W solar panels', detail: 'All-black, 25-year product warranty', qty: 12, unit_pence: 21000, vat_rate: 0 },
-        { id: '2', description: '10 kWh battery', qty: 1, unit_pence: 450000, vat_rate: 0 },
-        { id: '3', description: 'Scaffolding', qty: 1, unit_pence: 60000, vat_rate: 20 },
+        { id: '1', description: '12 × 450W solar panels', detail: 'All-black, 25-year product warranty', qty: 12, unit_pence: 21000, vat_rate: 0, cost_pence: 15000, mode: 'manual', markup: 0 },
+        { id: '2', description: '10 kWh battery', qty: 1, unit_pence: 450000, vat_rate: 0, cost_pence: 300000, mode: 'manual', markup: 0 },
+        { id: '3', description: 'Scaffolding', qty: 1, unit_pence: 60000, vat_rate: 20, cost_pence: 40000, mode: 'manual', markup: 0 },
+        { id: '4', description: 'Internal labour (not on the quote)', qty: 1, unit_pence: 0, vat_rate: 0, cost_pence: 120000, mode: 'manual', markup: 0, internal: true },
       ];
     }
     const inc = content.blocks[1];
