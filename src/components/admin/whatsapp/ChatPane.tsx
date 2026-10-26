@@ -15,6 +15,7 @@ import { SERVICE_WINDOW_MS, windowLeft, windowOpen } from '@/lib/whatsapp/shared
 import { shownBody } from '@/lib/whatsapp/describe';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
 import type { WaTemplate } from '@/lib/whatsapp/templates-shared';
+import { emailBodyFromWhatsApp, emailSubjectFor } from '@/lib/whatsapp/email-fallback';
 import { useChatTasks } from './ChatTasks';
 import { MediaBubble } from './MediaBubble';
 import { ScheduledBubble, useSendLater } from './SendLater';
@@ -230,6 +231,9 @@ export function ChatPane({
   /** A template to go at this time instead of a typed message that would miss the free window. */
   const [tplAt, setTplAt] = useState<Date | null>(null);
   const [error, setError] = useState('');
+  // Email instead: the same words, sent from the shared mailbox when WhatsApp can't reach them.
+  const [tplAgain, setTplAgain] = useState(false);
+  const [mail, setMail] = useState<{ subject: string; text: string; busy?: boolean; err?: string; sent?: string } | null>(null);
   const key = draftKey(me, id);
   const [text, setText] = useState(() => readDraft(key));
   const [sending, setSending] = useState(false);
@@ -619,6 +623,11 @@ export function ChatPane({
                 {m.direction === 'out' && !imported && <span className={`wa-tick ${m.status}`}>{TICKS[m.status] || ''}</span>}
               </span>
               {m.error && <span className="wa-err">{m.error}</span>}
+              {m.direction === 'out' && m.status === 'failed' && enquiry.email && (
+                <button type="button" className="wsl-link" onClick={() => startMail(m.body || '')}>
+                  They may not have WhatsApp: send this by email instead
+                </button>
+              )}
               {tasks.actionsFor(m)}
             </div>
           </div>
@@ -693,10 +702,79 @@ export function ChatPane({
     </div>
   );
 
+  const startMail = (text: string) =>
+    setMail({ subject: emailSubjectFor(enquiry.name), text: emailBodyFromWhatsApp(text) });
+  async function sendMail() {
+    if (!mail) return;
+    setMail({ ...mail, busy: true, err: '' });
+    try {
+      const r = await fetch(`/api/whatsapp/conversations/${id}/email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: mail.subject, text: mail.text }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Email not sent');
+      setMail({ subject: mail.subject, text: '', sent: d.to });
+    } catch (e) {
+      setMail({ ...mail, busy: false, err: e instanceof Error ? e.message : 'Email not sent' });
+    }
+  }
+  const mailPanel = mail && (
+    <div className="wa-compose wa-compose--tpl">
+      {mail.sent ? (
+        <p className="wa-muted">
+          Email sent to <b>{mail.sent}</b> from the Heliaxis mailbox. It’s on their record, and when they reply it will be logged there too.{' '}
+          <button type="button" className="wsl-link" onClick={() => setMail(null)}>Close</button>
+        </p>
+      ) : (
+        <>
+          <p className="wa-muted">
+            Emails <b>{enquiry.email}</b> from the Heliaxis mailbox instead. A company footer is added, WhatsApp button labels are left out, and their reply is logged on their record.
+          </p>
+          <input className="wa-input" value={mail.subject} onChange={(e) => setMail({ ...mail, subject: e.target.value })} aria-label="Email subject" />
+          <textarea className="wa-input" rows={8} value={mail.text} onChange={(e) => setMail({ ...mail, text: e.target.value })} aria-label="Email message" />
+          {mail.err && <p className="wa-banner wa-banner--err">{mail.err}</p>}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" className="wa-send" disabled={mail.busy || !mail.text.trim() || !mail.subject.trim()} onClick={() => void sendMail()}>
+              {mail.busy ? 'Sending…' : 'Send email'}
+            </button>
+            <button type="button" className="wsl-link" onClick={() => setMail(null)}>Cancel</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
   const errorLine = error && <p className="wa-banner wa-banner--err">{error}</p>;
 
-  const templateBox = (
+  // Once a template has gone and they haven't replied, the picker steps aside: nothing more can be sent until they answer.
+  const lastIn = messages.filter((m) => m.direction === 'in' && m.via !== 'import').at(-1)?.created_at ?? '';
+  const tplWaiting =
+    !open &&
+    (messages.some((m) => m.direction === 'out' && m.kind === 'template' && m.status !== 'failed' && m.created_at > lastIn) ||
+      outbox.some((o) => o.template_name && o.status !== 'failed'));
+  const waitingBox = (
     <div className="wa-compose wa-compose--tpl">
+      <p className="wa-muted">
+        Template sent. WhatsApp only lets you message {enquiry.name.split(/\s+/)[0]} again once they reply, and then free chat opens for 24 hours.{' '}
+        {enquiry.email && !mail && (
+          <button type="button" className="wsl-link" onClick={() => startMail('')}>
+            Email them instead
+          </button>
+        )}{' '}
+        <button type="button" className="wsl-link" onClick={() => setTplAgain(true)}>
+          Send another template
+        </button>
+      </p>
+    </div>
+  );
+  const templateFull = (
+    <div className="wa-compose wa-compose--tpl">
+      {enquiry.email && !mail && (
+        <p className="wa-muted">
+          <button type="button" className="wsl-link" onClick={() => startMail('')}>Email {enquiry.name.split(/\s+/)[0]} instead</button>
+        </p>
+      )}
       {tplAt ? (
         <p className="wa-muted">
           A template to go at <b>{atWords(tplAt, new Date(now))}</b>: {enquiry.name.split(/\s+/)[0]}’s free window will have closed by then, so WhatsApp
@@ -752,6 +830,8 @@ export function ChatPane({
     </div>
   );
 
+  const templateBox = tplWaiting && !tplAgain ? waitingBox : templateFull;
+
   const jobLink = job && (
     <p className="wa-jobchip">
       <span>
@@ -779,6 +859,7 @@ export function ChatPane({
         </div>
         <div className="wa-pane__foot">
           {errorLine}
+          {mailPanel}
           {notice}
           {open && !tplAt ? (
             <div className="wa-pane__compose">
@@ -858,6 +939,7 @@ export function ChatPane({
       {banners}
       {thread}
       {errorLine}
+      {mailPanel}
 
       {open && !tplAt ? (
         <>
