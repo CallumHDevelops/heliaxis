@@ -291,3 +291,9 @@
 .sm-notes small {
   color: var(--muted);
 }
+
+.sm-headlinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
