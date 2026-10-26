@@ -43,6 +43,19 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
       count(admin.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'new')).then((n) => {
         if (n) out.enquiries = { n, detail: 'new' };
       }),
+    // Social monitoring: Critical and High comments nobody has dealt with yet (a missing table just gives 0).
+    keys.includes('social_monitoring') &&
+      count(
+        admin
+          .from('social_mention')
+          .select('id', { count: 'exact', head: true })
+          .in('severity', ['critical', 'high'])
+          .not('status', 'in', '(posted,dismissed)')
+          .eq('is_synthetic', false)
+          .eq('author_is_own', false)
+      ).then((n) => {
+        if (n) out.social_monitoring = { n, detail: `urgent comment${n === 1 ? '' : 's'}` };
+      }),
     keys.includes('tasks') &&
       count(
         admin.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'done').lt('due_date', todayISO())
