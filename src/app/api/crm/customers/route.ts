@@ -24,12 +24,13 @@ export async function GET(req: Request) {
   if (q.length < 2) return json({ customers: [] });
   const db = createAdminClient();
 
+  const withContacts = new URL(req.url).searchParams.get('contacts') === '1';
   const found = await findCustomers(db, q, LIMIT);
   if (found.error) return json({ error: found.error, customers: [] }, 500);
   const { refs } = found;
   const list = found.customers;
   const ids = list.map((c) => c.id);
-  if (!ids.length) return json({ customers: [] });
+  if (!ids.length) return json({ customers: withContacts ? await contactMatches(db, q, []) : [] });
   const [jobs, dupes, refRows] = await Promise.all([
     readAll<Job>(ids, async (b, from, to) => {
       const read = (cols: string) => db.from('crm_projects').select(cols).in('enquiry_id', b).order('created_at', { ascending: false }).range(from, to);
@@ -72,5 +73,24 @@ export async function GET(req: Request) {
         was: c.was ?? null,
       };
     });
-  return json({ customers });
+  return json({ customers: withContacts ? [...customers, ...(await contactMatches(db, q, customers))] : customers });
+}
+
+/**
+ * People added under CRM › Contacts who match the search and are not already one of the customers found (same
+ * mobile or email), so "+ New opportunity" can start a job for them. Their id is the contact's, flagged `contact`.
+ */
+async function contactMatches(db: ReturnType<typeof createAdminClient>, q: string, have: { phone: string | null; email: string | null }[]) {
+  try {
+    const words = q.split(/\s+/).filter((w) => w.length >= 2).slice(0, 4);
+    let query = db.from('crm_contacts').select('id, name, mobile, email, organisation_id').limit(8);
+    for (const w of words) query = query.ilike('name', `%${w.replace(/[%_,]/g, '')}%`);
+    const { data } = await query;
+    const seen = new Set(have.flatMap((h) => [h.phone?.replace(/\D/g, ''), h.email?.toLowerCase()]).filter(Boolean) as string[]);
+    return (data ?? [])
+      .filter((c) => !(c.mobile && seen.has(String(c.mobile).replace(/\D/g, ''))) && !(c.email && seen.has(String(c.email).toLowerCase())))
+      .map((c) => ({ id: c.id as string, name: c.name as string, email: (c.email as string | null) || null, phone: (c.mobile as string | null) || null, postcode: null, customer_ref: null, projects: 0, latest: null, possible_duplicate: null, was: null, contact: true }));
+  } catch {
+    return [];
+  }
 }

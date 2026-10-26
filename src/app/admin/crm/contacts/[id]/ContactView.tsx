@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PRODUCTS } from '@/lib/crm/stages';
 import { jobHref } from '@/lib/global-search';
 import { mailHref, orgTypeLabel, telHref, waMeHref, type ContactWithOrg, type OrgJob } from '@/lib/organisations/shared';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
@@ -13,7 +14,7 @@ import '../../crm.css';
 import '../../organisations/orgs.css';
 
 type Data = { contact: ContactWithOrg; jobs: OrgJob[] };
-type SheetState = 'edit' | 'link' | null;
+type SheetState = 'edit' | 'link' | 'new' | null;
 
 const PhoneIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -197,14 +198,19 @@ export function ContactView({ id, initial, canInbox }: { id: string; initial: Da
             <div className="crmh-card__h">
               <h3 id="ct-jobs-h">Jobs</h3>
               <span className="crmh-n">{data.jobs.length}</span>
-              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small crmh-ml" onClick={() => setSheet('link')}>
-                Link a job
-              </button>
+              <span className="crmh-ml org-jobbtns">
+                <button type="button" className="crm-btn crm-btn--solar crm-btn--small" onClick={() => setSheet('new')}>
+                  + New opportunity
+                </button>
+                <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setSheet('link')}>
+                  Link a job
+                </button>
+              </span>
             </div>
             {!data.jobs.length ? (
               <div className="crmh-card__b org-none">
                 <p>
-                  No jobs yet. Link one here, or from the job’s own page (its <b>Organisation and contact</b> card).
+                  No jobs yet. Press <b>+ New opportunity</b> to start one for {c.name}, or link an existing job.
                 </p>
               </div>
             ) : (
@@ -298,6 +304,11 @@ export function ContactView({ id, initial, canInbox }: { id: string; initial: Da
           />
         </Sheet>
       )}
+      {sheet === 'new' && (
+        <Sheet title={`New opportunity for ${c.name}`} onClose={() => setSheet(null)}>
+          <NewOpportunity contact={c} onCancel={() => setSheet(null)} onMade={(jobId) => router.push(`/admin/crm/${jobId}`)} />
+        </Sheet>
+      )}
       {sheet === 'link' && (
         <Sheet title={`Link a job to ${c.name}`} onClose={() => setSheet(null)} wide>
           <LinkJobToContact
@@ -365,3 +376,55 @@ function LinkJobToContact({ contact, linked, onCancel, onLinked }: { contact: Co
   );
 }
 
+
+/** Start an opportunity for this contact: what they want, and where. It opens on the new job. */
+function NewOpportunity({ contact, onCancel, onMade }: { contact: ContactWithOrg; onCancel: () => void; onMade: (jobId: string) => void }) {
+  const [products, setProducts] = useState<string[]>([]);
+  const [postcode, setPostcode] = useState('');
+  const [address, setAddress] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function make() {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/crm/contacts/${contact.id}/opportunity`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products, postcode, address }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.id) {
+      setBusy(false);
+      return setErr(d.error || 'Couldn’t create the opportunity. Try again.');
+    }
+    onMade(d.id as string);
+  }
+  return (
+    <div className="org-form">
+      <p className="crm-muted crm-small">
+        This starts a job at <b>Lead</b> for {contact.name}{contact.organisation ? ` (${contact.organisation.name})` : ''}. They are added as a customer from their name, mobile and email, so you can quote, message and book them as normal.
+      </p>
+      <label className="qb-lab">What are they interested in?</label>
+      <div className="crm-stages" role="group" aria-label="Products">
+        {PRODUCTS.map((p) => (
+          <button key={p.key} type="button" className={products.includes(p.key) ? 'on' : ''} aria-pressed={products.includes(p.key)} onClick={() => setProducts((cur) => (cur.includes(p.key) ? cur.filter((k) => k !== p.key) : [...cur, p.key]))}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <label className="qb-lab" htmlFor="no-pc">
+        Site postcode (optional)
+      </label>
+      <input id="no-pc" className="crm-input" value={postcode} onChange={(e) => setPostcode(e.target.value)} placeholder="e.g. NP15 1DG" autoComplete="off" />
+      <label className="qb-lab" htmlFor="no-addr">
+        Site address (optional)
+      </label>
+      <input id="no-addr" className="crm-input" value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="off" />
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      <div className="crm-actions">
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={() => void make()}>
+          {busy ? 'Creating…' : 'Create opportunity'}
+        </button>
+        <button type="button" className="crm-btn crm-btn--ghost" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}

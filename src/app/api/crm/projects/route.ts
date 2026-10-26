@@ -1,4 +1,5 @@
 import { after } from 'next/server';
+import { customerFromContact } from '@/lib/crm/from-contact';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { isProjectStage, PRODUCT_KEYS, PROJECT_START_STAGES, type StageKey } from '@/lib/crm/stages';
@@ -37,6 +38,14 @@ export async function POST(req: Request) {
   const delivery = isProjectStage(startStage);
 
   let enquiryId = String(b.enquiry_id || '');
+  // Someone added under Contacts: their customer record is made (or found) from their details, and the job is linked back to them.
+  let fromContact: { contactId: string; organisationId: string | null } | null = null;
+  if (!enquiryId && b.contact_id && isUuid(String(b.contact_id))) {
+    const made = await customerFromContact(db, String(b.contact_id), String(b.postcode || '').trim().toUpperCase().slice(0, 12) || null);
+    if (!made.ok) return json({ error: made.error }, made.status);
+    enquiryId = made.enquiryId;
+    fromContact = { contactId: String(b.contact_id), organisationId: made.organisationId };
+  }
   let customer: { name: string; postcode: string | null; interest: string | null } | null = null;
   // Their latest job, for the site address, and to tell a second job from their first.
   let latest: { id: string; stage: string; address: string | null; postcode: string | null } | null = null;
@@ -97,6 +106,7 @@ export async function POST(req: Request) {
       owner_id: ownerId,
       created_by: s.user.id,
       stage: startStage,
+      ...(fromContact ? { contact_id: fromContact.contactId, organisation_id: fromContact.organisationId } : {}),
     })
     .select('id')
     .single();

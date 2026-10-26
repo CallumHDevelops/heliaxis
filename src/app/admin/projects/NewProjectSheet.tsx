@@ -17,6 +17,8 @@ type Customer = {
   projects: number;
   latest: { address: string | null; postcode: string | null; products: string[] } | null;
   possible_duplicate: { name: string; project_ref: string | null } | null;
+  /** Someone added under CRM › Contacts (not yet a customer): their customer record is made when the job is. */
+  contact?: boolean;
 };
 
 const OPPORTUNITY_STARTS = [
@@ -100,6 +102,7 @@ export function NewProjectSheet({
       ...(t.assignments.length ? { assignments: t.assignments } : {}),
     };
     if (fresh) Object.assign(body, { name: person.name.trim(), phone: person.phone.trim(), email: person.email.trim(), postcode });
+    else if (customer!.contact) Object.assign(body, { contact_id: customer!.id, postcode });
     else Object.assign(body, { enquiry_id: customer!.id, postcode });
     const r = await fetch('/api/crm/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
@@ -139,7 +142,7 @@ export function NewProjectSheet({
             <b>{customer.name}</b>
             <small>
               {' '}
-              · {[customer.customer_ref, customer.postcode, customer.projects ? `${customer.projects} job${customer.projects === 1 ? '' : 's'}` : 'no jobs yet'].filter(Boolean).join(' · ')}
+              · {[customer.contact ? 'From Contacts' : customer.customer_ref, customer.postcode, customer.projects ? `${customer.projects} job${customer.projects === 1 ? '' : 's'}` : 'no jobs yet'].filter(Boolean).join(' · ')}
             </small>
           </span>
           {!preset && (
@@ -255,7 +258,7 @@ function CustomerSearch({ onPick, onNew }: { onPick: (c: Customer) => void; onNe
     const ctl = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/crm/customers?q=${encodeURIComponent(t)}`, { cache: 'no-store', signal: ctl.signal });
+        const r = await fetch(`/api/crm/customers?contacts=1&q=${encodeURIComponent(t)}`, { cache: 'no-store', signal: ctl.signal });
         const d = await r.json().catch(() => ({}));
         if (r.ok) setFound({ q: t, rows: (d.customers ?? []) as Customer[] });
       } catch {
@@ -281,7 +284,7 @@ function CustomerSearch({ onPick, onNew }: { onPick: (c: Customer) => void; onNe
                 <span>
                   <b>{c.name}</b>
                   <small>
-                    {[c.customer_ref, c.postcode, c.phone, c.projects ? `${c.projects} job${c.projects === 1 ? '' : 's'}` : 'no jobs yet'].filter(Boolean).join(' · ')}
+                    {[c.contact ? 'From Contacts' : c.customer_ref, c.postcode, c.phone, c.projects ? `${c.projects} job${c.projects === 1 ? '' : 's'}` : 'no jobs yet'].filter(Boolean).join(' · ')}
                     {c.possible_duplicate ? ' · possible duplicate' : ''}
                   </small>
                 </span>
