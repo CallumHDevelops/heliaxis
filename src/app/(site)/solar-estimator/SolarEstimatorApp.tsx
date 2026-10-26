@@ -18,6 +18,7 @@ import {
   type Who,
 } from '@/lib/estimator/calc';
 import { compassWord, type MapData, type RoofFound } from '@/lib/estimator/roof';
+import { SurveyModal } from './SurveyModal';
 import { panelPolygon, pointsAttr, toPixel, MAP_SIZE } from '@/lib/estimator/overlay';
 
 const gbp = (n: number) => '£' + Math.round(n).toLocaleString('en-GB');
@@ -159,8 +160,11 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
     if (!picker && (!needHouse || !house.trim())) return go(1);
     setLooking(true);
     try {
+      // A short minimum, so a quick answer is a smooth change of screen and not a flash.
+      const wait = new Promise((r) => setTimeout(r, 1600));
       const res = await fetch(picker ? `/api/solar/roof?id=${encodeURIComponent(pickedId)}` : `/api/solar/roof?pc=${encodeURIComponent(postcode.trim())}&line=${encodeURIComponent(house.trim())}`);
       const d = await res.json();
+      await wait;
       if (d?.found) {
         setRoofHit({ address: d.address, roof: d.roof, kwhPerKwp: d.kwhPerKwp, monthly: d.monthly, imageryDate: d.imageryDate, map: d.map ?? null });
         setRoofChoice('ask');
@@ -189,6 +193,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
       <div className="wrap est-wrap" ref={head}>
         {!done ? (
           <div className="est-card est-wiz">
+            {looking && <Finding address={picker ? query : [house, postcode].filter(Boolean).join(', ')} />}
             <div className="est-prog" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={`Question ${step + 1} of ${STEPS.length}`}>
               {STEPS.map((s, i) => (
                 <span key={s} className={i < step ? 'done' : i === step ? 'now' : ''}>
@@ -475,6 +480,7 @@ function Stepper({ label, value, onChange }: { label: string; value: number; onC
 }
 
 function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, postcode, town, source, note, controls, onRestart }: { rates: { imp: number; exp: number }; setRates: (r: { imp: number; exp: number }) => void; roofHit: RoofHit | null; r: ReturnType<typeof estimate>; withBattery: ReturnType<typeof estimate> | null; inputs: Inputs; settings: EstimatorSettings; postcode: string; town: string; source: 'pvgis' | 'fallback'; note: string; controls: Controls; onRestart: () => void }) {
+  const [booking, setBooking] = useState(false);
   const home = inputs.who === 'home';
   const max = Math.max(...r.monthly, 1);
   const pot = potentialOf(inputs.yieldKwhPerKwp * SHADE_FACTOR[inputs.shade]);
@@ -546,9 +552,9 @@ function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, po
               <div className="sub">
                 {r.kwp.toFixed(2)} kWp system · {r.panels} panels{r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}
               </div>
-              <a className="btn btn-solar est-headcta" href="#est-survey">
+              <button type="button" className="btn btn-solar est-headcta" onClick={() => setBooking(true)}>
                 Book my free survey
-              </a>
+              </button>
             </div>
           </div>
           <div className="est-card est-stats">
@@ -689,7 +695,8 @@ function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, po
         </div>
       </div>
 
-      <Lead r={r} inputs={inputs} postcode={postcode} address={roofHit?.address ?? ''} />
+      <SurveyCard onBook={() => setBooking(true)} postcode={postcode} />
+      <SurveyModal open={booking} onClose={() => setBooking(false)} who={inputs.who} postcode={postcode} picks={['Solar panels', ...(inputs.battery ? ['Battery storage'] : []), ...(inputs.heatpump ? ['Heat pump'] : []), ...(inputs.ev ? ['EV charger'] : [])]} message={estimateMessage(r, inputs, roofHit?.address ?? '')} />
 
 
       <details className="assumptions">
@@ -708,68 +715,55 @@ function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, po
   );
 }
 
-function Lead({ r, inputs, postcode, address }: { r: ReturnType<typeof estimate>; inputs: Inputs; postcode: string; address: string }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [wa, setWa] = useState(false);
-  const [trap, setTrap] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [sent, setSent] = useState('');
-  async function send() {
-    setErr('');
-    if (name.trim().length < 2) return setErr('Please add your name.');
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setErr('Please check your email address.');
-    if (phone.replace(/\D/g, '').length < 10) return setErr('Please check your phone number.');
-    setBusy(true);
-    const dir = address ? `roof found at ${address}` : 'roof answered by the visitor';
-    const message = `Solar estimator: ${r.kwp.toFixed(2)} kWp (${r.panels} panels)${r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}. About ${num(r.generation)} kWh a year, saving about ${gbp(r.saving)} a year, indicative cost ${gbpRound(r.cost, 100)}, payback about ${yrs(r.paybackYears)} years. Uses ${inputs.usage.kind === 'bill' ? `£${inputs.usage.value}/month` : `${num(inputs.usage.value)} kWh/year`}; ${inputs.shade} shade; daytime: ${inputs.daytime}${inputs.ev ? '; electric car' : ''}${inputs.heatpump ? '; heat pump' : ''} (${dir}).`;
-    try {
-      const res = await fetch('/api/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim(), postcode, propertyType: inputs.who, interests: ['Solar PV Installation', ...(inputs.battery ? ['Battery Storage'] : [])], message, source: 'solar-estimator', whatsappOptIn: wa, company_website: trap }),
-      });
-      const d = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
-      if (res.ok && d.success) setSent(name.trim().split(/\s+/)[0]);
-      else setErr(d.error || 'Something went wrong. Please try again, or call us on 01633 965205.');
-    } catch {
-      setErr('Something went wrong. Please try again, or call us on 01633 965205.');
-    }
-    setBusy(false);
-  }
-  if (sent) {
-    return (
-      <div className="est-card est-pad est-lead" id="est-survey">
-        <h3>Thank you, {sent}</h3>
-        <p>We have your estimate and will be in touch within one working day to arrange your free survey. No obligation.</p>
+/** Shown while we look up the property: steps that change every few seconds, so the wait never looks like a stall. */
+const FINDING = ['Finding your property…', 'Looking at your roof from above…', 'Measuring each roof face…', 'Checking the shade through the year…', 'Laying out the panels…'];
+function Finding({ address }: { address: string }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((n) => Math.min(n + 1, FINDING.length - 1)), 2200);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="est-finding" role="status" aria-live="polite">
+      <div className="est-finding__sun" aria-hidden="true">
+        <span />
       </div>
-    );
-  }
+      <h2 key={i}>{FINDING[i]}</h2>
+      <p>{address ? address : 'This takes a few seconds.'}</p>
+      <div className="est-finding__bar" aria-hidden="true">
+        <i />
+      </div>
+    </div>
+  );
+}
+
+/** What goes into the CRM with the enquiry: the figures they saw, so the call starts from them. */
+function estimateMessage(r: ReturnType<typeof estimate>, inputs: Inputs, address: string) {
+  const dir = address ? `roof found at ${address}` : 'roof answered by the visitor';
+  return `Solar estimator: ${r.kwp.toFixed(2)} kWp (${r.panels} panels)${r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}. About ${num(r.generation)} kWh a year, saving about ${gbp(r.saving)} a year, indicative cost ${gbpRound(r.cost, 100)}, payback about ${yrs(r.paybackYears)} years. Uses ${inputs.usage.kind === 'bill' ? `£${inputs.usage.value}/month` : `${num(inputs.usage.value)} kWh/year`}; ${inputs.shade} shade; daytime: ${inputs.daytime}${inputs.ev ? '; electric car' : ''}${inputs.heatpump ? '; heat pump' : ''} (${dir}).`;
+}
+
+/** The invitation under the estimate: one clear button that opens the survey form. */
+function SurveyCard({ onBook, postcode }: { onBook: () => void; postcode: string }) {
   return (
     <div className="est-card est-pad est-lead" id="est-survey">
-      <h3>Want exact figures? Book your free survey</h3>
-      <p className="est-sub">We will look at your roof, shading and electrics and give you a fixed price. No obligation, no pushy sales.</p>
-      <div className="est-fields">
-        <input className="est-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" aria-label="Your name" />
-        <input className="est-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" autoComplete="email" aria-label="Email" />
-        <input className="est-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile or phone" type="tel" autoComplete="tel" aria-label="Phone" />
-        <input className="est-trap" tabIndex={-1} autoComplete="off" aria-hidden="true" value={trap} onChange={(e) => setTrap(e.target.value)} name="company_website" />
+      <div className="est-lead__copy">
+        <h3>Want exact figures? Book your free survey</h3>
+        <ul className="est-ticks">
+          <li>We look at your roof, shading and electrics</li>
+          <li>You get a fixed price, in writing</li>
+          <li>No obligation and no pushy sales</li>
+        </ul>
       </div>
-      <label className="est-check">
-        <input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /> OK to message me on WhatsApp about my enquiry
-      </label>
-      {err && <p className="est-err">{err}</p>}
-      <div className="est-leadbtns">
-        <button type="button" className="btn btn-solar" disabled={busy} onClick={() => void send()}>
-          {busy ? 'Sending…' : 'Send me my estimate and book a survey'}
+      <div className="est-lead__act">
+        <button type="button" className="btn btn-solar est-lead__btn" onClick={onBook}>
+          Book my free survey
         </button>
         <Link className="est-link" href={`/book-a-survey?type=solar&postcode=${encodeURIComponent(postcode)}`}>
           Or pick a survey time yourself
         </Link>
+        <p className="est-fine">Takes about a minute. We use your details to reply to your enquiry. See our <Link href="/privacy-policy">privacy policy</Link>.</p>
       </div>
-      <p className="est-fine">We use your details to reply to your enquiry. See our <Link href="/privacy-policy">privacy policy</Link>.</p>
     </div>
   );
 }

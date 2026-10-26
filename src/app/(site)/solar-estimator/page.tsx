@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './solar-estimator.css';
 import { readEstimatorSettings } from '@/lib/estimator/settings';
 import { SolarEstimatorApp } from './SolarEstimatorApp';
+import { EstimatorExtras } from './EstimatorExtras';
 
 export const revalidate = 300;
 
@@ -12,5 +13,10 @@ export const metadata: Metadata = {
 };
 
 export default async function SolarEstimatorPage() {
-  return <SolarEstimatorApp settings={await readEstimatorSettings()} roofLookup={!!process.env.GOOGLE_SOLAR_API_KEY} addressPicker={!!process.env.IDEAL_POSTCODES_API_KEY} />;
+  return (
+    <>
+      <SolarEstimatorApp settings={await readEstimatorSettings()} roofLookup={!!process.env.GOOGLE_SOLAR_API_KEY} addressPicker={!!process.env.IDEAL_POSTCODES_API_KEY} />
+      <EstimatorExtras />
+    </>
+  );
 }

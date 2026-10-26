@@ -278,3 +278,37 @@ a.est-link{display:inline-block}
 .est-sugs{position:absolute;left:0;right:0;top:100%;z-index:5;list-style:none;margin:4px 0 0;padding:4px;background:var(--card,#fff);border:1px solid var(--line,#e5dfd0);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:260px;overflow:auto}
 .est-sugs button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;border-radius:8px;font:inherit;cursor:pointer;color:inherit}
 .est-sugs button:hover,.est-sugs button:focus-visible{background:rgba(232,184,64,.18);outline:none}
+
+/* Survey card and dialog */
+.est-lead{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:center}
+.est-ticks{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.est-ticks li{position:relative;padding-left:26px}
+.est-ticks li::before{content:"";position:absolute;left:0;top:.25em;width:16px;height:16px;border-radius:50%;background:var(--solar);box-shadow:inset 0 0 0 4px var(--solar),inset 0 0 0 16px var(--ink);opacity:1}
+.est-lead__act{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.est-lead__btn{font-size:1.1rem;padding:16px 28px}
+@media (max-width:760px){.est-lead{grid-template-columns:1fr}}
+.est-headcta{cursor:pointer}
+.est-modal{position:fixed;inset:0;z-index:1000;background:rgba(20,18,12,.62);display:flex;align-items:center;justify-content:center;padding:16px;animation:estFade .18s ease-out}
+.est-modal__box{position:relative;width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--card,#fffdf8);border-radius:6px;padding:28px 32px 32px;box-shadow:0 24px 70px rgba(0,0,0,.35);animation:estRise .22s ease-out}
+.est-modal__x{position:absolute;top:10px;right:14px;width:38px;height:38px;border:0;background:none;font-size:2rem;line-height:1;cursor:pointer;color:var(--ink)}
+.est-modal__lab{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 40px 14px 0}
+@keyframes estFade{from{opacity:0}to{opacity:1}}
+@keyframes estRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (max-width:560px){.est-modal{padding:0;align-items:flex-end}.est-modal__box{border-radius:14px 14px 0 0;padding:22px 18px 26px}}
+
+/* Finding your property */
+.est-wiz{position:relative}
+.est-finding{position:absolute;inset:0;z-index:4;background:var(--card,#fffdf8);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:24px;border-radius:inherit;animation:estFade .25s ease-out}
+.est-finding h2{font-size:clamp(1.3rem,3vw,1.9rem);margin:6px 0 0;animation:estRise .35s ease-out}
+.est-finding p{margin:0;color:var(--muted);max-width:42ch}
+.est-finding__sun{width:64px;height:64px;position:relative}
+.est-finding__sun span{position:absolute;inset:14px;border-radius:50%;background:var(--solar)}
+.est-finding__sun::before{content:"";position:absolute;inset:0;border-radius:50%;border:3px dashed var(--amber);animation:estSpin 6s linear infinite}
+.est-finding__bar{width:min(280px,70%);height:4px;border-radius:2px;background:rgba(33,31,24,.12);overflow:hidden;margin-top:14px}
+.est-finding__bar i{display:block;height:100%;width:40%;background:var(--solar);border-radius:2px;animation:estSlide 1.4s ease-in-out infinite}
+@keyframes estSpin{to{transform:rotate(360deg)}}
+@keyframes estSlide{0%{margin-left:-40%}100%{margin-left:100%}}
+@media (prefers-reduced-motion:reduce){.est-finding__sun::before,.est-finding__bar i{animation:none}}
+
+.vgrid.est-three{grid-template-columns:repeat(3,1fr)}
+@media (max-width:760px){.vgrid.est-three{grid-template-columns:1fr}}

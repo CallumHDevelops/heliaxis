@@ -3,7 +3,9 @@
 import { useRef, useState } from 'react';
 import { Eyebrow } from './Eyebrow';
 
-const faqs = [
+export type Faq = { id: string; q: string; a: string };
+
+const faqs: Faq[] = [
   { id: 'Q/01', q: 'Do solar panels work in Wales\u2019 cloudy weather?', a: 'Yes. Panels generate from daylight, not direct sun, so they still produce power on overcast days. The UK gets more than enough solar energy each year to make a well-designed system a sound investment.' },
   { id: 'Q/02', q: 'How much could I save?', a: 'It depends on your roof, usage and whether you add a battery \u2014 but many homes save four figures a year. The quickest way to find out is our 20-second estimator, or a free survey for exact figures.' },
   { id: 'Q/03', q: 'Will I need planning permission?', a: 'For most homes solar is classed as permitted development, so no permission is needed. Listed buildings, conservation areas and some commercial sites are exceptions \u2014 we\u2019ll confirm at survey.' },
@@ -37,16 +39,16 @@ function FaqItem({ id, q, a }: { id: string; q: string; a: string }) {
   );
 }
 
-export function FaqAccordion() {
+export function FaqAccordion({ items = faqs, eyebrow = 'Good to know', title = 'Your questions, answered' }: { items?: Faq[]; eyebrow?: string; title?: string }) {
   return (
     <section className="sec" id="faq">
       <div className="wrap">
         <div className="sec-head center reveal">
-          <Eyebrow>Good to know</Eyebrow>
-          <h2>Your questions, answered</h2>
+          <Eyebrow>{eyebrow}</Eyebrow>
+          <h2>{title}</h2>
         </div>
         <div className="faq reveal">
-          {faqs.map((faq) => (
+          {items.map((faq) => (
             <FaqItem key={faq.id} {...faq} />
           ))}
         </div>

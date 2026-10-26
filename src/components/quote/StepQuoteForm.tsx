@@ -38,13 +38,30 @@ function track(step: number) {
   }
 }
 
-export function StepQuoteForm({ variant = 'card', initialWho }: { variant?: 'card' | 'page'; initialWho?: 'home' | 'business' }) {
+export function StepQuoteForm({
+  variant = 'card',
+  initialWho,
+  initialPostcode,
+  initialPicks,
+  message,
+  source,
+}: {
+  variant?: 'card' | 'page';
+  initialWho?: 'home' | 'business';
+  /** With the type of property, a postcode and what they want already known (from the solar estimator), the form starts at their name. */
+  initialPostcode?: string;
+  initialPicks?: string[];
+  /** Sent with the enquiry (the estimator's figures) and the source it is labelled with in the CRM. */
+  message?: string;
+  source?: string;
+}) {
   // ?for=business (or home) on /get-a-quote answers the first question for them.
-  const [step, setStep] = useState<Step>(initialWho ? 2 : 1);
+  const known = !!initialWho && !!initialPostcode;
+  const [step, setStep] = useState<Step>(known ? 4 : initialWho ? 2 : 1);
   const [who, setWho] = useState<Who>(initialWho ?? '');
-  const [picks, setPicks] = useState<string[]>([]);
+  const [picks, setPicks] = useState<string[]>(initialPicks ?? []);
   const [site, setSite] = useState('');
-  const [postcode, setPostcode] = useState('');
+  const [postcode, setPostcode] = useState(initialPostcode ?? '');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -100,6 +117,8 @@ export function StepQuoteForm({ variant = 'card', initialWho }: { variant?: 'car
           propertyType: who,
           interests: home ? picks : [],
           sector: home ? '' : site,
+          ...(message ? { message } : {}),
+          ...(source ? { source } : {}),
           whatsappOptIn: whatsapp,
           company_website: trap,
         }),
