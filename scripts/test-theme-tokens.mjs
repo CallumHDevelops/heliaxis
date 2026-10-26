@@ -70,7 +70,7 @@ const CONVERTED = [
   'src/app/admin/page.tsx',
   'src/app/admin/layout.tsx',
   'src/app/admin/HubView.tsx',
-  'src/app/admin/HubMetaLeads.tsx',
+  'src/app/admin/DashPanels.tsx',
   'src/app/admin/HubMyDay.tsx',
   'src/app/admin/approvals/page.tsx',
   'src/app/admin/tasks/page.tsx',
