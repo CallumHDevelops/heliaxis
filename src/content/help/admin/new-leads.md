@@ -23,7 +23,7 @@ The list only shows people who are approved and have **CRM** access. If someone 
 
 > **Good to know:** Leads already given to someone stay theirs when they lose access. Change the **Owner** on those jobs to hand them over (see [Job details](/admin/help/customers/job-details)).
 
-> **Good to know:** The **Choose who gets new leads** job on the **From Claude** card disappears once at least one person is ticked. It comes back if nobody who’s ticked can open the CRM any more, because new leads would then stay unassigned. It comes back unticked, even if you ticked the job off before. Ticking it off then only lasts until the card next loads: it goes once someone ticked can open the CRM again.
+> **Good to know:** The **Choose who gets new leads** job on the **From Claude** card disappears once at least one person is ticked. It comes back if nobody who’s ticked can open the CRM any more, because new leads would then stay unassigned. It comes back unticked, even if you ticked the job off before. If you’re happy for new leads to stay unassigned, tick it off: it then says **Ticked. Waiting to confirm** and stays that way until someone ticked can open the CRM again, when it goes.
 
 ## The "hasn’t been contacted" alert
 

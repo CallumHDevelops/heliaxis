@@ -838,6 +838,9 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   if (settings) {
     // Only the people the rotation will use count (those the settings screen shows ticked); if they can't be looked up, the ticks do.
     const takers = await rotationOnTeam(settings.leadRotation);
+    // Someone ticked can take leads, so a tick on this to-do is used up: if they all lose CRM access later, it
+    // comes back unticked, and only a tick made then (leads can stay unassigned) greys it.
+    if (takers && done.includes('crm-rotation')) await markDone('crm-rotation', false).catch(() => {});
     add(takers === null ? !settings.leadRotation.length : !takers, {
       id: 'crm-rotation',
       title: 'Choose who gets new leads',
@@ -1186,10 +1189,8 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
   });
   // Copies: these are set per request below.
   for (const m of MANUAL) add(!done.includes(m.id), { ...m });
-  // Ticked but not detected yet: keep it, greyed, at the bottom. Not "Choose who gets new leads" once people are
-  // ticked: it's only back because they've lost CRM access since, which no tick from before can have been about.
-  const staleTick = (id: string) => id === 'crm-rotation' && !!settings?.leadRotation.length;
-  for (const t of out) if (done.includes(t.id) && !staleTick(t.id)) t.ticked = true;
+  // Ticked but not detected yet: keep it, greyed, at the bottom.
+  for (const t of out) if (done.includes(t.id)) t.ticked = true;
   const answers = out.some((t) => t.kind === 'question') ? await savedAnswers().catch(() => ({})) : {};
   for (const t of out) {
     const a = (answers as Record<string, SavedAnswer>)[t.id];
