@@ -16,7 +16,7 @@ What’s on it depends on what you can open. From left to right:
 | Button | Opens | Shows for |
 | --- | --- | --- |
 | **Home** | The dashboard | Everyone |
-| **CRM** | The CRM pipeline | CRM |
+| **CRM** | Opportunities (the CRM pipeline); Organisations and Contacts are in **More** | CRM |
 | **Enquiries** | Enquiries | Enquiries, without CRM (in place of **CRM**) |
 | **Tasks** | Tasks | Tasks only, without CRM or Enquiries (in place of **CRM**) |
 | **WhatsApp** | The WhatsApp inbox, or WhatsApp chats if you have CRM but not Enquiries | Enquiries or CRM |

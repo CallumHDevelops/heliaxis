@@ -3,7 +3,7 @@ title: Change a customer’s details, postcode or site address
 summary: Correct a customer’s name, mobile, email or postcode, change where a job’s work is, and manage their other numbers.
 order: 120
 keywords: edit customer, update phone, change mobile, change email, wrong postcode, 88888, site address, site postcode, other numbers, use for WhatsApp, WhatsApp permission switch, house move
-where: CRM › Pipeline › a customer › Customer card
+where: CRM › Opportunities › a customer › Customer card
 access: crm
 ---
 A customer’s own details (name, mobile, email, postcode) are on the **Customer** card. Where a job’s work is (site address and site postcode) is in **Job details**. Both are in the left column of their page (the **Details** tab on a tablet or phone).

@@ -3,7 +3,7 @@ title: Next steps and tasks for a customer
 summary: Set a follow-up reminder on a customer so they don’t go quiet, and add tasks for yourself or a colleague.
 order: 100
 keywords: next step, follow up, follow-up reminder, chase, call back, snooze, reminder, task, assign, due date, high priority, done
-where: CRM › Pipeline › a customer
+where: CRM › Opportunities › a customer
 access: crm
 ---
 Every live customer should have a next step: the one thing that happens next, and when. Tasks are for anything else that needs doing on the job, by anyone.

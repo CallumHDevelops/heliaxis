@@ -3,7 +3,7 @@ title: Find a customer
 summary: Search the CRM by name, postcode, phone number or HX reference, word by word, and open the right job.
 order: 40
 keywords: search, look up, find, postcode, phone number, reference, HX-0042, hx42, slash, filter list, accents
-where: CRM › Pipeline
+where: CRM › Opportunities
 path: /admin/crm
 access: crm
 ---

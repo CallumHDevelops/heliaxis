@@ -3,7 +3,7 @@ title: Sales stages and moving a customer along
 summary: The five sales stages, the main button at each one, how to move a customer by hand, and which moves the app makes by itself.
 order: 130
 keywords: stages, pipeline stages, lead, contacted, survey booked, surveyed, quote sent, won, move stage, mark contacted, mark won, stage path, automatic moves
-where: CRM › Pipeline › a customer
+where: CRM › Opportunities › a customer
 access: crm
 ---
 A customer’s job goes through five sales stages, then **Won**. From Won it’s a project (see [How a job flows from Won to handed over](/admin/help/projects/how-a-job-flows)).

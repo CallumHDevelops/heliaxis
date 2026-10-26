@@ -7,7 +7,7 @@ access: crm, enquiries
 ---
 Anyone with CRM or Enquiries access gets the WhatsApp panel on a computer or tablet, so you can answer chats without leaving the page you’re on. Phones don’t have it: use **WhatsApp** on the bottom bar.
 
-![The WhatsApp panel docked open on the CRM Pipeline, on the Chats tab](/help/whatsapp/panel-chats.jpg "The WhatsApp panel: filters, search and chats")
+![The WhatsApp panel docked open on CRM Opportunities, on the Chats tab](/help/whatsapp/panel-chats.jpg "The WhatsApp panel: filters, search and chats")
 
 ## How it shows
 
@@ -18,7 +18,7 @@ Anyone with CRM or Enquiries access gets the WhatsApp panel on a computer or tab
 | Tablet | A **WhatsApp** button in the header, with the unread count; it opens the panel over the page |
 | Phone | No panel |
 
-It starts open on the CRM **Pipeline** (Home view) and on job pages, and folded to the strip on most other pages. It’s hidden on the WhatsApp inbox and WhatsApp chats pages, where the chat already fills the screen. Once you open or fold it, it stays that way on that kind of page, for you, in that browser.
+It starts open on CRM **Opportunities** (Home view) and on job pages, and folded to the strip on most other pages. It’s hidden on the WhatsApp inbox and WhatsApp chats pages, where the chat already fills the screen. Once you open or fold it, it stays that way on that kind of page, for you, in that browser.
 
 ## The strip
 

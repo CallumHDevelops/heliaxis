@@ -3,7 +3,7 @@ title: The Activity tab
 summary: A customer’s full history on one tab: notes, calls, WhatsApp messages, emails, stage changes, documents and payments.
 order: 90
 keywords: timeline, history, activity, notes and calls, WhatsApp messages, emails, stages and checklist, docs and payments, load older, show in chat
-where: CRM › Pipeline › a customer › Activity
+where: CRM › Opportunities › a customer › Activity
 access: crm
 ---
 **Activity** is the customer’s timeline, newest first, grouped by day. A sales job opens on this tab.

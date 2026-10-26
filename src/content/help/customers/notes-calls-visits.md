@@ -3,7 +3,7 @@ title: Add a note, log a call or a site visit
 summary: Write down what was said or agreed with a customer, so it’s on their timeline for everyone.
 order: 80
 keywords: note, log call, phone call, site visit, home visit, record conversation, timeline, contacted, no answer
-where: CRM › Pipeline › a customer › Activity
+where: CRM › Opportunities › a customer › Activity
 access: crm
 ---
 Everything you add shows on the customer’s **Activity** tab and in **Latest notes** on the CRM home.

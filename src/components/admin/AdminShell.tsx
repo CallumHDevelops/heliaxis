@@ -342,9 +342,11 @@ export async function AdminShell({
       id: 'crm',
       label: 'CRM',
       items: [
-        { href: '/admin/crm', label: 'Pipeline', icon: icons.crm, show: can('crm'), tab: true },
-        { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
+        { href: '/admin/crm', label: 'Opportunities', icon: icons.crm, show: can('crm'), tab: true },
+        { href: '/admin/crm/organisations', label: 'Organisations', icon: <svg {...ICON}><path d="M4 21V4l9-1v18M13 8h7v13M7.5 8h2M7.5 12h2M7.5 16h2M16 12h1.5M16 16h1.5M2 21h20" /></svg>, show: can('crm') },
+        { href: '/admin/crm/contacts', label: 'Contacts', icon: <svg {...ICON}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>, show: can('crm') },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
+        { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },
         { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa' },
         { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries') },

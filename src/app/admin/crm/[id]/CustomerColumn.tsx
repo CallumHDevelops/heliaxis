@@ -6,10 +6,12 @@ import { isProjectStage, money, portalOpen, PRODUCTS, productLabel, stageIndex, 
 import type { TeamMember } from '@/lib/projects/server';
 import type { SchemaReady } from '@/lib/schema-ready';
 import type { TrackerStep } from '@/lib/crm/tracker';
+import type { JobContact, JobOrganisation } from '@/lib/organisations/shared';
 import { followsCustomerPostcode, siteHasOtherPostcode } from '@/lib/crm/site-postcode';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { StageChip } from '../CrmUi';
 import { firstName, jobLabel, shortDate, ukDayOf } from '../crm-shared';
+import { OrganisationCard } from './OrganisationCard';
 import { DnoDeposit, PortalCard } from './ProjectExtras';
 import {
   copyText,
@@ -29,7 +31,7 @@ import {
 } from './record-shared';
 
 /**
- * The record page's left column (research 2.3 "LEFT"): Important, Customer, Other projects, Job
+ * The record page's left column (research 2.3 "LEFT"): Important, Customer, Organisation, Other projects, Job
  * details, the customer portal and Quote & deposit · DNO (Unit Q's cards, props unchanged), then the
  * footer. Below 1280px the same column is the Details tab. Each card has one Edit and one Save.
  */
@@ -54,6 +56,8 @@ export function CustomerColumn({
   onDelete,
   onNewProject,
   tasksElsewhere,
+  organisation,
+  contact,
 }: {
   project: Project;
   customer: Customer;
@@ -77,6 +81,9 @@ export function CustomerColumn({
   onNewProject: () => void;
   /** The Tasks card, at the top, while the open WhatsApp panel is showing Chats (no right-hand column then). */
   tasksElsewhere?: ReactNode;
+  /** The job's organisation and the person it's dealt with through (organisations.sql): their card shows once that's run. */
+  organisation?: JobOrganisation | null;
+  contact?: JobContact | null;
 }) {
   const base = area === 'projects' ? '/admin/projects' : '/admin/crm';
   const flagged = surveys.filter((s) => s.flags.length > 0);
@@ -127,6 +134,8 @@ export function CustomerColumn({
         onMoved={setMovedNote}
         onSaved={onSaved}
       />
+
+      {schema.organisations && <OrganisationCard projectId={project.id} organisation={organisation ?? null} contact={contact ?? null} onChanged={onSaved} />}
 
       {others.length > 0 && (
         <section className="crmh-card" aria-label="Other projects">

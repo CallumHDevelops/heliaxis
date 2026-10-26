@@ -3,7 +3,7 @@ title: Move messaged customers to Contacted
 summary: The one-tap catch-up for imported WhatsApp chats whose customers are still at Lead although you’d already messaged them.
 order: 100
 keywords: catch-up, contacted catch-up, still at Lead, already messaged, imported chats, move to contacted, move them all to Contacted, banner, WhatsApp import
-where: CRM › Pipeline, and CRM › Enquiries › Import
+where: CRM › Opportunities, and CRM › Enquiries › Import
 path: /admin/enquiries/import
 access: admin
 ---
@@ -13,7 +13,7 @@ When WhatsApp Business app chats are imported, anyone you’d already messaged m
 
 ## Where it shows
 
-A banner on the CRM home (**CRM › Pipeline**) and on **Enquiries › Import**, for example:
+A banner on the CRM home (**CRM › Opportunities**) and on **Enquiries › Import**, for example:
 
 "**41 customers** you’ve already messaged on WhatsApp are still at Lead."
 

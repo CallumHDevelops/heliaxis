@@ -3,7 +3,7 @@ title: Send a quote for signing
 summary: Upload the quote, send the customer their private link to read and sign it on their phone, and see when they’ve signed.
 order: 180
 keywords: send quote, e-sign, sign online, signature, accept quote, contract, 14 days, cancellation, chase quote, mark won, quote sent, signed
-where: CRM › Pipeline › a customer › Customer portal card
+where: CRM › Opportunities › a customer › Customer portal card
 access: crm
 ---
 The customer reads and signs the quote on their phone. Signing moves the job to **Won** by itself.

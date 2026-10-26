@@ -3,7 +3,7 @@ title: Take a deposit by card
 summary: Set a deposit on a job so the customer can pay it by card from their portal after signing, and see when it’s paid.
 order: 190
 keywords: deposit, card payment, pay online, Stripe, payment link, bank transfer, paid, deposit due
-where: CRM › Pipeline › a customer › Quote & deposit
+where: CRM › Opportunities › a customer › Quote & deposit
 access: crm
 ---
 The deposit is set on the **Quote & deposit · DNO** card in the customer’s left column. The card appears from Quote sent.

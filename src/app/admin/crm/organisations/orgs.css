@@ -1,0 +1,592 @@
+/* CRM › Organisations, an organisation's page, and the record page's Organisation card. Phone first.
+ * Colours: the theme's tokens (src/app/theme.css), light and dark. */
+
+/* ── The type, as a pill and as the round badge's colour ── */
+.org-type {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.org-type--commercial,
+.org-badge--commercial {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.org-type--landlord,
+.org-badge--landlord {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.org-type--public_sector,
+.org-badge--public_sector {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.org-type--partner,
+.org-badge--partner {
+  background: rgb(var(--info-rgb) / 0.05);
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--info-line);
+}
+.org-badge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.org-badge--big {
+  width: 52px;
+  height: 52px;
+  font-size: 16px;
+}
+
+/* ── The list ── */
+.crmh-head.org-head {
+  flex-wrap: nowrap;
+}
+.org-head .crmh-head__l {
+  min-width: 0;
+}
+.org-head .org-add {
+  flex: none;
+  min-height: 40px;
+  gap: 6px;
+}
+.org-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 12px;
+  min-width: 0;
+}
+.org-search {
+  width: 100%;
+}
+.org-search input {
+  min-width: 0;
+}
+.org-chips {
+  min-width: 0;
+}
+.org-chips {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.org-chips button {
+  min-height: 44px;
+}
+.org-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.org-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'badge main type'
+    'badge counts pc';
+  align-items: center;
+  gap: 2px 12px;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+.org-row:hover {
+  border-color: var(--border-strong);
+}
+.org-row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.org-row .org-badge {
+  grid-area: badge;
+  align-self: start;
+}
+.org-row__main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.org-row__name,
+.org-row__who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.org-row__name {
+  font-size: 15px;
+}
+.org-row__who {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.org-row__type {
+  grid-area: type;
+  justify-self: end;
+}
+.org-row__counts {
+  grid-area: counts;
+  font-size: 12.5px;
+  color: var(--muted);
+  min-width: 0;
+}
+.org-row__pc {
+  grid-area: pc;
+  justify-self: end;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.org-empty .crm-btn {
+  margin-top: 12px;
+}
+.org-empty p {
+  max-width: 560px;
+  margin: 8px auto 0;
+}
+
+@media (min-width: 900px) {
+  .org-tools {
+    flex-direction: row;
+    align-items: center;
+  }
+  .org-search {
+    flex: 0 0 340px;
+  }
+  .org-row {
+    grid-template-columns: 40px minmax(0, 2fr) 120px minmax(0, 1.3fr) 90px;
+    grid-template-areas: 'badge main type counts pc';
+    gap: 0 16px;
+  }
+  .org-row .org-badge {
+    align-self: center;
+  }
+  .org-row__type {
+    justify-self: start;
+  }
+}
+
+/* ── An organisation's page ── */
+.org-hero {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 14px;
+  margin: 4px 0 14px;
+}
+.org-hero__name {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.org-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.org-hero__acts {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.org-hero__acts .crm-btn {
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.org-hide-sm {
+  display: none;
+}
+.org-ok {
+  background: var(--ok-soft);
+  border-color: var(--ok-line);
+  color: var(--text);
+}
+.org-cols,
+.org-main,
+.org-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.org-none p {
+  margin: 0;
+  color: var(--muted);
+}
+.org-none {
+  padding: 12px 14px;
+}
+
+.org-contacts,
+.org-jobs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.org-contact {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-soft);
+}
+.org-contact:first-child {
+  border-top: 0;
+}
+.org-contact__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+.org-contact__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.org-contact__role {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.org-primary {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.org-contact__lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+  min-width: 0;
+}
+.org-contact__notes {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: pre-line;
+}
+.org-contact__acts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+.org-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.org-act:hover {
+  border-color: var(--border-strong);
+}
+.org-act--wa {
+  background: var(--wa-soft);
+  border-color: rgb(var(--wa-rgb) / 0.35);
+  color: var(--wa-text);
+}
+.org-act.is-off {
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.org-contact__more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 22px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.org-contact__more .crm-link {
+  min-height: 44px;
+}
+.org-contact__more .org-danger {
+  margin-left: auto;
+}
+.org-act svg,
+.org-hero__acts svg {
+  flex: none;
+}
+.org-danger,
+.crm-link.org-danger {
+  color: var(--danger);
+}
+
+.org-job {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--border-soft);
+}
+.org-job:first-child {
+  border-top: 0;
+}
+.org-job__link {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 14px;
+  color: inherit;
+  text-decoration: none;
+}
+.org-job__link:hover b {
+  text-decoration: underline;
+}
+.org-job__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.org-job__main b,
+.org-job__main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.org-job__main small {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.org-job__unlink {
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+.org-pre {
+  white-space: pre-line;
+}
+.org-notes {
+  margin: 0;
+}
+.org-trunc {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.org-foot {
+  margin: 0;
+  padding: 0 4px;
+  text-align: right;
+  font-size: 13px;
+}
+.org-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 600px) {
+  .org-hero__acts {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
+  .org-hide-sm {
+    display: inline;
+  }
+  .org-contact__acts {
+    grid-template-columns: repeat(3, max-content);
+  }
+}
+@media (min-width: 900px) {
+  .org-hero {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+  }
+  .org-hero__acts {
+    grid-column: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .org-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+    align-items: start;
+    gap: 16px;
+  }
+}
+
+/* ── Sheets ── */
+.org-form .crm-label {
+  display: block;
+  margin-top: 10px;
+}
+.org-form textarea.crm-input {
+  resize: vertical;
+}
+.org-twin {
+  margin: 6px 0 0;
+}
+.org-first {
+  margin: 16px 0 0;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.org-first legend {
+  padding: 0 4px;
+  font-weight: 800;
+}
+.org-first p {
+  margin: 0;
+}
+.org-actions .crm-btn {
+  min-height: 44px;
+}
+.org-addnew {
+  margin-top: 12px;
+}
+.org-addnew__row {
+  display: flex;
+  gap: 8px;
+}
+.org-addnew__row .crm-input {
+  flex: 1;
+  min-width: 0;
+}
+.crmh-picker__list .org-type,
+.crmh-picked .org-type {
+  display: inline-flex;
+  flex: none;
+}
+@media (max-width: 479px) {
+  .org-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── The record page's Organisation card ── */
+.org-card__org {
+  flex-wrap: wrap;
+}
+.org-card__contact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.org-card__contact small {
+  color: var(--muted);
+}
+.org-card__none {
+  margin: 0;
+}
+.org-twin a {
+  color: var(--accent-text);
+  font-weight: 700;
+  text-decoration: underline;
+}
+.org-picked {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+}
+.org-unlink {
+  margin-top: 10px;
+  flex-basis: 100%;
+  text-align: left;
+}
+
+/* ── Contacts: people on their own or in an organisation, and customers ── */
+.org-badge--person {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.org-group {
+  margin: 0 0 18px;
+}
+.org-group__h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.org-group__note {
+  margin: -4px 0 8px;
+}
+.org-contact__link {
+  color: inherit;
+  text-decoration: none;
+}
+.org-contact__link:hover b {
+  text-decoration: underline;
+}
+.org-wa {
+  background: var(--wa-soft);
+  border-color: rgb(var(--wa-rgb) / 0.35);
+  color: var(--wa-text);
+}
+.org-addnew__person {
+  margin: 10px 0 0;
+}
+.org-addnew__person .crm-link {
+  min-height: 44px;
+}
+.org-row .org-type {
+  font-weight: 700;
+}

@@ -1,6 +1,6 @@
 ---
 title: Customers and the pipeline
-summary: The CRM Pipeline, adding customers, a customer’s page, sales stages, duplicates, deleting and the customer portal.
+summary: The CRM Opportunities page (the pipeline), adding customers, a customer’s page, sales stages, duplicates, deleting and the customer portal.
 order: 40
 icon: crm
 ---

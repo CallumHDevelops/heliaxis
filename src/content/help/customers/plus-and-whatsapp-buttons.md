@@ -3,7 +3,7 @@ title: The + and WhatsApp buttons on a customer’s page
 summary: The yellow + adds a task, note, call, photos, email or stage move; the green button opens the customer’s WhatsApp chat.
 order: 110
 keywords: plus button, add menu, floating button, quick add, WhatsApp button, green button, message customer, add mobile, photos, email, move stage
-where: CRM › Pipeline › a customer
+where: CRM › Opportunities › a customer
 access: crm
 ---
 Two round buttons sit at the bottom right of every customer’s page (on a wide screen, at the bottom of the middle column): the green WhatsApp button on top and the yellow **+** below it.

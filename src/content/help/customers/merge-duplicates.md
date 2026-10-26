@@ -3,7 +3,7 @@ title: Merge a customer who’s in twice
 summary: Join two records for the same person into one, choose which details to keep, and join their jobs for the same work.
 order: 150
 keywords: duplicate, merge, same person twice, possible duplicate, looks like the same person, combine, join jobs, not the same person, dedupe, two records
-where: CRM › Pipeline › a customer › ⋯
+where: CRM › Opportunities › a customer › ⋯
 access: crm
 ---
 When the same person is in the CRM twice (say they came in from the website and again from a Meta ad), merge them so there’s one record with everything on it.

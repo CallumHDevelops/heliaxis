@@ -3,7 +3,7 @@ title: The Board and List views
 summary: See every opportunity as columns by stage or as a work queue, filter them, and move them between stages.
 order: 50
 keywords: kanban, columns, drag, move to, filter, chips, live, mine, due, no next step, not contacted, quiet, possible duplicate, work queue
-where: CRM › Pipeline › Board or List
+where: CRM › Opportunities › Board or List
 path: /admin/crm
 access: crm
 ---

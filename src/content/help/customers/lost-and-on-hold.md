@@ -3,7 +3,7 @@ title: Lost, on hold and reopening
 summary: Mark a job Lost (with a reason), put it on hold so the reminders stop, and bring it back later.
 order: 200
 keywords: lost, not interested, went elsewhere, lost reason, on hold, pause, paused, waiting, reopen, revive, come back, closed
-where: CRM › Pipeline › a customer
+where: CRM › Opportunities › a customer
 access: crm
 ---
 ## Mark a job Lost

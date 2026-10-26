@@ -14,6 +14,7 @@ import { isProjectStage } from '@/lib/crm/stages';
 import { ukPostcode } from '@/lib/crm/site-postcode';
 import type { CrmDoc } from './ProjectExtras';
 import { shortDate, ukDayOf, ukTime } from '../crm-shared';
+import type { JobContact, JobOrganisation } from '@/lib/organisations/shared';
 
 /** crm_projects, read with select('*'): the crm-v3.sql and survey-booking.sql columns may be missing. */
 export type Project = {
@@ -184,6 +185,10 @@ export type RecordData = {
   schema: SchemaReady;
   /** The job's purchase orders at a glance (null before purchase-orders.sql). */
   orders?: OrdersSummary | null;
+  /** The job's organisation and its contacts (null when none is linked; absent before organisations.sql). */
+  organisation?: JobOrganisation | null;
+  /** The person it's dealt with through (in that organisation, or on their own). */
+  contact?: JobContact | null;
 };
 
 /** ?light=1&since=: what the page polls for. */

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { personHint, searchOptions, stepOption, type SearchOption, type SearchPerson } from '@/lib/global-search';
+import { personHint, searchOptions, stepOption, type SearchOption, type SearchOrg, type SearchPerson } from '@/lib/global-search';
 import './global-search.css';
 
 /**
@@ -14,8 +14,8 @@ import './global-search.css';
  * their details on Enquiries): it never makes an opportunity.
  */
 
-type Results = { q: string; people: SearchPerson[]; error: string | null };
-const NONE: Results = { q: '', people: [], error: null };
+type Results = { q: string; people: SearchPerson[]; orgs: SearchOrg[]; error: string | null };
+const NONE: Results = { q: '', people: [], orgs: [], error: null };
 const DELAY = 200;
 
 /** Typing somewhere else (a box, a chat), where "/" is just a character. */
@@ -65,17 +65,17 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
         const r = await fetch(`/api/search?q=${encodeURIComponent(t)}`, { cache: 'no-store', signal: ctl.signal });
         const d = await r.json().catch(() => ({}));
         next = r.ok
-          ? { q: t, people: (d.people ?? []) as SearchPerson[], error: null }
-          : { q: t, people: [], error: r.status === 401 ? 'You’ve been signed out. Refresh the page to sign in again.' : d.error || 'Search isn’t working right now.' };
+          ? { q: t, people: (d.people ?? []) as SearchPerson[], orgs: (d.orgs ?? []) as SearchOrg[], error: null }
+          : { q: t, people: [], orgs: [], error: r.status === 401 ? 'You’ve been signed out. Refresh the page to sign in again.' : d.error || 'Search isn’t working right now.' };
       } catch {
         if (ctl.signal.aborted) return;
-        next = { q: t, people: [], error: 'Can’t search right now: are you offline?' };
+        next = { q: t, people: [], orgs: [], error: 'Can’t search right now: are you offline?' };
       }
       if (ctl.signal.aborted) return;
       setResults(next);
       if (enterFor.current === t) {
         enterFor.current = null;
-        const first = searchOptions(next.people).find((o) => o.href);
+        const first = searchOptions(next.people, next.orgs, t).find((o) => o.href);
         if (first?.href) {
           setOpen(false);
           onDone?.();
@@ -91,7 +91,7 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
 
   const fresh = results.q === t;
   // While the next answer is on its way the last one stays up (faded), so the list doesn't flicker.
-  const options = t.length >= 2 && results.q ? searchOptions(results.people) : [];
+  const options = t.length >= 2 && results.q ? searchOptions(results.people, results.orgs, results.q) : [];
   const showList = open && t.length >= 1;
 
   function pick(o: SearchOption) {
@@ -191,7 +191,7 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
         )}
         {variant === 'inline' && !q && <kbd aria-hidden="true">/</kbd>}
       </label>
-      {variant === 'inline' && <p className="gs-tip">Name, postcode, phone, email or HX-ref</p>}
+      {variant === 'inline' && <p className="gs-tip">Name, postcode, phone, email, HX-ref or organisation</p>}
       {showList && (
         // Keeps the cursor in the box while a result is clicked: Safari doesn't focus links on click, so the
         // box's blur would close the list before the click landed.
@@ -201,20 +201,29 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
               {status}
             </p>
           )}
-          <ul id={listId} className={fresh ? 'gs-list' : 'gs-list is-stale'} role="listbox" aria-label="Customers and projects" aria-busy={!fresh || undefined}>
+          <ul id={listId} className={fresh ? 'gs-list' : 'gs-list is-stale'} role="listbox" aria-label="Customers, projects, organisations and contacts" aria-busy={!fresh || undefined}>
             {options.map((o, i) => {
-              const p = o.person;
+              const isOrg = o.kind === 'org' || o.kind === 'contact';
+              const firstOrg = isOrg && !(options[i - 1]?.kind === 'org' || options[i - 1]?.kind === 'contact');
               const body =
-                o.kind === 'person' ? (
+                o.kind === 'org' || o.kind === 'contact' ? (
+                  <>
+                    <span className="gs-main">
+                      <b>{o.org.name}</b>
+                      <small>{o.org.sub}</small>
+                    </span>
+                    <span className="gs-hint">{o.org.hint}</span>
+                  </>
+                ) : o.kind === 'person' ? (
                   <>
                     <span className="gs-main">
                       <b>
-                        {p.name}
-                        {p.ref && <span className="gs-ref">{p.ref}</span>}
+                        {o.person.name}
+                        {o.person.ref && <span className="gs-ref">{o.person.ref}</span>}
                       </b>
-                      <small>{[p.postcode, p.phone, p.source].filter(Boolean).join(' · ')}</small>
+                      <small>{[o.person.postcode, o.person.phone, o.person.source].filter(Boolean).join(' · ')}</small>
                     </span>
-                    <span className="gs-hint">{personHint(p)}</span>
+                    <span className="gs-hint">{personHint(o.person)}</span>
                   </>
                 ) : (
                   <>
@@ -232,7 +241,8 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
                   role="option"
                   aria-selected={i === active}
                   aria-disabled={!o.href || undefined}
-                  className={`gs-opt is-${o.kind}${i === active ? ' on' : ''}`}
+                  className={`gs-opt is-${isOrg ? 'org' : o.kind}${firstOrg ? ' is-firstorg' : ''}${i === active ? ' on' : ''}`}
+                  data-group={firstOrg ? 'Organisations and contacts' : undefined}
                 >
                   {o.href ? (
                     <Link href={o.href} className="gs-row" tabIndex={-1} onMouseEnter={() => setActive(i)} onClick={() => pick(o)}>
@@ -243,7 +253,7 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
                       {body}
                     </span>
                   )}
-                  {o.kind === 'job' && p.more > 0 && o.job === p.jobs[p.jobs.length - 1] && <span className="gs-morejobs">and {p.more} more</span>}
+                  {o.kind === 'job' && o.person.more > 0 && o.job === o.person.jobs[o.person.jobs.length - 1] && <span className="gs-morejobs">and {o.person.more} more</span>}
                 </li>
               );
             })}
