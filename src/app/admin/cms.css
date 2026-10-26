@@ -494,8 +494,9 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-estband h2{font-size:clamp(1.6rem,3.2vw,2.3rem);font-weight:900;max-width:20ch;margin:0}
 .pv-estband p{margin-top:8px;max-width:44ch;opacity:.85}
 .pv-estband .eb-btn{flex-shrink:0}
-.pv-split{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:76px var(--pv-pad,24px);box-sizing:border-box;width:100%}
-.pv-splitcard{border:1px solid var(--line);border-radius:3px;padding:32px;background:var(--card)}
+.pv-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:76px var(--pv-pad,24px);box-sizing:border-box;width:100%}
+@media(max-width:760px){.pv-split{grid-template-columns:minmax(0,1fr)}.pv-splitcard{padding:24px}}
+.pv-splitcard{min-width:0;border:1px solid var(--line);border-radius:3px;padding:32px;background:var(--card)}
 .pv-splitcard.dark{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .pv-splitcard .pv-sc-ic{width:46px;height:46px;border:1px solid var(--line);border-radius:2px;background:var(--paper-2);display:grid;place-items:center;margin-bottom:16px;animation:pv-scfloat 3.6s ease-in-out infinite}
 .pv-splitcard .pv-sc-ic.dark{background:rgba(247,242,231,.05);border-color:var(--line-d)}

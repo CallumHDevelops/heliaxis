@@ -168,7 +168,7 @@ function defaultSite(){return {
   ]
 }}
 function footerDefaults(){return {
-  logoImg:'/assets/heliaxis-logo.png',
+  logoImg:'/assets/heliaxis-logo-doc.png',
   brandText:'Heliaxis',
   about:'MCS-certified solar, battery, heat pump, EV & LED installation for homes and businesses across South Wales.',
   cols:[

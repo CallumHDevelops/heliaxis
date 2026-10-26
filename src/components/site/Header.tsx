@@ -203,7 +203,7 @@ export default function Header({ menu, topbar }: { menu?: MenuTop[]; topbar?: Si
         <div className={styles.barrow}>
           <Link href="/" className={styles.logo}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/heliaxis-logo.png" alt="Heliaxis" />
+            <img src="/assets/heliaxis-logo-doc.png" alt="Heliaxis" />
           </Link>
 
           <nav className={styles.nav}>

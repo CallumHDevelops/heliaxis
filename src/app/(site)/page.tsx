@@ -23,6 +23,7 @@ import {
 } from '@/components/home';
 import { findCmsPage, getCmsRendered, hasCmsHomeContent } from '@/lib/cms-rendered';
 import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
+import { freshenLogo, LIVE_FIXES_CSS, splitForCtas } from '@/lib/cms-ctas';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,11 +92,35 @@ export default async function HomePage() {
   if (rendered && hasCmsHomeContent(page) && page) {
     return (
       <>
-        <style dangerouslySetInnerHTML={{ __html: rendered.css }} />
-        <div
-          className={page.theme === 'dark' ? 'dk' : ''}
-          dangerouslySetInnerHTML={{ __html: page.html }}
-        />
+        <style dangerouslySetInnerHTML={{ __html: rendered.css + LIVE_FIXES_CSS }} />
+        <div className={page.theme === 'dark' ? 'dk' : ''}>
+          {splitForCtas(freshenLogo(page.html)).map((part, i) =>
+            typeof part === 'string' ? (
+              <div key={i} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: part }} />
+            ) : part.cta === 'survey' ? (
+              <CtaBand
+                key={i}
+                variant="solar"
+                eyebrow="Step one is free"
+                title="Book your free home survey"
+                text="Pick a time that suits you. We come to you, look at your home and give honest figures. No obligation."
+                primary={{ label: 'Book a free survey', href: '/book-a-survey' }}
+                secondary={{ label: 'Get a quote in a minute', href: '/get-a-quote' }}
+              />
+            ) : (
+              <CtaBand
+                key={i}
+                variant="paper"
+                eyebrow="Still got a question?"
+                title="Talk to a real person"
+                text="Ring us, book a call or a video chat, or message us on WhatsApp. No pressure, no sales scripts."
+                primary={{ label: 'Book a call', href: '/book-a-call' }}
+                secondary={{ label: 'Get my free quote', href: '/get-a-quote' }}
+                links={TALK_LINKS}
+              />
+            )
+          )}
+        </div>
         <CmsFormRuntime />
       </>
     );
