@@ -1,0 +1,128 @@
+.cs-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.cs-month {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.cs-month a,
+.cs-month span {
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--text);
+  text-decoration: none;
+}
+.cs-month span {
+  opacity: 0.3;
+}
+.cs-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.9rem;
+}
+.cs-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.cs-tile span {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cs-tile b {
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+.cs-tile small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.cs-tile.is-good {
+  background: var(--inverse);
+  border-color: var(--inverse);
+  color: var(--inverse-text);
+}
+.cs-tile.is-good span,
+.cs-tile.is-good b {
+  color: var(--inverse-accent);
+}
+.cs-tile.is-good small {
+  color: var(--inverse-text);
+  opacity: 0.8;
+}
+.cs-meter {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.cs-meter span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--accent);
+}
+.cs-meter span.is-warn {
+  background: var(--danger);
+}
+.cs-facts {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.cs-facts dd {
+  font-weight: 800;
+  text-align: right;
+}
+.cs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.cs-table td {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border);
+}
+.cs-table td:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+.cs-table a {
+  color: var(--text);
+}
+.cs-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem 1.25rem;
+}
+.cs-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.cs-form small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.cs-form .sm-input {
+  min-width: 0;
+}
+.cs-form button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}

@@ -90,6 +90,9 @@ export default async function SocialMonitoringPage({ searchParams }: { searchPar
             <h1>Social monitoring</h1>
             <p className="sm-sub">Comments and reviews about Heliaxis. Replies are copied and posted by hand: nothing is ever posted, hidden or deleted for you.</p>
           </div>
+          <Link href="/admin/social/costs" className="sm-btn">
+            Costs and savings
+          </Link>
         </header>
 
         {!ready.social ? (

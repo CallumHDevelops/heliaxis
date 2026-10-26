@@ -7,6 +7,7 @@ import seed from './config/scripts.seed.json';
 import settings from './config/settings.defaults.json';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { runGuardrails } from './rules/guardrails';
+import { recordUsage } from './usage';
 import { allFixedTexts, deriveFirstName, DraftChoiceSchema, renderDraft, validateChoice, type DraftChoice, type RenderContext, type Script } from './rules/template';
 import type { Platform, Severity } from './rules/types';
 
@@ -113,6 +114,7 @@ Choose the script, variants, slots and booking type.`,
       },
       { timeout: 30_000 }
     );
+    await recordUsage('draft', res.model, res.usage);
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') return null;
     const last = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').at(-1)?.text;
     const parsed = last ? DraftChoiceSchema.safeParse(JSON.parse(last)) : null;

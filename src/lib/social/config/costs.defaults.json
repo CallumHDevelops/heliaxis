@@ -1,0 +1,19 @@
+{
+  "_note": "Starting assumptions for the Costs report. Admins can change them on Social monitoring > Costs; the saved values live in cms_kv, key 'social-costs'. Every figure here is a guess to be replaced with your own.",
+  "usd_to_gbp": 0.78,
+  "ai_monthly_cap_gbp": 10,
+  "staff_hourly_cost_gbp": 20,
+  "minutes_to_check_one_comment": 2,
+  "minutes_to_write_one_reply": 6,
+  "minutes_to_review_a_draft": 1.5,
+  "minutes_checking_platforms_per_day": 20,
+  "days_checked_per_month": 22,
+  "fixed_costs_gbp": {
+    "Supabase (database)": 0,
+    "Vercel (hosting)": 0,
+    "Other tools": 0
+  },
+  "comparison_tool_name": "A paid social inbox tool (for example Sprout Social or Hootsuite)",
+  "comparison_tool_monthly_gbp": 150,
+  "comparison_tool_note": "Indicative only. Check the current price of the tool you would otherwise buy; these tools charge per user and change their plans often."
+}

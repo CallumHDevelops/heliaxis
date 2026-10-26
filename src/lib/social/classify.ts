@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { alertForMention } from './alerts';
 import { combine, type CombineInput } from './rules/combine';
+import { recordUsage } from './usage';
 import { SEVERITIES, sevRank, type Severity } from './rules/types';
 
 export const COMMENT_TYPES = ['quote_request', 'question', 'positive', 'complaint', 'general', 'spam'] as const;
@@ -110,6 +111,7 @@ export async function callClassifier(input: ClassifierInput): Promise<{ result: 
       },
       { timeout: 30_000 }
     );
+    await recordUsage('classify', res.model, res.usage);
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') return null;
     const last = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').at(-1)?.text;
     const parsed = last ? ModelClassification.safeParse(JSON.parse(last)) : null;

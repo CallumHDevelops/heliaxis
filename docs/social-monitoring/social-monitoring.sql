@@ -393,6 +393,21 @@ begin
   end loop;
 end $$;
 
+-- ── What the AI steps cost (one row per model call; the Costs report adds these up) ──────────
+create table if not exists public.social_usage (
+  id             bigint generated always as identity primary key,
+  at             timestamptz not null default now(),
+  kind           text not null,                 -- classify | draft
+  model          text not null,
+  input_tokens   int not null default 0,
+  output_tokens  int not null default 0,
+  cache_read_tokens  int not null default 0,
+  cache_write_tokens int not null default 0,
+  cost_usd       numeric(12,6) not null default 0
+);
+create index if not exists social_usage_at on public.social_usage (at desc);
+alter table public.social_usage enable row level security;
+
 -- ── Job runner: every minute (replace the URL and secret; same pattern as whatsapp.sql) ─────────
 -- select cron.schedule('heliaxis-social', '* * * * *', $$ select net.http_post(
 --   url := 'https://heliaxis.co.uk/api/cron/social',
