@@ -43,18 +43,20 @@ async function badges(keys: PortalKey[], isAdmin: boolean) {
       count(admin.from('enquiries').select('id', { count: 'exact', head: true }).eq('status', 'new')).then((n) => {
         if (n) out.enquiries = { n, detail: 'new' };
       }),
-    // Social monitoring: Critical and High comments nobody has dealt with yet (a missing table just gives 0).
+    // Social monitoring: every comment or review still waiting for a person (anything that is not "ignore"),
+    // so each one shows up here until it has been answered or dismissed. A missing table just gives 0.
     keys.includes('social_monitoring') &&
       count(
         admin
           .from('social_mention')
           .select('id', { count: 'exact', head: true })
-          .in('severity', ['critical', 'high'])
+          .neq('severity', 'ignore')
           .not('status', 'in', '(posted,dismissed)')
           .eq('is_synthetic', false)
           .eq('author_is_own', false)
+          .eq('hidden_from_queue', false)
       ).then((n) => {
-        if (n) out.social_monitoring = { n, detail: `urgent comment${n === 1 ? '' : 's'}` };
+        if (n) out.social_monitoring = { n, detail: `comment${n === 1 ? '' : 's'} to answer` };
       }),
     keys.includes('tasks') &&
       count(
