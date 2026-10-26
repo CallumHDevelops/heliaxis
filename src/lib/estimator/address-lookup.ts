@@ -14,10 +14,23 @@ export type Place = { lat: number | null; lng: number | null; address: string; p
 const base = 'https://api.ideal-postcodes.co.uk/v1';
 const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/i;
 
+/** A key limited to certain websites (as an Ideal Postcodes browser key can be) refuses a server call unless it says which site is asking. */
+const referer = () => process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk';
+const clean = (t: string) => t.replace(/ak_[A-Za-z0-9]+/g, 'ak_…').slice(0, 300);
+
+/** What happened on the last suggestion call, for the ?debug=1 view of the address route. */
+export async function suggestDebug(term: string): Promise<string> {
+  const key = process.env.IDEAL_POSTCODES_API_KEY;
+  if (!key) return 'IDEAL_POSTCODES_API_KEY is not set on this deployment';
+  const r = await fetch(`${base}/autocomplete/addresses?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(term.trim())}&limit=8`, { headers: { Referer: referer() }, signal: AbortSignal.timeout(5000) }).catch((e) => String(e));
+  if (typeof r === 'string') return clean(`No answer: ${r}`);
+  return clean(`HTTP ${r.status}: ${await r.text().catch(() => '')}`);
+}
+
 export async function suggest(term: string): Promise<Suggestion[]> {
   const key = process.env.IDEAL_POSTCODES_API_KEY;
   if (!key || term.trim().length < 3) return [];
-  const r = await fetch(`${base}/autocomplete/addresses?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(term.trim())}&limit=8`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
+  const r = await fetch(`${base}/autocomplete/addresses?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(term.trim())}&limit=8`, { headers: { Referer: referer() }, signal: AbortSignal.timeout(5000) }).catch(() => null);
   if (!r || !r.ok) return [];
   const d = (await r.json().catch(() => null)) as { result?: { hits?: { id?: string; suggestion?: string }[] } } | null;
   // UK addresses only: anything without a UK postcode is dropped, whatever the service sends back.
@@ -28,7 +41,7 @@ export async function suggest(term: string): Promise<Suggestion[]> {
 export async function place(id: string): Promise<Place | null> {
   const key = process.env.IDEAL_POSTCODES_API_KEY;
   if (!key || !/^[\w-]{4,200}$/.test(id)) return null;
-  const r = await fetch(`${base}/autocomplete/addresses/${encodeURIComponent(id)}/gbr?api_key=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
+  const r = await fetch(`${base}/autocomplete/addresses/${encodeURIComponent(id)}/gbr?api_key=${encodeURIComponent(key)}`, { headers: { Referer: referer() }, signal: AbortSignal.timeout(5000) }).catch(() => null);
   if (!r || !r.ok) return null;
   const d = (await r.json().catch(() => null)) as { result?: Record<string, unknown> } | null;
   const a = d?.result;
