@@ -59,6 +59,8 @@ export type RoofAnalysis = {
   panelH: number;
   /** Yearly sun per kW (shade included) averaged over the panels laid. */
   fluxMean: number | null;
+  /** What the analysis saw, for the ?debug view: each face found and how many panels it took. */
+  info: { imageryQuality?: string; okCells: number; faces: { bearing: number; pitch: number; areaM2: number; cells: number; panels: number }[] };
 };
 
 export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key: string, referer: string): Promise<{ ok: true; roof: RoofAnalysis } | { ok: false; why: string }> {
@@ -75,7 +77,7 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
     const r = await fetch(u, { headers: { Referer: referer }, signal: AbortSignal.timeout(10000) }).catch(() => null);
     if (!r) return { ok: false, why: 'data layers did not answer' };
     if (!r.ok) return { ok: false, why: `data layers returned ${r.status}: ${(await r.text().catch(() => '')).replace(/key=[A-Za-z0-9_-]+/g, 'key=…').replace(/AIza[0-9A-Za-z_-]{20,}/g, '…').slice(0, 200)}` };
-    const d = (await r.json()) as { dsmUrl?: string; maskUrl?: string; annualFluxUrl?: string };
+    const d = (await r.json()) as { dsmUrl?: string; maskUrl?: string; annualFluxUrl?: string; imageryQuality?: string };
     if (!d.dsmUrl) return { ok: false, why: 'data layers gave no height map' };
     const [dsm, mask, flux] = await Promise.all([readLayer(d.dsmUrl, key, referer), d.maskUrl ? readLayer(d.maskUrl, key, referer) : null, d.annualFluxUrl ? readLayer(d.annualFluxUrl, key, referer) : null]);
     if (!dsm) return { ok: false, why: 'could not read the height map' };
@@ -145,6 +147,11 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
         main: { bearing: Math.round(mainFace.bearing), pitch: Math.round(mainFace.pitch), areaM2: Math.round(mainFace.areaM2) },
         panelW: PANEL_W,
         panelH: PANEL_H,
+        info: {
+          imageryQuality: d.imageryQuality,
+          okCells: g.ok.reduce((a, v) => a + v, 0),
+          faces: faces.map((f) => ({ bearing: Math.round(f.bearing), pitch: Math.round(f.pitch), areaM2: Math.round(f.areaM2), cells: f.cells.length, panels: placed.filter((p) => p.face === f.id).length })),
+        },
         fluxMean: flat.length ? flat.reduce((a, p) => a + p.flux, 0) / flat.length : null,
       },
     };

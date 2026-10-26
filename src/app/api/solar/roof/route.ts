@@ -13,7 +13,7 @@ export const maxDuration = 30;
 
 const json = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { 'Cache-Control': (b as { found?: boolean }).found ? 'private, max-age=600' : 'no-store' } });
 
-type Found = { found: true; address: string; lat: number; lng: number; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null; /** How the roof was read: 'ok', or why we fell back to Google's own layout. */ layers?: string; map: (MapData & { imageUrl: string; outline: { lat: number; lng: number }[] | null }) | null };
+type Found = { found: true; address: string; lat: number; lng: number; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null; /** What the roof analysis saw (only with ?debug). */ info?: unknown; /** How the roof was read: 'ok', or why we fell back to Google's own layout. */ layers?: string; map: (MapData & { imageUrl: string; outline: { lat: number; lng: number }[] | null }) | null };
 type Miss = { found: false; reason: 'not_configured' | 'bad_address' | 'no_address' | 'not_covered' | 'busy' | 'error'; detail?: string };
 
 /** Same address asked again within a day is answered from memory (so it is only billed once). */
@@ -119,6 +119,7 @@ async function solar(lat: number, lng: number, key: string): Promise<{ b: Google
 export async function GET(req: Request) {
   const u = new URL(req.url);
   const id = (u.searchParams.get('id') || '').trim();
+  const debug = u.searchParams.has('debug');
   let pc = (u.searchParams.get('pc') || '').trim().toUpperCase().slice(0, 9);
   let line = (u.searchParams.get('line') || '').trim().slice(0, 80);
   const key = process.env.GOOGLE_SOLAR_API_KEY;
@@ -133,7 +134,7 @@ export async function GET(req: Request) {
   if (line.length < 1) return json({ found: false, reason: 'no_address' } satisfies Miss);
 
   const ck = picked ? `id|${id}` : `${pc.replace(/\s+/g, '')}|${line.toLowerCase()}`;
-  const hit = cache.get(ck);
+  const hit = debug ? undefined : cache.get(ck);
   if (hit && Date.now() - hit.at < 86400_000) return json(hit.value);
 
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'x';
@@ -171,7 +172,7 @@ export async function GET(req: Request) {
         const kwh = y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical');
         roof = { ...roof, shade: roofFromGoogle(b, kwh)?.shade ?? roof.shade };
         const layers = mine.ok ? 'ok' : mine.why;
-        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: kwh, monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, layers, map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
+        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: kwh, monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, layers, ...(debug && mine.ok ? { info: mine.roof.info } : {}), map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
       }
     }
   } catch (e) {
