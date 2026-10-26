@@ -26,6 +26,7 @@ type Tab =
   | 'whatsapp'
   | 'approvals'
   | 'users'
+  | 'value'
   | 'blog'
   | 'analytics'
   | 'heatmap'
@@ -367,6 +368,7 @@ export async function AdminShell({
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         // On site: one tap away on the phone's bottom bar, so not in "More".
         { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring },
+        { href: '/admin/value', label: 'Added value', icon: icons.analytics, active: active === 'value', show: admin },
         { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
       ],
     },
