@@ -33,18 +33,22 @@ export async function suggest(term: string): Promise<Suggestion[]> {
   const r = await fetch(`${base}/autocomplete/addresses?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(term.trim())}&limit=8`, { headers: { Referer: referer() }, signal: AbortSignal.timeout(5000) }).catch(() => null);
   if (!r || !r.ok) return [];
   const d = (await r.json().catch(() => null)) as { result?: { hits?: { id?: string; suggestion?: string }[] } } | null;
-  // UK addresses only: anything without a UK postcode is dropped, whatever the service sends back.
-  return (d?.result?.hits ?? []).filter((h) => h.id && h.suggestion && UK_POSTCODE.test(String(h.suggestion))).slice(0, 8).map((h) => ({ id: String(h.id), address: String(h.suggestion) }));
+  // The service is UK only. Its suggestions carry just the first half of the postcode ("NP26"), so the full one comes from the pick.
+  return (d?.result?.hits ?? []).filter((h) => h.id && h.suggestion).slice(0, 8).map((h) => ({ id: String(h.id), address: String(h.suggestion) }));
 }
 
 /** One picked address in full. Null if the service does not know it. */
 export async function place(id: string): Promise<Place | null> {
   const key = process.env.IDEAL_POSTCODES_API_KEY;
   if (!key || !/^[\w-]{4,200}$/.test(id)) return null;
-  const r = await fetch(`${base}/autocomplete/addresses/${encodeURIComponent(id)}/gbr?api_key=${encodeURIComponent(key)}`, { headers: { Referer: referer() }, signal: AbortSignal.timeout(5000) }).catch(() => null);
-  if (!r || !r.ok) return null;
-  const d = (await r.json().catch(() => null)) as { result?: Record<string, unknown> } | null;
-  const a = d?.result;
+  const get = async (path: string) => {
+    const r = await fetch(`${base}${path}?api_key=${encodeURIComponent(key)}`, { headers: { Referer: referer() }, signal: AbortSignal.timeout(5000) }).catch(() => null);
+    if (!r || !r.ok) return null;
+    return ((await r.json().catch(() => null)) as { result?: Record<string, unknown> } | null)?.result ?? null;
+  };
+  // The full address for a suggestion; failing that, by its UDPRN (the number after "paf_").
+  const udprn = id.match(/^paf_(\d+)$/)?.[1];
+  const a = (await get(`/autocomplete/addresses/${encodeURIComponent(id)}/gbr`)) ?? (udprn ? await get(`/udprn/${udprn}`) : null);
   if (!a) return null;
   const postcode = String(a.postcode || '').toUpperCase();
   if (!UK_POSTCODE.test(postcode)) return null;
