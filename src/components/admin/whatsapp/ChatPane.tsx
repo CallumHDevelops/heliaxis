@@ -16,6 +16,8 @@ import { shownBody } from '@/lib/whatsapp/describe';
 import type { MediaFields } from '@/lib/whatsapp/media-shared';
 import type { WaTemplate } from '@/lib/whatsapp/templates-shared';
 import { emailBodyFromWhatsApp, emailSubjectFor } from '@/lib/whatsapp/email-fallback';
+import { appendBlock } from '@/lib/quick-links';
+import { QuickLinks } from '@/components/admin/QuickLinks';
 import { useChatTasks } from './ChatTasks';
 import { MediaBubble } from './MediaBubble';
 import { ScheduledBubble, useSendLater } from './SendLater';
@@ -732,6 +734,7 @@ export function ChatPane({
           <p className="wa-muted">
             Emails <b>{enquiry.email}</b> from the Heliaxis mailbox instead. A company footer is added, WhatsApp button labels are left out, and their reply is logged on their record.
           </p>
+          <QuickLinks via="email" postcode={enquiry.postcode} onPick={(t) => setMail({ ...mail, text: appendBlock(mail.text, t) })} />
           <input className="wa-input" value={mail.subject} onChange={(e) => setMail({ ...mail, subject: e.target.value })} aria-label="Email subject" />
           <textarea className="wa-input" rows={8} value={mail.text} onChange={(e) => setMail({ ...mail, text: e.target.value })} aria-label="Email message" />
           {mail.err && <p className="wa-banner wa-banner--err">{mail.err}</p>}
@@ -868,6 +871,7 @@ export function ChatPane({
                 {number && ` · ${number}`}
               </p>
               <div className="wa-pane__chips">
+                <QuickLinks via="whatsapp" postcode={enquiry.postcode} onPick={(t) => setDraft(appendBlock(textNow.current, t))} />
                 {projectId && <SnippetPicker projectId={projectId} name={enquiry.name} onPick={(t) => setDraft(textNow.current.trim() ? `${textNow.current}\n${t}` : t)} />}
                 {projectId && docs && <WhatsAppDocSend id={projectId} docs={docs} lateTime={typed.lateTime} onSent={async () => void (await reload())} />}
                 {chasePicker(text, false, typed.lateAt)}
@@ -946,6 +950,7 @@ export function ChatPane({
           {chasePicker(text, false, typed.lateAt)}
           <div className="wa-compose wsl-compose">
             {typed.panel}
+            <QuickLinks via="whatsapp" postcode={enquiry.postcode} onPick={(t) => setDraft(appendBlock(text, t))} />
             <div className="wsl-row">
               <textarea
                 ref={inputRef}

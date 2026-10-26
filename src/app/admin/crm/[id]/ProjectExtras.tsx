@@ -5,6 +5,8 @@
  * the document picker (WhatsApp / email) and the Microsoft 365 email composer.
  */
 
+import { QuickLinks } from '@/components/admin/QuickLinks';
+import { appendBlock } from '@/lib/quick-links';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -1010,6 +1012,7 @@ export function EmailComposerV2({
         To {customer.email} · {connected ? 'sent from the shared Heliaxis mailbox; replies appear on the timeline.' : 'opens your email app (Microsoft 365 not connected yet) and is logged here.'}
       </p>
       <SnippetPicker projectId={id} name={customer.name} onPick={(t) => setBody((b) => (b.trim().split('\n').length <= 2 ? `${b}${t}` : `${b}\n${t}`))} />
+      <QuickLinks via="email" onPick={(t) => setBody((b) => appendBlock(b, t))} />
       <input className="crm-input" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
       <textarea className="crm-input" rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
       {connected && (
