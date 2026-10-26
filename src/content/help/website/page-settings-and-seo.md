@@ -23,7 +23,7 @@ Open the page in the editor and click the **SEO** tab on the left. It’s headed
 | **Canonical URL** | Only needed if the same content lives at another address. See the note below. |
 | **Hide from search engines (noindex)** | Tick to ask Google not to list the page. |
 
-Changes save automatically, and go live the next time the website is published.
+Changes save automatically. On a live page they go live the next time the website is published; on a draft page, when that page is published.
 
 > **Good to know:** Of the search and sharing settings, the live website uses **Page title (SEO)**, **Meta description** and **Hide from search engines (noindex)**. **Social share image URL** and **Canonical URL** are saved, and go into the file from **⋯ › Export HTML**, but heliaxis.co.uk doesn’t use them yet.
 

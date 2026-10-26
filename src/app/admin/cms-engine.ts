@@ -2094,12 +2094,13 @@ function openPublish(){
   box.className='modalbox';
   // Mega / library / logos are site chrome — not a single page. The toolbar
   // still remembers the last edited page (e.g. a blog), which confused the URL.
-  if(MODE==='mega'||MODE==='library'||MODE==='logos'){
-    var chromeLabel=MODE==='mega'?'mega menu (site header)':MODE==='library'?'image library':'brand logos';
+  // Outside the page editor no page is being published (doPublish), so none is named.
+  if(MODE!=='edit'){
+    var chromeLabel=MODE==='mega'?'mega menu (site header)':MODE==='library'?'image library':MODE==='logos'?'brand logos':'';
     var homeUrl=siteOrigin()+'/';
     box.innerHTML='<button class="close" onclick="closeModal()">×</button>'
       +'<h2>Publish to your site</h2>'
-      +'<p>This publishes your <b>'+esc(chromeLabel)+'</b> and the rest of the saved CMS. The top navigation on every public page will update.</p>'
+      +'<p>This publishes '+(chromeLabel?'your <b>'+esc(chromeLabel)+'</b> and ':'')+'saved changes to pages that are already live. Draft pages and articles stay off the website. The top navigation on every public page will update.</p>'
       +'<div class="pub-live-url" title="Check the live header"><span>See it on</span><code>'+esc(homeUrl)+'</code></div>'
       +(MODE==='mega'?'<p style="font-size:.85rem;color:var(--muted);margin:10px 0 0">After publish, open the homepage and hover Solar &amp; Battery / Business to check the mega panels.</p>':'')
       +'<div id="pubmsg" style="margin:12px 0;font-size:.9rem"></div>'
@@ -2175,7 +2176,7 @@ async function doPublish(){
   if(!m)return;
   m.style.color='var(--muted)';m.textContent='Saving & publishing…';
   try{
-    // AI blogs must live under /blog/{slug} and be marked published for the journal.
+    // AI blogs must live under /blog/{slug} for the journal.
     var nowIso=new Date().toISOString();
     (STATE.pages||[]).forEach(function(pg,i){
       if(!isCmsBlogPage(pg))return;
@@ -2183,20 +2184,25 @@ async function doPublish(){
       pg.slug=next;
       pg.seo=pg.seo||{};
       pg.seo.slug=next;
-      pg.blogStatus='published';
-      pg.publishAt=pg.publishAt||nowIso;
-      pg.scheduledRender=null;
     });
+    // Only the page or article being published goes live. Other draft pages stay off the website, and
+    // other articles keep their own status (Draft, Scheduled, Live): the server keeps it and leaves out
+    // every article that isn't live (src/lib/blog/cms-publish-rules.ts). Every page is sent, with its id:
+    // the server decides which are drafts, so a page this tab still has as a draft after another tab
+    // published it stays on the website.
+    var cur=(MODE==='edit')?page():null;
+    var curBlog=!!(cur&&isCmsBlogPage(cur));
+    if(curBlog){cur.blogStatus='published';cur.publishAt=cur.publishAt||nowIso;cur.scheduledRender=null;}
     await save();
     await ensurePublishStyles();
     var css=buildPublishCss();
     var pages=STATE.pages.map(function(pg){
-      return{slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
+      return{id:pg.id,slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
         html:'<div class="pv-page">'+pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')+'</div>'};
     });
     // Send live STATE (incl. site.menu) so publish does not re-read a stale draft.
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
-      body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages}})});
+      body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages},publishBlogId:curBlog?cur.id:null,publishPageId:(cur&&!curBlog)?cur.id:null})});
     if(!r.ok){
       var em='Publish failed';
       try{em=(await r.json()).error||em;}catch(e){}
@@ -2206,9 +2212,9 @@ async function doPublish(){
       }
       throw new Error(em);
     }
-    // Publish succeeded — every page in the doc is now live (clears draft status).
-    try{var _dch=false;STATE.pages.forEach(function(p){if(p&&p._draft){delete p._draft;_dch=true;}});if(_dch)save();}catch(e){}
-    var liveUrl=(MODE==='mega'||MODE==='library'||MODE==='logos')
+    // Publish succeeded — the page published is live now (other new pages stay drafts).
+    try{if(cur&&cur._draft){delete cur._draft;save();}}catch(e){}
+    var liveUrl=!cur
       ? (siteOrigin()+'/')
       : publicPageUrl(page()?(isCmsBlogPage(page())?toPublicBlogSlug(page().slug):page().slug):'/');
     var viewLabel=(MODE==='mega')?'View site header →':'View live page →';

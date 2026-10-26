@@ -170,6 +170,11 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
               <input type="checkbox" checked={s.sequenceEnabled} onChange={(e) => set('sequenceEnabled', e.target.checked)} /> On — stops the moment they reply, or when the
               opportunity moves past Contacted
             </label>
+            <p className="crm-muted crm-small">
+              When you switch it on, leads already in the CRM only get the steps that fall due from then on. Earlier ones are skipped, not sent late. A step you
+              add only goes to leads it falls due for after you save; the other steps carry on as they were. Changing a step’s hours or Send by doesn’t change who
+              gets it: a lead still waiting for it gets it, straight away if it’s now past its time. Nobody gets the same step twice.
+            </p>
             {s.sequence.map((st, i) => (
               <div key={i} className="crm-step">
                 <div className="crm-step-head">
@@ -209,7 +214,7 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
             <button
               type="button"
               className="crm-btn crm-btn--ghost"
-              onClick={() => set('sequence', [...s.sequence, { afterHours: (s.sequence.at(-1)?.afterHours || 0) + 48, channel: 'whatsapp', text: 'Hi {first_name}, ' }])}
+              onClick={() => set('sequence', [...s.sequence, { id: '', afterHours: (s.sequence.at(-1)?.afterHours || 0) + 48, channel: 'whatsapp', text: 'Hi {first_name}, ' }])}
             >
               + Add step
             </button>

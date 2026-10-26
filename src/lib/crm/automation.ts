@@ -7,8 +7,8 @@ import { sendSystem } from '@/lib/whatsapp/inbox';
 import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { isQuiet } from '@/lib/whatsapp/schedule';
 import { msConfigured, sendMail } from '@/lib/ms365';
-import { getCrmSettings } from './crm-settings';
-import { fillText } from './settings-shared';
+import { getCrmSettings, getSavedCrmSettings } from './crm-settings';
+import { fillText, sequenceHad, sequenceNext, type SequenceStep } from './settings-shared';
 import { daysWord } from './tracker';
 import { ensurePortalToken, logActivity, portalUrl } from './server';
 import { bookingUrl, ensureBookingToken } from './booking-link';
@@ -423,18 +423,37 @@ export async function runCrmAutomations() {
 
   // Follow-up sequences for leads that haven't replied (not for jobs on hold).
   if (s.sequenceEnabled && s.sequence.length) {
+    // Leads a step added or removed still has to put back, if the run after that Save was cut off.
+    await finishSequenceChange().catch(() => 0);
+    // A Save since the start has put its leads back: go by the list as saved now, not the one read at the start, or this
+    // pass would undo that. If it can't be read, the list read at the start stands.
+    const sequence = (await getSavedCrmSettings().catch(() => s)).sequence;
     const { data: seq } = await db
       .from('crm_projects')
       .select(cols)
       .in('stage', ['lead', 'contacted'])
       .is('sequence_stopped_at', null)
-      .lt('sequence_step', s.sequence.length)
+      .lt('sequence_step', sequence.length)
       .gte('created_at', new Date(now.getTime() - 45 * 86_400_000).toISOString())
       .limit(50);
     const seqHeld = await onHold(((seq ?? []) as Proj[]).map((p) => p.id));
     for (const p of (seq ?? []) as Proj[]) {
-      const step = s.sequence[p.sequence_step];
-      if (!step || seqHeld.has(p.id) || now.getTime() < new Date(p.created_at).getTime() + step.afterHours * 3_600_000) continue;
+      if (seqHeld.has(p.id)) continue;
+      // sequence_step is the place of the lead's next step (the list's length once it has had them all), for the
+      // query above; which steps it has had go by id.
+      const had = sequenceHad(p.reminders_sent, p.sequence_step);
+      const { at, skip } = sequenceNext(sequence, had, p.created_at);
+      const step = sequence[at];
+      const due = !!step && now.getTime() >= new Date(p.created_at).getTime() + step.afterHours * 3_600_000;
+      if (!due && !skip.length && at === p.sequence_step) continue;
+      // What it has had goes down by id first (for a lead from before ids, the steps its sequence_step counted),
+      // so adding, moving or removing a step never re-sends another. Steps it came in too early for (it was
+      // past them when the sequence was switched on, or the step added) are skipped quietly, not sent late.
+      for (const id of [...had, ...skip]) await markSent(p, `seq:${id}`);
+      if (!due || !(await markSent(p, `seq:${step.id}`))) {
+        await db.from('crm_projects').update({ sequence_step: at }).eq('id', p.id);
+        continue;
+      }
       const c = await customer(p.enquiry_id);
       const token = step.text.includes('{portal_link}') ? await ensurePortalToken(p.id) : null;
       const link = token ? portalUrl(token) : null;
@@ -463,12 +482,12 @@ export async function runCrmAutomations() {
           }
         }
       }
-      await db.from('crm_projects').update({ sequence_step: p.sequence_step + 1 }).eq('id', p.id);
+      await db.from('crm_projects').update({ sequence_step: at + 1 }).eq('id', p.id);
       await logActivity({
         enquiryId: p.enquiry_id,
         projectId: p.id,
         kind: 'system',
-        body: ok ? `Follow-up ${p.sequence_step + 1} sent (${by})` : `Follow-up ${p.sequence_step + 1} skipped: ${why}`,
+        body: ok ? `Follow-up ${at + 1} sent (${by})` : `Follow-up ${at + 1} skipped: ${why}`,
       });
       if (ok) out.sequence++;
     }
@@ -476,13 +495,120 @@ export async function runCrmAutomations() {
   return out;
 }
 
-/** Give a new lead to the next person in the rotation (CRM → Settings) and tell them. */
+/** cms_kv: when a Save added or removed a step, kept until a run finds no lead left to put back (finishSequenceChange). */
+const SEQUENCE_CHECK = 'crm-sequence-check';
+const PAGE = 1000;
+
+/**
+ * After a save that added or removed a step (CRM settings): a lead whose sequence_step is at or past the new
+ * list's length, though there's a step in it the lead hasn't had (one added after a step it had was removed, or a
+ * step removed in front of the one it's waiting for), has to be put back to that step's place, so the runner's
+ * query finds it again. Only noted here, so the Save answers straight away: finishSequenceChange does it once the
+ * answer has gone, and the next Save or the every-minute job finishes a run that's cut off. Never throws.
+ */
+export async function sequenceChanged(prev: SequenceStep[], next: SequenceStep[]) {
+  const ids = (l: SequenceStep[]) => l.map((x) => x.id).sort().join();
+  if (!next.length || ids(prev) === ids(next)) return;
+  const at = new Date().toISOString();
+  await createAdminClient()
+    .from('cms_kv')
+    .upsert({ key: SEQUENCE_CHECK, value: at, updated_at: at })
+    .then(
+      () => null,
+      () => null
+    );
+}
+
+/**
+ * Put back the leads sequenceChanged noted: once the Save has answered, and again after every Save and from the
+ * every-minute job until a run finds none left, so a run cut off is finished. Every lead past the end is read first,
+ * a page at a time by id (none missed past PostgREST's row limit, or skipped as others are put back). A lead from
+ * before ids has what its sequence_step counted written down by id and its new place in one write, so it's never
+ * left with part of its history; the others go back in one write per place. The runner works out the rest by id,
+ * including skipping a step the lead was already past when it was added. → how many leads it found to put back.
+ * Throws if the saved settings can't be read or aren't there, so the note stays and a later run tries again (the
+ * defaults would find nothing owed, and the note would go).
+ */
+export async function finishSequenceChange(): Promise<number> {
+  const db = createAdminClient();
+  const { data: noted } = await db.from('cms_kv').select('value').eq('key', SEQUENCE_CHECK).maybeSingle();
+  if (!noted) return 0;
+  // Read after the note, so a Save from here on leaves a new one.
+  const { sequence } = await getSavedCrmSettings();
+  type Row = Pick<Proj, 'id' | 'reminders_sent' | 'sequence_step'>;
+  const found: Row[] = [];
+  while (sequence.length) {
+    const q = db
+      .from('crm_projects')
+      .select('id, reminders_sent, sequence_step')
+      .in('stage', ['lead', 'contacted'])
+      .is('sequence_stopped_at', null)
+      .gte('sequence_step', sequence.length)
+      .gte('created_at', new Date(Date.now() - 45 * 86_400_000).toISOString())
+      .order('id')
+      .limit(PAGE);
+    const { data, error } = await (found.length ? q.gt('id', found[found.length - 1].id) : q);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    found.push(...(data as Row[]));
+  }
+  const before: { p: Row; at: number; keys: string[] }[] = [];
+  const back = new Map<number, string[]>();
+  for (const p of found) {
+    const had = sequenceHad(p.reminders_sent, p.sequence_step);
+    const at = sequence.findIndex((x) => !had.includes(x.id));
+    if (at < 0) continue;
+    const keys = had.map((id) => `seq:${id}`).filter((k) => !p.reminders_sent?.includes(k));
+    if (keys.length) before.push({ p, at, keys });
+    else back.set(at, [...(back.get(at) ?? []), p.id]);
+  }
+  if (!before.length && !back.size) {
+    await db.from('cms_kv').delete().eq('key', SEQUENCE_CHECK).eq('value', noted.value);
+    return 0;
+  }
+  // From before ids: only while nothing else has written to it since it was read (a key added meanwhile would be
+  // lost); one that has is left for the next run.
+  for (let i = 0; i < before.length; i += 10) {
+    await Promise.all(
+      before.slice(i, i + 10).map(async ({ p, at, keys }) => {
+        const sent = p.reminders_sent ?? [];
+        const { error } = await db
+          .from('crm_projects')
+          .update({ reminders_sent: [...sent, ...keys], sequence_step: at })
+          .eq('id', p.id)
+          .eq('sequence_step', p.sequence_step)
+          .contains('reminders_sent', sent)
+          .containedBy('reminders_sent', sent);
+        if (error) throw new Error(error.message);
+      })
+    );
+  }
+  for (const [at, ids] of back) {
+    for (let i = 0; i < ids.length; i += 100) {
+      const { error } = await db.from('crm_projects').update({ sequence_step: at }).in('id', ids.slice(i, i + 100)).gte('sequence_step', sequence.length);
+      if (error) throw new Error(error.message);
+    }
+  }
+  return before.length + [...back.values()].reduce((n, ids) => n + ids.length, 0);
+}
+
+/**
+ * Give a new lead to the next person in the rotation (CRM → Settings) and tell them. Only people who can
+ * still open the CRM take a turn: someone rejected, set back to pending or without the CRM portal is
+ * skipped (they stay ticked and keep their place, and take turns again when their access comes back).
+ */
 export async function assignNewLead(projectId: string, customerName: string, enquiryId?: string) {
   const s = await getCrmSettings();
-  if (!s.leadRotation.length) return null;
-  const owner = s.leadRotation[s.rotationIndex % s.leadRotation.length];
+  const n = s.leadRotation.length;
+  if (!n) return null;
+  const team = new Set(await crmTeam());
+  // rotationIndex is a place in the whole ticked list (not just who's on the team today), so the turn order
+  // holds when someone's access changes: from there, the first person who can still take a lead gets it.
+  const at = Array.from({ length: n }, (_, k) => (s.rotationIndex + k) % n).find((i) => team.has(s.leadRotation[i]));
+  if (at === undefined) return null;
+  const owner = s.leadRotation[at];
   const { saveCrmSettings } = await import('./crm-settings');
-  await saveCrmSettings({ ...s, rotationIndex: (s.rotationIndex + 1) % s.leadRotation.length });
+  await saveCrmSettings({ ...s, rotationIndex: (at + 1) % n });
   await createAdminClient().from('crm_projects').update({ owner_id: owner }).eq('id', projectId).is('owner_id', null);
   await notify({
     userId: owner,

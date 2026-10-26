@@ -17,7 +17,9 @@ While suspended:
 - RAMS no longer sees the firm or its team: RAMS only sees **Active** firms.
 - They can still sign in to their portal, where the top says "Your account is suspended. Please contact Heliaxis."
 - They still get the daily reminder emails. Use **Pause reminders** if you don’t want that.
-- They still appear when putting a trade on a job, so check before you do.
+- They can’t be put on a new job. When putting a trade on a job, they and their people still show in the list, marked "Suspended: can’t be given new jobs", but they can’t be picked. Jobs they’re already on carry on as they are.
+- A trade you put on a job for them before they were suspended, but that hasn’t reached them yet, is a new job to them. That’s one still **Not sent**, or **Sent** where no email or WhatsApp with their link went through, you haven’t copied the link or sent it with **WhatsApp from my phone**, and they haven’t opened it. Nothing more can be sent on it: not the job pack, “clear to start”, the link, a **New link** or **Send again**. Only “don’t use the scaffold yet” still goes to a **Sent** trade, as it’s a safety notice. It has no link, so it doesn’t count as reaching them. Take them off the job, or reinstate them first.
+- A job pack or “clear to start” for such a trade that was waiting to send (one sent late in the evening) doesn’t go either: when its time comes, the trade’s card on the job’s **Site** tab shows it didn’t go, and why. If you reinstate the firm before then, it goes as planned; after, use **Send again** on the card.
 
 ## Reinstate
 
@@ -33,7 +35,7 @@ Use this when you’ve stopped working with a firm for good.
 Their status becomes **Terminated**, and:
 
 - their portal link stops working and they’re signed out of every device, so they can’t get in at all,
-- they can’t be put on a job ("That subcontractor can’t be given work."),
+- they can’t be put on a new job: they and their people no longer show when putting a trade on a job, and a trade already on a job for them that hasn’t reached them yet is treated as for a suspended firm above (take them off the job),
 - they’re never sent reminders, and
 - everything on their page stays, for your records.
 

@@ -34,7 +34,7 @@ There’s no delete button. Instead, stop them signing in:
 
 The next time they open any page in Heliaxis, they’re sent to the **Awaiting approval** page instead. Everything they did (notes, tasks, messages) stays as it was. Nothing is handed over by itself: jobs they own and open tasks given to them stay with them, so give those to someone else. To let them back in, set **Status** to **Approved** and press **Save**.
 
-> **Watch out:** If they take new leads, untick them under **CRM › CRM settings › New leads** first, and press **Save settings**. Once they’re rejected, or lose the **CRM** tick, they drop off that list on screen, but the app can still hand them new leads in turn. See [Choose who gets new leads](/admin/help/admin/new-leads).
+> **Good to know:** If they took new leads in turn, the app stops giving them any once they’re rejected or lose the **CRM** tick, and shares new leads between the others. If they come back, they take turns again by themselves. See [Choose who gets new leads](/admin/help/admin/new-leads).
 
 > **Watch out:** **RAMS** and the **Social media studio** are separate apps with their own accounts. Rejecting someone here, or unticking those boxes, only removes the buttons. They can still sign in to those apps directly, so also remove them there: in the studio, use **Manage users**.
 

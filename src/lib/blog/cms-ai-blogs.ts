@@ -113,7 +113,8 @@ export async function listCmsAiBlogs(): Promise<CmsAiBlogListItem[]> {
         livePath: slug,
         live,
         status,
-        publishAt: p.publishAt ? String(p.publishAt) : null,
+        // A draft that was live keeps its first date, which the Schedule dialog mustn't start from.
+        publishAt: status !== 'draft' && p.publishAt ? String(p.publishAt) : null,
         sections: Array.isArray(p.blocks) ? p.blocks.length : 0,
       };
     })

@@ -2093,6 +2093,12 @@ textarea.crm-input {
 .crmh-picker__list button:focus-visible {
   background: rgb(var(--accent-rgb) / 0.14);
 }
+/* Someone who can't be given work (a suspended firm's people): listed, marked, not pickable. */
+.crmh-picker__list button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  background: none;
+}
 .crmh-picker__list span,
 .crmh-picked > span {
   display: flex;

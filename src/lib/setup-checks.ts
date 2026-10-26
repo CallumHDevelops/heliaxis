@@ -5,6 +5,7 @@ import { savedAnswers, type SavedAnswer } from '@/lib/claude-answers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { msConfigured } from '@/lib/ms365';
+import { canAccess } from '@/lib/portals';
 import type { GuideKey, SqlFile } from '@/lib/setup-files';
 
 /**
@@ -123,6 +124,22 @@ async function readKv<T>(key: string): Promise<T | null> {
 }
 
 /**
+ * How many of the people ticked for new leads can still open the CRM (approved, with CRM access): the
+ * rotation skips the rest (assignNewLead). null if the lookup fails, so the card doesn't nag on a guess.
+ */
+async function rotationOnTeam(ids: string[]): Promise<number | null> {
+  if (!ids.length) return 0;
+  try {
+    // '*', not named columns: portals may not be there yet, and canAccess falls back without it.
+    const { data, error } = await createAdminClient().from('profiles').select('*').eq('status', 'approved').in('id', ids);
+    if (error) return null;
+    return (data ?? []).filter((p) => canAccess(p, 'crm')).length;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A week of "Ask me to confirm" has gone cleanly: at least 5 requests that instant booking would
  * have accepted, and none it wouldn't have or that were turned down.
  */
@@ -200,7 +217,7 @@ const MANUAL: SetupTodo[] = [
     id: 'cron-check',
     title: 'Check the every-minute job is switched on',
     detail:
-      'Smart replies, chasers, reminders, follow-ups and alerts all run from a Supabase job that calls the CRM every minute. The app can’t check it for you.',
+      'Smart replies, chasers, reminders, follow-ups, alerts and scheduled blog articles all run from a Supabase job that calls the CRM every minute. The app can’t check it for you.',
     steps: [
       'Tap **Open Supabase**, paste the check (first Copy button) and tap **Run**.',
       'You should see **whatsapp-outbox** with `* * * * *` and **active** = true. If so, tick this. You’re done.',
@@ -287,9 +304,14 @@ export async function markDone(id: string, done = true) {
   const set = new Set(await doneManual());
   if (done) set.add(id);
   else set.delete(id);
+  await saveDone([...set]);
+}
+
+/** Save the ticked list as given, for a caller that has just read it and must not read it again. */
+async function saveDone(ids: string[]) {
   await createAdminClient()
     .from('cms_kv')
-    .upsert({ key: DONE_KEY, value: JSON.stringify([...set]), updated_at: new Date().toISOString() });
+    .upsert({ key: DONE_KEY, value: JSON.stringify(ids), updated_at: new Date().toISOString() });
 }
 
 /** Approved users (one lookup per request): who can be picked, and who still counts when picked. */
@@ -818,10 +840,18 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     kind: 'tip',
   });
   if (settings) {
-    add(!settings.leadRotation.length, {
+    // Only the people the rotation will use count (those the settings screen shows ticked); if they can't be looked up, the ticks do.
+    const takers = await rotationOnTeam(settings.leadRotation);
+    // Someone ticked can take leads, so a tick on this to-do is used up: if they all lose CRM access later, it
+    // comes back unticked, and only a tick made then (leads can stay unassigned) greys it. Written from the
+    // list read above, not read again: a failed read would otherwise save an empty list over everyone's ticks.
+    if (takers && done.includes('crm-rotation')) await saveDone(done.filter((id) => id !== 'crm-rotation')).catch(() => {});
+    add(takers === null ? !settings.leadRotation.length : !takers, {
       id: 'crm-rotation',
       title: 'Choose who gets new leads',
-      detail: 'New leads are handed out in turn and that person gets a notification.',
+      detail: settings.leadRotation.length
+        ? 'Nobody ticked for new leads can open the CRM any more, so new leads stay unassigned and nobody gets the “New lead for you” notification.'
+        : 'New leads are handed out in turn and that person gets a notification.',
       steps: [
         'Tap **Open CRM settings**.',
         'Under **New leads → Share new leads between**, tick everyone who should take new leads (e.g. you and Esther).',

@@ -1,9 +1,13 @@
 import 'server-only';
 import crypto from 'node:crypto';
 
-/** Stripe Checkout for deposits (REST, no SDK). Off until STRIPE_SECRET_KEY is set. */
+/**
+ * Stripe Checkout for deposits (REST, no SDK). Off until both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
+ * are set: without the webhook secret a card payment would be taken but never recorded on the job
+ * (/api/stripe/webhook refuses Stripe's message), and the customer would be asked to pay again.
+ */
 
-export const stripeConfigured = () => !!process.env.STRIPE_SECRET_KEY;
+export const stripeConfigured = () => !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_WEBHOOK_SECRET;
 
 function form(obj: Record<string, string | number | undefined>) {
   const p = new URLSearchParams();

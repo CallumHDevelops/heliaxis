@@ -25,7 +25,7 @@ The **CMS** menu only shows the pages you can open. An admin gives access on the
 
 Everyone with **Website CMS** can edit pages, add and delete pages, change the menu and pictures, and publish the website, including with **Publish now** on the Blog page.
 
-> **Watch out:** Because anyone with **Website CMS** can publish, and publishing puts the whole site live, agree in the office who publishes and when.
+> **Watch out:** Because anyone with **Website CMS** can publish, and any publish puts everyone’s saved changes to live pages live, agree in the office who publishes and when.
 
 ## If something’s missing
 

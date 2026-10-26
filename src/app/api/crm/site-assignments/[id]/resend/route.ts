@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
 import { siteReview } from '@/lib/site/review';
 import { sendAgain } from '@/lib/site/send';
-import { notReady, readAssignment, siteReady, siteTabData } from '@/lib/site/server';
+import { blockedFirmProblem, notReady, readAssignment, siteReady, siteTabData } from '@/lib/site/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -27,6 +27,13 @@ export async function POST(req: Request, { params }: Ctx) {
   const a = await readAssignment(db, id);
   if (!a) return json({ error: 'That trade isn’t on the job any more.' }, 404);
   if (a.status === 'cancelled') return json({ error: 'This trade was taken off the job.' }, 409);
+  // Nothing has reached them yet and their firm has been suspended or terminated since: it would be a new job.
+  const [{ data: c }, { data: m }] = await Promise.all([
+    db.from('site_contacts').select('subcontractor_id').eq('id', a.contact_id).maybeSingle(),
+    db.from('site_messages').select('kind').eq('id', messageId).maybeSingle(),
+  ]);
+  const blocked = c ? await blockedFirmProblem(db, a, c, m?.kind) : null;
+  if (blocked) return json({ error: blocked }, 422);
   const message = await sendAgain(db, messageId, a.id, s.user.email ?? s.user.id);
   if (!message) return json({ error: 'That message can’t be sent again: it went already, or something newer has replaced it.' }, 409);
   const now = (await readAssignment(db, id)) ?? a;

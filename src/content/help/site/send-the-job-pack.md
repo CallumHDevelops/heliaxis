@@ -31,4 +31,6 @@ Press **Edit**, make the change and press **Save**. Their job pack updates on th
 
 > **Watch out:** **New link** makes a fresh link, and the old one stops working at once on every phone. Use it if a link went to the wrong person. **Take off the job** stops their link straight away.
 
+> **Good to know:** If their firm has been suspended or terminated since you added them and nothing has reached them yet (no email or WhatsApp with their link went through, you haven’t copied the link or sent it with **WhatsApp from my phone**, and they haven’t opened it), nothing more can be sent, and a job pack waiting to send (one sent late in the evening) doesn’t go either: you’ll see, for example, “Valley Scaffolding is suspended, so they can’t be given new jobs.” Only “don’t use the scaffold yet” still goes to a trade marked **Sent**. It has no link, so it doesn’t count as reaching them. Take them off the job, or reinstate the firm first. See [Suspend or terminate a subcontractor](/admin/help/team/suspend-or-terminate).
+
 What happens next on their side is in [What the trade sees on the site app](/admin/help/site/what-the-trade-sees).

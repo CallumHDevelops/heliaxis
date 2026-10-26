@@ -40,7 +40,13 @@ A lead gets no more follow-ups once:
 
 While the job is on hold, its follow-ups wait. Only leads from the last 45 days get follow-ups, and leads you import never do.
 
-> **Watch out:** Switching it on (or adding steps) applies to leads already in the CRM too. Any lead from the last 45 days that’s still at **Lead** or **Contacted** and hasn’t replied gets every step it’s now past, one a minute apart, starting within a minute (or when the quiet hours end). Check the **Lead** and **Contacted** lists before you switch it on.
+## Leads already in the CRM
+
+When you switch it on, leads from the last 45 days that are still at **Lead** or **Contacted** and haven’t replied join in, but they only get the steps that fall due from then on. A step they’re already past is skipped quietly: it isn’t sent late, and nothing goes on their timeline. For example, with the two steps it comes with, a lead from 2 days ago skips the 24-hour WhatsApp and gets the 72-hour email tomorrow; a lead from a week ago gets neither.
+
+A step you add works the same way: from when you press **Save settings**, a lead already past its hours skips it, and the others get it when it falls due. The other steps carry on as they were, including any that are due but waiting for the quiet hours to end or a job to come off hold.
+
+Changing a step’s hours, **Send by** or message doesn’t change who gets it. A lead still waiting for it gets it at its new time, or straight away if they’re already past that, so moving a step earlier never drops it. Removing a step doesn’t hold up the others either: a lead waiting for a later step still gets it. Nobody gets the same step twice, whatever you add, move, change or remove. Switching it off and on again starts again from the moment you switch it back on.
 
 ## Good to know
 

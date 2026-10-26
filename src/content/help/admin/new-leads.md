@@ -19,9 +19,11 @@ When a new enquiry comes in (from the website, a Meta lead form, a new WhatsApp 
 
 With nobody ticked, new leads stay unassigned and nobody gets the "for you" notification.
 
-> **Watch out:** The list only shows people who are approved and have **CRM** access. If someone leaves or loses CRM access while they’re ticked, they vanish from the list but the app can still hand them leads. Untick them here, and press **Save settings**, before you change their access on **Users**.
+The list only shows people who are approved and have **CRM** access. If someone who’s ticked is rejected, set back to pending or loses the **CRM** tick on **Users**, they drop off the list and the app skips them: new leads go to the others in turn, and only they get the notification. They stay ticked and keep their place, so if their access comes back they take turns again by themselves.
 
-> **Good to know:** The **Choose who gets new leads** job on the **From Claude** card disappears once at least one person is ticked.
+> **Good to know:** Leads already given to someone stay theirs when they lose access. Change the **Owner** on those jobs to hand them over (see [Job details](/admin/help/customers/job-details)).
+
+> **Good to know:** The **Choose who gets new leads** job on the **From Claude** card disappears once at least one person is ticked. It comes back if nobody who’s ticked can open the CRM any more, because new leads would then stay unassigned. It usually comes back unticked, even if you ticked the job off before: the app clears an old tick each time the card loads while someone ticked can open the CRM. If the card didn’t load in that time, the job comes back still ticked. If you’re happy for new leads to stay unassigned, tick it off: it then says **Ticked. Waiting to confirm** and stays that way until someone ticked can open the CRM again, when it goes.
 
 ## The "hasn’t been contacted" alert
 

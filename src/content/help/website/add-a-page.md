@@ -7,7 +7,7 @@ where: CMS › Manage CMS
 path: /admin/cms
 access: cms
 ---
-New pages start as drafts. Nobody outside the office sees them until the website is published (see [Preview and publish the website](/admin/help/website/preview-and-publish)).
+New pages start as drafts. Nobody outside the office sees them until you publish them from the editor: open the page and click **Publish**. Publishing another page doesn’t put them live (see [Preview and publish the website](/admin/help/website/preview-and-publish)).
 
 ## From the dashboard
 

@@ -25,7 +25,7 @@ import {
   type EmailText,
   type MessageKind,
 } from './messages';
-import { logJob, logSiteEvent, type AssignmentRow, type ContactRow, type Db } from './server';
+import { blockedFirmProblem, logJob, logSiteEvent, readAssignment, type AssignmentRow, type ContactRow, type Db } from './server';
 import { linkHashFor, linkTokenFor, siteLink } from './tokens';
 import { firstNameOf, TRADE_LABEL } from './types';
 
@@ -198,6 +198,18 @@ export async function queueMessage(db: Db, m: Outgoing, actor: string): Promise<
   return row;
 }
 
+/**
+ * Why a job pack, "clear to start" or "don't use the scaffold yet" can't go now (blockedFirmProblem),
+ * or null: one held for the morning whose firm was suspended or terminated overnight, with nothing
+ * else having reached them, would give them a new job.
+ */
+async function firmProblem(db: Db, m: MessageRow): Promise<string | null> {
+  if (m.kind !== 'job_pack' && m.kind !== 'clear_to_start' && m.kind !== 'scaffold_hold') return null;
+  const a = await readAssignment(db, m.assignment_id);
+  const { data: c } = a ? await db.from('site_contacts').select('subcontractor_id').eq('id', a.contact_id).maybeSingle() : { data: null };
+  return a && c ? blockedFirmProblem(db, a, c, m.kind) : null;
+}
+
 /** Send one queued message now: claimed first, so two runs can't both send it. Never throws. */
 export async function deliver(db: Db, m: MessageRow): Promise<MessageRow | null> {
   try {
@@ -211,7 +223,10 @@ export async function deliver(db: Db, m: MessageRow): Promise<MessageRow | null>
       .select('id');
     if (!claimed?.length) return null;
     let result: { ok: true; id: string | null } | { ok: false; error: string };
-    if (m.channel === 'email') {
+    // Not sent, with the reason on the card ("Valley Roofing is suspended, so they can’t be given new jobs.").
+    const blocked = await firmProblem(db, m);
+    if (blocked) result = { ok: false, error: blocked };
+    else if (m.channel === 'email') {
       const p = (m.params ?? {}) as { subject?: string; html?: string; attach?: { bucket: string; path: string; filename: string } };
       let attachments: { filename: string; content: Uint8Array; contentType: string }[] | undefined;
       if (p.attach) {

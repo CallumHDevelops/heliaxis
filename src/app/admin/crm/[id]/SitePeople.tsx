@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { mobileProblem } from '@/lib/site/phone';
 import type { PickRow } from '@/lib/site/server';
-import { TRADE_LABEL, type Trade } from '@/lib/site/types';
+import { firmBlockedWords, TRADE_LABEL, type Trade } from '@/lib/site/types';
 
 /**
  * Who's doing it (screen D1/D3): one box that finds a site contact or a subcontractor firm
@@ -31,7 +31,11 @@ export function PersonPicker({ trade, picked, onPick, idPrefix }: { trade: Trade
         <span>
           <b>{r.name}</b>
           <small> · {[r.company, r.trades.join(', '), r.mobile].filter(Boolean).join(' · ')}</small>
-          {r.firm_status && r.firm_status !== 'active' && <small className="sx-warnline"> · Their onboarding isn’t finished ({r.firm_status.replace(/_/g, ' ')})</small>}
+          {firmBlockedWords(r.firm_status) ? (
+            <small className="sx-warnline"> · {firmBlockedWords(r.firm_status)}</small>
+          ) : (
+            r.firm_status && r.firm_status !== 'active' && <small className="sx-warnline"> · Their onboarding isn’t finished ({r.firm_status.replace(/_/g, ' ')})</small>
+          )}
         </span>
         <button type="button" className="crm-link" onClick={() => onPick(null)}>
           Change
@@ -73,10 +77,11 @@ function PeopleSearch({ trade, onPick, onNew }: { trade: Trade; onPick: (r: Pick
         {rows?.length === 0 && !found?.error && <li className="crm-muted">{q.trim() ? `Nobody found for “${q.trim()}”.` : 'Nobody yet. Add them below.'}</li>}
         {rows?.slice(0, 8).map((r) => (
           <li key={r.contact_id ?? `firm-${r.firm_id}`}>
-            <button type="button" onClick={() => onPick(r)}>
+            <button type="button" onClick={() => onPick(r)} disabled={!!firmBlockedWords(r.firm_status)}>
               <span>
                 <b>{r.name}</b>
                 <small> {[r.company, r.trades.join(', '), r.mobile].filter(Boolean).join(' · ')}</small>
+                {firmBlockedWords(r.firm_status) && <small className="sx-warnline"> · {firmBlockedWords(r.firm_status)}</small>}
               </span>
             </button>
           </li>

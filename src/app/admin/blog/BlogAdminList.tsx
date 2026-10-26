@@ -126,7 +126,7 @@ function confirmCopy(c: ConfirmState): { title: string; body: string; action: st
   }
   return {
     title: 'Publish now',
-    body: `Publish “${name}” now? This publishes the whole CMS site (including this article) and makes it live immediately.`,
+    body: `Publish “${name}” now? It goes live immediately, with any saved changes to pages that are already live. Other draft and scheduled articles stay as they are.`,
     action: 'Publish',
   };
 }
@@ -329,6 +329,8 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
       router.refresh();
     } catch (e) {
       setMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Could not cancel schedule' });
+      // It may have gone live since the list was loaded: show it as it is now (Live, with Unpublish).
+      router.refresh();
     } finally {
       setBusyId(null);
       setBusyAction(null);

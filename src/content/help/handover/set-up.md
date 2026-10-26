@@ -29,4 +29,6 @@ On **CRM settings › Product library**, upload a manual, datasheet, warranty or
 
 **Gaps on jobs still to be installed** lists models with nothing yet. On a job’s Handover tab, press **Add to the library** for a model that’s missing ([Who makes each handover document](/admin/help/handover/who-makes-each-document)).
 
+> **Admins only:** Only admins can change what a library document is, the models it’s for, or **In every pack**. For everyone else they’re greyed out, and the app refuses the change. Anyone with CRM access can still add a manual for a missing model from a job’s Handover tab.
+
 > **Once switched on:** **CRM settings › Handover pack** and **Product library** need handover.sql, after site-commissioning.sql. See [What needs switching on](/admin/help/projects/what-needs-switching-on).

@@ -8,12 +8,13 @@ import { designOf } from './design';
 import { formsFor, isElectricianForm, suggestedTrades } from './forms';
 import { legacySections } from './forms/legacy';
 import { defaultCertRoute } from './forms/electrician/cert';
+import { WITH_LINK } from './messages';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
 import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
 import { heldWords, snapshotOf, type HeldReason } from './po-shared';
 import { returnView, stageStates, type PoReview, type ReturnView, type ReviewState, type ReviewStatus } from './review-shared';
-import { STATUS_LABEL, TRADE_LABEL, yesNo, type Answers, type AssignmentStatus, type Flag, type Stage, type Trade } from './types';
+import { firmBlockedWords, STATUS_LABEL, TRADE_LABEL, yesNo, type Answers, type AssignmentStatus, type Flag, type Stage, type Trade } from './types';
 import { valuesOf } from './values';
 
 /**
@@ -175,7 +176,11 @@ const matches = (hay: (string | null | undefined)[], q: string) => {
   return words(q).every((w) => h.includes(w));
 };
 
-/** Search the people who go to site: their own site contacts and subcontractor firms (not terminated), the asked-for trade first. */
+/**
+ * Search the people who go to site: their own site contacts and subcontractor firms (not terminated, nor
+ * their people), the asked-for trade first. A suspended firm's people are listed, marked (firm_status), so
+ * the office sees why they can't be picked.
+ */
 export async function searchPeople(db: Db, q: string, trade: Trade | null): Promise<PickRow[]> {
   const [{ data: contacts }, { data: firms }] = await Promise.all([
     db.from('site_contacts').select('*').is('archived_at', null).order('name').limit(1000),
@@ -186,6 +191,8 @@ export async function searchPeople(db: Db, q: string, trade: Trade | null): Prom
   const hasMain = new Set<string>();
   for (const c of (contacts ?? []) as ContactRow[]) {
     const firm = c.subcontractor_id ? (firmMap.get(c.subcontractor_id) ?? null) : null;
+    // A terminated firm's people (its firm isn't in the list) aren't quick contacts either.
+    if (c.subcontractor_id && !firm) continue;
     if (firm && !c.operative_id) hasMain.add(firm.id);
     const company = firm?.company_name ?? c.company;
     const trades = c.trades?.length ? c.trades : firm ? [tradeKeyOf(firm.trade) ?? 'other'] : [];
@@ -354,6 +361,9 @@ export type NewAssignment = Record<string, unknown> & {
   forms?: unknown;
 };
 
+/** What the office is told when a suspended or terminated firm would be given a job. */
+const noNewJobs = (firm: FirmRow) => `${firm.company_name} is ${firm.status}, so they can’t be given new jobs.`;
+
 /**
  * Put trades on a job. Each gets its person (made first when it's a firm picked for the first time,
  * or a new quick contact), the agreed rate and basis, the VAT (refused when it can't be right: VAT
@@ -395,12 +405,14 @@ export async function createAssignments(
       firm = contact.subcontractor_id ? (firms.get(contact.subcontractor_id) ?? null) : null;
     } else if (typeof input.firm_id === 'string' && input.firm_id) {
       firm = firms.get(input.firm_id) ?? null;
-      if (!firm || firm.status === 'terminated') return { ok: false, status: 422, error: `${at}That subcontractor can’t be given work.` };
+      if (!firm) return { ok: false, status: 422, error: `${at}That subcontractor can’t be given work.` };
     } else if (input.new_contact && typeof input.new_contact === 'object') {
       const c = cleanContact(input.new_contact as Record<string, unknown>);
       if (!c.ok) return { ok: false, status: 422, error: at + c.error };
       fresh = { ...c.fields, trades: [clean.fields.trade] };
     } else return { ok: false, status: 400, error: `${at}Choose who’s doing it.` };
+    // Picked as the firm or as one of its people: a suspended or terminated firm gets no new jobs.
+    if (firm && firmBlockedWords(firm.status)) return { ok: false, status: 422, error: at + noNewJobs(firm) };
     const facts = moneyFacts(
       contact ?? { vat_number: (fresh?.vat_number as string | null) ?? null, cis_rate: null, cis_verified_on: null },
       firm
@@ -450,6 +462,28 @@ export async function createAssignments(
     await logSiteEvent(db, data.id as string, byId ?? 'system', 'created', { trade: data.trade });
   }
   return { ok: true, ids };
+}
+
+/**
+ * Why nothing can be sent to this trade, or null: their firm was suspended or terminated after they
+ * were put on the job, and the job hasn't reached them yet (it's not sent, or it is but no message
+ * with their link went, the office didn't hand them the link itself with Copy link or WhatsApp from
+ * my phone, and they haven't opened it), so sending would give them a new job. Once it has, the job
+ * carries on as it is. "Don't use the scaffold yet" (`kind` scaffold_hold) is a safety notice: it
+ * still goes to a trade that's been sent anything, but it has no link, so it doesn't count as
+ * reaching them. The send and Send again routes ask before anything goes, and deliver() before a
+ * message that was waiting goes.
+ */
+export async function blockedFirmProblem(db: Db, a: AssignmentRow, c: Pick<ContactRow, 'subcontractor_id'>, kind?: string): Promise<string | null> {
+  if (!c.subcontractor_id || (a.status !== 'draft' && a.status !== 'sent')) return null;
+  if (kind === 'scaffold_hold' && a.status === 'sent') return null;
+  const firm = (await firmsById(db, [c.subcontractor_id])).get(c.subcontractor_id);
+  if (!firm || !firmBlockedWords(firm.status)) return null;
+  const [{ data: went }, { data: handed }] = await Promise.all([
+    db.from('site_messages').select('id').eq('assignment_id', a.id).eq('status', 'sent').in('kind', WITH_LINK).limit(1),
+    db.from('site_events').select('id').eq('assignment_id', a.id).eq('type', 'link_copied').limit(1),
+  ]);
+  return went?.length || handed?.length ? null : noNewJobs(firm);
 }
 
 /* ── The Site tab ────────────────────────────────────────────────────────────── */

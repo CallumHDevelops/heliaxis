@@ -25,9 +25,20 @@ The editor saves your work as you go, but the public website only changes when s
 
 There’s no need to wait for anything else: the change is live as soon as it says so.
 
-> **Watch out:** Publishing puts the **whole** website live, not just the page you’re on. Every page in the CMS goes live, including other people’s unfinished drafts and menu changes. Every blog article goes live too, even ones still marked **Draft** or **Scheduled** on the Blog page, and ones that were taken down with **Unpublish**. Check the **Draft pages** list on the dashboard, and the Blog page, before you publish.
+## What goes live
 
-After publishing, every page moves from **Draft pages** to **Live pages** on the dashboard.
+Publishing puts live:
+
+- the page or blog article you’re on, even if it’s new or a draft, and
+- the saved changes to every page and blog article that’s already live, and to the menu, top bar, images and logos.
+
+Everything else stays off the website: other new pages still under **Draft pages** on the dashboard, and blog articles that are **Draft**, **Scheduled** or were taken down with **Unpublish**. Each of those goes live only when it’s published itself (a scheduled article at its time).
+
+> **Watch out:** Saved changes to live pages go live with any publish, whoever made them. If a colleague is part-way through changing a live page, agree who publishes and when.
+
+If you click **Publish** away from the page editor (on the dashboard, or in the mega menu, image library or logos), the box shows the homepage under **See it on**: it publishes the saved changes to live pages, and no draft page.
+
+After publishing, the page you published moves from **Draft pages** to **Live pages** on the dashboard.
 
 ## Live and draft pages
 
@@ -35,6 +46,8 @@ After publishing, every page moves from **Draft pages** to **Live pages** on the
 | --- | --- |
 | **Draft pages** | New and never published. Not on the public website. |
 | **Live pages** | Published at least once. Edits you’ve made since are saved but not live until the next **Publish**. |
+
+> **Good to know:** If another tab (yours or a colleague’s) had the editor open while a page was still a draft, it keeps listing that page under **Draft pages** after it’s published, until the tab is reloaded. That’s only what the tab shows: saving or publishing from it doesn’t make the page a draft again or take it off the website.
 
 ## If publishing fails
 

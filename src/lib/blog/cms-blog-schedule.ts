@@ -28,7 +28,6 @@ export {
   type ScheduledRenderPage,
 } from '@/lib/blog/cms-blog-shared';
 
-type CmsState = { pages?: CmsLoosePage[]; current?: number; [key: string]: unknown };
 type RenderedDoc = { css?: string; pages?: ScheduledRenderPage[] };
 
 function upsertKv(
@@ -191,13 +190,33 @@ export async function scheduleCmsBlog(opts: {
 export async function cancelCmsBlogSchedule(opts: { id?: string; slug?: string }) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
-  const { data, error } = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
-  if (error) throw new Error(error.message);
+  const [draftRes, renRes] = await Promise.all([
+    admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle(),
+    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
+  ]);
+  const failedRead = draftRes.error || renRes.error;
+  if (failedRead) throw new Error(failedRead.message);
 
-  const state = parseCmsState(data?.value);
+  const state = parseCmsState(draftRes.data?.value);
   const idx = findPageIndex(state.pages || [], opts.id, opts.slug);
   if (idx < 0) throw new Error('Blog page not found');
   const pg = state.pages![idx];
+
+  // The every-minute job may have put it live since the Blog list was loaded. Unschedule only
+  // changes the saved site, so it would say Draft while the website still shows the article.
+  let rendered: RenderedDoc = { pages: [] };
+  try {
+    rendered = renRes.data?.value ? (JSON.parse(renRes.data.value) as RenderedDoc) : { pages: [] };
+  } catch {
+    rendered = { pages: [] };
+  }
+  const aliases = slugAliases(String(pg.slug || opts.slug || ''));
+  const onWebsite = (rendered.pages || []).some((p) => pageMatchesBlog(p, undefined, aliases));
+  if (String(pg.blogStatus || '').toLowerCase() === 'published' || onWebsite) {
+    throw new Error(
+      'This article has already gone live, so there’s no schedule to cancel. To take it off the website, click ⋯, then Unpublish.',
+    );
+  }
 
   pg.blogStatus = 'draft';
   pg.publishAt = null;
@@ -236,8 +255,9 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
     admin.from('cms_kv').select('value').eq('key', PUBLISHED_KEY).maybeSingle(),
     admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
   ]);
-
-  if (draftRes.error) throw new Error(draftRes.error.message);
+  // A doc that couldn't be read would be written back empty, taking every page with it.
+  const failedRead = draftRes.error || pubRes.error || renRes.error;
+  if (failedRead) throw new Error(failedRead.message);
 
   const draft = parseCmsState(draftRes.data?.value);
   const idx = findPageIndex(draft.pages || [], opts.id, opts.slug);
@@ -250,8 +270,9 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
   const aliases = slugAliases(rawSlug);
   const id = String(pg.id || opts.id || '');
 
+  // publishAt stays: a draft ignores it, and if a later write fails the article is still on the website, which
+  // takes its date from the saved site. Published again, it keeps this first date.
   pg.blogStatus = 'draft';
-  pg.publishAt = null;
   pg.scheduledRender = null;
 
   const published = parseCmsState(pubRes.data?.value);
@@ -271,14 +292,17 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
     rendered.pages = rendered.pages.filter((p) => !pageMatchesBlog(p, undefined, aliases));
   }
 
-  const writes = [
-    upsertKv(admin, DRAFT_KEY, draft, now),
-    upsertKv(admin, PUBLISHED_KEY, published, now),
-    upsertKv(admin, RENDERED_KEY, rendered, now),
-  ];
-  const results = await Promise.all(writes);
-  const failed = results.find((r) => r.error);
-  if (failed?.error) throw new Error(failed.error.message);
+  // One after another, each checked, in the reverse of the job's order: the saved site (Draft), then the
+  // published copy, then the website's pages. If a write fails, the article is still on the website, with its
+  // date, so the Blog list's Live is right and View opens it, and clicking Unpublish again finishes the job.
+  for (const [key, value] of [
+    [DRAFT_KEY, draft],
+    [PUBLISHED_KEY, published],
+    [RENDERED_KEY, rendered],
+  ] as const) {
+    const { error } = await upsertKv(admin, key, value, now);
+    if (error) throw new Error(error.message);
+  }
 
   revalidatePath('/', 'layout');
   revalidatePath('/blog');
@@ -287,26 +311,18 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
   return { ok: true, slug: publicSlug };
 }
 
-/** Publish all AI blogs whose publishAt has passed. */
+/**
+ * Publish all AI blogs whose publishAt has passed. Run every minute by the cron
+ * (/api/cron/whatsapp-outbox) and by /api/cron/publish-scheduled-blogs; it reads the
+ * published and rendered docs only when something is due, and running twice is harmless.
+ */
 export async function publishDueScheduledBlogs(now = new Date()) {
   const admin = createAdminClient();
   const nowIso = now.toISOString();
 
-  const [draftRes, pubRes, renRes] = await Promise.all([
-    admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle(),
-    admin.from('cms_kv').select('value').eq('key', PUBLISHED_KEY).maybeSingle(),
-    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
-  ]);
-
+  const draftRes = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
+  if (draftRes.error) throw new Error(draftRes.error.message);
   const draft = parseCmsState(draftRes.data?.value);
-  const published = parseCmsState(pubRes.data?.value);
-  let rendered: RenderedDoc = { css: '', pages: [] };
-  try {
-    rendered = renRes.data?.value ? (JSON.parse(renRes.data.value) as RenderedDoc) : { pages: [] };
-  } catch {
-    rendered = { pages: [] };
-  }
-  if (!rendered.css) rendered.css = buildLivePublishCss();
 
   const due = (draft.pages || []).filter((p) => {
     if (!isCmsBlogPage(p)) return false;
@@ -319,6 +335,21 @@ export async function publishDueScheduledBlogs(now = new Date()) {
   if (!due.length) {
     return { published: 0, slugs: [] as string[] };
   }
+
+  const [pubRes, renRes] = await Promise.all([
+    admin.from('cms_kv').select('value').eq('key', PUBLISHED_KEY).maybeSingle(),
+    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
+  ]);
+  const failedRead = pubRes.error || renRes.error;
+  if (failedRead) throw new Error(failedRead.message);
+  const published = parseCmsState(pubRes.data?.value);
+  let rendered: RenderedDoc = { css: '', pages: [] };
+  try {
+    rendered = renRes.data?.value ? (JSON.parse(renRes.data.value) as RenderedDoc) : { pages: [] };
+  } catch {
+    rendered = { pages: [] };
+  }
+  if (!rendered.css) rendered.css = buildLivePublishCss();
 
   const publishedPages = [...(published.pages || [])];
   const slugs: string[] = [];
@@ -363,13 +394,21 @@ export async function publishDueScheduledBlogs(now = new Date()) {
 
   published.pages = publishedPages;
 
-  await Promise.all([
-    upsertKv(admin, DRAFT_KEY, draft, nowIso),
-    upsertKv(admin, PUBLISHED_KEY, published, nowIso),
-    upsertKv(admin, RENDERED_KEY, rendered, nowIso),
-  ]);
+  // One after another, each checked: the website's pages, then the published copy (which the Blog list
+  // also counts as Live), then the saved site (Live, captured page cleared). If a write fails, the article
+  // is still Scheduled with its captured page and the next minute retries. It's never Live in the list
+  // without being on the website, and once it's on the website Unschedule refuses it.
+  for (const [key, value] of [
+    [RENDERED_KEY, rendered],
+    [PUBLISHED_KEY, published],
+    [DRAFT_KEY, draft],
+  ] as const) {
+    const { error } = await upsertKv(admin, key, value, nowIso);
+    if (error) throw new Error(error.message);
+  }
 
   revalidatePath('/', 'layout');
   revalidatePath('/blog');
+  for (const slug of slugs) revalidatePath(slug);
   return { published: slugs.length, slugs };
 }
