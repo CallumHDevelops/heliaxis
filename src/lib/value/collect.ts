@@ -1,5 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { parseKv, toKv } from '@/lib/kv-json';
 import { DEFAULTS, type Assumptions, type Counts, type MeasuredCosts } from './model';
 
 const KEY = 'hap-value';
@@ -8,7 +9,7 @@ const KEY = 'hap-value';
 export async function loadValueAssumptions(): Promise<Assumptions> {
   try {
     const { data } = await createAdminClient().from('cms_kv').select('value').eq('key', KEY).maybeSingle();
-    const s = (data?.value ?? {}) as Partial<Assumptions>;
+    const s = parseKv<Assumptions>(data?.value);
     return {
       ...DEFAULTS,
       ...s,
@@ -22,7 +23,8 @@ export async function loadValueAssumptions(): Promise<Assumptions> {
 }
 
 export async function saveValueAssumptions(a: Assumptions) {
-  await createAdminClient().from('cms_kv').upsert({ key: KEY, value: a });
+  const { error } = await createAdminClient().from('cms_kv').upsert({ key: KEY, value: toKv(a), updated_at: new Date().toISOString() });
+  if (error) throw new Error(`Could not save: ${error.message}`);
 }
 
 type Count = number | null;
