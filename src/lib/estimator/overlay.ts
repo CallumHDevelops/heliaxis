@@ -28,7 +28,7 @@ export function toPixel(p: LngLat, centre: LngLat, zoom = MAP_ZOOM, size = MAP_S
   return { x: size / 2 + (a.x - c.x), y: size / 2 + (a.y - c.y) };
 }
 
-export type PanelSpec = { lat: number; lng: number; orientation: 'portrait' | 'landscape'; azimuth: number };
+export type PanelSpec = { lat: number; lng: number; orientation: 'portrait' | 'landscape'; azimuth: number; /** Roof pitch in degrees: seen from above a panel is shorter along the slope by its cosine. */ pitch?: number };
 
 /**
  * The four corners of a panel in picture pixels. `azimuth` is the compass direction its roof face looks (180 = south), which
@@ -42,7 +42,8 @@ export function panelPolygon(p: PanelSpec, widthM: number, heightM: number, cent
   // Unit vectors in picture pixels (x right = east, y down = south): down the slope, and across it.
   const down = { x: Math.sin(az), y: -Math.cos(az) };
   const across = { x: Math.cos(az), y: Math.sin(az) };
-  const [along, side] = p.orientation === 'portrait' ? [heightM, widthM] : [widthM, heightM];
+  const [slopeLen, side] = p.orientation === 'portrait' ? [heightM, widthM] : [widthM, heightM];
+  const along = slopeLen * Math.cos(((p.pitch ?? 0) * Math.PI) / 180);
   const hl = along / 2 / mpp;
   const hs = side / 2 / mpp;
   return [

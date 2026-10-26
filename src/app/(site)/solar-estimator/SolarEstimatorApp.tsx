@@ -437,8 +437,11 @@ function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panel
         <img src={map.imageUrl} alt={`Satellite picture of ${address}`} onError={() => setFailed(true)} />
         <svg viewBox={`0 0 ${MAP_SIZE} ${MAP_SIZE}`} aria-hidden="true">
           {outline && <polygon points={pointsAttr(outline)} fill="rgba(255,255,255,.12)" stroke="#fff" strokeWidth="2.5" strokeLinejoin="round" />}
+          {!plain && map.faces?.map((f, i) => (
+            <polygon key={`f${i}`} points={pointsAttr(f.map((g) => toPixel(g, map.centre)))} fill="none" stroke="rgba(120,230,90,.9)" strokeWidth="1.6" strokeLinejoin="round" />
+          ))}
           {shown.map((p, i) => (
-            <polygon key={i} points={pointsAttr(panelPolygon({ lat: p.lat, lng: p.lng, orientation: p.o === 'p' ? 'portrait' : 'landscape', azimuth: p.az }, map.panelW, map.panelH, map.centre))} fill="rgba(248,188,30,.82)" stroke="#211f18" strokeWidth="1.2" />
+            <polygon key={i} points={pointsAttr(panelPolygon({ lat: p.lat, lng: p.lng, orientation: p.o === 'p' ? 'portrait' : 'landscape', azimuth: p.az, pitch: p.pt }, map.panelW, map.panelH, map.centre))} fill="rgba(248,188,30,.82)" stroke="#211f18" strokeWidth="1.2" />
           ))}
         </svg>
       </div>

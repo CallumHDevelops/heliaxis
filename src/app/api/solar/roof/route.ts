@@ -4,7 +4,8 @@ import { pvgisYield } from '@/lib/estimator/pvgis';
 import { buildingOutline } from '@/lib/estimator/osm';
 import { osBuildingOutline } from '@/lib/estimator/os-buildings';
 import { place } from '@/lib/estimator/address-lookup';
-import { roofFromGoogle, mapFromGoogle, tidyPanels, type GoogleBuilding, type MapData, type RoofFound } from '@/lib/estimator/roof';
+import { analyseRoof } from '@/lib/estimator/layers';
+import { roofFromGoogle, mapFromGoogle, tidyPanels, aspectFromBearing, directionFor, type GoogleBuilding, type MapData, type RoofFound } from '@/lib/estimator/roof';
 import { signView } from '@/lib/estimator/sign';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export const maxDuration = 30;
 
 const json = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { 'Cache-Control': (b as { found?: boolean }).found ? 'private, max-age=600' : 'no-store' } });
 
-type Found = { found: true; address: string; lat: number; lng: number; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null; map: (MapData & { imageUrl: string; outline: { lat: number; lng: number }[] | null }) | null };
+type Found = { found: true; address: string; lat: number; lng: number; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null; /** How the roof was read: 'ok', or why we fell back to Google's own layout. */ layers?: string; map: (MapData & { imageUrl: string; outline: { lat: number; lng: number }[] | null }) | null };
 type Miss = { found: false; reason: 'not_configured' | 'bad_address' | 'no_address' | 'not_covered' | 'busy' | 'error'; detail?: string };
 
 /** Same address asked again within a day is answered from memory (so it is only billed once). */
@@ -148,17 +149,29 @@ export async function GET(req: Request) {
       if (error) result = { found: false, reason: 'error', detail: swhy };
       else if (!b || !first) result = { found: false, reason: 'not_covered', detail: b ? 'Google found the building but no usable roof faces' : swhy };
       else {
-        const y = await pvgisYield(geo.lat, geo.lng, first.angle, first.aspect);
-        const roof = roofFromGoogle(b, y?.kwhPerKwp ?? fallbackYield(first.direction, 'typical')) ?? first;
         const d = b.imageryDate;
-        const m = mapFromGoogle(b, { lat: geo.lat, lng: geo.lng });
-        const outline = m ? ((await osBuildingOutline(m.centre)) ?? (await buildingOutline(m.centre))) : null;
-        // Only panels that sit on this building's roof, in one group: a stray pair on a bay or lean-to is not shown or counted.
-        if (m) {
+        const bc = b.center;
+        const centre = typeof bc?.latitude === 'number' && typeof bc?.longitude === 'number' ? { lat: bc.latitude, lng: bc.longitude } : { lat: geo.lat, lng: geo.lng };
+        let m = mapFromGoogle(b, centre);
+        const outline = (await osBuildingOutline(centre)) ?? (await buildingOutline(centre));
+        // Our own reading of the roof from Google's height maps: faces, and panels packed on them. Google's own layout is the fallback.
+        const mine = await analyseRoof(centre, outline, key, process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk');
+        let roof = first;
+        if (mine.ok && mine.roof.panels.length && mine.roof.main) {
+          const mf = mine.roof.main;
+          m = { centre, panels: mine.roof.panels, panelW: mine.roof.panelW, panelH: mine.roof.panelH, faces: mine.roof.faces };
+          const aspect = aspectFromBearing(mf.bearing);
+          roof = { ...first, bearing: mf.bearing, aspect, angle: Math.max(0, Math.min(60, mf.pitch)), areaM2: mf.areaM2, direction: directionFor(aspect), maxPanels: mine.roof.panels.length };
+        } else if (m) {
+          // Only panels that sit on this building's roof, in one group: a stray pair on a bay or lean-to is not shown or counted.
           m.panels = tidyPanels(m.panels, outline);
           if (m.panels.length) roof.maxPanels = Math.min(roof.maxPanels, m.panels.length);
         }
-        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical'), monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
+        const y = await pvgisYield(geo.lat, geo.lng, roof.angle, roof.aspect);
+        const kwh = y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical');
+        roof = { ...roof, shade: roofFromGoogle(b, kwh)?.shade ?? roof.shade };
+        const layers = mine.ok ? 'ok' : mine.why;
+        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: kwh, monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, layers, map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
       }
     }
   } catch (e) {

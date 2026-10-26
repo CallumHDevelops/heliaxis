@@ -57,7 +57,7 @@ export const aspectFromBearing = (bearing: number) => {
 /** A roof face worth putting panels on: not turned away from the sun (within 100 degrees of south). */
 export const usableAspect = (bearing: number) => Math.abs(aspectFromBearing(bearing)) <= 100;
 
-const directionFor = (aspect: number): DirectionKey => {
+export const directionFor = (aspect: number): DirectionKey => {
   const abs = Math.abs(aspect);
   return DIRECTIONS.reduce((best, d) => (Math.abs(d.aspect - abs) < Math.abs(best.aspect - abs) ? d : best), DIRECTIONS[0]).key;
 };
@@ -106,8 +106,9 @@ const POINTS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-wes
 export const compassWord = (bearing: number) => POINTS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8];
 
 /** What the picture needs: where each panel of Google's layout sits (best first), its size, and the building's centre. */
-export type MapPanel = { lat: number; lng: number; o: 'p' | 'l'; az: number };
-export type MapData = { centre: { lat: number; lng: number }; panels: MapPanel[]; panelW: number; panelH: number };
+/** `pt` is the roof's pitch when we laid the panel out ourselves: its footprint is then shortened along the slope. */
+export type MapPanel = { lat: number; lng: number; o: 'p' | 'l'; az: number; pt?: number };
+export type MapData = { centre: { lat: number; lng: number }; panels: MapPanel[]; panelW: number; panelH: number; /** The roof faces we found, as outlines, when we worked them out ourselves. */ faces?: { lat: number; lng: number }[][] };
 
 export function mapFromGoogle(b: GoogleBuilding | null | undefined, fallbackCentre: { lat: number; lng: number }): MapData | null {
   const sp = b?.solarPotential;
