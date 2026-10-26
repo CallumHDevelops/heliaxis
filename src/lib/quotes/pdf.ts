@@ -1,0 +1,104 @@
+import 'server-only';
+import { PDFDocument } from 'pdf-lib';
+import { issueOf } from '@/lib/documents/issue';
+import { longDate, newDocument, type PhotoItem } from '@/lib/documents/pdf-kit';
+import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
+import { lineNet, money, totalsOf, type QuoteContent } from './types';
+
+/** What the quote PDF is made from: the content, the customer, and the files already fetched (images, datasheet PDFs). */
+export type QuoteFacts = {
+  number: string;
+  title: string;
+  issued: string; // YYYY-MM-DD
+  validUntil: string | null;
+  jobRef: string | null;
+  customer: { name: string; email: string | null; phone: string | null; address: string | null };
+  content: QuoteContent;
+  depositPence: number | null;
+  /** storage path → bytes, for the images block. */
+  images: Map<string, { bytes: Uint8Array; mime: string }>;
+  /** library id → the datasheet's PDF bytes. */
+  datasheets: Map<string, Uint8Array>;
+};
+
+const paragraphs = (s: string) => s.split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean);
+
+/** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
+export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
+  const kit = await newDocument({ code: f.number, label: f.number, title: f.title || 'Quote', revision: issueOf('QUOTE'), jobRef: f.jobRef, issued: f.issued });
+  kit.header({ meta: [['Quote', f.number], ['Date', longDate(f.issued)], ...(f.validUntil ? ([['Valid until', longDate(f.validUntil)]] as [string, string][]) : [])] });
+  kit.idGrid([
+    ['Prepared for', f.customer.name],
+    ['Site', f.customer.address],
+    ['Email', f.customer.email],
+    ['Phone', f.customer.phone],
+    ['From', `${HELIAXIS_COMPANY.tradingName} · ${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}`],
+  ]);
+  for (const p of paragraphs(f.content.intro)) kit.paragraph(p);
+
+  const totals = totalsOf(f.content);
+  let shownTotals = false;
+  const sheets: string[] = [];
+  const lastItems = [...f.content.blocks].reverse().find((b) => b.type === 'items');
+
+  for (const b of f.content.blocks) {
+    if (b.type === 'text') {
+      if (!b.body.trim()) continue;
+      kit.section(b.heading || 'Details');
+      for (const p of paragraphs(b.body)) kit.paragraph(p);
+    } else if (b.type === 'items') {
+      const lines = b.lines.filter((l) => l.description.trim() || l.unit_pence);
+      if (!lines.length) continue;
+      kit.section(b.heading || 'Price');
+      kit.grid({
+        columns: ['Item', 'Qty', 'Unit price', 'VAT', 'Total'],
+        widths: [5, 0.9, 1.6, 0.9, 1.7],
+        rows: lines.map((l) => [
+          l.detail ? `${l.description}\n${l.detail}`.replace(/\n/g, ' · ') : l.description,
+          String(l.qty),
+          money(l.unit_pence),
+          `${l.vat_rate}%`,
+          money(lineNet(l)),
+        ]),
+      });
+      if (b === lastItems) {
+        shownTotals = true;
+        kit.rows([
+          { label: 'Total before VAT', value: money(totals.net) },
+          ...totals.byRate.filter((r) => r.vat).map((r) => ({ label: `VAT at ${r.rate}%`, value: money(r.vat) })),
+          ...(totals.vat ? [] : [{ label: 'VAT', value: 'None on this quote' }]),
+          { label: 'Total to pay', value: money(totals.gross), strong: true },
+          ...(f.depositPence ? [{ label: 'Deposit once you accept', value: money(f.depositPence) }] : []),
+        ]);
+      }
+    } else if (b.type === 'images') {
+      const items: PhotoItem[] = b.images.flatMap((i) => {
+        const img = f.images.get(i.path);
+        return img ? [{ bytes: img.bytes, mime: img.mime, caption: i.caption || '', fit: 'contain' as const }] : [];
+      });
+      if (!items.length) continue;
+      kit.section(b.heading || 'Photos and diagrams');
+      await kit.photos(items, { perRow: items.length === 1 ? 1 : 2 });
+    } else if (b.type === 'datasheets') {
+      const named = b.files.filter((x) => f.datasheets.has(x.library_id));
+      if (!named.length) continue;
+      kit.section(b.heading || 'Datasheets');
+      kit.list(named.map((x, i) => `${i + 1}. ${x.name}, included after this page`));
+      sheets.push(...named.map((x) => x.library_id));
+    }
+  }
+  if (!shownTotals) kit.note('Add your items to see the total.');
+
+  const main = await kit.save();
+  if (!sheets.length) return main;
+  const out = await PDFDocument.load(main);
+  for (const id of sheets) {
+    try {
+      const src = await PDFDocument.load(f.datasheets.get(id)!, { ignoreEncryption: true });
+      for (const p of await out.copyPages(src, src.getPageIndices())) out.addPage(p);
+    } catch {
+      // A datasheet that can't be read is left out rather than stopping the quote.
+    }
+  }
+  return out.save();
+}

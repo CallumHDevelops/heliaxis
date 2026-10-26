@@ -1,0 +1,385 @@
+'use client';
+
+import Link from 'next/link';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { QuoteRow } from '@/lib/quotes/server';
+import { emptyLine, money, newId, penceFromText, textFromPence, totalsOf, VAT_RATES, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
+
+type Customer = { name: string; email: string | null; phone: string | null };
+type Sent = { url: string; whatsappText: string; emailSubject: string; emailText: string; email: string | null; projectId: string; enquiryId: string };
+
+/** Shrink a picture in the browser (max 1600 px, JPEG) so it uploads quickly and keeps the PDF small. */
+async function shrink(file: File): Promise<File> {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/jpeg', 0.82));
+  if (!blob) throw new Error('Couldn’t read that picture.');
+  return new File([blob], 'picture.jpg', { type: 'image/jpeg' });
+}
+
+export function QuoteBuilder({ initial, customer, library, imageUrls }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string> }) {
+  const [title, setTitle] = useState(initial.title);
+  const [content, setContent] = useState<QuoteContent>(initial.content);
+  const [validUntil, setValidUntil] = useState(initial.valid_until ?? '');
+  const [deposit, setDeposit] = useState(textFromPence(initial.deposit_pence ?? 0));
+  const [urls, setUrls] = useState(imageUrls);
+  const [state, setState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
+  const [status, setStatus] = useState(initial.status);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [sent, setSent] = useState<Sent | null>(null);
+  const [note, setNote] = useState('');
+  const first = useRef(true);
+  const payload = useRef({ title, content, validUntil, deposit });
+  payload.current = { title, content, validUntil, deposit };
+
+  const save = useCallback(async () => {
+    setState('saving');
+    const p = payload.current;
+    const r = await fetch(`/api/crm/quotes/${initial.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: p.title, content: p.content, valid_until: p.validUntil || null, deposit_pence: penceFromText(p.deposit) }),
+    }).catch(() => null);
+    setState(r?.ok ? 'saved' : 'error');
+    return !!r?.ok;
+  }, [initial.id]);
+
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    setState('dirty');
+    const t = setTimeout(() => void save(), 1200);
+    return () => clearTimeout(t);
+  }, [title, content, validUntil, deposit, save]);
+
+  const totals = totalsOf(content);
+  const edit = (fn: (c: QuoteContent) => QuoteContent) => setContent((c) => fn(c));
+  const setBlock = (id: string, patch: Partial<QuoteBlock>) => edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === id ? ({ ...b, ...patch } as QuoteBlock) : b)) }));
+  const move = (id: string, d: -1 | 1) =>
+    edit((c) => {
+      const i = c.blocks.findIndex((b) => b.id === id);
+      const j = i + d;
+      if (i < 0 || j < 0 || j >= c.blocks.length) return c;
+      const blocks = [...c.blocks];
+      [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+      return { ...c, blocks };
+    });
+  const remove = (id: string) => edit((c) => ({ ...c, blocks: c.blocks.filter((b) => b.id !== id) }));
+  const add = (type: QuoteBlock['type']) =>
+    edit((c) => ({
+      ...c,
+      blocks: [
+        ...c.blocks,
+        type === 'items'
+          ? { id: newId(), type, heading: 'Price', lines: [emptyLine()] }
+          : type === 'text'
+            ? { id: newId(), type, heading: '', body: '' }
+            : type === 'images'
+              ? { id: newId(), type, heading: 'Photos and diagrams', images: [] }
+              : { id: newId(), type, heading: 'Datasheets', files: [] },
+      ],
+    }));
+  const setLine = (bid: string, lid: string, patch: Partial<QuoteLine>) =>
+    edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === bid && b.type === 'items' ? { ...b, lines: b.lines.map((l) => (l.id === lid ? { ...l, ...patch } : l)) } : b)) }));
+
+  async function upload(bid: string, files: FileList | null) {
+    if (!files?.length) return;
+    setErr('');
+    for (const f of Array.from(files).slice(0, 6)) {
+      try {
+        const small = await shrink(f);
+        const fd = new FormData();
+        fd.append('file', small);
+        const r = await fetch(`/api/crm/quotes/${initial.id}/image`, { method: 'POST', body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Upload failed');
+        setUrls((u) => ({ ...u, [d.path]: d.url }));
+        edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === bid && b.type === 'images' ? { ...b, images: [...b.images, { path: d.path, caption: '' }] } : b)) }));
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'Upload failed');
+      }
+    }
+  }
+
+  async function preview() {
+    setBusy('preview');
+    setErr('');
+    if (!(await save())) {
+      setBusy('');
+      return setErr('Couldn’t save, so the preview would be out of date. Try again.');
+    }
+    window.open(`/api/crm/quotes/${initial.id}/pdf`, '_blank');
+    setBusy('');
+  }
+  async function send() {
+    if (totals.gross <= 0) return setErr('Add at least one priced item first.');
+    if (!window.confirm(`Send this quote to ${customer.name} for signing? The job moves to Quote sent and their link is made.`)) return;
+    setBusy('send');
+    setErr('');
+    if (!(await save())) {
+      setBusy('');
+      return setErr('Couldn’t save, so it wasn’t sent. Try again.');
+    }
+    const r = await fetch(`/api/crm/quotes/${initial.id}/send`, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    setBusy('');
+    if (!r.ok) return setErr(d.error || 'Not sent');
+    setSent(d);
+    setStatus('sent');
+  }
+  async function emailIt() {
+    if (!sent) return;
+    if (!window.confirm(`Email the link to ${sent.email}?`)) return;
+    setBusy('email');
+    const r = await fetch(`/api/crm/projects/${sent.projectId}/email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: sent.emailSubject, text: sent.emailText }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy('');
+    setNote(r.ok ? `Emailed to ${sent.email} ✓` : d.error || 'Email not sent');
+  }
+  async function copy(text: string, what: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setNote(`${what} copied ✓`);
+    } catch {
+      window.prompt('Copy this', text);
+    }
+  }
+
+  const locked = status === 'accepted';
+  return (
+    <div className="qb-page qb-build">
+      <div className="qb-head">
+        <div>
+          <Link href="/admin/sales/quotes" className="crm-link" style={{ margin: 0 }}>
+            ← Quotes
+          </Link>
+          <h1>
+            {initial.number} <span className={`qb-status qb-status--${status}`}>{status}</span>
+          </h1>
+          <p className="crm-muted crm-small">
+            For <b>{customer.name}</b> · <Link href={`/admin/crm/${initial.project_id}`}>open the opportunity</Link>
+          </p>
+        </div>
+        <div className="qb-actions">
+          <span className="crm-muted crm-small" aria-live="polite">
+            {state === 'saved' ? 'Saved ✓' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved changes' : 'Couldn’t save, retrying on your next change'}
+          </span>
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy} onClick={() => void preview()}>
+            {busy === 'preview' ? 'Opening…' : 'Preview PDF'}
+          </button>
+          <button type="button" className="crm-btn crm-btn--solar" disabled={!!busy || locked} onClick={() => void send()} title={locked ? 'They have signed this quote' : undefined}>
+            {busy === 'send' ? 'Sending…' : status === 'sent' ? 'Update and send again' : 'Send to customer'}
+          </button>
+        </div>
+      </div>
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      {locked && <p className="crm-banner">The customer has signed this quote, so it is locked.</p>}
+
+      {sent && (
+        <div className="qb-sent">
+          <b>Ready to send ✓</b>
+          <p className="crm-small">The customer’s link opens this quote to read and sign. The job is now at Quote sent.</p>
+          <code className="qb-link">{sent.url}</code>
+          <div className="crm-actions">
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => void copy(sent.url, 'Link')}>
+              Copy link
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => void copy(sent.whatsappText, 'WhatsApp message')}>
+              Copy WhatsApp message
+            </button>
+            <Link className="crm-btn crm-btn--wa" href={`/admin/crm/chats/${sent.enquiryId}`}>
+              Open WhatsApp chat
+            </Link>
+            <button type="button" className="crm-btn crm-btn--ghost" disabled={!sent.email || busy === 'email'} title={sent.email ? undefined : 'No email address on file'} onClick={() => void emailIt()}>
+              Email it
+            </button>
+          </div>
+          {note && <p className="crm-small">{note}</p>}
+        </div>
+      )}
+
+      <div className="qb-grid" aria-disabled={locked}>
+        <div className="qb-col">
+          <section className="qb-card">
+            <label className="qb-lab">Quote title</label>
+            <input className="crm-input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={locked} />
+            <label className="qb-lab">Introduction</label>
+            <textarea className="crm-input" rows={4} value={content.intro} onChange={(e) => edit((c) => ({ ...c, intro: e.target.value }))} disabled={locked} />
+          </section>
+
+          {content.blocks.map((b, i) => (
+            <section key={b.id} className="qb-card">
+              <div className="qb-bhead">
+                <input className="crm-input qb-heading" placeholder="Section heading" value={b.heading} onChange={(e) => setBlock(b.id, { heading: e.target.value })} disabled={locked} />
+                <span className="qb-type">{b.type === 'items' ? 'Items' : b.type === 'text' ? 'Text' : b.type === 'images' ? 'Images' : 'Datasheets'}</span>
+                <button type="button" className="qb-icon" aria-label="Move up" disabled={i === 0 || locked} onClick={() => move(b.id, -1)}>
+                  ↑
+                </button>
+                <button type="button" className="qb-icon" aria-label="Move down" disabled={i === content.blocks.length - 1 || locked} onClick={() => move(b.id, 1)}>
+                  ↓
+                </button>
+                <button type="button" className="qb-icon" aria-label="Remove section" disabled={locked} onClick={() => window.confirm('Remove this section?') && remove(b.id)}>
+                  ✕
+                </button>
+              </div>
+
+              {b.type === 'text' && <textarea className="crm-input" rows={6} placeholder="Write the text. A blank line starts a new paragraph." value={b.body} onChange={(e) => setBlock(b.id, { body: e.target.value })} disabled={locked} />}
+
+              {b.type === 'items' && (
+                <>
+                  <div className="qb-lines">
+                    <div className="qb-line qb-line--head">
+                      <span>Item</span>
+                      <span>Qty</span>
+                      <span>Unit price £</span>
+                      <span>VAT</span>
+                      <span>Total</span>
+                      <span />
+                    </div>
+                    {b.lines.map((l) => (
+                      <div key={l.id} className="qb-line">
+                        <div>
+                          <input className="crm-input" placeholder="e.g. 12 × 450W solar panels" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} />
+                          <input className="crm-input qb-detail" placeholder="Optional detail" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} />
+                        </div>
+                        <input className="crm-input" inputMode="decimal" value={String(l.qty)} onChange={(e) => setLine(b.id, l.id, { qty: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} disabled={locked} aria-label="Quantity" />
+                        <input className="crm-input" inputMode="decimal" defaultValue={textFromPence(l.unit_pence)} key={`${l.id}-${l.unit_pence === 0}`} onBlur={(e) => setLine(b.id, l.id, { unit_pence: penceFromText(e.target.value) })} disabled={locked} aria-label="Unit price in pounds" />
+                        <select className="crm-input" value={l.vat_rate} onChange={(e) => setLine(b.id, l.id, { vat_rate: Number(e.target.value) })} disabled={locked} aria-label="VAT rate">
+                          {VAT_RATES.map((r) => (
+                            <option key={r} value={r}>
+                              {r}%
+                            </option>
+                          ))}
+                        </select>
+                        <span className="qb-amt">{money(Math.round(l.qty * l.unit_pence))}</span>
+                        <button type="button" className="qb-icon" aria-label="Remove line" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: x.lines.filter((y) => y.id !== l.id) } : x)) }))}>
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" className="crm-link" style={{ margin: '6px 0 0' }} disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines, emptyLine()] } : x)) }))}>
+                    + Add a line
+                  </button>
+                  <p className="crm-muted crm-small">A discount is a line with a minus price, e.g. -500.</p>
+                </>
+              )}
+
+              {b.type === 'images' && (
+                <>
+                  <div className="qb-imgs">
+                    {b.images.map((im, k) => (
+                      <figure key={im.path} className="qb-img">
+                        {urls[im.path] ? <img src={urls[im.path]} alt={im.caption || 'Picture'} /> : <div className="qb-ph">Picture</div>}
+                        <input className="crm-input" placeholder="Caption (optional)" value={im.caption} onChange={(e) => setBlock(b.id, { images: b.images.map((x, n) => (n === k ? { ...x, caption: e.target.value } : x)) })} disabled={locked} />
+                        <button type="button" className="crm-link" disabled={locked} onClick={() => setBlock(b.id, { images: b.images.filter((_, n) => n !== k) })}>
+                          Remove
+                        </button>
+                      </figure>
+                    ))}
+                  </div>
+                  <label className="crm-btn crm-btn--ghost qb-upload">
+                    + Add pictures
+                    <input type="file" accept="image/jpeg,image/png" multiple hidden disabled={locked} onChange={(e) => void upload(b.id, e.target.files)} />
+                  </label>
+                </>
+              )}
+
+              {b.type === 'datasheets' && (
+                <>
+                  {b.files.map((f) => (
+                    <p key={f.library_id} className="qb-file">
+                      📄 {f.name}
+                      <button type="button" className="crm-link" disabled={locked} onClick={() => setBlock(b.id, { files: b.files.filter((x) => x.library_id !== f.library_id) })}>
+                        Remove
+                      </button>
+                    </p>
+                  ))}
+                  {library.length === 0 ? (
+                    <p className="crm-muted crm-small">No PDFs in the document library yet. Add datasheets under CRM → Settings → Library, then pick them here.</p>
+                  ) : (
+                    <select
+                      className="crm-input"
+                      value=""
+                      disabled={locked}
+                      onChange={(e) => {
+                        const l = library.find((x) => x.id === e.target.value);
+                        if (l && !b.files.some((x) => x.library_id === l.id)) setBlock(b.id, { files: [...b.files, { library_id: l.id, name: l.name }] });
+                      }}
+                    >
+                      <option value="">+ Add a datasheet from the library…</option>
+                      {library.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="crm-muted crm-small">Each datasheet is added to the end of the quote PDF.</p>
+                </>
+              )}
+            </section>
+          ))}
+
+          <div className="qb-add">
+            <b>Add a section:</b>
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => add('items')}>
+              Items and prices
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => add('text')}>
+              Text
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => add('images')}>
+              Images
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => add('datasheets')}>
+              Datasheets
+            </button>
+          </div>
+        </div>
+
+        <aside className="qb-side">
+          <section className="qb-card">
+            <b>Total</b>
+            <div className="qb-sum">
+              <span>Before VAT</span>
+              <span>{money(totals.net)}</span>
+            </div>
+            {totals.byRate.filter((r) => r.vat).map((r) => (
+              <div key={r.rate} className="qb-sum">
+                <span>VAT at {r.rate}%</span>
+                <span>{money(r.vat)}</span>
+              </div>
+            ))}
+            <div className="qb-sum qb-sum--total">
+              <span>Total to pay</span>
+              <span>{money(totals.gross)}</span>
+            </div>
+            <label className="qb-lab">Deposit once they accept (£, optional)</label>
+            <input className="crm-input" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} disabled={locked} placeholder="e.g. 500" />
+            <label className="qb-lab">Valid until</label>
+            <input className="crm-input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} disabled={locked} />
+          </section>
+          <section className="qb-card qb-help">
+            <b>How it goes</b>
+            <ol>
+              <li>Build the quote, then Preview PDF.</li>
+              <li>Send to customer makes their private link and moves the job to Quote sent.</li>
+              <li>They read it, sign on their phone and can pay the deposit. The job then moves to Won.</li>
+            </ol>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}

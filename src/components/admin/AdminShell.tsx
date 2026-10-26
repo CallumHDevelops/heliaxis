@@ -21,6 +21,7 @@ type Tab =
   | 'dashboard'
   | 'enquiries'
   | 'crm'
+  | 'sales'
   | 'projects'
   | 'orders'
   | 'surveys'
@@ -378,6 +379,13 @@ export async function AdminShell({
         { href: '/admin/crm/settings', label: 'CRM settings', icon: icons.settings, show: can('crm') },
         { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm') },
       ],
+    },
+    {
+      // Quotes made in the app (Sales › Quotes); sent for signing through the customer's portal link.
+      id: 'sales',
+      label: 'Sales',
+      dropdown: true,
+      items: [{ href: '/admin/sales/quotes', label: 'Quotes', icon: icons.orders, active: active === 'sales', show: can('crm') && ready.quotes }],
     },
     {
       // The jobs once they're won (Projects: list, schedule, board and each job's page) and RAMS for site.

@@ -73,6 +73,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     body: `✍️ Quote “${doc.name}” accepted and signed online by ${name}${startEarly ? '. They asked us to start within the 14 days' : ''}`,
   });
   await applyStageEvent(p.id, 'accepted', { note: 'signed online' });
+  // A quote made in the builder: now accepted (no table yet, or an uploaded quote: nothing to update).
+  await db.from('crm_quotes').update({ status: 'accepted', updated_at: now }).eq('document_id', doc.id).then(() => null, () => null);
 
   after(async () => {
     if (!hash) {
