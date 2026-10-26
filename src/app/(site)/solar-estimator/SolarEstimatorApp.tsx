@@ -436,7 +436,13 @@ function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panel
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={map.imageUrl} alt={`Satellite picture of ${address}`} onError={() => setFailed(true)} />
         <svg viewBox={`0 0 ${MAP_SIZE} ${MAP_SIZE}`} aria-hidden="true">
-          {outline && <polygon points={pointsAttr(outline)} fill="rgba(255,255,255,.12)" stroke="#fff" strokeWidth="2.5" strokeLinejoin="round" />}
+          {outline && (
+            <>
+              {/* The rest of the picture is dimmed a little, and the property lit with a light wash, so it is clear which building we mean. */}
+              <path d={`M0,0H${MAP_SIZE}V${MAP_SIZE}H0Z M${outline.map((o) => `${o.x.toFixed(1)},${o.y.toFixed(1)}`).join(' L')}Z`} fill="rgba(12,12,10,.28)" fillRule="evenodd" />
+              <polygon points={pointsAttr(outline)} fill="rgba(255,214,90,.2)" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
+            </>
+          )}
           {!plain && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug') && map.faces?.map((f, i) => (
             <polygon key={`f${i}`} points={pointsAttr(f.map((g) => toPixel(g, map.centre)))} fill="none" stroke="rgba(120,230,90,.9)" strokeWidth="1.6" strokeLinejoin="round" />
           ))}
