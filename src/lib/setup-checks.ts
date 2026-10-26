@@ -626,19 +626,19 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 12,
     optional: true,
   });
-  add(!env('GETADDRESS_API_KEY'), {
-    id: 'env-getaddress',
-    title: 'Solar estimator: let visitors pick their address from a list (getAddress.io)',
+  add(!env('IDEAL_POSTCODES_API_KEY'), {
+    id: 'env-ideal-postcodes',
+    title: 'Solar estimator: let visitors pick their address from a list (Ideal Postcodes)',
     detail: 'Optional. Visitors type part of their address and pick it, so the estimator finds the exact house and roof. Without it they type a house number and postcode, which is less reliable.',
     steps: [
-      'Sign up at [getaddress.io](https://getaddress.io) and choose a plan (the free trial is enough to test; a small paid plan covers a website).',
-      'In your getAddress dashboard, copy the **API key**.',
+      'Sign up at [ideal-postcodes.co.uk](https://ideal-postcodes.co.uk) (the free trial is enough to test; it is pay-as-you-go after that).',
+      'In your dashboard open **Keys** and copy the **API key** (it starts `ak_`).',
       ...VERCEL_STEPS,
-      'Then try it: open heliaxis.co.uk/solar-estimator and type your own address. You should get a list to pick from.',
+      'Then try it: open heliaxis.co.uk/solar-estimator and type your own address. You should get a list of UK addresses to pick from.',
     ],
-    copies: [{ label: 'Key', value: 'GETADDRESS_API_KEY' }],
-    href: 'https://getaddress.io',
-    hrefLabel: 'Open getAddress.io',
+    copies: [{ label: 'Key', value: 'IDEAL_POSTCODES_API_KEY' }],
+    href: 'https://ideal-postcodes.co.uk',
+    hrefLabel: 'Open Ideal Postcodes',
     order: 12,
     optional: true,
   });

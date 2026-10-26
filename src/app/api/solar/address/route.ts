@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { suggest } from '@/lib/estimator/getaddress';
+import { suggest } from '@/lib/estimator/address-lookup';
 
 export const dynamic = 'force-dynamic';
 

@@ -3,7 +3,7 @@ import { fallbackYield } from '@/lib/estimator/calc';
 import { pvgisYield } from '@/lib/estimator/pvgis';
 import { buildingOutline } from '@/lib/estimator/osm';
 import { osBuildingOutline } from '@/lib/estimator/os-buildings';
-import { place } from '@/lib/estimator/getaddress';
+import { place } from '@/lib/estimator/address-lookup';
 import { roofFromGoogle, mapFromGoogle, type GoogleBuilding, type MapData, type RoofFound } from '@/lib/estimator/roof';
 import { signView } from '@/lib/estimator/sign';
 
@@ -140,7 +140,7 @@ export async function GET(req: Request) {
 
   let result: Found | Miss = { found: false, reason: 'error' };
   try {
-    const { geo, why } = picked ? { geo: { lat: picked.lat, lng: picked.lng, address: picked.address }, why: 'ok' } : await geocode(line, pc);
+    const { geo, why } = picked && picked.lat !== null && picked.lng !== null ? { geo: { lat: picked.lat, lng: picked.lng, address: picked.address }, why: 'ok' } : await geocode(line, pc);
     if (!geo) result = { found: false, reason: 'bad_address', detail: why };
     else {
       const { b, error, why: swhy } = await solar(geo.lat, geo.lng, key);
