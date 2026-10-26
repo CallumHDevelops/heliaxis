@@ -606,6 +606,26 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     hrefLabel: 'Open Claude Console',
     order: 7,
   });
+  add(!env('GOOGLE_SOLAR_API_KEY'), {
+    id: 'env-solar-google',
+    title: 'Solar estimator: find the visitor’s roof from their address (Google Solar API)',
+    detail:
+      'Optional. Lets the website’s solar estimator pick up the roof from satellite data, so visitors skip the roof questions and you get the address. Free for the first 10,000 lookups a month; the estimator works without it.',
+    steps: [
+      'Open the [Google Cloud console](https://console.cloud.google.com) and sign in with the Heliaxis Google account. Tap the project list at the top, then **New project**, name it `Heliaxis`, and **Create**.',
+      '**Billing**: open the menu → **Billing** and link a card (Google needs one on file even though your use should stay free). Then **Billing → Budgets & alerts → Create budget**: set £10 a month with email alerts, so you hear about any charge.',
+      'Open **APIs & Services → Library**. Search for **Solar API** and press **Enable**. Then search for **Geocoding API** and press **Enable** (it turns “2 Marine Terrace, NP26 5ST” into a spot on the map).',
+      'Open **APIs & Services → Credentials → Create credentials → API key**. Name it `Heliaxis website estimator`. Under **API restrictions** choose **Restrict key** and tick only **Solar API** and **Geocoding API**. Leave **Application restrictions** as **None** (this key lives only on the server). Save, then **Copy** the key.',
+      '**Daily limit** (keeps a bot from running up a bill): **APIs & Services → Solar API → Quotas & System limits**, find the request limit for **Building Insights** and set it to about 200 a day. Do the same for the Geocoding API.',
+      ...VERCEL_STEPS,
+      'Then try it: open the estimator at heliaxis.co.uk/solar-estimator, enter your own postcode and house number, and check “Is this your roof?” shows your house. If it says it could not match, Google may not have roof data for that address, and the estimator carries on with its questions.',
+    ],
+    copies: [{ label: 'Key', value: 'GOOGLE_SOLAR_API_KEY' }],
+    href: 'https://console.cloud.google.com/apis/library/solar.googleapis.com',
+    hrefLabel: 'Open the Solar API in Google Cloud',
+    order: 12,
+    optional: true,
+  });
   add(!env('NEXT_PUBLIC_VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'), {
     id: 'env-vapid',
     title: 'Add the phone notification keys',
