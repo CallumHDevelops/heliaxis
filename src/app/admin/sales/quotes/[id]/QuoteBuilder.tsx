@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuoteRow } from '@/lib/quotes/server';
+import { createClient } from '@/lib/supabase/client';
+import '../../../crm/crm.css';
+import '../quotes.css';
 import { emptyLine, money, newId, penceFromText, textFromPence, totalsOf, VAT_RATES, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
@@ -24,7 +27,8 @@ async function shrink(file: File): Promise<File> {
   return new File([blob], 'picture.jpg', { type: 'image/jpeg' });
 }
 
-export function QuoteBuilder({ initial, customer, library, imageUrls }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string> }) {
+export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string> }) {
+  const [library, setLibrary] = useState(libraryIn);
   const [title, setTitle] = useState(initial.title);
   const [content, setContent] = useState<QuoteContent>(initial.content);
   const [validUntil, setValidUntil] = useState(initial.valid_until ?? '');
@@ -111,6 +115,32 @@ export function QuoteBuilder({ initial, customer, library, imageUrls }: { initia
     }
   }
 
+  /** Upload PDF datasheets: saved to the document library (so they can be used on other quotes) and added here. */
+  async function uploadSheets(bid: string, files: FileList | null) {
+    if (!files?.length) return;
+    setErr('');
+    setBusy('sheet');
+    try {
+      for (const f of Array.from(files).slice(0, 6)) {
+        if (f.type !== 'application/pdf') throw new Error(`${f.name} isn’t a PDF. Datasheets must be PDFs.`);
+        const prep = await fetch('/api/crm/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'prepare', name: f.name, mime: f.type, size: f.size }) });
+        const p = await prep.json().catch(() => ({}));
+        if (!prep.ok) throw new Error(p.error || 'Upload failed');
+        const up = await createClient().storage.from(p.bucket).uploadToSignedUrl(p.path, p.token, f, { contentType: f.type });
+        if (up.error) throw new Error(up.error.message);
+        const name = f.name.replace(/\.[a-z0-9]+$/i, '');
+        const saved = await fetch('/api/crm/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'save', path: p.path, name, mime: f.type, size: f.size }) });
+        const d = await saved.json().catch(() => ({}));
+        if (!saved.ok || !d.item?.id) throw new Error(d.error || 'Couldn’t save the datasheet');
+        setLibrary((l) => [...l, { id: d.item.id as string, name }].sort((a, b) => a.name.localeCompare(b.name)));
+        edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === bid && b.type === 'datasheets' ? { ...b, files: [...b.files, { library_id: d.item.id as string, name }] } : b)) }));
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Upload failed');
+    }
+    setBusy('');
+  }
+
   async function preview() {
     setBusy('preview');
     setErr('');
@@ -157,13 +187,13 @@ export function QuoteBuilder({ initial, customer, library, imageUrls }: { initia
 
   const locked = status === 'accepted';
   return (
-    <div className="qb-page qb-build">
+    <div className="crm crmh qb-page qb-build">
       <div className="qb-head">
         <div>
-          <Link href="/admin/sales/quotes" className="crm-link" style={{ margin: 0 }}>
+          <Link href="/admin/sales/quotes" className="crm-back">
             ← Quotes
           </Link>
-          <h1>
+          <h1 className="crmh-h1">
             {initial.number} <span className={`qb-status qb-status--${status}`}>{status}</span>
           </h1>
           <p className="crm-muted crm-small">
@@ -305,9 +335,11 @@ export function QuoteBuilder({ initial, customer, library, imageUrls }: { initia
                       </button>
                     </p>
                   ))}
-                  {library.length === 0 ? (
-                    <p className="crm-muted crm-small">No PDFs in the document library yet. Add datasheets under CRM → Settings → Library, then pick them here.</p>
-                  ) : (
+                  <label className="crm-btn crm-btn--ghost qb-upload">
+                    {busy === 'sheet' ? 'Uploading…' : '+ Upload a datasheet (PDF)'}
+                    <input type="file" accept="application/pdf" multiple hidden disabled={locked || busy === 'sheet'} onChange={(e) => { void uploadSheets(b.id, e.target.files); e.target.value = ''; }} />
+                  </label>
+                  {library.length > 0 && (
                     <select
                       className="crm-input"
                       value=""
@@ -317,7 +349,7 @@ export function QuoteBuilder({ initial, customer, library, imageUrls }: { initia
                         if (l && !b.files.some((x) => x.library_id === l.id)) setBlock(b.id, { files: [...b.files, { library_id: l.id, name: l.name }] });
                       }}
                     >
-                      <option value="">+ Add a datasheet from the library…</option>
+                      <option value="">Or pick one already in the library…</option>
                       {library.map((l) => (
                         <option key={l.id} value={l.id}>
                           {l.name}
@@ -325,7 +357,7 @@ export function QuoteBuilder({ initial, customer, library, imageUrls }: { initia
                       ))}
                     </select>
                   )}
-                  <p className="crm-muted crm-small">Each datasheet is added to the end of the quote PDF.</p>
+                  <p className="crm-muted crm-small">Each datasheet is added to the end of the quote PDF, and kept in the document library for other quotes.</p>
                 </>
               )}
             </section>

@@ -5,7 +5,6 @@ import { isUuid } from '@/lib/crm/server';
 import { imageUrls, readQuote } from '@/lib/quotes/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { QuoteBuilder } from './QuoteBuilder';
-import '../quotes.css';
 
 export const dynamic = 'force-dynamic';
 

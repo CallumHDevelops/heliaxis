@@ -5,7 +5,6 @@ import { schemaReady } from '@/lib/schema-ready';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { cleanContent, totalsOf } from '@/lib/quotes/types';
 import { QuotesList, type QuoteListRow } from './QuotesList';
-import './quotes.css';
 
 export const dynamic = 'force-dynamic';
 

@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { money } from '@/lib/quotes/types';
+import '../../crm/crm.css';
+import './quotes.css';
 
 export type QuoteListRow = { id: string; number: string; title: string; status: string; customer: string; project_id: string; total: number; updated_at: string };
 type Found = { id: string; name: string; email: string | null; postcode: string | null; customer_ref: string | null; projects: number };
@@ -44,28 +46,48 @@ export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteL
 
   if (!ready) {
     return (
-      <div className="qb-page">
-        <h1>Quotes</h1>
-        <p className="crm-banner crm-banner--err">Quotes need one database step first: run <b>supabase/quotes.sql</b> in the Supabase SQL editor, then refresh.</p>
+      <div className="crm crmh qb-page">
+        <div className="crmh-head">
+          <h1 className="crmh-h1">Quotes</h1>
+        </div>
+        <div className="crm-emptystate">
+          <b>Quotes appear here once quotes.sql has been run</b>
+          <p>Run supabase/quotes.sql in the Supabase SQL editor, then refresh this page.</p>
+        </div>
       </div>
     );
   }
+  const count = (f: string) => (f === 'all' ? initial.length : initial.filter((r) => r.status === f).length);
   const rows = initial.filter((r) => filter === 'all' || r.status === filter);
+  const open = initial.filter((r) => r.status === 'sent');
+  const openValue = open.reduce((n, r) => n + r.total, 0);
   return (
-    <div className="qb-page">
-      <div className="qb-head">
-        <h1>Quotes</h1>
-        <button type="button" className="crm-btn crm-btn--solar" onClick={() => setPicking(true)}>
-          + New quote
-        </button>
+    <div className="crm crmh qb-page">
+      <div className="crmh-head">
+        <div className="crmh-head__l">
+          <h1 className="crmh-h1">Quotes</h1>
+          {open.length > 0 && (
+            <span className="crmh-sum">
+              {open.length} waiting for a signature · {money(openValue)}
+            </span>
+          )}
+        </div>
+        <div className="crmh-head__r">
+          <button type="button" className="crm-btn crm-btn--solar" onClick={() => setPicking(true)}>
+            + New quote
+          </button>
+        </div>
       </div>
-      <div className="qb-chips">
+
+      <div className="crm-stages crmh-chips qb-chips" role="group" aria-label="Show">
         {(['all', 'draft', 'sent', 'accepted'] as const).map((f) => (
-          <button key={f} type="button" className={`qb-chip${filter === f ? ' on' : ''}`} onClick={() => setFilter(f)}>
+          <button key={f} type="button" className={filter === f ? 'on' : ''} aria-pressed={filter === f} onClick={() => setFilter(f)}>
             {f === 'all' ? 'All' : STATUS[f]}
+            <span>{count(f)}</span>
           </button>
         ))}
       </div>
+
       {picking && (
         <div className="qb-sheet" role="dialog" aria-label="New quote">
           <b>Who is the quote for?</b>
@@ -80,25 +102,38 @@ export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteL
               </button>
             ))}
           </div>
-          <button type="button" className="crm-link" onClick={() => setPicking(false)}>
+          <button type="button" className="crm-link" style={{ margin: 0 }} onClick={() => setPicking(false)}>
             Cancel
           </button>
         </div>
       )}
+
       {rows.length === 0 ? (
-        <p className="crm-muted">No quotes yet. Press + New quote to build one.</p>
+        <div className="crm-emptystate">
+          <b>{initial.length === 0 ? 'No quotes yet' : 'No quotes here'}</b>
+          {initial.length === 0 && <p>Press + New quote, choose the customer, and build the quote with prices, text, pictures and datasheets.</p>}
+        </div>
       ) : (
-        <div className="qb-table">
+        <div className="qb-list">
+          <div className="qb-row qb-row--head" aria-hidden="true">
+            <span>Quote</span>
+            <span>Customer</span>
+            <span>Status</span>
+            <span className="qb-total">Total</span>
+            <span>Updated</span>
+          </div>
           {rows.map((r) => (
             <Link key={r.id} href={`/admin/sales/quotes/${r.id}`} className="qb-row">
               <span className="qb-num">{r.number}</span>
               <span className="qb-main">
                 <b>{r.customer}</b>
-                <small className="crm-muted">{r.title}</small>
+                <small>{r.title}</small>
               </span>
-              <span className={`qb-status qb-status--${r.status}`}>{STATUS[r.status] ?? r.status}</span>
+              <span>
+                <span className={`qb-status qb-status--${r.status}`}>{STATUS[r.status] ?? r.status}</span>
+              </span>
               <span className="qb-total">{r.total ? money(r.total) : '–'}</span>
-              <small className="crm-muted">{new Date(r.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</small>
+              <small className="qb-when">{new Date(r.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</small>
             </Link>
           ))}
         </div>
