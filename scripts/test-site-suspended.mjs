@@ -3,11 +3,12 @@
 // one of its people (its main site contact or an operative), the Site tab and New project are refused with
 // a clear message; the picker leaves out a terminated firm's people and marks a suspended firm's as
 // "Suspended: can't be given new jobs". Active firms, and firms still onboarding, are unchanged. A trade
-// put on a job before its firm was suspended or terminated, that nothing has reached yet, can't be sent
+// put on a job before its firm was suspended or terminated, that the job hasn't reached yet, can't be sent
 // (Send the job pack, Copy link, a new link) nor sent again (Send again on a message that didn't go), with
 // the same message, and one already waiting for the morning (deliver in src/lib/site/send.ts) doesn't go;
-// once something has reached them (a message went, the office copied or WhatsApped the link itself, or
-// they opened it) it carries on. "Don't use the scaffold yet" still goes to any trade that's been sent.
+// once the job has reached them (a message with their link went, the office copied or WhatsApped the link
+// itself, or they opened it) it carries on. "Don't use the scaffold yet" still goes to any trade that's
+// been sent, but it has no link, so it doesn't count as reaching them.
 // Usage: node --experimental-strip-types scripts/test-site-suspended.mjs
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -121,6 +122,19 @@ globalThis.__fail.email = globalThis.__fail.whatsapp = false;
 const holdAgain = await resendTo(missed.a, msgsOf(missed.a).find((m) => m.kind === 'scaffold_hold' && m.channel === 'email')?.id);
 eq('…but “don’t use the scaffold yet” still goes to them (Sent, so they were sent the job)', [missedHold.status, missedHold.body.messages?.map((m) => `${m.kind} ${m.status}`)], [200, ['scaffold_hold failed', 'scaffold_hold failed']]);
 eq('…and Send again on one that didn’t go sends it', [holdAgain.status, holdAgain.body.message?.kind, holdAgain.body.message?.status], [200, 'scaffold_hold', 'sent']);
+// It has no link, so the job still hasn't reached them: the next day's "clear to start" (which has the
+// link) is refused like the rest.
+const wasHold = went();
+const packAfterHold = await sendTo(missed.a, { via: 'both' });
+const clearAfterHold = await sendTo(missed.a, { via: 'both', kind: 'clear_to_start' });
+const linkAfterHold = await sendTo(missed.a, { via: 'link', rotate: true });
+const againAfterHold = await resendTo(missed.a, msgsOf(missed.a).find((m) => m.kind === 'job_pack' && m.channel === 'email').id);
+eq(
+  '…which doesn’t count as reaching them: the job pack, “clear to start”, a new link and Send again on the job pack are still refused',
+  [packAfterHold.status, clearAfterHold.status, clearAfterHold.body.error, linkAfterHold.status, againAfterHold.status],
+  [422, 422, 'Missed Roofing is suspended, so they can’t be given new jobs.', 422, 422]
+);
+eq('…and nothing more went', [went() - wasHold, msgsOf(missed.a).filter((m) => m.status === 'sent').map((m) => m.kind), missed.a.link_generation], [0, ['scaffold_hold'], 1]);
 
 // Already with them: the WhatsApp went and only the email failed, or they opened it. The job carries on.
 const half = await addedWhileActive('Half Roofing');
@@ -176,6 +190,9 @@ for (const label of ['suspended', 'terminated']) {
   const said = `${f.company_name} is ${label}, so they can’t be given new jobs.`;
   eq('…don’t go when their time comes: the card says they didn’t, and why', [n, went() - was, stateOf(a)], [0, 0, [`job_pack email failed: ${said}`, `job_pack whatsapp failed: ${said}`, `clear_to_start email failed: ${said}`, `clear_to_start whatsapp failed: ${said}`]]);
   if (label !== 'suspended') continue;
+  // The scaffold isn't tagged that morning, so the office sends "don't use it yet". It goes, but has no link.
+  const hold = await sendTo(a, { via: 'both', kind: 'scaffold_hold' });
+  eq('…“don’t use the scaffold yet” still goes that morning', [hold.status, hold.body.messages?.map((m) => m.status)], [200, ['sent', 'sent']]);
   const refused = await resendTo(a, msgsOf(a)[0].id);
   f.status = 'active';
   const back = await resendTo(a, msgsOf(a)[0].id);
@@ -185,6 +202,21 @@ const holdLater = await queued('Overnight Hold', ['scaffold_hold']);
 holdLater.f.status = 'suspended';
 await morning(holdLater.a);
 eq('a waiting “don’t use the scaffold yet” still goes (a safety notice)', stateOf(holdLater.a), ['scaffold_hold email sent', 'scaffold_hold whatsapp sent']);
+// Both waiting for the same morning: the hold goes and the job pack doesn't, whichever is sent first.
+for (const first of ['scaffold_hold', 'job_pack']) {
+  const { f, a } = await queued(first === 'job_pack' ? 'Pack First Roofing' : 'Hold First Roofing', ['job_pack', 'scaffold_hold']);
+  f.status = 'suspended';
+  const due = Date.now() - 60_000;
+  for (const m of msgsOf(a)) m.send_after = new Date(m.kind === first ? due - 1000 : due).toISOString();
+  await SD.sendDue(db);
+  const said = `${f.company_name} is suspended, so they can’t be given new jobs.`;
+  eq(`a job pack and “don’t use the scaffold yet” waiting for the same morning (${first === 'job_pack' ? 'job pack' : 'hold'} sent first): only the hold goes`, stateOf(a), [
+    `job_pack email failed: ${said}`,
+    `job_pack whatsapp failed: ${said}`,
+    'scaffold_hold email sent',
+    'scaffold_hold whatsapp sent',
+  ]);
+}
 const reinstated = await queued('Overnight Back', ['job_pack']);
 reinstated.f.status = 'suspended';
 reinstated.f.status = 'active';

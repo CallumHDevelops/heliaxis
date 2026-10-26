@@ -229,6 +229,8 @@ export const KIND_TEMPLATE: Record<MessageKind, string> = {
   return_to_site: 'site_return_to_site',
   green_light: 'site_green_light',
 };
+/** The kinds that carry the trade's link (the PO, "don't use the scaffold yet" and the green light don't). */
+export const WITH_LINK: readonly MessageKind[] = ['job_pack', 'strike', 'clear_to_start', 'return_to_site'];
 export const KIND_LABEL: Record<MessageKind, string> = {
   job_pack: 'Job pack',
   po: 'PO',

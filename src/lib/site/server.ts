@@ -8,6 +8,7 @@ import { designOf } from './design';
 import { formsFor, isElectricianForm, suggestedTrades } from './forms';
 import { legacySections } from './forms/legacy';
 import { defaultCertRoute } from './forms/electrician/cert';
+import { WITH_LINK } from './messages';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
 import { getSiteSettings } from './settings';
 import { jobStrip, type StripStep } from './strip';
@@ -465,12 +466,13 @@ export async function createAssignments(
 
 /**
  * Why nothing can be sent to this trade, or null: their firm was suspended or terminated after they
- * were put on the job, and nothing has reached them yet (it's not sent, or it is but no message went,
- * the office didn't hand them the link itself with Copy link or WhatsApp from my phone, and they
- * haven't opened it), so sending would give them a new job. Once something has, the job carries on
- * as it is. "Don't use the scaffold yet" (`kind` scaffold_hold) is a safety notice: it still goes to
- * a trade that's been sent anything. The send and Send again routes ask before anything goes, and
- * deliver() before a message that was waiting goes.
+ * were put on the job, and the job hasn't reached them yet (it's not sent, or it is but no message
+ * with their link went, the office didn't hand them the link itself with Copy link or WhatsApp from
+ * my phone, and they haven't opened it), so sending would give them a new job. Once it has, the job
+ * carries on as it is. "Don't use the scaffold yet" (`kind` scaffold_hold) is a safety notice: it
+ * still goes to a trade that's been sent anything, but it has no link, so it doesn't count as
+ * reaching them. The send and Send again routes ask before anything goes, and deliver() before a
+ * message that was waiting goes.
  */
 export async function blockedFirmProblem(db: Db, a: AssignmentRow, c: Pick<ContactRow, 'subcontractor_id'>, kind?: string): Promise<string | null> {
   if (!c.subcontractor_id || (a.status !== 'draft' && a.status !== 'sent')) return null;
@@ -478,7 +480,7 @@ export async function blockedFirmProblem(db: Db, a: AssignmentRow, c: Pick<Conta
   const firm = (await firmsById(db, [c.subcontractor_id])).get(c.subcontractor_id);
   if (!firm || !firmBlockedWords(firm.status)) return null;
   const [{ data: went }, { data: handed }] = await Promise.all([
-    db.from('site_messages').select('id').eq('assignment_id', a.id).eq('status', 'sent').limit(1),
+    db.from('site_messages').select('id').eq('assignment_id', a.id).eq('status', 'sent').in('kind', WITH_LINK).limit(1),
     db.from('site_events').select('id').eq('assignment_id', a.id).eq('type', 'link_copied').limit(1),
   ]);
   return went?.length || handed?.length ? null : noNewJobs(firm);
