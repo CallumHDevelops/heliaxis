@@ -190,3 +190,86 @@ a.est-link{display:inline-block}
 .est-roofcard .est-sub{margin:0 0 12px}
 .est-facts{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:.92rem}
 .est-facts b{font-family:var(--display);font-size:1.15rem;text-transform:capitalize}
+
+/* ── Compact: each question fits one screen, no scrolling on a laptop ────────── */
+.est-hero{padding:18px 0 58px}
+.est-hero .wrap,.est-wrap{padding-left:24px;padding-right:24px;box-sizing:border-box}
+.est-hero .eyebrow{font-size:.66rem}
+.est-hero h1{font-size:clamp(1.35rem,2.6vw,1.9rem);margin-top:8px;max-width:none;line-height:1.1}
+.est-hero p{margin-top:8px;font-size:.9rem;max-width:68ch}
+.est-wrap{margin-top:-40px;padding-bottom:28px}
+.est-prog{padding:14px 22px 0}
+.est-q{padding:14px 22px 2px}
+.est-q h2{font-size:clamp(1.15rem,2.2vw,1.45rem)}
+.est-h2{margin-top:14px}
+.est-sub{margin:4px 0 10px;font-size:.92rem}
+.est-opts{margin:8px 0 2px;gap:8px}
+.est-opts.six{grid-template-columns:repeat(6,minmax(0,1fr))}
+.est-opt{padding:9px 11px;gap:1px}
+.est-opt b{font-size:.92rem}
+.est-opt__i{margin-bottom:2px}
+.est-q-mark{display:inline-grid;place-items:center;width:28px;height:28px;font-weight:800;font-size:1.1rem}
+.est-addr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.est-lab{margin:12px 0 4px}
+.est-input{padding:10px 12px}
+.est-nav{padding:10px 22px 14px}
+.est-slide{padding:2px 0}
+.est-big{font-size:clamp(1.5rem,4vw,2rem)}
+@media(max-width:840px){
+  .est-opts.six{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .est-addr{grid-template-columns:minmax(0,1fr)}
+  .est-hero p{display:none}
+}
+@media(max-height:760px) and (min-width:841px){
+  .est-opt small{display:none}
+  .est-hero{padding-top:12px}
+  .est-hero p{display:none}
+}
+
+/* ── The report: a dashboard that fits one screen on a laptop ───────────────── */
+.est-res{gap:14px}
+.est-reporthead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:3px;padding:10px 16px}
+.est-rh-l{display:flex;align-items:center;gap:12px}
+.est-rh-l h2{font-family:var(--display);font-weight:900;font-size:1.2rem;line-height:1.1}
+.est-rh-l p{color:var(--muted);font-size:.85rem;margin:2px 0 0}
+.est-rh-r{display:flex;gap:16px}
+.est-suns svg{width:22px;height:22px}
+.est-dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:14px;align-items:start}
+.est-dash.single{grid-template-columns:minmax(0,1fr)}
+.est-col{display:grid;gap:12px;min-width:0}
+.est-roofcard{padding:10px;display:grid;gap:8px}
+.est-map{margin:0;display:grid;gap:6px}
+.est-mapbox{position:relative;width:min(100%,max(260px,min(48vh,440px)));aspect-ratio:1/1;overflow:hidden;background:#2a3a28;margin:0 auto}
+.est-mapbox img,.est-mapbox svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.est-map figcaption{font-size:.7rem;color:var(--muted);line-height:1.4}
+.est-roofcard .est-facts{padding:0 4px 4px}
+.est-head{padding:16px 20px}
+.est-head .big{font-size:clamp(1.7rem,3.4vw,2.4rem)}
+.est-headcta{margin-top:10px;justify-self:start;padding:.6rem 1rem;font-size:.9rem}
+.est-stats .tile{padding:10px 14px}
+.est-stats .tile .v{font-size:1.1rem}
+.est-chartcard{padding:12px 16px}
+.est-chartcard h3{margin-bottom:6px;font-size:.95rem}
+.est-chartcard .est-note{margin-top:4px;font-size:.76rem}
+.est-adjust .est-chips{margin-bottom:8px}
+.est-steppers{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:4px}
+.est-step{display:flex;align-items:center;gap:8px;font-size:.86rem}
+.est-step span{color:var(--muted)}
+.est-step button{width:28px;height:28px;border:1.5px solid var(--line);background:var(--card);border-radius:50%;font-size:1.05rem;cursor:pointer;color:var(--ink);line-height:1}
+.est-step button:hover{border-color:var(--ink)}
+.est-step b{min-width:46px;text-align:center;font-family:var(--mono)}
+@media(max-width:900px){.est-dash{grid-template-columns:minmax(0,1fr)}.est-mapbox{width:100%}}
+.est-chart{max-height:150px}
+@media print{
+  .site header,.site footer,.est-hero,.est-adjust,.est-lead,.est-headcta,.est-rh-r,.assumptions summary~*{display:none!important}
+  .assumptions[open] ul{display:block!important}
+  .est-wrap{margin-top:0;padding:0}
+  .est-card,.est-reporthead{break-inside:avoid;box-shadow:none}
+  body{background:#fff}
+}
+.est-addr.one{grid-template-columns:minmax(0,1fr)}
+.est-confirm{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:16px;align-items:start;margin:6px 0 4px}
+.est-confirm__map .est-mapbox{width:100%}
+.est-confirm .est-found{margin:0}
+.est-confirm .est-opts{grid-column:1 / -1}
+@media(max-width:700px){.est-confirm{grid-template-columns:minmax(0,1fr)}}

@@ -12,5 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default async function SolarEstimatorPage() {
-  return <SolarEstimatorApp settings={await readEstimatorSettings()} />;
+  return <SolarEstimatorApp settings={await readEstimatorSettings()} roofLookup={!!process.env.GOOGLE_SOLAR_API_KEY} />;
 }

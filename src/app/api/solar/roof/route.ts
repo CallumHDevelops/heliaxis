@@ -2,14 +2,16 @@ import { NextResponse } from 'next/server';
 import { geocodePostcodes } from '@/lib/geocode-postcode';
 import { fallbackYield } from '@/lib/estimator/calc';
 import { pvgisYield } from '@/lib/estimator/pvgis';
-import { roofFromGoogle, type GoogleBuilding, type RoofFound } from '@/lib/estimator/roof';
+import { buildingOutline } from '@/lib/estimator/osm';
+import { roofFromGoogle, mapFromGoogle, type GoogleBuilding, type MapData, type RoofFound } from '@/lib/estimator/roof';
+import { signView } from '@/lib/estimator/sign';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const json = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { 'Cache-Control': 'private, max-age=600' } });
 
-type Found = { found: true; address: string; lat: number; lng: number; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null };
+type Found = { found: true; address: string; lat: number; lng: number; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null; map: (MapData & { imageUrl: string; outline: { lat: number; lng: number }[] | null }) | null };
 type Miss = { found: false; reason: 'not_configured' | 'bad_address' | 'no_address' | 'not_covered' | 'busy' | 'error' };
 
 /** Same address asked again within a day is answered from memory (so it is only billed once). */
@@ -111,7 +113,9 @@ export async function GET(req: Request) {
         const y = await pvgisYield(geo.lat, geo.lng, first.angle, first.aspect);
         const roof = roofFromGoogle(b, y?.kwhPerKwp ?? fallbackYield(first.direction, 'typical')) ?? first;
         const d = b.imageryDate;
-        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical'), monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null };
+        const m = mapFromGoogle(b, { lat: geo.lat, lng: geo.lng });
+        const outline = m ? await buildingOutline(m.centre) : null;
+        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical'), monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
       }
     }
   } catch {

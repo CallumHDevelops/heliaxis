@@ -11,12 +11,17 @@ export type GoogleSegment = {
   azimuthDegrees?: number;
   stats?: { areaMeters2?: number; groundAreaMeters2?: number };
 };
+type GLatLng = { latitude?: number; longitude?: number };
 export type GoogleBuilding = {
+  center?: GLatLng;
   imageryQuality?: string;
   solarPotential?: {
     maxArrayPanelsCount?: number;
     maxArrayAreaMeters2?: number;
     panelCapacityWatts?: number;
+    panelHeightMeters?: number;
+    panelWidthMeters?: number;
+    solarPanels?: { center?: GLatLng; orientation?: string; segmentIndex?: number }[];
     roofSegmentStats?: GoogleSegment[];
     solarPanelConfigs?: { panelsCount?: number; yearlyEnergyDcKwh?: number }[];
     wholeRoofStats?: { areaMeters2?: number };
@@ -88,3 +93,27 @@ export function roofFromGoogle(b: GoogleBuilding | null | undefined, fallbackYie
 
 const POINTS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 export const compassWord = (bearing: number) => POINTS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8];
+
+/** What the picture needs: where each panel of Google's layout sits (best first), its size, and the building's centre. */
+export type MapPanel = { lat: number; lng: number; o: 'p' | 'l'; az: number };
+export type MapData = { centre: { lat: number; lng: number }; panels: MapPanel[]; panelW: number; panelH: number };
+
+export function mapFromGoogle(b: GoogleBuilding | null | undefined, fallbackCentre: { lat: number; lng: number }): MapData | null {
+  const sp = b?.solarPotential;
+  const segs = sp?.roofSegmentStats ?? [];
+  const panels: MapPanel[] = (sp?.solarPanels ?? [])
+    .slice(0, 80)
+    .flatMap((p) => {
+      const seg = segs[p.segmentIndex ?? 0];
+      if (typeof p.center?.latitude !== 'number' || typeof p.center?.longitude !== 'number' || typeof seg?.azimuthDegrees !== 'number') return [];
+      return [{ lat: p.center.latitude, lng: p.center.longitude, o: p.orientation === 'LANDSCAPE' ? ('l' as const) : ('p' as const), az: seg.azimuthDegrees }];
+    });
+  if (!panels.length) return null;
+  const c = b?.center;
+  return {
+    centre: typeof c?.latitude === 'number' && typeof c?.longitude === 'number' ? { lat: c.latitude, lng: c.longitude } : fallbackCentre,
+    panels,
+    panelW: sp?.panelWidthMeters ?? 1.045,
+    panelH: sp?.panelHeightMeters ?? 1.879,
+  };
+}
