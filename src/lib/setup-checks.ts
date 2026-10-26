@@ -304,9 +304,14 @@ export async function markDone(id: string, done = true) {
   const set = new Set(await doneManual());
   if (done) set.add(id);
   else set.delete(id);
+  await saveDone([...set]);
+}
+
+/** Save the ticked list as given, for a caller that has just read it and must not read it again. */
+async function saveDone(ids: string[]) {
   await createAdminClient()
     .from('cms_kv')
-    .upsert({ key: DONE_KEY, value: JSON.stringify([...set]), updated_at: new Date().toISOString() });
+    .upsert({ key: DONE_KEY, value: JSON.stringify(ids), updated_at: new Date().toISOString() });
 }
 
 /** Approved users (one lookup per request): who can be picked, and who still counts when picked. */
@@ -839,8 +844,9 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     // Only the people the rotation will use count (those the settings screen shows ticked); if they can't be looked up, the ticks do.
     const takers = await rotationOnTeam(settings.leadRotation);
     // Someone ticked can take leads, so a tick on this to-do is used up: if they all lose CRM access later, it
-    // comes back unticked, and only a tick made then (leads can stay unassigned) greys it.
-    if (takers && done.includes('crm-rotation')) await markDone('crm-rotation', false).catch(() => {});
+    // comes back unticked, and only a tick made then (leads can stay unassigned) greys it. Written from the
+    // list read above, not read again: a failed read would otherwise save an empty list over everyone's ticks.
+    if (takers && done.includes('crm-rotation')) await saveDone(done.filter((id) => id !== 'crm-rotation')).catch(() => {});
     add(takers === null ? !settings.leadRotation.length : !takers, {
       id: 'crm-rotation',
       title: 'Choose who gets new leads',

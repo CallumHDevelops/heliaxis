@@ -4,7 +4,8 @@
 // their access is back; a lead someone already has is left alone. The "Choose who gets new leads" to-do
 // (src/lib/setup-checks.ts) counts the same people, and comes back unticked when none of them can take a
 // lead any more, whatever was ticked off before; ticked off then, it stays ticked until someone can take
-// leads again. The follow-up sequence: switched on (or given a new
+// leads again. An old tick is cleared from the list the card has just read, so a failed read never wipes the
+// other ticks, and a failed lookup of the people leaves it. The follow-up sequence: switched on (or given a new
 // step), it sends only the steps that fall due from then on; leads already in the CRM skip older ones
 // quietly, instead of getting every overdue step a minute apart. Steps go by id, so a step added (even
 // one at the same hours and Send by as another), moved or edited never re-sends one a lead has had, a
@@ -150,12 +151,42 @@ eq('nobody ticked: a tick still greys it, as before', await rotationTicked(), tr
 db.t.cms_kv = db.rows('cms_kv').filter((r) => r.key !== 'setup-done');
 eq('nobody ticked: the to-do, as before', await rotationTodo(), 'New leads are handed out in turn and that person gets a notification.');
 
-// People can't be looked up: it goes by the ticks, rather than nag on a guess.
+// People can't be looked up: it goes by the ticks, rather than nag on a guess, and leaves a tick it can't judge.
 setSettings({ leadRotation: [esther.id], rotationIndex: 0 });
+db.rows('cms_kv').push({ key: 'setup-done', value: JSON.stringify(['crm-rotation']) });
 const down = { select: () => down, eq: () => down, in: () => down, then: (res, rej) => Promise.resolve({ data: null, error: { message: 'down' } }).then(res, rej) };
 globalThis.__db = { ...db, from: (t) => (t === 'profiles' ? down : db.from(t)) };
 eq('people can’t be looked up: no to-do while someone is ticked', await rotationTodo(), 'none');
 globalThis.__db = db;
+eq('…and a tick on it stays, so a short outage can’t clear it', (await C.doneManual()).includes('crm-rotation'), true);
+
+// The tick is used up from the list the card has just read: if reading the ticks fails after that, the other
+// ticks are still there.
+const ticked = () => JSON.parse(db.rows('cms_kv').find((r) => r.key === 'setup-done')?.value ?? '[]');
+db.t.profiles = [esther];
+db.rows('cms_kv').find((r) => r.key === 'setup-done').value = JSON.stringify(['crm-rotation', 'q-home-by', 'meta-leadgen']);
+let doneReads = 0;
+globalThis.__db = {
+  ...db,
+  from: (t) => {
+    const q = db.from(t);
+    if (t !== 'cms_kv') return q;
+    let key;
+    const { eq: where, maybeSingle } = q;
+    q.eq = (c, v) => ((key = v), where(c, v));
+    q.maybeSingle = () => (key === 'setup-done' && ++doneReads > 1 ? Promise.resolve({ data: null, error: { message: 'timed out' } }) : maybeSingle());
+    return q;
+  },
+};
+await rotationTodo();
+globalThis.__db = db;
+eq('the ticks can’t be read a second time: the tick on it is used up and the others are still there', ticked(), ['q-home-by', 'meta-leadgen']);
+
+// Ticked off, but the card doesn't load while someone ticked can open the CRM: nothing has used the tick up.
+db.t.profiles = [{ ...esther, status: 'rejected' }];
+db.rows('cms_kv').find((r) => r.key === 'setup-done').value = JSON.stringify(['crm-rotation']);
+eq('ticked off, and the card only loads once nobody ticked can open the CRM: it comes back still ticked', await rotationTicked(), true);
+db.t.cms_kv = db.rows('cms_kv').filter((r) => r.key !== 'setup-done');
 db.t.profiles = [esther, callum, leaver];
 
 /* ── The follow-up sequence ────────────────────────────────────────────────── */
@@ -586,6 +617,13 @@ await A.runCrmAutomations();
 eq('…the lead waiting for its WhatsApp still gets it', globalThis.__rec.whatsapp.map((m) => m.enquiryId), [waitingWa.enquiry_id]);
 const changed = await put({ ...oldTab, sequence: [{ ...oldTab.sequence[0], text: 'Hi {first_name}, changed in the old tab' }, oldTab.sequence[1]] });
 eq('…a step changed on that page can’t be told from a new one: refused, nothing changed', [changed.status, changed.body.error, settings().sequence.map((x) => [x.id, x.leadsFrom])], [409, 'The app has been updated since this page was opened. Reload the page, make your changes again and save.', kept0]);
+
+// Help says when the old tick on the "Choose who gets new leads" to-do is cleared, as the card does.
+const help = readFileSync(new URL('../src/content/help/admin/new-leads.md', import.meta.url), 'utf8').replace(/\s+/g, ' ');
+eq('Help says the job usually comes back unticked, as the card clears an old tick only when it loads while someone ticked can open the CRM', [
+  help.includes('It usually comes back unticked, even if you ticked the job off before: the app clears an old tick each time the card loads while someone ticked can open the CRM. If the card didn’t load in that time, the job comes back still ticked.'),
+  help.includes('It comes back unticked'),
+], [true, false]);
 
 // The note under the switch on CRM settings.
 const view = readFileSync(new URL('../src/app/admin/crm/settings/CrmSettingsView.tsx', import.meta.url), 'utf8');
