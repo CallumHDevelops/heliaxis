@@ -437,7 +437,7 @@ function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panel
         <img src={map.imageUrl} alt={`Satellite picture of ${address}`} onError={() => setFailed(true)} />
         <svg viewBox={`0 0 ${MAP_SIZE} ${MAP_SIZE}`} aria-hidden="true">
           {outline && <polygon points={pointsAttr(outline)} fill="rgba(255,255,255,.12)" stroke="#fff" strokeWidth="2.5" strokeLinejoin="round" />}
-          {!plain && map.faces?.map((f, i) => (
+          {!plain && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug') && map.faces?.map((f, i) => (
             <polygon key={`f${i}`} points={pointsAttr(f.map((g) => toPixel(g, map.centre)))} fill="none" stroke="rgba(120,230,90,.9)" strokeWidth="1.6" strokeLinejoin="round" />
           ))}
           {shown.map((p, i) => (

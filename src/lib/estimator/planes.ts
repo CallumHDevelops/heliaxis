@@ -183,7 +183,7 @@ export function detectFaces(g: Grid): Face[] {
 }
 
 export type PackOptions = { panelW: number; panelH: number; clearance: number; gap: number };
-export type Placed = { x: number; y: number; o: 'p' | 'l'; az: number; pt: number; flux: number; face: number };
+export type Placed = { x: number; y: number; o: 'p' | 'l'; az: number; pt: number; flux: number; face: number; /** Across the face (along the eaves) and down it, in metres, for ordering. */ u: number; v: number };
 
 const SAMPLE = 6;
 
@@ -256,14 +256,19 @@ export function packFaces(g: Grid, faces: Face[], opt: PackOptions): Placed[] {
             if (flux < minFlux) continue;
             const uc = u0 + across / 2;
             const vc = v0 + along / 2;
-            placed.push({ x: uc * a.x + vc * d.x, y: uc * a.y + vc * d.y, o, az: f.bearing, pt: f.pitch, flux, face: f.id });
+            placed.push({ x: uc * a.x + vc * d.x, y: uc * a.y + vc * d.y, o, az: f.bearing, pt: f.pitch, flux, face: f.id, u: uc, v: vc });
             sun += flux;
           }
         }
         if (placed.length > best.length || (placed.length === best.length && sun > bestSun)) { best = placed; bestSun = sun; }
       }
     }
-    if (best.length) perFace.push({ placed: best.sort((p, q) => q.flux - p.flux), sun: bestSun });
+    if (best.length) {
+      // Fewer panels than the face holds should still look tidy: the sunniest first (in 10% steps), then whole rows from the eaves up.
+      const top = Math.max(...best.map((p) => p.flux)) || 1;
+      const band = (p: Placed) => Math.round((p.flux / top) * 10);
+      perFace.push({ placed: best.sort((p, q) => band(q) - band(p) || q.v - p.v || p.u - q.u), sun: bestSun });
+    }
   }
   return perFace.sort((p, q) => q.sun - p.sun).flatMap((p) => p.placed);
 }
