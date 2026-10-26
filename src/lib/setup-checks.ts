@@ -5,6 +5,7 @@ import { savedAnswers, type SavedAnswer } from '@/lib/claude-answers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
 import { msConfigured } from '@/lib/ms365';
+import { canAccess } from '@/lib/portals';
 import type { GuideKey, SqlFile } from '@/lib/setup-files';
 
 /**
@@ -117,6 +118,22 @@ async function readKv<T>(key: string): Promise<T | null> {
     const { data, error } = await createAdminClient().from('cms_kv').select('value').eq('key', key).maybeSingle();
     if (error || !data?.value) return null;
     return JSON.parse(data.value) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How many of the people ticked for new leads can still open the CRM (approved, with CRM access): the
+ * rotation skips the rest (assignNewLead). null if the lookup fails, so the card doesn't nag on a guess.
+ */
+async function rotationOnTeam(ids: string[]): Promise<number | null> {
+  if (!ids.length) return 0;
+  try {
+    // '*', not named columns: portals may not be there yet, and canAccess falls back without it.
+    const { data, error } = await createAdminClient().from('profiles').select('*').eq('status', 'approved').in('id', ids);
+    if (error) return null;
+    return (data ?? []).filter((p) => canAccess(p, 'crm')).length;
   } catch {
     return null;
   }
@@ -819,10 +836,14 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     kind: 'tip',
   });
   if (settings) {
-    add(!settings.leadRotation.length, {
+    // Only the people the rotation will use count (those the settings screen shows ticked); if they can't be looked up, the ticks do.
+    const takers = await rotationOnTeam(settings.leadRotation);
+    add(takers === null ? !settings.leadRotation.length : !takers, {
       id: 'crm-rotation',
       title: 'Choose who gets new leads',
-      detail: 'New leads are handed out in turn and that person gets a notification.',
+      detail: settings.leadRotation.length
+        ? 'Nobody ticked for new leads can open the CRM any more, so new leads stay unassigned and nobody gets a notification.'
+        : 'New leads are handed out in turn and that person gets a notification.',
       steps: [
         'Tap **Open CRM settings**.',
         'Under **New leads → Share new leads between**, tick everyone who should take new leads (e.g. you and Esther).',

@@ -1,9 +1,10 @@
 // What the CRM does by itself with new leads (src/lib/crm/automation.ts): who gets a new lead. The
 // rotation (CRM → Settings → New leads) skips anyone who can no longer open the CRM (rejected, set back
-// to pending, CRM portal taken away), who stays ticked and takes turns again when their access is back;
-// a lead someone already has is left alone. The follow-up sequence: switched on (or given a new step),
-// it sends only the steps that fall due from then on; leads already in the CRM skip older ones quietly,
-// instead of getting every overdue step a minute apart.
+// to pending, CRM portal taken away), who stays ticked, keeps their place and takes turns again when
+// their access is back; a lead someone already has is left alone. The "Choose who gets new leads" to-do
+// (src/lib/setup-checks.ts) counts the same people. The follow-up sequence: switched on (or given a new
+// step), it sends only the steps that fall due from then on; leads already in the CRM skip older ones
+// quietly, instead of getting every overdue step a minute apart.
 // Usage: node --experimental-strip-types scripts/test-crm-automation.mjs
 import { randomUUID } from 'node:crypto';
 import * as kit from './site-test-kit.mjs';
@@ -23,6 +24,7 @@ const { eq } = kit;
 const A = await import('../src/lib/crm/automation.ts');
 const S = await import('../src/lib/crm/settings-shared.ts');
 const settingsRoute = await import('../src/app/api/crm/settings/route.ts');
+const C = await import('../src/lib/setup-checks.ts');
 
 const person = (name, o = {}) => ({ id: randomUUID(), full_name: name, email: `${name.toLowerCase()}@heliaxis.test`, status: 'approved', role: 'member', portals: ['crm'], ...o });
 const settings = () => JSON.parse(db.rows('cms_kv').find((r) => r.key === 'crm-settings')?.value ?? '{}');
@@ -73,7 +75,17 @@ eq('CRM portal taken away: skipped too', names(await turns(2)).includes('Leaver'
 
 // Their access comes back: they're back in turn without anyone ticking them again.
 leaver.portals = ['crm', 'enquiries'];
-eq('access back: they take turns again by themselves', names(await turns(3)).sort(), ['Callum', 'Esther', 'Leaver']);
+eq('access back: they take turns again by themselves', names(await turns(3)), ['Esther', 'Leaver', 'Callum']);
+
+// Someone drops out part-way round, then comes back: the turn order holds both times (nobody gets two
+// in a row, nobody misses a turn), as the person skipped keeps their place.
+setSettings({ leadRotation: [esther.id, leaver.id, callum.id], rotationIndex: 0 });
+const order = names(await turns(2));
+esther.status = 'rejected';
+order.push('|', ...names(await turns(3)));
+esther.status = 'approved';
+order.push('|', ...names(await turns(3)));
+eq('the turn order holds when someone drops out part-way round, and when they come back', order.join(' '), 'Esther Leaver | Callum Leaver Callum | Esther Leaver Callum');
 
 // Nobody on the rotation can open the CRM: the lead stays unassigned and nobody is told.
 db.t.profiles = [{ ...esther, status: 'rejected' }, { ...callum, status: 'rejected' }, { ...leaver, status: 'rejected' }];
@@ -87,6 +99,29 @@ const taken = lead({ owner_id: leaver.id });
 leaver.status = 'rejected';
 await A.assignNewLead(taken.id, 'Jane Smith');
 eq('a lead already assigned (even to someone who has left) is left alone', ownerOf(taken), leaver.id);
+
+/* ── The "Choose who gets new leads" to-do (From Claude) ───────────────────── */
+
+// It counts only the people the rotation will use, as the settings screen shows them ticked: when everyone
+// ticked has lost CRM access, new leads go to nobody, so it comes back.
+const rotationTodo = async () => (await C.setupTodos({})).find((t) => t.id === 'crm-rotation')?.detail ?? 'none';
+leaver.status = 'approved';
+setSettings({ leadRotation: [esther.id, leaver.id, callum.id], rotationIndex: 0 });
+eq('someone ticked can open the CRM: no to-do', await rotationTodo(), 'none');
+db.t.profiles = [{ ...esther, status: 'rejected' }, { ...callum, status: 'pending' }, { ...leaver, portals: ['enquiries'] }];
+eq('nobody ticked can open the CRM any more: the to-do is back, and says why', await rotationTodo(), 'Nobody ticked for new leads can open the CRM any more, so new leads stay unassigned and nobody gets a notification.');
+db.t.profiles = [];
+eq('…the same when they’ve been deleted', (await rotationTodo()).startsWith('Nobody ticked'), true);
+setSettings({ leadRotation: [], rotationIndex: 0 });
+eq('nobody ticked: the to-do, as before', await rotationTodo(), 'New leads are handed out in turn and that person gets a notification.');
+
+// People can't be looked up: it goes by the ticks, rather than nag on a guess.
+setSettings({ leadRotation: [esther.id], rotationIndex: 0 });
+const down = { select: () => down, eq: () => down, in: () => down, then: (res, rej) => Promise.resolve({ data: null, error: { message: 'down' } }).then(res, rej) };
+globalThis.__db = { ...db, from: (t) => (t === 'profiles' ? down : db.from(t)) };
+eq('people can’t be looked up: no to-do while someone is ticked', await rotationTodo(), 'none');
+globalThis.__db = db;
+db.t.profiles = [esther, callum, leaver];
 
 /* ── The follow-up sequence ────────────────────────────────────────────────── */
 
