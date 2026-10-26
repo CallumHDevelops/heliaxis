@@ -1,13 +1,15 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { cleanCrmSettings, DEFAULT_CRM_SETTINGS, type CrmSettings } from './settings-shared';
+import { cleanCrmSettings, DEFAULT_CRM_SETTINGS, storedSteps, type CrmSettings } from './settings-shared';
 
 const KEY = 'crm-settings';
 
 export async function getCrmSettings(): Promise<CrmSettings> {
   try {
     const { data } = await createAdminClient().from('cms_kv').select('value').eq('key', KEY).maybeSingle();
-    return data?.value ? cleanCrmSettings({ ...DEFAULT_CRM_SETTINGS, ...JSON.parse(data.value) }) : DEFAULT_CRM_SETTINGS;
+    if (!data?.value) return DEFAULT_CRM_SETTINGS;
+    const saved = JSON.parse(data.value);
+    return cleanCrmSettings({ ...DEFAULT_CRM_SETTINGS, ...saved, sequence: storedSteps(saved.sequence ?? DEFAULT_CRM_SETTINGS.sequence) });
   } catch {
     return DEFAULT_CRM_SETTINGS;
   }

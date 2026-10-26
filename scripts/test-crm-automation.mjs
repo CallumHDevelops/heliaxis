@@ -4,7 +4,10 @@
 // their access is back; a lead someone already has is left alone. The "Choose who gets new leads" to-do
 // (src/lib/setup-checks.ts) counts the same people. The follow-up sequence: switched on (or given a new
 // step), it sends only the steps that fall due from then on; leads already in the CRM skip older ones
-// quietly, instead of getting every overdue step a minute apart.
+// quietly, instead of getting every overdue step a minute apart. Steps go by id, so a step added (even
+// one at the same hours and Send by as another), moved or edited never re-sends one a lead has had, a
+// step moved earlier still goes to the leads waiting for it, and editing one step doesn't drop another
+// that's due but waiting for the quiet hours or a hold.
 // Usage: node --experimental-strip-types scripts/test-crm-automation.mjs
 import { randomUUID } from 'node:crypto';
 import * as kit from './site-test-kit.mjs';
@@ -128,40 +131,57 @@ db.t.profiles = [esther, callum, leaver];
 const HOUR = 3_600_000;
 const ago = (ms) => new Date(Date.now() - ms).toISOString();
 const D = S.DEFAULT_CRM_SETTINGS;
-eq('the default sequence: WhatsApp at 24h, email at 72h, off', [D.sequence.map((x) => [x.afterHours, x.channel]), D.sequenceEnabled, D.sequenceFrom], [[[24, 'whatsapp'], [72, 'email']], false, null]);
+eq('the default sequence: WhatsApp at 24h, email at 72h, off', [D.sequence.map((x) => [x.id, x.afterHours, x.channel]), D.sequenceEnabled], [[['1', 24, 'whatsapp'], ['2', 72, 'email']], false]);
 
-// When the sequence starts counting.
+// Steps by id.
+const ids = S.cleanCrmSettings({ sequence: [...D.sequence, { id: '', afterHours: 120, channel: 'email', text: 'Last one' }, { ...D.sequence[0], text: 'A repeat' }] }).sequence.map((x) => x.id);
+eq('a step keeps its id; one just added, or a repeat, gets its own', [ids[0], ids[2], new Set(ids).size, /^[0-9a-f]{8}$/.test(ids[1]) && /^[0-9a-f]{8}$/.test(ids[3])], ['1', '2', 4, true]);
+eq('steps saved before ids are named by their place in the list', S.storedSteps([{ afterHours: 24, text: 'a' }, { afterHours: 72, text: 'c' }]).map((x) => x.id), ['1', '2']);
+
+// Who a step goes to: leads that came in from its leadsFrom on.
 const now = new Date('2026-10-22T10:00:00Z');
-const on = { ...D, sequenceEnabled: true, sequenceFrom: '2026-10-01T09:00:00.000Z' };
-eq('switched on: from now', S.sequenceFromAfter(D, { ...D, sequenceEnabled: true }, now), now.toISOString());
-eq('saved again, nothing new: as it was', S.sequenceFromAfter(on, on, now), on.sequenceFrom);
-eq('a step’s words changed: as it was', S.sequenceFromAfter(on, { ...on, sequence: on.sequence.map((x) => ({ ...x, text: `${x.text} Thanks!` })) }, now), on.sequenceFrom);
-eq('a step added: from now', S.sequenceFromAfter(on, { ...on, sequence: [...on.sequence, { afterHours: 120, channel: 'email', text: 'Last one' }] }, now), now.toISOString());
-eq('a step moved to a new time: from now', S.sequenceFromAfter(on, { ...on, sequence: [{ ...on.sequence[0], afterHours: 48 }, on.sequence[1]] }, now), now.toISOString());
-eq('a step removed: as it was', S.sequenceFromAfter(on, { ...on, sequence: [on.sequence[0]] }, now), on.sequenceFrom);
-eq('switched off: kept (switching on again starts again)', S.sequenceFromAfter(on, { ...on, sequenceEnabled: false }, now), on.sequenceFrom);
-eq('saved settings keep it; rubbish is dropped', [S.cleanCrmSettings({ sequenceFrom: on.sequenceFrom }).sequenceFrom, S.cleanCrmSettings({ sequenceFrom: 'soon' }).sequenceFrom, S.cleanCrmSettings({}).sequenceFrom], [on.sequenceFrom, null, null]);
+const before = (h) => new Date(now.getTime() - h * HOUR).toISOString();
+const on = { ...D, sequenceEnabled: true, sequence: D.sequence.map((x) => ({ ...x, leadsFrom: '2026-10-01T09:00:00.000Z' })) };
+const froms = (seq) => seq.map((x) => x.leadsFrom);
+eq('switched on: every step goes to the leads it falls due for from now', froms(S.sequenceAfterSave(D, { ...D, sequenceEnabled: true }, now)), [before(24), before(72)]);
+eq('saved again, nothing new: as it was', froms(S.sequenceAfterSave(on, on, now)), froms(on.sequence));
+eq('a step’s words, hours or Send by changed: as it was', froms(S.sequenceAfterSave(on, { ...on, sequence: [{ ...on.sequence[0], text: 'Hello' }, { ...on.sequence[1], afterHours: 48, channel: 'whatsapp' }] }, now)), froms(on.sequence));
+eq('a step added: only that one from now', froms(S.sequenceAfterSave(on, { ...on, sequence: [...on.sequence, { id: 'n1', afterHours: 120, channel: 'email', text: 'Last one' }] }, now)), [...froms(on.sequence), before(120)]);
+eq('a second step at the same hours and Send by as another: added too', froms(S.sequenceAfterSave(on, { ...on, sequence: [on.sequence[0], { id: 'n2', afterHours: 24, channel: 'whatsapp', text: 'Second nudge' }, on.sequence[1]] }, now)), [on.sequence[0].leadsFrom, before(24), on.sequence[1].leadsFrom]);
+eq('a step removed: the others as they were', froms(S.sequenceAfterSave(on, { ...on, sequence: [on.sequence[1]] }, now)), [on.sequence[1].leadsFrom]);
+eq('switched off: kept (switching on again starts again)', froms(S.sequenceAfterSave(on, { ...on, sequenceEnabled: false }, now)), froms(on.sequence));
+eq('a sequence running from before this (no times): still none', froms(S.sequenceAfterSave({ ...D, sequenceEnabled: true }, { ...D, sequenceEnabled: true, reviewDelayDays: 5 }, now)), [undefined, undefined]);
+eq('saved steps keep it; rubbish is dropped', froms(S.cleanCrmSettings({ sequence: [{ ...D.sequence[0], leadsFrom: before(24) }, { ...D.sequence[1], leadsFrom: 'soon' }] }).sequence), [before(24), undefined]);
 
-// Which step a lead is on.
+// Which steps a lead has had, and its next one.
+eq('the steps a lead has had, by id', S.sequenceHad(['review', 'seq:1', 'seq:a1b2c3d4'], 2), ['1', 'a1b2c3d4']);
+eq('a lead from before ids: the first ones, by place', [S.sequenceHad([], 2), S.sequenceHad(null, 0)], [['1', '2'], []]);
 const since = '2026-10-22T10:00:00.000Z';
+const switched = S.sequenceAfterSave(D, { ...D, sequenceEnabled: true }, new Date(since));
 const at = (h) => new Date(Date.parse(since) - h * HOUR).toISOString();
-eq('a lead from 10 days before: both steps skipped', S.stepAfterSkipped(D.sequence, at(240), 0, since), 2);
-eq('a lead from 2 days before: the 24h step skipped, the 72h one still to come', S.stepAfterSkipped(D.sequence, at(48), 0, since), 1);
-eq('a lead from 23h before: nothing skipped (its 24h step falls due after)', S.stepAfterSkipped(D.sequence, at(23), 0, since), 0);
-eq('a lead from after it was switched on: nothing skipped', S.stepAfterSkipped(D.sequence, new Date(Date.parse(since) + HOUR).toISOString(), 0, since), 0);
-eq('settings from before this (no time): nothing skipped', S.stepAfterSkipped(D.sequence, at(240), 0, null), 0);
+eq('a lead from 10 days before: both steps skipped', S.sequenceNext(switched, [], at(240)), { at: 2, skip: ['1', '2'] });
+eq('a lead from 2 days before: the 24h step skipped, the 72h one still to come', S.sequenceNext(switched, [], at(48)), { at: 1, skip: ['1'] });
+eq('a lead from 23h before: nothing skipped (its 24h step falls due after)', S.sequenceNext(switched, [], at(23)), { at: 0, skip: [] });
+eq('a lead from after it was switched on: nothing skipped', S.sequenceNext(switched, [], at(-1)), { at: 0, skip: [] });
+eq('a step it has had is passed over, not skipped', S.sequenceNext(switched, ['1'], at(48)), { at: 1, skip: [] });
+eq('settings from before this (no times): nothing skipped', S.sequenceNext(D.sequence, [], at(240)), { at: 0, skip: [] });
 
 // The runner, a minute after the sequence was switched on.
-db.t.crm_projects = [];
-db.t.enquiries = [];
-globalThis.__rec.whatsapp.length = 0;
-globalThis.__rec.email.length = 0;
-setSettings({ ...D, sequenceEnabled: true, sequenceFrom: ago(60_000), firstResponseMinutes: 0 });
+const switchedOn = (h) => ({ ...D, sequenceEnabled: true, firstResponseMinutes: 0, sequence: S.sequenceAfterSave(D, { ...D, sequenceEnabled: true }, new Date(Date.now() - h * HOUR)) });
+const reset = (h) => {
+  db.t.crm_projects = [];
+  db.t.enquiries = [];
+  globalThis.__rec.whatsapp.length = 0;
+  globalThis.__rec.email.length = 0;
+  setSettings(switchedOn(h));
+};
+reset(1 / 60);
 const old = lead({ stage: 'contacted', created_at: ago(10 * 24 * HOUR) });
 const twoDays = lead({ created_at: ago(48 * HOUR) });
 const justDue = lead({ created_at: ago(24 * HOUR + 30_000) }); // its 24h step fell due 30 s ago, after switch-on
 const fresh = lead({ created_at: ago(HOUR) });
 const stepOf = (p) => db.rows('crm_projects').find((x) => x.id === p.id).sequence_step;
+const hadOf = (p) => db.rows('crm_projects').find((x) => x.id === p.id).reminders_sent.filter((k) => k.startsWith('seq:')).length;
 const run1 = await A.runCrmAutomations();
 eq('switched on: only the step that fell due after it is sent', [run1.sequence, globalThis.__rec.whatsapp.map((m) => m.enquiryId), globalThis.__rec.email.length], [1, [justDue.enquiry_id], 0]);
 eq('…older overdue steps are skipped (both for a 10-day-old lead, the 24h one for a 2-day-old lead)', [stepOf(old), stepOf(twoDays), stepOf(justDue), stepOf(fresh)], [2, 1, 1, 0]);
@@ -169,23 +189,70 @@ eq('…quietly: nothing on their timelines', globalThis.__rec.activity.filter((a
 const run2 = await A.runCrmAutomations();
 eq('a minute later: nothing more (no burst of catch-up messages)', [run2.sequence, globalThis.__rec.whatsapp.length, globalThis.__rec.email.length], [0, 1, 0]);
 
-// A sequence already running before this (no time saved) carries on as it did.
-setSettings({ ...D, sequenceEnabled: true, firstResponseMinutes: 0 });
+// A sequence already running before this (no ids or times saved) carries on as it did.
+setSettings({ ...D, sequenceEnabled: true, firstResponseMinutes: 0, sequence: D.sequence.map((x) => ({ ...x, id: undefined })) });
 const running = lead({ created_at: ago(30 * HOUR) });
 await A.runCrmAutomations();
 eq('settings saved before this: a due step is sent as before', [stepOf(running), globalThis.__rec.whatsapp.at(-1)?.enquiryId], [1, running.enquiry_id]);
 
-// Saving CRM settings sets the time on the server.
+// Saving CRM settings sets the times on the server.
 const put = (body) => kit.call(settingsRoute, '/api/crm/settings', { method: 'PUT', body });
+const page = async () => (await kit.call(settingsRoute, '/api/crm/settings', { method: 'GET' })).body.settings;
+const counting = () => settings().sequence.map((x) => Date.parse(x.leadsFrom) + x.afterHours * HOUR);
 setSettings({ ...D });
-const before = Date.now();
-const p1 = await put({ ...D, sequenceEnabled: true, sequenceFrom: '2020-01-01T00:00:00.000Z' });
-const from1 = Date.parse(settings().sequenceFrom);
-eq('switching it on (Save) sets the time to now, whatever the page sent', [p1.status, from1 >= before && from1 <= Date.now()], [200, true]);
-await put({ ...settings(), reviewDelayDays: 5 });
-eq('saving something else keeps it', settings().sequenceFrom, new Date(from1).toISOString());
-await new Promise((r) => setTimeout(r, 5));
-await put({ ...settings(), sequence: [...settings().sequence, { afterHours: 120, channel: 'email', text: 'Last one' }] });
-eq('adding a step moves it on', Date.parse(settings().sequenceFrom) > from1, true);
+const t0 = Date.now();
+const p1 = await put({ ...(await page()), sequenceEnabled: true, sequence: D.sequence.map((x) => ({ ...x, leadsFrom: '2020-01-01T00:00:00.000Z' })) });
+const from1 = counting();
+eq('switching it on (Save) starts every step counting now, whatever the page sent', [p1.status, from1.every((t) => t >= t0 && t <= Date.now())], [200, true]);
+await put({ ...(await page()), reviewDelayDays: 5 });
+eq('saving something else keeps them', counting(), from1);
+
+// Steps changed while it's running (switched on 10 days ago).
+reset(240);
+const finished = lead({ created_at: ago(120 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+const halfway = lead({ created_at: ago(30 * HOUR), sequence_step: 1, reminders_sent: ['seq:1'] });
+const finishedBefore = lead({ created_at: ago(120 * HOUR), sequence_step: 2 }); // from before ids: only its sequence_step
+const halfwayBefore = lead({ created_at: ago(30 * HOUR), sequence_step: 1 });
+let cur = await page();
+await put({ ...cur, sequence: [...cur.sequence, { id: '', afterHours: 24, channel: 'whatsapp', text: 'Hi {first_name}, a second nudge' }] });
+await A.runCrmAutomations();
+eq('a second 24h WhatsApp added: nothing is sent again, and the new one isn’t sent late', [globalThis.__rec.whatsapp.length, globalThis.__rec.email.length], [0, 0]);
+eq('…leads that had them all, or the first, are where they were (from before ids too)', [finished, halfway, finishedBefore, halfwayBefore].map(stepOf), [3, 2, 3, 2]);
+eq('…what the leads from before ids had is written down by id', [hadOf(finishedBefore), hadOf(halfwayBefore)], [3, 2]);
+cur = await page();
+await put({ ...cur, sequence: [{ id: '', afterHours: 12, channel: 'whatsapp', text: 'Hi {first_name}, an early one' }, ...cur.sequence] });
+await A.runCrmAutomations();
+eq('a step added in front of the others: still nothing sent again', [globalThis.__rec.whatsapp.length, globalThis.__rec.email.length], [0, 0]);
+
+reset(240);
+const waiting = lead({ created_at: ago(60 * HOUR), sequence_step: 1, reminders_sent: ['seq:1'] });
+cur = await page();
+await put({ ...cur, sequence: [cur.sequence[0], { ...cur.sequence[1], afterHours: 48 }] });
+await A.runCrmAutomations();
+eq('the email moved from 72h to 48h: a lead 60h in, waiting for it, gets it now', [globalThis.__rec.email.length, stepOf(waiting)], [1, 2]);
+
+reset(10);
+const early = lead({ created_at: ago(70 * HOUR), sequence_step: 1, reminders_sent: ['seq:1'] });
+cur = await page();
+await put({ ...cur, sequence: [cur.sequence[0], { ...cur.sequence[1], afterHours: 48 }] });
+await A.runCrmAutomations();
+eq('…even with the sequence switched on since its new time (the lead was waiting for it then)', [globalThis.__rec.email.length, stepOf(early)], [1, 2]);
+
+reset(240);
+const overnight = lead({ created_at: ago(30 * HOUR) }); // its 24h WhatsApp fell due 6h ago, in the quiet hours
+cur = await page();
+await put({ ...cur, sequence: [...cur.sequence, { id: '', afterHours: 120, channel: 'email', text: 'Hi {first_name}, a last one' }] });
+await A.runCrmAutomations();
+eq('a step added while a due WhatsApp waits for the quiet hours to end: it still goes', [globalThis.__rec.whatsapp.map((m) => m.enquiryId), stepOf(overnight)], [[overnight.enquiry_id], 1]);
+
+reset(240);
+const held = lead({ created_at: ago(30 * HOUR), on_hold: true });
+await A.runCrmAutomations();
+eq('a job on hold: its due follow-up waits', globalThis.__rec.whatsapp.length, 0);
+cur = await page();
+await put({ ...cur, sequence: [cur.sequence[0], { ...cur.sequence[1], channel: 'whatsapp' }] });
+db.rows('crm_projects').find((x) => x.id === held.id).on_hold = false;
+await A.runCrmAutomations();
+eq('…another step’s Send by changed meanwhile: it goes when the hold lifts', [globalThis.__rec.whatsapp.map((m) => m.enquiryId), stepOf(held)], [[held.enquiry_id], 1]);
 
 kit.done();

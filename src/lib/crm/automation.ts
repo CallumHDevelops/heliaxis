@@ -8,7 +8,7 @@ import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { isQuiet } from '@/lib/whatsapp/schedule';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { getCrmSettings } from './crm-settings';
-import { fillText, stepAfterSkipped } from './settings-shared';
+import { fillText, sequenceHad, sequenceNext } from './settings-shared';
 import { daysWord } from './tracker';
 import { ensurePortalToken, logActivity, portalUrl } from './server';
 import { bookingUrl, ensureBookingToken } from './booking-link';
@@ -433,12 +433,20 @@ export async function runCrmAutomations() {
       .limit(50);
     const seqHeld = await onHold(((seq ?? []) as Proj[]).map((p) => p.id));
     for (const p of (seq ?? []) as Proj[]) {
-      const step = s.sequence[p.sequence_step];
-      if (!step || seqHeld.has(p.id) || now.getTime() < new Date(p.created_at).getTime() + step.afterHours * 3_600_000) continue;
-      // Steps that fell due before the sequence was switched on (or the step added) are skipped quietly, not sent late.
-      const next = stepAfterSkipped(s.sequence, p.created_at, p.sequence_step, s.sequenceFrom);
-      if (next > p.sequence_step) {
-        await db.from('crm_projects').update({ sequence_step: next }).eq('id', p.id);
+      if (seqHeld.has(p.id)) continue;
+      // sequence_step is the place of the lead's next step (the list's length once it has had them all), for the
+      // query above; which steps it has had go by id.
+      const had = sequenceHad(p.reminders_sent, p.sequence_step);
+      const { at, skip } = sequenceNext(s.sequence, had, p.created_at);
+      const step = s.sequence[at];
+      const due = !!step && now.getTime() >= new Date(p.created_at).getTime() + step.afterHours * 3_600_000;
+      if (!due && !skip.length && at === p.sequence_step) continue;
+      // What it has had goes down by id first (for a lead from before ids, the steps its sequence_step counted),
+      // so adding, moving or removing a step never re-sends another. Steps it came in too early for (it was
+      // past them when the sequence was switched on, or the step added) are skipped quietly, not sent late.
+      for (const id of [...had, ...skip]) await markSent(p, `seq:${id}`);
+      if (!due || !(await markSent(p, `seq:${step.id}`))) {
+        await db.from('crm_projects').update({ sequence_step: at }).eq('id', p.id);
         continue;
       }
       const c = await customer(p.enquiry_id);
@@ -469,12 +477,12 @@ export async function runCrmAutomations() {
           }
         }
       }
-      await db.from('crm_projects').update({ sequence_step: p.sequence_step + 1 }).eq('id', p.id);
+      await db.from('crm_projects').update({ sequence_step: at + 1 }).eq('id', p.id);
       await logActivity({
         enquiryId: p.enquiry_id,
         projectId: p.id,
         kind: 'system',
-        body: ok ? `Follow-up ${p.sequence_step + 1} sent (${by})` : `Follow-up ${p.sequence_step + 1} skipped: ${why}`,
+        body: ok ? `Follow-up ${at + 1} sent (${by})` : `Follow-up ${at + 1} skipped: ${why}`,
       });
       if (ok) out.sequence++;
     }

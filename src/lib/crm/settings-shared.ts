@@ -1,6 +1,13 @@
 /** CRM automation settings (stored in cms_kv as 'crm-settings'). Safe for client code. */
 
 export type SequenceStep = {
+  /**
+   * The step's own name, kept when its hours, Send by or words change. What a lead has had is written down by it
+   * ("seq:<id>" in crm_projects.reminders_sent), not by its place in the list, so adding, moving or removing a
+   * step never re-sends another. A step just added on the page has none ('') until it's saved; steps saved
+   * before ids are named by their place ("1", "2"…) when read (storedSteps).
+   */
+  id: string;
   /** Hours after the enquiry arrived. */
   afterHours: number;
   channel: 'whatsapp' | 'email';
@@ -9,6 +16,13 @@ export type SequenceStep = {
   /** WhatsApp template used when the 24h window is closed ({{1}} = first name). */
   template?: string;
   subject?: string;
+  /**
+   * Only leads that came in from this time on get the step. Set by the server (sequenceAfterSave) to the step's
+   * hours before the moment the sequence was switched on or the step added, so a lead already past it then
+   * skips it quietly instead of getting it late; kept whatever the step's hours become later. None on steps
+   * from before this, and then nobody skips them.
+   */
+  leadsFrom?: string;
 };
 
 export type CrmSettings = {
@@ -41,12 +55,6 @@ export type CrmSettings = {
   /** Follow-up sequence for new leads; stops when they reply or the stage moves past Contacted. */
   sequenceEnabled: boolean;
   sequence: SequenceStep[];
-  /**
-   * When the sequence was last switched on or given a step at a new time (set by the server on save, see
-   * sequenceFromAfter): a step that fell due before then is skipped, not sent late. Null on settings saved
-   * before this, and then nothing is skipped.
-   */
-  sequenceFrom: string | null;
   /** Where purchase orders can be delivered instead of the site (blank until set: "To the office" waits for it). */
   officeAddress: string;
   officePostcode: string;
@@ -72,18 +80,19 @@ export const DEFAULT_CRM_SETTINGS: CrmSettings = {
   sequenceEnabled: false,
   sequence: [
     {
+      id: '1',
       afterHours: 24,
       channel: 'whatsapp',
       text: 'Hi {first_name}, just checking you saw our message about your enquiry? Happy to answer any questions, or just reply here to book a free survey.',
     },
     {
+      id: '2',
       afterHours: 72,
       channel: 'email',
       subject: 'Your Heliaxis enquiry',
       text: 'Hi {first_name},\n\nThanks again for your enquiry. If you’d like to book a free survey, just reply with a couple of days and times that suit you.\n\nAny questions, just reply to this email.\n\nThe Heliaxis team',
     },
   ],
-  sequenceFrom: null,
   officeAddress: '',
   officePostcode: '',
 };
@@ -105,15 +114,23 @@ export function cleanCrmSettings(b: Partial<Record<keyof CrmSettings, unknown>>)
   const slots = (Array.isArray(b.bookingSlots) ? b.bookingSlots : String(b.bookingSlots ?? '').split(','))
     .map((s) => String(s).trim())
     .filter((s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s));
+  const ids = new Set<string>();
   const seq = (Array.isArray(b.sequence) ? b.sequence : d.sequence)
     .map((s) => s as Partial<SequenceStep>)
-    .map((s) => ({
-      afterHours: num(s.afterHours, 1, 24 * 60, 24),
-      channel: (s.channel === 'email' ? 'email' : 'whatsapp') as SequenceStep['channel'],
-      text: str(s.text, 2000),
-      template: str(s.template, 100) || undefined,
-      subject: str(s.subject, 200) || undefined,
-    }))
+    .map((s) => {
+      // A step keeps its id; one just added on the page (or a repeat) gets its own.
+      const id = typeof s.id === 'string' && /^[\w-]{1,40}$/.test(s.id) && !ids.has(s.id) ? s.id : crypto.randomUUID().slice(0, 8);
+      ids.add(id);
+      return {
+        id,
+        afterHours: num(s.afterHours, 1, 24 * 60, 24),
+        channel: (s.channel === 'email' ? 'email' : 'whatsapp') as SequenceStep['channel'],
+        text: str(s.text, 2000),
+        template: str(s.template, 100) || undefined,
+        subject: str(s.subject, 200) || undefined,
+        leadsFrom: typeof s.leadsFrom === 'string' && !Number.isNaN(Date.parse(s.leadsFrom)) ? new Date(s.leadsFrom).toISOString() : undefined,
+      };
+    })
     .filter((s) => s.text)
     .sort((a, b) => a.afterHours - b.afterHours)
     .slice(0, 8);
@@ -136,7 +153,6 @@ export function cleanCrmSettings(b: Partial<Record<keyof CrmSettings, unknown>>)
     bookingHorizonDays: num(b.bookingHorizonDays, 1, 90, d.bookingHorizonDays),
     sequenceEnabled: !!b.sequenceEnabled,
     sequence: seq,
-    sequenceFrom: typeof b.sequenceFrom === 'string' && !Number.isNaN(Date.parse(b.sequenceFrom)) ? new Date(b.sequenceFrom).toISOString() : null,
     officeAddress: String(b.officeAddress ?? '')
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -159,27 +175,52 @@ export function fillText(text: string, v: { name?: string | null; portalLink?: s
     .replace(/[ \t]+$/gm, '');
 }
 
-const stepKey = (x: SequenceStep) => `${x.afterHours}:${x.channel}`;
-
 /**
- * sequenceFrom after a save: now, when the sequence has just been switched on or given a step at a new time
- * (or a step moved to a new time or channel); otherwise as it was. Switching it off keeps it.
+ * Steps as saved, for reading them back. Saved before steps had ids, they're named by their place in the list
+ * ("1", "2"…), which is how a lead from then counted the ones it had had (sequenceHad).
  */
-export function sequenceFromAfter(prev: CrmSettings, next: CrmSettings, now: Date): string | null {
-  if (!next.sequenceEnabled) return prev.sequenceFrom;
-  const had = new Set(prev.sequence.map(stepKey));
-  return !prev.sequenceEnabled || next.sequence.some((x) => !had.has(stepKey(x))) ? now.toISOString() : prev.sequenceFrom;
+export function storedSteps(sequence: unknown): unknown {
+  return Array.isArray(sequence) && !sequence.some((x) => x?.id) ? sequence.map((x, i) => ({ ...x, id: String(i + 1) })) : sequence;
 }
 
 /**
- * The step a lead is on, past any that fell due before the sequence was switched on (or the step added):
- * those are skipped, not sent late. `at` is the lead's sequence_step.
+ * The steps after a save, each with its leadsFrom, set here on the server (never taken from the page). Switched
+ * on, every step starts counting now; so does a new step (an id the saved settings didn't have). Any other step
+ * keeps its own whatever its hours or Send by become, so editing one step never holds back another, and a step
+ * moved earlier still goes to every lead that was waiting for it. Switching it off keeps them.
  */
-export function stepAfterSkipped(sequence: SequenceStep[], createdAt: string, at: number, sequenceFrom: string | null): number {
-  const since = sequenceFrom ? Date.parse(sequenceFrom) : NaN;
+export function sequenceAfterSave(prev: CrmSettings, next: CrmSettings, now: Date): SequenceStep[] {
+  const was = new Map(prev.sequence.map((x) => [x.id, x.leadsFrom]));
+  const restart = next.sequenceEnabled && !prev.sequenceEnabled;
+  return next.sequence.map((x) => ({
+    ...x,
+    leadsFrom: restart || !was.has(x.id) ? new Date(now.getTime() - x.afterHours * 3_600_000).toISOString() : was.get(x.id),
+  }));
+}
+
+/**
+ * The steps a lead has had (sent, or skipped), by id: "seq:<id>" in its reminders_sent. A lead from before steps
+ * had ids has only its sequence_step, how many it had had: the first ones, named by their place ("1", "2"…).
+ */
+export function sequenceHad(sent: string[] | null, sequenceStep: number): string[] {
+  const ids = (sent ?? []).filter((k) => k.startsWith('seq:')).map((k) => k.slice(4));
+  return ids.length ? ids : Array.from({ length: sequenceStep }, (_, i) => String(i + 1));
+}
+
+/**
+ * A lead's next step: the first in the list it hasn't had (`at` is the list's length once it has had them all).
+ * `skip` is any before it that the lead came in too early for (before the step's leadsFrom): those are passed
+ * quietly, not sent late.
+ */
+export function sequenceNext(sequence: SequenceStep[], had: string[], createdAt: string): { at: number; skip: string[] } {
   const born = Date.parse(createdAt);
-  if (Number.isNaN(since) || Number.isNaN(born)) return at;
-  let i = at;
-  while (i < sequence.length && born + sequence[i].afterHours * 3_600_000 < since) i++;
-  return i;
+  const skip: string[] = [];
+  let at = 0;
+  for (; at < sequence.length; at++) {
+    const x = sequence[at];
+    if (had.includes(x.id)) continue;
+    if (!(born < Date.parse(x.leadsFrom ?? ''))) break;
+    skip.push(x.id);
+  }
+  return { at, skip };
 }

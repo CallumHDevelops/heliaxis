@@ -44,7 +44,9 @@ While the job is on hold, its follow-ups wait. Only leads from the last 45 days 
 
 When you switch it on, leads from the last 45 days that are still at **Lead** or **Contacted** and haven’t replied join in, but they only get the steps that fall due from then on. A step they’re already past is skipped quietly: it isn’t sent late, and nothing goes on their timeline. For example, with the two steps it comes with, a lead from 2 days ago skips the 24-hour WhatsApp and gets the 72-hour email tomorrow; a lead from a week ago gets neither.
 
-The same goes when you add a step, or change a step’s hours or **Send by**, and press **Save settings**: no lead gets a step that fell due before you saved. Changing a step’s message doesn’t restart anything. Switching it off and on again starts again from the moment you switch it back on.
+A step you add works the same way: from when you press **Save settings**, a lead already past its hours skips it, and the others get it when it falls due. The other steps carry on as they were, including any that are due but waiting for the quiet hours to end or a job to come off hold.
+
+Changing a step’s hours, **Send by** or message doesn’t change who gets it. A lead still waiting for it gets it at its new time, or straight away if they’re already past that, so moving a step earlier never drops it. Nobody gets the same step twice, whatever you add, move or change. Switching it off and on again starts again from the moment you switch it back on.
 
 ## Good to know
 
