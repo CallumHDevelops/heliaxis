@@ -92,8 +92,8 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
     const mPerLng = 111320 * Math.cos((centre.lat * Math.PI) / 180);
     const inOutline = (x: number, y: number) => {
       if (!outline) return true;
-      // A metre of give each way: the outline and the picture never line up exactly.
-      return [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inside({ lat: centre.lat + (y + dy) / mPerLat, lng: centre.lng + (x + dx) / mPerLng }, outline));
+      // A little give each way (30 cm): the outline and the picture never line up exactly, but a party wall is a hard limit.
+      return [[0, 0], [0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]].some(([dx, dy]) => inside({ lat: centre.lat + (y + dy) / mPerLat, lng: centre.lng + (x + dx) / mPerLng }, outline));
     };
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
