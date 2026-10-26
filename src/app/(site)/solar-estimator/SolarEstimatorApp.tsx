@@ -17,6 +17,7 @@ import {
   type Shade,
   type Who,
 } from '@/lib/estimator/calc';
+import { compassWord, type RoofFound } from '@/lib/estimator/roof';
 
 const gbp = (n: number) => '£' + Math.round(n).toLocaleString('en-GB');
 const gbpRound = (n: number, step = 50) => gbp(Math.round(n / step) * step);
@@ -26,6 +27,7 @@ const PC = /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i;
 const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+type RoofHit = { address: string; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null };
 type Yield = { kwhPerKwp: number; monthly: number[] | null; town: string; source: 'pvgis' | 'fallback' } | null;
 const STEPS = ['Where', 'Roof', 'Shade', 'Usage', 'Daytime', 'Extras'] as const;
 
@@ -73,6 +75,12 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
   const [battery, setBattery] = useState(false);
   const [ev, setEv] = useState(false);
   const [heatpump, setHeatpump] = useState(false);
+  const [house, setHouse] = useState('');
+  const [roofHit, setRoofHit] = useState<RoofHit | null>(null);
+  // 'ask': we found a roof, the visitor has not said yet; 'yes': use it; 'no': they will answer the questions.
+  const [roofChoice, setRoofChoice] = useState<'ask' | 'yes' | 'no'>('no');
+  const [looking, setLooking] = useState(false);
+  const [lookNote, setLookNote] = useState('');
   const [yieldData, setYieldData] = useState<Yield>(null);
   const [yieldNote, setYieldNote] = useState('');
   const head = useRef<HTMLDivElement>(null);
@@ -80,7 +88,7 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
   const pcOk = PC.test(postcode.trim());
   // The roof's yield: asked for when the visitor has given a postcode and roof, and again if they change them.
   useEffect(() => {
-    if (!pcOk || step < 2) return;
+    if (!pcOk || step < 2 || roofChoice === 'yes') return;
     const ctl = new AbortController();
     fetch(`/api/solar/yield?pc=${encodeURIComponent(postcode.trim())}&dir=${dir}&pitch=${pitch}`, { signal: ctl.signal })
       .then((r) => r.json())
@@ -90,12 +98,13 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
       })
       .catch(() => undefined);
     return () => ctl.abort();
-  }, [pcOk, postcode, dir, pitch, step >= 2]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pcOk, postcode, dir, pitch, step >= 2, roofChoice]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inputs: Inputs = {
     who,
-    yieldKwhPerKwp: yieldData?.kwhPerKwp ?? fallbackYield(dir, pitch),
-    monthlyPerKwp: yieldData?.monthly ?? null,
+    yieldKwhPerKwp: roofChoice === 'yes' && roofHit ? roofHit.kwhPerKwp : (yieldData?.kwhPerKwp ?? fallbackYield(dir, pitch)),
+    monthlyPerKwp: roofChoice === 'yes' && roofHit ? roofHit.monthly : (yieldData?.monthly ?? null),
+    maxPanels: roofChoice === 'yes' && roofHit ? roofHit.roof.maxPanels : undefined,
     shade,
     usage: kind === 'bill' ? { kind: 'bill', value: bill } : { kind: 'kwh', value: kwh },
     daytime,
@@ -110,7 +119,30 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
     setStep(n);
     setTimeout(() => head.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
   }
-  const canNext = step === 0 ? pcOk : true;
+  const canNext = step === 0 ? pcOk && !looking : true;
+
+  /** Next from the first question: if they gave a house number, try to find the roof from satellite data first. */
+  async function nextFromWhere() {
+    setLookNote('');
+    setRoofHit(null);
+    setRoofChoice('no');
+    if (!house.trim()) return go(1);
+    setLooking(true);
+    try {
+      const res = await fetch(`/api/solar/roof?pc=${encodeURIComponent(postcode.trim())}&line=${encodeURIComponent(house.trim())}`);
+      const d = await res.json();
+      if (d?.found) {
+        setRoofHit({ address: d.address, roof: d.roof, kwhPerKwp: d.kwhPerKwp, monthly: d.monthly, imageryDate: d.imageryDate });
+        setRoofChoice('ask');
+      } else if (d?.reason && d.reason !== 'not_configured') {
+        setLookNote('We could not match your roof from satellite pictures, so a few quick questions instead.');
+      }
+    } catch {
+      // The estimator carries on with the questions.
+    }
+    setLooking(false);
+    go(1);
+  }
 
   return (
     <>
@@ -149,10 +181,38 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
                   </label>
                   <input id="est-pc" className="est-input" value={postcode} onChange={(e) => setPostcode(e.target.value.toUpperCase())} placeholder="e.g. NP15 1DG" autoComplete="postal-code" inputMode="text" onKeyDown={(e) => e.key === 'Enter' && canNext && go(1)} />
                   {postcode && !pcOk && <p className="est-hint">Enter a full UK postcode, such as CF10 1AA.</p>}
+                  <label className="est-lab" htmlFor="est-house">
+                    House number or name <span className="est-opt-tag">(optional, but it lets us find your roof from satellite pictures)</span>
+                  </label>
+                  <input id="est-house" className="est-input" value={house} onChange={(e) => setHouse(e.target.value)} placeholder="e.g. 2 Marine Terrace" autoComplete="address-line1" onKeyDown={(e) => e.key === 'Enter' && canNext && void nextFromWhere()} />
                 </>
               )}
-              {step === 1 && (
+              {step === 1 && roofChoice === 'ask' && roofHit && (
                 <>
+                  <h2>Is this your roof?</h2>
+                  <p className="est-sub">{roofHit.address}</p>
+                  <div className="est-found">
+                    <div>
+                      <b>Main roof face</b>
+                      <span>
+                        Faces {compassWord(roofHit.roof.bearing)} · {roofHit.roof.angle}° pitch · about {roofHit.roof.areaM2} m²
+                      </span>
+                    </div>
+                    <div>
+                      <b>Room for about {roofHit.roof.maxPanels} panels</b>
+                      <span>{roofHit.roof.shade === 'none' ? 'Little shading' : roofHit.roof.shade === 'some' ? 'Some shading' : 'Quite a lot of shading'}{roofHit.imageryDate ? ` · satellite picture from ${roofHit.imageryDate}` : ''}</span>
+                    </div>
+                  </div>
+                  <div className="est-opts two">
+                    <Opt on={false} onClick={() => { const r = roofHit.roof; setDir(r.direction); setShade(r.shade); setRoofChoice('yes'); go(3); }} title="Yes, use it" sub="Skip the roof and shade questions" />
+                    <Opt on={false} onClick={() => setRoofChoice('no')} title="No, I will answer the questions" sub="If it is the wrong building" />
+                  </div>
+                  <p className="est-hint">Includes solar data from Google. It is a model from aerial pictures, so the survey confirms it.</p>
+                </>
+              )}
+              {step === 1 && roofChoice !== 'ask' && (
+                <>
+                  {lookNote && <p className="est-hint">{lookNote}</p>}
                   <h2>Which way does your main roof face?</h2>
                   <p className="est-sub">Look at the roof with the most space. Not sure? Pick “Not sure” and we assume a typical house.</p>
                   <div className="est-opts">
@@ -237,15 +297,15 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
 
             <div className="est-nav">
               {step > 0 ? (
-                <button type="button" className="est-back" onClick={() => go(step - 1)}>
+                <button type="button" className="est-back" onClick={() => { if (step === 3 && roofChoice === 'yes') { setRoofChoice('ask'); go(1); } else go(step - 1); }}>
                   ← Back
                 </button>
               ) : (
                 <span />
               )}
               {step < STEPS.length - 1 ? (
-                <button type="button" className="btn btn-solar" disabled={!canNext} onClick={() => go(step + 1)}>
-                  Next
+                <button type="button" className="btn btn-solar" disabled={!canNext || (step === 1 && roofChoice === 'ask')} onClick={() => (step === 0 ? void nextFromWhere() : go(step + 1))}>
+                  {looking ? 'Finding your roof…' : 'Next'}
                 </button>
               ) : (
                 <button type="button" className="btn btn-solar" onClick={() => { setDone(true); go(0); }}>
@@ -255,7 +315,7 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
             </div>
           </div>
         ) : (
-          <Result r={r} withBattery={withBattery} inputs={inputs} settings={settings} postcode={postcode} town={yieldData?.town ?? ''} source={yieldData?.source ?? 'fallback'} note={yieldNote} controls={{ shade, setShade, daytime, setDaytime, battery, setBattery, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
+          <Result roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={settings} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ shade, setShade, daytime, setDaytime, battery, setBattery, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
         )}
       </div>
     </>
@@ -264,7 +324,7 @@ export function SolarEstimatorApp({ settings }: { settings: EstimatorSettings })
 
 type Controls = { shade: Shade; setShade: (s: Shade) => void; daytime: Daytime; setDaytime: (d: Daytime) => void; battery: boolean; setBattery: (b: boolean) => void; ev: boolean; setEv: (b: boolean) => void; heatpump: boolean; setHeatpump: (b: boolean) => void };
 
-function Result({ r, withBattery, inputs, settings, postcode, town, source, note, controls, onRestart }: { r: ReturnType<typeof estimate>; withBattery: ReturnType<typeof estimate> | null; inputs: Inputs; settings: EstimatorSettings; postcode: string; town: string; source: 'pvgis' | 'fallback'; note: string; controls: Controls; onRestart: () => void }) {
+function Result({ roofHit, r, withBattery, inputs, settings, postcode, town, source, note, controls, onRestart }: { roofHit: RoofHit | null; r: ReturnType<typeof estimate>; withBattery: ReturnType<typeof estimate> | null; inputs: Inputs; settings: EstimatorSettings; postcode: string; town: string; source: 'pvgis' | 'fallback'; note: string; controls: Controls; onRestart: () => void }) {
   const home = inputs.who === 'home';
   const max = Math.max(...r.monthly, 1);
   const pot = potentialOf(inputs.yieldKwhPerKwp * SHADE_FACTOR[inputs.shade]);
@@ -287,6 +347,19 @@ function Result({ r, withBattery, inputs, settings, postcode, town, source, note
           {pot.line} About <b>{num(inputs.yieldKwhPerKwp * SHADE_FACTOR[inputs.shade])} kWh</b> a year from each kWp of panels{town ? ` in ${town}` : ''}.
         </p>
       </div>
+      {roofHit && (
+        <div className="est-card est-pad est-roofcard">
+          <h3>Your roof, from satellite data</h3>
+          <p className="est-sub">{roofHit.address}</p>
+          <div className="est-facts">
+            <span><b>{compassWord(roofHit.roof.bearing)}</b> facing</span>
+            <span><b>{roofHit.roof.angle}°</b> pitch</span>
+            <span><b>{roofHit.roof.areaM2} m²</b> main roof face</span>
+            <span><b>{roofHit.roof.maxPanels}</b> panels fit</span>
+          </div>
+          {r.roofLimited && <p className="est-note">Your roof has room for about {roofHit.roof.maxPanels} panels, so that is the most we have sized for. It is less than your electricity use could use.</p>}
+        </div>
+      )}
       <div className="est-resgrid">
         <div className="est-card est-head">
           <div className="glow" />
@@ -442,7 +515,7 @@ function Result({ r, withBattery, inputs, settings, postcode, town, source, note
         {note && <p className="est-note">{note}</p>}
       </div>
 
-      <Lead r={r} inputs={inputs} postcode={postcode} />
+      <Lead r={r} inputs={inputs} postcode={postcode} address={roofHit?.address ?? ''} />
 
       <details className="assumptions">
         <summary>What’s behind the numbers</summary>
@@ -460,7 +533,7 @@ function Result({ r, withBattery, inputs, settings, postcode, town, source, note
   );
 }
 
-function Lead({ r, inputs, postcode }: { r: ReturnType<typeof estimate>; inputs: Inputs; postcode: string }) {
+function Lead({ r, inputs, postcode, address }: { r: ReturnType<typeof estimate>; inputs: Inputs; postcode: string; address: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -475,7 +548,7 @@ function Lead({ r, inputs, postcode }: { r: ReturnType<typeof estimate>; inputs:
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setErr('Please check your email address.');
     if (phone.replace(/\D/g, '').length < 10) return setErr('Please check your phone number.');
     setBusy(true);
-    const dir = 'see estimate';
+    const dir = address ? `roof found at ${address}` : 'roof answered by the visitor';
     const message = `Solar estimator: ${r.kwp.toFixed(2)} kWp (${r.panels} panels)${r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}. About ${num(r.generation)} kWh a year, saving about ${gbp(r.saving)} a year, indicative cost ${gbpRound(r.cost, 100)}, payback about ${yrs(r.paybackYears)} years. Uses ${inputs.usage.kind === 'bill' ? `£${inputs.usage.value}/month` : `${num(inputs.usage.value)} kWh/year`}; ${inputs.shade} shade; daytime: ${inputs.daytime}${inputs.ev ? '; electric car' : ''}${inputs.heatpump ? '; heat pump' : ''} (${dir}).`;
     try {
       const res = await fetch('/api/quote', {

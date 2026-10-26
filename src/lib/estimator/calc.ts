@@ -112,6 +112,8 @@ export type Inputs = {
   battery: boolean;
   ev: boolean;
   heatpump: boolean;
+  /** The most panels the roof has room for, when a satellite lookup found the roof (0 or missing: not known). */
+  maxPanels?: number;
 };
 
 export type Estimate = {
@@ -142,6 +144,8 @@ export type Estimate = {
   /** The panel count needs the network operator's G99 application (over 3.68 kW on one phase). */
   needsG99: boolean;
   batteryKwh: number;
+  /** The roof, not the electricity use, is what limits the size. */
+  roofLimited: boolean;
 };
 
 const EV_KWH = 2000;
@@ -167,7 +171,10 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
   const wantKwp = (consumption * 0.95) / eff;
   const [minKwp, maxKwp] = home ? [2, 10] : [5, 250];
   const panels = Math.max(Math.ceil((minKwp * 1000) / s.panelWatts), Math.min(Math.floor((maxKwp * 1000) / s.panelWatts), Math.round((wantKwp * 1000) / s.panelWatts)));
-  const kwp = (panels * s.panelWatts) / 1000;
+  const roofCap = i.maxPanels && i.maxPanels > 0 ? Math.max(4, i.maxPanels) : Infinity;
+  const panelsUsed = Math.min(panels, roofCap);
+  const roofLimited = panelsUsed < panels;
+  const kwp = (panelsUsed * s.panelWatts) / 1000;
   const generation = kwp * eff;
 
   // How much of it is used in the building: more with someone at home in the day, a battery, an EV or a heat pump.
@@ -198,7 +205,7 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
   return {
     consumption,
     kwp,
-    panels,
+    panels: panelsUsed,
     generation,
     selfPct,
     selfUsed,
@@ -219,6 +226,7 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
     monthly,
     needsG99: home && kwp > 3.68,
     batteryKwh,
+    roofLimited,
   };
 }
 

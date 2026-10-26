@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { geocodePostcodes } from '@/lib/geocode-postcode';
 import { DIRECTIONS, PITCHES, fallbackYield } from '@/lib/estimator/calc';
+import { pvgisYield } from '@/lib/estimator/pvgis';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,16 +36,9 @@ export async function GET(req: Request) {
   try {
     const geo = (await geocodePostcodes([pc])).get(pc.replace(/\s+/g, ''));
     if (!geo) return json({ ...fallback, error: 'We couldn’t find that postcode.' });
-    const url =
-      `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${geo.lat.toFixed(3)}&lon=${geo.lng.toFixed(3)}&peakpower=1&loss=14` +
-      `&angle=${pitch.angle}&aspect=${dir.aspect}&usehorizon=1&outputformat=json`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(7000), next: { revalidate: 60 * 60 * 24 * 30 } });
-    if (!r.ok) return json({ ...fallback, town: geo.town });
-    const d = (await r.json()) as { outputs?: { totals?: { fixed?: { E_y?: number } }; monthly?: { fixed?: { E_m?: number }[] } } };
-    const year = Number(d.outputs?.totals?.fixed?.E_y);
-    const months = (d.outputs?.monthly?.fixed ?? []).map((m) => Number(m.E_m));
-    if (!(year > 300 && year < 1500)) return json({ ...fallback, town: geo.town });
-    return json({ kwhPerKwp: Math.round(year), monthly: months.length === 12 && months.every((m) => m >= 0) ? months : null, town: geo.town, source: 'pvgis' as const });
+    const y = await pvgisYield(geo.lat, geo.lng, pitch.angle, dir.aspect);
+    if (!y) return json({ ...fallback, town: geo.town });
+    return json({ kwhPerKwp: y.kwhPerKwp, monthly: y.monthly, town: geo.town, source: 'pvgis' as const });
   } catch {
     return json(fallback);
   }
