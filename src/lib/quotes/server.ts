@@ -31,7 +31,7 @@ export async function readQuote(id: string): Promise<QuoteRow | null> {
 const MIME_OF: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };
 
 /** The quote as a PDF: its customer, site and job reference, the images and the datasheets it uses, fetched. */
-export async function renderQuote(q: QuoteRow): Promise<Uint8Array> {
+export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): Promise<Uint8Array> {
   const db = createAdminClient();
   const [{ data: c }, { data: p }] = await Promise.all([
     db.from('enquiries').select('name, email, phone').eq('id', q.enquiry_id).maybeSingle(),
@@ -75,6 +75,7 @@ export async function renderQuote(q: QuoteRow): Promise<Uint8Array> {
     depositPence: q.deposit_pence,
     images,
     datasheets,
+    signed,
   };
   return quotePdf(facts);
 }
@@ -84,4 +85,30 @@ export async function imageUrls(paths: string[]): Promise<Record<string, string>
   if (!paths.length) return {};
   const { data } = await createAdminClient().storage.from(DOCS_BUCKET).createSignedUrls(paths, 3600);
   return Object.fromEntries((data ?? []).filter((x) => x.path && x.signedUrl).map((x) => [x.path as string, x.signedUrl as string]));
+}
+
+/**
+ * Once the customer signs a quote made in the builder: a copy of it with their signature, name and time,
+ * stored on the job and shown in their portal (the PDF they signed stays as it was, for the record).
+ */
+export async function saveSignedQuote(documentId: string, who: { name: string; at: string; signaturePath: string }): Promise<void> {
+  const db = createAdminClient();
+  const { data } = await db.from('crm_quotes').select('*').eq('document_id', documentId).maybeSingle();
+  if (!data) return;
+  const q = quoteRow(data);
+  const { data: png } = await db.storage.from(DOCS_BUCKET).download(who.signaturePath);
+  if (!png) return;
+  const bytes = await renderQuote(q, { png: new Uint8Array(await png.arrayBuffer()), name: who.name, at: who.at });
+  const { data: p } = await db.from('crm_projects').select('project_ref').eq('id', q.project_id).maybeSingle();
+  const { saveGenerated } = await import('@/lib/documents/store');
+  const { docFileName } = await import('@/lib/documents/pdf-kit');
+  await saveGenerated(db, q.project_id, {
+    key: `${q.number}-SIGNED`,
+    name: docFileName((p?.project_ref as string | null) ?? null, 'Signed quote', q.number),
+    bytes,
+    inputs: { documentId, who },
+    category: 'quote',
+    visible: true,
+    force: true,
+  });
 }

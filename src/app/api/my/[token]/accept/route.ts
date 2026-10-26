@@ -4,6 +4,7 @@ import { projectByToken, SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 import { DOCS_BUCKET, ensureDocsBucket, fingerprintDocument, isUuid, logActivity } from '@/lib/crm/server';
 import { applyStageEvent } from '@/lib/crm/move-stage';
 import { notify } from '@/lib/notify';
+import { saveSignedQuote } from '@/lib/quotes/server';
 import { canAccess } from '@/lib/portals';
 
 export const dynamic = 'force-dynamic';
@@ -77,6 +78,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   await db.from('crm_quotes').update({ status: 'accepted', updated_at: now }).eq('document_id', doc.id).then(() => null, () => null);
 
   after(async () => {
+    await saveSignedQuote(doc.id as string, { name, at: now, signaturePath: path }).catch(() => null);
     if (!hash) {
       const h = await fingerprintDocument(doc.id as string);
       if (h) await db.from('crm_projects').update({ accepted_hash: h }).eq('id', p.id);

@@ -19,6 +19,8 @@ export type QuoteFacts = {
   images: Map<string, { bytes: Uint8Array; mime: string }>;
   /** library id → the datasheet's PDF bytes. */
   datasheets: Map<string, Uint8Array>;
+  /** Once they have signed online: their signature, name and the time (the signed copy). */
+  signed?: { png: Uint8Array; name: string; at: string };
 };
 
 const paragraphs = (s: string) => s.split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean);
@@ -88,6 +90,24 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     }
   }
   if (!shownTotals) kit.note('Add your items to see the total.');
+
+  // Acceptance: how to accept online, and a place to sign if they prefer paper; the signed copy shows their signature.
+  kit.section('Accepting this quote', { keep: 300 });
+  kit.rows([
+    { label: 'Total to pay', value: money(totals.gross), strong: true },
+    ...(f.depositPence ? [{ label: 'Deposit once you accept', value: money(f.depositPence) }] : []),
+    ...(f.validUntil ? [{ label: 'Valid until', value: longDate(f.validUntil) }] : []),
+  ]);
+  if (f.signed) {
+    kit.paragraph('Accepted online by the customer, including the 14-day cancellation terms above.', { bold: true });
+  } else {
+    kit.paragraph('To accept, open the link we sent you and sign on your phone or computer. If you would rather sign on paper, sign below and send it back to us. You can change your mind and cancel within 14 days of signing, free of charge.');
+  }
+  await kit.signatures([
+    f.signed
+      ? { title: 'Accepted by (customer)', png: f.signed.png, name: f.signed.name, at: f.signed.at }
+      : { title: 'Accepted by (customer)', png: null, name: f.customer.name, at: null, line: 'Date: ____ / ____ / ________' },
+  ]);
 
   const main = await kit.save();
   if (!sheets.length) return main;
