@@ -198,8 +198,9 @@ export function fakeDb() {
       delete: () => ((mode = 'delete'), b),
       // A jsonb column compared with a JSON string, as PostgREST casts it.
       eq: (c, v) => (where.push((r) => (r[c] && typeof r[c] === 'object' && typeof v === 'string' ? JSON.stringify(r[c]) === JSON.stringify(JSON.parse(v)) : r[c] === v)), b),
-      contains: (c, v) => (where.push((r) => JSON.stringify(r[c]) === JSON.stringify(v)), b),
-      containedBy: (c, v) => (where.push((r) => JSON.stringify(r[c]) === JSON.stringify(v)), b),
+      // An array column as Postgres compares it (@> and <@): every wanted element is there, or every element is wanted.
+      contains: (c, v) => (where.push((r) => (Array.isArray(r[c]) && Array.isArray(v) ? v.every((x) => r[c].includes(x)) : JSON.stringify(r[c]) === JSON.stringify(v))), b),
+      containedBy: (c, v) => (where.push((r) => (Array.isArray(r[c]) && Array.isArray(v) ? r[c].every((x) => v.includes(x)) : JSON.stringify(r[c]) === JSON.stringify(v))), b),
       neq: (c, v) => (where.push((r) => r[c] !== v), b),
       in: (c, v) => (where.push((r) => v.includes(r[c])), b),
       is: (c, v) => (where.push((r) => (r[c] ?? null) === v), b),

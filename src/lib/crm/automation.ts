@@ -7,7 +7,7 @@ import { sendSystem } from '@/lib/whatsapp/inbox';
 import { getSettings as getWaSettings } from '@/lib/whatsapp/settings';
 import { isQuiet } from '@/lib/whatsapp/schedule';
 import { msConfigured, sendMail } from '@/lib/ms365';
-import { getCrmSettings } from './crm-settings';
+import { getCrmSettings, getSavedCrmSettings } from './crm-settings';
 import { fillText, sequenceHad, sequenceNext, type SequenceStep } from './settings-shared';
 import { daysWord } from './tracker';
 import { ensurePortalToken, logActivity, portalUrl } from './server';
@@ -425,12 +425,15 @@ export async function runCrmAutomations() {
   if (s.sequenceEnabled && s.sequence.length) {
     // Leads a step added or removed still has to put back, if the run after that Save was cut off.
     await finishSequenceChange().catch(() => 0);
+    // A Save since the start has put its leads back: go by the list as saved now, not the one read at the start, or this
+    // pass would undo that. If it can't be read, the list read at the start stands.
+    const sequence = (await getSavedCrmSettings().catch(() => s)).sequence;
     const { data: seq } = await db
       .from('crm_projects')
       .select(cols)
       .in('stage', ['lead', 'contacted'])
       .is('sequence_stopped_at', null)
-      .lt('sequence_step', s.sequence.length)
+      .lt('sequence_step', sequence.length)
       .gte('created_at', new Date(now.getTime() - 45 * 86_400_000).toISOString())
       .limit(50);
     const seqHeld = await onHold(((seq ?? []) as Proj[]).map((p) => p.id));
@@ -439,8 +442,8 @@ export async function runCrmAutomations() {
       // sequence_step is the place of the lead's next step (the list's length once it has had them all), for the
       // query above; which steps it has had go by id.
       const had = sequenceHad(p.reminders_sent, p.sequence_step);
-      const { at, skip } = sequenceNext(s.sequence, had, p.created_at);
-      const step = s.sequence[at];
+      const { at, skip } = sequenceNext(sequence, had, p.created_at);
+      const step = sequence[at];
       const due = !!step && now.getTime() >= new Date(p.created_at).getTime() + step.afterHours * 3_600_000;
       if (!due && !skip.length && at === p.sequence_step) continue;
       // What it has had goes down by id first (for a lead from before ids, the steps its sequence_step counted),
@@ -523,13 +526,15 @@ export async function sequenceChanged(prev: SequenceStep[], next: SequenceStep[]
  * before ids has what its sequence_step counted written down by id and its new place in one write, so it's never
  * left with part of its history; the others go back in one write per place. The runner works out the rest by id,
  * including skipping a step the lead was already past when it was added. → how many leads it found to put back.
+ * Throws if the saved settings can't be read or aren't there, so the note stays and a later run tries again (the
+ * defaults would find nothing owed, and the note would go).
  */
 export async function finishSequenceChange(): Promise<number> {
   const db = createAdminClient();
   const { data: noted } = await db.from('cms_kv').select('value').eq('key', SEQUENCE_CHECK).maybeSingle();
   if (!noted) return 0;
   // Read after the note, so a Save from here on leaves a new one.
-  const { sequence } = await getCrmSettings();
+  const { sequence } = await getSavedCrmSettings();
   type Row = Pick<Proj, 'id' | 'reminders_sent' | 'sequence_step'>;
   const found: Row[] = [];
   while (sequence.length) {

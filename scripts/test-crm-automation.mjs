@@ -14,7 +14,9 @@
 // before ids too; a page opened before ids and saved after keeps every step's id; and the note on CRM
 // settings says the same. Those leads are put back once the Save has answered, in a few writes and past
 // PostgREST's 1,000-row pages; a run that fails or is cut off is finished by the next Save or the
-// every-minute job, and never leaves a lead from before ids with part of what it had.
+// every-minute job, and never leaves a lead from before ids with part of what it had. A run goes by the saved settings
+// (if they can't be read, the note stays), writes a lead only while it is as the run read it, clears only the note it
+// read, and leaves it after a run that did work; the every-minute job's pass goes by the list saved when it starts.
 // Usage: node --experimental-strip-types scripts/test-crm-automation.mjs
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -432,6 +434,136 @@ cur = await page();
 await put({ ...cur, sequence: [cur.sequence[0], { id: '', afterHours: 96, channel: 'email', text: 'Hi {first_name}, one more' }] });
 globalThis.__db = db;
 eq('1,150 leads that had finished the list: all put back, in 3 reads, a write for each of the 50 from before ids and one for each 100 others', [finishedMany.filter((p) => stepOf(p) === 1).length, requests], [1150, 3 + 50 + 11]);
+
+// The rules the put-back keeps while something else is writing. `interrupt` runs `fn` just before the first `method` on
+// `table` is answered: a Save, or another write, landing in the middle of a run.
+const interrupt = (table, method, fn) => {
+  let hit = false;
+  return {
+    ...db,
+    from: (t) => {
+      const q = db.from(t);
+      if (t !== table) return q;
+      const call = q[method];
+      q[method] = (...a) => {
+        const b = call(...a);
+        const then = b.then;
+        b.then = (res, rej) => (hit ? then(res, rej) : ((hit = true), Promise.resolve(fn()).then(() => then(res, rej), rej)));
+        return b;
+      };
+      return q;
+    },
+  };
+};
+// The saved settings can't be read, from the nth read on.
+const settingsDown = (n = 1) => {
+  let reads = 0;
+  return {
+    ...db,
+    from: (t) => {
+      const q = db.from(t);
+      if (t !== 'cms_kv') return q;
+      let key;
+      const eqKey = q.eq;
+      const maybeSingle = q.maybeSingle;
+      q.eq = (c, v) => ((key = v), eqKey(c, v));
+      q.maybeSingle = async () => (key === 'crm-settings' && ++reads >= n ? { data: null, error: { message: 'read failed' } } : maybeSingle());
+      return q;
+    },
+  };
+};
+const noteValue = () => db.rows('cms_kv').find((r) => r.key === 'crm-sequence-check')?.value;
+const oneMore = { id: '', afterHours: 96, channel: 'email', text: 'Hi {first_name}, one more' };
+
+// A lead is written to only while it is as the run read it. A key added or taken away, or a place moved, in the middle
+// of the run is kept, and the lead is left for the next run (or, moved, for the every-minute job).
+reset(240);
+const keyAdded = lead({ created_at: ago(80 * HOUR), sequence_step: 2 }); // from before ids
+const keyTaken = lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['review'] });
+const placeMoved = lead({ created_at: ago(80 * HOUR), sequence_step: 2 });
+const idsMoved = lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+cur = await page();
+await save({ ...cur, sequence: [cur.sequence[0], oneMore] });
+globalThis.__db = interrupt('crm_projects', 'update', () => {
+  rowOf(keyAdded).reminders_sent = ['review'];
+  rowOf(keyTaken).reminders_sent = [];
+  rowOf(placeMoved).sequence_step = 3;
+  rowOf(idsMoved).sequence_step = 0;
+});
+await kit.afterReply();
+globalThis.__db = db;
+eq('leads changed by something else in the middle of the run: a key added is kept, and none of them is written over', [rowOf(keyAdded).reminders_sent, rowOf(keyAdded).sequence_step], [['review'], 2]);
+eq('…a key taken away is kept too', [rowOf(keyTaken).reminders_sent, rowOf(keyTaken).sequence_step], [[], 2]);
+eq('…a place moved, from before ids or not: as it was moved', [[rowOf(placeMoved).reminders_sent, rowOf(placeMoved).sequence_step], [rowOf(idsMoved).reminders_sent, rowOf(idsMoved).sequence_step]], [[[], 3], [['seq:1', 'seq:2'], 0]]);
+await A.finishSequenceChange();
+eq('…the next run puts back the ones still past the end, with what was added meanwhile', [rowOf(keyAdded), rowOf(keyTaken)].map((p) => [p.reminders_sent, p.sequence_step]), [[['review', 'seq:1', 'seq:2'], 1], [['seq:1', 'seq:2'], 1]]);
+
+// A run that put leads back leaves the note, in case a Save landed meanwhile; the next run, finding none, clears it.
+reset(240);
+const putBack = lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+cur = await page();
+await put({ ...cur, sequence: [cur.sequence[0], oneMore] });
+eq('a run that put a lead back leaves the note', [stepOf(putBack), noted()], [1, true]);
+eq('…and the next run, finding none left, clears it', [await A.finishSequenceChange(), noted()], [0, false]);
+
+// A second Save landing while a run finds nothing left: the run clears only the note it read, so the new one stays and
+// its own run puts the lead back.
+reset(240);
+const forSecond = lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+cur = await page();
+await save({ ...cur, sequence: [...cur.sequence, { id: '', afterHours: 120, channel: 'email', text: 'Hi {first_name}, a last one' }] });
+const firstNote = noteValue();
+globalThis.__db = interrupt('cms_kv', 'delete', async () => {
+  await new Promise((r) => setTimeout(r, 5)); // so its note has a later time than the first
+  const now = await page();
+  await save({ ...now, sequence: [now.sequence[0], oneMore] });
+});
+await kit.afterReply();
+globalThis.__db = db;
+eq('a second Save landing in the middle of a run that finds nothing: its note is still there', [noted(), noteValue() !== firstNote, stepOf(forSecond)], [true, true, 2]);
+await kit.afterReply();
+eq('…and its run puts the lead back', [stepOf(forSecond), noted()], [1, true]);
+
+// The saved settings can't be read (or aren't there): the run must not take the defaults for them, find nothing owed
+// and clear the note.
+reset(240);
+const owedWith = lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+const owedBefore = lead({ created_at: ago(80 * HOUR), sequence_step: 2 }); // from before ids
+cur = await page();
+await save({ ...cur, sequence: [cur.sequence[0], oneMore] });
+const swappedSettings = settings();
+globalThis.__db = settingsDown();
+const unread = await quietly(() => kit.afterReply());
+globalThis.__db = db;
+eq('the settings can’t be read in the run after a Save: it says so, leaves the leads, and the note stays', [unread.length, /read failed/.test(unread[0]), [owedWith, owedBefore].map(stepOf), noted()], [1, true, [2, 2], true]);
+db.t.cms_kv = db.rows('cms_kv').filter((r) => r.key !== 'crm-settings');
+const unsaved = await A.finishSequenceChange().then(() => 'finished', (e) => e.message);
+eq('…and no saved settings is the same: it throws, and the note stays', [unsaved, [owedWith, owedBefore].map(stepOf), noted()], ['CRM settings are not saved', [2, 2], true]);
+setSettings(swappedSettings);
+eq('…once they can be read, the next run puts both back', [await A.finishSequenceChange(), [owedWith, owedBefore].map(stepOf)], [2, [1, 1]]);
+
+// The every-minute job goes by the list as saved when its sequence pass starts: a Save landing after it read the settings
+// has had its leads put back, and the pass must not undo that with the old list.
+reset(240);
+globalThis.__rec.activity.length = 0;
+const midRun = lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] });
+cur = await page();
+globalThis.__db = interrupt('crm_projects', 'select', () => put({ ...cur, sequence: [cur.sequence[0], oneMore] }));
+await A.runCrmAutomations();
+globalThis.__db = db;
+eq('a Save landing in the middle of the every-minute job: the lead is put back and the job doesn’t undo it', [stepOf(midRun), noted()], [1, false]);
+hoursPass(17);
+await A.runCrmAutomations();
+eq('…so it gets the new 96h email when it falls due', [sentTo(), stepOf(midRun)], [[midRun.id], 2]);
+
+// …and if the saved settings can't be read then, it carries on with the list it read at the start, not the defaults.
+reset(240);
+setSettings({ ...settings(), sequence: [{ id: 'x1', afterHours: 24, channel: 'whatsapp', text: 'Hi {first_name}, the custom nudge' }] });
+const custom = lead({ created_at: ago(30 * HOUR) });
+globalThis.__db = settingsDown(2);
+await A.runCrmAutomations();
+globalThis.__db = db;
+eq('the settings can’t be read again when the every-minute job reaches the sequence: it uses the list it already had', [globalThis.__rec.whatsapp.map((m) => m.text), stepOf(custom)], [['Hi Jane, the custom nudge'], 1]);
 
 // Two jobs joined in a merge (src/lib/crm/merge-rules.ts), the kept one from before ids: what each had is kept.
 reset(240);
