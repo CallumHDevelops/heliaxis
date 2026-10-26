@@ -143,7 +143,8 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
         setRoofHit({ address: d.address, roof: d.roof, kwhPerKwp: d.kwhPerKwp, monthly: d.monthly, imageryDate: d.imageryDate, map: d.map ?? null });
         setRoofChoice('ask');
       } else if (d?.reason && d.reason !== 'not_configured') {
-        setLookNote('We could not match your roof from satellite pictures, so a few quick questions instead.');
+        const dbg = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
+        setLookNote(`We could not match your roof from satellite pictures, so a few quick questions instead.${dbg ? ` [${d.reason}: ${d.detail ?? 'no detail'}]` : ''}`);
       }
     } catch {
       // The estimator carries on with the questions.
