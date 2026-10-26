@@ -74,3 +74,11 @@ describe('logo', () => {
     expect(freshenLogo('/assets/heliaxis-logo-light.png')).toBe('/assets/heliaxis-logo-light.png');
   });
 });
+
+describe('older snapshots', () => {
+  it('finds the form by its class when the block has no id', () => {
+    const html = '<div class="pv-page"><div style="x"><div class="pv-rich"><p>a</p></div></div><div style="x"><div class="pv-quote is-contact"><div class="pv-quote-inner"><form></form></div></div></div></div>';
+    const parts = splitCmsPage(html, { quote: true });
+    expect(parts.some((p) => typeof p !== 'string' && 'quote' in p)).toBe(true);
+  });
+});

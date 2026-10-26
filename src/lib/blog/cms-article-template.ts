@@ -115,12 +115,16 @@ export function sanitizeArticleHtml(html: string): string {
       if (!href || /^javascript:/i.test(href) || /^data:/i.test(href)) return '<a>';
       if (href.startsWith('/') || href.startsWith('https://') || href.startsWith('http://') || href.startsWith('#')) {
         const safe = href.replace(/"/g, '');
-        return `<a href="${safe}">`;
+        // data-button="solar" (gold) or "ghost" (outlined): a link shown as a button.
+        const btn = (attrs.match(/\bdata-button\s*=\s*(['"])(solar|ghost)\1/i) || [])[2]?.toLowerCase();
+        return btn ? `<a href="${safe}" class="pv-inline-btn ${btn}">` : `<a href="${safe}">`;
       }
       return '<a>';
     }
     return `<${t}>`;
   });
+  // A paragraph holding only buttons becomes a row of them.
+  s = s.replace(/<p>\s*((?:<a href="[^"]*" class="pv-inline-btn (?:solar|ghost)">[\s\S]*?<\/a>\s*)+)<\/p>/g, '<p class="pv-btnrow">$1</p>');
   return s.trim() || '<p></p>';
 }
 

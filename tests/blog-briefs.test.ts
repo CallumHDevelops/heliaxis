@@ -24,6 +24,13 @@ describe('blog briefs and prompt', () => {
     expect(out).not.toMatch(/script|img|class|style/i);
   });
 
+  it('turns data-button links into styled buttons and a row of them into a button row', () => {
+    const out = sanitizeArticleHtml('<p><a href="/book-a-survey" data-button="solar">Book a free survey</a> <a href="/solar-estimator" data-button="ghost">Estimator</a></p><p>Read <a href="/get-a-quote">this</a>.</p><p><a href="javascript:x" data-button="solar">Bad</a></p>');
+    expect(out).toContain('<p class="pv-btnrow"><a href="/book-a-survey" class="pv-inline-btn solar">Book a free survey</a>');
+    expect(out).toContain('class="pv-inline-btn ghost">Estimator</a>');
+    expect(out).toContain('<p>Read <a href="/get-a-quote">this</a>.</p>');
+    expect(out).not.toMatch(/javascript/i);
+  });
   it('asks for the answer first, FAQs and editor notes, and carries the brief', () => {
     expect(BLOG_SYSTEM).toMatch(/Answer first/);
     expect(BLOG_SYSTEM).toMatch(/Frequently asked questions/);

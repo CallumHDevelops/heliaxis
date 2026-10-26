@@ -18,7 +18,7 @@ STRUCTURE (this is what ranks, gets quoted by AI answers and converts)
 3. Include at least one worked example for a realistic South Wales household or site. State every assumption (usage in kWh, tariff in p/kWh, system size in kWp) in the example itself. Never present an example as a guarantee.
 4. Include the specific section headings named in the brief, using those exact titles as <h2>.
 5. bodyHtml2 finishes with, in this order: an <h2> "How Heliaxis approaches this" (what we actually check on a survey: roof, shading, usage, tariff, DNO, etc. and that we quote after a survey, not by guesswork); an <h2>Frequently asked questions</h2> with 5–7 <h3> questions, each answered in 2–3 plain sentences that stand alone; then one short closing paragraph with a soft next step.
-6. Link to relevant site pages inside the text where natural: /solar-estimator, /commercial-funding, /book-a-survey, /get-a-quote, /book-a-call. Do not invent other URLs.
+6. Calls to action are BUTTONS, not buried text links. After "How Heliaxis approaches this" and after the FAQ, and once mid-article where the reader has just learned something that makes the next step obvious, add a button row: a paragraph holding only links written exactly like this: <p><a href="/book-a-survey" data-button="solar">Book a free survey</a> <a href="/solar-estimator" data-button="ghost">Try the solar estimator</a></p>. data-button is "solar" for the main action and "ghost" for the secondary one. Use one or two buttons per row, short labels (2–4 words, no full stops), and 2–3 rows in the whole article. Pages you may link to: /book-a-survey, /book-a-call, /get-a-quote, /solar-estimator, /commercial-funding. Do not invent other URLs. Ordinary text links to those pages are fine sparingly inside sentences.
 
 ACCURACY RULES (non-negotiable)
 - Never invent statistics, prices, grant values, tariff rates, studies or regulations. If a figure is not certain, give a wide, clearly-labelled indicative range or describe it qualitatively, and add it to editorNotes so a person checks it before publishing.
@@ -62,7 +62,7 @@ OUTPUT: return ONLY one valid JSON object, no markdown fence and no commentary, 
 }
 
 HTML RULES for bodyHtml1 and bodyHtml2
-- Allowed tags only: <h2> <h3> <p> <ul> <ol> <li> <table> <thead> <tbody> <tr> <th> <td> <strong> <em> <a> <br>. No attributes except href on <a>. No images, no <h1>, no inline styles, no classes, no forms, no emails or phone numbers.
+- Allowed tags only: <h2> <h3> <p> <ul> <ol> <li> <table> <thead> <tbody> <tr> <th> <td> <strong> <em> <a> <br>. No attributes except href (and data-button on button links) on <a>. No images, no <h1>, no inline styles, no classes, no forms, no emails or phone numbers.
 - Do not put the same heading twice. Keep tables to 3–6 rows and 2–5 columns, with a header row.
 - Use <strong> sparingly for the key phrase or number in a paragraph.
 - Write complete articles. Never output placeholders, "..." or "[insert]".`;

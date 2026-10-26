@@ -828,6 +828,11 @@ button.pv-seg{font:inherit}
 .pv-rich table{width:100%;border-collapse:collapse;margin:0 0 1.4em;font-size:.96rem;display:block;overflow-x:auto}
 .pv-rich th,.pv-rich td{border:1px solid rgba(0,0,0,.14);padding:.6em .8em;text-align:left;vertical-align:top}
 .pv-rich th{background:rgba(0,0,0,.05);font-weight:700}
+.pv-rich .pv-btnrow{display:flex;flex-wrap:wrap;gap:12px;margin:1.4em 0}
+.pv-rich a.pv-inline-btn{display:inline-flex;align-items:center;gap:8px;padding:.85em 1.5em;font-weight:700;font-size:.98rem;line-height:1.2;text-decoration:none;border:2px solid var(--ink);color:var(--ink);background:transparent;cursor:pointer}
+.pv-rich a.pv-inline-btn.solar{background:var(--solar);border-color:var(--solar);color:#211f18}
+.pv-rich a.pv-inline-btn:hover{text-decoration:none;filter:brightness(.96)}
+.pv-rich a.pv-inline-btn::after{content:'→'}
 .pv-rich a{color:#2F6FED;text-decoration:none;font-weight:500}
 .pv-rich a:hover{text-decoration:underline;text-underline-offset:2px}
 .pv-rich strong,.pv-rich b{font-weight:700;color:var(--ink)}
