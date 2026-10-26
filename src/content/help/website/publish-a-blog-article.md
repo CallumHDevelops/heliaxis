@@ -51,7 +51,7 @@ If its time has come and it’s already gone live, there’s no schedule to canc
 
 ## Take an article off the website
 
-Click **⋯**, then **Unpublish**, then **Unpublish**. It leaves the website and becomes a draft you can edit and publish again later.
+Click **⋯**, then **Unpublish**, then **Unpublish**. It leaves the website and becomes a draft you can edit and publish again later. If the app can’t take it off, you’ll see a message and it stays on the website, still **Live**: click **Unpublish** again.
 
 It stays off the website until it’s published again, with **Publish now** or from its editor. Publishing the website for anything else doesn’t bring it back.
 

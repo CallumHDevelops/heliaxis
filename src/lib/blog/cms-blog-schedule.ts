@@ -255,8 +255,9 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
     admin.from('cms_kv').select('value').eq('key', PUBLISHED_KEY).maybeSingle(),
     admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
   ]);
-
-  if (draftRes.error) throw new Error(draftRes.error.message);
+  // A doc that couldn't be read would be written back empty, taking every page with it.
+  const failedRead = draftRes.error || pubRes.error || renRes.error;
+  if (failedRead) throw new Error(failedRead.message);
 
   const draft = parseCmsState(draftRes.data?.value);
   const idx = findPageIndex(draft.pages || [], opts.id, opts.slug);
@@ -290,14 +291,17 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
     rendered.pages = rendered.pages.filter((p) => !pageMatchesBlog(p, undefined, aliases));
   }
 
-  const writes = [
-    upsertKv(admin, DRAFT_KEY, draft, now),
-    upsertKv(admin, PUBLISHED_KEY, published, now),
-    upsertKv(admin, RENDERED_KEY, rendered, now),
-  ];
-  const results = await Promise.all(writes);
-  const failed = results.find((r) => r.error);
-  if (failed?.error) throw new Error(failed.error.message);
+  // One after another, each checked, in the reverse of the job's order: the saved site (Draft), then the
+  // published copy, then the website's pages. If a write fails, the article is still on the website, so the
+  // Blog list's Live is right and View opens it, and clicking Unpublish again finishes the job.
+  for (const [key, value] of [
+    [DRAFT_KEY, draft],
+    [PUBLISHED_KEY, published],
+    [RENDERED_KEY, rendered],
+  ] as const) {
+    const { error } = await upsertKv(admin, key, value, now);
+    if (error) throw new Error(error.message);
+  }
 
   revalidatePath('/', 'layout');
   revalidatePath('/blog');

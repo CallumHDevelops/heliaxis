@@ -13,6 +13,8 @@
 // won't call an article that has already gone live a draft. The job writes the website's pages, then the
 // published copy, then the saved site, so the Blog list (listCmsAiBlogs) never shows an article as Live
 // that isn't on the website, and an Unschedule after a failed write leaves the list and the copy agreeing.
+// Unpublish (unpublishCmsBlog) writes the other way round, the website's pages last, so a failed write leaves
+// the article on the website, Live in the list, and Unpublish again finishes it.
 // Usage: node --experimental-strip-types scripts/test-cms-publish.mjs
 import { readFileSync } from 'node:fs';
 import * as kit from './site-test-kit.mjs';
@@ -350,5 +352,49 @@ eq('Unschedule after only the published copy failed to write is refused (it’s 
 const list = readFileSync(new URL('../src/app/admin/blog/BlogAdminList.tsx', import.meta.url), 'utf8');
 const runCancel = list.slice(list.indexOf('async function runCancelSchedule('), list.indexOf('async function runUnpublish('));
 eq('a refused Unschedule reloads the Blog list, so the article shows as Live with Unpublish', runCancel.slice(runCancel.indexOf('catch (e) {'), runCancel.indexOf('} finally {')).includes('router.refresh();'), true);
+
+/* ── Unpublish a live article ──────────────────────────────────────────────── */
+
+const unpublishRoute = await import('../src/app/api/blog/unpublish/route.ts');
+const unpublish = (id) => kit.call(unpublishRoute, '/api/blog/unpublish', { body: { id, slug: byId(SCHEDULED, id).slug } });
+/** The job has put it live: in the saved site, the published copy and the website's pages. */
+const resetLive = async () => (resetDocs(), await minute());
+/** What View opens (null is a 404). */
+const view = async (slug) => (await getCmsBlogArticleBySlug(slug))?.html ?? null;
+await resetLive();
+failing(PUBLISHED);
+const p1 = await unpublish('due');
+db.from = from;
+eq('Unpublish: the published copy fails to write: reported, and the website’s pages aren’t written', [p1.status, /couldn’t write heliaxis-cms-published/.test(p1.body.error ?? ''), written], [400, true, [DRAFT, PUBLISHED]]);
+eq('…it’s still on the website, so the Blog list’s Live is right and View opens it', [await listed('due'), await view('due')], [{ status: 'published', live: true }, dueRender.html]);
+failing(null);
+const p2 = await unpublish('due');
+db.from = from;
+eq('…Unpublish again finishes it: a draft, out of the published copy and off the website', [p2.status, await listed('due'), kv(PUBLISHED).pages.some((p) => p.id === 'due'), await view('due')], [200, { status: 'draft', live: false }, false, null]);
+eq('…writing the saved site, then the published copy, then the website’s pages', written, [DRAFT, PUBLISHED, RENDERED]);
+await resetLive();
+failing(DRAFT);
+const p3 = await unpublish('due');
+db.from = from;
+eq('the saved site fails to write: nothing else is written, and it’s Live and View opens it', [p3.status, written, await listed('due'), await view('due')], [400, [DRAFT], { status: 'published', live: true }, dueRender.html]);
+await resetLive();
+failing(RENDERED);
+const p4 = await unpublish('due');
+db.from = from;
+eq('the website’s pages fail to write: it’s still on the website, Live, and View opens it', [p4.status, await listed('due'), await view('due')], [400, { status: 'published', live: true }, dueRender.html]);
+// A doc that can't be read isn't written back empty.
+for (const [key, doc] of [[PUBLISHED, 'the published copy'], [RENDERED, 'the website’s pages']]) {
+  await resetLive();
+  const before = [kv(DRAFT), kv(PUBLISHED), kv(RENDERED)];
+  db.from = (table) => {
+    const b = from(table);
+    const eqKey = b.eq;
+    b.eq = (c, v) => (table === 'cms_kv' && v === key ? { maybeSingle: async () => ({ data: null, error: { message: `couldn’t read ${v}` } }) } : eqKey(c, v));
+    return b;
+  };
+  const p5 = await unpublish('due');
+  db.from = from;
+  eq(`${doc} can’t be read: reported, and nothing is written (or written back empty)`, [p5.status, p5.body.error, [kv(DRAFT), kv(PUBLISHED), kv(RENDERED)]], [400, `couldn’t read ${key}`, before]);
+}
 
 kit.done();
