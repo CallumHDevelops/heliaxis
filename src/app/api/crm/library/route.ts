@@ -36,6 +36,9 @@ export async function POST(req: Request) {
   if (b.action === 'save') {
     const path = String(b.path || '');
     if (!path.startsWith('library/') || path.includes('..')) return json({ error: 'Bad file' }, 400);
+    // "In every pack" and a model's details are admin-only, as on CRM settings → Product library; anyone
+    // can still add a manual for a model from a job's Handover tab, which sends neither.
+    if (s.profile.role !== 'admin' && (b.every_pack === true || 'details' in b)) return json({ error: 'Only admins can change the product library.' }, 403);
     const product = (await handoverReady()) ? libraryFields(b) : {};
     const { data, error } = await db
       .from('crm_library')
