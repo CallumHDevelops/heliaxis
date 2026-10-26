@@ -60,7 +60,7 @@ export type RoofAnalysis = {
   /** Yearly sun per kW (shade included) averaged over the panels laid. */
   fluxMean: number | null;
   /** What the analysis saw, for the ?debug view: each face found and how many panels it took. */
-  info: { imageryQuality?: string; okCells: number; faces: { bearing: number; pitch: number; areaM2: number; cells: number; panels: number }[] };
+  info: { imageryQuality?: string; okCells: number; faces: { bearing: number; pitch: number; areaM2: number; cells: number; panels: number; usable: boolean; fluxMedian: number | null; centre: { x: number; y: number } }[] };
 };
 
 export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key: string, referer: string): Promise<{ ok: true; roof: RoofAnalysis } | { ok: false; why: string }> {
@@ -150,7 +150,20 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
         info: {
           imageryQuality: d.imageryQuality,
           okCells: g.ok.reduce((a, v) => a + v, 0),
-          faces: faces.map((f) => ({ bearing: Math.round(f.bearing), pitch: Math.round(f.pitch), areaM2: Math.round(f.areaM2), cells: f.cells.length, panels: placed.filter((p) => p.face === f.id).length })),
+          faces: faces.map((f) => {
+            const fl = f.cells.map((k) => g.flux[k]).filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+            const xy = f.cells.map((k) => cellXY(g, k % n, (k - (k % n)) / n));
+            return {
+              bearing: Math.round(f.bearing),
+              pitch: Math.round(f.pitch),
+              areaM2: Math.round(f.areaM2),
+              cells: f.cells.length,
+              panels: placed.filter((p) => p.face === f.id).length,
+              usable: f.bearing >= 80 && f.bearing <= 280 && f.pitch >= 3 && f.pitch <= 65,
+              fluxMedian: fl.length ? Math.round(fl[Math.floor(fl.length / 2)]) : null,
+              centre: { x: Math.round((xy.reduce((a, p) => a + p.x, 0) / xy.length) * 10) / 10, y: Math.round((xy.reduce((a, p) => a + p.y, 0) / xy.length) * 10) / 10 },
+            };
+          }),
         },
         fluxMean: flat.length ? flat.reduce((a, p) => a + p.flux, 0) / flat.length : null,
       },
