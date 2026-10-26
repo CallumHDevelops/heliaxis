@@ -626,6 +626,37 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 12,
     optional: true,
   });
+  add(!env('GETADDRESS_API_KEY'), {
+    id: 'env-getaddress',
+    title: 'Solar estimator: let visitors pick their address from a list (getAddress.io)',
+    detail: 'Optional. Visitors type part of their address and pick it, so the estimator finds the exact house and roof. Without it they type a house number and postcode, which is less reliable.',
+    steps: [
+      'Sign up at [getaddress.io](https://getaddress.io) and choose a plan (the free trial is enough to test; a small paid plan covers a website).',
+      'In your getAddress dashboard, copy the **API key**.',
+      ...VERCEL_STEPS,
+      'Then try it: open heliaxis.co.uk/solar-estimator and type your own address. You should get a list to pick from.',
+    ],
+    copies: [{ label: 'Key', value: 'GETADDRESS_API_KEY' }],
+    href: 'https://getaddress.io',
+    hrefLabel: 'Open getAddress.io',
+    order: 12,
+    optional: true,
+  });
+  add(!env('OS_DATAHUB_KEY'), {
+    id: 'env-os-datahub',
+    title: 'Solar estimator: draw the exact building outline (Ordnance Survey)',
+    detail: 'Optional and free. Gives the roof picture an accurate Ordnance Survey outline of the building. Without it the estimator uses OpenStreetMap, which misses some buildings.',
+    steps: [
+      'Sign up at the [OS Data Hub](https://osdatahub.os.uk) and open **My projects → Create a project**. Choose the **OS OpenData** plan.',
+      'In the project, **Add an API** and choose **OS Features API**. Then copy the project **API key**.',
+      ...VERCEL_STEPS,
+    ],
+    copies: [{ label: 'Key', value: 'OS_DATAHUB_KEY' }],
+    href: 'https://osdatahub.os.uk',
+    hrefLabel: 'Open OS Data Hub',
+    order: 12,
+    optional: true,
+  });
   add(!env('NEXT_PUBLIC_VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'), {
     id: 'env-vapid',
     title: 'Add the phone notification keys',

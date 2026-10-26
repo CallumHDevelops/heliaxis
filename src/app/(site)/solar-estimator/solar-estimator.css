@@ -273,3 +273,8 @@ a.est-link{display:inline-block}
 .est-confirm .est-found{margin:0}
 .est-confirm .est-opts{grid-column:1 / -1}
 @media(max-width:700px){.est-confirm{grid-template-columns:minmax(0,1fr)}}
+
+.est-pick{position:relative}
+.est-sugs{position:absolute;left:0;right:0;top:100%;z-index:5;list-style:none;margin:4px 0 0;padding:4px;background:var(--card,#fff);border:1px solid var(--line,#e5dfd0);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:260px;overflow:auto}
+.est-sugs button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;border-radius:8px;font:inherit;cursor:pointer;color:inherit}
+.est-sugs button:hover,.est-sugs button:focus-visible{background:rgba(232,184,64,.18);outline:none}

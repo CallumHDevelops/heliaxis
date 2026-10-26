@@ -63,7 +63,7 @@ const Compass = ({ deg }: { deg: number }) => (
   </svg>
 );
 
-export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: EstimatorSettings; roofLookup?: boolean }) {
+export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker = false }: { settings: EstimatorSettings; roofLookup?: boolean; addressPicker?: boolean }) {
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
   const [who, setWho] = useState<Who>('home');
@@ -80,6 +80,10 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
   const [ev, setEv] = useState(false);
   const [heatpump, setHeatpump] = useState(false);
   const [house, setHouse] = useState('');
+  // The address picker: what they have typed, the suggestions for it, and the property they chose.
+  const [query, setQuery] = useState('');
+  const [sugs, setSugs] = useState<{ id: string; address: string }[]>([]);
+  const [pickedId, setPickedId] = useState('');
   const [rates, setRates] = useState({ imp: settings.importPence, exp: settings.exportPence });
   const [roofHit, setRoofHit] = useState<RoofHit | null>(null);
   // 'ask': we found a roof, the visitor has not said yet; 'yes': use it; 'no': they will answer the questions.
@@ -93,6 +97,21 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
   const head = useRef<HTMLDivElement>(null);
 
   const pcOk = PC.test(postcode.trim());
+  const picker = addressPicker && roofLookup && !skipLookup;
+  useEffect(() => {
+    if (!picker || pickedId || query.trim().length < 3) return;
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`/api/solar/address?q=${encodeURIComponent(query.trim())}`, { signal: ctl.signal })
+        .then((r) => r.json())
+        .then((d) => setSugs(Array.isArray(d?.suggestions) ? d.suggestions : []))
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      clearTimeout(t);
+      ctl.abort();
+    };
+  }, [picker, pickedId, query]);
   // The roof's yield: asked for when the visitor has given a postcode and roof, and again if they change them.
   useEffect(() => {
     if (!pcOk || step < 2 || roofChoice === 'yes') return;
@@ -129,17 +148,17 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
     setTimeout(() => head.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
   }
   const needHouse = roofLookup && !skipLookup;
-  const canNext = step === 0 ? pcOk && !looking && (!needHouse || house.trim().length > 0) : true;
+  const canNext = step === 0 ? (picker ? !!pickedId && !looking : pcOk && !looking && (!needHouse || house.trim().length > 0)) : true;
 
   /** Next from the first question: if they gave a house number, try to find the roof from satellite data first. */
   async function nextFromWhere() {
     setLookNote('');
     setRoofHit(null);
     setRoofChoice('no');
-    if (!needHouse || !house.trim()) return go(1);
+    if (!picker && (!needHouse || !house.trim())) return go(1);
     setLooking(true);
     try {
-      const res = await fetch(`/api/solar/roof?pc=${encodeURIComponent(postcode.trim())}&line=${encodeURIComponent(house.trim())}`);
+      const res = await fetch(picker ? `/api/solar/roof?id=${encodeURIComponent(pickedId)}` : `/api/solar/roof?pc=${encodeURIComponent(postcode.trim())}&line=${encodeURIComponent(house.trim())}`);
       const d = await res.json();
       if (d?.found) {
         setRoofHit({ address: d.address, roof: d.roof, kwhPerKwp: d.kwhPerKwp, monthly: d.monthly, imageryDate: d.imageryDate, map: d.map ?? null });
@@ -187,6 +206,49 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
                     <Opt on={who === 'home'} onClick={() => setWho('home')} title="A home" sub="House, bungalow, flat with its own roof" />
                     <Opt on={who === 'business'} onClick={() => setWho('business')} title="A business" sub="Shop, farm, warehouse, office" />
                   </div>
+                  {picker ? (
+                    <div className="est-pick">
+                      <label className="est-lab" htmlFor="est-find">
+                        Your address
+                      </label>
+                      <input
+                        id="est-find"
+                        className="est-input"
+                        value={query}
+                        onChange={(e) => {
+                          setQuery(e.target.value);
+                          setPickedId('');
+                          setSugs([]);
+                        }}
+                        placeholder="Start typing your house number and postcode"
+                        autoComplete="off"
+                        role="combobox"
+                        aria-expanded={sugs.length > 0 && !pickedId}
+                        aria-controls="est-sugs"
+                        onKeyDown={(e) => e.key === 'Enter' && canNext && void nextFromWhere()}
+                      />
+                      {sugs.length > 0 && !pickedId && (
+                        <ul id="est-sugs" className="est-sugs" role="listbox">
+                          {sugs.map((sg) => (
+                            <li key={sg.id} role="option" aria-selected="false">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPickedId(sg.id);
+                                  setQuery(sg.address);
+                                  setSugs([]);
+                                  const m = sg.address.match(/[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}/i);
+                                  if (m) setPostcode(m[0].toUpperCase());
+                                }}
+                              >
+                                {sg.address}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ) : (
                   <div className={`est-addr${roofLookup && !skipLookup ? '' : ' one'}`}>
                   <div>
                   <label className="est-lab" htmlFor="est-pc">
@@ -203,8 +265,9 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
                     </div>
                   )}
                   </div>
+                  )}
                   {roofLookup && !skipLookup && <p className="est-hint">We find your roof from satellite pictures, so there is nothing to measure or guess.{' '}<button type="button" className="est-link" onClick={() => setSkipLookup(true)}>I would rather answer a few roof questions</button></p>}
-                  {postcode && !pcOk && <p className="est-hint">Enter a full UK postcode, such as CF10 1AA.</p>}
+                  {!picker && postcode && !pcOk && <p className="est-hint">Enter a full UK postcode, such as CF10 1AA.</p>}
                 </>
               )}
               {step === 1 && roofChoice === 'ask' && roofHit && (
@@ -368,7 +431,7 @@ function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panel
         </svg>
       </div>
       {!plain && <figcaption>
-        {shown.length} panels shown as an indicative layout{outline ? ', with the outline of the building' : ''}. A survey confirms what fits. Includes solar data and imagery from Google{outline ? '; building outline © OpenStreetMap contributors' : ''}.
+        {shown.length} panels shown as an indicative layout{outline ? ', with the outline of the building' : ''}. A survey confirms what fits. Includes solar data and imagery from Google{outline ? '; building outline from Ordnance Survey data © Crown copyright and database rights, or © OpenStreetMap contributors' : ''}.
       </figcaption>}
     </figure>
   );

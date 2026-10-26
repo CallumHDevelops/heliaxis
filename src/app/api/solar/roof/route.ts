@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { fallbackYield } from '@/lib/estimator/calc';
 import { pvgisYield } from '@/lib/estimator/pvgis';
 import { buildingOutline } from '@/lib/estimator/osm';
+import { osBuildingOutline } from '@/lib/estimator/os-buildings';
+import { place } from '@/lib/estimator/getaddress';
 import { roofFromGoogle, mapFromGoogle, type GoogleBuilding, type MapData, type RoofFound } from '@/lib/estimator/roof';
 import { signView } from '@/lib/estimator/sign';
 
@@ -115,14 +117,21 @@ async function solar(lat: number, lng: number, key: string): Promise<{ b: Google
  */
 export async function GET(req: Request) {
   const u = new URL(req.url);
-  const pc = (u.searchParams.get('pc') || '').trim().toUpperCase().slice(0, 9);
-  const line = (u.searchParams.get('line') || '').trim().slice(0, 80);
+  const id = (u.searchParams.get('id') || '').trim();
+  let pc = (u.searchParams.get('pc') || '').trim().toUpperCase().slice(0, 9);
+  let line = (u.searchParams.get('line') || '').trim().slice(0, 80);
   const key = process.env.GOOGLE_SOLAR_API_KEY;
   if (!key) return json({ found: false, reason: 'not_configured' } satisfies Miss);
+  // A picked address (getAddress.io id) already has its coordinates; otherwise postcode and house are geocoded below.
+  const picked = id ? await place(id) : null;
+  if (id && picked) {
+    pc = picked.postcode;
+    line = picked.address.slice(0, 80);
+  }
   if (!/^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/.test(pc)) return json({ found: false, reason: 'bad_address' } satisfies Miss);
   if (line.length < 1) return json({ found: false, reason: 'no_address' } satisfies Miss);
 
-  const ck = `${pc.replace(/\s+/g, '')}|${line.toLowerCase()}`;
+  const ck = picked ? `id|${id}` : `${pc.replace(/\s+/g, '')}|${line.toLowerCase()}`;
   const hit = cache.get(ck);
   if (hit && Date.now() - hit.at < 86400_000) return json(hit.value);
 
@@ -131,7 +140,7 @@ export async function GET(req: Request) {
 
   let result: Found | Miss = { found: false, reason: 'error' };
   try {
-    const { geo, why } = await geocode(line, pc);
+    const { geo, why } = picked ? { geo: { lat: picked.lat, lng: picked.lng, address: picked.address }, why: 'ok' } : await geocode(line, pc);
     if (!geo) result = { found: false, reason: 'bad_address', detail: why };
     else {
       const { b, error, why: swhy } = await solar(geo.lat, geo.lng, key);
@@ -143,7 +152,7 @@ export async function GET(req: Request) {
         const roof = roofFromGoogle(b, y?.kwhPerKwp ?? fallbackYield(first.direction, 'typical')) ?? first;
         const d = b.imageryDate;
         const m = mapFromGoogle(b, { lat: geo.lat, lng: geo.lng });
-        const outline = m ? await buildingOutline(m.centre) : null;
+        const outline = m ? ((await osBuildingOutline(m.centre)) ?? (await buildingOutline(m.centre))) : null;
         result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical'), monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
       }
     }
