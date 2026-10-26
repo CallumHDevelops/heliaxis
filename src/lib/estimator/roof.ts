@@ -1,3 +1,4 @@
+import { inside } from './overlay';
 import { DIRECTIONS, type DirectionKey, type Shade } from './calc';
 
 /**
@@ -126,4 +127,40 @@ export function mapFromGoogle(b: GoogleBuilding | null | undefined, fallbackCent
     panelW: sp?.panelWidthMeters ?? 1.045,
     panelH: sp?.panelHeightMeters ?? 1.879,
   };
+}
+
+const M_PER_DEG = 111320;
+
+/**
+ * Tidies Google's panel layout for the picture: drops panels that fall outside the building's outline (with a little give for the
+ * outline and the imagery not lining up exactly) and small stray groups, such as two panels on a lean-to or a bay, keeping the
+ * order (best first). Without an outline only the stray groups go.
+ */
+export function tidyPanels(panels: MapPanel[], outline: { lat: number; lng: number }[] | null, linkM = 2.6): MapPanel[] {
+  if (panels.length < 2) return panels;
+  const kept = outline && outline.length >= 4
+    ? panels.filter((p) => {
+        const dLat = 1.2 / M_PER_DEG;
+        const dLng = 1.2 / (M_PER_DEG * Math.cos((p.lat * Math.PI) / 180));
+        return [[0, 0], [dLat, 0], [-dLat, 0], [0, dLng], [0, -dLng]].some(([a, b]) => inside({ lat: p.lat + a, lng: p.lng + b }, outline));
+      })
+    : panels;
+  const dist = (a: MapPanel, b: MapPanel) => Math.hypot((a.lat - b.lat) * M_PER_DEG, (a.lng - b.lng) * M_PER_DEG * Math.cos((a.lat * Math.PI) / 180));
+  const group = kept.map(() => -1);
+  let n = 0;
+  for (let i = 0; i < kept.length; i++) {
+    if (group[i] >= 0) continue;
+    const stack = [i];
+    group[i] = n;
+    while (stack.length) {
+      const a = stack.pop()!;
+      for (let j = 0; j < kept.length; j++) if (group[j] < 0 && dist(kept[a], kept[j]) <= linkM) { group[j] = n; stack.push(j); }
+    }
+    n++;
+  }
+  const size = Array.from({ length: n }, (_, g) => group.filter((x) => x === g).length);
+  const biggest = Math.max(0, ...size);
+  const min = Math.max(3, Math.ceil(biggest * 0.25));
+  const out = kept.filter((_, i) => size[group[i]] >= min);
+  return out.length ? out : kept.length ? kept : panels;
 }

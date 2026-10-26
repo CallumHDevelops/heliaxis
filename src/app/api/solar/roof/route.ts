@@ -4,7 +4,7 @@ import { pvgisYield } from '@/lib/estimator/pvgis';
 import { buildingOutline } from '@/lib/estimator/osm';
 import { osBuildingOutline } from '@/lib/estimator/os-buildings';
 import { place } from '@/lib/estimator/address-lookup';
-import { roofFromGoogle, mapFromGoogle, type GoogleBuilding, type MapData, type RoofFound } from '@/lib/estimator/roof';
+import { roofFromGoogle, mapFromGoogle, tidyPanels, type GoogleBuilding, type MapData, type RoofFound } from '@/lib/estimator/roof';
 import { signView } from '@/lib/estimator/sign';
 
 export const dynamic = 'force-dynamic';
@@ -153,6 +153,11 @@ export async function GET(req: Request) {
         const d = b.imageryDate;
         const m = mapFromGoogle(b, { lat: geo.lat, lng: geo.lng });
         const outline = m ? ((await osBuildingOutline(m.centre)) ?? (await buildingOutline(m.centre))) : null;
+        // Only panels that sit on this building's roof, in one group: a stray pair on a bay or lean-to is not shown or counted.
+        if (m) {
+          m.panels = tidyPanels(m.panels, outline);
+          if (m.panels.length) roof.maxPanels = Math.min(roof.maxPanels, m.panels.length);
+        }
         result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical'), monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
       }
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aspectFromBearing, compassWord, mapFromGoogle, roofFromGoogle, usableAspect, type GoogleBuilding } from '@/lib/estimator/roof';
+import { aspectFromBearing, compassWord, mapFromGoogle, tidyPanels, roofFromGoogle, usableAspect, type GoogleBuilding } from '@/lib/estimator/roof';
 import { DEFAULT_SETTINGS, estimate } from '@/lib/estimator/calc';
 
 const house: GoogleBuilding = {
@@ -93,5 +93,18 @@ describe('a roof with a north face (2 Marine Terrace)', () => {
     expect(m.panels).toHaveLength(12);
     expect(m.panels.every((p) => p.az > 200 && p.az < 208)).toBe(true);
     expect(m.centre.lat).toBeCloseTo(51.5851509, 6);
+  });
+  it('drops panels off the building and small stray groups, keeping the main group in order', () => {
+    const lat0 = 51.6;
+    const lng0 = -2.7;
+    const at = (e: number, n: number) => ({ lat: lat0 + n / 111320, lng: lng0 + e / (111320 * Math.cos((lat0 * Math.PI) / 180)), o: 'p' as const, az: 200 });
+    const grid = [0, 1, 2].flatMap((c) => [0, 1, 2].map((r) => at(c * 1.1, r * 1.9)));
+    const stray = [at(-6, 2), at(-6, 4)];
+    const off = [at(30, 0)];
+    const ring = [at(-8, -3), at(8, -3), at(8, 8), at(-8, 8)].map(({ lat, lng }) => ({ lat, lng }));
+    const out = tidyPanels([...grid, ...stray, ...off], ring);
+    expect(out).toHaveLength(9);
+    expect(out[0]).toEqual(grid[0]);
+    expect(tidyPanels([...grid, ...stray], null)).toHaveLength(9);
   });
 });
