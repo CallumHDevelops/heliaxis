@@ -41,13 +41,22 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
 
   const { data: m } = await db.from('social_mention').select('*').eq('id', id).maybeSingle();
   if (!m) notFound();
-  const [{ data: cls }, { data: draft }, { data: notes }, { data: parent }] = await Promise.all([
+  const [{ data: cls }, { data: draft }, { data: notes }, { data: events }, { data: parent }] = await Promise.all([
     db.from('social_classification').select('*').eq('mention_id', id).order('id', { ascending: false }).limit(1).maybeSingle(),
     db.from('social_draft').select('*').eq('mention_id', id).not('status', 'in', '(superseded)').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    db.from('social_note').select('id, text, created_at').eq('mention_id', id).order('created_at', { ascending: true }),
+    db.from('social_note').select('id, text, created_at, author_id').eq('mention_id', id).order('created_at', { ascending: true }),
+    db.from('social_status_event').select('id, to_status, actor_id, reason, at').eq('mention_id', id).order('at', { ascending: true }),
     m.parent_id ? db.from('social_mention').select('text, author_display_name, author_is_own').eq('id', m.parent_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
+  // Who did what: names for everyone who wrote a note or changed the status.
+  const peopleIds = [...new Set([...(notes ?? []).map((n) => n.author_id), ...(events ?? []).map((e) => e.actor_id)].filter(Boolean))] as string[];
+  const { data: people } = peopleIds.length ? await db.from('profiles').select('id, full_name, email').in('id', peopleIds) : { data: [] };
+  const nameOf = (uid: string | null) => {
+    if (!uid) return 'The system';
+    const p = (people ?? []).find((x) => x.id === uid);
+    return p?.full_name || p?.email || 'Someone';
+  };
   const closed = m.status === 'posted' || m.status === 'dismissed';
   const sev = (m.severity ?? 'medium') as string;
   const failures = ((draft?.guardrail_result as { failures?: { rule: string; detail: string }[] } | null)?.failures ?? []) as { rule: string; detail: string }[];
@@ -199,13 +208,34 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
 
         <section className="sm-card">
           <h2>Notes</h2>
-          {(notes ?? []).length === 0 ? <p className="sm-sub">No notes yet.</p> : <ul className="sm-notes">{(notes ?? []).map((n) => <li key={n.id}>{n.text} <small>{ago(n.created_at)}</small></li>)}</ul>}
+          {(notes ?? []).length === 0 ? <p className="sm-sub">No notes yet.</p> : <ul className="sm-notes">{(notes ?? []).map((n) => (
+                <li key={n.id}>
+                  {n.text}{' '}
+                  <small>
+                    {nameOf(n.author_id)} · {ago(n.created_at)}
+                  </small>
+                </li>
+              ))}</ul>}
           <form action={addNote} className="sm-inline">
             <input type="hidden" name="mentionId" value={m.id} />
             <input name="text" placeholder="Add a note" className="sm-input" required />
             <button className="sm-btn">Add note</button>
           </form>
         </section>
+
+        {(events ?? []).length > 0 && (
+          <section className="sm-card">
+            <h2>Activity</h2>
+            <ul className="sm-notes">
+              {(events ?? []).map((e) => (
+                <li key={e.id}>
+                  {STATUS_LABEL[e.to_status] ?? e.to_status} by {nameOf(e.actor_id)}
+                  {e.reason ? `: ${e.reason}` : ''} <small>{ago(e.at)}</small>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </AdminShell>
   );
