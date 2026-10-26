@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   DEFAULT_SURVEY_MINUTES,
   DELIVERY_STAGES,
@@ -170,7 +171,36 @@ function Tile({
   );
 }
 
+type JobQuote = { id: string; number: string; status: string; total: number };
+const QUOTE_STATUS: Record<string, string> = { draft: 'Draft', sent: 'Sent, waiting', accepted: 'Accepted', declined: 'Declined', expired: 'Expired' };
+
+/** The quotes made in the quote builder for this opportunity (none, or before quotes.sql has been run, is an empty list). */
+function useJobQuotes(projectId: string): JobQuote[] {
+  const [quotes, setQuotes] = useState<JobQuote[]>([]);
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/crm/quotes?project_id=${projectId}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => live && setQuotes(Array.isArray(d.quotes) ? d.quotes : []))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [projectId]);
+  return quotes;
+}
+
 function JobFile({ rec, today, actions }: { rec: RecordData; today: string; actions: OverviewActions }) {
+  const router = useRouter();
+  const jobQuotes = useJobQuotes(rec.project.id);
+  const [newBusy, setNewBusy] = useState(false);
+  async function newQuote() {
+    setNewBusy(true);
+    const r = await fetch('/api/crm/quotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enquiry_id: rec.project.enquiry_id, project_id: rec.project.id }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.id) router.push(`/admin/sales/quotes/${d.id}`);
+    else setNewBusy(false);
+  }
   const p = rec.project as RecordData['project'] & { accepted_hash?: string | null };
   const docs = rec.documents as (RecordData['documents'][number] & { signed_outside_at?: string | null })[];
   const of = (cats: string[]) => docs.filter((d) => cats.includes(d.category));
@@ -189,7 +219,26 @@ function JobFile({ rec, today, actions }: { rec: RecordData; today: string; acti
     <section className="crmr-file" aria-label="Everything for this job">
       <h3 className="crmr-ovh">Everything for this job</h3>
       <div className="crmr-tiles">
-        <Tile title="Quote and contract" count={quoteDocs.length} onOpen={() => actions.openTab('docs')} onAdd={() => actions.addDocument('quote')}>
+        <Tile
+          title="Quote and contract"
+          count={quoteDocs.length + jobQuotes.filter((q) => q.status === 'draft').length}
+          onOpen={() => actions.openTab('docs')}
+          onAdd={() => actions.addDocument('quote')}
+          foot={
+            <span className="crmr-quotes">
+              {jobQuotes.map((q) => (
+                <Link key={q.id} href={`/admin/sales/quotes/${q.id}`} className="crmr-quote">
+                  <b>{q.number}</b>
+                  <span className={`crmr-qstatus crmr-qstatus--${q.status}`}>{QUOTE_STATUS[q.status] ?? q.status}</span>
+                  {q.total > 0 && <small>{money(q.total / 100)}</small>}
+                </Link>
+              ))}
+              <button type="button" className="crm-link crmr-newquote" disabled={newBusy} onClick={() => void newQuote()}>
+                {newBusy ? 'Starting…' : '+ New quote'}
+              </button>
+            </span>
+          }
+        >
           {p.accepted_at ? (
             <>
               <span>
@@ -204,7 +253,7 @@ function JobFile({ rec, today, actions }: { rec: RecordData; today: string; acti
           ) : signedOut?.signed_outside_at ? (
             <span>Signed outside the portal ✓ ({shortDate(ukDayOf(signedOut.signed_outside_at))})</span>
           ) : (
-            <span className="crm-muted">{quoteDocs.length ? 'Not signed yet' : 'No quote yet'}</span>
+            <span className="crm-muted">{quoteDocs.length ? 'Not signed yet' : jobQuotes.some((q) => q.status === 'draft') ? 'Draft quote in progress, not sent yet' : 'No quote yet'}</span>
           )}
           {p.deposit_amount ? <small>{p.deposit_paid_at ? `Deposit paid ${shortDate(ukDayOf(p.deposit_paid_at))}` : 'Deposit not paid yet'}</small> : null}
         </Tile>

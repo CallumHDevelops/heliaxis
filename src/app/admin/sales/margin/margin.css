@@ -1,0 +1,22 @@
+.mr-chip { font: inherit; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 0.35rem 0.75rem; white-space: nowrap; text-decoration: none; }
+.mr-chip.on { background: var(--inverse); color: var(--inverse-accent); border-color: var(--inverse); }
+.mr-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 4px 0 16px; }
+.mr-kpi { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 14px 16px; display: grid; gap: 2px; }
+.mr-kpi span { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.mr-kpi b { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mr-kpi small { color: var(--muted); font-size: 12.5px; }
+.mr-kpi--hero { background: var(--inverse); border-color: var(--inverse); }
+.mr-kpi--hero span, .mr-kpi--hero small { color: var(--inverse-accent); opacity: 0.75; }
+.mr-kpi--hero b { color: var(--inverse-accent); }
+.mr-target { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 18px; font-size: 0.9rem; }
+.mr-target .crm-input { width: 90px; }
+.mr-h2 { font-size: 1rem; margin: 22px 0 8px; }
+.mr-row { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)); gap: 4px 14px; align-items: center; min-height: 46px; padding: 8px 16px; border-top: 1px solid var(--border-soft); font-variant-numeric: tabular-nums; }
+.mr-row:first-child { border-top: 0; }
+.mr-row--head { min-height: 0; padding: 8px 16px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: rgb(var(--fg-rgb) / 0.03); }
+.mr-row--q { grid-template-columns: 78px minmax(0, 1.6fr) 70px repeat(4, minmax(0, 0.8fr)); }
+.qb-rowlink { color: var(--text); text-decoration: none; }
+.qb-rowlink:hover { background: rgb(var(--accent-rgb) / 0.07); }
+.mr-row.is-low { box-shadow: inset 3px 0 0 var(--danger); }
+.mr-neg { color: var(--danger); font-weight: 800; }
+@media (max-width: 860px) { .mr-row, .mr-row--q { grid-template-columns: minmax(0, 1fr) repeat(2, 90px); } .mr-row > :nth-child(n+4), .mr-row--q > :nth-child(n+6) { display: none; } .mr-row--q > :nth-child(3) { display: none; } }

@@ -1,16 +1,22 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { SALES_STAGES } from '@/lib/crm/stages';
-import { starterContent } from '@/lib/quotes/types';
+import { cleanContent, starterContent, totalsOf } from '@/lib/quotes/types';
 
 export const dynamic = 'force-dynamic';
 
-/** Quotes, newest first, with the customer's name and the total, for Sales › Quotes. */
-export async function GET() {
+/** Quotes, newest first, with the total (never the costs). `?project_id=` limits them to one opportunity. */
+export async function GET(req: Request) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
-  const { data, error } = await createAdminClient().from('crm_quotes').select('id, number, title, status, enquiry_id, project_id, updated_at, sent_at, content').order('updated_at', { ascending: false }).limit(200);
+  const pid = new URL(req.url).searchParams.get('project_id') || '';
+  let q = createAdminClient().from('crm_quotes').select('id, number, title, status, enquiry_id, project_id, updated_at, sent_at, content').order('updated_at', { ascending: false }).limit(200);
+  if (pid) {
+    if (!isUuid(pid)) return json({ quotes: [] });
+    q = q.eq('project_id', pid);
+  }
+  const { data, error } = await q;
   if (error) return json({ error: error.message, quotes: [] }, 500);
-  return json({ quotes: data ?? [] });
+  return json({ quotes: (data ?? []).map(({ content, ...r }) => ({ ...r, total: totalsOf(cleanContent(content)).gross })) });
 }
 
 /**

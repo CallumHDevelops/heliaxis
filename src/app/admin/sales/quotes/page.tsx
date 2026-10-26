@@ -34,7 +34,7 @@ export default async function QuotesPage() {
   }
   return (
     <AdminShell active="sales" fluid>
-      <QuotesList ready={ready} initial={rows} />
+      <QuotesList ready={ready} initial={rows} admin={session.profile.role === 'admin'} />
     </AdminShell>
   );
 }

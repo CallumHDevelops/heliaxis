@@ -12,7 +12,7 @@ type Found = { id: string; name: string; email: string | null; postcode: string 
 
 const STATUS: Record<string, string> = { draft: 'Draft', sent: 'Sent', accepted: 'Accepted', declined: 'Declined', expired: 'Expired' };
 
-export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteListRow[] }) {
+export function QuotesList({ ready, initial, admin = false }: { ready: boolean; initial: QuoteListRow[]; admin?: boolean }) {
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   const [q, setQ] = useState('');
@@ -74,6 +74,11 @@ export function QuotesList({ ready, initial }: { ready: boolean; initial: QuoteL
           )}
         </div>
         <div className="crmh-head__r">
+          {admin && (
+            <Link href="/admin/sales/margin" className="crm-btn crm-btn--ghost">
+              Margin report
+            </Link>
+          )}
           <button type="button" className="crm-btn crm-btn--solar" onClick={() => setPicking(true)}>
             + New quote
           </button>

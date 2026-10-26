@@ -5063,3 +5063,15 @@ button.crmb-rail {
     min-height: 48px;
   }
 }
+
+/* Quotes from the quote builder, listed in the job's "Quote and contract" card. */
+.crmr-quotes { display: grid; gap: 4px; padding: 0 14px 8px; }
+.crmr-quote { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); text-decoration: none; font-size: 0.85rem; }
+.crmr-quote:hover { border-color: var(--solar); }
+.crmr-quote b { font-family: var(--mono, ui-monospace, monospace); font-size: 0.8rem; }
+.crmr-quote small { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.crmr-qstatus { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: rgb(var(--fg-rgb) / 0.08); color: var(--muted); }
+.crmr-qstatus--draft { background: rgb(var(--accent-rgb) / 0.25); color: var(--accent-text); }
+.crmr-qstatus--sent { background: rgb(var(--info-rgb) / 0.14); color: var(--info); }
+.crmr-qstatus--accepted { background: rgb(var(--ok-rgb) / 0.15); color: var(--ok); }
+.crmr-newquote { margin: 2px 0 0; justify-self: start; font-size: 0.82rem; }

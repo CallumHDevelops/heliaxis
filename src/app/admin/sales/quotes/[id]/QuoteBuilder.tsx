@@ -51,7 +51,7 @@ function MoneyInput({ pence, onChange, label, disabled, placeholder }: { pence: 
   );
 }
 
-export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls, savedItems: savedIn }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string>; savedItems: SavedItem[] }) {
+export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls, savedItems: savedIn, minMarginPct }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string>; savedItems: SavedItem[]; minMarginPct: number }) {
   const [saved, setSaved] = useState(savedIn);
   const [library, setLibrary] = useState(libraryIn);
   const [title, setTitle] = useState(initial.title);
@@ -97,6 +97,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
 
   const totals = totalsOf(content);
   const prof = profitOf(content);
+  const lowMargin = minMarginPct > 0 && prof.marginPct !== null && prof.marginPct < minMarginPct;
   const edit = (fn: (c: QuoteContent) => QuoteContent) => setContent((c) => fn(c));
   const setBlock = (id: string, patch: Partial<QuoteBlock>) => edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === id ? ({ ...b, ...patch } as QuoteBlock) : b)) }));
   const move = (id: string, d: -1 | 1) =>
@@ -265,6 +266,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
         <div className="qb-sheet" role="dialog" aria-label="Send the quote">
           <b>Send {initial.number} to {customer.name}</b>
           <p className="crm-small crm-muted">They get a link to their private portal, where they can view the quote, accept it, or raise a query. Nothing is sent until you press Send quote.</p>
+          {lowMargin && <p className="crm-banner crm-banner--err">This quote’s margin is {pct(prof.marginPct)}, below your {minMarginPct}% target. You can still send it.</p>}
           <label className="crm-check">
             <input type="checkbox" checked={viaEmail} disabled={!customer.email} onChange={(e) => setViaEmail(e.target.checked)} /> Branded email{customer.email ? ` to ${customer.email}` : ' (no email address on file)'}
           </label>
@@ -364,7 +366,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                                 <input type="checkbox" checked={!!l.internal} disabled={locked} onChange={(e) => setLine(b.id, l.id, { internal: e.target.checked })} /> Not on the quote (our cost only)
                               </label>
                               {(l.cost_pence > 0 || sell > 0) && !l.internal && (
-                                <span className={`qb-profit${profit < 0 ? ' neg' : ''}`} title="Profit on this line (internal)">
+                                <span className={`qb-profit${profit < 0 || (minMarginPct > 0 && sell > 0 && (profit / sell) * 100 < minMarginPct) ? ' neg' : ''}`} title={minMarginPct > 0 && sell > 0 && (profit / sell) * 100 < minMarginPct ? `Below your ${minMarginPct}% margin target` : 'Profit on this line (internal)'}>
                                   Profit {money(profit)}{sell > 0 ? ` · ${pct((profit / sell) * 100)}` : ''}
                                 </span>
                               )}
@@ -557,6 +559,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
               <span>Markup on cost</span>
               <span>{pct(prof.markupPct)}</span>
             </div>
+            {lowMargin && <p className="crm-small qb-warn">Margin is {pct(prof.marginPct)}, below your {minMarginPct}% target.</p>}
             {prof.uncosted > 0 && <p className="crm-small qb-warn">{prof.uncosted} priced line{prof.uncosted === 1 ? ' has' : 's have'} no cost yet, so the profit shown is too high.</p>}
             <p className="crm-small crm-muted">Never printed on the quote or shown in the customer’s portal. VAT is passed on, so it is not counted.</p>
           </section>

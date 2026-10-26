@@ -5,6 +5,7 @@ import { isUuid } from '@/lib/crm/server';
 import { imageUrls, readQuote } from '@/lib/quotes/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { readSavedItems } from '@/lib/quotes/items';
+import { readQuoteSettings } from '@/lib/quotes/settings';
 import { QuoteBuilder } from './QuoteBuilder';
 
 export const dynamic = 'force-dynamic';
@@ -18,11 +19,12 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const q = await readQuote(id);
   if (!q) notFound();
   const db = createAdminClient();
-  const [{ data: c }, { data: lib }, urls, saved] = await Promise.all([
+  const [{ data: c }, { data: lib }, urls, saved, settings] = await Promise.all([
     db.from('enquiries').select('name, email, phone').eq('id', q.enquiry_id).maybeSingle(),
     db.from('crm_library').select('id, name, mime').eq('mime', 'application/pdf').order('name'),
     imageUrls(q.content.blocks.flatMap((b) => (b.type === 'images' ? b.images.map((i) => i.path) : []))),
     readSavedItems().catch(() => []),
+    readQuoteSettings().catch(() => ({ minMarginPct: 0 })),
   ]);
   return (
     <AdminShell active="sales" fluid>
@@ -32,6 +34,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         library={(lib ?? []).map((l) => ({ id: l.id as string, name: l.name as string }))}
         imageUrls={urls}
         savedItems={saved}
+        minMarginPct={settings.minMarginPct}
       />
     </AdminShell>
   );

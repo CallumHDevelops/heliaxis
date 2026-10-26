@@ -385,7 +385,10 @@ export async function AdminShell({
       id: 'sales',
       label: 'Sales',
       dropdown: true,
-      items: [{ href: '/admin/sales/quotes', label: 'Quotes', icon: icons.orders, active: active === 'sales', show: can('crm') && ready.quotes }],
+      items: [
+        { href: '/admin/sales/quotes', label: 'Quotes', icon: icons.orders, active: active === 'sales', show: can('crm') && ready.quotes },
+        { href: '/admin/sales/margin', label: 'Margin report', short: 'Margin', icon: icons.analytics, show: admin && ready.quotes },
+      ],
     },
     {
       // The jobs once they're won (Projects: list, schedule, board and each job's page) and RAMS for site.
