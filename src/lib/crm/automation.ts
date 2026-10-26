@@ -423,6 +423,8 @@ export async function runCrmAutomations() {
 
   // Follow-up sequences for leads that haven't replied (not for jobs on hold).
   if (s.sequenceEnabled && s.sequence.length) {
+    // Leads a step added or removed still has to put back, if the run after that Save was cut off.
+    await finishSequenceChange().catch(() => 0);
     const { data: seq } = await db
       .from('crm_projects')
       .select(cols)
@@ -490,31 +492,99 @@ export async function runCrmAutomations() {
   return out;
 }
 
+/** cms_kv: when a Save added or removed a step, kept until a run finds no lead left to put back (finishSequenceChange). */
+const SEQUENCE_CHECK = 'crm-sequence-check';
+const PAGE = 1000;
+
 /**
  * After a save that added or removed a step (CRM settings): a lead whose sequence_step is at or past the new
  * list's length, though there's a step in it the lead hasn't had (one added after a step it had was removed, or a
- * step removed in front of the one it's waiting for), is put back to that step's place, so the runner's query
- * finds it again. A lead from before ids has what its sequence_step counted written down by id first. The runner
- * works out the rest by id, including skipping a step the lead was already past when it was added.
+ * step removed in front of the one it's waiting for), has to be put back to that step's place, so the runner's
+ * query finds it again. Only noted here, so the Save answers straight away: finishSequenceChange does it once the
+ * answer has gone, and the next Save or the every-minute job finishes a run that's cut off. Never throws.
  */
 export async function sequenceChanged(prev: SequenceStep[], next: SequenceStep[]) {
   const ids = (l: SequenceStep[]) => l.map((x) => x.id).sort().join();
   if (!next.length || ids(prev) === ids(next)) return;
+  const at = new Date().toISOString();
+  await createAdminClient()
+    .from('cms_kv')
+    .upsert({ key: SEQUENCE_CHECK, value: at, updated_at: at })
+    .then(
+      () => null,
+      () => null
+    );
+}
+
+/**
+ * Put back the leads sequenceChanged noted: once the Save has answered, and again after every Save and from the
+ * every-minute job until a run finds none left, so a run cut off is finished. Every lead past the end is read first,
+ * a page at a time by id (none missed past PostgREST's row limit, or skipped as others are put back). A lead from
+ * before ids has what its sequence_step counted written down by id and its new place in one write, so it's never
+ * left with part of its history; the others go back in one write per place. The runner works out the rest by id,
+ * including skipping a step the lead was already past when it was added. → how many leads it found to put back.
+ */
+export async function finishSequenceChange(): Promise<number> {
   const db = createAdminClient();
-  const { data } = await db
-    .from('crm_projects')
-    .select(COLS)
-    .in('stage', ['lead', 'contacted'])
-    .is('sequence_stopped_at', null)
-    .gte('sequence_step', next.length)
-    .gte('created_at', new Date(Date.now() - 45 * 86_400_000).toISOString());
-  for (const p of (data ?? []) as Proj[]) {
-    const had = sequenceHad(p.reminders_sent, p.sequence_step);
-    const at = next.findIndex((x) => !had.includes(x.id));
-    if (at < 0) continue;
-    for (const id of had) await markSent(p, `seq:${id}`);
-    await db.from('crm_projects').update({ sequence_step: at }).eq('id', p.id);
+  const { data: noted } = await db.from('cms_kv').select('value').eq('key', SEQUENCE_CHECK).maybeSingle();
+  if (!noted) return 0;
+  // Read after the note, so a Save from here on leaves a new one.
+  const { sequence } = await getCrmSettings();
+  type Row = Pick<Proj, 'id' | 'reminders_sent' | 'sequence_step'>;
+  const found: Row[] = [];
+  while (sequence.length) {
+    const q = db
+      .from('crm_projects')
+      .select('id, reminders_sent, sequence_step')
+      .in('stage', ['lead', 'contacted'])
+      .is('sequence_stopped_at', null)
+      .gte('sequence_step', sequence.length)
+      .gte('created_at', new Date(Date.now() - 45 * 86_400_000).toISOString())
+      .order('id')
+      .limit(PAGE);
+    const { data, error } = await (found.length ? q.gt('id', found[found.length - 1].id) : q);
+    if (error) throw new Error(error.message);
+    if (!data?.length) break;
+    found.push(...(data as Row[]));
   }
+  const before: { p: Row; at: number; keys: string[] }[] = [];
+  const back = new Map<number, string[]>();
+  for (const p of found) {
+    const had = sequenceHad(p.reminders_sent, p.sequence_step);
+    const at = sequence.findIndex((x) => !had.includes(x.id));
+    if (at < 0) continue;
+    const keys = had.map((id) => `seq:${id}`).filter((k) => !p.reminders_sent?.includes(k));
+    if (keys.length) before.push({ p, at, keys });
+    else back.set(at, [...(back.get(at) ?? []), p.id]);
+  }
+  if (!before.length && !back.size) {
+    await db.from('cms_kv').delete().eq('key', SEQUENCE_CHECK).eq('value', noted.value);
+    return 0;
+  }
+  // From before ids: only while nothing else has written to it since it was read (a key added meanwhile would be
+  // lost); one that has is left for the next run.
+  for (let i = 0; i < before.length; i += 10) {
+    await Promise.all(
+      before.slice(i, i + 10).map(async ({ p, at, keys }) => {
+        const sent = p.reminders_sent ?? [];
+        const { error } = await db
+          .from('crm_projects')
+          .update({ reminders_sent: [...sent, ...keys], sequence_step: at })
+          .eq('id', p.id)
+          .eq('sequence_step', p.sequence_step)
+          .contains('reminders_sent', sent)
+          .containedBy('reminders_sent', sent);
+        if (error) throw new Error(error.message);
+      })
+    );
+  }
+  for (const [at, ids] of back) {
+    for (let i = 0; i < ids.length; i += 100) {
+      const { error } = await db.from('crm_projects').update({ sequence_step: at }).in('id', ids.slice(i, i + 100)).gte('sequence_step', sequence.length);
+      if (error) throw new Error(error.message);
+    }
+  }
+  return before.length + [...back.values()].reduce((n, ids) => n + ids.length, 0);
 }
 
 /**

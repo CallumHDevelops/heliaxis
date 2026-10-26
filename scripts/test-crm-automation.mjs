@@ -12,7 +12,9 @@
 // that's due but waiting for the quiet hours or a hold. A step added after one was removed still reaches
 // the leads that had finished the shorter list; two jobs joined in a merge keep what each had, one from
 // before ids too; a page opened before ids and saved after keeps every step's id; and the note on CRM
-// settings says the same.
+// settings says the same. Those leads are put back once the Save has answered, in a few writes and past
+// PostgREST's 1,000-row pages; a run that fails or is cut off is finished by the next Save or the
+// every-minute job, and never leaves a lead from before ids with part of what it had.
 // Usage: node --experimental-strip-types scripts/test-crm-automation.mjs
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -223,8 +225,13 @@ const running = lead({ created_at: ago(30 * HOUR) });
 await A.runCrmAutomations();
 eq('settings saved before this: a due step is sent as before', [stepOf(running), globalThis.__rec.whatsapp.at(-1)?.enquiryId], [1, running.enquiry_id]);
 
-// Saving CRM settings sets the times on the server.
-const put = (body) => kit.call(settingsRoute, '/api/crm/settings', { method: 'PUT', body });
+// Saving CRM settings sets the times on the server. What Next runs once the answer has gone (after()) runs too.
+const save = (body) => kit.call(settingsRoute, '/api/crm/settings', { method: 'PUT', body });
+const put = async (body) => {
+  const r = await save(body);
+  await kit.afterReply();
+  return r;
+};
 const page = async () => (await kit.call(settingsRoute, '/api/crm/settings', { method: 'GET' })).body.settings;
 const counting = () => settings().sequence.map((x) => Date.parse(x.leadsFrom) + x.afterHours * HOUR);
 setSettings({ ...D });
@@ -328,6 +335,103 @@ await put({ ...cur, sequence: cur.sequence.filter((x) => x.afterHours !== 12) })
 hoursPass(43);
 await A.runCrmAutomations();
 eq('a 12h step added, then removed again: a lead waiting for the 72h email still gets it', [sentTo(), stepOf(undone)], [[undone.id], 2]);
+
+// Putting those leads back happens once the Save has answered, in a few writes. A run that fails or is cut off is
+// finished by the next Save or the every-minute job, and never leaves a lead from before ids with part of what it had.
+const noted = () => db.rows('cms_kv').some((r) => r.key === 'crm-sequence-check');
+const quietly = async (fn) => {
+  const was = console.error;
+  const logged = [];
+  console.error = (...a) => logged.push(a.join(' '));
+  try {
+    await fn();
+  } finally {
+    console.error = was;
+  }
+  return logged;
+};
+reset(240);
+globalThis.__rec.activity.length = 0;
+const swappedBefore = lead({ created_at: ago(80 * HOUR), sequence_step: 2 }); // from before ids: had both
+cur = await page();
+globalThis.__db = {
+  ...db,
+  from: (t) => {
+    if (t === 'crm_projects') throw new Error('function timed out');
+    return db.from(t);
+  },
+};
+const answer = await save({ ...cur, sequence: [cur.sequence[0], { id: '', afterHours: 96, channel: 'email', text: 'Hi {first_name}, one more' }] }).catch((e) => ({ status: e.message }));
+const logged = await quietly(() => kit.afterReply());
+globalThis.__db = db;
+eq('the 72h email swapped while the leads can’t be put back: the Save still answers that it saved', [answer.status, answer.body?.settings?.sequence.map((x) => x.afterHours), settings().sequence.map((x) => x.afterHours), logged.length], [200, [24, 96], [24, 96], 1]);
+await A.runCrmAutomations();
+hoursPass(17);
+await A.runCrmAutomations();
+eq('…the every-minute job puts them back: the lead gets the 96h email once, and nothing is left to do', [sentTo(), stepOf(swappedBefore), noted()], [[swappedBefore.id], 2, false]);
+
+// Three steps saved before ids, and leads from before ids that had all three. The Save swaps the WhatsApp for a 200h
+// email, and the run after it is cut off (the time limit) after its second write.
+reset(240);
+globalThis.__rec.activity.length = 0;
+setSettings({ ...D, sequenceEnabled: true, firstResponseMinutes: 0, sequence: [
+  { afterHours: 24, channel: 'whatsapp', text: 'Hi {first_name}, a nudge' },
+  { afterHours: 72, channel: 'email', text: 'Hi {first_name}, the 72h email' },
+  { afterHours: 120, channel: 'email', text: 'Hi {first_name}, the 120h email' },
+] });
+const hadThree = [1, 2, 3].map(() => lead({ created_at: ago(130 * HOUR), sequence_step: 3 }));
+cur = await page();
+let writes = 0;
+const write = () => {
+  if (++writes > 2) throw new Error('function timed out');
+};
+globalThis.__db = {
+  ...db,
+  rpc: (...a) => (write(), db.rpc(...a)),
+  from: (t) => {
+    const q = db.from(t);
+    const update = q.update;
+    if (t === 'crm_projects') q.update = (v) => (write(), update(v));
+    return q;
+  },
+};
+await quietly(() => put({ ...cur, sequence: [cur.sequence[1], cur.sequence[2], { id: '', afterHours: 200, channel: 'email', text: 'Hi {first_name}, the 200h email' }] }).catch(() => null));
+globalThis.__db = db;
+const rowOf = (p) => db.rows('crm_projects').find((x) => x.id === p.id);
+eq('cut off part-way: each lead from before ids is as it was, or has all three written down by id (never part)', hadThree.map((p) => (rowOf(p).reminders_sent.length ? `${rowOf(p).reminders_sent.join(' ')} at ${rowOf(p).sequence_step}` : `as it was at ${rowOf(p).sequence_step}`)).sort(), ['as it was at 3', 'seq:1 seq:2 seq:3 at 2', 'seq:1 seq:2 seq:3 at 2']);
+await put({ ...(await page()), reviewDelayDays: 5 });
+eq('…the next Save finishes it, whatever it changes', hadThree.map(stepOf), [2, 2, 2]);
+cur = await page();
+await put({ ...cur, sequence: [...cur.sequence, { id: '', afterHours: 300, channel: 'email', text: 'Hi {first_name}, the 300h email' }] });
+await A.runCrmAutomations();
+hoursPass(75);
+await A.runCrmAutomations();
+eq('…and after another step is added, nothing they had is sent again: each gets the 200h email once', [globalThis.__rec.email.map((m) => m.text), globalThis.__rec.whatsapp.length], [Array(3).fill('Hi Jane, the 200h email'), 0]);
+
+// 1,150 leads that had finished the list, 50 of them from before ids: every one is put back, past the 1,000 rows
+// PostgREST hands back at once, in one write for each lead from before ids and one for each 100 others.
+reset(240);
+const finishedMany = [
+  ...Array.from({ length: 1100 }, () => lead({ created_at: ago(80 * HOUR), sequence_step: 2, reminders_sent: ['seq:1', 'seq:2'] })),
+  ...Array.from({ length: 50 }, () => lead({ created_at: ago(80 * HOUR), sequence_step: 2 })),
+];
+let requests = 0;
+globalThis.__db = {
+  ...db,
+  rpc: (...a) => (requests++, db.rpc(...a)),
+  from: (t) => {
+    const q = db.from(t);
+    if (t !== 'crm_projects') return q;
+    requests++;
+    const then = q.then;
+    q.then = (res, rej) => then((r) => res(r.data?.length > 1000 ? { ...r, data: r.data.slice(0, 1000) } : r), rej);
+    return q;
+  },
+};
+cur = await page();
+await put({ ...cur, sequence: [cur.sequence[0], { id: '', afterHours: 96, channel: 'email', text: 'Hi {first_name}, one more' }] });
+globalThis.__db = db;
+eq('1,150 leads that had finished the list: all put back, in 3 reads, a write for each of the 50 from before ids and one for each 100 others', [finishedMany.filter((p) => stepOf(p) === 1).length, requests], [1150, 3 + 50 + 11]);
 
 // Two jobs joined in a merge (src/lib/crm/merge-rules.ts), the kept one from before ids: what each had is kept.
 reset(240);

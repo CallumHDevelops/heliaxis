@@ -1,7 +1,8 @@
+import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, json } from '@/lib/crm/server';
 import { getCrmSettings, saveCrmSettings } from '@/lib/crm/crm-settings';
-import { sequenceChanged } from '@/lib/crm/automation';
+import { finishSequenceChange, sequenceChanged } from '@/lib/crm/automation';
 import { cleanCrmSettings, sequenceAfterSave, stepsWithSavedIds } from '@/lib/crm/settings-shared';
 import { canAccess } from '@/lib/portals';
 import { msConfigured, mailbox } from '@/lib/ms365';
@@ -46,7 +47,9 @@ export async function PUT(req: Request) {
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'Not saved' }, 500);
   }
-  // A step added or removed: a lead past the end of the new list, with a step in it still to come, is found again (automation.ts).
+  // A step added or removed: a lead past the end of the new list, with a step in it still to come, is found again
+  // once the answer has gone, so it never holds up the Save. After every Save, so one cut off is finished (automation.ts).
   await sequenceChanged(current.sequence, next.sequence);
+  after(() => finishSequenceChange().catch((e) => console.error('[crm] follow-up sequence: leads not put back yet:', e instanceof Error ? e.message : e)));
   return json({ settings: next });
 }
