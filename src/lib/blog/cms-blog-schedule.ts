@@ -270,8 +270,9 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
   const aliases = slugAliases(rawSlug);
   const id = String(pg.id || opts.id || '');
 
+  // publishAt stays: a draft ignores it, and if a later write fails the article is still on the website, which
+  // takes its date from the saved site. Published again, it keeps this first date.
   pg.blogStatus = 'draft';
-  pg.publishAt = null;
   pg.scheduledRender = null;
 
   const published = parseCmsState(pubRes.data?.value);
@@ -292,8 +293,8 @@ export async function unpublishCmsBlog(opts: { id?: string; slug?: string }) {
   }
 
   // One after another, each checked, in the reverse of the job's order: the saved site (Draft), then the
-  // published copy, then the website's pages. If a write fails, the article is still on the website, so the
-  // Blog list's Live is right and View opens it, and clicking Unpublish again finishes the job.
+  // published copy, then the website's pages. If a write fails, the article is still on the website, with its
+  // date, so the Blog list's Live is right and View opens it, and clicking Unpublish again finishes the job.
   for (const [key, value] of [
     [DRAFT_KEY, draft],
     [PUBLISHED_KEY, published],

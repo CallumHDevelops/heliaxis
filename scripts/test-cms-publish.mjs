@@ -14,7 +14,8 @@
 // published copy, then the saved site, so the Blog list (listCmsAiBlogs) never shows an article as Live
 // that isn't on the website, and an Unschedule after a failed write leaves the list and the copy agreeing.
 // Unpublish (unpublishCmsBlog) writes the other way round, the website's pages last, so a failed write leaves
-// the article on the website, Live in the list, and Unpublish again finishes it.
+// the article on the website, Live in the list, and Unpublish again finishes it. It keeps the article's
+// publish date, so a failed write never changes the date the website shows, and publishing it again keeps it.
 // Usage: node --experimental-strip-types scripts/test-cms-publish.mjs
 import { readFileSync } from 'node:fs';
 import * as kit from './site-test-kit.mjs';
@@ -38,7 +39,7 @@ const minuteRoute = await import('../src/app/api/cron/whatsapp-outbox/route.ts')
 const blogCronRoute = await import('../src/app/api/cron/publish-scheduled-blogs/route.ts');
 const scheduleRoute = await import('../src/app/api/blog/schedule/route.ts');
 const { listCmsAiBlogs } = await import('../src/lib/blog/cms-ai-blogs.ts');
-const { getCmsBlogArticleBySlug } = await import('../src/lib/blog/cms-public.ts');
+const { getCmsBlogArticleBySlug, getCmsPublicPosts } = await import('../src/lib/blog/cms-public.ts');
 // The Blog list and the public article read the database only when it's set up.
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://supabase.test';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'a-test-key';
@@ -361,17 +362,23 @@ const unpublish = (id) => kit.call(unpublishRoute, '/api/blog/unpublish', { body
 const resetLive = async () => (resetDocs(), await minute());
 /** What View opens (null is a 404). */
 const view = async (slug) => (await getCmsBlogArticleBySlug(slug))?.html ?? null;
+/** The date the website gives the article: on its page and in the blog index. */
+const dated = async (slug) => [(await getCmsBlogArticleBySlug(slug))?.post.publishAt, (await getCmsPublicPosts()).find((p) => p.slug === slug)?.publishAt];
 await resetLive();
 failing(PUBLISHED);
 const p1 = await unpublish('due');
 db.from = from;
 eq('Unpublish: the published copy fails to write: reported, and the website’s pages aren’t written', [p1.status, /couldn’t write heliaxis-cms-published/.test(p1.body.error ?? ''), written], [400, true, [DRAFT, PUBLISHED]]);
 eq('…it’s still on the website, so the Blog list’s Live is right and View opens it', [await listed('due'), await view('due')], [{ status: 'published', live: true }, dueRender.html]);
+eq('…and the website still gives it the date it went live, not today’s', await dated('due'), [due, due]);
 failing(null);
 const p2 = await unpublish('due');
 db.from = from;
 eq('…Unpublish again finishes it: a draft, out of the published copy and off the website', [p2.status, await listed('due'), kv(PUBLISHED).pages.some((p) => p.id === 'due'), await view('due')], [200, { status: 'draft', live: false }, false, null]);
 eq('…writing the saved site, then the published copy, then the website’s pages', written, [DRAFT, PUBLISHED, RENDERED]);
+eq('…the Blog list shows the draft without a date, and the saved site keeps the one it went live on', [(await listCmsAiBlogs()).find((b) => b.id === 'due').publishAt, byId(kv(DRAFT), 'due').publishAt], [null, due]);
+const again = await publish({ state: clone(kv(DRAFT)), rendered: { css: '', pages: clientRendered(kv(DRAFT)) }, publishBlogId: 'due' });
+eq('…published again, it’s Live with that first date, on the website’s pages too', [again.status, byId(kv(DRAFT), 'due').blogStatus, byId(kv(DRAFT), 'due').publishAt, await dated('due')], [200, 'published', due, [due, due]]);
 await resetLive();
 failing(DRAFT);
 const p3 = await unpublish('due');
@@ -382,6 +389,7 @@ failing(RENDERED);
 const p4 = await unpublish('due');
 db.from = from;
 eq('the website’s pages fail to write: it’s still on the website, Live, and View opens it', [p4.status, await listed('due'), await view('due')], [400, { status: 'published', live: true }, dueRender.html]);
+eq('…with the date it went live', await dated('due'), [due, due]);
 // A doc that can't be read isn't written back empty.
 for (const [key, doc] of [[PUBLISHED, 'the published copy'], [RENDERED, 'the website’s pages']]) {
   await resetLive();
