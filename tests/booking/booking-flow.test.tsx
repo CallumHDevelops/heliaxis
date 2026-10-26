@@ -13,8 +13,8 @@ const base: BookingFlowProps = {
 };
 const html = (over: Partial<BookingFlowProps> = {}) => renderToStaticMarkup(<BookingFlow {...base} {...over} />);
 
-describe('the booking form: how would you like to speak to us?', () => {
-  it('offers Phone call, In-person consultation and Video call', () => {
+describe('the booking form: one question at a time', () => {
+  it('opens on how would you like to speak to us, with all three choices', () => {
     const out = html();
     expect(out).toContain('How would you like to speak to us?');
     expect(out).toContain('In-person consultation');
@@ -22,26 +22,29 @@ describe('the booking form: how would you like to speak to us?', () => {
     expect(out).toContain('Video call');
   });
 
-  it('starts on the in-person survey form, as before', () => {
+  it('shows only the first question, with progress, not the whole form', () => {
     const out = html();
-    expect(out).toContain('What’s the survey for?');
-    expect(out).toContain('Find times');
-    expect(out).not.toContain('Request a phone call');
+    expect(out).toContain('1 / 3');
+    expect(out).not.toContain('What’s the survey for?');
+    expect(out).not.toContain('Your postcode');
   });
 
-  it('opens the phone call request when asked to (?mode=phone)', () => {
+  it('skips the first question when the link already chose phone (?mode=phone)', () => {
     const out = html({ initialMode: 'phone' });
-    expect(out).toContain('Tell us about your phone call');
-    expect(out).toContain('Request a phone call');
-    expect(out).toContain('Best time to ring you');
-    expect(out).not.toContain('Find times');
+    expect(out).toContain('What would you like to talk about?');
+    expect(out).toContain('2 / 7');
+    expect(out).not.toContain('How would you like to speak to us?');
   });
 
-  it('opens the video call request (?mode=video) and asks for an email', () => {
+  it('skips it for a video call too, and counts the same seven questions', () => {
     const out = html({ initialMode: 'video' });
-    expect(out).toContain('Tell us about your video call');
-    expect(out).toContain('Request a video call');
-    expect(out).toContain('we’ll send the video link here');
+    expect(out).toContain('What would you like to talk about?');
+    expect(out).toContain('2 / 7');
+  });
+
+  it('offers a way back from the second question', () => {
+    expect(html({ initialMode: 'phone' })).toContain('Back');
+    expect(html()).not.toContain('>Back<');
   });
 
   it('does not show the choice to a customer on their own booking link', () => {

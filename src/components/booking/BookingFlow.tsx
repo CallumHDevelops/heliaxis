@@ -167,6 +167,20 @@ export function BookingFlow(p: BookingFlowProps) {
   const [when, setWhen] = useState<(typeof WHEN_CHOICES)[number]['key']>('any');
   /** Set once a phone or video call has been requested, for the thank-you message. */
   const [requested, setRequested] = useState<'phone' | 'video' | null>(null);
+  /** Which question the customer is on. They arrive on the mode question unless a link already chose it. */
+  const [qi, setQi] = useState(p.initialMode ? 1 : 0);
+
+  const firstQ = useRef(true);
+  const qform = useRef<HTMLFormElement | null>(null);
+  useEffect(() => {
+    if (firstQ.current) {
+      firstQ.current = false;
+      return;
+    }
+    // A typed answer: straight into the box. A tile question: the heading, so a screen reader reads it.
+    const box = qform.current?.querySelector<HTMLInputElement>('input.bk-input--big');
+    (box ?? head.current)?.focus({ preventScroll: true });
+  }, [qi]);
 
   // Bots fill the form in within moments of the page loading; people don't.
   const loadedAt = useRef(0);
@@ -452,6 +466,189 @@ export function BookingFlow(p: BookingFlowProps) {
     </button>
   );
 
+  /** The first screen, one question at a time: how to speak, what it's for, then what we need to find a time or ring them. */
+  const guided = !isLink && !moving;
+  type Q = 'mode' | 'type' | 'name' | 'phone' | 'email' | 'postcode' | 'when';
+  const questions: Q[] = !guided ? ['type', 'postcode'] : mode === 'visit' ? ['mode', 'type', 'postcode'] : ['mode', 'type', 'name', 'phone', 'email', 'postcode', 'when'];
+  const at = Math.min(qi, questions.length - 1);
+  const current_q = questions[at];
+  const lastQ = at === questions.length - 1;
+
+  function back() {
+    setError('');
+    setQi(Math.max(0, at - 1));
+  }
+  function check(q: Q): string {
+    if (q === 'type' && !type) return 'Please choose one.';
+    if (q === 'name' && cb.name.trim().length < 2) return 'Please enter your name.';
+    if (q === 'phone' && cb.phone.replace(/\D/g, '').length < 10) return 'Please check your phone number.';
+    if (q === 'email' && mode === 'video' && !/^\S+@\S+\.\S+$/.test(cb.email.trim())) return 'Please enter your email so we can send the video link.';
+    if (q === 'postcode' && postcode.replace(/\s/g, '').length < 5) return 'Please enter your postcode.';
+    return '';
+  }
+  function next() {
+    const msg = check(current_q);
+    if (msg) return setError(msg);
+    setError('');
+    if (!lastQ) return setQi(at + 1);
+    if (mode === 'visit' || !guided) void findTimes();
+    else void onRequest();
+  }
+  /** Picking a tile answers the question and moves on. */
+  function choose(apply: () => void) {
+    apply();
+    setError('');
+    setQi(Math.min(at + 1, questions.length - 1));
+  }
+
+  function startStep() {
+    const wantsCall = guided && mode !== 'visit';
+    const textInput = (id: string, label: string, props: React.InputHTMLAttributes<HTMLInputElement>) => (
+      <>
+        <label className="bk-label bk-sr" htmlFor={id}>
+          {label}
+        </label>
+        <input id={id} className="bk-input bk-input--big" autoFocus {...props} />
+      </>
+    );
+    let body: ReactNode = null;
+    let title = '';
+    let hint: string | null = null;
+    switch (current_q) {
+      case 'mode':
+        title = 'How would you like to speak to us?';
+        body = (
+          <div className="bk-types" role="group" aria-labelledby="bk-q-h">
+            {MODE_CHOICES.map((m) => (
+              <button key={m.key} type="button" aria-pressed={mode === m.key} className={mode === m.key ? 'bk-type is-on' : 'bk-type'} onClick={() => choose(() => setMode(m.key))}>
+                <b>{m.label}</b>
+                <span>{m.blurb}</span>
+              </button>
+            ))}
+          </div>
+        );
+        break;
+      case 'type':
+        title = wantsCall ? 'What would you like to talk about?' : 'What’s the survey for?';
+        body = (
+          <div className="bk-types" role="group" aria-labelledby="bk-q-h">
+            {TYPE_CHOICES.map((t) => (
+              <button key={t.key} type="button" aria-pressed={type === t.key} className={type === t.key ? 'bk-type is-on' : 'bk-type'} onClick={() => choose(() => setType(t.key))}>
+                <b>{t.label}</b>
+                {!wantsCall && <span>{minutesWords(p.durations[t.key])}</span>}
+              </button>
+            ))}
+          </div>
+        );
+        break;
+      case 'name':
+        title = 'What’s your name?';
+        body = textInput('rq-name', 'Your name', { value: cb.name, onChange: (e) => setCb({ ...cb, name: e.target.value }), autoComplete: 'name', placeholder: 'Your full name' });
+        break;
+      case 'phone':
+        title = 'What’s the best number to reach you on?';
+        body = textInput('rq-phone', 'Phone number', { type: 'tel', value: cb.phone, onChange: (e) => setCb({ ...cb, phone: e.target.value }), autoComplete: 'tel', inputMode: 'tel', placeholder: '07123 456789' });
+        break;
+      case 'email':
+        title = mode === 'video' ? 'What’s your email?' : 'And your email? (optional)';
+        hint = mode === 'video' ? 'We’ll send the video link here.' : 'So we can send you a summary. You can leave this blank.';
+        body = textInput('rq-email', 'Email', { type: 'email', value: cb.email, onChange: (e) => setCb({ ...cb, email: e.target.value }), autoComplete: 'email', placeholder: 'you@example.com' });
+        break;
+      case 'postcode':
+        title = 'What’s your postcode?';
+        hint = wantsCall ? null : 'We use it to find a time when we are already nearby.';
+        body = textInput('bk-pc', 'Your postcode', { value: postcode, onChange: (e) => setPostcode(e.target.value), autoComplete: 'postal-code', autoCapitalize: 'characters', placeholder: 'NP20 4AB', maxLength: 10 });
+        break;
+      case 'when':
+        title = mode === 'video' ? 'When’s best to arrange it?' : 'When’s best to ring you?';
+        body = (
+          <div className="bk-types" role="group" aria-labelledby="bk-q-h">
+            {WHEN_CHOICES.map((w) => (
+              <button key={w.key} type="button" aria-pressed={when === w.key} className={when === w.key ? 'bk-type is-on' : 'bk-type'} onClick={() => setWhen(w.key)}>
+                <b>{w.label}</b>
+              </button>
+            ))}
+          </div>
+        );
+        break;
+    }
+    const isTiles = current_q === 'mode' || current_q === 'type' || (current_q === 'when' && false);
+    const submitLabel = busy
+      ? lastQ && !wantsCall
+        ? 'Finding…'
+        : 'Sending…'
+      : lastQ
+        ? wantsCall
+          ? mode === 'video'
+            ? 'Request a video call'
+            : 'Request a phone call'
+          : 'Find times'
+        : 'Continue';
+    return (
+      <section className="bk-card bk-q" aria-labelledby="bk-q-h">
+        <div className="bk-prog" aria-label={`Question ${at + 1} of ${questions.length}`}>
+          <span className="bk-prog-n">
+            {at + 1} / {questions.length}
+          </span>
+          <span className="bk-prog-bar" aria-hidden="true">
+            {questions.map((q, i) => (
+              <i key={q} className={i < at ? 'is-done' : i === at ? 'is-now' : ''} />
+            ))}
+          </span>
+        </div>
+        <form
+          ref={qform}
+          className="bk-qform"
+          onSubmit={(e) => {
+            e.preventDefault();
+            next();
+          }}
+        >
+          <h2 className="bk-h bk-q-h" id="bk-q-h" ref={head} tabIndex={-1}>
+            {title}
+          </h2>
+          {hint && <p className="bk-q-hint">{hint}</p>}
+          {body}
+          {err}
+          {(!isTiles || at > 0 || lastQ) && (
+            <div className="bk-qnav">
+              {at > 0 && (
+                <button type="button" className="bk-link" onClick={back}>
+                  Back
+                </button>
+              )}
+              {!isTiles && (
+                <button type="submit" className="bk-btn bk-btn--wide" disabled={busy}>
+                  {submitLabel}
+                </button>
+              )}
+              {isTiles && lastQ && (
+                <button type="submit" className="bk-btn bk-btn--wide" disabled={busy}>
+                  {submitLabel}
+                </button>
+              )}
+            </div>
+          )}
+          {current_q === 'when' && (
+            <div className="bk-hp" aria-hidden="true">
+              <label htmlFor="rq-cw">Company website</label>
+              <input id="rq-cw" tabIndex={-1} autoComplete="off" value={d.company_website} onChange={field('company_website')} />
+            </div>
+          )}
+          {lastQ && wantsCall && (
+            <p className="bk-small">
+              We’ll be in touch within a working day. See our{' '}
+              <a href="/privacy-policy" target="_blank" rel="noreferrer">
+                privacy policy
+              </a>
+              .
+            </p>
+          )}
+        </form>
+      </section>
+    );
+  }
+
   return (
     <div className="bk">
       {p.intro && (step === 'start' || step === 'manage') && <p className="bk-intro">{p.intro}</p>}
@@ -556,153 +753,7 @@ export function BookingFlow(p: BookingFlowProps) {
         </section>
       )}
 
-      {step === 'start' && (
-        <section className="bk-card">
-          {!isLink && !moving && (
-            <>
-              <h2 className="bk-h" id="bk-mode-h">
-                How would you like to speak to us?
-              </h2>
-              <div className="bk-types" role="group" aria-labelledby="bk-mode-h">
-                {MODE_CHOICES.map((m) => (
-                  <button
-                    key={m.key}
-                    type="button"
-                    aria-pressed={mode === m.key}
-                    className={mode === m.key ? 'bk-type is-on' : 'bk-type'}
-                    onClick={() => {
-                      setMode(m.key);
-                      setError('');
-                    }}
-                  >
-                    <b>{m.label}</b>
-                    <span>{m.blurb}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {mode === 'visit' || isLink || moving ? (
-            <>
-          {heading('What’s the survey for?')}
-              <div className="bk-types" role="group" aria-label="What’s the survey for?">
-                {TYPE_CHOICES.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    aria-pressed={type === t.key}
-                    className={type === t.key ? 'bk-type is-on' : 'bk-type'}
-                    onClick={() => setType(t.key)}
-                  >
-                    <b>{t.label}</b>
-                    <span>{minutesWords(p.durations[t.key])}</span>
-                  </button>
-                ))}
-              </div>
-              <label className="bk-label" htmlFor="bk-pc">
-                Your postcode
-              </label>
-              <form
-                className="bk-pcrow"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void findTimes();
-                }}
-              >
-                <input
-                  id="bk-pc"
-                  className="bk-input bk-input--pc"
-                  value={postcode}
-                  onChange={(e) => setPostcode(e.target.value)}
-                  autoComplete="postal-code"
-                  autoCapitalize="characters"
-                  placeholder="NP20 4AB"
-                  inputMode="text"
-                  maxLength={10}
-                />
-                <button type="submit" className="bk-btn" disabled={busy}>
-                  {busy ? 'Finding…' : 'Find times'}
-                </button>
-              </form>
-          {err}
-            </>
-          ) : (
-            <form
-              className="bk-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void onRequest();
-              }}
-            >
-              {heading(mode === 'video' ? 'Tell us about your video call' : 'Tell us about your phone call')}
-              <div className="bk-types" role="group" aria-label="What’s it for?">
-                {TYPE_CHOICES.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    aria-pressed={type === t.key}
-                    className={type === t.key ? 'bk-type is-on' : 'bk-type'}
-                    onClick={() => setType(t.key)}
-                  >
-                    <b>{t.label}</b>
-                  </button>
-                ))}
-              </div>
-              <label className="bk-label" htmlFor="rq-name">
-                Your name
-              </label>
-              <input id="rq-name" className="bk-input" value={cb.name} onChange={(e) => setCb({ ...cb, name: e.target.value })} autoComplete="name" required />
-              <label className="bk-label" htmlFor="rq-phone">
-                Phone number
-              </label>
-              <input id="rq-phone" className="bk-input" type="tel" value={cb.phone} onChange={(e) => setCb({ ...cb, phone: e.target.value })} autoComplete="tel" inputMode="tel" required />
-              <label className="bk-label" htmlFor="rq-email">
-                {mode === 'video' ? 'Email (we’ll send the video link here)' : 'Email (optional)'}
-              </label>
-              <input id="rq-email" className="bk-input" type="email" value={cb.email} onChange={(e) => setCb({ ...cb, email: e.target.value })} autoComplete="email" required={mode === 'video'} />
-              <label className="bk-label" htmlFor="rq-pc">
-                Your postcode
-              </label>
-              <input
-                id="rq-pc"
-                className="bk-input bk-input--pc"
-                value={postcode}
-                onChange={(e) => setPostcode(e.target.value)}
-                autoComplete="postal-code"
-                autoCapitalize="characters"
-                placeholder="NP20 4AB"
-                maxLength={10}
-                required
-              />
-              <label className="bk-label" htmlFor="rq-when">
-                Best time to {mode === 'video' ? 'arrange it' : 'ring you'}
-              </label>
-              <select id="rq-when" className="bk-input" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
-                {WHEN_CHOICES.map((w) => (
-                  <option key={w.key} value={w.key}>
-                    {w.label}
-                  </option>
-                ))}
-              </select>
-              <div className="bk-hp" aria-hidden="true">
-                <label htmlFor="rq-cw">Company website</label>
-                <input id="rq-cw" tabIndex={-1} autoComplete="off" value={d.company_website} onChange={field('company_website')} />
-              </div>
-              <p className="bk-small">
-                We’ll be in touch within a working day. See our{' '}
-                <a href="/privacy-policy" target="_blank" rel="noreferrer">
-                  privacy policy
-                </a>
-                .
-              </p>
-              {err}
-              <button type="submit" className="bk-btn bk-btn--wide" disabled={busy}>
-                {busy ? 'Sending…' : mode === 'video' ? 'Request a video call' : 'Request a phone call'}
-              </button>
-            </form>
-          )}
-        </section>
-      )}
+      {step === 'start' && startStep()}
 
       {step === 'times' && slots && (
         <section className="bk-card">

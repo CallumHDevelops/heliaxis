@@ -579,3 +579,79 @@ textarea.bk-input {
     border-color: var(--accent);
   }
 }
+
+/* One question at a time (the first screen): progress, big answers, a clear way back. */
+.bk-q {
+  gap: 0;
+  padding: 22px 20px 20px;
+}
+.bk-prog {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.bk-prog-n {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--bk-muted);
+}
+.bk-prog-bar {
+  display: flex;
+  gap: 6px;
+}
+.bk-prog-bar i {
+  width: 30px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bk-line);
+  transition: background 0.3s;
+}
+.bk-prog-bar i.is-done {
+  background: var(--accent);
+}
+.bk-prog-bar i.is-now {
+  background: var(--bk-ink);
+}
+.bk-qform {
+  display: flex;
+  flex-direction: column;
+}
+.bk .bk-q-h {
+  font-size: clamp(1.5rem, 4.6vw, 2rem);
+  margin-bottom: 8px;
+}
+.bk-q-hint {
+  margin: 0 0 16px;
+  color: var(--bk-muted);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.bk-qform .bk-types {
+  margin-top: 14px;
+}
+.bk-input--big {
+  margin-top: 14px;
+  min-height: 60px;
+  font-size: 1.2rem;
+}
+.bk-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.bk-qnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 20px;
+}
+.bk-qnav .bk-btn--wide {
+  flex: 1;
+}
