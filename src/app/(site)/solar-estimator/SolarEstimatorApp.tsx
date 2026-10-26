@@ -84,6 +84,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
   const [query, setQuery] = useState('');
   const [sugs, setSugs] = useState<{ id: string; address: string }[]>([]);
   const [pickedId, setPickedId] = useState('');
+  const [typed, setTyped] = useState(false);
   const [rates, setRates] = useState({ imp: settings.importPence, exp: settings.exportPence });
   const [roofHit, setRoofHit] = useState<RoofHit | null>(null);
   // 'ask': we found a roof, the visitor has not said yet; 'yes': use it; 'no': they will answer the questions.
@@ -97,7 +98,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
   const head = useRef<HTMLDivElement>(null);
 
   const pcOk = PC.test(postcode.trim());
-  const picker = addressPicker && roofLookup && !skipLookup;
+  const picker = addressPicker && roofLookup && !skipLookup && !typed;
   useEffect(() => {
     if (!picker || pickedId || query.trim().length < 3) return;
     const ctl = new AbortController();
@@ -230,6 +231,14 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
                         aria-controls="est-sugs"
                         onKeyDown={(e) => e.key === 'Enter' && canNext && void nextFromWhere()}
                       />
+                      {query.trim().length >= 6 && sugs.length === 0 && !pickedId && (
+                        <p className="est-hint">
+                          Cannot see it?{' '}
+                          <button type="button" className="est-link" onClick={() => setTyped(true)}>
+                            Enter your postcode and house number instead
+                          </button>
+                        </p>
+                      )}
                       {sugs.length > 0 && !pickedId && (
                         <ul id="est-sugs" className="est-sugs" role="listbox">
                           {sugs.map((sg) => (
