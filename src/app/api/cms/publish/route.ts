@@ -3,17 +3,29 @@ import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { parseCmsState, type CmsState } from '@/lib/blog/cms-blog-shared';
-import { keepServerBlogStatus, liveRenderedPages, withoutOfflineBlogs } from '@/lib/blog/cms-publish-rules';
+import { keepServerBlogStatus, keepServerPageDraft, liveRenderedPages, withoutOfflineBlogs } from '@/lib/blog/cms-publish-rules';
 
 const DRAFT_KEY = 'heliaxis-cms-v1';
 const PUBLISHED_KEY = 'heliaxis-cms-published';
 const RENDERED_KEY = 'heliaxis-cms-rendered';
 
+/** The pages on the website now, from the rendered copy. */
+function onSitePages(raw: string | null | undefined): { id?: unknown; slug?: unknown }[] {
+  try {
+    const pages = raw ? JSON.parse(raw)?.pages : null;
+    return Array.isArray(pages) ? pages : [];
+  } catch {
+    return [];
+  }
+}
+
 // Publish: snapshot CMS state as published, and store client-rendered page HTML.
 // Prefer the live `state` from the browser so mega-menu deletes aren't lost to a
 // stale draft read (overlapping saves). Blog articles keep the status saved here,
 // except `publishBlogId` (the article being published), and only live articles go
-// into the published copy and the rendered pages (src/lib/blog/cms-publish-rules.ts).
+// into the published copy and the rendered pages. Pages keep the draft flag saved
+// here too, except `publishPageId` (the page being published) and a page that's on
+// the website now, and draft pages aren't rendered (src/lib/blog/cms-publish-rules.ts).
 export async function POST(req: Request) {
   const session = await requirePortal('cms');
   if (!session) {
@@ -24,10 +36,14 @@ export async function POST(req: Request) {
   const now = new Date().toISOString();
   const body = await req.json().catch(() => null);
 
-  const { data: saved, error: readErr } = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
-  if (readErr) return NextResponse.json({ error: 'Couldn’t read the saved site. Try again.' }, { status: 500 });
+  const [{ data: saved, error: readErr }, { data: site, error: siteErr }] = await Promise.all([
+    admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle(),
+    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
+  ]);
+  if (readErr || siteErr) return NextResponse.json({ error: 'Couldn’t read the saved site. Try again.' }, { status: 500 });
   const server = parseCmsState(saved?.value);
   const publishId = typeof body?.publishBlogId === 'string' && body.publishBlogId ? body.publishBlogId : null;
+  const publishPageId = typeof body?.publishPageId === 'string' && body.publishPageId ? body.publishPageId : null;
 
   let state: CmsState | null = null;
   if (body?.state != null) {
@@ -39,7 +55,7 @@ export async function POST(req: Request) {
   } else if (saved?.value) {
     state = server;
   }
-  if (state) state = keepServerBlogStatus(state, server, publishId);
+  if (state) state = keepServerPageDraft(keepServerBlogStatus(state, server, publishId), server, publishPageId, onSitePages(site?.value));
   const snapshot = state ? JSON.stringify(state) : null;
 
   if (state && snapshot) {

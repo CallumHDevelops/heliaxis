@@ -2187,20 +2187,22 @@ async function doPublish(){
     });
     // Only the page or article being published goes live. Other draft pages stay off the website, and
     // other articles keep their own status (Draft, Scheduled, Live): the server keeps it and leaves out
-    // every article that isn't live (src/lib/blog/cms-publish-rules.ts).
+    // every article that isn't live (src/lib/blog/cms-publish-rules.ts). Every page is sent, with its id:
+    // the server decides which are drafts, so a page this tab still has as a draft after another tab
+    // published it stays on the website.
     var cur=(MODE==='edit')?page():null;
     var curBlog=!!(cur&&isCmsBlogPage(cur));
     if(curBlog){cur.blogStatus='published';cur.publishAt=cur.publishAt||nowIso;cur.scheduledRender=null;}
     await save();
     await ensurePublishStyles();
     var css=buildPublishCss();
-    var pages=STATE.pages.filter(function(pg){return isCmsBlogPage(pg)||!pg._draft||pg===cur;}).map(function(pg){
-      return{slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
+    var pages=STATE.pages.map(function(pg){
+      return{id:pg.id,slug:pg.slug,name:pg.name,theme:pg.theme||'',seo:pg.seo||{},
         html:'<div class="pv-page">'+pg.blocks.map(function(b){return '<div style="'+spacingStyle(b.p)+'">'+renderBlock(b)+'</div>';}).join('\n')+'</div>'};
     });
     // Send live STATE (incl. site.menu) so publish does not re-read a stale draft.
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
-      body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages},publishBlogId:curBlog?cur.id:null})});
+      body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages},publishBlogId:curBlog?cur.id:null,publishPageId:(cur&&!curBlog)?cur.id:null})});
     if(!r.ok){
       var em='Publish failed';
       try{em=(await r.json()).error||em;}catch(e){}

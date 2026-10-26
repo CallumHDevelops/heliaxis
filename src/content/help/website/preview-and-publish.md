@@ -47,6 +47,8 @@ After publishing, the page you published moves from **Draft pages** to **Live pa
 | **Draft pages** | New and never published. Not on the public website. |
 | **Live pages** | Published at least once. Edits you’ve made since are saved but not live until the next **Publish**. |
 
+> **Good to know:** If another tab (yours or a colleague’s) had the editor open while a page was still a draft, it keeps listing that page under **Draft pages** after it’s published, until the tab is reloaded. That’s only what the tab shows: saving or publishing from it doesn’t make the page a draft again or take it off the website.
+
 ## If publishing fails
 
 - **You must be signed in as an approved admin to publish.** Your sign-in has run out: sign in again and retry.
