@@ -181,6 +181,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
               {(isAdmin || sev !== 'critical') && (
                 <form action={dismissMention} className="sm-inline">
                   <input type="hidden" name="mentionId" value={m.id} />
+                  <input type="hidden" name="reason" value="Deleted by the commenter or removed on the platform" />
+                  <button className="sm-btn">It was deleted</button>
+                </form>
+              )}
+              {(isAdmin || sev !== 'critical') && (
+                <form action={dismissMention} className="sm-inline">
+                  <input type="hidden" name="mentionId" value={m.id} />
                   <input name="reason" placeholder="Why no reply is needed" className="sm-input" />
                   <button className="sm-btn">No reply needed</button>
                 </form>
