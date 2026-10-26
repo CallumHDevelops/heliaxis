@@ -106,6 +106,9 @@ export default async function SocialMonitoringPage({ searchParams }: { searchPar
             <Link href="/admin/social/insights" className="sm-btn">
               Insights
             </Link>
+            <Link href="/admin/social/competitors" className="sm-btn">
+              Competitors
+            </Link>
             <Link href="/admin/social/costs" className="sm-btn">
               Costs and savings
             </Link>
