@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
-import { HubMyDay } from './HubMyDay';
+import { TodayList } from './HubMyDay';
+import { MetaLeadsPanel, TodoPanel } from './DashPanels';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
-import { HubMetaLeads } from './HubMetaLeads';
 import { HubSearch } from '@/components/admin/GlobalSearch';
 import type { HubMetaLeads as MetaLeads } from './meta-leads';
 import './hub.css';
@@ -145,10 +145,8 @@ export function HubView({
         <p className="hub-banner">You don&apos;t have access to that area. Ask an admin to add it to your account.</p>
       )}
 
-      <div className="hub-cols">
-        <div className="hub-col-needs">
       {attention.length > 0 && (
-        <section className="hub-needs hub-col hx-moment" aria-label="Needs your attention">
+        <section className="hub-needs hub-strip hx-moment" aria-label="Needs your attention">
           <h2 className="hub-needs-h">Needs you</h2>
           <ul>
             {attention.map((a) => (
@@ -157,11 +155,11 @@ export function HubView({
                   <span className="hub-need-icon">
                     {a.icon === 'whatsapp' ? <WaIcon /> : a.icon === 'metis' ? <MetisIcon size={38} className="hub-need-metis" /> : <Icon k={a.icon} />}
                   </span>
+                  <span className="hub-need-n">{a.n}</span>
                   <span className="hub-need-main">
                     <b>{a.label}</b>
                     <small>{a.detail}</small>
                   </span>
-                  <span className="hub-need-n">{a.n}</span>
                 </Link>
               </li>
             ))}
@@ -169,14 +167,11 @@ export function HubView({
         </section>
       )}
 
-        </div>
-        <div className="hub-col-leads">
-      {metaLeads && <HubMetaLeads data={metaLeads} />}
-
-        </div>
-        <div className="hub-col-tasks">
-      <HubMyDay tasks={tasks} followUps={followUps} today={todayIso} todayList={todayList} />
-
+      <div className="hub-work">
+        {metaLeads && <MetaLeadsPanel leads={metaLeads} />}
+        <div className="hub-work-side">
+          {todayList && todayList.items.length > 0 && <TodayList today={todayList} />}
+          <TodoPanel tasks={tasks} followUps={followUps} today={todayIso} />
         </div>
       </div>
 
