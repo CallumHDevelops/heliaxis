@@ -21,7 +21,7 @@ export type GoogleBuilding = {
     panelCapacityWatts?: number;
     panelHeightMeters?: number;
     panelWidthMeters?: number;
-    solarPanels?: { center?: GLatLng; orientation?: string; segmentIndex?: number }[];
+    solarPanels?: { center?: GLatLng; orientation?: string; segmentIndex?: number; yearlyEnergyDcKwh?: number }[];
     roofSegmentStats?: GoogleSegment[];
     solarPanelConfigs?: { panelsCount?: number; yearlyEnergyDcKwh?: number }[];
     wholeRoofStats?: { areaMeters2?: number };
@@ -53,6 +53,9 @@ export const aspectFromBearing = (bearing: number) => {
   return Math.round(a);
 };
 
+/** A roof face worth putting panels on: not turned away from the sun (within 100 degrees of south). */
+export const usableAspect = (bearing: number) => Math.abs(aspectFromBearing(bearing)) <= 100;
+
 const directionFor = (aspect: number): DirectionKey => {
   const abs = Math.abs(aspect);
   return DIRECTIONS.reduce((best, d) => (Math.abs(d.aspect - abs) < Math.abs(best.aspect - abs) ? d : best), DIRECTIONS[0]).key;
@@ -67,23 +70,30 @@ export function roofFromGoogle(b: GoogleBuilding | null | undefined, fallbackYie
   const segs = (sp?.roofSegmentStats ?? []).filter((s) => typeof s.azimuthDegrees === 'number' && typeof s.pitchDegrees === 'number' && (s.stats?.areaMeters2 ?? 0) > 3);
   if (!sp || !segs.length) return null;
   const area = (s: GoogleSegment) => s.stats?.areaMeters2 ?? 0;
-  const usable = segs.filter((s) => Math.abs(aspectFromBearing(s.azimuthDegrees!)) <= 120);
+  const usable = segs.filter((s) => usableAspect(s.azimuthDegrees!));
   const main = (usable.length ? usable : segs).reduce((a, s) => (area(s) > area(a) ? s : a));
   const bearing = Math.round(main.azimuthDegrees!);
   const aspect = aspectFromBearing(bearing);
-  const maxArea = sp.maxArrayAreaMeters2 ?? 0;
-  // Shading: how much less Google's own best layout makes per kW than an unshaded roof like this one would.
-  const best = (sp.solarPanelConfigs ?? []).reduce<{ panelsCount?: number; yearlyEnergyDcKwh?: number } | null>((a, c) => ((c.panelsCount ?? 0) > (a?.panelsCount ?? 0) ? c : a), null);
+  const all = sp.roofSegmentStats ?? [];
+  // Google's own layout puts panels on every face, north ones too. We only count and judge the faces that face the sun.
+  const good = (sp.solarPanels ?? []).filter((p) => {
+    const seg = all[p.segmentIndex ?? 0];
+    return typeof seg?.azimuthDegrees === 'number' && usableAspect(seg.azimuthDegrees);
+  });
+  const usableArea = (usable.length ? usable : segs).reduce((n, x) => n + area(x), 0);
+  const maxPanels = good.length ? good.length : Math.max(0, Math.floor((usableArea * 0.6) / PANEL_AREA_M2));
+  // Shading: Google's yield on those faces (its figure is before system losses, so take 14% off like PVGIS) against an unshaded roof like this one.
   const cap = (sp.panelCapacityWatts ?? 250) / 1000;
-  const googleYield = best?.panelsCount && best.yearlyEnergyDcKwh ? best.yearlyEnergyDcKwh / (best.panelsCount * cap) : 0;
-  const ratio = googleYield && fallbackYieldPerKwp ? googleYield / fallbackYieldPerKwp : 1;
+  const withEnergy = good.filter((p) => (p.yearlyEnergyDcKwh ?? 0) > 0);
+  const googleYield = withEnergy.length ? withEnergy.reduce((n, p) => n + (p.yearlyEnergyDcKwh ?? 0), 0) / (withEnergy.length * cap) : 0;
+  const ratio = googleYield && fallbackYieldPerKwp ? (googleYield * 0.86) / fallbackYieldPerKwp : 1;
   const shade: Shade = ratio >= 0.93 ? 'none' : ratio >= 0.82 ? 'some' : 'lots';
   return {
     aspect,
     bearing,
     angle: Math.max(0, Math.min(60, Math.round(main.pitchDegrees!))),
     areaM2: Math.round(area(main)),
-    maxPanels: Math.max(0, Math.floor((maxArea || segs.reduce((s, x) => s + area(x), 0) * 0.6) / PANEL_AREA_M2)),
+    maxPanels,
     direction: directionFor(aspect),
     shade,
     segments: segs.length,
@@ -102,13 +112,13 @@ export function mapFromGoogle(b: GoogleBuilding | null | undefined, fallbackCent
   const sp = b?.solarPotential;
   const segs = sp?.roofSegmentStats ?? [];
   const panels: MapPanel[] = (sp?.solarPanels ?? [])
-    .slice(0, 80)
     .flatMap((p) => {
       const seg = segs[p.segmentIndex ?? 0];
-      if (typeof p.center?.latitude !== 'number' || typeof p.center?.longitude !== 'number' || typeof seg?.azimuthDegrees !== 'number') return [];
+      if (typeof p.center?.latitude !== 'number' || typeof p.center?.longitude !== 'number' || typeof seg?.azimuthDegrees !== 'number' || !usableAspect(seg.azimuthDegrees)) return [];
       return [{ lat: p.center.latitude, lng: p.center.longitude, o: p.orientation === 'LANDSCAPE' ? ('l' as const) : ('p' as const), az: seg.azimuthDegrees }];
     });
   if (!panels.length) return null;
+  panels.splice(80);
   const c = b?.center;
   return {
     centre: typeof c?.latitude === 'number' && typeof c?.longitude === 'number' ? { lat: c.latitude, lng: c.longitude } : fallbackCentre,

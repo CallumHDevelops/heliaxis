@@ -7,16 +7,20 @@ import { inside, type LngLat } from './overlay';
  */
 export async function buildingOutline(p: LngLat): Promise<LngLat[] | null> {
   const q = `[out:json][timeout:6];way(around:15,${p.lat.toFixed(6)},${p.lng.toFixed(6)})[building];out geom;`;
-  try {
-    const r = await fetch('https://overpass-api.de/api/interpreter', {
+  // The free service is often busy, so two servers are asked at once and the first proper answer is used.
+  const servers = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+  const ask = async (url: string) => {
+    const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'heliaxis.co.uk solar estimator' },
       body: `data=${encodeURIComponent(q)}`,
-      signal: AbortSignal.timeout(7000),
-      next: { revalidate: 60 * 60 * 24 * 30 },
+      signal: AbortSignal.timeout(8000),
     });
-    if (!r.ok) return null;
-    const d = (await r.json()) as { elements?: { geometry?: { lat: number; lon: number }[] }[] };
+    if (!r.ok) throw new Error(`overpass ${r.status}`);
+    return (await r.json()) as { elements?: { geometry?: { lat: number; lon: number }[] }[] };
+  };
+  try {
+    const d = await Promise.any(servers.map(ask));
     const rings = (d.elements ?? []).map((e) => (e.geometry ?? []).map((g) => ({ lat: g.lat, lng: g.lon }))).filter((g) => g.length >= 4);
     if (!rings.length) return null;
     const containing = rings.find((ring) => inside(p, ring));
