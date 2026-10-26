@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { draftMention } from '@/lib/social/drafts';
+import { draftMention, saveDraftEdit } from '@/lib/social/drafts';
 
 /**
  * Everything a person can do on a comment. None of these touch Facebook, Instagram or any review site:
@@ -99,4 +99,13 @@ export async function addNote(f: FormData) {
   if (!text) return;
   await createAdminClient().from('social_note').insert({ mention_id: mentionId, author_id: me.id, text });
   refresh(mentionId);
+}
+
+/** Someone edits the suggested reply: the checks run again, and any approval is withdrawn (it belonged to the old wording). */
+export async function editDraft(f: FormData) {
+  const me = await session();
+  const r = await saveDraftEdit(idOf(f), String(f.get('text') || ''), me.id);
+  if (!r.ok) throw new Error(r.error || 'Could not save');
+  const mentionId = String(f.get('mentionId') || '');
+  if (mentionId) refresh(mentionId);
 }

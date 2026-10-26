@@ -200,3 +200,57 @@ async function ensureScript(s: Script) {
     .from('social_script_version')
     .upsert({ script_id: s.id, version: SCRIPT_VERSION, status: 'published', body: s, published_at: new Date().toISOString() }, { onConflict: 'script_id,version', ignoreDuplicates: true });
 }
+
+/**
+ * A person edits the reply. Their wording gets the full guardrail check again (only the approved script text is
+ * exempt), any earlier approval is withdrawn because the approval belongs to the exact old text, and the change
+ * is kept.
+ */
+export async function saveDraftEdit(draftId: string, newTextRaw: string, editorId: string): Promise<{ ok: boolean; error?: string; pass?: boolean }> {
+  const text = newTextRaw.replace(/\r\n/g, '\n').trim();
+  if (text.length < 5) return { ok: false, error: 'The reply is too short.' };
+  if (text.length > 2000) return { ok: false, error: 'The reply is too long.' };
+  const db = createAdminClient();
+  const { data: d } = await db.from('social_draft').select('id, mention_id, text, script_id, is_safety, status').eq('id', draftId).maybeSingle();
+  if (!d || !d.text) return { ok: false, error: 'Draft not found.' };
+  if (['posted', 'superseded', 'rejected'].includes(d.status)) return { ok: false, error: 'This draft can no longer be edited.' };
+  if (text === d.text) return { ok: true, pass: undefined };
+  const { data: m } = await db.from('social_mention').select('platform, text, severity, author_display_name, status').eq('id', d.mention_id).maybeSingle();
+  if (!m) return { ok: false, error: 'Comment not found.' };
+  const script = SCRIPTS.find((s) => s.id === d.script_id);
+  const firstName = deriveFirstName(m.author_display_name);
+  const ctx = { ...baseContext(), firstName };
+  const guard = runGuardrails({
+    text,
+    isSafety: !!d.is_safety,
+    severity: (m.severity ?? 'medium') as Severity,
+    platform: m.platform as Platform,
+    officePhone: settings.office_phone,
+    scriptBannedPhrases: script?.banned_phrases ?? [],
+    commenterFirstName: firstName,
+    signoff: settings.signoff_default,
+    comment: m.text,
+    fixedTexts: script ? allFixedTexts(script, ctx) : [],
+  });
+  const { error } = await db
+    .from('social_draft')
+    .update({
+      text,
+      text_sha256: sha256(text),
+      status: 'ready',
+      guardrail_result: { failures: guard.failures, warnings: guard.warnings },
+      guardrail_pass: guard.pass,
+      rules_version: guard.rulesVersion,
+      approved_by: null,
+      approved_at: null,
+      approved_text_sha256: null,
+      copied_by: null,
+      copied_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', draftId);
+  if (error) return { ok: false, error: 'Could not save the change.' };
+  await db.from('social_draft_edit').insert({ draft_id: draftId, editor_id: editorId, before_text: d.text, after_text: text });
+  if (m.status === 'approved' || m.status === 'copied') await db.from('social_mention').update({ status: 'in_review', updated_at: new Date().toISOString() }).eq('id', d.mention_id);
+  return { ok: true, pass: guard.pass };
+}

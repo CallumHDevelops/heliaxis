@@ -5,7 +5,7 @@ import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { schemaReady } from '@/lib/schema-ready';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { addNote, approveDraft, dismissMention, markPosted, regenerateDraft } from '../../actions';
+import { addNote, approveDraft, dismissMention, editDraft, markPosted, regenerateDraft } from '../../actions';
 import { CopyDraft } from '../../CopyDraft';
 import { ago, PLATFORM_LABEL, SEVERITY_LABEL, STATUS_LABEL, TYPE_LABEL } from '../../labels';
 import '../../social.css';
@@ -131,6 +131,18 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
                       </li>
                     ))}
                   </ul>
+                )}
+                {!closed && draft.text && (
+                  <details className="sm-edit">
+                    <summary>Edit this reply</summary>
+                    <form action={editDraft}>
+                      <input type="hidden" name="id" value={draft.id} />
+                      <input type="hidden" name="mentionId" value={m.id} />
+                      <textarea name="text" rows={7} defaultValue={draft.text} className="sm-input sm-textarea" maxLength={2000} required />
+                      <p className="sm-sub">The checks run again on your wording. Replies to safety comments then need an admin to approve the new text.</p>
+                      <button className="sm-btn">Save my changes</button>
+                    </form>
+                  </details>
                 )}
                 {draft.requires_approval && (
                   <p className="sm-sub">{draft.status === 'approved' || draft.status === 'copied' ? 'Approved by an admin.' : 'This reply needs an admin to approve it before it can be copied.'}</p>

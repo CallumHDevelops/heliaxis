@@ -297,3 +297,27 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+.sm-edit summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--accent-text);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+.sm-edit form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.sm-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem 0.8rem;
+  min-height: 140px;
+  line-height: 1.5;
+  resize: vertical;
+}

@@ -54,3 +54,25 @@ describe('the no-AI fallback draft', () => {
     }
   }
 });
+
+describe('editing a reply', () => {
+  it('a reviewer edit is checked: a promise of a price fails the guardrails', () => {
+    const s = SCRIPTS.find((x) => x.id === 'price-objection')!;
+    const ctx = { ...baseContext(), firstName: 'Sam' };
+    const ok = renderDraft(s, defaultChoice(s, ctx), { ...ctx, platform: 'facebook' }).text;
+    const edited = `${ok}\nWe can do it for £4,000 and guarantee it will never fail.`;
+    const r = runGuardrails({
+      text: edited,
+      isSafety: false,
+      severity: 'medium',
+      platform: 'facebook',
+      officePhone: settings.office_phone,
+      scriptBannedPhrases: s.banned_phrases ?? [],
+      commenterFirstName: 'Sam',
+      signoff: settings.signoff_default,
+      fixedTexts: allFixedTexts(s, ctx),
+    });
+    expect(r.pass).toBe(false);
+    expect(r.failures.length).toBeGreaterThan(0);
+  });
+});

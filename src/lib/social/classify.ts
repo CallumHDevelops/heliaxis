@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { alertForMention } from './alerts';
 import { combine, type CombineInput } from './rules/combine';
 import { recordUsage } from './usage';
+import { createQuoteFollowUp } from './followup';
 import { SEVERITIES, sevRank, type Severity } from './rules/types';
 
 export const COMMENT_TYPES = ['quote_request', 'question', 'positive', 'complaint', 'general', 'spam'] as const;
@@ -128,7 +129,7 @@ export async function callClassifier(input: ClassifierInput): Promise<{ result: 
  */
 export async function classifyMention(mentionId: string, version: number): Promise<boolean> {
   const db = createAdminClient();
-  const { data: m } = await db.from('social_mention').select('id, platform, kind, text, version, rating, severity, post_id, parent_id, author_is_own, status').eq('id', mentionId).maybeSingle();
+  const { data: m } = await db.from('social_mention').select('id, platform, kind, text, version, rating, severity, post_id, parent_id, author_is_own, author_display_name, status').eq('id', mentionId).maybeSingle();
   if (!m || m.version !== version || m.author_is_own) return true;
 
   const { data: prior } = await db
@@ -196,6 +197,8 @@ export async function classifyMention(mentionId: string, version: number): Promi
     .from('social_mention')
     .update({ severity, comment_type: out?.result.type ?? null, updated_at: new Date().toISOString() })
     .eq('id', mentionId);
+  // Someone asking for a quote: a Follow up task and a note, once (not a CRM customer).
+  if (out?.result.type === 'quote_request') await createQuoteFollowUp({ id: mentionId, platform: m.platform, author_display_name: m.author_display_name, text: m.text });
   // A draft is made for every comment worth answering: after the AI step, so it uses the final severity.
   if (out && severity !== 'ignore') {
     await db.from('social_job').upsert({ kind: 'draft', dedupe_key: `draft:${mentionId}:v${version}`, payload: { mentionId, version } }, { onConflict: 'dedupe_key', ignoreDuplicates: true });

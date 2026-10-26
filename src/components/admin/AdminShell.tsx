@@ -6,6 +6,7 @@ import { BrandLogo } from '@/components/theme/BrandLogo';
 import { getSessionProfile } from '@/lib/auth';
 import { canAccess } from '@/lib/portals';
 import { schemaReady } from '@/lib/schema-ready';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { unreadPeople } from '@/lib/whatsapp/active';
 import { AppRuntime } from './AppRuntime';
 import { HeaderSearch } from './GlobalSearch';
@@ -285,6 +286,22 @@ function MoreTile({ href, label, short, icon, active }: NavItem) {
   );
 }
 
+/** Critical and High social comments nobody has dealt with yet. Never throws. */
+async function urgentSocialCount(): Promise<number> {
+  try {
+    const r = await createAdminClient()
+      .from('social_mention')
+      .select('id', { count: 'exact', head: true })
+      .in('severity', ['critical', 'high'])
+      .not('status', 'in', '(posted,dismissed)')
+      .eq('is_synthetic', false)
+      .eq('author_is_own', false);
+    return r.error ? 0 : (r.count ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
 /** "Esther Smith" → "ES", "callum@…" → "C". */
 function initialsOf(name: string) {
   const words = name.split('@')[0].split(/[\s._-]+/).filter(Boolean);
@@ -320,7 +337,12 @@ export async function AdminShell({
   // a job for CRM staff (who use /admin/crm/chats instead of the inbox).
   const chats = can('enquiries') || can('crm');
   // Fetched together: they don't depend on each other, and every admin page waits for both.
-  const [waUnread, ready] = await Promise.all([chats ? unreadPeople(can('enquiries') ? 'all' : 'linked') : 0, schemaReady()]);
+  // Urgent social comments are counted alongside, only for people who can open Social (a missing table just counts 0).
+  const [waUnread, ready, socialUrgent] = await Promise.all([
+    chats ? unreadPeople(can('enquiries') ? 'all' : 'linked') : 0,
+    schemaReady(),
+    can('social_monitoring') ? urgentSocialCount() : 0,
+  ]);
   const waHref = can('enquiries') ? '/admin/enquiries/inbox' : '/admin/crm/chats';
   // Purchase orders: once purchase-orders.sql has been run (checked once a minute).
   const orders = can('crm') && ready.purchaseOrders;
@@ -367,7 +389,7 @@ export async function AdminShell({
       items: [
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         // On site: one tap away on the phone's bottom bar, so not in "More".
-        { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring },
+        { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring, badge: socialUrgent },
         { href: '/admin/value', label: 'Added value', icon: icons.analytics, active: active === 'value', show: admin },
         { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
       ],
