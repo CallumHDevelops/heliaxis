@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { queueGeoRun } from '@/lib/social/competitors/geo-run';
 
 /** The monthly check: for one search, where each business appeared (blank = not in the top ten). Admins only. */
 export async function recordRanks(f: FormData) {
@@ -33,5 +34,14 @@ export async function recordRanks(f: FormData) {
     if (pack != null) rows.push({ date, keyword_id: keywordId, device, competitor_id: id, organic_rank: null, local_pack_rank: pack });
   }
   if (rows.length) await createAdminClient().from('social_seo_rank').upsert(rows, { onConflict: 'date,keyword_id,device,competitor_id' });
+  revalidatePath('/admin/social/seo');
+}
+
+/** Starts this month's AI-answer check (30 questions over the next few minutes). Admins only. */
+export async function startGeoRun() {
+  const s = await requirePortal('social_monitoring');
+  if (!s || s.profile.role !== 'admin') throw new Error('Only an admin can start this');
+  const r = await queueGeoRun();
+  if (!r.queued) throw new Error(r.reason || 'Could not start');
   revalidatePath('/admin/social/seo');
 }

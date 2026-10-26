@@ -7,7 +7,10 @@ import { schemaReady } from '@/lib/schema-ready';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { competitorTablesReady, ensureSeed, type Competitor } from '@/lib/social/competitors/data';
 import { visibilityShares, type RankRow } from '@/lib/social/competitors/visibility';
-import { recordRanks } from './actions';
+import { geoShares } from '@/lib/social/competitors/geo';
+import { getLegalSignOff } from '@/lib/social/competitors/data';
+import { aiSpendThisMonthGbp } from '@/lib/social/competitors/geo-run';
+import { recordRanks, startGeoRun } from './actions';
 import '../social.css';
 import '../competitors/competitors.css';
 
@@ -40,6 +43,11 @@ export default async function SeoPage({ searchParams }: { searchParams: Promise<
   const db = createAdminClient();
   const sp = await searchParams;
   const since = daysAgoIso(100);
+  const [{ data: geo }, legal, spend] = await Promise.all([
+    db.from('social_geo_sample').select('date, prompt_id, mentioned_ids').gte('date', daysAgoIso(40)).order('date', { ascending: false }),
+    getLegalSignOff(),
+    aiSpendThisMonthGbp(),
+  ]);
   const [{ data: kws }, { data: comps }, { data: ranks }] = await Promise.all([
     db.from('social_seo_keyword').select('id, keyword, town').eq('active', true).order('keyword'),
     db.from('social_competitor').select('*').eq('tracked', true).order('is_self', { ascending: false }).order('name'),
@@ -60,6 +68,10 @@ export default async function SeoPage({ searchParams }: { searchParams: Promise<
   const vis = visibilityShares(checked);
   const today = new Date().toISOString().slice(0, 10);
   const self = competitors.find((c) => c.is_self);
+  // The newest month of AI answers: a business's share is the fraction of answers that name it.
+  const geoMonth = (geo ?? [])[0]?.date?.slice(0, 7);
+  const geoSamples = (geo ?? []).filter((g) => g.date.slice(0, 7) === geoMonth) as { prompt_id: number; mentioned_ids: string[] }[];
+  const geoResult = geoShares(geoSamples, competitors.map((c) => c.id));
   const nameOf = new Map(competitors.map((c) => [c.id, c.name]));
   const rankFor = (kwId: number, compId: string) => latest.get(`${kwId}:${compId}`);
 
@@ -109,6 +121,40 @@ export default async function SeoPage({ searchParams }: { searchParams: Promise<
               );
             })}
           </ul>
+        </section>
+
+        <section className="sm-card">
+          <h2>Does an AI assistant name us?</h2>
+          <p className="sm-sub">Ten local questions such as “Who are the best solar installers in Cardiff?” are each asked three times to Claude with web search. A business’s share is the fraction of answers that name it. These are <b>API samples</b>: the consumer chat apps can answer differently.</p>
+          {geoResult.answers === 0 ? (
+            <p className="sm-sub">No answers collected yet.</p>
+          ) : (
+            <>
+              <p className="sm-sub">{geoMonth}: based on {geoResult.answers} answers.</p>
+              <ul className="cp-share">
+                {competitors
+                  .slice()
+                  .sort((a, b) => (geoResult.shares[b.id] ?? 0) - (geoResult.shares[a.id] ?? 0))
+                  .map((c) => (
+                    <li key={c.id} className={c.is_self ? 'is-self' : ''}>
+                      <span>{c.name}</span>
+                      <i style={{ width: `${geoResult.shares[c.id] ?? 0}%` }} />
+                      <b>{geoResult.shares[c.id] ?? 0}%</b>
+                    </li>
+                  ))}
+              </ul>
+            </>
+          )}
+          <p className="sm-sub">AI spend this month: £{spend.gbp.toFixed(2)} of your £{spend.capGbp} cap. The check stops by itself if the cap is reached.</p>
+          {isAdmin && (
+            legal ? (
+              <form action={startGeoRun}>
+                <button className="sm-btn is-primary">Run this month’s check</button>
+              </form>
+            ) : (
+              <p className="sm-sub">An admin needs to sign off the <Link href="/admin/social/competitors/legal">legal check</Link> first.</p>
+            )
+          )}
         </section>
 
         {isAdmin && picked && (
