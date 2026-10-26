@@ -102,3 +102,11 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
 .qb-pf small { color: var(--muted); font-weight: 500; font-size: 11.5px; }
 @media (max-width: 860px) { .qb-row .qb-pf, .qb-row--head span:nth-child(5) { display: none; } }
 .qb-val .crm-input, .qb-line .crm-input { padding-left: 8px; padding-right: 8px; }
+
+/* Solar estimator settings */
+.est-admin { display: grid; gap: 14px; max-width: 920px; }
+.est-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 18px; margin-top: 6px; }
+.est-field { display: grid; gap: 4px; align-content: start; }
+.est-field label { font-weight: 700; font-size: 0.88rem; }
+.est-input { display: flex; align-items: center; gap: 6px; }
+.est-input .crm-input { max-width: 140px; }

@@ -388,6 +388,7 @@ export async function AdminShell({
       items: [
         { href: '/admin/sales/quotes', label: 'Quotes', icon: icons.orders, active: active === 'sales', show: can('crm') && ready.quotes },
         { href: '/admin/sales/margin', label: 'Margin report', short: 'Margin', icon: icons.analytics, show: admin && ready.quotes },
+        { href: '/admin/sales/estimator', label: 'Solar estimator', short: 'Estimator', icon: icons.analytics, show: admin },
       ],
     },
     {

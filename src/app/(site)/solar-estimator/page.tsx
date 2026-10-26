@@ -1,12 +1,16 @@
 import type { Metadata } from 'next';
 import './solar-estimator.css';
+import { readEstimatorSettings } from '@/lib/estimator/settings';
 import { SolarEstimatorApp } from './SolarEstimatorApp';
 
+export const revalidate = 300;
+
 export const metadata: Metadata = {
-  title: 'Heliaxis — Solar Estimator',
-  description: 'Estimate your solar system size, annual savings, payback and CO₂ reduction in South Wales with the Heliaxis solar estimator.',
+  title: 'Solar Panel Calculator for South Wales | Heliaxis',
+  description: 'Free solar estimator: six quick questions for the system size, yearly saving, cost and payback for your home or business in South Wales, using satellite weather data for your postcode.',
+  alternates: { canonical: '/solar-estimator' },
 };
 
-export default function SolarEstimatorPage() {
-  return <SolarEstimatorApp />;
+export default async function SolarEstimatorPage() {
+  return <SolarEstimatorApp settings={await readEstimatorSettings()} />;
 }

@@ -116,7 +116,7 @@ export const PORTALS: Portal[] = [
 export const PORTAL_KEYS = PORTALS.map((p) => p.key);
 
 /** Admin-only areas — never grantable to members. */
-export const ADMIN_ONLY_PATHS = ['/admin/users', '/admin/approvals', '/admin/setup', '/admin/value', '/admin/sales/margin'];
+export const ADMIN_ONLY_PATHS = ['/admin/users', '/admin/approvals', '/admin/setup', '/admin/value', '/admin/sales/margin', '/admin/sales/estimator'];
 
 /**
  * The exceptions inside /admin/setup, open to every approved user: the guide and SQL viewers that
