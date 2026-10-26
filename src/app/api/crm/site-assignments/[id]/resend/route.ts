@@ -28,8 +28,11 @@ export async function POST(req: Request, { params }: Ctx) {
   if (!a) return json({ error: 'That trade isn’t on the job any more.' }, 404);
   if (a.status === 'cancelled') return json({ error: 'This trade was taken off the job.' }, 409);
   // Nothing has reached them yet and their firm has been suspended or terminated since: it would be a new job.
-  const { data: c } = await db.from('site_contacts').select('subcontractor_id').eq('id', a.contact_id).maybeSingle();
-  const blocked = c ? await blockedFirmProblem(db, a, c) : null;
+  const [{ data: c }, { data: m }] = await Promise.all([
+    db.from('site_contacts').select('subcontractor_id').eq('id', a.contact_id).maybeSingle(),
+    db.from('site_messages').select('kind').eq('id', messageId).maybeSingle(),
+  ]);
+  const blocked = c ? await blockedFirmProblem(db, a, c, m?.kind) : null;
   if (blocked) return json({ error: blocked }, 422);
   const message = await sendAgain(db, messageId, a.id, s.user.email ?? s.user.id);
   if (!message) return json({ error: 'That message can’t be sent again: it went already, or something newer has replaced it.' }, 409);

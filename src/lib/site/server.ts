@@ -465,16 +465,23 @@ export async function createAssignments(
 
 /**
  * Why nothing can be sent to this trade, or null: their firm was suspended or terminated after they
- * were put on the job, and nothing has reached them yet (it's not sent, or it is but no message went
- * and they haven't opened it), so sending would give them a new job. Once something has, the job
- * carries on as it is. The send and Send again routes ask before anything goes.
+ * were put on the job, and nothing has reached them yet (it's not sent, or it is but no message went,
+ * the office didn't hand them the link itself with Copy link or WhatsApp from my phone, and they
+ * haven't opened it), so sending would give them a new job. Once something has, the job carries on
+ * as it is. "Don't use the scaffold yet" (`kind` scaffold_hold) is a safety notice: it still goes to
+ * a trade that's been sent anything. The send and Send again routes ask before anything goes, and
+ * deliver() before a message that was waiting goes.
  */
-export async function blockedFirmProblem(db: Db, a: AssignmentRow, c: Pick<ContactRow, 'subcontractor_id'>): Promise<string | null> {
+export async function blockedFirmProblem(db: Db, a: AssignmentRow, c: Pick<ContactRow, 'subcontractor_id'>, kind?: string): Promise<string | null> {
   if (!c.subcontractor_id || (a.status !== 'draft' && a.status !== 'sent')) return null;
+  if (kind === 'scaffold_hold' && a.status === 'sent') return null;
   const firm = (await firmsById(db, [c.subcontractor_id])).get(c.subcontractor_id);
   if (!firm || !firmBlockedWords(firm.status)) return null;
-  const { data: went } = await db.from('site_messages').select('id').eq('assignment_id', a.id).eq('status', 'sent').limit(1);
-  return went?.length ? null : noNewJobs(firm);
+  const [{ data: went }, { data: handed }] = await Promise.all([
+    db.from('site_messages').select('id').eq('assignment_id', a.id).eq('status', 'sent').limit(1),
+    db.from('site_events').select('id').eq('assignment_id', a.id).eq('type', 'link_copied').limit(1),
+  ]);
+  return went?.length || handed?.length ? null : noNewJobs(firm);
 }
 
 /* ── The Site tab ────────────────────────────────────────────────────────────── */

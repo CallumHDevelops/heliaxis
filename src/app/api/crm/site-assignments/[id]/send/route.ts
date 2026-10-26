@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: Ctx) {
   const { data: c } = await db.from('site_contacts').select('*').eq('id', a.contact_id).maybeSingle();
   if (!c) return json({ error: 'That person isn’t there any more.' }, 404);
   // Not with them yet and their firm has been suspended or terminated since: it would be a new job.
-  const blocked = await blockedFirmProblem(db, a, c as ContactRow);
+  const blocked = await blockedFirmProblem(db, a, c as ContactRow, kind);
   if (blocked) return json({ error: blocked }, 422);
   try {
     const r = await sendToTrade(db, a, c as ContactRow, {
