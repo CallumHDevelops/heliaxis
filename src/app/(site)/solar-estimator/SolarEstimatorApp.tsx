@@ -76,6 +76,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
   const [kwh, setKwh] = useState(3800);
   const [daytime, setDaytime] = useState<Daytime>('some');
   const [battery, setBattery] = useState(false);
+  const [sizeMode, setSizeMode] = useState<'usage' | 'roof'>('usage');
   const [ev, setEv] = useState(false);
   const [heatpump, setHeatpump] = useState(false);
   const [house, setHouse] = useState('');
@@ -111,6 +112,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
     yieldKwhPerKwp: roofChoice === 'yes' && roofHit ? roofHit.kwhPerKwp : (yieldData?.kwhPerKwp ?? fallbackYield(dir, pitch)),
     monthlyPerKwp: roofChoice === 'yes' && roofHit ? roofHit.monthly : (yieldData?.monthly ?? null),
     maxPanels: roofChoice === 'yes' && roofHit ? roofHit.roof.maxPanels : undefined,
+    sizeMode,
     shade,
     usage: kind === 'bill' ? { kind: 'bill', value: bill } : { kind: 'kwh', value: kwh },
     daytime,
@@ -338,14 +340,14 @@ export function SolarEstimatorApp({ settings, roofLookup = false }: { settings: 
             </div>
           </div>
         ) : (
-          <Result rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ shade, setShade, daytime, setDaytime, battery, setBattery, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
+          <Result rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ sizeMode, setSizeMode, shade, setShade, daytime, setDaytime, battery, setBattery, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
         )}
       </div>
     </>
   );
 }
 
-type Controls = { shade: Shade; setShade: (s: Shade) => void; daytime: Daytime; setDaytime: (d: Daytime) => void; battery: boolean; setBattery: (b: boolean) => void; ev: boolean; setEv: (b: boolean) => void; heatpump: boolean; setHeatpump: (b: boolean) => void };
+type Controls = { sizeMode: 'usage' | 'roof'; setSizeMode: (m: 'usage' | 'roof') => void; shade: Shade; setShade: (s: Shade) => void; daytime: Daytime; setDaytime: (d: Daytime) => void; battery: boolean; setBattery: (b: boolean) => void; ev: boolean; setEv: (b: boolean) => void; heatpump: boolean; setHeatpump: (b: boolean) => void };
 
 /** The roof from above, with the building outline and the panels of the suggested system drawn on it. */
 function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panels: number; address: string; plain?: boolean }) {
@@ -437,6 +439,16 @@ function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, po
               <span><b>{roofHit.roof.maxPanels}</b> panels fit</span>
             </div>
             {r.roofLimited && <p className="est-note">Your roof has room for about {roofHit.roof.maxPanels} panels, so that is the most we have sized for.</p>}
+            {r.roofPanels > r.panelsWanted && (
+              <div className="est-chips" role="group" aria-label="System size">
+                <button type="button" className={controls.sizeMode === 'usage' ? 'on' : ''} aria-pressed={controls.sizeMode === 'usage'} onClick={() => controls.setSizeMode('usage')}>
+                  Match my usage
+                </button>
+                <button type="button" className={controls.sizeMode === 'roof' ? 'on' : ''} aria-pressed={controls.sizeMode === 'roof'} onClick={() => controls.setSizeMode('roof')}>
+                  Fill my roof ({r.roofPanels} panels)
+                </button>
+              </div>
+            )}
           </div>
         )}
         <div className="est-col">
@@ -601,8 +613,8 @@ function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, po
         <ul>
           <li>Yield: {num(inputs.yieldKwhPerKwp)} kWh per kWp a year for your postcode, roof direction and pitch ({source === 'pvgis' ? 'EU PVGIS data' : 'typical South Wales figure'}), less shading of {inputs.shade === 'none' ? '0' : inputs.shade === 'some' ? '10' : '22'}%.</li>
           <li>Electricity price {settings.importPence}p per kWh; export payment {settings.exportPence}p per kWh (Smart Export Guarantee rates vary from about 4p to 15p).</li>
-          <li>You use about {Math.round(r.selfPct * 100)}% of the solar yourself, based on who is home in the day{r.batteryKwh ? ', with the battery' : ''}{inputs.ev ? ', and an electric car' : ''}{inputs.heatpump ? ', and a heat pump' : ''}.</li>
-          <li>{home ? 'Home' : 'Business'} price £{(home ? settings.homePerKwp : settings.businessPerKwp).toLocaleString('en-GB')} per kWp installed{r.batteryKwh ? `, plus £${(settings.batteryPerKwh * settings.batteryKwh).toLocaleString('en-GB')} for the battery` : ''}. Savings are shown ±12% and prices ±8%.</li>
+          <li>You use about {Math.round(r.selfPct * 100)}% of the solar yourself, based on who is home in the day (a bigger system exports more of what it makes){r.batteryKwh ? ', with the battery' : ''}{inputs.ev ? ', and an electric car' : ''}{inputs.heatpump ? ', and a heat pump' : ''}.</li>
+          <li>{home ? 'Home' : 'Business'} price £{(home ? settings.homeFixed : settings.businessFixed).toLocaleString('en-GB')} fixed plus £{(home ? settings.homePerKwp : settings.businessPerKwp).toLocaleString('en-GB')} per kWp installed{r.batteryKwh ? `, plus £${(settings.batteryPerKwh * settings.batteryKwh).toLocaleString('en-GB')} for the battery` : ''}. Savings are shown ±12% and prices ±8%.</li>
           <li>25-year figure: panels lose {settings.degradationPct}% a year and electricity prices are assumed {settings.priceRisePct ? `to rise ${settings.priceRisePct}% a year` : 'not to rise (today’s prices, a cautious view)'}.</li>
           <li>CO₂: about {r.co2Tonnes.toFixed(1)} tonnes a year, at {settings.co2PerKwh} kg per kWh.</li>
         </ul>

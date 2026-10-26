@@ -8,8 +8,10 @@ const FIELDS: { title: string; fields: Field[] }[] = [
   {
     title: 'Prices shown to visitors (indicative)',
     fields: [
-      { key: 'homePerKwp', label: 'Home: installed price per kWp', unit: '£', help: 'What a typical home system costs per kW of panels, installed. The survey sets the real price.' },
-      { key: 'businessPerKwp', label: 'Business: installed price per kWp', unit: '£', help: 'Larger systems cost less per kW.' },
+      { key: 'homeFixed', label: 'Home: fixed cost of any installation', unit: '£', help: 'Scaffold, inverter, labour, grid paperwork: the part that does not grow with the number of panels.' },
+      { key: 'homePerKwp', label: 'Home: price per extra kWp', unit: '£', help: 'Added for each kW of panels. A 4 kWp system costs the fixed cost plus 4 times this. The survey sets the real price.' },
+      { key: 'businessFixed', label: 'Business: fixed cost', unit: '£', help: 'As above, for a business site.' },
+      { key: 'businessPerKwp', label: 'Business: price per extra kWp', unit: '£', help: 'Larger systems cost less per kW.' },
       { key: 'batteryPerKwh', label: 'Battery: price per kWh of storage', unit: '£', help: 'Added when the visitor adds a battery.' },
       { key: 'batteryKwh', label: 'Battery size offered', unit: 'kWh', help: 'The battery the estimate assumes.' },
       { key: 'panelWatts', label: 'Panel size', unit: 'W', help: 'Used to count panels.' },

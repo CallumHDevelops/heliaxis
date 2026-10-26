@@ -16,8 +16,10 @@ export type EstimatorSettings = {
   /** What exported electricity earns (Smart Export Guarantee), pence per kWh. */
   exportPence: number;
   panelWatts: number;
-  /** Installed price per kWp, home and business (pounds). Indicative: a survey sets the real price. */
+  /** Installed price: a fixed part (scaffold, inverter, labour, grid paperwork) plus a price per kWp, for homes and businesses (pounds). Indicative: a survey sets the real price. */
+  homeFixed: number;
   homePerKwp: number;
+  businessFixed: number;
   businessPerKwp: number;
   /** Battery price per kWh of storage (pounds), and the size offered. */
   batteryPerKwh: number;
@@ -35,8 +37,10 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
   standingPence: 54.8,
   exportPence: 12,
   panelWatts: 450,
-  homePerKwp: 1350,
-  businessPerKwp: 950,
+  homeFixed: 1500,
+  homePerKwp: 1000,
+  businessFixed: 2000,
+  businessPerKwp: 850,
   batteryPerKwh: 800,
   batteryKwh: 5,
   priceRisePct: 0,
@@ -56,7 +60,10 @@ export function cleanSettings(v: unknown): EstimatorSettings {
     standingPence: num('standingPence', 0, 150),
     exportPence: num('exportPence', 0, 60),
     panelWatts: num('panelWatts', 250, 700),
+    // Settings saved before fixed costs existed keep their old flat price per kWp.
+    homeFixed: o.homeFixed === undefined && o.homePerKwp !== undefined ? 0 : num('homeFixed', 0, 50000),
     homePerKwp: num('homePerKwp', 300, 5000),
+    businessFixed: o.businessFixed === undefined && o.businessPerKwp !== undefined ? 0 : num('businessFixed', 0, 100000),
     businessPerKwp: num('businessPerKwp', 300, 5000),
     batteryPerKwh: num('batteryPerKwh', 100, 3000),
     batteryKwh: num('batteryKwh', 2, 30),
@@ -114,6 +121,12 @@ export type Inputs = {
   heatpump: boolean;
   /** The most panels the roof has room for, when a satellite lookup found the roof (0 or missing: not known). */
   maxPanels?: number;
+  /** 'usage' (the default): sized to cover the electricity used. 'roof': as many panels as the roof takes. */
+  sizeMode?: 'usage' | 'roof';
+  /** Battery size when a battery is chosen (the settings' size if not given). */
+  batteryKwh?: number;
+  /** kWh per kWp a year for each panel the roof takes, best face first (a roof with more than one face). Overrides yieldKwhPerKwp. */
+  panelYields?: number[];
 };
 
 export type Estimate = {
@@ -146,6 +159,11 @@ export type Estimate = {
   batteryKwh: number;
   /** The roof, not the electricity use, is what limits the size. */
   roofLimited: boolean;
+  /** The panels that would cover the electricity used, if the roof had no limit; and the most the roof takes (0: not known). */
+  panelsWanted: number;
+  roofPanels: number;
+  /** Money position at the end of each year, 0 to 25 (negative until the system has paid for itself). */
+  cashflow: number[];
 };
 
 const EV_KWH = 2000;
@@ -161,40 +179,64 @@ export function consumptionFrom(usage: Inputs['usage'], s: EstimatorSettings): n
   return Math.max(0, (yearly - (s.standingPence / 100) * 365) / (s.importPence / 100));
 }
 
+/** A smooth minimum: close to the smaller of two numbers, without a sharp corner where they cross. */
+const softMin = (a: number, b: number) => (a <= 0 || b <= 0 ? 0 : Math.pow(Math.pow(a, -4) + Math.pow(b, -4), -0.25));
+
+/** The share of a home's (or site's) electricity used while the sun is up, before any battery. */
+const DAY_SHARE = { home: { out: 0.25, some: 0.33, home: 0.42 }, business: { out: 0.45, some: 0.5, home: 0.55 } } as const;
+
 export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Estimate {
   const home = i.who === 'home';
   const base = consumptionFrom(i.usage, s);
   const consumption = base + (i.ev ? EV_KWH : 0) + (i.heatpump ? HEATPUMP_KWH : 0);
-  const eff = Math.max(300, i.yieldKwhPerKwp) * SHADE_FACTOR[i.shade];
+  const shadeF = SHADE_FACTOR[i.shade];
+  const panelKw = s.panelWatts / 1000;
 
-  // Size: enough to cover about 95% of the year's use, within what a home roof can take (2 to about 10 kWp) or a site's (5 to 250).
-  const wantKwp = (consumption * 0.95) / eff;
+  // What n panels make a year: from each panel's own yield when the roof has several faces, otherwise one yield for all.
+  const py = i.panelYields && i.panelYields.length ? i.panelYields : null;
+  const avg = py ? py.reduce((a, b) => a + b, 0) / py.length : Math.max(300, i.yieldKwhPerKwp);
+  const genFor = (n: number) => {
+    const kwh = py ? py.slice(0, n).reduce((a, b) => a + b, 0) + Math.max(0, n - py.length) * avg : n * avg;
+    return kwh * panelKw * shadeF;
+  };
+
+  // Size: enough panels to cover about 95% of the year's use, within what a home roof can take (2 to about 10 kWp) or a site's (5 to 250).
   const [minKwp, maxKwp] = home ? [2, 10] : [5, 250];
-  const panels = Math.max(Math.ceil((minKwp * 1000) / s.panelWatts), Math.min(Math.floor((maxKwp * 1000) / s.panelWatts), Math.round((wantKwp * 1000) / s.panelWatts)));
-  const roofCap = i.maxPanels && i.maxPanels > 0 ? Math.max(4, i.maxPanels) : Infinity;
-  const panelsUsed = Math.min(panels, roofCap);
-  const roofLimited = panelsUsed < panels;
-  const kwp = (panelsUsed * s.panelWatts) / 1000;
-  const generation = kwp * eff;
+  const minPanels = Math.ceil((minKwp * 1000) / s.panelWatts);
+  const typeMax = Math.floor((maxKwp * 1000) / s.panelWatts);
+  const roofCap = i.maxPanels && i.maxPanels > 0 ? Math.max(4, i.maxPanels) : 0;
+  const target = consumption * 0.95;
+  let wanted = minPanels;
+  while (wanted < typeMax && genFor(wanted) < target) wanted++;
+  const cap = roofCap ? Math.min(typeMax, roofCap) : typeMax;
+  const panels = i.sizeMode === 'roof' && roofCap ? cap : Math.min(wanted, cap);
+  const roofLimited = !!roofCap && wanted > roofCap && i.sizeMode !== 'roof';
+  const kwp = (panels * s.panelWatts) / 1000;
+  const generation = genFor(panels);
 
-  // How much of it is used in the building: more with someone at home in the day, a battery, an EV or a heat pump.
-  let selfPct = (home ? { out: 0.3, some: 0.4, home: 0.5 }[i.daytime] : { out: 0.5, some: 0.55, home: 0.6 }[i.daytime]) + (i.ev ? 0.04 : 0) + (i.heatpump ? 0.04 : 0);
-  if (i.battery) selfPct += home ? 0.3 : 0.2;
-  selfPct = Math.min(selfPct, 0.85);
-  const selfUsed = Math.min(generation * selfPct, consumption * 0.92);
+  // How much is used in the building: limited by what is made and by what the building uses while the sun is up. A battery, an
+  // electric car and a heat pump all raise that daytime use; a bigger system on the same use exports more of what it makes.
+  const batteryKwh = i.battery ? (i.batteryKwh ?? s.batteryKwh) : 0;
+  const batteryBonus = batteryKwh > 0 ? (home ? 0.3 : 0.2) * ((1 - Math.exp(-batteryKwh / 4)) / (1 - Math.exp(-5 / 4))) : 0;
+  const dayShare = Math.min(0.9, DAY_SHARE[home ? 'home' : 'business'][i.daytime] + batteryBonus + (i.ev ? 0.04 : 0) + (i.heatpump ? 0.04 : 0));
+  const selfUsed = Math.min(generation, softMin(generation * 0.95, consumption * dayShare * 1.15));
   const exported = Math.max(generation - selfUsed, 0);
+  const selfPct = generation > 0 ? selfUsed / generation : 0;
 
   const imp = s.importPence / 100;
   const saving = selfUsed * imp + exported * (s.exportPence / 100);
-  const batteryKwh = i.battery ? s.batteryKwh : 0;
-  const cost = kwp * (home ? s.homePerKwp : s.businessPerKwp) + batteryKwh * s.batteryPerKwh;
+  const cost = (home ? s.homeFixed + kwp * s.homePerKwp : s.businessFixed + kwp * s.businessPerKwp) + batteryKwh * s.batteryPerKwh;
   const savingLow = saving * (1 - SPREAD);
   const savingHigh = saving * (1 + SPREAD);
   const costLow = cost * (1 - 0.08);
   const costHigh = cost * (1 + 0.08);
 
+  const cashflow = [-cost];
   let total = 0;
-  for (let y = 0; y < 25; y++) total += saving * Math.pow(1 - s.degradationPct / 100, y) * Math.pow(1 + s.priceRisePct / 100, y);
+  for (let y = 0; y < 25; y++) {
+    total += saving * Math.pow(1 - s.degradationPct / 100, y) * Math.pow(1 + s.priceRisePct / 100, y);
+    cashflow.push(total - cost);
+  }
 
   const monthly = (i.monthlyPerKwp && i.monthlyPerKwp.length === 12 ? (() => {
     const sum = i.monthlyPerKwp.reduce((a, b) => a + b, 0) || 1;
@@ -205,7 +247,7 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
   return {
     consumption,
     kwp,
-    panels: panelsUsed,
+    panels,
     generation,
     selfPct,
     selfUsed,
@@ -227,6 +269,9 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
     needsG99: home && kwp > 3.68,
     batteryKwh,
     roofLimited,
+    panelsWanted: wanted,
+    roofPanels: roofCap,
+    cashflow,
   };
 }
 

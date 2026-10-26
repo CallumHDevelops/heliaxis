@@ -63,4 +63,27 @@ describe('solar estimator maths', () => {
     expect(s.exportPence).toBe(DEFAULT_SETTINGS.exportPence);
     expect(s.homePerKwp).toBe(1500);
   });
+  it('a fixed cost makes small systems pay back slower than large ones', () => {
+    const small = estimate({ ...base, usage: { kind: 'kwh', value: 2000 } });
+    const large = estimate({ ...base, usage: { kind: 'kwh', value: 6000 } });
+    expect(small.cost).toBeCloseTo(DEFAULT_SETTINGS.homeFixed + small.kwp * DEFAULT_SETTINGS.homePerKwp, 0);
+    expect(small.paybackYears).toBeGreaterThan(large.paybackYears);
+  });
+  it('a bigger system on the same use exports more and uses a smaller share', () => {
+    const usage = { kind: 'kwh' as const, value: 3000 };
+    const a = estimate({ ...base, usage, maxPanels: 8, sizeMode: 'roof' });
+    const b = estimate({ ...base, usage, maxPanels: 20, sizeMode: 'roof' });
+    expect(b.exported).toBeGreaterThan(a.exported);
+    expect(b.selfPct).toBeLessThan(a.selfPct);
+    expect(b.panels).toBe(20);
+  });
+  it('cashflow starts at minus the cost and ends at the 25 year net', () => {
+    const e = estimate(base);
+    expect(e.cashflow).toHaveLength(26);
+    expect(e.cashflow[0]).toBeCloseTo(-e.cost, 5);
+    expect(e.cashflow[25]).toBeCloseTo(e.net25, 5);
+  });
+  it('keeps old saved prices as a flat price per kWp', () => {
+    expect(cleanSettings({ homePerKwp: 1350 }).homeFixed).toBe(0);
+  });
 });
