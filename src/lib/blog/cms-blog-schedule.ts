@@ -191,13 +191,33 @@ export async function scheduleCmsBlog(opts: {
 export async function cancelCmsBlogSchedule(opts: { id?: string; slug?: string }) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
-  const { data, error } = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
-  if (error) throw new Error(error.message);
+  const [draftRes, renRes] = await Promise.all([
+    admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle(),
+    admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle(),
+  ]);
+  const failedRead = draftRes.error || renRes.error;
+  if (failedRead) throw new Error(failedRead.message);
 
-  const state = parseCmsState(data?.value);
+  const state = parseCmsState(draftRes.data?.value);
   const idx = findPageIndex(state.pages || [], opts.id, opts.slug);
   if (idx < 0) throw new Error('Blog page not found');
   const pg = state.pages![idx];
+
+  // The every-minute job may have put it live since the Blog list was loaded. Unschedule only
+  // changes the saved site, so it would say Draft while the website still shows the article.
+  let rendered: RenderedDoc = { pages: [] };
+  try {
+    rendered = renRes.data?.value ? (JSON.parse(renRes.data.value) as RenderedDoc) : { pages: [] };
+  } catch {
+    rendered = { pages: [] };
+  }
+  const aliases = slugAliases(String(pg.slug || opts.slug || ''));
+  const onWebsite = (rendered.pages || []).some((p) => pageMatchesBlog(p, undefined, aliases));
+  if (String(pg.blogStatus || '').toLowerCase() === 'published' || onWebsite) {
+    throw new Error(
+      'This article has already gone live, so there’s no schedule to cancel. To take it off the website, click ⋯, then Unpublish.',
+    );
+  }
 
   pg.blogStatus = 'draft';
   pg.publishAt = null;
@@ -370,13 +390,16 @@ export async function publishDueScheduledBlogs(now = new Date()) {
 
   published.pages = publishedPages;
 
+  // The website first, and the saved site (Live, captured page cleared) only once both are written: if
+  // a write fails, the article is still Scheduled with its captured page, and the next minute retries.
   const results = await Promise.all([
-    upsertKv(admin, DRAFT_KEY, draft, nowIso),
     upsertKv(admin, PUBLISHED_KEY, published, nowIso),
     upsertKv(admin, RENDERED_KEY, rendered, nowIso),
   ]);
   const failed = results.find((r) => r.error);
   if (failed?.error) throw new Error(failed.error.message);
+  const { error: draftErr } = await upsertKv(admin, DRAFT_KEY, draft, nowIso);
+  if (draftErr) throw new Error(draftErr.message);
 
   revalidatePath('/', 'layout');
   revalidatePath('/blog');

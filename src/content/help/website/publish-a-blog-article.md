@@ -47,6 +47,8 @@ The time must be at least 30 seconds away.
 
 Click **Unschedule**, then **Unschedule** again. The article goes back to being a draft.
 
+If its time has come and it’s already gone live, there’s no schedule to cancel: you’ll see a message saying so, and its badge changes to **Live**. To take it off the website, use **Unpublish** (below).
+
 ## Take an article off the website
 
 Click **⋯**, then **Unpublish**, then **Unpublish**. It leaves the website and becomes a draft you can edit and publish again later.

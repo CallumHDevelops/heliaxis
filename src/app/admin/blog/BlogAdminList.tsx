@@ -329,6 +329,8 @@ export function BlogAdminList({ posts: initial }: { posts: CmsAiBlogListItem[] }
       router.refresh();
     } catch (e) {
       setMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Could not cancel schedule' });
+      // It may have gone live since the list was loaded: show it as it is now (Live, with Unpublish).
+      router.refresh();
     } finally {
       setBusyId(null);
       setBusyAction(null);
