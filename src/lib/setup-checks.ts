@@ -719,22 +719,21 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 12,
     optional: true,
   });
-  add(socialSql && !env('TRUSTPILOT_API_KEY', 'TRUSTPILOT_API_SECRET', 'TRUSTPILOT_BUSINESS_UNIT_ID'), {
+  add(socialSql && !env('TRUSTPILOT_API_KEY', 'TRUSTPILOT_BUSINESS_UNIT_ID'), {
     id: 'env-social-trustpilot',
     title: 'Social monitoring: get your Trustpilot API key',
     detail: 'Lets the app read your Trustpilot reviews every 15 minutes. Needs a Trustpilot Business account that includes API access.',
     steps: [
       'Sign in to [Trustpilot Business](https://businessapp.b2b.trustpilot.com) with the Heliaxis account.',
-      'Go to **Integrations → Developers → APIs** (the menu names can move). Tap **Create application**, name it `Heliaxis monitoring`, and save. It shows an **API key** and an **API secret**.',
+      'Go to **Integrations → Developers → APIs** (the menu names can move). Tap **Create application**, name it `Heliaxis monitoring`, and save. It shows an **API key** (the secret is not needed for reading reviews).',
       'If you cannot see an API area, your Trustpilot plan may not include API access. Ask Trustpilot support, or tell Claude: the review-email route (next to-do) works instead.',
       'Find your **business unit ID**: open this address in a browser, replacing `YOUR_API_KEY`: `https://api.trustpilot.com/v1/business-units/find?name=heliaxis.co.uk&apikey=YOUR_API_KEY`. Copy the `id` in the reply.',
       'The developer documentation is at [developers.trustpilot.com](https://developers.trustpilot.com) (see **Authentication** and **Business Units API**).',
-      'Add the three keys below in Vercel (tick **Sensitive** on the secret).',
+      'Add the two keys below in Vercel (tick **Sensitive** on the API key).',
       ...VERCEL_STEPS,
     ],
     copies: [
       { label: 'Key', value: 'TRUSTPILOT_API_KEY' },
-      { label: 'Key', value: 'TRUSTPILOT_API_SECRET' },
       { label: 'Key', value: 'TRUSTPILOT_BUSINESS_UNIT_ID' },
     ],
     href: 'https://developers.trustpilot.com',

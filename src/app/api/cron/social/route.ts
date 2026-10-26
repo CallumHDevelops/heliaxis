@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sendDueAlerts } from '@/lib/social/alerts';
+import { pollTrustpilot } from '@/lib/social/connectors/trustpilot';
 import { runDailySnapshots } from '@/lib/social/insights/collect';
 import { runSocialJobs } from '@/lib/social/jobs';
 
@@ -20,9 +21,11 @@ async function run(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const deferredSent = await sendDueAlerts().catch(() => 0);
   const jobs = await runSocialJobs().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
+  // Trustpilot reviews, every 15 minutes (skips itself in between, and does nothing until the keys are in).
+  const trustpilot = await pollTrustpilot().catch(() => ({ polled: false }));
   // Once a day after 02:15: followers, views and post figures from Facebook and Instagram.
   const snapshots = await runDailySnapshots().catch(() => ({ ran: false }));
-  return NextResponse.json({ ok: true, deferredSent, jobs, snapshots });
+  return NextResponse.json({ ok: true, deferredSent, jobs, trustpilot, snapshots });
 }
 export const GET = run;
 export const POST = run;
