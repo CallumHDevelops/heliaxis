@@ -17,7 +17,7 @@ describe('quote pdf', () => {
     const inc = content.blocks[1];
     if (inc.type === 'text') inc.body = 'Supply and installation of the panels and battery.\n\nMCS certificate and DNO notification.';
     const bytes = await quotePdf({
-      number: 'Q-0001', title: 'Your Heliaxis quote', issued: '2026-10-26', validUntil: '2026-11-25', jobRef: null,
+      number: 'Q-0001', title: 'Your Heliaxis quote', issued: '2026-10-26', validUntil: '2026-11-25', customerRef: 'HX-0007',
       customer: { name: 'Sam Example', email: 'sam@example.com', phone: '07700 900123', address: '1 High Street, Swansea, SA1 1AA' },
       content, depositPence: 50000, images: new Map(), datasheets: new Map(),
     });

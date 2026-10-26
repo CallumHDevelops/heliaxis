@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import { ThemeChoice } from '@/components/theme/ThemeChoice';
@@ -117,6 +117,7 @@ const quoteWord = (q: { category: string }) => (q.category === 'contract' ? 'con
 function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref }) {
   const q = data.quote;
   const [signing, setSigning] = useState(false);
+  const [query, setQuery] = useState(0);
   return (
     <Shell tag="Your quote" themePref={themePref}>
       <section className="pt-hello">
@@ -149,6 +150,9 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
             <button type="button" className="pt-btn" onClick={() => setSigning(true)}>
               Accept quote
             </button>
+            <button type="button" className="pt-btn ghost" onClick={() => setQuery((n) => n + 1)}>
+              Raise a query
+            </button>
           </div>
           <ol className="pt-steps">
             <li>Accept and sign</li>
@@ -162,6 +166,8 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
           <p className="pt-muted">We’re just finishing your quote and will send it over shortly.</p>
         </section>
       )}
+
+      <PortalMessages token={data.token} first={data.first} focus={query} prefill="I have a question about my quote: " />
 
       <Contact data={data} />
 
@@ -186,6 +192,7 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
 
 function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData; paid: boolean; justAccepted: boolean; themePref: ThemePref }) {
   const [signing, setSigning] = useState(false);
+  const [query, setQuery] = useState(0);
   const [photo, setPhoto] = useState<string | null>(null);
   const now = useNow(60_000);
   const accepted = data.accepted;
@@ -247,6 +254,9 @@ function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData;
             </a>
             <button type="button" className="pt-btn" onClick={() => setSigning(true)}>
               Accept quote
+            </button>
+            <button type="button" className="pt-btn ghost" onClick={() => setQuery((n) => n + 1)}>
+              Raise a query
             </button>
           </div>
         </section>
@@ -334,6 +344,8 @@ function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData;
           </div>
         </section>
       )}
+
+      <PortalMessages token={data.token} first={data.first} focus={query} prefill={data.quote && !accepted ? 'I have a question about my quote: ' : ''} />
 
       <Contact data={data} />
 
@@ -554,5 +566,77 @@ function InstallDates({ token, pref }: { token: string; pref: PortalData['instal
         )}
       </div>
     </div>
+  );
+}
+
+type Msg = { id: string; direction: 'in' | 'out'; body: string; created_at: string; by: string | null };
+
+/**
+ * The customer's conversation with Heliaxis: what they send comes straight to the team and is logged against
+ * them. `focus` goes up each time "Raise a query" is pressed: the card scrolls into view with the box ready
+ * (and `prefill` started for them).
+ */
+function PortalMessages({ token, first, focus, prefill }: { token: string; first: string; focus: number; prefill: string }) {
+  const [messages, setMessages] = useState<Msg[] | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [sent, setSent] = useState(false);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const card = useRef<HTMLElement>(null);
+  const load = () =>
+    fetch(`/api/my/${token}/messages`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setMessages(d.messages || []))
+      .catch(() => setMessages([]));
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+  useEffect(() => {
+    if (!focus) return;
+    setText((t) => t || prefill);
+    card.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => box.current?.focus(), 350);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
+  async function send() {
+    setBusy(true);
+    setErr('');
+    setSent(false);
+    const r = await fetch(`/api/my/${token}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text }) }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!r?.ok) return setErr(d.error || 'Something went wrong. Please try again.');
+    setText('');
+    setSent(true);
+    await load();
+  }
+  const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return (
+    <section className="pt-card pt-msgs" id="pt-messages" ref={card}>
+      <h2>Messages</h2>
+      <p className="pt-muted">Ask us anything about your quote or your installation. {first ? `${first}, ` : ''}your message comes straight to the team and we will reply here.</p>
+      {messages && messages.length > 0 && (
+        <ul className="pt-thread">
+          {messages.map((m) => (
+            <li key={m.id} className={m.direction === 'in' ? 'me' : 'them'}>
+              <small>
+                {m.direction === 'in' ? 'You' : m.by || 'Heliaxis'} · {when(m.created_at)}
+              </small>
+              <span>{m.body}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <textarea ref={box} className="pt-input" rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write your message" aria-label="Your message" />
+      {err && <p className="pt-err">{err}</p>}
+      {sent && <p className="pt-banner ok">Thank you, we have your message and will reply here.</p>}
+      <div className="pt-row">
+        <button type="button" className="pt-btn" disabled={busy || !text.trim()} onClick={() => void send()}>
+          {busy ? 'Sending…' : 'Send message'}
+        </button>
+      </div>
+    </section>
   );
 }

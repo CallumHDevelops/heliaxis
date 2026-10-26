@@ -775,6 +775,8 @@ export type DocOptions = {
   /** "Issue 1", from the one map of issues (documents/issue.ts). */
   revision?: string | null;
   jobRef: string | null;
+  /** What the reference in the eyebrow is called: "Project" (the default) or "Customer" (a quote has the customer's ID). */
+  refLabel?: string;
   /** YYYY-MM-DD (UK). */
   issued: string;
   /** "Not answered" in red where an answer is missing, and the "Draft: not signed yet" banner. Never shown to a customer. */
@@ -1074,7 +1076,7 @@ export async function newDocument(o: DocOptions) {
      * title in cream, the references on the right), then the draft banner on a draft.
      */
     header(h: { meta?: [string, string][] } = {}) {
-      y = pk.masthead(page, { x: X, w: W, meta: h.meta ?? [], eyebrow: `${label} · ${o.jobRef ? `Project ${o.jobRef}` : 'Heliaxis'}`, title: o.title });
+      y = pk.masthead(page, { x: X, w: W, meta: h.meta ?? [], eyebrow: `${label} · ${o.jobRef ? `${o.refLabel ?? 'Project'} ${o.jobRef}` : 'Heliaxis'}`, title: o.title });
       if (o.draft) {
         page.drawRectangle({ x: X, y: y - 22, width: W, height: 22, ...fillOf(look.cell), borderColor: SOLAR, borderWidth: 1.4 });
         text('Draft: not signed yet', X + 10, y - 15, 9.5, { bold: true, color: look.flag });

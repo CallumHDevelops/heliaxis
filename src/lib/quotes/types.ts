@@ -10,7 +10,8 @@ export type QuoteBlock =
   | { id: string; type: 'images'; heading: string; images: QuoteImage[] }
   | { id: string; type: 'datasheets'; heading: string; files: QuoteFile[] };
 
-export type QuoteContent = { intro: string; blocks: QuoteBlock[] };
+/** `terms` always print at the bottom of the quote, after everything else. */
+export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string };
 
 /** VAT rates the builder offers: 0% (domestic solar and batteries to 2027), 5% and 20%. */
 export const VAT_RATES = [0, 5, 20] as const;
@@ -66,8 +67,8 @@ export function starterContent(first: string): QuoteContent {
     blocks: [
       { id: newId(), type: 'items', heading: 'Your quote', lines: [emptyLine()] },
       { id: newId(), type: 'text', heading: 'What is included', body: '' },
-      { id: newId(), type: 'text', heading: 'Terms', body: DEFAULT_TERMS },
     ],
+    terms: DEFAULT_TERMS,
   };
 }
 
@@ -117,5 +118,15 @@ export function cleanContent(v: unknown): QuoteContent {
           .filter((f) => /^[0-9a-f-]{36}$/i.test(f.library_id)),
       });
   }
-  return { intro: str(o.intro, 4000), blocks };
+  // A quote made before terms had their own place: its "Terms" text section moves to the bottom.
+  let terms = typeof o.terms === 'string' ? str(o.terms, 8000) : null;
+  if (terms === null) {
+    const i = blocks.findIndex((b) => b.type === 'text' && /^terms/i.test(b.heading.trim()));
+    if (i >= 0) {
+      const b = blocks[i];
+      terms = b.type === 'text' ? b.body : '';
+      blocks.splice(i, 1);
+    } else terms = DEFAULT_TERMS;
+  }
+  return { intro: str(o.intro, 4000), blocks, terms };
 }

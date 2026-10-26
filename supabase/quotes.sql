@@ -27,3 +27,30 @@ alter table public.crm_quotes enable row level security;
 -- The installation dates a customer asks for after accepting (portal: "Choose your installation date").
 -- { dates: ['2026-12-01', ...], flexible: bool, notes: text, at: iso }. The office confirms the real date.
 alter table public.crm_projects add column if not exists install_pref jsonb;
+
+-- Quote numbers start at Q-1001 (not Q-0001), and any draft already made is renumbered. Safe to run again:
+-- it only moves the counter when it is still below 1000, and only renumbers drafts that carry an old Q-0… number.
+do $$
+begin
+  if (select last_value from public.crm_quote_seq) < 1000 then
+    perform setval('public.crm_quote_seq', 1000);
+    update public.crm_quotes
+       set number = 'Q-' || lpad(nextval('public.crm_quote_seq')::text, 4, '0')
+     where status = 'draft' and number like 'Q-0%';
+  end if;
+end $$;
+
+-- Messages between a customer and Heliaxis through their portal. Every one is logged against the customer
+-- (also written to the opportunity's activity), and the team is notified of each message the customer sends.
+create table if not exists public.portal_messages (
+  id          uuid primary key default gen_random_uuid(),
+  project_id  uuid not null references public.crm_projects(id) on delete cascade,
+  enquiry_id  uuid not null references public.enquiries(id) on delete cascade,
+  direction   text not null check (direction in ('in','out')),   -- in = from the customer, out = from us
+  body        text not null,
+  sent_by     uuid references public.profiles(id) on delete set null,
+  read_at     timestamptz,
+  created_at  timestamptz not null default now()
+);
+create index if not exists portal_messages_project_idx on public.portal_messages (project_id, created_at);
+alter table public.portal_messages enable row level security;

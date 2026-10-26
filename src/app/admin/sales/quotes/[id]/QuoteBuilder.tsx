@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuoteRow } from '@/lib/quotes/server';
+import { defaultQuoteMessage } from '@/lib/quotes/message';
 import { createClient } from '@/lib/supabase/client';
 import '../../../crm/crm.css';
 import '../quotes.css';
 import { emptyLine, money, newId, penceFromText, textFromPence, totalsOf, VAT_RATES, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
-type Sent = { url: string; whatsappText: string; emailSubject: string; emailText: string; email: string | null; projectId: string; enquiryId: string };
+type Channel = { ok: true; to?: string; via?: string } | { ok: false; error: string };
+type Sent = { url: string; whatsappText: string; emailSubject: string; emailText: string; email: string | null; projectId: string; enquiryId: string; sentVia: { email?: Channel; whatsapp?: Channel } };
 
 /** Shrink a picture in the browser (max 1600 px, JPEG) so it uploads quickly and keeps the PDF small. */
 async function shrink(file: File): Promise<File> {
@@ -40,6 +42,10 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
   const [err, setErr] = useState('');
   const [sent, setSent] = useState<Sent | null>(null);
   const [note, setNote] = useState('');
+  const [composing, setComposing] = useState(false);
+  const [viaEmail, setViaEmail] = useState(!!customer.email);
+  const [viaWa, setViaWa] = useState(!!customer.phone);
+  const [message, setMessage] = useState(() => defaultQuoteMessage(customer.name, initial.title));
   const first = useRef(true);
   const payload = useRef({ title, content, validUntil, deposit });
   payload.current = { title, content, validUntil, deposit };
@@ -151,20 +157,24 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
     window.open(`/api/crm/quotes/${initial.id}/pdf`, '_blank');
     setBusy('');
   }
-  async function send() {
+  function openSend() {
     if (totals.gross <= 0) return setErr('Add at least one priced item first.');
-    if (!window.confirm(`Send this quote to ${customer.name} for signing? The job moves to Quote sent and their link is made.`)) return;
+    setErr('');
+    setComposing(true);
+  }
+  async function send() {
     setBusy('send');
     setErr('');
     if (!(await save())) {
       setBusy('');
       return setErr('Couldn’t save, so it wasn’t sent. Try again.');
     }
-    const r = await fetch(`/api/crm/quotes/${initial.id}/send`, { method: 'POST' });
+    const r = await fetch(`/api/crm/quotes/${initial.id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: viaEmail, whatsapp: viaWa, message }) });
     const d = await r.json().catch(() => ({}));
     setBusy('');
     if (!r.ok) return setErr(d.error || 'Not sent');
     setSent(d);
+    setComposing(false);
     setStatus('sent');
   }
   async function emailIt() {
@@ -207,18 +217,44 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
           <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy} onClick={() => void preview()}>
             {busy === 'preview' ? 'Opening…' : 'Preview PDF'}
           </button>
-          <button type="button" className="crm-btn crm-btn--solar" disabled={!!busy || locked} onClick={() => void send()} title={locked ? 'They have signed this quote' : undefined}>
-            {busy === 'send' ? 'Sending…' : status === 'sent' ? 'Update and send again' : 'Send to customer'}
+          <button type="button" className="crm-btn crm-btn--solar" disabled={!!busy || locked} onClick={openSend} title={locked ? 'They have signed this quote' : undefined}>
+            {status === 'sent' ? 'Update and send again' : 'Send to customer'}
           </button>
         </div>
       </div>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {locked && <p className="crm-banner">The customer has signed this quote, so it is locked.</p>}
 
+      {composing && (
+        <div className="qb-sheet" role="dialog" aria-label="Send the quote">
+          <b>Send {initial.number} to {customer.name}</b>
+          <p className="crm-small crm-muted">They get a link to their private portal, where they can view the quote, accept it, or raise a query. Nothing is sent until you press Send quote.</p>
+          <label className="crm-check">
+            <input type="checkbox" checked={viaEmail} disabled={!customer.email} onChange={(e) => setViaEmail(e.target.checked)} /> Branded email{customer.email ? ` to ${customer.email}` : ' (no email address on file)'}
+          </label>
+          <label className="crm-check">
+            <input type="checkbox" checked={viaWa} disabled={!customer.phone} onChange={(e) => setViaWa(e.target.checked)} /> WhatsApp{customer.phone ? ` to ${customer.phone}` : ' (no mobile number on file)'}
+          </label>
+          <label className="qb-lab">Message (the portal link and button are added for you)</label>
+          <textarea className="crm-input" rows={9} value={message} onChange={(e) => setMessage(e.target.value)} />
+          {viaWa && <p className="crm-small crm-muted">If their 24-hour WhatsApp window is closed, the approved “Quote ready” template goes instead, with its own fixed wording.</p>}
+          <div className="crm-actions">
+            <button type="button" className="crm-btn crm-btn--solar" disabled={!!busy} onClick={() => void send()}>
+              {busy === 'send' ? 'Sending…' : viaEmail || viaWa ? 'Send quote' : 'Make the link only'}
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setComposing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {sent && (
         <div className="qb-sent">
-          <b>Ready to send ✓</b>
-          <p className="crm-small">The customer’s link opens this quote to read and sign. The job is now at Quote sent.</p>
+          <b>{sent.sentVia.email || sent.sentVia.whatsapp ? 'Quote sent' : 'Link ready'} ✓</b>
+          <p className="crm-small">The job is now at Quote sent. Their link opens the quote to view, accept or query.</p>
+          {sent.sentVia.email && <p className="crm-small">{sent.sentVia.email.ok ? `✓ Email sent to ${sent.sentVia.email.to}` : `✗ Email not sent: ${sent.sentVia.email.error}`}</p>}
+          {sent.sentVia.whatsapp && <p className="crm-small">{sent.sentVia.whatsapp.ok ? `✓ WhatsApp sent${sent.sentVia.whatsapp.via === 'template' ? ' (as the Quote ready template)' : ''}` : `✗ WhatsApp not sent: ${sent.sentVia.whatsapp.error}`}</p>}
           <code className="qb-link">{sent.url}</code>
           <div className="crm-actions">
             <button type="button" className="crm-btn crm-btn--ghost" onClick={() => void copy(sent.url, 'Link')}>
@@ -378,6 +414,11 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
               Datasheets
             </button>
           </div>
+
+          <section className="qb-card">
+            <label className="qb-lab">Terms (printed at the bottom of the quote, just before the acceptance)</label>
+            <textarea className="crm-input" rows={6} value={content.terms} onChange={(e) => edit((c) => ({ ...c, terms: e.target.value }))} disabled={locked} />
+          </section>
         </div>
 
         <aside className="qb-side">

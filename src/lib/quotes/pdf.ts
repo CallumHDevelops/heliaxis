@@ -11,7 +11,8 @@ export type QuoteFacts = {
   title: string;
   issued: string; // YYYY-MM-DD
   validUntil: string | null;
-  jobRef: string | null;
+  /** The customer's CRM ID (HX-0007), shown instead of a project reference. */
+  customerRef: string | null;
   customer: { name: string; email: string | null; phone: string | null; address: string | null };
   content: QuoteContent;
   depositPence: number | null;
@@ -27,10 +28,11 @@ const paragraphs = (s: string) => s.split(/\n{2,}/).map((p) => p.replace(/\n/g, 
 
 /** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
 export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
-  const kit = await newDocument({ code: f.number, label: f.number, title: f.title || 'Quote', revision: issueOf('QUOTE'), jobRef: f.jobRef, issued: f.issued });
+  const kit = await newDocument({ code: f.number, label: f.number, title: f.title || 'Quote', revision: issueOf('QUOTE'), jobRef: f.customerRef, refLabel: 'Customer', issued: f.issued });
   kit.header({ meta: [['Quote', f.number], ['Date', longDate(f.issued)], ...(f.validUntil ? ([['Valid until', longDate(f.validUntil)]] as [string, string][]) : [])] });
   kit.idGrid([
     ['Prepared for', f.customer.name],
+    ['Customer ID', f.customerRef],
     ['Site', f.customer.address],
     ['Email', f.customer.email],
     ['Phone', f.customer.phone],
@@ -90,6 +92,12 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     }
   }
   if (!shownTotals) kit.note('Add your items to see the total.');
+
+  // The terms: last, so they are the last thing read before accepting.
+  if (f.content.terms.trim()) {
+    kit.section('Terms');
+    for (const p of paragraphs(f.content.terms)) kit.paragraph(p);
+  }
 
   // Acceptance: how to accept online, and a place to sign if they prefer paper; the signed copy shows their signature.
   kit.section('Accepting this quote', { keep: 300 });

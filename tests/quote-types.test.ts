@@ -3,6 +3,7 @@ import { cleanContent, money, penceFromText, starterContent, totalsOf, type Quot
 
 const content: QuoteContent = {
   intro: '',
+  terms: '',
   blocks: [
     { id: 'a', type: 'items', heading: 'Solar', lines: [
       { id: '1', description: 'Panels', qty: 12, unit_pence: 25000, vat_rate: 0 },
@@ -34,7 +35,13 @@ describe('quote money', () => {
     const items = c.blocks[1];
     expect(items.type === 'items' && items.lines[0]).toMatchObject({ qty: 0, vat_rate: 0 });
   });
+  it('moves an old Terms text section to the terms field, at the bottom', () => {
+    const c = cleanContent({ blocks: [{ type: 'text', heading: 'Terms', body: 'Pay in 14 days.' }, { type: 'text', heading: 'Included', body: 'Panels' }] });
+    expect(c.terms).toBe('Pay in 14 days.');
+    expect(c.blocks).toHaveLength(1);
+  });
   it('starts with items, included and terms', () => {
-    expect(starterContent('Sam').blocks.map((b) => b.type)).toEqual(['items', 'text', 'text']);
+    expect(starterContent('Sam').blocks.map((b) => b.type)).toEqual(['items', 'text']);
+    expect(starterContent('Sam').terms).toMatch(/valid until/);
   });
 });

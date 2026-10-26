@@ -12,6 +12,7 @@ import { toWaId } from '@/lib/whatsapp/shared';
 import { StageChip } from '../CrmUi';
 import { firstName, jobLabel, shortDate, ukDayOf } from '../crm-shared';
 import { OrganisationCard } from './OrganisationCard';
+import { PortalMessages } from './PortalMessages';
 import { DnoDeposit, PortalCard } from './ProjectExtras';
 import {
   copyText,
@@ -168,6 +169,7 @@ export function CustomerColumn({
           <b>Customer portal</b> appears at Surveyed, to send the quote for signing.
         </p>
       )}
+      {portalShown && schema.quotes && <PortalMessages key={project.id} projectId={project.id} />}
       {dnoShown ? (
         <section className="crmh-card crmr-slot crmr-slot--dno" aria-label="Quote, deposit and DNO">
           <div className="crmh-card__b">

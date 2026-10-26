@@ -28,14 +28,21 @@ export async function readQuote(id: string): Promise<QuoteRow | null> {
   return data ? quoteRow(data) : null;
 }
 
+/** The customer's CRM ID (HX-0007), once customer-refs.sql has been run. */
+export async function customerRefOf(enquiryId: string): Promise<string | null> {
+  const { data, error } = await createAdminClient().from('enquiries').select('customer_ref').eq('id', enquiryId).maybeSingle();
+  return error ? null : ((data?.customer_ref as string | null) ?? null);
+}
+
 const MIME_OF: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };
 
 /** The quote as a PDF: its customer, site and job reference, the images and the datasheets it uses, fetched. */
 export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): Promise<Uint8Array> {
   const db = createAdminClient();
-  const [{ data: c }, { data: p }] = await Promise.all([
+  const [{ data: c }, { data: p }, ref] = await Promise.all([
     db.from('enquiries').select('name, email, phone').eq('id', q.enquiry_id).maybeSingle(),
-    db.from('crm_projects').select('address, postcode, project_ref').eq('id', q.project_id).maybeSingle(),
+    db.from('crm_projects').select('address, postcode').eq('id', q.project_id).maybeSingle(),
+    customerRefOf(q.enquiry_id),
   ]);
   const images = new Map<string, { bytes: Uint8Array; mime: string }>();
   const datasheets = new Map<string, Uint8Array>();
@@ -64,7 +71,7 @@ export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): P
     title: q.title,
     issued: ukDay(new Date()),
     validUntil: q.valid_until,
-    jobRef: (p?.project_ref as string | null) ?? null,
+    customerRef: ref,
     customer: {
       name: (c?.name as string) || '',
       email: (c?.email as string | null) || null,
@@ -99,12 +106,12 @@ export async function saveSignedQuote(documentId: string, who: { name: string; a
   const { data: png } = await db.storage.from(DOCS_BUCKET).download(who.signaturePath);
   if (!png) return;
   const bytes = await renderQuote(q, { png: new Uint8Array(await png.arrayBuffer()), name: who.name, at: who.at });
-  const { data: p } = await db.from('crm_projects').select('project_ref').eq('id', q.project_id).maybeSingle();
+  const ref = await customerRefOf(q.enquiry_id);
   const { saveGenerated } = await import('@/lib/documents/store');
   const { docFileName } = await import('@/lib/documents/pdf-kit');
   await saveGenerated(db, q.project_id, {
     key: `${q.number}-SIGNED`,
-    name: docFileName((p?.project_ref as string | null) ?? null, 'Signed quote', q.number),
+    name: docFileName(ref, 'Signed quote', q.number),
     bytes,
     inputs: { documentId, who },
     category: 'quote',

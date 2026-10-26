@@ -69,13 +69,13 @@ async function graph<T>(path: string, init: RequestInit = {}, retried = false): 
 export type MailAttachment = { name: string; contentType: string; bytes: Uint8Array };
 
 /** Send from the shared mailbox. Returns the message's internetMessageId (to match it in Sent Items). */
-export async function sendMail(opts: { to: string; subject: string; text: string; attachments?: MailAttachment[]; replyTo?: string }) {
+export async function sendMail(opts: { to: string; subject: string; text: string; /** A branded HTML version; `text` is then only the fallback. */ html?: string; attachments?: MailAttachment[]; replyTo?: string }) {
   const box = encodeURIComponent(mailbox());
   const draft = await graph<{ id: string; internetMessageId: string }>(`/users/${box}/messages`, {
     method: 'POST',
     body: JSON.stringify({
       subject: opts.subject,
-      body: { contentType: 'Text', content: opts.text },
+      body: opts.html ? { contentType: 'HTML', content: opts.html } : { contentType: 'Text', content: opts.text },
       toRecipients: [{ emailAddress: { address: opts.to } }],
       ...(opts.replyTo ? { replyTo: [{ emailAddress: { address: opts.replyTo } }] } : {}),
       attachments: (opts.attachments ?? []).map((a) => ({
