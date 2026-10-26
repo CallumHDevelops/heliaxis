@@ -9,8 +9,12 @@ kit.setup({
   '@/lib/crm/portal': `
     export async function projectByToken(t) { return t === 'tok' ? { id: 'p1', enquiry_id: 'e1', title: 'Solar', deposit_amount: 500, deposit_paid_at: null } : null; }
     export async function projectSigned() { return true; }`,
-  '@/lib/crm/server': `${kit.STUBS['@/lib/crm/server']}\nexport const portalUrl = (t) => 'https://heliaxis.test/my/' + t;`,
-  '@/lib/ms365': `export const msConfigured = () => false; export const mailbox = () => null;`,
+  '@/lib/crm/server': `${kit.STUBS['@/lib/crm/server']}\nexport const portalUrl = (t) => 'https://heliaxis.test/my/' + t;\nexport async function ensurePortalToken() { return 'portal-token'; }`,
+  '@/lib/ms365': `export const msConfigured = () => false; export const mailbox = () => null; export async function sendMail() { return null; }`,
+  // The settings route reaches the follow-up sequence (automation.ts), which needs these: not used here.
+  '@/lib/crm/booking-link': `export async function ensureBookingToken() { return 'booking-token'; } export const bookingUrl = (t) => 'https://heliaxis.test/book/' + t;`,
+  '@/lib/crm/move-stage': 'export async function applyStageEvent() { return { ok: true }; }',
+  '@/lib/whatsapp/inbox': 'export async function sendSystem() { return { ok: true }; }',
 });
 const { eq } = kit;
 const { stripeConfigured, verifyStripe } = await import('../src/lib/stripe.ts');
