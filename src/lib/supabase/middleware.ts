@@ -25,9 +25,12 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims checks the signed-in token here, without a round trip to Supabase's auth server on every page
+  // (it refreshes an expired token and falls back to the server check for older projects). The pages still
+  // confirm the user with getUser where it matters.
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  const user = claims?.sub ? { id: claims.sub as string, email: (claims.email as string | undefined) ?? null } : null;
 
   return { response, supabase, user };
 }

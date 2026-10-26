@@ -47,26 +47,20 @@ export async function requirePortal(key: PortalKey) {
   return session;
 }
 
-/** Redirect unauthenticated / unapproved users away from admin routes. */
+/**
+ * Redirect unauthenticated / unapproved users away from admin routes. Shares getSessionProfile's one lookup
+ * for the request (the layout, the page and the shell all ask), instead of asking Supabase again here.
+ */
 export async function guardAdmin(nextPath = '/admin') {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, profile } = await getSessionProfile();
 
   if (!user) {
     redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, status')
-    .eq('id', user.id)
-    .single();
-
   if (!profile || profile.status !== 'approved') {
     redirect('/pending');
   }
 
-  return { user, profile: profile as Profile };
+  return { user, profile };
 }

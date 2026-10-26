@@ -23,7 +23,10 @@ export type SchemaReady = {
   social: boolean;
 };
 
-const TTL = 60_000;
+/** A "false" is re-checked after a minute (so it flips soon after the SQL is run); once everything is true, 10 minutes. */
+const TTL_PENDING = 60_000;
+const TTL_ALL_READY = 10 * 60_000;
+const ttlFor = (v: SchemaReady) => (Object.values(v).every(Boolean) ? TTL_ALL_READY : TTL_PENDING);
 let cached: { at: number; value: SchemaReady } | null = null;
 let pending: Promise<SchemaReady> | null = null;
 
@@ -62,7 +65,7 @@ async function check(): Promise<SchemaReady> {
 
 /** Cached in memory for 60 s, so a `false` is checked again a minute after the SQL is run. Never throws. */
 export async function schemaReady(): Promise<SchemaReady> {
-  if (cached && Date.now() - cached.at < TTL) return cached.value;
+  if (cached && Date.now() - cached.at < ttlFor(cached.value)) return cached.value;
   pending ??= check()
     .then((value) => {
       cached = { at: Date.now(), value };
