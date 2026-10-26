@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { freshenLogo, LIVE_FIXES_CSS } from '@/lib/cms-ctas';
+import { LIVE_FIXES_CSS } from '@/lib/cms-ctas';
+import { CmsBody } from '@/components/cms/CmsBody';
 import { notFound } from 'next/navigation';
 import { findCmsPage, getCmsRendered } from '@/lib/cms-rendered';
 import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
@@ -39,10 +40,7 @@ export default async function CmsCatchAllPage({
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: rendered.css + LIVE_FIXES_CSS }} />
-      <div
-        className={'pv-live' + (page.theme === 'dark' ? ' dk' : '')}
-        dangerouslySetInnerHTML={{ __html: freshenLogo(page.html) }}
-      />
+      <CmsBody html={page.html} className={'pv-live' + (page.theme === 'dark' ? ' dk' : '')} />
       <CmsFormRuntime />
     </>
   );

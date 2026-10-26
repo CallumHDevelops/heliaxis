@@ -192,6 +192,7 @@ footer img{height:24px;margin-bottom:14px}
 footer h4{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--paper);margin-bottom:14px;font-weight:500}
 footer a{color:var(--muted-d);display:block;margin-bottom:8px}
 footer a:hover{color:var(--solar)}
+footer .base a{display:inline;margin:0}
 footer .base{margin-top:34px;padding-top:20px;border-top:1px solid var(--line-d);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:.8rem}
 
 /* sticky mobile CTA */

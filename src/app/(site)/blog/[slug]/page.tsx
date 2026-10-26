@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { freshenLogo, LIVE_FIXES_CSS } from '@/lib/cms-ctas';
+import { LIVE_FIXES_CSS } from '@/lib/cms-ctas';
+import { CmsBody } from '@/components/cms/CmsBody';
 import { notFound } from 'next/navigation';
 import '../blog.css';
 import '../../home.css';
@@ -83,10 +84,7 @@ export default async function BlogPostPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         {cms.css ? <style dangerouslySetInnerHTML={{ __html: cms.css + LIVE_FIXES_CSS }} /> : null}
-        <div
-          className={`blog-live-body${cms.theme === 'dark' ? ' dk' : ''}`}
-          dangerouslySetInnerHTML={{ __html: freshenLogo(cms.html) }}
-        />
+        <CmsBody html={cms.html} className={`blog-live-body${cms.theme === 'dark' ? ' dk' : ''}`} />
         <SiteFooter />
         <CmsFormRuntime />
       </>
