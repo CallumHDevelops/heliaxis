@@ -10,8 +10,8 @@ import type { NormalisedMention } from './types';
 const MAX_TEXT = 8000;
 
 /** Saves the raw webhook body before anything else, so nothing is lost if later steps fail. */
-export async function storeRaw(source: string, body: unknown): Promise<number | null> {
-  const { data } = await createAdminClient().from('social_ingest_event').insert({ source, body }).select('id').single();
+export async function storeRaw(source: string, body: unknown, error?: string): Promise<number | null> {
+  const { data } = await createAdminClient().from('social_ingest_event').insert({ source, body, ...(error ? { error, processed_at: new Date().toISOString() } : {}) }).select('id').single();
   return data?.id ?? null;
 }
 

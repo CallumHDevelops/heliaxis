@@ -33,6 +33,7 @@ const FILTERS = [
   { key: 'critical', label: 'Critical and High' },
   { key: 'quotes', label: 'Quote requests' },
   { key: 'done', label: 'Done' },
+  { key: 'ignored', label: 'Ignored by the AI' },
 ] as const;
 
 /**
@@ -46,11 +47,20 @@ export default async function SocialMonitoringPage({ searchParams }: { searchPar
   const isAdmin = session.profile.role === 'admin';
   const { view = 'open' } = await searchParams;
 
+  let conn: { lastIngest: string | null; lastRejected: string | null; statuses: { source: string; status: string; last_error: string | null }[] } | null = null;
   let rows: Row[] = [];
   let safetyIds = new Set<string>();
   let counts = { open: 0, critical: 0, quotes: 0 };
   if (ready.social) {
     const db = createAdminClient();
+    if (isAdmin) {
+      const [ing, rej, st] = await Promise.all([
+        db.from('social_ingest_event').select('received_at').eq('source', 'meta-webhook').order('id', { ascending: false }).limit(1).maybeSingle(),
+        db.from('social_ingest_event').select('received_at').eq('source', 'meta-webhook-rejected').order('id', { ascending: false }).limit(1).maybeSingle(),
+        db.from('social_connector_status').select('source, status, last_error'),
+      ]);
+      conn = { lastIngest: ing.data?.received_at ?? null, lastRejected: rej.data?.received_at ?? null, statuses: (st.data ?? []) as { source: string; status: string; last_error: string | null }[] };
+    }
     const { data } = await db
       .from('social_mention')
       .select('id, platform, kind, text, severity, comment_type, status, author_display_name, created_at, removed_at_source')
@@ -68,14 +78,16 @@ export default async function SocialMonitoringPage({ searchParams }: { searchPar
       quotes: open.filter((r) => r.comment_type === 'quote_request').length,
     };
     rows =
-      view === 'done'
-        ? all.filter((r) => !isOpen(r)).slice(0, 100)
+      view === 'ignored'
+        ? all.filter((r) => r.severity === 'ignore').slice(0, 100)
+        : view === 'done'
+        ? all.filter((r) => !isOpen(r) && r.severity !== 'ignore').slice(0, 100)
         : view === 'critical'
           ? open.filter((r) => r.severity === 'critical' || r.severity === 'high')
           : view === 'quotes'
             ? open.filter((r) => r.comment_type === 'quote_request')
             : open;
-    rows = [...rows].sort(view === 'done' ? (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) : byUrgency);
+    rows = [...rows].sort(view === 'done' || view === 'ignored' ? (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) : byUrgency);
     if (rows.length) {
       const { data: cls } = await db.from('social_classification').select('mention_id, safety_related').in('mention_id', rows.map((r) => r.id)).eq('safety_related', true);
       safetyIds = new Set((cls ?? []).map((c) => c.mention_id as string));
@@ -114,17 +126,24 @@ export default async function SocialMonitoringPage({ searchParams }: { searchPar
           </p>
         ) : (
           <>
+            {conn && (
+              <p className="sm-sub sm-conn">
+                {conn.lastIngest ? `Last comment delivery from Meta: ${ago(conn.lastIngest)}.` : 'No comment has reached Heliaxis from Meta yet: check the webhook to-do.'}
+                {conn.lastRejected ? ` A delivery was rejected ${ago(conn.lastRejected)} (signature check failed: check META_APP_SECRET).` : ''}
+                {conn.statuses.filter((c) => c.status !== 'green').map((c) => ` ${PLATFORM_LABEL[c.source] ?? c.source}: ${c.status}${c.last_error ? ` (${c.last_error})` : ''}.`)}
+              </p>
+            )}
             <nav className="sm-tabs" aria-label="Filter">
               {FILTERS.map((f) => (
                 <Link key={f.key} href={f.key === 'open' ? '/admin/social' : `/admin/social?view=${f.key}`} className={view === f.key || (f.key === 'open' && !FILTERS.some((x) => x.key === view)) ? 'sm-tab on' : 'sm-tab'}>
                   {f.label}
-                  {f.key !== 'done' && <span>{counts[f.key]}</span>}
+                  {f.key !== 'done' && f.key !== 'ignored' && <span>{counts[f.key]}</span>}
                 </Link>
               ))}
             </nav>
 
             {rows.length === 0 ? (
-              <p className="sm-empty">{view === 'done' ? 'Nothing finished yet.' : 'Nothing waiting. New comments and reviews will appear here, and you will be notified of anything risky.'}</p>
+              <p className="sm-empty">{view === 'done' ? 'Nothing finished yet.' : view === 'ignored' ? 'Nothing has been ignored.' : 'Nothing waiting. New comments and reviews will appear here, and you will be notified of anything risky.'}</p>
             ) : (
               <ul className="sm-list">
                 {rows.map((r) => (

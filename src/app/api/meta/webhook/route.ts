@@ -45,6 +45,13 @@ export async function POST(req: Request) {
   const raw = await req.text();
   const sig = req.headers.get('x-hub-signature-256');
   if (!validSignature(raw, sig) && !validInstagramSignature(raw, sig)) {
+    // Say so on the Social page (metadata only, never the unverified body), so a wrong app secret is easy to spot.
+    try {
+      const obj = (JSON.parse(raw) as Payload).object;
+      if (obj === 'page' || obj === 'instagram') await storeRaw('meta-webhook-rejected', { object: obj }, 'signature check failed: check META_APP_SECRET (and META_IG_APP_SECRET for Instagram)');
+    } catch {
+      // not JSON: nothing to record
+    }
     return NextResponse.json({ error: 'Bad signature' }, { status: 401 });
   }
   let payload: Payload;
