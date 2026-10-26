@@ -8,7 +8,9 @@
 // the same message, and one already waiting for the morning (deliver in src/lib/site/send.ts) doesn't go;
 // once the job has reached them (a message with their link went, the office copied or WhatsApped the link
 // itself, or they opened it) it carries on. "Don't use the scaffold yet" still goes to any trade that's
-// been sent, but it has no link, so it doesn't count as reaching them.
+// been sent, but it has no link, so it doesn't count as reaching them (nor can it be asked for as a link).
+// The messages that do count are the ones with their link: the job pack, "clear to start", strike photos
+// and a return to site.
 // Usage: node --experimental-strip-types scripts/test-site-suspended.mjs
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -135,6 +137,19 @@ eq(
   [422, 422, 'Missed Roofing is suspended, so they can’t be given new jobs.', 422, 422]
 );
 eq('…and nothing more went', [went() - wasHold, msgsOf(missed.a).filter((m) => m.status === 'sent').map((m) => m.kind), missed.a.link_generation], [0, ['scaffold_hold'], 1]);
+// Nor does asking for the hold as a link (an API call: the Site tab sends it by email and WhatsApp). It
+// has none to hand over, and handing one over would count as reaching them.
+const eventsOf = (a, type) => db.rows('site_events').filter((e) => e.assignment_id === a.id && e.type === type).length;
+const holdAsLink = await sendTo(missed.a, { via: 'link', kind: 'scaffold_hold' });
+const holdAsNewLink = await sendTo(missed.a, { via: 'link', kind: 'scaffold_hold', rotate: true });
+eq(
+  '…the hold can’t be asked for as a link: refused, with no link handed over or logged and the link left as it was',
+  [holdAsLink.status, holdAsLink.body.link ?? null, holdAsNewLink.status, holdAsNewLink.body.link ?? null, eventsOf(missed.a, 'link_copied'), missed.a.link_generation],
+  [400, null, 400, null, 0, 1]
+);
+const clearAfterLink = await sendTo(missed.a, { via: 'both', kind: 'clear_to_start' });
+const againAfterLink = await resendTo(missed.a, msgsOf(missed.a).find((m) => m.kind === 'job_pack' && m.channel === 'email').id);
+eq('…so “clear to start” and Send again on the job pack are still refused', [clearAfterLink.status, againAfterLink.status, went() - wasHold], [422, 422, 0]);
 
 // Already with them: the WhatsApp went and only the email failed, or they opened it. The job carries on.
 const half = await addedWhileActive('Half Roofing');
@@ -222,5 +237,37 @@ reinstated.f.status = 'suspended';
 reinstated.f.status = 'active';
 await morning(reinstated.a);
 eq('a firm suspended and reinstated before the morning: the waiting job pack goes as planned', stateOf(reinstated.a), ['job_pack email sent', 'job_pack whatsapp sent']);
+
+/* ── The messages that count as reaching them ──────────────────────────────── */
+
+// "Clear to start" carries their link too. A trade who was Not sent is sent it while the firm is active
+// (the email fails, the WhatsApp goes), then the firm is suspended: it reached them, so the job carries on.
+const cleared = await addedWhileActive('Cleared Roofing');
+globalThis.__fail.email = true;
+const clearedFirst = await sendTo(cleared.a, { via: 'both', kind: 'clear_to_start' });
+globalThis.__fail.email = false;
+eq('a Not sent trade sent “clear to start” while the firm is active: Sent, with the WhatsApp gone and the email not', [clearedFirst.status, cleared.a.status, msgsOf(cleared.a).map((m) => `${m.kind} ${m.channel} ${m.status}`)], [200, 'sent', ['clear_to_start email failed', 'clear_to_start whatsapp sent']]);
+cleared.f.status = 'suspended';
+const clearedAgain = await resendTo(cleared.a, msgsOf(cleared.a).find((m) => m.channel === 'email').id);
+const clearedPack = await sendTo(cleared.a, { via: 'both' });
+eq('…then the firm is suspended: it reached them, so Send again and the job pack both go', [clearedAgain.status, clearedAgain.body.message?.status, clearedPack.status, clearedPack.body.messages?.map((m) => m.status)], [200, 'sent', 200, ['sent', 'sent']]);
+
+// So do strike photos and a return to site. They go to trades past Sent, which are never blocked, so this
+// checks the list itself: the job pack failed on both channels, one of these went, then the firm was suspended.
+for (const [label, company, reach] of [
+  ['a strike photos request', 'Striking Roofing', (a, c) => SD.sendStrikeRequest(db, a, c, 1)],
+  ['a return to site notice', 'Returning Roofing', (a, c) => SD.queueMessage(db, { assignmentId: a.id, channel: 'email', kind: 'return_to_site', dedupeKey: `return:${randomUUID()}:email`, to: c.email, params: { subject: 'Return to site', html: '<p>Please put it right.</p>' }, sendAfter: new Date() }, 'office@heliaxis.co.uk')],
+]) {
+  const t = await addedWhileActive(company);
+  globalThis.__fail.email = globalThis.__fail.whatsapp = true;
+  await sendTo(t.a, { via: 'both' });
+  globalThis.__fail.email = globalThis.__fail.whatsapp = false;
+  const a = await SV.readAssignment(db, t.a.id);
+  await reach(a, db.rows('site_contacts').find((x) => x.id === a.contact_id));
+  t.f.status = 'suspended';
+  const again = await resendTo(t.a, msgsOf(t.a).find((m) => m.kind === 'job_pack' && m.channel === 'email').id);
+  const pack = await sendTo(t.a, { via: 'both' });
+  eq(`${label} that went before the firm was suspended counts as reaching them: Send again on the job pack and the job pack both go`, [again.status, again.body.message?.status, pack.status], [200, 'sent', 200]);
+}
 
 kit.done();
