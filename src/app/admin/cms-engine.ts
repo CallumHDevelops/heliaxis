@@ -2967,6 +2967,11 @@ var NAV_LINK_PRESETS=[
   {id:'faqs',label:'FAQs',href:'/#faq'},
   {id:'contact',label:'Contact',href:'/#quote'},
   {id:'blog',label:'Blog',href:'/blog'},
+  {id:'survey',label:'Book a free survey',href:'/book-a-survey'},
+  {id:'phonecall',label:'Book a phone call',href:'/book-a-survey?mode=phone'},
+  {id:'videocall',label:'Book a video call',href:'/book-a-survey?mode=video'},
+  {id:'quote',label:'Get a quote',href:'/get-a-quote'},
+  {id:'quote-business',label:'Get a quote (business)',href:'/get-a-quote?for=business'},
   {id:'home',label:'Home',href:'/'}
 ];
 /** In-page anchors commonly used by CTAs / buttons. */
@@ -3084,11 +3089,20 @@ function renderLinkPick(id,qOverride){
   if(q){
     if(nav){nav.hidden=true;nav.innerHTML='';}
     if(foot)foot.textContent='Search results';
+    // A path, link or anchor that is not in the list can still be used as typed.
+    var typed=(q.charAt(0)==='/'||q.charAt(0)==='#'||q.indexOf('http')===0||q.indexOf('tel:')===0||q.indexOf('mailto:')===0)?q:'';
+    var typedKnown=typed&&linkCatalog().some(function(x){return x.href===typed});
+    var sh='';
+    if(typed&&!typedKnown){
+      sh+='<div class="link-pick-group">Use what you typed</div>'
+        +'<button type="button" class="link-pick-item" role="option" data-href="'+esc(typed)+'" onclick="event.stopPropagation();applyLinkPick(\''+id+'\',this)">'
+        +'<span class="link-pick-item-name">Custom path</span>'
+        +'<span class="link-pick-item-path">'+esc(typed)+'</span></button>';
+    }
     if(!order.length){
-      list.innerHTML='<div class="link-pick-empty">No matches</div>';
+      list.innerHTML=sh||'<div class="link-pick-empty">No matches</div>';
       return;
     }
-    var sh='';
     order.forEach(function(g){
       sh+='<div class="link-pick-group">'+esc(g)+'</div>';
       groups[g].forEach(function(it){
