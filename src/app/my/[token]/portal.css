@@ -575,3 +575,4 @@ textarea.pt-input { resize: vertical; font: inherit; }
 .pt-thread li.me { justify-self: end; background: rgb(var(--accent-rgb, 248 188 30) / 0.22); }
 .pt-thread small { opacity: 0.65; font-size: 0.72rem; }
 .pt-thread span { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pt-signform .pt-label { display: block; margin: 0.6rem 0 0.25rem; }

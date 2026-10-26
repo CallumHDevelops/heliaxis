@@ -7,6 +7,7 @@ import { defaultQuoteMessage } from '@/lib/quotes/message';
 import { createClient } from '@/lib/supabase/client';
 import '../../../crm/crm.css';
 import '../quotes.css';
+import type { SavedItem } from '@/lib/quotes/items';
 import { emptyLine, money, newId, penceFromText, textFromPence, totalsOf, VAT_RATES, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
@@ -29,7 +30,8 @@ async function shrink(file: File): Promise<File> {
   return new File([blob], 'picture.jpg', { type: 'image/jpeg' });
 }
 
-export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string> }) {
+export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls, savedItems: savedIn }: { initial: QuoteRow; customer: Customer; library: { id: string; name: string }[]; imageUrls: Record<string, string>; savedItems: SavedItem[] }) {
+  const [saved, setSaved] = useState(savedIn);
   const [library, setLibrary] = useState(libraryIn);
   const [title, setTitle] = useState(initial.title);
   const [content, setContent] = useState<QuoteContent>(initial.content);
@@ -146,6 +148,18 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
     }
     setBusy('');
   }
+
+  async function putSaved(items: SavedItem[]) {
+    const r = await fetch('/api/crm/quote-items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setErr(d.error || 'Couldn’t save the item.');
+    setSaved(d.items);
+    setNote('Saved items updated ✓');
+  }
+  const saveLineAsItem = (l: QuoteLine) => {
+    if (!l.description.trim()) return setErr('Give the line a description first.');
+    void putSaved([...saved, { id: newId(), description: l.description, detail: l.detail ?? '', unit_pence: l.unit_pence, vat_rate: l.vat_rate }]);
+  };
 
   async function preview() {
     setBusy('preview');
@@ -273,6 +287,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
           {note && <p className="crm-small">{note}</p>}
         </div>
       )}
+      {!sent && note && <p className="crm-small" aria-live="polite">{note}</p>}
 
       <div className="qb-grid" aria-disabled={locked}>
         <div className="qb-col">
@@ -317,6 +332,11 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
                         <div>
                           <input className="crm-input" placeholder="e.g. 12 × 450W solar panels" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} />
                           <input className="crm-input qb-detail" placeholder="Optional detail" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} />
+                          {l.description.trim() && !saved.some((x) => x.description === l.description && x.unit_pence === l.unit_pence) && (
+                            <button type="button" className="crm-link qb-saveitem" disabled={locked} onClick={() => saveLineAsItem(l)}>
+                              Save as a saved item
+                            </button>
+                          )}
                         </div>
                         <input className="crm-input" inputMode="decimal" value={String(l.qty)} onChange={(e) => setLine(b.id, l.id, { qty: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} disabled={locked} aria-label="Quantity" />
                         <input className="crm-input" inputMode="decimal" defaultValue={textFromPence(l.unit_pence)} key={`${l.id}-${l.unit_pence === 0}`} onBlur={(e) => setLine(b.id, l.id, { unit_pence: penceFromText(e.target.value) })} disabled={locked} aria-label="Unit price in pounds" />
@@ -334,9 +354,30 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
                       </div>
                     ))}
                   </div>
-                  <button type="button" className="crm-link" style={{ margin: '6px 0 0' }} disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines, emptyLine()] } : x)) }))}>
-                    + Add a line
-                  </button>
+                  <div className="qb-addrow">
+                    <button type="button" className="crm-link" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines, emptyLine()] } : x)) }))}>
+                      + Add a line
+                    </button>
+                    {saved.length > 0 && (
+                      <select
+                        className="crm-input qb-saved"
+                        value=""
+                        disabled={locked}
+                        aria-label="Add a saved item"
+                        onChange={(e) => {
+                          const it = saved.find((x) => x.id === e.target.value);
+                          if (it) edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines.filter((l) => l.description.trim() || l.unit_pence), { id: newId(), description: it.description, detail: it.detail || undefined, qty: 1, unit_pence: it.unit_pence, vat_rate: it.vat_rate }] } : x)) }));
+                        }}
+                      >
+                        <option value="">+ Add a saved item…</option>
+                        {saved.map((it) => (
+                          <option key={it.id} value={it.id}>
+                            {it.description}{it.unit_pence ? ` · ${money(it.unit_pence)}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                   <p className="crm-muted crm-small">A discount is a line with a minus price, e.g. -500.</p>
                 </>
               )}
@@ -443,6 +484,22 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls 
             <label className="qb-lab">Valid until</label>
             <input className="crm-input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} disabled={locked} />
           </section>
+          {saved.length > 0 && (
+            <section className="qb-card">
+              <b>Saved items</b>
+              <ul className="qb-savedlist">
+                {saved.map((it) => (
+                  <li key={it.id}>
+                    <span>{it.description}</span>
+                    <small>{it.unit_pence ? money(it.unit_pence) : ''}</small>
+                    <button type="button" className="crm-link" aria-label={`Remove ${it.description}`} onClick={() => void putSaved(saved.filter((x) => x.id !== it.id))}>
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section className="qb-card qb-help">
             <b>How it goes</b>
             <ol>

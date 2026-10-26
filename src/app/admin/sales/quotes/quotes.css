@@ -65,3 +65,9 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
   .qb-amt { grid-column: 2 / 4; text-align: left; padding-top: 0; }
 }
 .qb-card .crm-link { justify-self: start; margin-left: 0; }
+.qb-addrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.qb-saved { width: auto; min-width: 220px; max-width: 100%; }
+.qb-saveitem { font-size: 0.78rem; justify-self: start; }
+.qb-savedlist { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 0.85rem; }
+.qb-savedlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.qb-savedlist small { color: var(--muted); }
