@@ -47,7 +47,7 @@ export function enquiryReceiptEmail(i: ReceiptInput): { subject: string; html: s
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px">${steps}</table>
     <p style="margin:16px 0 12px">Anything to add, or a better time to call? Just reply to this email, or ring us on <a href="tel:01633965205" style="color:#211F18;font-weight:700">01633 965205</a> (Mon–Fri 8am–6pm, weekends 10am–3pm).</p>
     <p style="margin:0 0 4px">Kind regards,<br>The Heliaxis team</p>`;
-  const html = emailShell(`We’ve received your ${what}`, body, undefined, 'South Wales solar, batteries, heat pumps and EV chargers', 'MCS-certified installer · heliaxis.co.uk · You are receiving this because you sent us a request on our website.');
+  const html = emailShell(`We’ve received your ${what}`, body, undefined, 'South Wales solar, batteries, heat pumps and EV chargers', 'heliaxis.co.uk · You are receiving this because you sent us a request on our website.');
   const text = [
     `Hi ${firstName(i.name)},`,
     '',

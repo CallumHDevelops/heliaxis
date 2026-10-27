@@ -219,6 +219,8 @@ export async function sendEmail(opts: {
   return { ok: true as const, id: body.id ?? null };
 }
 
+const EMAIL_SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
+
 /** Brand-styled transactional email shell (inline styles only — email clients). */
 export function emailShell(
   title: string,
@@ -232,9 +234,10 @@ export function emailShell(
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F2E7;padding:28px 12px">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFDF8;border:1px solid #e4ddcc">
-      <tr><td style="background:#211F18;padding:18px 26px">
-        <span style="color:#F8BC1E;font-weight:800;letter-spacing:.08em;font-size:15px">HELIAXIS</span>
-        <span style="color:#bdb6a4;font-size:12px;margin-left:10px">${esc(tag)}</span>
+      <tr><td style="background:#F8BC1E;height:5px;font-size:0;line-height:0">&nbsp;</td></tr>
+      <tr><td style="background:#211F18;padding:24px 26px 20px">
+        <img src="${EMAIL_SITE}/assets/heliaxis-logo-light.png" width="176" alt="HELIAXIS" style="display:block;border:0;width:176px;max-width:100%;height:auto;color:#F8BC1E;font-weight:800;font-size:20px;letter-spacing:.08em">
+        <div style="color:#bdb6a4;font-size:11px;margin-top:12px;font-family:'Courier New',Courier,monospace;letter-spacing:.12em;text-transform:uppercase">${esc(tag)}</div>
       </td></tr>
       <tr><td style="padding:28px 26px 8px">
         <h1 style="margin:0 0 14px;font-size:21px;line-height:1.3">${esc(title)}</h1>
@@ -246,6 +249,7 @@ export function emailShell(
             : ''
         }
       </td></tr>
+      <tr><td style="background:#211F18;padding:14px 26px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:.1em;color:#F8BC1E;text-transform:uppercase">MCS · RECC · NICEIC · TrustMark certified installer</td></tr>
       <tr><td style="padding:18px 26px 24px;font-size:12px;color:#6E6A5E;border-top:1px solid #eee6d4">
         Heliaxis Limited · Company No. ${HELIAXIS_PARTY.companyNumber} · Registered in England &amp; Wales · VAT ${HELIAXIS_PARTY.vatNumber}<br>
         ${esc(footerNote)}
