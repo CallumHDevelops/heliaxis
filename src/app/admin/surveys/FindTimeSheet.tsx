@@ -57,6 +57,13 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; status: 
   }
 }
 
+/** " · email sent to x" or why it was not, from the booking reply. */
+function emailNote(e: unknown): string {
+  const m = e as { sent?: boolean; to?: string; why?: string } | undefined;
+  if (!m) return '';
+  return m.sent ? ` · appointment email sent to ${m.to}` : ` · email NOT sent: ${m.why || 'unknown reason'}`;
+}
+
 async function copy(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -94,6 +101,8 @@ export function FindTimeSheet({
   const [aDay, setADay] = useState(today);
   const [aTime, setATime] = useState('09:00');
   const [aWho, setAWho] = useState(surveyors[0]?.key ?? '');
+  // Email them the appointment, with a calendar file. On unless staff untick it.
+  const [emailThem, setEmailThem] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function apply(r: { ok: boolean; data: Reply }) {
@@ -157,9 +166,9 @@ export function FindTimeSheet({
     setBusy(true);
     setError('');
     // The postcode these times were worked out for (typed here when the job has none, or it's elsewhere).
-    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, postcode: found?.postcode, surveyor_key: pick.surveyorKey });
+    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, postcode: found?.postcode, surveyor_key: pick.surveyorKey, email_customer: emailThem });
     setBusy(false);
-    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(pick.start)} with ${String(r.data.surveyor || pick.surveyorName)}`);
+    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(pick.start)} with ${String(r.data.surveyor || pick.surveyorName)}${emailNote(r.data.emailed)}`);
     if (r.status === 409 && Array.isArray(r.data.days) && found) {
       setFound({ ...found, days: r.data.days });
       setPick(null);
@@ -181,9 +190,10 @@ export function FindTimeSheet({
       surveyor_key: aWho || undefined,
       override: true,
       all_day_ok: allDayOk,
+      email_customer: emailThem,
     });
     setBusy(false);
-    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(start)} (outside the usual rules)`);
+    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(start)}${emailNote(r.data.emailed)}`);
     if (r.status === 409 && r.data.error === 'all_day') {
       if (window.confirm(r.data.message || 'The diary is blocked all day. Book anyway?')) return bookAnyway(true);
       return;
@@ -404,9 +414,9 @@ export function FindTimeSheet({
 
         {anyway && (
           <div className="dy-card">
-            <h3>Book anyway</h3>
+            <h3>Already agreed a time with them?</h3>
             <p className="dy-small">
-              Any day and time you choose, outside the usual hours, distance and daily limits. It’s still refused if it overlaps something in the diary.
+              Enter the day and time you agreed (by phone, WhatsApp or in person). It goes in the diary and Outlook, outside the usual hours, distance and daily limits, and they get the appointment by email. It’s only refused if it overlaps something in the diary.
             </p>
             <div className="dy-grid2">
               <div>
@@ -438,13 +448,19 @@ export function FindTimeSheet({
             )}
             <div className="dy-row">
               <button type="button" className="dy-btn dy-btn--solar" disabled={busy || !job} onClick={() => bookAnyway()}>
-                {busy ? 'Booking…' : `Book ${type ? `${typeLabel(type).toLowerCase()} ` : ''}survey anyway`}
+                {busy ? 'Booking…' : `Add ${type ? `${typeLabel(type).toLowerCase()} ` : ''}survey to the diary`}
               </button>
             </div>
             {!job && <p className="dy-small">Pick the customer first.</p>}
           </div>
         )}
 
+        {job && (
+          <label className="dy-small" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0 10px' }}>
+            <input type="checkbox" checked={emailThem} onChange={(e) => setEmailThem(e.target.checked)} />
+            Email them the appointment (with a calendar file for their diary)
+          </label>
+        )}
         <div className="dy-bar">
           <button type="button" className="dy-btn" disabled={busy || !job || !pick} onClick={bookIt}>
             {pick ? `Book it: ${when(pick.start)}` : 'Book it'}
@@ -454,7 +470,7 @@ export function FindTimeSheet({
           </button>
           {!anyway && (
             <button type="button" className="dy-btn dy-btn--ghost" onClick={() => setAnyway(true)}>
-              Book anyway…
+              Already agreed a time…
             </button>
           )}
         </div>
