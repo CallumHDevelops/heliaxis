@@ -5,6 +5,7 @@ import { PRODUCTS, PROJECT_START_STAGES, stageLabel } from '@/lib/crm/stages';
 import type { TeamMember } from '@/lib/projects/server';
 import { Sheet } from '../crm/CrmUi';
 import { productsShort } from '../crm/crm-shared';
+import { AddressFinder } from './AddressFinder';
 import { NewProjectTrades, rowsFor, tradesBody, useVatDefault, type TradeRow } from './NewProjectTrades';
 
 type Customer = {
@@ -58,6 +59,10 @@ export function NewProjectSheet({
   const [title, setTitle] = useState('');
   const [site, setSite] = useState({ address: preset?.latest?.address ?? '', postcode: preset?.latest?.postcode ?? preset?.postcode ?? '' });
   const [value, setValue] = useState('');
+  // For someone added by hand (a phone call): how they got in touch, what was said, and that we have spoken to them.
+  const [how, setHow] = useState('Phone call');
+  const [note, setNote] = useState('');
+  const [spoken, setSpoken] = useState(true);
   const [owner, setOwner] = useState(me);
   const [start, setStart] = useState<string>(mode === 'project' ? 'won' : 'lead');
   const [err, setErr] = useState('');
@@ -98,7 +103,8 @@ export function NewProjectSheet({
       value: value.trim() === '' ? null : value.replace(/[£,\s]/g, ''),
       owner_id: owner || null,
       start_stage: start,
-      source: 'crm',
+      source: fresh ? how : 'crm',
+      ...(mode === 'opportunity' ? { spoken, note: note.trim() || undefined } : {}),
       ...(t.assignments.length ? { assignments: t.assignments } : {}),
     };
     if (fresh) Object.assign(body, { name: person.name.trim(), phone: person.phone.trim(), email: person.email.trim(), postcode });
@@ -127,11 +133,16 @@ export function NewProjectSheet({
       {fresh ? (
         <div className="nps-fresh">
           <input className="crm-input" value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} placeholder="Full name" aria-label="Customer name" autoFocus />
-          <div className="crm-grid2">
-            <input className="crm-input" type="tel" value={person.phone} onChange={(e) => setPerson({ ...person, phone: e.target.value })} placeholder="Mobile" aria-label="Mobile" />
-            <input className="crm-input" value={person.postcode} onChange={(e) => setPerson({ ...person, postcode: e.target.value })} placeholder="Postcode" aria-label="Postcode" />
-          </div>
+          <input className="crm-input" type="tel" value={person.phone} onChange={(e) => setPerson({ ...person, phone: e.target.value })} placeholder="Mobile" aria-label="Mobile" />
           <input className="crm-input" type="email" value={person.email} onChange={(e) => setPerson({ ...person, email: e.target.value })} placeholder="Email" aria-label="Email" />
+          <label className="crm-label" htmlFor="nps-how">
+            How did they get in touch?
+          </label>
+          <select id="nps-how" className="crm-input" value={how} onChange={(e) => setHow(e.target.value)}>
+            {['Phone call', 'Referral', 'Word of mouth', 'Existing customer', 'Walk-in or event', 'Other'].map((h) => (
+              <option key={h}>{h}</option>
+            ))}
+          </select>
           <button type="button" className="crm-link nps-switch" onClick={() => setFresh(false)}>
             Find someone already in the CRM instead
           </button>
@@ -152,7 +163,13 @@ export function NewProjectSheet({
           )}
         </div>
       ) : (
-        <CustomerSearch onPick={choose} onNew={() => setFresh(true)} />
+        <CustomerSearch
+          onPick={choose}
+          onNew={(name) => {
+            setPerson((p) => ({ ...p, name: name || p.name }));
+            setFresh(true);
+          }}
+        />
       )}
       {customer?.possible_duplicate && !fresh && (
         <p className="crm-banner">
@@ -180,6 +197,12 @@ export function NewProjectSheet({
       </label>
       <input id="nps-title" className="crm-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={defaultTitle || 'e.g. Solar + battery · NP20 4AB'} />
 
+      <AddressFinder
+        onPick={(a) => {
+          setSite({ address: a.address, postcode: a.postcode });
+          setPerson((p) => ({ ...p, postcode: a.postcode }));
+        }}
+      />
       <label className="crm-label" htmlFor="nps-address">
         Site address
       </label>
@@ -190,12 +213,25 @@ export function NewProjectSheet({
         onChange={(e) => setSite({ ...site, address: e.target.value })}
         placeholder={customer?.latest ? 'Same as their last job' : 'Where the work is'}
       />
-      {!fresh && (
+      <label className="crm-label" htmlFor="nps-postcode">
+        Site postcode
+      </label>
+      <input
+        id="nps-postcode"
+        className="crm-input"
+        value={fresh ? person.postcode : site.postcode}
+        onChange={(e) => (fresh ? setPerson({ ...person, postcode: e.target.value }) : setSite({ ...site, postcode: e.target.value }))}
+      />
+
+      {mode === 'opportunity' && (
         <>
-          <label className="crm-label" htmlFor="nps-postcode">
-            Site postcode
+          <label className="crm-label" htmlFor="nps-note">
+            What was said? (optional)
           </label>
-          <input id="nps-postcode" className="crm-input" value={site.postcode} onChange={(e) => setSite({ ...site, postcode: e.target.value })} />
+          <textarea id="nps-note" className="crm-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Andy wants solar and a battery, has a south-facing roof, free Thursdays" />
+          <label className="crm-check">
+            <input type="checkbox" checked={spoken} onChange={(e) => setSpoken(e.target.checked)} /> I’ve spoken to them already (marks them contacted, no chasers)
+          </label>
         </>
       )}
 
@@ -249,7 +285,7 @@ export function NewProjectSheet({
 }
 
 /** Type to find a customer (name, email, phone, postcode or HX-ref), or add a new one. */
-function CustomerSearch({ onPick, onNew }: { onPick: (c: Customer) => void; onNew: () => void }) {
+function CustomerSearch({ onPick, onNew }: { onPick: (c: Customer) => void; onNew: (name: string) => void }) {
   const [q, setQ] = useState('');
   const [found, setFound] = useState<{ q: string; rows: Customer[] }>({ q: '', rows: [] });
   const t = q.trim();
@@ -293,8 +329,8 @@ function CustomerSearch({ onPick, onNew }: { onPick: (c: Customer) => void; onNe
           ))}
         </ul>
       )}
-      <button type="button" className="crm-btn crm-btn--ghost crm-btn--small nps-new" onClick={onNew}>
-        + New customer
+      <button type="button" className="crm-btn crm-btn--small nps-new" onClick={() => onNew(t)}>
+        {t.length >= 2 ? `+ Add “${t}” as a new customer` : '+ New customer'}
       </button>
     </div>
   );

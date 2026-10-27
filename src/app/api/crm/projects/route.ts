@@ -1,7 +1,7 @@
 import { after } from 'next/server';
 import { customerFromContact } from '@/lib/crm/from-contact';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
+import { crmSession, isUuid, json, logActivity, markContacted } from '@/lib/crm/server';
 import { isProjectStage, PRODUCT_KEYS, PROJECT_START_STAGES, type StageKey } from '@/lib/crm/stages';
 import { sendStageToMeta } from '@/lib/meta-capi';
 import { pipeline, projectsList, syncEnquiryStatus } from '@/lib/projects/server';
@@ -127,6 +127,15 @@ export async function POST(req: Request) {
       );
   }
   await logActivity({ enquiryId, projectId: project.id, kind: 'system', body: delivery ? 'Project created' : 'Opportunity created', byId: s.user.id });
+  // Added by hand after a conversation: what was said goes on the job as a note, and "I've spoken to them" counts as first
+  // contact (no "not contacted" alert, no automatic chasers to someone you have just spoken to).
+  const said = String(b.note || '').trim().slice(0, 2000);
+  if (said) await logActivity({ enquiryId, projectId: project.id, kind: 'note', body: said, byId: s.user.id }).catch(() => null);
+  if (!delivery && b.spoken === true) {
+    const now = new Date().toISOString();
+    await db.from('crm_projects').update({ sequence_stopped_at: now, first_response_alerted_at: now }).eq('id', project.id).then(() => null, () => null);
+    await markContacted({ projectId: project.id }, now, { note: 'spoke to them', byId: s.user.id }).catch(() => 0);
+  }
   if (startStage !== 'lead') await syncEnquiryStatus(db, enquiryId).catch(() => null);
   // A job loaded straight in at Won or later is still a sale for Meta (sent once per job).
   if (delivery) after(() => sendStageToMeta(project.id, startStage).catch(() => {}));

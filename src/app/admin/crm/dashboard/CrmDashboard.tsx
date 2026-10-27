@@ -209,7 +209,7 @@ export function CrmDashboard({ dash, me, team, unassigned, booking, quotes }: { 
               <span className="ic">＋</span>
               <span className="t">
                 <b>Opportunity</b>
-                <small>A new job to survey and quote</small>
+                <small>Someone you have spoken to: their details, address and what was said</small>
               </span>
             </button>
             {booking && (
