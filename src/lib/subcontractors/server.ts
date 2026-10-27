@@ -2,6 +2,9 @@ import 'server-only';
 import { createHash, randomBytes } from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
+import { brandEmail, emailShell, esc } from '@/lib/email-brand';
+
+export { emailShell, esc };
 import {
   AGREEMENT_VERSION,
   DEFAULT_RATES,
@@ -152,14 +155,6 @@ export async function signedDocUrl(path: string, download?: string) {
 
 // ---------- email ----------
 
-export function esc(s: unknown) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 export const ADMIN_EMAIL = () => process.env.ADMIN_EMAIL || 'callum@heliaxis.co.uk';
 
 /** A file sent with an email: its name and bytes (sent to Resend as base64). */
@@ -196,7 +191,8 @@ export async function sendEmail(opts: {
       from: opts.from || 'Heliaxis Subcontractors <noreply@heliaxis.co.uk>',
       to: [opts.to],
       subject: opts.subject,
-      html: opts.html,
+      // Whatever a caller hands in comes out in the Heliaxis template (already-branded mail is left alone).
+      html: brandEmail({ subject: opts.subject, html: opts.html, text: opts.text }),
       text: opts.text,
       reply_to: opts.replyTo,
       ...(opts.attachments?.length
@@ -217,45 +213,6 @@ export async function sendEmail(opts: {
   }
   const body = (await res.json().catch(() => ({}))) as { id?: string };
   return { ok: true as const, id: body.id ?? null };
-}
-
-const EMAIL_SITE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
-
-/** Brand-styled transactional email shell (inline styles only — email clients). */
-export function emailShell(
-  title: string,
-  bodyHtml: string,
-  cta?: { href: string; label: string },
-  tag = 'Subcontractor portal',
-  /** Replaces the "personal link" note under the company details, for emails that carry no personal link. */
-  footerNote = "This link is personal to you — please don't forward it."
-) {
-  return `<!doctype html><html><body style="margin:0;background:#F7F2E7;font-family:Arial,Helvetica,sans-serif;color:#211F18">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F2E7;padding:28px 12px">
-  <tr><td align="center">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:#FFFDF8;border:1px solid #e4ddcc">
-      <tr><td style="background:#F8BC1E;height:5px;font-size:0;line-height:0">&nbsp;</td></tr>
-      <tr><td style="background:#211F18;padding:24px 26px 20px">
-        <img src="${EMAIL_SITE}/assets/heliaxis-logo-light.png" width="176" alt="HELIAXIS" style="display:block;border:0;width:176px;max-width:100%;height:auto;color:#F8BC1E;font-weight:800;font-size:20px;letter-spacing:.08em">
-        <div style="color:#bdb6a4;font-size:11px;margin-top:12px;font-family:'Courier New',Courier,monospace;letter-spacing:.12em;text-transform:uppercase">${esc(tag)}</div>
-      </td></tr>
-      <tr><td style="padding:28px 26px 8px">
-        <h1 style="margin:0 0 14px;font-size:21px;line-height:1.3">${esc(title)}</h1>
-        <div style="font-size:15px;line-height:1.6">${bodyHtml}</div>
-        ${
-          cta
-            ? `<p style="margin:26px 0 8px"><a href="${esc(cta.href)}" style="display:inline-block;background:#F8BC1E;color:#211F18;font-weight:700;text-decoration:none;padding:13px 22px">${esc(cta.label)}</a></p>
-               <p style="font-size:12px;color:#6E6A5E;word-break:break-all">Or paste this link into your browser:<br>${esc(cta.href)}</p>`
-            : ''
-        }
-      </td></tr>
-      <tr><td style="background:#211F18;padding:14px 26px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:.1em;color:#F8BC1E;text-transform:uppercase">MCS · RECC · NICEIC · TrustMark certified installer</td></tr>
-      <tr><td style="padding:18px 26px 24px;font-size:12px;color:#6E6A5E;border-top:1px solid #eee6d4">
-        Heliaxis Limited · Company No. ${HELIAXIS_PARTY.companyNumber} · Registered in England &amp; Wales · VAT ${HELIAXIS_PARTY.vatNumber}<br>
-        ${esc(footerNote)}
-      </td></tr>
-    </table>
-  </td></tr></table></body></html>`;
 }
 
 export function inviteEmail(sub: SubcontractorRow, link: string, reminder = false) {

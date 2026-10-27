@@ -1,3 +1,4 @@
+import { brandEmail } from '@/lib/email-brand';
 import { NextResponse } from 'next/server';
 import { getSessionProfile } from '@/lib/auth';
 import { getResendApiKey } from '@/lib/resend';
@@ -67,6 +68,7 @@ export async function GET(req: Request) {
         to: [user.email],
         subject: 'Heliaxis email test',
         text: 'This is a test from /api/admin/email-health. If you received it, sending as noreply@heliaxis.co.uk works.',
+        html: brandEmail({ subject: 'Heliaxis email test', text: 'This is a test from /api/admin/email-health. If you received it, sending as noreply@heliaxis.co.uk works.', tag: 'Email test' }),
       }),
       cache: 'no-store',
     });

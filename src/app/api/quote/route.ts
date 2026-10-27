@@ -7,14 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 import { grantPermission } from '@/lib/whatsapp/permission';
 import { sendEnquiryReceipt } from '@/lib/enquiry-receipt';
-
-function escHtml(s: string) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { detailRows, emailShell } from '@/lib/email-brand';
 
 // Handles quote / CMS contact form submissions.
 export async function POST(request: NextRequest) {
@@ -129,42 +122,27 @@ export async function POST(request: NextRequest) {
           ? 'Home'
           : data.sector || 'Not specified';
 
-    const adminEmailHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #211F18; background: #F7F2E7; }
-            .container { max-width: 600px; margin: 20px auto; background: #FFFDF8; border: 1px solid rgba(33,31,24,.14); }
-            .header { background: #211F18; color: #F8BC1E; padding: 24px; }
-            .header h1 { margin: 0; font-size: 20px; }
-            .content { padding: 24px; }
-            .row { margin: 12px 0; padding: 12px; background: #F7F2E7; border-radius: 2px; }
-            .label { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: #6E6A5E; }
-            .value { color: #211F18; margin-top: 4px; font-size: 15px; }
-            .footer { padding: 16px 24px; color: #6E6A5E; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><h1>☀️ New enquiry</h1></div>
-            <div class="content">
-              <div class="row"><div class="label">Name</div><div class="value">${escHtml(data.name)}</div></div>
-              <div class="row"><div class="label">Sector / property</div><div class="value">${escHtml(propertyLabel)}</div></div>
-              ${data.organization ? `<div class="row"><div class="label">Organisation</div><div class="value">${escHtml(data.organization)}</div></div>` : ''}
-              <div class="row"><div class="label">Email</div><div class="value"><a href="mailto:${escHtml(data.email)}">${escHtml(data.email)}</a></div></div>
-              <div class="row"><div class="label">Phone</div><div class="value">${escHtml(data.phone || 'Not provided')}</div></div>
-              <div class="row"><div class="label">WhatsApp</div><div class="value">${data.whatsappOptIn ? 'Happy to be messaged on WhatsApp' : 'Didn’t tick the WhatsApp box'}</div></div>
-              <div class="row"><div class="label">Postcode</div><div class="value">${escHtml(data.postcode || 'Not provided')}</div></div>
-              <div class="row"><div class="label">Interested in</div><div class="value">${escHtml(data.interest || 'Not specified')}</div></div>
-              ${data.message ? `<div class="row"><div class="label">Message</div><div class="value">${escHtml(data.message)}</div></div>` : ''}
-              <div class="row"><div class="label">Source</div><div class="value">${escHtml(data.source)}</div></div>
-            </div>
-            <div class="footer">Submitted: ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })} · heliaxis.co.uk</div>
-          </div>
-        </body>
-      </html>
-    `;
+    const adminEmailHtml = emailShell(
+      'New enquiry',
+      detailRows(
+        [
+          ['Name', data.name],
+          ['Sector / property', propertyLabel],
+          ['Organisation', data.organization],
+          ['Email', data.email],
+          ['Phone', data.phone || 'Not provided'],
+          ['WhatsApp', data.whatsappOptIn ? 'Happy to be messaged on WhatsApp' : 'Didn’t tick the WhatsApp box'],
+          ['Postcode', data.postcode || 'Not provided'],
+          ['Interested in', data.interest || 'Not specified'],
+          ['Message', data.message],
+          ['Source', data.source],
+        ],
+        { Email: `mailto:${data.email}`, ...(data.phone ? { Phone: `tel:${data.phone.replace(/\s/g, '')}` } : {}) }
+      ) + `<p style="font-size:12px;color:#6E6A5E;margin:0">Submitted ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</p>`,
+      { href: `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '')}/admin/enquiries`, label: 'Open Enquiries' },
+      'Website enquiry',
+      'heliaxis.co.uk · An enquiry came in on the website.'
+    );
 
     const adminEmailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',

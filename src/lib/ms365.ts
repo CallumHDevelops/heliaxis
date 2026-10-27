@@ -1,3 +1,4 @@
+import { brandEmail } from '@/lib/email-brand';
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -75,7 +76,8 @@ export async function sendMail(opts: { to: string; subject: string; text: string
     method: 'POST',
     body: JSON.stringify({
       subject: opts.subject,
-      body: opts.html ? { contentType: 'HTML', content: opts.html } : { contentType: 'Text', content: opts.text },
+      // Always the Heliaxis template: HTML that is already in it is sent as it is, anything else goes inside it.
+      body: { contentType: 'HTML', content: brandEmail({ subject: opts.subject, html: opts.html, text: opts.text }) },
       toRecipients: [{ emailAddress: { address: opts.to } }],
       ...(opts.replyTo ? { replyTo: [{ emailAddress: { address: opts.replyTo } }] } : {}),
       attachments: (opts.attachments ?? []).map((a) => ({
