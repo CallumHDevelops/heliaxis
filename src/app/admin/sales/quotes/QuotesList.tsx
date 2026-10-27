@@ -12,9 +12,9 @@ type Found = { id: string; name: string; email: string | null; postcode: string 
 
 const STATUS: Record<string, string> = { draft: 'Draft', sent: 'Sent', accepted: 'Accepted', declined: 'Declined', expired: 'Expired' };
 
-export function QuotesList({ ready, initial, admin = false }: { ready: boolean; initial: QuoteListRow[]; admin?: boolean }) {
+export function QuotesList({ ready, initial, admin = false, startNew = false }: { ready: boolean; initial: QuoteListRow[]; admin?: boolean; /** ?new=1: open the customer picker straight away. */ startNew?: boolean }) {
   const router = useRouter();
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState(startNew);
   const [q, setQ] = useState('');
   const [found, setFound] = useState<Found[]>([]);
   const [busy, setBusy] = useState(false);

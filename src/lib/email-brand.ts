@@ -96,3 +96,17 @@ export function detailRows(rows: [string, string | null | undefined][], href?: R
     .join('');
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F7F2E7;border-left:4px solid #F8BC1E;padding:10px 16px;margin:0 0 16px"><tr><td><table role="presentation" cellpadding="0" cellspacing="0">${body}</table></td></tr></table>`;
 }
+
+/** Two or three buttons in a row (stacking on a phone): the first is the main gold one, the others are outlined. `kind: 'whatsapp'` is green. */
+export function buttonsHtml(buttons: { href: string; label: string; kind?: 'primary' | 'whatsapp' | 'outline' }[]): string {
+  const style = (k: string) =>
+    k === 'whatsapp'
+      ? 'background:#1B7F4D;color:#FFFFFF;border:2px solid #1B7F4D'
+      : k === 'outline'
+        ? 'background:#FFFDF8;color:#211F18;border:2px solid #211F18'
+        : 'background:#F8BC1E;color:#211F18;border:2px solid #F8BC1E';
+  const cells = buttons
+    .map((b, i) => `<td class="hx-btn" style="padding:0 ${i === buttons.length - 1 ? 0 : 10}px 10px 0"><a href="${esc(b.href)}" style="display:inline-block;${style(b.kind ?? (i === 0 ? 'primary' : 'outline'))};font-weight:700;font-size:15px;text-decoration:none;padding:12px 20px;border-radius:2px">${esc(b.label)}</a></td>`)
+    .join('');
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 14px"><tr>${cells}</tr></table>`;
+}

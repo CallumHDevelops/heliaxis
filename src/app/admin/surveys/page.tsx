@@ -14,10 +14,10 @@ export const metadata: Metadata = { title: 'Diary' };
 const todayUk = () => ukDate(Date.now());
 
 /**
- * Surveys → Diary. ?add=1 opens "+ Add to my diary"; ?project={id} opens Find a time for that job
+ * Surveys → Diary. ?add=1 opens "+ Add to my diary"; ?find=1 opens Find a time (to pick the customer there); ?project={id} opens Find a time for that job
  * (links from the job page and Home's Today list).
  */
-export default async function SurveysDiaryPage({ searchParams }: { searchParams: Promise<{ add?: string; project?: string }> }) {
+export default async function SurveysDiaryPage({ searchParams }: { searchParams: Promise<{ add?: string; project?: string; find?: string }> }) {
   const session = await requirePortal('crm');
   if (!session) redirect('/admin?denied=1');
   const q = await searchParams;
@@ -30,6 +30,7 @@ export default async function SurveysDiaryPage({ searchParams }: { searchParams:
         isAdmin={session.profile.role === 'admin'}
         project={typeof q.project === 'string' && isUuid(q.project) ? q.project : null}
         add={q.add === '1'}
+        find={q.find === '1'}
         today={todayUk()}
       />
     </AdminShell>

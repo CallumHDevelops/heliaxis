@@ -135,6 +135,7 @@ export function DiaryView({
   isAdmin,
   project,
   add,
+  find = false,
   today: todayProp,
 }: {
   ready: boolean;
@@ -143,6 +144,8 @@ export function DiaryView({
   project: string | null;
   /** ?add=1: open + Add to my diary. */
   add: boolean;
+  /** ?find=1: open Find a time with no job chosen yet. */
+  find?: boolean;
   /** The UK date when the page was made (until the diary has loaded). */
   today: string;
 }) {
@@ -153,7 +156,7 @@ export function DiaryView({
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState('');
   const [sheet, setSheet] = useState<{ kind: 'entry'; entry: EntryView | null } | { kind: 'find'; project: string | null } | null>(
-    project ? { kind: 'find', project } : add ? { kind: 'entry', entry: null } : null
+    project ? { kind: 'find', project } : find ? { kind: 'find', project: null } : add ? { kind: 'entry', entry: null } : null
   );
   const [declined, setDeclined] = useState<Declined | null>(null);
   const [bf, setBf] = useState<{ items: Backfill[]; off: string[] } | null>(null);

@@ -1,0 +1,48 @@
+/* CRM dashboard (CrmDashboard.tsx). Builds on crm.css's tokens. */
+.dash{display:grid;gap:20px;padding-bottom:90px}
+.dash-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px}
+.dash-head h1{margin:0 0 2px;font-size:1.5rem}
+.dash-head__act{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dash-periods{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.dash-periods a{padding:9px 14px;font-size:.88rem;font-weight:600;color:var(--ink);text-decoration:none;background:var(--card)}
+.dash-periods a+a{border-left:1px solid var(--line)}
+.dash-periods a.on{background:var(--ink);color:var(--paper)}
+.dash-plus{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px 0 12px;border:0;border-radius:999px;background:var(--solar);color:#211f18;font:inherit;font-weight:800;cursor:pointer;box-shadow:0 2px 10px var(--crm-shadow-soft)}
+.dash-plus span{font-size:1.6rem;line-height:1;font-weight:500}
+.dash-fab{display:none;position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:30;width:58px;height:58px;border:0;border-radius:50%;background:var(--solar);color:#211f18;font-size:2rem;line-height:1;cursor:pointer;box-shadow:0 6px 18px var(--crm-shadow-fab)}
+@media (max-width:760px){.dash-plus{display:none}.dash-fab{display:block}}
+
+.dash-tiles{display:grid;grid-template-columns:1.4fr repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.dash-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.dash-tiles{grid-template-columns:1fr}}
+.dash-tile{display:flex;flex-direction:column;gap:4px;padding:16px 18px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.dash-tile .lab{font-family:var(--mono,monospace);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.dash-tile .big{font-size:2rem;line-height:1.1;font-weight:800}
+.dash-tile .sub{font-size:.85rem;color:var(--muted)}
+.dash-tile--hero{background:#211f18;border-color:#211f18;color:#fffdf8}
+.dash-tile--hero .lab,.dash-tile--hero .sub{color:#cfc8b6}
+.dash-tile--hero .big{color:#f8bc1e;font-size:2.5rem}
+.dash-tile .delta{margin-top:4px;font-size:.85rem;font-weight:600;color:#cfc8b6}
+.dash-tile .delta.up{color:#7cc28f}
+.dash-tile .delta.down{color:#f0a08a}
+
+.dash-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+@media (max-width:1100px){.dash-cols{grid-template-columns:1fr}}
+.dash-card{padding:16px 18px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.dash-card h2{margin:0 0 10px;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+.dash-card .count{font-size:.78rem;font-weight:700;background:var(--solar);color:#211f18;border-radius:999px;padding:2px 9px}
+.dash-list{list-style:none;margin:0;padding:0;display:grid}
+.dash-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.dash-list li:first-child{border-top:0}
+.dash-list b{font-weight:700}
+.dash-list a{color:var(--ink);text-decoration:none}
+.dash-list a:hover b{text-decoration:underline}
+.dash-list small{display:block;color:var(--muted);font-size:.8rem}
+.dash-list .amt{font-weight:800;white-space:nowrap}
+.dash-menu{display:grid;gap:8px}
+.dash-menu button,.dash-menu .dash-menu__link{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:14px;align-items:center;text-align:left;width:100%;min-height:64px;padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;color:var(--ink);text-decoration:none;font:inherit;cursor:pointer}
+.dash-menu button:hover,.dash-menu .dash-menu__link:hover{border-color:var(--ink)}
+.dash-menu .ic{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--solar);color:#211f18;font-size:1.15rem}
+.dash-menu .t{display:flex;flex-direction:column;gap:2px}
+.dash-menu .t b{font-size:1rem}
+.dash-menu .t small{color:var(--muted);font-size:.82rem;line-height:1.3}

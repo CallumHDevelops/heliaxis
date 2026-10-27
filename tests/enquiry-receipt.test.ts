@@ -19,6 +19,11 @@ describe('enquiry receipt email', () => {
     expect(m.html).toContain('4.50 kWp');
     expect(m.html).not.toContain('personal to you');
     expect(m.text).toContain('We call you within one working day');
+    // The two do-it-yourself buttons: pick a survey time, and WhatsApp with their name and postcode ready in the message.
+    expect(m.html).toContain('/book-a-survey?type=solar&amp;postcode=NP26%205ST');
+    expect(m.html).toContain('https://wa.me/');
+    expect(m.html).toContain('Message us on WhatsApp');
+    expect(m.html).toContain('Pick my own survey time');
   });
   it('is a plain enquiry receipt for other forms and escapes what people typed', () => {
     const m = enquiryReceiptEmail({ name: '<b>Sam</b>', email: 'a@b.co', source: 'quote-form' });

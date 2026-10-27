@@ -9,7 +9,8 @@ import { QuotesList, type QuoteListRow } from './QuotesList';
 export const dynamic = 'force-dynamic';
 
 /** Sales › Quotes: every quote, newest first, and + New quote. */
-export default async function QuotesPage() {
+export default async function QuotesPage({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
+  const q = await searchParams;
   const session = await requirePortal('crm');
   if (!session) redirect('/admin?denied=1');
   const ready = (await schemaReady()).quotes;
@@ -34,7 +35,7 @@ export default async function QuotesPage() {
   }
   return (
     <AdminShell active="sales" fluid>
-      <QuotesList ready={ready} initial={rows} admin={session.profile.role === 'admin'} />
+      <QuotesList ready={ready} initial={rows} admin={session.profile.role === 'admin'} startNew={q.new === '1'} />
     </AdminShell>
   );
 }

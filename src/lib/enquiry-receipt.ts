@@ -1,7 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured, sendMail } from '@/lib/ms365';
-import { emailShell, esc } from '@/lib/subcontractors/server';
+import { buttonsHtml, emailShell, esc } from '@/lib/email-brand';
 
 /**
  * The "we have your request" email to whoever filled in a form on the site. It goes from the Heliaxis mailbox (so it is in
@@ -16,6 +16,9 @@ export type ReceiptInput = {
   /** The solar estimator's own summary line, when they came from it. */
   message?: string;
 };
+
+const SITE = () => (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
+const WHATSAPP = () => `https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '441633965439').replace(/\D/g, '')}`;
 
 const firstName = (n: string) => n.trim().split(/\s+/)[0] || 'there';
 
@@ -40,12 +43,20 @@ export function enquiryReceiptEmail(i: ReceiptInput): { subject: string; html: s
   ]
     .map(([t, d], n) => `<tr><td style="padding:0 14px 12px 0;vertical-align:top"><span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background:#F8BC1E;color:#211F18;font-weight:800;font-size:13px">${n + 1}</span></td><td style="padding:0 0 12px;font-size:14px;line-height:1.5"><b>${esc(t)}</b><br><span style="color:#4d493d">${esc(d)}</span></td></tr>`)
     .join('');
+  const bookHref = `${SITE()}/book-a-survey?type=solar${i.postcode ? `&postcode=${encodeURIComponent(i.postcode)}` : ''}`;
+  const waHref = `${WHATSAPP()}?text=${encodeURIComponent(`Hi Heliaxis, it's ${i.name.trim() || 'a customer'}. I sent a ${what} on your website${i.postcode ? ` (${i.postcode})` : ''}.`)}`;
+  const buttons = buttonsHtml([
+    { href: bookHref, label: survey ? 'Pick my own survey time' : 'Book a free survey', kind: 'primary' },
+    { href: waHref, label: 'Message us on WhatsApp', kind: 'whatsapp' },
+  ]);
   const body = `<p style="margin:0 0 12px">Hi ${esc(firstName(i.name))},</p>
     <p style="margin:0 0 16px">Thanks for getting in touch. We have your ${what} and a real person is on it.</p>
     ${rows ? `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F7F2E7;padding:10px 16px;margin:0 0 20px"><tr><td><table role="presentation" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table>` : ''}
     <p style="margin:0 0 10px;font-weight:700">What happens next</p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px">${steps}</table>
-    <p style="margin:16px 0 12px">Anything to add, or a better time to call? Just reply to this email, or ring us on <a href="tel:01633965205" style="color:#211F18;font-weight:700">01633 965205</a> (Mon–Fri 8am–6pm, weekends 10am–3pm).</p>
+    <p style="margin:16px 0 6px;font-weight:700">Quicker? Do it yourself</p>
+    ${buttons}
+    <p style="margin:8px 0 12px">Anything to add, or a better time to call? Just reply to this email, or ring us on <a href="tel:01633965205" style="color:#211F18;font-weight:700">01633 965205</a> (Mon–Fri 8am–6pm, weekends 10am–3pm).</p>
     <p style="margin:0 0 4px">Kind regards,<br>The Heliaxis team</p>`;
   const html = emailShell(`We’ve received your ${what}`, body, undefined, 'South Wales solar, batteries, heat pumps and EV chargers', 'heliaxis.co.uk · You are receiving this because you sent us a request on our website.');
   const text = [
@@ -60,6 +71,9 @@ export function enquiryReceiptEmail(i: ReceiptInput): { subject: string; html: s
     '1. We call you within one working day.',
     '2. A free survey of your roof, shading and electrics.',
     '3. A fixed price in writing. No obligation, no pushy sales.',
+    '',
+    `Pick your own survey time: ${bookHref}`,
+    `Message us on WhatsApp: ${waHref}`,
     '',
     'Anything to add? Reply to this email or ring 01633 965205 (Mon-Fri 8am-6pm, weekends 10am-3pm).',
     '',
