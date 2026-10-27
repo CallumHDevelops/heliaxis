@@ -45,6 +45,7 @@ export function StepQuoteForm({
   initialPicks,
   message,
   source,
+  onSent,
 }: {
   variant?: 'card' | 'page';
   initialWho?: 'home' | 'business';
@@ -54,6 +55,8 @@ export function StepQuoteForm({
   /** Sent with the enquiry (the estimator's figures) and the source it is labelled with in the CRM. */
   message?: string;
   source?: string;
+  /** Called once the enquiry has been sent. */
+  onSent?: () => void;
 }) {
   // ?for=business (or home) on /get-a-quote answers the first question for them.
   const known = !!initialWho && !!initialPostcode;
@@ -130,6 +133,7 @@ export function StepQuoteForm({
         setFirstNameDone(first);
         moved.current = true;
         setStep(7);
+        onSent?.();
       } else {
         setErr(d.error || 'Something went wrong. Please try again, or call us on 01633 965205.');
       }

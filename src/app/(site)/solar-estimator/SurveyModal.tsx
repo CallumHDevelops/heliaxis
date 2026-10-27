@@ -9,7 +9,7 @@ import { StepQuoteForm } from '@/components/quote/StepQuoteForm';
  * and the WhatsApp button, with a close button that is always in reach: Esc, the cross or a tap outside closes it.
  * What we already know from the estimate (type of property, address, what they want) is not asked again.
  */
-export function SurveyModal({ open, onClose, who, postcode, address, picks, message }: { open: boolean; onClose: () => void; who: 'home' | 'business'; postcode: string; address: string; picks: string[]; message: string }) {
+export function SurveyModal({ open, onClose, who, postcode, address, picks, message, onSent }: { open: boolean; onClose: () => void; who: 'home' | 'business'; postcode: string; address: string; picks: string[]; message: string; onSent: () => void }) {
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
@@ -42,7 +42,7 @@ export function SurveyModal({ open, onClose, who, postcode, address, picks, mess
               Survey for <b>{address}</b>. Your estimate comes with it.
             </p>
           )}
-          <StepQuoteForm variant="card" initialWho={who} initialPostcode={postcode} initialPicks={picks} message={message} source="solar-estimator" />
+          <StepQuoteForm variant="card" initialWho={who} initialPostcode={postcode} initialPicks={picks} message={message} source="solar-estimator" onSent={onSent} />
         </div>
       </div>
     </div>,

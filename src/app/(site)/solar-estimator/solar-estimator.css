@@ -326,3 +326,9 @@ a.est-link{display:inline-block}
 
 .vgrid.est-three{grid-template-columns:repeat(3,1fr)}
 @media (max-width:760px){.vgrid.est-three{grid-template-columns:1fr}}
+
+.est-headdone{display:inline-flex;flex-direction:column;gap:2px;padding:14px 20px;border:1.5px solid var(--solar);border-radius:4px;color:var(--paper)}
+.est-headdone b{color:var(--solar);font-size:1.05rem}
+.est-headdone span{font-size:.95rem;opacity:.9}
+.est-lead--done{grid-template-columns:1fr}
+.est-lead--done h3{color:#2f7d46}

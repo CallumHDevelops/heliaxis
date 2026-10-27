@@ -224,7 +224,9 @@ export function emailShell(
   title: string,
   bodyHtml: string,
   cta?: { href: string; label: string },
-  tag = 'Subcontractor portal'
+  tag = 'Subcontractor portal',
+  /** Replaces the "personal link" note under the company details, for emails that carry no personal link. */
+  footerNote = "This link is personal to you — please don't forward it."
 ) {
   return `<!doctype html><html><body style="margin:0;background:#F7F2E7;font-family:Arial,Helvetica,sans-serif;color:#211F18">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F2E7;padding:28px 12px">
@@ -246,7 +248,7 @@ export function emailShell(
       </td></tr>
       <tr><td style="padding:18px 26px 24px;font-size:12px;color:#6E6A5E;border-top:1px solid #eee6d4">
         Heliaxis Limited · Company No. ${HELIAXIS_PARTY.companyNumber} · Registered in England &amp; Wales · VAT ${HELIAXIS_PARTY.vatNumber}<br>
-        This link is personal to you — please don't forward it.
+        ${esc(footerNote)}
       </td></tr>
     </table>
   </td></tr></table></body></html>`;

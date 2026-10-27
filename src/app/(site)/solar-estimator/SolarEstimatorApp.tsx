@@ -495,6 +495,23 @@ function Stepper({ label, value, onChange }: { label: string; value: number; onC
 
 function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs, settings, postcode, town, source, note, controls, onRestart }: { rates: { imp: number; exp: number }; setRates: (r: { imp: number; exp: number }) => void; roofHit: RoofHit | null; r: ReturnType<typeof estimate>; withBattery: ReturnType<typeof estimate> | null; inputs: Inputs; settings: EstimatorSettings; postcode: string; town: string; source: 'pvgis' | 'fallback'; note: string; controls: Controls; onRestart: () => void; knownAddress: string }) {
   const [booking, setBooking] = useState(false);
+  // Once they have sent the survey form, the buttons say so (remembered on this device for a month, per postcode).
+  const [requested, setRequested] = useState(() => {
+    try {
+      const o = JSON.parse(window.localStorage.getItem('hx-est-survey') || 'null') as { postcode?: string; at?: number } | null;
+      return !!o && o.postcode === postcode && Date.now() - (o.at ?? 0) < 30 * 864e5;
+    } catch {
+      return false;
+    }
+  });
+  const sent = () => {
+    setRequested(true);
+    try {
+      window.localStorage.setItem('hx-est-survey', JSON.stringify({ postcode, at: Date.now() }));
+    } catch {
+      // Not remembered: the page still shows it for now.
+    }
+  };
   const home = inputs.who === 'home';
   const max = Math.max(...r.monthly, 1);
   const pot = potentialOf(inputs.yieldKwhPerKwp * SHADE_FACTOR[inputs.shade]);
@@ -566,9 +583,16 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
               <div className="sub">
                 {r.kwp.toFixed(2)} kWp system · {r.panels} panels{r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}
               </div>
-              <button type="button" className="btn btn-solar est-headcta" onClick={() => setBooking(true)}>
-                Book my free survey
-              </button>
+              {requested ? (
+                <div className="est-headdone" role="status">
+                  <b>✓ Survey request received</b>
+                  <span>We’ll be in touch with you soon!</span>
+                </div>
+              ) : (
+                <button type="button" className="btn btn-solar est-headcta" onClick={() => setBooking(true)}>
+                  Book my free survey
+                </button>
+              )}
             </div>
           </div>
           <div className="est-card est-stats">
@@ -717,8 +741,8 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
         </div>
       </div>
 
-      <SurveyCard onBook={() => setBooking(true)} postcode={postcode} />
-      <SurveyModal open={booking} onClose={() => setBooking(false)} who={inputs.who} postcode={postcode} address={knownAddress} picks={['Solar panels', ...(inputs.battery ? ['Battery storage'] : []), ...(inputs.heatpump ? ['Heat pump'] : []), ...(inputs.ev ? ['EV charger'] : [])]} message={estimateMessage(r, inputs, roofHit?.address ?? '')} />
+      <SurveyCard onBook={() => setBooking(true)} postcode={postcode} requested={requested} />
+      <SurveyModal open={booking} onClose={() => setBooking(false)} who={inputs.who} postcode={postcode} address={knownAddress} picks={['Solar panels', ...(inputs.battery ? ['Battery storage'] : []), ...(inputs.heatpump ? ['Heat pump'] : []), ...(inputs.ev ? ['EV charger'] : [])]} message={estimateMessage(r, inputs, roofHit?.address ?? '')} onSent={sent} />
 
 
       <details className="assumptions">
@@ -768,7 +792,17 @@ function estimateMessage(r: ReturnType<typeof estimate>, inputs: Inputs, address
 }
 
 /** The invitation under the estimate: one clear button that opens the survey form. */
-function SurveyCard({ onBook, postcode }: { onBook: () => void; postcode: string }) {
+function SurveyCard({ onBook, postcode, requested }: { onBook: () => void; postcode: string; requested: boolean }) {
+  if (requested) {
+    return (
+      <div className="est-card est-pad est-lead est-lead--done" id="est-survey" role="status">
+        <div>
+          <h3>✓ Survey request received</h3>
+          <p className="est-sub">We’ll be in touch with you soon! We’ve emailed you a receipt. Anything to add? Just reply to it.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="est-card est-pad est-lead" id="est-survey">
       <div className="est-lead__copy">

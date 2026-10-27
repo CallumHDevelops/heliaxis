@@ -6,6 +6,7 @@ import { ATTR_COOKIE, CONSENT_COOKIE, hasConsent, parseAttribution, sourceLabel 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 import { grantPermission } from '@/lib/whatsapp/permission';
+import { sendEnquiryReceipt } from '@/lib/enquiry-receipt';
 
 function escHtml(s: string) {
   return s
@@ -98,6 +99,8 @@ export async function POST(request: NextRequest) {
             if (data.whatsappOptIn) await grantPermission(row.id, 'website-form');
             await ensureOpportunity(row.id, data.source);
           });
+          // The "we have your request" email to them, from the Heliaxis mailbox and logged on the enquiry.
+          after(() => sendEnquiryReceipt(row.id, { name: data.name, email: data.email, postcode: data.postcode, interest: data.interest, source: data.source, message: data.message }).then(() => null, () => null));
           after(() =>
             notifyEnquiryTeam(`New enquiry: ${data.name}${where}`, data.interest || data.message || 'From the website', `/admin/enquiries?enquiry=${row.id}`, {
               tag: `enq-${row.id}`,
