@@ -480,13 +480,15 @@ function Stepper({ label, value, onChange }: { label: string; value: number; onC
   return (
     <div className="est-step">
       <span>{label}</span>
-      <button type="button" aria-label={`Lower ${label}`} onClick={() => onChange(Math.max(1, Math.round((value - 1) * 10) / 10))}>
-        −
-      </button>
-      <b>{(Math.round(value * 10) / 10).toString()}p</b>
-      <button type="button" aria-label={`Raise ${label}`} onClick={() => onChange(Math.min(99, Math.round((value + 1) * 10) / 10))}>
-        +
-      </button>
+      <div>
+        <button type="button" aria-label={`Lower ${label}`} onClick={() => onChange(Math.max(1, Math.round((value - 1) * 10) / 10))}>
+          −
+        </button>
+        <b>{(Math.round(value * 10) / 10).toString()}p</b>
+        <button type="button" aria-label={`Raise ${label}`} onClick={() => onChange(Math.round((value + 1) * 10) / 10)}>
+          +
+        </button>
+      </div>
     </div>
   );
 }
@@ -673,34 +675,42 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
 
         <div className="est-card est-pad est-adjust">
           <h3>Change something</h3>
-          <div className="est-chips" role="group" aria-label="Adjust the estimate">
-            <button type="button" className={controls.battery ? 'on' : ''} aria-pressed={controls.battery} onClick={() => controls.setBattery(!controls.battery)}>
-              Battery
-            </button>
-            <button type="button" className={controls.ev ? 'on' : ''} aria-pressed={controls.ev} onClick={() => controls.setEv(!controls.ev)}>
-              Electric car
-            </button>
-            <button type="button" className={controls.heatpump ? 'on' : ''} aria-pressed={controls.heatpump} onClick={() => controls.setHeatpump(!controls.heatpump)}>
-              Heat pump
-            </button>
+          <div className="est-adj__g">
+            <span className="est-adj__lab">Add to your system</span>
+            <div className="est-tog3" role="group" aria-label="Add to your system">
+              {([['Battery', controls.battery, controls.setBattery], ['Electric car', controls.ev, controls.setEv], ['Heat pump', controls.heatpump, controls.setHeatpump]] as const).map(([label, on, set]) => (
+                <button key={label} type="button" className={on ? 'on' : ''} aria-pressed={on} onClick={() => set(!on)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="est-chips" role="group" aria-label="Shade">
-            {(['none', 'some', 'lots'] as const).map((sh) => (
-              <button key={sh} type="button" className={controls.shade === sh ? 'on' : ''} aria-pressed={controls.shade === sh} onClick={() => controls.setShade(sh)}>
-                {sh === 'none' ? 'No shade' : sh === 'some' ? 'Some shade' : 'Lots of shade'}
-              </button>
-            ))}
+          <div className="est-adj__g">
+            <span className="est-adj__lab">Shade on the roof</span>
+            <div className="est-tog3 seg" role="group" aria-label="Shade">
+              {([['none', 'None'], ['some', 'Some'], ['lots', 'Lots']] as const).map(([sh, label]) => (
+                <button key={sh} type="button" className={controls.shade === sh ? 'on' : ''} aria-pressed={controls.shade === sh} onClick={() => controls.setShade(sh)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="est-chips" role="group" aria-label="Who is home in the day">
-            {(['out', 'some', 'home'] as const).map((d) => (
-              <button key={d} type="button" className={controls.daytime === d ? 'on' : ''} aria-pressed={controls.daytime === d} onClick={() => controls.setDaytime(d)}>
-                {d === 'out' ? 'Out all day' : d === 'some' ? 'In some days' : 'Home all day'}
-              </button>
-            ))}
+          <div className="est-adj__g">
+            <span className="est-adj__lab">Who is home in the day</span>
+            <div className="est-tog3 seg" role="group" aria-label="Who is home in the day">
+              {([['out', 'Out all day'], ['some', 'Some days'], ['home', 'Home all day']] as const).map(([d, label]) => (
+                <button key={d} type="button" className={controls.daytime === d ? 'on' : ''} aria-pressed={controls.daytime === d} onClick={() => controls.setDaytime(d)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="est-steppers">
-            <Stepper label="Electricity price" value={rates.imp} onChange={(n) => setRates({ ...rates, imp: n })} />
-            <Stepper label="Export price" value={rates.exp} onChange={(n) => setRates({ ...rates, exp: n })} />
+          <div className="est-adj__g">
+            <span className="est-adj__lab">Electricity prices</span>
+            <div className="est-steppers">
+              <Stepper label="You pay" value={rates.imp} onChange={(n) => setRates({ ...rates, imp: n })} />
+              <Stepper label="You export at" value={rates.exp} onChange={(n) => setRates({ ...rates, exp: n })} />
+            </div>
           </div>
           {r.needsG99 && <p className="est-note">A system over 3.68 kW needs approval from your network operator (a G99 application). We handle that for you.</p>}
           {note && <p className="est-note">{note}</p>}
@@ -727,34 +737,25 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
   );
 }
 
-/** The steps of the lookup, shown as four sparks: faded until their turn, pulsing while it happens, gold when done. */
+/** The lookup as one big spark: its top arm lights first, then the right, the bottom and the left. */
 const FINDING = ['Finding your property', 'Reading your roof from above', 'Measuring each face and its shade', 'Laying out your panels'];
-const SPARK = (
-  <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true">
-    {[0, 90, 180, 270].map((a) => (
-      <g key={a} transform={`rotate(${a} 12 12)`}>
-        <path d="M11 9.6 L13 9.6 L13 0.8 L11 3 Z" />
-      </g>
-    ))}
-  </svg>
-);
 function Finding({ address, done }: { address: string; done: boolean }) {
-  // The step that is happening now. It moves on every couple of seconds while we wait, and runs to the end when the answer is in.
+  // The arm that is lighting now. It moves on every couple of seconds while we wait, and runs to the end when the answer is in.
   const [now, setNow] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setNow((n) => (done ? Math.min(n + 1, FINDING.length) : Math.min(n + 1, FINDING.length - 1))), done ? 160 : 2200);
+    const t = setInterval(() => setNow((n) => (done ? Math.min(n + 1, FINDING.length) : Math.min(n + 1, FINDING.length - 1))), done ? 200 : 2200);
     return () => clearInterval(t);
   }, [done]);
   return (
     <div className="est-finding" role="status" aria-live="polite">
-      <ol className="est-finding__steps">
-        {FINDING.map((label, i) => (
-          <li key={label} className={i < now ? 'is-done' : i === now ? 'is-now' : ''}>
-            <span className="est-finding__spark">{SPARK}</span>
-            <span>{label}{i === now ? '…' : ''}</span>
-          </li>
+      <svg className="est-bigspark" viewBox="0 0 24 24" aria-hidden="true">
+        {[0, 90, 180, 270].map((a, i) => (
+          <g key={a} transform={`rotate(${a} 12 12)`} className={i < now ? 'is-done' : i === now ? 'is-now' : ''}>
+            <path d="M11 9.6 L13 9.6 L13 0.8 L11 3 Z" />
+          </g>
         ))}
-      </ol>
+      </svg>
+      <h2 key={Math.min(now, FINDING.length - 1)}>{FINDING[Math.min(now, FINDING.length - 1)]}…</h2>
       <p>{address || 'This takes a few seconds.'}</p>
     </div>
   );
