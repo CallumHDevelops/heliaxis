@@ -57,6 +57,8 @@ export function StepQuoteForm({
 }) {
   // ?for=business (or home) on /get-a-quote answers the first question for them.
   const known = !!initialWho && !!initialPostcode;
+  // Questions already answered (from the estimator) are not asked again, and are not counted.
+  const from = known ? 4 : 1;
   const [step, setStep] = useState<Step>(known ? 4 : initialWho ? 2 : 1);
   const [who, setWho] = useState<Who>(initialWho ?? '');
   const [picks, setPicks] = useState<string[]>(initialPicks ?? []);
@@ -203,9 +205,9 @@ export function StepQuoteForm({
     <div className={`sq sq--${variant}`}>
       {asking && (
         <div className="sq-top">
-          <span className="sq-count">0{step} / 0{QUESTIONS}</span>
-          <div className="sq-bar" role="progressbar" aria-label="Progress" aria-valuemin={1} aria-valuemax={QUESTIONS} aria-valuenow={step}>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
+          <span className="sq-count">0{step - from + 1} / 0{QUESTIONS - from + 1}</span>
+          <div className="sq-bar" role="progressbar" aria-label="Progress" aria-valuemin={1} aria-valuemax={QUESTIONS - from + 1} aria-valuenow={step - from + 1}>
+            {[1, 2, 3, 4, 5, 6].filter((n) => n >= from).map((n) => (
               <span key={n} className={n < step ? 'is-done' : n === step ? 'is-now' : ''} />
             ))}
           </div>
@@ -311,7 +313,7 @@ export function StepQuoteForm({
         )}
       </div>
 
-      {step > 1 && step < 7 && (
+      {step > from && step < 7 && (
         <div className="sq-foot">
           <button type="button" className="sq-back" onClick={() => go((step - 1) as Step)}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

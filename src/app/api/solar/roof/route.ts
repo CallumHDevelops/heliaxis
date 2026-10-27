@@ -14,7 +14,7 @@ export const maxDuration = 30;
 const json = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { 'Cache-Control': (b as { found?: boolean }).found ? 'private, max-age=600' : 'no-store' } });
 
 type Found = { found: true; address: string; lat: number; lng: number; roof: RoofFound; kwhPerKwp: number; monthly: number[] | null; imageryDate: string | null; /** What the roof analysis saw (only with ?debug). */ info?: unknown; /** How the roof was read: 'ok', or why we fell back to Google's own layout. */ layers?: string; map: (MapData & { imageUrl: string; outline: { lat: number; lng: number }[] | null }) | null };
-type Miss = { found: false; reason: 'not_configured' | 'bad_address' | 'no_address' | 'not_covered' | 'busy' | 'error'; detail?: string };
+type Miss = { found: false; address?: string; postcode?: string; reason: 'not_configured' | 'bad_address' | 'no_address' | 'not_covered' | 'busy' | 'error'; detail?: string };
 
 /** Same address asked again within a day is answered from memory (so it is only billed once). */
 const cache = new Map<string, { at: number; value: Found | Miss }>();
@@ -178,6 +178,8 @@ export async function GET(req: Request) {
   } catch (e) {
     result = { found: false, reason: 'error', detail: clean(String(e)) };
   }
+  // A picked address is known even when its roof is not: the survey form then does not ask for it again.
+  if (!result.found && picked) result = { ...result, address: picked.address, postcode: picked.postcode };
   // Only a good answer is remembered: a failure is tried again next time, so fixing a setting works at once.
   if (result.found) cache.set(ck, { at: Date.now(), value: result });
   if (cache.size > 2000) cache.clear();

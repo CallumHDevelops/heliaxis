@@ -91,6 +91,10 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
   // 'ask': we found a roof, the visitor has not said yet; 'yes': use it; 'no': they will answer the questions.
   const [roofChoice, setRoofChoice] = useState<'ask' | 'yes' | 'no'>('no');
   const [looking, setLooking] = useState(false);
+  // The lookup has an answer: the loading sparks finish before the screen changes.
+  const [lookDone, setLookDone] = useState(false);
+  // The address we know for the survey form, so it is not asked again.
+  const [knownAddress, setKnownAddress] = useState('');
   // They chose to answer the roof questions themselves instead of giving an address.
   const [skipLookup, setSkipLookup] = useState(false);
   const [lookNote, setLookNote] = useState('');
@@ -158,6 +162,8 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
     setRoofHit(null);
     setRoofChoice('no');
     if (!picker && (!needHouse || !house.trim())) return go(1);
+    setLookDone(false);
+    setKnownAddress('');
     setLooking(true);
     try {
       // A short minimum, so a quick answer is a smooth change of screen and not a flash.
@@ -165,6 +171,9 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
       const res = await fetch(picker ? `/api/solar/roof?id=${encodeURIComponent(pickedId)}` : `/api/solar/roof?pc=${encodeURIComponent(postcode.trim())}&line=${encodeURIComponent(house.trim())}`);
       const d = await res.json();
       await wait;
+      const full = String(d?.address ?? '').match(/[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}/i);
+      if (full) setPostcode(full[0].toUpperCase());
+      if (d?.address) setKnownAddress(String(d.address));
       if (d?.found) {
         setRoofHit({ address: d.address, roof: d.roof, kwhPerKwp: d.kwhPerKwp, monthly: d.monthly, imageryDate: d.imageryDate, map: d.map ?? null });
         setRoofChoice('ask');
@@ -175,6 +184,9 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
     } catch {
       // The estimator carries on with the questions.
     }
+    // Let the last sparks turn gold before the screen changes.
+    setLookDone(true);
+    await new Promise((r) => setTimeout(r, 900));
     setLooking(false);
     go(1);
   }
@@ -193,7 +205,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
       <div className="wrap est-wrap" ref={head}>
         {!done ? (
           <div className="est-card est-wiz">
-            {looking && <Finding address={picker ? query : [house, postcode].filter(Boolean).join(', ')} />}
+            {looking && <Finding address={picker ? query : [house, postcode].filter(Boolean).join(', ')} done={lookDone} />}
             <div className="est-prog" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={`Question ${step + 1} of ${STEPS.length}`}>
               {STEPS.map((s, i) => (
                 <span key={s} className={i < step ? 'done' : i === step ? 'now' : ''}>
@@ -420,7 +432,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
             </div>
           </div>
         ) : (
-          <Result rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ sizeMode, setSizeMode, shade, setShade, daytime, setDaytime, battery, setBattery, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
+          <Result knownAddress={knownAddress} rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ sizeMode, setSizeMode, shade, setShade, daytime, setDaytime, battery, setBattery, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
         )}
       </div>
     </>
@@ -479,7 +491,7 @@ function Stepper({ label, value, onChange }: { label: string; value: number; onC
   );
 }
 
-function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, postcode, town, source, note, controls, onRestart }: { rates: { imp: number; exp: number }; setRates: (r: { imp: number; exp: number }) => void; roofHit: RoofHit | null; r: ReturnType<typeof estimate>; withBattery: ReturnType<typeof estimate> | null; inputs: Inputs; settings: EstimatorSettings; postcode: string; town: string; source: 'pvgis' | 'fallback'; note: string; controls: Controls; onRestart: () => void }) {
+function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs, settings, postcode, town, source, note, controls, onRestart }: { rates: { imp: number; exp: number }; setRates: (r: { imp: number; exp: number }) => void; roofHit: RoofHit | null; r: ReturnType<typeof estimate>; withBattery: ReturnType<typeof estimate> | null; inputs: Inputs; settings: EstimatorSettings; postcode: string; town: string; source: 'pvgis' | 'fallback'; note: string; controls: Controls; onRestart: () => void; knownAddress: string }) {
   const [booking, setBooking] = useState(false);
   const home = inputs.who === 'home';
   const max = Math.max(...r.monthly, 1);
@@ -696,7 +708,7 @@ function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, po
       </div>
 
       <SurveyCard onBook={() => setBooking(true)} postcode={postcode} />
-      <SurveyModal open={booking} onClose={() => setBooking(false)} who={inputs.who} postcode={postcode} picks={['Solar panels', ...(inputs.battery ? ['Battery storage'] : []), ...(inputs.heatpump ? ['Heat pump'] : []), ...(inputs.ev ? ['EV charger'] : [])]} message={estimateMessage(r, inputs, roofHit?.address ?? '')} />
+      <SurveyModal open={booking} onClose={() => setBooking(false)} who={inputs.who} postcode={postcode} address={knownAddress} picks={['Solar panels', ...(inputs.battery ? ['Battery storage'] : []), ...(inputs.heatpump ? ['Heat pump'] : []), ...(inputs.ev ? ['EV charger'] : [])]} message={estimateMessage(r, inputs, roofHit?.address ?? '')} />
 
 
       <details className="assumptions">
@@ -715,24 +727,35 @@ function Result({ rates, setRates, roofHit, r, withBattery, inputs, settings, po
   );
 }
 
-/** Shown while we look up the property: steps that change every few seconds, so the wait never looks like a stall. */
-const FINDING = ['Finding your property…', 'Looking at your roof from above…', 'Measuring each roof face…', 'Checking the shade through the year…', 'Laying out the panels…'];
-function Finding({ address }: { address: string }) {
-  const [i, setI] = useState(0);
+/** The steps of the lookup, shown as four sparks: faded until their turn, pulsing while it happens, gold when done. */
+const FINDING = ['Finding your property', 'Reading your roof from above', 'Measuring each face and its shade', 'Laying out your panels'];
+const SPARK = (
+  <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true">
+    {[0, 90, 180, 270].map((a) => (
+      <g key={a} transform={`rotate(${a} 12 12)`}>
+        <path d="M11 9.6 L13 9.6 L13 0.8 L11 3 Z" />
+      </g>
+    ))}
+  </svg>
+);
+function Finding({ address, done }: { address: string; done: boolean }) {
+  // The step that is happening now. It moves on every couple of seconds while we wait, and runs to the end when the answer is in.
+  const [now, setNow] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setI((n) => Math.min(n + 1, FINDING.length - 1)), 2200);
+    const t = setInterval(() => setNow((n) => (done ? Math.min(n + 1, FINDING.length) : Math.min(n + 1, FINDING.length - 1))), done ? 160 : 2200);
     return () => clearInterval(t);
-  }, []);
+  }, [done]);
   return (
     <div className="est-finding" role="status" aria-live="polite">
-      <div className="est-finding__sun" aria-hidden="true">
-        <span />
-      </div>
-      <h2 key={i}>{FINDING[i]}</h2>
-      <p>{address ? address : 'This takes a few seconds.'}</p>
-      <div className="est-finding__bar" aria-hidden="true">
-        <i />
-      </div>
+      <ol className="est-finding__steps">
+        {FINDING.map((label, i) => (
+          <li key={label} className={i < now ? 'is-done' : i === now ? 'is-now' : ''}>
+            <span className="est-finding__spark">{SPARK}</span>
+            <span>{label}{i === now ? '…' : ''}</span>
+          </li>
+        ))}
+      </ol>
+      <p>{address || 'This takes a few seconds.'}</p>
     </div>
   );
 }
