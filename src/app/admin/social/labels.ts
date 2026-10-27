@@ -2,7 +2,7 @@ import { sevRank, type Severity } from '@/lib/social/rules/types';
 
 export const SEVERITY_LABEL: Record<string, string> = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', positive: 'Positive', ignore: 'Ignore' };
 export const TYPE_LABEL: Record<string, string> = { quote_request: 'Quote request', question: 'Question', positive: 'Positive', complaint: 'Complaint', general: 'General', spam: 'Spam' };
-export const PLATFORM_LABEL: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', trustpilot: 'Trustpilot', google: 'Google', manual: 'Manual' };
+export const PLATFORM_LABEL: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', trustpilot: 'Trustpilot', google: 'Google', manual: 'Manual', 'meta-ads': 'Meta ads' };
 export const STATUS_LABEL: Record<string, string> = { new: 'New', in_review: 'In review', approved: 'Approved', copied: 'Copied', posted: 'Posted', dismissed: 'Dismissed', escalated: 'Escalated' };
 
 /** Most urgent first, then oldest first (the one waiting longest). */

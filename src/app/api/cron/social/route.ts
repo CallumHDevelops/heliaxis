@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sendDueAlerts } from '@/lib/social/alerts';
+import { pollAdComments } from '@/lib/social/connectors/metaAds';
 import { pollTrustpilot } from '@/lib/social/connectors/trustpilot';
 import { runDailySnapshots } from '@/lib/social/insights/collect';
 import { runSocialJobs } from '@/lib/social/jobs';
@@ -23,9 +24,11 @@ async function run(req: Request) {
   const jobs = await runSocialJobs().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
   // Trustpilot reviews, every 15 minutes (skips itself in between, and does nothing until the keys are in).
   const trustpilot = await pollTrustpilot().catch(() => ({ polled: false }));
+  // Comments on Meta ads (which the Page webhook does not send for ads that exist only in Ads Manager), every 5 minutes.
+  const metaAds = await pollAdComments().catch(() => ({ polled: false }));
   // Once a day after 02:15: followers, views and post figures from Facebook and Instagram.
   const snapshots = await runDailySnapshots().catch(() => ({ ran: false }));
-  return NextResponse.json({ ok: true, deferredSent, jobs, trustpilot, snapshots });
+  return NextResponse.json({ ok: true, deferredSent, jobs, trustpilot, metaAds, snapshots });
 }
 export const GET = run;
 export const POST = run;

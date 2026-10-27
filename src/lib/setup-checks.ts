@@ -746,6 +746,23 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     hrefLabel: 'Open Meta apps',
     order: 11,
   });
+  add(socialSql && env('META_SOCIAL_TOKEN') && !env('META_AD_ACCOUNT_ID'), {
+    id: 'env-social-meta-ads',
+    title: 'Social monitoring: also read comments on your Meta ads',
+    detail:
+      'Comments on ads made in Ads Manager are not sent to the Page, so they would be missed. This lets the app look up the post behind each active ad and read its comments every 5 minutes. Read only, like the rest.',
+    steps: [
+      'Open [Meta Business settings → System users](https://business.facebook.com/settings/system-users), pick the system user you made the social token with, and tap **Add assets → Ad accounts**. Choose the Heliaxis ad account and give it **View performance** (read access is enough).',
+      'Tap **Generate token** for that system user and tick **ads_read** as well as the Page permissions you ticked before (add `instagram_manage_comments` if it is offered, for Instagram ads). Replace `META_SOCIAL_TOKEN` in Vercel with the new token.',
+      'Find the **Ad account ID**: open [Ads Manager](https://adsmanager.facebook.com), and it is the number in the top-left account picker (or in the web address after `act=`). Digits only. This is `META_AD_ACCOUNT_ID`.',
+      ...VERCEL_STEPS,
+      'Then test it: comment on one of your live ads from a personal account. Within about five minutes it should appear on the Social monitoring page.',
+    ],
+    copies: [{ label: 'Key', value: 'META_AD_ACCOUNT_ID' }],
+    href: 'https://business.facebook.com/settings/system-users',
+    hrefLabel: 'Open Meta system users',
+    order: 11,
+  });
   add(socialSql && !env('GOOGLE_BP_CLIENT_ID', 'GOOGLE_BP_CLIENT_SECRET', 'GOOGLE_BP_REFRESH_TOKEN', 'GOOGLE_BP_LOCATION'), {
     id: 'env-social-google',
     title: 'Social monitoring: ask Google for review access (start now, it can take weeks)',
