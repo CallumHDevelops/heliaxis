@@ -746,3 +746,8 @@ textarea.dy-input {
 .dy-map:hover {
   border-color: currentColor;
 }
+
+.dy-results__add {
+  font-weight: 700;
+  color: var(--amber-2, #8a5d00);
+}

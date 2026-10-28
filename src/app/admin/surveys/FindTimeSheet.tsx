@@ -6,6 +6,7 @@ import { SURVEY_TYPES, type SurveyTypeKey } from '@/lib/crm/stages';
 import { londonSlot, ukDate, ukTime, weekday } from '@/lib/booking/engine';
 import type { Job } from './DiaryEntrySheet';
 import { AutoNotice, useBookingPeople } from '../projects/AutoNotice';
+import { NewCustomerSheet } from './NewCustomerSheet';
 
 /**
  * Find a time (staff): pick the customer's job (or just type a postcode), see the times that fit
@@ -86,6 +87,7 @@ export function FindTimeSheet({
   onBooked: (message: string) => void;
 }) {
   const [job, setJob] = useState<Project | null>(null);
+  const [adding, setAdding] = useState(false);
   const [q, setQ] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [postcode, setPostcode] = useState('');
@@ -271,7 +273,7 @@ export function FindTimeSheet({
               onChange={(e) => search(e.target.value)}
               aria-label="Search for a customer"
             />
-            {jobs.length > 0 && (
+            {q.trim().length >= 2 && (
               <ul className="dy-results">
                 {jobs.map((j) => (
                   <li key={j.id}>
@@ -293,9 +295,30 @@ export function FindTimeSheet({
                     </button>
                   </li>
                 ))}
+                <li>
+                  <button type="button" className="dy-results__add" onClick={() => setAdding(true)}>
+                    + Add “{q.trim()}” as a new customer
+                  </button>
+                </li>
               </ul>
             )}
           </>
+        )}
+        {adding && (
+          <NewCustomerSheet
+            name={q.trim()}
+            type={type}
+            onClose={() => setAdding(false)}
+            onCreated={(c) => {
+              const p: Project = { id: c.id, title: c.customer, customer: c.customer, postcode: c.postcode, surveyAt: null, stage: 'lead' };
+              setAdding(false);
+              setJob(p);
+              setJobs([]);
+              setQ('');
+              setPostcode(c.postcode ?? '');
+              void find({ job: p, pc: c.postcode ?? '', t: type });
+            }}
+          />
         )}
         {job?.surveyAt && <p className="dy-small">Booking a new time moves their survey from {when(job.surveyAt)}.</p>}
 
