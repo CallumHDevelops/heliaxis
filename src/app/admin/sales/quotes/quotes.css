@@ -110,3 +110,16 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
 .est-field label { font-weight: 700; font-size: 0.88rem; }
 .est-input { display: flex; align-items: center; gap: 6px; }
 .est-input .crm-input { max-width: 140px; }
+
+/* Tidier lines: one soft row each with a divider, a slim detail field and one quiet meta line. */
+.qb-lines { gap: 0; }
+.qb-line:not(.qb-line--head) { padding: 10px 0; border-top: 1px solid var(--line); align-items: start; }
+.qb-line.is-internal { padding: 10px 6px; }
+.qb-desc .crm-input { min-height: 38px; }
+.qb-detail { margin-top: 0; min-height: 32px !important; font-size: 0.8rem; border-style: dashed; background: transparent; }
+.qb-detail:focus { border-style: solid; }
+.qb-linemeta { gap: 2px 14px; min-height: 20px; }
+.qb-internal, .qb-saveitem { font-size: 0.74rem; }
+.qb-saveitem { margin-left: auto; text-decoration: none; }
+.qb-line .crm-input, .qb-line select.crm-input { min-height: 38px; }
+.qb-amt { padding-top: 8px; }
