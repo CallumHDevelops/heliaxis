@@ -1105,3 +1105,38 @@ a.nu-main:hover b {
   gap: 10px;
   align-items: baseline;
 }
+
+/* New Meta leads: refresh, at the right of the header. */
+.nu-refresh {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--border, rgba(33, 31, 24, 0.14));
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.nu-refresh:hover {
+  background: rgba(248, 188, 30, 0.18);
+}
+.nu-refresh:focus-visible {
+  outline: 3px solid #211f18;
+  outline-offset: 2px;
+}
+.nu-refresh.is-spinning svg {
+  animation: nu-spin 0.8s linear infinite;
+}
+@keyframes nu-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nu-refresh.is-spinning svg {
+    animation: none;
+  }
+}

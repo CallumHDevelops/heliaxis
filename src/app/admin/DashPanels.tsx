@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
 import type { HubFollowUp, HubTask } from './HubView';
 import { dueLabel } from './HubMyDay';
 import type { HubMetaLeads } from './meta-leads';
 
 /** Dashboard → New Meta leads: the ones someone needs to get to, with why, WhatsApp, Call and Open. */
 export function MetaLeadsPanel({ leads }: { leads: HubMetaLeads }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
   return (
     <section className="nu" aria-labelledby="nu-leads-h">
       <div className="nu-head">
@@ -19,6 +22,12 @@ export function MetaLeadsPanel({ leads }: { leads: HubMetaLeads }) {
           </span>
         )}
         {leads.today > 0 && <span className="nu-today">{leads.today} today</span>}
+        <button type="button" className={`nu-refresh${pending ? ' is-spinning' : ''}`} onClick={() => start(() => router.refresh())} disabled={pending} aria-label="Refresh the leads" title="Refresh">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 12a8 8 0 1 1-2.6-5.9" />
+            <path d="M20 4v5h-5" />
+          </svg>
+        </button>
       </div>
       {leads.rows.length === 0 ? (
         <p className="nu-empty">
