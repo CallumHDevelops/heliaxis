@@ -7,7 +7,8 @@ import 'server-only';
  */
 const BASE = 'https://api.thesmsworks.co.uk/v1';
 
-export const smsConfigured = () => !!(process.env.SMSWORKS_CUSTOMER_ID && process.env.SMSWORKS_KEY && process.env.SMSWORKS_SECRET);
+/** Either the three account values, or the ready-made token from their dashboard ("Generate JSON Web Token") in SMSWORKS_TOKEN. */
+export const smsConfigured = () => !!(process.env.SMSWORKS_TOKEN || (process.env.SMSWORKS_CUSTOMER_ID && process.env.SMSWORKS_KEY && process.env.SMSWORKS_SECRET));
 
 /** A UK mobile as the number a text service wants: "447700900123" (no plus or spaces). Null if it isn't one. */
 export function toMsisdn(phone: string | null | undefined): string | null {
@@ -19,6 +20,8 @@ export function toMsisdn(phone: string | null | undefined): string | null {
 let cached: { token: string; at: number } | null = null;
 
 async function token(): Promise<string> {
+  // A token pasted from their dashboard: used as it is (with or without the "JWT " in front).
+  if (process.env.SMSWORKS_TOKEN) return process.env.SMSWORKS_TOKEN.trim().replace(/^JWT\s+/i, '');
   if (cached && Date.now() - cached.at < 50 * 60_000) return cached.token;
   const r = await fetch(`${BASE}/auth/token`, {
     method: 'POST',
@@ -40,9 +43,9 @@ export async function sendSms(to: string, content: string, tag = 'heliaxis'): Pr
   if (!destination) return { ok: false, error: 'That isn’t a UK mobile number.' };
   try {
     const t = await token();
-    // The token goes in the Authorization header; the service has been seen to want it bare or with a "JWT" prefix.
+    // Their docs: the whole token goes in the Authorization header, "JWT eyJ…". The bare token is tried second.
     let last = '';
-    for (const auth of [t, `JWT ${t}`]) {
+    for (const auth of [`JWT ${t}`, t]) {
       const r = await fetch(`${BASE}/message/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: auth },

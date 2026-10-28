@@ -657,21 +657,19 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 12,
     optional: true,
   });
-  add(!env('SMSWORKS_CUSTOMER_ID', 'SMSWORKS_KEY', 'SMSWORKS_SECRET'), {
+  add(!env('SMSWORKS_TOKEN') && !env('SMSWORKS_CUSTOMER_ID', 'SMSWORKS_KEY', 'SMSWORKS_SECRET'), {
     id: 'env-smsworks',
     title: 'Text messages: tell customers about appointments by SMS',
     detail: 'Optional. For customers we have a mobile number for but no email, or who would rather get a text. About 4p a text, pay as you go, no contract. Used for the appointment message with its check-the-pin link.',
     steps: [
       'Sign up at [thesmsworks.co.uk](https://www.thesmsworks.co.uk) and buy a small bundle of credits (a few pounds goes a long way).',
-      'In their dashboard open **API** (or **Developers**) and create an API key. You get three values: a **customer ID**, a **key** and a **secret**. Copy each.',
+      'In their dashboard open the **API** page. Step 1 is **Generate Key & Secret**; step 2 is **Generate JSON Web Token**. Press **Generate Token** and copy the whole token (it starts `JWT eyJ…`). This is `SMSWORKS_TOKEN`: one value is all you need. (If you would rather use the key, secret and customer ID, add those three instead.)',
       ...VERCEL_STEPS,
       'Optional: add `SMS_SENDER_ID` to change the name the texts come from (up to 11 letters or numbers; it is `Heliaxis` if you do not).',
       'Then try it: book an appointment for yourself (use your own mobile) with **Text message** ticked. If it says “Text NOT sent”, the reason is shown, so tell Claude what it says.',
     ],
     copies: [
-      { label: 'Customer ID', value: 'SMSWORKS_CUSTOMER_ID' },
-      { label: 'Key', value: 'SMSWORKS_KEY' },
-      { label: 'Secret', value: 'SMSWORKS_SECRET' },
+      { label: 'Token', value: 'SMSWORKS_TOKEN' },
     ],
     href: 'https://www.thesmsworks.co.uk',
     hrefLabel: 'Open The SMS Works',
