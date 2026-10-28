@@ -12,6 +12,8 @@ import { toWaId } from '@/lib/whatsapp/shared';
 import { StageChip } from '../CrmUi';
 import { firstName, jobLabel, shortDate, ukDayOf } from '../crm-shared';
 import { OrganisationCard } from './OrganisationCard';
+import { PeopleCard } from './PeopleCard';
+import { SendAppointment } from './SendAppointment';
 import { PortalMessages } from './PortalMessages';
 import { DnoDeposit, PortalCard } from './ProjectExtras';
 import {
@@ -137,6 +139,7 @@ export function CustomerColumn({
       />
 
       {schema.organisations && <OrganisationCard projectId={project.id} organisation={organisation ?? null} contact={contact ?? null} onChanged={onSaved} />}
+      {schema.organisations && <PeopleCard projectId={project.id} />}
 
       {others.length > 0 && (
         <section className="crmh-card" aria-label="Other projects">
@@ -742,6 +745,7 @@ function JobDetails({
               <span className="crmr-wrap">
                 {[project.survey_at ? `Survey ${ukWhen(project.survey_at)}` : '', project.install_at ? `Install ${ukWhen(project.install_at)}` : ''].filter(Boolean).join(' · ')}
               </span>
+              {project.survey_at && <SendAppointment projectId={project.id} />}
             </Field>
           )}
           {project.stage === 'lost' && <Field label="Why it was lost">{project.lost_reason || <span className="crm-muted">Not said</span>}</Field>}

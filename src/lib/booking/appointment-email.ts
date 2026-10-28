@@ -119,12 +119,12 @@ export const surveyTitle = (type: string) => `${surveyTypeLabel(type)} survey ($
 export type SendResult = { sent: boolean; to?: string; why?: string };
 
 /** Emails the customer their appointment (with the .ics) and logs it. Never throws. */
-export async function sendAppointmentEmail(x: { enquiryId: string; projectId: string | null; appointment: Omit<AppointmentInput, 'name' | 'address' | 'postcode'>; byId?: string | null }): Promise<SendResult> {
+export async function sendAppointmentEmail(x: { enquiryId: string; projectId: string | null; appointment: Omit<AppointmentInput, 'name' | 'address' | 'postcode'>; byId?: string | null; /** Send to this person instead of the customer (someone else on the job). */ to?: { name: string; email: string } }): Promise<SendResult> {
   try {
     if (!msConfigured()) return { sent: false, why: 'Microsoft 365 isn’t connected, so email can’t be sent.' };
     const db = createAdminClient();
     const { data: e } = await db.from('enquiries').select('name, email').eq('id', x.enquiryId).maybeSingle();
-    const to = String(e?.email ?? '').trim();
+    const to = (x.to?.email ?? String(e?.email ?? '')).trim();
     if (!/^\S+@\S+\.\S+$/.test(to)) return { sent: false, why: 'No email address on the customer’s record.' };
     let address: string | null = null;
     let postcode: string | null = null;
@@ -133,7 +133,7 @@ export async function sendAppointmentEmail(x: { enquiryId: string; projectId: st
       address = (p?.address as string | null) ?? null;
       postcode = (p?.postcode as string | null) ?? null;
     }
-    const i: AppointmentInput = { ...x.appointment, name: String(e?.name ?? ''), address, postcode };
+    const i: AppointmentInput = { ...x.appointment, name: x.to?.name ?? String(e?.name ?? ''), address, postcode };
     const mail = appointmentEmail(i);
     const ics = appointmentIcs(i, process.env.MS_MAILBOX);
     const graphId = await sendMail({ to, subject: mail.subject, text: mail.text, html: mail.html, attachments: [{ name: 'heliaxis-appointment.ics', contentType: 'text/calendar', bytes: new TextEncoder().encode(ics) }] });
