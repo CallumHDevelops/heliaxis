@@ -11,8 +11,9 @@ export async function GET(_req: Request, { params }: Ctx) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
-  const people = await listJobPeople(id);
-  return json({ ready: people !== null, people: people ?? [] });
+  const why: { error?: string } = {};
+  const people = await listJobPeople(id, why);
+  return json({ ready: people !== null, people: people ?? [], error: why.error });
 }
 
 /** Link a contact to the job: { contact_id, role? }. Linking them again just changes the role. */

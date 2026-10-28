@@ -4,11 +4,14 @@ import { createAdminClient } from '@/lib/supabase/admin';
 /** The people linked to a job besides its customer (supabase/job-people.sql). */
 export type JobPerson = { contact_id: string; role: string | null; name: string; mobile: string | null; email: string | null; organisation: string | null };
 
-/** Null until job-people.sql has run. */
-export async function listJobPeople(projectId: string): Promise<JobPerson[] | null> {
+/** Null until job-people.sql has run (or if the read fails: `why` says what Supabase answered). */
+export async function listJobPeople(projectId: string, why?: { error?: string }): Promise<JobPerson[] | null> {
   const db = createAdminClient();
   const { data: links, error } = await db.from('crm_project_contacts').select('contact_id, role, created_at').eq('project_id', projectId).order('created_at');
-  if (error) return null;
+  if (error) {
+    if (why) why.error = error.message;
+    return null;
+  }
   const ids = (links ?? []).map((l) => l.contact_id as string);
   if (!ids.length) return [];
   const { data: people } = await db.from('crm_contacts').select('id, name, mobile, email, organisation_id').in('id', ids);

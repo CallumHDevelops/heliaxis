@@ -20,20 +20,23 @@ export function PeopleCard({ projectId, onChanged }: { projectId: string; onChan
   const [ready, setReady] = useState(true);
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState('');
+  const [why, setWhy] = useState('');
 
   async function load() {
     const r = await fetch(`/api/crm/projects/${projectId}/people`, { cache: 'no-store' });
-    const d = (await r.json().catch(() => ({}))) as { ready?: boolean; people?: Person[] };
+    const d = (await r.json().catch(() => ({}))) as { ready?: boolean; people?: Person[]; error?: string };
     setReady(d.ready !== false);
+    setWhy(d.error ?? '');
     setPeople(d.people ?? []);
   }
   useEffect(() => {
     let gone = false;
     fetch(`/api/crm/projects/${projectId}/people`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d: { ready?: boolean; people?: Person[] }) => {
+      .then((d: { ready?: boolean; people?: Person[]; error?: string }) => {
         if (gone) return;
         setReady(d.ready !== false);
+        setWhy(d.error ?? '');
         setPeople(d.people ?? []);
       })
       .catch(() => !gone && setPeople([]));
@@ -56,22 +59,25 @@ export function PeopleCard({ projectId, onChanged }: { projectId: string; onChan
   }
 
   return (
-    <section className="crmh-card org-card" aria-label="People on this job">
+    <section className="crmh-card org-card" aria-label="Other contacts on this job">
       <div className="crmh-card__h">
-        <h3>People on this job</h3>
+        <h3>Other contacts</h3>
         {ready && (
           <button type="button" className="crmr-edit crmh-ml" onClick={() => setAdding(true)}>
-            + Add person
+            + New contact
           </button>
         )}
       </div>
       <div className="crmh-card__b">
         {!ready ? (
-          <p className="crm-muted crm-small">Run <code>supabase/job-people.sql</code> in Supabase to add more people to a job.</p>
+          <p className="crm-muted crm-small">
+            Run <code>supabase/job-people.sql</code> in Supabase to add more contacts to a job.
+            {why && <><br />Supabase says: {why}</>}
+          </p>
         ) : people === null ? (
           <p className="crm-muted crm-small">Loading…</p>
         ) : people.length === 0 ? (
-          <p className="crm-muted crm-small">Just the customer so far. Add a partner, a landlord, a tenant or a site contact.</p>
+          <p className="crm-muted crm-small">Nobody else yet. Add a partner, a landlord, a tenant or a site contact.</p>
         ) : (
           <ul className="crmh-people">
             {people.map((p) => (
@@ -105,7 +111,7 @@ export function PeopleCard({ projectId, onChanged }: { projectId: string; onChan
         {err && <p className="crm-error">{err}</p>}
       </div>
       {adding && (
-        <Sheet title="Add a person to this job" onClose={() => setAdding(false)} wide>
+        <Sheet title="Add a contact to this job" onClose={() => setAdding(false)} wide>
           <AddPerson
             projectId={projectId}
             already={new Set((people ?? []).map((p) => p.contact_id))}
@@ -184,7 +190,7 @@ function AddPerson({ projectId, already, onDone, onCancel }: { projectId: string
             ))}
           </ul>
           <button type="button" className="crm-btn crm-btn--solar" onClick={() => setFresh(true)}>
-            + New person
+            + New contact
           </button>{' '}
           <button type="button" className="crm-btn crm-btn--ghost" onClick={onCancel}>
             Cancel
