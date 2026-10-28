@@ -91,7 +91,6 @@ export function OrganisationCard({
           <PeopleCard projectId={projectId} onChanged={onChanged} embedded />
         </div>
       </div>
-      </div>
       {open && (
         <Sheet title={linked ? 'Change the organisation or contact' : 'Link an organisation or contact'} onClose={() => setOpen(false)} wide>
           <LinkSheet
