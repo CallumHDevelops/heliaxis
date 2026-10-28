@@ -705,6 +705,7 @@ export function ProjectView({
           <div className="crmr-pane" role="tabpanel">
             {tab === 'overview' && <ProjectOverview rec={rec} team={rec.team} today={today} actions={overviewActions} />}
             {tab === 'activity' && (
+              <div className="crmr-actcard">
               <ActivityTab
                 projectId={id}
                 entries={rec.timeline}
@@ -716,6 +717,7 @@ export function ProjectView({
                 // Stable, and a full read: a file's "on its way" check runs once, and an older message's new status still shows.
                 onChanged={refresh}
               />
+              </div>
             )}
             {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={refresh} />}
             {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} siteDocs={schema.site} handover={schema.handover} />}

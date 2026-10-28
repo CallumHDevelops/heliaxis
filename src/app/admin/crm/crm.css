@@ -4133,7 +4133,7 @@ button.crmb-rail {
   }
 }
 
-/* Floating buttons: WhatsApp directly above +, centred, 12px apart. */
+/* Floating buttons: WhatsApp directly above +, centred, 12px apart, in the bottom right corner (clear of the dock strip). */
 .crmr-fabs {
   position: fixed;
   right: calc(var(--hx-dock, 0px) + 24px);
@@ -4186,24 +4186,6 @@ button.crmb-rail {
   font-weight: 800;
   color: var(--on-solid);
 }
-/* From 1280px: pinned to the bottom right of the centre column, not the window. */
-@media (min-width: 1280px) {
-  .crmr-fabs {
-    position: sticky;
-    right: auto;
-    bottom: 24px;
-    z-index: 22;
-    align-self: flex-end;
-    height: 0;
-    margin-top: auto;
-  }
-  .crmr-fabs__stack {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-  }
-}
-
 /* Activity */
 .crmr-compose {
   display: flex;
@@ -5075,3 +5057,16 @@ button.crmb-rail {
 .crmr-qstatus--sent { background: rgb(var(--info-rgb) / 0.14); color: var(--info); }
 .crmr-qstatus--accepted { background: rgb(var(--ok-rgb) / 0.15); color: var(--ok); }
 .crmr-newquote { margin: 2px 0 0; justify-self: start; font-size: 0.82rem; }
+
+/* Activity sits in a white card like the customer column. */
+.crmr-actcard {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+@media (max-width: 760px) {
+  .crmr-actcard {
+    padding: 12px;
+  }
+}
