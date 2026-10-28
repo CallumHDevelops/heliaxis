@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured, sendMail } from '@/lib/ms365';
+import { greetingName } from '@/lib/greeting-name';
 import { buttonsHtml, emailShell, esc } from '@/lib/email-brand';
 import { logActivity } from '@/lib/crm/server';
 import { minutesWords, surveyTypeLabel } from '@/lib/crm/stages';
@@ -32,7 +33,7 @@ const longDayLabel = (ymd: string) => {
   const d = new Date(`${ymd}T12:00:00Z`);
   return `${WD_LONG[d.getUTCDay()]} ${d.getUTCDate()} ${MON_LONG[d.getUTCMonth()]}`;
 };
-const firstName = (n: string) => n.trim().split(/\s+/)[0] || 'there';
+const firstName = (n: string) => greetingName(n) || 'there';
 const row = (label: string, value: string) => `<tr><td style="padding:6px 16px 6px 0;color:#6E6A5E;font-size:13px;vertical-align:top;white-space:nowrap">${esc(label)}</td><td style="padding:6px 0;font-size:15px;font-weight:600">${esc(value)}</td></tr>`;
 
 /** UTC "20261103T104500Z". */

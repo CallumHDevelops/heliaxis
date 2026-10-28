@@ -1,6 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured, sendMail } from '@/lib/ms365';
+import { greetingName } from '@/lib/greeting-name';
 import { buttonsHtml, emailShell, esc } from '@/lib/email-brand';
 
 /**
@@ -20,7 +21,7 @@ export type ReceiptInput = {
 const SITE = () => (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
 const WHATSAPP = () => `https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '441633965439').replace(/\D/g, '')}`;
 
-const firstName = (n: string) => n.trim().split(/\s+/)[0] || 'there';
+const firstName = (n: string) => greetingName(n) || 'there';
 
 /** "4.50 kWp (10 panels), about 3,993 kWh a year, saving about £950 a year, indicative cost £12,500, payback about 12 years" from the estimator's message. */
 export function estimateLine(message?: string): string | null {

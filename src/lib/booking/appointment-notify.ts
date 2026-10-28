@@ -6,6 +6,7 @@ import { sendSystem } from '@/lib/whatsapp/inbox';
 import { whatsappConfigured } from '@/lib/whatsapp/api';
 import { sendSms, smsConfigured, toMsisdn } from '@/lib/sms';
 import { getCrmSettings } from '@/lib/crm/crm-settings';
+import { greetingName } from '@/lib/greeting-name';
 import { sendAppointmentEmail, surveyTitle } from './appointment-email';
 import { parseRange, type BookingRow } from './diary';
 import { dateWords, smsText, whatsappText } from './appointment-text';
@@ -24,7 +25,7 @@ export async function sendAppointmentNotices(x: { enquiryId: string; projectId: 
   try {
     const db = createAdminClient();
     const { data: e } = await db.from('enquiries').select('name, phone, wa_id').eq('id', x.enquiryId).maybeSingle();
-    const first = String(e?.name ?? '').trim().split(/\s+/)[0] || 'there';
+    const first = greetingName(e?.name as string | null) || 'there';
     const token = await ensureBookingToken(x.projectId);
     const link = token ? locationUrl(token) : null;
     const { date, time } = dateWords(x.startMs);
@@ -62,10 +63,13 @@ export async function sendAppointmentNotices(x: { enquiryId: string; projectId: 
 
 /* ── Automatic delivery ──────────────────────────────────────────────────────── */
 
-/** After WhatsApp has been tried: is a text needed now, later (once WhatsApp reports), or not at all? Pure, so it can be tested. */
-export function afterWhatsapp(w: { enabled: boolean; sentOk: boolean }, smsEnabled: boolean): 'sms-now' | 'wait' | 'none' {
-  if (!smsEnabled) return 'none';
-  if (!w.enabled) return 'none';
+/**
+ * After WhatsApp has been tried: is a text needed now, later (once WhatsApp reports), or not at all? `wanted` is the setting;
+ * WhatsApp that could not be sent (no connection, no mobile, no permission, refused) counts as undeliverable, so the text goes.
+ * Pure, so it can be tested.
+ */
+export function afterWhatsapp(w: { wanted: boolean; sentOk: boolean }, smsEnabled: boolean): 'sms-now' | 'wait' | 'none' {
+  if (!smsEnabled || !w.wanted) return 'none';
   return w.sentOk ? 'wait' : 'sms-now';
 }
 
@@ -88,7 +92,7 @@ export async function autoNotifyAppointment(x: AutoInput): Promise<AutoResult> {
     if (!claim.error && !(claim.data ?? []).length) return { skipped: 'already sent', reached: true, lines };
 
     const { data: e } = await db.from('enquiries').select('name, email, phone').eq('id', x.enquiryId).maybeSingle();
-    const first = String(e?.name ?? '').trim().split(/\s+/)[0] || 'there';
+    const first = greetingName(e?.name as string | null) || 'there';
     const token = await ensureBookingToken(x.projectId);
     const link = token ? locationUrl(token) : null;
     const { date, time } = dateWords(x.startMs);
@@ -103,24 +107,27 @@ export async function autoNotifyAppointment(x: AutoInput): Promise<AutoResult> {
     }
 
     let whatsappOk = false;
-    const wantsWhatsapp = s.apptWhatsapp && whatsappConfigured() && !!toMsisdn(phone);
-    if (wantsWhatsapp && link) {
-      const r = await sendSystem(x.enquiryId, { text: whatsappText(words), template: 'survey_location', params: [first, date, time, link, x.me] }, `appointment:${x.bookingId}`);
-      whatsappOk = r.ok;
-      lines.push(r.ok ? 'WhatsApp sent' : `WhatsApp NOT sent: ${r.error}`);
-      reached ||= r.ok;
+    const canWhatsapp = whatsappConfigured() && !!toMsisdn(phone) && !!link;
+    if (s.apptWhatsapp) {
+      if (!canWhatsapp) lines.push(`WhatsApp NOT sent: ${!whatsappConfigured() ? 'it isn’t connected' : !toMsisdn(phone) ? 'no UK mobile number' : 'no location link could be made'}`);
+      else {
+        const r = await sendSystem(x.enquiryId, { text: whatsappText(words), template: 'survey_location', params: [first, date, time, link as string, x.me] }, `appointment:${x.bookingId}`);
+        whatsappOk = r.ok;
+        lines.push(r.ok ? 'WhatsApp sent' : `WhatsApp NOT sent: ${r.error}`);
+        reached ||= r.ok;
+      }
     }
 
-    const next = afterWhatsapp({ enabled: wantsWhatsapp && !!link, sentOk: whatsappOk }, s.apptSms);
-    // No WhatsApp route at all (no WhatsApp setting or no mobile) and no email either: a text is still better than nothing.
-    const nothingElse = !reached && !wantsWhatsapp;
+    const next = afterWhatsapp({ wanted: s.apptWhatsapp, sentOk: whatsappOk }, s.apptSms);
+    // WhatsApp switched off and no email either: a text is still better than nothing.
+    const nothingElse = !reached && !s.apptWhatsapp;
     if (next === 'sms-now' || (nothingElse && s.apptSms)) {
       if (!smsConfigured()) lines.push('Text NOT sent: text messages aren’t set up yet.');
       else if (!toMsisdn(phone)) lines.push('Text NOT sent: no UK mobile number.');
       else if (!link) lines.push('Text NOT sent: no location link could be made.');
       else {
         const r = await sendSms(phone as string, smsText(words));
-        lines.push(r.ok ? `Text sent to ${phone}${next === 'sms-now' ? ' (WhatsApp could not be sent)' : ''}` : `Text NOT sent: ${r.error}`);
+        lines.push(r.ok ? `Text sent to ${phone}${next === 'sms-now' ? ' (WhatsApp didn’t go)' : ''}` : `Text NOT sent: ${r.error}`);
         reached ||= r.ok;
         if (r.ok) await db.from('survey_bookings').update({ sms_fallback_at: new Date().toISOString() }).eq('id', x.bookingId).then(() => null, () => null);
       }
@@ -150,7 +157,7 @@ export async function textInsteadOfWhatsapp(bookingId: string): Promise<void> {
     const range = parseRange(row.onsite);
     if (!range) return;
     const { data: e } = await db.from('enquiries').select('name, phone').eq('id', row.enquiry_id).maybeSingle();
-    const first = String(e?.name ?? '').trim().split(/\s+/)[0] || 'there';
+    const first = greetingName(e?.name as string | null) || 'there';
     const phone = (e?.phone as string | null) ?? null;
     const token = await ensureBookingToken(row.project_id);
     const { date, time } = dateWords(range.start);

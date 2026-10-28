@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectByBookingToken } from '@/lib/crm/booking-link';
 import { siteUrl } from '@/lib/crm/server';
+import { greetingName } from '@/lib/greeting-name';
 import { isHit, lookupPostcode } from './geo';
 
 export type LocationView = {
@@ -41,7 +42,7 @@ export async function locationView(token: string): Promise<LocationView | null> 
   return {
     projectId: p.id,
     enquiryId: p.enquiry_id,
-    firstName: String(e?.name ?? '').trim().split(/\s+/)[0] || '',
+    firstName: greetingName(e?.name as string | null),
     address: p.address,
     postcode: p.postcode,
     lat,

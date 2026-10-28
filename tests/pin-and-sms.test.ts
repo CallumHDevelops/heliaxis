@@ -65,15 +65,31 @@ import { afterWhatsapp } from '@/lib/booking/appointment-notify';
 import { cleanCrmSettings, DEFAULT_CRM_SETTINGS } from '@/lib/crm/settings-shared';
 
 describe('automatic appointment messages', () => {
-  it('sends a text at once when WhatsApp could not be sent, waits when WhatsApp was accepted, and never when texts are off', () => {
-    expect(afterWhatsapp({ enabled: true, sentOk: false }, true)).toBe('sms-now');
-    expect(afterWhatsapp({ enabled: true, sentOk: true }, true)).toBe('wait');
-    expect(afterWhatsapp({ enabled: true, sentOk: false }, false)).toBe('none');
-    expect(afterWhatsapp({ enabled: false, sentOk: false }, true)).toBe('none');
+  it('sends a text at once when WhatsApp did not go, waits when WhatsApp was accepted, and never when texts or WhatsApp are off', () => {
+    expect(afterWhatsapp({ wanted: true, sentOk: false }, true)).toBe('sms-now');
+    expect(afterWhatsapp({ wanted: true, sentOk: true }, true)).toBe('wait');
+    expect(afterWhatsapp({ wanted: true, sentOk: false }, false)).toBe('none');
+    expect(afterWhatsapp({ wanted: false, sentOk: false }, true)).toBe('none');
   });
   it('is on by default, and settings that were saved before it existed keep it on', () => {
     expect(DEFAULT_CRM_SETTINGS).toMatchObject({ apptNotices: true, apptEmail: true, apptWhatsapp: true, apptSms: true });
     expect(cleanCrmSettings({ firstResponseMinutes: 10 })).toMatchObject({ apptNotices: true, apptSms: true });
     expect(cleanCrmSettings({ apptNotices: false }).apptNotices).toBe(false);
+  });
+});
+
+import { greetingName, tidyAddress } from '@/lib/greeting-name';
+
+describe('names and addresses in messages', () => {
+  it('never greets someone as just "Mrs"', () => {
+    expect(greetingName('Sam Williams')).toBe('Sam');
+    expect(greetingName('Mrs Smith')).toBe('Mrs Smith');
+    expect(greetingName('Mrs Jane Smith')).toBe('Jane');
+    expect(greetingName('Dr. Evans')).toBe('Dr. Evans');
+    expect(greetingName('')).toBe('');
+  });
+  it('tidies doubled commas in an address', () => {
+    expect(tidyAddress('Hollyberry House,, NP26 5SA')).toBe('Hollyberry House, NP26 5SA');
+    expect(tidyAddress(null)).toBe('');
   });
 });

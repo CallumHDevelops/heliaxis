@@ -1,10 +1,12 @@
 /* The "check the pin" page (PinMap.tsx). Sits in booking.css's bk-page. */
-.wh{display:grid;gap:14px}
-.wh-map{width:100%;height:min(62vh,520px);min-height:320px;border-radius:10px;border:1px solid rgba(33,31,24,.2);overflow:hidden;z-index:0}
+.wh{display:grid;gap:12px;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+.wh .bk-title{font-size:clamp(1.35rem,5vw,1.9rem);margin:0}
+.wh .bk-lead{margin:0}
+.wh-map{width:100%;height:clamp(280px,48dvh,480px);border-radius:10px;border:1px solid rgba(33,31,24,.2);overflow:hidden;z-index:0}
 .wh-hint{margin:0;font-size:.9rem;opacity:.75}
 .wh-err{margin:0;color:#b3261e;font-weight:600}
-.wh-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;bottom:0;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bk-bg,#f7f2e7) 30%)}
-.wh-btn{min-height:54px;padding:0 24px;border-radius:6px;border:2px solid #211f18;background:transparent;color:inherit;font:700 1.05rem inherit;font-family:inherit;cursor:pointer}
+.wh-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.wh-btn{min-height:56px;flex:1 1 220px;padding:0 24px;border-radius:6px;border:2px solid #211f18;background:transparent;color:inherit;font:700 1.05rem inherit;font-family:inherit;cursor:pointer}
 .wh-btn.is-moved{background:#f8bc1e;border-color:#f8bc1e;color:#211f18;box-shadow:0 0 0 0 rgba(248,188,30,.6);animation:whPulse 1.6s ease-out infinite}
 .wh-btn:disabled{opacity:.6}
 .wh-moved{font-size:.92rem;font-weight:600}

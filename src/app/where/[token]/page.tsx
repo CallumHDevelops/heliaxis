@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { OFFICE_PHONE } from '@/lib/booking/book';
 import { locationView } from '@/lib/booking/location-server';
+import { tidyAddress } from '@/lib/greeting-name';
 import { schemaReady } from '@/lib/schema-ready';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import '@/components/booking/booking.css';
@@ -44,10 +45,11 @@ export default async function WherePage({ params }: { params: Promise<{ token: s
             lat={view.lat}
             lng={view.lng}
             exact={view.exact}
-            address={[view.address, view.postcode].filter(Boolean).join(', ')}
+            address={tidyAddress([view.address, view.postcode].filter(Boolean).join(', '))}
             surveyAt={view.surveyAt}
             confirmedAt={view.confirmedAt}
             phone={OFFICE_PHONE}
+            googleKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || ''}
           />
         )}
       </main>

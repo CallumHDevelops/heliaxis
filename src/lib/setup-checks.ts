@@ -657,6 +657,23 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 12,
     optional: true,
   });
+  add(!env('NEXT_PUBLIC_GOOGLE_MAPS_KEY'), {
+    id: 'env-google-maps-js',
+    title: 'Satellite map on the “check the pin” page (Google Maps)',
+    detail: 'Optional. Customers see a satellite view of their house when they check or move the pin, so they can put it on their front door. Without it they get a plain street map. Google’s free monthly credit covers roughly 28,000 map views.',
+    steps: [
+      'Open the [Google Cloud console](https://console.cloud.google.com), in the same project as the roof lookup. Go to **APIs & Services → Library**, search for **Maps JavaScript API** and press **Enable**.',
+      'Go to **APIs & Services → Credentials → Create credentials → API key**. Name it `Heliaxis website map` (a NEW key: do not reuse the roof lookup key).',
+      'Under **Application restrictions** choose **Websites** and add `https://heliaxis.co.uk/*` and `https://www.heliaxis.co.uk/*`. Under **API restrictions** choose **Restrict key** and tick only **Maps JavaScript API**. Save, then **Copy** the key.',
+      ...VERCEL_STEPS,
+      'Open the link in one of your own appointment messages on your phone: you should see satellite imagery with the pin, and a Map / Satellite switch.',
+    ],
+    copies: [{ label: 'Key', value: 'NEXT_PUBLIC_GOOGLE_MAPS_KEY' }],
+    href: 'https://console.cloud.google.com/apis/library/maps-backend.googleapis.com',
+    hrefLabel: 'Open Maps JavaScript API',
+    order: 12,
+    optional: true,
+  });
   add(!env('SMSWORKS_TOKEN') && !env('SMSWORKS_CUSTOMER_ID', 'SMSWORKS_KEY', 'SMSWORKS_SECRET'), {
     id: 'env-smsworks',
     title: 'Text messages: tell customers about appointments by SMS',

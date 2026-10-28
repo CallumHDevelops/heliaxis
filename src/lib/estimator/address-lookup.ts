@@ -11,6 +11,8 @@ export type Suggestion = { id: string; address: string };
 /** Coordinates are missing when the service does not give them: the caller then finds the point from the address text. */
 export type Place = { lat: number | null; lng: number | null; address: string; postcode: string };
 
+import { tidyAddress } from '@/lib/greeting-name';
+
 const base = 'https://api.ideal-postcodes.co.uk/v1';
 const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/i;
 
@@ -54,5 +56,5 @@ export async function place(id: string): Promise<Place | null> {
   if (!UK_POSTCODE.test(postcode)) return null;
   const parts = [a.line_1, a.line_2, a.line_3, a.post_town].map((x) => String(x ?? '').trim()).filter(Boolean);
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-  return { lat: num(a.latitude), lng: num(a.longitude), address: [...parts, postcode].join(', '), postcode };
+  return { lat: num(a.latitude), lng: num(a.longitude), address: tidyAddress([...parts, postcode].join(', ')), postcode };
 }
