@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { SURVEY_TYPES, type SurveyTypeKey } from '@/lib/crm/stages';
 import { londonSlot, ukDate, ukTime, weekday } from '@/lib/booking/engine';
 import type { Job } from './DiaryEntrySheet';
-import { TellThem, useBookingPeople, type Notify } from '../projects/TellThem';
+import { AutoNotice, useBookingPeople } from '../projects/AutoNotice';
 
 /**
  * Find a time (staff): pick the customer's job (or just type a postcode), see the times that fit
@@ -100,8 +100,8 @@ export function FindTimeSheet({
   const [aDay, setADay] = useState(today);
   const [aTime, setATime] = useState('09:00');
   const [aWho, setAWho] = useState(surveyors[0]?.key ?? '');
-  // Tell them the appointment: email (with a calendar file) on by default; WhatsApp and a text when staff choose them.
-  const [notify, setNotify] = useState<Notify>({ email: true, whatsapp: false, sms: false });
+  // Tell them the appointment automatically (email and WhatsApp, a text if WhatsApp isn't delivered): on unless staff untick it.
+  const [tell, setTell] = useState(true);
   const people = useBookingPeople();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,7 +166,7 @@ export function FindTimeSheet({
     setBusy(true);
     setError('');
     // The postcode these times were worked out for (typed here when the job has none, or it's elsewhere).
-    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, postcode: found?.postcode, surveyor_key: pick.surveyorKey, notify });
+    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, postcode: found?.postcode, surveyor_key: pick.surveyorKey, ...(tell ? {} : { notify: { email: false, whatsapp: false, sms: false } }) });
     setBusy(false);
     if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(pick.start)} with ${String(r.data.surveyor || pick.surveyorName)}${emailNote(r.data.notices)}`);
     if (r.status === 409 && Array.isArray(r.data.days) && found) {
@@ -190,7 +190,7 @@ export function FindTimeSheet({
       surveyor_key: aWho || undefined,
       override: true,
       all_day_ok: allDayOk,
-      notify,
+      ...(tell ? {} : { notify: { email: false, whatsapp: false, sms: false } }),
     });
     setBusy(false);
     if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(start)}${emailNote(r.data.notices)}`);
@@ -455,7 +455,7 @@ export function FindTimeSheet({
           </div>
         )}
 
-        {job && <TellThem value={notify} onChange={setNotify} channels={people?.channels ?? null} hasEmail={job.hasEmail !== false} hasMobile={job.hasMobile !== false} />}
+        {job && <AutoNotice on={tell} onChange={setTell} channels={people?.channels ?? null} hasEmail={job.hasEmail !== false} hasMobile={job.hasMobile !== false} />}
         <div className="dy-bar">
           <button type="button" className="dy-btn" disabled={busy || !job || !pick} onClick={bookIt}>
             {pick ? `Book it: ${when(pick.start)}` : 'Book it'}

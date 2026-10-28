@@ -36,7 +36,7 @@ import { firstName, itemsOnDay, loadDiary, parseRange, surveyMinutesFor, surveyo
 import { isHit, lookupPostcode, normPostcode, outcodeOf, placeFromHit, spacedPostcode, type GeoHit } from './geo';
 import { buildDrive, estimateBetween } from './travel';
 import { syncProjectCalendar } from './calendar-sync';
-import { sendAppointmentNotices, type Notify } from './appointment-notify';
+import { autoNotifyAppointment, sendAppointmentNotices, type Notify } from './appointment-notify';
 
 /**
  * Searching, holding and confirming survey times. The database is the source of truth: every time
@@ -708,9 +708,11 @@ type AfterConfirm = {
   duplicateOf?: string | null;
   /** Instead of the usual timeline line. */
   note?: string;
+  /** Tell the customer (email, WhatsApp, text) automatically once confirmed. Default on; staff who tick their own ways pass false. */
+  auto?: boolean;
 };
 
-/** Everything that follows a request or a confirmed booking (never a message to the customer). */
+/** Everything that follows a request or a confirmed booking, including telling the customer about a confirmed one (appointment-notify.ts). */
 export async function afterConfirm(x: AfterConfirm) {
   const db = createAdminClient();
   const s = await getBookingSettings();
@@ -794,6 +796,17 @@ export async function afterConfirm(x: AfterConfirm) {
     await logActivity({ enquiryId, projectId, kind: 'system', body, byId: x.by?.id ?? null }).catch(() => null);
     await clearRequestStep(projectId).catch(() => null);
     after(() => syncProjectCalendar(projectId));
+    // Tell them, once: email and WhatsApp, and a text if WhatsApp can't be delivered. If nothing can reach them, say so to staff.
+    if (x.auto !== false) {
+      const me = sv ? firstName(sv.name) : x.by?.name || 'Heliaxis';
+      after(async () => {
+        const r = await autoNotifyAppointment({ bookingId: b.id, enquiryId, projectId, surveyType: b.survey_type, startMs: start, endMs: end, who: sv?.name ?? null, me });
+        if (!r.reached && !r.skipped) {
+          await setNextStep(projectId, `Tell ${firstName(name) || name} about their appointment on ${whenText(start)} (nothing could be sent)`).catch(() => null);
+          await pushStaff({ projectId, title: `Couldn’t tell ${firstName(name) || name} about their appointment`, body: r.lines.join('. ') || 'No email, WhatsApp or mobile worked', href: `/admin/crm/${projectId}` }).catch(() => null);
+        }
+      });
+    }
     if (x.how === 'online') {
       await pushStaff({
         projectId,
@@ -1401,7 +1414,7 @@ export async function staffBook(x: {
   }
   const b = await bookingById(made.id);
   if (!b) return UNAVAILABLE;
-  await afterConfirm({ b, status: 'confirmed', projectId: p.id, enquiryId: p.enquiry_id, how: 'staff', by: x.by, note });
+  await afterConfirm({ b, status: 'confirmed', projectId: p.id, enquiryId: p.enquiry_id, how: 'staff', by: x.by, note, auto: !x.notify });
   const notices = p.enquiry_id && x.notify ? await sendAppointmentNotices({ enquiryId: p.enquiry_id, projectId: p.id, surveyType: type, startMs: x.start, endMs: made.end, who: made.sv.name, notify: x.notify, by: x.by }) : [];
   return { status: 200, body: { ok: true, id: made.id, start: new Date(x.start).toISOString(), end: new Date(made.end).toISOString(), surveyor: made.sv.name, ...(notices.length ? { notices } : {}) } };
 }

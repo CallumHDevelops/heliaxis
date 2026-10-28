@@ -406,7 +406,7 @@ export async function handleStatus(s: Status) {
   const db = createAdminClient();
   const { data: msg } = await db
     .from('whatsapp_messages')
-    .select('id, status, enquiry_id')
+    .select('*')
     .eq('wa_message_id', s.id)
     .maybeSingle();
   if (!msg) return;
@@ -416,6 +416,12 @@ export async function handleStatus(s: Status) {
     const reason = e?.error_data?.details || e?.message || e?.title || 'Not delivered';
     await db.from('whatsapp_messages').update({ status: 'failed', error: reason, status_at: at }).eq('id', msg.id);
     await notifyEnquiryTeam('WhatsApp message not delivered', reason, inboxHref(msg.enquiry_id));
+    // An appointment message that never arrived: send the text instead (once).
+    const via = String((msg as { via?: string | null }).via ?? '');
+    if (via.startsWith('appointment:')) {
+      const { textInsteadOfWhatsapp } = await import('@/lib/booking/appointment-notify');
+      await textInsteadOfWhatsapp(via.slice('appointment:'.length));
+    }
     return;
   }
   if ((RANK[s.status] || 0) > (RANK[msg.status] || 0)) {

@@ -41,6 +41,11 @@ export type CrmSettings = {
   /** Follow-up sequence for new leads; stops when they reply or the stage moves past Contacted. */
   sequenceEnabled: boolean;
   sequence: SequenceStep[];
+  /** Tell the customer when an appointment is booked (by them or by staff): email and WhatsApp, and a text if WhatsApp can't be delivered. */
+  apptNotices: boolean;
+  apptEmail: boolean;
+  apptWhatsapp: boolean;
+  apptSms: boolean;
   /** Where purchase orders can be delivered instead of the site (blank until set: "To the office" waits for it). */
   officeAddress: string;
   officePostcode: string;
@@ -77,6 +82,10 @@ export const DEFAULT_CRM_SETTINGS: CrmSettings = {
       text: 'Hi {first_name},\n\nThanks again for your enquiry. If you’d like to book a free survey, just reply with a couple of days and times that suit you.\n\nAny questions, just reply to this email.\n\nThe Heliaxis team',
     },
   ],
+  apptNotices: true,
+  apptEmail: true,
+  apptWhatsapp: true,
+  apptSms: true,
   officeAddress: '',
   officePostcode: '',
 };
@@ -129,6 +138,10 @@ export function cleanCrmSettings(b: Partial<Record<keyof CrmSettings, unknown>>)
     bookingHorizonDays: num(b.bookingHorizonDays, 1, 90, d.bookingHorizonDays),
     sequenceEnabled: !!b.sequenceEnabled,
     sequence: seq,
+    apptNotices: b.apptNotices === undefined ? d.apptNotices : !!b.apptNotices,
+    apptEmail: b.apptEmail === undefined ? d.apptEmail : !!b.apptEmail,
+    apptWhatsapp: b.apptWhatsapp === undefined ? d.apptWhatsapp : !!b.apptWhatsapp,
+    apptSms: b.apptSms === undefined ? d.apptSms : !!b.apptSms,
     officeAddress: String(b.officeAddress ?? '')
       .split(/\r?\n/)
       .map((l) => l.trim())

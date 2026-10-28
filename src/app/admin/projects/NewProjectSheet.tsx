@@ -7,7 +7,7 @@ import { Sheet } from '../crm/CrmUi';
 import { productsShort } from '../crm/crm-shared';
 import { londonSlot } from '@/lib/booking/engine';
 import { AddressFinder } from './AddressFinder';
-import { TellThem, useBookingPeople, type Notify } from './TellThem';
+import { AutoNotice, useBookingPeople } from './AutoNotice';
 import { NewProjectTrades, rowsFor, tradesBody, useVatDefault, type TradeRow } from './NewProjectTrades';
 
 type Customer = {
@@ -71,7 +71,8 @@ export function NewProjectSheet({
   const [aDay, setADay] = useState(() => new Date().toISOString().slice(0, 10));
   const [aTime, setATime] = useState('10:00');
   const [aWho, setAWho] = useState('');
-  const [notify, setNotify] = useState<Notify>({ email: true, whatsapp: false, sms: false });
+  const [tell, setTell] = useState(true);
+  const [waOk, setWaOk] = useState(true);
   const [owner, setOwner] = useState(me);
   const [start, setStart] = useState<string>(mode === 'project' ? 'won' : 'lead');
   const [err, setErr] = useState('');
@@ -108,7 +109,6 @@ export function NewProjectSheet({
     if (appointment) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(aDay) || !/^\d{2}:\d{2}$/.test(aTime)) return setErr('Pick the day and time of the appointment.');
       if (postcode.replace(/\s/g, '').length < 5) return setErr('An appointment needs the postcode: use Find the address, or type it in.');
-      if (!notify.email && !notify.whatsapp && !notify.sms && !window.confirm('You haven’t ticked a way to tell them. Book it without telling them?')) return;
     }
     setBusy(true);
     setErr('');
@@ -120,7 +120,8 @@ export function NewProjectSheet({
       owner_id: owner || null,
       start_stage: appointment ? 'lead' : start,
       ...(pin ? { site_lat: pin.lat, site_lng: pin.lng } : {}),
-      ...(appointment ? { appointment: { start: new Date(londonSlot(aDay, aTime)).toISOString(), surveyor_key: aWho || undefined, notify } } : {}),
+      ...(appointment && tell && waOk ? { whatsapp_ok: true } : {}),
+      ...(appointment ? { appointment: { start: new Date(londonSlot(aDay, aTime)).toISOString(), surveyor_key: aWho || undefined, ...(tell ? {} : { notify: { email: false, whatsapp: false, sms: false } }) } } : {}),
       source: fresh ? how : 'crm',
       ...(mode === 'opportunity' ? { spoken, note: note.trim() || undefined } : {}),
       ...(t.assignments.length ? { assignments: t.assignments } : {}),
@@ -324,13 +325,18 @@ export function NewProjectSheet({
               </select>
             </>
           )}
-          <TellThem
-            value={notify}
-            onChange={setNotify}
+          <AutoNotice
+            on={tell}
+            onChange={setTell}
             channels={people?.channels ?? null}
             hasEmail={fresh ? /^\S+@\S+\.\S+$/.test(person.email.trim()) : !!customer?.email}
             hasMobile={fresh ? person.phone.replace(/\D/g, '').length >= 10 : !!customer?.phone}
           />
+          {tell && (
+            <label className="crm-check">
+              <input type="checkbox" checked={waOk} onChange={(e) => setWaOk(e.target.checked)} /> They’ve said it’s fine to message them on WhatsApp (WhatsApp needs their OK)
+            </label>
+          )}
         </div>
       )}
 

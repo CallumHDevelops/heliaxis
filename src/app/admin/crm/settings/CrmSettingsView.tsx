@@ -165,6 +165,26 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
           </section>
 
           <section className="crm-set">
+            <h2>Appointment messages</h2>
+            <p className="crm-muted crm-small">
+              When an appointment is booked, by the customer or by you, they are told automatically: email and WhatsApp together, each with a link to a
+              map with a pin they can move. If WhatsApp can’t be delivered, a text goes instead. Once per booking.
+            </p>
+            <label className="crm-check">
+              <input type="checkbox" checked={s.apptNotices} onChange={(e) => set('apptNotices', e.target.checked)} /> On
+            </label>
+            <label className="crm-check">
+              <input type="checkbox" checked={s.apptEmail} disabled={!s.apptNotices} onChange={(e) => set('apptEmail', e.target.checked)} /> Email (with a calendar file)
+            </label>
+            <label className="crm-check">
+              <input type="checkbox" checked={s.apptWhatsapp} disabled={!s.apptNotices} onChange={(e) => set('apptWhatsapp', e.target.checked)} /> WhatsApp (needs the “Appointment booked: check the pin” template approved by Meta, unless they messaged in the last 24 hours)
+            </label>
+            <label className="crm-check">
+              <input type="checkbox" checked={s.apptSms} disabled={!s.apptNotices} onChange={(e) => set('apptSms', e.target.checked)} /> Text message if WhatsApp can’t be delivered (about 4p, needs The SMS Works set up)
+            </label>
+          </section>
+
+          <section className="crm-set">
             <h2>Follow-up sequence for new leads</h2>
             <label className="crm-check">
               <input type="checkbox" checked={s.sequenceEnabled} onChange={(e) => set('sequenceEnabled', e.target.checked)} /> On — stops the moment they reply, or when the

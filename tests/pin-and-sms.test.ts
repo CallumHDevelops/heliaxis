@@ -60,3 +60,20 @@ describe('appointment messages', () => {
     expect(m.text).toContain('https://heliaxis.co.uk/where/abc');
   });
 });
+
+import { afterWhatsapp } from '@/lib/booking/appointment-notify';
+import { cleanCrmSettings, DEFAULT_CRM_SETTINGS } from '@/lib/crm/settings-shared';
+
+describe('automatic appointment messages', () => {
+  it('sends a text at once when WhatsApp could not be sent, waits when WhatsApp was accepted, and never when texts are off', () => {
+    expect(afterWhatsapp({ enabled: true, sentOk: false }, true)).toBe('sms-now');
+    expect(afterWhatsapp({ enabled: true, sentOk: true }, true)).toBe('wait');
+    expect(afterWhatsapp({ enabled: true, sentOk: false }, false)).toBe('none');
+    expect(afterWhatsapp({ enabled: false, sentOk: false }, true)).toBe('none');
+  });
+  it('is on by default, and settings that were saved before it existed keep it on', () => {
+    expect(DEFAULT_CRM_SETTINGS).toMatchObject({ apptNotices: true, apptEmail: true, apptWhatsapp: true, apptSms: true });
+    expect(cleanCrmSettings({ firstResponseMinutes: 10 })).toMatchObject({ apptNotices: true, apptSms: true });
+    expect(cleanCrmSettings({ apptNotices: false }).apptNotices).toBe(false);
+  });
+});

@@ -148,13 +148,14 @@ export async function POST(req: Request) {
   if (inUk(pinLat, pinLng)) await db.from('crm_projects').update({ site_lat: pinLat, site_lng: pinLng }).eq('id', project.id).then(() => null, () => null);
   // "Appointment arranged": book it in the diary (any time they agreed, as long as it doesn't overlap something), then tell them
   // by the ways staff ticked. A booking that can't be made leaves the opportunity in place and says why.
-  const appt = b.appointment as { start?: unknown; surveyor_key?: unknown; notify?: Record<string, unknown> } | undefined;
+  const appt = b.appointment as { start?: unknown; surveyor_key?: unknown; notify?: Record<string, unknown> | null } | undefined;
   let notices: string[] = [];
   let apptWarning = '';
   if (!delivery && appt && Number.isFinite(Date.parse(String(appt.start || '')))) {
-    const notify = { email: appt.notify?.email === true, whatsapp: appt.notify?.whatsapp === true, sms: appt.notify?.sms === true };
-    // Ticking WhatsApp here is staff saying they agreed to it on the call: recorded as their permission.
-    if (notify.whatsapp) await grantPermission(enquiryId, 'phone-call').catch(() => false);
+    // No `notify` = tell them automatically (email and WhatsApp, a text if WhatsApp can't be delivered). A `notify` object (all false = don't tell them) is staff's own choice.
+    const notify = appt.notify && typeof appt.notify === 'object' ? { email: appt.notify.email === true, whatsapp: appt.notify.whatsapp === true, sms: appt.notify.sms === true } : undefined;
+    // "They've said WhatsApp is fine" (ticked in the sheet): recorded as their permission, with how it was given.
+    if (b.whatsapp_ok === true || notify?.whatsapp) await grantPermission(enquiryId, 'phone-call').catch(() => false);
     const o = await staffBook({ projectId: project.id, start: Date.parse(String(appt.start)), surveyorKey: typeof appt.surveyor_key === 'string' ? appt.surveyor_key.toLowerCase() : null, type: surveyTypeFor(products) ?? 'solar', override: true, allDayOk: true, notify, by: staffFrom(s) });
     if (o.status === 200) notices = (o.body.notices as string[] | undefined) ?? [];
     else apptWarning = `The opportunity is made, but the appointment wasn’t booked: ${String(o.body.error || o.body.message || 'try Find a time on the job')}`;
