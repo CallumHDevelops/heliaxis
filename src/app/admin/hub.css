@@ -1028,3 +1028,80 @@ a.nu-main:hover b {
   width: 34px;
   height: 34px;
 }
+
+/* Week ahead: seven day tiles, then that day's bookings. */
+.hub-week__n {
+  margin-left: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.hub-week__card {
+  padding: 12px;
+  border: 1px solid var(--border, rgba(33, 31, 24, 0.14));
+  border-radius: 14px;
+  background: var(--surface, #fffdf8);
+}
+.hub-week__tiles {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.hub-week__tile {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 6px 2px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.hub-week__tile small {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.hub-week__tile b {
+  font-size: 1.05rem;
+}
+.hub-week__tile:hover {
+  background: rgba(248, 188, 30, 0.14);
+}
+.hub-week__tile.on {
+  border-color: #211f18;
+  background: #f8bc1e;
+  color: #211f18;
+}
+.hub-week__tile.on small {
+  color: #211f18;
+}
+.hub-week__dots {
+  display: flex;
+  gap: 3px;
+  min-height: 7px;
+}
+.hub-week__dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #211f18;
+}
+.hub-week__dots i.is-install {
+  background: #b57f00;
+}
+.hub-week__list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.hub-week__list li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}

@@ -8,7 +8,7 @@ import { setupPeople, visibleSetupTodos } from '@/lib/setup-checks';
 import { schemaReady } from '@/lib/schema-ready';
 import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
 import { DEFAULT_SURVEY_MINUTES, isSurveyType, noSurveyNeeded, SURVEY_TYPES, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
-import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem } from './HubView';
+import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem, type HubWeekDay } from './HubView';
 import { newMetaLeads } from './meta-leads';
 
 export const dynamic = 'force-dynamic';
@@ -276,13 +276,53 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
   return { items, canAddDiary: ready.booking };
 }
 
+/** The next seven days for the week strip: every booked survey and install day on the team's jobs (UK days). */
+async function weekAhead(keys: PortalKey[]): Promise<HubWeekDay[] | null> {
+  if (!keys.includes('crm')) return null;
+  const db = createAdminClient();
+  const today = todayISO();
+  const days = Array.from({ length: 7 }, (_, i) => new Date(Date.parse(`${today}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10));
+  const at = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
+  const [surveyJobs, installJobs] = await Promise.all([
+    rows(db.from('crm_projects').select('*').gte('survey_at', at(-12)).lte('survey_at', at(24 * 8)).neq('stage', 'lost').limit(200)),
+    rows(db.from('crm_projects').select('*').gte('install_at', at(-24 * 62)).lte('install_at', at(24 * 8)).neq('stage', 'lost').limit(300)),
+  ]);
+  const hols = installJobs.some((p) => Number(p.install_days ?? 1) > 1) ? await ukBankHolidays() : new Set<string>();
+  const ids = [...new Set([...surveyJobs, ...installJobs].map((p) => String(p.enquiry_id)))];
+  const customers = ids.length ? await rows(db.from('enquiries').select('id, name, postcode').in('id', ids)) : [];
+  const cust = new Map(customers.map((c) => [String(c.id), c]));
+  const nameOf = (p: Row) => String(cust.get(String(p.enquiry_id))?.name || p.title || 'Customer');
+  const pcOf = (p: Row) => String(p.postcode || cust.get(String(p.enquiry_id))?.postcode || '');
+  const out: HubWeekDay[] = days.map((iso) => {
+    const d = new Date(`${iso}T12:00:00Z`);
+    return { iso, dow: d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }), dom: d.getUTCDate(), items: [] };
+  });
+  const day = new Map(out.map((d) => [d.iso, d]));
+  for (const p of surveyJobs) {
+    const d = day.get(ukDay(String(p.survey_at)));
+    if (!d) continue;
+    const start = Date.parse(String(p.survey_at));
+    d.items.push({ key: `s-${p.id}`, kind: 'survey', sort: start, time: timeOf(p.survey_at), title: nameOf(p), sub: ['Survey', pcOf(p)].filter(Boolean).join(' · '), href: `/admin/crm/${p.id}` });
+  }
+  for (const p of installJobs) {
+    const list = installDayList(ukDay(String(p.install_at)), Number(p.install_days ?? 1), hols);
+    list.forEach((iso, i) => {
+      const d = day.get(iso);
+      if (!d) return;
+      d.items.push({ key: `i-${p.id}-${iso}`, kind: 'install', sort: i === 0 ? Date.parse(String(p.install_at)) : 0, time: i === 0 ? timeOf(p.install_at) : 'All day', title: nameOf(p), sub: [list.length > 1 ? `Install, day ${i + 1} of ${list.length}` : 'Install', pcOf(p)].filter(Boolean).join(' · '), href: `/admin/crm/${p.id}` });
+    });
+  }
+  for (const d of out) d.items.sort((a, b) => a.sort - b.sort);
+  return out;
+}
+
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const { denied } = await searchParams;
   const { user, profile } = await getSessionProfile();
   const isAdmin = profile?.role === 'admin';
   const keys = portalsFor(profile);
   const portals = PORTALS.filter((p) => keys.includes(p.key));
-  const [counts, day, today, setup, people, metaLeads] = await Promise.all([
+  const [counts, day, today, setup, people, metaLeads, week] = await Promise.all([
     badges(keys, isAdmin),
     user ? myDay(user.id, keys) : null,
     user ? todayList(profile?.email || user.email || null, keys).catch(() => null) : null,
@@ -291,6 +331,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     isAdmin ? setupPeople() : [],
     // New Meta leads (Enquiries and CRM staff): a failure just hides the panel.
     user ? newMetaLeads(keys).catch(() => null) : null,
+    user ? weekAhead(keys).catch(() => null) : null,
   ]);
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
 
@@ -306,6 +347,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         followUps={day?.followUps ?? []}
         today={todayISO()}
         todayList={today}
+        week={week}
         setup={{
           todos: setup?.mine ?? [],
           admin: isAdmin && user ? { others: setup?.others ?? [], people, meId: user.id } : undefined,

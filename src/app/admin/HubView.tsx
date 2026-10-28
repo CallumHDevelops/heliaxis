@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Portal, PortalKey } from '@/lib/portals';
 import { TodayList } from './HubMyDay';
+import { WeekAhead } from './WeekAhead';
 import { MetaLeadsPanel, TodoPanel } from './DashPanels';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
@@ -27,6 +28,8 @@ export type HubTodayItem = {
   directions: string | null;
 };
 export type HubToday = { items: HubTodayItem[]; canAddDiary: boolean };
+/** One day of the week strip: its surveys and install days for the whole team. */
+export type HubWeekDay = { iso: string; dow: string; dom: number; items: { key: string; kind: 'survey' | 'install'; sort: number; time: string; title: string; sub: string; href: string }[] };
 
 const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   app: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
@@ -84,6 +87,7 @@ export function HubView({
   needs = {},
   today: todayIso = '',
   todayList = null,
+  week = null,
   setup = { todos: [] },
   assistant = false,
   metaLeads = null,
@@ -100,6 +104,8 @@ export function HubView({
   today?: string;
   /** Home → Today (CRM users, once surveys.sql has run); null hides it. */
   todayList?: HubToday | null;
+  /** The next seven days (CRM staff); null hides it. */
+  week?: HubWeekDay[] | null;
   /** Setup jobs Claude has left (they tick themselves off): admins', or ones passed to this person. */
   setup?: FromClaudeProps;
   /** Show the "Talk to Metis" bar. */
@@ -171,6 +177,7 @@ export function HubView({
       <div className="hub-work">
         {metaLeads && <MetaLeadsPanel leads={metaLeads} />}
         <div className="hub-work-side">
+          {week && <WeekAhead days={week} />}
           {todayList && todayList.items.length > 0 && <TodayList today={todayList} />}
           <TodoPanel tasks={tasks} followUps={followUps} today={todayIso} />
         </div>
