@@ -15,7 +15,7 @@ const ROLES = ['Husband', 'Wife', 'Partner', 'Tenant', 'Landlord', 'Site contact
  * "People on this job": everyone besides the customer, each a contact with a role (a couple, a landlord and the tenant, a site
  * contact). Add from Contacts or make a new one on the spot; call, WhatsApp or email them from here.
  */
-export function PeopleCard({ projectId, onChanged }: { projectId: string; onChanged?: () => Promise<void> | void }) {
+export function PeopleCard({ projectId, onChanged, embedded }: { projectId: string; onChanged?: () => Promise<void> | void; embedded?: boolean }) {
   const [people, setPeople] = useState<Person[] | null>(null);
   const [ready, setReady] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -58,17 +58,15 @@ export function PeopleCard({ projectId, onChanged }: { projectId: string; onChan
     await fetch(`/api/crm/projects/${projectId}/people`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contact_id: p.contact_id, role }) });
   }
 
+  const Wrap = embedded ? 'div' : 'section';
   return (
-    <section className="crmh-card org-card" aria-label="Other contacts on this job">
-      <div className="crmh-card__h">
-        <h3>Other contacts</h3>
-        {ready && (
-          <button type="button" className="crmr-edit crmh-ml" onClick={() => setAdding(true)}>
-            + New contact
-          </button>
-        )}
-      </div>
-      <div className="crmh-card__b">
+    <Wrap className={embedded ? 'org-people' : 'crmh-card org-card'} aria-label="Other contacts on this job">
+      {!embedded && (
+        <div className="crmh-card__h">
+          <h3>Other contacts</h3>
+        </div>
+      )}
+      <div className={embedded ? undefined : 'crmh-card__b'}>
         {!ready ? (
           <p className="crm-muted crm-small">
             Run <code>supabase/job-people.sql</code> in Supabase to add more contacts to a job.
@@ -77,7 +75,7 @@ export function PeopleCard({ projectId, onChanged }: { projectId: string; onChan
         ) : people === null ? (
           <p className="crm-muted crm-small">Loading…</p>
         ) : people.length === 0 ? (
-          <p className="crm-muted crm-small">Nobody else yet. Add a partner, a landlord, a tenant or a site contact.</p>
+          <p className="crm-muted crm-small">Add a partner, a landlord, a tenant or a site contact.</p>
         ) : (
           <ul className="crmh-people">
             {people.map((p) => (
@@ -109,6 +107,11 @@ export function PeopleCard({ projectId, onChanged }: { projectId: string; onChan
           ))}
         </datalist>
         {err && <p className="crm-error">{err}</p>}
+        {ready && (
+          <button type="button" className="crm-link crmr-inline" onClick={() => setAdding(true)}>
+            + New contact
+          </button>
+        )}
       </div>
       {adding && (
         <Sheet title="Add a contact to this job" onClose={() => setAdding(false)} wide>
@@ -124,7 +127,7 @@ export function PeopleCard({ projectId, onChanged }: { projectId: string; onChan
           />
         </Sheet>
       )}
-    </section>
+    </Wrap>
   );
 }
 

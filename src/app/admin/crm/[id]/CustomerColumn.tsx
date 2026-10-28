@@ -12,7 +12,6 @@ import { toWaId } from '@/lib/whatsapp/shared';
 import { StageChip } from '../CrmUi';
 import { firstName, jobLabel, shortDate, ukDayOf } from '../crm-shared';
 import { OrganisationCard } from './OrganisationCard';
-import { PeopleCard } from './PeopleCard';
 import { SendAppointment } from './SendAppointment';
 import { PortalMessages } from './PortalMessages';
 import { DnoDeposit, PortalCard } from './ProjectExtras';
@@ -139,7 +138,6 @@ export function CustomerColumn({
       />
 
       {schema.organisations && <OrganisationCard projectId={project.id} organisation={organisation ?? null} contact={contact ?? null} onChanged={onSaved} />}
-      {schema.organisations && <PeopleCard projectId={project.id} />}
 
       {others.length > 0 && (
         <section className="crmh-card" aria-label="Other projects">
