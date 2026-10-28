@@ -5,6 +5,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { SURVEY_TYPES, type SurveyTypeKey } from '@/lib/crm/stages';
 import { londonSlot, ukDate, ukTime, weekday } from '@/lib/booking/engine';
 import type { Job } from './DiaryEntrySheet';
+import { TellThem, useBookingPeople, type Notify } from '../projects/TellThem';
 
 /**
  * Find a time (staff): pick the customer's job (or just type a postcode), see the times that fit
@@ -24,7 +25,7 @@ type StaffSlot = {
   driveOut: number;
 };
 type SlotDay = { day: string; label: string; morning: StaffSlot[]; afternoon: StaffSlot[] };
-type Project = { id: string; title: string; customer: string; postcode: string | null; surveyAt: string | null; stage: string };
+type Project = { id: string; title: string; customer: string; postcode: string | null; surveyAt: string | null; stage: string; hasEmail?: boolean; hasMobile?: boolean };
 type Found = {
   project: Project | null;
   type: SurveyTypeKey;
@@ -57,11 +58,9 @@ async function post(url: string, body: unknown): Promise<{ ok: boolean; status: 
   }
 }
 
-/** " · email sent to x" or why it was not, from the booking reply. */
-function emailNote(e: unknown): string {
-  const m = e as { sent?: boolean; to?: string; why?: string } | undefined;
-  if (!m) return '';
-  return m.sent ? ` · appointment email sent to ${m.to}` : ` · email NOT sent: ${m.why || 'unknown reason'}`;
+/** " · Email sent to x. WhatsApp sent" or why one was not, from the booking reply. */
+function emailNote(n: unknown): string {
+  return Array.isArray(n) && n.length ? ` · ${n.join('. ')}` : '';
 }
 
 async function copy(text: string): Promise<boolean> {
@@ -101,8 +100,9 @@ export function FindTimeSheet({
   const [aDay, setADay] = useState(today);
   const [aTime, setATime] = useState('09:00');
   const [aWho, setAWho] = useState(surveyors[0]?.key ?? '');
-  // Email them the appointment, with a calendar file. On unless staff untick it.
-  const [emailThem, setEmailThem] = useState(true);
+  // Tell them the appointment: email (with a calendar file) on by default; WhatsApp and a text when staff choose them.
+  const [notify, setNotify] = useState<Notify>({ email: true, whatsapp: false, sms: false });
+  const people = useBookingPeople();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function apply(r: { ok: boolean; data: Reply }) {
@@ -166,9 +166,9 @@ export function FindTimeSheet({
     setBusy(true);
     setError('');
     // The postcode these times were worked out for (typed here when the job has none, or it's elsewhere).
-    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, postcode: found?.postcode, surveyor_key: pick.surveyorKey, email_customer: emailThem });
+    const r = await post('/api/crm/booking/book', { project_id: job.id, start: pick.start, type, postcode: found?.postcode, surveyor_key: pick.surveyorKey, notify });
     setBusy(false);
-    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(pick.start)} with ${String(r.data.surveyor || pick.surveyorName)}${emailNote(r.data.emailed)}`);
+    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(pick.start)} with ${String(r.data.surveyor || pick.surveyorName)}${emailNote(r.data.notices)}`);
     if (r.status === 409 && Array.isArray(r.data.days) && found) {
       setFound({ ...found, days: r.data.days });
       setPick(null);
@@ -190,10 +190,10 @@ export function FindTimeSheet({
       surveyor_key: aWho || undefined,
       override: true,
       all_day_ok: allDayOk,
-      email_customer: emailThem,
+      notify,
     });
     setBusy(false);
-    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(start)}${emailNote(r.data.emailed)}`);
+    if (r.ok && r.data.ok) return onBooked(`Booked ✓ ${job.customer}: ${when(start)}${emailNote(r.data.notices)}`);
     if (r.status === 409 && r.data.error === 'all_day') {
       if (window.confirm(r.data.message || 'The diary is blocked all day. Book anyway?')) return bookAnyway(true);
       return;
@@ -455,12 +455,7 @@ export function FindTimeSheet({
           </div>
         )}
 
-        {job && (
-          <label className="dy-small" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0 10px' }}>
-            <input type="checkbox" checked={emailThem} onChange={(e) => setEmailThem(e.target.checked)} />
-            Email them the appointment (with a calendar file for their diary)
-          </label>
-        )}
+        {job && <TellThem value={notify} onChange={setNotify} channels={people?.channels ?? null} hasEmail={job.hasEmail !== false} hasMobile={job.hasMobile !== false} />}
         <div className="dy-bar">
           <button type="button" className="dy-btn" disabled={busy || !job || !pick} onClick={bookIt}>
             {pick ? `Book it: ${when(pick.start)}` : 'Book it'}

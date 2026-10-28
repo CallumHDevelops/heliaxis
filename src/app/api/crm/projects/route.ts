@@ -2,7 +2,10 @@ import { after } from 'next/server';
 import { customerFromContact } from '@/lib/crm/from-contact';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity, markContacted } from '@/lib/crm/server';
-import { isProjectStage, PRODUCT_KEYS, PROJECT_START_STAGES, type StageKey } from '@/lib/crm/stages';
+import { staffBook, staffFrom } from '@/lib/booking/book';
+import { inUk } from '@/lib/booking/location';
+import { grantPermission } from '@/lib/whatsapp/permission';
+import { isProjectStage, PRODUCT_KEYS, PROJECT_START_STAGES, surveyTypeFor, type StageKey } from '@/lib/crm/stages';
 import { sendStageToMeta } from '@/lib/meta-capi';
 import { pipeline, projectsList, syncEnquiryStatus } from '@/lib/projects/server';
 import { createAssignments, siteReady, type NewAssignment } from '@/lib/site/server';
@@ -139,11 +142,30 @@ export async function POST(req: Request) {
   if (startStage !== 'lead') await syncEnquiryStatus(db, enquiryId).catch(() => null);
   // A job loaded straight in at Won or later is still a sale for Meta (sent once per job).
   if (delivery) after(() => sendStageToMeta(project.id, startStage).catch(() => {}));
+  // Where the address lookup put the pin: the customer's "check the pin" page starts from it.
+  const pinLat = Number(b.site_lat);
+  const pinLng = Number(b.site_lng);
+  if (inUk(pinLat, pinLng)) await db.from('crm_projects').update({ site_lat: pinLat, site_lng: pinLng }).eq('id', project.id).then(() => null, () => null);
+  // "Appointment arranged": book it in the diary (any time they agreed, as long as it doesn't overlap something), then tell them
+  // by the ways staff ticked. A booking that can't be made leaves the opportunity in place and says why.
+  const appt = b.appointment as { start?: unknown; surveyor_key?: unknown; notify?: Record<string, unknown> } | undefined;
+  let notices: string[] = [];
+  let apptWarning = '';
+  if (!delivery && appt && Number.isFinite(Date.parse(String(appt.start || '')))) {
+    const notify = { email: appt.notify?.email === true, whatsapp: appt.notify?.whatsapp === true, sms: appt.notify?.sms === true };
+    // Ticking WhatsApp here is staff saying they agreed to it on the call: recorded as their permission.
+    if (notify.whatsapp) await grantPermission(enquiryId, 'phone-call').catch(() => false);
+    const o = await staffBook({ projectId: project.id, start: Date.parse(String(appt.start)), surveyorKey: typeof appt.surveyor_key === 'string' ? appt.surveyor_key.toLowerCase() : null, type: surveyTypeFor(products) ?? 'solar', override: true, allDayOk: true, notify, by: staffFrom(s) });
+    if (o.status === 200) notices = (o.body.notices as string[] | undefined) ?? [];
+    else apptWarning = `The opportunity is made, but the appointment wasn’t booked: ${String(o.body.error || o.body.message || 'try Find a time on the job')}`;
+  }
+
   // Who's doing the work (New project, once site-commissioning.sql has run): made after the job.
   const trades = (Array.isArray(b.assignments) ? b.assignments : []) as NewAssignment[];
   if (delivery && trades.length && (await siteReady())) {
     const r = await createAssignments(db, project.id, trades, s.user.id);
     if (!r.ok) return json({ id: project.id, warning: `The job is made, but the trades weren’t added: ${r.error} Add them on the job’s Site tab.` });
   }
-  return json({ id: project.id });
+  if (apptWarning) return json({ id: project.id, warning: apptWarning });
+  return json({ id: project.id, ...(notices.length ? { notices } : {}) });
 }

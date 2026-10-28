@@ -34,6 +34,9 @@ export type FieldKey =
   | 'interest'
   | 'quote_link'
   | 'when_words'
+  | 'date_words'
+  | 'time_words'
+  | 'location_link'
   | 'date_time'
   | 'review_link'
   | 'work_words'
@@ -55,6 +58,9 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
   },
   quote_link: { label: 'Quote / portal link', example: 'https://heliaxis.co.uk/my/Xk2pQ7', help: 'Their customer portal link', token: 'quote_link' },
   when_words: { label: 'When (“tomorrow”, “in 3 days”)', example: 'tomorrow', help: 'Filled in by the reminder' },
+  date_words: { label: 'The day (“Tuesday 3 November”)', example: 'Tuesday 3 November', help: 'Filled in when an appointment is booked', auto: true },
+  time_words: { label: 'The time (“10:45”)', example: '10:45', help: 'Filled in when an appointment is booked', auto: true },
+  location_link: { label: 'Check-the-pin link', example: 'https://heliaxis.co.uk/where/Xk2pQ7mNabcd', help: 'Filled in when an appointment is booked', auto: true },
   date_time: { label: 'Date and time', example: 'Monday 3 November, 10:00', help: 'Filled in by the reminder' },
   review_link: { label: 'Google review link', example: 'https://g.page/r/CQx8HeliaxisReview/review', help: 'From CRM settings → Review requests' },
   // Filled in by the site app (trades' job packs and POs) and the handover pack, never typed.
@@ -157,6 +163,15 @@ export const READY_MADE: ReadyTemplate[] = [
     use: 'Tell them their quote is ready, with the link to see it.',
     body: 'Hi {{1}}, your Heliaxis quote is ready to view: {{2}} Any questions, just reply here.',
     fields: ['first_name', 'quote_link'],
+    buttons: [],
+  },
+  {
+    name: 'survey_location',
+    title: 'Appointment booked: check the pin',
+    category: 'UTILITY',
+    use: 'Sent when you book an appointment with someone: thanks, the day and time, and a link to a map with a pin they can move to show you where to come.',
+    body: 'Hi {{1}}, thank you for your time. I look forward to meeting you on {{2}} at {{3}}. I would be grateful if you could check the pin location at the link below and confirm, so I can find you first time around. {{4}} Kind regards, {{5}}, Heliaxis',
+    fields: ['first_name', 'date_words', 'time_words', 'location_link', 'my_first_name'],
     buttons: [],
   },
   {

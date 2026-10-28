@@ -1,7 +1,7 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured, sendMail } from '@/lib/ms365';
-import { emailShell, esc } from '@/lib/subcontractors/server';
+import { buttonsHtml, emailShell, esc } from '@/lib/email-brand';
 import { logActivity } from '@/lib/crm/server';
 import { minutesWords, surveyTypeLabel } from '@/lib/crm/stages';
 import { ukDate, ukTime } from './engine';
@@ -21,6 +21,8 @@ export type AppointmentInput = {
   who?: string | null;
   notes?: string | null;
   uid: string;
+  /** The "check the pin" page for this booking. */
+  locationUrl?: string | null;
 };
 
 const WD_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -82,6 +84,7 @@ export function appointmentEmail(i: AppointmentInput): { subject: string; html: 
     <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F7F2E7;padding:12px 16px;margin:0 0 18px;border-left:4px solid #F8BC1E"><tr><td><table role="presentation" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table>
     ${i.notes ? `<p style="margin:0 0 16px">${esc(i.notes).replace(/\n/g, '<br>')}</p>` : ''}
     ${survey ? `<p style="margin:0 0 6px;font-weight:700">What to expect</p><p style="margin:0 0 16px;color:#4d493d">We look at your roof, shading, electrics and meter, and talk through what suits you. You get a fixed price in writing afterwards. No obligation and no pushy sales.</p>` : ''}
+    ${i.locationUrl ? `<p style="margin:0 0 6px">Could you check the pin location, and confirm it, so we can find you first time around?</p>${buttonsHtml([{ href: i.locationUrl, label: 'Check the pin on the map', kind: 'primary' }])}` : ''}
     <p style="margin:0 0 16px">The attached calendar file adds it to your diary.</p>
     <p style="margin:0 0 12px">Need to change the time? Just reply to this email, or ring us on <a href="tel:01633965205" style="color:#211F18;font-weight:700">01633 965205</a> and we’ll sort it.</p>
     <p style="margin:0 0 4px">Kind regards,<br>The Heliaxis team</p>`;
@@ -97,6 +100,7 @@ export function appointmentEmail(i: AppointmentInput): { subject: string; html: 
     `What: ${i.title}`,
     i.notes ? `\n${i.notes}` : '',
     '',
+    i.locationUrl ? `Please check the pin location and confirm it, so we can find you first time: ${i.locationUrl}` : '',
     'The attached calendar file adds it to your diary.',
     'Need to change the time? Reply to this email or ring 01633 965205.',
     '',

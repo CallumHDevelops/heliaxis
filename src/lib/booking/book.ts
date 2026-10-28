@@ -36,7 +36,7 @@ import { firstName, itemsOnDay, loadDiary, parseRange, surveyMinutesFor, surveyo
 import { isHit, lookupPostcode, normPostcode, outcodeOf, placeFromHit, spacedPostcode, type GeoHit } from './geo';
 import { buildDrive, estimateBetween } from './travel';
 import { syncProjectCalendar } from './calendar-sync';
-import { sendAppointmentEmail, surveyTitle, type SendResult } from './appointment-email';
+import { sendAppointmentNotices, type Notify } from './appointment-notify';
 
 /**
  * Searching, holding and confirming survey times. The database is the source of truth: every time
@@ -1286,8 +1286,8 @@ export async function staffBook(x: {
   surveyorKey?: string | null;
   override?: boolean;
   allDayOk?: boolean;
-  /** Email the customer their appointment, with a calendar file (when they have an email address). */
-  emailCustomer?: boolean;
+  /** Tell the customer: email (with a calendar file), WhatsApp and/or a text, each with the check-the-pin link. */
+  notify?: Notify;
   by: Staff;
 }): Promise<Outcome> {
   const s = await getBookingSettings();
@@ -1402,11 +1402,8 @@ export async function staffBook(x: {
   const b = await bookingById(made.id);
   if (!b) return UNAVAILABLE;
   await afterConfirm({ b, status: 'confirmed', projectId: p.id, enquiryId: p.enquiry_id, how: 'staff', by: x.by, note });
-  let emailed: SendResult | null = null;
-  if (x.emailCustomer && p.enquiry_id) {
-    emailed = await sendAppointmentEmail({ enquiryId: p.enquiry_id, projectId: p.id, appointment: { title: surveyTitle(type), startMs: x.start, endMs: made.end, who: made.sv.name, uid: made.id }, byId: x.by.id });
-  }
-  return { status: 200, body: { ok: true, id: made.id, start: new Date(x.start).toISOString(), end: new Date(made.end).toISOString(), surveyor: made.sv.name, ...(emailed ? { emailed } : {}) } };
+  const notices = p.enquiry_id && x.notify ? await sendAppointmentNotices({ enquiryId: p.enquiry_id, projectId: p.id, surveyType: type, startMs: x.start, endMs: made.end, who: made.sv.name, notify: x.notify, by: x.by }) : [];
+  return { status: 200, body: { ok: true, id: made.id, start: new Date(x.start).toISOString(), end: new Date(made.end).toISOString(), surveyor: made.sv.name, ...(notices.length ? { notices } : {}) } };
 }
 
 /** The customer's booking link and a ready-made WhatsApp message. */

@@ -121,6 +121,7 @@ export type ProjectRow = {
   install_team?: string[] | null;
   site_lat?: number | null;
   site_lng?: number | null;
+  location_confirmed_at?: string | null;
   survey_type?: string | null;
   survey_minutes?: number | null;
   survey_mailbox?: string | null;

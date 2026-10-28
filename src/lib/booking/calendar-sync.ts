@@ -15,6 +15,7 @@ import {
 import { logActivity, siteUrl } from '@/lib/crm/server';
 import { isSurveyType, noSurveyNeeded, productLabel, surveyTypeFor, surveyTypeLabel } from '@/lib/crm/stages';
 import { addDays, londonSlot } from './engine';
+import { mapsUrl } from './location';
 import { ENTRY_KIND_LABEL, surveyMinutesFor, type EntryRow, type ProjectRow } from './diary';
 import { getBookingSettings } from './settings-server';
 import type { BookingSettings } from './settings';
@@ -42,6 +43,13 @@ async function customerOf(enquiryId: string): Promise<Customer> {
   const { data } = await createAdminClient().from('enquiries').select('name, email, phone').eq('id', enquiryId).maybeSingle();
   return { name: (data?.name as string) || 'Customer', email: (data?.email as string | null) ?? null, phone: (data?.phone as string | null) ?? null };
 }
+
+/** The Google Maps pin line for an event: the customer's confirmed pin, or the address's. Opens the Maps app on a phone. */
+const pinLine = (p: Pick<ProjectRow, 'address' | 'postcode' | 'site_lat' | 'site_lng' | 'location_confirmed_at'>): string => {
+  const url = mapsUrl({ lat: p.site_lat, lng: p.site_lng, address: p.address, postcode: p.postcode });
+  if (!url) return '';
+  return `Google Maps pin${p.location_confirmed_at ? ' (confirmed by the customer)' : p.site_lat != null ? '' : ' (from the address)'}: ${url}`;
+};
 
 const where = (p: Pick<ProjectRow, 'address' | 'postcode'>): CalWrite['location'] => {
   const text = [p.address, p.postcode].filter(Boolean).join(', ');
@@ -111,6 +119,7 @@ async function syncSurvey(p: ProjectRow, c: Customer, ctx: Ctx): Promise<Partial
       c.email ? `Email: ${c.email}` : '',
       (p.products ?? []).length ? `Interested in: ${(p.products ?? []).map(productLabel).join(', ')}` : '',
       `${how}.`,
+      pinLine(p),
       `In the CRM: ${siteUrl()}/admin/crm/${p.id}`,
     ]
       .filter(Boolean)
@@ -163,6 +172,7 @@ async function syncInstall(p: ProjectRow, c: Customer, ctx: Ctx): Promise<Partia
         p.scaffold_up_on ? `Scaffold up: ${p.scaffold_up_on}` : '',
         p.scaffold_down_on ? `Scaffold down: ${p.scaffold_down_on}` : '',
         c.phone ? `Customer: ${c.phone}` : '',
+        pinLine(p),
         `In the CRM: ${siteUrl()}/admin/crm/${p.id}`,
       ]
         .filter(Boolean)

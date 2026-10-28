@@ -1,3 +1,4 @@
+import { toMsisdn } from '@/lib/sms';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
 import { isSurveyType, noSurveyNeeded, stageLabel, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
@@ -122,7 +123,7 @@ export async function POST(req: Request) {
   }
 
   let ignore: string | null = null;
-  let project: { id: string; title: string; customer: string; postcode: string | null; surveyAt: string | null; stage: string } | null = null;
+  let project: { id: string; title: string; customer: string; postcode: string | null; surveyAt: string | null; stage: string; hasEmail: boolean; hasMobile: boolean } | null = null;
   if (typeof b.project_id === 'string' && isUuid(b.project_id)) {
     const db = createAdminClient();
     const { data } = await db.from('crm_projects').select('*').eq('id', b.project_id).maybeSingle();
@@ -134,8 +135,8 @@ export async function POST(req: Request) {
     type ??= isSurveyType(p.survey_type) ? p.survey_type : (surveyTypeFor(p.products ?? []) ?? 'solar');
     // Moving their booking (or the date on the job): their own time doesn't count as busy.
     ignore = (await liveBookingFor(p.id))?.id ?? null;
-    const { data: e } = await db.from('enquiries').select('name').eq('id', p.enquiry_id).maybeSingle();
-    project = { id: p.id, title: p.title, customer: (e?.name as string) || p.title, postcode: p.postcode, surveyAt: p.survey_at, stage: p.stage };
+    const { data: e } = await db.from('enquiries').select('name, email, phone').eq('id', p.enquiry_id).maybeSingle();
+    project = { id: p.id, title: p.title, customer: (e?.name as string) || p.title, postcode: p.postcode, surveyAt: p.survey_at, stage: p.stage, hasEmail: /^\S+@\S+\.\S+$/.test(String(e?.email ?? '').trim()), hasMobile: !!toMsisdn(e?.phone as string | null) };
     if (none)
       return json({ project, type: null, code: 'no_survey', error: 'This job has no solar, battery or heat pump on it, so it doesn’t need a survey. Use + Add to my diary for a home visit, or pick Solar or Heat pump above if they want a survey too.' }, 409);
   }

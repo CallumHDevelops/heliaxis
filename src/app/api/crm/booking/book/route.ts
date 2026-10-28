@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Book it (staff, confirmed straight away): { project_id, start, type, postcode?, surveyor_key?,
- * override?, all_day_ok?, email_customer? }. postcode = the one Find a time searched with (saved to the job when it
+ * override?, all_day_ok?, notify? { email, whatsapp, sms } (tells the customer, each message with a check-the-pin link) }. postcode = the one Find a time searched with (saved to the job when it
  * differs). "Book anyway" (override) takes any start that doesn't overlap the diary; on a day
  * blocked all day it answers 409 { error: 'all_day', message } and needs all_day_ok to go ahead.
  */
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     surveyorKey: typeof b.surveyor_key === 'string' ? b.surveyor_key.toLowerCase() : null,
     override: b.override === true,
     allDayOk: b.all_day_ok === true,
-    emailCustomer: b.email_customer === true,
+    notify: b.notify && typeof b.notify === 'object' ? { email: (b.notify as Record<string, unknown>).email === true, whatsapp: (b.notify as Record<string, unknown>).whatsapp === true, sms: (b.notify as Record<string, unknown>).sms === true } : undefined,
     by: staffFrom(s),
   });
   return json(o.body, o.status);

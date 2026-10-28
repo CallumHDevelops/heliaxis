@@ -8,7 +8,7 @@ type Sug = { id: string; address: string };
  * "Find the address": type part of it, pick the match, and the address and postcode are filled in. Without a lookup service
  * (no key set up) it says nothing and the boxes beside it are typed as before.
  */
-export function AddressFinder({ onPick }: { onPick: (a: { address: string; postcode: string }) => void }) {
+export function AddressFinder({ onPick }: { onPick: (a: { address: string; postcode: string; lat?: number | null; lng?: number | null }) => void }) {
   const [q, setQ] = useState('');
   const [sugs, setSugs] = useState<Sug[]>([]);
   const [on, setOn] = useState(true);
@@ -39,10 +39,10 @@ export function AddressFinder({ onPick }: { onPick: (a: { address: string; postc
     setBusy(true);
     setErr('');
     const r = await fetch(`/api/crm/address?id=${encodeURIComponent(s.id)}`, { cache: 'no-store' });
-    const d = (await r.json().catch(() => ({}))) as { address?: string; postcode?: string; error?: string };
+    const d = (await r.json().catch(() => ({}))) as { address?: string; postcode?: string; lat?: number | null; lng?: number | null; error?: string };
     setBusy(false);
     if (!r.ok || !d.address) return setErr(d.error || 'Couldn’t get that address. Type it in instead.');
-    onPick({ address: d.address, postcode: d.postcode ?? '' });
+    onPick({ address: d.address, postcode: d.postcode ?? '', lat: d.lat, lng: d.lng });
     setSugs([]);
     setQ('');
   }

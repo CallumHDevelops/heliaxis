@@ -23,6 +23,7 @@ type Item = {
   label: string;
   place: string;
   postcode: string | null;
+  mapUrl: string | null;
   isSurvey: boolean;
   allDay: boolean;
   private: boolean;
@@ -642,6 +643,14 @@ function DayCard({
                   <b>{i.time}</b>
                   <div>
                     <ItemLabel i={i} onOpen={onOpen} />
+                    {i.mapUrl && (
+                      <>
+                        {' '}
+                        <a className="dy-map" href={i.mapUrl} target="_blank" rel="noreferrer" aria-label={`Open ${i.label} in Google Maps`}>
+                          📍 Map
+                        </a>
+                      </>
+                    )}
                   </div>
                 </li>
                 {i.noLocation && (

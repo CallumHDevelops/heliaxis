@@ -729,3 +729,20 @@ textarea.dy-input {
     min-width: 76px;
   }
 }
+
+/* The Google Maps link on a diary item. */
+.dy-map {
+  display: inline-block;
+  margin-left: 2px;
+  padding: 2px 8px;
+  border: 1px solid var(--border, rgba(33, 31, 24, 0.25));
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+  white-space: nowrap;
+}
+.dy-map:hover {
+  border-color: currentColor;
+}

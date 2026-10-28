@@ -5,7 +5,9 @@ import { PRODUCTS, PROJECT_START_STAGES, stageLabel } from '@/lib/crm/stages';
 import type { TeamMember } from '@/lib/projects/server';
 import { Sheet } from '../crm/CrmUi';
 import { productsShort } from '../crm/crm-shared';
+import { londonSlot } from '@/lib/booking/engine';
 import { AddressFinder } from './AddressFinder';
+import { TellThem, useBookingPeople, type Notify } from './TellThem';
 import { NewProjectTrades, rowsFor, tradesBody, useVatDefault, type TradeRow } from './NewProjectTrades';
 
 type Customer = {
@@ -23,6 +25,7 @@ type Customer = {
 };
 
 const OPPORTUNITY_STARTS = [
+  { key: 'appointment', label: 'Appointment arranged: I’ve agreed a time with them' },
   { key: 'lead', label: 'New enquiry: needs a survey and quote' },
   { key: 'surveyed', label: 'Surveyed: needs a quote' },
 ] as const;
@@ -63,6 +66,12 @@ export function NewProjectSheet({
   const [how, setHow] = useState('Phone call');
   const [note, setNote] = useState('');
   const [spoken, setSpoken] = useState(true);
+  // Where the address lookup put the pin, and the appointment when one has been arranged.
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [aDay, setADay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [aTime, setATime] = useState('10:00');
+  const [aWho, setAWho] = useState('');
+  const [notify, setNotify] = useState<Notify>({ email: true, whatsapp: false, sms: false });
   const [owner, setOwner] = useState(me);
   const [start, setStart] = useState<string>(mode === 'project' ? 'won' : 'lead');
   const [err, setErr] = useState('');
@@ -71,6 +80,8 @@ export function NewProjectSheet({
   const trades = siteApp && mode === 'project';
   const [tradeRows, setTradeRows] = useState<TradeRow[]>([]);
   const vatDefault = useVatDefault(trades);
+  const appointment = mode === 'opportunity' && start === 'appointment';
+  const people = useBookingPeople(appointment);
 
   const postcode = fresh ? person.postcode.trim().toUpperCase() : site.postcode.trim().toUpperCase();
   const defaultTitle = [productsShort(products), postcode].filter(Boolean).join(' · ');
@@ -94,6 +105,11 @@ export function NewProjectSheet({
       setErr(t.error);
       return;
     }
+    if (appointment) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(aDay) || !/^\d{2}:\d{2}$/.test(aTime)) return setErr('Pick the day and time of the appointment.');
+      if (postcode.replace(/\s/g, '').length < 5) return setErr('An appointment needs the postcode: use Find the address, or type it in.');
+      if (!notify.email && !notify.whatsapp && !notify.sms && !window.confirm('You haven’t ticked a way to tell them. Book it without telling them?')) return;
+    }
     setBusy(true);
     setErr('');
     const body: Record<string, unknown> = {
@@ -102,7 +118,9 @@ export function NewProjectSheet({
       address: site.address.trim(),
       value: value.trim() === '' ? null : value.replace(/[£,\s]/g, ''),
       owner_id: owner || null,
-      start_stage: start,
+      start_stage: appointment ? 'lead' : start,
+      ...(pin ? { site_lat: pin.lat, site_lng: pin.lng } : {}),
+      ...(appointment ? { appointment: { start: new Date(londonSlot(aDay, aTime)).toISOString(), surveyor_key: aWho || undefined, notify } } : {}),
       source: fresh ? how : 'crm',
       ...(mode === 'opportunity' ? { spoken, note: note.trim() || undefined } : {}),
       ...(t.assignments.length ? { assignments: t.assignments } : {}),
@@ -116,6 +134,8 @@ export function NewProjectSheet({
     if (r.ok && d.id) {
       // Made, but a trade wasn't added: say so on the job.
       if (d.warning) window.alert(d.warning);
+      // What went out (and what didn't) when they were told about the appointment.
+      else if (Array.isArray(d.notices) && d.notices.some((n: string) => /NOT sent/.test(n))) window.alert(`Appointment booked.\n\n${d.notices.join('\n')}`);
       onCreated(d.id);
     } else setErr(d.error || 'Not created. Try again.');
   }
@@ -201,6 +221,7 @@ export function NewProjectSheet({
         onPick={(a) => {
           setSite({ address: a.address, postcode: a.postcode });
           setPerson((p) => ({ ...p, postcode: a.postcode }));
+          setPin(a.lat != null && a.lng != null ? { lat: a.lat, lng: a.lng } : null);
         }}
       />
       <label className="crm-label" htmlFor="nps-address">
@@ -210,7 +231,10 @@ export function NewProjectSheet({
         id="nps-address"
         className="crm-input"
         value={site.address}
-        onChange={(e) => setSite({ ...site, address: e.target.value })}
+        onChange={(e) => {
+          setSite({ ...site, address: e.target.value });
+          setPin(null);
+        }}
         placeholder={customer?.latest ? 'Same as their last job' : 'Where the work is'}
       />
       <label className="crm-label" htmlFor="nps-postcode">
@@ -268,6 +292,47 @@ export function NewProjectSheet({
           </label>
         ))}
       </fieldset>
+
+      {appointment && (
+        <div className="nps-appt">
+          <div className="crm-grid2">
+            <div>
+              <label className="crm-label" htmlFor="nps-aday">
+                Day
+              </label>
+              <input id="nps-aday" className="crm-input" type="date" value={aDay} onChange={(e) => setADay(e.target.value)} />
+            </div>
+            <div>
+              <label className="crm-label" htmlFor="nps-atime">
+                Arrive at
+              </label>
+              <input id="nps-atime" className="crm-input" type="time" step={900} value={aTime} onChange={(e) => setATime(e.target.value)} />
+            </div>
+          </div>
+          {(people?.surveyors.length ?? 0) > 1 && (
+            <>
+              <label className="crm-label" htmlFor="nps-awho">
+                Who is going
+              </label>
+              <select id="nps-awho" className="crm-input" value={aWho} onChange={(e) => setAWho(e.target.value)}>
+                <option value="">First free surveyor</option>
+                {people!.surveyors.map((v) => (
+                  <option key={v.key} value={v.key}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          <TellThem
+            value={notify}
+            onChange={setNotify}
+            channels={people?.channels ?? null}
+            hasEmail={fresh ? /^\S+@\S+\.\S+$/.test(person.email.trim()) : !!customer?.email}
+            hasMobile={fresh ? person.phone.replace(/\D/g, '').length >= 10 : !!customer?.phone}
+          />
+        </div>
+      )}
 
       {trades && tradeRows.length > 0 && <NewProjectTrades rows={tradeRows} onChange={setTradeRows} vatDefault={vatDefault} />}
 

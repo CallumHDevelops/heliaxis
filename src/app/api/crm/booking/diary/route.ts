@@ -1,3 +1,4 @@
+import { mapsUrl } from '@/lib/booking/location';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, json } from '@/lib/crm/server';
 import { msConfigured } from '@/lib/ms365';
@@ -46,6 +47,8 @@ type ViewItem = {
   label: string;
   place: string;
   postcode: string | null;
+  /** Google Maps pin for the place (the exact point when there is one), or null for private, online and unknown places. */
+  mapUrl: string | null;
   isSurvey: boolean;
   allDay: boolean;
   private: boolean;
@@ -68,6 +71,7 @@ const view = (i: DiaryItem): ViewItem => ({
   label: i.label,
   place: i.private ? '' : i.place.online ? 'Online / phone' : i.place.unknown ? '' : i.place.label,
   postcode: i.postcode ?? null,
+  mapUrl: i.private || i.place.online || i.place.unknown ? null : mapsUrl({ lat: i.approx ? null : i.place.ll?.lat, lng: i.approx ? null : i.place.ll?.lng, address: i.place.label, postcode: i.postcode ?? null }),
   isSurvey: i.isSurvey,
   allDay: !!i.allDayBlock,
   private: !!i.private,
