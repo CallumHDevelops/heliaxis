@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-html-link-for-pages -- survey pages open with a full page load, so the service worker can serve its copy with no signal */
 
+import { BrandIcon } from '@/app/admin/crm/CrmUi';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import {
@@ -689,7 +690,7 @@ export function SurveyForm() {
       <div className="svf-head__row">
         {directions && (
           <a className="svf-btn svf-btn--ghost" href={directions} target="_blank" rel="noopener noreferrer">
-            📍 Directions
+            <BrandIcon k="mappin" size={16} /> Directions
           </a>
         )}
         {payload.customer?.phone && (

@@ -1,5 +1,6 @@
 'use client';
 
+import { BrandIcon } from '@/app/admin/crm/CrmUi';
 import Link from 'next/link';
 import { Fragment, useEffect, useEffectEvent, useState } from 'react';
 import { ukDate, ukTime } from '@/lib/booking/engine';
@@ -647,7 +648,7 @@ function DayCard({
                       <>
                         {' '}
                         <a className="dy-map" href={i.mapUrl} target="_blank" rel="noreferrer" aria-label={`Open ${i.label} in Google Maps`}>
-                          📍 Map
+                          <BrandIcon k="mappin" size={14} /> Map
                         </a>
                       </>
                     )}

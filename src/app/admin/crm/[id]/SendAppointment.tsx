@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Sheet } from '../CrmUi';
+import { BrandIcon, Sheet } from '../CrmUi';
 
 type Info = {
   appointment: { whenText: string; who: string | null } | null;
@@ -14,8 +14,8 @@ export function SendAppointment({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="crmr-edit" onClick={() => setOpen(true)}>
-        📲 Send appointment
+      <button type="button" className="crmr-edit" style={{ whiteSpace: "nowrap" }} onClick={() => setOpen(true)}>
+        <BrandIcon k="calendar" size={16} /> Send appointment
       </button>
       {open && (
         <Sheet title="Send the appointment" onClose={() => setOpen(false)} wide>

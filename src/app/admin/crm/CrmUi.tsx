@@ -40,6 +40,27 @@ export function WaIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+/** Brand-kit duotone icons (brand-kit/heliaxis-icons.svg): charcoal outline in the text colour, gold wash at 30%. Only draw from the kit. */
+const BRAND_ICONS = {
+  calendar: { wash: 'M4 5h16v4H4z', line: ['M4 5h16v16H4z', 'M4 9h16M8 3v4M16 3v4', 'M8 13h2M12 13h2M8 17h2M12 17h2'] },
+  mail: { wash: 'M3 6h18v12H3z', line: ['M3 6h18v12H3z', 'M3 7l9 6 9-6'] },
+  mappin: { wash: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7', line: ['M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7', 'M12 9a2.5 2.5 0 1 0 0 .01'] },
+  phone: { wash: '', line: ['M6.5 3h3l1.5 5-2 1.5a12 12 0 0 0 5 5l1.5-2 5 1.5v3a2 2 0 0 1-2 2A17 17 0 0 1 4.5 5a2 2 0 0 1 2-2Z'] },
+  users: { wash: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', line: ['M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', 'M3 20a5 5 0 0 1 10 0', 'M16 6a3 3 0 0 1 0 6M15 20a5 5 0 0 0-1-3.5 5 5 0 0 1 7 3.5'] },
+} as const;
+
+export function BrandIcon({ k, size = 18 }: { k: keyof typeof BRAND_ICONS; size?: number }) {
+  const i = BRAND_ICONS[k];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: '-0.2em' }}>
+      {i.wash && <path d={i.wash} fill="#F8BC1E" fillOpacity=".3" stroke="none" />}
+      {i.line.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
 export function Icon({ k, size = 16 }: { k: 'search' | 'gear' | 'clock' | 'open' | 'pin' | 'plus' | 'more' | 'check'; size?: number }) {
   const paths: Record<typeof k, ReactNode> = {
     search: (
