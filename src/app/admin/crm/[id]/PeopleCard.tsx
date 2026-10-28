@@ -80,14 +80,12 @@ export function PeopleCard({ projectId, onChanged, embedded }: { projectId: stri
           <ul className="crmh-people">
             {people.map((p) => (
               <li key={p.contact_id}>
-                <div>
+                <div className="crmh-people__who">
                   <Link href={`/admin/crm/contacts/${p.contact_id}`} className="crmh-link">
                     <b>{p.name}</b>
                   </Link>
-                  {p.organisation && <small> · {p.organisation}</small>}
-                  <div className="crm-small">
-                    <input className="crm-input crmh-role" list="job-roles" value={p.role ?? ''} placeholder="Role" aria-label={`Role of ${p.name}`} onChange={(e) => setPeople((l) => (l ?? []).map((x) => (x.contact_id === p.contact_id ? { ...x, role: e.target.value } : x)))} onBlur={(e) => void setRole(p, e.target.value)} />
-                  </div>
+                  {p.organisation && <small>{p.organisation}</small>}
+                  <input className="crmh-role" list="job-roles" value={p.role ?? ''} placeholder="Add a role" aria-label={`Role of ${p.name}`} onChange={(e) => setPeople((l) => (l ?? []).map((x) => (x.contact_id === p.contact_id ? { ...x, role: e.target.value } : x)))} onBlur={(e) => void setRole(p, e.target.value)} />
                 </div>
                 <span className="crmh-people__act">
                   {telHref(p.mobile) && <a href={telHref(p.mobile)!} className="crmr-copy">Call</a>}

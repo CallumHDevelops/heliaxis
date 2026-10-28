@@ -48,7 +48,7 @@ export function OrganisationCard({
       <div className="crmh-card__h">
         <h3>Organisation / Contacts</h3>
         <button type="button" className="crmr-edit crmh-ml" onClick={() => setOpen(true)}>
-          {organisation ? '✎ Change' : '+ Organisation'}
+          {organisation ? '✎ Change' : '+ Org'}
         </button>
       </div>
       <div className="crmh-card__b crmr-fields">
@@ -63,29 +63,34 @@ export function OrganisationCard({
             </span>
           </div>
         )}
-        <div className="crmr-field">
+        <div className="org-contacts">
           <span className="crmr-field__l">Contacts</span>
-          <span className="crmr-field__v">
-            {contact ? (
-              <span className="org-card__contact">
-                <Link href={`/admin/crm/contacts/${contact.id}`} className="crmh-link org-trunc">
-                  {contact.name}
-                  {contact.role ? <small> · {contact.role}</small> : null}
-                </Link>
-                {tel && (
-                  <a href={tel} className="crmr-copy" aria-label={`Call ${contact.name}`}>
-                    Call
-                  </a>
-                )}
-              </span>
-            ) : (
-              <button type="button" className="crm-link crmr-inline" onClick={() => setOpen(true)}>
-                {organisation?.contacts.length ? 'Pick who it’s with' : 'No main contact yet'}
-              </button>
-            )}
-            <PeopleCard projectId={projectId} onChanged={onChanged} embedded />
-          </span>
+          {contact ? (
+            <ul className="crmh-people">
+              <li>
+                <div className="crmh-people__who">
+                  <Link href={`/admin/crm/contacts/${contact.id}`} className="crmh-link">
+                    <b>{contact.name}</b>
+                  </Link>
+                  <small>{contact.role || 'Main contact'}</small>
+                </div>
+                <span className="crmh-people__act">
+                  {tel && (
+                    <a href={tel} className="crmr-copy" aria-label={`Call ${contact.name}`}>
+                      Call
+                    </a>
+                  )}
+                </span>
+              </li>
+            </ul>
+          ) : (
+            <button type="button" className="crm-link crmr-inline" onClick={() => setOpen(true)}>
+              {organisation?.contacts.length ? 'Pick who it’s with' : 'No main contact yet'}
+            </button>
+          )}
+          <PeopleCard projectId={projectId} onChanged={onChanged} embedded />
         </div>
+      </div>
       </div>
       {open && (
         <Sheet title={linked ? 'Change the organisation or contact' : 'Link an organisation or contact'} onClose={() => setOpen(false)} wide>
