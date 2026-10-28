@@ -7,7 +7,7 @@
  * customer's totals only ever read it. `internal` lines cost us something but are not printed on the quote.
  */
 export type PriceMode = 'pct' | 'gbp' | 'manual';
-export type QuoteLine = { id: string; description: string; detail?: string; qty: number; unit_pence: number; vat_rate: number; cost_pence: number; mode: PriceMode; markup: number; internal?: boolean };
+export type QuoteLine = { id: string; description: string; detail?: string; qty: number; unit_pence: number; vat_rate: number; cost_pence: number; mode: PriceMode; markup: number; internal?: boolean; text?: boolean };
 export type QuoteImage = { path: string; caption: string };
 export type QuoteFile = { library_id: string; name: string };
 
@@ -28,6 +28,9 @@ export const newId = () => 'b' + Math.random().toString(36).slice(2, 10);
 export const emptyLine = (from?: Pick<QuoteLine, 'mode' | 'markup' | 'vat_rate'>): QuoteLine => ({
   id: newId(), description: '', qty: 1, unit_pence: 0, vat_rate: from?.vat_rate ?? 0, cost_pence: 0, mode: from?.mode ?? 'pct', markup: from?.mode === 'manual' ? 0 : (from?.markup ?? 0),
 });
+
+/** A free-text line between items: printed as plain text in the Item column, with no quantity or price (a heading, a note). */
+export const emptyText = (): QuoteLine => ({ id: newId(), description: '', qty: 0, unit_pence: 0, vat_rate: 0, cost_pence: 0, mode: 'manual', markup: 0, text: true });
 
 /** The sell price each, from the cost and the way this line is priced. */
 export function sellUnit(l: Pick<QuoteLine, 'mode' | 'cost_pence' | 'markup' | 'unit_pence'>): number {
@@ -157,7 +160,10 @@ export function cleanContent(v: unknown): QuoteContent {
             mode,
             markup: Math.max(-100, Math.min(1_000_000_000, num(l.markup))),
             ...(l.internal === true ? { internal: true } : {}),
+            ...(l.text === true ? { text: true } : {}),
           };
+          // A text line carries no money at all.
+          if (line.text) return { ...line, qty: 0, unit_pence: 0, cost_pence: 0, markup: 0, vat_rate: 0, mode: 'manual' as const, internal: undefined };
           // The sell price is worked out here too, so what is saved and sent can never disagree with the cost and markup.
           return priced(line);
         }),

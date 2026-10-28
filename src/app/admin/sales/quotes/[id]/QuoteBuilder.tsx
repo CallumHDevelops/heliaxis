@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import '../../../crm/crm.css';
 import '../quotes.css';
 import type { SavedItem } from '@/lib/quotes/items';
-import { emptyLine, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
+import { emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
 type Channel = { ok: true; to?: string; via?: string } | { ok: false; error: string };
@@ -126,6 +126,39 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     }));
   const setLine = (bid: string, lid: string, patch: Partial<QuoteLine>) =>
     edit((c) => ({ ...c, blocks: c.blocks.map((b) => (b.id === bid && b.type === 'items' ? { ...b, lines: b.lines.map((l) => (l.id === lid ? priced({ ...l, ...patch }) : l)) } : b)) }));
+
+  // Dragging lines (by the ⠿ handle) within a list or between lists: dropped on a line, it goes just above it; on the end of a list, it goes last.
+  const drag = useRef<{ bid: string; lid: string } | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState<Set<string>>(new Set());
+  const moveLine = (toBid: string, beforeLid: string | null) => {
+    const from = drag.current;
+    drag.current = null;
+    setOver(null);
+    if (!from || from.lid === beforeLid) return;
+    edit((c) => {
+      let moving: QuoteLine | undefined;
+      const without = c.blocks.map((b) => {
+        if (b.id !== from.bid || b.type !== 'items') return b;
+        moving = b.lines.find((l) => l.id === from.lid);
+        return { ...b, lines: b.lines.filter((l) => l.id !== from.lid) };
+      });
+      const line = moving;
+      if (!line) return c;
+      return {
+        ...c,
+        blocks: without.map((b) => {
+          if (b.id !== toBid || b.type !== 'items') return b;
+          const at = beforeLid ? b.lines.findIndex((l) => l.id === beforeLid) : -1;
+          const lines = [...b.lines];
+          lines.splice(at < 0 ? lines.length : at, 0, line);
+          return { ...b, lines };
+        }),
+      };
+    });
+  };
+  const addTo = (bid: string, line: (last: QuoteLine | undefined) => QuoteLine) =>
+    edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === bid && x.type === 'items' ? { ...x, lines: [...x.lines, line(x.lines.filter((l) => !l.text).at(-1))] } : x)) }));
 
   async function upload(bid: string, files: FileList | null) {
     if (!files?.length) return;
@@ -354,14 +387,65 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                       <span />
                     </div>
                     {b.lines.map((l) => {
+                      const handle = (
+                        <span
+                          className="qb-grip"
+                          draggable={!locked}
+                          role="img"
+                          aria-label="Drag to move this line"
+                          title="Drag to move"
+                          onDragStart={(e) => {
+                            drag.current = { bid: b.id, lid: l.id };
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', l.id);
+                            const row = (e.currentTarget as HTMLElement).closest('.qb-line');
+                            if (row) e.dataTransfer.setDragImage(row, 12, 12);
+                          }}
+                          onDragEnd={() => {
+                            drag.current = null;
+                            setOver(null);
+                          }}
+                        >
+                          ⠿
+                        </span>
+                      );
+                      const dropProps = {
+                        onDragOver: (e: React.DragEvent) => {
+                          if (!drag.current) return;
+                          e.preventDefault();
+                          setOver(l.id);
+                        },
+                        onDrop: (e: React.DragEvent) => {
+                          e.preventDefault();
+                          moveLine(b.id, l.id);
+                        },
+                      };
+                      if (l.text) {
+                        return (
+                          <div key={l.id} className={`qb-line qb-line--text${over === l.id ? ' is-over' : ''}`} {...dropProps}>
+                            {handle}
+                            <textarea className="crm-input qb-textline" rows={1} placeholder="Text between items, e.g. Battery storage" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} aria-label="Text" />
+                            <button type="button" className="qb-icon" aria-label="Remove text" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: x.lines.filter((y) => y.id !== l.id) } : x)) }))}>
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      }
                       const profit = lineProfit(l);
                       const sell = lineNet(l);
+                      const showMore = !!l.detail || moreOpen.has(l.id);
                       return (
-                        <div key={l.id} className={`qb-line${l.internal ? ' is-internal' : ''}`}>
+                        <div key={l.id} className={`qb-line${l.internal ? ' is-internal' : ''}${over === l.id ? ' is-over' : ''}`} {...dropProps}>
+                          {handle}
                           <div className="qb-desc">
                             <input className="crm-input" placeholder="e.g. 12 × 450W solar panels" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} aria-label="Description" />
-                            <input className="crm-input qb-detail" placeholder="Optional detail" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} aria-label="Detail" />
+                            {showMore && <input className="crm-input qb-detail" placeholder="Optional detail" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} aria-label="Detail" />}
                             <div className="qb-linemeta">
+                              {!showMore && (
+                                <button type="button" className="crm-link qb-saveitem qb-more" disabled={locked} onClick={() => setMoreOpen((m) => new Set(m).add(l.id))}>
+                                  + detail
+                                </button>
+                              )}
                               <label className="crm-check qb-internal" title="Not shown on the quote: our cost only">
                                 <input type="checkbox" checked={!!l.internal} disabled={locked} onChange={(e) => setLine(b.id, l.id, { internal: e.target.checked })} /> Internal only
                               </label>
@@ -406,10 +490,26 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                         </div>
                       );
                     })}
+                    {/* Drop here to put a dragged line last. */}
+                    <div
+                      className={`qb-droptail${over === `tail-${b.id}` ? ' is-over' : ''}`}
+                      onDragOver={(e) => {
+                        if (!drag.current) return;
+                        e.preventDefault();
+                        setOver(`tail-${b.id}`);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        moveLine(b.id, null);
+                      }}
+                    />
                   </div>
                   <div className="qb-addrow">
-                    <button type="button" className="crm-link" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: [...x.lines, emptyLine(x.lines.at(-1))] } : x)) }))}>
+                    <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => addTo(b.id, (last) => emptyLine(last))}>
                       + Add a line
+                    </button>
+                    <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => addTo(b.id, () => emptyText())}>
+                      + Add text
                     </button>
                     {saved.length > 0 && (
                       <select

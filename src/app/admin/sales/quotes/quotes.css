@@ -123,3 +123,19 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
 .qb-saveitem { margin-left: auto; text-decoration: none; }
 .qb-line .crm-input, .qb-line select.crm-input { min-height: 38px; }
 .qb-amt { padding-top: 8px; }
+
+/* Drag handle, text lines and a compact row: item, numbers and total on one line; the rest in one quiet line beneath. */
+.qb-lines .qb-line { position: relative; padding-left: 24px; }
+.qb-lines .qb-line.is-over { box-shadow: 0 -3px 0 0 var(--solar); }
+.qb-grip { position: absolute; left: 2px; top: 10px; width: 20px; text-align: center; font-size: 1.1rem; line-height: 1; color: var(--muted); cursor: grab; user-select: none; touch-action: none; }
+.qb-grip:active { cursor: grabbing; }
+.qb-line--text { grid-template-columns: minmax(0, 1fr) 30px !important; }
+.qb-line--text .qb-textline { min-height: 38px; resize: vertical; font-style: italic; background: rgb(var(--accent-rgb) / 0.07); }
+.qb-droptail { height: 10px; border-top: 1px solid var(--line); }
+.qb-droptail.is-over { border-top: 3px solid var(--solar); }
+.qb-more { margin-left: 0 !important; }
+.qb-linemeta { margin-top: -2px; }
+.qb-addrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (max-width: 860px) {
+  .qb-grip { top: 8px; }
+}

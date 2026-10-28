@@ -59,10 +59,10 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
         widths: [5, 0.9, 1.6, 0.9, 1.7],
         rows: lines.map((l) => [
           l.detail ? `${l.description}\n${l.detail}`.replace(/\n/g, ' · ') : l.description,
-          String(l.qty),
-          money(l.unit_pence),
-          `${l.vat_rate}%`,
-          money(lineNet(l)),
+          l.text ? '' : String(l.qty),
+          l.text ? '' : money(l.unit_pence),
+          l.text ? '' : `${l.vat_rate}%`,
+          l.text ? '' : money(lineNet(l)),
         ]),
       });
       if (b === lastItems) {

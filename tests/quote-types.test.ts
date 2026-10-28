@@ -71,3 +71,25 @@ describe('quote money', () => {
     expect(starterContent('Sam').terms).toMatch(/valid until/);
   });
 });
+
+describe('text lines', () => {
+  it('stay text lines with no money, and never change the totals', () => {
+    const c = cleanContent({
+      blocks: [
+        {
+          id: 'a',
+          type: 'items',
+          heading: 'Price',
+          lines: [
+            { id: 'l1', description: 'Panels', qty: 2, unit_pence: 10000, vat_rate: 20, cost_pence: 5000, mode: 'manual', markup: 0 },
+            { id: 'l2', description: 'Battery storage', text: true, qty: 5, unit_pence: 999, vat_rate: 20, cost_pence: 100, mode: 'pct', markup: 10, internal: true },
+          ],
+        },
+      ],
+    });
+    const b = c.blocks[0];
+    if (b.type !== 'items') throw new Error('items block');
+    expect(b.lines[1]).toMatchObject({ text: true, qty: 0, unit_pence: 0, cost_pence: 0, vat_rate: 0, description: 'Battery storage' });
+    expect(totalsOf(c).net).toBe(20000);
+  });
+});
