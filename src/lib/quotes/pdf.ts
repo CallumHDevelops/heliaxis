@@ -58,7 +58,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
         columns: ['Item', 'Qty', 'Unit price', 'VAT', 'Total'],
         widths: [5, 0.9, 1.6, 0.9, 1.7],
         rows: lines.map((l) => [
-          l.detail ? `${l.description}\n${l.detail}`.replace(/\n/g, ' · ') : l.description,
+          l.detail?.trim() ? `${l.description.replace(/\n/g, ' ')}\n${l.detail.trim()}` : l.description.replace(/\n/g, ' '),
           l.text ? '' : String(l.qty),
           l.text ? '' : money(l.unit_pence),
           l.text ? '' : `${l.vat_rate}%`,

@@ -1300,8 +1300,21 @@ export async function newDocument(o: DocOptions) {
       };
       need(44);
       head();
-      const cells = t.rows.map((row) => row.map((c, i) => lines(c ?? '–', 8.5, ws[i] - 10)));
-      const heights = cells.map((cl) => Math.max(...cl.map((l) => l.length)) * 10.5 + 7.5);
+      // A cell with a line break is a name and its sub text: the name, then the rest smaller and quieter beneath it.
+      const SUB = 7.6;
+      const SUB_LH = 9.6;
+      const split = (c: string | null) => {
+        const v = c ?? '–';
+        const i = v.indexOf('\n');
+        return i < 0 ? { main: v, sub: '' } : { main: v.slice(0, i), sub: v.slice(i + 1).trim() };
+      };
+      const cells = t.rows.map((row) =>
+        row.map((c, i) => {
+          const { main, sub } = split(c);
+          return { main: lines(main, 8.5, ws[i] - 10), sub: sub ? lines(sub, SUB, ws[i] - 10) : [] };
+        })
+      );
+      const heights = cells.map((cl) => Math.max(...cl.map((c) => c.main.length * 10.5 + c.sub.length * SUB_LH + (c.sub.length ? 1.5 : 0))) + 7.5);
       for (const [r, row] of t.rows.entries()) {
         const cl = cells[r];
         const h = heights[r];
@@ -1312,7 +1325,10 @@ export async function newDocument(o: DocOptions) {
         }
         need(h, head);
         if (look.cell) page.drawRectangle({ x: X, y: y - h, width: W, height: h, color: look.cell });
-        cl.forEach((l, i) => l.forEach((s, n) => text(s, xs[i] + 5, y - 10.5 - n * 10.5, 8.5)));
+        cl.forEach((c, i) => {
+          c.main.forEach((s, n) => text(s, xs[i] + 5, y - 10.5 - n * 10.5, 8.5));
+          c.sub.forEach((s, n) => text(s, xs[i] + 5, y - c.main.length * 10.5 - SUB_LH + 1 - n * SUB_LH, SUB, { color: MUTED }));
+        });
         cols(y, y - h);
         y -= h;
         hairline(y, LINE, 0.5);

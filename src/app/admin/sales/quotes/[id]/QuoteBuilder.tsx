@@ -439,7 +439,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                           {handle}
                           <div className="qb-desc">
                             <input className="crm-input" placeholder="e.g. 12 × 450W solar panels" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} aria-label="Description" />
-                            {showMore && <input className="crm-input qb-detail" placeholder="Optional detail" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} aria-label="Detail" />}
+                            {showMore && <textarea className="crm-input qb-detail" rows={2} placeholder="Detail: shown as a smaller paragraph under the item name" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} aria-label="Detail" />}
                             <div className="qb-linemeta">
                               {!showMore && (
                                 <button type="button" className="crm-link qb-saveitem qb-more" disabled={locked} onClick={() => setMoreOpen((m) => new Set(m).add(l.id))}>
