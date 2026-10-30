@@ -161,14 +161,17 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === bid && x.type === 'items' ? { ...x, lines: [...x.lines, line(x.lines.filter((l) => !l.text).at(-1))] } : x)) }));
 
   const [writing, setWriting] = useState('');
+  const [asking, setAsking] = useState('');
+  const [ask, setAsk] = useState({ ancillaries: true, access: true, handover: true, compliance: true, keyPoints: '' });
   /** Write "What is included" from the items on screen. */
   async function writeIncluded(bid: string) {
     const cur = content.blocks.find((x) => x.id === bid);
     if (cur?.type === 'text' && cur.body.trim().length > 40 && !window.confirm('Replace what is written here?')) return;
     setWriting(bid);
+    setAsking('');
     setErr('');
     try {
-      const r = await fetch(`/api/crm/quotes/${initial.id}/included`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+      const r = await fetch(`/api/crm/quotes/${initial.id}/included`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, options: ask }) });
       const d = (await r.json().catch(() => ({}))) as { text?: string; via?: string; error?: string };
       if (!r.ok || !d.text) throw new Error(d.error || 'Couldn’t write it. Try again.');
       setBlock(bid, { body: d.text });
@@ -394,12 +397,43 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
               {b.type === 'text' && (
                 <>
                   {/includ/i.test(b.heading) && (
+                    <>
                     <div className="qb-writeit">
-                      <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked || writing === b.id} onClick={() => void writeIncluded(b.id)}>
+                      <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked || writing === b.id} onClick={() => setAsking(asking === b.id ? '' : b.id)}>
                         {writing === b.id ? 'Writing…' : 'Write from the quote'}
                       </button>
-                      <small className="crm-muted">Reads your items and writes this section. Check it reads right.</small>
+                      <small className="crm-muted">Reads your items and writes this section in formal wording.</small>
                     </div>
+                    {asking === b.id && (
+                      <div className="qb-ask">
+                        <b>A few questions first</b>
+                        <label className="crm-check">
+                          <input type="checkbox" checked={ask.ancillaries} onChange={(e) => setAsk({ ...ask, ancillaries: e.target.checked })} /> Includes the supply and installation of all electrical ancillaries
+                        </label>
+                        <label className="crm-check">
+                          <input type="checkbox" checked={ask.access} onChange={(e) => setAsk({ ...ask, access: e.target.checked })} /> Includes access equipment to complete the works (scaffold, towers)
+                        </label>
+                        <label className="crm-check">
+                          <input type="checkbox" checked={ask.handover} onChange={(e) => setAsk({ ...ask, handover: e.target.checked })} /> Includes all handover documentation
+                        </label>
+                        <label className="crm-check">
+                          <input type="checkbox" checked={ask.compliance} onChange={(e) => setAsk({ ...ask, compliance: e.target.checked })} /> States the works comply with BS 7671 and any other applicable standards
+                        </label>
+                        <label className="qb-lab" htmlFor="qb-keypts">
+                          Key selling points to mention (optional)
+                        </label>
+                        <textarea id="qb-keypts" className="crm-input" rows={3} value={ask.keyPoints} onChange={(e) => setAsk({ ...ask, keyPoints: e.target.value })} placeholder="e.g. battery: 10-year warranty, backup power in a cut. Inverter: IP66, 98% efficient. Only what you can stand behind: nothing is added that isn’t here or in an item’s detail." />
+                        <div className="crm-actions">
+                          <button type="button" className="crm-btn crm-btn--solar crm-btn--small" onClick={() => void writeIncluded(b.id)}>
+                            Write it
+                          </button>
+                          <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setAsking('')}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    </>
                   )}
                   <textarea className="crm-input" rows={6} placeholder="Write the text. A blank line starts a new paragraph." value={b.body} onChange={(e) => setBlock(b.id, { body: e.target.value })} disabled={locked} />
                 </>

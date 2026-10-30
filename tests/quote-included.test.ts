@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-import { includedByRule, itemsOf, writeIncluded } from '@/lib/quotes/included';
+import { DEFAULT_OPTIONS, includedByRule, itemsOf, standardClauses, writeIncluded } from '@/lib/quotes/included';
 import { cleanContent, emptyText, starterContent } from '@/lib/quotes/types';
 
 function quote() {
@@ -24,10 +24,22 @@ describe('what is included', () => {
   });
   it('makes a readable draft by rule: a sentence per item, in order, and no prices', () => {
     const t = includedByRule(quote());
-    expect(t).toContain('Supply and installation of 12 × Trina Vertex S 500W Solar PV. All-black panels.');
-    expect(t).toContain('Supply and installation of GoodWe ES Uniq 12kW.');
+    expect(t).toContain('This quote includes the supply and installation of 12 × Trina Vertex S 500W Solar PV: All-black panels.');
+    expect(t).toContain('This quote includes the supply and installation of GoodWe ES Uniq 12kW.');
     expect(t).not.toContain('Battery storage');
     expect(t).not.toContain('£');
+  });
+  it('adds the standard inclusions in fixed wording, only the ones ticked', () => {
+    const all = standardClauses(DEFAULT_OPTIONS);
+    expect(all).toEqual([
+      'This quote includes the supply and installation of all electrical ancillaries, and provision for any access equipment required to complete the works.',
+      'This quote includes all documentation required for handover.',
+      'All works comply with BS 7671 (the IET Wiring Regulations) and any other applicable standards.',
+    ]);
+    expect(standardClauses({ ...DEFAULT_OPTIONS, ancillaries: false, access: false, handover: false })).toEqual(['All works comply with BS 7671 (the IET Wiring Regulations) and any other applicable standards.']);
+    const t = includedByRule(quote(), { ...DEFAULT_OPTIONS, keyPoints: '10-year warranty' });
+    expect(t).toContain('Key points: 10-year warranty.');
+    expect(t.endsWith('any other applicable standards.')).toBe(true);
   });
   it('falls back to the rule draft with no model key, and says nothing for an empty quote', async () => {
     const prev = process.env.ANTHROPIC_API_KEY;
