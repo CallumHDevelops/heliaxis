@@ -55,6 +55,10 @@ export type RoofAnalysis = {
   panels: MapPanel[];
   faces: LngLat[][];
   main: { bearing: number; pitch: number; areaM2: number } | null;
+  /** The building outline moved (up to 2 m) to sit on the building in the picture, or null when none was given. */
+  outline: LngLat[] | null;
+  /** How far the outline was moved, in metres east and north (for the ?debug view). */
+  shift: { x: number; y: number } | null;
   panelW: number;
   panelH: number;
   /** Yearly sun per kW (shade included) averaged over the panels laid. */
@@ -90,11 +94,55 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
     const g: Grid = { n, cell: CELL_M, z: new Float32Array(n * n).fill(NaN), ok: new Uint8Array(n * n), flux: new Float32Array(n * n).fill(NaN) };
     const mPerLat = 111320;
     const mPerLng = 111320 * Math.cos((centre.lat * Math.PI) / 180);
+    let poly = outline;
+    let shift: { x: number; y: number } | null = null;
     const inOutline = (x: number, y: number) => {
-      if (!outline) return true;
+      const area = poly;
+      if (!area) return true;
       // A little give each way (30 cm): the outline and the picture never line up exactly, but a party wall is a hard limit.
-      return [[0, 0], [0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]].some(([dx, dy]) => inside({ lat: centre.lat + (y + dy) / mPerLat, lng: centre.lng + (x + dx) / mPerLng }, outline));
+      return [[0, 0], [0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]].some(([dx, dy]) => inside({ lat: centre.lat + (y + dy) / mPerLat, lng: centre.lng + (x + dx) / mPerLng }, area));
     };
+    // The outline is surveyed at the eaves and the picture is taken from above at an angle, so they can sit a metre or two apart.
+    // Slide the outline until it covers as much of the building mask as it can (the smallest move that does), within 2 m.
+    if (outline && mask) {
+      const mk = new Uint8Array(n * n);
+      const inside0: number[] = [];
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          const { x, y } = cellXY(g, i, j);
+          const e = c.e + x * Math.cos(gam) - y * Math.sin(gam);
+          const nn = c.n + x * Math.sin(gam) + y * Math.cos(gam);
+          if (at(mask, e, nn) > 0) mk[j * n + i] = 1;
+          if (inside({ lat: centre.lat + y / mPerLat, lng: centre.lng + x / mPerLng }, outline)) inside0.push(j * n + i);
+        }
+      }
+      const R = Math.round(2 / CELL_M);
+      const score = (si: number, sj: number) => {
+        let hit = 0;
+        for (const k of inside0) {
+          const i = (k % n) + si;
+          const j = (k - (k % n)) / n + sj;
+          if (i >= 0 && j >= 0 && i < n && j < n && mk[j * n + i]) hit++;
+        }
+        return hit;
+      };
+      const base = score(0, 0);
+      let best = { si: 0, sj: 0, v: base - 0 };
+      for (let sj = -R; sj <= R; sj++) {
+        for (let si = -R; si <= R; si++) {
+          const v = score(si, sj) - 0.6 * Math.hypot(si, sj);
+          if (v > best.v) best = { si, sj, v };
+        }
+      }
+      // Only worth moving for a real improvement (3% of the outline's area or more).
+      if ((best.si || best.sj) && score(best.si, best.sj) - base >= inside0.length * 0.03) {
+        const dx = best.si * CELL_M;
+        const dy = -best.sj * CELL_M;
+        // Cells move by (si, sj) from the outline to the mask; so the outline moves the same way.
+        poly = outline.map((p) => ({ lat: p.lat + dy / mPerLat, lng: p.lng + dx / mPerLng }));
+        shift = { x: Math.round(dx * 100) / 100, y: Math.round(dy * 100) / 100 };
+      }
+    }
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const { x, y } = cellXY(g, i, j);
@@ -111,7 +159,7 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
         }
       }
     }
-    if (!outline) {
+    if (!poly) {
       // Without an outline, keep only the building the point is on (a connected patch of mask within a few metres).
       const start = g.ok.findIndex((v, k) => v === 1 && Math.hypot(cellXY(g, k % n, (k - (k % n)) / n).x, cellXY(g, k % n, (k - (k % n)) / n).y) < 6);
       if (start < 0) return { ok: false, why: 'no building at that point' };
@@ -144,6 +192,8 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
       roof: {
         panels: placed.slice(0, 120).map((p) => ({ ...toLL(p.x, p.y), o: p.o, az: p.az, pt: p.pt })),
         faces: faces.filter((f) => f.areaM2 >= 4).map((f) => hull(g, f.cells).map((h) => toLL(h.x, h.y))),
+        outline: poly,
+        shift,
         main: { bearing: Math.round(mainFace.bearing), pitch: Math.round(mainFace.pitch), areaM2: Math.round(mainFace.areaM2) },
         panelW: PANEL_W,
         panelH: PANEL_H,

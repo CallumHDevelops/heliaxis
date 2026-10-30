@@ -172,7 +172,7 @@ export async function GET(req: Request) {
         const kwh = y?.kwhPerKwp ?? fallbackYield(roof.direction, 'typical');
         roof = { ...roof, shade: roofFromGoogle(b, kwh)?.shade ?? roof.shade };
         const layers = mine.ok ? 'ok' : mine.why;
-        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: kwh, monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, layers, ...(debug && mine.ok ? { info: mine.roof.info } : {}), map: m ? { ...m, outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
+        result = { found: true, address: geo.address, lat: geo.lat, lng: geo.lng, roof, kwhPerKwp: kwh, monthly: y?.monthly ?? null, imageryDate: d ? `${d.year}-${String(d.month).padStart(2, '0')}` : null, layers, ...(debug && mine.ok ? { info: { ...mine.roof.info, outlineShift: mine.roof.shift } } : {}), map: m ? { ...m, outline: mine.ok ? (mine.roof.outline ?? outline) : outline, imageUrl: `/api/solar/image?lat=${m.centre.lat.toFixed(6)}&lng=${m.centre.lng.toFixed(6)}&sig=${signView(Number(m.centre.lat.toFixed(6)), Number(m.centre.lng.toFixed(6)))}` } : null };
       }
     }
   } catch (e) {
