@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { WritingSpark } from './WritingSpark';
+import { Sheet } from '../../../crm/CrmUi';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuoteRow } from '@/lib/quotes/server';
 import { defaultQuoteMessage } from '@/lib/quotes/message';
@@ -166,9 +167,9 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   const [asking, setAsking] = useState('');
   const [ask, setAsk] = useState({ ancillaries: true, access: true, handover: true, compliance: true, keyPoints: '' });
   /** Write "What is included" from the items on screen. */
-  async function writeIncluded(bid: string) {
+  async function writeIncluded(bid: string, force = false): Promise<boolean> {
     const cur = content.blocks.find((x) => x.id === bid);
-    if (cur?.type === 'text' && cur.body.trim().length > 40 && !window.confirm('Replace what is written here?')) return;
+    if (!force && cur?.type === 'text' && cur.body.trim().length > 40 && !window.confirm('Replace what is written here?')) return false;
     setWriting(bid);
     setAsking('');
     setErr('');
@@ -178,16 +179,18 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
       if (!r.ok || !d.text) throw new Error(d.error || 'Couldn’t write it. Try again.');
       setBlock(bid, { body: d.text });
       setNote(d.via === 'ai' ? 'Written from your items. Have a read and change anything you like.' : 'Made from your item names (the writing assistant isn’t switched on). Have a read and tidy it.');
+      return true;
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Couldn’t write it. Try again.');
+      return false;
     } finally {
       setWriting('');
     }
   }
 
   /** The cover letter, written from the items on screen. */
-  async function writeIntro() {
-    if (content.intro.trim().length > 60 && !window.confirm('Replace the introduction?')) return;
+  async function writeIntro(force = false): Promise<boolean> {
+    if (!force && content.intro.trim().length > 60 && !window.confirm('Replace the introduction?')) return false;
     setWriting('intro');
     setErr('');
     try {
@@ -196,8 +199,10 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
       if (!r.ok || !d.text) throw new Error(d.error || 'Couldn’t write it. Try again.');
       edit((c) => ({ ...c, intro: d.text! }));
       setNote(d.via === 'ai' ? 'Introduction written from your items. Have a read and change anything you like.' : 'Introduction made from a standard form (the writing assistant isn’t switched on). Have a read and tidy it.');
+      return true;
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Couldn’t write it. Try again.');
+      return false;
     } finally {
       setWriting('');
     }
@@ -281,7 +286,42 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     void putSaved([...saved, { id: newId(), description: l.description, detail: l.detail ?? '', unit_pence: l.unit_pence, vat_rate: l.vat_rate, cost_pence: l.cost_pence, mode: l.mode, markup: l.markup }]);
   };
 
-  async function preview() {
+  /** Is the introduction still the starter text, and is What is included empty: the two things Generate quote fills in. */
+  const introUnwritten = !content.intro.trim() || /^Hi .*thank you for the chance to quote/i.test(content.intro.trim());
+  const includedBlock = content.blocks.find((b) => b.type === 'text' && /includ/i.test(b.heading));
+  const includedUnwritten = !includedBlock || (includedBlock.type === 'text' && !includedBlock.body.trim());
+  const [finishing, setFinishing] = useState(false);
+  const [askFinish, setAskFinish] = useState(false);
+
+  /** Write the introduction and What is included in one go (each with its spark). Only what is still unwritten, unless `all`. */
+  async function generateQuote(all = false) {
+    if (totals.gross <= 0) return setErr('Add at least one priced item first, then it can write the quote.');
+    if (all && !introUnwritten && !includedUnwritten && !window.confirm('Replace the introduction and What is included with new text?')) return;
+    setFinishing(true);
+    setErr('');
+    try {
+      if (all || introUnwritten) await writeIntro(true);
+      if (all || includedUnwritten) {
+        let bid = includedBlock?.id;
+        if (!bid) {
+          bid = newId();
+          const id = bid;
+          edit((c) => {
+            const at = Math.max(0, c.blocks.findIndex((b) => b.type === 'items') + 1);
+            const blocks = [...c.blocks];
+            blocks.splice(at, 0, { id, type: 'text', heading: 'What is included', body: '' });
+            return { ...c, blocks };
+          });
+        }
+        await writeIncluded(bid, true);
+      }
+    } finally {
+      setFinishing(false);
+    }
+  }
+
+  async function preview(skipAsk = false) {
+    if (!skipAsk && totals.gross > 0 && (introUnwritten || includedUnwritten)) return setAskFinish(true);
     setBusy('preview');
     setErr('');
     if (!(await save())) {
@@ -348,7 +388,10 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
           <span className="crm-muted crm-small" aria-live="polite">
             {state === 'saved' ? 'Saved ✓' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved changes' : 'Couldn’t save, retrying on your next change'}
           </span>
-          <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy} onClick={() => void preview()}>
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy || finishing || locked} onClick={() => void generateQuote(!introUnwritten && !includedUnwritten)} title="Writes the introduction and What is included from your items">
+            {finishing ? 'Generating…' : 'Generate quote'}
+          </button>
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy || finishing} onClick={() => void preview()}>
             {busy === 'preview' ? 'Opening…' : 'Preview PDF'}
           </button>
           <button type="button" className="crm-btn crm-btn--solar" disabled={!!busy || locked} onClick={openSend} title={locked ? 'They have signed this quote' : undefined}>
@@ -409,6 +452,41 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
         </div>
       )}
       {!sent && note && <p className="crm-small" aria-live="polite">{note}</p>}
+
+      {askFinish && (
+        <Sheet title="Finish the quote first?" onClose={() => setAskFinish(false)}>
+          <p>
+            {introUnwritten && includedUnwritten ? 'The introduction and What is included have not been written yet.' : introUnwritten ? 'The introduction has not been written yet.' : 'What is included has not been written yet.'} Shall I write {introUnwritten && includedUnwritten ? 'them' : 'it'} from your items now?
+          </p>
+          <div className="crm-actions">
+            <button
+              type="button"
+              className="crm-btn crm-btn--solar"
+              onClick={() => {
+                setAskFinish(false);
+                void generateQuote(false)
+                  .then(() => new Promise((r) => setTimeout(r, 120)))
+                  .then(() => preview(true));
+              }}
+            >
+              Write it, then preview
+            </button>
+            <button
+              type="button"
+              className="crm-btn crm-btn--ghost"
+              onClick={() => {
+                setAskFinish(false);
+                void preview(true);
+              }}
+            >
+              Preview as it is
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setAskFinish(false)}>
+              Cancel
+            </button>
+          </div>
+        </Sheet>
+      )}
 
       <div className="qb-grid" aria-disabled={locked}>
         <div className="qb-col">
