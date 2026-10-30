@@ -439,27 +439,6 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                           {handle}
                           <div className="qb-desc">
                             <input className="crm-input" placeholder="e.g. 12 × 450W solar panels" value={l.description} onChange={(e) => setLine(b.id, l.id, { description: e.target.value })} disabled={locked} aria-label="Description" />
-                            {showMore && <textarea className="crm-input qb-detail" rows={2} placeholder="Detail: shown as a smaller paragraph under the item name" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} aria-label="Detail" />}
-                            <div className="qb-linemeta">
-                              {!showMore && (
-                                <button type="button" className="crm-link qb-saveitem qb-more" disabled={locked} onClick={() => setMoreOpen((m) => new Set(m).add(l.id))}>
-                                  + detail
-                                </button>
-                              )}
-                              <label className="crm-check qb-internal" title="Not shown on the quote: our cost only">
-                                <input type="checkbox" checked={!!l.internal} disabled={locked} onChange={(e) => setLine(b.id, l.id, { internal: e.target.checked })} /> Internal only
-                              </label>
-                              {(l.cost_pence > 0 || sell > 0) && !l.internal && (
-                                <span className={`qb-profit${profit < 0 || (minMarginPct > 0 && sell > 0 && (profit / sell) * 100 < minMarginPct) ? ' neg' : ''}`} title={minMarginPct > 0 && sell > 0 && (profit / sell) * 100 < minMarginPct ? `Below your ${minMarginPct}% margin target` : 'Profit on this line (internal)'}>
-                                  Profit {money(profit)}{sell > 0 ? ` · ${pct((profit / sell) * 100)}` : ''}
-                                </span>
-                              )}
-                              {l.description.trim() && !saved.some((x) => x.description === l.description && x.unit_pence === l.unit_pence && x.cost_pence === l.cost_pence) && (
-                                <button type="button" className="crm-link qb-saveitem" title="Save as a saved item" disabled={locked} onClick={() => saveLineAsItem(l)}>
-                                  Save item
-                                </button>
-                              )}
-                            </div>
                           </div>
                           <input className="crm-input" inputMode="decimal" value={String(l.qty)} onChange={(e) => setLine(b.id, l.id, { qty: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} disabled={locked} aria-label="Quantity" />
                           <MoneyInput pence={l.cost_pence} onChange={(p) => setLine(b.id, l.id, { cost_pence: p })} label="Cost each in pounds (not shown to the customer)" disabled={locked} placeholder="Cost" />
@@ -487,6 +466,29 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                           <button type="button" className="qb-icon" aria-label="Remove line" disabled={locked} onClick={() => edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === b.id && x.type === 'items' ? { ...x, lines: x.lines.filter((y) => y.id !== l.id) } : x)) }))}>
                             ✕
                           </button>
+                          <div className="qb-sub">
+                            {showMore && <textarea className="crm-input qb-detail" rows={2} placeholder="Detail: shown as a smaller paragraph under the item name" value={l.detail ?? ''} onChange={(e) => setLine(b.id, l.id, { detail: e.target.value })} disabled={locked} aria-label="Detail" />}
+                            <div className="qb-linemeta">
+                              {!showMore && (
+                                <button type="button" className="crm-link qb-saveitem qb-more" disabled={locked} onClick={() => setMoreOpen((m) => new Set(m).add(l.id))}>
+                                  + detail
+                                </button>
+                              )}
+                              <label className="crm-check qb-internal" title="Not shown on the quote: our cost only">
+                                <input type="checkbox" checked={!!l.internal} disabled={locked} onChange={(e) => setLine(b.id, l.id, { internal: e.target.checked })} /> Internal only
+                              </label>
+                              {(l.cost_pence > 0 || sell > 0) && !l.internal && (
+                                <span className={`qb-profit${profit < 0 || (minMarginPct > 0 && sell > 0 && (profit / sell) * 100 < minMarginPct) ? ' neg' : ''}`} title={minMarginPct > 0 && sell > 0 && (profit / sell) * 100 < minMarginPct ? `Below your ${minMarginPct}% margin target` : 'Profit on this line (internal)'}>
+                                  Profit {money(profit)}{sell > 0 ? ` · ${pct((profit / sell) * 100)}` : ''}
+                                </span>
+                              )}
+                              {l.description.trim() && !saved.some((x) => x.description === l.description && x.unit_pence === l.unit_pence && x.cost_pence === l.cost_pence) && (
+                                <button type="button" className="crm-link qb-saveitem" title="Save as a saved item" disabled={locked} onClick={() => saveLineAsItem(l)}>
+                                  Save item
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
