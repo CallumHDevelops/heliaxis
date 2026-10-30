@@ -23,6 +23,8 @@ export type QuoteFacts = {
   datasheets: Map<string, Uint8Array>;
   /** Once they have signed online: their signature, name and the time (the signed copy). */
   signed?: { png: Uint8Array; name: string; at: string };
+  /** Who signs the introduction (a PNG data URL for the signature), unless the quote has turned it off. */
+  signatory?: { name: string; role: string; png: string } | null;
 };
 
 const paragraphs = (s: string) => s.split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean);
@@ -40,7 +42,17 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     ['From', `${HELIAXIS_COMPANY.tradingName} · ${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}`],
   ]);
   // Page 1, the cover: who it is for, the introduction and what the quote includes, with the headline figure.
-  for (const p of paragraphs(f.content.intro)) kit.paragraph(p);
+  const sig = f.signatory && f.content.signOff !== false ? f.signatory : null;
+  // With a signature the letter's own "Yours sincerely, Heliaxis" is replaced by the signature and the signatory's name.
+  const letter = sig ? f.content.intro.replace(/\n*\s*Yours (sincerely|faithfully),?\s*(\n+\s*Heliaxis\s*)?$/i, '').trim() : f.content.intro;
+  for (const p of paragraphs(letter)) kit.paragraph(p);
+  if (sig) {
+    const img = await kit.embed(sig.png);
+    kit.paragraph('Yours sincerely,');
+    if (img) kit.block(54, (d) => d.image(img, d.x, d.top - 50, 190, 46));
+    kit.paragraph(sig.name, { bold: true });
+    kit.paragraph(`${sig.role ? `${sig.role}, ` : ''}Heliaxis`);
+  }
 
   const totals = totalsOf(f.content);
   const isIncluded = (bl: QuoteContent['blocks'][number]) => bl.type === 'text' && /includ/i.test(bl.heading);

@@ -3,6 +3,7 @@ import { ukDay } from '@/lib/bank-holidays';
 import { DOCS_BUCKET } from '@/lib/crm/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { quotePdf, type QuoteFacts } from './pdf';
+import { readSignatory } from './signatory';
 import { cleanContent, type QuoteContent } from './types';
 
 export type QuoteRow = {
@@ -44,6 +45,7 @@ export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): P
     db.from('crm_projects').select('address, postcode').eq('id', q.project_id).maybeSingle(),
     customerRefOf(q.enquiry_id),
   ]);
+  const signatory = await readSignatory().catch(() => null);
   const images = new Map<string, { bytes: Uint8Array; mime: string }>();
   const datasheets = new Map<string, Uint8Array>();
   const paths = q.content.blocks.flatMap((b) => (b.type === 'images' ? b.images.map((i) => i.path) : []));
@@ -83,6 +85,7 @@ export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): P
     images,
     datasheets,
     signed,
+    signatory,
   };
   return quotePdf(facts);
 }

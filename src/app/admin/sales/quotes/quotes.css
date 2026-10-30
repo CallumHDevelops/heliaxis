@@ -165,3 +165,6 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
 @keyframes qbFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes qbRise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .qb-spark__svg g.is-now, .qb-spark b, .qb-spark { animation: none; } }
+
+.qb-sigrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; }
+.qb-sigimg { height: 44px; width: auto; max-width: 180px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }

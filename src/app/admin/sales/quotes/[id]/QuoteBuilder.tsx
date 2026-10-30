@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { WritingSpark } from './WritingSpark';
 import { Sheet } from '../../../crm/CrmUi';
+import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuoteRow } from '@/lib/quotes/server';
 import { defaultQuoteMessage } from '@/lib/quotes/message';
@@ -186,6 +187,30 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     } finally {
       setWriting('');
     }
+  }
+
+  // Whose signature goes under the introduction: one for the company, drawn once.
+  const [signatory, setSignatory] = useState<{ name: string; role: string; png: string } | null | undefined>(undefined);
+  const [signing, setSigning] = useState(false);
+  const [sigDraft, setSigDraft] = useState({ name: '', role: '', png: null as string | null });
+  useEffect(() => {
+    let gone = false;
+    fetch('/api/crm/quote-signatory', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { signatory?: { name: string; role: string; png: string } | null }) => !gone && setSignatory(d.signatory ?? null))
+      .catch(() => !gone && setSignatory(null));
+    return () => {
+      gone = true;
+    };
+  }, []);
+  async function saveSignatory() {
+    setErr('');
+    const r = await fetch('/api/crm/quote-signatory', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sigDraft) });
+    const d = (await r.json().catch(() => ({}))) as { signatory?: { name: string; role: string; png: string }; error?: string };
+    if (!r.ok || !d.signatory) return setErr(d.error || 'Couldn’t save the signature. Try again.');
+    setSignatory(d.signatory);
+    setSigning(false);
+    setNote('Signature saved. It prints under the introduction on every quote.');
   }
 
   /** The cover letter, written from the items on screen. */
@@ -488,6 +513,30 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
         </Sheet>
       )}
 
+      {signing && (
+        <Sheet title="Your signature" onClose={() => setSigning(false)}>
+          <p className="crm-small crm-muted">Drawn once, it prints under the introduction on every quote, with your name and role beneath.</p>
+          <label className="crm-label" htmlFor="sg-name">
+            Name
+          </label>
+          <input id="sg-name" className="crm-input" value={sigDraft.name} onChange={(e) => setSigDraft({ ...sigDraft, name: e.target.value })} autoComplete="off" />
+          <label className="crm-label" htmlFor="sg-role">
+            Role (optional)
+          </label>
+          <input id="sg-role" className="crm-input" value={sigDraft.role} onChange={(e) => setSigDraft({ ...sigDraft, role: e.target.value })} placeholder="e.g. Director" autoComplete="off" />
+          <label className="crm-label">Sign here with your finger or mouse</label>
+          <SignaturePad onChange={(png) => setSigDraft((d) => ({ ...d, png }))} height={150} />
+          <div className="crm-actions">
+            <button type="button" className="crm-btn crm-btn--solar" disabled={!sigDraft.name.trim() || !sigDraft.png} onClick={() => void saveSignatory()}>
+              Save signature
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setSigning(false)}>
+              Cancel
+            </button>
+          </div>
+        </Sheet>
+      )}
+
       <div className="qb-grid" aria-disabled={locked}>
         <div className="qb-col">
           <section className="qb-card">
@@ -504,6 +553,28 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
             <div className="qb-writewrap">
               <textarea id="qb-intro" className="crm-input" rows={8} value={content.intro} onChange={(e) => edit((c) => ({ ...c, intro: e.target.value }))} disabled={locked} />
               {writing === 'intro' && <WritingSpark />}
+            </div>
+            <div className="qb-sigrow">
+              {signatory ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={signatory.png} alt={`Signature of ${signatory.name}`} className="qb-sigimg" />
+                  <span>
+                    <b>{signatory.name}</b>
+                    {signatory.role ? `, ${signatory.role}` : ''}
+                  </span>
+                  <label className="crm-check">
+                    <input type="checkbox" checked={content.signOff !== false} disabled={locked} onChange={(e) => edit((c) => ({ ...c, signOff: e.target.checked ? undefined : false }))} /> Sign the introduction
+                  </label>
+                  <button type="button" className="crm-link" onClick={() => { setSigDraft({ name: signatory.name, role: signatory.role, png: null }); setSigning(true); }}>
+                    Change
+                  </button>
+                </>
+              ) : signatory === null ? (
+                <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => { setSigDraft({ name: '', role: '', png: null }); setSigning(true); }}>
+                  Add my signature
+                </button>
+              ) : null}
             </div>
           </section>
 
