@@ -160,6 +160,26 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   const addTo = (bid: string, line: (last: QuoteLine | undefined) => QuoteLine) =>
     edit((c) => ({ ...c, blocks: c.blocks.map((x) => (x.id === bid && x.type === 'items' ? { ...x, lines: [...x.lines, line(x.lines.filter((l) => !l.text).at(-1))] } : x)) }));
 
+  const [writing, setWriting] = useState('');
+  /** Write "What is included" from the items on screen. */
+  async function writeIncluded(bid: string) {
+    const cur = content.blocks.find((x) => x.id === bid);
+    if (cur?.type === 'text' && cur.body.trim().length > 40 && !window.confirm('Replace what is written here?')) return;
+    setWriting(bid);
+    setErr('');
+    try {
+      const r = await fetch(`/api/crm/quotes/${initial.id}/included`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+      const d = (await r.json().catch(() => ({}))) as { text?: string; via?: string; error?: string };
+      if (!r.ok || !d.text) throw new Error(d.error || 'Couldn’t write it. Try again.');
+      setBlock(bid, { body: d.text });
+      setNote(d.via === 'ai' ? 'Written from your items. Have a read and change anything you like.' : 'Made from your item names (the writing assistant isn’t switched on). Have a read and tidy it.');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Couldn’t write it. Try again.');
+    } finally {
+      setWriting('');
+    }
+  }
+
   async function upload(bid: string, files: FileList | null) {
     if (!files?.length) return;
     setErr('');
@@ -371,7 +391,19 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                 </button>
               </div>
 
-              {b.type === 'text' && <textarea className="crm-input" rows={6} placeholder="Write the text. A blank line starts a new paragraph." value={b.body} onChange={(e) => setBlock(b.id, { body: e.target.value })} disabled={locked} />}
+              {b.type === 'text' && (
+                <>
+                  {/includ/i.test(b.heading) && (
+                    <div className="qb-writeit">
+                      <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked || writing === b.id} onClick={() => void writeIncluded(b.id)}>
+                        {writing === b.id ? 'Writing…' : 'Write from the quote'}
+                      </button>
+                      <small className="crm-muted">Reads your items and writes this section. Check it reads right.</small>
+                    </div>
+                  )}
+                  <textarea className="crm-input" rows={6} placeholder="Write the text. A blank line starts a new paragraph." value={b.body} onChange={(e) => setBlock(b.id, { body: e.target.value })} disabled={locked} />
+                </>
+              )}
 
               {b.type === 'items' && (
                 <>

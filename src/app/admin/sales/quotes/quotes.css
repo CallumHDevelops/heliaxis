@@ -143,3 +143,5 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
 /* The detail box and the quiet line under each item run the full width of the row. */
 .qb-sub { grid-column: 1 / -1; display: grid; gap: 4px; min-width: 0; }
 .qb-sub .qb-detail { width: 100%; }
+
+.qb-writeit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; }
