@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import '../../../crm/crm.css';
 import '../quotes.css';
 import type { SavedItem } from '@/lib/quotes/items';
+import { greetingName } from '@/lib/greeting-name';
 import { DEFAULT_TERMS, emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
@@ -176,6 +177,24 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
       if (!r.ok || !d.text) throw new Error(d.error || 'Couldn’t write it. Try again.');
       setBlock(bid, { body: d.text });
       setNote(d.via === 'ai' ? 'Written from your items. Have a read and change anything you like.' : 'Made from your item names (the writing assistant isn’t switched on). Have a read and tidy it.');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Couldn’t write it. Try again.');
+    } finally {
+      setWriting('');
+    }
+  }
+
+  /** The cover letter, written from the items on screen. */
+  async function writeIntro() {
+    if (content.intro.trim().length > 60 && !window.confirm('Replace the introduction?')) return;
+    setWriting('intro');
+    setErr('');
+    try {
+      const r = await fetch(`/api/crm/quotes/${initial.id}/included`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, intro: { first: greetingName(customer.name) } }) });
+      const d = (await r.json().catch(() => ({}))) as { text?: string; via?: string; error?: string };
+      if (!r.ok || !d.text) throw new Error(d.error || 'Couldn’t write it. Try again.');
+      edit((c) => ({ ...c, intro: d.text! }));
+      setNote(d.via === 'ai' ? 'Introduction written from your items. Have a read and change anything you like.' : 'Introduction made from a standard form (the writing assistant isn’t switched on). Have a read and tidy it.');
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Couldn’t write it. Try again.');
     } finally {
@@ -374,8 +393,15 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
           <section className="qb-card">
             <label className="qb-lab">Quote title</label>
             <input className="crm-input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={locked} />
-            <label className="qb-lab">Introduction</label>
-            <textarea className="crm-input" rows={4} value={content.intro} onChange={(e) => edit((c) => ({ ...c, intro: e.target.value }))} disabled={locked} />
+            <div className="qb-writeit">
+              <label className="qb-lab" htmlFor="qb-intro">
+                Introduction
+              </label>
+              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked || writing === 'intro'} onClick={() => void writeIntro()}>
+                {writing === 'intro' ? 'Writing…' : 'Write the introduction'}
+              </button>
+            </div>
+            <textarea id="qb-intro" className="crm-input" rows={8} value={content.intro} onChange={(e) => edit((c) => ({ ...c, intro: e.target.value }))} disabled={locked} />
           </section>
 
           {content.blocks.map((b, i) => (

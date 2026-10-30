@@ -38,14 +38,34 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     ['Phone', f.customer.phone],
     ['From', `${HELIAXIS_COMPANY.tradingName} · ${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}`],
   ]);
+  // Page 1, the cover: who it is for, the introduction and what the quote includes, with the headline figure.
   for (const p of paragraphs(f.content.intro)) kit.paragraph(p);
 
   const totals = totalsOf(f.content);
+  const isIncluded = (bl: QuoteContent['blocks'][number]) => bl.type === 'text' && /includ/i.test(bl.heading);
+  for (const b of f.content.blocks) {
+    if (!isIncluded(b) || b.type !== 'text' || !b.body.trim()) continue;
+    kit.section(b.heading || 'What is included');
+    for (const p of paragraphs(b.body)) kit.paragraph(p);
+  }
+  if (totals.gross > 0) {
+    kit.section('Quote summary', { keep: 90 });
+    kit.rows([
+      { label: 'Total to pay', value: money(totals.gross), strong: true },
+      ...(f.depositPence ? [{ label: 'Deposit once you accept', value: money(f.depositPence) }] : []),
+      ...(f.validUntil ? [{ label: 'Valid until', value: longDate(f.validUntil) }] : []),
+    ]);
+    kit.note('The items and prices are on the next page. This is a quotation, subject to the terms and conditions at the end of this document.');
+  }
+
+  // Page 2 onwards: the quoted items, and anything else the quote shows (text, pictures, datasheets).
+  kit.newPage({ continued: true });
   let shownTotals = false;
   const sheets: string[] = [];
   const lastItems = [...f.content.blocks].reverse().find((b) => b.type === 'items');
 
   for (const b of f.content.blocks) {
+    if (isIncluded(b)) continue;
     if (b.type === 'text') {
       if (!b.body.trim()) continue;
       kit.section(b.heading || 'Details');
@@ -92,9 +112,9 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     }
   }
   if (!shownTotals) kit.note('Add your items to see the total.');
-  else if (f.content.terms.trim()) kit.note('This is a quotation. It is subject to the terms and conditions set out at the end of this document.');
 
-  // The terms: last, so they are the last thing read before accepting.
+  // The last page: the terms, then the acceptance, so they are the last thing read before accepting.
+  kit.newPage({ continued: true });
   if (f.content.terms.trim()) {
     kit.section('Terms and conditions');
     for (const p of paragraphs(f.content.terms)) kit.paragraph(p);

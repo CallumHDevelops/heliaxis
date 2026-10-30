@@ -48,15 +48,33 @@ export function standardClauses(o: IncludedOptions): string[] {
 
 const plain = (t: string) => t.replace(/[.\s]*$/, '');
 
-/** The equipment paragraphs by rule: one formal sentence per priced item, in the quote's order. */
+const kindOf = (d: string): 'panels' | 'inverter' | 'battery' | 'other' => {
+  if (/\binstall(ation)?\b|labour|labor|scaffold|commission|ancillar|access/i.test(d)) return 'other';
+  if (/inverter|hybrid|\bGW\d|\bET-?\d|\bSUN2000|\bSolis\b/i.test(d)) return 'inverter';
+  if (/batter|kwh|storage|\bES\b|lynx|\bBMS\b/i.test(d)) return 'battery';
+  if (/panel|\bPV\b|solar|\d{3}\s?W\b|vertex|\bmodule/i.test(d)) return 'panels';
+  return 'other';
+};
+const asList = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+const withDetail = (i: Item) => {
+  const what = i.qty > 1 ? `${i.qty} × ${i.description}` : i.description;
+  return i.detail ? `${what} (${plain(i.detail)})` : what;
+};
+
+/** The equipment paragraphs by rule: the solar system with its inverter, the battery, then everything else, in formal wording. */
 export function equipmentByRule(content: QuoteContent, keyPoints = ''): string[] {
   const items = itemsOf(content).filter((i) => !i.note);
-  const paras = items.map((i) => {
-    const what = i.qty > 1 ? `${i.qty} × ${i.description}` : i.description;
-    return `This quote includes the supply and installation of ${what}${i.detail ? `: ${plain(i.detail)}` : ''}.`;
-  });
+  const by = { panels: [] as Item[], inverter: [] as Item[], battery: [] as Item[], other: [] as Item[] };
+  for (const i of items) by[kindOf(i.description)].push(i);
+  const paras: string[] = [];
+  if (by.panels.length && by.inverter.length) paras.push(`This quote includes the supply and installation of a solar PV system comprising ${asList(by.panels.map(withDetail))}, connected to ${asList(by.inverter.map(withDetail))}.`);
+  else if (by.panels.length) paras.push(`This quote includes the supply and installation of a solar PV system comprising ${asList(by.panels.map(withDetail))}.`);
+  else if (by.inverter.length) paras.push(`This quote includes the supply and installation of ${asList(by.inverter.map(withDetail))}.`);
+  if (by.battery.length) paras.push(`This quote includes the supply and installation of battery energy storage, comprising ${asList(by.battery.map(withDetail))}.`);
+  if (by.other.length === 1) paras.push(`This quote includes the supply and installation of ${withDetail(by.other[0])}.`);
+  else if (by.other.length > 1) paras.push(`This quote also includes the supply and installation of the following: ${asList(by.other.map(withDetail))}.`);
   const kp = keyPoints.trim();
-  if (kp) paras.push(`Key points: ${plain(kp.replace(/\s+/g, ' '))}.`);
+  if (kp) paras.push(`Key features: ${plain(kp.replace(/\s+/g, ' '))}.`);
   return paras;
 }
 
@@ -67,7 +85,7 @@ export function includedByRule(content: QuoteContent, o: IncludedOptions = DEFAU
 }
 
 const SYSTEM = `You write the "What is included" section of a formal quotation for Heliaxis, a solar, battery and heat pump installer in South Wales.
-Use formal, precise British English in the third person, as in a contract schedule. No hype, no exclamation marks, no emoji, no headings, no bullet symbols.
+Use formal, precise British English in the third person, as in a contract schedule: fluent, well-constructed sentences, not a list of item names. No hype, no exclamation marks, no emoji, no headings, no bullet symbols.
 Write short paragraphs, each beginning "This quote includes". Describe the system in the order it is built, joining the items up: for example "This quote includes the supply and installation of a 30 kWp solar PV array of 60 × Trina Vertex S 500W panels, connected to a GoodWe GW6K-ET-20 hybrid inverter." then the battery with its capacity in kWh, then any other equipment. Use the quantities, makes and model names exactly as listed and work out totals (such as the array size in kWp, or the battery capacity) only when the arithmetic is certain from the list.
 Where the person has given key points, or an item's own detail contains them, put them in a short clause on the relevant item (for example the battery or the inverter). Never add a feature, warranty length, certification, scheme, timescale, price or product that is not in the list or the key points. If there are no key points, add none.
 Do NOT write about electrical ancillaries, access equipment, documentation, compliance, BS 7671 or standards: those are added separately.
@@ -89,6 +107,44 @@ export async function writeIncluded(content: QuoteContent, o: IncludedOptions = 
     });
     const eq = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('').trim();
     return eq ? { text: [eq, ...standardClauses(o)].join('\n\n'), via: 'ai' } : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const INTRO_SYSTEM = `You write the introduction of a formal quotation for Heliaxis, a solar, battery and heat pump installer in South Wales.
+Use formal, courteous British English. Open "Dear {first name}," if a name is given, then two short paragraphs: thank them for the opportunity to quote for the property and say what this quotation covers, naming the main equipment from the list (the solar PV system, the battery and its capacity, and so on); then say the items, prices and terms follow, and that Heliaxis would be glad to answer any questions. End with "Yours sincerely," then a blank line then "Heliaxis".
+No hype, no exclamation marks, no emoji, no prices, no claims about savings, warranties or timescales. Use only the items and facts you are given. Keep it under 120 words. Reply with the text only.`;
+
+/** The cover letter, by rule: used when the writing assistant is not switched on or fails. */
+export function introByRule(content: QuoteContent, first: string, site: string): string {
+  const eq = itemsOf(content).filter((i) => !i.note);
+  const kinds = new Set(eq.map((i) => kindOf(i.description)));
+  const parts = [kinds.has('panels') ? 'a solar PV system' : '', kinds.has('battery') ? 'battery energy storage' : '', kinds.has('other') || kinds.has('inverter') ? 'the associated electrical works' : ''].filter(Boolean);
+  const what = parts.length ? asList(parts) : 'the works described in this quotation';
+  return [
+    `${first ? `Dear ${first},` : 'Dear customer,'}`,
+    `Thank you for the opportunity to quote for the supply and installation of ${what}${site ? ` at ${site}` : ''}. This quotation sets out what is included, the items and their prices, and the terms on which the work would be carried out.`,
+    'The items, prices and terms follow. If anything is unclear, or you would like to change any part of it, please contact us and we will be glad to help.',
+    'Yours sincerely,\n\nHeliaxis',
+  ].join('\n\n');
+}
+
+export async function writeIntro(content: QuoteContent, first: string, site: string): Promise<{ text: string; via: 'ai' | 'rules' }> {
+  const items = itemsOf(content).filter((i) => !i.note);
+  if (!items.length) return { text: '', via: 'rules' };
+  const fallback = { text: introByRule(content, first, site), via: 'rules' as const };
+  if (!process.env.ANTHROPIC_API_KEY) return fallback;
+  const list = items.map((i) => `${i.qty} × ${i.description}${i.detail ? ` (${i.detail})` : ''}`).join('\n');
+  try {
+    const res = await new Anthropic().messages.create({
+      model: MODEL,
+      max_tokens: 500,
+      system: INTRO_SYSTEM,
+      messages: [{ role: 'user', content: `Customer first name: ${first || '(none)'}\nSite: ${site || '(not given)'}\nItems:\n${list}` }],
+    });
+    const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('').trim();
+    return text ? { text, via: 'ai' } : fallback;
   } catch {
     return fallback;
   }

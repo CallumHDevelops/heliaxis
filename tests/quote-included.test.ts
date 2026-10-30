@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-import { DEFAULT_OPTIONS, includedByRule, itemsOf, standardClauses, writeIncluded } from '@/lib/quotes/included';
+import { DEFAULT_OPTIONS, includedByRule, introByRule, itemsOf, standardClauses, writeIncluded } from '@/lib/quotes/included';
 import { cleanContent, emptyText, starterContent } from '@/lib/quotes/types';
 
 function quote() {
@@ -22,10 +22,10 @@ describe('what is included', () => {
     expect(items.map((i) => i.description)).toEqual(['Trina Vertex S 500W Solar PV', 'Battery storage', 'GoodWe ES Uniq 12kW']);
     expect(JSON.stringify(items)).not.toMatch(/6400|7680|168000|140000|50000/);
   });
-  it('makes a readable draft by rule: a sentence per item, in order, and no prices', () => {
+  it('makes a readable draft by rule: the solar system, then the battery, and no prices', () => {
     const t = includedByRule(quote());
-    expect(t).toContain('This quote includes the supply and installation of 12 × Trina Vertex S 500W Solar PV: All-black panels.');
-    expect(t).toContain('This quote includes the supply and installation of GoodWe ES Uniq 12kW.');
+    expect(t).toContain('This quote includes the supply and installation of a solar PV system comprising 12 × Trina Vertex S 500W Solar PV (All-black panels).');
+    expect(t).toContain('battery energy storage, comprising GoodWe ES Uniq 12kW.');
     expect(t).not.toContain('Battery storage');
     expect(t).not.toContain('£');
   });
@@ -38,7 +38,7 @@ describe('what is included', () => {
     ]);
     expect(standardClauses({ ...DEFAULT_OPTIONS, ancillaries: false, access: false, handover: false })).toEqual(['All works comply with BS 7671 (the IET Wiring Regulations) and any other applicable standards.']);
     const t = includedByRule(quote(), { ...DEFAULT_OPTIONS, keyPoints: '10-year warranty' });
-    expect(t).toContain('Key points: 10-year warranty.');
+    expect(t).toContain('Key features: 10-year warranty.');
     expect(t.endsWith('any other applicable standards.')).toBe(true);
   });
   it('falls back to the rule draft with no model key, and says nothing for an empty quote', async () => {
@@ -47,5 +47,13 @@ describe('what is included', () => {
     expect((await writeIncluded(quote())).via).toBe('rules');
     expect((await writeIncluded(starterContent('Sam'))).text).toBe('');
     if (prev) process.env.ANTHROPIC_API_KEY = prev;
+  });
+  it('writes a formal cover letter by rule, addressed to the customer', () => {
+    const t = introByRule(quote(), 'Sam', '9 Turner Street');
+    expect(t.startsWith('Dear Sam,')).toBe(true);
+    expect(t).toContain('a solar PV system and battery energy storage');
+    expect(t).toContain('at 9 Turner Street');
+    expect(t.endsWith('Yours sincerely,\n\nHeliaxis')).toBe(true);
+    expect(t).not.toContain('£');
   });
 });
