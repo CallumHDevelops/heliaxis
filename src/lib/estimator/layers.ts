@@ -64,7 +64,7 @@ export type RoofAnalysis = {
   /** Yearly sun per kW (shade included) averaged over the panels laid. */
   fluxMean: number | null;
   /** What the analysis saw, for the ?debug view: each face found and how many panels it took. */
-  info: { imageryQuality?: string; okCells: number; faces: { bearing: number; pitch: number; areaM2: number; cells: number; panels: number; usable: boolean; fluxMedian: number | null; centre: { x: number; y: number }; /** The face seen from above in its own frame, 40 cm squares: # on the face, . not on it (only with ?debug, for the biggest usable face). */ plan?: string[] }[] };
+  info: { imageryQuality?: string; okCells: number; faces: { bearing: number; pitch: number; areaM2: number; cells: number; panels: number; usable: boolean; fluxMedian: number | null; centre: { x: number; y: number }; /** The face seen from above in its own frame, 40 cm squares: # on the face and sunny enough, ~ on the face but too shaded for panels, . not on it (only with ?debug, for the biggest usable face). */ plan?: string[] }[] };
 };
 
 export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key: string, referer: string): Promise<{ ok: true; roof: RoofAnalysis } | { ok: false; why: string }> {
@@ -191,6 +191,9 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
       const d = { x: Math.sin(bt), y: Math.cos(bt) };
       const a = { x: Math.cos(bt), y: -Math.sin(bt) };
       const on = new Set(f.cells);
+      // The same cut-off the packing uses: 70% of the sunniest tenth of the usable faces' cells.
+      const all = faces.filter((x) => x.bearing >= 80 && x.bearing <= 280 && x.pitch >= 3 && x.pitch <= 65).flatMap((x) => x.cells.map((k) => g.flux[k]).filter((v) => Number.isFinite(v) && v > 0)).sort((p, q) => p - q);
+      const minF = (all.length ? all[Math.floor(all.length * 0.9)] : 0) * 0.7;
       const us: number[] = [];
       const vs: number[] = [];
       for (const k of f.cells) {
@@ -204,8 +207,9 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
         let row = '';
         for (let u = u0; u <= u1 + 0.2; u += 0.4) {
           const { i, j } = xyCell(g, u * a.x + v * d.x, u * a.y + v * d.y);
-          const hit = i >= 0 && j >= 0 && i < n && j < n && on.has(j * n + i);
-          row += hit ? '#' : '.';
+          const k = j * n + i;
+          const hit = i >= 0 && j >= 0 && i < n && j < n && on.has(k);
+          row += !hit ? '.' : Number.isFinite(g.flux[k]) && g.flux[k] >= minF ? '#' : '~';
         }
         rows.push(row);
       }
