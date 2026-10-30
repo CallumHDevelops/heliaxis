@@ -19,13 +19,13 @@ export default async function CustomerPortal({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ paid?: string; accepted?: string }>;
+  searchParams: Promise<{ paid?: string; accepted?: string; accept?: string }>;
 }) {
   const { token } = await params;
-  const { paid, accepted } = await searchParams;
+  const { paid, accepted, accept } = await searchParams;
   const data = await loadPortal(token);
   if (!data) notFound();
   // Their Light / Dark / Match phone from this phone's cookie, so the toggle's first paint is right.
   const { pref } = await themeContext();
-  return <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} themePref={pref} />;
+  return <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} openAccept={accept !== undefined} themePref={pref} />;
 }

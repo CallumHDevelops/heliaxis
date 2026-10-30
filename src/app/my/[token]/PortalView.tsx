@@ -49,8 +49,8 @@ const CANCEL_NOTE = 'You can change your mind and cancel within 14 days of signi
  * their portal: progress, dates, documents, photos and the deposit. `themePref`: their Light / Dark /
  * Match phone as the server rendered it (from this phone's cookie), so the toggle hydrates as drawn.
  */
-export function PortalView({ data, paid = false, justAccepted = false, themePref = 'system' }: { data: PortalData; paid?: boolean; justAccepted?: boolean; themePref?: ThemePref }) {
-  return data.mode === 'quote' ? <QuotePage data={data} themePref={themePref} /> : <FullPortal data={data} paid={paid} justAccepted={justAccepted} themePref={themePref} />;
+export function PortalView({ data, paid = false, justAccepted = false, openAccept = false, themePref = 'system' }: { data: PortalData; paid?: boolean; justAccepted?: boolean; /** Came from the quote's Accept button: the sign box opens straight away. */ openAccept?: boolean; themePref?: ThemePref }) {
+  return data.mode === 'quote' ? <QuotePage data={data} openAccept={openAccept} themePref={themePref} /> : <FullPortal data={data} paid={paid} justAccepted={justAccepted} openAccept={openAccept} themePref={themePref} />;
 }
 
 function Shell({ tag, themePref, children }: { tag: string; themePref: ThemePref; children: ReactNode }) {
@@ -181,14 +181,15 @@ const quoteWord = (q: { category: string }) => (q.category === 'contract' ? 'con
 
 /* ── Quote sent: just the quote, to read and sign ──────────────────────────── */
 
-function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref }) {
+function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAccept: boolean; themePref: ThemePref }) {
   const q = data.quote;
-  const [signing, setSigningRaw] = useState(false);
+  const [signing, setSigningRaw] = useState(openAccept && !!q);
   const [declining, setDeclining] = useState(false);
   const [query, setQuery] = useState(0);
   useEffect(() => {
     track(data.token, 'opened');
-  }, [data.token]);
+    if (openAccept && q) track(data.token, 'sign_started');
+  }, [data.token, openAccept, q]);
   useEngagement(data.token, !!q || !!data.accepted);
   const setSigning = (v: boolean) => {
     if (v) track(data.token, 'sign_started');
@@ -236,6 +237,11 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
             <button type="button" className="pt-btn ghost" onClick={openDecline}>
               Decline
             </button>
+            {data.hasProposal && (
+              <a className="pt-btn ghost" href={`/my/${data.token}/proposal`}>
+                Explore your proposal
+              </a>
+            )}
           </div>
           <ol className="pt-steps" data-track="steps">
             <li>Accept and sign</li>
@@ -274,8 +280,8 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
 
 /* ── Won onwards: the full portal ──────────────────────────────────────────── */
 
-function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData; paid: boolean; justAccepted: boolean; themePref: ThemePref }) {
-  const [signing, setSigningRaw] = useState(false);
+function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data: PortalData; paid: boolean; justAccepted: boolean; openAccept: boolean; themePref: ThemePref }) {
+  const [signing, setSigningRaw] = useState(openAccept && !!data.quote);
   const [declining, setDeclining] = useState(false);
   const [query, setQuery] = useState(0);
   useEffect(() => {
@@ -361,6 +367,11 @@ function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData;
             >
               Decline
             </button>
+            {data.hasProposal && (
+              <a className="pt-btn ghost" href={`/my/${data.token}/proposal`}>
+                Explore your proposal
+              </a>
+            )}
           </div>
         </section>
       )}

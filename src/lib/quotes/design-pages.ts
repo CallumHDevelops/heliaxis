@@ -1,10 +1,11 @@
 import 'server-only';
-import { clip, endPath, popGraphicsState, pushGraphicsState, rectangle, rgb } from 'pdf-lib';
+import { rgb } from 'pdf-lib';
 import { AMBER, INK, LABEL, LINE, MUTED, SOLAR, type Drawing, type Kit } from '@/lib/documents/pdf-kit';
+import { DEFAULT_EXPORT_PENCE, monthlyExportKwh } from './roi';
 import type { ProposalOption } from './types';
 
 /**
- * The pages lifted from a design proposal, in Heliaxis's own style: figures on white cards with the brand's cross-hatch fade, the
+ * The pages lifted from a design proposal, in Heliaxis's own style: figures on white cards with a gold edge, the
  * roof design, "Your Solar Setup" as wide product cards with warranty badges, expected performance (generation against the
  * customer's own use), and, when allowed, what it could save, with a payback chart and the footprint. Every figure is the proposal's own.
  */
@@ -18,34 +19,9 @@ const kw = (x: number) => `${Math.round(x * 100) / 100}`;
 
 type Pics = Map<string, { bytes: Uint8Array; mime: string }>;
 
-/**
- * The brand's card fill (brand-kit/heliaxis-card-fills.css) in a PDF: a cross-hatch of fine lines that fades from the top left to
- * nothing at 80% of the way to the bottom right, and a warm glow at the top right. `dark` is the ink version.
- */
-export function cardFill(d: Drawing, x: number, y: number, w: number, h: number, dark = false, step = 14) {
-  d.rect(x, y, w, h, { fill: dark ? INK : WHITE });
-  const page = d.page;
-  page.pushOperators(pushGraphicsState(), rectangle(x, y, w, h), clip(), endPath());
-  // The glow: a few soft gold discs, biggest and faintest first.
-  for (let i = 0; i < 7; i++) page.drawCircle({ x: x + w * 0.9, y: y + h * 1.05, size: (h * 1.15 * (7 - i)) / 7 + 6, color: SOLAR, opacity: dark ? 0.035 : 0.022 });
-  // The hatch: CSS gives it a 150-degree mask (opaque at the start, clear at 80%), so each short piece of line is drawn at that strength.
-  const dx = 0.5;
-  const dy = 0.866;
-  const span = w * dx + h * dy;
-  const alpha = (px: number, py: number) => Math.max(0, 1 - ((px - x) * dx + (y + h - py) * dy) / span / 0.8);
-  const ink = dark ? rgb(0.97, 0.95, 0.9) : INK;
-  const peak = dark ? 0.16 : 0.13;
-  const piece = 5;
-  for (let gx = x + step; gx < x + w; gx += step) for (let py = y; py < y + h; py += piece) {
-    const a = alpha(gx, py + piece / 2) * peak;
-    if (a > 0.01) page.drawLine({ start: { x: gx, y: py }, end: { x: gx, y: Math.min(py + piece, y + h) }, thickness: 0.4, color: ink, opacity: a });
-  }
-  for (let gy = y + h - step; gy > y; gy -= step) for (let px = x; px < x + w; px += piece) {
-    const a = alpha(px + piece / 2, gy) * peak;
-    if (a > 0.01) page.drawLine({ start: { x: px, y: gy }, end: { x: Math.min(px + piece, x + w), y: gy }, thickness: 0.4, color: ink, opacity: a });
-  }
-  page.pushOperators(popGraphicsState());
-  d.rect(x, y, w, h, { border: dark ? undefined : LINE, line: 0.6 });
+/** A white card with a fine border: the stat and product cards. */
+export function cardFill(d: Drawing, x: number, y: number, w: number, h: number) {
+  d.rect(x, y, w, h, { fill: WHITE, border: LINE, line: 0.6 });
 }
 
 type Tile = { v: string; l: string };
@@ -282,12 +258,31 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
     }
     if (sunpath) {
       const ratio = sunpath.height / sunpath.width;
-      kit.section('Sun path and shading', { keep: 190 });
-      kit.block(Math.min(165, 460 * ratio) + 20, (d) => {
-        const h = Math.min(165, d.width * ratio);
-        const w = h / ratio;
-        d.image(sunpath, d.x + (d.width - w) / 2, d.top - h, w, h);
-        d.text('Where the sun travels over the year, with shading marked at the middle of the array.', d.x, d.top - h - 12, 6.8, { color: MUTED });
+      const shade = o.shadeFactor && o.shadeFactor > 0 && o.shadeFactor <= 1 ? Math.round((1 - o.shadeFactor) * 100) : null;
+      const notes = [
+        'This diagram shows where the sun is in the sky through the year, as seen from the middle of your panels.',
+        'Left to right is east, through south in the middle, to west. Height is how high the sun climbs: the top curve is the summer sun and the bottom curve the winter sun.',
+        'Green areas are sunlight reaching your panels. Red areas are where something blocks the sun. The grey bars along the bottom are the outline of buildings, trees or hills on your skyline.',
+        ...(shade !== null ? [`In your design about ${shade}% of the sunlight is lost to shading (a shade factor of ${o.shadeFactor}). The rest reaches the panels.`] : []),
+      ];
+      kit.section('Sun path and shading', { keep: 165 });
+      const imgW = 262;
+      const colW = 480 - imgW - 18;
+      const textH = 14 + notes.reduce((a, t) => a + Math.ceil((t.length * 3.7) / colW) * 9.6 + 5, 0);
+      kit.block(Math.max(imgW * ratio, textH) + 10, (d) => {
+        const w = Math.min(imgW, d.width * 0.56);
+        d.image(sunpath, d.x, d.top - w * ratio, w, w * ratio);
+        const x = d.x + w + 16;
+        const cw = d.width - w - 16;
+        d.text('HOW TO READ THIS', x, d.top - 8, 6.4, { style: 'mono', color: AMBER });
+        let y = d.top - 22;
+        for (const t of notes) {
+          for (const l of d.lines(t, 7.6, cw, false)) {
+            d.text(l, x, y, 7.6, { color: LABEL });
+            y -= 9.6;
+          }
+          y -= 5;
+        }
       });
     }
   }
@@ -296,18 +291,36 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
     kit.newPage({ continued: true });
     kit.section('What it could save you', { intro: 'The design proposal’s own estimates, using today’s tariff and a yearly rise in energy prices. Prices can go down as well as up.', keep: 300 });
     tiles(kit, [
-      ...(o.annualSavingsGbp ? [{ v: gbp(o.annualSavingsGbp), l: 'Saved in year one' }] : []),
+      ...(o.annualSavingsGbp ? [{ v: gbp(o.annualSavingsGbp), l: 'Bill saving, year one' }] : []),
       ...(o.paybackText ? [{ v: o.paybackText.replace(/years?/i, 'yrs').replace(/months?/i, 'mths'), l: 'Payback' }] : []),
       ...(o.netSavingsGbp ? [{ v: gbp(o.netSavingsGbp), l: `Net saving over ${cum?.length ?? 20} years` }] : []),
       ...(o.rateOfReturnPct ? [{ v: `${o.rateOfReturnPct}%`, l: 'Rate of return' }] : []),
     ]);
     if (cum) paybackChart(kit, cum, o.firstYear ?? new Date().getFullYear(), o.paybackText);
     if (o.billBeforeGbp?.length === 12 && o.billAfterGbp?.length === 12) {
-      kit.grid({
-        columns: ['Month', 'Solar (kWh)', 'Your use (kWh)', 'Bill before', 'Bill after', 'Saving'],
-        widths: [0.9, 1.2, 1.3, 1.2, 1.2, 1.2],
-        rows: MONTHS.map((m, i) => [m, gen ? n0(gen[i]) : '–', use ? n0(use[i]) : '–', gbp(o.billBeforeGbp![i]), gbp(o.billAfterGbp![i]), gbp(o.billBeforeGbp![i] - o.billAfterGbp![i])]),
+      const before = o.billBeforeGbp;
+      const after = o.billAfterGbp;
+      const exportPence = o.exportPence ?? DEFAULT_EXPORT_PENCE;
+      const keptKwh = o.selfUseBatteryKwh ?? o.selfUsePvKwh ?? (o.consumptionKwh && (o.selfSufficiencyPct ?? o.selfSufficiencyPvOnlyPct) ? (o.consumptionKwh * (o.selfSufficiencyPct ?? o.selfSufficiencyPvOnlyPct ?? 0)) / 100 : 0);
+      const annualExport = o.annualGenerationKwh && keptKwh ? Math.max(0, o.annualGenerationKwh - keptKwh) : 0;
+      const exportKwh = gen && use && annualExport ? monthlyExportKwh(gen, use, annualExport) : null;
+      const exportGbp = MONTHS.map((_, i) => (exportKwh ? (exportKwh[i] * exportPence) / 100 : 0));
+      const benefit = MONTHS.map((_, i) => before[i] - after[i] + exportGbp[i]);
+      let run = 0;
+      const rows = MONTHS.map((m, i) => {
+        run += benefit[i];
+        return [m, gen ? n0(gen[i]) : '–', use ? n0(use[i]) : '–', gbp(before[i]), gbp(after[i]), exportKwh ? gbp(exportGbp[i]) : '–', gbp(benefit[i]), gbp(run)];
       });
+      const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+      rows.push(['TOTAL', gen ? n0(sum(gen)) : '–', use ? n0(sum(use)) : '–', gbp(sum(before)), gbp(sum(after)), exportKwh ? gbp(sum(exportGbp)) : '–', gbp(sum(benefit)), gbp(sum(benefit))]);
+      kit.grid({
+        columns: ['Month', 'Solar (kWh)', 'Your use (kWh)', 'Bill before', 'Bill after', 'Export (est.)', 'Benefit', 'Running total'],
+        widths: [0.8, 1.05, 1.15, 1.05, 1.05, 1.15, 1.0, 1.2],
+        rows,
+      });
+      kit.note(
+        `Bill savings (${gbp(sum(before) - sum(after))}) are the design's figures. ${exportKwh ? `Export payments are an estimate on top: about ${n0(annualExport)} kWh a year sent to the grid, paid at ${exportPence}p per kWh${o.exportPence ? '' : ' (a typical Smart Export Guarantee rate: change it in your interactive proposal)'}.` : ''} The running total is the benefit added up month by month through the first year.`
+      );
     }
   }
 

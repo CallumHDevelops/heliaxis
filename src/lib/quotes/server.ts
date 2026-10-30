@@ -1,7 +1,7 @@
 import 'server-only';
 import { ukDay } from '@/lib/bank-holidays';
-import { DOCS_BUCKET } from '@/lib/crm/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { DOCS_BUCKET, mintPortalToken, portalUrl } from '@/lib/crm/server';
 import { quotePdf, type QuoteFacts } from './pdf';
 import { readSignatory } from './signatory';
 import { cleanContent, type QuoteContent } from './types';
@@ -45,6 +45,8 @@ export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): P
     db.from('crm_projects').select('address, postcode').eq('id', q.project_id).maybeSingle(),
     customerRefOf(q.enquiry_id),
   ]);
+  // The Accept button's link: the customer's own page, opening the sign box (not on the signed copy).
+  const token = signed ? null : await mintPortalToken(q.project_id).catch(() => null);
   const signatory = q.content.signerId ? await readSignatory(q.content.signerId).catch(() => null) : null;
   const images = new Map<string, { bytes: Uint8Array; mime: string }>();
   const datasheets = new Map<string, Uint8Array>();
@@ -87,6 +89,7 @@ export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): P
     datasheets,
     signed,
     signatory,
+    acceptUrl: token ? `${portalUrl(token)}?accept=1` : undefined,
   };
   return quotePdf(facts);
 }

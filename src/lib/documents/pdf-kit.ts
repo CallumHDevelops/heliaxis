@@ -664,7 +664,7 @@ export async function pageKit(doc: PDFDocument, opt: { bannerOnly?: boolean; var
    * too long), so a loose page can be put back (its page number is in the banner at the foot). Returns
    * where the content starts.
    */
-  const strip = (page: PDFPage, o: { x: number; w: number; what: string; short?: string }): number => {
+  const strip = (page: PDFPage, o: { x: number; w: number; what: string; short?: string; badge?: PDFImage | null }): number => {
     const ph = page.getHeight();
     topBand(page, STRIP_H, false, o.x + o.w);
     // The line everything in the strip is centred on: 7 mm down, so the wordmark's top is 5 mm in.
@@ -673,7 +673,11 @@ export async function pageKit(doc: PDFDocument, opt: { bannerOnly?: boolean; var
     lightLogo(page, o.x, cy, logoW);
     const tx = o.x + logoW + 22;
     page.drawLine({ start: { x: tx - 11, y: cy - 6 }, end: { x: tx - 11, y: cy + 6 }, thickness: 0.6, color: on.rule });
-    const room = o.x + o.w - tx;
+    // The accreditations (reversed), at the right of the strip, when the document has them.
+    const bh = 13;
+    const bw = o.badge ? Math.min(150, (o.badge.width / o.badge.height) * bh) : 0;
+    if (o.badge) page.drawImage(o.badge, { x: o.x + o.w - bw, y: cy - bh / 2, width: bw, height: bh });
+    const room = o.x + o.w - tx - (bw ? bw + 14 : 0);
     const what = o.short && width(o.what.toUpperCase(), 7, 'mono', TRACK) > room ? o.short : o.what;
     label(page, what, tx, cy - 2.5, 7, { color: on.small });
     return ph - STRIP_H - GOLD_RULE - 22;
@@ -782,6 +786,8 @@ export type DocOptions = {
   /** "Not answered" in red where an answer is missing, and the "Draft: not signed yet" banner. Never shown to a customer. */
   draft?: boolean;
   landscape?: boolean;
+  /** The accreditation logos (MCS, TrustMark, NAPIT, RECC, SSIP) in the slim strip at the top of every page after the first. */
+  accreditations?: boolean;
   /** Shown instead of the code in the eyebrow and footer ("Roofer report"). */
   label?: string;
   /** 'digital' (the default: emailed, the portal, the handover pack) or 'print' (the ink saver, on request). */
@@ -877,6 +883,7 @@ export async function newDocument(o: DocOptions) {
   const form = !!o.pageHead;
   const pk = await pageKit(doc, { variant: o.variant, body: form ? 'form' : 'brand' });
   const look = pk.look;
+  const badge = o.accreditations ? await asset('heliaxis-accreditations-light.png').then((b) => (b ? doc.embedPng(b).catch(() => null) : null)) : null;
   const M: Margins = { ...MARGIN, ...o.margins };
   const bannerH = form ? FORM_BANNER_H : BANNER_H;
   /** Content stops this far up the page: over the banner and its gold rule. */
@@ -977,7 +984,7 @@ export async function newDocument(o: DocOptions) {
       return head();
     }
     const ref = `${o.jobRef ? ` · ${o.jobRef}` : ''} (continued)`;
-    y = pk.strip(page, { x: X, w: W, what: `${label === o.title ? label : `${label} · ${o.title}`}${ref}`, short: `${label}${ref}` });
+    y = pk.strip(page, { x: X, w: W, what: `${label === o.title ? label : `${label} · ${o.title}`}${ref}`, short: `${label}${ref}`, badge });
   };
   /** Room for h more on this page, else a new page (then `again`: a table's headings). */
   const need = (h: number, again?: () => void) => {
@@ -1064,6 +1071,11 @@ export async function newDocument(o: DocOptions) {
       need(h, again);
       draw(drawing());
       y -= h;
+    },
+    /** A brand asset from public/assets (the accreditation logos, the wordmark) ready for block()'s image(); null when it can't be found. */
+    async brandImage(name: string): Promise<PDFImage | null> {
+      const b = await asset(name);
+      return b ? doc.embedPng(b).catch(() => null) : null;
     },
     /** A PNG or JPEG ready for block()'s image(); null when it can't be read. */
     async embed(bytes: Uint8Array | string | null | undefined): Promise<PDFImage | null> {

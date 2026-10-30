@@ -55,7 +55,7 @@ export async function loadPortal(token: string) {
   if (!p || !mode) return null;
   const full = mode === 'full';
   const multiDayInstall = !!p.install_at && Number(p.install_days ?? 1) > 1;
-  const [{ data: c }, { data: docRows }, { data: photos }, { data: owner }, hols] = await Promise.all([
+  const [{ data: c }, { data: docRows }, { data: photos }, { data: owner }, hols, { data: quoteRows }] = await Promise.all([
     db.from('enquiries').select('id, name, postcode').eq('id', p.enquiry_id).maybeSingle(),
     db.from('crm_documents').select('*').eq('project_id', p.id).order('created_at', { ascending: false }),
     full
@@ -69,6 +69,8 @@ export async function loadPortal(token: string) {
       : Promise.resolve({ data: [] as { id: string; category: string; storage_path: string; caption: string | null }[] }),
     p.owner_id ? db.from('profiles').select('full_name').eq('id', p.owner_id).maybeSingle() : Promise.resolve({ data: null }),
     full && multiDayInstall ? ukBankHolidays() : Promise.resolve(new Set<string>()),
+    // The newest quote sent from the builder: does it carry a design proposal (the interactive page)?
+    db.from('crm_quotes').select('content').eq('project_id', p.id).in('status', ['sent', 'accepted']).order('sent_at', { ascending: false }).limit(1),
   ]);
   const paths = (photos ?? []).flatMap((ph) => [ph.storage_path, thumbPath(ph.storage_path)]);
   const signed = new Map<string, string>();
@@ -129,6 +131,8 @@ export async function loadPortal(token: string) {
         : null,
     // supabase/quotes.sql: the dates they asked for (null before it has run).
     installPref: (p.install_pref ?? null) as { dates: string[]; flexible: boolean; notes: string; at: string } | null,
+    /** The quote has a design proposal: the interactive page at /my/<token>/proposal is there to explore. */
+    hasProposal: !!(quoteRows?.[0]?.content as { proposal?: { options?: unknown[] } } | undefined)?.proposal?.options?.length,
     whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || null,
     email: process.env.MS_MAILBOX || 'hello@heliaxis.co.uk',
   };

@@ -1,7 +1,7 @@
 import 'server-only';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFString, rgb } from 'pdf-lib';
 import { issueOf } from '@/lib/documents/issue';
-import { longDate, newDocument, type PhotoItem } from '@/lib/documents/pdf-kit';
+import { INK, LINE, longDate, newDocument, SOLAR, type Kit, type PhotoItem } from '@/lib/documents/pdf-kit';
 import { designPages } from './design-pages';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { glanceRows } from './proposal';
@@ -26,14 +26,37 @@ export type QuoteFacts = {
   signed?: { png: Uint8Array; name: string; at: string };
   /** Who signs the introduction (a PNG data URL for the signature), unless the quote has turned it off. */
   signatory?: { name: string; role: string; png: string } | null;
+  /** The customer's page, opening the sign box: the Accept button's link (absent on the signed copy and when there is no link). */
+  acceptUrl?: string;
 };
 
 const paragraphs = (s: string) => s.split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean);
 
 
+
+/** A button in the PDF that opens `url` when it is clicked: a gold block with its words, and a link over it. */
+function linkButton(kit: Kit, label: string, sub: string, url: string) {
+  kit.block(58, (d) => {
+    const h = 44;
+    const w = Math.min(d.width, 300);
+    const x = d.x;
+    const y = d.top - h - 6;
+    d.rect(x, y, w, h, { fill: SOLAR });
+    d.rect(x, y, w, 2.5, { fill: INK });
+    d.text(label, x + 16, y + 24, 12, { style: 'display', color: INK });
+    d.text(sub, x + 16, y + 10, 7.2, { color: INK });
+    d.text('→', x + w - 26, y + 17, 15, { bold: true, color: INK });
+    const ctx = d.page.doc.context;
+    const link = ctx.register(
+      ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [x, y, x + w, y + h], Border: [0, 0, 0], A: { Type: 'Action', S: 'URI', URI: PDFString.of(url) } })
+    );
+    d.page.node.addAnnot(link);
+  });
+}
+
 /** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
 export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
-  const kit = await newDocument({ code: f.number, label: f.number, title: f.title || 'Quote', revision: issueOf('QUOTE'), jobRef: f.customerRef, refLabel: 'Customer', issued: f.issued });
+  const kit = await newDocument({ code: f.number, label: f.number, title: f.title || 'Quote', revision: issueOf('QUOTE'), jobRef: f.customerRef, refLabel: 'Customer', issued: f.issued, accreditations: true });
   kit.header({ meta: [['Quote', f.number], ['Date', longDate(f.issued)], ...(f.validUntil ? ([['Valid until', longDate(f.validUntil)]] as [string, string][]) : [])] });
   kit.idGrid([
     ['Prepared for', f.customer.name],
@@ -57,12 +80,6 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   }
 
   const totals = totalsOf(f.content);
-  const isIncluded = (bl: QuoteContent['blocks'][number]) => bl.type === 'text' && /includ/i.test(bl.heading);
-  for (const b of f.content.blocks) {
-    if (!isIncluded(b) || b.type !== 'text' || !b.body.trim()) continue;
-    kit.section(b.heading || 'What is included');
-    for (const p of paragraphs(b.body)) kit.paragraph(p);
-  }
   const chosen = f.content.proposal?.options[f.content.proposal.chosen];
   // With design pages the figures sit at the top of those, so the cover stays the introduction, what is included and the total.
   const hasDesignPictures = !!chosen && !!(Object.keys(chosen.images ?? {}).length || chosen.panelCount || chosen.inverterModel || chosen.batteryModel || chosen.monthlyKwh || chosen.selfSufficiencyPct);
@@ -84,6 +101,28 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     ]);
     kit.note(`${glance.length ? 'Figures are from the design proposal prepared for this property; generation is an estimate, not a guarantee. ' : ''}The items and prices follow. This is a quotation, subject to the terms and conditions at the end of this document.`);
     }
+  }
+
+  if (f.acceptUrl && !f.signed) linkButton(kit, 'Accept this quote online', 'Opens your private page to read, sign and choose your installation date', f.acceptUrl);
+
+  // Who we are accredited with: the main section, in the brand's ink on a white card (the same logos run along the top of every later page).
+  const accr = await kit.brandImage('heliaxis-accreditations.png');
+  if (accr) {
+    kit.section('Accredited and certified', { keep: 56 });
+    kit.block(54, (d) => {
+      const h = 40;
+      const w = Math.min(d.width - 28, (accr.width / accr.height) * h);
+      d.rect(d.x, d.top - 48, d.width, 48, { fill: rgb(1, 1, 1), border: LINE, line: 0.6 });
+      d.rect(d.x, d.top - 48, 3, 48, { fill: SOLAR });
+      d.image(accr, d.x + (d.width - w) / 2, d.top - 48 + 4, w, 40);
+    });
+  }
+
+  const isIncluded = (bl: QuoteContent['blocks'][number]) => bl.type === 'text' && /includ/i.test(bl.heading);
+  for (const b of f.content.blocks) {
+    if (!isIncluded(b) || b.type !== 'text' || !b.body.trim()) continue;
+    kit.section(b.heading || 'What is included');
+    for (const p of paragraphs(b.body)) kit.paragraph(p);
   }
 
   // The design pages lifted from the uploaded proposal (when there is one), between the cover and the items.
@@ -161,6 +200,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   if (f.signed) {
     kit.paragraph('Accepted online by the customer, including the terms and conditions above.', { bold: true });
   } else {
+    if (f.acceptUrl) linkButton(kit, 'Accept this quote online', 'Opens your private page to read, sign and choose your installation date', f.acceptUrl);
     kit.paragraph('To accept, open the link we sent you and sign on your phone or computer. If you would rather sign on paper, sign below and send it back to us. By accepting, you agree to the terms and conditions above, including your right to cancel within 14 days.');
   }
   await kit.signatures([

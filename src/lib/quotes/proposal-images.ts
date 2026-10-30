@@ -55,10 +55,87 @@ function png(width: number, height: number, channels: 1 | 3, rows: Uint8Array, f
   return out;
 }
 
+/** Undo PNG-style row filters (a PDF predictor of 10 or more) so the pixels can be read. */
+function unfilter(data: Uint8Array, width: number, height: number, bpp: number): Uint8Array {
+  const stride = width * bpp;
+  const out = new Uint8Array(stride * height);
+  for (let y = 0; y < height; y++) {
+    const ft = data[y * (stride + 1)];
+    const src = y * (stride + 1) + 1;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? out[y * stride + x - bpp] : 0;
+      const b = y > 0 ? out[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y > 0 ? out[(y - 1) * stride + x - bpp] : 0;
+      let v = data[src + x];
+      if (ft === 1) v += a;
+      else if (ft === 2) v += b;
+      else if (ft === 3) v += (a + b) >> 1;
+      else if (ft === 4) {
+        const p = a + b - c;
+        const pa = Math.abs(p - a);
+        const pb = Math.abs(p - b);
+        const pc = Math.abs(p - c);
+        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      out[y * stride + x] = v & 255;
+    }
+  }
+  return out;
+}
+
+function rgbaWith(doc: PDFDocument, smask: PDFObject, colour: Uint8Array, width: number, height: number, channels: 1 | 3, filtered: boolean): Uint8Array | null {
+  const m = smask instanceof PDFRef ? doc.context.lookup(smask) : smask;
+  if (!(m instanceof PDFRawStream)) return null;
+  const f = m.dict.get(PDFName.of('Filter'));
+  if ((f instanceof PDFArray ? f.lookup(0)?.toString() : f?.toString()) !== '/FlateDecode' || num(m.dict.get(PDFName.of('BitsPerComponent'))) !== 8) return null;
+  if (num(m.dict.get(PDFName.of('Width'))) !== width || num(m.dict.get(PDFName.of('Height'))) !== height) return null;
+  const dp = m.dict.get(PDFName.of('DecodeParms'));
+  const mp = dp instanceof PDFDict ? dp : undefined;
+  const mFiltered = num(mp?.get(PDFName.of('Predictor'))) >= 10;
+  try {
+    let a: Uint8Array = new Uint8Array(inflateSync(m.contents));
+    if (mFiltered) a = unfilter(a, width, height, 1);
+    if (a.length !== width * height) return null;
+    const c = filtered ? unfilter(colour, width, height, channels) : colour;
+    const rgba = new Uint8Array(width * height * 4);
+    for (let i = 0; i < width * height; i++) {
+      if (channels === 3) {
+        rgba[i * 4] = c[i * 3];
+        rgba[i * 4 + 1] = c[i * 3 + 1];
+        rgba[i * 4 + 2] = c[i * 3 + 2];
+      } else rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = c[i];
+      rgba[i * 4 + 3] = a[i];
+    }
+    return pngRgba(width, height, rgba);
+  } catch {
+    return null;
+  }
+}
+
+function pngRgba(width: number, height: number, rgba: Uint8Array): Uint8Array {
+  const stride = width * 4;
+  const idat = new Uint8Array((stride + 1) * height);
+  for (let y = 0; y < height; y++) idat.set(rgba.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+  const head = new Uint8Array(13);
+  const dv = new DataView(head.buffer);
+  dv.setUint32(0, width);
+  dv.setUint32(4, height);
+  head[8] = 8;
+  head[9] = 6;
+  const parts = [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', head), chunk('IDAT', deflateSync(idat)), chunk('IEND', new Uint8Array(0))];
+  const out = new Uint8Array(parts.reduce((x, p) => x + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+}
+
 function lift(doc: PDFDocument, o: PDFObject, page: number, order: number): LiftedImage | null {
   if (!(o instanceof PDFRawStream)) return null;
   const d = o.dict;
-  if (name(d, 'Subtype')?.toString() !== '/Image' || d.get(PDFName.of('SMask')) || d.get(PDFName.of('Mask'))) return null;
+  if (name(d, 'Subtype')?.toString() !== '/Image' || d.get(PDFName.of('Mask'))) return null;
   const width = num(d.get(PDFName.of('Width')));
   const height = num(d.get(PDFName.of('Height')));
   if (width < 200 || height < 100) return null;
@@ -83,6 +160,12 @@ function lift(doc: PDFDocument, o: PDFObject, page: number, order: number): Lift
     const raw = new Uint8Array(inflateSync(o.contents));
     const filtered = predictor >= 10;
     if (raw.length !== (width * channels + (filtered ? 1 : 0)) * height) return null;
+    // A soft mask (transparency) goes in as an alpha channel: both planes are un-filtered, then woven together as RGBA.
+    const sm = d.get(PDFName.of('SMask'));
+    if (sm) {
+      const alpha = rgbaWith(doc, sm, raw, width, height, channels, filtered);
+      return alpha ? { page, width, height, mime: 'image/png', bytes: alpha, order } : null;
+    }
     return { page, width, height, mime: 'image/png', bytes: png(width, height, channels, raw, filtered), order };
   } catch {
     return null;
@@ -90,7 +173,7 @@ function lift(doc: PDFDocument, o: PDFObject, page: number, order: number): Lift
 }
 
 /** Every liftable picture on a 1-based page, biggest first. Pictures used on every page (banners, logos) are small or wide and skipped. */
-export async function liftPageImages(bytes: Uint8Array, pageNumber: number): Promise<LiftedImage[]> {
+export async function liftPageImages(bytes: Uint8Array, pageNumber: number, opt: { banners?: boolean } = {}): Promise<LiftedImage[]> {
   const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   const pg = doc.getPages()[pageNumber - 1];
   if (!pg) return [];
@@ -106,7 +189,7 @@ export async function liftPageImages(bytes: Uint8Array, pageNumber: number): Pro
     const obj = doc.context.lookup(v);
     const img = obj ? lift(doc, obj, pageNumber, order++) : null;
     // The wide banners (the header artwork, the brand strip) are over 2000 px wide and not part of the design.
-    if (img && img.width < 2000 && img.width / img.height < 6) out.push(img);
+    if (img && (opt.banners || (img.width < 2000 && img.width / img.height < 6))) out.push(img);
   }
   return out.sort((a, b) => b.width * b.height - a.width * a.height);
 }

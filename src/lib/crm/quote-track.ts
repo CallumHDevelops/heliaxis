@@ -12,7 +12,7 @@ import { logActivity } from '@/lib/crm/server';
  * timeline (the first of each, and a return visit at most every six hours); the first opening and the start of accepting also ping the team.
  * Called from the browser (a link-preview robot never runs it) and from the PDF route.
  */
-export const TRACK_EVENTS = ['opened', 'viewed_pdf', 'sign_started', 'decline_started', 'dates_started'] as const;
+export const TRACK_EVENTS = ['opened', 'viewed_pdf', 'sign_started', 'decline_started', 'dates_started', 'proposal_opened', 'prices_edited'] as const;
 /** Sections of the customer's page we note being scrolled into view. */
 export const TRACK_SECTIONS = ['quote', 'steps', 'dates', 'messages', 'contact'] as const;
 export type TrackEvent = (typeof TRACK_EVENTS)[number];
@@ -25,6 +25,8 @@ export type QuoteTrack = {
   signStartedAt?: string;
   declineStartedAt?: string;
   datesStartedAt?: string;
+  proposalOpenedAt?: string;
+  pricesEditedAt?: string;
   lastLoggedOpenAt?: string;
   /** Seconds the page was open and on screen, all visits together, and the sections they scrolled to. */
   engagedSeconds?: number;
@@ -92,6 +94,12 @@ export async function recordQuoteEvent(p: Proj, ev: TrackEvent): Promise<void> {
   } else if (ev === 'dates_started' && !t.datesStartedAt) {
     t.datesStartedAt = at;
     await log('Customer is choosing installation dates');
+  } else if (ev === 'proposal_opened' && !t.proposalOpenedAt) {
+    t.proposalOpenedAt = at;
+    await log('Customer opened the interactive proposal');
+  } else if (ev === 'prices_edited' && !t.pricesEditedAt) {
+    t.pricesEditedAt = at;
+    await log('Customer tried their own energy prices in the proposal');
   } else return;
   await save(p.id, t);
 }

@@ -282,6 +282,22 @@ export async function ensurePortalToken(projectId: string): Promise<string | nul
   return (again?.portal_token as string) || token;
 }
 
+/**
+ * The portal token whatever the stage (made if there isn't one). The link only opens once the job is at a stage with a portal
+ * (loadPortal checks), so a quote's "Accept" button can carry it before the quote has been sent.
+ */
+export async function mintPortalToken(projectId: string): Promise<string | null> {
+  const db = createAdminClient();
+  const { data } = await db.from('crm_projects').select('portal_token').eq('id', projectId).maybeSingle();
+  if (!data) return null;
+  if (data.portal_token) return data.portal_token as string;
+  const { randomBytes } = await import('node:crypto');
+  const token = randomBytes(18).toString('base64url');
+  await db.from('crm_projects').update({ portal_token: token }).eq('id', projectId).is('portal_token', null);
+  const { data: again } = await db.from('crm_projects').select('portal_token').eq('id', projectId).maybeSingle();
+  return (again?.portal_token as string) || token;
+}
+
 /** A fresh portal link: the old one stops working straight away (e.g. it was shared by mistake). */
 export async function resetPortalToken(projectId: string): Promise<string | null> {
   const db = createAdminClient();

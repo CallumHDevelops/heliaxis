@@ -70,6 +70,17 @@ export type ProposalOption = {
   carKm?: number;
   trees?: number;
   flights?: number;
+  /** The energy basis for recalculating savings: used in the home straight from the panels, and in total with the battery (kWh a year). */
+  selfUsePvKwh?: number;
+  selfUseBatteryKwh?: number;
+  /** The prices the design software used, in pence (per kWh, or per day for the standing charge), and its yearly assumptions in per cent. */
+  tariffDayPence?: number;
+  tariffNightPence?: number;
+  standingPencePerDay?: number;
+  exportPence?: number;
+  priceRisePct?: number;
+  discountPct?: number;
+  degradationPct?: number;
   /** Pictures lifted from the proposal and kept with the quote: storage paths. */
   images?: Partial<Record<'roof' | 'inverter' | 'battery' | 'sunpath', string>>;
 };
@@ -78,7 +89,7 @@ export type QuoteProposal = { file: string; options: ProposalOption[]; chosen: n
 /** `terms` always print at the bottom of the quote, after everything else. */
 export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal; /** false: no signature under the introduction (on by default once one is saved). */ signOff?: boolean; /** Whose signature (a user's id): theirs, or one they have shared. */ signerId?: string };
 
-const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct', 'selfSufficiencyPvOnlyPct', 'consumptionKwh', 'kwhPerKwp', 'shadeFactor', 'tiltDeg', 'optionPage', 'firstYear', 'netSavingsGbp', 'rateOfReturnPct', 'solarSharePct', 'co2TonnesYear', 'carKm', 'trees', 'flights'] as const;
+const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct', 'selfSufficiencyPvOnlyPct', 'consumptionKwh', 'kwhPerKwp', 'shadeFactor', 'tiltDeg', 'optionPage', 'firstYear', 'netSavingsGbp', 'rateOfReturnPct', 'solarSharePct', 'co2TonnesYear', 'carKm', 'trees', 'flights', 'selfUsePvKwh', 'selfUseBatteryKwh', 'tariffDayPence', 'tariffNightPence', 'standingPencePerDay', 'exportPence', 'priceRisePct', 'discountPct', 'degradationPct'] as const;
 const STR_KEYS = ['name', 'panelBrand', 'panelModel', 'inverterBrand', 'inverterModel', 'batteryBrand', 'batteryModel', 'paybackText'] as const;
 
 /** A proposal option from a request or the database, with only sensible values kept. */
