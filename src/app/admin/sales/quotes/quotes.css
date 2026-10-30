@@ -147,3 +147,8 @@ a.qb-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; 
 .qb-writeit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; }
 
 .qb-ask { display: grid; gap: 8px; margin-bottom: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: rgb(var(--accent-rgb) / 0.06); }
+
+.qb-proposal { display: grid; gap: 8px; }
+.qb-opt { align-items: flex-start; }
+.qb-opt span { display: grid; gap: 1px; }
+.qb-opt small { color: var(--muted); }

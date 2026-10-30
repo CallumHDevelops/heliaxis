@@ -1,6 +1,7 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
-import type { QuoteContent } from './types';
+import { factsText } from './proposal';
+import type { ProposalOption, QuoteContent } from './types';
 
 /**
  * "What is included", written from the quote's own items in formal contract wording ("This quote includes the supply and installation
@@ -11,6 +12,13 @@ import type { QuoteContent } from './types';
 const MODEL = process.env.QUOTE_WRITER_MODEL || 'claude-haiku-5-5';
 
 type Item = { heading: string; description: string; detail: string; qty: number; note: boolean };
+
+/** The chosen option of an uploaded design proposal, if there is one. */
+export const proposalOf = (c: QuoteContent): { option: ProposalOption; facts: string } | null => {
+  const p = c.proposal;
+  const option = p?.options[p.chosen];
+  return option ? { option, facts: factsText(option, false) } : null;
+};
 
 /** The customer-facing lines of the quote, with sections: never costs, markups or internal lines. */
 export function itemsOf(content: QuoteContent): Item[] {
@@ -50,8 +58,8 @@ const plain = (t: string) => t.replace(/[.\s]*$/, '');
 
 const kindOf = (d: string): 'panels' | 'inverter' | 'battery' | 'other' => {
   if (/\binstall(ation)?\b|labour|labor|scaffold|commission|ancillar|access/i.test(d)) return 'other';
+  if (/batter|\bBAT\b|-BAT-|kwh|storage|\bES\b|lynx|\bBMS\b/i.test(d)) return 'battery';
   if (/inverter|hybrid|\bGW\d|\bET-?\d|\bSUN2000|\bSolis\b/i.test(d)) return 'inverter';
-  if (/batter|kwh|storage|\bES\b|lynx|\bBMS\b/i.test(d)) return 'battery';
   if (/panel|\bPV\b|solar|\d{3}\s?W\b|vertex|\bmodule/i.test(d)) return 'panels';
   return 'other';
 };
@@ -73,6 +81,12 @@ export function equipmentByRule(content: QuoteContent, keyPoints = ''): string[]
   if (by.battery.length) paras.push(`This quote includes the supply and installation of battery energy storage, comprising ${asList(by.battery.map(withDetail))}.`);
   if (by.other.length === 1) paras.push(`This quote includes the supply and installation of ${withDetail(by.other[0])}.`);
   else if (by.other.length > 1) paras.push(`This quote also includes the supply and installation of the following: ${asList(by.other.map(withDetail))}.`);
+  const pr = proposalOf(content)?.option;
+  const w: string[] = [];
+  if (pr?.panelProductWarrantyYears) w.push(`a ${pr.panelProductWarrantyYears}-year product warranty${pr.panelPerformanceWarrantyYears ? ` and a ${pr.panelPerformanceWarrantyYears}-year performance warranty` : ''} on the solar panels`);
+  if (pr?.inverterWarrantyYears) w.push(`a ${pr.inverterWarrantyYears}-year warranty on the inverter`);
+  if (pr?.batteryWarrantyYears) w.push(`a ${pr.batteryWarrantyYears}-year warranty on the battery`);
+  if (w.length) paras.push(`The equipment is supplied with the manufacturer’s warranties: ${asList(w)}.`);
   const kp = keyPoints.trim();
   if (kp) paras.push(`Key features: ${plain(kp.replace(/\s+/g, ' '))}.`);
   return paras;
@@ -87,7 +101,7 @@ export function includedByRule(content: QuoteContent, o: IncludedOptions = DEFAU
 const SYSTEM = `You write the "What is included" section of a formal quotation for Heliaxis, a solar, battery and heat pump installer in South Wales.
 Use formal, precise British English in the third person, as in a contract schedule: fluent, well-constructed sentences, not a list of item names. No hype, no exclamation marks, no emoji, no headings, no bullet symbols.
 Write short paragraphs, each beginning "This quote includes". Describe the system in the order it is built, joining the items up: for example "This quote includes the supply and installation of a 30 kWp solar PV array of 60 × Trina Vertex S 500W panels, connected to a GoodWe GW6K-ET-20 hybrid inverter." then the battery with its capacity in kWh, then any other equipment. Use the quantities, makes and model names exactly as listed and work out totals (such as the array size in kWp, or the battery capacity) only when the arithmetic is certain from the list.
-Where the person has given key points, or an item's own detail contains them, put them in a short clause on the relevant item (for example the battery or the inverter). Never add a feature, warranty length, certification, scheme, timescale, price or product that is not in the list or the key points. If there are no key points, add none.
+Where the person has given key points, or an item's own detail contains them, put them in a short clause on the relevant item (for example the battery or the inverter). Never add a feature, warranty length, certification, scheme, timescale, price or product that is not in the list, the design-proposal facts or the key points. Warranty lengths in the design-proposal facts may be stated. If there are no key points, add none.
 Do NOT write about electrical ancillaries, access equipment, documentation, compliance, BS 7671 or standards: those are added separately.
 Keep the whole thing under 170 words. Reply with the paragraphs only, separated by a blank line.`;
 
@@ -103,7 +117,7 @@ export async function writeIncluded(content: QuoteContent, o: IncludedOptions = 
       model: MODEL,
       max_tokens: 600,
       system: SYSTEM,
-      messages: [{ role: 'user', content: `The quote's items:\n${list}${kp ? `\n\nKey points to include (from the person writing the quote):\n${kp}` : ''}` }],
+      messages: [{ role: 'user', content: `The quote's items:\n${list}${proposalOf(content) ? `\n\nFacts from the design proposal (use them to describe the equipment and its warranties accurately):\n${proposalOf(content)!.facts}` : ''}${kp ? `\n\nKey points to include (from the person writing the quote):\n${kp}` : ''}` }],
     });
     const eq = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('').trim();
     return eq ? { text: [eq, ...standardClauses(o)].join('\n\n'), via: 'ai' } : fallback;
@@ -141,7 +155,7 @@ export async function writeIntro(content: QuoteContent, first: string, site: str
       model: MODEL,
       max_tokens: 500,
       system: INTRO_SYSTEM,
-      messages: [{ role: 'user', content: `Customer first name: ${first || '(none)'}\nSite: ${site || '(not given)'}\nItems:\n${list}` }],
+      messages: [{ role: 'user', content: `Customer first name: ${first || '(none)'}\nSite: ${site || '(not given)'}\nItems:\n${list}${proposalOf(content) ? `\n\nFacts from the design proposal:\n${proposalOf(content)!.facts}` : ''}` }],
     });
     const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('').trim();
     return text ? { text, via: 'ai' } : fallback;

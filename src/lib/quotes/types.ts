@@ -17,8 +17,57 @@ export type QuoteBlock =
   | { id: string; type: 'images'; heading: string; images: QuoteImage[] }
   | { id: string; type: 'datasheets'; heading: string; files: QuoteFile[] };
 
+/**
+ * One system option read from an uploaded design proposal (OpenSolar): the figures the cover page and the writing use.
+ * Every field is optional: only what the proposal printed is kept. Savings and payback are the designer's own assumptions, so
+ * they only ever print when `showFinancials` is on.
+ */
+export type ProposalOption = {
+  name?: string;
+  systemKwp?: number;
+  panelCount?: number;
+  panelWatts?: number;
+  panelBrand?: string;
+  panelModel?: string;
+  panelProductWarrantyYears?: number;
+  panelPerformanceWarrantyYears?: number;
+  inverterBrand?: string;
+  inverterModel?: string;
+  inverterCount?: number;
+  inverterKw?: number;
+  inverterWarrantyYears?: number;
+  batteryBrand?: string;
+  batteryModel?: string;
+  batteryModules?: number;
+  batteryUsableKwh?: number;
+  batteryWarrantyYears?: number;
+  annualGenerationKwh?: number;
+  annualSavingsGbp?: number;
+  paybackText?: string;
+  selfSufficiencyPct?: number;
+};
+export type QuoteProposal = { file: string; options: ProposalOption[]; chosen: number; showFinancials: boolean };
+
 /** `terms` always print at the bottom of the quote, after everything else. */
-export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string };
+export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal };
+
+const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct'] as const;
+const STR_KEYS = ['name', 'panelBrand', 'panelModel', 'inverterBrand', 'inverterModel', 'batteryBrand', 'batteryModel', 'paybackText'] as const;
+
+/** A proposal option from a request or the database, with only sensible values kept. */
+export function cleanOption(v: unknown): ProposalOption {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const out: Record<string, string | number> = {};
+  for (const k of NUM_KEYS) {
+    const n = Number(o[k]);
+    if (o[k] != null && o[k] !== '' && Number.isFinite(n) && n >= 0 && n < 10_000_000) out[k] = Math.round(n * 100) / 100;
+  }
+  for (const k of STR_KEYS) {
+    const t = typeof o[k] === 'string' ? String(o[k]).replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+    if (t) out[k] = t;
+  }
+  return out as ProposalOption;
+}
 
 /** VAT rates the builder offers: 0% (domestic solar and batteries to 2027), 5% and 20%. */
 export const VAT_RATES = [0, 5, 20] as const;
@@ -214,5 +263,8 @@ export function cleanContent(v: unknown): QuoteContent {
       blocks.splice(i, 1);
     } else terms = DEFAULT_TERMS;
   }
-  return { intro: str(o.intro, 4000), blocks, terms };
+  const pr = o.proposal as Partial<QuoteProposal> | undefined;
+  const options = Array.isArray(pr?.options) ? pr!.options.slice(0, 4).map(cleanOption).filter((x) => Object.keys(x).length) : [];
+  const proposal: QuoteProposal | undefined = options.length ? { file: str(pr?.file, 160), options, chosen: Math.min(Math.max(0, Math.round(Number(pr?.chosen) || 0)), options.length - 1), showFinancials: pr?.showFinancials === true } : undefined;
+  return { intro: str(o.intro, 6000), blocks, terms, ...(proposal ? { proposal } : {}) };
 }

@@ -9,7 +9,7 @@ import '../../../crm/crm.css';
 import '../quotes.css';
 import type { SavedItem } from '@/lib/quotes/items';
 import { greetingName } from '@/lib/greeting-name';
-import { DEFAULT_TERMS, emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
+import { DEFAULT_TERMS, emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type ProposalOption, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
 type Channel = { ok: true; to?: string; via?: string } | { ok: false; error: string };
@@ -199,6 +199,27 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
       setErr(e instanceof Error ? e.message : 'Couldn’t write it. Try again.');
     } finally {
       setWriting('');
+    }
+  }
+
+  const [reading, setReading] = useState(false);
+  /** Read an OpenSolar proposal for the figures the cover and the writing use. */
+  async function readProposal(file: File | undefined) {
+    if (!file) return;
+    setReading(true);
+    setErr('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await fetch(`/api/crm/quotes/${initial.id}/proposal`, { method: 'POST', body: fd });
+      const d = (await r.json().catch(() => ({}))) as { options?: ProposalOption[]; file?: string; error?: string };
+      if (!r.ok || !d.options?.length) throw new Error(d.error || 'It couldn’t read that file. Try again.');
+      edit((c) => ({ ...c, proposal: { file: d.file ?? file.name, options: d.options!, chosen: 0, showFinancials: false } }));
+      setNote(`Read ${d.options.length} system option${d.options.length === 1 ? '' : 's'} from the proposal. Check the figures, then use Write the introduction and Write from the quote.`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'It couldn’t read that file. Try again.');
+    } finally {
+      setReading(false);
     }
   }
 
@@ -402,6 +423,42 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
               </button>
             </div>
             <textarea id="qb-intro" className="crm-input" rows={8} value={content.intro} onChange={(e) => edit((c) => ({ ...c, intro: e.target.value }))} disabled={locked} />
+          </section>
+
+          <section className="qb-card qb-proposal">
+            <label className="qb-lab">Design proposal (optional)</label>
+            {content.proposal ? (
+              <>
+                <p className="crm-small crm-muted">
+                  Read from <b>{content.proposal.file}</b>. The cover shows these figures as System at a glance, and the writing uses them.
+                </p>
+                {content.proposal.options.map((o, k) => (
+                  <label key={k} className={`crm-check qb-opt${content.proposal!.chosen === k ? ' on' : ''}`}>
+                    <input type="radio" name="qb-opt" checked={content.proposal!.chosen === k} disabled={locked} onChange={() => edit((c) => (c.proposal ? { ...c, proposal: { ...c.proposal, chosen: k } } : c))} />
+                    <span>
+                      <b>{o.name || `Option ${k + 1}`}</b>
+                      <small>
+                        {[o.systemKwp ? `${o.systemKwp} kWp` : '', o.panelCount ? `${o.panelCount} panels` : '', o.inverterModel, o.batteryUsableKwh ? `${o.batteryUsableKwh} kWh battery` : '', o.annualGenerationKwh ? `${o.annualGenerationKwh.toLocaleString('en-GB')} kWh a year` : ''].filter(Boolean).join(' · ')}
+                      </small>
+                    </span>
+                  </label>
+                ))}
+                <label className="crm-check">
+                  <input type="checkbox" checked={content.proposal.showFinancials} disabled={locked} onChange={(e) => edit((c) => (c.proposal ? { ...c, proposal: { ...c.proposal, showFinancials: e.target.checked } } : c))} /> Show the estimated annual saving and payback on the cover (these are the proposal’s own assumptions)
+                </label>
+                <div className="crm-actions">
+                  <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => edit((c) => ({ ...c, proposal: undefined }))}>
+                    Remove the proposal
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="crm-small crm-muted">Upload the OpenSolar proposal (PDF) and the cover gets a System at a glance box, and the introduction and What is included are written from its figures and warranties.</p>
+                <input type="file" accept="application/pdf" disabled={locked || reading} onChange={(e) => { void readProposal(e.target.files?.[0]); e.target.value = ''; }} aria-label="Upload the OpenSolar proposal" />
+                {reading && <p className="crm-small">Reading the proposal…</p>}
+              </>
+            )}
           </section>
 
           {content.blocks.map((b, i) => (

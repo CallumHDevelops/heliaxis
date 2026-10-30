@@ -3,6 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { issueOf } from '@/lib/documents/issue';
 import { longDate, newDocument, type PhotoItem } from '@/lib/documents/pdf-kit';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
+import { glanceRows } from './proposal';
 import { lineNet, money, totalsOf, type QuoteContent } from './types';
 
 /** What the quote PDF is made from: the content, the customer, and the files already fetched (images, datasheet PDFs). */
@@ -48,14 +49,21 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     kit.section(b.heading || 'What is included');
     for (const p of paragraphs(b.body)) kit.paragraph(p);
   }
-  if (totals.gross > 0) {
-    kit.section('Quote summary', { keep: 90 });
+  const chosen = f.content.proposal?.options[f.content.proposal.chosen];
+  const glance = chosen ? glanceRows(chosen, f.content.proposal?.showFinancials === true) : [];
+  if (glance.length || totals.gross > 0) {
+    kit.section(glance.length ? 'System at a glance' : 'Quote summary', { keep: 120 });
     kit.rows([
-      { label: 'Total to pay', value: money(totals.gross), strong: true },
-      ...(f.depositPence ? [{ label: 'Deposit once you accept', value: money(f.depositPence) }] : []),
-      ...(f.validUntil ? [{ label: 'Valid until', value: longDate(f.validUntil) }] : []),
+      ...glance.map((r) => ({ label: r.label, value: r.value })),
+      ...(totals.gross > 0
+        ? [
+            { label: 'Total to pay', value: money(totals.gross), strong: true },
+            ...(f.depositPence ? [{ label: 'Deposit once you accept', value: money(f.depositPence) }] : []),
+            ...(f.validUntil ? [{ label: 'Valid until', value: longDate(f.validUntil) }] : []),
+          ]
+        : []),
     ]);
-    kit.note('The items and prices are on the next page. This is a quotation, subject to the terms and conditions at the end of this document.');
+    kit.note(`${glance.length ? 'Figures are from the design proposal prepared for this property; generation is an estimate, not a guarantee. ' : ''}The items and prices are on the next page. This is a quotation, subject to the terms and conditions at the end of this document.`);
   }
 
   // Page 2 onwards: the quoted items, and anything else the quote shows (text, pictures, datasheets).
