@@ -55,7 +55,6 @@ function productRows(kit: Kit, items: Product[]) {
       const y0 = d.top - 92;
       cardFill(d, d.x, y0, d.width, 92);
       d.rect(d.x, y0, d.width, 3, { fill: SOLAR });
-      d.rect(d.x + 1, y0 + 3, 112, 88, { fill: rgb(0.975, 0.965, 0.94) });
       if (p.img) {
         const r = p.img.width / p.img.height;
         const ih = 80;
@@ -179,6 +178,17 @@ function paybackChart(kit: Kit, cum: number[], firstYear: number, paybackText?: 
   });
 }
 
+
+/** The year's estimated export: how much is sent to the grid, by month, and what it earns at the export rate. */
+function exportYearOne(o: ProposalOption, gen: number[] | null, use: number[] | undefined) {
+  const rate = o.exportPence ?? DEFAULT_EXPORT_PENCE;
+  const kept = o.selfUseBatteryKwh ?? o.selfUsePvKwh ?? (o.consumptionKwh && (o.selfSufficiencyPct ?? o.selfSufficiencyPvOnlyPct) ? (o.consumptionKwh * (o.selfSufficiencyPct ?? o.selfSufficiencyPvOnlyPct ?? 0)) / 100 : 0);
+  const annual = o.annualGenerationKwh && kept ? Math.max(0, o.annualGenerationKwh - kept) : 0;
+  if (!annual || !gen || !use) return null;
+  const kwh = monthlyExportKwh(gen, use, annual);
+  return { rate, annual, kwh, gbpByMonth: kwh.map((k) => (k * rate) / 100), gbp: kwh.reduce((a, k) => a + (k * rate) / 100, 0) };
+}
+
 export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, financials: boolean, glance: { label: string; value: string }[]): Promise<boolean> {
   const pic = (kind: 'roof' | 'inverter' | 'battery' | 'sunpath') => (o.images?.[kind] ? pics.get(o.images[kind]!) : undefined);
   const roof = await kit.embed(pic('roof')?.bytes);
@@ -290,21 +300,22 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
   if (hasMoney) {
     kit.newPage({ continued: true });
     kit.section('What it could save you', { intro: 'The design proposal’s own estimates, using today’s tariff and a yearly rise in energy prices. Prices can go down as well as up.', keep: 300 });
+    const exp = exportYearOne(o, gen, use);
     tiles(kit, [
       ...(o.annualSavingsGbp ? [{ v: gbp(o.annualSavingsGbp), l: 'Bill saving, year one' }] : []),
-      ...(o.paybackText ? [{ v: o.paybackText.replace(/years?/i, 'yrs').replace(/months?/i, 'mths'), l: 'Payback' }] : []),
-      ...(o.netSavingsGbp ? [{ v: gbp(o.netSavingsGbp), l: `Net saving over ${cum?.length ?? 20} years` }] : []),
-      ...(o.rateOfReturnPct ? [{ v: `${o.rateOfReturnPct}%`, l: 'Rate of return' }] : []),
+      ...(exp ? [{ v: gbp(exp.gbp), l: 'Export income (est.)' }] : []),
+      ...(o.paybackText ? [{ v: o.paybackText.replace(/years?/i, 'yrs').replace(/months?/i, 'mths'), l: 'Payback (bill savings)' }] : []),
+      ...(o.netSavingsGbp ? [{ v: gbp(o.netSavingsGbp), l: `Net saving, ${cum?.length ?? 20} yrs (bills)` }] : []),
     ]);
     if (cum) paybackChart(kit, cum, o.firstYear ?? new Date().getFullYear(), o.paybackText);
     if (o.billBeforeGbp?.length === 12 && o.billAfterGbp?.length === 12) {
       const before = o.billBeforeGbp;
       const after = o.billAfterGbp;
-      const exportPence = o.exportPence ?? DEFAULT_EXPORT_PENCE;
-      const keptKwh = o.selfUseBatteryKwh ?? o.selfUsePvKwh ?? (o.consumptionKwh && (o.selfSufficiencyPct ?? o.selfSufficiencyPvOnlyPct) ? (o.consumptionKwh * (o.selfSufficiencyPct ?? o.selfSufficiencyPvOnlyPct ?? 0)) / 100 : 0);
-      const annualExport = o.annualGenerationKwh && keptKwh ? Math.max(0, o.annualGenerationKwh - keptKwh) : 0;
-      const exportKwh = gen && use && annualExport ? monthlyExportKwh(gen, use, annualExport) : null;
-      const exportGbp = MONTHS.map((_, i) => (exportKwh ? (exportKwh[i] * exportPence) / 100 : 0));
+      const ex = exportYearOne(o, gen, use);
+      const exportPence = ex?.rate ?? DEFAULT_EXPORT_PENCE;
+      const annualExport = ex?.annual ?? 0;
+      const exportKwh = ex?.kwh ?? null;
+      const exportGbp = MONTHS.map((_, i) => ex?.gbpByMonth[i] ?? 0);
       const benefit = MONTHS.map((_, i) => before[i] - after[i] + exportGbp[i]);
       let run = 0;
       const rows = MONTHS.map((m, i) => {
@@ -319,7 +330,7 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
         rows,
       });
       kit.note(
-        `Bill savings (${gbp(sum(before) - sum(after))}) are the design's figures. ${exportKwh ? `Export payments are an estimate on top: about ${n0(annualExport)} kWh a year sent to the grid, paid at ${exportPence}p per kWh${o.exportPence ? '' : ' (a typical Smart Export Guarantee rate: change it in your interactive proposal)'}.` : ''} The running total is the benefit added up month by month through the first year.`
+        `The design's bill saving (${gbp(sum(before) - sum(after))}) is what you stop buying from your supplier, and does not include any Smart Export Guarantee (SEG) payments. ${exportKwh ? `Export payments are an estimate on top of it: about ${n0(annualExport)} kWh a year sent to the grid, paid at ${exportPence}p per kWh${o.exportPence ? '' : ' (a typical Smart Export Guarantee rate: change it in your interactive proposal)'}.` : ''} The running total is the benefit added up month by month through the first year.`
       );
     }
   }

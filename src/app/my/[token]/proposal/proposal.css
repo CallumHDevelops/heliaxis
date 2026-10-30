@@ -11,8 +11,8 @@
 .ip-roof img { display: block; width: 100%; height: auto; }
 .ip-roof figcaption { padding: 8px 14px; font-size: 0.78rem; color: var(--muted); }
 .ip-products { display: grid; gap: 10px; margin-top: 10px; }
-.ip-product { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 12px; border-bottom: 3px solid #f8bc1e; }
-.ip-product-img { display: grid; place-items: center; height: 96px; background: #fff; border-radius: 8px; }
+.ip-product { background: #fff; display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 12px; border-bottom: 3px solid #f8bc1e; }
+.ip-product-img { display: grid; place-items: center; height: 96px; background: #fff; }
 .ip-product-img img, .ip-product-img svg { max-width: 84px; max-height: 88px; width: auto; height: auto; }
 .ip-product-body { display: grid; gap: 2px; min-width: 0; }
 .ip-product-body small { font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: #c77f04; }
