@@ -9,6 +9,7 @@ import { quoteEmailHtml } from '@/lib/quotes/email';
 import { defaultQuoteMessage, firstOf, quoteSubject, quoteWhatsApp } from '@/lib/quotes/message';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { sendManual } from '@/lib/whatsapp/inbox';
+import { sendSms, smsConfigured, toMsisdn } from '@/lib/sms';
 import { blanksFor, getBlankMap, sendableTemplates } from '@/lib/whatsapp/templates';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const q = await readQuote(id);
   if (!q) return json({ error: 'Not found' }, 404);
-  const opts = (await req.json().catch(() => ({}))) as { email?: boolean; whatsapp?: boolean; message?: string };
+  const opts = (await req.json().catch(() => ({}))) as { email?: boolean; whatsapp?: boolean; sms?: boolean; message?: string };
   const totals = totalsOf(q.content);
   if (totals.gross <= 0) return json({ error: 'Add at least one priced item before sending.' }, 400);
 
@@ -69,7 +70,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { data: c } = await db.from('enquiries').select('name, email, phone').eq('id', q.enquiry_id).maybeSingle();
   const name = (c?.name as string) || '';
   const message = String(opts.message || '').trim().slice(0, 3000) || defaultQuoteMessage(name, q.title);
-  const sentVia: { email?: Channel; whatsapp?: Channel } = {};
+  const sentVia: { email?: Channel; whatsapp?: Channel; sms?: Channel } = {};
 
   if (opts.email) {
     const to = ((c?.email as string | null) || '').trim();
@@ -104,6 +105,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
     sentVia.whatsapp = w.ok ? { ok: true, via } : { ok: false, error: (w as { error: string }).error };
+  }
+  if (opts.sms) {
+    const to = toMsisdn((c?.phone as string | null) ?? null);
+    if (!to) sentVia.sms = { ok: false, error: 'No UK mobile number on file for a text.' };
+    else if (!smsConfigured()) sentVia.sms = { ok: false, error: 'Text messages aren’t set up yet.' };
+    else {
+      const first = firstOf(name);
+      const out = await sendSms(to, `${first ? `Hi ${first}, ` : ''}your Heliaxis quote is ready. View it, accept it or ask us a question here: ${r.url}`, 'quote');
+      sentVia.sms = out.ok ? { ok: true, to } : { ok: false, error: out.error };
+      if (out.ok) await logActivity({ enquiryId: q.enquiry_id, projectId: q.project_id, kind: 'system', body: `Quote ${q.number} link texted to ${to}`, byId: s.user.id });
+    }
   }
   return json({ ok: true, url: r.url, whatsappText: quoteWhatsApp(message, r.url), emailSubject: r.emailSubject, emailText: r.emailText, email: (c?.email as string | null) ?? null, projectId: q.project_id, enquiryId: q.enquiry_id, sentVia });
 }

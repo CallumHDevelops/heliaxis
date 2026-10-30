@@ -16,7 +16,7 @@ import { DEFAULT_TERMS, emptyLine, emptyText, lineNet, lineProfit, money, newId,
 
 type Customer = { name: string; email: string | null; phone: string | null };
 type Channel = { ok: true; to?: string; via?: string } | { ok: false; error: string };
-type Sent = { url: string; whatsappText: string; emailSubject: string; emailText: string; email: string | null; projectId: string; enquiryId: string; sentVia: { email?: Channel; whatsapp?: Channel } };
+type Sent = { url: string; whatsappText: string; emailSubject: string; emailText: string; email: string | null; projectId: string; enquiryId: string; sentVia: { email?: Channel; whatsapp?: Channel; sms?: Channel } };
 
 /** Shrink a picture in the browser (max 1600 px, JPEG) so it uploads quickly and keeps the PDF small. */
 async function shrink(file: File): Promise<File> {
@@ -72,6 +72,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   const [composing, setComposing] = useState(false);
   const [viaEmail, setViaEmail] = useState(!!customer.email);
   const [viaWa, setViaWa] = useState(!!customer.phone);
+  const [viaSms, setViaSms] = useState(false);
   const [message, setMessage] = useState(() => defaultQuoteMessage(customer.name, initial.title));
   const first = useRef(true);
   const payload = useRef({ title, content, validUntil, deposit });
@@ -371,7 +372,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
       setBusy('');
       return setErr('Couldn’t save, so it wasn’t sent. Try again.');
     }
-    const r = await fetch(`/api/crm/quotes/${initial.id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: viaEmail, whatsapp: viaWa, message }) });
+    const r = await fetch(`/api/crm/quotes/${initial.id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: viaEmail, whatsapp: viaWa, sms: viaSms, message }) });
     const d = await r.json().catch(() => ({}));
     setBusy('');
     if (!r.ok) return setErr(d.error || 'Not sent');
@@ -447,10 +448,13 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
           </label>
           <label className="qb-lab">Message (the portal link and button are added for you)</label>
           <textarea className="crm-input" rows={9} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <label className="crm-check">
+            <input type="checkbox" checked={viaSms} disabled={!customer.phone} onChange={(e) => setViaSms(e.target.checked)} /> Text message with the link{customer.phone ? ` to ${customer.phone}` : ' (no mobile number on file)'}
+          </label>
           {viaWa && <p className="crm-small crm-muted">If their 24-hour WhatsApp window is closed, the approved “Quote ready” template goes instead, with its own fixed wording.</p>}
           <div className="crm-actions">
             <button type="button" className="crm-btn crm-btn--solar" disabled={!!busy} onClick={() => void send()}>
-              {busy === 'send' ? 'Sending…' : viaEmail || viaWa ? 'Send quote' : 'Make the link only'}
+              {busy === 'send' ? 'Sending…' : viaEmail || viaWa || viaSms ? 'Send quote' : 'Make the link only'}
             </button>
             <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setComposing(false)}>
               Cancel
@@ -461,10 +465,11 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
 
       {sent && (
         <div className="qb-sent">
-          <b>{sent.sentVia.email || sent.sentVia.whatsapp ? 'Quote sent' : 'Link ready'} ✓</b>
+          <b>{sent.sentVia.email || sent.sentVia.whatsapp || sent.sentVia.sms ? 'Quote sent' : 'Link ready'} ✓</b>
           <p className="crm-small">The job is now at Quote sent. Their link opens the quote to view, accept or query.</p>
           {sent.sentVia.email && <p className="crm-small">{sent.sentVia.email.ok ? `✓ Email sent to ${sent.sentVia.email.to}` : `✗ Email not sent: ${sent.sentVia.email.error}`}</p>}
           {sent.sentVia.whatsapp && <p className="crm-small">{sent.sentVia.whatsapp.ok ? `✓ WhatsApp sent${sent.sentVia.whatsapp.via === 'template' ? ' (as the Quote ready template)' : ''}` : `✗ WhatsApp not sent: ${sent.sentVia.whatsapp.error}`}</p>}
+          {sent.sentVia.sms && <p className="crm-small">{sent.sentVia.sms.ok ? `✓ Text sent to ${sent.sentVia.sms.to}` : `✗ Text not sent: ${sent.sentVia.sms.error}`}</p>}
           <code className="qb-link">{sent.url}</code>
           <div className="crm-actions">
             <button type="button" className="crm-btn crm-btn--ghost" onClick={() => void copy(sent.url, 'Link')}>
