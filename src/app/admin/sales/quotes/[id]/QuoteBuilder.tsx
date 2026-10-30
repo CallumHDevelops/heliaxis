@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { WritingSpark } from './WritingSpark';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuoteRow } from '@/lib/quotes/server';
 import { defaultQuoteMessage } from '@/lib/quotes/message';
@@ -422,7 +423,10 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                 {writing === 'intro' ? 'Writing…' : 'Write the introduction'}
               </button>
             </div>
-            <textarea id="qb-intro" className="crm-input" rows={8} value={content.intro} onChange={(e) => edit((c) => ({ ...c, intro: e.target.value }))} disabled={locked} />
+            <div className="qb-writewrap">
+              <textarea id="qb-intro" className="crm-input" rows={8} value={content.intro} onChange={(e) => edit((c) => ({ ...c, intro: e.target.value }))} disabled={locked} />
+              {writing === 'intro' && <WritingSpark />}
+            </div>
           </section>
 
           <section className="qb-card qb-proposal">
@@ -518,7 +522,10 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                     )}
                     </>
                   )}
-                  <textarea className="crm-input" rows={6} placeholder="Write the text. A blank line starts a new paragraph." value={b.body} onChange={(e) => setBlock(b.id, { body: e.target.value })} disabled={locked} />
+                  <div className="qb-writewrap">
+                    <textarea className="crm-input" rows={6} placeholder="Write the text. A blank line starts a new paragraph." value={b.body} onChange={(e) => setBlock(b.id, { body: e.target.value })} disabled={locked} />
+                    {writing === b.id && <WritingSpark />}
+                  </div>
                 </>
               )}
 
