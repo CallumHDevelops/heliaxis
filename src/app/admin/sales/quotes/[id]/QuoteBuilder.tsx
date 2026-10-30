@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import '../../../crm/crm.css';
 import '../quotes.css';
 import type { SavedItem } from '@/lib/quotes/items';
-import { emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
+import { DEFAULT_TERMS, emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
 type Channel = { ok: true; to?: string; via?: string } | { ok: false; error: string };
@@ -678,8 +678,14 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
           </div>
 
           <section className="qb-card">
-            <label className="qb-lab">Terms (printed at the bottom of the quote, just before the acceptance)</label>
-            <textarea className="crm-input" rows={6} value={content.terms} onChange={(e) => edit((c) => ({ ...c, terms: e.target.value }))} disabled={locked} />
+            <label className="qb-lab">Terms and conditions (printed at the end of the quote, just before the acceptance)</label>
+            <textarea className="crm-input" rows={14} value={content.terms} onChange={(e) => edit((c) => ({ ...c, terms: e.target.value }))} disabled={locked} />
+            <div className="qb-writeit">
+              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => (!content.terms.trim() || window.confirm('Replace the terms with the standard Heliaxis terms and conditions?')) && edit((c) => ({ ...c, terms: DEFAULT_TERMS }))}>
+                Use the standard terms
+              </button>
+              <small className="crm-muted">Covers positions and fire routes, pre-existing faults, maintenance, access, regulations, estimates, payment, cancellation, warranties and liability. Edit freely.</small>
+            </div>
           </section>
         </div>
 

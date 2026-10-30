@@ -92,10 +92,11 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     }
   }
   if (!shownTotals) kit.note('Add your items to see the total.');
+  else if (f.content.terms.trim()) kit.note('This is a quotation. It is subject to the terms and conditions set out at the end of this document.');
 
   // The terms: last, so they are the last thing read before accepting.
   if (f.content.terms.trim()) {
-    kit.section('Terms');
+    kit.section('Terms and conditions');
     for (const p of paragraphs(f.content.terms)) kit.paragraph(p);
   }
 
@@ -107,9 +108,9 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     ...(f.validUntil ? [{ label: 'Valid until', value: longDate(f.validUntil) }] : []),
   ]);
   if (f.signed) {
-    kit.paragraph('Accepted online by the customer, including the 14-day cancellation terms above.', { bold: true });
+    kit.paragraph('Accepted online by the customer, including the terms and conditions above.', { bold: true });
   } else {
-    kit.paragraph('To accept, open the link we sent you and sign on your phone or computer. If you would rather sign on paper, sign below and send it back to us. You can change your mind and cancel within 14 days of signing, free of charge.');
+    kit.paragraph('To accept, open the link we sent you and sign on your phone or computer. If you would rather sign on paper, sign below and send it back to us. By accepting, you agree to the terms and conditions above, including your right to cancel within 14 days.');
   }
   await kit.signatures([
     f.signed
