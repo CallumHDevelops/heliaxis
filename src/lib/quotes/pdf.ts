@@ -1,11 +1,12 @@
 import 'server-only';
 import { PDFDocument, PDFString, rgb } from 'pdf-lib';
 import { issueOf } from '@/lib/documents/issue';
-import { INK, LINE, longDate, newDocument, SOLAR, type Kit, type PhotoItem } from '@/lib/documents/pdf-kit';
+import { INK, LINE, longDate, MUTED, newDocument, SOLAR, type Kit, type PhotoItem } from '@/lib/documents/pdf-kit';
 import { designPages } from './design-pages';
+import { drawQr } from './qr';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { glanceRows } from './proposal';
-import { lineNet, money, totalsOf, type QuoteContent } from './types';
+import { DEFAULT_ABOUT, DEFAULT_SURVEY, lineNet, money, totalsOf, type QuoteContent } from './types';
 
 /** What the quote PDF is made from: the content, the customer, and the files already fetched (images, datasheet PDFs). */
 export type QuoteFacts = {
@@ -26,6 +27,8 @@ export type QuoteFacts = {
   signed?: { png: Uint8Array; name: string; at: string };
   /** Who signs the introduction (a PNG data URL for the signature), unless the quote has turned it off. */
   signatory?: { name: string; role: string; png: string } | null;
+  /** The customer's page itself (for the QR code). */
+  portalUrl?: string;
   /** The customer's page, opening the sign box: the Accept button's link (absent on the signed copy and when there is no link). */
   acceptUrl?: string;
 };
@@ -34,11 +37,11 @@ const paragraphs = (s: string) => s.split(/\n{2,}/).map((p) => p.replace(/\n/g, 
 
 
 
-/** A button in the PDF that opens `url` when it is clicked: a gold block with its words, and a link over it. */
-function linkButton(kit: Kit, label: string, sub: string, url: string) {
-  kit.block(58, (d) => {
+/** A button in the PDF that opens `url` when it is clicked: a gold block with its words, and a link over it. With `qrUrl`, a QR code beside it for a phone camera. */
+function linkButton(kit: Kit, label: string, sub: string, url: string, qrUrl?: string) {
+  kit.block(qrUrl ? 76 : 58, (d) => {
     const h = 44;
-    const w = Math.min(d.width, 300);
+    const w = Math.min(d.width - (qrUrl ? 190 : 0), 290);
     const x = d.x;
     const y = d.top - h - 6;
     d.rect(x, y, w, h, { fill: SOLAR });
@@ -51,12 +54,23 @@ function linkButton(kit: Kit, label: string, sub: string, url: string) {
       ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: [x, y, x + w, y + h], Border: [0, 0, 0], A: { Type: 'Action', S: 'URI', URI: PDFString.of(url) } })
     );
     d.page.node.addAnnot(link);
+    if (qrUrl) {
+      const q = 66;
+      drawQr(d, qrUrl, d.x + d.width - q, d.top - q - 4, q);
+      d.lines('Or point your phone camera here to open your private quote page.', 7.2, 96, false).forEach((l, k) => d.text(l, d.x + d.width - q - 104, d.top - 22 - k * 9.5, 7.2, { color: MUTED }));
+    }
   });
 }
 
-/** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
-export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
+type Toc = { title: string; page: number }[];
+
+/** One pass at the document: the PDF so far, the page each section landed on, and the datasheets to add after it. */
+async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array; marks: Toc; sheets: string[] }> {
+  const marks: Toc = [];
   const kit = await newDocument({ code: f.number, label: f.number, title: f.title || 'Quote', revision: issueOf('QUOTE'), jobRef: f.customerRef, refLabel: 'Customer', issued: f.issued, accreditations: true });
+  const mark = (title: string) => {
+    if (!marks.some((m) => m.title === title)) marks.push({ title, page: kit.pageNumber });
+  };
   kit.header({ meta: [['Quote', f.number], ['Date', longDate(f.issued)], ...(f.validUntil ? ([['Valid until', longDate(f.validUntil)]] as [string, string][]) : [])] });
   kit.idGrid([
     ['Prepared for', f.customer.name],
@@ -103,7 +117,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
     }
   }
 
-  if (f.acceptUrl && !f.signed) linkButton(kit, 'Accept this quote online', 'Opens your private page to read, sign and choose your installation date', f.acceptUrl);
+  if (f.acceptUrl && !f.signed) linkButton(kit, 'Accept this quote online', 'Opens your private page to read, sign and choose your installation date', f.acceptUrl, f.portalUrl);
 
   // Who we are accredited with: the main section, in the brand's ink on a white card (the same logos run along the top of every later page).
   const accr = await kit.brandImage('heliaxis-accreditations.png');
@@ -119,14 +133,42 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   }
 
   const isIncluded = (bl: QuoteContent['blocks'][number]) => bl.type === 'text' && /includ/i.test(bl.heading);
+
+  // Page 2: the contents (page numbers filled in on the second pass) and About Heliaxis. Always one page, so the numbers hold.
+  kit.newPage({ continued: true });
+  kit.section('Contents', { keep: 160 });
+  if (toc) {
+    for (const e of toc) {
+      kit.block(17, (d) => {
+        d.text(e.title, d.x, d.top - 11, 9, { bold: false });
+        const num = String(e.page);
+        const tw = d.widthOf(e.title, 9);
+        d.line(d.x + tw + 8, d.top - 11, d.x + d.width - d.widthOf(num, 9, true) - 8, d.top - 11, { color: MUTED, t: 0.8, dash: [0, 3], round: true });
+        d.right(num, d.x + d.width, d.top - 11, 9, { bold: true });
+      });
+    }
+  }
+  const about = f.content.about === undefined ? DEFAULT_ABOUT : f.content.about;
+  if (about.trim()) {
+    kit.section('About Heliaxis', { keep: 150 });
+    mark('About Heliaxis');
+    for (const p of paragraphs(about)) kit.paragraph(p);
+    kit.rows([
+      { label: 'Registered address', value: HELIAXIS_COMPANY.addressLines.join(', ') },
+      { label: 'Contact', value: `${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}` },
+      { label: 'MCS · Company number', value: `${HELIAXIS_COMPANY.mcsNumber} · ${HELIAXIS_COMPANY.companyNumber}` },
+    ]);
+  }
+
   for (const b of f.content.blocks) {
     if (!isIncluded(b) || b.type !== 'text' || !b.body.trim()) continue;
     kit.section(b.heading || 'What is included');
+    mark('What is included');
     for (const p of paragraphs(b.body)) kit.paragraph(p);
   }
 
   // The design pages lifted from the uploaded proposal (when there is one), between the cover and the items.
-  if (chosen) await designPages(kit, chosen, f.images, f.content.proposal?.showFinancials === true, glanceRows(chosen, f.content.proposal?.showFinancials === true));
+  if (chosen) await designPages(kit, chosen, f.images, f.content.proposal?.showFinancials === true, glanceRows(chosen, f.content.proposal?.showFinancials === true), mark);
 
   // Page 2 onwards: the quoted items, and anything else the quote shows (text, pictures, datasheets).
   kit.newPage({ continued: true });
@@ -144,6 +186,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
       const lines = b.lines.filter((l) => !l.internal && (l.description.trim() || l.unit_pence));
       if (!lines.length) continue;
       kit.section(b.heading || 'Price');
+      mark(b.heading || 'Price');
       kit.grid({
         columns: ['Item', 'Qty', 'Unit price', 'VAT', 'Total'],
         widths: [5, 0.9, 1.6, 0.9, 1.7],
@@ -183,15 +226,25 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   }
   if (!shownTotals) kit.note('Add your items to see the total.');
 
+  // Structural requirements and the survey: what we check before anything is installed.
+  const survey = f.content.survey === undefined ? DEFAULT_SURVEY : f.content.survey;
+  if (survey.trim()) {
+    kit.section('Structural requirements and survey', { keep: 140 });
+    mark('Structural requirements and survey');
+    for (const p of paragraphs(survey)) kit.paragraph(p);
+  }
+
   // The last page: the terms, then the acceptance, so they are the last thing read before accepting.
   kit.newPage({ continued: true });
   if (f.content.terms.trim()) {
     kit.section('Terms and conditions');
+    mark('Terms and conditions');
     for (const p of paragraphs(f.content.terms)) kit.paragraph(p);
   }
 
   // Acceptance: how to accept online, and a place to sign if they prefer paper; the signed copy shows their signature.
   kit.section('Accepting this quote', { keep: 300 });
+  mark('Accepting this quote');
   kit.rows([
     { label: 'Total to pay', value: money(totals.gross), strong: true },
     ...(f.depositPence ? [{ label: 'Deposit once you accept', value: money(f.depositPence) }] : []),
@@ -200,7 +253,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   if (f.signed) {
     kit.paragraph('Accepted online by the customer, including the terms and conditions above.', { bold: true });
   } else {
-    if (f.acceptUrl) linkButton(kit, 'Accept this quote online', 'Opens your private page to read, sign and choose your installation date', f.acceptUrl);
+    if (f.acceptUrl) linkButton(kit, 'Accept this quote online', 'Opens your private page to read, sign and choose your installation date', f.acceptUrl, f.portalUrl);
     kit.paragraph('To accept, open the link we sent you and sign on your phone or computer. If you would rather sign on paper, sign below and send it back to us. By accepting, you agree to the terms and conditions above, including your right to cancel within 14 days.');
   }
   await kit.signatures([
@@ -209,7 +262,15 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
       : { title: 'Accepted by (customer)', png: null, name: f.customer.name, at: null, line: 'Date: ____ / ____ / ________' },
   ]);
 
-  const main = await kit.save();
+  return { main: await kit.save(), marks, sheets };
+}
+
+/** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
+export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
+  // Three passes: the first finds the sections, the second lays the contents out at its real length (which can move later pages), the third prints it with the numbers the second found.
+  const first = await build(f, null);
+  const second = await build(f, first.marks);
+  const { main, sheets } = await build(f, second.marks);
   if (!sheets.length) return main;
   const out = await PDFDocument.load(main);
   for (const id of sheets) {

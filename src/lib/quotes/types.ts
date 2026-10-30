@@ -70,6 +70,14 @@ export type ProposalOption = {
   carKm?: number;
   trees?: number;
   flights?: number;
+  /** MCS performance estimate details: the panels' direction (degrees from south, as printed), the MCS postcode region and the household pattern assumed. */
+  orientationDeg?: number;
+  postcodeRegion?: string;
+  occupancy?: string;
+  /** Battery capacity not used for self-consumption, the energy it discharges in a year and any extra self-consumption (EV, heat pump), in kWh. */
+  eessUnusedKwh?: number;
+  energyDischargedKwh?: number;
+  extraSelfUseKwh?: number;
   /** The energy basis for recalculating savings: used in the home straight from the panels, and in total with the battery (kWh a year). */
   selfUsePvKwh?: number;
   selfUseBatteryKwh?: number;
@@ -87,10 +95,10 @@ export type ProposalOption = {
 export type QuoteProposal = { file: string; options: ProposalOption[]; chosen: number; showFinancials: boolean };
 
 /** `terms` always print at the bottom of the quote, after everything else. */
-export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal; /** false: no signature under the introduction (on by default once one is saved). */ signOff?: boolean; /** Whose signature (a user's id): theirs, or one they have shared. */ signerId?: string };
+export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal; /** false: no signature under the introduction (on by default once one is saved). */ signOff?: boolean; /** The About Heliaxis page and the structural requirements and survey section: absent = the standard wording, empty = left out. */ about?: string; survey?: string; /** Whose signature (a user's id): theirs, or one they have shared. */ signerId?: string };
 
-const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct', 'selfSufficiencyPvOnlyPct', 'consumptionKwh', 'kwhPerKwp', 'shadeFactor', 'tiltDeg', 'optionPage', 'firstYear', 'netSavingsGbp', 'rateOfReturnPct', 'solarSharePct', 'co2TonnesYear', 'carKm', 'trees', 'flights', 'selfUsePvKwh', 'selfUseBatteryKwh', 'tariffDayPence', 'tariffNightPence', 'standingPencePerDay', 'exportPence', 'priceRisePct', 'discountPct', 'degradationPct'] as const;
-const STR_KEYS = ['name', 'panelBrand', 'panelModel', 'inverterBrand', 'inverterModel', 'batteryBrand', 'batteryModel', 'paybackText'] as const;
+const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct', 'selfSufficiencyPvOnlyPct', 'consumptionKwh', 'kwhPerKwp', 'shadeFactor', 'tiltDeg', 'optionPage', 'firstYear', 'netSavingsGbp', 'rateOfReturnPct', 'solarSharePct', 'co2TonnesYear', 'carKm', 'trees', 'flights', 'selfUsePvKwh', 'selfUseBatteryKwh', 'tariffDayPence', 'tariffNightPence', 'standingPencePerDay', 'exportPence', 'priceRisePct', 'discountPct', 'degradationPct', 'orientationDeg', 'eessUnusedKwh', 'energyDischargedKwh', 'extraSelfUseKwh'] as const;
+const STR_KEYS = ['name', 'panelBrand', 'panelModel', 'inverterBrand', 'inverterModel', 'batteryBrand', 'batteryModel', 'paybackText', 'postcodeRegion', 'occupancy'] as const;
 
 /** A proposal option from a request or the database, with only sensible values kept. */
 export function cleanOption(v: unknown): ProposalOption {
@@ -98,7 +106,7 @@ export function cleanOption(v: unknown): ProposalOption {
   const out: Record<string, string | number> = {};
   for (const k of NUM_KEYS) {
     const n = Number(o[k]);
-    if (o[k] != null && o[k] !== '' && Number.isFinite(n) && n >= 0 && n < 10_000_000) out[k] = Math.round(n * 100) / 100;
+    if (o[k] != null && o[k] !== '' && Number.isFinite(n) && (n >= 0 || (k === 'orientationDeg' && n >= -360)) && n < 10_000_000) out[k] = k === 'shadeFactor' ? Math.round(n * 1000) / 1000 : Math.round(n * 100) / 100;
   }
   for (const k of STR_KEYS) {
     const t = typeof o[k] === 'string' ? String(o[k]).replace(/\s+/g, ' ').trim().slice(0, 120) : '';
@@ -127,6 +135,24 @@ export function cleanOption(v: unknown): ProposalOption {
   }
   return out as ProposalOption;
 }
+
+export const DEFAULT_ABOUT = [
+  'Heliaxis is a South Wales renewable energy company, based in Newport. We design, supply, install and look after solar panels, battery storage and heat pumps for homes and businesses.',
+  'Our approach is energy that revolves around you: we start from how you use electricity, design the system around that, and stay with you once it is installed.',
+  'We are certified and registered with the schemes shown in this document. Our team is on hand before, during and after your installation: call 01633 965205 or email hello@heliaxis.co.uk.',
+].join('\n\n');
+
+export const DEFAULT_SURVEY = [
+  'Before any equipment is ordered or installed, we carry out a survey of your property. It checks:',
+  'The roof: its covering and condition, its structure (rafter size and spacing) and whether it can carry the weight of the panels and their fixings, and the best place for the array.',
+  'Access and safety: scaffold or other access equipment, roof edge protection and any restrictions at the property.',
+  'Shading: trees, buildings and chimneys that could shade the panels at different times of day and year.',
+  'Your electrics: the consumer unit, earthing and bonding, the supply (single or three phase) and the routes for cables.',
+  'Equipment positions: where the inverter, battery and isolators go, in line with the manufacturer’s instructions and the regulations that apply, including fire routes and means of escape, and the space and ventilation the equipment needs.',
+  'Your network connection: whether notification to, or approval from, your distribution network operator is needed.',
+  'If the survey finds that the roof cannot take the panels as designed, the layout, the equipment or the price may need to change. We will explain any change and agree it with you in writing before work starts. Repairs or strengthening to the roof or structure are not included unless this quote says so, and may need a roofer or a structural engineer.',
+  'Please tell us before the survey about anything we should know: leaks or repairs to the roof, asbestos, alterations to the building, or restrictions on where equipment can go.',
+].join('\n\n');
 
 /** VAT rates the builder offers: 0% (domestic solar and batteries to 2027), 5% and 20%. */
 export const VAT_RATES = [0, 5, 20] as const;
@@ -325,5 +351,5 @@ export function cleanContent(v: unknown): QuoteContent {
   const pr = o.proposal as Partial<QuoteProposal> | undefined;
   const options = Array.isArray(pr?.options) ? pr!.options.slice(0, 4).map(cleanOption).filter((x) => Object.keys(x).length) : [];
   const proposal: QuoteProposal | undefined = options.length ? { file: str(pr?.file, 160), options, chosen: Math.min(Math.max(0, Math.round(Number(pr?.chosen) || 0)), options.length - 1), showFinancials: pr?.showFinancials === true } : undefined;
-  return { intro: str(o.intro, 6000), blocks, terms, ...(proposal ? { proposal } : {}), ...(o.signOff === false ? { signOff: false } : {}), ...(typeof o.signerId === 'string' && /^[0-9a-f-]{36}$/i.test(o.signerId) ? { signerId: o.signerId } : {}) };
+  return { intro: str(o.intro, 6000), blocks, terms, ...(proposal ? { proposal } : {}), ...(o.signOff === false ? { signOff: false } : {}), ...(typeof o.about === 'string' ? { about: str(o.about, 6000) } : {}), ...(typeof o.survey === 'string' ? { survey: str(o.survey, 8000) } : {}), ...(typeof o.signerId === 'string' && /^[0-9a-f-]{36}$/i.test(o.signerId) ? { signerId: o.signerId } : {}) };
 }

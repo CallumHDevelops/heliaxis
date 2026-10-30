@@ -1,6 +1,8 @@
 import 'server-only';
 import { rgb } from 'pdf-lib';
 import { AMBER, INK, LABEL, LINE, MUTED, SOLAR, type Drawing, type Kit } from '@/lib/documents/pdf-kit';
+import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from './how-it-works';
+import { MCS_NOTE, mcsTable } from './mcs';
 import { DEFAULT_EXPORT_PENCE, monthlyExportKwh } from './roi';
 import type { ProposalOption } from './types';
 
@@ -189,7 +191,94 @@ function exportYearOne(o: ProposalOption, gen: number[] | null, use: number[] | 
   return { rate, annual, kwh, gbpByMonth: kwh.map((k) => (k * rate) / 100), gbp: kwh.reduce((a, k) => a + (k * rate) / 100, 0) };
 }
 
-export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, financials: boolean, glance: { label: string; value: string }[]): Promise<boolean> {
+
+/** A small drawing for each node: panels, a house, a pylon, a battery. */
+function nodeGlyph(d: Drawing, n: Node, cx: number, cy: number, c: ReturnType<typeof rgb>) {
+  const t = 0.9;
+  if (n === 'solar') {
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) d.rect(cx - 9 + i * 9.5, cy - 8 + j * 8.5, 8.5, 7.5, { border: c, line: t });
+  } else if (n === 'home') {
+    d.line(cx - 10, cy + 1, cx, cy + 10, { color: c, t });
+    d.line(cx, cy + 10, cx + 10, cy + 1, { color: c, t });
+    d.rect(cx - 7, cy - 9, 14, 10, { border: c, line: t });
+    d.rect(cx - 2, cy - 9, 4, 6, { border: c, line: t });
+  } else if (n === 'grid') {
+    d.line(cx, cy + 10, cx, cy - 10, { color: c, t });
+    d.line(cx - 8, cy + 3, cx + 8, cy + 3, { color: c, t });
+    d.line(cx - 6, cy - 3, cx + 6, cy - 3, { color: c, t });
+    d.line(cx - 8, cy - 10, cx, cy + 10, { color: c, t: 0.7 });
+    d.line(cx + 8, cy - 10, cx, cy + 10, { color: c, t: 0.7 });
+  } else {
+    d.rect(cx - 5, cy - 10, 10, 20, { border: c, line: t });
+    d.rect(cx - 2, cy + 10, 4, 2.5, { fill: c });
+    d.line(cx - 3, cy - 4, cx + 3, cy - 4, { color: c, t });
+    d.line(cx - 3, cy, cx + 3, cy, { color: c, t });
+    d.line(cx - 3, cy + 4, cx + 3, cy + 4, { color: c, t });
+  }
+}
+
+/** "How your system works": where the electricity goes in the sun, on a cloudy day or evening, and at night. */
+function howItWorksBlock(kit: Kit, hasBattery: boolean) {
+  const states = howItWorks(hasBattery);
+  kit.block(204, (d) => {
+    const gap = 12;
+    const pw = (d.width - gap * 2) / 3;
+    const sc = Math.min(1, (pw - 6) / 160);
+    states.forEach((st, i) => {
+      const ox = d.x + i * (pw + gap) + (pw - 160 * sc) / 2;
+      const oy = d.top - 6;
+      const P = (x: number, y: number) => ({ x: ox + x * sc, y: oy - y * sc });
+      d.rect(d.x + i * (pw + gap), d.top - 204, pw, 204, { fill: WHITE, border: LINE, line: 0.6 });
+      d.text(st.title.toUpperCase(), d.x + i * (pw + gap) + 8, d.top - 14, 6.3, { style: 'mono', color: AMBER });
+      const nodes: Node[] = hasBattery ? ['home', 'solar', 'grid', 'battery'] : ['home', 'solar', 'grid'];
+      for (const [a, b] of st.flows) {
+        const ar = arrow(a, b);
+        const p1 = P(ar.x1, ar.y1 + 22);
+        const p2 = P(ar.x2, ar.y2 + 22);
+        d.line(p1.x, p1.y, p2.x, p2.y, { color: AMBER, t: 1.5 });
+        const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        for (const s of [-1, 1]) d.line(p2.x, p2.y, p2.x - Math.cos(ang + s * 0.5) * 6, p2.y - Math.sin(ang + s * 0.5) * 6, { color: AMBER, t: 1.5 });
+      }
+      for (const n of nodes) {
+        const c = P(NODE_AT[n].x, NODE_AT[n].y + 22);
+        const off = st.off.includes(n);
+        const h = (NODE_SIZE * sc) / 2;
+        d.rect(c.x - h, c.y - h, h * 2, h * 2, { fill: off ? rgb(0.88, 0.87, 0.84) : SOLAR });
+        nodeGlyph(d, n, c.x, c.y, off ? rgb(0.55, 0.54, 0.5) : INK);
+        d.text(NODE_LABEL[n].toUpperCase(), c.x - d.widthOf(NODE_LABEL[n].toUpperCase(), 5.6) / 2, n === 'home' ? c.y + h + 4 : c.y - h - 8, 5.6, { style: 'mono', color: LABEL });
+      }
+      d.lines(st.caption, 7.2, pw - 18, false).forEach((l, k) => d.text(l, d.x + i * (pw + gap) + 9, d.top - 174 - k * 9, 7.2, { color: LABEL }));
+    });
+  });
+}
+
+/** The MCS performance estimate, in the sections MCS uses. */
+function mcsPages(kit: Kit, o: ProposalOption, mark: (title: string) => void) {
+  const sections = mcsTable(o);
+  if (!sections.length) return;
+  kit.section('MCS performance estimate', { keep: 200 });
+  mark('MCS performance estimate');
+  for (const sec of sections) {
+    kit.block(20, (d) => {
+      d.rect(d.x, d.top - 18, d.width, 18, { fill: rgb(0.93, 0.91, 0.86) });
+      d.rect(d.x, d.top - 18, 3, 18, { fill: SOLAR });
+      d.text(sec.title.toUpperCase(), d.x + 10, d.top - 12, 6.6, { style: 'mono', color: INK });
+    });
+    for (const r of sec.rows) {
+      kit.block(14.5, (d) => {
+        d.rect(d.x, d.top - 14.5, d.width, 14.5, { fill: WHITE });
+        d.line(d.x, d.top - 14.5, d.x + d.width, d.top - 14.5, { color: LINE, t: 0.4 });
+        d.text(r.label, d.x + 10, d.top - 10, 7.8, { color: INK });
+        d.text(r.value, d.x + d.width * 0.62, d.top - 10, 7.8, { bold: true });
+        if (r.unit) d.text(r.unit, d.x + d.width * 0.9, d.top - 10, 7.8, { color: MUTED });
+      });
+    }
+    kit.gap(3);
+  }
+  kit.note(MCS_NOTE);
+}
+
+export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, financials: boolean, glance: { label: string; value: string }[], mark: (title: string) => void = () => undefined): Promise<boolean> {
   const pic = (kind: 'roof' | 'inverter' | 'battery' | 'sunpath') => (o.images?.[kind] ? pics.get(o.images[kind]!) : undefined);
   const roof = await kit.embed(pic('roof')?.bytes);
   const inverter = await kit.embed(pic('inverter')?.bytes);
@@ -220,6 +309,7 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
 
   kit.newPage({ continued: true });
   kit.section('Your system design', { keep: 280 });
+  mark('Your system design');
   tiles(kit, key);
   if (roof) {
     const ratio = roof.height / roof.width;
@@ -233,6 +323,7 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
   }
   if (hasSetup) {
     kit.section('Your Solar Setup', { keep: 120 });
+    mark('Your Solar Setup');
     const products: Product[] = [];
     if (o.panelCount || o.panelModel)
       products.push({
@@ -251,6 +342,7 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
   if (hasPerformance) {
     kit.newPage({ continued: true });
     kit.section('Expected performance', { intro: 'Estimated by the MCS method from your roof, its direction and shading, against how much electricity you use. A guide, not a guarantee.', keep: 250 });
+    mark('Expected performance');
     if (gen) generationChart(kit, gen, use);
     if (o.selfSufficiencyPvOnlyPct || o.selfSufficiencyPct) {
       kit.section('How much of your electricity it covers', { keep: 80 });
@@ -276,6 +368,7 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
         ...(shade !== null ? [`In your design about ${shade}% of the sunlight is lost to shading (a shade factor of ${o.shadeFactor}). The rest reaches the panels.`] : []),
       ];
       kit.section('Sun path and shading', { keep: 165 });
+      mark('Sun path and shading');
       const imgW = 262;
       const colW = 480 - imgW - 18;
       const textH = 14 + notes.reduce((a, t) => a + Math.ceil((t.length * 3.7) / colW) * 9.6 + 5, 0);
@@ -297,9 +390,19 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
     }
   }
 
+  // How it works, and the MCS performance estimate tables.
+  if (hasSetup || hasPerformance) {
+    kit.newPage({ continued: true });
+    kit.section('How your system works', { intro: 'Where your electricity comes from and goes, through the day.', keep: 240 });
+    mark('How your system works');
+    howItWorksBlock(kit, !!(o.batteryUsableKwh || o.batteryModel));
+    mcsPages(kit, o, mark);
+  }
+
   if (hasMoney) {
     kit.newPage({ continued: true });
     kit.section('What it could save you', { intro: 'The design proposal’s own estimates, using today’s tariff and a yearly rise in energy prices. Prices can go down as well as up.', keep: 300 });
+    mark('What it could save you');
     const exp = exportYearOne(o, gen, use);
     tiles(kit, [
       ...(o.annualSavingsGbp ? [{ v: gbp(o.annualSavingsGbp), l: 'Bill saving, year one' }] : []),

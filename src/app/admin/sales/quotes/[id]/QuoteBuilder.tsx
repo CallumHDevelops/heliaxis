@@ -12,7 +12,7 @@ import '../../../crm/crm.css';
 import '../quotes.css';
 import type { SavedItem } from '@/lib/quotes/items';
 import { greetingName } from '@/lib/greeting-name';
-import { DEFAULT_TERMS, emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type ProposalOption, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
+import { DEFAULT_ABOUT, DEFAULT_SURVEY, DEFAULT_TERMS, emptyLine, emptyText, lineNet, lineProfit, money, newId, pct, penceFromText, priced, profitOf, textFromPence, totalsOf, VAT_RATES, type PriceMode, type ProposalOption, type QuoteBlock, type QuoteContent, type QuoteLine } from '@/lib/quotes/types';
 
 type Customer = { name: string; email: string | null; phone: string | null };
 type Channel = { ok: true; to?: string; via?: string } | { ok: false; error: string };
@@ -1046,6 +1046,27 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
               Datasheets
             </button>
           </div>
+
+          <section className="qb-card">
+            <label className="qb-lab" htmlFor="qb-about">
+              About Heliaxis (the second page, beside the contents)
+            </label>
+            <textarea id="qb-about" className="crm-input" rows={7} value={content.about ?? DEFAULT_ABOUT} onChange={(e) => edit((c) => ({ ...c, about: e.target.value }))} disabled={locked} />
+            <p className="crm-small crm-muted">Leave it empty to leave the About page out. The company details, MCS number and contact details are added underneath for you.</p>
+          </section>
+
+          <section className="qb-card">
+            <label className="qb-lab" htmlFor="qb-survey">
+              Structural requirements and survey (printed after the prices)
+            </label>
+            <textarea id="qb-survey" className="crm-input" rows={12} value={content.survey ?? DEFAULT_SURVEY} onChange={(e) => edit((c) => ({ ...c, survey: e.target.value }))} disabled={locked} />
+            <div className="qb-writeit">
+              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => (!content.survey || window.confirm('Replace this with the standard wording?')) && edit((c) => ({ ...c, survey: DEFAULT_SURVEY }))}>
+                Use the standard wording
+              </button>
+              <small className="crm-muted">What we check at survey and what happens if the roof or structure needs work. Edit it to suit the job (a flat roof, a barn, ground mount).</small>
+            </div>
+          </section>
 
           <section className="qb-card">
             <label className="qb-lab">Terms and conditions (printed at the end of the quote, just before the acceptance)</label>

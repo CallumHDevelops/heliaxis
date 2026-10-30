@@ -42,3 +42,15 @@
 .ip-sun h3 { margin: 0 0 6px; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: #c77f04; }
 .ip-sun p { margin: 0 0 8px; font-size: 0.86rem; line-height: 1.45; }
 @media (max-width: 640px) { .ip-sun { grid-template-columns: 1fr; } }
+
+.ip-flows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+.ip-flow { padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: #211f18; }
+.ip-flow small { font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; color: #c77f04; }
+.ip-flow svg { width: 100%; height: auto; display: block; margin: 4px 0; }
+.ip-flow p { margin: 0; font-size: 0.8rem; line-height: 1.4; }
+@media (max-width: 640px) { .ip-flows { grid-template-columns: 1fr; } }
+.ip-mcs { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font-size: 0.86rem; }
+.ip-mcs caption { text-align: left; font-weight: 700; padding: 6px 0; font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: #c77f04; }
+.ip-mcs th { text-align: left; font-weight: 400; padding: 6px 8px 6px 0; border-top: 1px solid var(--border); width: 55%; }
+.ip-mcs td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border); font-weight: 600; }
+.ip-mcs td:last-child { font-weight: 400; color: var(--muted); }

@@ -3,6 +3,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import type { InteractiveData } from '@/lib/quotes/interactive';
+import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from '@/lib/quotes/how-it-works';
+import { MCS_NOTE, mcsTable } from '@/lib/quotes/mcs';
 import { paybackWords, recalc, type Basis, type Tariff } from '@/lib/quotes/roi';
 import '../portal.css';
 import './proposal.css';
@@ -153,6 +155,40 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
                 {o.selfSufficiencyPct ? <Cover label="Panels with the battery" pct={o.selfSufficiencyPct} strong /> : null}
               </div>
             )}
+          </section>
+        )}
+
+        {(products.length > 0 || gen) && (
+          <section className="pt-card">
+            <h2>How your system works</h2>
+            <p className="pt-muted">Where your electricity comes from and goes, through the day.</p>
+            <div className="ip-flows">
+              {howItWorks(!!(o.batteryUsableKwh || o.batteryModel)).map((st) => (
+                <FlowPanel key={st.title} state={st} hasBattery={!!(o.batteryUsableKwh || o.batteryModel)} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {mcsTable(o).length > 0 && (
+          <section className="pt-card">
+            <h2>MCS performance estimate</h2>
+            <p className="pt-muted">The figures MCS asks to be shown with a solar PV estimate, as calculated in the design software.</p>
+            {mcsTable(o).map((sec) => (
+              <table key={sec.title} className="ip-mcs">
+                <caption>{sec.title}</caption>
+                <tbody>
+                  {sec.rows.map((r) => (
+                    <tr key={r.label}>
+                      <th scope="row">{r.label}</th>
+                      <td>{r.value}</td>
+                      <td>{r.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ))}
+            <p className="pt-muted ip-note">{MCS_NOTE}</p>
           </section>
         )}
 
@@ -370,5 +406,39 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
         </g>
       )}
     </svg>
+  );
+}
+
+function FlowPanel({ state, hasBattery }: { state: ReturnType<typeof howItWorks>[number]; hasBattery: boolean }) {
+  const nodes: Node[] = hasBattery ? ['home', 'solar', 'grid', 'battery'] : ['home', 'solar', 'grid'];
+  const h = NODE_SIZE / 2;
+  return (
+    <div className="ip-flow">
+      <small>{state.title}</small>
+      <svg viewBox="0 0 160 160" role="img" aria-label={`${state.title}: ${state.caption}`}>
+        <defs>
+          <marker id={`arr-${state.title.length}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" fill="#C77F04" />
+          </marker>
+        </defs>
+        {state.flows.map(([a, b]) => {
+          const ar = arrow(a, b);
+          return <line key={`${a}${b}`} x1={ar.x1} y1={ar.y1 + 6} x2={ar.x2} y2={ar.y2 + 6} stroke="#C77F04" strokeWidth="2" markerEnd={`url(#arr-${state.title.length})`} />;
+        })}
+        {nodes.map((n) => {
+          const c = { x: NODE_AT[n].x, y: NODE_AT[n].y + 6 };
+          const off = state.off.includes(n);
+          return (
+            <g key={n}>
+              <rect x={c.x - h} y={c.y - h} width={NODE_SIZE} height={NODE_SIZE} fill={off ? '#e1ded6' : '#F8BC1E'} />
+              <text x={c.x} y={n === 'home' ? c.y - h - 3 : c.y + h + 9} textAnchor="middle" fontSize="7" letterSpacing="0.6" fill="currentColor" opacity="0.7">
+                {NODE_LABEL[n].toUpperCase()}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <p>{state.caption}</p>
+    </div>
   );
 }

@@ -90,6 +90,7 @@ export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): P
     signed,
     signatory,
     acceptUrl: token ? `${portalUrl(token)}?accept=1` : undefined,
+    portalUrl: token ? portalUrl(token) : undefined,
   };
   return quotePdf(facts);
 }
