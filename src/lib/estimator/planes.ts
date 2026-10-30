@@ -270,7 +270,20 @@ export function packFaces(g: Grid, faces: Face[], opt: PackOptions): Placed[] {
       perFace.push({ placed: best.sort((p, q) => band(q) - band(p) || q.v - p.v || p.u - q.u), sun: bestSun });
     }
   }
-  return perFace.sort((p, q) => q.sun - p.sun).flatMap((p) => p.placed);
+  // The sunniest face first, in full. A smaller system that spills onto the next face starts at the end of it nearest the panels
+  // already laid, so the extra ones sit beside the block and not at the far end of the roof.
+  const ordered = perFace.sort((p, q) => q.sun - p.sun);
+  const out: Placed[] = [];
+  for (const f of ordered) {
+    if (!out.length) {
+      out.push(...f.placed);
+      continue;
+    }
+    const cx = out.reduce((a, p) => a + p.x, 0) / out.length;
+    const cy = out.reduce((a, p) => a + p.y, 0) / out.length;
+    out.push(...[...f.placed].sort((p, q) => Math.hypot(p.x - cx, p.y - cy) - Math.hypot(q.x - cx, q.y - cy)));
+  }
+  return out;
 }
 
 /** The corners of the smallest convex shape round some cells, for drawing a face. */
