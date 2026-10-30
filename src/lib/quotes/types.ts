@@ -44,14 +44,26 @@ export type ProposalOption = {
   annualGenerationKwh?: number;
   annualSavingsGbp?: number;
   paybackText?: string;
+  /** Self-sufficiency with the battery, and with the panels alone, in per cent. */
   selfSufficiencyPct?: number;
+  selfSufficiencyPvOnlyPct?: number;
+  /** Assumed yearly use, the MCS yield (kWh per kWp), its shading factor, the panels' tilt and the page the option sits on in the proposal. */
+  consumptionKwh?: number;
+  kwhPerKwp?: number;
+  shadeFactor?: number;
+  tiltDeg?: number;
+  optionPage?: number;
+  /** Generation in each month, January to December, in kWh. */
+  monthlyKwh?: number[];
+  /** Pictures lifted from the proposal and kept with the quote: storage paths. */
+  images?: Partial<Record<'roof' | 'inverter' | 'battery' | 'sunpath', string>>;
 };
 export type QuoteProposal = { file: string; options: ProposalOption[]; chosen: number; showFinancials: boolean };
 
 /** `terms` always print at the bottom of the quote, after everything else. */
 export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal; /** false: no signature under the introduction (on by default once one is saved). */ signOff?: boolean; /** Whose signature (a user's id): theirs, or one they have shared. */ signerId?: string };
 
-const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct'] as const;
+const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct', 'selfSufficiencyPvOnlyPct', 'consumptionKwh', 'kwhPerKwp', 'shadeFactor', 'tiltDeg', 'optionPage'] as const;
 const STR_KEYS = ['name', 'panelBrand', 'panelModel', 'inverterBrand', 'inverterModel', 'batteryBrand', 'batteryModel', 'paybackText'] as const;
 
 /** A proposal option from a request or the database, with only sensible values kept. */
@@ -65,6 +77,19 @@ export function cleanOption(v: unknown): ProposalOption {
   for (const k of STR_KEYS) {
     const t = typeof o[k] === 'string' ? String(o[k]).replace(/\s+/g, ' ').trim().slice(0, 120) : '';
     if (t) out[k] = t;
+  }
+  if (Array.isArray(o.monthlyKwh) && o.monthlyKwh.length === 12) {
+    const m = o.monthlyKwh.map((x) => Math.round(Number(x)));
+    if (m.every((x) => Number.isFinite(x) && x >= 0 && x < 1_000_000)) (out as Record<string, unknown>).monthlyKwh = m;
+  }
+  const im = o.images as Record<string, unknown> | undefined;
+  if (im && typeof im === 'object') {
+    const keep: Record<string, string> = {};
+    for (const k of ['roof', 'inverter', 'battery', 'sunpath']) {
+      const v = typeof im[k] === 'string' ? String(im[k]) : '';
+      if (v.startsWith('quotes/') && !v.includes('..') && v.length < 200) keep[k] = v;
+    }
+    if (Object.keys(keep).length) (out as Record<string, unknown>).images = keep;
   }
   return out as ProposalOption;
 }

@@ -12,7 +12,7 @@ import { cleanOption, type ProposalOption } from './types';
  * proposal costs no more than a short one. No ANTHROPIC_API_KEY: no read.
  */
 const MODEL = process.env.QUOTE_READER_MODEL || 'claude-haiku-5-5';
-const FIRST_PAGES = 16;
+const FIRST_PAGES = 20;
 
 const Option = z.object({
   name: z.string().nullable(),
@@ -37,6 +37,13 @@ const Option = z.object({
   annual_savings_gbp: z.number().nullable(),
   payback_text: z.string().nullable(),
   self_sufficiency_pct_with_battery: z.number().nullable(),
+  self_sufficiency_pct_panels_only: z.number().nullable(),
+  annual_consumption_kwh: z.number().nullable(),
+  kwh_per_kwp: z.number().nullable(),
+  shade_factor: z.number().nullable(),
+  tilt_degrees: z.number().nullable(),
+  monthly_generation_kwh: z.array(z.number()).nullable(),
+  option_page: z.number().nullable(),
 });
 const Read = z.object({ readable: z.boolean(), options: z.array(Option) });
 
@@ -44,7 +51,9 @@ const PROMPT =
   'This is a design proposal for a home solar system, with one or more system options. For each option copy exactly what is printed: ' +
   'its name, system size in kWp, number of panels and their wattage, panel brand and model, inverter brand, model, count and power in kW, ' +
   'battery brand, model, number of modules and usable capacity in kWh, each warranty in years, the estimated annual generation in kWh, ' +
-  'the estimated annual bill saving in pounds, the payback as printed (for example "9 Years 6 Months") and self-sufficiency with the battery in percent. ' +
+  'the estimated annual bill saving in pounds, the payback as printed (for example "9 Years 6 Months"), self-sufficiency with the battery and with the panels only in percent, ' +
+  'the assumed annual consumption in kWh, the MCS kWh per kWp, the shade factor, the panel tilt in degrees, the monthly generation for January to December in kWh (exactly twelve numbers, from the monthly table) ' +
+  'and the page number (counting the first page as 1) of the page headed System Option for that option. ' +
   'Use null for anything not printed. Never work anything out and never guess. If there is no system option in it, set readable to false and give an empty list.';
 
 /** Just the first pages of the PDF: where the options and their specifications are, and far cheaper than all of it. */
@@ -83,6 +92,7 @@ export async function readProposal(bytes: Uint8Array): Promise<{ ok: true; optio
         inverterBrand: o.inverter_brand, inverterModel: o.inverter_model, inverterCount: o.inverter_count, inverterKw: o.inverter_kw, inverterWarrantyYears: o.inverter_warranty_years,
         batteryBrand: o.battery_brand, batteryModel: o.battery_model, batteryModules: o.battery_modules, batteryUsableKwh: o.battery_usable_kwh, batteryWarrantyYears: o.battery_warranty_years,
         annualGenerationKwh: o.annual_generation_kwh, annualSavingsGbp: o.annual_savings_gbp, paybackText: o.payback_text, selfSufficiencyPct: o.self_sufficiency_pct_with_battery,
+        selfSufficiencyPvOnlyPct: o.self_sufficiency_pct_panels_only, consumptionKwh: o.annual_consumption_kwh, kwhPerKwp: o.kwh_per_kwp, shadeFactor: o.shade_factor, tiltDeg: o.tilt_degrees, monthlyKwh: o.monthly_generation_kwh ?? undefined, optionPage: o.option_page,
       })
     );
     return { ok: true, options: options.filter((o) => Object.keys(o).length) };

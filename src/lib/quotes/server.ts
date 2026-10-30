@@ -48,7 +48,8 @@ export async function renderQuote(q: QuoteRow, signed?: QuoteFacts['signed']): P
   const signatory = q.content.signerId ? await readSignatory(q.content.signerId).catch(() => null) : null;
   const images = new Map<string, { bytes: Uint8Array; mime: string }>();
   const datasheets = new Map<string, Uint8Array>();
-  const paths = q.content.blocks.flatMap((b) => (b.type === 'images' ? b.images.map((i) => i.path) : []));
+  const chosenOption = q.content.proposal?.options[q.content.proposal.chosen];
+  const paths = [...q.content.blocks.flatMap((b) => (b.type === 'images' ? b.images.map((i) => i.path) : [])), ...Object.values(chosenOption?.images ?? {})];
   const libIds = q.content.blocks.flatMap((b) => (b.type === 'datasheets' ? b.files.map((f) => f.library_id) : []));
   await Promise.all(
     paths.map(async (path) => {
