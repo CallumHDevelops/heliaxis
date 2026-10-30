@@ -65,6 +65,8 @@ const Compass = ({ deg }: { deg: number }) => (
 );
 
 export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker = false }: { settings: EstimatorSettings; roofLookup?: boolean; addressPicker?: boolean }) {
+  // With ?debug on the page address: the roof lookup's raw answer, to copy and send (never shown otherwise).
+  const [debugText, setDebugText] = useState('');
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
   const [who, setWho] = useState<Who>('home');
@@ -168,8 +170,10 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
     try {
       // A short minimum, so a quick answer is a smooth change of screen and not a flash.
       const wait = new Promise((r) => setTimeout(r, 1600));
-      const res = await fetch(picker ? `/api/solar/roof?id=${encodeURIComponent(pickedId)}` : `/api/solar/roof?pc=${encodeURIComponent(postcode.trim())}&line=${encodeURIComponent(house.trim())}`);
+      const debugOn = new URLSearchParams(window.location.search).has('debug');
+      const res = await fetch((picker ? `/api/solar/roof?id=${encodeURIComponent(pickedId)}` : `/api/solar/roof?pc=${encodeURIComponent(postcode.trim())}&line=${encodeURIComponent(house.trim())}`) + (debugOn ? '&debug=1' : ''));
       const d = await res.json();
+      if (debugOn) setDebugText(JSON.stringify(d));
       await wait;
       const full = String(d?.address ?? '').match(/[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}/i);
       if (full) setPostcode(full[0].toUpperCase());
@@ -193,6 +197,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
 
   return (
     <>
+      {debugText && <textarea readOnly value={debugText} onFocus={(e) => e.currentTarget.select()} aria-label="Roof lookup debug" style={{ position: 'fixed', left: 8, right: 8, bottom: 8, height: 90, zIndex: 9999, fontSize: 11 }} />}
       <section className="est-hero">
         <div className="glow" />
         <div className="wrap">
