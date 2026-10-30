@@ -36,4 +36,12 @@ describe('design proposal figures', () => {
     b.lines = [{ id: '1', description: 'Astronergy 460W panels', qty: 14, unit_pence: 1, vat_rate: 0, cost_pence: 0, mode: 'manual', markup: 0 }];
     expect(includedByRule(c)).toContain('manufacturer’s warranties: a 25-year product warranty and a 30-year performance warranty on the solar panels, a 10-year warranty on the inverter and a 10-year warranty on the battery.');
   });
+  it('keeps the monthly and yearly series only when they are the right length and sensible', () => {
+    const o = cleanOption({ monthlyKwh: [1, 2, 3], monthlyUseKwh: Array(12).fill(300), cumulativeGbp: [-11367, -10339, 889, 26603], billBeforeGbp: Array(12).fill(100), billAfterGbp: Array(11).fill(0) });
+    expect(o.monthlyKwh).toBeUndefined();
+    expect(o.monthlyUseKwh).toHaveLength(12);
+    expect(o.cumulativeGbp).toEqual([-11367, -10339, 889, 26603]);
+    expect(o.billBeforeGbp).toHaveLength(12);
+    expect(o.billAfterGbp).toBeUndefined();
+  });
 });

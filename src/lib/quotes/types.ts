@@ -53,8 +53,23 @@ export type ProposalOption = {
   shadeFactor?: number;
   tiltDeg?: number;
   optionPage?: number;
-  /** Generation in each month, January to December, in kWh. */
+  /** Generation, and the customer's electricity use, in each month, January to December, in kWh. */
   monthlyKwh?: number[];
+  monthlyUseKwh?: number[];
+  /** The proposal's monthly electricity bill before and after, in pounds. */
+  billBeforeGbp?: number[];
+  billAfterGbp?: number[];
+  /** Cumulative net position at the end of each year from the first (pounds, the first is negative: the price), and that first year. */
+  cumulativeGbp?: number[];
+  firstYear?: number;
+  netSavingsGbp?: number;
+  rateOfReturnPct?: number;
+  /** Generation as a share of use, CO2 avoided a year (tonnes), and the lifetime car kilometres, trees and flights it equals. */
+  solarSharePct?: number;
+  co2TonnesYear?: number;
+  carKm?: number;
+  trees?: number;
+  flights?: number;
   /** Pictures lifted from the proposal and kept with the quote: storage paths. */
   images?: Partial<Record<'roof' | 'inverter' | 'battery' | 'sunpath', string>>;
 };
@@ -63,7 +78,7 @@ export type QuoteProposal = { file: string; options: ProposalOption[]; chosen: n
 /** `terms` always print at the bottom of the quote, after everything else. */
 export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal; /** false: no signature under the introduction (on by default once one is saved). */ signOff?: boolean; /** Whose signature (a user's id): theirs, or one they have shared. */ signerId?: string };
 
-const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct', 'selfSufficiencyPvOnlyPct', 'consumptionKwh', 'kwhPerKwp', 'shadeFactor', 'tiltDeg', 'optionPage'] as const;
+const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct', 'selfSufficiencyPvOnlyPct', 'consumptionKwh', 'kwhPerKwp', 'shadeFactor', 'tiltDeg', 'optionPage', 'firstYear', 'netSavingsGbp', 'rateOfReturnPct', 'solarSharePct', 'co2TonnesYear', 'carKm', 'trees', 'flights'] as const;
 const STR_KEYS = ['name', 'panelBrand', 'panelModel', 'inverterBrand', 'inverterModel', 'batteryBrand', 'batteryModel', 'paybackText'] as const;
 
 /** A proposal option from a request or the database, with only sensible values kept. */
@@ -78,10 +93,18 @@ export function cleanOption(v: unknown): ProposalOption {
     const t = typeof o[k] === 'string' ? String(o[k]).replace(/\s+/g, ' ').trim().slice(0, 120) : '';
     if (t) out[k] = t;
   }
-  if (Array.isArray(o.monthlyKwh) && o.monthlyKwh.length === 12) {
-    const m = o.monthlyKwh.map((x) => Math.round(Number(x)));
-    if (m.every((x) => Number.isFinite(x) && x >= 0 && x < 1_000_000)) (out as Record<string, unknown>).monthlyKwh = m;
-  }
+  const series = (k: string, len: number | [number, number], min: number) => {
+    const v = o[k];
+    if (!Array.isArray(v)) return;
+    const n = v.map((x) => Math.round(Number(x)));
+    const okLen = Array.isArray(len) ? n.length >= len[0] && n.length <= len[1] : n.length === len;
+    if (okLen && n.every((x) => Number.isFinite(x) && x >= min && x < 100_000_000)) (out as Record<string, unknown>)[k] = n;
+  };
+  series('monthlyKwh', 12, 0);
+  series('monthlyUseKwh', 12, 0);
+  series('billBeforeGbp', 12, 0);
+  series('billAfterGbp', 12, 0);
+  series('cumulativeGbp', [2, 40], -100_000_000);
   const im = o.images as Record<string, unknown> | undefined;
   if (im && typeof im === 'object') {
     const keep: Record<string, string> = {};
@@ -198,7 +221,7 @@ export const DEFAULT_TERMS = [
   '5. Maintenance. We are not responsible for the maintenance, repair or servicing of your existing systems and equipment, or of anything we have not supplied. You are responsible for the upkeep of your property and for following the maintenance guidance supplied with the equipment. Maintenance or servicing of the new equipment is included only where this quote says so.',
   '6. Access and site. You will make sure we can reach the work area safely, with clear working space and, where needed, power, water and parking. We are not responsible for hidden services or unforeseen conditions, such as asbestos, structural defects or concealed pipes and cables. If we find any, work may stop and any extra cost will be agreed with you first.',
   '7. Regulations. Our work is carried out to BS 7671 and the other standards and regulations that apply to it. Where an installation needs the approval of, or notification to, your distribution network operator, we will tell you what is needed and, where it forms part of our work, submit it. The operator’s decision can affect the date or the size of system allowed.',
-  '8. Estimates. Figures for generation, savings and payback are estimates, not guarantees. They depend on weather, shade, how you use electricity and energy prices, none of which we control.',
+  '8. Estimates and design software. Where this quote includes a system design or performance figures, the system has been designed in third-party design software (OpenSolar), and the key data points in this proposal have been extracted from that design and presented fairly. Figures for generation, savings and payback are estimates, not guarantees. They depend on weather, shade, how you use electricity and energy prices, none of which we control.',
   '9. Price and payment. Prices include VAT at the rate shown against each item. Any deposit shown is payable once you have accepted this quote, and the balance as set out in our invoices. Goods remain our property until they have been paid for in full.',
   '10. Cancellation. If you are a consumer, you can cancel within 14 days of accepting this quote by telling us in writing. If you ask us to start work within that period, you will pay for the work done and the goods ordered or fitted up to the point you cancel.',
   '11. Warranties. The equipment carries the manufacturer’s warranty set out in its documentation. Any warranty on our workmanship is as stated in writing by us. Warranties do not cover faults caused by misuse, lack of maintenance, changes made by others or events outside our control.',

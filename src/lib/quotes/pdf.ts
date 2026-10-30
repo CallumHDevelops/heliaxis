@@ -1,10 +1,11 @@
 import 'server-only';
 import { PDFDocument } from 'pdf-lib';
 import { issueOf } from '@/lib/documents/issue';
-import { INK, LABEL, LINE, longDate, MUTED, newDocument, SOLAR, type Kit, type PhotoItem } from '@/lib/documents/pdf-kit';
+import { longDate, newDocument, type PhotoItem } from '@/lib/documents/pdf-kit';
+import { designPages } from './design-pages';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { glanceRows } from './proposal';
-import { lineNet, money, totalsOf, type ProposalOption, type QuoteContent } from './types';
+import { lineNet, money, totalsOf, type QuoteContent } from './types';
 
 /** What the quote PDF is made from: the content, the customer, and the files already fetched (images, datasheet PDFs). */
 export type QuoteFacts = {
@@ -29,116 +30,6 @@ export type QuoteFacts = {
 
 const paragraphs = (s: string) => s.split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean);
 
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const n0 = (x: number) => Math.round(x).toLocaleString('en-GB');
-
-/** The monthly generation as gold bars, with the figure over each. */
-function generationChart(kit: Kit, kwh: number[]) {
-  const H = 150;
-  kit.block(H, (d) => {
-    const top = d.top - 6;
-    const base = d.top - H + 22;
-    const max = Math.max(...kwh, 1);
-    const colW = d.width / 12;
-    const barW = colW * 0.62;
-    d.line(d.x, base, d.x + d.width, base, { color: LINE, t: 0.6 });
-    kwh.forEach((v, i) => {
-      const h = Math.max(1, ((top - base - 14) * v) / max);
-      const x = d.x + i * colW + (colW - barW) / 2;
-      d.rect(x, base, barW, h, { fill: SOLAR });
-      const label = n0(v);
-      d.text(label, x + barW / 2 - d.widthOf(label, 6.6) / 2, base + h + 3, 6.6, { color: LABEL });
-      d.text(MONTHS[i], x + barW / 2 - d.widthOf(MONTHS[i], 7) / 2, base - 11, 7, { color: MUTED });
-    });
-  });
-}
-
-/**
- * The pages lifted from the design proposal: the roof design and the equipment with their photos, then the expected performance
- * (generation by month, self-sufficiency, the MCS yield and the sun-path diagram). Only what the proposal gave is shown.
- */
-async function designPages(kit: Kit, o: ProposalOption, pics: Map<string, { bytes: Uint8Array; mime: string }>, financials: boolean): Promise<boolean> {
-  const pic = (kind: 'roof' | 'inverter' | 'battery' | 'sunpath') => (o.images?.[kind] ? pics.get(o.images[kind]!) : undefined);
-  const roof = await kit.embed(pic('roof')?.bytes);
-  const inverter = await kit.embed(pic('inverter')?.bytes);
-  const battery = await kit.embed(pic('battery')?.bytes);
-  const sunpath = await kit.embed(pic('sunpath')?.bytes);
-  const glance = glanceRows(o, financials);
-  const hasPerformance = o.monthlyKwh?.length === 12 || o.selfSufficiencyPct || o.selfSufficiencyPvOnlyPct || sunpath;
-  if (!roof && !inverter && !battery && !hasPerformance) return false;
-
-  kit.newPage({ continued: true });
-  kit.section('Your system design', { keep: 260 });
-  // The roof design, whole, at its own proportions.
-  if (roof) {
-    const ratio = roof.height / roof.width;
-    kit.block(
-      Math.min(250, 480 * ratio) + 34,
-      (d) => {
-        const h = Math.min(250, d.width * ratio);
-        const w = h / ratio;
-        d.rect(d.x, d.top - h, d.width, h, { fill: undefined, border: LINE, line: 0.5 });
-        d.image(roof, d.x + (d.width - w) / 2, d.top - h, w, h);
-        d.text('Your roof with the proposed panels', d.x, d.top - h - 12, 8, { bold: true });
-        d.text('Indicative design from the design proposal. The final layout is confirmed at survey.', d.x, d.top - h - 22, 6.8, { color: MUTED });
-      }
-    );
-  }
-  if (glance.length) kit.rows(glance.map((r) => ({ label: r.label, value: r.value })));
-
-  // The equipment: the photos side by side, each with its name, size and warranty.
-  const cards = [
-    inverter && { img: inverter, title: 'Inverter', name: [o.inverterBrand, o.inverterModel].filter(Boolean).join(' ') || 'As quoted', sub: [o.inverterKw ? `${Math.round(o.inverterKw * 10) / 10} kW` : '', o.inverterWarrantyYears ? `${o.inverterWarrantyYears}-year warranty` : ''].filter(Boolean).join(' · ') },
-    battery && { img: battery, title: 'Battery storage', name: [o.batteryBrand, o.batteryModel].filter(Boolean).join(' ') || 'As quoted', sub: [o.batteryUsableKwh ? `${Math.round(o.batteryUsableKwh * 10) / 10} kWh usable` : '', o.batteryWarrantyYears ? `${o.batteryWarrantyYears}-year warranty` : ''].filter(Boolean).join(' · ') },
-  ].filter((c): c is NonNullable<typeof c> => !!c);
-  if (cards.length) {
-    kit.section('The equipment', { keep: 190 });
-    kit.block(190, (d) => {
-      const colW = d.width / cards.length;
-      cards.forEach((c, i) => {
-        const x = d.x + i * colW;
-        const ratio = c.img.width / c.img.height;
-        const ih = 122;
-        const iw = Math.min(colW - 20, ih * ratio);
-        d.image(c.img, x + (colW - iw) / 2, d.top - ih - 4, iw, ih);
-        d.text(c.title.toUpperCase(), x + 6, d.top - ih - 18, 6.4, { style: 'mono', color: MUTED });
-        d.lines(c.name, 8.5, colW - 16, true).slice(0, 2).forEach((l, k) => d.text(l, x + 6, d.top - ih - 29 - k * 10, 8.5, { bold: true }));
-        if (c.sub) d.text(c.sub, x + 6, d.top - ih - 49, 7.2, { color: LABEL });
-      });
-    });
-  }
-  if (o.panelProductWarrantyYears || o.panelPerformanceWarrantyYears) {
-    kit.paragraph(`Solar panels: ${o.panelCount ? `${o.panelCount} × ` : ''}${o.panelWatts ? `${o.panelWatts} W ` : ''}${[o.panelBrand, o.panelModel].filter(Boolean).join(' ')}. ${[o.panelProductWarrantyYears ? `${o.panelProductWarrantyYears}-year product warranty` : '', o.panelPerformanceWarrantyYears ? `${o.panelPerformanceWarrantyYears}-year performance warranty` : ''].filter(Boolean).join(' and ')}.`);
-  }
-
-  if (hasPerformance) {
-    kit.newPage({ continued: true });
-    kit.section('Expected performance', { intro: 'Estimated by the MCS method from your roof, its direction and shading. A guide, not a guarantee.', keep: 220 });
-    if (o.monthlyKwh?.length === 12) generationChart(kit, o.monthlyKwh);
-    const rows = [
-      ...(o.annualGenerationKwh ? [{ label: 'Estimated generation a year', value: `${n0(o.annualGenerationKwh)} kWh`, strong: true }] : []),
-      ...(o.consumptionKwh ? [{ label: 'Assumed use a year', value: `${n0(o.consumptionKwh)} kWh` }] : []),
-      ...(o.selfSufficiencyPvOnlyPct ? [{ label: 'Self-sufficiency, panels only', value: `${o.selfSufficiencyPvOnlyPct}%` }] : []),
-      ...(o.selfSufficiencyPct ? [{ label: 'Self-sufficiency, with the battery', value: `${o.selfSufficiencyPct}%` }] : []),
-      ...(o.kwhPerKwp ? [{ label: 'MCS yield', value: `${n0(o.kwhPerKwp)} kWh per kWp${o.shadeFactor ? `, shade factor ${o.shadeFactor}` : ''}${o.tiltDeg ? `, ${Math.round(o.tiltDeg)}° tilt` : ''}` }] : []),
-      ...(financials && o.annualSavingsGbp ? [{ label: 'Estimated annual bill saving', value: `£${n0(o.annualSavingsGbp)}` }] : []),
-      ...(financials && o.paybackText ? [{ label: 'Estimated payback', value: o.paybackText }] : []),
-    ];
-    if (rows.length) kit.rows(rows);
-    if (sunpath) {
-      const ratio = sunpath.height / sunpath.width;
-      kit.section('Sun path and shading', { keep: 240 });
-      kit.block(Math.min(230, 470 * ratio) + 22, (d) => {
-        const h = Math.min(230, d.width * ratio);
-        const w = h / ratio;
-        d.image(sunpath, d.x + (d.width - w) / 2, d.top - h, w, h);
-        d.text('Where the sun travels over the year, with shading marked at the middle of the array.', d.x, d.top - h - 12, 6.8, { color: MUTED });
-      });
-    }
-  }
-  return true;
-}
 
 /** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
 export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
@@ -174,7 +65,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   }
   const chosen = f.content.proposal?.options[f.content.proposal.chosen];
   // With design pages the figures sit at the top of those, so the cover stays the introduction, what is included and the total.
-  const hasDesignPictures = !!chosen && Object.keys(chosen.images ?? {}).length > 0;
+  const hasDesignPictures = !!chosen && !!(Object.keys(chosen.images ?? {}).length || chosen.panelCount || chosen.inverterModel || chosen.batteryModel || chosen.monthlyKwh || chosen.selfSufficiencyPct);
   const glance = chosen && !hasDesignPictures ? glanceRows(chosen, f.content.proposal?.showFinancials === true) : [];
   if (glance.length || totals.gross > 0) {
     // The summary stays on the cover when it fits; if the cover is full, the totals are on the items page straight after.
@@ -196,7 +87,7 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   }
 
   // The design pages lifted from the uploaded proposal (when there is one), between the cover and the items.
-  if (chosen) await designPages(kit, chosen, f.images, f.content.proposal?.showFinancials === true);
+  if (chosen) await designPages(kit, chosen, f.images, f.content.proposal?.showFinancials === true, glanceRows(chosen, f.content.proposal?.showFinancials === true));
 
   // Page 2 onwards: the quoted items, and anything else the quote shows (text, pictures, datasheets).
   kit.newPage({ continued: true });
