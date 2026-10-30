@@ -144,10 +144,59 @@ export function detectFaces(g: Grid): Face[] {
     }
     planes.push(fitPlane(xs, ys, zs));
   }
+  // 2b. One long slope can come out as two regions (a patch of roughness, a vent, a join in the surveyed heights splits it). Regions
+  // that lean the same way and lie on one common plane are one face.
+  const sample = (cells: number[], want: number) => {
+    const step = Math.max(1, Math.floor(cells.length / want));
+    const out: number[] = [];
+    for (let q = 0; q < cells.length; q += step) out.push(cells[q]);
+    return out;
+  };
+  const offPlane = (cells: number[], pl: { a: number; b: number; c: number }) => {
+    let sum = 0;
+    for (const k of cells) {
+      const { x, y } = cellXY(g, k % n, (k - (k % n)) / n);
+      sum += Math.abs(g.z[k] - (pl.a * x + pl.b * y + pl.c));
+    }
+    return sum / Math.max(1, cells.length);
+  };
+  const root = regions.map((_, i) => i);
+  const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i])));
+  for (let i = 0; i < regions.length; i++) {
+    const pi = planes[i];
+    if (!pi) continue;
+    for (let j = i + 1; j < regions.length; j++) {
+      const pj = planes[j];
+      if (!pj || find(i) === find(j)) continue;
+      const ni = Math.hypot(pi.a, pi.b, 1);
+      const nj = Math.hypot(pj.a, pj.b, 1);
+      const cosA = (pi.a * pj.a + pi.b * pj.b + 1) / (ni * nj);
+      if (cosA < Math.cos((6 * Math.PI) / 180)) continue;
+      if (offPlane(sample(regions[i], 80), pj) > 0.15 || offPlane(sample(regions[j], 80), pi) > 0.15) continue;
+      root[find(j)] = find(i);
+    }
+  }
+  for (let i = 0; i < regions.length; i++) {
+    const r = find(i);
+    if (r === i || !planes[i]) continue;
+    for (const k of regions[i]) label[k] = r;
+    regions[r] = regions[r].concat(regions[i]);
+    regions[i] = [];
+    planes[i] = null;
+  }
+  for (let i = 0; i < regions.length; i++) {
+    if (!planes[i] || find(i) !== i || regions[i].length === 0) continue;
+    const xs: number[] = [], ys: number[] = [], zs: number[] = [];
+    for (const k of regions[i]) {
+      const { x, y } = cellXY(g, k % n, (k - (k % n)) / n);
+      xs.push(x); ys.push(y); zs.push(g.z[k]);
+    }
+    planes[i] = fitPlane(xs, ys, zs) ?? planes[i];
+  }
   // 3. Let each face grow into the edge cells next to it (ridges, hips, eaves), as long as they sit on its plane.
   let frontier: number[] = [];
   for (let k = 0; k < N; k++) if (label[k] >= 0) frontier.push(k);
-  for (let step = 0; step < 4; step++) {
+  for (let step = 0; step < 16; step++) {
     const next: number[] = [];
     const claims = new Map<number, number>();
     for (const k of frontier) {

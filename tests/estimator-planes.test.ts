@@ -74,3 +74,27 @@ describe('UTM', () => {
     expect(convergence(51.6, -2.7, 30)).toBeGreaterThan(0);
   });
 });
+
+describe('one long slope with a rough patch across it', () => {
+  it('stays one face, and panels run along the whole length', () => {
+    const n = 240;
+    const cell = 0.2;
+    const g: Grid = { n, cell, z: new Float32Array(n * n).fill(NaN), ok: new Uint8Array(n * n), flux: new Float32Array(n * n).fill(NaN) };
+    let seed = 11;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 2;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const { x, y } = cellXY(g, i, j);
+      if (Math.abs(x) > 12 || Math.abs(y) > 2.5) continue;
+      // A single south-facing slope, 24 m long, with a 1.4 m band of rough heights across the middle.
+      const rough = Math.abs(x) < 0.7 ? rnd() * 0.35 : rnd() * 0.01;
+      g.z[j * n + i] = 8 + (y + 2.5) * TAN + rough;
+      g.ok[j * n + i] = 1;
+      g.flux[j * n + i] = 900;
+    }
+    const faces = detectFaces(g).filter((f) => f.areaM2 > 10);
+    expect(faces).toHaveLength(1);
+    const placed = packFaces(g, faces, OPT);
+    expect(Math.min(...placed.map((p) => p.x))).toBeLessThan(-8);
+    expect(Math.max(...placed.map((p) => p.x))).toBeGreaterThan(8);
+  });
+});
