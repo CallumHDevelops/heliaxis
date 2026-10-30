@@ -1,23 +1,27 @@
 import { crmSession, json } from '@/lib/crm/server';
-import { clearSignatory, readSignatory, writeSignatory } from '@/lib/quotes/signatory';
+import { clearSignatory, readSignatory, sharedSignatories, writeSignatory } from '@/lib/quotes/signatory';
 
 export const dynamic = 'force-dynamic';
 
-/** The signature that goes under the quote introduction: { signatory } or null. */
+/** Your own signature, the ones others have shared, and who you are: { meId, mine, shared }. */
 export async function GET() {
-  if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
-  return json({ signatory: await readSignatory() });
+  const s = await crmSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
+  const [mine, shared] = await Promise.all([readSignatory(s.user.id), sharedSignatories(s.user.id)]);
+  return json({ meId: s.user.id, mine, shared });
 }
 
-/** Save it: { name, role, png }. */
+/** Save your own: { name, role, png, shared }. */
 export async function PUT(req: Request) {
-  if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
-  const out = await writeSignatory(await req.json().catch(() => ({})));
+  const s = await crmSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
+  const out = await writeSignatory(s.user.id, await req.json().catch(() => ({})));
   return out.ok ? json({ signatory: out.signatory }) : json({ error: out.error }, 400);
 }
 
 export async function DELETE() {
-  if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
-  await clearSignatory();
+  const s = await crmSession();
+  if (!s) return json({ error: 'unauthorized' }, 401);
+  await clearSignatory(s.user.id);
   return json({ ok: true });
 }

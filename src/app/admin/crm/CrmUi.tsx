@@ -214,3 +214,31 @@ export function JobPicker({
     </div>
   );
 }
+
+/**
+ * The way to choose a file: a button in the house style (the same as every other crm-btn), never the browser's own "Choose File"
+ * control. The real input is hidden and opened by the button. `onFiles` gets the chosen files; the input is cleared so the same file can be picked again.
+ */
+export function FileButton({ label, accept, multiple, disabled, busy, onFiles, variant = 'ghost' }: { label: string; accept?: string; multiple?: boolean; disabled?: boolean; busy?: boolean; onFiles: (files: File[]) => void; variant?: 'ghost' | 'solar' }) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button type="button" className={`crm-btn crm-btn--${variant} crm-btn--small`} disabled={disabled || busy} onClick={() => input.current?.click()}>
+        {label}
+      </button>
+      <input
+        ref={input}
+        type="file"
+        hidden
+        accept={accept}
+        multiple={multiple}
+        disabled={disabled || busy}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length) onFiles(files);
+        }}
+      />
+    </>
+  );
+}

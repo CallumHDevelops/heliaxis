@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { WritingSpark } from './WritingSpark';
-import { Sheet } from '../../../crm/CrmUi';
+import { FileButton, Sheet } from '../../../crm/CrmUi';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuoteRow } from '@/lib/quotes/server';
@@ -189,28 +189,31 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     }
   }
 
-  // Whose signature goes under the introduction: one for the company, drawn once.
-  const [signatory, setSignatory] = useState<{ name: string; role: string; png: string } | null | undefined>(undefined);
+  // Whose signature goes under the introduction: yours (drawn once), or one a colleague has shared with the CRM.
+  type Sig = { name: string; role: string; png: string; shared: boolean };
+  const [sigs, setSigs] = useState<{ meId: string; mine: Sig | null; shared: (Sig & { userId: string })[] } | null>(null);
   const [signing, setSigning] = useState(false);
-  const [sigDraft, setSigDraft] = useState({ name: '', role: '', png: null as string | null });
+  const [sigDraft, setSigDraft] = useState({ name: '', role: '', png: null as string | null, shared: false });
   useEffect(() => {
     let gone = false;
     fetch('/api/crm/quote-signatory', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d: { signatory?: { name: string; role: string; png: string } | null }) => !gone && setSignatory(d.signatory ?? null))
-      .catch(() => !gone && setSignatory(null));
+      .then((d: { meId?: string; mine?: Sig | null; shared?: (Sig & { userId: string })[] }) => !gone && d.meId && setSigs({ meId: d.meId, mine: d.mine ?? null, shared: d.shared ?? [] }))
+      .catch(() => undefined);
     return () => {
       gone = true;
     };
   }, []);
+  const signer: Sig | null = !sigs || !content.signerId ? null : content.signerId === sigs.meId ? sigs.mine : (sigs.shared.find((x) => x.userId === content.signerId) ?? null);
   async function saveSignatory() {
     setErr('');
     const r = await fetch('/api/crm/quote-signatory', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sigDraft) });
-    const d = (await r.json().catch(() => ({}))) as { signatory?: { name: string; role: string; png: string }; error?: string };
+    const d = (await r.json().catch(() => ({}))) as { signatory?: Sig; error?: string };
     if (!r.ok || !d.signatory) return setErr(d.error || 'Couldn’t save the signature. Try again.');
-    setSignatory(d.signatory);
+    setSigs((cur) => (cur ? { ...cur, mine: d.signatory! } : cur));
+    edit((c) => ({ ...c, signerId: sigs?.meId }));
     setSigning(false);
-    setNote('Signature saved. It prints under the introduction on every quote.');
+    setNote('Signature saved against your profile. It prints under the introduction on your quotes.');
   }
 
   /** The cover letter, written from the items on screen. */
@@ -395,6 +398,10 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   }
 
   const locked = status === 'accepted';
+  // A quote without a signer takes your own signature as soon as you have one.
+  useEffect(() => {
+    if (sigs?.mine && !content.signerId && !locked) edit((c) => (c.signerId ? c : { ...c, signerId: sigs.meId }));
+  }, [sigs, content.signerId, locked]);
   return (
     <div className="crm crmh qb-page qb-build">
       <div className="qb-head">
@@ -515,7 +522,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
 
       {signing && (
         <Sheet title="Your signature" onClose={() => setSigning(false)}>
-          <p className="crm-small crm-muted">Drawn once, it prints under the introduction on every quote, with your name and role beneath.</p>
+          <p className="crm-small crm-muted">Drawn once and kept against your profile. It prints under the introduction on your quotes, with your name and role beneath.</p>
           <label className="crm-label" htmlFor="sg-name">
             Name
           </label>
@@ -526,6 +533,9 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
           <input id="sg-role" className="crm-input" value={sigDraft.role} onChange={(e) => setSigDraft({ ...sigDraft, role: e.target.value })} placeholder="e.g. Director" autoComplete="off" />
           <label className="crm-label">Sign here with your finger or mouse</label>
           <SignaturePad onChange={(png) => setSigDraft((d) => ({ ...d, png }))} height={150} />
+          <label className="crm-check">
+            <input type="checkbox" checked={sigDraft.shared} onChange={(e) => setSigDraft({ ...sigDraft, shared: e.target.checked })} /> Any user with CRM access can sign with my name and signature
+          </label>
           <div className="crm-actions">
             <button type="button" className="crm-btn crm-btn--solar" disabled={!sigDraft.name.trim() || !sigDraft.png} onClick={() => void saveSignatory()}>
               Save signature
@@ -555,26 +565,42 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
               {writing === 'intro' && <WritingSpark />}
             </div>
             <div className="qb-sigrow">
-              {signatory ? (
+              {sigs && (sigs.mine || sigs.shared.length > 0) && (
                 <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={signatory.png} alt={`Signature of ${signatory.name}`} className="qb-sigimg" />
-                  <span>
-                    <b>{signatory.name}</b>
-                    {signatory.role ? `, ${signatory.role}` : ''}
-                  </span>
+                  {signer && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={signer.png} alt={`Signature of ${signer.name}`} className="qb-sigimg" />
+                  )}
+                  <label className="qb-sigsel">
+                    <span className="crm-small crm-muted">Signed by</span>
+                    <select className="crm-input" value={content.signerId ?? ''} disabled={locked} onChange={(e) => edit((c) => ({ ...c, signerId: e.target.value || undefined }))} aria-label="Who signs the introduction">
+                      <option value="">No signature</option>
+                      {sigs.mine && <option value={sigs.meId}>{sigs.mine.name} (you)</option>}
+                      {sigs.shared.map((x) => (
+                        <option key={x.userId} value={x.userId}>
+                          {x.name}
+                          {x.role ? `, ${x.role}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="crm-check">
                     <input type="checkbox" checked={content.signOff !== false} disabled={locked} onChange={(e) => edit((c) => ({ ...c, signOff: e.target.checked ? undefined : false }))} /> Sign the introduction
                   </label>
-                  <button type="button" className="crm-link" onClick={() => { setSigDraft({ name: signatory.name, role: signatory.role, png: null }); setSigning(true); }}>
-                    Change
-                  </button>
                 </>
-              ) : signatory === null ? (
-                <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => { setSigDraft({ name: '', role: '', png: null }); setSigning(true); }}>
-                  Add my signature
+              )}
+              {sigs && (
+                <button
+                  type="button"
+                  className="crm-btn crm-btn--ghost crm-btn--small"
+                  onClick={() => {
+                    setSigDraft({ name: sigs.mine?.name ?? '', role: sigs.mine?.role ?? '', png: null, shared: sigs.mine?.shared ?? false });
+                    setSigning(true);
+                  }}
+                >
+                  {sigs.mine ? 'Change my signature' : 'Add my signature'}
                 </button>
-              ) : null}
+              )}
             </div>
           </section>
 
@@ -608,8 +634,9 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
             ) : (
               <>
                 <p className="crm-small crm-muted">Upload the OpenSolar proposal (PDF) and the cover gets a System at a glance box, and the introduction and What is included are written from its figures and warranties.</p>
-                <input type="file" accept="application/pdf" disabled={locked || reading} onChange={(e) => { void readProposal(e.target.files?.[0]); e.target.value = ''; }} aria-label="Upload the OpenSolar proposal" />
-                {reading && <p className="crm-small">Reading the proposal…</p>}
+                <div>
+                  <FileButton label={reading ? 'Reading the proposal…' : 'Upload the OpenSolar proposal (PDF)'} accept="application/pdf" disabled={locked} busy={reading} onFiles={(f) => void readProposal(f[0])} />
+                </div>
               </>
             )}
           </section>

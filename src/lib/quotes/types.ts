@@ -49,7 +49,7 @@ export type ProposalOption = {
 export type QuoteProposal = { file: string; options: ProposalOption[]; chosen: number; showFinancials: boolean };
 
 /** `terms` always print at the bottom of the quote, after everything else. */
-export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal; /** false: no signature under the introduction (on by default once one is saved). */ signOff?: boolean };
+export type QuoteContent = { intro: string; blocks: QuoteBlock[]; terms: string; proposal?: QuoteProposal; /** false: no signature under the introduction (on by default once one is saved). */ signOff?: boolean; /** Whose signature (a user's id): theirs, or one they have shared. */ signerId?: string };
 
 const NUM_KEYS = ['systemKwp', 'panelCount', 'panelWatts', 'panelProductWarrantyYears', 'panelPerformanceWarrantyYears', 'inverterCount', 'inverterKw', 'inverterWarrantyYears', 'batteryModules', 'batteryUsableKwh', 'batteryWarrantyYears', 'annualGenerationKwh', 'annualSavingsGbp', 'selfSufficiencyPct'] as const;
 const STR_KEYS = ['name', 'panelBrand', 'panelModel', 'inverterBrand', 'inverterModel', 'batteryBrand', 'batteryModel', 'paybackText'] as const;
@@ -266,5 +266,5 @@ export function cleanContent(v: unknown): QuoteContent {
   const pr = o.proposal as Partial<QuoteProposal> | undefined;
   const options = Array.isArray(pr?.options) ? pr!.options.slice(0, 4).map(cleanOption).filter((x) => Object.keys(x).length) : [];
   const proposal: QuoteProposal | undefined = options.length ? { file: str(pr?.file, 160), options, chosen: Math.min(Math.max(0, Math.round(Number(pr?.chosen) || 0)), options.length - 1), showFinancials: pr?.showFinancials === true } : undefined;
-  return { intro: str(o.intro, 6000), blocks, terms, ...(proposal ? { proposal } : {}), ...(o.signOff === false ? { signOff: false } : {}) };
+  return { intro: str(o.intro, 6000), blocks, terms, ...(proposal ? { proposal } : {}), ...(o.signOff === false ? { signOff: false } : {}), ...(typeof o.signerId === 'string' && /^[0-9a-f-]{36}$/i.test(o.signerId) ? { signerId: o.signerId } : {}) };
 }
