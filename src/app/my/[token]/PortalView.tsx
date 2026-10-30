@@ -77,7 +77,7 @@ function Shell({ tag, themePref, children }: { tag: string; themePref: ThemePref
 
 function Contact({ data }: { data: PortalData }) {
   return (
-    <section className="pt-card pt-contact">
+    <section className="pt-card pt-contact" data-track="contact">
       <h2>Questions?</h2>
       <p>{data.owner ? `${data.owner} and the team are` : 'We’re'} here to help.</p>
       <div className="pt-row">
@@ -107,6 +107,64 @@ function track(token: string, type: 'opened' | 'sign_started' | 'decline_started
   }
 }
 
+/**
+ * Time on the page (only while it is on screen) and which parts were scrolled to (anything marked data-track), sent every 15 seconds
+ * and as the page is left. Quiet, and only while the customer still has a quote to decide on.
+ */
+function useEngagement(token: string, on: boolean) {
+  useEffect(() => {
+    if (!on) return;
+    const seen = new Set<string>();
+    let pending = new Set<string>();
+    let visibleSince: number | null = document.visibilityState === 'visible' ? Date.now() : null;
+    let seconds = 0;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const id = (e.target as HTMLElement).dataset.track;
+          if (e.isIntersecting && id && !seen.has(id)) {
+            seen.add(id);
+            pending.add(id);
+          }
+        }
+      },
+      { threshold: 0.4 }
+    );
+    document.querySelectorAll<HTMLElement>('[data-track]').forEach((el) => io.observe(el));
+    const flush = (leaving: boolean) => {
+      if (visibleSince !== null) {
+        seconds += (Date.now() - visibleSince) / 1000;
+        visibleSince = document.visibilityState === 'visible' ? Date.now() : null;
+      }
+      if (seconds < 1 && !pending.size) return;
+      const body = JSON.stringify({ type: 'engaged', seconds, sections: [...pending] });
+      seconds = 0;
+      pending = new Set();
+      try {
+        if (leaving && navigator.sendBeacon) navigator.sendBeacon(`/api/my/${token}/event`, new Blob([body], { type: 'application/json' }));
+        else void fetch(`/api/my/${token}/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => null);
+      } catch {
+        // Tracking must never get in the way.
+      }
+    };
+    const beat = setInterval(() => flush(false), 15_000);
+    const vis = () => {
+      if (document.visibilityState === 'hidden') flush(true);
+      else visibleSince = Date.now();
+    };
+    const leave = () => flush(true);
+    document.addEventListener('visibilitychange', vis);
+    window.addEventListener('pagehide', leave);
+    return () => {
+      clearInterval(beat);
+      io.disconnect();
+      document.removeEventListener('visibilitychange', vis);
+      window.removeEventListener('pagehide', leave);
+      flush(true);
+    };
+  }, [token, on]);
+}
+
 async function afterAccept(token: string, d: { deposit?: boolean }) {
   if (d.deposit) {
     const r = await fetch(`/api/my/${token}/deposit`, { method: 'POST' }).catch(() => null);
@@ -131,6 +189,7 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
   useEffect(() => {
     track(data.token, 'opened');
   }, [data.token]);
+  useEngagement(data.token, !!q || !!data.accepted);
   const setSigning = (v: boolean) => {
     if (v) track(data.token, 'sign_started');
     setSigningRaw(v);
@@ -160,7 +219,7 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
           <InstallDates token={data.token} pref={data.installPref} />
         </section>
       ) : q ? (
-        <section className="pt-card pt-action pt-quote">
+        <section className="pt-card pt-action pt-quote" data-track="quote">
           <h2>Your {quoteWord(q)} from Heliaxis</h2>
           <p>Have a read through. When you’re happy, press Accept quote. You will sign, then pay your deposit and choose your installation date.</p>
           <div className="pt-row">
@@ -178,7 +237,7 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
               Decline
             </button>
           </div>
-          <ol className="pt-steps">
+          <ol className="pt-steps" data-track="steps">
             <li>Accept and sign</li>
             <li>Pay your deposit by card</li>
             <li>Choose your installation date</li>
@@ -222,6 +281,7 @@ function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData;
   useEffect(() => {
     if (data.quote) track(data.token, 'opened');
   }, [data.token, data.quote]);
+  useEngagement(data.token, !!data.quote || !!data.accepted);
   const setSigning = (v: boolean) => {
     if (v) track(data.token, 'sign_started');
     setSigningRaw(v);
@@ -278,7 +338,7 @@ function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData;
       )}
 
       {data.quote && !accepted && (
-        <section className="pt-card pt-action">
+        <section className="pt-card pt-action" data-track="quote">
           <h2>Your {quoteWord(data.quote)}</h2>
           <p>Have a read through. When you’re happy, press Accept quote. You will sign, then pay your deposit and choose your installation date.</p>
           <div className="pt-row">
@@ -659,7 +719,7 @@ function InstallDates({ token, pref }: { token: string; pref: PortalData['instal
   const weeks: CalendarDay[][] = [];
   if (cal) for (let i = 0; i < cal.days.length; i += 7) weeks.push(cal.days.slice(i, i + 7).slice(0, 5));
   return (
-    <div className="pt-signform">
+    <div className="pt-signform" data-track="dates">
       <p>Pick a day for your installation. It’s a provisional booking: we hold the day for you and confirm it once we’ve checked our installers and scaffolding. We install Monday to Friday.</p>
       {!cal ? (
         <p className="pt-muted">Loading the available dates…</p>
@@ -764,7 +824,7 @@ function PortalMessages({ token, first, focus, prefill }: { token: string; first
   }
   const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   return (
-    <section className="pt-card pt-msgs" id="pt-messages" ref={card}>
+    <section className="pt-card pt-msgs" id="pt-messages" ref={card} data-track="messages">
       <h2>Messages</h2>
       <p className="pt-muted">Ask us anything about your quote or your installation. {first ? `${first}, ` : ''}your message comes straight to the team and we will reply here.</p>
       {messages && messages.length > 0 && (

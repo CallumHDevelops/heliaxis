@@ -373,7 +373,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   }
 
   // Where the customer has got to with the quote they were sent.
-  type Activity = { sentAt: string | null; track: { opens: number; firstOpenedAt?: string; lastOpenedAt?: string; pdfViewedAt?: string; signStartedAt?: string; declineStartedAt?: string; datesStartedAt?: string; declined?: { at: string; reason: string } }; acceptedAt: string | null; acceptedName: string | null; installPref: { dates?: string[]; provisional?: boolean; at?: string } | null };
+  type Activity = { sentAt: string | null; track: { opens: number; firstOpenedAt?: string; lastOpenedAt?: string; pdfViewedAt?: string; signStartedAt?: string; declineStartedAt?: string; datesStartedAt?: string; engagedSeconds?: number; sections?: string[]; declined?: { at: string; reason: string } }; acceptedAt: string | null; acceptedName: string | null; installPref: { dates?: string[]; provisional?: boolean; at?: string } | null };
   const [activity, setActivity] = useState<Activity | null>(null);
   useEffect(() => {
     if (status === 'draft') return;
@@ -566,6 +566,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                 { done: !!activity.sentAt, label: 'Quote sent', at: activity.sentAt },
                 { done: !!t.firstOpenedAt, label: t.firstOpenedAt ? `Opened ${t.opens > 1 ? `(${t.opens} visits, last ${when(t.lastOpenedAt)})` : ''}`.trim() : 'Not opened yet', at: t.firstOpenedAt },
                 { done: !!t.pdfViewedAt, label: 'Looked at the quote PDF', at: t.pdfViewedAt },
+                ...(t.engagedSeconds ? [{ done: true, label: `Time on the page: ${t.engagedSeconds >= 60 ? `${Math.floor(t.engagedSeconds / 60)} min ${t.engagedSeconds % 60} s` : `${t.engagedSeconds} s`}${t.sections?.length ? `. Scrolled to: ${t.sections.map((x) => ({ quote: 'the quote', steps: 'what happens next', dates: 'the dates', messages: 'the message box', contact: 'contact details' })[x] ?? x).join(', ')}` : ''}`, at: null as string | null }] : []),
                 { done: !!t.signStartedAt || !!activity.acceptedAt, label: 'Started to accept', at: t.signStartedAt },
                 ...(t.declined ? [{ done: true, label: `Declined${t.declined.reason ? `: “${t.declined.reason}”` : ' (no comment)'}`, at: t.declined.at }] : []),
                 { done: !!activity.acceptedAt, label: activity.acceptedName ? `Accepted by ${activity.acceptedName}` : 'Accepted', at: activity.acceptedAt },

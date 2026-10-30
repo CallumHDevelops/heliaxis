@@ -13,6 +13,8 @@ import { logActivity } from '@/lib/crm/server';
  * Called from the browser (a link-preview robot never runs it) and from the PDF route.
  */
 export const TRACK_EVENTS = ['opened', 'viewed_pdf', 'sign_started', 'decline_started', 'dates_started'] as const;
+/** Sections of the customer's page we note being scrolled into view. */
+export const TRACK_SECTIONS = ['quote', 'steps', 'dates', 'messages', 'contact'] as const;
 export type TrackEvent = (typeof TRACK_EVENTS)[number];
 
 export type QuoteTrack = {
@@ -24,6 +26,10 @@ export type QuoteTrack = {
   declineStartedAt?: string;
   datesStartedAt?: string;
   lastLoggedOpenAt?: string;
+  /** Seconds the page was open and on screen, all visits together, and the sections they scrolled to. */
+  engagedSeconds?: number;
+  lastEngagedAt?: string;
+  sections?: string[];
   declined?: { at: string; reason: string };
 };
 
@@ -97,4 +103,18 @@ export async function recordDecline(p: Proj, reason: string): Promise<void> {
   await save(p.id, t);
   await logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'note', body: `Customer declined the quote${reason ? `: ${reason}` : ' (no comment)'}` });
   after(() => tellTeam(p, { kind: 'crm_quote_declined', title: `Quote declined: ${p.title}`, body: reason || 'No comment given.' }));
+}
+
+/** The page's heartbeat: seconds it has been on screen since the last beat (never more than 45, never faster than every 8 s) and the sections seen. */
+export async function recordEngagement(p: { id: string }, seconds: number, sections: string[]): Promise<void> {
+  const t = await readTrack(p.id);
+  const now = Date.now();
+  if (t.lastEngagedAt && now - Date.parse(t.lastEngagedAt) < 8_000) return;
+  const add = Math.max(0, Math.min(45, Math.round(seconds) || 0));
+  const seen = sections.filter((x): x is (typeof TRACK_SECTIONS)[number] => (TRACK_SECTIONS as readonly string[]).includes(x));
+  if (!add && !seen.length) return;
+  t.engagedSeconds = (t.engagedSeconds ?? 0) + add;
+  t.lastEngagedAt = new Date(now).toISOString();
+  t.sections = [...new Set([...(t.sections ?? []), ...seen])];
+  await save(p.id, t);
 }
