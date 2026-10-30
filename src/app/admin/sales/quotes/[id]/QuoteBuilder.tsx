@@ -349,6 +349,44 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     }
   }
 
+  // "Send me a copy": the email and text the customer will get, to you.
+  type CopyChannel = { ok: true; to: string } | { ok: false; error: string };
+  const [copyResult, setCopyResult] = useState<{ email: CopyChannel; sms: CopyChannel; needMobile?: boolean; live: boolean } | null>(null);
+  const [askMobile, setAskMobile] = useState(false);
+  const [mobileDraft, setMobileDraft] = useState('');
+  const [copying, setCopying] = useState(false);
+  async function sendCopy(mobile?: string) {
+    if (totals.gross <= 0) return setErr('Add at least one priced item first.');
+    setCopying(true);
+    setErr('');
+    if (!(await save())) {
+      setCopying(false);
+      return setErr('Couldn’t save, so the copy would be out of date. Try again.');
+    }
+    const r = await fetch(`/api/crm/quotes/${initial.id}/send-copy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, mobile }) }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    setCopying(false);
+    if (!r?.ok) return setErr(d.error || 'The copy wasn’t sent. Try again.');
+    setCopyResult(d);
+    setAskMobile(!!d.needMobile);
+    if (!d.needMobile) setMobileDraft('');
+  }
+
+  // Where the customer has got to with the quote they were sent.
+  type Activity = { sentAt: string | null; track: { opens: number; firstOpenedAt?: string; lastOpenedAt?: string; pdfViewedAt?: string; signStartedAt?: string; declineStartedAt?: string; datesStartedAt?: string; declined?: { at: string; reason: string } }; acceptedAt: string | null; acceptedName: string | null; installPref: { dates?: string[]; provisional?: boolean; at?: string } | null };
+  const [activity, setActivity] = useState<Activity | null>(null);
+  useEffect(() => {
+    if (status === 'draft') return;
+    let gone = false;
+    fetch(`/api/crm/quotes/${initial.id}/activity`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: Activity | null) => !gone && d && setActivity(d))
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+    };
+  }, [initial.id, status, sent]);
+
   async function preview(skipAsk = false) {
     if (!skipAsk && totals.gross > 0 && (introUnwritten || includedUnwritten)) return setAskFinish(true);
     setBusy('preview');
@@ -421,6 +459,9 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
           <span className="crm-muted crm-small" aria-live="polite">
             {state === 'saved' ? 'Saved ✓' : state === 'saving' ? 'Saving…' : state === 'dirty' ? 'Unsaved changes' : 'Couldn’t save, retrying on your next change'}
           </span>
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy || finishing || copying} onClick={() => void sendCopy()} title="Emails and texts you what the customer will receive. Nothing goes to them.">
+            {copying ? 'Sending…' : 'Send me a copy'}
+          </button>
           <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy || finishing || locked} onClick={() => void generateQuote(!introUnwritten && !includedUnwritten)} title="Writes the introduction and What is included from your items">
             {finishing ? 'Generating…' : 'Generate quote'}
           </button>
@@ -489,6 +530,58 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
         </div>
       )}
       {!sent && note && <p className="crm-small" aria-live="polite">{note}</p>}
+
+      {copyResult && (
+        <div className="qb-sent" role="status">
+          <b>Copy sent to you{copyResult.live ? '' : ' (the quote hasn’t been sent to the customer yet, so the link opens the PDF preview)'}</b>
+          <p className="crm-small">{copyResult.email.ok ? `✓ Email sent to ${copyResult.email.to}` : `✗ Email not sent: ${copyResult.email.error}`}</p>
+          <p className="crm-small">{copyResult.sms.ok ? `✓ Text sent to ${copyResult.sms.to}` : `✗ Text not sent: ${copyResult.sms.error}`}</p>
+        </div>
+      )}
+      {askMobile && (
+        <Sheet title="Your mobile number" onClose={() => setAskMobile(false)}>
+          <p className="crm-small crm-muted">Where should the text copy go? It’s kept against your account, so you’re only asked once.</p>
+          <label className="crm-label" htmlFor="qb-mob">
+            Mobile
+          </label>
+          <input id="qb-mob" className="crm-input" type="tel" value={mobileDraft} onChange={(e) => setMobileDraft(e.target.value)} placeholder="07…" autoComplete="tel" autoFocus />
+          <div className="crm-actions">
+            <button type="button" className="crm-btn crm-btn--solar" disabled={!mobileDraft.trim() || copying} onClick={() => { setAskMobile(false); void sendCopy(mobileDraft); }}>
+              Save and send the text
+            </button>
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setAskMobile(false)}>
+              Not now
+            </button>
+          </div>
+        </Sheet>
+      )}
+      {activity && status !== 'draft' && (
+        <section className="qb-card qb-activity" aria-label="What the customer has done">
+          <b>Customer activity</b>
+          <ul>
+            {(() => {
+              const t = activity.track;
+              const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+              const rows: { done: boolean; label: string; at?: string | null }[] = [
+                { done: !!activity.sentAt, label: 'Quote sent', at: activity.sentAt },
+                { done: !!t.firstOpenedAt, label: t.firstOpenedAt ? `Opened ${t.opens > 1 ? `(${t.opens} visits, last ${when(t.lastOpenedAt)})` : ''}`.trim() : 'Not opened yet', at: t.firstOpenedAt },
+                { done: !!t.pdfViewedAt, label: 'Looked at the quote PDF', at: t.pdfViewedAt },
+                { done: !!t.signStartedAt || !!activity.acceptedAt, label: 'Started to accept', at: t.signStartedAt },
+                ...(t.declined ? [{ done: true, label: `Declined${t.declined.reason ? `: “${t.declined.reason}”` : ' (no comment)'}`, at: t.declined.at }] : []),
+                { done: !!activity.acceptedAt, label: activity.acceptedName ? `Accepted by ${activity.acceptedName}` : 'Accepted', at: activity.acceptedAt },
+                { done: !!activity.installPref?.dates?.length, label: activity.installPref?.dates?.length ? `${activity.installPref.provisional ? 'Provisionally booked' : 'Asked for'} installation on ${activity.installPref.dates.map((d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })).join(', ')}` : 'Installation date', at: activity.installPref?.at },
+              ];
+              return rows.map((r) => (
+                <li key={r.label} className={r.done ? 'done' : ''}>
+                  <span aria-hidden="true">{r.done ? '✓' : '○'}</span>
+                  <span>{r.label}</span>
+                  <small>{when(r.at)}</small>
+                </li>
+              ));
+            })()}
+          </ul>
+        </section>
+      )}
 
       {askFinish && (
         <Sheet title="Finish the quote first?" onClose={() => setAskFinish(false)}>

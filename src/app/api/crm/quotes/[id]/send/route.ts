@@ -6,7 +6,7 @@ import { saveGenerated } from '@/lib/documents/store';
 import { customerRefOf, readQuote, renderQuote } from '@/lib/quotes/server';
 import { totalsOf } from '@/lib/quotes/types';
 import { quoteEmailHtml } from '@/lib/quotes/email';
-import { defaultQuoteMessage, firstOf, quoteSubject, quoteWhatsApp } from '@/lib/quotes/message';
+import { defaultQuoteMessage, firstOf, quoteSms, quoteSubject, quoteWhatsApp } from '@/lib/quotes/message';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { sendManual } from '@/lib/whatsapp/inbox';
 import { sendSms, smsConfigured, toMsisdn } from '@/lib/sms';
@@ -112,7 +112,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     else if (!smsConfigured()) sentVia.sms = { ok: false, error: 'Text messages aren’t set up yet.' };
     else {
       const first = firstOf(name);
-      const out = await sendSms(to, `${first ? `Hi ${first}, ` : ''}your Heliaxis quote is ready. View it, accept it or ask us a question here: ${r.url}`, 'quote');
+      const out = await sendSms(to, quoteSms(first, r.url), 'quote');
       sentVia.sms = out.ok ? { ok: true, to } : { ok: false, error: out.error };
       if (out.ok) await logActivity({ enquiryId: q.enquiry_id, projectId: q.project_id, kind: 'system', body: `Quote ${q.number} link texted to ${to}`, byId: s.user.id });
     }

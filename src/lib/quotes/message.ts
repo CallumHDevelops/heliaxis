@@ -12,3 +12,6 @@ export const quoteSubject = 'Your Heliaxis quote';
 
 /** The WhatsApp wording: the message, then the link. */
 export const quoteWhatsApp = (message: string, url: string) => `${message.trim()}\n\nClick here to access your portal and view your quote: ${url}`;
+
+/** The text message: short, with the link. */
+export const quoteSms = (first: string, url: string) => `${first ? `Hi ${first}, ` : ''}your Heliaxis quote is ready. View it, accept it or ask us a question here: ${url}`;
