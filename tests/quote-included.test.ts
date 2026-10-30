@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-import { DEFAULT_OPTIONS, includedByRule, introByRule, itemsOf, standardClauses, writeIncluded } from '@/lib/quotes/included';
+import { finished, DEFAULT_OPTIONS, includedByRule, introByRule, itemsOf, standardClauses, writeIncluded } from '@/lib/quotes/included';
 import { cleanContent, emptyText, starterContent } from '@/lib/quotes/types';
 
 function quote() {
@@ -55,5 +55,12 @@ describe('what is included', () => {
     expect(t).toContain('at 9 Turner Street');
     expect(t.endsWith('Yours sincerely,\n\nHeliaxis')).toBe(true);
     expect(t).not.toContain('£');
+  });
+  it('never uses a model answer that was cut off', () => {
+    const text = (t: string, stop = 'end_turn') => ({ stop_reason: stop, content: [{ type: 'text', text: t }] });
+    expect(finished(text('Dear Sam,\n\nThank you.\n\nYours sincerely,\n\nHeliaxis'))).toContain('Heliaxis');
+    expect(finished(text('This covers two batteries and an external IP65', 'max_tokens'))).toBeNull();
+    expect(finished(text('This covers two batteries and an external IP65'))).toBeNull();
+    expect(finished(text('This quote includes the supply and installation of a battery.'))).toBe('This quote includes the supply and installation of a battery.');
   });
 });

@@ -105,6 +105,16 @@ Where the person has given key points, or an item's own detail contains them, pu
 Do NOT write about electrical ancillaries, access equipment, documentation, compliance, BS 7671 or standards: those are added separately.
 Keep the whole thing under 170 words. Reply with the paragraphs only, separated by a blank line.`;
 
+/**
+ * The model's text, but only if it finished: an answer cut off by the length limit (or that stops mid-sentence) is never used,
+ * so a half-written paragraph can't reach a quote. Null sends the caller to the rule-made text.
+ */
+export function finished(res: { stop_reason: string | null; content: { type: string; text?: string }[] }): string | null {
+  if (res.stop_reason === 'max_tokens' || res.stop_reason === 'refusal') return null;
+  const t = res.content.flatMap((b) => (b.type === 'text' && b.text ? [b.text] : [])).join('').trim();
+  return /[.!?”"’)]$|Heliaxis$/.test(t) ? t : null;
+}
+
 export async function writeIncluded(content: QuoteContent, o: IncludedOptions = DEFAULT_OPTIONS): Promise<{ text: string; via: 'ai' | 'rules' }> {
   const items = itemsOf(content);
   if (!items.length) return { text: '', via: 'rules' };
@@ -115,11 +125,11 @@ export async function writeIncluded(content: QuoteContent, o: IncludedOptions = 
   try {
     const res = await new Anthropic().messages.create({
       model: MODEL,
-      max_tokens: 600,
+      max_tokens: 2000,
       system: SYSTEM,
       messages: [{ role: 'user', content: `The quote's items:\n${list}${proposalOf(content) ? `\n\nFacts from the design proposal (use them to describe the equipment and its warranties accurately):\n${proposalOf(content)!.facts}` : ''}${kp ? `\n\nKey points to include (from the person writing the quote):\n${kp}` : ''}` }],
     });
-    const eq = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('').trim();
+    const eq = finished(res);
     return eq ? { text: [eq, ...standardClauses(o)].join('\n\n'), via: 'ai' } : fallback;
   } catch {
     return fallback;
@@ -128,7 +138,7 @@ export async function writeIncluded(content: QuoteContent, o: IncludedOptions = 
 
 const INTRO_SYSTEM = `You write the introduction of a formal quotation for Heliaxis, a solar, battery and heat pump installer in South Wales.
 Use formal, courteous British English. Open "Dear {first name}," if a name is given, then two short paragraphs: thank them for the opportunity to quote for the property and say what this quotation covers, naming the main equipment from the list (the solar PV system, the battery and its capacity, and so on); then say the items, prices and terms follow, and that Heliaxis would be glad to answer any questions. End with "Yours sincerely," then a blank line then "Heliaxis".
-No hype, no exclamation marks, no emoji, no prices, no claims about savings, warranties or timescales. Use only the items and facts you are given. Keep it under 120 words. Reply with the text only.`;
+No hype, no exclamation marks, no emoji, no prices, no claims about savings, warranties or timescales. Use only the items and facts you are given. Keep it under 120 words. Do not list the items or their details (where something is fitted, cable runs, breakers): name only the main systems, such as the solar PV system, the battery storage and its capacity, and the associated electrical works. Reply with the text only.`;
 
 /** The cover letter, by rule: used when the writing assistant is not switched on or fails. */
 export function introByRule(content: QuoteContent, first: string, site: string): string {
@@ -153,11 +163,11 @@ export async function writeIntro(content: QuoteContent, first: string, site: str
   try {
     const res = await new Anthropic().messages.create({
       model: MODEL,
-      max_tokens: 500,
+      max_tokens: 2000,
       system: INTRO_SYSTEM,
       messages: [{ role: 'user', content: `Customer first name: ${first || '(none)'}\nSite: ${site || '(not given)'}\nItems:\n${list}${proposalOf(content) ? `\n\nFacts from the design proposal:\n${proposalOf(content)!.facts}` : ''}` }],
     });
-    const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('').trim();
+    const text = finished(res);
     return text ? { text, via: 'ai' } : fallback;
   } catch {
     return fallback;
