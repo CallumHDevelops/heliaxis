@@ -4,6 +4,7 @@ import { ukBankHolidays, ukDay } from '@/lib/bank-holidays';
 import { projectSigned, projectByToken } from '@/lib/crm/portal';
 import { logActivity } from '@/lib/crm/server';
 import { cleanPref } from '@/lib/install-dates';
+import { calendarFor } from '@/lib/install-availability';
 import { notify } from '@/lib/notify';
 import { canAccess } from '@/lib/portals';
 
@@ -24,18 +25,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const b = await req.json().catch(() => ({}));
   const r = cleanPref(b, ukDay(new Date()), await ukBankHolidays());
   if (!r.ok) return reply({ error: r.error }, 400);
+  const provisional = b.provisional === true;
+  if (provisional) {
+    // A provisional booking is one date from the calendar, and it must still have room.
+    const day = r.pref.dates[0];
+    const { cal } = await calendarFor(ukDay(new Date()), day, p.id);
+    const state = cal.days.find((x) => x.day === day)?.state;
+    if (r.pref.dates.length !== 1 || !state || state === 'closed' || state === 'full') return reply({ error: 'That date has just been taken. Please pick another one.' }, 409);
+  }
   const db = createAdminClient();
   const at = new Date().toISOString();
-  const { error } = await db.from('crm_projects').update({ install_pref: { ...r.pref, at }, updated_at: at }).eq('id', p.id);
+  const { error } = await db.from('crm_projects').update({ install_pref: { ...r.pref, at, ...(provisional ? { provisional: true } : {}) }, updated_at: at }).eq('id', p.id);
   if (error) return reply({ error: 'Couldn’t save your dates just now. Please try again, or message us.' }, 500);
   const words = r.pref.dates.map((d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })).join(', ');
-  await logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'system', body: `Customer asked for installation on: ${words}${r.pref.flexible ? ' (flexible)' : ''}${r.pref.notes ? `. Note: ${r.pref.notes}` : ''}` });
+  await logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'system', body: `${provisional ? 'Customer provisionally booked installation for' : 'Customer asked for installation on'}: ${words}${r.pref.flexible ? ' (flexible)' : ''}${r.pref.notes ? `. Note: ${r.pref.notes}` : ''}` });
   after(async () => {
     const { data: people } = await db.from('profiles').select('*').eq('status', 'approved');
     const team = (people ?? []).filter((x) => canAccess(x, 'crm')).map((x) => x.id as string);
     await Promise.all(
       team.map((userId) =>
-        notify({ userId, kind: 'crm_install_dates', title: `📅 Install dates requested: ${p.title}`, body: words, href: `/admin/crm/${p.id}`, tag: `crm-install-${p.id}` })
+        notify({ userId, kind: 'crm_install_dates', title: `${provisional ? 'Provisional install date' : 'Install dates requested'}: ${p.title}`, body: words, href: `/admin/crm/${p.id}`, tag: `crm-install-${p.id}` })
       )
     );
   });

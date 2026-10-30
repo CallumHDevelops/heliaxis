@@ -6,7 +6,7 @@ import { BrandLogo } from '@/components/theme/BrandLogo';
 import { ThemeChoice } from '@/components/theme/ThemeChoice';
 import type { PortalData } from '@/lib/crm/portal';
 import { isWonStage } from '@/lib/crm/stages';
-import { earliestInstall, latestInstall, MAX_CHOICES } from '@/lib/install-dates';
+import type { CalendarDay } from '@/lib/install-dates';
 import { useNow } from '@/lib/use-now';
 import { HandoverSection } from './HandoverSection';
 import './portal.css';
@@ -98,6 +98,15 @@ function Contact({ data }: { data: PortalData }) {
  * After they accept: straight on to the card payment page for the deposit if there is one; otherwise (or if
  * card payment isn't available) back to their portal, which shows what is left to do.
  */
+/** Tell Heliaxis a step was reached (opened the link, started to accept, ...). Quiet, and never in the customer's way. */
+function track(token: string, type: 'opened' | 'sign_started' | 'decline_started' | 'dates_started') {
+  try {
+    void fetch(`/api/my/${token}/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }), keepalive: true }).catch(() => null);
+  } catch {
+    // Tracking must never get in the way.
+  }
+}
+
 async function afterAccept(token: string, d: { deposit?: boolean }) {
   if (d.deposit) {
     const r = await fetch(`/api/my/${token}/deposit`, { method: 'POST' }).catch(() => null);
@@ -116,8 +125,20 @@ const quoteWord = (q: { category: string }) => (q.category === 'contract' ? 'con
 
 function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref }) {
   const q = data.quote;
-  const [signing, setSigning] = useState(false);
+  const [signing, setSigningRaw] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const [query, setQuery] = useState(0);
+  useEffect(() => {
+    track(data.token, 'opened');
+  }, [data.token]);
+  const setSigning = (v: boolean) => {
+    if (v) track(data.token, 'sign_started');
+    setSigningRaw(v);
+  };
+  const openDecline = () => {
+    track(data.token, 'decline_started');
+    setDeclining(true);
+  };
   return (
     <Shell tag="Your quote" themePref={themePref}>
       <section className="pt-hello">
@@ -153,6 +174,9 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
             <button type="button" className="pt-btn ghost" onClick={() => setQuery((n) => n + 1)}>
               Raise a query
             </button>
+            <button type="button" className="pt-btn ghost" onClick={openDecline}>
+              Decline
+            </button>
           </div>
           <ol className="pt-steps">
             <li>Accept and sign</li>
@@ -184,6 +208,7 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
           </div>
         </div>
       )}
+      {declining && q && <DeclineSheet token={data.token} word={quoteWord(q)} onClose={() => setDeclining(false)} />}
     </Shell>
   );
 }
@@ -191,8 +216,16 @@ function QuotePage({ data, themePref }: { data: PortalData; themePref: ThemePref
 /* ── Won onwards: the full portal ──────────────────────────────────────────── */
 
 function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData; paid: boolean; justAccepted: boolean; themePref: ThemePref }) {
-  const [signing, setSigning] = useState(false);
+  const [signing, setSigningRaw] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const [query, setQuery] = useState(0);
+  useEffect(() => {
+    if (data.quote) track(data.token, 'opened');
+  }, [data.token, data.quote]);
+  const setSigning = (v: boolean) => {
+    if (v) track(data.token, 'sign_started');
+    setSigningRaw(v);
+  };
   const [photo, setPhoto] = useState<string | null>(null);
   const now = useNow(60_000);
   const accepted = data.accepted;
@@ -257,6 +290,16 @@ function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData;
             </button>
             <button type="button" className="pt-btn ghost" onClick={() => setQuery((n) => n + 1)}>
               Raise a query
+            </button>
+            <button
+              type="button"
+              className="pt-btn ghost"
+              onClick={() => {
+                track(data.token, 'decline_started');
+                setDeclining(true);
+              }}
+            >
+              Decline
             </button>
           </div>
         </section>
@@ -362,6 +405,7 @@ function FullPortal({ data, paid, justAccepted, themePref }: { data: PortalData;
           </div>
         </div>
       )}
+      {declining && data.quote && <DeclineSheet token={data.token} word={quoteWord(data.quote)} onClose={() => setDeclining(false)} />}
       {photo && (
         <div className="pt-sheet" onClick={() => setPhoto(null)} role="dialog" aria-modal="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -498,54 +542,160 @@ function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Qu
   );
 }
 
-/** After accepting: up to three dates they would like the installation on. A request; the office confirms the real day. */
+/** Declining the quote: a comment (what put them off), then the team is told. The quote stays open to them until they decide. */
+function DeclineSheet({ token, word, onClose }: { token: string; word: string; onClose: () => void }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState('');
+  async function send() {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/my/${token}/decline`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!r?.ok) return setErr(d.error || 'Something went wrong. Please try again.');
+    setDone(true);
+  }
+  return (
+    <div className="pt-sheet" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="pt-sheet-box" onClick={(e) => e.stopPropagation()}>
+        <h2>{done ? 'Thank you for letting us know' : `Decline your ${word}`}</h2>
+        {done ? (
+          <>
+            <p>We’ve passed your comments to the team. Someone may be in touch to see whether anything could be changed. If you change your mind, your {word} is still here.</p>
+            <button type="button" className="pt-btn" onClick={onClose}>
+              Close
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="pt-muted">We’re sorry it isn’t right. Could you tell us why? It helps us, and we may be able to change the quote.</p>
+            <label className="pt-label" htmlFor="pt-decline">
+              Your comments
+            </label>
+            <textarea id="pt-decline" className="pt-input" rows={5} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. the price is higher than I expected, or I would like fewer panels" autoFocus />
+            {err && <p className="pt-err">{err}</p>}
+            <div className="pt-row">
+              <button type="button" className="pt-btn" disabled={busy} onClick={() => void send()}>
+                {busy ? 'Sending…' : 'Send and decline'}
+              </button>
+              <button type="button" className="pt-btn ghost" onClick={onClose}>
+                Go back
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const wordsOf = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+const shortOf = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDate();
+
+/**
+ * After accepting: a calendar of the next three weeks, free days to tap. Picking one is a provisional booking: the day is held
+ * for them and the office confirms it. Weekends and bank holidays are greyed, as are days with no room.
+ */
 function InstallDates({ token, pref }: { token: string; pref: PortalData['installPref'] }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [dates, setDates] = useState<string[]>(pref?.dates?.length ? pref.dates : ['']);
+  const [cal, setCal] = useState<{ days: CalendarDay[]; from: string; prev: string | null; next: string | null } | null>(null);
+  const [from, setFrom] = useState<string | null>(null);
+  const [pick, setPick] = useState(pref?.dates?.[0] ?? '');
   const [flexible, setFlexible] = useState(pref?.flexible ?? false);
   const [notes, setNotes] = useState(pref?.notes ?? '');
   const [editing, setEditing] = useState(!pref);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(!!pref);
-  const words = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-  const set = (i: number, v: string) => setDates((cur) => cur.map((d, n) => (n === i ? v : d)));
-  const chosen = dates.filter(Boolean);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (!editing) return;
+    let gone = false;
+    fetch(`/api/my/${token}/install-availability${from ? `?from=${from}` : ''}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => !gone && d && setCal(d))
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+    };
+  }, [token, from, editing]);
+
+  function choose(d: string) {
+    if (!started.current) {
+      started.current = true;
+      void fetch(`/api/my/${token}/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'dates_started' }), keepalive: true }).catch(() => null);
+    }
+    setPick(d);
+  }
   async function save() {
     setBusy(true);
     setErr('');
-    const r = await fetch(`/api/my/${token}/install-dates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates: chosen, flexible, notes }) }).catch(() => null);
+    const r = await fetch(`/api/my/${token}/install-dates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates: [pick], flexible, notes, provisional: true }) }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     setBusy(false);
-    if (!r?.ok) return setErr(d.error || 'Something went wrong. Please try again.');
+    if (!r?.ok) {
+      if (r?.status === 409) setFrom(cal?.from ?? null);
+      setPick('');
+      return setErr(d.error || 'Something went wrong. Please try again.');
+    }
     setDone(true);
     setEditing(false);
   }
   if (done && !editing) {
     return (
       <div>
-        <p className="pt-banner ok">✓ We have your dates: {chosen.map(words).join('; ')}{flexible ? ' (flexible)' : ''}. We will check them and confirm your installation date with you.</p>
+        <p className="pt-banner ok">
+          ✓ Provisionally booked for {pick ? wordsOf(pick) : pref?.dates?.[0] ? wordsOf(pref.dates[0]) : 'your chosen date'}
+          {flexible ? ' (flexible)' : ''}. We’ll check it against our installers and scaffolding and confirm it with you.
+        </p>
         <button type="button" className="pt-btn ghost" onClick={() => setEditing(true)}>
-          Change my dates
+          Change my date
         </button>
       </div>
     );
   }
+  const weeks: CalendarDay[][] = [];
+  if (cal) for (let i = 0; i < cal.days.length; i += 7) weeks.push(cal.days.slice(i, i + 7).slice(0, 5));
   return (
     <div className="pt-signform">
-      <p>Tell us up to {MAX_CHOICES} dates that suit you for the installation. We will check them against our installers and confirm your date. We install Monday to Friday.</p>
-      {dates.map((d, i) => (
-        <div key={i}>
-          <label className="pt-label" htmlFor={`pt-date-${i}`}>
-            {i === 0 ? 'First choice' : i === 1 ? 'Second choice' : 'Third choice'}
-          </label>
-          <input id={`pt-date-${i}`} type="date" className="pt-input" min={earliestInstall(today)} max={latestInstall(today)} value={d} onChange={(e) => set(i, e.target.value)} />
-        </div>
-      ))}
-      {dates.length < MAX_CHOICES && (
-        <button type="button" className="pt-btn ghost" onClick={() => setDates((cur) => [...cur, ''])}>
-          + Add another date
-        </button>
+      <p>Pick a day for your installation. It’s a provisional booking: we hold the day for you and confirm it once we’ve checked our installers and scaffolding. We install Monday to Friday.</p>
+      {!cal ? (
+        <p className="pt-muted">Loading the available dates…</p>
+      ) : (
+        <>
+          <div className="pt-cal" role="group" aria-label="Available installation dates">
+            <div className="pt-cal-head" aria-hidden="true">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((w) => (
+                <span key={w}>{w}</span>
+              ))}
+            </div>
+            {weeks.map((wk) => (
+              <div key={wk[0].day} className="pt-cal-week">
+                {wk.map((d) => {
+                  const off = d.state === 'closed' || d.state === 'full';
+                  return (
+                    <button key={d.day} type="button" disabled={off} aria-pressed={pick === d.day} aria-label={`${wordsOf(d.day)}${d.state === 'full' ? ', fully booked' : d.state === 'closed' ? ', not available' : d.state === 'few' ? ', last place' : ''}`} className={`pt-cal-day is-${d.state}${pick === d.day ? ' on' : ''}`} onClick={() => choose(d.day)}>
+                      <small>{new Date(`${d.day}T12:00:00Z`).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })}</small>
+                      <b>{shortOf(d.day)}</b>
+                      {d.state === 'few' && <i>last place</i>}
+                      {d.state === 'full' && <i>full</i>}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          <div className="pt-row">
+            <button type="button" className="pt-btn ghost" disabled={!cal.prev} onClick={() => setFrom(cal.prev)}>
+              Earlier dates
+            </button>
+            <button type="button" className="pt-btn ghost" disabled={!cal.next} onClick={() => setFrom(cal.next)}>
+              Next three weeks
+            </button>
+          </div>
+        </>
       )}
       <label className="pt-check">
         <input type="checkbox" checked={flexible} onChange={(e) => setFlexible(e.target.checked)} /> I am flexible: a day or two either side is fine.
@@ -556,8 +706,8 @@ function InstallDates({ token, pref }: { token: string; pref: PortalData['instal
       <textarea id="pt-inst-notes" className="pt-input" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. away the first week of December" />
       {err && <p className="pt-err">{err}</p>}
       <div className="pt-row">
-        <button type="button" className="pt-btn" disabled={busy || chosen.length === 0} onClick={() => void save()}>
-          {busy ? 'Saving…' : 'Send my dates'}
+        <button type="button" className="pt-btn" disabled={busy || !pick} onClick={() => void save()}>
+          {busy ? 'Booking…' : pick ? `Book ${wordsOf(pick)} provisionally` : 'Choose a day'}
         </button>
         {pref && (
           <button type="button" className="pt-btn ghost" onClick={() => setEditing(false)}>

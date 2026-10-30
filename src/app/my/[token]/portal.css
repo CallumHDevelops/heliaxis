@@ -576,3 +576,18 @@ textarea.pt-input { resize: vertical; font: inherit; }
 .pt-thread small { opacity: 0.65; font-size: 0.72rem; }
 .pt-thread span { white-space: pre-wrap; overflow-wrap: anywhere; }
 .pt-signform .pt-label { display: block; margin: 0.6rem 0 0.25rem; }
+
+/* Choosing an installation date: three weeks, Monday to Friday. */
+.pt-cal { display: grid; gap: 6px; }
+.pt-cal-head, .pt-cal-week { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pt-cal-head span { text-align: center; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.pt-cal-day { display: grid; place-items: center; gap: 0; min-height: 62px; padding: 6px 2px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.pt-cal-day small { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.pt-cal-day b { font-size: 1.15rem; }
+.pt-cal-day i { font-style: normal; font-size: 0.62rem; color: var(--muted); }
+.pt-cal-day.is-free:hover, .pt-cal-day.is-few:hover { border-color: #f8bc1e; background: rgba(248, 188, 30, 0.14); }
+.pt-cal-day.is-few i { color: #b57f00; font-weight: 700; }
+.pt-cal-day.on { background: #f8bc1e; border-color: #211f18; color: #211f18; }
+.pt-cal-day.on small, .pt-cal-day.on i { color: #211f18; }
+.pt-cal-day:disabled { cursor: not-allowed; opacity: 0.45; background: transparent; }
+.pt-cal-day:focus-visible { outline: 3px solid #211f18; outline-offset: 2px; }

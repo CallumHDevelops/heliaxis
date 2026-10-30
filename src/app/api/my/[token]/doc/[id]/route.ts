@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isUuid, signedDoc } from '@/lib/crm/server';
 import { projectByToken, SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
 import { printResponse, printVersion, type PrintDoc } from '@/lib/documents/print';
+import { recordQuoteEvent } from '@/lib/crm/quote-track';
 
 export const dynamic = 'force-dynamic';
 // A print version of the combined handover pack is built again on request.
@@ -31,6 +32,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   // Only the quote-only page serves a document that isn't marked visible (and the signed one stays viewable).
   if (!(p.mode === 'quote' ? isQuote : d.visible || id === p.accepted_document_id)) return new NextResponse('Not found', { status: 404 });
   const q = new URL(req.url).searchParams;
+  // A customer looking at the quote they were sent: noted on the job (once), not the signed copy afterwards.
+  if (isQuote && !p.accepted_at) after(() => recordQuoteEvent({ id: p.id, enquiry_id: p.enquiry_id, owner_id: p.owner_id as string | null, title: p.title }, 'viewed_pdf').then(() => null, () => null));
   if (q.get('variant') === 'print') return printResponse(await printVersion(db, d as PrintDoc), q.has('download'));
   const url = await signedDoc(d.storage_path, 300, q.has('download') ? d.name : undefined);
   return url ? NextResponse.redirect(url) : new NextResponse('Not found', { status: 404 });
