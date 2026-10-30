@@ -75,7 +75,14 @@ export function cleanSettings(v: unknown): EstimatorSettings {
 
 export type Who = 'home' | 'business';
 export type Shade = 'none' | 'some' | 'lots';
-export type Daytime = 'out' | 'some' | 'home';
+/** Homes: out, some, home. Businesses: when it is open (office hours, long hours, round the clock, evenings and weekends). */
+export type Daytime = 'out' | 'some' | 'home' | 'office' | 'long' | 'always' | 'evening';
+export const BUSINESS_HOURS: { key: Daytime; label: string; sub: string; short: string }[] = [
+  { key: 'office', label: 'Weekdays, 9 to 5', sub: 'Office, workshop, school: closed evenings and weekends', short: '9 to 5' },
+  { key: 'long', label: 'Long hours, 6 or 7 days', sub: 'Shop, café, garage, farm: early starts and late finishes', short: 'Long hours' },
+  { key: 'always', label: 'Round the clock', sub: 'Care home, cold store, factory on shifts, 24/7', short: '24/7' },
+  { key: 'evening', label: 'Evenings and weekends', sub: 'Pub, gym, club, hall: busiest after work', short: 'Evenings' },
+];
 
 /** Roof directions offered, with PVGIS's aspect (degrees from south; it is symmetrical) and the fallback factor. */
 export const DIRECTIONS = [
@@ -183,7 +190,11 @@ export function consumptionFrom(usage: Inputs['usage'], s: EstimatorSettings): n
 const softMin = (a: number, b: number) => (a <= 0 || b <= 0 ? 0 : Math.pow(Math.pow(a, -4) + Math.pow(b, -4), -0.25));
 
 /** The share of a home's (or site's) electricity used while the sun is up, before any battery. */
-const DAY_SHARE = { home: { out: 0.25, some: 0.33, home: 0.42 }, business: { out: 0.45, some: 0.5, home: 0.55 } } as const;
+/** The share of what is used that falls while the sun is up (before a battery, an electric car or a heat pump). */
+const DAY_SHARE: Record<'home' | 'business', Record<Daytime, number>> = {
+  home: { out: 0.25, some: 0.33, home: 0.42, office: 0.33, long: 0.33, always: 0.33, evening: 0.33 },
+  business: { out: 0.45, some: 0.5, home: 0.55, office: 0.62, long: 0.52, always: 0.42, evening: 0.28 },
+};
 
 export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Estimate {
   const home = i.who === 'home';

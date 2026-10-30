@@ -217,6 +217,30 @@ export function detectFaces(g: Grid): Face[] {
     for (const [m, id] of claims) { label[m] = id; next.push(m); }
     frontier = next;
   }
+  // 3b. Small holes inside a face (a patch of rough heights, a vent's shadow in the height map) are still roof: a cell with most of its
+  // neighbours on one face, and heights near that face's plane, joins it. A chimney or a skylight frame stands too far off the plane.
+  for (let pass = 0; pass < 6; pass++) {
+    const joins = new Map<number, number>();
+    for (let j = 1; j < n - 1; j++) {
+      for (let i = 1; i < n - 1; i++) {
+        const m = j * n + i;
+        if (label[m] >= 0 || !ok(i, j)) continue;
+        const votes = new Map<number, number>();
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const l = label[(j + dj) * n + i + di];
+          if (l >= 0) votes.set(l, (votes.get(l) ?? 0) + 1);
+        }
+        let top = -1, topN = 0;
+        for (const [l, v] of votes) if (v > topN) { top = l; topN = v; }
+        const pl = top >= 0 ? planes[top] : null;
+        if (!pl || topN < 3) continue;
+        const { x, y } = cellXY(g, i, j);
+        if (Math.abs(g.z[m] - (pl.a * x + pl.b * y + pl.c)) <= 0.4) joins.set(m, top);
+      }
+    }
+    if (!joins.size) break;
+    for (const [m, id] of joins) label[m] = id;
+  }
   for (let id = 0; id < regions.length; id++) {
     const pl = planes[id];
     if (!pl) continue;

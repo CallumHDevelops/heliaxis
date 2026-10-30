@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
+  BUSINESS_HOURS,
   DIRECTIONS,
   PITCHES,
   estimate,
@@ -202,8 +203,8 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
         <div className="glow" />
         <div className="wrap">
           <span className="eyebrow">South Wales · Free instant estimate</span>
-          <h1>See what solar could do for your home.</h1>
-          <p>Six quick questions. Satellite weather data for your postcode, your roof and your electricity use give you a size, a saving and a payback.</p>
+          <h1>{who === 'business' ? 'See what solar could do for your business.' : 'See what solar could do for your home.'}</h1>
+          <p>Six quick questions. Satellite weather data for your postcode, your roof and your electricity use give you a size, a saving and a payback{who === 'business' ? ', based on when your business is open' : ''}.</p>
         </div>
       </section>
 
@@ -226,8 +227,8 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
                   <h2>Where is the property?</h2>
                   <p className="est-sub">Your postcode gives us the sunshine for your area.</p>
                   <div className="est-opts two">
-                    <Opt on={who === 'home'} onClick={() => setWho('home')} title="A home" sub="House, bungalow, flat with its own roof" />
-                    <Opt on={who === 'business'} onClick={() => setWho('business')} title="A business" sub="Shop, farm, warehouse, office" />
+                    <Opt on={who === 'home'} onClick={() => { setWho('home'); setDaytime((d) => (['out', 'some', 'home'].includes(d) ? d : 'some')); }} title="A home" sub="House, bungalow, flat with its own roof" />
+                    <Opt on={who === 'business'} onClick={() => { setWho('business'); setDaytime((d) => (['office', 'long', 'always', 'evening'].includes(d) ? d : 'office')); }} title="A business" sub="Shop, farm, warehouse, office" />
                   </div>
                   {picker ? (
                     <div className="est-pick">
@@ -393,13 +394,27 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
               )}
               {step === 4 && (
                 <>
-                  <h2>Who is in during the day?</h2>
-                  <p className="est-sub">Solar makes power in daylight. The more you use then, the more you save.</p>
-                  <div className="est-opts three">
-                    <Opt on={daytime === 'out'} onClick={() => setDaytime('out')} title="Out at work" sub="Mostly empty 9 to 5" />
-                    <Opt on={daytime === 'some'} onClick={() => setDaytime('some')} title="Some of the time" sub="Part-time or shifts" />
-                    <Opt on={daytime === 'home'} onClick={() => setDaytime('home')} title="Home most days" sub="Retired, working from home" />
-                  </div>
+                  {who === 'business' ? (
+                    <>
+                      <h2>When is your business open?</h2>
+                      <p className="est-sub">Solar makes power in daylight, so the more of your electricity you use while the sun is up, the more you save.</p>
+                      <div className="est-opts two">
+                        {BUSINESS_HOURS.map((h) => (
+                          <Opt key={h.key} on={daytime === h.key} onClick={() => setDaytime(h.key)} title={h.label} sub={h.sub} />
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h2>Who is in during the day?</h2>
+                      <p className="est-sub">Solar makes power in daylight. The more you use then, the more you save.</p>
+                      <div className="est-opts three">
+                        <Opt on={daytime === 'out'} onClick={() => setDaytime('out')} title="Out at work" sub="Mostly empty 9 to 5" />
+                        <Opt on={daytime === 'some'} onClick={() => setDaytime('some')} title="Some of the time" sub="Part-time or shifts" />
+                        <Opt on={daytime === 'home'} onClick={() => setDaytime('home')} title="Home most days" sub="Retired, working from home" />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               {step === 5 && (
@@ -725,9 +740,9 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
             </div>
           </div>
           <div className="est-adj__g">
-            <span className="est-adj__lab">Who is home in the day</span>
-            <div className="est-tog3 seg" role="group" aria-label="Who is home in the day">
-              {([['out', 'Out all day'], ['some', 'Some days'], ['home', 'Home all day']] as const).map(([d, label]) => (
+            <span className="est-adj__lab">{home ? 'Who is home in the day' : 'When you are open'}</span>
+            <div className="est-tog3 seg" role="group" aria-label={home ? 'Who is home in the day' : 'When you are open'}>
+              {(home ? ([['out', 'Out all day'], ['some', 'Some days'], ['home', 'Home all day']] as const) : (BUSINESS_HOURS.map((h) => [h.key, h.short]) as [Daytime, string][])).map(([d, label]) => (
                 <button key={d} type="button" className={controls.daytime === d ? 'on' : ''} aria-pressed={controls.daytime === d} onClick={() => controls.setDaytime(d)}>
                   {label}
                 </button>
@@ -793,7 +808,7 @@ function Finding({ address, done }: { address: string; done: boolean }) {
 /** What goes into the CRM with the enquiry: the figures they saw, so the call starts from them. */
 function estimateMessage(r: ReturnType<typeof estimate>, inputs: Inputs, address: string) {
   const dir = address ? `roof found at ${address}` : 'roof answered by the visitor';
-  return `Solar estimator: ${r.kwp.toFixed(2)} kWp (${r.panels} panels)${r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}. About ${num(r.generation)} kWh a year, saving about ${gbp(r.saving)} a year, indicative cost ${gbpRound(r.cost, 100)}, payback about ${yrs(r.paybackYears)} years. Uses ${inputs.usage.kind === 'bill' ? `£${inputs.usage.value}/month` : `${num(inputs.usage.value)} kWh/year`}; ${inputs.shade} shade; daytime: ${inputs.daytime}${inputs.ev ? '; electric car' : ''}${inputs.heatpump ? '; heat pump' : ''} (${dir}).`;
+  return `Solar estimator: ${r.kwp.toFixed(2)} kWp (${r.panels} panels)${r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}. About ${num(r.generation)} kWh a year, saving about ${gbp(r.saving)} a year, indicative cost ${gbpRound(r.cost, 100)}, payback about ${yrs(r.paybackYears)} years. Uses ${inputs.usage.kind === 'bill' ? `£${inputs.usage.value}/month` : `${num(inputs.usage.value)} kWh/year`}; ${inputs.shade} shade; daytime: ${BUSINESS_HOURS.find((h) => h.key === inputs.daytime)?.label ?? inputs.daytime}${inputs.ev ? '; electric car' : ''}${inputs.heatpump ? '; heat pump' : ''} (${dir}).`;
 }
 
 /** The invitation under the estimate: one clear button that opens the survey form. */

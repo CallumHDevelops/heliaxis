@@ -1,7 +1,7 @@
 import 'server-only';
 import { fromArrayBuffer } from 'geotiff';
 import { convergence, toUtm } from './utm';
-import { cellXY, detectFaces, hull, packFaces, type Grid } from './planes';
+import { cellXY, detectFaces, hull, packFaces, xyCell, type Grid } from './planes';
 import { inside, type LngLat } from './overlay';
 import type { MapPanel } from './roof';
 
@@ -64,7 +64,7 @@ export type RoofAnalysis = {
   /** Yearly sun per kW (shade included) averaged over the panels laid. */
   fluxMean: number | null;
   /** What the analysis saw, for the ?debug view: each face found and how many panels it took. */
-  info: { imageryQuality?: string; okCells: number; faces: { bearing: number; pitch: number; areaM2: number; cells: number; panels: number; usable: boolean; fluxMedian: number | null; centre: { x: number; y: number } }[] };
+  info: { imageryQuality?: string; okCells: number; faces: { bearing: number; pitch: number; areaM2: number; cells: number; panels: number; usable: boolean; fluxMedian: number | null; centre: { x: number; y: number }; /** The face seen from above in its own frame, 40 cm squares: # on the face, . not on it (only with ?debug, for the biggest usable face). */ plan?: string[] }[] };
 };
 
 export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key: string, referer: string): Promise<{ ok: true; roof: RoofAnalysis } | { ok: false; why: string }> {
@@ -184,6 +184,33 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
     if (!faces.length) return { ok: false, why: 'no roof faces found in the height map' };
     const placed = packFaces(g, faces, { panelW: PANEL_W, panelH: PANEL_H, clearance: 0.4, gap: 0.02 });
     const toLL = (x: number, y: number): LngLat => ({ lat: centre.lat + y / mPerLat, lng: centre.lng + x / mPerLng });
+    // For ?debug: the biggest usable face drawn square-on in its own frame (rows run along the eaves), so holes and edges show.
+    const planFace = faces.filter((f) => f.bearing >= 80 && f.bearing <= 280 && f.pitch >= 3 && f.pitch <= 65).reduce<(typeof faces)[number] | null>((a, b) => (!a || b.areaM2 > a.areaM2 ? b : a), null);
+    const planOf = (f: (typeof faces)[number]) => {
+      const bt = (f.bearing * Math.PI) / 180;
+      const d = { x: Math.sin(bt), y: Math.cos(bt) };
+      const a = { x: Math.cos(bt), y: -Math.sin(bt) };
+      const on = new Set(f.cells);
+      const us: number[] = [];
+      const vs: number[] = [];
+      for (const k of f.cells) {
+        const { x, y } = cellXY(g, k % n, (k - (k % n)) / n);
+        us.push(x * a.x + y * a.y);
+        vs.push(x * d.x + y * d.y);
+      }
+      const u0 = Math.min(...us), u1 = Math.max(...us), v0 = Math.min(...vs), v1 = Math.max(...vs);
+      const rows: string[] = [];
+      for (let v = v1; v >= v0 - 0.2; v -= 0.4) {
+        let row = '';
+        for (let u = u0; u <= u1 + 0.2; u += 0.4) {
+          const { i, j } = xyCell(g, u * a.x + v * d.x, u * a.y + v * d.y);
+          const hit = i >= 0 && j >= 0 && i < n && j < n && on.has(j * n + i);
+          row += hit ? '#' : '.';
+        }
+        rows.push(row);
+      }
+      return rows;
+    };
     const usable = faces.filter((f) => f.bearing >= 80 && f.bearing <= 280);
     const mainFace = (usable.length ? usable : faces).reduce((a, b) => (b.areaM2 > a.areaM2 ? b : a));
     const flat = placed.filter((p) => p.flux > 0);
@@ -212,6 +239,7 @@ export async function analyseRoof(centre: LngLat, outline: LngLat[] | null, key:
               usable: f.bearing >= 80 && f.bearing <= 280 && f.pitch >= 3 && f.pitch <= 65,
               fluxMedian: fl.length ? Math.round(fl[Math.floor(fl.length / 2)]) : null,
               centre: { x: Math.round((xy.reduce((a, p) => a + p.x, 0) / xy.length) * 10) / 10, y: Math.round((xy.reduce((a, p) => a + p.y, 0) / xy.length) * 10) / 10 },
+              ...(f === planFace ? { plan: planOf(f) } : {}),
             };
           }),
         },
