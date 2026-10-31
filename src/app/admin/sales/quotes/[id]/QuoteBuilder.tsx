@@ -73,6 +73,8 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   const [content, setContent] = useState<QuoteContent>(initial.content);
   const [validUntil, setValidUntil] = useState(initial.valid_until ?? '');
   const [deposit, setDeposit] = useState(textFromPence(initial.deposit_pence ?? 0));
+  const [depMode, setDepMode] = useState<'gbp' | 'pct'>('gbp');
+  const [depPct, setDepPct] = useState('');
   const [urls, setUrls] = useState(imageUrls);
   const [state, setState] = useState<'saved' | 'saving' | 'dirty' | 'error'>('saved');
   const [status, setStatus] = useState(initial.status);
@@ -1155,8 +1157,34 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
               <span>Total to pay</span>
               <span>{money(totals.gross)}</span>
             </div>
-            <label className="qb-lab">Deposit once they accept (£, optional)</label>
-            <input className="crm-input" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} disabled={locked} placeholder="e.g. 500" />
+            <label className="qb-lab">Deposit once they accept (optional)</label>
+            <div className="crm-actions">
+              <div style={{ flex: 1 }}>
+                {depMode === 'gbp' ? (
+                  <input className="crm-input" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} disabled={locked} placeholder="e.g. 500" aria-label="Deposit in pounds" />
+                ) : (
+                  <input
+                    className="crm-input"
+                    inputMode="decimal"
+                    value={depPct}
+                    disabled={locked}
+                    placeholder="e.g. 25"
+                    aria-label="Deposit as a percentage of the total"
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^\d.]/g, '').slice(0, 5);
+                      setDepPct(v);
+                      const n = Math.min(100, Number(v) || 0);
+                      setDeposit(textFromPence(Math.round((totals.gross * n) / 100)));
+                    }}
+                  />
+                )}
+              </div>
+              <select className="crm-input" style={{ width: 'auto' }} value={depMode} disabled={locked} aria-label="Deposit units" onChange={(e) => setDepMode(e.target.value as 'gbp' | 'pct')}>
+                <option value="gbp">£</option>
+                <option value="pct">%</option>
+              </select>
+            </div>
+            {depMode === 'pct' && depPct ? <p className="crm-small crm-muted">{depPct}% of the total to pay is £{deposit || '0'}. Re-enter the % if the total changes.</p> : null}
             <label className="qb-lab">Valid until</label>
             <input className="crm-input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} disabled={locked} />
           </section>
