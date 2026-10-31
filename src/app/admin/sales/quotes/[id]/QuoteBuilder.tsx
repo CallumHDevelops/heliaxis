@@ -794,7 +794,7 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                 <p className="crm-small crm-muted">Upload the OpenSolar proposal (PDF) and the cover gets a System at a glance box, and the introduction and What is included are written from its figures and warranties.</p>
                 <div>
                   {reading ? (
-                    <WritingSpark label="Reading the proposal" steps={READING_STEPS} stepMs={4500} />
+                    <WritingSpark label="Reading the proposal" steps={READING_STEPS} stepMs={4500} screen />
                   ) : (
                     <FileButton label="Upload the OpenSolar proposal (PDF)" accept="application/pdf" disabled={locked} onFiles={(f) => void readProposal(f[0])} />
                   )}
