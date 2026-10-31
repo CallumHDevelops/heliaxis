@@ -172,8 +172,8 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
 
         {mcsTable(o).length > 0 && (
           <section className="pt-card">
-            <h2>MCS performance estimate</h2>
-            <p className="pt-muted">The figures MCS asks to be shown with a solar PV estimate, as calculated in the design software.</p>
+            <h2>MCS performance estimate: your solar installation</h2>
+            <p className="pt-muted">Calculated for your property, {data.first ? `${data.first}, ` : ''}so these figures are for your roof and your system, not a standard example.</p>
             {mcsTable(o).map((sec) => (
               <table key={sec.title} className="ip-mcs">
                 <caption>{sec.title}</caption>

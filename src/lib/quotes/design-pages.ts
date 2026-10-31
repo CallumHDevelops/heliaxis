@@ -1,13 +1,13 @@
 import 'server-only';
-import { rgb } from 'pdf-lib';
+import { clip, endPath, popGraphicsState, pushGraphicsState, rectangle, rgb } from 'pdf-lib';
 import { AMBER, INK, LABEL, LINE, MUTED, SOLAR, type Drawing, type Kit } from '@/lib/documents/pdf-kit';
 import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from './how-it-works';
-import { MCS_NOTE, mcsTable } from './mcs';
+import { mcsTable } from './mcs';
 import { DEFAULT_EXPORT_PENCE, monthlyExportKwh } from './roi';
 import type { ProposalOption } from './types';
 
 /**
- * The pages lifted from a design proposal, in Heliaxis's own style: figures on white cards with a gold edge, the
+ * The pages lifted from a design proposal, in Heliaxis's own style: figures on white cards with a gold edge and the faint cross-hatch, the
  * roof design, "Your Solar Setup" as wide product cards with warranty badges, expected performance (generation against the
  * customer's own use), and, when allowed, what it could save, with a payback chart and the footprint. Every figure is the proposal's own.
  */
@@ -21,9 +21,15 @@ const kw = (x: number) => `${Math.round(x * 100) / 100}`;
 
 type Pics = Map<string, { bytes: Uint8Array; mime: string }>;
 
-/** A white card with a fine border: the stat and product cards. */
-export function cardFill(d: Drawing, x: number, y: number, w: number, h: number) {
-  d.rect(x, y, w, h, { fill: WHITE, border: LINE, line: 0.6 });
+/** A white card with a fine border and the brand's cross-hatch, very faint and even across it: the stat, product and diagram cards. */
+export function cardFill(d: Drawing, x: number, y: number, w: number, h: number, step = 13) {
+  d.rect(x, y, w, h, { fill: WHITE });
+  const page = d.page;
+  page.pushOperators(pushGraphicsState(), rectangle(x, y, w, h), clip(), endPath());
+  for (let gx = x + step; gx < x + w; gx += step) page.drawLine({ start: { x: gx, y }, end: { x: gx, y: y + h }, thickness: 0.35, color: INK, opacity: 0.06 });
+  for (let gy = y + step; gy < y + h; gy += step) page.drawLine({ start: { x, y: gy }, end: { x: x + w, y: gy }, thickness: 0.35, color: INK, opacity: 0.06 });
+  page.pushOperators(popGraphicsState());
+  d.rect(x, y, w, h, { border: LINE, line: 0.6 });
 }
 
 type Tile = { v: string; l: string };
@@ -181,6 +187,29 @@ function paybackChart(kit: Kit, cum: number[], firstYear: number, paybackText?: 
 }
 
 
+/** A table with banded rows, numbers lined up on the right, and a bold total row if the last row starts with TOTAL. */
+function bandedTable(kit: Kit, columns: string[], widths: number[], rows: string[][]) {
+  const sum = widths.reduce((a, b) => a + b, 0);
+  const draw = (d: Drawing, cells: string[], h: number, o: { head?: boolean; fill?: ReturnType<typeof rgb> | null; bold?: boolean; ruleTop?: boolean }) => {
+    if (o.fill) d.rect(d.x, d.top - h, d.width, h, { fill: o.fill });
+    if (o.ruleTop) d.line(d.x, d.top, d.x + d.width, d.top, { color: INK, t: 0.8 });
+    let x = d.x;
+    cells.forEach((c, i) => {
+      const w = (widths[i] / sum) * d.width;
+      if (o.head) d.text(c.toUpperCase(), i === 0 ? x + 8 : x + w - 8 - d.widthOf(c.toUpperCase(), 5.8), d.top - 12, 5.8, { style: 'mono', color: LABEL });
+      else if (i === 0) d.text(c, x + 8, d.top - 11.5, 8, { bold: o.bold });
+      else d.right(c, x + w - 8, d.top - 11.5, 8, { bold: o.bold });
+      x += w;
+    });
+  };
+  kit.block(20, (d) => draw(d, columns, 20, { head: true, fill: rgb(0.93, 0.91, 0.86), ruleTop: true }));
+  rows.forEach((r, i) => {
+    const total = r[0] === 'TOTAL';
+    kit.block(17, (d) => draw(d, r, 17, { fill: total ? rgb(0.95, 0.93, 0.88) : i % 2 === 0 ? WHITE : rgb(0.975, 0.96, 0.925), bold: total, ruleTop: total }));
+  });
+  kit.gap(6);
+}
+
 /** The year's estimated export: how much is sent to the grid, by month, and what it earns at the export rate. */
 function exportYearOne(o: ProposalOption, gen: number[] | null, use: number[] | undefined) {
   const rate = o.exportPence ?? DEFAULT_EXPORT_PENCE;
@@ -220,7 +249,7 @@ function nodeGlyph(d: Drawing, n: Node, cx: number, cy: number, c: ReturnType<ty
 /** "How your system works": where the electricity goes in the sun, on a cloudy day or evening, and at night. */
 function howItWorksBlock(kit: Kit, hasBattery: boolean) {
   const states = howItWorks(hasBattery);
-  kit.block(204, (d) => {
+  kit.block(210, (d) => {
     const gap = 12;
     const pw = (d.width - gap * 2) / 3;
     const sc = Math.min(1, (pw - 6) / 160);
@@ -228,7 +257,7 @@ function howItWorksBlock(kit: Kit, hasBattery: boolean) {
       const ox = d.x + i * (pw + gap) + (pw - 160 * sc) / 2;
       const oy = d.top - 6;
       const P = (x: number, y: number) => ({ x: ox + x * sc, y: oy - y * sc });
-      d.rect(d.x + i * (pw + gap), d.top - 204, pw, 204, { fill: WHITE, border: LINE, line: 0.6 });
+      cardFill(d, d.x + i * (pw + gap), d.top - 210, pw, 210);
       d.text(st.title.toUpperCase(), d.x + i * (pw + gap) + 8, d.top - 14, 6.3, { style: 'mono', color: AMBER });
       const nodes: Node[] = hasBattery ? ['home', 'solar', 'grid', 'battery'] : ['home', 'solar', 'grid'];
       for (const [a, b] of st.flows) {
@@ -247,16 +276,16 @@ function howItWorksBlock(kit: Kit, hasBattery: boolean) {
         nodeGlyph(d, n, c.x, c.y, off ? rgb(0.55, 0.54, 0.5) : INK);
         d.text(NODE_LABEL[n].toUpperCase(), c.x - d.widthOf(NODE_LABEL[n].toUpperCase(), 5.6) / 2, n === 'home' ? c.y + h + 4 : c.y - h - 8, 5.6, { style: 'mono', color: LABEL });
       }
-      d.lines(st.caption, 7.2, pw - 18, false).forEach((l, k) => d.text(l, d.x + i * (pw + gap) + 9, d.top - 174 - k * 9, 7.2, { color: LABEL }));
+      d.lines(st.caption, 7.2, pw - 18, false).forEach((l, k) => d.text(l, d.x + i * (pw + gap) + 9, d.top - 183 - k * 9, 7.2, { color: LABEL }));
     });
   });
 }
 
 /** The MCS performance estimate, in the sections MCS uses. */
-function mcsPages(kit: Kit, o: ProposalOption, mark: (title: string) => void) {
+function mcsPages(kit: Kit, o: ProposalOption, mark: (title: string) => void, who: { name: string; site: string | null }) {
   const sections = mcsTable(o);
   if (!sections.length) return;
-  kit.section('MCS performance estimate', { keep: 200 });
+  kit.section('MCS performance estimate: your solar installation', { keep: 200, intro: `Calculated for ${who.name ? `${who.name}${who.site ? `, ${who.site}` : ''}` : who.site || 'your property'}: these figures are for your roof and your system, not a standard example. They follow the standard MCS procedure and are guidance only, not a guarantee: actual performance may be lower or higher if the installed system differs from the values assumed.` });
   mark('MCS performance estimate');
   for (const sec of sections) {
     kit.block(20, (d) => {
@@ -275,10 +304,9 @@ function mcsPages(kit: Kit, o: ProposalOption, mark: (title: string) => void) {
     }
     kit.gap(3);
   }
-  kit.note(MCS_NOTE);
 }
 
-export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, financials: boolean, glance: { label: string; value: string }[], mark: (title: string) => void = () => undefined): Promise<boolean> {
+export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, financials: boolean, glance: { label: string; value: string }[], mark: (title: string) => void = () => undefined, who: { name: string; site: string | null } = { name: '', site: null }): Promise<boolean> {
   const pic = (kind: 'roof' | 'inverter' | 'battery' | 'sunpath') => (o.images?.[kind] ? pics.get(o.images[kind]!) : undefined);
   const roof = await kit.embed(pic('roof')?.bytes);
   const inverter = await kit.embed(pic('inverter')?.bytes);
@@ -396,7 +424,7 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
     kit.section('How your system works', { intro: 'Where your electricity comes from and goes, through the day.', keep: 240 });
     mark('How your system works');
     howItWorksBlock(kit, !!(o.batteryUsableKwh || o.batteryModel));
-    mcsPages(kit, o, mark);
+    mcsPages(kit, o, mark, who);
   }
 
   if (hasMoney) {
@@ -427,11 +455,8 @@ export async function designPages(kit: Kit, o: ProposalOption, pics: Pics, finan
       });
       const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
       rows.push(['TOTAL', gen ? n0(sum(gen)) : '–', use ? n0(sum(use)) : '–', gbp(sum(before)), gbp(sum(after)), exportKwh ? gbp(sum(exportGbp)) : '–', gbp(sum(benefit)), gbp(sum(benefit))]);
-      kit.grid({
-        columns: ['Month', 'Solar (kWh)', 'Your use (kWh)', 'Bill before', 'Bill after', 'Export (est.)', 'Benefit', 'Running total'],
-        widths: [0.8, 1.05, 1.15, 1.05, 1.05, 1.15, 1.0, 1.2],
-        rows,
-      });
+      kit.section('Your first year, month by month', { keep: 260 });
+      bandedTable(kit, ['Month', 'Solar (kWh)', 'Your use (kWh)', 'Bill before', 'Bill after', 'Export (est.)', 'Benefit', 'Running total'], [0.8, 1.05, 1.15, 1.05, 1.05, 1.15, 1.0, 1.2], rows);
       kit.note(
         `The design's bill saving (${gbp(sum(before) - sum(after))}) is what you stop buying from your supplier, and does not include any Smart Export Guarantee (SEG) payments. ${exportKwh ? `Export payments are an estimate on top of it: about ${n0(annualExport)} kWh a year sent to the grid, paid at ${exportPence}p per kWh${o.exportPence ? '' : ' (a typical Smart Export Guarantee rate: change it in your interactive proposal)'}.` : ''} The running total is the benefit added up month by month through the first year.`
       );

@@ -79,8 +79,14 @@ export function equipmentByRule(content: QuoteContent, keyPoints = ''): string[]
   else if (by.panels.length) paras.push(`This quote includes the supply and installation of a solar PV system comprising ${asList(by.panels.map(withDetail))}.`);
   else if (by.inverter.length) paras.push(`This quote includes the supply and installation of ${asList(by.inverter.map(withDetail))}.`);
   if (by.battery.length) paras.push(`This quote includes the supply and installation of battery energy storage, comprising ${asList(by.battery.map(withDetail))}.`);
-  if (by.other.length === 1) paras.push(`This quote includes the supply and installation of ${withDetail(by.other[0])}.`);
-  else if (by.other.length > 1) paras.push(`This quote also includes the supply and installation of the following: ${asList(by.other.map(withDetail))}.`);
+  // Work (installation, commissioning, scaffold...) reads as "includes the work"; goods as "supply and installation of".
+  const isWork = (i: Item) => /^(install|commission|labour|labor|scaffold|handover|testing|electrical (work|install)|dno|design|survey|project)/i.test(i.description);
+  const work = by.other.filter(isWork);
+  const goods = by.other.filter((i) => !isWork(i));
+  const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+  if (goods.length === 1) paras.push(`This quote includes the supply and installation of ${withDetail(goods[0])}.`);
+  else if (goods.length > 1) paras.push(`This quote also includes the supply and installation of the following: ${asList(goods.map(withDetail))}.`);
+  if (work.length) paras.push(`This quote includes ${asList(work.map((i) => lower(withDetail(i))))}.`);
   const pr = proposalOf(content)?.option;
   const w: string[] = [];
   if (pr?.panelProductWarrantyYears) w.push(`a ${pr.panelProductWarrantyYears}-year product warranty${pr.panelPerformanceWarrantyYears ? ` and a ${pr.panelPerformanceWarrantyYears}-year performance warranty` : ''} on the solar panels`);

@@ -168,7 +168,7 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
   }
 
   // The design pages lifted from the uploaded proposal (when there is one), between the cover and the items.
-  if (chosen) await designPages(kit, chosen, f.images, f.content.proposal?.showFinancials === true, glanceRows(chosen, f.content.proposal?.showFinancials === true), mark);
+  if (chosen) await designPages(kit, chosen, f.images, f.content.proposal?.showFinancials === true, glanceRows(chosen, f.content.proposal?.showFinancials === true), mark, { name: f.customer.name, site: f.customer.address });
 
   // Page 2 onwards: the quoted items, and anything else the quote shows (text, pictures, datasheets).
   kit.newPage({ continued: true });
@@ -267,10 +267,12 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
 
 /** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
 export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
-  // Three passes: the first finds the sections, the second lays the contents out at its real length (which can move later pages), the third prints it with the numbers the second found.
+  // Two passes, three if the contents moved a page: the first finds the sections, the second prints the contents with those numbers, and a third only if that changed where sections fall.
   const first = await build(f, null);
   const second = await build(f, first.marks);
-  const { main, sheets } = await build(f, second.marks);
+  // Usually the contents did not move anything, so the second pass already has the right numbers.
+  const settled = JSON.stringify(second.marks) === JSON.stringify(first.marks);
+  const { main, sheets } = settled ? second : await build(f, second.marks);
   if (!sheets.length) return main;
   const out = await PDFDocument.load(main);
   for (const id of sheets) {
