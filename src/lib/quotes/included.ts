@@ -22,6 +22,24 @@ export const proposalOf = (c: QuoteContent): { option: ProposalOption; facts: st
 
 /** The customer-facing lines of the quote, with sections: never costs, markups or internal lines. */
 export function itemsOf(content: QuoteContent): Item[] {
+  const out = quoteItems(content);
+  return out.length ? out : proposalItems(content);
+}
+
+/** With no lines on the quote yet, the equipment in the chosen design option stands in for them (so the writers still have something true to work from). */
+function proposalItems(content: QuoteContent): Item[] {
+  const o = proposalOf(content)?.option;
+  if (!o) return [];
+  const item = (description: string, qty: number, detail = ''): Item => ({ heading: '', description, detail, qty, note: false });
+  const out: Item[] = [];
+  const kw = (x: number) => `${Math.round(x * 100) / 100}`;
+  if (o.panelCount) out.push(item(`${[o.panelWatts ? `${o.panelWatts} W` : '', o.panelBrand, o.panelModel].filter(Boolean).join(' ')} solar panels`.replace(/^ /, ''), o.panelCount, o.systemKwp ? `${kw(o.systemKwp)} kWp array` : ''));
+  if (o.inverterBrand || o.inverterModel) out.push(item(`${[o.inverterBrand, o.inverterModel].filter(Boolean).join(' ')} inverter`, o.inverterCount ?? 1, o.inverterKw ? `${kw(o.inverterKw)} kW` : ''));
+  if (o.batteryBrand || o.batteryModel || o.batteryUsableKwh) out.push(item(`${[o.batteryBrand, o.batteryModel].filter(Boolean).join(' ')} battery`.trim(), o.batteryModules ?? 1, o.batteryUsableKwh ? `${kw(o.batteryUsableKwh)} kWh usable capacity` : ''));
+  return out;
+}
+
+function quoteItems(content: QuoteContent): Item[] {
   const out: Item[] = [];
   for (const b of content.blocks) {
     if (b.type !== 'items') continue;

@@ -2,6 +2,17 @@
 
 import Link from 'next/link';
 import { WritingSpark } from './WritingSpark';
+
+const READING_STEPS = [
+  'Uploading your proposal',
+  'Opening the pages',
+  'Finding each system option',
+  'Copying the panels, inverter and battery',
+  'Copying the warranties and the monthly figures',
+  'Reading the tariff and the MCS tables',
+  'Lifting the roof and product pictures',
+  'Checking nothing has been guessed',
+];
 import { FileButton, Sheet } from '../../../crm/CrmUi';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -235,6 +246,26 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     } finally {
       setWriting('');
     }
+  }
+
+  /** The design proposal's net system price as a quote line, with its equipment as the detail (check the VAT rate, which the proposal doesn't say). */
+  function addProposalLine() {
+    const o = content.proposal?.options[content.proposal.chosen];
+    if (!o?.systemPriceGbp) return;
+    const kw = (x: number) => `${Math.round(x * 100) / 100}`;
+    const parts = [
+      o.systemKwp ? `${kw(o.systemKwp)} kWp solar PV` : '',
+      o.panelCount ? `${o.panelCount} × ${[o.panelWatts ? `${o.panelWatts} W` : '', o.panelBrand, o.panelModel].filter(Boolean).join(' ')} panels` : '',
+      o.inverterBrand || o.inverterModel ? `${[o.inverterBrand, o.inverterModel].filter(Boolean).join(' ')} inverter` : '',
+      o.batteryUsableKwh ? `${kw(o.batteryUsableKwh)} kWh battery storage` : '',
+    ].filter(Boolean);
+    const line: QuoteLine = { ...emptyLine({ mode: 'manual', markup: 0, vat_rate: 0 }), id: newId(), description: 'Solar PV and battery storage system, as designed', detail: parts.join(', ') || undefined, qty: 1, unit_pence: Math.round(o.systemPriceGbp * 100), mode: 'manual' };
+    edit((c) => {
+      const has = c.blocks.some((b) => b.type === 'items');
+      if (!has) return { ...c, blocks: [{ id: newId(), type: 'items', heading: 'Your quote', lines: [line] }, ...c.blocks] };
+      return { ...c, blocks: c.blocks.map((b, k) => (b.type === 'items' && c.blocks.findIndex((x) => x.type === 'items') === k ? { ...b, lines: [...b.lines.filter((l) => l.description.trim() || l.unit_pence), line] } : b)) };
+    });
+    setNote(`Added the proposal’s price (£${o.systemPriceGbp.toLocaleString('en-GB')}) as a line. Check the VAT rate and your cost.`);
   }
 
   const [reading, setReading] = useState(false);
@@ -736,6 +767,11 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
                   <a className="crm-btn crm-btn--ghost crm-btn--small" href={`/admin/sales/quotes/${initial.id}/proposal`} target="_blank" rel="noreferrer">
                     Preview the interactive proposal
                   </a>
+                  {content.proposal.options[content.proposal.chosen]?.systemPriceGbp ? (
+                    <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => addProposalLine()}>
+                      Add the proposal’s price to the quote
+                    </button>
+                  ) : null}
                   <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={locked} onClick={() => edit((c) => ({ ...c, proposal: undefined }))}>
                     Remove the proposal
                   </button>
@@ -745,7 +781,11 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
               <>
                 <p className="crm-small crm-muted">Upload the OpenSolar proposal (PDF) and the cover gets a System at a glance box, and the introduction and What is included are written from its figures and warranties.</p>
                 <div>
-                  <FileButton label={reading ? 'Reading the proposal…' : 'Upload the OpenSolar proposal (PDF)'} accept="application/pdf" disabled={locked} busy={reading} onFiles={(f) => void readProposal(f[0])} />
+                  {reading ? (
+                    <WritingSpark label="Reading the proposal" steps={READING_STEPS} stepMs={4500} />
+                  ) : (
+                    <FileButton label="Upload the OpenSolar proposal (PDF)" accept="application/pdf" disabled={locked} onFiles={(f) => void readProposal(f[0])} />
+                  )}
                 </div>
               </>
             )}
