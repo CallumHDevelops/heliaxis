@@ -244,11 +244,17 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
     setReading(true);
     setErr('');
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const r = await fetch(`/api/crm/quotes/${initial.id}/proposal`, { method: 'POST', body: fd });
+      // Straight to storage first: the host refuses request bodies over about 4.5 MB, and proposals are often larger.
+      const url = `/api/crm/quotes/${initial.id}/proposal`;
+      const json = { 'Content-Type': 'application/json' };
+      const prep = await fetch(url, { method: 'POST', headers: json, body: JSON.stringify({ action: 'prepare' }) });
+      const p = await prep.json().catch(() => ({}));
+      if (!prep.ok) throw new Error(p.error || 'Couldn’t start the upload. Try again.');
+      const up = await createClient().storage.from(p.bucket).uploadToSignedUrl(p.path, p.token, file, { contentType: 'application/pdf' });
+      if (up.error) throw new Error(`Upload failed: ${up.error.message}`);
+      const r = await fetch(url, { method: 'POST', headers: json, body: JSON.stringify({ action: 'read', path: p.path, name: file.name }) });
       const d = (await r.json().catch(() => ({}))) as { options?: ProposalOption[]; file?: string; error?: string };
-      if (!r.ok || !d.options?.length) throw new Error(d.error || 'It couldn’t read that file. Try again.');
+      if (!r.ok || !d.options?.length) throw new Error(d.error || `It couldn’t read that file (${r.status}). Try again.`);
       edit((c) => ({ ...c, proposal: { file: d.file ?? file.name, options: d.options!, chosen: 0, showFinancials: false } }));
       setNote(`Read ${d.options.length} system option${d.options.length === 1 ? '' : 's'} from the proposal. Check the figures, then use Write the introduction and Write from the quote.`);
     } catch (e) {
