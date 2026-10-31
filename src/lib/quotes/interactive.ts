@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { DOCS_BUCKET } from '@/lib/crm/server';
 import { projectByToken } from '@/lib/crm/portal';
 import { quoteRow, type QuoteRow } from './server';
-import { totalsOf, type ProposalOption } from './types';
+import { DEFAULT_ABOUT, DEFAULT_SURVEY, totalsOf, type ProposalOption } from './types';
 
 /** What the interactive proposal page needs: the chosen design option, its pictures (as short-lived links) and what the quote costs. */
 export type InteractiveData = {
@@ -13,6 +13,9 @@ export type InteractiveData = {
   priceGbp: number;
   showFinancials: boolean;
   option: Omit<ProposalOption, 'images'>;
+  /** The About Heliaxis and the survey wording, as on the quote (null: left out). */
+  about: string | null;
+  survey: string | null;
   pictures: Partial<Record<'roof' | 'inverter' | 'battery' | 'sunpath', string>>;
   /** The customer's link, to track what they do on the page (absent when staff preview it). */
   token: string | null;
@@ -32,7 +35,7 @@ async function build(q: QuoteRow, first: string, token: string | null): Promise<
       if (hit?.signedUrl) pictures[kind as keyof InteractiveData['pictures']] = hit.signedUrl;
     }
   }
-  return { first, quoteNumber: q.number, title: q.title, priceGbp: Math.round(totalsOf(q.content).gross) / 100, showFinancials: proposal.showFinancials, option: rest, pictures, token };
+  return { first, quoteNumber: q.number, title: q.title, priceGbp: Math.round(totalsOf(q.content).gross) / 100, showFinancials: proposal.showFinancials, option: rest, about: (q.content.about ?? DEFAULT_ABOUT).trim() || null, survey: (q.content.survey ?? DEFAULT_SURVEY).trim() || null, pictures, token };
 }
 
 /** The customer's view: their link's newest quote that has been sent (or signed). */

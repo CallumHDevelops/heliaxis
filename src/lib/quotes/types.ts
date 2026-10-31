@@ -137,9 +137,11 @@ export function cleanOption(v: unknown): ProposalOption {
 }
 
 export const DEFAULT_ABOUT = [
-  'Heliaxis is a South Wales renewable energy company, based in Newport. We design, supply, install and look after solar panels, battery storage and heat pumps for homes and businesses.',
-  'Our approach is energy that revolves around you: we start from how you use electricity, design the system around that, and stay with you once it is installed.',
-  'We are certified and registered with the schemes shown in this document. Our team is on hand before, during and after your installation: call 01633 965205 or email hello@heliaxis.co.uk.',
+  'After almost a decade in the renewable energy industry, I had seen at first hand how too many installations are sold and carried out: the cowboys, the shortcuts and the poor workmanship that leave customers with systems that never deliver what they were promised. I believed it could be done better, and more ethically.',
+  'I had already delivered successful projects for other organisations. I saw no reason why I should not do the same for our own customers, and that is why we started Heliaxis.',
+  'Heliaxis is a family-owned company of three people with more than 30 years’ combined experience in the renewable sector. Between us we cover compliance, applications and grant funding, consultation and design, and installation and commissioning. We know this work at every stage, because we have done it, and done it well.',
+  'We are not a sales-led business. We work with customers who want to hear the truth about their installation: what will work, what will not, and figures they can believe, supported by science we can stand behind.',
+  'We are also not tied to one brand. There are makes we install more often, but we install what is right for you. We will help you understand the technology available, which of it will make a real difference, and how to reach your goals.',
 ].join('\n\n');
 
 export const DEFAULT_SURVEY = [

@@ -1075,7 +1075,8 @@ export async function newDocument(o: DocOptions) {
     /** A brand asset from public/assets (the accreditation logos, the wordmark) ready for block()'s image(); null when it can't be found. */
     async brandImage(name: string): Promise<PDFImage | null> {
       const b = await asset(name);
-      return b ? doc.embedPng(b).catch(() => null) : null;
+      if (!b) return null;
+      return (/\.jpe?g$/i.test(name) ? doc.embedJpg(b) : doc.embedPng(b)).catch(() => null);
     },
     /** A PNG or JPEG ready for block()'s image(); null when it can't be read. */
     async embed(bytes: Uint8Array | string | null | undefined): Promise<PDFImage | null> {

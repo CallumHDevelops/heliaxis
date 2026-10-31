@@ -1,7 +1,7 @@
 import 'server-only';
-import { PDFDocument, PDFString, rgb } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString } from 'pdf-lib';
 import { issueOf } from '@/lib/documents/issue';
-import { INK, LINE, longDate, MUTED, newDocument, SOLAR, type Kit, type PhotoItem } from '@/lib/documents/pdf-kit';
+import { INK, longDate, MUTED, newDocument, SOLAR, type Kit, type PhotoItem } from '@/lib/documents/pdf-kit';
 import { designPages } from './design-pages';
 import { drawQr } from './qr';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
@@ -65,8 +65,9 @@ function linkButton(kit: Kit, label: string, sub: string, url: string, qrUrl?: s
 type Toc = { title: string; page: number }[];
 
 /** One pass at the document: the PDF so far, the page each section landed on, and the datasheets to add after it. */
-async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array; marks: Toc; sheets: string[] }> {
+async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array; marks: Toc; sheets: string[]; links: { page: number; rect: [number, number, number, number]; to: number }[] }> {
   const marks: Toc = [];
+  const links: { page: number; rect: [number, number, number, number]; to: number }[] = [];
   const kit = await newDocument({ code: f.number, label: f.number, title: f.title || 'Quote', revision: issueOf('QUOTE'), jobRef: f.customerRef, refLabel: 'Customer', issued: f.issued, accreditations: true });
   const mark = (title: string) => {
     if (!marks.some((m) => m.title === title)) marks.push({ title, page: kit.pageNumber });
@@ -119,22 +120,22 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
 
   if (f.acceptUrl && !f.signed) linkButton(kit, 'Accept this quote online', 'Opens your private page to read, sign and choose your installation date', f.acceptUrl, f.portalUrl);
 
-  // Who we are accredited with: the main section, in the brand's ink on a white card (the same logos run along the top of every later page).
-  const accr = await kit.brandImage('heliaxis-accreditations.png');
+  // Who we are accredited with: the main section, a dark band with the logos in cream (the same logos run along the top of every later page).
+  const accr = await kit.brandImage('heliaxis-accreditations-light.png');
   if (accr) {
-    kit.section('Accredited and certified', { keep: 56 });
-    kit.block(54, (d) => {
-      const h = 40;
-      const w = Math.min(d.width - 28, (accr.width / accr.height) * h);
-      d.rect(d.x, d.top - 48, d.width, 48, { fill: rgb(1, 1, 1), border: LINE, line: 0.6 });
-      d.rect(d.x, d.top - 48, 3, 48, { fill: SOLAR });
-      d.image(accr, d.x + (d.width - w) / 2, d.top - 48 + 4, w, 40);
+    kit.section('Accredited and certified', { keep: 70 });
+    kit.block(62, (d) => {
+      const h = 38;
+      const w = Math.min(d.width - 40, (accr.width / accr.height) * h);
+      d.rect(d.x, d.top - 56, d.width, 56, { fill: INK });
+      d.rect(d.x, d.top - 56, d.width, 2.5, { fill: SOLAR });
+      d.image(accr, d.x + (d.width - w) / 2, d.top - 56 + 9, w, h);
     });
   }
 
   const isIncluded = (bl: QuoteContent['blocks'][number]) => bl.type === 'text' && /includ/i.test(bl.heading);
 
-  // Page 2: the contents (page numbers filled in on the second pass) and About Heliaxis. Always one page, so the numbers hold.
+  // Page 2: the contents (page numbers filled in on the second pass, each a link to its page) and what is included.
   kit.newPage({ continued: true });
   kit.section('Contents', { keep: 160 });
   if (toc) {
@@ -145,26 +146,54 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
         const tw = d.widthOf(e.title, 9);
         d.line(d.x + tw + 8, d.top - 11, d.x + d.width - d.widthOf(num, 9, true) - 8, d.top - 11, { color: MUTED, t: 0.8, dash: [0, 3], round: true });
         d.right(num, d.x + d.width, d.top - 11, 9, { bold: true });
+        links.push({ page: kit.pageNumber, rect: [d.x, d.top - 16, d.x + d.width, d.top], to: e.page });
       });
     }
   }
-  const about = f.content.about === undefined ? DEFAULT_ABOUT : f.content.about;
-  if (about.trim()) {
-    kit.section('About Heliaxis', { keep: 150 });
-    mark('About Heliaxis');
-    for (const p of paragraphs(about)) kit.paragraph(p);
-    kit.rows([
-      { label: 'Registered address', value: HELIAXIS_COMPANY.addressLines.join(', ') },
-      { label: 'Contact', value: `${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}` },
-      { label: 'MCS · Company number', value: `${HELIAXIS_COMPANY.mcsNumber} · ${HELIAXIS_COMPANY.companyNumber}` },
-    ]);
-  }
-
   for (const b of f.content.blocks) {
     if (!isIncluded(b) || b.type !== 'text' || !b.body.trim()) continue;
     kit.section(b.heading || 'What is included');
     mark('What is included');
     for (const p of paragraphs(b.body)) kit.paragraph(p);
+  }
+
+  // About Heliaxis: its own page, with a photograph and the story in the director's own words.
+  const about = f.content.about === undefined ? DEFAULT_ABOUT : f.content.about;
+  if (about.trim()) {
+    kit.newPage({ continued: true });
+    kit.section('About Heliaxis', { keep: 300 });
+    mark('About Heliaxis');
+    const photo = await kit.brandImage('heliaxis-about-callum.jpg');
+    const paras = paragraphs(about);
+    const photoW = photo ? 150 : 0;
+    const colW = 480 - (photo ? photoW + 22 : 0);
+    const laid = paras.map((p) => kit.lines(p, 9.6, colW, 'regular'));
+    const textH = laid.reduce((a, l) => a + l.length * 13 + 8, 0);
+    const photoH = photo ? (photo.height / photo.width) * photoW + 26 : 0;
+    kit.block(Math.max(textH, photoH) + 8, (d) => {
+      let x0 = d.x;
+      if (photo) {
+        const ph = (photo.height / photo.width) * photoW;
+        d.image(photo, d.x, d.top - ph - 2, photoW, ph);
+        d.rect(d.x, d.top - ph - 4.5, photoW, 2.5, { fill: SOLAR });
+        d.text('Callum Hiscott', d.x, d.top - ph - 18, 8.6, { bold: true });
+        d.text('Heliaxis', d.x, d.top - ph - 28, 7.4, { color: MUTED });
+        x0 = d.x + photoW + 22;
+      }
+      let y = d.top - 11;
+      for (const l of laid) {
+        for (const line of l) {
+          d.text(line, x0, y, 9.6, { color: INK });
+          y -= 13;
+        }
+        y -= 8;
+      }
+    });
+    kit.rows([
+      { label: 'Registered address', value: HELIAXIS_COMPANY.addressLines.join(', ') },
+      { label: 'Contact', value: `${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}` },
+      { label: 'MCS · Company number', value: `${HELIAXIS_COMPANY.mcsNumber} · ${HELIAXIS_COMPANY.companyNumber}` },
+    ]);
   }
 
   // The design pages lifted from the uploaded proposal (when there is one), between the cover and the items.
@@ -262,7 +291,22 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
       : { title: 'Accepted by (customer)', png: null, name: f.customer.name, at: null, line: 'Date: ____ / ____ / ________' },
   ]);
 
-  return { main: await kit.save(), marks, sheets };
+  return { main: await kit.save(), marks, sheets, links };
+}
+
+/** Make each line of the contents a link to its page. */
+async function linkContents(bytes: Uint8Array, links: { page: number; rect: [number, number, number, number]; to: number }[]): Promise<Uint8Array> {
+  if (!links.length) return bytes;
+  const doc = await PDFDocument.load(bytes);
+  const pages = doc.getPages();
+  const ctx = doc.context;
+  for (const l of links) {
+    const target = pages[l.to - 1];
+    const from = pages[l.page - 1];
+    if (!target || !from) continue;
+    from.node.addAnnot(ctx.register(ctx.obj({ Type: 'Annot', Subtype: 'Link', Rect: l.rect, Border: [0, 0, 0], Dest: [target.ref, PDFName.of('Fit')] })));
+  }
+  return doc.save();
 }
 
 /** The quote as a PDF in Heliaxis's document style, with each chosen datasheet added after the last page. */
@@ -272,7 +316,9 @@ export async function quotePdf(f: QuoteFacts): Promise<Uint8Array> {
   const second = await build(f, first.marks);
   // Usually the contents did not move anything, so the second pass already has the right numbers.
   const settled = JSON.stringify(second.marks) === JSON.stringify(first.marks);
-  const { main, sheets } = settled ? second : await build(f, second.marks);
+  const done = settled ? second : await build(f, second.marks);
+  const { sheets } = done;
+  const main = await linkContents(done.main, done.links);
   if (!sheets.length) return main;
   const out = await PDFDocument.load(main);
   for (const id of sheets) {

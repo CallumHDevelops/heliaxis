@@ -54,3 +54,15 @@
 .ip-mcs th { text-align: left; font-weight: 400; padding: 6px 8px 6px 0; border-top: 1px solid var(--border); width: 55%; }
 .ip-mcs td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border); font-weight: 600; }
 .ip-mcs td:last-child { font-weight: 400; color: var(--muted); }
+
+.ip-toc ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+.ip-toc a { display: block; padding: 8px 2px; color: inherit; text-decoration: none; border-bottom: 1px dotted var(--border); }
+.ip-toc a:hover { color: #c77f04; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+[id] { scroll-margin-top: 14px; }
+.ip-about-body { display: grid; grid-template-columns: 170px 1fr; gap: 18px; align-items: start; }
+.ip-about-body img { width: 100%; height: auto; display: block; border-bottom: 3px solid #f8bc1e; }
+.ip-about-body p { margin: 0 0 10px; line-height: 1.5; }
+.ip-about-body small { color: var(--muted); font-weight: 700; }
+@media (max-width: 640px) { .ip-about-body { grid-template-columns: 1fr; } .ip-about-body img { max-width: 220px; } }

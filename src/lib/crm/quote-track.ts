@@ -14,7 +14,7 @@ import { logActivity } from '@/lib/crm/server';
  */
 export const TRACK_EVENTS = ['opened', 'viewed_pdf', 'sign_started', 'decline_started', 'dates_started', 'proposal_opened', 'prices_edited'] as const;
 /** Sections of the customer's page we note being scrolled into view. */
-export const TRACK_SECTIONS = ['quote', 'steps', 'dates', 'messages', 'contact'] as const;
+export const TRACK_SECTIONS = ['quote', 'steps', 'dates', 'messages', 'contact', 'design', 'setup', 'performance', 'howitworks', 'mcs', 'sunpath', 'prices', 'about', 'survey'] as const;
 export type TrackEvent = (typeof TRACK_EVENTS)[number];
 
 export type QuoteTrack = {

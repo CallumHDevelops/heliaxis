@@ -6,6 +6,7 @@ import type { InteractiveData } from '@/lib/quotes/interactive';
 import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from '@/lib/quotes/how-it-works';
 import { MCS_NOTE, mcsTable } from '@/lib/quotes/mcs';
 import { paybackWords, recalc, type Basis, type Tariff } from '@/lib/quotes/roi';
+import { useEngagement } from '../useEngagement';
 import '../portal.css';
 import './proposal.css';
 
@@ -55,10 +56,22 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
     if (data.token) void fetch(`/api/my/${data.token}/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'proposal_opened' }), keepalive: true }).catch(() => null);
   }, [data.token]);
 
+  useEngagement(data.token ?? '', !!data.token);
   const r = useMemo(() => (basis ? recalc(basis, t) : null), [basis, t]);
   const theirs = useMemo(() => (basis ? recalc(basis, proposalTariff) : null), [basis, proposalTariff]);
   const changed = JSON.stringify(t) !== JSON.stringify(proposalTariff);
   const money = data.showFinancials && !!r && !!basis;
+  const contents: { id: string; label: string }[] = [
+    ...(tilesPresent(o) ? [{ id: 'design', label: 'Your system design' }] : []),
+    ...(o.panelCount || o.inverterModel || o.batteryModel ? [{ id: 'setup', label: 'Your Solar Setup' }] : []),
+    ...(o.monthlyKwh?.length === 12 ? [{ id: 'performance', label: 'Expected performance' }] : []),
+    { id: 'howitworks', label: 'How your system works' },
+    ...(mcsTable(o).length ? [{ id: 'mcs', label: 'MCS performance estimate' }] : []),
+    ...(data.pictures.sunpath ? [{ id: 'sunpath', label: 'Sun path and shading' }] : []),
+    ...(money ? [{ id: 'prices', label: 'Try your own energy prices' }] : []),
+    ...(data.about ? [{ id: 'about', label: 'About Heliaxis' }] : []),
+    ...(data.survey ? [{ id: 'survey', label: 'Structural requirements and survey' }] : []),
+  ];
 
   const tiles: { v: string; l: string }[] = [
     ...(o.systemKwp ? [{ v: `${kw(o.systemKwp)} kWp`, l: 'System size' }] : []),
@@ -91,8 +104,19 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           </p>
         </section>
 
+        <nav className="pt-card ip-toc" aria-label="Contents">
+          <h2>Contents</h2>
+          <ul>
+            {contents.map((c) => (
+              <li key={c.id}>
+                <a href={`#${c.id}`}>{c.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         {tiles.length > 0 && (
-          <div className="ip-tiles">
+          <div className="ip-tiles" id="design" data-track="design">
             {tiles.map((x) => (
               <div key={x.l} className="ip-tile">
                 <b>{x.v}</b>
@@ -111,7 +135,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         )}
 
         {products.length > 0 && (
-          <section className="pt-card">
+          <section className="pt-card" id="setup" data-track="setup">
             <h2>Your Solar Setup</h2>
             <div className="ip-products">
               {products.map((p) => (
@@ -145,7 +169,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         )}
 
         {gen && (
-          <section className="pt-card">
+          <section className="pt-card" id="performance" data-track="performance">
             <h2>Expected performance</h2>
             <p className="pt-muted">What your system should generate each month, against the electricity you use.</p>
             <GenerationChart gen={gen} use={use} />
@@ -159,7 +183,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         )}
 
         {(products.length > 0 || gen) && (
-          <section className="pt-card">
+          <section className="pt-card" id="howitworks" data-track="howitworks">
             <h2>How your system works</h2>
             <p className="pt-muted">Where your electricity comes from and goes, through the day.</p>
             <div className="ip-flows">
@@ -171,7 +195,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         )}
 
         {mcsTable(o).length > 0 && (
-          <section className="pt-card">
+          <section className="pt-card" id="mcs" data-track="mcs">
             <h2>MCS performance estimate: your solar installation</h2>
             <p className="pt-muted">Calculated for your property, {data.first ? `${data.first}, ` : ''}so these figures are for your roof and your system, not a standard example.</p>
             {mcsTable(o).map((sec) => (
@@ -193,7 +217,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         )}
 
         {data.pictures.sunpath && (
-          <section className="pt-card">
+          <section className="pt-card" id="sunpath" data-track="sunpath">
             <h2>Sun path and shading</h2>
             <div className="ip-sun">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -214,7 +238,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         )}
 
         {money && r && basis && theirs && (
-          <section className="pt-card ip-money" id="prices">
+          <section className="pt-card ip-money" id="prices" data-track="prices">
             <h2>Try your own energy prices</h2>
             <p className="pt-muted">The figures below start from the design’s own assumptions. Change them to match your bill and see what it does to your saving, your payback and your return. Nothing here changes your quote.</p>
 
@@ -265,12 +289,41 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           </section>
         )}
 
+        {data.about && (
+          <section className="pt-card ip-about" id="about" data-track="about">
+            <h2>About Heliaxis</h2>
+            <div className="ip-about-body">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/heliaxis-about-callum.jpg" alt="Callum Hiscott, Heliaxis" />
+              <div>
+                {data.about.split(/\n{2,}/).map((p) => (
+                  <p key={p}>{p}</p>
+                ))}
+                <small>Callum Hiscott, Heliaxis</small>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {data.survey && (
+          <section className="pt-card" id="survey" data-track="survey">
+            <h2>Structural requirements and survey</h2>
+            {data.survey.split(/\n{2,}/).map((p) => (
+              <p key={p}>{p}</p>
+            ))}
+          </section>
+        )}
+
         <p className="pt-foot ip-foot">
           This system has been designed in third-party design software (OpenSolar). The key data points in this proposal have been extracted from that design and presented fairly. Figures are estimates, not guarantees. This proposal is subject to the terms and conditions in your quote.
         </p>
       </main>
     </div>
   );
+}
+
+function tilesPresent(o: InteractiveData['option']) {
+  return !!(o.systemKwp || o.annualGenerationKwh || o.batteryUsableKwh || o.selfSufficiencyPct || o.selfSufficiencyPvOnlyPct);
 }
 
 function Field({ label, hint, value, onChange }: { label: string; hint?: string; value: number; onChange: (v: number) => void }) {
