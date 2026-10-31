@@ -300,7 +300,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
                 {data.about.split(/\n{2,}/).map((p) => (
                   <p key={p}>{p}</p>
                 ))}
-                <small>Callum Hiscott, Managing Director</small>
+                <small>Callum Hiscott<br />Managing Director, Heliaxis</small>
               </div>
             </div>
             <div className="ip-accred">

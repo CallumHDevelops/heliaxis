@@ -177,7 +177,7 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
         d.image(photo, d.x, d.top - ph - 2, photoW, ph);
         d.rect(d.x, d.top - ph - 4.5, photoW, 2.5, { fill: SOLAR });
         d.text('Callum Hiscott', d.x, d.top - ph - 18, 8.6, { bold: true });
-        d.text('Managing Director', d.x, d.top - ph - 28, 7.6, { color: MUTED });
+        d.text('Managing Director, Heliaxis', d.x, d.top - ph - 28, 7.6, { color: MUTED });
         x0 = d.x + photoW + 22;
       }
       let y = d.top - 11;
