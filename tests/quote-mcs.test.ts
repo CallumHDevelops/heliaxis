@@ -40,6 +40,6 @@ describe('standard wording', () => {
     expect(DEFAULT_SURVEY).toMatch(/rafter size and spacing/);
     expect(DEFAULT_SURVEY).toMatch(/fire routes and means of escape/);
     expect(DEFAULT_SURVEY).toMatch(/not included unless this quote says so/);
-    expect(DEFAULT_ABOUT).toMatch(/Newport/);
+    expect(DEFAULT_ABOUT).toMatch(/family-owned/);
   });
 });
