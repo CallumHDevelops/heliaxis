@@ -269,6 +269,18 @@ export function QuoteBuilder({ initial, customer, library: libraryIn, imageUrls,
   }
 
   const [reading, setReading] = useState(false);
+  // While the proposal is being read the page is held still: no scrolling, no layout shift from the scrollbar.
+  useEffect(() => {
+    if (!reading) return;
+    const { overflow, paddingRight } = document.body.style;
+    const bar = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    if (bar > 0) document.body.style.paddingRight = `${bar}px`;
+    return () => {
+      document.body.style.overflow = overflow;
+      document.body.style.paddingRight = paddingRight;
+    };
+  }, [reading]);
   /** Read an OpenSolar proposal for the figures the cover and the writing use. */
   async function readProposal(file: File | undefined) {
     if (!file) return;

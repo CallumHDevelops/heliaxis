@@ -72,7 +72,7 @@ const Option = z.object({
   total_energy_discharged_per_year_kwh: z.number().nullable(),
   additional_self_consumption_kwh: z.number().nullable(),
 });
-const Read = z.object({ readable: z.boolean(), options: z.array(Option) });
+const Read = z.object({ readable: z.boolean(), options: z.array(Option.partial()) });
 
 const PROMPT =
   'This is a design proposal for a home solar system, with one or more system options. For each option copy exactly what is printed: ' +
@@ -125,7 +125,8 @@ export async function readProposal(bytes: Uint8Array): Promise<{ ok: true; optio
     const json = last && last.slice(last.indexOf('{'), last.lastIndexOf('}') + 1);
     const parsed = json ? Read.safeParse(JSON.parse(json)) : null;
     if (parsed && !parsed.success) console.error('Proposal read: unexpected shape', parsed.error.issues.slice(0, 5));
-    if (!parsed?.success || !parsed.data.readable || !parsed.data.options.length) return { ok: false, error: 'No system options found in that file. Is it an OpenSolar proposal?' };
+    if (!parsed?.success) return { ok: false, error: 'It couldn’t make sense of that file this time. Try again.' };
+    if (!parsed.data.readable || !parsed.data.options.length) return { ok: false, error: 'No system options found in that file. Is it an OpenSolar proposal?' };
     const options = parsed.data.options.map((o) =>
       cleanOption({
         name: o.name, systemKwp: o.system_kwp, panelCount: o.panel_count, panelWatts: o.panel_watts, panelBrand: o.panel_brand, panelModel: o.panel_model,
