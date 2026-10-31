@@ -66,3 +66,7 @@ html { scroll-behavior: smooth; }
 .ip-about-body p { margin: 0 0 10px; line-height: 1.5; }
 .ip-about-body small { color: var(--muted); font-weight: 700; }
 @media (max-width: 640px) { .ip-about-body { grid-template-columns: 1fr; } .ip-about-body img { max-width: 220px; } }
+.ip-accred { margin-top: 18px; }
+.ip-accred h3 { margin: 0 0 8px; font-size: 1rem; }
+.ip-accred img { display: block; width: 100%; max-width: 520px; height: auto; background: #211f18; padding: 12px 16px; border-bottom: 3px solid #f8bc1e; box-sizing: border-box; }
+.ip-accred p { margin: 10px 0 0; line-height: 1.5; }

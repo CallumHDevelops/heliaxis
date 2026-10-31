@@ -137,12 +137,17 @@ export function cleanOption(v: unknown): ProposalOption {
 }
 
 export const DEFAULT_ABOUT = [
-  'After almost a decade in the renewable energy industry, I had seen at first hand how too many installations are sold and carried out: the cowboys, the shortcuts and the poor workmanship that leave customers with systems that never deliver what they were promised. I believed it could be done better, and more ethically.',
+  'After almost a decade in the renewable energy industry, I had seen at first hand how too many installations are sold and carried out: the cowboys, the shortcuts and the poor workmanship that leave customers with systems that never deliver what they were promised.',
+  'I believed it could be done better, and more ethically.',
   'I had already delivered successful projects for other organisations. I saw no reason why I should not do the same for our own customers, and that is why we started Heliaxis.',
-  'Heliaxis is a family-owned company of three people with more than 30 years’ combined experience in the renewable sector. Between us we cover compliance, applications and grant funding, consultation and design, and installation and commissioning. We know this work at every stage, because we have done it, and done it well.',
+  'Heliaxis is a family-owned company of three people with more than 30 years’ combined experience in the renewable sector. Between us we cover compliance, applications and grant funding, consultation and design, and installation and commissioning. We have processed hundreds of compliance packs, DNO applications, certificates and BUS applications, among much else, and we have installed on hundreds of homes and businesses across the UK. We know this work at every stage, because we have done it, and done it well.',
   'We are not a sales-led business. We work with customers who want to hear the truth about their installation: what will work, what will not, and figures they can believe, supported by science we can stand behind.',
-  'We are also not tied to one brand. There are makes we install more often, but we install what is right for you. We will help you understand the technology available, which of it will make a real difference, and how to reach your goals.',
+  'We are proud to work closely with a number of brands we trust, whose technology we back. But we are not biased: we explore the market for you to find the right option for your home. We will help you understand the technology available, which of it will make a real difference, and how to reach your goals.',
 ].join('\n\n');
+
+/** What MCS certification means, printed beside the accreditation logos. */
+export const MCS_EXPLAINED =
+  'MCS, the Microgeneration Certification Scheme, is the UK’s standards body for small-scale renewable energy installations. An MCS-certified installer is independently assessed against recognised standards for design, installation, commissioning and customer protection, and must hand over properly documented work. MCS certification is also what makes an installation eligible for Smart Export Guarantee payments and for grants such as the Boiler Upgrade Scheme. Alongside MCS, our other accreditations are TrustMark, NAPIT, RECC and SSIP.';
 
 export const DEFAULT_SURVEY = [
   'Before any equipment is ordered or installed, we carry out a survey of your property. It checks:',

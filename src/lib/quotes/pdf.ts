@@ -6,7 +6,7 @@ import { designPages } from './design-pages';
 import { drawQr } from './qr';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { glanceRows } from './proposal';
-import { DEFAULT_ABOUT, DEFAULT_SURVEY, lineNet, money, totalsOf, type QuoteContent } from './types';
+import { DEFAULT_ABOUT, DEFAULT_SURVEY, lineNet, MCS_EXPLAINED, money, totalsOf, type QuoteContent } from './types';
 
 /** What the quote PDF is made from: the content, the customer, and the files already fetched (images, datasheet PDFs). */
 export type QuoteFacts = {
@@ -177,7 +177,7 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
         d.image(photo, d.x, d.top - ph - 2, photoW, ph);
         d.rect(d.x, d.top - ph - 4.5, photoW, 2.5, { fill: SOLAR });
         d.text('Callum Hiscott', d.x, d.top - ph - 18, 8.6, { bold: true });
-        d.text('Heliaxis', d.x, d.top - ph - 28, 7.4, { color: MUTED });
+        d.text('Managing Director', d.x, d.top - ph - 28, 7.6, { color: MUTED });
         x0 = d.x + photoW + 22;
       }
       let y = d.top - 11;
@@ -194,6 +194,20 @@ async function build(f: QuoteFacts, toc: Toc | null): Promise<{ main: Uint8Array
       { label: 'Contact', value: `${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}` },
       { label: 'MCS · Company number', value: `${HELIAXIS_COMPANY.mcsNumber} · ${HELIAXIS_COMPANY.companyNumber}` },
     ]);
+
+    // The accreditations, with what MCS certification means.
+    const logos = await kit.brandImage('heliaxis-accreditations-light.png');
+    if (logos) {
+      kit.section('Accredited and certified', { keep: 150 });
+      kit.block(62, (d) => {
+        const h = 38;
+        const w = Math.min(d.width - 40, (logos.width / logos.height) * h);
+        d.rect(d.x, d.top - 56, d.width, 56, { fill: INK });
+        d.rect(d.x, d.top - 56, d.width, 2.5, { fill: SOLAR });
+        d.image(logos, d.x + (d.width - w) / 2, d.top - 56 + 9, w, h);
+      });
+      for (const p of paragraphs(MCS_EXPLAINED)) kit.paragraph(p);
+    }
   }
 
   // The design pages lifted from the uploaded proposal (when there is one), between the cover and the items.

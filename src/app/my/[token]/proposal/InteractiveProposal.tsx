@@ -5,6 +5,7 @@ import { BrandLogo } from '@/components/theme/BrandLogo';
 import type { InteractiveData } from '@/lib/quotes/interactive';
 import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from '@/lib/quotes/how-it-works';
 import { MCS_NOTE, mcsTable } from '@/lib/quotes/mcs';
+import { MCS_EXPLAINED } from '@/lib/quotes/types';
 import { paybackWords, recalc, type Basis, type Tariff } from '@/lib/quotes/roi';
 import { useEngagement } from '../useEngagement';
 import '../portal.css';
@@ -299,8 +300,14 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
                 {data.about.split(/\n{2,}/).map((p) => (
                   <p key={p}>{p}</p>
                 ))}
-                <small>Callum Hiscott, Heliaxis</small>
+                <small>Callum Hiscott, Managing Director</small>
               </div>
+            </div>
+            <div className="ip-accred">
+              <h3>Accredited and certified</h3>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/heliaxis-accreditations-light.png" alt="MCS Certified, TrustMark, NAPIT, RECC and SSIP" />
+              <p>{MCS_EXPLAINED}</p>
             </div>
           </section>
         )}
