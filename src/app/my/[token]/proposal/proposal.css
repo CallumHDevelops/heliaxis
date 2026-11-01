@@ -3,7 +3,7 @@
 .ip-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .ip-tile { background-image: linear-gradient(rgba(33, 31, 24, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(33, 31, 24, 0.045) 1px, transparent 1px); background-size: 20px 20px; position: relative; padding: 14px 14px 14px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; display: grid; gap: 3px; }
 .ip-tile::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: #f8bc1e; }
-.ip-tile b { font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 800; }
+.ip-tile b { font-family: 'Ezra', 'Outfit', system-ui, sans-serif; font-size: 1.35rem; font-weight: 800; }
 .ip-tile small { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .ip-tile em { font-style: normal; font-size: 0.72rem; color: var(--muted); }
 .ip-roof { margin: 0; padding: 0; overflow: hidden; }
@@ -15,7 +15,7 @@
 .ip-product-img img, .ip-product-img svg { max-width: 84px; max-height: 88px; width: auto; height: auto; }
 .ip-product-body { display: grid; gap: 2px; min-width: 0; }
 .ip-product-body small { font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: #c77f04; }
-.ip-product-body b { font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.02rem; overflow-wrap: anywhere; }
+.ip-product-body b { font-family: 'Ezra', 'Outfit', system-ui, sans-serif; font-size: 1.02rem; overflow-wrap: anywhere; }
 .ip-product-body span { font-size: 0.85rem; color: var(--muted); }
 .ip-product-body em { justify-self: start; margin-top: 4px; padding: 3px 9px; font-style: normal; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; background: #211f18; color: #f8bc1e; border-radius: 3px; }
 .ip-chart { width: 100%; height: auto; display: block; color: var(--text); margin-top: 8px; }
@@ -106,7 +106,7 @@ html { scroll-behavior: smooth; }
 /* The way in: greeting, introduction, tariff */
 .ip-gate { position: fixed; inset: 0; z-index: 200; overflow-y: auto; display: grid; place-items: center; padding: 20px; background: var(--bg); }
 .ip-gate-card { width: 100%; max-width: 640px; display: grid; gap: 14px; padding: 28px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); box-shadow: 0 20px 60px -30px rgba(33, 31, 24, 0.5); border-bottom: 4px solid #f8bc1e; }
-.ip-gate-card h1 { margin: 6px 0 0; font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.9rem; font-weight: 800; }
+.ip-gate-card h1 { margin: 6px 0 0; font-family: 'Ezra', 'Outfit', system-ui, sans-serif; font-size: 1.9rem; font-weight: 800; }
 .ip-gate-card p { margin: 0; line-height: 1.55; }
 .ip-assume { margin: 0; padding: 12px 14px 12px 30px; border-radius: 10px; background: rgba(248, 188, 30, 0.14); font-size: 0.92rem; display: grid; gap: 2px; }
 .ip-gate-card .pt-row .pt-btn { flex: 1 1 160px; }
@@ -140,13 +140,16 @@ html { scroll-behavior: smooth; }
 .ip-about-photo { margin: 0; display: grid; gap: 10px; }
 .ip-about-photo img { width: 100%; height: auto; display: block; border-radius: 12px; border-bottom: 4px solid #f8bc1e; }
 .ip-about-photo figcaption { display: grid; gap: 1px; }
-.ip-about-photo figcaption b { font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.05rem; }
+.ip-about-photo figcaption b { font-family: 'Ezra', 'Outfit', system-ui, sans-serif; font-size: 1.05rem; }
 .ip-about-photo figcaption span { font-size: 0.8rem; color: var(--muted); }
 .ip-about-text { display: grid; gap: 12px; }
 .ip-about-text p { margin: 0; line-height: 1.6; }
 .ip-about-text p.lead { font-size: 1.05rem; }
-.ip-about-text blockquote { margin: 4px 0; padding: 6px 0 6px 16px; border-left: 4px solid #f8bc1e; font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; line-height: 1.35; }
+.ip-about-text blockquote { margin: 4px 0; padding: 6px 0 6px 16px; border-left: 4px solid #f8bc1e; font-family: 'Ezra', 'Outfit', system-ui, sans-serif; font-size: 1.2rem; font-weight: 700; line-height: 1.35; }
 .ip-mcs-box { margin-top: 8px; padding: 14px 16px; border-radius: 12px; background: rgba(248, 188, 30, 0.14); border-left: 4px solid #f8bc1e; }
 .ip-mcs-box h3 { margin: 0 0 4px; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: #c77f04; }
 .ip-mcs-box p { margin: 0; font-size: 0.9rem; line-height: 1.55; }
 @media (max-width: 700px) { .ip-about-body { grid-template-columns: 1fr; } .ip-about-photo { max-width: 240px; } }
+
+/* Headings in the brand's own font (Ezra), as on the rest of the site. */
+.ip .pt-hello h1, .ip .pt-card h2, .ip-gate-card h1 { font-family: 'Ezra', 'Outfit', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
