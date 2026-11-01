@@ -200,7 +200,6 @@ html { scroll-behavior: smooth; }
   .ip-side .ip-toc h2 { font-size: 1rem; }
   .ip-side .ip-accept { min-height: 44px; padding: 8px 14px; font-size: 0.92rem; }
   .ip-accred-side { padding: 9px 12px; gap: 6px; }
-  .ip-accred-side img { max-width: 250px; }
   .ip-side .ip-contact h2 { font-size: 0.95rem; }
   .ip-side .ip-contact .pt-btn { min-height: 38px; padding: 6px 10px; font-size: 0.84rem; }
 }
@@ -281,3 +280,5 @@ html { scroll-behavior: smooth; }
 .ip-tip .row.net b.neg { color: #ff9b86; }
 .ip-tip .row.net b.pos { color: #8fe0a0; }
 .ip-tip:has(.row) { min-width: 210px; }
+
+.ip-accred-side img { width: 100%; max-width: none; margin: 0 auto; }
