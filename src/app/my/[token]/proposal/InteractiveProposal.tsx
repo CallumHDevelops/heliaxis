@@ -450,10 +450,13 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         {money && r && basis && theirs && (
           <section className="pt-card ip-money" id="prices" data-track="prices">
             <h2>Your energy prices and savings</h2>
-            <p className="pt-muted">
-              Worked from {t.mode === 'flat' ? `${t.flatPence}p per kWh` : `${t.dayPence}p day, ${t.eveningPence}p evening and ${t.nightPence}p night per kWh`}, a {t.standingPencePerDay}p a day standing charge, {t.exportPence}p per kWh for export and a {t.risePct}% yearly price rise
-              {changed ? ', as you entered them' : ', the design’s own assumptions'}.
-            </p>
+            <ul className="ip-chips" aria-label="The prices used">
+              {t.mode === 'flat' ? <li>{t.flatPence}p per kWh</li> : <li>{t.dayPence}p day · {t.eveningPence}p evening · {t.nightPence}p night per kWh</li>}
+              <li>{t.standingPencePerDay}p a day standing charge</li>
+              <li>{t.exportPence}p per kWh export</li>
+              <li>{t.risePct}% yearly price rise</li>
+            </ul>
+            <p className="pt-muted ip-note">{changed ? 'Using the prices you entered.' : 'Using the design’s own assumptions.'}</p>
             <div className="pt-row">
               <button type="button" className="pt-btn ghost" onClick={() => setStage('tariff')}>
                 Change my prices
@@ -644,9 +647,9 @@ function Field({ label, hint, value, onChange }: { label: string; hint?: string;
 
 function Result({ v, l, was }: { v: string; l: string; was: string | null }) {
   return (
-    <div className="ip-tile">
-      <b>{v}</b>
+    <div className="ip-tile ip-result">
       <small>{l}</small>
+      <b>{v}</b>
       {was && <em>design’s figure: {was}</em>}
     </div>
   );
@@ -855,11 +858,27 @@ function PaybackChart({ cum, firstYear, payback, price }: { cum: number[]; first
     </svg>
       {hi !== null && (
         <div className="ip-tip" style={{ left: `${Math.min(84, Math.max(16, ((left + (hi + 0.5) * col) / W) * 100))}%` }} role="status">
-          <b>{firstYear + hi}</b>
-          <span>
-            Year {hi + 1}: <b>{gbp(cum[hi])}</b> in total
+          <b>
+            Year {hi + 1} · {firstYear + hi}
+          </b>
+          <span className="row">
+            <span>Investment</span>
+            <b>{gbp(price)}</b>
           </span>
-          {hi > 0 && <em>{gbp(cum[hi] - cum[hi - 1])} that year</em>}
+          {hi > 0 && (
+            <span className="row">
+              <span>Saving so far</span>
+              <b>{gbp(cum[hi - 1] + price)}</b>
+            </span>
+          )}
+          <span className="row">
+            <span>Year {hi + 1} saving</span>
+            <b>{gbp(hi > 0 ? cum[hi] - cum[hi - 1] : cum[0] + price)}</b>
+          </span>
+          <span className="row net">
+            <span>Net</span>
+            <b className={cum[hi] >= 0 ? 'pos' : 'neg'}>{gbp(cum[hi])}</b>
+          </span>
         </div>
       )}
     </div>
