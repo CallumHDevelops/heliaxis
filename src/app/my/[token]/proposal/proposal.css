@@ -66,7 +66,22 @@ html { scroll-behavior: smooth; }
 .ip-main { max-width: none; margin: 0; padding: 14px 0 0; }
 .ip-scroll [id] { scroll-margin-top: 8px; }
 .ip-back { display: inline-block; }
+/* Phone: a bar along the bottom (menu, WhatsApp, call); the contents open as a sheet from it. */
+.ip-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #211f18; border-top: 3px solid #f8bc1e; }
+.ip-bar button, .ip-bar a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border: 0; border-radius: 10px; background: rgba(255, 253, 248, 0.1); color: #fffdf8; font: inherit; font-weight: 700; font-size: 0.9rem; text-decoration: none; cursor: pointer; }
+.ip-bar a.wa { background: #f8bc1e; color: #211f18; }
+.ip-sheet { position: fixed; inset: 0; z-index: 160; background: rgba(20, 18, 14, 0.6); display: flex; align-items: flex-end; }
+.ip-sheet-panel { width: 100%; max-height: 86vh; overflow-y: auto; padding: 14px 14px calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 12px; border-radius: 18px 18px 0 0; background: var(--bg); }
+.ip-sheet-close { justify-self: end; min-height: 40px; padding: 8px 16px; }
+.ip-contact { gap: 8px; }
+.ip-contact .pt-row .pt-btn { flex: 1 1 130px; font-size: 0.88rem; padding: 10px 12px; min-height: 44px; }
+.ip-wa { gap: 8px; }
+.ip-shell { padding-bottom: 96px; }
+.ip-side-body { display: none; }
 @media (min-width: 960px) {
+  .ip-bar, .ip-sheet { display: none; }
+  .ip-side-body { display: grid; gap: 12px; align-content: start; }
+  .ip-shell { padding-bottom: 16px; }
   .ip { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
   .ip-shell { flex: 1; min-height: 0; width: 100%; max-width: 1280px; grid-template-columns: 310px minmax(0, 1fr); padding: 16px 20px; gap: 18px; }
   .ip-side { min-height: 0; overflow-y: auto; grid-template-rows: auto auto auto; padding-bottom: 2px; }

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { BrandLogo } from '@/components/theme/BrandLogo';
+import { WhatsAppIcon, whatsappHref } from '@/components/site/WhatsAppButton';
 import type { InteractiveData } from '@/lib/quotes/interactive';
 import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from '@/lib/quotes/how-it-works';
 import { MCS_NOTE, mcsTable } from '@/lib/quotes/mcs';
@@ -142,8 +143,65 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
     e.preventDefault();
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  const [sheet, setSheet] = useState(false);
+  useEffect(() => {
+    if (!sheet) return;
+    const was = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = was;
+    };
+  }, [sheet]);
   const activeAt = Math.max(0, contents.findIndex((c) => c.id === active));
   const intro = introBody(data.intro);
+
+  const waText = `Hi Heliaxis, I have a question about my proposal ${data.quoteNumber}`;
+  const sideBody = (
+    <>
+      <nav className="pt-card ip-toc" aria-label="Contents">
+        <h2>Contents</h2>
+        <div className="ip-bar-top" role="progressbar" aria-label="How far through your proposal" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
+          <i style={{ width: `${progress * 100}%` }} />
+        </div>
+        <ul>
+          {contents.map((c, i) => (
+            <li key={c.id} className={c.id === active ? 'on' : i < activeAt ? 'done' : ''}>
+              <a
+                href={`#${c.id}`}
+                onClick={(e) => {
+                  setSheet(false);
+                  jump(c.id)(e);
+                }}
+                aria-current={c.id === active ? 'true' : undefined}
+              >
+                {c.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="ip-accred-side">
+        <small>Accredited and certified</small>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/assets/heliaxis-accreditations-light.png" alt="MCS Certified, TrustMark, NAPIT, RECC and SSIP" />
+      </div>
+      <div className="pt-card ip-contact">
+        <h2>Questions? Talk to us</h2>
+        <p className="pt-muted">Ask anything about your proposal. We reply quickly.</p>
+        <a className="pt-btn ip-wa" href={whatsappHref(waText)} target="_blank" rel="noopener noreferrer">
+          <WhatsAppIcon size={18} /> WhatsApp us
+        </a>
+        <div className="pt-row">
+          <a className="pt-btn ghost" href="tel:01633965205">
+            Call us
+          </a>
+          <a className="pt-btn ghost" href={`mailto:hello@heliaxis.co.uk?subject=${encodeURIComponent(`My proposal ${data.quoteNumber}`)}`}>
+            Email us
+          </a>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="pt ip">
@@ -223,26 +281,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
               ← {back.label}
             </a>
           )}
-          <nav className="pt-card ip-toc" aria-label="Contents">
-            <h2>Contents</h2>
-            <div className="ip-bar-top" role="progressbar" aria-label="How far through your proposal" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
-              <i style={{ width: `${progress * 100}%` }} />
-            </div>
-            <ul>
-              {contents.map((c, i) => (
-                <li key={c.id} className={c.id === active ? 'on' : i < activeAt ? 'done' : ''}>
-                  <a href={`#${c.id}`} onClick={jump(c.id)} aria-current={c.id === active ? 'true' : undefined}>
-                    {c.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-          <div className="ip-accred-side">
-            <small>Accredited and certified</small>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/heliaxis-accreditations-light.png" alt="MCS Certified, TrustMark, NAPIT, RECC and SSIP" />
-          </div>
+          <div className="ip-side-body">{sideBody}</div>
         </aside>
 
         <div className="ip-scroll" ref={scroller}>
@@ -455,6 +494,34 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           </main>
         </div>
       </div>
+      <div className="ip-bar" role="toolbar" aria-label="Proposal menu">
+        <button type="button" onClick={() => setSheet(true)} aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+          <span>Menu</span>
+        </button>
+        <a className="wa" href={whatsappHref(waText)} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp us">
+          <WhatsAppIcon size={18} />
+          <span>WhatsApp</span>
+        </a>
+        <a href="tel:01633965205" aria-label="Call us">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6.5 3h3l1.5 5-2 1.5a12 12 0 0 0 5 5l1.5-2 5 1.5v3a2 2 0 0 1-2 2A17 17 0 0 1 4.5 5a2 2 0 0 1 2-2Z" />
+          </svg>
+          <span>Call</span>
+        </a>
+      </div>
+      {sheet && (
+        <div className="ip-sheet" role="dialog" aria-modal="true" aria-label="Contents" onClick={() => setSheet(false)}>
+          <div className="ip-sheet-panel" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="pt-btn ghost ip-sheet-close" onClick={() => setSheet(false)}>
+              Close
+            </button>
+            {sideBody}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
