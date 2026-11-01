@@ -87,6 +87,17 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
     ...(o.batteryModel || o.batteryUsableKwh ? [{ kind: 'Battery storage', title: [o.batteryModules && o.batteryModules > 1 ? `${o.batteryModules} ×` : '', o.batteryBrand, o.batteryModel].filter(Boolean).join(' '), spec: o.batteryUsableKwh ? `${kw(o.batteryUsableKwh)} kWh usable` : '', warranty: o.batteryWarrantyYears ? `${o.batteryWarrantyYears}-year warranty` : '', img: data.pictures.battery }] : []),
   ];
 
+  // Yearly energy flows from the design's own figures (generation, use and the self-consumption it printed): no new assumptions.
+  const flows = useMemo(() => {
+    if (!basis) return null;
+    const gen = basis.generationKwh;
+    const cons = basis.consumptionKwh;
+    const direct = Math.min(basis.selfPvKwh, gen, cons);
+    const used = Math.min(Math.max(basis.hasBattery ? basis.selfWithBatteryKwh : basis.selfPvKwh, direct), gen, cons);
+    const stored = Math.max(0, used - direct);
+    return { gen, cons, direct, stored, sent: Math.max(0, gen - used), bought: Math.max(0, cons - used) };
+  }, [basis]);
+
   // The way in: a greeting, the introduction, and the chance to confirm their energy costs before the proposal opens.
   const [stage, setStage] = useState<'welcome' | 'tariff' | 'proposal'>('welcome');
   const greeting = useSyncExternalStore(
@@ -388,7 +399,8 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           <section className="pt-card" id="howitworks" data-track="howitworks">
             <h2>How your system works</h2>
             <p className="pt-muted">Where your electricity comes from and goes, through the day.</p>
-            <FlowDiagram states={howItWorksDay(!!(o.batteryUsableKwh || o.batteryModel))} hasBattery={!!(o.batteryUsableKwh || o.batteryModel)} />
+            <FlowDiagram states={howItWorksDay(!!(o.batteryUsableKwh || o.batteryModel))} hasBattery={!!(o.batteryUsableKwh || o.batteryModel)} kwh={flows ? { 'solar>home': flows.direct, 'solar>battery': flows.stored, 'battery>home': flows.stored, 'solar>grid': flows.sent, 'grid>home': flows.bought } : undefined} />
+            {flows && <YearSplit f={flows} battery={!!(o.batteryUsableKwh || o.batteryModel)} />}
           </section>
         )}
 
@@ -888,11 +900,54 @@ function PaybackChart({ cum, firstYear, payback, price }: { cum: number[]; first
   );
 }
 
+type Year = { gen: number; cons: number; direct: number; stored: number; sent: number; bought: number };
+
+/** Two bars for the year: where the solar goes, and where the home's electricity comes from. Yearly totals from the design's own figures. */
+function YearSplit({ f, battery }: { f: Year; battery: boolean }) {
+  const pc = (x: number, of: number) => `${Math.max(0, Math.min(100, (x / of) * 100))}%`;
+  return (
+    <div className="ip-split">
+      <h3>Over a year</h3>
+      <div className="ip-split-row">
+        <b>
+          Your solar generation: {n0(f.gen)} kWh
+        </b>
+        <div className="ip-stack" role="img" aria-label="Where your solar electricity goes">
+          <i className="a" style={{ width: pc(f.direct, f.gen) }} />
+          {battery && <i className="b" style={{ width: pc(f.stored, f.gen) }} />}
+          <i className="c" style={{ width: pc(f.sent, f.gen) }} />
+        </div>
+        <ul>
+          <li><i className="a" /> Used in your home as it is made <b>{n0(f.direct)} kWh</b></li>
+          {battery && <li><i className="b" /> Stored in the battery, used later <b>{n0(f.stored)} kWh</b></li>}
+          <li><i className="c" /> Sent to the grid <b>{n0(f.sent)} kWh</b></li>
+        </ul>
+      </div>
+      <div className="ip-split-row">
+        <b>
+          Your home uses: {n0(f.cons)} kWh
+        </b>
+        <div className="ip-stack" role="img" aria-label="Where your home's electricity comes from">
+          <i className="a" style={{ width: pc(f.direct, f.cons) }} />
+          {battery && <i className="b" style={{ width: pc(f.stored, f.cons) }} />}
+          <i className="d" style={{ width: pc(f.bought, f.cons) }} />
+        </div>
+        <ul>
+          <li><i className="a" /> From your panels <b>{n0(f.direct)} kWh</b></li>
+          {battery && <li><i className="b" /> From your battery <b>{n0(f.stored)} kWh</b></li>}
+          <li><i className="d" /> Bought from the grid <b>{n0(f.bought)} kWh</b></li>
+        </ul>
+      </div>
+      <small>Worked from the design’s own self-consumption figures (battery losses not shown), so they are estimates, not guarantees.</small>
+    </div>
+  );
+}
+
 /**
  * One diagram that plays through the day: sun, evening, night. Energy travels along the lines as moving dots, the parts light up or rest,
  * and it moves on by itself every few seconds until the reader picks a moment.
  */
-function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWorksDay>; hasBattery: boolean }) {
+function FlowDiagram({ states, hasBattery, kwh }: { states: ReturnType<typeof howItWorksDay>; hasBattery: boolean; kwh?: Record<string, number> }) {
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState(false);
   useEffect(() => {
@@ -942,6 +997,11 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
             <g key={`${idx}${a}${b}`}>
               <path d={path} className="ip-fl-base" fill="none" />
               <path d={path} className="ip-fl-run" fill="none" markerEnd={`url(#arr-${uid})`} />
+              {kwh && kwh[`${a}>${b}`] > 0 && (
+                <text className="ip-fl-label" x={(ar.x1 + ar.x2) / 2} y={(ar.y1 + ar.y2) / 2 + 6 - 2.5} textAnchor="middle" fontSize="6.4" fontWeight="700">
+                  {n0(kwh[`${a}>${b}`])} kWh
+                </text>
+              )}
             </g>
           );
         })}
@@ -977,6 +1037,7 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
       <p key={idx} className="ip-flowcap">
         {state.caption}
       </p>
+      {kwh && <p className="ip-flownote">Figures on the lines are yearly totals from your design.</p>}
       <div className="ip-flowdots" aria-hidden="true">
         {states.map((st, i) => (
           <i key={st.title} className={i === idx ? 'on' : ''} />
