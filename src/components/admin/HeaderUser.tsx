@@ -27,6 +27,9 @@ type Notification = {
   ref?: string | null;
 };
 
+/** Notification wording without emoji (they are kept for phone pushes; the screen follows the brand's no-emoji rule). */
+const plain = (t: string) => t.replace(/[\p{Extended_Pictographic}\u200D\uFE0F]/gu, '').replace(/\s{2,}/g, ' ').trim();
+
 function ago(iso: string) {
   const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
   if (s < 60) return 'just now';
@@ -252,8 +255,8 @@ export function HeaderUser({
                       setBellOpen(false);
                     }}
                   >
-                    <span className="hu-title">{n.title}</span>
-                    {n.body && <span className="hu-body">{n.body}</span>}
+                    <span className="hu-title">{plain(n.title)}</span>
+                    {n.body && <span className="hu-body">{plain(n.body)}</span>}
                     <span className="hu-time">{ago(n.created_at)}</span>
                   </Link>
                 </li>
@@ -348,26 +351,35 @@ export function HeaderUser({
         .hu-count { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
           background: var(--danger); color: var(--on-solid); font-size: .66rem; font-weight: 800; display: grid; place-items: center; box-sizing: border-box; }
         .hu-dot { position: absolute; top: 4px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-        .hu-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: 340px; max-width: calc(100vw - 24px);
-          background: var(--raised); border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow);
+        .hu-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: 380px; max-width: calc(100vw - 24px);
+          max-height: min(78vh, 640px); display: flex; flex-direction: column; overflow: hidden;
+          background: var(--raised); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
           color: var(--text); text-align: left; }
-        .hu-panel-head, .hu-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; }
-        .hu-panel-head { border-bottom: 1px solid var(--border-soft); }
-        .hu-panel-foot { border-top: 1px solid var(--border-soft); font-size: .78rem; color: var(--muted); }
+        .hu-panel-head, .hu-panel-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; flex: 0 0 auto; }
+        .hu-panel-head { border-bottom: 1px solid var(--border-soft); font-size: 1rem; }
+        .hu-panel-foot { border-top: 1px solid var(--border-soft); font-size: .76rem; line-height: 1.4; color: var(--muted); }
         .hu-panel-foot:empty { display: none; }
-        .hu-link { background: none; border: 0; padding: 0; font: inherit; font-size: .78rem; font-weight: 700; color: var(--accent-text); cursor: pointer; }
-        .hu-push { display: flex; gap: 10px; align-items: center; margin: 10px 14px 0; padding: 10px; border-radius: 4px;
-          background: var(--accent-soft); font-size: .82rem; }
-        .hu-btn { flex: 0 0 auto; font: inherit; font-size: .8rem; font-weight: 800; padding: .4rem .7rem; border-radius: 2px;
+        .hu-link { background: none; border: 0; padding: 0; font: inherit; font-size: .8rem; font-weight: 700; color: var(--accent-text); cursor: pointer; white-space: nowrap; }
+        .hu-push { display: flex; gap: 10px; align-items: center; margin: 10px 14px 0; padding: 10px; border-radius: 8px;
+          background: var(--accent-soft); font-size: .82rem; flex: 0 0 auto; }
+        .hu-btn { flex: 0 0 auto; font: inherit; font-size: .8rem; font-weight: 800; padding: .45rem .8rem; border-radius: 8px;
           border: 0; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
-        .hu-list { list-style: none; margin: 0; padding: 6px 0; max-height: 60vh; overflow-y: auto; }
-        .hu-list a { display: flex; flex-direction: column; gap: 2px; padding: 9px 14px 9px 26px; text-decoration: none; color: inherit; position: relative; }
+        .hu-list { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+        .hu-list li + li { border-top: 1px solid var(--border-soft); }
+        .hu-list a { display: grid; gap: 3px; padding: 12px 16px 12px 32px; text-decoration: none; color: inherit; position: relative; }
         .hu-list a:hover { background: rgb(var(--fg-rgb) / .04); }
-        .hu-list li.is-unread a::before { content: ''; position: absolute; left: 11px; top: 15px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-        .hu-title { font-size: .88rem; font-weight: 700; }
-        .hu-body { font-size: .82rem; color: var(--text-2); overflow-wrap: anywhere; }
+        .hu-list li.is-unread a { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+        .hu-list li.is-unread a::before { content: ''; position: absolute; left: 14px; top: 17px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+        .hu-title { font-size: .9rem; font-weight: 700; line-height: 1.3; }
+        .hu-body { font-size: .82rem; line-height: 1.4; color: var(--text-2); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .hu-time { font-size: .72rem; color: var(--muted); }
-        .hu-empty { padding: 18px 14px; font-size: .85rem; color: var(--muted); }
+        .hu-empty { padding: 22px 16px; font-size: .88rem; color: var(--muted); }
+        /* Phone: the panel spans the screen with an even margin either side, sitting under the header. */
+        @media (max-width: 640px) {
+          .hu-wrap:has(> .hu-panel) { position: static; }
+          .hu-panel { position: fixed; left: 12px; right: 12px; top: 68px; width: auto; max-width: none; max-height: calc(100dvh - 160px); }
+          .hu-panel.hu-menu { left: auto; }
+        }
         .hu-menu { width: 252px; padding: 6px 0; }
         .hu-who { padding: 8px 14px 10px; border-bottom: 1px solid var(--border-soft); margin-bottom: 4px; }
         .hu-who b { display: block; font-size: .9rem; }
