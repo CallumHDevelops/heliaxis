@@ -237,3 +237,12 @@ html { scroll-behavior: smooth; }
 .ip-full-chart { flex: 1; min-height: 0; display: grid; align-content: center; }
 .ip-full .ip-expand { display: none; }
 .ip-full .ip-chart { margin-top: 0; max-height: 100%; }
+
+/* How it works: tabs stay on one line (scrolling sideways if they must) and the current moment is the clear one */
+.ip-flowtabs { flex-wrap: nowrap; overflow-x: auto; gap: 8px; border-bottom: 0; padding-bottom: 2px; scrollbar-width: none; }
+.ip-flowtabs::-webkit-scrollbar { display: none; }
+.ip-flowtabs button { flex: 0 0 auto; white-space: nowrap; padding: 9px 16px; margin: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-weight: 600; font-size: 0.88rem; transition: background 0.2s, border-color 0.2s; }
+.ip-flowtabs button.on { background: #211f18; border-color: #211f18; color: #f8bc1e; }
+.ip-flowdots { display: flex; justify-content: center; gap: 6px; }
+.ip-flowdots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(33, 31, 24, 0.2); transition: background 0.3s, width 0.3s; }
+.ip-flowdots i.on { width: 18px; border-radius: 4px; background: #f8bc1e; }

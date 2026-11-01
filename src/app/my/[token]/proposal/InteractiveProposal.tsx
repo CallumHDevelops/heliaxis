@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } fro
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import { WhatsAppIcon, whatsappHref } from '@/components/site/WhatsAppButton';
 import type { InteractiveData } from '@/lib/quotes/interactive';
-import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from '@/lib/quotes/how-it-works';
+import { arrow, howItWorksDay, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from '@/lib/quotes/how-it-works';
 import { MCS_NOTE, mcsTable } from '@/lib/quotes/mcs';
 import { MCS_EXPLAINED } from '@/lib/quotes/types';
 import { paybackWords, recalc, type Basis, type Tariff } from '@/lib/quotes/roi';
@@ -388,7 +388,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           <section className="pt-card" id="howitworks" data-track="howitworks">
             <h2>How your system works</h2>
             <p className="pt-muted">Where your electricity comes from and goes, through the day.</p>
-            <FlowDiagram states={howItWorks(!!(o.batteryUsableKwh || o.batteryModel))} hasBattery={!!(o.batteryUsableKwh || o.batteryModel)} />
+            <FlowDiagram states={howItWorksDay(!!(o.batteryUsableKwh || o.batteryModel))} hasBattery={!!(o.batteryUsableKwh || o.batteryModel)} />
           </section>
         )}
 
@@ -892,7 +892,7 @@ function PaybackChart({ cum, firstYear, payback, price }: { cum: number[]; first
  * One diagram that plays through the day: sun, evening, night. Energy travels along the lines as moving dots, the parts light up or rest,
  * and it moves on by itself every few seconds until the reader picks a moment.
  */
-function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWorks>; hasBattery: boolean }) {
+function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWorksDay>; hasBattery: boolean }) {
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState(false);
   useEffect(() => {
@@ -900,13 +900,19 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
     const t = setInterval(() => setIdx((i) => (i + 1) % states.length), 8000);
     return () => clearInterval(t);
   }, [picked, states.length]);
+  const tabs = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = tabs.current;
+    const el = box?.children[idx] as HTMLElement | undefined;
+    if (box && el) box.scrollTo({ left: el.offsetLeft - (box.clientWidth - el.clientWidth) / 2, behavior: 'smooth' });
+  }, [idx]);
   const state = states[idx];
   const nodes: Node[] = hasBattery ? ['home', 'solar', 'grid', 'battery'] : ['home', 'solar', 'grid'];
   const h = NODE_SIZE / 2;
   const uid = useId().replace(/:/g, '');
   return (
     <div className="ip-flowbox">
-      <div className="ip-flowtabs" role="tablist" aria-label="Moment of the day">
+      <div className="ip-flowtabs" role="tablist" aria-label="Moment of the day" ref={tabs}>
         {states.map((st, i) => (
           <button
             key={st.title}
@@ -971,6 +977,11 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
       <p key={idx} className="ip-flowcap">
         {state.caption}
       </p>
+      <div className="ip-flowdots" aria-hidden="true">
+        {states.map((st, i) => (
+          <i key={st.title} className={i === idx ? 'on' : ''} />
+        ))}
+      </div>
     </div>
   );
 }

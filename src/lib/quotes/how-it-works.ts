@@ -35,6 +35,27 @@ export function howItWorks(hasBattery: boolean): State[] {
   ];
 }
 
+/**
+ * The web page's longer walk through a day (the PDF keeps the three moments above): more moments, each with a short tab label. Plain
+ * general behaviour of a solar system with or without a battery; nothing here is a figure.
+ */
+export function howItWorksDay(hasBattery: boolean): State[] {
+  if (!hasBattery) {
+    return [
+      { title: 'Sunny day', caption: 'Your panels power the home first. The extra is sent to the grid.', flows: [['solar', 'home'], ['solar', 'grid']], off: [] },
+      { title: 'Cloudy day', caption: 'Your panels power what they can. The grid supplies the rest.', flows: [['solar', 'home'], ['grid', 'home']], off: [] },
+      { title: 'Night', caption: 'The panels rest. The home runs on the grid.', flows: [['grid', 'home']], off: ['solar'] },
+    ];
+  }
+  return [
+    { title: 'Morning', caption: 'Your panels power the home first, and the extra charges your battery.', flows: [['solar', 'home'], ['solar', 'battery']], off: [] },
+    { title: 'Midday', caption: 'Once the battery is full, your panels power the home and the extra is sent to the grid.', flows: [['solar', 'home'], ['solar', 'grid']], off: [] },
+    { title: 'Cloudy day', caption: 'Your panels cover what they can, your battery fills the gap and the grid tops up only what is left.', flows: [['solar', 'home'], ['battery', 'home'], ['grid', 'home']], off: [] },
+    { title: 'Evening', caption: 'The sun has gone, so your battery powers the home with the electricity you stored earlier.', flows: [['battery', 'home']], off: ['solar'] },
+    { title: 'Night', caption: 'The panels rest. Your battery keeps the home going, and the grid takes over only when it runs low.', flows: [['battery', 'home'], ['grid', 'home']], off: ['solar'] },
+  ];
+}
+
 /** The arrow between two nodes, from the edge of one to the edge of the other, for a panel at (0, 0). */
 export function arrow(from: Node, to: Node): { x1: number; y1: number; x2: number; y2: number } {
   const a = NODE_AT[from];
