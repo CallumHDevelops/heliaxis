@@ -1,0 +1,80 @@
+/* Operations › QMS. Built on crm.css (inputs, buttons, sheets); this adds the qms-* parts. Phones are under 761px. */
+.qms { padding: 1rem; max-width: 1180px; margin: 0 auto; }
+.qms-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.qms-title { margin: 0; font-size: 1.4rem; }
+.qms-spacer { flex: 1; }
+.qms-muted { color: var(--muted); font-size: 0.88rem; }
+.qms-msg { margin: 0.6rem 0; padding: 0.5rem 0.7rem; border-radius: 6px; background: rgb(var(--ok-rgb) / 0.12); color: var(--ok); font-size: 0.9rem; }
+.qms-err { margin: 0.6rem 0; padding: 0.5rem 0.7rem; border-radius: 6px; background: rgb(var(--danger-rgb) / 0.1); color: var(--danger); font-size: 0.9rem; }
+.qms-late { color: var(--danger); font-weight: 700; font-size: 0.8rem; }
+
+.qms-tabs { display: flex; gap: 0.25rem; overflow-x: auto; border-bottom: 1px solid var(--border); margin: 0.9rem 0 0.8rem; scrollbar-width: none; }
+.qms-tabs::-webkit-scrollbar { display: none; }
+.qms-tabs button { flex: none; border: 0; background: none; font: inherit; font-size: 0.9rem; font-weight: 600; color: var(--muted); padding: 0.55rem 0.8rem; border-bottom: 2px solid transparent; cursor: pointer; }
+.qms-tabs button.is-on { color: var(--ink); border-bottom-color: var(--accent-text, currentColor); }
+.qms-count { display: inline-block; margin-left: 0.35rem; min-width: 1.2em; padding: 0 0.35em; border-radius: 999px; background: rgb(var(--accent-rgb) / 0.3); font-size: 0.72rem; text-align: center; }
+
+.qms-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.7rem; margin-bottom: 0.9rem; }
+.qms-tile { display: flex; flex-direction: column; gap: 0.3rem; text-align: left; font: inherit; color: inherit; border: 1px solid var(--border); border-radius: 10px; background: var(--field); padding: 0.8rem 0.9rem; }
+button.qms-tile { cursor: pointer; }
+.qms-tile__name { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.qms-tile__big { font-size: 1.6rem; font-weight: 800; }
+.qms-tile__big small { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.qms-tile__sub { font-size: 0.8rem; color: var(--muted); }
+.qms-bar { display: block; height: 6px; border-radius: 3px; background: rgb(var(--fg-rgb) / 0.08); overflow: hidden; }
+.qms-bar > span { display: block; height: 100%; background: var(--ok); }
+.qms-box { border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 0.9rem; margin: 0.9rem 0; }
+
+.qms-bar2 { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.7rem; }
+.qms-search { max-width: 260px; }
+.qms-sec { max-width: 180px; }
+.qms-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.qms-chips button { border: 1px solid var(--border-strong); background: none; border-radius: 999px; padding: 0.25rem 0.7rem; font: inherit; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+.qms-chips button.is-on { background: rgb(var(--accent-rgb) / 0.28); color: var(--ink); border-color: transparent; font-weight: 700; }
+
+.qms-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.qms-table th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+.qms-table td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.qms-table tbody tr { cursor: pointer; }
+.qms-table tbody tr:hover, .qms-table tbody tr:focus-visible { background: rgb(var(--fg-rgb) / 0.04); outline: none; }
+.qms-ref { font-weight: 800; white-space: nowrap; }
+@media (max-width: 760px) {
+  .qms-table thead { display: none; }
+  .qms-table, .qms-table tbody, .qms-table tr, .qms-table td { display: block; }
+  .qms-table tr { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .qms-table td { border: 0; padding: 0.1rem 0; }
+}
+
+.qms-chip { display: inline-block; padding: 2px 7px; border-radius: 3px; background: rgb(var(--fg-rgb) / 0.07); color: var(--muted); font-size: 10.5px; font-weight: 800; line-height: 1.3; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap; }
+.qms-chip--in_review { background: rgb(var(--accent-rgb) / 0.22); color: var(--accent-text); }
+.qms-chip--changes_requested, .qms-chip--c-open { background: rgb(var(--danger-rgb) / 0.1); color: var(--danger); }
+.qms-chip--approved, .qms-chip--c-resolved, .qms-chip--r-closed { background: rgb(var(--ok-rgb) / 0.15); color: var(--ok); }
+.qms-chip--c-addressed, .qms-chip--r-in_progress { background: rgb(var(--info-rgb) / 0.12); color: var(--info); }
+.qms-chip--r-open { background: rgb(var(--accent-rgb) / 0.22); color: var(--accent-text); }
+.qms-score { font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+.qms-score.is-ok { color: var(--ok); }
+.qms-score.is-warn { color: var(--info); }
+.qms-score.is-fail { color: var(--danger); }
+
+.qms-sheet__head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.2rem; }
+.qms-pane { padding-top: 0.2rem; }
+.qms-edit-head { display: flex; align-items: end; }
+.qms-bodybox { position: relative; }
+.qms-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; line-height: 1.5; }
+.qms-doc { border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem 1rem; max-height: 60vh; overflow: auto; line-height: 1.55; }
+.qms-doc table { border-collapse: collapse; } .qms-doc th, .qms-doc td { border: 1px solid var(--border); padding: 0.3rem 0.5rem; }
+.qms-checks, .qms-comments, .qms-hist { list-style: none; margin: 0; padding: 0; }
+.qms-check { display: flex; gap: 0.7rem; padding: 0.55rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.qms-check__mark { flex: none; width: 3rem; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; padding-top: 0.15rem; }
+.qms-check--pass .qms-check__mark { color: var(--ok); } .qms-check--warn .qms-check__mark { color: var(--info); } .qms-check--fail .qms-check__mark { color: var(--danger); }
+.qms-comment { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.6rem; }
+.qms-comment--open { border-color: rgb(var(--danger-rgb) / 0.4); }
+.qms-comment__top { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+.qms-comment p { margin: 0.35rem 0; }
+.qms-comment blockquote { margin: 0.4rem 0; padding-left: 0.6rem; border-left: 3px solid var(--border-strong); color: var(--muted); font-size: 0.85rem; }
+.qms-reply { background: rgb(var(--info-rgb) / 0.08); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.88rem; }
+.qms-hist li { padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.qms-h { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0.9rem 0 0.4rem; }
+.qms-tick { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.3rem 0; font-size: 0.9rem; }
+.qms-approve { background: rgb(var(--fg-rgb) / 0.03); }
+.qms-foot { margin-top: 0.8rem; text-align: right; }

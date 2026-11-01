@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { callCostUsd, type Usage } from '@/lib/social/costs';
 
-export type AiFeature = 'proposal_read' | 'quote_intro' | 'quote_included' | 'mcs_read' | 'label_read' | 'blog' | 'assistant';
+export type AiFeature = 'proposal_read' | 'quote_intro' | 'quote_included' | 'mcs_read' | 'label_read' | 'blog' | 'assistant' | 'qms';
 
 /** Saves what one model call cost (ai-usage.sql). Never throws: a missing table or a failed write must never stop the work itself. */
 export async function recordAi(feature: AiFeature, model: string, usage: Usage | null | undefined, ref?: string | null) {

@@ -482,6 +482,11 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     crm && !((await has('crm_contacts')) && (await has('crm_projects', 'contact_id'))),
     sql('organisations.sql', 'Organisations: commercial customers, landlords, schools, partners and suppliers, with their contacts, linked to their jobs.', 6, 'crm.sql')
   );
+  // Quality management: Operations › QMS stays hidden until this has been run.
+  add(
+    !(await has('qms_records')),
+    sql('qms.sql', 'Quality management (QMS): the register of procedures, forms and standards, each with checks, comments and an approval, plus the QMS records.', 6)
+  );
   // Merging duplicate customers and jobs: the Merge buttons say this is needed until it's run.
   add(
     (await customerRefs) && !(await has('crm_merges')),
