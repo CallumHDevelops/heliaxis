@@ -225,3 +225,15 @@ html { scroll-behavior: smooth; }
   .ip-gate-card.welcome .ip-assume { display: none; }
   .ip-gate-card.welcome p { font-size: 0.84rem; }
 }
+
+/* Expand a chart full screen on a phone (turned sideways when the phone is upright) */
+.ip-expand { display: none; min-height: 36px; padding: 6px 14px; font-size: 0.82rem; justify-self: end; margin-bottom: 4px; }
+@media (max-width: 959px) { .ip-expand { display: inline-flex; } }
+.ip-full { position: fixed; inset: 0; z-index: 400; background: var(--bg); overflow: hidden; }
+.ip-full-inner { width: 100%; height: 100%; box-sizing: border-box; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.ip-full.rot .ip-full-inner { position: absolute; top: 0; left: 0; width: 100dvh; height: 100vw; transform-origin: top left; transform: translateX(100vw) rotate(90deg); }
+.ip-full-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ip-full-head .pt-btn { min-height: 38px; padding: 6px 16px; }
+.ip-full-chart { flex: 1; min-height: 0; display: grid; align-content: center; }
+.ip-full .ip-expand { display: none; }
+.ip-full .ip-chart { margin-top: 0; max-height: 100%; }

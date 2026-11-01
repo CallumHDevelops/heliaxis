@@ -654,9 +654,68 @@ function Cover({ label, pct, strong }: { label: string; pct: number; strong?: bo
   );
 }
 
+/** Whether the phone is held upright (so a full-screen chart is turned on its side for reading). */
+function usePortrait() {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia('(orientation: portrait)');
+      mq.addEventListener('change', cb);
+      return () => mq.removeEventListener('change', cb);
+    },
+    () => window.matchMedia('(orientation: portrait)').matches,
+    () => false
+  );
+}
+
+/** A chart with an Expand button (on phones): opens it full screen, turned sideways if the phone is upright, so it can be read. */
+function ChartFrame({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const portrait = usePortrait();
+  useEffect(() => {
+    if (!open) return;
+    const was = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', key);
+    return () => {
+      document.body.style.overflow = was;
+      window.removeEventListener('keydown', key);
+    };
+  }, [open]);
+  return (
+    <>
+      <button type="button" className="pt-btn ghost ip-expand" onClick={() => setOpen(true)}>
+        Expand chart
+      </button>
+      {children}
+      {open && (
+        <div className={`ip-full${portrait ? ' rot' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+          <div className="ip-full-inner">
+            <div className="ip-full-head">
+              <b>{title}</b>
+              <button type="button" className="pt-btn ghost" onClick={() => setOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="ip-full-chart">{children}</div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function GenerationChart({ gen, use }: { gen: number[]; use: number[] | null }) {
+  return (
+    <ChartFrame title="Expected performance">
+      <GenerationPlot gen={gen} use={use} />
+    </ChartFrame>
+  );
+}
+
+function GenerationPlot({ gen, use }: { gen: number[]; use: number[] | null }) {
   const [hi, setHi] = useState<number | null>(null);
   const W = 600;
   const H = 210;
@@ -741,8 +800,7 @@ function PaybackChart({ cum, firstYear, payback, price }: { cum: number[]; first
   const ticks = [min, 0, max].filter((v, i, a) => a.indexOf(v) === i);
   const soFar = sel > 0 ? cum[sel - 1] + price : 0;
   const thisYear = sel > 0 ? cum[sel] - cum[sel - 1] : cum[0] + price;
-  return (
-    <>
+  const plot = (
     <div className="ip-chartwrap" onMouseLeave={() => setHi(null)}>
     <svg className="ip-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Cumulative net saving by year">
       <text x="0" y="10" fontSize="11" fontWeight="700" fill="currentColor">
@@ -793,6 +851,10 @@ function PaybackChart({ cum, firstYear, payback, price }: { cum: number[]; first
         </div>
       )}
     </div>
+  );
+  return (
+    <>
+    <ChartFrame title="Cumulative net saving, year by year">{plot}</ChartFrame>
     <div className="ip-sum">
       <div className="ip-sum-head">
         <b>
