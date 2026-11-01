@@ -1,5 +1,4 @@
 /* The interactive proposal: figures on cards with the brand's cross-hatch fade, and the price tools. */
-.ip-main { max-width: 760px; }
 .ip-back { font-size: 0.9rem; color: var(--muted); text-decoration: none; }
 .ip-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .ip-tile { background-image: linear-gradient(rgba(33, 31, 24, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(33, 31, 24, 0.045) 1px, transparent 1px); background-size: 20px 20px; position: relative; padding: 14px 14px 14px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; display: grid; gap: 3px; }
@@ -60,13 +59,79 @@
 .ip-toc a:hover { color: #c77f04; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-[id] { scroll-margin-top: 14px; }
-.ip-about-body { display: grid; grid-template-columns: 170px 1fr; gap: 18px; align-items: start; }
-.ip-about-body img { width: 100%; height: auto; display: block; border-bottom: 3px solid #f8bc1e; }
-.ip-about-body p { margin: 0 0 10px; line-height: 1.5; }
-.ip-about-body small { color: var(--muted); font-weight: 700; }
-@media (max-width: 640px) { .ip-about-body { grid-template-columns: 1fr; } .ip-about-body img { max-width: 220px; } }
-.ip-accred { margin-top: 18px; }
-.ip-accred h3 { margin: 0 0 8px; font-size: 1rem; }
-.ip-accred img { display: block; width: 100%; max-width: 520px; height: auto; background: #211f18; padding: 12px 16px; border-bottom: 3px solid #f8bc1e; box-sizing: border-box; }
-.ip-accred p { margin: 10px 0 0; line-height: 1.5; }
+
+/* ── Layout: contents card on the left, the proposal scrolling on the right (stacked on a phone) ── */
+.ip-shell { max-width: 760px; margin: 0 auto; padding: 14px max(16px, env(safe-area-inset-left)) 40px; display: grid; gap: 14px; box-sizing: border-box; }
+.ip-side { display: grid; gap: 12px; align-content: start; }
+.ip-main { max-width: none; margin: 0; padding: 14px 0 0; }
+.ip-scroll [id] { scroll-margin-top: 8px; }
+.ip-back { display: inline-block; }
+@media (min-width: 960px) {
+  .ip { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  .ip-shell { flex: 1; min-height: 0; width: 100%; max-width: 1280px; grid-template-columns: 310px minmax(0, 1fr); padding: 16px 20px; gap: 18px; }
+  .ip-side { min-height: 0; overflow-y: auto; grid-template-rows: auto auto auto; padding-bottom: 2px; }
+  .ip-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth; padding: 0 18px 24px; border: 1px solid var(--border); border-radius: 16px; background: color-mix(in srgb, var(--surface) 55%, var(--bg)); }
+  .ip-scroll .pt-hello { padding-top: 6px; }
+}
+
+/* Contents: a progress bar for the whole proposal, the part being read highlighted and the ones read ticked off */
+.ip-toc { gap: 8px; }
+.ip-bar-top { height: 5px; border-radius: 3px; background: rgba(33, 31, 24, 0.1); overflow: hidden; }
+.ip-bar-top i { display: block; height: 100%; background: linear-gradient(90deg, #f8bc1e, #c77f04); transition: width 0.15s linear; }
+.ip-toc ul { margin: 4px 0 0; position: relative; }
+.ip-toc li { position: relative; }
+.ip-toc a { display: block; padding: 8px 10px 8px 14px; border-bottom: 0; border-left: 3px solid transparent; border-radius: 0 8px 8px 0; font-size: 0.92rem; color: var(--muted); transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.ip-toc li.done a { color: var(--text); border-left-color: rgba(248, 188, 30, 0.55); }
+.ip-toc li.on a { color: #211f18; font-weight: 800; background: rgba(248, 188, 30, 0.28); border-left-color: #f8bc1e; }
+.ip-toc a:hover { color: #c77f04; background: rgba(248, 188, 30, 0.14); }
+.ip-accred-side { padding: 12px; border-radius: 14px; background: #211f18; border-bottom: 3px solid #f8bc1e; display: grid; gap: 8px; }
+.ip-accred-side small { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: #f8bc1e; }
+.ip-accred-side img { display: block; width: 100%; height: auto; }
+
+/* The way in: greeting, introduction, tariff */
+.ip-gate { position: fixed; inset: 0; z-index: 200; overflow-y: auto; display: grid; place-items: center; padding: 20px; background: var(--bg); }
+.ip-gate-card { width: 100%; max-width: 640px; display: grid; gap: 14px; padding: 28px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); box-shadow: 0 20px 60px -30px rgba(33, 31, 24, 0.5); border-bottom: 4px solid #f8bc1e; }
+.ip-gate-card h1 { margin: 6px 0 0; font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.9rem; font-weight: 800; }
+.ip-gate-card p { margin: 0; line-height: 1.55; }
+.ip-assume { margin: 0; padding: 12px 14px 12px 30px; border-radius: 10px; background: rgba(248, 188, 30, 0.14); font-size: 0.92rem; display: grid; gap: 2px; }
+.ip-gate-card .pt-row .pt-btn { flex: 1 1 160px; }
+
+/* Charts: hover or tap a column */
+.ip-chartwrap { position: relative; }
+.ip-hit { cursor: pointer; outline: none; }
+.ip-hit:focus-visible { stroke: #c77f04; stroke-width: 1.5; }
+.ip-tip { position: absolute; top: 4px; transform: translateX(-50%); z-index: 2; min-width: 170px; padding: 9px 12px; display: grid; gap: 3px; font-size: 0.82rem; background: #211f18; color: #fffdf8; border-radius: 9px; border-bottom: 2px solid #f8bc1e; pointer-events: none; box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.5); }
+.ip-tip b:first-child { color: #f8bc1e; font-size: 0.9rem; }
+.ip-tip em { font-style: normal; color: rgba(255, 253, 248, 0.7); font-size: 0.76rem; }
+.ip-tip i { display: inline-block; width: 8px; height: 8px; margin-right: 4px; background: #f8bc1e; }
+.ip-tip i.u { background: #fffdf8; }
+
+/* How your system works: one animated diagram */
+.ip-flowbox { display: grid; gap: 10px; margin-top: 8px; }
+.ip-flowtabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ip-flowtabs button { font: inherit; font-weight: 700; font-size: 0.82rem; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
+.ip-flowtabs button.on { background: #f8bc1e; border-color: #f8bc1e; color: #211f18; }
+.ip-flowsvg { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; color: #211f18; background: #fff; border-radius: 14px; border: 1px solid var(--border); }
+.ip-node rect { fill: #f8bc1e; stroke: #211f18; stroke-width: 0.8; transition: fill 0.5s, opacity 0.5s; }
+.ip-node .ip-ic { stroke: #211f18; transition: stroke 0.5s; }
+.ip-node.off rect { fill: #e1ded6; stroke: #a8a398; }
+.ip-node.off .ip-ic { stroke: #8a8578; }
+.ip-flowcap { margin: 0; text-align: center; line-height: 1.5; animation: ipFade 0.5s ease-out; }
+@keyframes ipFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ip-dot { display: none; } .ip-flowcap { animation: none; } }
+
+/* About Heliaxis */
+.ip-about-body { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 26px; align-items: start; margin-top: 4px; }
+.ip-about-photo { margin: 0; display: grid; gap: 10px; }
+.ip-about-photo img { width: 100%; height: auto; display: block; border-radius: 12px; border-bottom: 4px solid #f8bc1e; }
+.ip-about-photo figcaption { display: grid; gap: 1px; }
+.ip-about-photo figcaption b { font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.05rem; }
+.ip-about-photo figcaption span { font-size: 0.8rem; color: var(--muted); }
+.ip-about-text { display: grid; gap: 12px; }
+.ip-about-text p { margin: 0; line-height: 1.6; }
+.ip-about-text p.lead { font-size: 1.05rem; }
+.ip-about-text blockquote { margin: 4px 0; padding: 6px 0 6px 16px; border-left: 4px solid #f8bc1e; font-family: var(--font-outfit), 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; line-height: 1.35; }
+.ip-mcs-box { margin-top: 8px; padding: 14px 16px; border-radius: 12px; background: rgba(248, 188, 30, 0.14); border-left: 4px solid #f8bc1e; }
+.ip-mcs-box h3 { margin: 0 0 4px; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: #c77f04; }
+.ip-mcs-box p { margin: 0; font-size: 0.9rem; line-height: 1.55; }
+@media (max-width: 700px) { .ip-about-body { grid-template-columns: 1fr; } .ip-about-photo { max-width: 240px; } }

@@ -14,6 +14,8 @@ export type InteractiveData = {
   showFinancials: boolean;
   option: Omit<ProposalOption, 'images'>;
   /** The About Heliaxis and the survey wording, as on the quote (null: left out). */
+  /** The quote's introduction (the customer is greeted on opening the proposal, then this is read). */
+  intro: string | null;
   about: string | null;
   survey: string | null;
   pictures: Partial<Record<'roof' | 'inverter' | 'battery' | 'sunpath', string>>;
@@ -35,7 +37,7 @@ async function build(q: QuoteRow, first: string, token: string | null): Promise<
       if (hit?.signedUrl) pictures[kind as keyof InteractiveData['pictures']] = hit.signedUrl;
     }
   }
-  return { first, quoteNumber: q.number, title: q.title, priceGbp: Math.round(totalsOf(q.content).gross) / 100, showFinancials: proposal.showFinancials, option: rest, about: (q.content.about ?? DEFAULT_ABOUT).trim() || null, survey: (q.content.survey ?? DEFAULT_SURVEY).trim() || null, pictures, token };
+  return { first, quoteNumber: q.number, title: q.title, priceGbp: Math.round(totalsOf(q.content).gross) / 100, showFinancials: proposal.showFinancials, option: rest, intro: (q.content.intro ?? '').trim() || null, about: (q.content.about ?? DEFAULT_ABOUT).trim() || null, survey: (q.content.survey ?? DEFAULT_SURVEY).trim() || null, pictures, token };
 }
 
 /** The customer's view: their link's newest quote that has been sent (or signed). */

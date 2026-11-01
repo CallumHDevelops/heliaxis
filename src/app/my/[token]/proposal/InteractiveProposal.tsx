@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import type { InteractiveData } from '@/lib/quotes/interactive';
 import { arrow, howItWorks, NODE_AT, NODE_LABEL, NODE_SIZE, type Node } from '@/lib/quotes/how-it-works';
@@ -69,7 +69,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
     { id: 'howitworks', label: 'How your system works' },
     ...(mcsTable(o).length ? [{ id: 'mcs', label: 'MCS performance estimate' }] : []),
     ...(data.pictures.sunpath ? [{ id: 'sunpath', label: 'Sun path and shading' }] : []),
-    ...(money ? [{ id: 'prices', label: 'Try your own energy prices' }] : []),
+    ...(money ? [{ id: 'prices', label: 'Your energy prices and savings' }] : []),
     ...(data.about ? [{ id: 'about', label: 'About Heliaxis' }] : []),
     ...(data.survey ? [{ id: 'survey', label: 'Structural requirements and survey' }] : []),
   ];
@@ -86,35 +86,175 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
     ...(o.batteryModel || o.batteryUsableKwh ? [{ kind: 'Battery storage', title: [o.batteryModules && o.batteryModules > 1 ? `${o.batteryModules} ×` : '', o.batteryBrand, o.batteryModel].filter(Boolean).join(' '), spec: o.batteryUsableKwh ? `${kw(o.batteryUsableKwh)} kWh usable` : '', warranty: o.batteryWarrantyYears ? `${o.batteryWarrantyYears}-year warranty` : '', img: data.pictures.battery }] : []),
   ];
 
+  // The way in: a greeting, the introduction, and the chance to confirm their energy costs before the proposal opens.
+  const [stage, setStage] = useState<'welcome' | 'tariff' | 'proposal'>('welcome');
+  const greeting = useSyncExternalStore(
+    () => () => undefined,
+    () => {
+      const h = new Date().getHours();
+      return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    },
+    () => 'Hello'
+  );
+  useEffect(() => {
+    if (stage === 'proposal') return;
+    const was = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = was;
+    };
+  }, [stage]);
+
+  // Where the reader has got to: the section in view, and how far through the whole proposal they are.
+  const scroller = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState('');
+  const [progress, setProgress] = useState(0);
+  const ids = contents.map((c) => c.id).join('|');
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const list = ids ? ids.split('|') : [];
+    const update = () => {
+      const inner = getComputedStyle(sc).overflowY === 'auto' && sc.scrollHeight > sc.clientHeight + 1;
+      const top = inner ? sc.getBoundingClientRect().top : 0;
+      let cur = list[0] ?? '';
+      for (const id of list) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top - top <= 140) cur = id;
+      }
+      const max = inner ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - window.innerHeight;
+      const pos = inner ? sc.scrollTop : window.scrollY;
+      if (max > 0 && pos >= max - 4) cur = list[list.length - 1] ?? cur;
+      setActive(cur);
+      setProgress(max > 0 ? Math.min(1, Math.max(0, pos / max)) : 0);
+    };
+    update();
+    sc.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      sc.removeEventListener('scroll', update);
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [ids]);
+  const jump = (id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const activeAt = Math.max(0, contents.findIndex((c) => c.id === active));
+  const intro = introBody(data.intro);
+
   return (
     <div className="pt ip">
+      {stage !== 'proposal' && (
+        <div className="ip-gate" role="dialog" aria-modal="true" aria-label="Welcome">
+          <div className="ip-gate-card">
+            <BrandLogo width={128} />
+            {stage === 'welcome' ? (
+              <>
+                <h1>
+                  {greeting} {data.first},
+                </h1>
+                {intro.map((p) => (
+                  <p key={p}>{p}</p>
+                ))}
+                {money ? (
+                  <>
+                    <p>We have added your estimated energy costs, but you can confirm them by hitting the button below, or press skip to get straight into your proposal.</p>
+                    <ul className="ip-assume">
+                      <li>{proposalTariff.mode === 'flat' ? `${proposalTariff.flatPence}p per kWh` : `${proposalTariff.dayPence}p day, ${proposalTariff.nightPence}p night per kWh`}</li>
+                      <li>{proposalTariff.standingPencePerDay}p a day standing charge</li>
+                      <li>{proposalTariff.exportPence}p per kWh for power you export</li>
+                    </ul>
+                    <div className="pt-row">
+                      <button type="button" className="pt-btn ghost" onClick={() => setStage('proposal')}>
+                        Skip
+                      </button>
+                      <button type="button" className="pt-btn" onClick={() => setStage('tariff')}>
+                        Enter my tariff
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="pt-row">
+                    <button type="button" className="pt-btn" onClick={() => setStage('proposal')}>
+                      View my proposal
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              r &&
+              basis &&
+              theirs && (
+                <>
+                  <h1>Your energy costs</h1>
+                  <p className="pt-muted">Change these to match your bill and the figures update straight away. Nothing here changes your quote.</p>
+                  <TariffEditor t={t} edit={edit} />
+                  <div className="ip-tiles ip-results" aria-live="polite">
+                    <Result v={gbp(r.yearOneGbp)} l="Saved in year one" was={changed ? gbp(theirs.yearOneGbp) : null} />
+                    <Result v={paybackWords(r.paybackYears)} l="Payback" was={changed ? paybackWords(theirs.paybackYears) : null} />
+                  </div>
+                  <div className="pt-row">
+                    {changed && (
+                      <button type="button" className="pt-btn ghost" onClick={() => setT(proposalTariff)}>
+                        Back to the design’s prices
+                      </button>
+                    )}
+                    <button type="button" className="pt-btn" onClick={() => setStage('proposal')}>
+                      Show my proposal
+                    </button>
+                  </div>
+                </>
+              )
+            )}
+          </div>
+        </div>
+      )}
       <header className="pt-head">
         <BrandLogo width={128} />
         <span className="pt-head-tag">Your proposal</span>
       </header>
-      <main className="pt-main ip-main">
-        {back && (
-          <a className="ip-back" href={back.href}>
-            ← {back.label}
-          </a>
-        )}
-        <section className="pt-hello">
-          <h1>Hi {data.first}</h1>
-          <p>
-            {data.title} · {data.quoteNumber}
-          </p>
-        </section>
+      <div className="ip-shell">
+        <aside className="ip-side">
+          {back && (
+            <a className="ip-back" href={back.href}>
+              ← {back.label}
+            </a>
+          )}
+          <nav className="pt-card ip-toc" aria-label="Contents">
+            <h2>Contents</h2>
+            <div className="ip-bar-top" role="progressbar" aria-label="How far through your proposal" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
+              <i style={{ width: `${progress * 100}%` }} />
+            </div>
+            <ul>
+              {contents.map((c, i) => (
+                <li key={c.id} className={c.id === active ? 'on' : i < activeAt ? 'done' : ''}>
+                  <a href={`#${c.id}`} onClick={jump(c.id)} aria-current={c.id === active ? 'true' : undefined}>
+                    {c.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="ip-accred-side">
+            <small>Accredited and certified</small>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/assets/heliaxis-accreditations-light.png" alt="MCS Certified, TrustMark, NAPIT, RECC and SSIP" />
+          </div>
+        </aside>
 
-        <nav className="pt-card ip-toc" aria-label="Contents">
-          <h2>Contents</h2>
-          <ul>
-            {contents.map((c) => (
-              <li key={c.id}>
-                <a href={`#${c.id}`}>{c.label}</a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <div className="ip-scroll" ref={scroller}>
+          <main className="pt-main ip-main">
+            <section className="pt-hello">
+              <h1>
+                {greeting} {data.first}
+              </h1>
+              <p>
+                {data.title} · {data.quoteNumber}
+              </p>
+            </section>
 
         {tiles.length > 0 && (
           <div className="ip-tiles" id="design" data-track="design">
@@ -187,11 +327,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           <section className="pt-card" id="howitworks" data-track="howitworks">
             <h2>How your system works</h2>
             <p className="pt-muted">Where your electricity comes from and goes, through the day.</p>
-            <div className="ip-flows">
-              {howItWorks(!!(o.batteryUsableKwh || o.batteryModel)).map((st) => (
-                <FlowPanel key={st.title} state={st} hasBattery={!!(o.batteryUsableKwh || o.batteryModel)} />
-              ))}
-            </div>
+            <FlowDiagram states={howItWorks(!!(o.batteryUsableKwh || o.batteryModel))} hasBattery={!!(o.batteryUsableKwh || o.batteryModel)} />
           </section>
         )}
 
@@ -240,38 +376,21 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
 
         {money && r && basis && theirs && (
           <section className="pt-card ip-money" id="prices" data-track="prices">
-            <h2>Try your own energy prices</h2>
-            <p className="pt-muted">The figures below start from the design’s own assumptions. Change them to match your bill and see what it does to your saving, your payback and your return. Nothing here changes your quote.</p>
-
-            <div className="ip-seg" role="group" aria-label="How you are charged">
-              <button type="button" className={t.mode === 'flat' ? 'on' : ''} aria-pressed={t.mode === 'flat'} onClick={() => edit({ mode: 'flat' })}>
-                One price all day
+            <h2>Your energy prices and savings</h2>
+            <p className="pt-muted">
+              Worked from {t.mode === 'flat' ? `${t.flatPence}p per kWh` : `${t.dayPence}p day, ${t.eveningPence}p evening and ${t.nightPence}p night per kWh`}, a {t.standingPencePerDay}p a day standing charge, {t.exportPence}p per kWh for export and a {t.risePct}% yearly price rise
+              {changed ? ', as you entered them' : ', the design’s own assumptions'}.
+            </p>
+            <div className="pt-row">
+              <button type="button" className="pt-btn ghost" onClick={() => setStage('tariff')}>
+                Change my prices
               </button>
-              <button type="button" className={t.mode === 'tou' ? 'on' : ''} aria-pressed={t.mode === 'tou'} onClick={() => edit({ mode: 'tou' })}>
-                Time of use tariff
-              </button>
-            </div>
-
-            <div className="ip-fields">
-              {t.mode === 'flat' ? (
-                <Field label="Unit price (pence per kWh)" value={t.flatPence} onChange={(v) => edit({ flatPence: v, dayPence: v, eveningPence: v, nightPence: v })} />
-              ) : (
-                <>
-                  <Field label="Day rate (pence per kWh)" hint="What your panels use directly is worth this." value={t.dayPence} onChange={(v) => edit({ dayPence: v })} />
-                  <Field label="Evening rate (pence per kWh)" hint="What your battery supplies is worth this." value={t.eveningPence} onChange={(v) => edit({ eveningPence: v })} />
-                  <Field label="Night rate (pence per kWh)" hint="Shown for your bill; night-time battery charging isn’t modelled." value={t.nightPence} onChange={(v) => edit({ nightPence: v })} />
-                </>
+              {changed && (
+                <button type="button" className="pt-btn ghost" onClick={() => setT(proposalTariff)}>
+                  Back to the design’s prices
+                </button>
               )}
-              <Field label="Standing charge (pence per day)" hint="The same with or without solar, so it changes your bills, not your saving." value={t.standingPencePerDay} onChange={(v) => edit({ standingPencePerDay: v })} />
-              <Field label="Paid for export (pence per kWh)" hint="What your supplier pays for power sent to the grid." value={t.exportPence} onChange={(v) => edit({ exportPence: v })} />
-              <Field label="Yearly price rise (%)" hint="How fast you expect electricity to get dearer." value={t.risePct} onChange={(v) => edit({ risePct: v })} />
             </div>
-            {changed && (
-              <button type="button" className="pt-btn ghost" onClick={() => setT(proposalTariff)}>
-                Back to the design’s prices
-              </button>
-            )}
-
             <div className="ip-tiles ip-results" aria-live="polite">
               <Result v={gbp(r.yearOneGbp)} l="Saved in year one" was={changed ? gbp(theirs.yearOneGbp) : null} />
               <Result v={paybackWords(r.paybackYears)} l="Payback" was={changed ? paybackWords(theirs.paybackYears) : null} />
@@ -294,19 +413,28 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           <section className="pt-card ip-about" id="about" data-track="about">
             <h2>About Heliaxis</h2>
             <div className="ip-about-body">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/heliaxis-about-callum.jpg" alt="Callum Hiscott, Heliaxis" />
-              <div>
-                {data.about.split(/\n{2,}/).map((p) => (
-                  <p key={p}>{p}</p>
-                ))}
-                <small>Callum Hiscott<br />Managing Director, Heliaxis</small>
+              <figure className="ip-about-photo">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/heliaxis-about-callum.jpg" alt="Callum Hiscott, Managing Director of Heliaxis" />
+                <figcaption>
+                  <b>Callum Hiscott</b>
+                  <span>Managing Director, Heliaxis</span>
+                </figcaption>
+              </figure>
+              <div className="ip-about-text">
+                {data.about.split(/\n{2,}/).map((p, i) =>
+                  /^I believed it could be done better/i.test(p) ? (
+                    <blockquote key={p}>{p}</blockquote>
+                  ) : (
+                    <p key={p} className={i === 0 ? 'lead' : undefined}>
+                      {p}
+                    </p>
+                  )
+                )}
               </div>
             </div>
-            <div className="ip-accred">
-              <h3>Accredited and certified</h3>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/heliaxis-accreditations-light.png" alt="MCS Certified, TrustMark, NAPIT, RECC and SSIP" />
+            <div className="ip-mcs-box">
+              <h3>What MCS certification means</h3>
               <p>{MCS_EXPLAINED}</p>
             </div>
           </section>
@@ -324,8 +452,50 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         <p className="pt-foot ip-foot">
           This system has been designed in third-party design software (OpenSolar). The key data points in this proposal have been extracted from that design and presented fairly. Figures are estimates, not guarantees. This proposal is subject to the terms and conditions in your quote.
         </p>
-      </main>
+          </main>
+        </div>
+      </div>
     </div>
+  );
+}
+
+/** The introduction without its greeting and sign-off (the page greets them itself). */
+function introBody(intro: string | null): string[] {
+  if (!intro) return [];
+  const paras = intro.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (paras[0] && /^(hi|hello|dear)\b[^.!?]{0,40},?$/i.test(paras[0])) paras.shift();
+  else if (paras[0]) paras[0] = paras[0].replace(/^(hi|hello|dear)\s+[^,.\n]{1,40},\s*/i, '');
+  while (paras.length && /^(yours|kind regards|best regards|regards|many thanks|thanks|heliaxis$)/i.test(paras[paras.length - 1])) paras.pop();
+  if (paras[0]) paras[0] = paras[0].charAt(0).toUpperCase() + paras[0].slice(1);
+  return paras;
+}
+
+function TariffEditor({ t, edit }: { t: Tariff; edit: (patch: Partial<Tariff>) => void }) {
+  return (
+    <>
+      <div className="ip-seg" role="group" aria-label="How you are charged">
+        <button type="button" className={t.mode === 'flat' ? 'on' : ''} aria-pressed={t.mode === 'flat'} onClick={() => edit({ mode: 'flat' })}>
+          One price all day
+        </button>
+        <button type="button" className={t.mode === 'tou' ? 'on' : ''} aria-pressed={t.mode === 'tou'} onClick={() => edit({ mode: 'tou' })}>
+          Time of use tariff
+        </button>
+      </div>
+      <div className="ip-fields">
+        {t.mode === 'flat' ? (
+          <Field label="Unit price (pence per kWh)" value={t.flatPence} onChange={(v) => edit({ flatPence: v, dayPence: v, eveningPence: v, nightPence: v })} />
+        ) : (
+          <>
+            <Field label="Day rate (pence per kWh)" hint="What your panels use directly is worth this." value={t.dayPence} onChange={(v) => edit({ dayPence: v })} />
+            <Field label="Evening rate (pence per kWh)" hint="What your battery supplies is worth this." value={t.eveningPence} onChange={(v) => edit({ eveningPence: v })} />
+            <Field label="Night rate (pence per kWh)" hint="Shown for your bill; night-time battery charging isn’t modelled." value={t.nightPence} onChange={(v) => edit({ nightPence: v })} />
+          </>
+        )}
+        <Field label="Standing charge (pence per day)" hint="The same with or without solar, so it changes your bills, not your saving." value={t.standingPencePerDay} onChange={(v) => edit({ standingPencePerDay: v })} />
+        <Field label="Paid for export (pence per kWh)" hint="What your supplier pays for power sent to the grid." value={t.exportPence} onChange={(v) => edit({ exportPence: v })} />
+        <Field label="Yearly price rise (%)" hint="How fast you expect electricity to get dearer." value={t.risePct} onChange={(v) => edit({ risePct: v })} />
+      </div>
+    </>
   );
 }
 
@@ -370,7 +540,10 @@ function Cover({ label, pct, strong }: { label: string; pct: number; strong?: bo
   );
 }
 
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 function GenerationChart({ gen, use }: { gen: number[]; use: number[] | null }) {
+  const [hi, setHi] = useState<number | null>(null);
   const W = 600;
   const H = 210;
   const base = H - 24;
@@ -378,45 +551,67 @@ function GenerationChart({ gen, use }: { gen: number[]; use: number[] | null }) 
   const max = Math.max(...gen, ...(use ?? []), 1);
   const y = (v: number) => base - ((base - top) * v) / max;
   const col = W / 12;
+  const diff = hi !== null && use ? gen[hi] - use[hi] : null;
   return (
-    <svg className="ip-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Monthly generation against use">
-      <line x1="0" y1={base} x2={W} y2={base} stroke="currentColor" strokeOpacity="0.2" />
-      {gen.map((v, i) => (
-        <g key={i}>
-          <rect x={i * col + col * 0.2} y={y(v)} width={col * 0.6} height={Math.max(1, base - y(v))} fill="#F8BC1E" />
-          <text x={i * col + col / 2} y={base + 14} textAnchor="middle" fontSize="10" fill="currentColor" opacity="0.6">
-            {MONTHS[i]}
-          </text>
-          <text x={i * col + col / 2} y={y(v) - 4} textAnchor="middle" fontSize="9" fill="currentColor" opacity="0.75">
-            {n0(v)}
-          </text>
-        </g>
-      ))}
-      {use && (
-        <>
-          <polyline points={use.map((v, i) => `${i * col + col / 2},${y(v)}`).join(' ')} fill="none" stroke="#211F18" strokeWidth="2" strokeLinejoin="round" />
-          {use.map((v, i) => (
-            <rect key={i} x={i * col + col / 2 - 2.5} y={y(v) - 2.5} width="5" height="5" fill="#211F18" />
-          ))}
-        </>
+    <div className="ip-chartwrap" onMouseLeave={() => setHi(null)}>
+      <svg className="ip-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Monthly generation against use. Hover or tap a month for its figures.">
+        <line x1="0" y1={base} x2={W} y2={base} stroke="currentColor" strokeOpacity="0.2" />
+        {gen.map((v, i) => (
+          <g key={i}>
+            {hi === i && <rect x={i * col} y={top - 6} width={col} height={base - top + 6} fill="#F8BC1E" opacity="0.16" />}
+            <rect x={i * col + col * 0.2} y={y(v)} width={col * 0.6} height={Math.max(1, base - y(v))} fill={hi === i ? '#C77F04' : '#F8BC1E'} />
+            <text x={i * col + col / 2} y={base + 14} textAnchor="middle" fontSize="10" fill="currentColor" opacity={hi === i ? 1 : 0.6} fontWeight={hi === i ? 700 : 400}>
+              {MONTHS[i]}
+            </text>
+            <text x={i * col + col / 2} y={y(v) - 4} textAnchor="middle" fontSize="9" fill="currentColor" opacity="0.75">
+              {n0(v)}
+            </text>
+          </g>
+        ))}
+        {use && (
+          <>
+            <polyline points={use.map((v, i) => `${i * col + col / 2},${y(v)}`).join(' ')} fill="none" stroke="#211F18" strokeWidth="2" strokeLinejoin="round" />
+            {use.map((v, i) => (
+              <rect key={i} x={i * col + col / 2 - (hi === i ? 4 : 2.5)} y={y(v) - (hi === i ? 4 : 2.5)} width={hi === i ? 8 : 5} height={hi === i ? 8 : 5} fill="#211F18" />
+            ))}
+          </>
+        )}
+        <rect x="0" y="0" width="9" height="7" fill="#F8BC1E" />
+        <text x="14" y="7" fontSize="10" fill="currentColor">
+          Generated
+        </text>
+        {use && (
+          <>
+            <line x1="80" y1="4" x2="96" y2="4" stroke="#211F18" strokeWidth="2" />
+            <text x="100" y="7" fontSize="10" fill="currentColor">
+              Your use
+            </text>
+          </>
+        )}
+        {gen.map((_, i) => (
+          <rect key={i} className="ip-hit" x={i * col} y="0" width={col} height={H} fill="transparent" tabIndex={0} role="button" aria-label={`${MONTHS_LONG[i]}: generated ${n0(gen[i])} kWh${use ? `, you use ${n0(use[i])} kWh` : ''}`} onMouseEnter={() => setHi(i)} onFocus={() => setHi(i)} onBlur={() => setHi(null)} onClick={() => setHi(i)} />
+        ))}
+      </svg>
+      {hi !== null && (
+        <div className="ip-tip" style={{ left: `${Math.min(84, Math.max(16, ((hi + 0.5) / 12) * 100))}%` }} role="status">
+          <b>{MONTHS_LONG[hi]}</b>
+          <span>
+            <i className="g" /> Generated <b>{n0(gen[hi])} kWh</b>
+          </span>
+          {use && (
+            <span>
+              <i className="u" /> You use <b>{n0(use[hi])} kWh</b>
+            </span>
+          )}
+          {diff !== null && <em>{diff >= 0 ? `${n0(diff)} kWh more than you use` : `${n0(-diff)} kWh less than you use`}</em>}
+        </div>
       )}
-      <rect x="0" y="0" width="9" height="7" fill="#F8BC1E" />
-      <text x="14" y="7" fontSize="10" fill="currentColor">
-        Generated
-      </text>
-      {use && (
-        <>
-          <line x1="80" y1="4" x2="96" y2="4" stroke="#211F18" strokeWidth="2" />
-          <text x="100" y="7" fontSize="10" fill="currentColor">
-            Your use
-          </text>
-        </>
-      )}
-    </svg>
+    </div>
   );
 }
 
 function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: number; payback: number | null }) {
+  const [hi, setHi] = useState<number | null>(null);
   const W = 600;
   const H = 230;
   const left = 44;
@@ -430,6 +625,7 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
   const zero = y(0);
   const ticks = [min, 0, max].filter((v, i, a) => a.indexOf(v) === i);
   return (
+    <div className="ip-chartwrap" onMouseLeave={() => setHi(null)}>
     <svg className="ip-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Cumulative net saving by year">
       <text x="0" y="10" fontSize="11" fontWeight="700" fill="currentColor">
         Cumulative net saving, year by year
@@ -444,7 +640,7 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
       ))}
       {cum.map((v, i) => (
         <g key={i}>
-          <rect x={left + i * col + col * 0.17} y={Math.min(y(v), zero)} width={col * 0.66} height={Math.max(1, Math.abs(y(v) - zero))} fill={v >= 0 ? '#F8BC1E' : '#c9c4b8'} />
+          <rect x={left + i * col + col * 0.17} y={Math.min(y(v), zero)} width={col * 0.66} height={Math.max(1, Math.abs(y(v) - zero))} fill={hi === i ? '#C77F04' : v >= 0 ? '#F8BC1E' : '#c9c4b8'} />
           {(i % 2 === 0 || i === cum.length - 1) && (
             <text x={left + i * col + col / 2} y={base + 14} textAnchor="middle" fontSize="9" fill="currentColor" opacity="0.6">
               {firstYear + i}
@@ -465,40 +661,110 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
           </text>
         </g>
       )}
+      {cum.map((_, i) => (
+        <rect key={`h${i}`} className="ip-hit" x={left + i * col} y="0" width={col} height={H} fill="transparent" tabIndex={0} role="button" aria-label={`${firstYear + i}: ${gbp(cum[i])} cumulative net saving`} onMouseEnter={() => setHi(i)} onFocus={() => setHi(i)} onBlur={() => setHi(null)} onClick={() => setHi(i)} />
+      ))}
     </svg>
+      {hi !== null && (
+        <div className="ip-tip" style={{ left: `${Math.min(84, Math.max(16, ((left + (hi + 0.5) * col) / W) * 100))}%` }} role="status">
+          <b>{firstYear + hi}</b>
+          <span>
+            Year {hi + 1}: <b>{gbp(cum[hi])}</b> in total
+          </span>
+          {hi > 0 && <em>{gbp(cum[hi] - cum[hi - 1])} that year</em>}
+        </div>
+      )}
+    </div>
   );
 }
 
-function FlowPanel({ state, hasBattery }: { state: ReturnType<typeof howItWorks>[number]; hasBattery: boolean }) {
+/**
+ * One diagram that plays through the day: sun, evening, night. Energy travels along the lines as moving dots, the parts light up or rest,
+ * and it moves on by itself every few seconds until the reader picks a moment.
+ */
+function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWorks>; hasBattery: boolean }) {
+  const [idx, setIdx] = useState(0);
+  const [picked, setPicked] = useState(false);
+  useEffect(() => {
+    if (picked) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % states.length), 6000);
+    return () => clearInterval(t);
+  }, [picked, states.length]);
+  const state = states[idx];
   const nodes: Node[] = hasBattery ? ['home', 'solar', 'grid', 'battery'] : ['home', 'solar', 'grid'];
   const h = NODE_SIZE / 2;
+  const uid = useId().replace(/:/g, '');
   return (
-    <div className="ip-flow">
-      <small>{state.title}</small>
-      <svg viewBox="0 0 160 160" role="img" aria-label={`${state.title}: ${state.caption}`}>
+    <div className="ip-flowbox">
+      <div className="ip-flowtabs" role="tablist" aria-label="Moment of the day">
+        {states.map((st, i) => (
+          <button
+            key={st.title}
+            type="button"
+            role="tab"
+            aria-selected={i === idx}
+            className={i === idx ? 'on' : ''}
+            onClick={() => {
+              setPicked(true);
+              setIdx(i);
+            }}
+          >
+            {st.title}
+          </button>
+        ))}
+      </div>
+      <svg className="ip-flowsvg" viewBox="0 0 160 160" role="img" aria-label={`${state.title}: ${state.caption}`}>
         <defs>
-          <marker id={`arr-${state.title.length}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+          <marker id={`arr-${uid}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
             <path d="M0 0 L8 4 L0 8 z" fill="#C77F04" />
           </marker>
         </defs>
         {state.flows.map(([a, b]) => {
           const ar = arrow(a, b);
-          return <line key={`${a}${b}`} x1={ar.x1} y1={ar.y1 + 6} x2={ar.x2} y2={ar.y2 + 6} stroke="#C77F04" strokeWidth="2" markerEnd={`url(#arr-${state.title.length})`} />;
+          const path = `M${ar.x1} ${ar.y1 + 6} L${ar.x2} ${ar.y2 + 6}`;
+          return (
+            <g key={`${idx}${a}${b}`}>
+              <path d={path} stroke="#C77F04" strokeOpacity="0.35" strokeWidth="1.6" fill="none" markerEnd={`url(#arr-${uid})`} />
+              {[0, 0.5, 1].map((d) => (
+                <circle key={d} className="ip-dot" r="2.4" fill="#F8BC1E" stroke="#C77F04" strokeWidth="0.6">
+                  <animateMotion dur="1.5s" begin={`${d}s`} repeatCount="indefinite" path={path} />
+                </circle>
+              ))}
+            </g>
+          );
         })}
         {nodes.map((n) => {
           const c = { x: NODE_AT[n].x, y: NODE_AT[n].y + 6 };
           const off = state.off.includes(n);
           return (
-            <g key={n}>
-              <rect x={c.x - h} y={c.y - h} width={NODE_SIZE} height={NODE_SIZE} fill={off ? '#e1ded6' : '#F8BC1E'} />
-              <text x={c.x} y={n === 'home' ? c.y - h - 3 : c.y + h + 9} textAnchor="middle" fontSize="7" letterSpacing="0.6" fill="currentColor" opacity="0.7">
+            <g key={n} className={off ? 'ip-node off' : 'ip-node'}>
+              <rect x={c.x - h} y={c.y - h} width={NODE_SIZE} height={NODE_SIZE} rx="2" />
+              <g className="ip-ic" transform={`translate(${c.x} ${c.y})`} fill="none" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                {n === 'home' && <path d="M-8 1 L0 -7 L8 1 M-5.5 0 V8 H5.5 V0" />}
+                {n === 'solar' && (
+                  <>
+                    <circle r="3.4" />
+                    <path d="M0 -8 V-6 M0 6 V8 M-8 0 H-6 M6 0 H8 M-5.6 -5.6 L-4.4 -4.4 M4.4 4.4 L5.6 5.6 M-5.6 5.6 L-4.4 4.4 M4.4 -4.4 L5.6 -5.6" />
+                  </>
+                )}
+                {n === 'grid' && <path d="M0 -9 L-6 9 M0 -9 L6 9 M-3.5 0 H3.5 M-5 5 H5 M-8 -4 H8" />}
+                {n === 'battery' && (
+                  <>
+                    <rect x="-8" y="-5" width="14" height="10" rx="1" />
+                    <path d="M8 -2 V2 M-4 -2 V2 M0 -2 V2" />
+                  </>
+                )}
+              </g>
+              <text x={c.x} y={n === 'home' ? c.y - h - 3 : c.y + h + 9} textAnchor="middle" fontSize="7.5" letterSpacing="0.6" fill="currentColor" opacity="0.8">
                 {NODE_LABEL[n].toUpperCase()}
               </text>
             </g>
           );
         })}
       </svg>
-      <p>{state.caption}</p>
+      <p key={idx} className="ip-flowcap">
+        {state.caption}
+      </p>
     </div>
   );
 }
