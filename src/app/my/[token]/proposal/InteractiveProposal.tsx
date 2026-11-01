@@ -220,15 +220,17 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
     <div className="pt ip">
       {stage !== 'proposal' && (
         <div className="ip-gate" role="dialog" aria-modal="true" aria-label="Welcome">
-          <div className="ip-gate-card">
+          <div className={`ip-gate-card${stage === 'welcome' ? ' welcome' : ''}`}>
             <BrandLogo width={128} />
             {stage === 'welcome' ? (
               <>
                 <h1>
                   {greeting} {data.first},
                 </h1>
-                {intro.map((p) => (
-                  <p key={p}>{p}</p>
+                {intro.map((p, i) => (
+                  <p key={p} className={i > 0 ? 'ip-more' : undefined}>
+                    {p}
+                  </p>
                 ))}
                 {money ? (
                   <>
