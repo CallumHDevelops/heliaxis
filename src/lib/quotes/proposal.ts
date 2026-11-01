@@ -1,3 +1,4 @@
+import { recordAi } from '@/lib/ai-usage';
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { PDFDocument } from 'pdf-lib';
@@ -108,7 +109,7 @@ async function firstPages(bytes: Uint8Array): Promise<Uint8Array> {
 
 export const proposalConfigured = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
-export async function readProposal(bytes: Uint8Array): Promise<{ ok: true; options: ProposalOption[] } | { ok: false; error: string }> {
+export async function readProposal(bytes: Uint8Array, ref?: string): Promise<{ ok: true; options: ProposalOption[] } | { ok: false; error: string }> {
   if (!proposalConfigured()) return { ok: false, error: 'The writing assistant isn’t switched on yet (it needs the ANTHROPIC_API_KEY in Vercel).' };
   try {
     const data = Buffer.from(await firstPages(bytes)).toString('base64');
@@ -120,6 +121,7 @@ export async function readProposal(bytes: Uint8Array): Promise<{ ok: true; optio
       },
       { timeout: 45_000 }
     );
+    await recordAi('proposal_read', res.model, res.usage, ref);
     if (res.stop_reason === 'refusal') return { ok: false, error: 'It couldn’t read that file.' };
     const last = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').at(-1)?.text;
     const json = last && last.slice(last.indexOf('{'), last.lastIndexOf('}') + 1);

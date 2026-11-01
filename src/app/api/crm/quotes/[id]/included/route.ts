@@ -12,7 +12,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
   const b = (await req.json().catch(() => ({}))) as { content?: unknown; options?: Partial<IncludedOptions>; intro?: { first?: string; site?: string } };
   if (b.intro) {
-    const t = await writeIntro(cleanContent(b.content), String(b.intro.first ?? '').slice(0, 60), String(b.intro.site ?? '').slice(0, 160));
+    const t = await writeIntro(cleanContent(b.content), String(b.intro.first ?? '').slice(0, 60), String(b.intro.site ?? '').slice(0, 160), id);
     if (!t.text) return json({ error: 'Add some items to the quote, or upload the design proposal, then it can write the introduction.' }, 400);
     return json(t);
   }
@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     compliance: o.compliance ?? DEFAULT_OPTIONS.compliance,
     keyPoints: typeof o.keyPoints === 'string' ? o.keyPoints.slice(0, 600) : '',
   };
-  const out = await writeIncluded(cleanContent(b.content), opts);
+  const out = await writeIncluded(cleanContent(b.content), opts, id);
   if (!out.text) return json({ error: 'Add some items to the quote, or upload the design proposal, then it can write what is included.' }, 400);
   return json(out);
 }

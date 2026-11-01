@@ -1,3 +1,4 @@
+import { recordAi } from '@/lib/ai-usage';
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
@@ -39,6 +40,7 @@ export async function readMcsNumber(bytes: Uint8Array, mime: string): Promise<st
       },
       { timeout: 15_000 }
     );
+    await recordAi('mcs_read', res.model, res.usage);
     if (res.stop_reason === 'refusal') return null;
     const last = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').at(-1)?.text;
     const parsed = last ? McsRead.safeParse(JSON.parse(last)) : null;

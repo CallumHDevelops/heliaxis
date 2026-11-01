@@ -32,6 +32,7 @@ type Tab =
   | 'blog'
   | 'analytics'
   | 'heatmap'
+  | 'aicosts'
   | 'subcontractors'
   | 'tasks'
   | 'assistant'
@@ -433,6 +434,7 @@ export async function AdminShell({
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms') },
         { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics') },
         { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics') },
+        { href: '/admin/analytics/ai', label: 'AI costs', icon: icons.analytics, active: active === 'aicosts', show: admin },
       ],
     },
     {

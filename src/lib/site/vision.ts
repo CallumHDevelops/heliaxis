@@ -1,3 +1,4 @@
+import { recordAi } from '@/lib/ai-usage';
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
@@ -73,6 +74,7 @@ export async function readLabel(bytes: Buffer, mime: string, key: string): Promi
       },
     ],
   });
+  await recordAi('label_read', res.model, res.usage);
   if (res.stop_reason === 'refusal') return { refused: true };
   const texts = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text');
   const last = texts.at(-1)?.text;

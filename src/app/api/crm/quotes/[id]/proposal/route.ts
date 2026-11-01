@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     bytes = new Uint8Array(await file.arrayBuffer());
     fileName = file.name;
   }
-  const out = await readProposal(bytes);
+  const out = await readProposal(bytes, id);
   if (!out.ok) return json({ error: out.error }, 422);
   // The pictures on each option's own page (and its sun-path diagram) are kept with the quote, so the design pages can show them.
   await ensureDocsBucket().catch(() => null);

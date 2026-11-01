@@ -1,3 +1,4 @@
+import { recordAi } from '@/lib/ai-usage';
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { TOOLS, runTool, type Actor, type AssistantAction } from './tools';
@@ -80,6 +81,7 @@ export async function runAssistant(history: Msg[], text: string, me: Actor): Pro
       messages,
     });
 
+    await recordAi('assistant', res.model, res.usage);
     if (res.stop_reason === 'refusal') {
       // Nothing from a refused turn is kept; the user can rephrase.
       reply = 'Sorry — I can’t help with that one. Try rewording it.';

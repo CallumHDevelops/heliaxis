@@ -1,3 +1,4 @@
+import { recordAi } from '@/lib/ai-usage';
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { factsText } from './proposal';
@@ -139,7 +140,7 @@ export function finished(res: { stop_reason: string | null; content: { type: str
   return /[.!?”"’)]$|Heliaxis$/.test(t) ? t : null;
 }
 
-export async function writeIncluded(content: QuoteContent, o: IncludedOptions = DEFAULT_OPTIONS): Promise<{ text: string; via: 'ai' | 'rules' }> {
+export async function writeIncluded(content: QuoteContent, o: IncludedOptions = DEFAULT_OPTIONS, ref?: string): Promise<{ text: string; via: 'ai' | 'rules' }> {
   const items = itemsOf(content);
   if (!items.length) return { text: '', via: 'rules' };
   const fallback = { text: includedByRule(content, o), via: 'rules' as const };
@@ -153,6 +154,7 @@ export async function writeIncluded(content: QuoteContent, o: IncludedOptions = 
       system: SYSTEM,
       messages: [{ role: 'user', content: `The quote's items:\n${list}${proposalOf(content) ? `\n\nFacts from the design proposal (use them to describe the equipment and its warranties accurately):\n${proposalOf(content)!.facts}` : ''}${kp ? `\n\nKey points to include (from the person writing the quote):\n${kp}` : ''}` }],
     });
+    await recordAi('quote_included', res.model, res.usage, ref);
     const eq = finished(res);
     return eq ? { text: [eq, ...standardClauses(o)].join('\n\n'), via: 'ai' } : fallback;
   } catch {
@@ -178,7 +180,7 @@ export function introByRule(content: QuoteContent, first: string, site: string):
   ].join('\n\n');
 }
 
-export async function writeIntro(content: QuoteContent, first: string, site: string): Promise<{ text: string; via: 'ai' | 'rules' }> {
+export async function writeIntro(content: QuoteContent, first: string, site: string, ref?: string): Promise<{ text: string; via: 'ai' | 'rules' }> {
   const items = itemsOf(content).filter((i) => !i.note);
   if (!items.length) return { text: '', via: 'rules' };
   const fallback = { text: introByRule(content, first, site), via: 'rules' as const };
@@ -191,6 +193,7 @@ export async function writeIntro(content: QuoteContent, first: string, site: str
       system: INTRO_SYSTEM,
       messages: [{ role: 'user', content: `Customer first name: ${first || '(none)'}\nSite: ${site || '(not given)'}\nItems:\n${list}${proposalOf(content) ? `\n\nFacts from the design proposal:\n${proposalOf(content)!.facts}` : ''}` }],
     });
+    await recordAi('quote_intro', res.model, res.usage, ref);
     const text = finished(res);
     return text ? { text, via: 'ai' } : fallback;
   } catch {

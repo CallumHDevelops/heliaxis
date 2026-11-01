@@ -1,3 +1,4 @@
+import { recordAi } from '@/lib/ai-usage';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
 import { cmsArticleAiSchema, type CmsArticleAi } from './cms-article-template';
@@ -128,6 +129,7 @@ export async function generateBlogPost(prompt: string, opts: { keyword?: string;
           },
         ],
       });
+      await recordAi('blog', res.model, res.usage);
       const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('');
       return text ? { text, finish: res.stop_reason === 'max_tokens' ? 'length' : 'stop' } : { err: 'empty response' };
     } catch (e) {

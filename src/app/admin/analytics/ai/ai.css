@@ -1,0 +1,15 @@
+.ac { max-width: 1000px; margin: 0 auto; padding: 24px 16px 60px; color: var(--text); }
+.ac h1 { margin: 0 0 6px; font-size: 1.5rem; }
+.ac h2 { margin: 28px 0 6px; font-size: 1.1rem; }
+.ac-muted { color: var(--muted); font-size: 0.88rem; line-height: 1.5; margin: 0 0 10px; }
+.ac-warn { padding: 12px 14px; border-radius: 8px; background: var(--accent-soft); font-size: 0.9rem; }
+.ac-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 16px 0 6px; }
+.ac-tiles > div { padding: 14px 16px; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--raised); display: grid; gap: 4px; }
+.ac-tiles small { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.ac-tiles b { font-size: 1.5rem; }
+.ac-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--raised); }
+.ac table { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+.ac th { text-align: left; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.ac td { padding: 10px 14px; border-top: 1px solid var(--border-soft); white-space: nowrap; }
+.ac th:not(:first-child), .ac td:not(:first-child) { text-align: right; }
+.ac td a { font-weight: 700; color: inherit; }
