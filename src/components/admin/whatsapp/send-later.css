@@ -299,6 +299,10 @@
 .wsl-row > .wa-input {
   flex: 1;
   min-width: 0;
+  /* A roomier writing box that grows with what is typed (Chrome and Android; older browsers keep the taller start). */
+  min-height: 120px;
+  max-height: min(50vh, 420px);
+  field-sizing: content;
 }
 .wsl-row .wa-send {
   white-space: nowrap;

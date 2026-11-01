@@ -881,7 +881,7 @@ export function ChatPane({
                 <textarea
                   ref={inputRef}
                   className="wa-input"
-                  rows={2}
+                  rows={3}
                   placeholder="Type a reply…"
                   aria-label={`Reply to ${enquiry.name}`}
                   value={text}
@@ -955,7 +955,7 @@ export function ChatPane({
               <textarea
                 ref={inputRef}
                 className="wa-input"
-                rows={2}
+                rows={4}
                 placeholder="Message"
                 value={text}
                 onChange={(e) => setDraft(e.target.value)}
