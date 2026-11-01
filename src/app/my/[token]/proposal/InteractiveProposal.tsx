@@ -155,9 +155,15 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
   const activeAt = Math.max(0, contents.findIndex((c) => c.id === active));
   const intro = introBody(data.intro);
 
+  const acceptHref = data.token ? `/my/${data.token}?accept=1` : null;
   const waText = `Hi Heliaxis, I have a question about my proposal ${data.quoteNumber}`;
   const sideBody = (
     <>
+      {acceptHref && (
+        <a className="pt-btn ip-accept" href={acceptHref}>
+          Accept this quote · £{n0(data.priceGbp)}
+        </a>
+      )}
       <nav className="pt-card ip-toc" aria-label="Contents">
         <h2>Contents</h2>
         <div className="ip-bar-top" role="progressbar" aria-label="How far through your proposal" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
@@ -272,7 +278,14 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
       )}
       <header className="pt-head">
         <BrandLogo width={128} />
-        <span className="pt-head-tag">Your proposal</span>
+        <span className="ip-head-right">
+          <span className="pt-head-tag">Your proposal · {data.quoteNumber}</span>
+          {acceptHref && (
+            <a className="pt-btn ip-accept-head" href={acceptHref}>
+              Accept quote
+            </a>
+          )}
+        </span>
       </header>
       <div className="ip-shell">
         <aside className="ip-side">
@@ -441,7 +454,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
             <p className="ip-bills">
               Your yearly electricity bill: <b>{gbp(r.billBeforeGbp)}</b> without solar, <b>{gbp(r.billAfterGbp)}</b> with it (standing charge included).
             </p>
-            <PaybackChart cum={r.cumulative} firstYear={o.firstYear ?? new Date().getFullYear()} payback={r.paybackYears} />
+            <PaybackChart price={basis.priceGbp} cum={r.cumulative} firstYear={o.firstYear ?? new Date().getFullYear()} payback={r.paybackYears} />
             <p className="pt-muted ip-note">
               {r.matched ? 'Worked from the design software’s own energy figures and matched to its first-year saving at its prices, so unchanged prices give its numbers.' : 'Worked from the design software’s energy figures.'} It is an estimate from yearly energy flows, not a half-hourly simulation, and prices can go down as well as up.
             </p>
@@ -488,6 +501,21 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           </section>
         )}
 
+        {acceptHref && (
+          <section className="pt-card ip-go" id="accept">
+            <h2>Ready to go ahead?</h2>
+            <p className="pt-muted">Accept the quote and choose your installation dates. You can still message us with any question first.</p>
+            <div className="pt-row">
+              <a className="pt-btn" href={acceptHref}>
+                Accept this quote · £{n0(data.priceGbp)}
+              </a>
+              <a className="pt-btn ghost" href={whatsappHref(waText)} target="_blank" rel="noopener noreferrer">
+                Ask a question first
+              </a>
+            </div>
+          </section>
+        )}
+
         <p className="pt-foot ip-foot">
           This system has been designed in third-party design software (OpenSolar). The key data points in this proposal have been extracted from that design and presented fairly. Figures are estimates, not guarantees. This proposal is subject to the terms and conditions in your quote.
         </p>
@@ -501,7 +529,12 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           </svg>
           <span>Menu</span>
         </button>
-        <a className="wa" href={whatsappHref(waText)} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp us">
+        {acceptHref && (
+          <a className="wa" href={acceptHref}>
+            <span>Accept</span>
+          </a>
+        )}
+        <a href={whatsappHref(waText)} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp us">
           <WhatsAppIcon size={18} />
           <span>WhatsApp</span>
         </a>
@@ -677,8 +710,9 @@ function GenerationChart({ gen, use }: { gen: number[]; use: number[] | null }) 
   );
 }
 
-function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: number; payback: number | null }) {
+function PaybackChart({ cum, firstYear, payback, price }: { cum: number[]; firstYear: number; payback: number | null; price: number }) {
   const [hi, setHi] = useState<number | null>(null);
+  const [sel, setSel] = useState(0);
   const W = 600;
   const H = 230;
   const left = 44;
@@ -691,7 +725,10 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
   const col = (W - left) / cum.length;
   const zero = y(0);
   const ticks = [min, 0, max].filter((v, i, a) => a.indexOf(v) === i);
+  const soFar = sel > 0 ? cum[sel - 1] + price : 0;
+  const thisYear = sel > 0 ? cum[sel] - cum[sel - 1] : cum[0] + price;
   return (
+    <>
     <div className="ip-chartwrap" onMouseLeave={() => setHi(null)}>
     <svg className="ip-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Cumulative net saving by year">
       <text x="0" y="10" fontSize="11" fontWeight="700" fill="currentColor">
@@ -707,7 +744,7 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
       ))}
       {cum.map((v, i) => (
         <g key={i}>
-          <rect x={left + i * col + col * 0.17} y={Math.min(y(v), zero)} width={col * 0.66} height={Math.max(1, Math.abs(y(v) - zero))} fill={hi === i ? '#C77F04' : v >= 0 ? '#F8BC1E' : '#c9c4b8'} />
+          <rect x={left + i * col + col * 0.17} y={Math.min(y(v), zero)} width={col * 0.66} height={Math.max(1, Math.abs(y(v) - zero))} fill={hi === i ? '#C77F04' : v >= 0 ? '#F8BC1E' : '#c9c4b8'} stroke={sel === i ? '#211F18' : 'none'} strokeWidth="1.5" />
           {(i % 2 === 0 || i === cum.length - 1) && (
             <text x={left + i * col + col / 2} y={base + 14} textAnchor="middle" fontSize="9" fill="currentColor" opacity="0.6">
               {firstYear + i}
@@ -716,7 +753,7 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
         </g>
       ))}
       {[0, cum.length - 1].map((i) => (
-        <text key={i} x={Math.min(Math.max(left + i * col + col / 2, left + 24), W - 24)} y={cum[i] >= 0 ? y(cum[i]) - 4 : y(cum[i]) + 11} textAnchor="middle" fontSize="10" fontWeight="700" fill="currentColor">
+        <text key={i} x={Math.min(Math.max(left + i * col + col / 2, left + 24), W - 24)} y={cum[i] >= 0 ? y(cum[i]) - 4 : zero - 5} textAnchor="middle" fontSize="10" fontWeight="700" fill="currentColor">
           {gbp(cum[i])}
         </text>
       ))}
@@ -729,7 +766,7 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
         </g>
       )}
       {cum.map((_, i) => (
-        <rect key={`h${i}`} className="ip-hit" x={left + i * col} y="0" width={col} height={H} fill="transparent" tabIndex={0} role="button" aria-label={`${firstYear + i}: ${gbp(cum[i])} cumulative net saving`} onMouseEnter={() => setHi(i)} onFocus={() => setHi(i)} onBlur={() => setHi(null)} onClick={() => setHi(i)} />
+        <rect key={`h${i}`} className="ip-hit" x={left + i * col} y="0" width={col} height={H} fill="transparent" tabIndex={0} role="button" aria-label={`${firstYear + i}: ${gbp(cum[i])} cumulative net saving`} onMouseEnter={() => setHi(i)} onFocus={() => setHi(i)} onBlur={() => setHi(null)} onClick={() => setSel(i)} />
       ))}
     </svg>
       {hi !== null && (
@@ -742,6 +779,36 @@ function PaybackChart({ cum, firstYear, payback }: { cum: number[]; firstYear: n
         </div>
       )}
     </div>
+    <div className="ip-sum">
+      <div className="ip-sum-head">
+        <b>
+          Year {sel + 1} · {firstYear + sel}
+        </b>
+        <input type="range" min={0} max={cum.length - 1} value={sel} onChange={(e) => setSel(Number(e.target.value))} aria-label="Choose a year" />
+      </div>
+      <dl>
+        <div>
+          <dt>Investment</dt>
+          <dd>{gbp(price)}</dd>
+        </div>
+        {sel > 0 && (
+          <div>
+            <dt>Saving so far</dt>
+            <dd>{gbp(soFar)}</dd>
+          </div>
+        )}
+        <div>
+          <dt>Year {sel + 1} saving</dt>
+          <dd>{gbp(thisYear)}</dd>
+        </div>
+        <div className="net">
+          <dt>Net</dt>
+          <dd className={cum[sel] >= 0 ? 'pos' : 'neg'}>{gbp(cum[sel])}</dd>
+        </div>
+      </dl>
+      <small>Net is the savings so far, less what you invested. It turns positive in the year you are paid back.</small>
+    </div>
+    </>
   );
 }
 
@@ -754,7 +821,7 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
   const [picked, setPicked] = useState(false);
   useEffect(() => {
     if (picked) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % states.length), 6000);
+    const t = setInterval(() => setIdx((i) => (i + 1) % states.length), 8000);
     return () => clearInterval(t);
   }, [picked, states.length]);
   const state = states[idx];
@@ -783,7 +850,7 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
       <svg className="ip-flowsvg" viewBox="0 0 160 160" role="img" aria-label={`${state.title}: ${state.caption}`}>
         <defs>
           <marker id={`arr-${uid}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
-            <path d="M0 0 L8 4 L0 8 z" fill="#C77F04" />
+            <path d="M1 1 L7 4 L1 7" fill="none" stroke="#C77F04" strokeWidth="1.2" />
           </marker>
         </defs>
         {state.flows.map(([a, b]) => {
@@ -791,12 +858,8 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
           const path = `M${ar.x1} ${ar.y1 + 6} L${ar.x2} ${ar.y2 + 6}`;
           return (
             <g key={`${idx}${a}${b}`}>
-              <path d={path} stroke="#C77F04" strokeOpacity="0.35" strokeWidth="1.6" fill="none" markerEnd={`url(#arr-${uid})`} />
-              {[0, 0.5, 1].map((d) => (
-                <circle key={d} className="ip-dot" r="2.4" fill="#F8BC1E" stroke="#C77F04" strokeWidth="0.6">
-                  <animateMotion dur="1.5s" begin={`${d}s`} repeatCount="indefinite" path={path} />
-                </circle>
-              ))}
+              <path d={path} className="ip-fl-base" fill="none" />
+              <path d={path} className="ip-fl-run" fill="none" markerEnd={`url(#arr-${uid})`} />
             </g>
           );
         })}
@@ -805,8 +868,8 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
           const off = state.off.includes(n);
           return (
             <g key={n} className={off ? 'ip-node off' : 'ip-node'}>
-              <rect x={c.x - h} y={c.y - h} width={NODE_SIZE} height={NODE_SIZE} rx="2" />
-              <g className="ip-ic" transform={`translate(${c.x} ${c.y})`} fill="none" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx={c.x} cy={c.y} r={h - 1} />
+              <g className="ip-ic" transform={`translate(${c.x} ${c.y}) scale(0.78)`} fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 {n === 'home' && <path d="M-8 1 L0 -7 L8 1 M-5.5 0 V8 H5.5 V0" />}
                 {n === 'solar' && (
                   <>
@@ -822,7 +885,7 @@ function FlowDiagram({ states, hasBattery }: { states: ReturnType<typeof howItWo
                   </>
                 )}
               </g>
-              <text x={c.x} y={n === 'home' ? c.y - h - 3 : c.y + h + 9} textAnchor="middle" fontSize="7.5" letterSpacing="0.6" fill="currentColor" opacity="0.8">
+              <text x={c.x} y={n === 'home' ? c.y - h - 3 : c.y + h + 9} textAnchor="middle" fontSize="6.5" letterSpacing="1" fill="currentColor" opacity="0.75">
                 {NODE_LABEL[n].toUpperCase()}
               </text>
             </g>

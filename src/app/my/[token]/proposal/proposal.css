@@ -48,9 +48,11 @@
 .ip-flow svg { width: 100%; height: auto; display: block; margin: 4px 0; }
 .ip-flow p { margin: 0; font-size: 0.8rem; line-height: 1.4; }
 @media (max-width: 640px) { .ip-flows { grid-template-columns: 1fr; } }
-.ip-mcs { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font-size: 0.86rem; }
+.ip-mcs { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 10px 0 4px; font-size: 0.86rem; }
 .ip-mcs caption { text-align: left; font-weight: 700; padding: 6px 0; font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: #c77f04; }
-.ip-mcs th { text-align: left; font-weight: 400; padding: 6px 8px 6px 0; border-top: 1px solid var(--border); width: 55%; }
+.ip-mcs th { text-align: left; font-weight: 400; padding: 6px 8px 6px 0; border-top: 1px solid var(--border); width: 58%; }
+.ip-mcs td:nth-child(2) { width: 22%; text-align: right; padding-right: 14px; font-variant-numeric: tabular-nums; }
+.ip-mcs td:nth-child(3) { width: 20%; }
 .ip-mcs td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border); font-weight: 600; }
 .ip-mcs td:last-child { font-weight: 400; color: var(--muted); }
 
@@ -67,9 +69,9 @@ html { scroll-behavior: smooth; }
 .ip-scroll [id] { scroll-margin-top: 8px; }
 .ip-back { display: inline-block; }
 /* Phone: a bar along the bottom (menu, WhatsApp, call); the contents open as a sheet from it. */
-.ip-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #211f18; border-top: 3px solid #f8bc1e; }
-.ip-bar button, .ip-bar a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border: 0; border-radius: 10px; background: rgba(255, 253, 248, 0.1); color: #fffdf8; font: inherit; font-weight: 700; font-size: 0.9rem; text-decoration: none; cursor: pointer; }
-.ip-bar a.wa { background: #f8bc1e; color: #211f18; }
+.ip-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; display: flex; gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #211f18; border-top: 3px solid #f8bc1e; }
+.ip-bar button, .ip-bar a { flex: 1 1 0; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border: 0; border-radius: 10px; background: rgba(255, 253, 248, 0.1); color: #fffdf8; font: inherit; font-weight: 700; font-size: 0.9rem; text-decoration: none; cursor: pointer; }
+.ip-bar a.wa { flex: 1.6 1 0; background: #f8bc1e; color: #211f18; }
 .ip-sheet { position: fixed; inset: 0; z-index: 160; background: rgba(20, 18, 14, 0.6); display: flex; align-items: flex-end; }
 .ip-sheet-panel { width: 100%; max-height: 86vh; overflow-y: auto; padding: 14px 14px calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 12px; border-radius: 18px 18px 0 0; background: var(--bg); }
 .ip-sheet-close { justify-self: end; min-height: 40px; padding: 8px 16px; }
@@ -123,17 +125,20 @@ html { scroll-behavior: smooth; }
 
 /* How your system works: one animated diagram */
 .ip-flowbox { display: grid; gap: 10px; margin-top: 8px; }
-.ip-flowtabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.ip-flowtabs button { font: inherit; font-weight: 700; font-size: 0.82rem; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
-.ip-flowtabs button.on { background: #f8bc1e; border-color: #f8bc1e; color: #211f18; }
-.ip-flowsvg { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; color: #211f18; background: #fff; border-radius: 14px; border: 1px solid var(--border); }
-.ip-node rect { fill: #f8bc1e; stroke: #211f18; stroke-width: 0.8; transition: fill 0.5s, opacity 0.5s; }
-.ip-node .ip-ic { stroke: #211f18; transition: stroke 0.5s; }
-.ip-node.off rect { fill: #e1ded6; stroke: #a8a398; }
-.ip-node.off .ip-ic { stroke: #8a8578; }
-.ip-flowcap { margin: 0; text-align: center; line-height: 1.5; animation: ipFade 0.5s ease-out; }
+.ip-flowtabs { display: flex; gap: 22px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.ip-flowtabs button { font: inherit; font-weight: 600; font-size: 0.86rem; padding: 8px 0; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; }
+.ip-flowtabs button.on { color: var(--text); border-bottom-color: #f8bc1e; }
+.ip-flowsvg { width: 100%; max-width: 440px; height: auto; display: block; margin: 4px auto 0; color: #211f18; }
+.ip-node circle { fill: #fffdf8; stroke: #211f18; stroke-width: 0.9; transition: fill 0.6s, stroke 0.6s; }
+.ip-node .ip-ic { stroke: #211f18; transition: stroke 0.6s; }
+.ip-node.off circle { fill: transparent; stroke: #b9b4a6; stroke-dasharray: 2 2; }
+.ip-node.off .ip-ic { stroke: #b9b4a6; }
+.ip-fl-base { stroke: #211f18; stroke-opacity: 0.12; stroke-width: 1.2; }
+.ip-fl-run { stroke: #c77f04; stroke-width: 1.4; stroke-dasharray: 1.5 5; stroke-linecap: round; animation: ipRun 1.6s linear infinite; }
+@keyframes ipRun { to { stroke-dashoffset: -13; } }
+.ip-flowcap { margin: 0; text-align: center; line-height: 1.5; color: var(--muted); font-size: 0.92rem; animation: ipFade 0.5s ease-out; }
 @keyframes ipFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .ip-dot { display: none; } .ip-flowcap { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ip-fl-run { animation: none; stroke-dasharray: none; } .ip-flowcap { animation: none; } }
 
 /* About Heliaxis */
 .ip-about-body { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 26px; align-items: start; margin-top: 4px; }
@@ -153,3 +158,33 @@ html { scroll-behavior: smooth; }
 
 /* Headings in the brand's own font (Ezra), as on the rest of the site. */
 .ip .pt-hello h1, .ip .pt-card h2, .ip-gate-card h1 { font-family: 'Ezra', 'Outfit', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+
+/* Slim, quiet scrollbars in the brand's colours (no arrows) */
+.ip-scroll::-webkit-scrollbar, .ip-side::-webkit-scrollbar { width: 10px; }
+.ip-scroll::-webkit-scrollbar-track, .ip-side::-webkit-scrollbar-track { background: transparent; }
+.ip-scroll::-webkit-scrollbar-button, .ip-side::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.ip-scroll::-webkit-scrollbar-thumb, .ip-side::-webkit-scrollbar-thumb { background: rgba(33, 31, 24, 0.22); border-radius: 8px; border: 3px solid transparent; background-clip: padding-box; }
+.ip-scroll::-webkit-scrollbar-thumb:hover { background: #f8bc1e; background-clip: padding-box; }
+@supports not selector(::-webkit-scrollbar) { .ip-scroll, .ip-side { scrollbar-width: thin; scrollbar-color: rgba(33, 31, 24, 0.3) transparent; } }
+
+/* Year-by-year sum under the payback chart */
+.ip-sum { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--border); border-left: 4px solid #f8bc1e; border-radius: 12px; background: var(--surface); display: grid; gap: 10px; }
+.ip-sum-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ip-sum-head input[type='range'] { flex: 1 1 160px; max-width: 320px; accent-color: #f8bc1e; }
+.ip-sum dl { margin: 0; display: grid; gap: 0; }
+.ip-sum dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.ip-sum dl > div:first-child { border-top: 0; }
+.ip-sum dt { color: var(--muted); }
+.ip-sum dd { margin: 0; font-weight: 700; }
+.ip-sum .net { border-top: 2px solid #211f18; margin-top: 4px; font-size: 1.05rem; }
+.ip-sum .net dt { color: var(--text); font-weight: 800; }
+.ip-sum .net dd.neg { color: #a8331f; }
+.ip-sum .net dd.pos { color: #2d7a3a; }
+.ip-sum small { color: var(--muted); font-size: 0.76rem; }
+
+.ip-head-right { display: inline-flex; align-items: center; gap: 16px; }
+.ip-accept-head { display: none; min-height: 40px; padding: 8px 18px; font-size: 0.9rem; }
+.ip-accept { width: 100%; box-sizing: border-box; }
+.ip-go { border-left: 4px solid #f8bc1e; }
+.ip-go .pt-row .pt-btn { flex: 1 1 200px; }
+@media (min-width: 960px) { .ip-accept-head { display: inline-flex; } }
