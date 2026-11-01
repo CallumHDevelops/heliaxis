@@ -5,7 +5,8 @@
  *
  * The life of a RAMS, as Cal described it:
  *
- *   1. It is written automatically, early, when the project is created (ramsToCreate).
+ *   1. It is written automatically when the project is created, and only then (ramsAtCreation).
+ *      Adding a product later doesn't write another: that is done by hand on the project's RAMS tab.
  *   2. It goes to the project's owner to review, or any admin if the owner isn't one (reviewersFor).
  *   3. Once that person signs it off it can go to the trades, and to each trade added afterwards
  *      (tradesToSend). Nothing goes to a trade before then.
@@ -49,19 +50,20 @@ export function technologiesFor(products: string[]): TechnologyId[] {
   return out;
 }
 
-/* ── 1. Writing it early ─────────────────────────────────────────────────── */
+/* ── 1. Writing it when the project is created ───────────────────────────── */
 
 export type ToCreate = { create: TechnologyId[]; why: string | null };
 
 /**
- * Which RAMS a project still needs writing. Safe to call as often as you like (on creation, when the
- * products change, from the worker): it only ever asks for a technology that has no RAMS yet, so a
- * project that already has one is never given a second. A lost job gets none.
+ * Which RAMS to write for a project that has just been created: one per technology its products
+ * call for. It is only ever asked once, from the project's creation. It still checks what exists,
+ * so that the worker picking the same new project up twice (a retry) never writes a second. A
+ * project created with no product that has a template gets none: its RAMS tab offers to write one.
  */
-export function ramsToCreate(p: { products: string[]; lost?: boolean; existing: { technology: string }[] }): ToCreate {
+export function ramsAtCreation(p: { products: string[]; lost?: boolean; existing: { technology: string }[] }): ToCreate {
   if (p.lost) return { create: [], why: 'The job is lost.' };
   const wanted = technologiesFor(p.products);
-  if (!wanted.length) return { create: [], why: 'No product with a RAMS template on the job yet. It’s written as soon as one is added.' };
+  if (!wanted.length) return { create: [], why: 'No product with a RAMS template on the project when it was created, so none was written. Write one on the RAMS tab.' };
   const have = new Set(p.existing.map((d) => d.technology));
   const create = wanted.filter((t) => !have.has(t));
   return { create, why: create.length ? null : 'Already written.' };

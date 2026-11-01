@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canMove,
   isSignedOff,
-  ramsToCreate,
+  ramsAtCreation,
   reviewersFor,
   revision,
   summarise,
@@ -23,33 +23,33 @@ const people: Person[] = [
   { id: 'm1', name: 'Jo Brown', role: 'member' },
 ];
 
-describe('writing it early', () => {
+describe('writing it when the project is created', () => {
   it('maps the project’s products to RAMS technologies, once each, in order', () => {
     expect(technologiesFor(['battery', 'solar', 'solar'])).toEqual(['battery_storage', 'solar_pv']);
     expect(technologiesFor(['heatpump', 'led'])).toEqual(['ashp', 'led_lighting']);
   });
   it('has no template for EV, infrared or other, so writes nothing for them', () => {
     expect(technologiesFor(['ev', 'infrared', 'other'])).toEqual([]);
-    expect(ramsToCreate({ products: ['ev'], existing: [] }).create).toEqual([]);
+    expect(ramsAtCreation({ products: ['ev'], existing: [] }).create).toEqual([]);
   });
   it('asks for one RAMS per technology that has none', () => {
-    expect(ramsToCreate({ products: ['solar', 'battery'], existing: [] }).create).toEqual(['solar_pv', 'battery_storage']);
+    expect(ramsAtCreation({ products: ['solar', 'battery'], existing: [] }).create).toEqual(['solar_pv', 'battery_storage']);
   });
   it('never writes a second one, however often it is asked', () => {
     const existing = [{ technology: 'solar_pv' }];
-    expect(ramsToCreate({ products: ['solar'], existing }).create).toEqual([]);
-    expect(ramsToCreate({ products: ['solar'], existing }).why).toBe('Already written.');
+    expect(ramsAtCreation({ products: ['solar'], existing }).create).toEqual([]);
+    expect(ramsAtCreation({ products: ['solar'], existing }).why).toBe('Already written.');
   });
-  it('writes the missing one when a product is added later', () => {
-    expect(ramsToCreate({ products: ['solar', 'battery'], existing: [{ technology: 'solar_pv' }] }).create).toEqual(['battery_storage']);
+  it('finishes the job if a retry finds only some of them written, without repeating any', () => {
+    expect(ramsAtCreation({ products: ['solar', 'battery'], existing: [{ technology: 'solar_pv' }] }).create).toEqual(['battery_storage']);
   });
-  it('waits for a product when the project is created without one', () => {
-    const r = ramsToCreate({ products: [], existing: [] });
+  it('writes none for a project created without a product that has a template, and says where to write one', () => {
+    const r = ramsAtCreation({ products: [], existing: [] });
     expect(r.create).toEqual([]);
-    expect(r.why).toContain('as soon as one is added');
+    expect(r.why).toContain('Write one on the RAMS tab');
   });
   it('writes nothing for a lost job', () => {
-    expect(ramsToCreate({ products: ['solar'], lost: true, existing: [] }).create).toEqual([]);
+    expect(ramsAtCreation({ products: ['solar'], lost: true, existing: [] }).create).toEqual([]);
   });
 });
 

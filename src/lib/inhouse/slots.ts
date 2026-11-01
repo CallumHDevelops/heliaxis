@@ -359,7 +359,7 @@ export function nameList(names: string[], max = 3): string {
 
 /** The RAMS itself: written, in review, signed off. */
 function ramsState(r: RamsFacts): Partial0 {
-  if (!r.documents.length) return { state: 'missing', why: 'No RAMS yet. One is written when the job gets its number: open the RAMS tab to create it.', fix: 'rams' };
+  if (!r.documents.length) return { state: 'missing', why: 'No RAMS yet. One is written when a project is created; if this one has none, open the RAMS tab to write it.', fix: 'rams' };
   const drafts = r.documents.filter((d) => d.status === 'draft');
   if (drafts.length) return { state: 'waiting', why: `Being written: ${nameList(drafts.map((d) => d.reference))}. It goes to a project admin to review when it’s ready.`, fix: 'rams' };
   const inReview = r.documents.filter((d) => d.status === 'in_review');
