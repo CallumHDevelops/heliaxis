@@ -15,6 +15,7 @@
  * module produces from its own tables; nothing here knows about the database.
  */
 import { STATE_LABEL, TECH_LABEL, type SlotDoc, type SlotMark, type State, type Tech } from '../handover/slots';
+import { isSignedOff, type RamsStatus, type RamsSummary } from '../rams/workflow';
 
 export { STATE_LABEL, TECH_LABEL };
 export type { SlotDoc, SlotMark, State, Tech };
@@ -291,19 +292,17 @@ export const UPLOAD_SLOTS: SlotCode[] = SLOTS.filter((s) => s.kind === 'C').map(
 
 /* ── The project's RAMS, as this pack sees it ─────────────────────────────── */
 
-/** A RAMS document's place in its life (the RAMS module owns the transitions). */
-export type RamsStatus = 'draft' | 'in_review' | 'approved' | 'issued' | 'archived';
-
-export type RamsFacts = {
-  /** The project's RAMS documents, newest version of each; archived (superseded) ones left out. */
-  documents: { id: string; reference: string; title: string; status: RamsStatus; version: number; reviewer?: string | null }[];
-  /** Trades added to the project, each with whether they have signed the RAMS they were sent. */
-  trades: { name: string; sent: boolean; signed: boolean }[];
-};
+/**
+ * The project's RAMS as this pack reads it: the current version of each document (superseded ones
+ * left out) and which trades have been sent it and have signed. rams/workflow.ts owns the rules and
+ * builds this (summarise).
+ */
+export type RamsFacts = RamsSummary;
+export type { RamsStatus };
 export const NO_RAMS: RamsFacts = { documents: [], trades: [] };
 
 /** The RAMS is signed off once a project admin has approved it (approved, then issued). */
-export const ramsSignedOff = (r: RamsFacts) => r.documents.length > 0 && r.documents.every((d) => d.status === 'approved' || d.status === 'issued');
+export const ramsSignedOff = (r: RamsFacts) => r.documents.length > 0 && r.documents.every((d) => isSignedOff(d.status));
 
 /* ── States ──────────────────────────────────────────────────────────────── */
 
