@@ -155,12 +155,20 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
   const activeAt = Math.max(0, contents.findIndex((c) => c.id === active));
   const intro = introBody(data.intro);
 
-  const acceptHref = data.token ? `/my/${data.token}?accept=1` : null;
+  // Staff preview has no customer link: the buttons show, and say so when pressed.
+  const acceptHref = data.token ? `/my/${data.token}?accept=1` : '#accept';
+  const [toast, setToast] = useState('');
+  const onAccept = (e: React.MouseEvent) => {
+    if (data.token) return;
+    e.preventDefault();
+    setToast('Preview only: on the customer’s own link this opens the signing box.');
+    setTimeout(() => setToast(''), 3500);
+  };
   const waText = `Hi Heliaxis, I have a question about my proposal ${data.quoteNumber}`;
   const sideBody = (
     <>
       {acceptHref && (
-        <a className="pt-btn ip-accept" href={acceptHref}>
+        <a className="pt-btn ip-accept" href={acceptHref} onClick={onAccept}>
           Accept this quote · £{n0(data.priceGbp)}
         </a>
       )}
@@ -193,7 +201,6 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
       </div>
       <div className="pt-card ip-contact">
         <h2>Questions? Talk to us</h2>
-        <p className="pt-muted">Ask anything about your proposal. We reply quickly.</p>
         <a className="pt-btn ip-wa" href={whatsappHref(waText)} target="_blank" rel="noopener noreferrer">
           <WhatsAppIcon size={18} /> WhatsApp us
         </a>
@@ -281,7 +288,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
         <span className="ip-head-right">
           <span className="pt-head-tag">Your proposal · {data.quoteNumber}</span>
           {acceptHref && (
-            <a className="pt-btn ip-accept-head" href={acceptHref}>
+            <a className="pt-btn ip-accept-head" href={acceptHref} onClick={onAccept}>
               Accept quote
             </a>
           )}
@@ -506,7 +513,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
             <h2>Ready to go ahead?</h2>
             <p className="pt-muted">Accept the quote and choose your installation dates. You can still message us with any question first.</p>
             <div className="pt-row">
-              <a className="pt-btn" href={acceptHref}>
+              <a className="pt-btn" href={acceptHref} onClick={onAccept}>
                 Accept this quote · £{n0(data.priceGbp)}
               </a>
               <a className="pt-btn ghost" href={whatsappHref(waText)} target="_blank" rel="noopener noreferrer">
@@ -530,7 +537,7 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           <span>Menu</span>
         </button>
         {acceptHref && (
-          <a className="wa" href={acceptHref}>
+          <a className="wa" href={acceptHref} onClick={onAccept}>
             <span>Accept</span>
           </a>
         )}
@@ -545,6 +552,11 @@ export function InteractiveProposal({ data, back }: { data: InteractiveData; bac
           <span>Call</span>
         </a>
       </div>
+      {toast && (
+        <div className="ip-toast" role="status">
+          {toast}
+        </div>
+      )}
       {sheet && (
         <div className="ip-sheet" role="dialog" aria-modal="true" aria-label="Contents" onClick={() => setSheet(false)}>
           <div className="ip-sheet-panel" onClick={(e) => e.stopPropagation()}>
