@@ -22,6 +22,14 @@ export const ISSUE: Record<string, string> = {
   'HX-HO-18': 'Issue 1',
   'HX-EV-01': 'Issue 1',
   'HX-HP-01': 'Issue 1',
+  // The In-House pack (internal, never sent to a customer). Provisional until the owner approves the codes.
+  'HX-IH-01': 'Issue 1',
+  'HX-IH-02': 'Issue 1',
+  'HX-IH-03': 'Issue 1',
+  'HX-IH-05': 'Issue 1',
+  'HX-IH-07': 'Issue 1',
+  'HX-IH-08': 'Issue 1',
+  'HX-IH-09': 'Issue 1',
   PACK: 'Issue 1',
 };
 export const issueOf = (code: string) => ISSUE[code] ?? 'Issue 1';
