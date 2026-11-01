@@ -8,9 +8,13 @@ Branch: `claude/rams-into-hap-inhouse-pack`. Read `docs/DOCUMENT-KIT.md` and `AG
 
 - **RAMS lives in HAP.** The separate RAMS app and its Supabase project are retired. Existing RAMS,
   signatures, briefings and files are kept (merge and migrate, do not start fresh).
-- **Written only when a project is created.** One RAMS per technology the project's products call for
-  (`rams/workflow.ts`: `ramsAtCreation`). Not again when products change. A project created with no product
-  that has a template gets none; the RAMS tab offers to write one. Lost jobs get none.
+- **Written only when a job becomes a project.** In HAP a `crm_projects` row is an *opportunity* (lead, contacted,
+  survey booked, quote sent). It becomes a *project* from stage Won onwards (`PROJECT_STAGES`,
+  `src/lib/crm/stages.ts`), and the database trigger `crm_projects_start` sets `project_started_at` at that
+  moment, once. The RAMS is written then, one per technology the project's products call for
+  (`rams/workflow.ts`: `ramsAtCreation`), and never again for the same job. Not for opportunities, not when
+  products change later. A project with no product that has a template gets none; the RAMS tab offers to write one.
+  Lost jobs get none.
 - **Reviewer:** the project's owner (`crm_projects.owner_id`) if they are an admin, otherwise any admin.
   Never the author. RAMS "managers" become HAP admins. HAP roles are only `member` and `admin`.
 - **Sign-off, then trades.** Nothing goes to a trade until a project admin has signed the RAMS off. Then it
@@ -24,25 +28,23 @@ Branch: `claude/rams-into-hap-inhouse-pack`. Read `docs/DOCUMENT-KIT.md` and `AG
   slots until the QMS wording is supplied. Nothing is invented.
 - **Git:** work on a branch, never push to `main` (every push to `main` deploys the live site).
 
-## Where a project (a `crm_projects` row) is created: six places
+## When a job becomes a project (corrected)
 
-1. `src/app/api/crm/projects/route.ts` (about line 100): the CRM's "New project" sheet. Owner defaults to the
-   person creating it.
-2. `src/app/api/crm/quotes/route.ts` (about line 45): making a quote for a customer with no open project creates
-   one at stage `surveyed` with `products: []`.
-3. `src/app/api/crm/contacts/[id]/opportunity/route.ts` (about line 28): opening an opportunity from a contact.
-4. `src/lib/crm/import.ts` (line 159): the CRM import (past enquiries). Should not create RAMS for old imports.
-5. `src/lib/crm/server.ts`, `ensureOpportunity` (about line 170): every incoming enquiry becomes a Lead. Called
-   from the website quote form (`api/quote`), online survey booking (`lib/booking/book.ts`), Meta lead ads
-   (`lib/whatsapp/lead-ads.ts`) and new WhatsApp numbers (`lib/whatsapp/inbox.ts`).
-6. `src/lib/assistant/tools.ts` (about line 363): the assistant's tool that adds a customer and a Lead.
+An earlier version of this note listed six places a "project" is created. Those are where *opportunities* are
+created (every row in `crm_projects` starts as one), and hooking them would have written a RAMS for every lead.
+On 2026-11-01 the live database had 133 rows: 71 contacted, 52 lead, 3 quote sent, 3 survey booked, 2 lost and
+only 2 projects (1 installing, 1 won). Every row has a `project_ref` because `customer-refs.sql` numbers each
+opportunity from its customer (HX-0042, HX-0042-2); the older `crm-v3.sql` only numbered won jobs.
 
-Hooking each of those is fragile (a seventh path would be missed). The plan is one `AFTER INSERT` trigger on
-`crm_projects` that adds the new project to a queue table, and a worker that writes the RAMS from the queue. The
-import (4) must be excluded, for example by the import marking its rows so the trigger skips them.
+The six opportunity-creation points, for reference (none of them should write a RAMS):
+`api/crm/projects/route.ts`, `api/crm/quotes/route.ts`, `api/crm/contacts/[id]/opportunity/route.ts`,
+`lib/crm/import.ts`, `lib/crm/server.ts` (`ensureOpportunity`) and `lib/assistant/tools.ts`.
 
-Note the consequence of "only at creation": paths 2 and 5 often create a project with no or guessed products,
-so those get no RAMS, or one for the guessed technology. Cal to confirm whether that is what he wants.
+The hook is one database trigger on `crm_projects`, firing when `project_started_at` goes from null to set (and
+on insert if a row is created already started, as an "already in progress" job from the Projects page is). It adds
+the project to a queue table; a worker writes the RAMS from the queue. Because the field is only ever set once,
+a job is never queued twice. The worker skips jobs at Complete or Lost, so importing old finished jobs does not
+write RAMS for them.
 
 ## Merging the databases
 

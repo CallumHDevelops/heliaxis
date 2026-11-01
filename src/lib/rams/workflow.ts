@@ -5,8 +5,10 @@
  *
  * The life of a RAMS, as Cal described it:
  *
- *   1. It is written automatically when the project is created, and only then (ramsAtCreation).
- *      Adding a product later doesn't write another: that is done by hand on the project's RAMS tab.
+ *   1. It is written automatically when the job becomes a project (it reaches Won, which is when
+ *      crm_projects.project_started_at is set), and only then (ramsAtCreation). An opportunity (a lead,
+ *      a quote) gets none. Adding a product later doesn't write another: that is done by hand on the
+ *      project's RAMS tab.
  *   2. It goes to the project's owner to review, or any admin if the owner isn't one (reviewersFor).
  *   3. Once that person signs it off it can go to the trades, and to each trade added afterwards
  *      (tradesToSend). Nothing goes to a trade before then.
@@ -55,10 +57,10 @@ export function technologiesFor(products: string[]): TechnologyId[] {
 export type ToCreate = { create: TechnologyId[]; why: string | null };
 
 /**
- * Which RAMS to write for a project that has just been created: one per technology its products
- * call for. It is only ever asked once, from the project's creation. It still checks what exists,
+ * Which RAMS to write for a job that has just become a project: one per technology its products
+ * call for. It is only ever asked once, when the job first reaches Won. It still checks what exists,
  * so that the worker picking the same new project up twice (a retry) never writes a second. A
- * project created with no product that has a template gets none: its RAMS tab offers to write one.
+ * project with no product that has a template gets none: its RAMS tab offers to write one.
  */
 export function ramsAtCreation(p: { products: string[]; lost?: boolean; existing: { technology: string }[] }): ToCreate {
   if (p.lost) return { create: [], why: 'The job is lost.' };
