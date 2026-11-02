@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { writeWithClaude } from '@/lib/qms/ai';
 import { addMonths, bumpRevision, canApprove } from '@/lib/qms/checks';
-import { loadDetail, loadOverview, qmsSession, ukToday, type QmsDetail, type QmsOverview } from '@/lib/qms/server';
+import { loadDetail, loadOverview, loadRecords, qmsSession, recordsSession, ukToday, type QmsDetail, type QmsOverview } from '@/lib/qms/server';
 import { SEED } from '@/lib/qms/seed';
 import { APPROVAL_CHECKLIST, DOC_COLUMNS, RECORD_COLUMNS, RECORD_KINDS, type DocKind, type QmsDoc, type RecordKind, type QmsRecord } from '@/lib/qms/types';
 
@@ -17,6 +17,12 @@ const done = () => revalidatePath('/admin/qms');
 
 async function who(admin = false) {
   const s = await qmsSession();
+  if (!s) throw new Error('Not authorised');
+  if (admin && !s.admin) throw new Error('Only an admin can do that.');
+  return s;
+}
+async function recordsWho(admin = false) {
+  const s = await recordsSession();
   if (!s) throw new Error('Not authorised');
   if (admin && !s.admin) throw new Error('Only an admin can do that.');
   return s;
@@ -263,7 +269,7 @@ export async function archiveDoc(id: string, archived: boolean): Promise<Result<
   });
 }
 
-/* Records */
+/* Records: open to every approved user */
 
 async function nextRecordRef(kind: RecordKind) {
   const prefix = RECORD_KINDS.find((k) => k.key === kind)!.prefix;
@@ -274,7 +280,7 @@ async function nextRecordRef(kind: RecordKind) {
 
 export async function saveRecord(input: { id?: string; kind: RecordKind; title: string; status: QmsRecord['status']; owner: string; due_on: string; data: Record<string, string>; notes: string }): Promise<Result<{ record: QmsRecord }>> {
   return guard(async () => {
-    const s = await who();
+    const s = await recordsWho();
     const kind = RECORD_KINDS.find((k) => k.key === input.kind);
     if (!kind) return fail('Pick the kind of record.');
     const title = clean(input.title, 200);
@@ -307,10 +313,15 @@ export async function saveRecord(input: { id?: string; kind: RecordKind; title: 
 
 export async function deleteRecord(id: string): Promise<Result> {
   return guard(async () => {
-    await who(true);
+    await recordsWho(true);
     if (!isUuid(id)) return fail('Not found.');
     await createAdminClient().from('qms_records').delete().eq('id', id);
     done();
     return { ok: true };
   });
+}
+
+export async function refreshRecords(): Promise<QmsRecord[]> {
+  await recordsWho();
+  return loadRecords();
 }

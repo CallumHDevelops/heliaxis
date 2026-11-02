@@ -12,13 +12,13 @@ export const dynamic = 'force-dynamic';
  * each document's checks, comments and approval, and the QMS records. ?doc=P03 opens a document.
  */
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const session = await requirePortal('crm');
+  const session = await requirePortal('qms');
   if (!session) redirect('/admin?denied=1');
   const [sp, schema] = await Promise.all([searchParams, schemaReady()]);
-  const initial = schema.qms ? await loadOverview().catch(() => ({ rows: [], records: [], today: ukToday() })) : { rows: [], records: [], today: ukToday() };
+  const initial = schema.qms ? await loadOverview().catch(() => ({ rows: [], today: ukToday() })) : { rows: [], today: ukToday() };
   return (
     <AdminShell active="qms" fluid>
-      <QmsPage ready={schema.qms} initial={initial} admin={session.profile.role === 'admin'} openRef={typeof sp.doc === 'string' ? sp.doc.slice(0, 20) : null} />
+      <QmsPage ready={schema.qms} initial={initial} admin openRef={typeof sp.doc === 'string' ? sp.doc.slice(0, 20) : null} />
     </AdminShell>
   );
 }

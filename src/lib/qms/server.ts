@@ -1,5 +1,5 @@
 import 'server-only';
-import { requirePortal } from '@/lib/auth';
+import { requireApproved, requirePortal } from '@/lib/auth';
 import { ukDay } from '@/lib/bank-holidays';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { canApprove, failCount, runChecks, warnCount, type Check } from './checks';
@@ -10,26 +10,36 @@ import {
 
 export const ukToday = () => ukDay(Date.now());
 
-/** Everyone with the CRM portal can read the QMS and comment; only admins approve, import and write with Claude. */
+/** The QMS (registers, checks, comments, approvals) is for audits: only people given "QMS Administration" (and admins). They can do all of it. */
 export async function qmsSession() {
-  const s = await requirePortal('crm');
+  const s = await requirePortal('qms');
   if (!s) return null;
-  const name = s.profile.full_name || s.profile.email || 'Someone';
-  return { name, admin: s.profile.role === 'admin' };
+  return { name: s.profile.full_name || s.profile.email || 'Someone', admin: true };
+}
+
+/** The quality records (complaints etc.) are open to every approved user; only an admin deletes. */
+export async function recordsSession() {
+  const s = await requireApproved();
+  if (!s) return null;
+  return { name: s.profile.full_name || s.profile.email || 'Someone', admin: s.profile.role === 'admin' };
+}
+
+export async function loadRecords(): Promise<QmsRecord[]> {
+  const { data } = await createAdminClient().from('qms_records').select(RECORD_COLUMNS).order('created_at', { ascending: false }).limit(1000);
+  return (data ?? []) as QmsRecord[];
 }
 
 /** A register row: the document without its text, plus what the checker found. */
 export type QmsRow = Omit<QmsDoc, 'body_md'> & { hasBody: boolean; fails: number; warns: number; openComments: number; addressed: number };
 
-export type QmsOverview = { rows: QmsRow[]; records: QmsRecord[]; today: string };
+export type QmsOverview = { rows: QmsRow[]; today: string };
 
 export async function loadOverview(): Promise<QmsOverview> {
   const db = createAdminClient();
   const today = ukToday();
-  const [{ data: docs }, { data: comments }, { data: records }] = await Promise.all([
+  const [{ data: docs }, { data: comments }] = await Promise.all([
     db.from('qms_documents').select(DOC_COLUMNS).order('ref'),
     db.from('qms_comments').select('document_id, status').neq('status', 'resolved'),
-    db.from('qms_records').select(RECORD_COLUMNS).order('created_at', { ascending: false }).limit(1000),
   ]);
   const all = (docs ?? []) as QmsDoc[];
   const by = new Map<string, { status: QmsComment['status'] }[]>();
@@ -40,7 +50,7 @@ export async function loadOverview(): Promise<QmsOverview> {
     const { body_md, ...rest } = d;
     return { ...rest, hasBody: !!body_md?.trim(), fails: failCount(checks), warns: warnCount(checks), openComments: cs.filter((c) => c.status === 'open').length, addressed: cs.filter((c) => c.status === 'addressed').length };
   });
-  return { rows, records: (records ?? []) as QmsRecord[], today };
+  return { rows, today };
 }
 
 export type QmsDetail = { doc: QmsDoc; comments: QmsComment[]; revisions: QmsRevision[]; reviews: QmsReview[]; checks: Check[]; canApprove: boolean };

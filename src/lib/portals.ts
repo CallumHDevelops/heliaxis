@@ -6,7 +6,7 @@
  * (profiles.portals). Safe to import from middleware, server and client code.
  */
 
-export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'social_monitoring' | 'team' | 'social' | 'rams';
+export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'social_monitoring' | 'team' | 'social' | 'rams' | 'qms';
 
 export type Portal = {
   key: PortalKey;
@@ -85,6 +85,13 @@ export const PORTALS: Portal[] = [
     paths: ['/admin/social'],
   },
   {
+    key: 'qms',
+    label: 'QMS Administration',
+    description: 'The quality management system for audits: the register of procedures, forms and standards, their checks, comments and approvals. (The quality records, such as customer complaints, are open to everyone.)',
+    href: '/admin/qms',
+    paths: ['/admin/qms'],
+  },
+  {
     key: 'team',
     label: 'Our team',
     description: 'Heliaxis’s own operatives — cards, qualifications and expiry dates (kept in RAMS).',
@@ -134,6 +141,9 @@ export const APP_PATH = '/admin/app';
 /** Help (how to use every part of the app): open to every approved user. */
 export const HELP_PATH = '/admin/help';
 
+/** The quality records (customer complaints, corrective actions, calibration, training): open to every approved user. */
+export const QUALITY_PATH = '/admin/quality';
+
 /** Confirming your email before one-tap sign-in to RAMS or the social studio (src/lib/sso.ts): open to any approved user. */
 export const SSO_PATH = '/admin/sso';
 
@@ -169,6 +179,7 @@ export function portalForPath(pathname: string): PortalKey | 'admin' | null {
   const p = pathname.replace(/\/$/, '') || '/';
   if (p === HUB_PATH || p === APP_PATH || p === SSO_PATH || p.startsWith(`${SSO_PATH}/`)) return null;
   if (p === HELP_PATH || p.startsWith(`${HELP_PATH}/`)) return null;
+  if (p === QUALITY_PATH || p.startsWith(`${QUALITY_PATH}/`)) return null;
   if (OPEN_SETUP_PATHS.some((a) => p.startsWith(`${a}/`))) return null;
   if (ADMIN_ONLY_PATHS.some((a) => p === a || p.startsWith(`${a}/`))) return 'admin';
   for (const portal of PORTALS) {

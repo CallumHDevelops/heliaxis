@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { KINDS, RECORD_KINDS, SECTIONS, type DocKind, type QmsRecord, type RecordKind } from '@/lib/qms/types';
+import Link from 'next/link';
+import { KINDS, SECTIONS, type DocKind } from '@/lib/qms/types';
 import type { QmsDetail, QmsOverview, QmsRow } from '@/lib/qms/server';
 import { Sheet } from '../crm/CrmUi';
 import '../crm/crm.css';
-import { createDoc, deleteRecord, importStandardRegister, openDoc, refresh, saveRecord } from './actions';
+import { createDoc, importStandardRegister, openDoc, refresh } from './actions';
 import { DocSheet, StatusChip } from './DocSheet';
 import './qms.css';
 
-type View = 'overview' | 'queue' | DocKind | 'records';
+type View = 'overview' | 'queue' | DocKind;
 type Filter = 'all' | 'todo' | 'review' | 'approved' | 'archived';
 
 export function QmsPage({ ready, initial, admin, openRef }: { ready: boolean; initial: QmsOverview; admin: boolean; openRef: string | null }) {
@@ -22,8 +23,6 @@ export function QmsPage({ ready, initial, admin, openRef }: { ready: boolean; in
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
-  const [rec, setRec] = useState<{ kind: RecordKind; record: QmsRecord | null } | null>(null);
-  const [recKind, setRecKind] = useState<RecordKind>('capa');
 
   const live = useMemo(() => data.rows.filter((r) => r.status !== 'archived'), [data.rows]);
   const queue = useMemo(() => live.filter((r) => r.status === 'in_review' || r.status === 'changes_requested' || r.addressed > 0), [live]);
@@ -64,7 +63,7 @@ export function QmsPage({ ready, initial, admin, openRef }: { ready: boolean; in
 
   const rows = useMemo(() => {
     if (view === 'queue') return queue;
-    if (view === 'overview' || view === 'records') return [];
+    if (view === 'overview') return [];
     const needle = q.trim().toLowerCase();
     return data.rows
       .filter((r) => r.kind === view)
@@ -87,7 +86,6 @@ export function QmsPage({ ready, initial, admin, openRef }: { ready: boolean; in
     { key: 'overview', label: 'Overview' },
     { key: 'queue', label: 'To review', n: queue.length },
     ...KINDS.map((k) => ({ key: k.key as View, label: k.plural })),
-    { key: 'records', label: 'Records' },
   ];
 
   return (
@@ -130,7 +128,7 @@ export function QmsPage({ ready, initial, admin, openRef }: { ready: boolean; in
             <div className="qms-tile"><span className="qms-tile__name">Open comments</span><span className="qms-tile__big">{stats.open}</span><span className="qms-tile__sub">for Claude to answer or you to resolve</span></div>
             <div className="qms-tile"><span className="qms-tile__name">Reviews overdue</span><span className="qms-tile__big">{stats.overdue}</span><span className="qms-tile__sub">past their review date</span></div>
           </div>
-          <p className="qms-muted">Purchase orders (R03) are under Finance, suppliers (R08) in Purchase orders → Suppliers, and subcontractors (R09) under Team → Subcontractors. The company documents record (R11) is this register.</p>
+          <p className="qms-muted">The quality records (customer complaints, corrective actions, internal reviews, calibration and training) are open to everyone under <Link className="crm-link" href="/admin/quality">Operations → Quality records</Link>. Purchase orders (R03) are under Finance, suppliers (R08) in Purchase orders → Suppliers, and subcontractors (R09) under Team → Subcontractors. The company documents record (R11) is this register.</p>
         </div>
       )}
 
@@ -165,37 +163,8 @@ export function QmsPage({ ready, initial, admin, openRef }: { ready: boolean; in
         </>
       )}
 
-      {view === 'records' && (
-        <>
-          <div className="qms-bar2">
-            <div className="qms-chips">
-              {RECORD_KINDS.map((k) => <button key={k.key} type="button" className={recKind === k.key ? 'is-on' : ''} onClick={() => setRecKind(k.key)}>{k.code} {k.plural}</button>)}
-            </div>
-            <span className="qms-spacer" />
-            <button type="button" className="crm-btn crm-btn--solar crm-btn--small" onClick={() => setRec({ kind: recKind, record: null })}>Add</button>
-          </div>
-          {data.records.filter((r) => r.kind === recKind).length === 0 ? (
-            <p className="qms-muted">None yet.</p>
-          ) : (
-            <table className="qms-table">
-              <thead><tr><th>Ref</th><th>Title</th><th>Status</th><th>Owner</th><th>Due</th></tr></thead>
-              <tbody>
-                {data.records.filter((r) => r.kind === recKind).map((r) => (
-                  <tr key={r.id} tabIndex={0} onClick={() => setRec({ kind: r.kind, record: r })} onKeyDown={(e) => e.key === 'Enter' && setRec({ kind: r.kind, record: r })}>
-                    <td className="qms-ref">{r.ref}</td><td>{r.title}</td>
-                    <td><span className={`qms-chip qms-chip--r-${r.status}`}>{r.status === 'open' ? 'Open' : r.status === 'in_progress' ? 'In progress' : 'Closed'}</span></td>
-                    <td>{r.owner ?? ''}</td><td className={r.due_on && r.status !== 'closed' && r.due_on < data.today ? 'qms-late' : ''}>{r.due_on ?? ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </>
-      )}
-
       {sheet && <DocSheet key={sheet.doc.id} initial={sheet} admin={admin} onClose={() => { setSheet(null); void reload(); }} onChanged={() => void reload()} />}
       {adding && <AddDoc defaultKind={KINDS.some((k) => k.key === view) ? (view as DocKind) : 'procedure'} onClose={() => setAdding(false)} onCreated={async (id) => { setAdding(false); await reload(); void open(id); }} />}
-      {rec && <RecordSheet kind={rec.kind} record={rec.record} admin={admin} onClose={() => setRec(null)} onSaved={async () => { setRec(null); await reload(); }} />}
     </div>
   );
 }
@@ -245,46 +214,6 @@ function AddDoc({ defaultKind, onClose, onCreated }: { defaultKind: DocKind; onC
       <div className="crm-actions">
         <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !ref.trim() || !title.trim()} onClick={async () => { setBusy(true); const r = await createDoc({ kind, ref, title, section }); setBusy(false); if (r.ok) onCreated(r.id); else setErr(r.error); }}>{busy ? 'Adding…' : 'Add'}</button>
         <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>Cancel</button>
-      </div>
-    </Sheet>
-  );
-}
-
-function RecordSheet({ kind, record, admin, onClose, onSaved }: { kind: RecordKind; record: QmsRecord | null; admin: boolean; onClose: () => void; onSaved: () => void }) {
-  const k = RECORD_KINDS.find((x) => x.key === kind)!;
-  const [title, setTitle] = useState(record?.title ?? '');
-  const [status, setStatus] = useState<QmsRecord['status']>(record?.status ?? 'open');
-  const [owner, setOwner] = useState(record?.owner ?? '');
-  const [due, setDue] = useState(record?.due_on ?? '');
-  const [notes, setNotes] = useState(record?.notes ?? '');
-  const [data, setData] = useState<Record<string, string>>(record?.data ?? {});
-  const [busy, setBusy] = useState('');
-  const [err, setErr] = useState('');
-  return (
-    <Sheet title={record ? `${record.ref} · ${k.label}` : `New ${k.label.toLowerCase()}`} onClose={onClose}>
-      <label className="crm-label" htmlFor="qr-title">Title</label>
-      <input id="qr-title" className="crm-input" value={title} onChange={(e) => setTitle(e.target.value)} />
-      {k.fields.map((f) => (
-        <div key={f.key}>
-          <label className="crm-label" htmlFor={`qr-${f.key}`}>{f.label}</label>
-          {f.long ? <textarea id={`qr-${f.key}`} className="crm-input" rows={3} value={data[f.key] ?? ''} onChange={(e) => setData({ ...data, [f.key]: e.target.value })} /> : <input id={`qr-${f.key}`} type={f.date ? 'date' : 'text'} className="crm-input" value={data[f.key] ?? ''} onChange={(e) => setData({ ...data, [f.key]: e.target.value })} />}
-        </div>
-      ))}
-      <div className="crm-grid2">
-        <div><label className="crm-label" htmlFor="qr-owner">Owner</label><input id="qr-owner" className="crm-input" value={owner} onChange={(e) => setOwner(e.target.value)} /></div>
-        <div><label className="crm-label" htmlFor="qr-due">{kind === 'calibration' ? 'Next due' : 'Due'}</label><input id="qr-due" type="date" className="crm-input" value={due} onChange={(e) => setDue(e.target.value)} /></div>
-      </div>
-      <label className="crm-label" htmlFor="qr-status">Status</label>
-      <select id="qr-status" className="crm-input" value={status} onChange={(e) => setStatus(e.target.value as QmsRecord['status'])}>
-        <option value="open">Open</option><option value="in_progress">In progress</option><option value="closed">Closed</option>
-      </select>
-      <label className="crm-label" htmlFor="qr-notes">Notes</label>
-      <textarea id="qr-notes" className="crm-input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-      {err && <p className="qms-err" role="alert">{err}</p>}
-      <div className="crm-actions">
-        <button type="button" className="crm-btn crm-btn--solar" disabled={!!busy || !title.trim()} onClick={async () => { setBusy('save'); const r = await saveRecord({ id: record?.id, kind, title, status, owner, due_on: due, data, notes }); setBusy(''); if (r.ok) onSaved(); else setErr(r.error); }}>{busy === 'save' ? 'Saving…' : 'Save'}</button>
-        <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>Cancel</button>
-        {admin && record && <button type="button" className="crm-link" disabled={!!busy} onClick={async () => { if (!window.confirm('Delete this record?')) return; setBusy('del'); const r = await deleteRecord(record.id); setBusy(''); if (r.ok) onSaved(); else setErr(r.error); }}>Delete</button>}
       </div>
     </Sheet>
   );

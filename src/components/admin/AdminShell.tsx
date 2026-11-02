@@ -25,6 +25,7 @@ type Tab =
   | 'projects'
   | 'orders'
   | 'qms'
+  | 'quality'
   | 'surveys'
   | 'whatsapp'
   | 'approvals'
@@ -406,7 +407,9 @@ export async function AdminShell({
         // On site: one tap away on the phone's bottom bar, so not in "More".
         { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring, badge: socialUrgent },
         { href: '/admin/value', label: 'Added value', icon: icons.analytics, active: active === 'value', show: admin },
-        { href: '/admin/qms', label: 'QMS', icon: icons.orders, active: active === 'qms', show: can('crm') && ready.qms },
+        { href: '/admin/qms', label: 'QMS', icon: icons.orders, active: active === 'qms', show: can('qms') && ready.qms },
+        // Open to every approved user: log and follow customer complaints, corrective actions, calibration and training.
+        { href: '/admin/quality', label: 'Quality records', short: 'Quality', icon: icons.orders, active: active === 'quality', show: ready.qms },
         { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
       ],
     },
