@@ -380,7 +380,7 @@ export async function AdminShell({
         { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm') },
         { href: '/admin/crm/map', label: 'Leads map', icon: icons.reports, show: can('crm') },
         { href: '/admin/crm/settings', label: 'CRM settings', icon: icons.settings, show: can('crm') },
-        { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm') },
+        { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm'), tab: true },
       ],
     },
     {
@@ -406,7 +406,7 @@ export async function AdminShell({
         // On site: one tap away on the phone's bottom bar, so not in "More".
         { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring, badge: socialUrgent },
         { href: '/admin/value', label: 'Added value', icon: icons.analytics, active: active === 'value', show: admin },
-        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
+        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: !can('crm') },
       ],
     },
     {
@@ -547,8 +547,12 @@ export async function AdminShell({
             badge={waUnread}
           />
         )}
-        {/* On site: RAMS one tap away. */}
-        {can('rams') && <TabLink href={RAMS_URL} label="RAMS" icon={icons.rams} active={false} />}
+        {/* Metis one tap away for the office; people who only have RAMS (on site) keep RAMS here, and it is in More for everyone else. */}
+        {can('crm') ? (
+          <TabLink href="/admin/assistant" label="Metis" icon={icons.metis} active={active === 'assistant'} />
+        ) : (
+          can('rams') && <TabLink href={RAMS_URL} label="RAMS" icon={icons.rams} active={false} />
+        )}
         {/* Always there: Help (for the page you're on) is the sheet's last tile. */}
         <MoreMenu>
           {/* Turns into "Close" while the sheet is open. */}
