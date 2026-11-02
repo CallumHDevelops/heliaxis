@@ -11,7 +11,7 @@ type Result = { ok: true } | { ok: false; error: string };
 
 export async function updateUser(
   id: string,
-  input: { status: string; role: string; portals: string[] }
+  input: { status: string; role: string; portals: string[]; /** Tick for Project Admin (needs supabase/proposal-pack.sql); left alone when absent. */ projectAdmin?: boolean }
 ): Promise<Result> {
   const { user, profile } = await getSessionProfile();
   if (!user || profile?.role !== 'admin' || profile.status !== 'approved') return { ok: false, error: 'Not authorised' };
@@ -34,6 +34,13 @@ export async function updateUser(
         ? 'The portals column is missing — run supabase/user-portals.sql in Supabase first.'
         : error.message,
     };
+  }
+  // Its own update, so saving the rest still works before proposal-pack.sql has been run.
+  if (typeof input.projectAdmin === 'boolean') {
+    const { error: paError } = await createAdminClient().from('profiles').update({ project_admin: input.projectAdmin }).eq('id', id);
+    if (paError) {
+      return { ok: false, error: /project_admin/.test(paError.message) ? 'The Project Admin column is missing: run supabase/proposal-pack.sql in Supabase first.' : paError.message };
+    }
   }
   revalidatePath('/admin/users');
   return { ok: true };

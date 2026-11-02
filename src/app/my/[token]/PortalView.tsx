@@ -6,6 +6,7 @@ import { BrandLogo } from '@/components/theme/BrandLogo';
 import { ThemeChoice } from '@/components/theme/ThemeChoice';
 import type { PortalData } from '@/lib/crm/portal';
 import { isWonStage } from '@/lib/crm/stages';
+import { HOLD_MESSAGE } from '@/lib/proposal/messages';
 import type { CalendarDay } from '@/lib/install-dates';
 import { useNow } from '@/lib/use-now';
 import { HandoverSection } from './HandoverSection';
@@ -120,13 +121,34 @@ async function afterAccept(token: string, d: { deposit?: boolean }) {
   window.location.href = `${window.location.pathname}?accepted=1`;
 }
 
+/**
+ * Accept. With the proposal pack switched on, the server first says whether the contract can be signed
+ * yet (api/my/[token]/accept-intent): "hold" thanks them while the paperwork is being finished. With it
+ * off, or on any hiccup, it is the signature sheet exactly as it always was.
+ */
+function useAcceptIntent(data: PortalData, open: () => void) {
+  const [held, setHeld] = useState(data.pack.held);
+  const [busy, setBusy] = useState(false);
+  async function accept() {
+    if (!data.pack.on) return open();
+    setBusy(true);
+    const r = await fetch(`/api/my/${data.token}/accept-intent`, { method: 'POST' }).catch(() => null);
+    const d = r?.ok ? await r.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (d.path === 'hold') return setHeld(true);
+    if (d.path === 'signed') return window.location.reload();
+    open();
+  }
+  return { held, busy, accept };
+}
+
 const quoteWord = (q: { category: string }) => (q.category === 'contract' ? 'contract' : 'quote');
 
 /* ── Quote sent: just the quote, to read and sign ──────────────────────────── */
 
 function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAccept: boolean; themePref: ThemePref }) {
   const q = data.quote;
-  const [signing, setSigningRaw] = useState(openAccept && !!q);
+  const [signing, setSigningRaw] = useState(openAccept && !!q && !data.pack.on);
   const [declining, setDeclining] = useState(false);
   const [query, setQuery] = useState(0);
   useEffect(() => {
@@ -138,6 +160,14 @@ function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAcce
     if (v) track(data.token, 'sign_started');
     setSigningRaw(v);
   };
+  const { held, busy, accept } = useAcceptIntent(data, () => setSigning(true));
+  // Came from the quote's Accept button (?accept): the same check, without a second press.
+  const auto = useRef(false);
+  useEffect(() => {
+    if (auto.current) return;
+    auto.current = true;
+    if (openAccept && data.pack.on && q && !held) void accept();
+  }, [openAccept, data.pack.on, q, held, accept]);
   const openDecline = () => {
     track(data.token, 'decline_started');
     setDeclining(true);
@@ -162,6 +192,16 @@ function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAcce
           {data.deposit && !data.deposit.paidAt && <Deposit token={data.token} deposit={data.deposit} />}
           <InstallDates token={data.token} pref={data.installPref} />
         </section>
+      ) : q && held ? (
+        <section className="pt-card pt-action pt-quote" data-track="quote-held">
+          <p className="pt-banner ok">{HOLD_MESSAGE}</p>
+          <div className="pt-row">
+            <a className="pt-btn ghost" href={`/api/my/${data.token}/doc/${q.id}`} target="_blank" rel="noreferrer">
+              View {quoteWord(q)}
+              {q.pdf ? ' (PDF)' : ''}
+            </a>
+          </div>
+        </section>
       ) : q ? (
         <section className="pt-card pt-action pt-quote" data-track="quote">
           <h2>Your {quoteWord(q)} from Heliaxis</h2>
@@ -171,8 +211,8 @@ function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAcce
               View {quoteWord(q)}
               {q.pdf ? ' (PDF)' : ''}
             </a>
-            <button type="button" className="pt-btn" onClick={() => setSigning(true)}>
-              Accept quote
+            <button type="button" className="pt-btn" disabled={busy} onClick={() => void accept()}>
+              {busy ? 'One moment…' : 'Accept quote'}
             </button>
             <button type="button" className="pt-btn ghost" onClick={() => setQuery((n) => n + 1)}>
               Raise a query
@@ -224,7 +264,7 @@ function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAcce
 /* ── Won onwards: the full portal ──────────────────────────────────────────── */
 
 function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data: PortalData; paid: boolean; justAccepted: boolean; openAccept: boolean; themePref: ThemePref }) {
-  const [signing, setSigningRaw] = useState(openAccept && !!data.quote);
+  const [signing, setSigningRaw] = useState(openAccept && !!data.quote && !data.pack.on);
   const [declining, setDeclining] = useState(false);
   const [query, setQuery] = useState(0);
   useEffect(() => {
@@ -235,6 +275,13 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
     if (v) track(data.token, 'sign_started');
     setSigningRaw(v);
   };
+  const { held, busy, accept } = useAcceptIntent(data, () => setSigning(true));
+  const auto = useRef(false);
+  useEffect(() => {
+    if (auto.current) return;
+    auto.current = true;
+    if (openAccept && data.pack.on && data.quote && !held) void accept();
+  }, [openAccept, data.pack.on, data.quote, held, accept]);
   const [photo, setPhoto] = useState<string | null>(null);
   const now = useNow(60_000);
   const accepted = data.accepted;
@@ -286,7 +333,18 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
         </section>
       )}
 
-      {data.quote && !accepted && (
+      {data.quote && !accepted && held && (
+        <section className="pt-card pt-action" data-track="quote-held">
+          <p className="pt-banner ok">{HOLD_MESSAGE}</p>
+          <div className="pt-row">
+            <a className="pt-btn ghost" href={`/api/my/${data.token}/doc/${data.quote.id}`} target="_blank" rel="noreferrer">
+              View {quoteWord(data.quote)}
+            </a>
+          </div>
+        </section>
+      )}
+
+      {data.quote && !accepted && !held && (
         <section className="pt-card pt-action" data-track="quote">
           <h2>Your {quoteWord(data.quote)}</h2>
           <p>Have a read through. When you’re happy, press Accept quote. You will sign, then pay your deposit and choose your installation date.</p>
@@ -294,8 +352,8 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
             <a className="pt-btn ghost" href={`/api/my/${data.token}/doc/${data.quote.id}`} target="_blank" rel="noreferrer">
               View {quoteWord(data.quote)}
             </a>
-            <button type="button" className="pt-btn" onClick={() => setSigning(true)}>
-              Accept quote
+            <button type="button" className="pt-btn" disabled={busy} onClick={() => void accept()}>
+              {busy ? 'One moment…' : 'Accept quote'}
             </button>
             <button type="button" className="pt-btn ghost" onClick={() => setQuery((n) => n + 1)}>
               Raise a query

@@ -48,6 +48,7 @@
 .us-controls { display: flex; gap: 0.5rem; }
 .us-controls label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.72rem; font-weight: 600; color: var(--muted); }
 .us-controls select { padding: 0.4rem 0.5rem; font: inherit; font-size: 0.85rem; color: var(--ink); border: 1px solid var(--border-strong); border-radius: 2px; background: var(--field); }
+.us-controls input[type='checkbox'] { align-self: flex-start; width: 1.1rem; height: 1.1rem; margin: 0.45rem 0 0.2rem; }
 .us-portals { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; min-width: 0; }
 .us-portals legend { font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 0.3rem; padding: 0; }
 .us-portals legend em { font-weight: 400; }

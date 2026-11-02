@@ -23,6 +23,8 @@ export type SchemaReady = {
   social: boolean;
   /** quotes.sql: Sales › Quotes, the quote builder. */
   quotes: boolean;
+  /** proposal-pack.sql: the proposal pack's slots and marks, and a customer's held acceptance. */
+  proposal: boolean;
 };
 
 /** A "false" is re-checked after a minute (so it flips soon after the SQL is run); once everything is true, 10 minutes. */
@@ -46,7 +48,7 @@ async function has(table: string, column = 'id') {
 }
 
 async function check(): Promise<SchemaReady> {
-  const [crmV3, surveys, bookings, diary, purchaseOrders, siteMessages, docSlots, siteReview, handover, design, social, orgContacts, jobOrgs, quotes] = await Promise.all([
+  const [crmV3, surveys, bookings, diary, purchaseOrders, siteMessages, docSlots, siteReview, handover, design, social, orgContacts, jobOrgs, quotes, proposalSlots, proposalDocs, proposalHeld] = await Promise.all([
     has('crm_projects', 'project_ref'), // crm-v3.sql
     has('crm_surveys'), // surveys.sql
     has('survey_bookings'), // survey-booking.sql
@@ -61,9 +63,24 @@ async function check(): Promise<SchemaReady> {
     has('crm_contacts'), // organisations.sql
     has('crm_projects', 'contact_id'), // and the job's link
     has('crm_quotes'), // quotes.sql
+    has('proposal_slots', 'project_id'), // proposal-pack.sql
+    has('crm_documents', 'proposal_slot'), // and its document column
+    has('crm_projects', 'accepted_pending_at'), // and a held acceptance
   ]);
   const site = siteMessages && docSlots && siteReview;
-  return { crmV3, surveys, booking: bookings && diary, purchaseOrders, site, handover: site && handover, design, social, quotes, organisations: orgContacts && jobOrgs };
+  return {
+    crmV3,
+    surveys,
+    booking: bookings && diary,
+    purchaseOrders,
+    site,
+    handover: site && handover,
+    design,
+    social,
+    quotes,
+    organisations: orgContacts && jobOrgs,
+    proposal: proposalSlots && proposalDocs && proposalHeld,
+  };
 }
 
 /** Cached in memory for 60 s, so a `false` is checked again a minute after the SQL is run. Never throws. */
