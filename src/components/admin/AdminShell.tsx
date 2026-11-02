@@ -378,6 +378,7 @@ export async function AdminShell({
         { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries') },
         { href: '/admin/enquiries/templates', label: 'WhatsApp templates', short: 'Templates', icon: icons.templates, show: can('enquiries') },
         { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm') },
+        { href: '/admin/crm/map', label: 'Leads map', icon: icons.reports, show: can('crm') },
         { href: '/admin/crm/settings', label: 'CRM settings', icon: icons.settings, show: can('crm') },
         { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm') },
       ],

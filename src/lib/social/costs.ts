@@ -12,6 +12,9 @@ export type Usage = { input_tokens?: number | null; output_tokens?: number | nul
 
 /** USD per million tokens (Anthropic's published prices for prompts up to 100K tokens). Cache reads 10% of input, cache writes 125%. */
 const PRICES: { match: string; input: number; output: number }[] = [
+  // OpenRouter models the blog and page builder fall back to. Order matters: the mini model is matched before the full one.
+  { match: 'gpt-4o-mini', input: 0.15, output: 0.6 },
+  { match: 'gpt-4o', input: 2.5, output: 10 },
   { match: 'haiku', input: 0.1, output: 0.5 },
   { match: 'sonnet', input: 2, output: 10 },
   { match: 'opus', input: 4, output: 20 },
