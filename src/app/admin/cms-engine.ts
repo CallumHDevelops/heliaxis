@@ -1779,16 +1779,58 @@ function renderImages(){const el=document.getElementById('panel-images');const i
  el.innerHTML=h;}
 function toWebp(dataURL,cb){try{const img=new Image();img.onload=()=>{try{var w=img.naturalWidth||img.width||1;var h=img.naturalHeight||img.height||1;var scale=1;if(w>IMG_MAX_EDGE||h>IMG_MAX_EDGE)scale=IMG_MAX_EDGE/Math.max(w,h);var cw=Math.max(1,Math.round(w*scale));var ch=Math.max(1,Math.round(h*scale));const c=document.createElement('canvas');c.width=cw;c.height=ch;c.getContext('2d').drawImage(img,0,0,cw,ch);cb(c.toDataURL('image/webp',IMG_WEBP_QUALITY));}catch(e){cb(dataURL)}};img.onerror=()=>cb(dataURL);img.src=dataURL;}catch(e){cb(dataURL)}}
 function toWebpPromise(dataURL){return new Promise(function(resolve){toWebp(dataURL,resolve);});}
-async function uploadCmsMediaFile(file,name){
+/** Upload one file to CMS media storage. onProgress(fraction 0–1) reports bytes sent (XHR, so the
+ *  upload panel can show a real progress bar; fetch can't report upload progress). */
+function uploadCmsMediaFile(file,name,onProgress){
  const f=file instanceof File?file:new File([file],name||'image.webp',{type:'image/webp'});
  const fd=new FormData();
  fd.append('file',f,f.name||name||'image.webp');
- const r=await fetch('/api/cms/media',{method:'POST',credentials:'same-origin',body:fd});
- var d=null;try{d=await r.json();}catch(e){}
- if(!r.ok)throw new Error((d&&d.error)||'Image upload failed');
- if(!d||!d.url)throw new Error('Image upload returned no URL');
- return String(d.url);
+ return new Promise(function(resolve,reject){
+  var x=new XMLHttpRequest();
+  x.open('POST','/api/cms/media');
+  x.withCredentials=true;
+  if(onProgress&&x.upload)x.upload.onprogress=function(e){if(e.lengthComputable)onProgress(e.loaded/e.total);};
+  x.onload=function(){
+   var d=null;try{d=JSON.parse(x.responseText);}catch(e){}
+   if(x.status<200||x.status>=300)return reject(new Error((d&&d.error)||(x.status===401?'You have been signed out. Sign in again and retry.':'Upload failed ('+x.status+')')));
+   if(!d||!d.url)return reject(new Error('Upload returned no image address'));
+   resolve(String(d.url));
+  };
+  x.onerror=function(){reject(new Error('Network error. Check your connection.'));};
+  x.ontimeout=function(){reject(new Error('Upload timed out'));};
+  x.timeout=120000;
+  x.send(fd);
+ });
 }
+/* ---- Upload progress panel: one row per file (preparing → uploading % → done / failed), then a
+ *      summary that says where the images went. Sits bottom-right over the editor. ---- */
+function upPanelEl(){
+ var el=document.getElementById('cms-upload-panel');
+ if(!el){el=document.createElement('div');el.id='cms-upload-panel';el.className='cms-up';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el);}
+ return el;
+}
+function upPanelStart(files){
+ var el=upPanelEl();clearTimeout(window._upPanelHide);
+ el.innerHTML='<div class="cms-up-head"><b id="cms-up-title">Uploading '+files.length+' image'+(files.length===1?'':'s')+'…</b><button type="button" class="cms-up-x" aria-label="Close" onclick="upPanelClose()">×</button></div>'
+  +'<div class="cms-up-list">'+files.map(function(f,i){return '<div class="cms-up-row" id="cms-up-'+i+'"><span class="cms-up-name">'+esc(f.name)+'</span><span class="cms-up-state">Waiting</span><span class="cms-up-bar"><i style="width:0%"></i></span></div>';}).join('')+'</div>'
+  +'<div class="cms-up-foot" id="cms-up-foot" hidden></div>';
+ el.classList.add('show');
+}
+function upPanelRow(i,state,frac,cls){
+ var r=document.getElementById('cms-up-'+i);if(!r)return;
+ r.className='cms-up-row'+(cls?' is-'+cls:'');
+ r.querySelector('.cms-up-state').textContent=state;
+ if(frac!=null)r.querySelector('.cms-up-bar i').style.width=Math.round(Math.max(0,Math.min(1,frac))*100)+'%';
+}
+function upPanelDone(title,footHtml,ok){
+ var t=document.getElementById('cms-up-title');if(t)t.textContent=title;
+ var f=document.getElementById('cms-up-foot');if(f){f.innerHTML=footHtml;f.hidden=!footHtml;}
+ var el=upPanelEl();el.classList.toggle('has-error',!ok);
+ clearTimeout(window._upPanelHide);
+ if(ok)window._upPanelHide=setTimeout(upPanelClose,9000);
+}
+function upPanelClose(){var el=document.getElementById('cms-upload-panel');if(el)el.classList.remove('show');}
+function upPanelShowLibrary(){upPanelClose();if(MODE==='edit')tab('images');else showLibrary();}
 function dataUrlToFile(dataURL,name){
  var m=String(dataURL||'').match(/^data:([^;]+);base64,(.+)$/);
  if(!m)throw new Error('Invalid image data');
@@ -1807,9 +1849,11 @@ async function imgUpload(inp,pickPath){
  const uploaded=[];
  const failures=[];
  setSaved('Uploading media…');
- for(var i=0;i<files.length;i++){
+ upPanelStart(files);
+ for(let i=0;i<files.length;i++){
   const f=files[i];
   try{
+   upPanelRow(i,'Preparing…',0.02,'busy');
    const dataURL=await new Promise(function(resolve,reject){
     const r=new FileReader();
     r.onload=function(){resolve(r.result);};
@@ -1820,27 +1864,40 @@ async function imgUpload(inp,pickPath){
    const name=f.name.replace(/\.[^.]+$/,'.webp');
    const baseName=f.name.replace(/\.[^.]+$/,'');
    const upFile=dataUrlToFile(webp,name);
-   const url=await uploadCmsMediaFile(upFile,name);
+   upPanelRow(i,'Uploading 0%',0.05,'busy');
+   const url=await uploadCmsMediaFile(upFile,name,function(fr){upPanelRow(i,fr>=1?'Finishing…':'Uploading '+Math.round(fr*100)+'%',0.05+fr*0.9,'busy');});
    const id=uid();
    (STATE.site.images=STATE.site.images||[]).push({id,name,data:url,cat:''});
    uploaded.push({id,name,baseName,data:url});
+   upPanelRow(i,'Done',1,'ok');
   }catch(e){
    failures.push((f&&f.name)||('file '+(i+1)));
+   upPanelRow(i,'Failed: '+((e&&e.message)||'upload error'),1,'err');
   }
  }
- if(uploaded.length)finishImgUpload(uploaded,pickPath);
- if(failures.length){
-  openNoticeModal({title:'Some uploads failed',message:'Could not upload '+failures.length+' image'+(failures.length===1?'':'s')+'. Check your connection and try again.'});
+ const placed=uploaded.length?finishImgUpload(uploaded,pickPath):false;
+ var n=uploaded.length;
+ var where=placed
+  ? (n===1?'Added to this section and saved in the Image library.':'The first image was added to this section. All '+n+' are saved in the Image library.')
+  : 'Saved in the Image library. Click an image frame, then Library, to use '+(n===1?'it':'them')+'.';
+ if(!failures.length){
+  upPanelDone(n+' image'+(n===1?'':'s')+' uploaded',esc(where)+' <button type="button" class="cms-up-link" onclick="upPanelShowLibrary()">Open Image library</button>',true);
+ }else{
+  upPanelDone(failures.length+' of '+files.length+' failed',(n?esc(where)+' ':'')+'Failed images are listed above. Try them again.',false);
+  setSaved(n?'Saved':'Upload failed');
  }
 }
 function finishImgUpload(uploaded,pickPath){renderImages();if(MODE==='library')renderLibrary();
- if(pickPath&&uploaded.length===1){
-  const u=uploaded[0];
+ var placed=false;
+ // Uploaded from an image frame: the frame gets the (first) image, even when several were picked.
+ if(pickPath&&uploaded.length){
+  const u=uploaded[0];placed=true;
   if(/\.(logoImg|markImg)$/.test(String(pickPath||'')))upd(pickPath,u.data);
   else upd(pickPath,{libId:u.id,src:'',alt:suggestAltFromName(u.baseName),title:'',desc:'',caption:'',keywords:'',loading:'lazy',decorative:false,focusX:50,focusY:50,zoom:1});
   if(window._imgLibPickPath===pickPath)closeImgLibModal();
  }else{save();if(window._imgLibPickPath)renderImgLibModalGrid();}
- if(MODE==='edit'){renderBuild();renderPreview();}}
+ if(MODE==='edit'){renderBuild();renderPreview();}
+ return placed;}
 function showImgMetaModal(im,opts){opts=opts||{};const suggestedAlt=opts.suggestedAlt||suggestAltFromName(im.name);
  const isPlacement=!!opts.placement;const m=imgResolve(im);m.data=im.data||m.src;m.name=im.name||'';
  const load=m.loading||'lazy';
@@ -3685,6 +3742,8 @@ w.logoAdd = logoAdd;
 w.imgRm = imgRm;
 w.imgRmAsk = imgRmAsk;
 w.imgUpload = imgUpload;
+w.upPanelClose = upPanelClose;
+w.upPanelShowLibrary = upPanelShowLibrary;
 w.closeImgMetaModal = closeImgMetaModal;
 w.confirmImgMeta = confirmImgMeta;
 w.imgMetaSetLoading = imgMetaSetLoading;
