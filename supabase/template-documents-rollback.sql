@@ -11,5 +11,6 @@ begin
   end if;
   drop table if exists public.template_documents;
   drop function if exists public.template_documents_guard();
+  drop function if exists public.revise_template_document(uuid, uuid);
   perform pg_notify('pgrst', 'reload schema');
 end $$;

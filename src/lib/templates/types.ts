@@ -31,7 +31,10 @@ export const YESNO: { value: YesNo; label: string }[] = [
   { value: 'na', label: 'N/A' },
 ];
 
-/** Only shown when an earlier field has this answer ("yes", "no", "na", or one of its options), or any of several. */
+/**
+ * Only shown when an earlier field has this answer ("yes", "no", "na", or one of its options), or any of several.
+ * An empty string among them means "not answered yet", so a question can show until its controlling answer says otherwise.
+ */
 export type ShowWhen = { key: string; is: string | string[] };
 
 export type TemplateField = {

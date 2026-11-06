@@ -71,6 +71,13 @@ describe('validating a template', () => {
     expect(validateTemplate(sec({ key: 'kind', is: 'Water' })).join(' ')).toContain('which that field can’t be');
     expect(validateTemplate(sec({ key: 'nope', is: 'Ground' })).join(' ')).toContain('isn’t an earlier field');
   });
+  it('lets a "show when" match "not answered yet", written as an empty answer', () => {
+    const t = base({ sections: [{ type: 'fields', title: 'One', fields: [{ key: 'a', label: 'A', kind: 'choice', options: ['x', 'y'] }, { key: 'b', label: 'B', kind: 'text', showWhen: { key: 'a', is: ['', 'x'] } }] }] });
+    expect(validateTemplate(t)).toEqual([]);
+    expect(visibility(t, {}).fields.has('b')).toBe(true);
+    expect(visibility(t, { a: 'x' }).fields.has('b')).toBe(true);
+    expect(visibility(t, { a: 'y' }).fields.has('b')).toBe(false);
+  });
   it('refuses a merge field that does not exist', () => {
     const t = base({ intro: 'For {{nobody}}', sections: [{ type: 'text', body: 'Hi {{customer}} {{whoever}}' }] });
     const why = validateTemplate(t).join(' ');

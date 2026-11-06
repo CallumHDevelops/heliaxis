@@ -135,7 +135,8 @@ export const HEAT_PUMP_COMMISSIONING: DocTemplate = {
     {
       type: 'fields',
       title: 'Outdoor unit and refrigerant (air source only)',
-      showWhen: { key: 'hpType', is: ['Air source (ASHP)', 'Water source', 'Exhaust air'] },
+      // Until the type is chosen both show, as in SimpliHeat; then the one that applies (water source and exhaust air keep both).
+      showWhen: { key: 'hpType', is: ['', 'Air source (ASHP)', 'Water source', 'Exhaust air'] },
       columns: 2,
       fields: [
         text('antifreezeType', 'Antifreeze make and type'),
@@ -153,14 +154,15 @@ export const HEAT_PUMP_COMMISSIONING: DocTemplate = {
     {
       type: 'fields',
       title: 'Clear space round the outdoor unit (air source only)',
-      showWhen: { key: 'hpType', is: ['Air source (ASHP)', 'Water source', 'Exhaust air'] },
+      // Until the type is chosen both show, as in SimpliHeat; then the one that applies (water source and exhaust air keep both).
+      showWhen: { key: 'hpType', is: ['', 'Air source (ASHP)', 'Water source', 'Exhaust air'] },
       columns: 3,
       fields: [num('clearBack', 'Behind', 'mm'), num('clearFront', 'In front', 'mm'), num('clearLeft', 'Left', 'mm'), num('clearRight', 'Right', 'mm'), num('clearBelow', 'Below', 'mm')],
     },
     {
       type: 'fields',
       title: 'Ground collector (ground source only)',
-      showWhen: { key: 'hpType', is: ['Ground source (GSHP)', 'Water source', 'Exhaust air'] },
+      showWhen: { key: 'hpType', is: ['', 'Ground source (GSHP)', 'Water source', 'Exhaust air'] },
       columns: 2,
       fields: [
         text('collectorType', 'Type of ground collector'),
@@ -311,8 +313,8 @@ export const CYLINDER_COMMISSIONING: DocTemplate = {
       type: 'sign',
       title: 'Signed off',
       signers: [
-        { key: 'sign_engineer', label: 'Commissioning engineer' },
-        { key: 'sign_customer', label: 'Customer' },
+        { key: 'technician', label: 'Commissioning engineer' },
+        { key: 'customer', label: 'Customer' },
       ],
     },
   ],

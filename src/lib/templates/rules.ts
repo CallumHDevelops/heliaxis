@@ -60,6 +60,7 @@ export function validateTemplate(t: DocTemplate): string[] {
       return;
     }
     for (const v of whenValues(w)) {
+      if (v === '') continue; // "not answered yet"
       if (dep.kind === 'yesno' ? !['yes', 'no', 'na'].includes(v) : dep.kind === 'choice' ? !(dep.options ?? []).includes(v) : !v.trim())
         out.push(`${name} is shown when “${dep.label}” is “${v}”, which that field can’t be.`);
     }
