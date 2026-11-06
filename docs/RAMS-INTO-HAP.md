@@ -67,7 +67,7 @@ RAMS has its own Supabase project with about 25 tables. Name collisions with HAP
 
 ## The database migration (supabase/rams.sql)
 
-`supabase/rams.sql` is additive and re-runnable: 3 columns on `profiles` (job title, phone, signature), 14 new
+`supabase/rams.sql` is additive and re-runnable: 3 columns on `profiles` (job title, phone, signature), 12 new
 tables (the RAMS documents, their site details, people, certificates, trades and each trade's signature,
 briefings, the queue), 4 functions, 4 triggers, 2 private storage buckets. It changes no existing data and the one
 trigger on `crm_projects` only ever inserts a queue row. `supabase/rams-rollback.sql` undoes it, and refuses
