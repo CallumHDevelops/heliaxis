@@ -170,8 +170,8 @@ describe('drawing a template as a PDF', () => {
   it('leaves out the parts of the heat pump forms that do not apply', async () => {
     const { renderTemplate } = await import('@/lib/documents/templates/render');
     const preview = await pages(await renderTemplate({ template: HEAT_PUMP_COMMISSIONING, job, draft: true }));
-    const airSource = await pages(await renderTemplate({ template: HEAT_PUMP_COMMISSIONING, job, draft: true, answers: { system_type: 'Air source', supply_phase: 'Single phase' } }));
-    const ground = await pages(await renderTemplate({ template: HEAT_PUMP_COMMISSIONING, job, draft: true, answers: { system_type: 'Ground source', supply_phase: 'Single phase' } }));
+    const airSource = await pages(await renderTemplate({ template: HEAT_PUMP_COMMISSIONING, job, draft: true, answers: { hpType: 'Air source (ASHP)', supplyPhase: 'Single phase' } }));
+    const ground = await pages(await renderTemplate({ template: HEAT_PUMP_COMMISSIONING, job, draft: true, answers: { hpType: 'Ground source (GSHP)', supplyPhase: 'Single phase' } }));
     expect(airSource).toBeLessThanOrEqual(preview);
     expect(ground).toBeLessThanOrEqual(preview);
     const unvented = await pages(await renderTemplate({ template: CYLINDER_COMMISSIONING, job, draft: true, answers: { cylinder_type: 'Unvented' } }));

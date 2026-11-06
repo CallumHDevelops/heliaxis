@@ -29,7 +29,10 @@ export const mergeKeysIn = (s: string | undefined): string[] => [...(s ?? '').ma
 export const fillMerge = (s: string, values: Record<string, string | null | undefined>): string => s.replace(MERGE, (_, k: string) => values[k] ?? '');
 
 export const CODE_PATTERN = /^HX-[A-Z]{2,4}-\d{2}$/;
-const KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
+const KEY_PATTERN = /^[a-z][A-Za-z0-9_]{0,39}$/;
+
+/** The answers a "show when" matches: one, or any of several. */
+export const whenValues = (w: ShowWhen): string[] => (Array.isArray(w.is) ? w.is : [w.is]);
 
 /** Every field in a template, in order. */
 export const allFields = (t: DocTemplate): TemplateField[] => t.sections.flatMap((s) => (s.type === 'fields' ? s.fields : []));
@@ -52,9 +55,14 @@ export function validateTemplate(t: DocTemplate): string[] {
   /** A "show when" must point at an earlier field, and at an answer that field can have. */
   const checkWhen = (name: string, w: ShowWhen) => {
     const dep = seen.get(w.key);
-    if (!dep) out.push(`${name} is shown when “${w.key}” is answered, which isn’t an earlier field.`);
-    else if (dep.kind === 'yesno' ? !['yes', 'no', 'na'].includes(w.is) : dep.kind === 'choice' ? !(dep.options ?? []).includes(w.is) : !w.is.trim())
-      out.push(`${name} is shown when “${dep.label}” is “${w.is}”, which that field can’t be.`);
+    if (!dep) {
+      out.push(`${name} is shown when “${w.key}” is answered, which isn’t an earlier field.`);
+      return;
+    }
+    for (const v of whenValues(w)) {
+      if (dep.kind === 'yesno' ? !['yes', 'no', 'na'].includes(v) : dep.kind === 'choice' ? !(dep.options ?? []).includes(v) : !v.trim())
+        out.push(`${name} is shown when “${dep.label}” is “${v}”, which that field can’t be.`);
+    }
   };
   t.sections.forEach((s, i) => {
     const where = `Section ${i + 1}${'title' in s && s.title ? ` (${s.title})` : ''}`;
@@ -65,7 +73,7 @@ export function validateTemplate(t: DocTemplate): string[] {
       if (s.columns !== undefined && ![1, 2, 3].includes(s.columns)) out.push(`${where}: columns must be 1, 2 or 3.`);
       for (const f of s.fields) {
         const name = f.label.trim() ? `“${f.label.trim()}”` : `A field in ${where}`;
-        if (!KEY_PATTERN.test(f.key)) out.push(`${name} has a key that isn’t allowed (lowercase letters, digits and _, starting with a letter).`);
+        if (!KEY_PATTERN.test(f.key)) out.push(`${name} has a key that isn’t allowed (letters, digits and _, starting with a lowercase letter).`);
         else if (seen.has(f.key)) out.push(`${name} reuses the key “${f.key}”.`);
         if (!f.label.trim()) out.push(`A field in ${where} has no label.`);
         else if (f.label.length > 200) out.push(`${name} has a label that is too long (200 characters at most).`);
@@ -104,7 +112,7 @@ export function validateTemplate(t: DocTemplate): string[] {
 export function visibility(t: DocTemplate, answers: Answers | undefined): { sections: boolean[]; fields: Set<string> } {
   const fields = new Set<string>();
   const sections: boolean[] = [];
-  const ok = (w: ShowWhen | undefined) => !w || !answers || (fields.has(w.key) && String(answers[w.key] ?? '') === w.is);
+  const ok = (w: ShowWhen | undefined) => !w || !answers || (fields.has(w.key) && whenValues(w).includes(String(answers[w.key] ?? '')));
   for (const s of t.sections) {
     const shown = ok(s.showWhen);
     sections.push(shown);

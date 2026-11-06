@@ -31,11 +31,11 @@ export const YESNO: { value: YesNo; label: string }[] = [
   { value: 'na', label: 'N/A' },
 ];
 
-/** Only shown when an earlier field has this answer ("yes", "no", "na", or one of its options). */
-export type ShowWhen = { key: string; is: string };
+/** Only shown when an earlier field has this answer ("yes", "no", "na", or one of its options), or any of several. */
+export type ShowWhen = { key: string; is: string | string[] };
 
 export type TemplateField = {
-  /** Never changes once a document has been made from it (answers are kept by key): lowercase letters, digits and _. */
+  /** Never changes once a document has been made from it (answers are kept by key): letters, digits and _, starting with a lowercase letter (hpType, v_l1n). */
   key: string;
   /** The question or field name as printed. */
   label: string;
@@ -48,6 +48,8 @@ export type TemplateField = {
   hint?: string;
   /** Printed in the answer already, from the job: "{{customer}}". */
   prefill?: string;
+  /** A yes/no field answered only Yes or No, with no N/A (the SimpliHeat checklist has none). */
+  noNa?: boolean;
   /** Left empty, the document can't be finished on screen. */
   required?: boolean;
   /** Only asked when an earlier field has this answer. */
