@@ -174,3 +174,17 @@ describe('SimpliHeat, both ways', () => {
     for (const f of allFields(tpl).filter((x) => x.kind === 'yesno')) expect(f.noNa, f.key).toBe(true);
   });
 });
+
+describe('pre-filled questions', () => {
+  const t: DocTemplate = {
+    schema: 1,
+    code: 'HX-TST-01',
+    title: 'Test',
+    tech: [],
+    sections: [{ type: 'fields', title: 'Site', fields: [{ key: 'client', label: 'Client', kind: 'text', prefill: '{{customer}}' }, { key: 'note', label: 'Note', kind: 'text' }] }],
+  };
+  it('are not left to answer, because they print the job’s own value', () => {
+    expect(progress(t, {})).toEqual({ asked: 2, answered: 1, left: 1 });
+    expect(outstanding(t, {}).map((f) => f.key)).toEqual(['note']);
+  });
+});

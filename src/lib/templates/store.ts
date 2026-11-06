@@ -2,7 +2,8 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { addressLines } from '@/lib/handover/facts';
 import type { JobHead } from '@/lib/handover/inputs';
-import type { FormRow, FormStore } from './forms';
+import { formView, type FormRow, type FormStore } from './forms';
+import { templatesForProducts } from './registry';
 
 /** The forms' storage in the database (supabase/template-documents.sql). The rules are in forms.ts. */
 export function supabaseStore(db: SupabaseClient): FormStore {
@@ -61,4 +62,14 @@ export async function jobHeadFor(db: SupabaseClient, projectId: string, variant?
     postcode,
     variant,
   };
+}
+
+/** The forms that belong on a project (by its products), each with where it is: not started, draft or signed, and how much is done. */
+export async function listForms(db: SupabaseClient, projectId: string, products: string[]) {
+  const { data } = await db.from('template_documents').select('*').eq('project_id', projectId).neq('status', 'superseded');
+  const rows = new Map(((data ?? []) as FormRow[]).map((r) => [r.template_code, r]));
+  return templatesForProducts(products).map((t) => {
+    const v = formView(t, rows.get(t.code) ?? null);
+    return { code: v.code, title: v.title, purpose: v.purpose, status: v.status, revision: v.revision, progress: v.progress, signed: Object.keys(v.signed), updatedAt: v.updatedAt };
+  });
 }

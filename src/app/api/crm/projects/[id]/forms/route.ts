@@ -1,8 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
-import { formView, type FormRow } from '@/lib/templates/forms';
-import { templatesForProducts } from '@/lib/templates/registry';
-import { formsReady } from '@/lib/templates/store';
+import { formsReady, listForms } from '@/lib/templates/store';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -16,11 +14,6 @@ export async function GET(_req: Request, { params }: Ctx) {
   if (!(await formsReady(db))) return json({ error: 'Forms are not set up yet', ready: false }, 503);
   const { data: p } = await db.from('crm_projects').select('id, products').eq('id', id).maybeSingle();
   if (!p) return json({ error: 'Not found' }, 404);
-  const { data } = await db.from('template_documents').select('*').eq('project_id', id).neq('status', 'superseded');
-  const rows = new Map(((data ?? []) as FormRow[]).map((r) => [r.template_code, r]));
-  const forms = templatesForProducts((p.products as string[] | null) ?? []).map((t) => {
-    const v = formView(t, rows.get(t.code) ?? null);
-    return { code: v.code, title: v.title, purpose: v.purpose, status: v.status, revision: v.revision, progress: v.progress, signed: Object.keys(v.signed), updatedAt: v.updatedAt };
-  });
+  const forms = await listForms(db, id, (p.products as string[] | null) ?? []);
   return json({ ready: true, forms });
 }

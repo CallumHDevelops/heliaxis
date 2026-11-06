@@ -66,7 +66,7 @@ const SIGNABLE = ['quote', 'contract'];
 
 const short = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
-async function uploadFile(url: string, file: File, extra: Record<string, unknown>) {
+export async function uploadFile(url: string, file: File, extra: Record<string, unknown>) {
   const prep = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

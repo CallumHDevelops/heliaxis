@@ -1,8 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { formView, reviseForm, saveAnswers, signLine, type Who } from '@/lib/templates/forms';
+import { mergeValues } from '@/lib/documents/templates/render';
 import { templateByCode } from '@/lib/templates/registry';
-import { formsReady, supabaseStore } from '@/lib/templates/store';
+import { formsReady, jobHeadFor, supabaseStore } from '@/lib/templates/store';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string; code: string }> };
@@ -26,7 +27,9 @@ export async function GET(_req: Request, { params }: Ctx) {
   const t = await target(id, code);
   if ('error' in t) return t.error;
   const row = await supabaseStore(t.db).live(id, t.template.code);
-  return json({ template: t.template, form: formView(t.template, row) });
+  // What the job fills in ({{customer}}, {{address}}…): shown on screen as it will print.
+  const job = await jobHeadFor(t.db, id);
+  return json({ template: t.template, form: formView(t.template, row), merge: job ? mergeValues(job) : {} });
 }
 
 /** Save answers: `{ answers: { key: value } }`. Answers that don't suit their question are listed in `problems`; the rest are saved. */

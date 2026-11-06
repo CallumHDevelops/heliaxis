@@ -1,0 +1,267 @@
+/* The MCS pack in the Docs tab (DocsHub.tsx, McsPack.tsx) and the form screen (FormEditor.tsx). Inside .crm; the rows reuse handover.css. */
+
+.mcs-hub,
+.mcs {
+  display: grid;
+  gap: 0.9rem;
+}
+
+/* Files | MCS pack */
+.mcs-switch {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.mcs-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mcs-switch button.on {
+  background: var(--solar);
+  color: var(--accent-ink);
+}
+.mcs-switch i {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 800;
+  opacity: 0.8;
+}
+
+.mcs-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.mcs-err {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--err);
+  color: var(--err);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.mcs-rowacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  align-items: start;
+}
+.mcs-files {
+  list-style: none;
+  margin: 0.6rem 0 0 8.25rem;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.mcs-files li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.mcs-files small {
+  color: var(--muted);
+}
+.mcs-sub {
+  display: grid;
+  gap: 0.35rem;
+}
+.mcs-sub h5 {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.mcs-handover {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* A form. */
+.mcs-formtop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.mcs-formtop__acts {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.mcs-saving {
+  min-width: 4.5rem;
+  text-align: right;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.mcs-formhead {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.mcs-formhead h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.mcs-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.mcs-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  margin: 0.15rem 0 0.2rem;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.mcs-locked {
+  margin: 0.3rem 0 0;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  background: rgb(var(--accent-rgb) / 0.14);
+  border: 1px solid var(--accent-line);
+  font-size: 0.9rem;
+}
+.mcs-sec {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.mcs-sec h4 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.mcs-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+.mcs-fields {
+  display: grid;
+  gap: 0.8rem 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 761px) {
+  .mcs-fields--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mcs-fields--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.mcs-field {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+  min-width: 0;
+}
+.mcs-yn {
+  display: flex;
+  gap: 0.4rem;
+}
+.mcs-yn .crm-btn {
+  min-width: 4rem;
+}
+.mcs-yn .crm-btn.is-on {
+  background: var(--solar);
+  border-color: var(--solar);
+  color: var(--accent-ink);
+}
+.mcs-hint,
+.mcs-prov {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.mcs-other {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+.mcs-signs {
+  display: grid;
+  gap: 0.8rem;
+}
+@media (min-width: 761px) {
+  .mcs-signs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.mcs-sign {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  padding: 0.75rem 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+.mcs-sign.is-signed {
+  border-style: solid;
+  border-left: 4px solid var(--ok);
+}
+.mcs-signbox {
+  display: grid;
+  gap: 0.5rem;
+}
+.mcs-signbox__btns {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* Phones: the state, the item, then its buttons, one under the other (the Handover tab's sheet layout is for its own rows). */
+@media (max-width: 760px) {
+  .mcs .hv-row__head {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.45rem;
+  }
+  .mcs-rowacts {
+    justify-content: flex-start;
+  }
+  .mcs-files {
+    margin-left: 0;
+  }
+  .mcs-formtop__acts {
+    margin-left: auto;
+  }
+}
+
+.mcs-sign > .crm-btn {
+  justify-self: start;
+}

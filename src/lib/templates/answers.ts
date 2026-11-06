@@ -105,17 +105,20 @@ export function applyAnswers(t: DocTemplate, state: FormState, patch: Record<str
   return { state: { ...state, answers, provenance }, changed, unknown, problems };
 }
 
+/** A question with nothing entered that prints the job's own value (a pre-fill: the address, the customer) is not left to answer. */
+const blank = (f: TemplateField, answers: Answers) => !f.prefill && String(answers[f.key] ?? '').trim() === '';
+
 /** The questions that are asked (shown) and still have no answer, in the order the form asks them. */
 export function outstanding(t: DocTemplate, answers: Answers): TemplateField[] {
   const { fields } = visibility(t, answers);
-  return allFields(t).filter((f) => fields.has(f.key) && String(answers[f.key] ?? '').trim() === '');
+  return allFields(t).filter((f) => fields.has(f.key) && blank(f, answers));
 }
 
 /** How much of the form is done: the questions asked, answered and left. */
 export function progress(t: DocTemplate, answers: Answers): { asked: number; answered: number; left: number } {
   const { fields } = visibility(t, answers);
   const asked = allFields(t).filter((f) => fields.has(f.key));
-  const left = asked.filter((f) => String(answers[f.key] ?? '').trim() === '').length;
+  const left = asked.filter((f) => blank(f, answers)).length;
   return { asked: asked.length, answered: asked.length - left, left };
 }
 

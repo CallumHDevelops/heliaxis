@@ -186,3 +186,19 @@ screen on the project, and filing a signed form into the Handover and In-House p
 HAP when it syncs, add the cylinder questions (31, `HX-HP-03`), and the handover certificate's extra questions. HAP's
 cylinder record uses Yes/No/N/A; SimpliHeat's yes/no has no N/A, so those would be a select there.
 Note that Next.js's bundled docs, which AGENTS.md points to, are not in this install: the routes follow the existing ones.
+
+## Where the MCS pack is in HAP
+
+On a job from Won: **Docs → MCS pack** (a Files | MCS pack switch at the top of the Docs tab), or the **MCS pack card on the Overview**.
+`?tab=docs&view=mcs` opens the pack from a link; `&form=HX-HP-02` goes straight into one form.
+
+- **Forms**: the heat pump commissioning record, cylinder record and handover certificate. Filled in on screen (autosave, who/when/from where beside each
+  answer, SimpliHeat's differing answer offered as "Use that"), PDF in the Heliaxis style, admin signs or starts a revision.
+- **In-House file** (HX-IH-xx): internal, never shown to a customer. Files are filed with `crm_documents.inhouse_slot` (needs `supabase/inhouse-docs.sql`,
+  **not yet applied**; the rows show and count without it, Upload is hidden until it is run).
+- **Handover pack**: the customer's pack keeps its own tab from Ready to book; the MCS pack links to it.
+
+API: `GET /api/crm/projects/[id]/mcs` (`?summary=1` for the headline only), `forms`, `forms/[code]`, `forms/[code]/pdf`.
+A question that pre-fills from the job (address, customer) counts as answered, because it prints the job's value.
+
+Not built yet: the In-House generators and merged internal PDF, the RAMS screens, the template builder, the SimpliHeat-side changes.

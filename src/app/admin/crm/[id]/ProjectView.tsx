@@ -20,7 +20,8 @@ import { ActivityTab } from './ActivityTab';
 import { CompactCustomer, CustomerColumn } from './CustomerColumn';
 import { PhotosTab } from './PhotosTab';
 import { HandoverTab } from './HandoverTab';
-import { DocumentsTab, EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
+import { DocsHub } from './DocsHub';
+import { EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
 import { SiteTab } from './SiteTab';
@@ -107,6 +108,8 @@ export function ProjectView({
   canInbox,
   area = 'crm',
   initialTab = null,
+  initialView = null,
+  initialForm = null,
   entry = null,
   schema: serverSchema,
 }: {
@@ -116,6 +119,9 @@ export function ProjectView({
   canInbox: boolean;
   area?: Area;
   initialTab?: Tab | null;
+  /** ?view=mcs: Docs opens on the MCS pack; initialForm, on one form in it. */
+  initialView?: 'mcs' | null;
+  initialForm?: string | null;
   entry?: string | null;
   schema: SchemaReady;
 }) {
@@ -134,6 +140,9 @@ export function ProjectView({
   /** This job was joined into another while open (a merge elsewhere). */
   const [joined, setJoined] = useState<{ id: string; ref: string | null } | null>(null);
   const [tabSel, setTabSel] = useState<Tab | null>(initialTab && TABS.includes(initialTab) ? initialTab : null);
+  // The MCS pack on the Docs tab: where the address asked to open it, and a request from the Overview's card to go in.
+  const [deep, setDeep] = useState<{ view: 'mcs'; form: string | null } | null>(initialView ? { view: initialView, form: initialForm } : null);
+  const [mcsJump, setMcsJump] = useState<{ form: string | null; key: number } | null>(null);
   const [photoView, setPhotoView] = useState<{ cat: string | null; key: number }>({ cat: null, key: 0 });
   const [sheet, setSheet] = useState<SheetKey>(null);
   const [sheetOpts, setSheetOpts] = useState<{ draft?: string; photoCat?: string }>({});
@@ -302,10 +311,18 @@ export function ProjectView({
 
   const pickTab = useCallback((t: Tab) => {
     setTabSel(t);
+    if (t !== 'docs') {
+      setDeep(null);
+      setMcsJump(null);
+    }
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('tab', t);
       url.searchParams.delete('entry');
+      if (t !== 'docs') {
+        url.searchParams.delete('view');
+        url.searchParams.delete('form');
+      }
       window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
     } catch {
       // The tab still changes; only Back won't remember it.
@@ -529,6 +546,10 @@ export function ProjectView({
       else pickTab(t);
     },
     addDocument,
+    openMcs: (form) => {
+      pickTab('docs');
+      setMcsJump((j) => ({ form: form ?? null, key: (j?.key ?? 0) + 1 }));
+    },
     addPhoto: (cat) => openSheet('photo', { photoCat: cat }),
     startSurvey: (type) => void startSurvey(type),
     bookingLink: () => openSheet('link'),
@@ -720,7 +741,23 @@ export function ProjectView({
               </div>
             )}
             {tab === 'photos' && <PhotosTab key={photoView.key} id={id} photos={rec.photos} initialCat={photoView.cat} onChanged={refresh} />}
-            {tab === 'docs' && <DocumentsTab id={id} docs={rec.documents} onChanged={refresh} siteDocs={schema.site} handover={schema.handover} />}
+            {tab === 'docs' && (
+              <DocsHub
+                projectId={id}
+                docs={rec.documents}
+                onChanged={refresh}
+                siteDocs={schema.site}
+                handover={schema.handover}
+                mcsOn={isProjectStage(stage)}
+                isAdmin={isAdmin}
+                me={rec.team.find((t) => t.id === me)?.name ?? ''}
+                version={p.updated_at}
+                initialView={deep?.view ?? null}
+                initialForm={deep?.form ?? null}
+                jump={mcsJump}
+                openHandover={() => pickTab('handover')}
+              />
+            )}
             {tab === 'orders' && <OrdersTab projectId={id} today={today} myName={rec.team.find((t) => t.id === me)?.name ?? null} onChanged={refresh} />}
             {tab === 'site' && <SiteTab projectId={id} now={now} onChanged={() => void refresh()} />}
             {tab === 'handover' && (

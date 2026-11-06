@@ -21,6 +21,7 @@ import type { EnaInfo } from '@/lib/projects/ena';
 import type { TeamMember } from '@/lib/projects/server';
 import { cleanDesign, DESIGN_FIELDS, designInput } from '@/lib/site/design';
 import { HandoverCard } from '../../crm/[id]/HandoverCard';
+import { McsCard } from '../../crm/[id]/McsCard';
 import { DOC_LABEL } from '../../crm/[id]/ProjectExtras';
 import { londonIso, shortDate, ukDayOf, ukTime } from '../../crm/crm-shared';
 import { useMedia } from '../../crm/use-stored';
@@ -52,6 +53,8 @@ export type OverviewActions = {
   moveTo: (stage: string) => Promise<void> | void;
   openTab: (tab: Tab, photoCat?: string) => void;
   addDocument: (category: string) => void;
+  /** Docs → MCS pack, or straight into one form in it. */
+  openMcs: (form?: string) => void;
   addPhoto: (category: string) => void;
   startSurvey: (type: 'solar' | 'ashp') => void;
   bookingLink: () => void;
@@ -69,6 +72,7 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
   return (
     <div className="crmr-ov">
       <JobFile rec={rec} today={today} actions={actions} />
+      {delivery && <McsCard projectId={p.id} version={p.updated_at} onOpen={() => actions.openMcs()} />}
       {rec.schema.handover && HANDOVER_STAGES.includes(p.stage) && <HandoverCard projectId={p.id} version={p.updated_at} onOpen={() => actions.openTab('handover')} />}
       {v3 ? (
         <Checklist rec={rec} actions={actions} />

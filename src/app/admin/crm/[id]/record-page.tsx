@@ -18,6 +18,9 @@ export async function recordPage({ params, searchParams }: RecordPageProps, area
   // A job joined into another (src/lib/crm/merge.ts): old links and notifications open that one.
   const joined = await mergedInto('job', id);
   if (joined?.project_id) redirect(`/admin/${area === 'projects' ? 'projects' : 'crm'}/${joined.project_id}${tab ? `?tab=${tab}` : ''}`);
+  // ?tab=docs&view=mcs opens the MCS pack; &form=HX-HP-02 goes straight into one form.
+  const view = sp.view === 'mcs' ? 'mcs' : null;
+  const form = view && typeof sp.form === 'string' && /^HX-[A-Z]{2,4}-\d{2}$/.test(sp.form) ? sp.form : null;
   const entry = typeof sp.entry === 'string' && /^[\w-]{1,64}$/.test(sp.entry) ? sp.entry : null;
   return (
     <AdminShell active={area === 'projects' ? 'projects' : 'crm'} fluid>
@@ -30,6 +33,8 @@ export async function recordPage({ params, searchParams }: RecordPageProps, area
         canInbox={canAccess(session.profile, 'enquiries')}
         area={area}
         initialTab={tab}
+        initialView={view}
+        initialForm={form}
         entry={entry}
         schema={schema}
       />
