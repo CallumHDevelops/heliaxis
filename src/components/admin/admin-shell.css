@@ -585,3 +585,10 @@
   padding: 0.55rem 0.9rem;
   cursor: pointer;
 }
+
+/* Mega menu: a group whose pages name a section opens as columns, each under a small heading. */
+.hx-dd__panel--mega { padding: 14px 10px 10px; }
+.hx-dd__cols { display: flex; gap: 6px; align-items: flex-start; }
+.hx-dd__col { min-width: 200px; padding: 0 6px; }
+.hx-dd__col + .hx-dd__col { border-left: 1px solid var(--border-soft, var(--border)); }
+.hx-dd__head { margin: 0 0 6px 0.6rem; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }

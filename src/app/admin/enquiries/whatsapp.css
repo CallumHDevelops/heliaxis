@@ -711,8 +711,10 @@ textarea.wa-input {
 }
 .wa-pane__row .wa-input {
   flex: 1;
-  min-height: 52px;
-  max-height: 160px;
+  min-height: 96px;
+  max-height: min(45vh, 360px);
+  /* Grows with what is written (Chrome and Android); older browsers keep the taller start. */
+  field-sizing: content;
   resize: none;
   border-radius: 8px;
   font-size: 0.9rem;

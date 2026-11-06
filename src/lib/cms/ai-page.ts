@@ -1,4 +1,5 @@
 import { aiConfig, isAiConfigured } from '@/lib/blog/ai';
+import { recordChatUsage } from '@/lib/ai-usage';
 
 export { isAiConfigured };
 
@@ -476,7 +477,8 @@ export async function generatePage(
     }
 
     if (res.ok) {
-      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+      await recordChatUsage('cms_page', model, data.usage);
       content = data.choices?.[0]?.message?.content;
       usedModel = model;
       if (content) break;

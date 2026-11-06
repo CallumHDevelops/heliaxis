@@ -18,7 +18,7 @@ import { DOCK_EVENTS, type WaCounts } from './whatsapp/dock-shared';
  * `badge` is a count beside it, kept live in the browser for `liveBadge: 'wa'` (unread WhatsApp people,
  * from the dock's hx:wa-counts). A group's button shows the total of its items' counts.
  */
-export type MenuItem = { href: string; label: string; icon?: ReactNode; reload?: boolean; badge?: number; liveBadge?: 'wa' };
+export type MenuItem = { href: string; label: string; section?: string; icon?: ReactNode; reload?: boolean; badge?: number; liveBadge?: 'wa' };
 /** `dropdown`: a dropdown under its own name even with one page in it (e.g. Finance → Purchase orders). */
 export type MenuGroup = { id: string; label: string; items: MenuItem[]; dropdown?: boolean };
 
@@ -238,14 +238,34 @@ export function TopMenu({ groups, fallback }: { groups: MenuGroup[]; fallback?: 
               <Badge n={total} />
               {chevron}
             </button>
-            <div id={`hx-menu-${g.id}`} className="hx-dd__panel" hidden={!isOpen} onKeyDown={(e) => onPanelKey(e, g.id)}>
-              <ul>
-                {g.items.map((i) => (
-                  <li key={i.href}>
-                    <ItemLink item={i} className="hx-dd__item" current={i.href === current} badge={badgeOf(i)} onPick={close} />
-                  </li>
-                ))}
-              </ul>
+            <div id={`hx-menu-${g.id}`} className={g.items.some((i) => i.section) ? 'hx-dd__panel hx-dd__panel--mega' : 'hx-dd__panel'} hidden={!isOpen} onKeyDown={(e) => onPanelKey(e, g.id)}>
+              {g.items.some((i) => i.section) ? (
+                // A mega menu: its pages in columns under a heading each.
+                <div className="hx-dd__cols">
+                  {[...new Set(g.items.map((i) => i.section ?? ''))].map((sec) => (
+                    <div key={sec} className="hx-dd__col">
+                      {sec && <h3 className="hx-dd__head">{sec}</h3>}
+                      <ul>
+                        {g.items
+                          .filter((i) => (i.section ?? '') === sec)
+                          .map((i) => (
+                            <li key={i.href}>
+                              <ItemLink item={i} className="hx-dd__item" current={i.href === current} badge={badgeOf(i)} onPick={close} />
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ul>
+                  {g.items.map((i) => (
+                    <li key={i.href}>
+                      <ItemLink item={i} className="hx-dd__item" current={i.href === current} badge={badgeOf(i)} onPick={close} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </li>
         );

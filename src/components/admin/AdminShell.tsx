@@ -265,6 +265,8 @@ type NavItem = {
   show: boolean;
   /** On the phone bottom bar, so left out of "More". */
   tab?: boolean;
+  /** The column it sits under in the desktop mega menu (a group whose items name sections opens as columns). */
+  section?: string;
   /** A full page load from the desktop menu too (the CMS's own stylesheet would stay on after a soft one). */
   reload?: boolean;
   /** A count beside it in the desktop menu (and on its group's button). */
@@ -367,19 +369,20 @@ export async function AdminShell({
       id: 'crm',
       label: 'CRM',
       items: [
-        { href: '/admin/crm/dashboard', label: 'Dashboard', icon: icons.analytics, show: can('crm') },
-        { href: '/admin/crm', label: 'Opportunities', icon: icons.crm, show: can('crm'), tab: true },
-        { href: '/admin/crm/organisations', label: 'Organisations', icon: <svg {...ICON}><path d="M4 21V4l9-1v18M13 8h7v13M7.5 8h2M7.5 12h2M7.5 16h2M16 12h1.5M16 16h1.5M2 21h20" /></svg>, show: can('crm') },
-        { href: '/admin/crm/contacts', label: 'Contacts', icon: <svg {...ICON}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>, show: can('crm') },
-        { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab },
-        { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm') },
-        { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa' },
-        { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa' },
-        { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries') },
-        { href: '/admin/enquiries/templates', label: 'WhatsApp templates', short: 'Templates', icon: icons.templates, show: can('enquiries') },
-        { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm') },
-        { href: '/admin/crm/settings', label: 'CRM settings', icon: icons.settings, show: can('crm') },
-        { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm') },
+        { href: '/admin/crm/dashboard', label: 'Dashboard', icon: icons.analytics, show: can('crm'), section: 'Customers' },
+        { href: '/admin/crm', label: 'Opportunities', icon: icons.crm, show: can('crm'), tab: true, section: 'Customers' },
+        { href: '/admin/crm/organisations', label: 'Organisations', icon: <svg {...ICON}><path d="M4 21V4l9-1v18M13 8h7v13M7.5 8h2M7.5 12h2M7.5 16h2M16 12h1.5M16 16h1.5M2 21h20" /></svg>, show: can('crm'), section: 'Customers' },
+        { href: '/admin/crm/contacts', label: 'Contacts', icon: <svg {...ICON}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>, show: can('crm'), section: 'Customers' },
+        { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab, section: 'Enquiries and messages' },
+        { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm'), section: 'Diary and insight' },
+        { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
+        { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
+        { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries'), section: 'Enquiries and messages' },
+        { href: '/admin/enquiries/templates', label: 'WhatsApp templates', short: 'Templates', icon: icons.templates, show: can('enquiries'), section: 'Enquiries and messages' },
+        { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm'), section: 'Diary and insight' },
+        { href: '/admin/crm/map', label: 'Leads map', icon: icons.reports, show: can('crm'), section: 'Diary and insight' },
+        { href: '/admin/crm/settings', label: 'CRM settings', icon: icons.settings, show: can('crm'), section: 'Diary and insight' },
+        { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm'), tab: true, section: 'Diary and insight' },
       ],
     },
     {
@@ -405,7 +408,7 @@ export async function AdminShell({
         // On site: one tap away on the phone's bottom bar, so not in "More".
         { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring, badge: socialUrgent },
         { href: '/admin/value', label: 'Added value', icon: icons.analytics, active: active === 'value', show: admin },
-        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: true },
+        { href: RAMS_URL, label: 'RAMS', icon: icons.rams, show: can('rams'), tab: !can('crm') },
       ],
     },
     {
@@ -430,11 +433,11 @@ export async function AdminShell({
       id: 'cms',
       label: 'CMS',
       items: [
-        { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true },
-        { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms') },
-        { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics') },
-        { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics') },
-        { href: '/admin/analytics/ai', label: 'AI costs', icon: icons.analytics, active: active === 'aicosts', show: admin },
+        { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true, section: 'Website' },
+        { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms'), section: 'Website' },
+        { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics'), section: 'Analytics' },
+        { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics'), section: 'Analytics' },
+        { href: '/admin/analytics/ai', label: 'AI costs', icon: icons.analytics, active: active === 'aicosts', show: admin, section: 'Analytics' },
       ],
     },
     {
@@ -452,9 +455,10 @@ export async function AdminShell({
   // Each icon goes to the (client) menu inside a span made here: passed bare, React's dev build warns about keys.
   const menu = pick((i) => i.show).map((g) => ({
     ...g,
-    items: g.items.map(({ href, label, icon, reload, badge, liveBadge }) => ({
+    items: g.items.map(({ href, label, icon, reload, badge, liveBadge, section }) => ({
       href,
       label,
+      section,
       reload,
       badge,
       liveBadge,
@@ -546,8 +550,12 @@ export async function AdminShell({
             badge={waUnread}
           />
         )}
-        {/* On site: RAMS one tap away. */}
-        {can('rams') && <TabLink href={RAMS_URL} label="RAMS" icon={icons.rams} active={false} />}
+        {/* Metis one tap away for the office; people who only have RAMS (on site) keep RAMS here, and it is in More for everyone else. */}
+        {can('crm') ? (
+          <TabLink href="/admin/assistant" label="Metis" icon={icons.metis} active={active === 'assistant'} />
+        ) : (
+          can('rams') && <TabLink href={RAMS_URL} label="RAMS" icon={icons.rams} active={false} />
+        )}
         {/* Always there: Help (for the page you're on) is the sheet's last tile. */}
         <MoreMenu>
           {/* Turns into "Close" while the sheet is open. */}

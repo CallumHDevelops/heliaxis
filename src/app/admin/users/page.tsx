@@ -14,6 +14,7 @@ export default async function UsersPage() {
 
   const rows = (data ?? []) as (UserRow & { portals?: string[] | null })[];
   const hasPortals = rows.length === 0 || rows.some((r) => 'portals' in r);
+  const hasProjectAdmin = rows.length === 0 || rows.some((r) => 'project_admin' in r);
 
   return (
     <AdminShell active="users" isAdmin={profile?.role === 'admin'}>
@@ -21,6 +22,7 @@ export default async function UsersPage() {
         rows={rows.map((r) => ({ ...r, portals: Array.isArray(r.portals) ? r.portals : [] }))}
         selfId={user?.id ?? ''}
         hasPortals={hasPortals}
+        hasProjectAdmin={hasProjectAdmin}
         loadError={error?.message ?? null}
       />
     </AdminShell>

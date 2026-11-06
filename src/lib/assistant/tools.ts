@@ -13,6 +13,7 @@ import { NOT_READY, orgsReady, searchOrgsAndContacts } from '@/lib/organisations
 import { cleanContact, matchesPerson, orgTypeLabel, sortContacts, type OrgContact } from '@/lib/organisations/shared';
 import { cleanSearch } from '@/lib/global-search';
 import { searchHelp } from '@/lib/help/server';
+import { adPerformanceAnswer, aiSpendAnswer, leadSourcesAnswer } from './insights';
 
 /**
  * What the assistant can do. It never contacts a customer: emails and WhatsApps are saved as
@@ -21,7 +22,7 @@ import { searchHelp } from '@/lib/help/server';
 
 export type Actor = { id: string; name: string };
 /** Shown under the reply as chips ("Task for Esther", "Email draft — Jane Smith"). */
-export type AssistantAction = { kind: 'task' | 'note' | 'next_step' | 'draft' | 'opportunity' | 'contact'; label: string; href: string };
+export type AssistantAction = { kind: 'task' | 'note' | 'next_step' | 'draft' | 'opportunity' | 'contact' | 'report'; label: string; href: string };
 
 const str = { type: 'string' } as const;
 const nullable = (description: string) => ({ type: ['string', 'null'], description }) as const;
@@ -98,6 +99,21 @@ export const TOOLS: Anthropic.Tool[] = [
     description:
       'Write a WhatsApp message to the customer and save it as a draft for the user to check and send. Short, friendly, no markdown.',
     input_schema: obj({ project_id: str, body: str }),
+  },
+  {
+    name: 'ai_spend',
+    description: 'What the AI features have cost (admins only): total and this month in pounds, by feature, and the average cost of a quote with a design proposal. Use it for "how much have we spent on AI".',
+    input_schema: obj({ days: { type: ['integer', 'null'], description: 'How many days back (default 30), or null.' } }),
+  },
+  {
+    name: 'lead_sources',
+    description: 'Where the leads come from over a period: by source (Meta ads, website, WhatsApp, other) with surveys and sales, and the top postcode areas. Use it for "where do most of our leads come from" and "put them on a map" (a link to the Leads map is added under your reply).',
+    input_schema: obj({ days: { type: ['integer', 'null'], description: 'How many days back (default 90), or null.' } }),
+  },
+  {
+    name: 'ad_performance',
+    description: 'The Meta ads compared: spend, leads, surveys, sales, cost per lead and cost per sale, with the best ads and the biggest spend with no sales. Use it for "what is our best performing ad".',
+    input_schema: obj({ days: { type: ['integer', 'null'], description: 'How many days back (default 90), or null.' } }),
   },
   {
     name: 'search_help',
@@ -331,6 +347,20 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
       if (error || !d) return `Not saved: ${error?.message}`;
       actions.push({ kind: 'draft', label: `${email ? 'Email' : 'WhatsApp'} draft — ${c?.name || p.title}`, href: `/admin/assistant#draft-${d.id}` });
       return 'Draft saved. The user will check and send it.';
+    }
+
+    case 'ai_spend':
+      return aiSpendAnswer(me.id, input.days);
+
+    case 'lead_sources': {
+      const out = await leadSourcesAnswer(input.days);
+      actions.push({ kind: 'report', label: 'Open the Leads map', href: out.mapHref });
+      return out.text;
+    }
+
+    case 'ad_performance': {
+      actions.push({ kind: 'report', label: 'Open CRM reports', href: '/admin/crm/reports' });
+      return adPerformanceAnswer(input.days);
     }
 
     case 'search_help': {

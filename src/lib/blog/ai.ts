@@ -1,4 +1,4 @@
-import { recordAi } from '@/lib/ai-usage';
+import { recordAi, recordChatUsage } from '@/lib/ai-usage';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
 import { cmsArticleAiSchema, type CmsArticleAi } from './cms-article-template';
@@ -158,7 +158,8 @@ export async function generateBlogPost(prompt: string, opts: { keyword?: string;
       else return { fatal: CREDITS_MSG };
     }
     if (res.ok) {
-      const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+      const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+      await recordChatUsage('blog', model, data.usage);
       const text = data.choices?.[0]?.message?.content;
       return text ? { text, finish: data.choices?.[0]?.finish_reason } : { err: 'empty response' };
     }

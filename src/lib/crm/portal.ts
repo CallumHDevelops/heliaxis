@@ -4,6 +4,7 @@ import { ukBankHolidays } from '@/lib/bank-holidays';
 import { CRM_BUCKET, thumbPath } from './server';
 import { buildTracker } from './tracker';
 import { portalMode } from './stages';
+import { proposalSwitch } from '@/lib/proposal/server';
 import { stripeConfigured } from '@/lib/stripe';
 import { portalHandover } from '@/lib/handover/portal';
 import { mergedInto } from './aliases';
@@ -94,6 +95,10 @@ export async function loadPortal(token: string) {
     : [...visible.filter((d) => d.category === 'handover'), ...visible.filter((d) => d.category !== 'handover')];
   const amount = Number(p.deposit_amount) || 0;
   const hasSigned = isSigned(p, docs);
+  // The proposal pack's accept check (src/lib/proposal): off unless PROPOSAL_PACK is "on" and proposal-pack.sql has run.
+  // `held`: they pressed Accept while the contract was still being finished (they have not signed).
+  const sw = await proposalSwitch().catch(() => ({ on: false, ready: false }));
+  const pack = { on: sw.on && sw.ready, held: sw.on && sw.ready && !!p.accepted_pending_at && !p.accepted_at };
   return {
     token,
     mode,
@@ -132,6 +137,7 @@ export async function loadPortal(token: string) {
     // supabase/quotes.sql: the dates they asked for (null before it has run).
     installPref: (p.install_pref ?? null) as { dates: string[]; flexible: boolean; notes: string; at: string } | null,
     /** The quote has a design proposal: the interactive page at /my/<token>/proposal is there to explore. */
+    pack,
     hasProposal: !!(quoteRows?.[0]?.content as { proposal?: { options?: unknown[] } } | undefined)?.proposal?.options?.length,
     whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || null,
     email: process.env.MS_MAILBOX || 'hello@heliaxis.co.uk',

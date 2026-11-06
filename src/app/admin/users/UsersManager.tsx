@@ -13,6 +13,8 @@ export type UserRow = {
   role: 'member' | 'admin';
   status: 'pending' | 'approved' | 'rejected';
   portals: string[];
+  /** Gets the proposal pack tasks and alerts. Absent until supabase/proposal-pack.sql has been run. */
+  project_admin?: boolean | null;
   created_at: string;
 };
 
@@ -22,11 +24,13 @@ export function UsersManager({
   rows,
   selfId,
   hasPortals,
+  hasProjectAdmin,
   loadError,
 }: {
   rows: UserRow[];
   selfId: string;
   hasPortals: boolean;
+  hasProjectAdmin: boolean;
   loadError: string | null;
 }) {
   const [q, setQ] = useState('');
@@ -65,7 +69,7 @@ export function UsersManager({
 
       <div className="us-list">
         {sorted.map((u) => (
-          <UserCard key={u.id} u={u} self={u.id === selfId} hasPortals={hasPortals} />
+          <UserCard key={u.id} u={u} self={u.id === selfId} hasPortals={hasPortals} hasProjectAdmin={hasProjectAdmin} />
         ))}
         {sorted.length === 0 && <p className="us-empty">No users found.</p>}
       </div>
@@ -73,23 +77,24 @@ export function UsersManager({
   );
 }
 
-function UserCard({ u, self, hasPortals }: { u: UserRow; self: boolean; hasPortals: boolean }) {
+function UserCard({ u, self, hasPortals, hasProjectAdmin }: { u: UserRow; self: boolean; hasPortals: boolean; hasProjectAdmin: boolean }) {
   const router = useRouter();
   const [status, setStatus] = useState(u.status);
   const [role, setRole] = useState(u.role);
   const [portals, setPortals] = useState<string[]>(u.portals);
+  const [projectAdmin, setProjectAdmin] = useState(!!u.project_admin);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const dirty =
-    status !== u.status || role !== u.role || [...portals].sort().join() !== [...u.portals].sort().join();
+    status !== u.status || role !== u.role || [...portals].sort().join() !== [...u.portals].sort().join() || (hasProjectAdmin && projectAdmin !== !!u.project_admin);
 
   async function save(next?: { status?: UserRow['status'] }) {
     setBusy(true);
     setMsg(null);
     const s = next?.status ?? status;
     if (next?.status) setStatus(next.status);
-    const r = await updateUser(u.id, { status: s, role, portals });
+    const r = await updateUser(u.id, { status: s, role, portals, ...(hasProjectAdmin ? { projectAdmin } : {}) });
     setBusy(false);
     setMsg(r.ok ? { ok: true, text: 'Saved' } : { ok: false, text: r.error });
     if (r.ok) router.refresh();
@@ -120,6 +125,10 @@ function UserCard({ u, self, hasPortals }: { u: UserRow; self: boolean; hasPorta
             <option value="member">Member</option>
             <option value="admin">Admin</option>
           </select>
+        </label>
+        <label title={hasProjectAdmin ? 'Gets the task and alert when a customer accepts before their proposal pack is finished' : 'Run supabase/proposal-pack.sql in the Supabase SQL editor first'}>
+          Project Admin
+          <input type="checkbox" checked={projectAdmin} onChange={(e) => setProjectAdmin(e.target.checked)} disabled={!hasProjectAdmin} />
         </label>
       </div>
 

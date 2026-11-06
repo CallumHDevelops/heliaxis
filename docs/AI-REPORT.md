@@ -110,7 +110,7 @@ The proposal reader has run successfully on a real OpenSolar file on the live si
 
 - **New:** `CMS → AI costs` shows this month, the last 120 days, the average cost of a quote with a proposal, a per-quote table (reading, introduction, What is included) and a by-feature table. It needs `supabase/ai-usage.sql` to be run once. It records the quote features, the MCS and label readers, the blog (Claude path) and the assistant.
 - **Existing:** the social features record to `social_usage` and are included on the same page. They also have their own report with a monthly cap.
-- **Not yet recorded:** the CMS page generator, and the blog when it runs through OpenRouter. Those two bypass the new logging.
+- **Also recorded now:** the CMS page generator and the blog when it runs through OpenRouter (priced as GPT-4o mini or GPT-4o from their token counts). Metis answers "how much have we spent on AI" from the same log.
 
 ## Rough cost per use (estimates, to be replaced by real figures)
 
@@ -128,7 +128,7 @@ The proposal reader has run successfully on a real OpenSolar file on the live si
 1. **Run `supabase/ai-usage.sql`** so the AI costs page starts filling in. Check the first real proposal's cost against the estimate above.
 2. **Move the MCS certificate and label readers to a cheaper model.** They currently use Opus. Reading a printed number off a label is well within Haiku or Sonnet, which would cut their cost several-fold. Worth trying on a handful of real photos first, because accuracy matters more than cost here.
 3. **Add a single monthly AI budget** across everything. Only the social features have a cap today. The quote writers, assistant and readers have none.
-4. **Log the two uncovered paths** (CMS page generator, blog via OpenRouter) so the cost page shows the full bill.
+4. ~~Log the two uncovered paths~~ Done: the CMS page generator and OpenRouter blog calls are now recorded.
 5. **Update the privacy policy line** to mention uploaded proposals and equipment photos.
 6. **Keep a person in the loop** exactly as it is now. The strongest part of the design is that every output is a draft or a suggestion, and that rules sit on both sides of the AI step in the social features.
 
