@@ -147,3 +147,42 @@ form meets a standard. The site app's own forms (`site/forms`) are code with rul
 
 Not built yet: storing templates and their versions in the database, the builder screen, and filing a made document
 into a Handover or In-House slot.
+
+## Commissioning forms in HAP, and SimpliHeat
+
+SimpliHeat (the separate heat pump app, `CallumHDevelops/simpliheat`, a Next.js and Supabase app under `web/`) already
+captures the MIS 3005-I commissioning checklist on site: 120 questions in `web/lib/commissioning/schema.ts`, filled in
+offline on a tablet, with answers suggested from the design, sign-off by trade, and the record kept inside the project's
+design document. It also has its own template engine (`web/lib/doctemplates`). `HX-HP-02` in HAP matches its checklist
+field for field (keys, kinds, units, options, conditions; checked by loading both schemas as data).
+
+**Decisions (Cal).** Answers can be entered in HAP as well as SimpliHeat, and what is entered in HAP feeds back to
+SimpliHeat **as suggestions the on-site engineer accepts** (SimpliHeat's own rule: an answer nobody looked at is not an
+answer), not written in as answers. HAP half first; SimpliHeat is changed afterwards, on a branch, with push access
+asked for then.
+
+**Why not write into SimpliHeat's design document.** Its saves use optimistic concurrency on `updated_at`; a device
+that was offline gets a conflict, and the prompt's "Load their version" discards its local edits (that has lost data
+before). So nothing here ever writes into the design document.
+
+**The rules** (`src/lib/templates/forms.ts`, tested against an in-memory store):
+- one record per project and form (`supabase/template-documents.sql`), each answer with who, when and from where;
+- saves are made against the version read and retried if someone else saved in between;
+- the first signature needs nothing left to answer and makes the form the record; the customer signs afterwards; a
+  signed record is locked (signatures can be added, never changed); correcting it is a revision, in one database step;
+- SimpliHeat's record is taken in: it fills what has no answer and updates its own earlier answers, but never replaces
+  one entered in HAP (its different answer is kept beside it and reported as a conflict); once its technician has
+  signed, what was signed is the record, and an answer only entered in HAP is dropped and listed;
+- HAP's own answers go to SimpliHeat as suggestions, in its types (Yes/No as true/false), with who and when.
+
+**The API.** SimpliHeat's server calls `GET` and `POST /api/simpliheat/v1/projects/{job ref}/forms/{code}` with
+`Authorization: Bearer <SIMPLIHEAT_API_KEY>` (the same secret on both apps, 32+ characters; unset, the API answers
+503 and nothing else). The job reference (HX-0042) is the link between the two apps' projects. The office's routes are
+under `/api/crm/projects/{id}/forms` (session; signing and revising are admin only), with a PDF in the Heliaxis style.
+
+**Still to do, HAP:** apply `supabase/template-documents.sql` (after approval), set `SIMPLIHEAT_API_KEY`, the fill-in
+screen on the project, and filing a signed form into the Handover and In-House packs.
+**Still to do, SimpliHeat (own branch, own review):** show HAP's suggestions beside each question, push its record to
+HAP when it syncs, add the cylinder questions (31, `HX-HP-03`), and the handover certificate's extra questions. HAP's
+cylinder record uses Yes/No/N/A; SimpliHeat's yes/no has no N/A, so those would be a select there.
+Note that Next.js's bundled docs, which AGENTS.md points to, are not in this install: the routes follow the existing ones.
