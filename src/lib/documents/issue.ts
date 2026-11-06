@@ -30,6 +30,10 @@ export const ISSUE: Record<string, string> = {
   'HX-IH-07': 'Issue 1',
   'HX-IH-08': 'Issue 1',
   'HX-IH-09': 'Issue 1',
+  // Heat pump commissioning paperwork, made from templates (src/lib/templates). Provisional until the owner approves the codes.
+  'HX-HP-02': 'Issue 1',
+  'HX-HP-03': 'Issue 1',
+  'HX-HP-04': 'Issue 1',
   PACK: 'Issue 1',
 };
 export const issueOf = (code: string) => ISSUE[code] ?? 'Issue 1';

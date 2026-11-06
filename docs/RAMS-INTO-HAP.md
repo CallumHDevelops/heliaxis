@@ -129,3 +129,21 @@ ground source only, the ground loop design (F24). `HX-HP-01` is only the *electr
 heat pump's own commissioning record comes from the heating engineer. These forms follow MIS 3005 and are Easy MCS's
 templates; whether HAP reproduces them or has Heliaxis-worded versions is Cal's call. The customer, address, email
 and MCS number on the sample files belong to a real job and are not in this repo.
+
+## Document templates (src/lib/templates)
+
+The heat pump forms are the first documents made from a **template**: plain data (`templates/types.ts`) that the
+renderer (`documents/templates/render.ts`) draws in the document kit, in the digital and print variants. A template is
+sections of fields (short text, number with a unit, yes/no/not applicable, one of a list, date, long text), passages of
+text and signature lines; text and pre-filled answers can use merge fields ({{customer}}, {{address}}, {{mcs_number}}…).
+The same drawing makes a blank form to print, a form with the job's details already on it, and a completed one.
+`templates/rules.ts` holds the merge fields, `validateTemplate` (what must be true before a template can be saved: keys
+unique and never reused, a "show when" pointing at an earlier field, merge fields that exist) and the answer rules.
+
+`templates/seed/heat-pump.ts` has the first three, in Heliaxis's own words: `HX-HP-02` heat pump commissioning record,
+`HX-HP-03` hot water cylinder commissioning record, `HX-HP-04` heat pump handover certificate. The codes and the field
+lists are provisional until the owner approves them in the quality system; nothing in them claims that completing a
+form meets a standard. The site app's own forms (`site/forms`) are code with rules in them and are not replaced.
+
+Not built yet: storing templates and their versions in the database, the builder screen, and filing a made document
+into a Handover or In-House slot.
