@@ -63,19 +63,19 @@ export const HEAT_PUMP_COMMISSIONING: DocTemplate = {
     {
       type: 'fields',
       title: 'Supply voltage at the unit',
-      intro: 'A single phase supply needs the first three readings. A three phase supply needs all of them.',
+      intro: 'The last seven readings are for a three phase supply.',
       columns: 3,
       fields: [
         num('v_l1_n', 'Line 1 to neutral', 'V'),
         num('v_l1_e', 'Line 1 to earth', 'V'),
         num('v_n_e', 'Neutral to earth', 'V'),
-        num('v_l2_n', 'Line 2 to neutral', 'V'),
-        num('v_l2_e', 'Line 2 to earth', 'V'),
-        num('v_l1_l2', 'Line 1 to line 2', 'V'),
-        num('v_l3_n', 'Line 3 to neutral', 'V'),
-        num('v_l3_e', 'Line 3 to earth', 'V'),
-        num('v_l1_l3', 'Line 1 to line 3', 'V'),
-        num('v_l2_l3', 'Line 2 to line 3', 'V'),
+        num('v_l2_n', 'Line 2 to neutral', 'V', { showWhen: { key: 'supply_phase', is: 'Three phase' } }),
+        num('v_l2_e', 'Line 2 to earth', 'V', { showWhen: { key: 'supply_phase', is: 'Three phase' } }),
+        num('v_l1_l2', 'Line 1 to line 2', 'V', { showWhen: { key: 'supply_phase', is: 'Three phase' } }),
+        num('v_l3_n', 'Line 3 to neutral', 'V', { showWhen: { key: 'supply_phase', is: 'Three phase' } }),
+        num('v_l3_e', 'Line 3 to earth', 'V', { showWhen: { key: 'supply_phase', is: 'Three phase' } }),
+        num('v_l1_l3', 'Line 1 to line 3', 'V', { showWhen: { key: 'supply_phase', is: 'Three phase' } }),
+        num('v_l2_l3', 'Line 2 to line 3', 'V', { showWhen: { key: 'supply_phase', is: 'Three phase' } }),
       ],
     },
     {
@@ -134,7 +134,8 @@ export const HEAT_PUMP_COMMISSIONING: DocTemplate = {
     },
     {
       type: 'fields',
-      title: 'Outdoor unit and refrigerant',
+      title: 'Outdoor unit and refrigerant (air source only)',
+      showWhen: { key: 'system_type', is: 'Air source' },
       columns: 2,
       fields: [
         text('antifreeze', 'Antifreeze make and type'),
@@ -152,13 +153,15 @@ export const HEAT_PUMP_COMMISSIONING: DocTemplate = {
     },
     {
       type: 'fields',
-      title: 'Clear space round the outdoor unit',
+      title: 'Clear space round the outdoor unit (air source only)',
+      showWhen: { key: 'system_type', is: 'Air source' },
       columns: 3,
       fields: [num('clear_back', 'Behind', 'mm'), num('clear_front', 'In front', 'mm'), num('clear_left', 'Left', 'mm'), num('clear_right', 'Right', 'mm'), num('clear_below', 'Below', 'mm')],
     },
     {
       type: 'fields',
       title: 'Ground collector (ground source only)',
+      showWhen: { key: 'system_type', is: 'Ground source' },
       columns: 2,
       fields: [
         text('collector_type', 'Type of ground collector'),
@@ -241,7 +244,13 @@ export const CYLINDER_COMMISSIONING: DocTemplate = {
       type: 'fields',
       title: 'The cylinder',
       columns: 2,
-      fields: [text('engineer', 'Commissioned by', { required: true }), day('commissioned_on', 'Date', { required: true }), text('cylinder_model', 'Cylinder make and model'), text('cylinder_serial', 'Cylinder serial number')],
+      fields: [
+        text('engineer', 'Commissioned by', { required: true }),
+        day('commissioned_on', 'Date', { required: true }),
+        text('cylinder_model', 'Cylinder make and model'),
+        text('cylinder_serial', 'Cylinder serial number'),
+        pick('cylinder_type', 'Type of cylinder', ['Unvented', 'Vented', 'Thermal store'], { required: true }),
+      ],
     },
     {
       type: 'fields',
@@ -271,6 +280,7 @@ export const CYLINDER_COMMISSIONING: DocTemplate = {
     {
       type: 'fields',
       title: 'Unvented cylinders only',
+      showWhen: { key: 'cylinder_type', is: 'Unvented' },
       columns: 2,
       fields: [
         text('prv_location', 'Where the pressure reducing valve is, if there is one'),
@@ -284,6 +294,7 @@ export const CYLINDER_COMMISSIONING: DocTemplate = {
     {
       type: 'fields',
       title: 'Thermal stores only',
+      showWhen: { key: 'cylinder_type', is: 'Thermal store' },
       columns: 2,
       fields: [num('store_temp', 'Temperature the store can reach', '°C'), num('store_hotwater_max', 'Highest hot water temperature', '°C')],
     },

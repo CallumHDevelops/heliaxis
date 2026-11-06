@@ -1,25 +1,27 @@
 import 'server-only';
 import type { JobHead } from '@/lib/handover/inputs';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
-import { answerWords, fillMerge, missingRequired, shownFields } from '@/lib/templates/rules';
+import { answerWords, fillMerge, missingRequired, visibility } from '@/lib/templates/rules';
 import type { Answers, DocTemplate, FieldsSection, SignAnswers, SignSection, TemplateField, TextSection } from '@/lib/templates/types';
 import { issueOf } from '../issue';
 import { MCS_CONTACT } from '../handover/common';
-import { INK, longDate, MissingAnswer, MUTED, MUTED_DARK, newDocument, type Drawing, type Kit } from '../pdf-kit';
+import { INK, LINE, longDate, MissingAnswer, MUTED, newDocument, RED, type Drawing, type Kit } from '../pdf-kit';
 
 /**
  * Draws a document template (src/lib/templates) in the document kit: the Heliaxis header and site box,
- * then each section, in the digital or print variant. The same drawing serves a blank form to print and
- * fill in by hand, a form with the job's details already on it (merge fields, pre-filled answers), and a
- * completed one (answers given): an answered field prints its answer on the line, a ticked box shows a tick.
+ * then each section, in the digital or print variant. The answers are entered in HAP, so a field prints
+ * as the house documents do: the question, with its answer beneath it in bold. One left empty says "Not
+ * answered" (in red on a draft). A pre-filled field (merge fields from the job) prints its value as an
+ * answer. With no answers at all it draws every question empty: a preview of the template.
  * Nothing is drawn from outside the template and the job: no claims of its own.
  */
 
 export type RenderInput = {
   template: DocTemplate;
   job: JobHead;
-  /** None: a blank form. Given: a field prints its answer, and a required one left empty stops a finished document. */
+  /** Given: each field prints its answer, and a required one left empty stops a finished document (unless a draft). */
   answers?: Answers;
+  /** Who has signed the signature lines, and when. */
   signed?: SignAnswers;
   /** A banner saying it isn't signed off yet (a preview of an unapproved template). */
   draft?: boolean;
@@ -45,144 +47,68 @@ export function mergeValues(job: JobHead): Record<string, string> {
   };
 }
 
+/**
+ * What a field prints as its answer: yes/no as words, a number with its unit, a date as "6 November
+ * 2026", a choice as the option; the pre-fill from the job when there is no answer. Empty when there is none.
+ */
+export function valueText(f: TemplateField, answers: Answers | undefined, merge: Record<string, string>): string {
+  const given = answers?.[f.key];
+  const answer = given === null || given === undefined ? '' : String(given).trim();
+  if (answer) return f.kind === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(answer) ? longDate(answer) : answerWords(f, answer);
+  return f.prefill ? fillMerge(f.prefill, merge).trim() : '';
+}
+
 const LABEL_SZ = 8.6;
 const LABEL_LH = 10.4;
 const HINT_SZ = 7.3;
 const HINT_LH = 9;
-const BOX = 9;
+const VALUE_SZ = 9.4;
+const VALUE_LH = 11.8;
 const GAP = 14;
-const ROW_LH = 15;
-const OPT_SZ = 8.4;
 /** A section shorter than this (points) is kept on one page. */
 const SHORT_SECTION = 230;
 
-/** `rowH` is the height of the row it is in: an answer line or tick boxes sit at the bottom of the row, so a row lines up. */
-type Cell = { h: number; draw: (d: Drawing, x: number, top: number, w: number, rowH: number) => void };
+type Cell = { h: number; draw: (d: Drawing, x: number, top: number) => void };
 
-/** One field's cell: its label and hint, then the way it is answered. Laid out first, so a row can be sized before it is drawn. */
-function cell(kit: Kit, f: TemplateField, w: number, answer: string, shown: string): Cell {
+/** One field: its question (and hint), with the answer beneath. Laid out first, so a row can be sized before it is drawn. */
+function cell(kit: Kit, f: TemplateField, w: number, value: string, draft: boolean): Cell {
   const labelLines = kit.lines(f.label, LABEL_SZ, w);
   const hintLines = f.hint ? kit.lines(f.hint, HINT_SZ, w) : [];
   const head = labelLines.length * LABEL_LH + hintLines.length * HINT_LH;
-  const drawHead = (d: Drawing, x: number, top: number) => {
-    labelLines.forEach((l, i) => d.text(l, x, top - 9.2 - i * LABEL_LH, LABEL_SZ, { color: INK }));
-    hintLines.forEach((l, i) => d.text(l, x, top - 9.2 - labelLines.length * LABEL_LH - i * HINT_LH + 1.5, HINT_SZ, { color: MUTED }));
-  };
-
-  if (f.kind === 'yesno') {
-    const h = head + 22;
-    return {
-      h,
-      draw(d, x, top, _w, rowH) {
-        drawHead(d, x, top);
-        const by = top - rowH + 5;
-        const at = [0, 56, 108];
-        [
-          ['yes', 'Yes'],
-          ['no', 'No'],
-          ['na', 'N/A'],
-        ].forEach(([v, name], i) => {
-          d.mark(x + at[i], by, answer === v ? 'tick' : 'empty', BOX);
-          d.text(name, x + at[i] + BOX + 4, by + 1.8, OPT_SZ, { color: INK });
-        });
-      },
-    };
-  }
-
-  if (f.kind === 'choice') {
-    const opts = f.options ?? [];
-    const pos: { x: number; row: number }[] = [];
-    let cx = 0;
-    let row = 0;
-    for (const o of opts) {
-      const ow = BOX + 4 + kit.widthOf(o, OPT_SZ) + 14;
-      if (cx > 0 && cx + ow - 14 > w) {
-        cx = 0;
-        row += 1;
-      }
-      pos.push({ x: cx, row });
-      cx += ow;
-    }
-    const rows = row + 1;
-    const h = head + rows * ROW_LH + 8;
-    return {
-      h,
-      draw(d, x, top) {
-        drawHead(d, x, top);
-        opts.forEach((o, i) => {
-          const by = top - head - 4 - pos[i].row * ROW_LH - 12;
-          d.mark(x + pos[i].x, by, answer === o ? 'tick' : 'empty', BOX);
-          d.text(o, x + pos[i].x + BOX + 4, by + 1.8, OPT_SZ, { color: INK });
-        });
-      },
-    };
-  }
-
-  if (f.kind === 'long') {
-    const text = shown ? kit.lines(shown, 9, w - 4, true) : [];
-    const n = Math.max(3, text.length);
-    const h = head + n * ROW_LH + 6;
-    return {
-      h,
-      draw(d, x, top, cw) {
-        drawHead(d, x, top);
-        for (let i = 0; i < n; i++) {
-          const y = top - head - 4 - (i + 1) * ROW_LH + 3;
-          d.line(x, y, x + cw, y, { color: MUTED_DARK, t: 0.6 });
-          if (text[i]) d.text(text[i], x + 2, y + 3.5, 9, { bold: true });
-        }
-      },
-    };
-  }
-
-  // text, number, date: an entry line, with a number's unit at its end.
-  const unit = f.kind === 'number' && f.unit ? f.unit : '';
-  const unitW = unit ? kit.widthOf(unit, OPT_SZ) + 5 : 0;
-  const h = head + 24;
+  const set = value !== '';
+  const body = set ? kit.lines(value, VALUE_SZ, w, true) : ['Not answered'];
   return {
-    h,
-    draw(d, x, top, cw, rowH) {
-      drawHead(d, x, top);
-      const y = top - rowH + 5;
-      d.line(x, y, x + cw - unitW, y, { color: MUTED_DARK, t: 0.6 });
-      if (shown) d.text(shown, x + 2, y + 3.5, 9, { bold: true });
-      if (unit) d.text(unit, x + cw - unitW + 3, y + 1.8, OPT_SZ, { color: MUTED });
+    h: head + body.length * VALUE_LH + 9,
+    draw(d, x, top) {
+      labelLines.forEach((l, i) => d.text(l, x, top - 9.2 - i * LABEL_LH, LABEL_SZ, { color: INK }));
+      hintLines.forEach((l, i) => d.text(l, x, top - 9.2 - labelLines.length * LABEL_LH - i * HINT_LH + 1.5, HINT_SZ, { color: MUTED }));
+      body.forEach((l, i) => d.text(l, x, top - head - 10.5 - i * VALUE_LH, VALUE_SZ, set ? { bold: true } : { italic: true, color: draft ? RED : MUTED }));
     },
   };
 }
 
-/** The value a field starts with: its answer, or its pre-fill from the job. */
-function valueOf(f: TemplateField, answers: Answers | undefined, merge: Record<string, string>): { answer: string; shown: string } {
-  const given = answers?.[f.key];
-  const answer = given === null || given === undefined ? '' : String(given);
-  // A number's unit is printed after the line, so its answer is just the figure; a yes/no prints as words.
-  if (answer.trim()) return { answer, shown: f.kind === 'yesno' ? answerWords(f, answer) : answer };
-  const pre = f.prefill ? fillMerge(f.prefill, merge).trim() : '';
-  return { answer: '', shown: pre };
-}
-
-function fieldsSection(kit: Kit, s: FieldsSection, answers: Answers | undefined, merge: Record<string, string>) {
-  const fields = shownFields(s, answers);
+function fieldsSection(kit: Kit, s: FieldsSection, shown: Set<string>, answers: Answers | undefined, merge: Record<string, string>, draft: boolean) {
+  const fields = s.fields.filter((f) => shown.has(f.key));
   if (!fields.length) return;
   const n = s.columns ?? 1;
   const w = (kit.width - (n - 1) * GAP) / n;
   const rows: { h: number; draw: (d: Drawing) => void }[] = [];
   for (let i = 0; i < fields.length; i += n) {
-    const cells = fields.slice(i, i + n).map((f) => {
-      const v = valueOf(f, answers, merge);
-      return cell(kit, f, w, v.answer, v.shown);
-    });
-    const tall = Math.max(...cells.map((c) => c.h));
+    const cells = fields.slice(i, i + n).map((f) => cell(kit, f, w, valueText(f, answers, merge), draft));
+    const h = Math.max(...cells.map((c) => c.h)) + 2;
     rows.push({
-      h: tall + 6,
-      draw: (d) => cells.forEach((c, j) => c.draw(d, d.x + j * (w + GAP), d.top, w, tall)),
+      h,
+      draw: (d) => {
+        cells.forEach((c, j) => c.draw(d, d.x + j * (w + GAP), d.top));
+        d.line(d.x, d.top - h + 1, d.x + d.width, d.top - h + 1, { color: LINE, t: 0.4 });
+      },
     });
   }
   // A short section stays on one page; a long one keeps its heading with its first row.
   const total = rows.reduce((a, r) => a + r.h, 0);
   kit.section(s.title, { intro: s.intro ? fillMerge(s.intro, merge) : null, keep: total <= SHORT_SECTION ? total : rows[0].h + 6 });
   for (const r of rows) kit.block(r.h, r.draw);
-  kit.gap(4);
+  kit.gap(6);
 }
 
 /** A bulleted line: a small square in the margin, the text wrapped beside it. The kit's list() is for numbered items. */
@@ -214,26 +140,18 @@ function textSection(kit: Kit, s: TextSection, merge: Record<string, string>) {
   flush();
 }
 
-function signSection(kit: Kit, s: SignSection, signed: SignAnswers | undefined) {
-  kit.section(s.title ?? 'Signatures', { keep: 70 });
-  for (const g of s.signers) {
-    const done = signed?.[g.key];
-    kit.block(66, (d) => {
-      const top = d.top;
-      d.text(g.label, d.x, top - 9.2, LABEL_SZ, { color: INK });
-      const sigW = d.width * 0.62;
-      const y = top - 48;
-      d.line(d.x, y, d.x + sigW, y, { color: INK, t: 0.7 });
-      if (done?.name) d.text(done.name, d.x + 2, y + 3.5, 9, { bold: true });
-      const dx = d.x + sigW + 18;
-      d.line(dx, y, d.x + d.width, y, { color: INK, t: 0.7 });
-      d.text('Date', dx, y - 9, 6.6, { color: MUTED });
-      if (done?.date) d.text(done.date, dx + 2, y + 3.5, 9, { bold: true });
-    });
-  }
+/** The kit's own signature blocks: the drawn signature (or typed name) on a baseline, "Signed on the Heliaxis app, 6 Nov 2026 17:41". */
+async function signSection(kit: Kit, s: SignSection, signed: SignAnswers | undefined) {
+  kit.section(s.title ?? 'Signatures', { keep: 100 });
+  await kit.signatures(
+    s.signers.map((g) => {
+      const done = signed?.[g.key];
+      return { title: g.label, png: done?.png ?? null, name: done?.name ?? '', at: done?.at ?? null };
+    })
+  );
 }
 
-/** The template as a PDF for this job: blank, pre-filled from the job, or completed. */
+/** The template as a PDF for this job: its questions with their answers, or empty as a preview. */
 export async function renderTemplate(i: RenderInput): Promise<Uint8Array> {
   const { template: t, job, answers } = i;
   if (answers && !i.draft) {
@@ -250,11 +168,12 @@ export async function renderTemplate(i: RenderInput): Promise<Uint8Array> {
     ['MCS certification number', HELIAXIS_COMPANY.mcsNumber],
   ]);
   if (t.intro) kit.note(fillMerge(t.intro, merge));
-  for (const s of t.sections) {
-    if (s.type === 'fields') fieldsSection(kit, s, answers, merge);
+  const vis = visibility(t, answers);
+  for (const [n, s] of t.sections.entries()) {
+    if (!vis.sections[n]) continue;
+    if (s.type === 'fields') fieldsSection(kit, s, vis.fields, answers, merge, !!i.draft);
     else if (s.type === 'text') textSection(kit, s, merge);
-    else signSection(kit, s, i.signed);
+    else await signSection(kit, s, i.signed);
   }
   return kit.save();
 }
-
