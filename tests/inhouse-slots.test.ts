@@ -169,7 +169,7 @@ describe('nameList', () => {
 });
 
 describe('heat pump jobs', () => {
-  const hp = (over: Partial<StateCtx> = {}) => ctx({ products: ['heatpump'], postcode: 'SN15 3EH', ...over });
+  const hp = (over: Partial<StateCtx> = {}) => ctx({ products: ['heatpump'], postcode: 'SW1A 1AA', ...over });
   const shown = (c: StateCtx) => slotStates(c).filter((v) => !v.hidden).map((v) => v.code);
 
   it('shows the heat pump items and hides the solar and battery ones', () => {
@@ -228,7 +228,7 @@ describe('nationOf', () => {
     expect(nationOf('EH12 5BB')).toBe('scotland');
     expect(nationOf('ab10 1xx')).toBe('scotland');
     expect(nationOf('GL1 1AA')).toBe('england_wales');
-    expect(nationOf('SN15 3EH')).toBe('england_wales');
+    expect(nationOf('SW1A 1AA')).toBe('england_wales');
     expect(nationOf('NP19 7AZ')).toBe('england_wales');
   });
   it('assumes England and Wales when there is no postcode', () => {
