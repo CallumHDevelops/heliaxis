@@ -52,10 +52,24 @@ export type SlotCode =
   | 'HX-IH-12'
   | 'HX-IH-13'
   | 'HX-IH-14'
-  | 'HX-IH-15';
+  | 'HX-IH-15'
+  | 'HX-IH-16'
+  | 'HX-IH-17'
+  | 'HX-IH-18'
+  | 'HX-IH-19'
+  | 'HX-IH-20';
 
-/** What applies() looks at: the job's technologies. */
-export type AppliesCtx = { products: string[] };
+/** What applies() looks at: the job's technologies and where the site is. */
+export type AppliesCtx = { products: string[]; /** The site's postcode: decides which nation's rules apply. */ postcode?: string | null };
+
+/** Postcode areas in Scotland. A few areas straddle the border, so the office can mark an item Not needed. */
+const SCOTTISH_AREAS = new Set(['AB', 'DD', 'DG', 'EH', 'FK', 'G', 'HS', 'IV', 'KA', 'KW', 'KY', 'ML', 'PA', 'PH', 'TD', 'ZE']);
+/** The nation a site is in, from its postcode area. No postcode (or one that isn't Scottish) is England and Wales. */
+export function nationOf(postcode: string | null | undefined): 'scotland' | 'england_wales' {
+  const area = /^[A-Z]{1,2}/.exec(String(postcode ?? '').trim().toUpperCase())?.[0] ?? '';
+  // The leading letters are the area: "G1 1AA" gives G (Glasgow), "GL1 1AA" gives GL (Gloucester).
+  return SCOTTISH_AREAS.has(area) ? 'scotland' : 'england_wales';
+}
 
 export type SlotDef = {
   code: SlotCode;
@@ -82,6 +96,9 @@ export type SlotDef = {
 const has = (c: AppliesCtx, ...t: Tech[]) => t.some((x) => c.products.includes(x));
 const any = () => null;
 const pvOrBattery = (c: AppliesCtx) => (has(c, 'solar', 'battery') ? null : 'No solar or battery on this job');
+const heatPump = (c: AppliesCtx) => (has(c, 'heatpump') ? null : 'No heat pump on this job');
+const noiseEnglandWales = (c: AppliesCtx) => heatPump(c) ?? (nationOf(c.postcode) === 'scotland' ? 'In Scotland: the Scotland calculation applies' : null);
+const noiseScotland = (c: AppliesCtx) => heatPump(c) ?? (nationOf(c.postcode) === 'scotland' ? null : 'Not in Scotland');
 
 export const SLOTS: SlotDef[] = [
   {
@@ -120,6 +137,59 @@ export const SLOTS: SlotDef[] = [
     applies: pvOrBattery,
     category: 'survey',
     pick: 'Survey record',
+  },
+  {
+    code: 'HX-IH-16',
+    title: 'Heat pump survey record',
+    purpose: 'The site survey for the heat pump.',
+    group: 'site',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 32,
+    applies: heatPump,
+    category: 'survey',
+    pick: 'Heat pump survey record',
+  },
+  {
+    code: 'HX-IH-17',
+    title: 'Room survey record',
+    purpose: 'The room-by-room survey, if one was done.',
+    group: 'site',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 34,
+    applies: heatPump,
+    optional: true,
+    category: 'survey',
+    pick: 'Room survey record',
+  },
+  {
+    code: 'HX-IH-18',
+    title: 'ASHP noise calculation (England and Wales)',
+    purpose: 'The air source heat pump noise level calculation for a site in England or Wales.',
+    group: 'site',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 36,
+    applies: noiseEnglandWales,
+    category: 'design',
+    pick: 'ASHP noise calculation (England and Wales)',
+  },
+  {
+    code: 'HX-IH-19',
+    title: 'ASHP noise calculation (Scotland)',
+    purpose: 'The air source heat pump noise level calculation for a site in Scotland.',
+    group: 'site',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 38,
+    applies: noiseScotland,
+    category: 'design',
+    pick: 'ASHP noise calculation (Scotland)',
   },
   {
     code: 'HX-IH-04',
@@ -257,14 +327,28 @@ export const SLOTS: SlotDef[] = [
     title: 'Letter of authority',
     purpose: 'The customer’s written authority for us to act for them.',
     group: 'forms',
-    tech: [],
+    tech: ['solar', 'battery'],
     kind: 'C',
     maker: 'office',
     order: 140,
-    applies: any,
+    applies: pvOrBattery,
     optional: true,
     category: 'inhouse-form',
     pick: 'Letter of authority',
+  },
+  {
+    code: 'HX-IH-20',
+    title: 'EPVS registration',
+    purpose: 'The EPVS registration, if one applies.',
+    group: 'other',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 145,
+    applies: heatPump,
+    optional: true,
+    category: 'registration',
+    pick: 'EPVS registration',
   },
   {
     code: 'HX-IH-15',
@@ -388,6 +472,7 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
     case 'HX-IH-02':
       return { state: 'complete' };
     case 'HX-IH-03':
+    case 'HX-IH-16':
       if (docs.length) return { state: 'complete' };
       return c.surveyed ? { state: 'complete' } : { state: 'missing', why: 'No survey recorded yet. Book it, or upload the survey record.', fix: 'survey' };
     case 'HX-IH-05':

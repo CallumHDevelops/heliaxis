@@ -4,6 +4,7 @@ import {
   headline,
   isSlot,
   nameList,
+  nationOf,
   NO_RAMS,
   ramsSignedOff,
   slotStates,
@@ -164,5 +165,74 @@ describe('nameList', () => {
     expect(nameList(['A', 'B'])).toBe('A and B');
     expect(nameList(['A', 'B', 'C'])).toBe('A, B and C');
     expect(nameList(['A', 'B', 'C', 'D', 'E'])).toBe('A, B, C and 2 more');
+  });
+});
+
+describe('heat pump jobs', () => {
+  const hp = (over: Partial<StateCtx> = {}) => ctx({ products: ['heatpump'], postcode: 'SN15 3EH', ...over });
+  const shown = (c: StateCtx) => slotStates(c).filter((v) => !v.hidden).map((v) => v.code);
+
+  it('shows the heat pump items and hides the solar and battery ones', () => {
+    const codes = shown(hp());
+    for (const c of ['HX-IH-16', 'HX-IH-17', 'HX-IH-18', 'HX-IH-19', 'HX-IH-20']) expect(codes).toContain(c);
+    for (const c of ['HX-IH-03', 'HX-IH-04', 'HX-IH-14']) expect(codes).not.toContain(c);
+  });
+  it('hides the heat pump items on a solar and battery job', () => {
+    const codes = shown(ctx({ products: ['solar', 'battery'] }));
+    for (const c of ['HX-IH-16', 'HX-IH-17', 'HX-IH-18', 'HX-IH-19', 'HX-IH-20']) expect(codes).not.toContain(c);
+    expect(codes).toContain('HX-IH-14');
+  });
+  it('treats the heat pump survey like the solar one: missing until it is done', () => {
+    expect(view(hp({ surveyed: false }), 'HX-IH-16').state).toBe('missing');
+    expect(view(hp({ surveyed: false }), 'HX-IH-16').fix).toBe('survey');
+    expect(view(hp({ surveyed: true }), 'HX-IH-16').state).toBe('complete');
+    expect(view(hp({ surveyed: false, docs: [doc('HX-IH-16')] }), 'HX-IH-16').state).toBe('complete');
+  });
+  it('needs the England and Wales noise calculation for a site there, and not the Scotland one', () => {
+    const c = hp();
+    expect(view(c, 'HX-IH-18').state).toBe('missing');
+    expect(view(c, 'HX-IH-19').state).toBe('na');
+    expect(view(c, 'HX-IH-19').why).toBe('Not in Scotland');
+    expect(view(hp({ docs: [doc('HX-IH-18')] }), 'HX-IH-18').state).toBe('complete');
+  });
+  it('needs the Scotland calculation for a Scottish site, and not the England and Wales one', () => {
+    const c = hp({ postcode: 'EH1 1AA' });
+    expect(view(c, 'HX-IH-19').state).toBe('missing');
+    expect(view(c, 'HX-IH-18').state).toBe('na');
+    expect(view(c, 'HX-IH-18').why).toBe('In Scotland: the Scotland calculation applies');
+  });
+  it('lets the office mark the wrong nation Not needed on a border postcode', () => {
+    const c = hp({ postcode: 'TD15 1AA', marks: { 'HX-IH-19': { na: true, reason: 'Site is in England', by: 'Cal', at: '2026-11-06' } } });
+    expect(view(c, 'HX-IH-19').state).toBe('na');
+    expect(view(c, 'HX-IH-19').office?.reason).toBe('Site is in England');
+  });
+  it('leaves the room survey and EPVS registration out of the count unless added', () => {
+    for (const code of ['HX-IH-17', 'HX-IH-20']) {
+      expect(view(hp(), code).state).toBe('na');
+      expect(view(hp(), code).counted).toBe(false);
+      expect(view(hp({ docs: [doc(code)] }), code).state).toBe('complete');
+    }
+  });
+  it('counts a heat pump job on its own list: survey, noise, RAMS, purchasing and photos', () => {
+    const h = headline(slotStates(hp({ docs: [doc('HX-IH-06'), doc('HX-IH-18')], rams: { documents: [{ id: 'r1', reference: 'R/1', title: 'RAMS', status: 'issued', version: 1 }], trades: [] } })));
+    // 01 02 05 06 07 09 16 18 complete; 08 (no trades) and 19 (not Scotland) not needed; nothing missing.
+    expect(h.missing).toBe(0);
+    expect(h.complete).toBe(8);
+    expect(h.na).toBe(2);
+  });
+});
+
+describe('nationOf', () => {
+  it('reads the postcode area, not just its first letter', () => {
+    expect(nationOf('G1 1AA')).toBe('scotland');
+    expect(nationOf('EH12 5BB')).toBe('scotland');
+    expect(nationOf('ab10 1xx')).toBe('scotland');
+    expect(nationOf('GL1 1AA')).toBe('england_wales');
+    expect(nationOf('SN15 3EH')).toBe('england_wales');
+    expect(nationOf('NP19 7AZ')).toBe('england_wales');
+  });
+  it('assumes England and Wales when there is no postcode', () => {
+    expect(nationOf(null)).toBe('england_wales');
+    expect(nationOf('')).toBe('england_wales');
   });
 });

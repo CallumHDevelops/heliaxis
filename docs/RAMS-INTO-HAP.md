@@ -105,3 +105,27 @@ downloaded from the old project and uploaded to the `rams-signatures` bucket at 
 Apply `rams.sql` to the Heliaxis project through the Supabase connector (not a paid branch: it only adds things and
 has a tested rollback), after Cal has approved it. Read-only inspection comes first and has been done on both
 projects. Never apply anything to the other projects the connector can see.
+
+## Heat pump paperwork (from Easy MCS, 2026-11-06)
+
+Taken from Easy MCS's In-House and Handover tabs for a heat pump job. The Easy MCS references are listed here only so
+the two can be matched; the code uses Heliaxis `HX-` codes.
+
+**In-House pack (done in `inhouse/slots.ts`).** Heat pump jobs get: `HX-IH-16` heat pump survey record (F20),
+`HX-IH-17` room survey record, only if done (F21), `HX-IH-18` ASHP noise calculation, England and Wales (F22A),
+`HX-IH-19` ASHP noise calculation, Scotland (F22), `HX-IH-20` EPVS registration, only if it applies (CC3). The risk
+assessment and method statement examples (F28, F29) are the project's RAMS (`HX-IH-07`, which has an ASHP template).
+The noise calculation follows the site's postcode area (`nationOf`); a border postcode can be marked Not needed.
+The letter of authority and structural survey are on the solar and battery list only. All the new items are uploads
+until the wording of the forms is supplied.
+
+**Handover pack: what a heat pump job still lacks.** The Handover catalogue (`handover/slots.ts`) already covers the
+cover letter, workmanship warranty, completion sign-off, manufacturer information, invoice, Building Regulations,
+electrical certificate, MCS certificate and warranty insurance for heat pumps. It does not have:
+heat pump commissioning checklist (F26A), cylinder commissioning checklist (F26), heat pump handover certificate
+(F26B), DNO application for heat pumps (F25, the G98 notice is solar and battery only), schematic diagram (CC10,
+`HX-HO-13` is solar and battery only), design calculations (CC15, `HX-HO-14` is solar and battery only) and, for
+ground source only, the ground loop design (F24). `HX-HP-01` is only the *electrical supply* record and says the
+heat pump's own commissioning record comes from the heating engineer. These forms follow MIS 3005 and are Easy MCS's
+templates; whether HAP reproduces them or has Heliaxis-worded versions is Cal's call. The customer, address, email
+and MCS number on the sample files belong to a real job and are not in this repo.

@@ -141,7 +141,7 @@ alter table public.rams_ref_counters enable row level security;
 
 -- The next number for a job, taken atomically so two documents never share one.
 create or replace function public.rams_next_number(p_project uuid) returns integer
-language sql as $$
+language sql set search_path = public as $$
   insert into public.rams_ref_counters as c (project_id, last_value) values (p_project, 1)
   on conflict (project_id) do update set last_value = c.last_value + 1
   returning last_value;
@@ -189,7 +189,7 @@ alter table public.rams_documents enable row level security;
 --   * once approved or issued its wording cannot change (only taking it back to draft reopens it);
 --   * approved and issued carry who approved it and when; a draft or one in review carries no approval.
 create or replace function public.rams_documents_guard() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 declare ok boolean;
 begin
   if tg_op = 'DELETE' then
@@ -279,7 +279,7 @@ alter table public.rams_trade_requests enable row level security;
 -- A signature, once given, is the record: it cannot be changed or withdrawn, and a withdrawn request
 -- cannot be revived.
 create or replace function public.rams_trade_requests_guard() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 begin
   if old.signed_at is not null and (to_jsonb(new) is distinct from to_jsonb(old)) then
     raise exception 'A signed RAMS request cannot be changed.' using errcode = '23001';
@@ -319,7 +319,7 @@ alter table public.rams_briefings enable row level security;
 -- Who was briefed is the first thing an inspector asks for: a briefing on an issued or superseded RAMS
 -- cannot be removed (a RAMS being deleted takes its own briefings with it, which only a draft allows).
 create or replace function public.rams_briefings_guard() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 begin
   if exists (select 1 from public.rams_documents d where d.id = old.rams_id and d.status in ('issued','archived')) then
     raise exception 'A briefing on an issued RAMS is part of the record and cannot be removed.' using errcode = '23001';
@@ -356,6 +356,19 @@ end $$;
 drop trigger if exists crm_projects_queue_rams on public.crm_projects;
 create trigger crm_projects_queue_rams after insert or update on public.crm_projects
   for each row execute function public.crm_projects_queue_rams();
+
+-- A trigger function is never meant to be called over the API: take execute away from the public and the
+-- API roles (the trigger still fires, which does not check the caller's execute right).
+do $$
+begin
+  revoke execute on function public.crm_projects_queue_rams() from public;
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke execute on function public.crm_projects_queue_rams() from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke execute on function public.crm_projects_queue_rams() from authenticated;
+  end if;
+end $$;
 
 -- 9. Private storage for signatures and certificate files (created here if the storage schema is present).
 do $$
