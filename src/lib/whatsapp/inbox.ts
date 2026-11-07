@@ -399,7 +399,7 @@ export async function queueFirstContact(enquiryId: string, name: string, ad: Lea
   return error ? null : { at, template: t.name, ad: own?.name ?? null };
 }
 
-type Status = { id: string; status: string; timestamp?: string; errors?: { title?: string; message?: string; error_data?: { details?: string } }[] };
+type Status = { id: string; status: string; timestamp?: string; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] };
 const RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
 
 export async function handleStatus(s: Status) {
@@ -415,7 +415,10 @@ export async function handleStatus(s: Status) {
     const e = s.errors?.[0];
     const reason = e?.error_data?.details || e?.message || e?.title || 'Not delivered';
     await db.from('whatsapp_messages').update({ status: 'failed', error: reason, status_at: at }).eq('id', msg.id);
-    await notifyEnquiryTeam('WhatsApp message not delivered', reason, inboxHref(msg.enquiry_id));
+    // A person's message to a number that isn't on WhatsApp: send it as a text instead, and tell them (src/lib/whatsapp/sms-fallback.ts).
+    const { isUndeliverable, textInsteadOfUndeliverable } = await import('./sms-fallback');
+    const fallback = isUndeliverable(e) ? await textInsteadOfUndeliverable(msg, reason) : 'skipped';
+    if (fallback === 'skipped') await notifyEnquiryTeam('WhatsApp message not delivered', reason, inboxHref(msg.enquiry_id));
     // An appointment message that never arrived: send the text instead (once).
     const via = String((msg as { via?: string | null }).via ?? '');
     if (via.startsWith('appointment:')) {
