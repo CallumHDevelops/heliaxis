@@ -138,7 +138,7 @@ export function FormEditor({ projectId, code, isAdmin, me, onBack, onChanged }: 
     return (
       <div className="mcs">
         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={onBack}>
-          Back to the MCS pack
+          Back to In-House
         </button>
         <p className="mcs-note">{err || 'Opening the form…'}</p>
       </div>
@@ -160,7 +160,7 @@ export function FormEditor({ projectId, code, isAdmin, me, onBack, onChanged }: 
     <div className="mcs mcs-form">
       <div className="mcs-formtop">
         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => void flush().then(onBack)}>
-          Back to the MCS pack
+          Back to In-House
         </button>
         <div className="mcs-formtop__acts">
           <span className="mcs-saving" role="status" aria-live="polite">

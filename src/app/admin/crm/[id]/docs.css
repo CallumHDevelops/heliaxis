@@ -1,0 +1,321 @@
+/* The Docs tab (DocsHub.tsx): a menu of the packs on the left, the chosen pack's line items on the right. Inside .crm. */
+
+.dk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+@media (min-width: 761px) {
+  .dk {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+}
+
+/* The menu. */
+.dk-nav {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.dk-nav::-webkit-scrollbar {
+  display: none;
+}
+@media (min-width: 761px) {
+  .dk-nav {
+    flex-direction: column;
+    overflow: visible;
+    position: sticky;
+    top: calc(var(--crmr-bar, 56px) + 56px);
+  }
+}
+.dk-nav__i {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: none;
+  min-height: 48px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font: inherit;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.dk-nav__i.on {
+  border-color: var(--solar);
+  box-shadow: inset 4px 0 0 var(--solar);
+  background: rgb(var(--accent-rgb) / 0.12);
+}
+.dk-nav__t {
+  flex: 1;
+}
+.dk-nav__n {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.dk-nav .dk-mark {
+  width: 20px;
+  height: 20px;
+}
+.dk-nav__up {
+  margin-top: 0.4rem;
+  justify-content: center;
+}
+
+/* A line's mark. */
+.dk-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+}
+.dk-mark--ok {
+  color: var(--ok);
+}
+.dk-mark--warn {
+  color: var(--crm-bar, #c77f04);
+}
+.dk-mark--na i {
+  display: block;
+  width: 12px;
+  border-top: 2px solid var(--muted);
+}
+
+/* The pack. */
+.dk-panel {
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+}
+.dk-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+@media (max-width: 760px) {
+  .dk-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.dk-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.dk-head__blurb {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.dk-head__sum {
+  margin: 0.55rem 0 0.4rem;
+  font-weight: 800;
+}
+.dk-bar {
+  display: block;
+  height: 8px;
+  max-width: 380px;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.dk-bar span {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+.dk-head__btns {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  min-width: 210px;
+}
+.dk-head__btns small {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.dk-group h4 {
+  margin: 0.2rem 0 0.45rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dk-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.dk-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.dk-row--complete {
+  border-left: 4px solid var(--ok);
+}
+.dk-row--missing,
+.dk-row--waiting,
+.dk-row--stale {
+  border-left: 4px solid var(--crm-bar, #c77f04);
+}
+.dk-row--na {
+  background: transparent;
+  border-style: dashed;
+}
+.dk-row__main {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.dk-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.55rem;
+}
+.dk-row__title b {
+  font-size: 0.97rem;
+}
+.dk-row__title code,
+.dk-docno {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.dk-docno {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.dk-row__why {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+.dk-row__why.is-act {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.dk-row__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+.dk-files {
+  grid-column: 2 / -1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.86rem;
+}
+.dk-files li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.8rem;
+  align-items: baseline;
+}
+.dk-files small {
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .dk-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .dk-row__btns {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .dk-files {
+    grid-column: 1 / -1;
+  }
+}
+
+/* The Overview's documents card (DocsCard.tsx). */
+.dk-card {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.dk-card h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.dk-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.dk-card li + li {
+  border-top: 1px solid var(--border);
+}
+.dk-card button {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.4rem 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dk-card__t {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.dk-card__t small {
+  color: var(--muted);
+}
+.dk-card__go {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--accent-text);
+}
+.dk-card .dk-mark {
+  width: 22px;
+  height: 22px;
+}
+.dk-card .dk-mark--ok {
+  color: var(--ok);
+}
+.dk-card .dk-mark--warn {
+  color: var(--crm-bar, #c77f04);
+}

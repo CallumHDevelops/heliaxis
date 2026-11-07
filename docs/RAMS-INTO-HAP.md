@@ -187,18 +187,30 @@ HAP when it syncs, add the cylinder questions (31, `HX-HP-03`), and the handover
 cylinder record uses Yes/No/N/A; SimpliHeat's yes/no has no N/A, so those would be a select there.
 Note that Next.js's bundled docs, which AGENTS.md points to, are not in this install: the routes follow the existing ones.
 
-## Where the MCS pack is in HAP
+## Where the packs are in HAP
 
-On a job from Won: **Docs → MCS pack** (a Files | MCS pack switch at the top of the Docs tab), or the **MCS pack card on the Overview**.
-`?tab=docs&view=mcs` opens the pack from a link; `&form=HX-HP-02` goes straight into one form.
+There are three packs, and Docs is the one place they live (there is no separate Handover tab). **Docs** has a menu down the
+left: **Proposal**, **In-House**, **Handover**, **General** (every file on the job) and **+ Upload**. Choosing a pack shows its
+line items on the right: a green tick when it is done, an orange warning when it is still needed, the item's code
+(`HX-PP-01`) and its document number (`HX-0126-PP-01`, with `v2` once there is a second version), and Preview / Edit /
+Download. Each pack has **Download ZIP**; Proposal and Handover (the packs the customer is given) have **Send to customer**.
 
-- **Forms**: the heat pump commissioning record, cylinder record and handover certificate. Filled in on screen (autosave, who/when/from where beside each
-  answer, SimpliHeat's differing answer offered as "Use that"), PDF in the Heliaxis style, admin signs or starts a revision.
-- **In-House file** (HX-IH-xx): internal, never shown to a customer. Files are filed with `crm_documents.inhouse_slot` (needs `supabase/inhouse-docs.sql`,
-  **not yet applied**; the rows show and count without it, Upload is hidden until it is run).
-- **Handover pack**: the customer's pack keeps its own tab from Ready to book; the MCS pack links to it.
+Links: `?tab=docs&view=proposal|inhouse|handover|general`; `&form=HX-HP-02` goes straight into one form in the In-House
+pack. The old `?tab=handover` and `?view=mcs` still work. The Overview has one Documents card with the three packs.
 
-API: `GET /api/crm/projects/[id]/mcs` (`?summary=1` for the headline only), `forms`, `forms/[code]`, `forms/[code]/pdf`.
+- **Proposal** (`src/lib/proposal`): line items from its catalogue. Uploads are filed with `crm_documents.proposal_slot`
+  and kept off the customer's portal (`visible = false`) until the pack is released. The documents we make ourselves
+  (covering letter, quotation, performance estimate, contract, complaints procedure) have no generators yet, so they show
+  as still needed; Preview / Edit / Download appear when they exist.
+- **In-House** (`src/lib/inhouse`): internal, never shown or sent to a customer. The heat pump forms (HX-HP-02, -03, -04)
+  are its first group: Edit fills them in on screen (autosave, who/when/from where beside each answer, SimpliHeat's
+  differing answer offered as "Use that"; admin signs or starts a revision). Files are filed with `crm_documents.inhouse_slot`
+  (`supabase/inhouse-docs.sql`, applied).
+- **Handover** (`src/lib/handover`): the screen it has always had (send, build, sign, payments), inside Docs.
+
+API: `GET /api/crm/projects/[id]/packs`, `GET /api/crm/projects/[id]/packs/[pack]/zip` (`src/lib/zip.ts`, stored not
+compressed, 80 MB at most), `forms`, `forms/[code]`, `forms/[code]/pdf` (`?download=1`).
 A question that pre-fills from the job (address, customer) counts as answered, because it prints the job's value.
 
-Not built yet: the In-House generators and merged internal PDF, the RAMS screens, the template builder, the SimpliHeat-side changes.
+Not built yet: Send to customer for the Proposal pack (it waits for the documents to be made), Edit for documents we make,
+the In-House generators and merged internal PDF, the RAMS screens, the template builder, the SimpliHeat-side changes.

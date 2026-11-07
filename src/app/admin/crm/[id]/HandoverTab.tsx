@@ -9,7 +9,9 @@ import { useLiveRefresh } from '@/lib/use-live-refresh';
 import { shortDate, ukDayOf, ukTime } from '../crm-shared';
 import { useMedia } from '../use-stored';
 import { CopySheet, InvoiceSheet, LibrarySheet, NotNeededSheet, OutstandingSheet, SendSheet, SignDesignSheet, UploadSheet, ValuesSheet } from './HandoverSheets';
+import { Mark } from './PackPanel';
 import { PlainSheet } from './RecordSheets';
+import { docNumber } from '@/lib/docs/packs';
 import { send, type Tab } from './record-shared';
 import './handover.css';
 
@@ -96,11 +98,14 @@ export function HandoverTab({
   isAdmin,
   onChanged,
   openTab,
+  jobRef = null,
 }: {
   projectId: string;
   now: number;
   me: string;
   isAdmin: boolean;
+  /** The job's reference (HX-0126): document numbers are built from it. */
+  jobRef?: string | null;
   onChanged: () => void;
   openTab: (t: Tab) => void;
 }) {
@@ -321,13 +326,11 @@ export function HandoverTab({
     const line = wide ? said : [STATE_LABEL[s.state], said].filter(Boolean).join(' · ');
     const head = (
       <>
-        <span className={`hv-state hv-state--${s.state}`} title={STATE_LABEL[s.state]}>
-          {ICON[s.state]}
-          <span className="hv-state__w">{STATE_LABEL[s.state]}</span>
-        </span>
+        <Mark state={s.state === 'stale' ? 'stale' : s.state} />
         <span className="hv-row__main">
           <span className="hv-row__title">
             <b>{s.title}</b> <code>{s.code}</code>
+            {latest && <code className="hv-docno">{docNumber(jobRef, s.code, latest.version)}</code>}
           </span>
           <small className="hv-row__cust">{s.customer}</small>
           {line && <small className={`hv-row__why${s.state === 'missing' || s.state === 'stale' ? ' is-act' : ''}`}>{line}</small>}
@@ -404,6 +407,9 @@ export function HandoverTab({
           <button type="button" className="crm-btn crm-btn--ghost hv-big" onClick={() => setSheet({ kind: 'upload', slot: null })}>
             + Add a document
           </button>
+          <a className="crm-btn crm-btn--ghost hv-big" href={`/api/crm/projects/${projectId}/packs/handover/zip`}>
+            Download ZIP
+          </a>
         </div>
       </section>
 

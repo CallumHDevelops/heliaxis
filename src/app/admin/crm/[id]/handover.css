@@ -520,3 +520,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Inside Docs the Handover pack's lines carry a tick or an orange warning (PackPanel's Mark) in place of the word chip. */
+.hv-row__head,
+.hv-row__tap {
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+}
+.hv-acts {
+  margin-left: 2.75rem;
+}
+.hv-acts--sheet {
+  margin-left: 0;
+}
+.hv-docno {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

@@ -46,6 +46,10 @@ const BRAND_ICONS = {
   mail: { wash: 'M3 6h18v12H3z', line: ['M3 6h18v12H3z', 'M3 7l9 6 9-6'] },
   mappin: { wash: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7', line: ['M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7', 'M12 9a2.5 2.5 0 1 0 0 .01'] },
   phone: { wash: '', line: ['M6.5 3h3l1.5 5-2 1.5a12 12 0 0 0 5 5l1.5-2 5 1.5v3a2 2 0 0 1-2 2A17 17 0 0 1 4.5 5a2 2 0 0 1 2-2Z'] },
+  // The kit's tick in its circle.
+  check: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M8.5 12l2.5 2.5 4.5-5'] },
+  // The kit has no warning sign yet: drawn in its style (outline, gold wash at 30%).
+  warning: { wash: 'M12 3.5l9.5 16.5h-19z', line: ['M12 3.5l9.5 16.5h-19z', 'M12 10v4.5', 'M12 17.2v.3'] },
   users: { wash: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', line: ['M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', 'M3 20a5 5 0 0 1 10 0', 'M16 6a3 3 0 0 1 0 6M15 20a5 5 0 0 0-1-3.5 5 5 0 0 1 7 3.5'] },
 } as const;
 

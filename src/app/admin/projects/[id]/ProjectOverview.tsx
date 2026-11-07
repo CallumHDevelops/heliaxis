@@ -20,12 +20,12 @@ import { checkGroupFor, type CheckView } from '@/lib/projects/checklist';
 import type { EnaInfo } from '@/lib/projects/ena';
 import type { TeamMember } from '@/lib/projects/server';
 import { cleanDesign, DESIGN_FIELDS, designInput } from '@/lib/site/design';
-import { HandoverCard } from '../../crm/[id]/HandoverCard';
-import { McsCard } from '../../crm/[id]/McsCard';
+import type { DocsView } from '../../crm/[id]/DocsHub';
+import { DocsCard } from '../../crm/[id]/DocsCard';
 import { DOC_LABEL } from '../../crm/[id]/ProjectExtras';
 import { londonIso, shortDate, ukDayOf, ukTime } from '../../crm/crm-shared';
 import { useMedia } from '../../crm/use-stored';
-import { HANDOVER_STAGES, type RecordData, type SurveyItem, type Tab } from '../../crm/[id]/record-shared';
+import { type RecordData, type SurveyItem, type Tab } from '../../crm/[id]/record-shared';
 import { askNewOrder } from '../orders/OrdersTab';
 import { KitOrdered, ordersCount } from '../orders/OrdersUi';
 
@@ -53,8 +53,8 @@ export type OverviewActions = {
   moveTo: (stage: string) => Promise<void> | void;
   openTab: (tab: Tab, photoCat?: string) => void;
   addDocument: (category: string) => void;
-  /** Docs → MCS pack, or straight into one form in it. */
-  openMcs: (form?: string) => void;
+  /** Docs, on a pack (Proposal, In-House, Handover) or General; a form in the In-House pack opens straight into it. */
+  openDocs: (view?: DocsView, form?: string) => void;
   addPhoto: (category: string) => void;
   startSurvey: (type: 'solar' | 'ashp') => void;
   bookingLink: () => void;
@@ -72,8 +72,7 @@ export function ProjectOverview({ rec, team, today, actions }: { rec: RecordData
   return (
     <div className="crmr-ov">
       <JobFile rec={rec} today={today} actions={actions} />
-      {delivery && <McsCard projectId={p.id} version={p.updated_at} onOpen={() => actions.openMcs()} />}
-      {rec.schema.handover && HANDOVER_STAGES.includes(p.stage) && <HandoverCard projectId={p.id} version={p.updated_at} onOpen={() => actions.openTab('handover')} />}
+      <DocsCard projectId={p.id} version={p.updated_at} onOpen={(v) => actions.openDocs(v)} />
       {v3 ? (
         <Checklist rec={rec} actions={actions} />
       ) : (

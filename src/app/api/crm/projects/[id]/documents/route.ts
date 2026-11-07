@@ -21,6 +21,8 @@ import { buildPdf } from '@/lib/subcontractors/pdf-engine';
 
 import { inhouseUploadsReady } from '@/lib/inhouse/server';
 import { isSlot as isInhouseSlot, slotDef as inhouseDef } from '@/lib/inhouse/slots';
+import { isSlot as isProposalSlot, slotDef as proposalDef } from '@/lib/proposal/slots';
+import { schemaReady } from '@/lib/schema-ready';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,8 +67,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const slot = isSlot(b.handover_slot) && b.handover_slot !== 'PACK' && (await handoverReady()) ? String(b.handover_slot) : null;
     // Filed to an In-House pack item: internal, so never shown to a customer, and not a handover item.
     const inhouse = !slot && isInhouseSlot(b.inhouse_slot) && (await inhouseUploadsReady(db)) ? String(b.inhouse_slot) : null;
+    // Filed to a Proposal pack item (proposal-pack.sql). Kept off the customer's portal until the pack is released to them.
+    const proposal = !slot && !inhouse && isProposalSlot(b.proposal_slot) && (await schemaReady()).proposal ? String(b.proposal_slot) : null;
     const category = await docCategoryOf(b.category ?? (slot ? slotDef(slot)?.category : undefined));
-    const name = String(b.name || '').trim().slice(0, 140) || (slot ? (slotDef(slot)?.title ?? 'Document') : inhouse ? (inhouseDef(inhouse)?.title ?? 'Document') : 'Document');
+    const name = String(b.name || '').trim().slice(0, 140) || (slot ? (slotDef(slot)?.title ?? 'Document') : inhouse ? (inhouseDef(inhouse)?.title ?? 'Document') : proposal ? (proposalDef(proposal)?.title ?? 'Document') : 'Document');
     let mime = String(b.mime || '') || null;
     let size = Number(b.size) || null;
     // Into the pack: a photo (of a certificate, say) becomes an A4 PDF page, so it merges and prints.
@@ -94,11 +98,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         storage_path: path,
         mime,
         size,
-        visible: inhouse ? false : slot ? !hold : b.visible !== false,
+        visible: inhouse || proposal ? false : slot ? !hold : b.visible !== false,
         needs_signature: !!b.needs_signature && SIGNABLE_CATEGORIES.includes(category),
         uploaded_by: s.user.id,
         ...(slot ? { handover_slot: slot, release: hold ? 'with_pack' : 'now', source: 'upload' } : {}),
         ...(inhouse ? { inhouse_slot: inhouse } : {}),
+        ...(proposal ? { proposal_slot: proposal } : {}),
       })
       .select('*')
       .single();

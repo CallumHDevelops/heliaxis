@@ -19,8 +19,7 @@ import { useMedia } from '../use-stored';
 import { ActivityTab } from './ActivityTab';
 import { CompactCustomer, CustomerColumn } from './CustomerColumn';
 import { PhotosTab } from './PhotosTab';
-import { HandoverTab } from './HandoverTab';
-import { DocsHub } from './DocsHub';
+import { defaultDocsView, DocsHub, type DocsView } from './DocsHub';
 import { EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
@@ -119,8 +118,8 @@ export function ProjectView({
   canInbox: boolean;
   area?: Area;
   initialTab?: Tab | null;
-  /** ?view=mcs: Docs opens on the MCS pack; initialForm, on one form in it. */
-  initialView?: 'mcs' | null;
+  /** ?view=inhouse: Docs opens on that pack (or General); initialForm, on one form in it. */
+  initialView?: DocsView | null;
   initialForm?: string | null;
   entry?: string | null;
   schema: SchemaReady;
@@ -139,10 +138,10 @@ export function ProjectView({
   const [merging, setMerging] = useState<MergeStart | null>(null);
   /** This job was joined into another while open (a merge elsewhere). */
   const [joined, setJoined] = useState<{ id: string; ref: string | null } | null>(null);
-  const [tabSel, setTabSel] = useState<Tab | null>(initialTab && TABS.includes(initialTab) ? initialTab : null);
-  // The MCS pack on the Docs tab: where the address asked to open it, and a request from the Overview's card to go in.
-  const [deep, setDeep] = useState<{ view: 'mcs'; form: string | null } | null>(initialView ? { view: initialView, form: initialForm } : null);
-  const [mcsJump, setMcsJump] = useState<{ form: string | null; key: number } | null>(null);
+  const [tabSel, setTabSel] = useState<Tab | null>(initialTab === 'handover' ? 'docs' : initialTab && TABS.includes(initialTab) ? initialTab : initialView ? 'docs' : null);
+  // The packs in Docs: where the address asked to open, and requests from elsewhere on the page (the Overview's card) to open one.
+  const [deep, setDeep] = useState<{ view: DocsView; form: string | null } | null>(initialView ? { view: initialView, form: initialForm } : null);
+  const [docsJump, setDocsJump] = useState<{ view: DocsView; form: string | null; key: number } | null>(null);
   const [photoView, setPhotoView] = useState<{ cat: string | null; key: number }>({ cat: null, key: 0 });
   const [sheet, setSheet] = useState<SheetKey>(null);
   const [sheetOpts, setSheetOpts] = useState<{ draft?: string; photoCat?: string }>({});
@@ -303,23 +302,26 @@ export function ProjectView({
   const ordersTab = !!schema.purchaseOrders && (isProjectStage(stage) || ordersCount(rec?.orders) > 0);
   // Site (site-commissioning.sql): the trades on the job, from Won.
   const siteTab = !!schema.site && isProjectStage(stage);
-  // Handover (handover.sql): the customer's handover pack, from Ready.
-  const handoverTab = !!schema.handover && HANDOVER_STAGES.includes(stage);
   let tab: Tab = tabSel ?? fallbackTab;
-  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys) || (tab === 'orders' && !ordersTab) || (tab === 'site' && !siteTab) || (tab === 'handover' && !handoverTab))
+  // The Handover pack lives in Docs now: an old link or a stale tab lands there.
+  if (tab === 'handover') tab = 'docs';
+  if ((tab === 'details' && wide1280) || (tab === 'surveys' && !schema.surveys) || (tab === 'orders' && !ordersTab) || (tab === 'site' && !siteTab))
     tab = fallbackTab;
 
   const pickTab = useCallback((t: Tab) => {
-    setTabSel(t);
-    if (t !== 'docs') {
+    // The Handover pack is part of Docs now.
+    const to: Tab = t === 'handover' ? 'docs' : t;
+    setTabSel(to);
+    if (t === 'handover') setDocsJump((j) => ({ view: 'handover', form: null, key: (j?.key ?? 0) + 1 }));
+    if (to !== 'docs') {
       setDeep(null);
-      setMcsJump(null);
+      setDocsJump(null);
     }
     try {
       const url = new URL(window.location.href);
-      url.searchParams.set('tab', t);
+      url.searchParams.set('tab', to);
       url.searchParams.delete('entry');
-      if (t !== 'docs') {
+      if (to !== 'docs') {
         url.searchParams.delete('view');
         url.searchParams.delete('form');
       }
@@ -546,9 +548,9 @@ export function ProjectView({
       else pickTab(t);
     },
     addDocument,
-    openMcs: (form) => {
+    openDocs: (view, form) => {
       pickTab('docs');
-      setMcsJump((j) => ({ form: form ?? null, key: (j?.key ?? 0) + 1 }));
+      setDocsJump((j) => ({ view: view ?? defaultDocsView(isProjectStage(stage), HANDOVER_STAGES.includes(stage)), form: form ?? null, key: (j?.key ?? 0) + 1 }));
     },
     addPhoto: (cat) => openSheet('photo', { photoCat: cat }),
     startSurvey: (type) => void startSurvey(type),
@@ -591,7 +593,6 @@ export function ProjectView({
     'docs',
     ...(ordersTab ? ['orders'] : []),
     ...(siteTab ? ['site'] : []),
-    ...(handoverTab ? ['handover'] : []),
     ...(schema.surveys ? ['surveys'] : []),
   ] as Exclude<Tab, 'details'>[];
 
@@ -748,21 +749,18 @@ export function ProjectView({
                 onChanged={refresh}
                 siteDocs={schema.site}
                 handover={schema.handover}
-                mcsOn={isProjectStage(stage)}
                 isAdmin={isAdmin}
                 me={rec.team.find((t) => t.id === me)?.name ?? ''}
+                now={now}
                 version={p.updated_at}
-                initialView={deep?.view ?? null}
-                initialForm={deep?.form ?? null}
-                jump={mcsJump}
-                openHandover={() => pickTab('handover')}
+                start={deep?.view ?? defaultDocsView(isProjectStage(stage), HANDOVER_STAGES.includes(stage))}
+                startForm={deep?.form ?? null}
+                jump={docsJump}
+                openTab={pickTab}
               />
             )}
             {tab === 'orders' && <OrdersTab projectId={id} today={today} myName={rec.team.find((t) => t.id === me)?.name ?? null} onChanged={refresh} />}
             {tab === 'site' && <SiteTab projectId={id} now={now} onChanged={() => void refresh()} />}
-            {tab === 'handover' && (
-              <HandoverTab projectId={id} now={now} me={rec.team.find((t) => t.id === me)?.name ?? ''} isAdmin={isAdmin} onChanged={() => void refresh()} openTab={pickTab} />
-            )}
             {tab === 'surveys' && <SurveysPanel surveys={rec.surveys} busy={starting} onStart={(type) => void startSurvey(type)} />}
           </div>
           <RecordFabs unread={wa.unread} name={c.name} onWhatsApp={() => openWhatsApp()} onAdd={() => openSheet('menu')} />
