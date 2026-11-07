@@ -101,9 +101,13 @@ const MARGINS = { l: 28, r: 28, t: 16 };
 /** Rows per schedule sheet, as the form has them. */
 export const ROWS = 12;
 
-/** The company line in the title block: who issued it and how to reach them, then the company's registration. */
+/** The registrations, as printed: NAPIT's registration number for the company, and the MCS number the scheme issued with it. */
+const NAPIT_LABEL = 'NAPIT Registration Number:';
+const MCS_LABEL = 'MCS Registration Number:';
+/** The company line in the title block: who issued it and how to reach them, its registrations, then the company's registration. */
 const FOOTER_LINES = [
-  `${HELIAXIS_COMPANY.tradingName} · ${HELIAXIS_COMPANY.addressLines.join(', ')} · ${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email} · MCS ${HELIAXIS_COMPANY.mcsNumber}`,
+  `${HELIAXIS_COMPANY.tradingName} · ${HELIAXIS_COMPANY.addressLines.join(', ')} · ${HELIAXIS_COMPANY.phone} · ${HELIAXIS_COMPANY.email}`,
+  `${NAPIT_LABEL} ${HELIAXIS_COMPANY.napitNumber} · ${MCS_LABEL} ${HELIAXIS_COMPANY.mcsNumber}`,
   `Registered in England and Wales No. ${HELIAXIS_PARTY.companyNumber} · VAT ${HELIAXIS_PARTY.vatNumber}`,
 ];
 /** The schedules are landscape: their width, for measuring remarks before those pages exist. */
@@ -967,7 +971,19 @@ function pageHead(d: Drawing, kind: HeadKind, certNo: string, draft: boolean): n
     d.text(EIC_SUBTITLE, X + 2, d.top - 22, 8.6);
     d.logo(R - MARK_W.first, d.top - 5.5, MARK_W.first);
     no(CERT_NO, R, d.top - 24, 8.8);
-    h = 30;
+    // Who issued it, by their scheme's numbers: clear on the first page, under the title.
+    const size = 8.4;
+    const napit = `${NAPIT_LABEL} `;
+    const mcs = `${MCS_LABEL} `;
+    let x = X + 2;
+    d.text(napit, x, d.top - 33, size);
+    x += d.widthOf(napit, size);
+    d.text(HELIAXIS_COMPANY.napitNumber, x, d.top - 33, size, { bold: true });
+    x += d.widthOf(HELIAXIS_COMPANY.napitNumber, size, true) + 14;
+    d.text(mcs, x, d.top - 33, size);
+    x += d.widthOf(mcs, size);
+    d.text(HELIAXIS_COMPANY.mcsNumber, x, d.top - 33, size, { bold: true });
+    h = 39;
   } else if (kind === 'details' || kind === 'tests') {
     // The schedule's title on the left; on the right its number, a gold rule, the wordmark.
     d.text(kind === 'details' ? CS.title : TS.title, X + 2, d.top - 13, 12, { bold: true });

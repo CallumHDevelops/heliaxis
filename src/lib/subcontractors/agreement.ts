@@ -42,6 +42,8 @@ export const HELIAXIS_COMPANY = {
   addressLines: ['9 Turner Street', 'Newport', 'Gwent', 'NP19 7AZ'],
   phone: '01633 965205',
   email: 'hello@heliaxis.co.uk',
+  /** Heliaxis's NAPIT membership (the scheme's registration number), and the MCS certification number the scheme issued with it. */
+  napitNumber: '82308',
   mcsNumber: 'NAP-82308',
   companyNumber: HELIAXIS_PARTY.companyNumber,
   vatNumber: HELIAXIS_PARTY.vatNumber,
