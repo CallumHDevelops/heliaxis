@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buttonsFor, docNumber, fileNameFor, headlineOf, itemFrom, shown, type AnySlot } from '@/lib/docs/packs';
 
 const slot = (over: Partial<AnySlot> = {}): AnySlot => ({ code: 'HX-PP-01', title: 'Covering letter', state: 'missing', why: 'Not made yet', group: 'start', hidden: false, counted: true, maker: 'pack', docs: [], ...over });
-const doc = (v = 1, source = 'generated') => ({ id: `d${v}`, name: 'Covering letter.pdf', at: `2026-11-0${v}T10:00:00Z`, version: v, source });
+const doc = (v = 1, source: string = 'generated') => ({ id: `d${v}`, name: 'Covering letter.pdf', at: `2026-11-0${v}T10:00:00Z`, version: v, source });
 
 describe('document numbers', () => {
   it('are the job, the item and the version', () => {
@@ -54,5 +54,13 @@ describe('ZIP file names', () => {
   it('are the document number, the title and the file’s own type', () => {
     expect(fileNameFor({ title: 'Covering letter' }, 'HX-0126-PP-01', 'letter.PDF')).toBe('HX-0126-PP-01 Covering letter.PDF');
     expect(fileNameFor({ title: 'Survey' }, null, 'scan')).toBe('Survey');
+  });
+});
+
+describe('library files', () => {
+  it('are marked, so they open from the library on every job', () => {
+    const lib = itemFrom(slot({ maker: 'library', state: 'complete', docs: [doc(1, 'library')] }), 'HX-0126');
+    expect(lib.docs[0]).toMatchObject({ library: true, generated: false });
+    expect(itemFrom(slot({ state: 'complete', docs: [doc(1, 'upload')] }), 'HX-0126').docs[0].library).toBe(false);
   });
 });

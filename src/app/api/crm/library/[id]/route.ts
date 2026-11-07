@@ -7,12 +7,15 @@ import { handoverReady } from '@/lib/handover/server';
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(req: Request, { params }: Ctx) {
   if (!(await crmSession())) return json({ error: 'unauthorized' }, 401);
   const { id } = await params;
   if (!isUuid(id)) return json({ error: 'Not found' }, 404);
-  const { data } = await createAdminClient().from('crm_library').select('storage_path').eq('id', id).maybeSingle();
-  const url = data ? await signedDoc(data.storage_path, 300) : null;
+  const { data } = await createAdminClient().from('crm_library').select('storage_path, name').eq('id', id).maybeSingle();
+  // ?download=1 saves it under its own name (with the file's type), instead of opening it.
+  const ext = /\.[a-z0-9]{1,5}$/i.exec(String(data?.storage_path ?? ''))?.[0] ?? '';
+  const dl = new URL(req.url).searchParams.has('download') ? `${String(data?.name ?? 'document')}${ext}` : undefined;
+  const url = data ? await signedDoc(data.storage_path, 300, dl) : null;
   return url ? NextResponse.redirect(url) : json({ error: 'Not found' }, 404);
 }
 

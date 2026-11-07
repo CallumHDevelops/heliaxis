@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { BrandIcon, FileButton } from '@/app/admin/crm/CrmUi';
-import { buttonsFor, type Pack, type PackItem } from '@/lib/docs/packs';
+import { buttonsFor, type Pack, type PackDoc, type PackItem } from '@/lib/docs/packs';
+import { isUniversal } from '@/lib/proposal/library';
 import { uploadFile } from './ProjectExtras';
 import './docs.css';
 
@@ -45,7 +47,8 @@ export function PackPanel({ projectId, pack, canUpload, onEdit, onChanged }: { p
   const [err, setErr] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const field = pack.key === 'proposal' ? 'proposal_slot' : 'inhouse_slot';
-  const doc = (id: string, q = '') => `/api/crm/documents/${id}${q}`;
+  // A file in the library is opened from there: it is one copy, the same on every job.
+  const doc = (d: Pick<PackDoc, 'id' | 'library'>, q = '') => `/api/crm/${d.library ? 'library' : 'documents'}/${d.id}${q}`;
   const form = (code: string, q = '') => `/api/crm/projects/${projectId}/forms/${encodeURIComponent(code)}/pdf${q}`;
   const hasFiles = pack.items.some((i) => i.docs.length > 0 || i.form);
   const pct = pack.headline.total ? Math.round((pack.headline.complete / pack.headline.total) * 100) : 0;
@@ -76,10 +79,23 @@ export function PackPanel({ projectId, pack, canUpload, onEdit, onChanged }: { p
             <code>{i.code}</code>
             {i.docNo && <span className="dk-docno">{i.docNo}</span>}
           </span>
-          {i.why && i.state !== 'complete' && <small className={`dk-row__why${i.state === 'na' ? '' : ' is-act'}`}>{i.why}</small>}
+          {i.why && i.state !== 'complete' && (
+            <small className={`dk-row__why${i.state === 'na' ? '' : ' is-act'}`}>
+              {i.why}
+              {pack.key === 'proposal' && isUniversal(i.code) && i.state !== 'na' && (
+                <>
+                  {' '}
+                  <Link className="crm-link" href="/admin/crm/settings">
+                    Add it once in Settings
+                  </Link>
+                  .
+                </>
+              )}
+            </small>
+          )}
           {newest && i.state === 'complete' && (
             <small className="dk-row__why">
-              {newest.generated ? 'Made by Heliaxis' : 'Uploaded'} {when(newest.at)}
+              {newest.library ? 'From the library: the same on every job' : `${newest.generated ? 'Made by Heliaxis' : 'Uploaded'} ${when(newest.at)}`}
               {i.docs.length > 1 && (
                 <>
                   {' · '}
@@ -93,7 +109,7 @@ export function PackPanel({ projectId, pack, canUpload, onEdit, onChanged }: { p
         </span>
         <span className="dk-row__btns">
           {b.preview && (
-            <a className="crm-btn crm-btn--ghost crm-btn--small" href={i.form ? form(i.code) : doc(newest!.id)} target="_blank" rel="noreferrer">
+            <a className="crm-btn crm-btn--ghost crm-btn--small" href={i.form ? form(i.code) : doc(newest!)} target="_blank" rel="noreferrer">
               Preview
             </a>
           )}
@@ -103,7 +119,7 @@ export function PackPanel({ projectId, pack, canUpload, onEdit, onChanged }: { p
             </button>
           )}
           {b.download && (
-            <a className="crm-btn crm-btn--ghost crm-btn--small" href={i.form ? form(i.code, '?download=1') : doc(newest!.id, '?download=1')}>
+            <a className="crm-btn crm-btn--ghost crm-btn--small" href={i.form ? form(i.code, '?download=1') : doc(newest!, '?download=1')}>
               Download
             </a>
           )}
@@ -116,10 +132,10 @@ export function PackPanel({ projectId, pack, canUpload, onEdit, onChanged }: { p
                 <span>
                   {d.name} <small>v{d.version} · {when(d.at)}</small>
                 </span>
-                <a className="crm-link" href={doc(d.id)} target="_blank" rel="noreferrer">
+                <a className="crm-link" href={doc(d)} target="_blank" rel="noreferrer">
                   Preview
                 </a>
-                <a className="crm-link" href={doc(d.id, '?download=1')}>
+                <a className="crm-link" href={doc(d, '?download=1')}>
                   Download
                 </a>
               </li>

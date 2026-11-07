@@ -1,5 +1,6 @@
 'use client';
 
+import { UNIVERSAL } from '@/lib/proposal/library';
 import { useCallback, useEffect, useState } from 'react';
 import type { DraftKey, HandoverSettings as Settings, ScheduleRow } from '@/lib/handover/settings-shared';
 import './handover-settings.css';
@@ -14,7 +15,7 @@ import './handover-settings.css';
 
 type Draft = { version: string; title: string; text: string };
 type Gap = { model: string; jobs: { id: string; ref: string | null }[] };
-type Lib = { id: string; name: string; kind: string | null; models?: string[] | null; handover_slot?: string | null; every_pack?: boolean | null; archived_at?: string | null };
+type Lib = { id: string; name: string; kind: string | null; models?: string[] | null; handover_slot?: string | null; every_pack?: boolean | null; proposal_slot?: string | null; archived_at?: string | null };
 
 const readAll = (): Promise<[Record<string, unknown>, Record<string, unknown>]> =>
   Promise.all([fetch('/api/crm/settings/handover', { cache: 'no-store' }).then((r) => r.json()), fetch('/api/crm/library', { cache: 'no-store' }).then((r) => r.json())]);
@@ -196,6 +197,14 @@ export function HandoverSettings({ isAdmin }: { isAdmin: boolean }) {
                       aria-label="Models"
                       onBlur={(e) => e.target.value !== (d.models ?? []).join('; ') && void patchLib(d.id, { models: e.target.value.split(';') })}
                     />
+                    <select className="crm-input" value={d.proposal_slot ?? ''} disabled={!isAdmin} onChange={(e) => void patchLib(d.id, { proposal_slot: e.target.value || null })} aria-label="Proposal pack item">
+                      <option value="">Not in the proposal</option>
+                      {UNIVERSAL.map((u) => (
+                        <option key={u.code} value={u.code}>
+                          {u.code} · {u.title}
+                        </option>
+                      ))}
+                    </select>
                     <label className="crm-check" style={{ margin: 0 }}>
                       <input type="checkbox" checked={!!d.every_pack} disabled={!isAdmin} onChange={(e) => void patchLib(d.id, { every_pack: e.target.checked, ...(e.target.checked && !d.kind ? { kind: 'guide', handover_slot: 'HX-HO-19' } : {}) })} /> In every pack
                     </label>

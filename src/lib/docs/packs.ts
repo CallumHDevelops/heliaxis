@@ -8,7 +8,7 @@ export type PackKey = 'proposal' | 'inhouse' | 'handover';
 /** complete: done (a tick) · missing, waiting, stale: still needed (an orange warning) · na: not needed. */
 export type ItemState = 'complete' | 'missing' | 'waiting' | 'stale' | 'na';
 
-export type PackDoc = { id: string; name: string; at: string; version: number; generated: boolean };
+export type PackDoc = { id: string; name: string; at: string; version: number; generated: boolean; /** One copy in the document library, the same on every job. */ library: boolean };
 export type PackItem = {
   code: string;
   title: string;
@@ -72,7 +72,7 @@ export function itemFrom(s: AnySlot, ref: string | null, extra: { form?: boolean
     hidden: s.hidden,
     counted: s.counted,
     docNo: newest ? docNumber(ref, s.code, newest.version) : extra.form ? docNumber(ref, s.code) : null,
-    docs: s.docs.map((d) => ({ id: d.id, name: d.name, at: d.at, version: d.version, generated: d.source === 'generated' })),
+    docs: s.docs.map((d) => ({ id: d.id, name: d.name, at: d.at, version: d.version, generated: d.source === 'generated', library: d.source === 'library' })),
     form: !!extra.form,
     made: s.maker === 'pack' || s.maker === 'site' || !!extra.form,
   };

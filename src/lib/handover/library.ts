@@ -2,6 +2,7 @@ import 'server-only';
 import { DOCS_BUCKET } from '@/lib/crm/server';
 import type { Db } from '@/lib/site/server';
 import { buildPdf } from '@/lib/subcontractors/pdf-engine';
+import { isUniversal } from '@/lib/proposal/library';
 import { libraryGaps } from './facts';
 import type { LibraryItem, LibraryKind, ModelDetails } from './inputs';
 
@@ -29,6 +30,8 @@ export function libraryFields(b: Record<string, unknown>): Record<string, unknow
     out.models = [...new Set(list.map((m) => text(m, 120)).filter(Boolean))].slice(0, 30);
   }
   if ('every_pack' in b) out.every_pack = b.every_pack === true;
+  // Which Proposal pack item it is (a universal document: the same on every job; proposal-library.sql).
+  if ('proposal_slot' in b) out.proposal_slot = isUniversal(b.proposal_slot) ? String(b.proposal_slot) : null;
   if ('details' in b && b.details && typeof b.details === 'object') {
     const details: Record<string, ModelDetails> = {};
     for (const [model, d] of Object.entries(b.details as Record<string, Record<string, unknown>>).slice(0, 30)) {

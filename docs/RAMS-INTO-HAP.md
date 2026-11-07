@@ -202,6 +202,10 @@ pack. The old `?tab=handover` and `?view=mcs` still work. The Overview has one D
   and kept off the customer's portal (`visible = false`) until the pack is released. The documents we make ourselves
   (covering letter, quotation, performance estimate, contract, complaints procedure) have no generators yet, so they show
   as still needed; Preview / Edit / Download appear when they exist.
+  **Universal documents** (`src/lib/proposal/library.ts`, `supabase/proposal-library.sql`, applied): the MCS Customer Commitment (HX-PP-05),
+  Consumer Code leaflet (HX-PP-06), deposit protection (HX-PP-07) and complaints procedure (HX-PP-08) are the same on every job.
+  They are added once to the document library (Settings) and tagged "Proposal pack item"; every job's Proposal pack then shows
+  them as done, opening the one library copy. Nothing is uploaded per job.
 - **In-House** (`src/lib/inhouse`): internal, never shown or sent to a customer. The heat pump forms (HX-HP-02, -03, -04)
   are its first group: Edit fills them in on screen (autosave, who/when/from where beside each answer, SimpliHeat's
   differing answer offered as "Use that"; admin signs or starts a revision). Files are filed with `crm_documents.inhouse_slot`

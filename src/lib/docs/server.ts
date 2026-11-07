@@ -106,9 +106,13 @@ export async function packZip(db: Db, projectId: string, key: PackKey): Promise<
   }
   items = shown(items).filter((i) => i.state !== 'na');
 
-  const ids = items.flatMap((i) => i.docs.map((d) => d.id));
-  const { data: rows } = ids.length ? await db.from('crm_documents').select('id, storage_path, created_at').in('id', ids) : { data: [] as { id: string; storage_path: string; created_at: string }[] };
-  const stored = new Map((rows ?? []).map((r) => [String(r.id), r]));
+  const ids = items.flatMap((i) => i.docs.filter((d) => !d.library).map((d) => d.id));
+  const libIds = items.flatMap((i) => i.docs.filter((d) => d.library).map((d) => d.id));
+  const [{ data: rows }, { data: libRows }] = await Promise.all([
+    ids.length ? db.from('crm_documents').select('id, storage_path, created_at').in('id', ids) : Promise.resolve({ data: [] as { id: string; storage_path: string; created_at: string }[] }),
+    libIds.length ? db.from('crm_library').select('id, storage_path, created_at').in('id', libIds) : Promise.resolve({ data: [] as { id: string; storage_path: string; created_at: string }[] }),
+  ]);
+  const stored = new Map([...(rows ?? []), ...(libRows ?? [])].map((r) => [String(r.id), r]));
 
   const entries: ZipEntry[] = [];
   const used = new Set<string>();
