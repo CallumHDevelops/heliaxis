@@ -4,7 +4,7 @@ import { requirePortal } from '@/lib/auth';
 import { mergedInto } from '@/lib/crm/aliases';
 import { canAccess } from '@/lib/portals';
 import { schemaReady } from '@/lib/schema-ready';
-import { DOCS_VIEWS, type DocsView } from './DocsHub';
+import { DOCS_VIEWS, type DocsView } from './docs-views';
 import { ProjectView } from './ProjectView';
 import { TABS, type Area, type Tab } from './record-shared';
 

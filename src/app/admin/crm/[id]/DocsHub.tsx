@@ -11,8 +11,8 @@ import type { Tab } from './record-shared';
 import './docs.css';
 import './mcs.css';
 
-export type DocsView = PackKey | 'general';
-export const DOCS_VIEWS: DocsView[] = ['proposal', 'inhouse', 'handover', 'general'];
+import type { DocsView } from './docs-views';
+export type { DocsView };
 type DocsProps = Parameters<typeof DocumentsTab>[0];
 
 /** The pack Docs opens on when nothing asks for another: the customer's handover once it is open, the In-House file for a job under way, the proposal before that. */
