@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { jobHref } from '@/lib/global-search';
+import { PRODUCTS } from '@/lib/crm/stages';
+import { AddressFinder } from '@/app/admin/projects/AddressFinder';
 import {
   mailHref,
   orgTypeLabel,
@@ -24,7 +26,7 @@ import '../../crm.css';
 import '../orgs.css';
 
 type Data = { organisation: Organisation; contacts: OrgContact[]; jobs: OrgJob[] };
-type SheetState = { kind: 'edit' } | { kind: 'contact'; contact: OrgContact | null } | { kind: 'link' } | null;
+type SheetState = { kind: 'edit' } | { kind: 'contact'; contact: OrgContact | null } | { kind: 'link' } | { kind: 'new' } | null;
 
 const PhoneIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -318,7 +320,10 @@ export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: 
             <div className="crmh-card__h">
               <h3 id="org-jobs-h">Jobs</h3>
               <span className="crmh-n">{data.jobs.length}</span>
-              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small crmh-ml" onClick={() => setSheet({ kind: 'link' })}>
+              <button type="button" className="crm-btn crm-btn--small crmh-ml" onClick={() => setSheet({ kind: 'new' })}>
+                + New opportunity
+              </button>
+              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setSheet({ kind: 'link' })}>
                 Link a job
               </button>
             </div>
@@ -439,6 +444,11 @@ export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: 
           />
         </Sheet>
       )}
+      {sheet?.kind === 'new' && (
+        <Sheet title={`New opportunity for ${o.name}`} onClose={() => setSheet(null)} wide>
+          <NewOrgOpportunity org={o} contacts={contacts} onCancel={() => setSheet(null)} onMade={(jobId) => router.push(`/admin/crm/${jobId}`)} />
+        </Sheet>
+      )}
       {sheet?.kind === 'link' && (
         <Sheet title={`Link a job to ${o.name}`} onClose={() => setSheet(null)} wide>
           <LinkJob
@@ -454,6 +464,88 @@ export function OrganisationView({ id, initial, canInbox, warning = '' }: { id: 
           />
         </Sheet>
       )}
+    </div>
+  );
+}
+
+/** Start an opportunity for this organisation: who it is for, what they want, and where. It opens on the new job. */
+function NewOrgOpportunity({ org, contacts, onCancel, onMade }: { org: Organisation; contacts: OrgContact[]; onCancel: () => void; onMade: (jobId: string) => void }) {
+  const primary = contacts.find((c) => c.is_primary)?.id ?? '';
+  const [who, setWho] = useState(primary);
+  const [products, setProducts] = useState<string[]>([]);
+  const [postcode, setPostcode] = useState(org.postcode ?? '');
+  const [address, setAddress] = useState(org.address ?? '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function make() {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/crm/organisations/${org.id}/opportunity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products, postcode, address, ...(who ? { contact_id: who } : {}) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.id) {
+      setBusy(false);
+      return setErr(d.error || 'Couldn’t create the opportunity. Try again.');
+    }
+    onMade(d.id as string);
+  }
+  return (
+    <div className="org-form">
+      <p className="crm-muted crm-small">
+        This starts a job at <b>Lead</b> for {org.name}. It is linked to the organisation, so it appears under its Jobs, and a customer record is made so you can quote, message and book.
+      </p>
+      {contacts.length > 0 && (
+        <>
+          <label className="qb-lab" htmlFor="noo-who">
+            Who is it for?
+          </label>
+          <select id="noo-who" className="crm-input" value={who} onChange={(e) => setWho(e.target.value)}>
+            <option value="">{org.name} itself</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.role ? `, ${c.role}` : ''}
+                {c.is_primary ? ' (primary)' : ''}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+      <label className="qb-lab">What are they interested in?</label>
+      <div className="crm-stages" role="group" aria-label="Products">
+        {PRODUCTS.map((p) => (
+          <button key={p.key} type="button" className={products.includes(p.key) ? 'on' : ''} aria-pressed={products.includes(p.key)} onClick={() => setProducts((cur) => (cur.includes(p.key) ? cur.filter((k) => k !== p.key) : [...cur, p.key]))}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <AddressFinder
+        id="noo"
+        onPick={(a) => {
+          setAddress(a.address.replace(new RegExp(`,?\\s*${a.postcode.replace(/\s+/g, '\\s*')}\\s*$`, 'i'), '').trim());
+          setPostcode(a.postcode || postcode);
+        }}
+      />
+      <label className="qb-lab" htmlFor="noo-pc">
+        Site postcode (optional)
+      </label>
+      <input id="noo-pc" className="crm-input" value={postcode} onChange={(e) => setPostcode(e.target.value)} placeholder="e.g. NP15 1DG" autoComplete="off" />
+      <label className="qb-lab" htmlFor="noo-addr">
+        Site address (optional)
+      </label>
+      <input id="noo-addr" className="crm-input" value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="off" />
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      <div className="crm-actions">
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={() => void make()}>
+          {busy ? 'Creating…' : 'Create opportunity'}
+        </button>
+        <button type="button" className="crm-btn crm-btn--ghost" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
