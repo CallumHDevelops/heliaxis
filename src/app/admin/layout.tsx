@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
+import { SearchHotkey } from '@/components/admin/GlobalSearch';
 import { DockFrame } from '@/components/admin/whatsapp/DockFrame';
 import { CRM_VIEW_COOKIE, DOCK_COOKIE } from '@/components/admin/whatsapp/dock-shared';
 import { getSessionProfile, guardAdmin } from '@/lib/auth';
@@ -35,6 +36,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       crmView={jar.get(CRM_VIEW_COOKIE)?.value ?? ''}
     >
       {children}
+      {(canAccess(profile, 'enquiries') || canAccess(profile, 'crm')) && <SearchHotkey />}
     </DockFrame>
   );
 }

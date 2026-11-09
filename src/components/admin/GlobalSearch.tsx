@@ -291,22 +291,18 @@ export function HubSearch() {
   );
 }
 
+/** The header's Search button (and anything else) opens the search by sending this to the window. */
+export const OPEN_SEARCH_EVENT = 'hx:open-search';
+
 /**
- * The header's Search button, and Ctrl/⌘+K on any page: the search in a small pop-up over the page. On
- * the dashboard both just put the cursor in its own box. "/" is left alone (the CRM page's search uses it).
+ * Ctrl/⌘+K on ANY staff screen (it is mounted once in the admin layout, so pages without the header have it too): the search in
+ * the middle of the screen with the page behind it softly blurred. Esc or a click outside closes it. "/" is left alone (the CRM
+ * page's search uses it).
  */
-export function HeaderSearch() {
+export function SearchHotkey() {
   const [open, setOpen] = useState(false);
   const back = useRef<HTMLElement | null>(null);
-  const mac = useMac();
-
   const show = useCallback(() => {
-    const inline = document.querySelector<HTMLInputElement>('[data-hx-search-inline] input');
-    if (inline && inline.offsetParent !== null) {
-      inline.focus();
-      inline.select();
-      return;
-    }
     back.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setOpen(true);
   }, []);
@@ -322,32 +318,46 @@ export function HeaderSearch() {
       show();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener(OPEN_SEARCH_EVENT, show);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener(OPEN_SEARCH_EVENT, show);
+    };
   }, [show]);
 
+  if (!open) return null;
+  return createPortal(
+    <div
+      className="gs-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
+      <div className="gs-dialog" role="dialog" aria-modal="true" aria-label="Search customers and projects">
+        <SearchBox variant="overlay" onDone={close} />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/** The header's Search button: opens the same pop-up as Ctrl/⌘+K. */
+export function HeaderSearch() {
+  const mac = useMac();
   return (
-    <>
-      <button type="button" className="hx-search" onClick={show} aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K" title={`Search customers and projects (${mac ? '⌘K' : 'Ctrl+K'})`}>
-        <SearchIcon />
-        <span className="hx-search__label">Search</span>
-        <kbd className="hx-search__kbd" aria-hidden="true">
-          {mac ? '⌘K' : 'Ctrl K'}
-        </kbd>
-      </button>
-      {open &&
-        createPortal(
-          <div
-            className="gs-overlay"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) close();
-            }}
-          >
-            <div className="gs-dialog" role="dialog" aria-modal="true" aria-label="Search customers and projects">
-              <SearchBox variant="overlay" onDone={close} />
-            </div>
-          </div>,
-          document.body
-        )}
-    </>
+    <button
+      type="button"
+      className="hx-search"
+      onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
+      aria-haspopup="dialog"
+      aria-keyshortcuts="Control+K Meta+K"
+      title={`Search customers and projects (${mac ? '⌘K' : 'Ctrl+K'})`}
+    >
+      <SearchIcon />
+      <span className="hx-search__label">Search</span>
+      <kbd className="hx-search__kbd" aria-hidden="true">
+        {mac ? '⌘K' : 'Ctrl K'}
+      </kbd>
+    </button>
   );
 }

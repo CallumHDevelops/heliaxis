@@ -308,12 +308,15 @@
 .gs-overlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 200;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 12vh 16px 16px;
-  background: var(--scrim);
+  /* The box sits in the middle of the screen (a little above centre); results open downwards from it. */
+  padding: 30vh 16px 16px;
+  background: color-mix(in srgb, var(--scrim) 70%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   animation: gs-fade 0.14s ease-out;
 }
 .gs-dialog {
@@ -338,6 +341,7 @@
   }
   .gs-overlay {
     padding-top: calc(12px + env(safe-area-inset-top));
+    align-items: flex-start;
   }
   .gs-hint {
     max-width: 34%;
