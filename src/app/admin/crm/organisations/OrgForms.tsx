@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AddressFinder } from '@/app/admin/projects/AddressFinder';
 import { ORG_TYPES, orgTypeShort, type ContactWithOrg, type OrgContact, type Organisation, type OrgType } from '@/lib/organisations/shared';
 
 /** A contact as the forms take them: with their organisation's name when it's known. */
@@ -181,6 +182,17 @@ export function OrgForm({
           <input id={`org-${id}-pc`} className="crm-input" value={f.postcode} onChange={set('postcode')} autoCapitalize="characters" autoComplete="off" />
         </div>
       </div>
+      <AddressFinder
+        id={`org-${id}`}
+        onPick={(a) =>
+          setF((cur) => ({
+            ...cur,
+            // The postcode has its own box here, so it isn't repeated at the end of the address.
+            address: a.address.replace(new RegExp(`,?\\s*${a.postcode.replace(/\s+/g, '\\s*')}\\s*$`, 'i'), '').trim(),
+            postcode: a.postcode || cur.postcode,
+          }))
+        }
+      />
       <label className="crm-label" htmlFor={`org-${id}-addr`}>
         Address
       </label>

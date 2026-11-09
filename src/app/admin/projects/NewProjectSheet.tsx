@@ -22,6 +22,8 @@ type Customer = {
   possible_duplicate: { name: string; project_ref: string | null } | null;
   /** Someone added under CRM › Contacts (not yet a customer): their customer record is made when the job is. */
   contact?: boolean;
+  /** An organisation (CRM › Organisations): the job is for it, and its customer record is made with the job. */
+  organisation?: boolean;
 };
 
 const OPPORTUNITY_STARTS = [
@@ -127,6 +129,7 @@ export function NewProjectSheet({
       ...(t.assignments.length ? { assignments: t.assignments } : {}),
     };
     if (fresh) Object.assign(body, { name: person.name.trim(), phone: person.phone.trim(), email: person.email.trim(), postcode });
+    else if (customer!.organisation) Object.assign(body, { organisation_id: customer!.id, postcode });
     else if (customer!.contact) Object.assign(body, { contact_id: customer!.id, postcode });
     else Object.assign(body, { enquiry_id: customer!.id, postcode });
     const r = await fetch('/api/crm/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -391,7 +394,7 @@ function CustomerSearch({ onPick, onNew }: { onPick: (c: Customer) => void; onNe
                 <span>
                   <b>{c.name}</b>
                   <small>
-                    {[c.contact ? 'From Contacts' : c.customer_ref, c.postcode, c.phone, c.projects ? `${c.projects} job${c.projects === 1 ? '' : 's'}` : 'no jobs yet'].filter(Boolean).join(' · ')}
+                    {[c.organisation ? 'Organisation' : c.contact ? 'From Contacts' : c.customer_ref, c.postcode, c.phone, c.projects ? `${c.projects} job${c.projects === 1 ? '' : 's'}` : 'no jobs yet'].filter(Boolean).join(' · ')}
                     {c.possible_duplicate ? ' · possible duplicate' : ''}
                   </small>
                 </span>

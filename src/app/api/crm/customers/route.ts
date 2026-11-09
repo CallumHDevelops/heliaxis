@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   const { refs } = found;
   const list = found.customers;
   const ids = list.map((c) => c.id);
-  if (!ids.length) return json({ customers: withContacts ? await contactMatches(db, q, []) : [] });
+  if (!ids.length) return json({ customers: withContacts ? [...(await orgMatches(db, q)), ...(await contactMatches(db, q, []))] : [] });
   const [jobs, dupes, refRows] = await Promise.all([
     readAll<Job>(ids, async (b, from, to) => {
       const read = (cols: string) => db.from('crm_projects').select(cols).in('enquiry_id', b).order('created_at', { ascending: false }).range(from, to);
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         was: c.was ?? null,
       };
     });
-  return json({ customers: withContacts ? [...customers, ...(await contactMatches(db, q, customers))] : customers });
+  return json({ customers: withContacts ? [...customers, ...(await orgMatches(db, q)), ...(await contactMatches(db, q, customers))] : customers });
 }
 
 /**
@@ -90,6 +90,35 @@ async function contactMatches(db: ReturnType<typeof createAdminClient>, q: strin
     return (data ?? [])
       .filter((c) => !(c.mobile && seen.has(String(c.mobile).replace(/\D/g, ''))) && !(c.email && seen.has(String(c.email).toLowerCase())))
       .map((c) => ({ id: c.id as string, name: c.name as string, email: (c.email as string | null) || null, phone: (c.mobile as string | null) || null, postcode: null, customer_ref: null, projects: 0, latest: null, possible_duplicate: null, was: null, contact: true }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Organisations (CRM › Organisations) that match the search by name, postcode, phone or email, so "+ New opportunity" can start a job
+ * for a company, landlord or housing association. Flagged `organisation`; the customer record is made when the job is.
+ */
+async function orgMatches(db: ReturnType<typeof createAdminClient>, q: string) {
+  try {
+    const words = q.split(/\s+/).filter((w) => w.length >= 2).slice(0, 4).map((w) => w.replace(/[%_,()]/g, ''));
+    if (!words.length) return [];
+    const digits = q.replace(/\D/g, '');
+    let query = db.from('organisations').select('id, name, phone, email, postcode').limit(8);
+    // Every word must be in the name, or the whole search is a postcode / phone / email.
+    const byName = words.map((w) => `name.ilike.%${w}%`).join(',');
+    const whole = q.replace(/[%_,()]/g, '');
+    const ors = [`and(${byName})`, `postcode.ilike.%${whole.replace(/\s+/g, '%')}%`, `email.ilike.%${whole}%`];
+    if (digits.length >= 6) ors.push(`phone.ilike.%${digits.slice(-9)}%`);
+    query = query.or(ors.join(','));
+    const { data } = await query;
+    const rows = data ?? [];
+    const counts = new Map<string, number>();
+    if (rows.length) {
+      const { data: jobs } = await db.from('crm_projects').select('organisation_id').in('organisation_id', rows.map((r) => r.id as string));
+      for (const j of jobs ?? []) counts.set(j.organisation_id as string, (counts.get(j.organisation_id as string) ?? 0) + 1);
+    }
+    return rows.map((o) => ({ id: o.id as string, name: o.name as string, email: (o.email as string | null) || null, phone: (o.phone as string | null) || null, postcode: (o.postcode as string | null) || null, customer_ref: null, projects: counts.get(o.id as string) ?? 0, latest: null, possible_duplicate: null, organisation: true }));
   } catch {
     return [];
   }

@@ -1,5 +1,6 @@
 import { after } from 'next/server';
 import { customerFromContact } from '@/lib/crm/from-contact';
+import { customerFromOrganisation } from '@/lib/crm/from-organisation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity, markContacted } from '@/lib/crm/server';
 import { staffBook, staffFrom } from '@/lib/booking/book';
@@ -42,12 +43,19 @@ export async function POST(req: Request) {
 
   let enquiryId = String(b.enquiry_id || '');
   // Someone added under Contacts: their customer record is made (or found) from their details, and the job is linked back to them.
-  let fromContact: { contactId: string; organisationId: string | null } | null = null;
+  let fromContact: { contactId: string | null; organisationId: string | null } | null = null;
   if (!enquiryId && b.contact_id && isUuid(String(b.contact_id))) {
     const made = await customerFromContact(db, String(b.contact_id), String(b.postcode || '').trim().toUpperCase().slice(0, 12) || null);
     if (!made.ok) return json({ error: made.error }, made.status);
     enquiryId = made.enquiryId;
     fromContact = { contactId: String(b.contact_id), organisationId: made.organisationId };
+  }
+  // An organisation (CRM › Organisations): its primary contact's customer record, or one made from the organisation itself.
+  if (!enquiryId && !fromContact && b.organisation_id && isUuid(String(b.organisation_id))) {
+    const made = await customerFromOrganisation(db, String(b.organisation_id), String(b.postcode || '').trim().toUpperCase().slice(0, 12) || null);
+    if (!made.ok) return json({ error: made.error }, made.status);
+    enquiryId = made.enquiryId;
+    fromContact = { contactId: made.contactId, organisationId: made.organisationId };
   }
   let customer: { name: string; postcode: string | null; interest: string | null } | null = null;
   // Their latest job, for the site address, and to tell a second job from their first.
@@ -109,7 +117,7 @@ export async function POST(req: Request) {
       owner_id: ownerId,
       created_by: s.user.id,
       stage: startStage,
-      ...(fromContact ? { contact_id: fromContact.contactId, organisation_id: fromContact.organisationId } : {}),
+      ...(fromContact ? { ...(fromContact.contactId ? { contact_id: fromContact.contactId } : {}), organisation_id: fromContact.organisationId } : {}),
     })
     .select('id')
     .single();

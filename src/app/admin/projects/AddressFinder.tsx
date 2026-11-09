@@ -8,7 +8,7 @@ type Sug = { id: string; address: string };
  * "Find the address": type part of it, pick the match, and the address and postcode are filled in. Without a lookup service
  * (no key set up) it says nothing and the boxes beside it are typed as before.
  */
-export function AddressFinder({ onPick }: { onPick: (a: { address: string; postcode: string; lat?: number | null; lng?: number | null }) => void }) {
+export function AddressFinder({ onPick, id = 'af' }: { onPick: (a: { address: string; postcode: string; lat?: number | null; lng?: number | null }) => void; /** Makes the box's ids unique when two are on one screen. */ id?: string }) {
   const [q, setQ] = useState('');
   const [sugs, setSugs] = useState<Sug[]>([]);
   const [on, setOn] = useState(true);
@@ -50,13 +50,13 @@ export function AddressFinder({ onPick }: { onPick: (a: { address: string; postc
   if (!on) return null;
   return (
     <div className="crmh-picker">
-      <label className="crm-label" htmlFor="af-q">
+      <label className="crm-label" htmlFor={`${id}-q`}>
         Find the address
       </label>
-      <input id="af-q" className="crm-input" value={q} onChange={(e) => { setQ(e.target.value); setSugs([]); }} placeholder="Start typing the house number and street or postcode" autoComplete="off" role="combobox" aria-controls="af-list" aria-expanded={sugs.length > 0} />
+      <input id={`${id}-q`} className="crm-input" value={q} onChange={(e) => { setQ(e.target.value); setSugs([]); }} placeholder="Start typing the house number and street or postcode" autoComplete="off" role="combobox" aria-controls={`${id}-list`} aria-expanded={sugs.length > 0} />
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {t.length >= 3 && sugs.length > 0 && (
-        <ul id="af-list" className="crmh-picker__list" role="listbox">
+        <ul id={`${id}-list`} className="crmh-picker__list" role="listbox">
           {sugs.map((s) => (
             <li key={s.id}>
               <button type="button" disabled={busy} onClick={() => void pick(s)}>
