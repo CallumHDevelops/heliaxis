@@ -1,7 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { PRODUCT_KEYS } from '@/lib/crm/stages';
-import { customerFromContact } from '@/lib/crm/from-contact';
 import { customerFromOrganisation } from '@/lib/crm/from-organisation';
 
 export const dynamic = 'force-dynamic';
@@ -20,27 +19,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const db = createAdminClient();
   const postcode = String(b.postcode || '').trim().toUpperCase().slice(0, 12) || null;
 
-  let enquiryId: string;
-  let contactId: string | null = null;
-  let name: string;
   const chosen = b.contact_id && isUuid(String(b.contact_id)) ? String(b.contact_id) : '';
   if (chosen) {
     // Only one of this organisation's own contacts.
     const { data: c } = await db.from('crm_contacts').select('id').eq('id', chosen).eq('organisation_id', id).maybeSingle();
     if (!c) return json({ error: 'That person isn’t one of this organisation’s contacts.' }, 400);
-    const made = await customerFromContact(db, chosen, postcode);
-    if (!made.ok) return json({ error: made.error }, made.status);
-    enquiryId = made.enquiryId;
-    contactId = chosen;
-    name = made.name;
-  } else {
-    const made = await customerFromOrganisation(db, id, postcode);
-    if (!made.ok) return json({ error: made.error }, made.status);
-    enquiryId = made.enquiryId;
-    contactId = made.contactId;
-    const { data: o } = await db.from('organisations').select('name').eq('id', id).maybeSingle();
-    name = (o?.name as string | undefined) ?? 'Organisation';
   }
+  // The customer is the organisation; the job's contact is the person chosen (or its primary contact).
+  const made = await customerFromOrganisation(db, id, postcode, chosen || null);
+  if (!made.ok) return json({ error: made.error }, made.status);
+  const { enquiryId, contactId, name } = made;
 
   const products = (Array.isArray(b.products) ? b.products : []).filter((k: unknown) => PRODUCT_KEYS.includes(String(k)));
   const title = String(b.title || '').trim() || `${name}${postcode ? ` · ${postcode}` : ''}`;
@@ -64,6 +52,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Added by hand, so no automatic new-lead follow-ups or "not contacted" alerts.
   const now = new Date().toISOString();
   await db.from('crm_projects').update({ sequence_stopped_at: now, first_response_alerted_at: now }).eq('id', project.id).then(() => null, () => null);
-  await logActivity({ enquiryId, projectId: project.id as string, kind: 'system', body: `Opportunity created from organisation ${name}`, byId: s.user.id });
+  await logActivity({ enquiryId, projectId: project.id as string, kind: 'system', body: `Opportunity created for ${name}`, byId: s.user.id });
   return json({ id: project.id });
 }
