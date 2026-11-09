@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { DELIVERY_STAGES, isProjectStage, money, SALES_STAGES, stageLabel } from '@/lib/crm/stages';
 import type { ActionKey, PrimaryAction } from '@/lib/projects/primary-action';
 import { Icon, StageChip } from '../CrmUi';
+import { TextButton } from '../TextSheet';
 import { firstName, jobLabel, phaseOf, productsShort } from '../crm-shared';
 import { dayWord, daysSince, directionsHref, phoneShown, type Area, type Customer, type Duplicate, type OtherJob, type Project } from './record-shared';
 
@@ -214,6 +215,7 @@ export function RecordHeader({
               Directions
             </button>
           )}
+          <TextButton enquiryId={customer.id} name={customer.name} phone={phone} />
           <button type="button" className="crm-btn crm-btn--ghost" onClick={onEmail}>
             <MailIcon />
             Email

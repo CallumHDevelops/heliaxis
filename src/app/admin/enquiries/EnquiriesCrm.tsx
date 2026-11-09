@@ -1,5 +1,6 @@
 'use client';
 
+import { TextButton } from '@/app/admin/crm/TextSheet';
 import Link from 'next/link';
 import { PushBanner } from '@/components/admin/PushBanner';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -580,6 +581,7 @@ export function EnquiriesCrm({
                   WhatsApp
                 </Link>
               )}
+              <TextButton enquiryId={active.id} name={active.name} phone={active.phone} className="enq-btn" />
               {canDelete && (
                 <button
                   type="button"
