@@ -53,6 +53,9 @@ const nextConfig: NextConfig = {
     ];
   },
   transpilePackages: ['heatmap.js'],
+  // ProspectPV makes its print PDFs in headless Chromium. These stay out of the bundle (they are large and
+  // load their own binaries at run time); bundling them is what makes a build slow.
+  serverExternalPackages: ['playwright-core', '@sparticuz/chromium'],
   // Setup guides and SQL files, opened from the "From Claude" to-dos (src/lib/setup-files.ts).
   outputFileTracingIncludes: {
     '/api/setup/file': ['./supabase/*.sql'],
@@ -75,6 +78,9 @@ const nextConfig: NextConfig = {
     '/api/crm/library/**': ['./public/assets/heliaxis-logo*.png', './public/assets/fonts/*.ttf'],
     '/api/crm/settings/**': ['./public/assets/heliaxis-logo*.png', './public/assets/fonts/*.ttf'],
     '/api/my/**': ['./public/assets/heliaxis-logo*.png', './public/assets/fonts/*.ttf'],
+    // ProspectPV letters embed the brand fonts as data in the page they print (components/prospectpv/brand/fonts.server.ts).
+    '/api/prospectpv/letters/**': ['./node_modules/react-dom/**/*.js', './node_modules/react/**/*.js', './node_modules/scheduler/**/*.js', './node_modules/@fontsource/hanken-grotesk/files/*latin-*.woff2', './node_modules/@fontsource/jetbrains-mono/files/*latin-*.woff2', './public/fonts/ezra/*'],
+    '/admin/sales/prospectpv/**': ['./node_modules/react-dom/**/*.js', './node_modules/react/**/*.js', './node_modules/scheduler/**/*.js', './node_modules/@fontsource/hanken-grotesk/files/*latin-*.woff2', './node_modules/@fontsource/jetbrains-mono/files/*latin-*.woff2', './public/fonts/ezra/*'],
     '/api/cron/site': ['./public/assets/heliaxis-logo*.png', './public/assets/fonts/*.ttf'],
   },
   images: {

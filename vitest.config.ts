@@ -12,5 +12,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
+    // ProspectPV's database, end-to-end and browser tests need services: run them with `npm run test:prospectpv:*`.
+    exclude: ['node_modules/**', 'tests/prospectpv/**'],
   },
 });
