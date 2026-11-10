@@ -34,6 +34,7 @@ type Props = {
   onToolChange?(t: DrawTool): void;
 };
 
+const WORKER_URL = '/maplibre/maplibre-gl-worker.mjs';
 const GOLD = '#F8BC1E' as const;
 const INK = '#14201C' as const;
 
@@ -55,6 +56,9 @@ export const AreaMap = forwardRef<AreaMapHandle, Props>(function AreaMap({ cente
           import('terra-draw-maplibre-gl-adapter'),
         ]);
         if (dead || !el.current) return;
+
+        // MapLibre's worker is served from /maplibre/ (scripts/copy-maplibre.mjs); a bundler does not emit it.
+        maplibregl.setWorkerUrl(WORKER_URL);
 
         const map = new maplibregl.Map({
           container: el.current,

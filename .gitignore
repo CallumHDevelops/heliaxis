@@ -45,3 +45,5 @@ next-env.d.ts
 
 # The site app's barcode decoder, copied from node_modules by scripts/copy-zxing.mjs before each build
 /public/portal/site/zxing_reader.wasm
+# The ProspectPV map's web worker, copied from node_modules by scripts/copy-maplibre.mjs before each build
+/public/maplibre/

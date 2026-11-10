@@ -6,7 +6,7 @@
  *   npm run test:prospectpv:browser      (needs Chromium; set CHROME_PATH if not at /opt/pw-browsers/chromium)
  */
 import { build } from 'esbuild';
-import { mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -28,13 +28,15 @@ beforeAll(async () => {
   await build({
     entryPoints: [path.join(ROOT, 'tests/prospectpv/browser/harness.tsx')],
     bundle: true, outfile: path.join(dir, 'app.js'), format: 'iife', platform: 'browser', jsx: 'automatic', minify: false,
-    loader: { ".css": "css", ".svg": "dataurl", ".png": "dataurl" }, define: { 'process.env.NODE_ENV': '"production"' },
+    loader: { ".css": "css", ".svg": "dataurl", ".png": "dataurl" }, define: { 'process.env.NODE_ENV': '"production"', 'process.env': '{}', 'process.platform': '"browser"' },
     alias: { '@': path.join(ROOT, 'src'), 'server-only': path.join(ROOT, 'tests/prospectpv/empty.ts') },
     tsconfig: path.join(ROOT, 'tsconfig.json'), logLevel: 'error',
   });
+  // The map's worker is served from /maplibre/ in the app (scripts/copy-maplibre.mjs); the test server serves it flat.
+  for (const f of ['maplibre-gl-worker.mjs', 'maplibre-gl-shared.mjs']) copyFileSync(path.join(ROOT, 'node_modules/maplibre-gl/dist', f), path.join(dir, f));
   writeFileSync(path.join(dir, 'index.html'), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="app.css"><div id="root"></div><script src="app.js"></script>');
   // Served over http: a file:// page makes MapLibre's worker fetch fail.
-  const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+  const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css' };
   server = createServer((req, res) => {
     const name = (req.url ?? '/').split('?')[0]!.replace(/^\/$/, '/index.html');
     const file = path.join(dir, path.basename(name));
@@ -52,7 +54,8 @@ afterAll(async () => { await browser?.close(); server?.close(); });
 async function open(width = 1280, height = 900): Promise<Page> {
   const page = await browser.newPage({ viewport: { width, height } });
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('pageerror', (e) => { errors.push(e.message); if (process.env.PV_DEBUG) console.log('pageerror', e.message.slice(0, 300)); });
+  page.on('console', (m) => { if (process.env.PV_DEBUG && m.type() === 'error') console.log('console.error', m.text().slice(0, 300)); });
   page.on('requestfailed', (r) => { if (process.env.PV_DEBUG) console.log('request failed', r.url().slice(0, 120), r.failure()?.errorText); });
   (page as Page & { errors: string[] }).errors = errors;
   await page.goto(`${base}/index.html`);
