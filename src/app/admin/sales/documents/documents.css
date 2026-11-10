@@ -1,0 +1,53 @@
+.dw-page { max-width: 980px; margin: 0 auto; padding: 18px 12px 60px; display: grid; gap: 14px; }
+.dw-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.dw-head h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.dw-head p { margin: 0; max-width: 62ch; }
+.dw-search { max-width: 420px; }
+.dw-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.dw-list li + li { border-top: 1px solid var(--border-soft, var(--border)); }
+.dw-list a { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 16px; color: inherit; text-decoration: none; }
+.dw-list a:hover { background: rgb(var(--fg-rgb) / 0.04); }
+.dw-num { font-family: var(--font-mono, monospace); font-size: 0.8rem; color: var(--muted); }
+.dw-main { display: grid; gap: 2px; min-width: 0; }
+.dw-main small, .dw-when { color: var(--muted); font-size: 0.8rem; }
+
+/* The editor */
+.dw-editor { max-width: 920px; margin: 0 auto; padding: 14px 12px 80px; display: grid; gap: 14px; }
+.dw-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 0; z-index: 5; padding: 10px 0; background: var(--bg); }
+.dw-top .dw-grow { flex: 1; min-width: 0; }
+.dw-back { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+.dw-saved { color: var(--muted); font-size: 0.8rem; min-width: 70px; }
+.dw-title { width: 100%; font-size: 1.5rem; font-weight: 800; padding: 10px 12px; }
+.dw-card { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.dw-lab { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.dw-for { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dw-pick { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.dw-pick li + li { border-top: 1px solid var(--border-soft, var(--border)); }
+.dw-pick button { width: 100%; text-align: left; background: none; border: 0; padding: 9px 12px; font: inherit; cursor: pointer; display: grid; gap: 1px; }
+.dw-pick button:hover { background: rgb(var(--fg-rgb) / 0.05); }
+.dw-pick small { color: var(--muted); }
+.dw-block { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 10px 14px 14px; display: grid; gap: 8px; }
+.dw-block--section { border-left: 4px solid var(--accent); }
+.dw-bhead { display: flex; align-items: center; gap: 6px; }
+.dw-btype { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); flex: 1; }
+.dw-tools { display: flex; gap: 4px; flex-wrap: wrap; }
+.dw-textarea { min-height: 150px; line-height: 1.5; }
+.dw-fmt { display: flex; gap: 4px; flex-wrap: wrap; }
+.dw-hint { font-size: 0.76rem; color: var(--muted); margin: 0; }
+.dw-img { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.dw-img.is-left { direction: ltr; }
+.dw-img.is-right { grid-template-columns: minmax(0, 1fr) minmax(0, 220px); }
+.dw-img.is-right .dw-pic { order: 2; }
+.dw-img.is-full { grid-template-columns: 1fr; }
+.dw-pic { display: grid; gap: 6px; align-content: start; }
+.dw-pic img { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--border); }
+.dw-empty { display: grid; place-items: center; min-height: 110px; border: 1px dashed var(--border-strong, var(--border)); border-radius: 8px; color: var(--muted); font-size: 0.85rem; text-align: center; padding: 10px; }
+.dw-seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.dw-tablewrap { overflow-x: auto; }
+.dw-table { border-collapse: collapse; width: 100%; min-width: 420px; }
+.dw-table th, .dw-table td { padding: 3px; }
+.dw-table th input { font-weight: 800; }
+.dw-table input { width: 100%; box-sizing: border-box; }
+.dw-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px; border: 1px dashed var(--border-strong, var(--border)); border-radius: 12px; }
+.dw-add b { font-size: 0.82rem; color: var(--muted); margin-right: 4px; }
+@media (max-width: 640px) { .dw-img, .dw-img.is-right { grid-template-columns: 1fr; } .dw-img.is-right .dw-pic { order: 0; } .dw-list a { grid-template-columns: 70px minmax(0, 1fr); } .dw-when { display: none; } }
