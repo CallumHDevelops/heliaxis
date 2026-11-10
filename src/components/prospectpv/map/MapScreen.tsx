@@ -67,10 +67,11 @@ export function MapScreen({ center, zoom, limits, tileUrl = '/api/prospectpv/til
     setBusy('search'); setSearchMsg(''); setHits(null);
     try {
       const res = await fetch(`/api/prospectpv/search?q=${encodeURIComponent(query.trim())}`);
-      const body = (await res.json()) as { places?: Hit[]; message?: string };
+      const body = (await res.json()) as { places?: Hit[]; message?: string; note?: string };
       if (!res.ok) { setSearchMsg(body.message ?? 'Search isn’t working right now.'); return; }
       if (!body.places?.length) { setSearchMsg('No address found. Check the postcode, or pan the map by hand.'); return; }
       setHits(body.places);
+      if (body.note) setSearchMsg(body.note);
     } catch {
       setSearchMsg('Search isn’t working right now.');
     } finally { setBusy(null); }

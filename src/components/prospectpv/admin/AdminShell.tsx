@@ -3,6 +3,7 @@
  * Server component.
  */
 import type { ReactNode } from 'react';
+import '@/app/admin/crm/crm.css';
 import { AdminShell as HeliaxisShell } from '@/components/admin/AdminShell';
 import { ADMIN_CSS } from './adminCss';
 

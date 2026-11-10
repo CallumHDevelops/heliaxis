@@ -35,6 +35,16 @@ export function osKey(): string {
 
 type Fetcher = typeof fetch;
 
+/** The short reason out of an OS error body, with anything key-shaped removed. */
+function detail(body: string): string {
+  let t = body;
+  try {
+    const j = JSON.parse(body) as { fault?: { faultstring?: string }; error?: { message?: string }; message?: string };
+    t = j.fault?.faultstring ?? j.error?.message ?? j.message ?? body;
+  } catch { /* plain text */ }
+  return t.replace(/key=[^&\s"']+/gi, 'key=…').replace(/[\r\n]+/g, ' ').trim().slice(0, 140);
+}
+
 async function osFetch(f: Fetcher, url: URL, init?: RequestInit): Promise<{ status: number; json: unknown }> {
   let res: Response;
   try {
@@ -42,7 +52,11 @@ async function osFetch(f: Fetcher, url: URL, init?: RequestInit): Promise<{ stat
   } catch {
     throw new OsError('unavailable', 'The address service didn’t answer. Try again in a moment.');
   }
-  if (res.status === 401 || res.status === 403) throw new OsError('auth', 'The OS key was refused. Check it, and that its plan includes OS Places.', res.status);
+  if (res.status === 401 || res.status === 403) {
+    // OS says why in the body (an invalid key, or a plan without this API). Shown to staff so it can be fixed; the key is never in it.
+    const why = await res.text().then((t) => detail(t)).catch(() => '');
+    throw new OsError('auth', `The OS key was refused${why ? ` (${why})` : ''}. Check it, and that its plan includes OS Places.`, res.status);
+  }
   if (res.status === 429) throw new OsError('rate_limited', 'The address service is busy. Try again in a minute.', 429);
   if (res.status === 400) throw new OsError('bad_request', 'The address service couldn’t use that area.', 400);
   if (!res.ok) throw new OsError('unavailable', `The address service is unavailable (${res.status}).`, res.status);
