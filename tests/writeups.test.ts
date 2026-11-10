@@ -61,3 +61,32 @@ describe('documents (tenders)', () => {
     expect(bytes.length).toBeGreaterThan(3000);
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { standardSections } from '@/lib/writeups/standard';
+
+describe('the section library', () => {
+  it('has the ready-made sections, all valid, using only the site’s own wording and pictures', () => {
+    const std = standardSections();
+    expect(std.map((s) => s.key)).toEqual(['about', 'accreditations', 'company', 'survey', 'terms', 'outline']);
+    for (const s of std) {
+      expect(s.blocks.length).toBeGreaterThan(0);
+      expect(cleanContent({ blocks: s.blocks }).blocks).toHaveLength(s.blocks.length);
+    }
+    const paths = std.flatMap((s) => s.blocks.flatMap((b) => (b.type === 'image' ? [b.path] : [])));
+    expect(paths).toEqual(['assets/heliaxis-about-callum.jpg', 'assets/heliaxis-accreditations.png']);
+    const about = std[0].blocks.find((b) => b.type === 'image');
+    expect(about && about.type === 'image' && about.body).toMatch(/family-owned/);
+  });
+
+  it('makes a PDF and a Word file out of every standard section together', async () => {
+    const blocks = standardSections().flatMap((s) => s.blocks);
+    const images = new Map(['assets/heliaxis-about-callum.jpg', 'assets/heliaxis-accreditations.png'].map((p) => [p, { bytes: new Uint8Array(readFileSync(`public/${p}`)), mime: p.endsWith('.png') ? 'image/png' : 'image/jpeg' }]));
+    const f = { ...facts([]), content: cleanContent({ subtitle: '', blocks }), images };
+    const pdf = await writeupPdf(f);
+    expect(Buffer.from(pdf.slice(0, 5)).toString()).toBe('%PDF-');
+    expect(pdf.length).toBeGreaterThan(20000);
+    const docx = await writeupDocx(f);
+    expect(Buffer.from(docx.slice(0, 2)).toString()).toBe('PK');
+  }, 30000);
+});
