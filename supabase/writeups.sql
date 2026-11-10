@@ -18,3 +18,14 @@ create index if not exists crm_writeups_enquiry_idx on public.crm_writeups (enqu
 create index if not exists crm_writeups_org_idx on public.crm_writeups (organisation_id) where organisation_id is not null;
 create index if not exists crm_writeups_updated_idx on public.crm_writeups (updated_at desc);
 alter table public.crm_writeups enable row level security;
+
+-- The section library: sections (one block or a few) saved from a document to drop into any other. Safe to run more than once.
+create table if not exists public.crm_writeup_library (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null check (length(btrim(name)) between 1 and 120),
+  blocks      jsonb not null default '[]'::jsonb,
+  created_by  uuid references public.profiles(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists crm_writeup_library_name_idx on public.crm_writeup_library (lower(name));
+alter table public.crm_writeup_library enable row level security;

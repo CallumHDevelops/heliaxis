@@ -1,4 +1,6 @@
 import 'server-only';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DOCS_BUCKET } from '@/lib/crm/server';
 import { lineNet, money, totalsOf } from '@/lib/quotes/types';
@@ -54,6 +56,12 @@ export async function loadImages(content: WriteupContent): Promise<Map<string, {
   const paths = [...new Set(content.blocks.flatMap((b) => (b.type === 'image' && b.path ? [b.path] : [])))];
   await Promise.all(
     paths.map(async (p) => {
+      // A picture of the site's own ("assets/…": the About photo, the accreditation logos) is a file, not in storage.
+      if (p.startsWith('assets/') && !p.includes('..')) {
+        const bytes = await readFile(path.join(process.cwd(), 'public', p)).catch(() => null);
+        if (bytes) out.set(p, { bytes: new Uint8Array(bytes), mime: /\.png$/i.test(p) ? 'image/png' : 'image/jpeg' });
+        return;
+      }
       const { data } = await db.storage.from(DOCS_BUCKET).download(p);
       if (!data) return;
       const bytes = new Uint8Array(await data.arrayBuffer());

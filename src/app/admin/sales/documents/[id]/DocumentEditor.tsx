@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import { BrandLogo } from '@/components/theme/BrandLogo';
-import { BLOCK_LABEL, newBlock, parasOf, type Block, type BlockType, type Run, type WriteupContent } from '@/lib/writeups/types';
+import { BLOCK_LABEL, newBlock, newId, parasOf, type Block, type BlockType, type Run, type WriteupContent } from '@/lib/writeups/types';
 import { FileButton } from '../../../crm/CrmUi';
 import '../../../crm/crm.css';
 import '../documents.css';
@@ -14,7 +14,12 @@ type QuoteOpt = { id: string; number: string; title: string; status: string };
 type Doc = { id: string; number: string; title: string; enquiry_id: string | null; organisation_id: string | null; project_id: string | null; content: WriteupContent };
 type Found = { id: string; name: string; postcode: string | null; phone: string | null; customer_ref: string | null; organisation?: boolean; contact?: boolean };
 type QuoteTable = { number: string; title: string; headers: string[]; rows: string[][]; totals: [string, string][] };
-type Drag = { kind: 'move'; id: string } | { kind: 'new'; type: BlockType; side?: 'left' | 'right' | 'full' } | null;
+type Drag = { kind: 'move'; id: string } | { kind: 'new'; type: BlockType; side?: 'left' | 'right' | 'full' } | { kind: 'lib'; blocks: Block[] } | null;
+type LibItem = { id?: string; key?: string; name: string; note?: string; blocks: Block[] };
+/** A picture of the site's own is shown from the website; the others from the link the server made. */
+const srcOf = (path: string, urls: Record<string, string>) => (path.startsWith('assets/') ? `/${path}` : urls[path]);
+/** Fresh copies of library blocks (their own ids), so the same section can be used twice in a document. */
+const fresh = (bs: Block[]): Block[] => bs.map((b) => ({ ...b, id: newId() }) as Block);
 
 /** Shrink a picture in the browser (max 1600 px, JPEG) so it uploads quickly and keeps the document small. */
 async function shrink(file: File): Promise<File> {
@@ -75,6 +80,11 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
   const [sel, setSel] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag>(null);
   const [over, setOver] = useState<number | null>(null);
+  const [lib, setLib] = useState<{ standard: LibItem[]; saved: LibItem[] }>({ standard: [], saved: [] });
+  const [libQ, setLibQ] = useState('');
+  const [saveFor, setSaveFor] = useState<string | null>(null);
+  const [saveName, setSaveName] = useState('');
+  const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/crm/writeups/${id}`, { cache: 'no-store' });
@@ -88,6 +98,15 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadLib = useCallback(async () => {
+    const r = await fetch('/api/crm/writeups/library', { cache: 'no-store' });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) setLib({ standard: d.standard ?? [], saved: d.saved ?? [] });
+  }, []);
+  useEffect(() => {
+    void loadLib();
+  }, [loadLib]);
 
   // Saved a moment after typing stops.
   const latest = useRef<Doc | null>(null);
@@ -155,6 +174,10 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
       const b = newBlock(drag.type, drag.side);
       setBlocks((bs) => [...bs.slice(0, index), b, ...bs.slice(index)]);
       setSel(b.id);
+    } else if (drag.kind === 'lib') {
+      const add = fresh(drag.blocks);
+      setBlocks((bs) => [...bs.slice(0, index), ...add, ...bs.slice(index)]);
+      setSel(add[0]?.id ?? null);
     } else {
       setBlocks((bs) => {
         const from = bs.findIndex((b) => b.id === drag.id);
@@ -196,6 +219,49 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
     setBlocks((bs) => [...bs, b]);
     setSel(b.id);
     setTimeout(() => document.getElementById(`blk-${b.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+  }
+
+  /** A library section onto the end of the page. */
+  function insertLib(item: LibItem) {
+    const add = fresh(item.blocks);
+    setBlocks((bs) => [...bs, ...add]);
+    setSel(add[0]?.id ?? null);
+    setNote(`Added “${item.name}”.`);
+    setTimeout(() => document.getElementById(`blk-${add[0]?.id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60);
+  }
+
+  /** What "Save to library" would take: a heading and everything after it up to the next heading, or the one block. */
+  function savePart(bid: string): Block[] {
+    const i = blocks.findIndex((b) => b.id === bid);
+    if (i < 0) return [];
+    if (blocks[i].type !== 'section') return [blocks[i]];
+    let j = i + 1;
+    while (j < blocks.length && blocks[j].type !== 'section') j++;
+    return blocks.slice(i, j);
+  }
+
+  function startSave(bid: string) {
+    const b = blocks.find((x) => x.id === bid);
+    setSaveFor(bid);
+    setSaveName(b && (b.type === 'section' || b.type === 'title') && b.text.trim() ? b.text.trim() : b ? BLOCK_LABEL[b.type] : '');
+    setNote('');
+  }
+
+  async function saveToLibrary() {
+    if (!saveFor) return;
+    const r = await fetch('/api/crm/writeups/library', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: saveName, blocks: savePart(saveFor) }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setErr(d.error || 'Couldn’t save it to the library.');
+    setErr('');
+    setSaveFor(null);
+    setNote(`Saved “${saveName.trim()}” to the library.`);
+    void loadLib();
+  }
+
+  async function deleteSaved(item: LibItem) {
+    if (!item.id || !window.confirm(`Remove “${item.name}” from the library? Documents already using it keep their copy.`)) return;
+    await fetch(`/api/crm/writeups/library/${item.id}`, { method: 'DELETE' });
+    void loadLib();
   }
 
   async function assign(p: { enquiry_id?: string | null; organisation_id?: string | null }) {
@@ -354,6 +420,61 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
             </div>
           </div>
 
+          <div className="dw-panel">
+            <div className="dw-lab">Section library</div>
+            {saveFor && (
+              <div className="dw-savebox">
+                <b>Save to the library</b>
+                <small>
+                  {(() => {
+                    const part = savePart(saveFor);
+                    return part.length > 1 ? `This heading and the ${part.length - 1} block${part.length === 2 ? '' : 's'} after it.` : 'This one block.';
+                  })()}
+                </small>
+                <input className="crm-input" value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Name, e.g. Our approach" aria-label="Library name" autoFocus />
+                <div className="dw-tools">
+                  <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={!saveName.trim()} onClick={() => void saveToLibrary()}>
+                    Save
+                  </button>
+                  <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setSaveFor(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {note && !saveFor && (
+              <p className="crm-small" style={{ margin: 0 }} role="status">
+                {note}
+              </p>
+            )}
+            <input className="crm-input" value={libQ} onChange={(e) => setLibQ(e.target.value)} placeholder="Search the library" aria-label="Search the library" />
+            {([['Heliaxis standard sections', lib.standard], ['Saved by us', lib.saved]] as const).map(([title, items]) => {
+              const shown = items.filter((x) => !libQ.trim() || `${x.name} ${x.note ?? ''}`.toLowerCase().includes(libQ.trim().toLowerCase()));
+              return (
+                <div key={title} className="dw-libgroup">
+                  <div className="dw-libh">{title}</div>
+                  {shown.length === 0 && <p className="dw-empty-note">{title === 'Saved by us' ? 'Nothing saved yet. Select a section on the page and choose Save to library.' : 'No match.'}</p>}
+                  {shown.map((x) => (
+                    <div key={x.id ?? x.key} className="dw-lib" draggable onDragStart={startDrag({ kind: 'lib', blocks: x.blocks })} title="Drag it onto the page, or press Insert">
+                      <span className="dw-libmain">
+                        <b>{x.name}</b>
+                        <small>{x.note || `${x.blocks.length} block${x.blocks.length === 1 ? '' : 's'}`}</small>
+                      </span>
+                      <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => insertLib(x)}>
+                        Insert
+                      </button>
+                      {x.id && (
+                        <button type="button" className="dw-x" aria-label={`Remove ${x.name} from the library`} onClick={() => void deleteSaved(x)}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
           {admin && (
             <button type="button" className="crm-link dw-del" onClick={() => void remove()}>
               Delete this document
@@ -414,6 +535,9 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                           <span className="dw-handle" draggable onDragStart={startDrag({ kind: 'move', id: b.id })} title="Drag to move">
                             ⠿ {b.type === 'image' ? `Picture ${b.side === 'full' ? 'full width' : b.side}` : BLOCK_LABEL[b.type]}
                           </span>
+                          <button type="button" onClick={() => startSave(b.id)} title={b.type === 'section' ? 'Save this heading and what follows it to the library' : 'Save this block to the library'}>
+                            Save to library
+                          </button>
                           <button type="button" onClick={() => nudge(b.id, -1)} disabled={i === 0} aria-label="Move up">
                             Up
                           </button>
@@ -584,9 +708,9 @@ function PageBlock({ b, selected, urls, quotes, qtable, hasWho, patch, onUpload 
     case 'image': {
       const pic = (
         <figure className="dw-fig">
-          {b.path && urls[b.path] ? (
+          {b.path && srcOf(b.path, urls) ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={urls[b.path]} alt={b.caption || 'Picture'} />
+            <img src={srcOf(b.path, urls)} alt={b.caption || 'Picture'} />
           ) : (
             <div className="dw-nopic">No picture yet</div>
           )}
