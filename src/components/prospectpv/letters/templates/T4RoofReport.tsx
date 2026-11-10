@@ -104,7 +104,7 @@ export function T4Back({ data, copy, preview }: TemplateProps) {
             </tbody>
           </table>
         </div>
-        <ImageSlot url={data.images.esaUnit} label="GoodWe ESA unit" preview={preview} />
+        <ImageSlot url={data.images.package ?? data.images.esaUnit} label="GoodWe ESA unit" preview={preview} />
       </div>
 
       <div className="t4-feat">

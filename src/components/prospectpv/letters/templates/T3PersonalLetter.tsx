@@ -93,7 +93,7 @@ export function T3Back({ data, copy, preview }: TemplateProps) {
           </div>
           <div className="t3-imgs">
             <ImageSlot url={data.images.install} label="finished Heliaxis roof install" preview={preview} />
-            <ImageSlot url={data.images.esaUnit} label="GoodWe ESA unit" preview={preview} />
+            <ImageSlot url={data.images.package ?? data.images.esaUnit} label="GoodWe ESA unit" preview={preview} />
           </div>
           <div className="t3-cols">
             <div>

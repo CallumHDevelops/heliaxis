@@ -33,7 +33,11 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ z: string;
   } catch {
     return new NextResponse(null, { status: 502 });
   }
-  if (!up.ok) return new NextResponse(null, { status: up.status === 404 ? 404 : 502 });
+  if (!up.ok) {
+    // Tell the browser (and the logs) why, without the key: a 401/403 from OS usually means the plan has no OS Maps API.
+    console.warn('[prospectpv] OS tile refused', up.status, layer);
+    return new NextResponse(null, { status: up.status === 404 ? 404 : 502, headers: { 'x-pv-os-status': String(up.status) } });
+  }
   return new NextResponse(up.body, {
     headers: { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=86400' },
   });

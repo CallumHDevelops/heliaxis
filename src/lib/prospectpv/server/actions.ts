@@ -16,7 +16,7 @@ import { coerceSection, SETTINGS_SECTIONS } from '../settingsSchema';
 import { withUniqueShortCode } from '../shortCode';
 import { ASSET_SLOTS, type ActionResult } from './actionTypes';
 import { staffOrNull, type Session } from './auth';
-import { assetUrls, loadAssets, loadPackages, loadRawSettings, loadSettings, loadTemplates } from './data';
+import { assetUrls, loadAssets, loadPackages, loadRawSettings, loadSettings, loadTemplates, publicAssetUrl } from './data';
 
 const DENIED = { ok: false, message: 'You need to be signed in as a ProspectPV admin to do that.' } as const;
 const STAFF_DENIED = { ok: false, message: 'You need to be signed in with ProspectPV access to do that.' } as const;
@@ -129,6 +129,41 @@ export async function uploadAsset(formData: FormData): Promise<ActionResult<{ ur
   return { ok: true, url: assetUrls([{ slot, storage_path: path, alt_text: null }])[slot as keyof ReturnType<typeof assetUrls>] ?? '' };
 }
 
+/**
+ * A package's own picture, shown on the back of its letters in place of the GoodWe ESA unit photo. Admins only.
+ * Old files are left in storage on purpose: letters already made keep the address they were printed with.
+ */
+export async function uploadPackageImage(formData: FormData): Promise<ActionResult<{ url: string }>> {
+  const s = await admin();
+  if (!s) return DENIED;
+  const id = String(formData.get('id') ?? '');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: 'Save the package first, then add its picture.' };
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Choose an image to upload.' };
+  const ext = IMAGE_TYPES[file.type];
+  if (!ext) return { ok: false, message: 'Upload a PNG, JPG or WebP image.' };
+  if (file.size > MAX_IMAGE_BYTES) return { ok: false, message: 'That image is over 3 MB. Export a smaller one.' };
+  const { data: pkg } = await s.db.from('pv_packages').select('id').eq('id', id).maybeSingle();
+  if (!pkg) return { ok: false, message: 'That package no longer exists.' };
+
+  const path = `package/${id}/${Date.now()}.${ext}`;
+  const up = await s.db.storage.from('prospectpv-assets').upload(path, file, { contentType: file.type, upsert: false });
+  if (up.error) return { ok: false, message: `Couldn’t upload: ${up.error.message}` };
+  const { error } = await s.db.from('pv_packages').update({ image_path: path }).eq('id', id);
+  if (error) return { ok: false, message: dbMessage(error, 'packages') };
+  revalidatePath('/admin/sales/prospectpv', 'layout');
+  return { ok: true, url: publicAssetUrl(path) };
+}
+
+export async function removePackageImage(id: string): Promise<ActionResult> {
+  const s = await admin();
+  if (!s) return DENIED;
+  const { error } = await s.db.from('pv_packages').update({ image_path: null }).eq('id', id);
+  if (error) return { ok: false, message: dbMessage(error, 'packages') };
+  revalidatePath('/admin/sales/prospectpv', 'layout');
+  return { ok: true };
+}
+
 export async function removeAsset(slot: string): Promise<ActionResult> {
   const s = await admin();
   if (!s) return DENIED;
@@ -155,7 +190,7 @@ async function prepareManual(s: Session, raw: Record<string, unknown>) {
     errors.panelCount = `A roof of ${form.widthM} × ${form.depthM} m only fits about ${maxPanelsOnRoof(form)} panels. Check the size, or lower the panel count.`;
   }
   if (Object.keys(errors).length) return { ok: false as const, errors };
-  return { ok: true as const, form, pkg, settings, template: enabled.find((t) => t.template_key === form.templateKey)!, urls: assetUrls(assetRows), assetRows };
+  return { ok: true as const, form, pkg, settings, template: enabled.find((t) => t.template_key === form.templateKey)!, urls: { ...assetUrls(assetRows), package_image: pkg.image_path ? publicAssetUrl(pkg.image_path) : null }, assetRows };
 }
 
 export async function previewManualLetter(raw: Record<string, unknown>): Promise<ActionResult<{ html: string; missing: { label: string; href: string }[] }>> {

@@ -98,7 +98,7 @@ export function T1Back({ data, copy, preview }: TemplateProps) {
       </div>
 
       <div className="t1-pkg">
-        <ImageSlot url={data.images.esaUnit} label="GoodWe ESA unit on a wall" preview={preview} />
+        <ImageSlot url={data.images.package ?? data.images.esaUnit} label="GoodWe ESA unit on a wall" preview={preview} />
         <div className="t1-pkg-right">
           <div className="pv-rows">
             <div><span>Solar panels</span><strong>{data.estimate.panelCount} × {p.panelModel} {p.panelWatts} W</strong></div>

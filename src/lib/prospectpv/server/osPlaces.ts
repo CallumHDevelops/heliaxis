@@ -125,3 +125,39 @@ export async function logOsCall(endpoint: string, statusCode: number | null, cam
     console.error('[prospectpv] api log failed', e instanceof Error ? e.message : e);
   }
 }
+
+export type OsCheck = { name: string; ok: boolean; status: number | null; message: string };
+
+/**
+ * One-click diagnosis for the Map screen: does the OS key work for each thing the map uses? Each check is one small request.
+ * Messages carry OS's own reason (bad key, or the API is not on the plan) and never the key.
+ */
+export async function checkOsConnection(f: Fetcher = fetch): Promise<OsCheck[]> {
+  const key = process.env.OS_DATAHUB_KEY ?? process.env.PROSPECTPV_OS_API_KEY;
+  if (!key) return [{ name: 'OS key', ok: false, status: null, message: 'OS_DATAHUB_KEY is not set on this deployment.' }];
+  const run = async (name: string, url: URL, init?: RequestInit, bodyOk?: (j: unknown) => string | null): Promise<OsCheck> => {
+    try {
+      const res = await f(url, { ...init, signal: AbortSignal.timeout(10_000), cache: 'no-store' });
+      if (!res.ok) return { name, ok: false, status: res.status, message: detail(await res.text().catch(() => '')) || `HTTP ${res.status}` };
+      if (bodyOk) {
+        const problem = bodyOk(await res.json().catch(() => null));
+        if (problem) return { name, ok: false, status: res.status, message: problem };
+      }
+      return { name, ok: true, status: res.status, message: 'Working.' };
+    } catch {
+      return { name, ok: false, status: null, message: 'No answer from OS.' };
+    }
+  };
+  const places = new URL(`${OS_PLACES_BASE}/find`);
+  places.searchParams.set('key', key); places.searchParams.set('query', 'SW1A 2AA'); places.searchParams.set('maxresults', '1');
+  const poly = new URL(`${OS_PLACES_BASE}/polygon`);
+  poly.searchParams.set('key', key); poly.searchParams.set('srs', 'EPSG:4326'); poly.searchParams.set('maxresults', '1'); poly.searchParams.set('fq', RESIDENTIAL_FQ);
+  const area = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[-0.1281, 51.5031], [-0.1261, 51.5031], [-0.1261, 51.5041], [-0.1281, 51.5041], [-0.1281, 51.5031]]] } };
+  const tile = new URL('https://api.os.uk/maps/raster/v1/zxy/Light_3857/10/511/340.png');
+  tile.searchParams.set('key', key);
+  return Promise.all([
+    run('Address search (OS Places)', places),
+    run('Counting homes in an area (OS Places)', poly, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(area) }, (j) => (typeof (j as { header?: unknown })?.header === 'object' ? null : 'OS answered, but not in the expected shape.')),
+    run('Map tiles (OS Maps)', tile),
+  ]);
+}

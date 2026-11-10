@@ -205,7 +205,7 @@ function App() {
           <NewLetterForm packages={db.packages.filter((p) => p.active)} templates={templates} settings={s} readiness={readiness({ settings: s, hasAccreditations: !!db.assets.accreditations })} actions={actions} onCreated={() => { location.hash = '#/letter'; }} />
         </>
       ) : null}
-      {route === 'packages' ? <PackagesManager packages={db.packages} extras={db.extras} actions={pkgActions} onChanged={changed} canEdit /> : null}
+      {route === 'packages' ? <PackagesManager packages={db.packages} extras={db.extras} imageUrls={{}} actions={{ ...pkgActions, uploadImage: async () => ({ ok: true, url: '' }), removeImage: async () => ({ ok: true }) }} onChanged={changed} canEdit /> : null}
       {route === 'estimator' ? <Estimator key={String(db.settings.scaffolding?.rate_per_m2_gbp)} packages={db.packages} settings={s} canEdit onChanged={changed} actions={{ saveRates: (raw) => settingsActions.saveSection('scaffolding', raw) }} /> : null}
       {route === 'settings' ? <SettingsPanels rawSettings={db.settings} assetUrls={Object.fromEntries(Object.entries(db.assets))} actions={settingsActions} onChanged={changed} canEdit /> : null}
     </AdminShell>

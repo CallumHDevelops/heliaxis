@@ -62,7 +62,7 @@ export function T5Back({ data, copy, preview }: TemplateProps) {
   return (
     <section className="pv-page t5">
       <div className="t5-back-top">
-        <ImageSlot url={data.images.esaUnit} label="GoodWe ESA unit" preview={preview} />
+        <ImageSlot url={data.images.package ?? data.images.esaUnit} label="GoodWe ESA unit" preview={preview} />
         <div>
           <Eyebrow>Your package</Eyebrow>
           <h2>{p.name}</h2>

@@ -70,12 +70,16 @@ export type LetterData = {
     accreditations: string;
     /** ADDED: GoodWe ESA product photo used on every back page. */
     esaUnit?: string;
+    /** This package's own picture (Packages screen). Shown on the back page in place of the ESA unit photo. */
+    package?: string;
   };
 };
 
 /** Row shapes (subset of columns the TS code uses). */
 export type PackageRow = {
   id: string;
+  /** Path of the package picture in the prospectpv-assets bucket. */
+  image_path?: string | null;
   name: string;
   min_panels: number;
   max_panels: number | null;

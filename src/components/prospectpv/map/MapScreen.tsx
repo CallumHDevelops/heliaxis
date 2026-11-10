@@ -51,6 +51,19 @@ export function MapScreen({ center, zoom, limits, tileUrl = '/api/prospectpv/til
   const [nameError, setNameError] = useState('');
   const [saved, setSaved] = useState<{ id: string; ha: number } | null>(null);
   const [lastHit, setLastHit] = useState<Hit | null>(null);
+  const [osChecks, setOsChecks] = useState<{ name: string; ok: boolean; status: number | null; message: string }[] | null>(null);
+  const [osBusy, setOsBusy] = useState(false);
+
+  async function checkOs() {
+    setOsBusy(true);
+    try {
+      const res = await fetch('/api/prospectpv/os-check');
+      const body = (await res.json()) as { checks?: typeof osChecks; message?: string };
+      setOsChecks(body.checks ?? [{ name: 'Check', ok: false, status: res.status, message: body.message ?? 'Couldn’t run the check.' }]);
+    } catch {
+      setOsChecks([{ name: 'Check', ok: false, status: null, message: 'Couldn’t run the check.' }]);
+    } finally { setOsBusy(false); }
+  }
 
   const check = useMemo(() => (shapes ? validateDrawnArea(shapes, limits) : null), [shapes, limits]);
 
@@ -186,6 +199,19 @@ export function MapScreen({ center, zoom, limits, tileUrl = '/api/prospectpv/til
               </>
             ) : null}
             {message ? <p className="pvm-block" role="alert">{message}</p> : null}
+          </div>
+
+          <div className="pva-card" aria-label="OS connection">
+            <h2>OS connection</h2>
+            <p className="pva-blurb" style={{ marginBottom: 8 }}>Checks that the OS key works for address search, counting homes and map tiles.</p>
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={checkOs} disabled={osBusy}>{osBusy ? 'Checking…' : 'Check OS connection'}</button>
+            {osChecks ? (
+              <ul className="pvm-list" aria-live="polite">
+                {osChecks.map((c) => (
+                  <li key={c.name}><strong>{c.name}:</strong> {c.ok ? 'working' : `not working${c.status ? ` (${c.status})` : ''}. ${c.message}`}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
 
           {e ? (

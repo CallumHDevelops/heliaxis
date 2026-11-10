@@ -72,7 +72,7 @@ export function T2Back({ data, copy, preview }: TemplateProps) {
           <div className="pv-price-num">£{money(p.priceIncVat)}</div>
           <small>{copy('priceNote')}</small>
         </div>
-        <ImageSlot url={data.images.esaUnit} label="GoodWe ESA unit" preview={preview} dark />
+        <ImageSlot url={data.images.package ?? data.images.esaUnit} label="GoodWe ESA unit" preview={preview} dark />
       </div>
 
       <div className="t2-cols">

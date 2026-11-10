@@ -27,7 +27,7 @@ export class LetterDataError extends Error {
 }
 
 export type AssetUrls = Partial<
-  Record<'logo' | 'logo_white' | 'accreditations' | 'hero' | 'install' | 'team' | 'signature' | 'director_photo' | 'esa_unit', string | null>
+  Record<'logo' | 'logo_white' | 'accreditations' | 'hero' | 'install' | 'team' | 'signature' | 'director_photo' | 'esa_unit' | 'package_image', string | null>
 >;
 
 export type LetterInputs = {
@@ -171,6 +171,7 @@ export function buildLetterData(input: LetterInputs): BuiltLetter {
       logoWhite: input.assets.logo_white ?? undefined,
       accreditations: input.assets.accreditations ?? '',
       esaUnit: input.assets.esa_unit ?? undefined,
+      package: input.assets.package_image ?? undefined,
     },
   };
 

@@ -15,6 +15,7 @@ These files are the exact SQL that was applied, in this order, as Supabase migra
 | `20261110090000_prospectpv_admin.sql` | `prospectpv_admin` | Manual letters, scaffolding settings, brand-image bucket `prospectpv-assets` |
 | `20261110120000_prospectpv_map.sql` | `prospectpv_map` | Drawn-area campaigns, `map` and `ranking` settings, area functions |
 | `20261110130000_prospectpv_revoke_anon_helpers.sql` | `prospectpv_revoke_anon_helpers` | Signed-out visitors can no longer call the role helpers |
+| `20261110140000_prospectpv_package_image.sql` | `prospectpv_package_image` | `pv_packages.image_path`: a picture per package for the letter |
 
 Nothing needs running again. Keep the files so a new environment can be built from them.
 

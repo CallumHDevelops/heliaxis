@@ -11,12 +11,15 @@ import { bandLabel, bandWarnings, bySize, EMPTY_PACKAGE, REQUIRED_FOR_ACTIVE, ro
 import type { ActionResult } from '@/lib/prospectpv/server/actionTypes';
 import type { ExtraAdminRow } from '@/lib/prospectpv/server/data';
 import type { PackageRow } from '@/lib/prospectpv/types';
+import { FileButton } from '@/app/admin/crm/CrmUi';
 import { Field, Toggle } from './ui';
 
 export type PackageActions = {
   save: (raw: Record<string, unknown>) => Promise<ActionResult>;
   remove: (id: string) => Promise<ActionResult>;
   duplicate: (id: string) => Promise<ActionResult>;
+  uploadImage: (formData: FormData) => Promise<ActionResult<{ url: string }>>;
+  removeImage: (id: string) => Promise<ActionResult>;
   saveExtra: (raw: { id: string; name: string; description: string; price: string | number | null; active: boolean }) => Promise<ActionResult>;
 };
 
@@ -34,8 +37,40 @@ const toDraft = (f: PackageForm): Draft => ({
   description: f.description, claims: f.claims, active: f.active, displayOrder: String(f.displayOrder),
 });
 
-export function PackagesManager({ packages, extras, actions, onChanged, canEdit }: {
-  packages: PackageRow[]; extras: ExtraAdminRow[]; actions: PackageActions; onChanged: () => void; canEdit: boolean;
+/** The picture that goes on a package's letters. Needs a saved package, because the file is kept against its id. */
+function PackageImageField({ id, url, actions, canEdit, onChanged }: { id: string; url: string | null; actions: PackageActions; canEdit: boolean; onChanged: () => void }) {
+  const [shown, setShown] = useState<string | null>(url);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true); setMsg('');
+    const fd = new FormData();
+    fd.set('id', id); fd.set('file', file);
+    const r = await actions.uploadImage(fd);
+    setBusy(false);
+    if (r.ok) { setShown(r.url); onChanged(); } else setMsg(r.message ?? 'Couldn’t upload.');
+  }
+  return (
+    <fieldset className="pva-fs">
+      <legend>Picture on the letter</legend>
+      <p className="pva-note" style={{ marginTop: 0 }}>Shown on the back of this package’s letters, in place of the GoodWe ESA unit photo. PNG, JPG or WebP, up to 3 MB. Letters already made keep the picture they were made with.</p>
+      <div className="pva-thumb">{shown ? <img src={shown} alt="Current package picture" /> : <span>No picture yet. Letters use the ESA unit photo.</span>}</div>
+      {msg ? <div className="pva-err" role="alert">{msg}</div> : null}
+      {canEdit ? (
+        <div className="pva-actions">
+          <FileButton label={busy ? 'Uploading…' : shown ? 'Replace picture' : 'Add picture'} accept="image/png,image/jpeg,image/webp" busy={busy} onFiles={(files) => void pick(files[0])} />
+          {shown ? (
+            <button type="button" className="crm-btn crm-btn--small crm-btn--ghost" disabled={busy} onClick={async () => { setBusy(true); const r = await actions.removeImage(id); setBusy(false); if (r.ok) { setShown(null); onChanged(); } else setMsg(r.message ?? 'Couldn’t remove.'); }}>Remove picture</button>
+          ) : null}
+        </div>
+      ) : null}
+    </fieldset>
+  );
+}
+
+export function PackagesManager({ packages, extras, imageUrls, actions, onChanged, canEdit }: {
+  packages: PackageRow[]; extras: ExtraAdminRow[]; imageUrls: Record<string, string | null>; actions: PackageActions; onChanged: () => void; canEdit: boolean;
 }) {
   const forms = packages.map(rowToForm).sort(bySize);
   const warnings = bandWarnings(forms);
@@ -97,6 +132,12 @@ export function PackagesManager({ packages, extras, actions, onChanged, canEdit 
                 <Field label="Price, fully installed" unit="£ inc. VAT" error={errors.price} help="Includes scaffolding."><input type="text" inputMode="decimal" value={String(draft.price)} onChange={set('price')} aria-invalid={!!errors.price} /></Field>
               </div>
             </fieldset>
+
+            {draft.id ? (
+              <PackageImageField key={String(draft.id)} id={String(draft.id)} url={imageUrls[String(draft.id)] ?? null} actions={actions} canEdit={canEdit} onChanged={onChanged} />
+            ) : (
+              <p className="pva-note">Save the package first, then you can add its picture for the letter.</p>
+            )}
 
             <details>
               <summary style={{ cursor: 'pointer', fontWeight: 700, minHeight: 32 }}>More details printed on the letter</summary>

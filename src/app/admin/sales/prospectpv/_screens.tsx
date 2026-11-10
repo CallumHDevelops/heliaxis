@@ -11,7 +11,7 @@ import { NewLetterForm } from '@/components/prospectpv/admin/NewLetterForm';
 import { PackagesManager } from '@/components/prospectpv/admin/PackagesManager';
 import { SettingsPanels } from '@/components/prospectpv/admin/SettingsPanels';
 import {
-  createManualLetter, deletePackage, duplicatePackage, previewManualLetter, removeAsset, saveExtra, savePackage, saveSettingsSection, uploadAsset,
+  createManualLetter, deletePackage, duplicatePackage, previewManualLetter, removeAsset, saveExtra, savePackage, saveSettingsSection, uploadAsset, uploadPackageImage, removePackageImage,
 } from '@/lib/prospectpv/server/actions';
 import { estimateArea, saveArea } from '@/lib/prospectpv/server/mapActions';
 
@@ -24,7 +24,7 @@ export function NewLetterScreen(props: Props<typeof NewLetterForm>) {
 
 export function PackagesScreen(props: Props<typeof PackagesManager>) {
   const router = useRouter();
-  return <PackagesManager {...props} actions={{ save: savePackage, remove: deletePackage, duplicate: duplicatePackage, saveExtra }} onChanged={() => router.refresh()} />;
+  return <PackagesManager {...props} actions={{ save: savePackage, remove: deletePackage, duplicate: duplicatePackage, saveExtra, uploadImage: uploadPackageImage, removeImage: removePackageImage }} onChanged={() => router.refresh()} />;
 }
 
 export function EstimatorScreen(props: Props<typeof Estimator>) {

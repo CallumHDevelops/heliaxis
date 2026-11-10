@@ -117,8 +117,13 @@ export const AreaMap = forwardRef<AreaMapHandle, Props>(function AreaMap({ cente
           (el.current as HTMLElement & { __ready?: boolean }).__ready = true;
           el.current?.setAttribute('data-ready', 'true');
         });
-        map.on('error', (e: { error?: { message?: string } }) => {
-          if (showTiles && /tile|403|401|502|503/i.test(String(e?.error?.message ?? ''))) setFailed('The map tiles can’t be loaded right now. You can still search for a postcode and draw, but you won’t see the streets.');
+        map.on('error', (e: { error?: { message?: string; status?: number } }) => {
+          if (!showTiles) return;
+          const status = e?.error?.status;
+          const text = String(e?.error?.message ?? '');
+          if (status === 401) setFailed('You’ve been signed out, so the map tiles stopped loading. Refresh the page and sign in again.');
+          else if (status === 502 || status === 503) setFailed('The map tiles can’t be loaded: OS didn’t supply them (the OS key may not include the OS Maps API). Use “Check OS connection” to see why. You can still search and draw, but you won’t see the streets.');
+          else if (/tile|403|502|503/i.test(text)) setFailed('The map tiles can’t be loaded right now. You can still search for a postcode and draw, but you won’t see the streets.');
         });
 
         cleanup = () => {

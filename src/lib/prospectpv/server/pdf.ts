@@ -38,12 +38,12 @@ export async function inlineLetterImages(data: LetterData): Promise<LetterData> 
     return cache.get(u)!;
   };
   const i = data.images;
-  const [logo, logoWhite, accreditations, hero, install, team, esaUnit, signatureUrl, photoUrl] = await Promise.all([
-    get(i.logo), get(i.logoWhite), get(i.accreditations), get(i.hero), get(i.install), get(i.team), get(i.esaUnit), get(data.sender.signatureUrl), get(data.sender.photoUrl),
+  const [logo, logoWhite, accreditations, hero, install, team, esaUnit, packageImage, signatureUrl, photoUrl] = await Promise.all([
+    get(i.logo), get(i.logoWhite), get(i.accreditations), get(i.hero), get(i.install), get(i.team), get(i.esaUnit), get(i.package), get(data.sender.signatureUrl), get(data.sender.photoUrl),
   ]);
   return {
     ...data,
-    images: { ...i, logo: logo ?? '', logoWhite, accreditations: accreditations ?? '', hero, install, team, esaUnit },
+    images: { ...i, logo: logo ?? '', logoWhite, accreditations: accreditations ?? '', hero, install, team, esaUnit, package: packageImage },
     sender: { ...data.sender, signatureUrl, photoUrl },
   };
 }
