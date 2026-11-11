@@ -69,7 +69,9 @@ const PALETTE: { label: string; hint: string; type: BlockType; side?: 'left' | '
   { label: 'Picture full width', hint: 'A wide picture', type: 'image', side: 'full' },
   { label: 'Table', hint: 'You fill it in', type: 'table' },
   { label: 'Quote table', hint: 'From the customer’s quote', type: 'quote' },
-  { label: 'Video with QR code', hint: 'A video the reader scans to watch', type: 'video' },
+  { label: 'Video left', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'left' },
+  { label: 'Video right', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'right' },
+  { label: 'Video full width', hint: 'A wide video picture, QR code beneath', type: 'video', side: 'full' },
   { label: 'Page break', hint: 'Start a new page', type: 'break' },
 ];
 
@@ -1010,7 +1012,7 @@ function PageBlock({ docId, b, selected, urls, quotes, qtable, hasWho, patch, on
     case 'table':
       return <PageTable b={b} selected={selected} patch={patch} />;
     case 'video':
-      return <VideoElement b={b} selected={selected} docId={docId} patch={patch} />;
+      return <VideoElement b={b} selected={selected} docId={docId} urls={urls} patch={patch} />;
     case 'quote':
       return (
         <div className="dw-quote">
@@ -1181,24 +1183,67 @@ function CustomerPicker({ onPick }: { onPick: (f: Found) => void }) {
   );
 }
 
-/** A video element: choose a file (it goes straight to storage), give it a sub-title, and the page shows the QR code the reader will scan. */
-function VideoElement({ b, selected, docId, patch }: { b: Extract<Block, { type: 'video' }>; selected: boolean; docId: string; patch: (p: Record<string, unknown>) => void }) {
+/** The picture the video shows: a frame from near its start, taken in the browser. */
+async function frameOf(file: File): Promise<File | null> {
+  const src = URL.createObjectURL(file);
+  try {
+    const v = document.createElement('video');
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    v.src = src;
+    await new Promise<void>((res, rej) => {
+      v.onloadeddata = () => res();
+      v.onerror = () => rej(new Error('unreadable'));
+      setTimeout(() => rej(new Error('slow')), 8000);
+    });
+    v.currentTime = Math.min(1, (v.duration || 2) / 2);
+    await new Promise<void>((res) => {
+      v.onseeked = () => res();
+      setTimeout(res, 3000);
+    });
+    const scale = Math.min(1, 1280 / Math.max(v.videoWidth, 1));
+    const c = document.createElement('canvas');
+    c.width = Math.round(v.videoWidth * scale);
+    c.height = Math.round(v.videoHeight * scale);
+    c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height);
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.82));
+    return blob && c.width > 0 ? new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' }) : null;
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
+
+/** A video element: its picture (left, right or full width) with a small QR code to watch it. The video goes straight to storage; the picture is taken from it, or chosen. */
+function VideoElement({ b, selected, docId, urls, patch }: { b: Extract<Block, { type: 'video' }>; selected: boolean; docId: string; urls: Record<string, string>; patch: (p: Record<string, unknown>) => void }) {
   const [qr, setQr] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
+  const [local, setLocal] = useState<Record<string, string>>({});
   const link = typeof window === 'undefined' ? '' : `${window.location.origin}/watch/${docId}/${b.id}`;
   useEffect(() => {
     let live = true;
     if (!b.path || !link) return;
-    void import('qrcode').then((m) => m.default.toDataURL(link, { errorCorrectionLevel: 'M', margin: 1, width: 240 })).then((u) => live && setQr(u));
+    void import('qrcode').then((m) => m.default.toDataURL(link, { errorCorrectionLevel: 'M', margin: 1, width: 200 })).then((u) => live && setQr(u));
     return () => {
       live = false;
     };
   }, [b.path, link]);
+  async function putThumb(f: File): Promise<string | null> {
+    const fd = new FormData();
+    fd.append('file', f);
+    const r = await fetch(`/api/crm/writeups/${docId}/image`, { method: 'POST', body: fd });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Couldn’t save the thumbnail.');
+    if (d.url) setLocal((l) => ({ ...l, [d.path]: d.url }));
+    return d.path as string;
+  }
   async function upload(files: File[]) {
     const f = files[0];
     if (!f) return;
-    setBusy(true);
+    setBusy('Uploading…');
     setErr('');
     try {
       const prep = await fetch(`/api/crm/writeups/${docId}/video`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mime: f.type, size: f.size }) });
@@ -1206,39 +1251,85 @@ function VideoElement({ b, selected, docId, patch }: { b: Extract<Block, { type:
       if (!prep.ok) throw new Error(p.error || 'Couldn’t start the upload.');
       const up = await createClient().storage.from(p.bucket).uploadToSignedUrl(p.path, p.token, f, { contentType: f.type });
       if (up.error) throw new Error(`Upload failed: ${up.error.message}`);
-      patch({ path: p.path, name: f.name });
+      setBusy('Making the thumbnail…');
+      const frame = await frameOf(f);
+      const thumb = frame ? await putThumb(frame).catch(() => null) : null;
+      patch({ path: p.path, name: f.name, ...(thumb ? { thumb } : {}) });
+      if (!thumb) setErr('The video is in, but a thumbnail couldn’t be taken from it. Choose a picture for it.');
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Upload failed. Try again.');
     } finally {
-      setBusy(false);
+      setBusy('');
     }
   }
-  return (
-    <div className="dw-video">
-      <div className="dw-video__code">
-        {b.path && qr ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={qr} alt="QR code to watch the video" />
-        ) : (
-          <div className="dw-nopic">{b.path ? 'Making the code…' : 'No video yet'}</div>
-        )}
-      </div>
-      <div className="dw-video__text">
-        <b>Watch the video</b>
-        {selected ? (
-          <input className="dw-capin" value={b.caption} onChange={(e) => patch({ caption: e.target.value })} placeholder="Sub-title, e.g. How your heat pump is installed" aria-label="Video sub-title" onClick={(e) => e.stopPropagation()} />
-        ) : (
-          <span>{b.caption || 'Add a sub-title'}</span>
-        )}
+  async function chooseThumb(files: File[]) {
+    if (!files[0]) return;
+    setBusy('Saving…');
+    setErr('');
+    try {
+      const thumb = await putThumb(await shrink(files[0]));
+      if (thumb) patch({ thumb });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Couldn’t save the thumbnail.');
+    } finally {
+      setBusy('');
+    }
+  }
+  const src = b.thumb ? local[b.thumb] || srcOf(b.thumb, urls) : '';
+  const thumb = (
+    <figure className="dw-vthumb">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={b.caption || 'Video thumbnail'} />
+      ) : (
+        <div className="dw-nopic">{b.path ? 'No thumbnail' : 'No video yet'}</div>
+      )}
+      {b.path && <span className="dw-play" aria-hidden="true" />}
+    </figure>
+  );
+  const code = b.path && qr ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="dw-vqr" src={qr} alt="QR code to watch the video" />
+  ) : null;
+  const info = (
+    <div className="dw-vinfo">
+      <b>Watch the video</b>
+      {selected ? (
+        <input className="dw-capin" value={b.caption} onChange={(e) => patch({ caption: e.target.value })} placeholder="Sub-title, e.g. How your heat pump is installed" aria-label="Video sub-title" onClick={(e) => e.stopPropagation()} />
+      ) : (
+        <span>{b.caption || 'Add a sub-title'}</span>
+      )}
+      <div className="dw-vcode">
+        {code}
         <small>Point your phone camera at the code.</small>
-        {selected && (
-          <div className="dw-picbar" onClick={(e) => e.stopPropagation()}>
-            <FileButton label={busy ? 'Uploading…' : b.path ? 'Change video' : 'Choose a video'} accept="video/mp4,video/quicktime,video/webm" onFiles={(fs) => void upload(fs)} variant="solar" />
-            {b.name && <small>{b.name}</small>}
-          </div>
-        )}
-        {err && <small className="dw-err">{err}</small>}
       </div>
+    </div>
+  );
+  return (
+    <div className={`dw-video is-${b.side}`}>
+      {b.side === 'left' && thumb}
+      {b.side === 'full' ? (
+        <div className="dw-vfull">
+          {thumb}
+          {info}
+        </div>
+      ) : (
+        info
+      )}
+      {b.side === 'right' && thumb}
+      {selected && (
+        <div className="dw-picbar dw-vbar" onClick={(e) => e.stopPropagation()}>
+          <FileButton label={busy || (b.path ? 'Change video' : 'Choose a video')} accept="video/mp4,video/quicktime,video/webm" onFiles={(fs) => void upload(fs)} variant="solar" />
+          {b.path && <FileButton label="Thumbnail picture" accept="image/jpeg,image/png" onFiles={(fs) => void chooseThumb(fs)} variant="ghost" />}
+          {(['left', 'right', 'full'] as const).map((sd) => (
+            <button key={sd} type="button" className={`crm-btn crm-btn--small ${b.side === sd ? 'crm-btn--solar' : 'crm-btn--ghost'}`} aria-pressed={b.side === sd} onClick={() => patch({ side: sd })}>
+              {sd === 'full' ? 'Full width' : sd === 'left' ? 'Left' : 'Right'}
+            </button>
+          ))}
+          {b.name && <small>{b.name}</small>}
+          {err && <small className="dw-err">{err}</small>}
+        </div>
+      )}
     </div>
   );
 }

@@ -180,11 +180,33 @@ export async function writeupDocx(f: WriteupFacts): Promise<Uint8Array> {
         if (!f.id || !b.path) break;
         const url = watchUrl(f.id, b.id);
         const png = await QRCode.toBuffer(url, { errorCorrectionLevel: 'M', margin: 2, width: 300 });
-        body.push(
-          new Paragraph({ spacing: { before: 120 }, children: [new ImageRun({ type: 'png', data: png, transformation: { width: 110, height: 110 } })] }),
-          new Paragraph({ spacing: { before: 40 }, children: [new TextRun({ text: 'Watch the video', bold: true, font: FONT, size: 24 })] }),
+        const file = b.thumb ? f.images.get(b.thumb) : null;
+        const dim = file ? await sizeOf(file) : null;
+        const full = b.side === 'full' || !file || !dim;
+        const maxW = full ? 420 : 230;
+        const w = dim ? Math.min(maxW, dim.w) : 0;
+        const h = dim ? Math.round((dim.h / dim.w) * w) : 0;
+        const pic = file && dim ? new Paragraph({ children: [new ImageRun({ type: file.mime === 'image/png' ? 'png' : 'jpg', data: file.bytes, transformation: { width: w, height: h } })] }) : null;
+        const info = [
+          new Paragraph({ spacing: { before: 60 }, children: [new TextRun({ text: 'Watch the video', bold: true, font: FONT, size: 24 })] }),
           ...(b.caption.trim() ? [new Paragraph({ children: [new TextRun({ text: b.caption.trim(), font: FONT, size: 20 })] })] : []),
+          new Paragraph({ spacing: { before: 60 }, children: [new ImageRun({ type: 'png', data: png, transformation: { width: 84, height: 84 } })] }),
           new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: 'Point your phone camera at the code, or open ', font: FONT, size: 16, color: '6E6A5E' }), new TextRun({ text: url, font: FONT, size: 16, color: '6E6A5E' })] }),
+        ];
+        if (full) {
+          body.push(...(pic ? [pic] : []), ...info);
+          break;
+        }
+        const picCell = new TableCell({ width: { size: 3600, type: WidthType.DXA }, borders: { top: none, bottom: none, left: none, right: none }, margins: { right: 160, left: 160 }, children: [pic!] });
+        const textCell = new TableCell({ width: { size: PAGE_W - 3600, type: WidthType.DXA }, borders: { top: none, bottom: none, left: none, right: none }, margins: { right: 160, left: 160 }, children: info });
+        body.push(
+          new Table({
+            width: { size: PAGE_W, type: WidthType.DXA },
+            columnWidths: b.side === 'left' ? [3600, PAGE_W - 3600] : [PAGE_W - 3600, 3600],
+            borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none },
+            rows: [new TableRow({ cantSplit: true, children: b.side === 'left' ? [picCell, textCell] : [textCell, picCell] })],
+          }),
+          gap(),
         );
         break;
       }

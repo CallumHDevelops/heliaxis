@@ -134,22 +134,51 @@ async function imageBlock(kit: Kit, b: Extract<Block, { type: 'image' }>, f: Wri
   });
 }
 
-/** A video: the QR code, and beside it what it is and how to use it. */
-function videoBlock(kit: Kit, b: Extract<Block, { type: 'video' }>, f: WriteupFacts) {
+/** A video: its picture (half the width, left or right, or the full width) with a play mark, and a small QR code to watch it. */
+async function videoBlock(kit: Kit, b: Extract<Block, { type: 'video' }>, f: WriteupFacts) {
   if (!f.id || !b.path) return;
   const url = watchUrl(f.id, b.id);
-  const q = 84;
-  const colX = q + 16;
-  kit.block(q + 10, (d) => {
-    drawQr(d, url, d.x, d.top - q - 4, q);
-    d.text('Watch the video', d.x + colX, d.top - 18, 12, { bold: true });
-    const cap = b.caption.trim();
-    let y = d.top - 34;
-    if (cap) for (const line of d.lines(cap, 10, d.width - colX).slice(0, 3)) {
-      d.text(line, d.x + colX, y, 10);
-      y -= 13;
-    }
-    d.text('Point your phone camera at the code.', d.x + colX, y - 4, 8.5, { color: MUTED });
+  const file = b.thumb ? f.images.get(b.thumb) : null;
+  const img = file ? await kit.embed(file.bytes) : null;
+  const cap = b.caption.trim();
+  const play = (d: Parameters<Parameters<Kit['block']>[1]>[0], x: number, y: number, w: number, h: number) => {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    d.rect(cx - 17, cy - 12, 34, 24, { fill: INK });
+    for (let k = 0; k < 12; k++) d.line(cx - 4, cy - 6 + k, cx - 4 + Math.max(1, 11 - Math.abs(k - 5.5) * 2), cy - 6 + k, { color: SOLAR, t: 1.3 });
+  };
+  const q = 64;
+  if (!img || b.side === 'full') {
+    const imgW = Math.min(kit.width, 420);
+    const imgH = img ? Math.min((img.height / img.width) * imgW, 240) : 0;
+    const w = img ? Math.min(imgW, (img.width / img.height) * imgH) : 0;
+    if (img) kit.block(imgH + 8, (d) => { d.image(img, d.x, d.top - imgH, w, imgH); play(d, d.x, d.top - imgH, w, imgH); });
+    kit.block(q + 12, (d) => {
+      drawQr(d, url, d.x, d.top - q - 4, q);
+      d.text('Watch the video', d.x + q + 14, d.top - 20, 11.5, { bold: true });
+      let y = d.top - 35;
+      if (cap) for (const line of d.lines(cap, 10, d.width - q - 14).slice(0, 3)) { d.text(line, d.x + q + 14, y, 10); y -= 13; }
+      d.text('Point your phone camera at the code.', d.x + q + 14, y - 3, 8.5, { color: MUTED });
+    });
+    kit.gap(6);
+    return;
+  }
+  const imgW = 230;
+  const gap = 16;
+  const imgH = Math.min((img.height / img.width) * imgW, 230);
+  const w = Math.min(imgW, (img.width / img.height) * imgH);
+  const colW = kit.width - imgW - gap;
+  const textH = 22 + (cap ? Math.min(3, Math.ceil(cap.length / Math.max(10, colW / 5))) * 13 : 0) + 18 + q + 8;
+  kit.block(Math.max(imgH, textH) + 8, (d) => {
+    const imgX = b.side === 'left' ? d.x : d.x + d.width - imgW;
+    const textX = b.side === 'left' ? d.x + imgW + gap : d.x;
+    d.image(img, imgX, d.top - imgH, w, imgH);
+    play(d, imgX, d.top - imgH, w, imgH);
+    d.text('Watch the video', textX, d.top - 12, 11.5, { bold: true });
+    let y = d.top - 27;
+    if (cap) for (const line of d.lines(cap, 10, colW).slice(0, 4)) { d.text(line, textX, y, 10); y -= 13; }
+    drawQr(d, url, textX, y - q - 6, q);
+    d.text('Point your phone camera at the code.', textX + q + 10, y - q / 2 - 2, 8.5, { color: MUTED });
   });
   kit.gap(6);
 }
@@ -201,7 +230,7 @@ export async function writeupPdf(f: WriteupFacts): Promise<Uint8Array> {
         break;
       }
       case 'video':
-        videoBlock(kit, b, f);
+        await videoBlock(kit, b, f);
         break;
       case 'break':
         kit.newPage({ continued: true });

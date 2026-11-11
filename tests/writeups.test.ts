@@ -98,7 +98,7 @@ describe('video element', () => {
     expect(newBlock('video').type).toBe('video');
   });
   it('prints a QR code in the PDF and the Word file', async () => {
-    const content = { subtitle: '', blocks: [{ id: 'v1', type: 'video' as const, path: 'writeups/x/a.mp4', name: 'a.mp4', caption: 'How it is fitted' }] };
+    const content = { subtitle: '', blocks: [{ id: 'v1', type: 'video' as const, side: 'right' as const, thumb: '', path: 'writeups/x/a.mp4', name: 'a.mp4', caption: 'How it is fitted' }] };
     const facts = { id: '11111111-1111-4111-8111-111111111111', number: 'DOC-0001', title: 'T', issued: '2026-11-11', content, who: { kind: null, id: null, name: '', address: '', ref: null }, images: new Map(), quotes: new Map() };
     expect((await writeupPdf(facts)).length).toBeGreaterThan(1000);
     expect((await writeupDocx(facts)).length).toBeGreaterThan(1000);

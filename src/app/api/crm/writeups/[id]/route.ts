@@ -14,7 +14,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const w = await readWriteup(id);
   if (!w) return json({ error: 'Not found' }, 404);
   // Pictures in storage get a link; the site's own ('assets/…') are shown from the website itself.
-  const paths = w.content.blocks.flatMap((b) => (b.type === 'image' && b.path && !b.path.startsWith('assets/') ? [b.path] : []));
+  const paths = w.content.blocks.flatMap((b) => (b.type === 'image' && b.path && !b.path.startsWith('assets/') ? [b.path] : b.type === 'video' && b.thumb ? [b.thumb] : []));
   const [who, urls, quotes] = await Promise.all([forWhom(w), imageUrls(paths), quotesFor(w)]);
   return json({ document: w, who, urls, quotes });
 }
