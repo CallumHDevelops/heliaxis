@@ -129,6 +129,25 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
       // Not remembered.
     }
   };
+  // Full screen, but under the site's menu bar: the editor starts where the bar ends (the bar can wrap on narrow windows).
+  const root = useRef<HTMLDivElement>(null);
+  const ready = doc !== null;
+  useEffect(() => {
+    const el = root.current;
+    const bar = document.querySelector<HTMLElement>('.hx-header');
+    if (!el || !bar) return;
+    const fit = () => {
+      el.style.top = `${Math.max(0, Math.round(bar.getBoundingClientRect().bottom))}px`;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(bar);
+    window.addEventListener('resize', fit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', fit);
+    };
+  }, [ready]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Undo and redo: snapshots of the document. Typing within a moment of itself is one step.
   const cur = useRef<Doc | null>(null);
@@ -459,7 +478,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
   };
 
   return (
-    <div className="crm dw-app" onDragEnd={endDrag}>
+    <div ref={root} className="crm dw-app" onDragEnd={endDrag}>
       <div className="dw-split">
         {/* ── Left: the document's details, its sections (drag to reorder) and what can be added ── */}
         <aside className="dw-shell" aria-label="Document tools">

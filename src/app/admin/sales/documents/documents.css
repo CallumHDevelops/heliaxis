@@ -219,7 +219,7 @@
 .dw-psec.is-target { border-left-color: #f8bc1e; background: rgba(248, 188, 30, 0.07); }
 
 /* Full screen: the editor covers the page, the dark rail hard against the left edge. */
-.dw-app { position: fixed; inset: 0; z-index: 100; max-width: none; margin: 0; padding: 0; display: block; background: var(--bg); }
+.dw-app { position: fixed; top: 84px; left: 0; right: var(--hx-dock, 0px); bottom: var(--hx-tabbar, 0px); z-index: 10; max-width: none; margin: 0; padding: 0; display: block; background: var(--bg); }
 .dw-split { display: flex; gap: 0; height: 100%; align-items: stretch; }
 .dw-shell { position: static; height: 100%; border-radius: 0; border: 0; border-right: 1px solid var(--border); flex: none; }
 .dw-stage { flex: 1; min-width: 0; height: 100%; overflow-y: auto; border: 0; border-radius: 0; padding: 24px 24px 60px; min-height: 0; }
