@@ -521,14 +521,17 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               </span>
             <a className="dw-rail__btn" href={`/api/crm/writeups/${id}/download?format=pdf&inline=1`} target="_blank" rel="noreferrer" title="Preview PDF">
               <BrandIcon k="document" size={18} />
+              <small>VIEW</small>
               
             </a>
             <a className="dw-rail__btn dw-rail__btn--solar" href={`/api/crm/writeups/${id}/download?format=pdf`} title="Download PDF">
               <BrandIcon k="download" size={18} />
+              <small>PDF</small>
               
             </a>
             <a className="dw-rail__btn dw-rail__btn--solar" href={`/api/crm/writeups/${id}/download?format=docx`} title="Download Word">
               <BrandIcon k="download" size={18} />
+              <small>DOCX</small>
               
             </a>
           </div>

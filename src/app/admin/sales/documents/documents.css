@@ -237,3 +237,6 @@
   .dw-stage { height: auto; overflow: visible; padding: 12px; }
   .dw-rail__hist { margin: 0; grid-auto-flow: column; }
 }
+
+.dw-rail__acts .dw-rail__btn { flex-direction: column; gap: 1px; width: 52px; height: 50px; }
+.dw-rail__acts .dw-rail__btn small { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1; }
