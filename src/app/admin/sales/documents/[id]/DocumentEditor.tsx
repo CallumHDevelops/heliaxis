@@ -60,19 +60,19 @@ async function shrink(file: File): Promise<File> {
   return new File([blob], 'picture.jpg', { type: 'image/jpeg' });
 }
 
-const PALETTE: { label: string; hint: string; type: BlockType; side?: 'left' | 'right' | 'full' }[] = [
-  { label: 'Section', hint: 'A big heading that holds the elements below it', type: 'section' },
-  { label: 'Title', hint: 'A smaller heading', type: 'title' },
-  { label: 'Text', hint: 'Paragraphs and lists', type: 'text' },
-  { label: 'Picture left', hint: 'Picture with text beside it', type: 'image', side: 'left' },
-  { label: 'Picture right', hint: 'Text, then the picture', type: 'image', side: 'right' },
-  { label: 'Picture full width', hint: 'A wide picture', type: 'image', side: 'full' },
-  { label: 'Table', hint: 'You fill it in', type: 'table' },
-  { label: 'Quote table', hint: 'From the customer’s quote', type: 'quote' },
-  { label: 'Video left', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'left' },
-  { label: 'Video right', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'right' },
-  { label: 'Video full width', hint: 'A wide video picture, QR code beneath', type: 'video', side: 'full' },
-  { label: 'Page break', hint: 'Start a new page', type: 'break' },
+const PALETTE: { label: string; hint: string; type: BlockType; side?: 'left' | 'right' | 'full'; icon: Parameters<typeof BrandIcon>[0]['k'] }[] = [
+  { label: 'Section', hint: 'A heading that holds the elements dragged into it', type: 'section', icon: 'el-section' },
+  { label: 'Title', hint: 'A smaller heading', type: 'title', icon: 'el-title' },
+  { label: 'Text', hint: 'Paragraphs and lists', type: 'text', icon: 'el-text' },
+  { label: 'Picture left', hint: 'Picture with text beside it', type: 'image', side: 'left', icon: 'el-picl' },
+  { label: 'Picture right', hint: 'Text, then the picture', type: 'image', side: 'right', icon: 'el-picr' },
+  { label: 'Picture wide', hint: 'A wide picture', type: 'image', side: 'full', icon: 'el-picf' },
+  { label: 'Table', hint: 'You fill it in', type: 'table', icon: 'el-table' },
+  { label: 'Quote table', hint: 'From the customer’s quote', type: 'quote', icon: 'el-quote' },
+  { label: 'Video left', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'left', icon: 'el-vidl' },
+  { label: 'Video right', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'right', icon: 'el-vidr' },
+  { label: 'Video wide', hint: 'A wide video picture, QR code beneath', type: 'video', side: 'full', icon: 'el-vidf' },
+  { label: 'Page break', hint: 'Start a new page', type: 'break', icon: 'el-break' },
 ];
 
 const summary = (b: Block): string => {
@@ -330,10 +330,13 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
     e.stopPropagation();
     const r = e.currentTarget.getBoundingClientRect();
     const upper = e.clientY < r.top + r.height / 2;
-    if (drag?.kind === 'group') {
-      // A section only lands between sections: before the one the pointer is over, or after it.
-      const g = groupAt(groupsOf(blocks), i);
-      if (g) return setOver(upper ? g.start : g.start + sizeOf(g));
+    const g = groupAt(groupsOf(blocks), i);
+    // Sections only land between sections; anything else lands inside one.
+    const wholeSection = drag?.kind === 'group' || (drag?.kind === 'new' && drag.type === 'section') || (drag?.kind === 'lib' && drag.blocks[0]?.type === 'section');
+    if (g) {
+      if (wholeSection) return setOver(upper ? g.start : g.start + sizeOf(g));
+      // Over a section's heading: into the section, at its end.
+      if (g.head && g.start === i) return setOver(g.start + sizeOf(g));
     }
     setOver(upper ? i : i + 1);
   }
@@ -464,15 +467,6 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
         <span className="dw-saved" role="status">
           {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}
         </span>
-        <a className="crm-btn crm-btn--ghost crm-btn--small" href={`/api/crm/writeups/${id}/download?format=pdf&inline=1`} target="_blank" rel="noreferrer">
-          Preview PDF
-        </a>
-        <a className="crm-btn crm-btn--solar crm-btn--small" href={`/api/crm/writeups/${id}/download?format=pdf`}>
-          Download PDF
-        </a>
-        <a className="crm-btn crm-btn--solar crm-btn--small" href={`/api/crm/writeups/${id}/download?format=docx`}>
-          Download Word
-        </a>
       </div>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
 
@@ -574,7 +568,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                 const open = !g.head || expanded.has(g.head.id);
                 const rows = g.head ? g.items : g.items;
                 return (
-                  <div key={g.head?.id ?? 'lead'} className={`dw-group${g.head && drag?.kind === 'group' && drag.id === g.head.id ? ' is-drag' : ''}`}>
+                  <div key={g.head?.id ?? 'lead'} className={`dw-group${drag && drag.kind !== 'group' && over !== null && over > g.start && over <= g.start + sizeOf(g) ? ' is-target' : ''}${g.head && drag?.kind === 'group' && drag.id === g.head.id ? ' is-drag' : ''}`}>
                     {g.head && (
                       <Fragment>
                         {over === g.start && drag && <div className="dw-dropline" />}
@@ -660,10 +654,11 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
           <div className="dw-panel">
             <div className="dw-lab">Add an element</div>
             <p className="dw-hint">{sel ? 'Goes at the end of the selected section.' : 'Goes at the end of the page. Select a section first to add inside it.'}</p>
-            <div className="dw-palette">
+            <div className="dw-tiles">
               {PALETTE.map((p) => (
-                <button key={p.label} type="button" className="dw-chip" draggable onDragStart={startDrag({ kind: 'new', type: p.type, side: p.side })} onClick={() => addBlock(p.type, p.side)} title={`${p.hint}. Click to add it into the selected section, or drag it into place.`}>
-                  <span aria-hidden="true">+</span> {p.label}
+                <button key={p.label} type="button" className="dw-tile" draggable onDragStart={startDrag({ kind: 'new', type: p.type, side: p.side })} onClick={() => addBlock(p.type, p.side)} title={`${p.hint}. Click to add it, or drag it into a section.`}>
+                  <BrandIcon k={p.icon} size={30} />
+                  <span>{p.label}</span>
                 </button>
               ))}
             </div>
@@ -727,6 +722,20 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               )}
             </div>
           )}
+          <div className="dw-rail__acts">
+            <a className={`crm-btn crm-btn--ghost crm-btn--small${railOpen ? '' : ' is-icon'}`} href={`/api/crm/writeups/${id}/download?format=pdf&inline=1`} target="_blank" rel="noreferrer" title="Preview PDF">
+              <BrandIcon k="document" size={18} />
+              {railOpen && <span>Preview PDF</span>}
+            </a>
+            <a className={`crm-btn crm-btn--solar crm-btn--small${railOpen ? '' : ' is-icon'}`} href={`/api/crm/writeups/${id}/download?format=pdf`} title="Download PDF">
+              <BrandIcon k="download" size={18} />
+              {railOpen && <span>Download PDF</span>}
+            </a>
+            <a className={`crm-btn crm-btn--solar crm-btn--small${railOpen ? '' : ' is-icon'}`} href={`/api/crm/writeups/${id}/download?format=docx`} title="Download Word">
+              <BrandIcon k="download" size={18} />
+              {railOpen && <span>Download Word</span>}
+            </a>
+          </div>
         </aside>
 
         {/* ── Right: the page itself; click anything to type on it ── */}
@@ -768,7 +777,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               >
                 {blocks.length === 0 && <div className="dw-blank">An empty page. Drag a section in from the left, or click one to add it.</div>}
                 {groupsOf(blocks).map((g) => (
-                  <section key={g.head?.id ?? 'lead'} className={`dw-psec${g.head && drag?.kind === 'group' && drag.id === g.head.id ? ' is-drag' : ''}`}>
+                  <section key={g.head?.id ?? 'lead'} className={`dw-psec${drag && drag.kind !== 'group' && over !== null && over > g.start && over <= g.start + sizeOf(g) ? ' is-target' : ''}${g.head && drag?.kind === 'group' && drag.id === g.head.id ? ' is-drag' : ''}`}>
                 {(g.head ? [g.head, ...g.items] : g.items).map((b) => { const i = blocks.findIndex((x) => x.id === b.id); return (
                   <Fragment key={b.id}>
                     {over === i && drag && <div className="dw-dropline dw-dropline--page" />}
