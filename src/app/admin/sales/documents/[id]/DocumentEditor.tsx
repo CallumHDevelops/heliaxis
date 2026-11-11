@@ -121,6 +121,14 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
       return true;
     }
   });
+  const setRail = (open: boolean) => {
+    setRailOpen(open);
+    try {
+      window.localStorage.setItem('hx-doc-rail', open ? 'open' : 'closed');
+    } catch {
+      // Not remembered.
+    }
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Undo and redo: snapshots of the document. Typing within a moment of itself is one step.
   const cur = useRef<Doc | null>(null);
@@ -472,49 +480,49 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
 
       <div className="dw-split">
         {/* ── Left: the document's details, its sections (drag to reorder) and what can be added ── */}
-        <aside className={`dw-rail${railOpen ? ' is-open' : ''}`} aria-label="Document tools">
-          <div className="dw-rail__bar">
-            <button
-              type="button"
-              className="dw-rail__tab dw-rail__toggle"
-              aria-label={railOpen ? 'Collapse the toolbar' : 'Expand the toolbar'}
-              title={railOpen ? 'Collapse' : 'Expand'}
-              onClick={() => {
-                setRailOpen((o) => {
-                  try {
-                    window.localStorage.setItem('hx-doc-rail', o ? 'closed' : 'open');
-                  } catch {
-                    // Not remembered.
-                  }
-                  return !o;
-                });
-              }}
-            >
-              <span style={{ display: 'inline-flex', transform: railOpen ? 'rotate(180deg)' : undefined }}>
-                <BrandIcon k="arrow" size={20} />
-              </span>
-              {railOpen && <span>Collapse</span>}
-            </button>
-            {RAIL_TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                className={`dw-rail__tab${tab === t.key && railOpen ? ' on' : ''}`}
-                title={t.label}
-                aria-label={t.label}
-                aria-pressed={tab === t.key && railOpen}
-                onClick={() => {
-                  setTab(t.key);
-                  setRailOpen(true);
-                }}
-              >
-                <BrandIcon k={t.icon} size={20} />
-                {railOpen && <span>{t.label}</span>}
-              </button>
-            ))}
+        <aside className="dw-shell" aria-label="Document tools">
+          <nav className="dw-rail">
+            <div className="dw-rail__tabs">
+              {RAIL_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  className={`dw-rail__tab${tab === t.key && railOpen ? ' on' : ''}`}
+                  title={t.label}
+                  aria-label={t.label}
+                  aria-pressed={tab === t.key && railOpen}
+                  onClick={() => {
+                    if (tab === t.key && railOpen) return setRail(false);
+                    setTab(t.key);
+                    setRail(true);
+                  }}
+                >
+                  <BrandIcon k={t.icon} size={22} />
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          <div className="dw-rail__acts">
+            <a className="dw-rail__btn" href={`/api/crm/writeups/${id}/download?format=pdf&inline=1`} target="_blank" rel="noreferrer" title="Preview PDF">
+              <BrandIcon k="document" size={18} />
+              
+            </a>
+            <a className="dw-rail__btn dw-rail__btn--solar" href={`/api/crm/writeups/${id}/download?format=pdf`} title="Download PDF">
+              <BrandIcon k="download" size={18} />
+              
+            </a>
+            <a className="dw-rail__btn dw-rail__btn--solar" href={`/api/crm/writeups/${id}/download?format=docx`} title="Download Word">
+              <BrandIcon k="download" size={18} />
+              
+            </a>
           </div>
+          </nav>
           {railOpen && (
-            <div className="dw-rail__panel">
+            <div className="dw-drawer">
+              <button type="button" className="dw-drawer__collapse" onClick={() => setRail(false)}>
+                <BrandIcon k="arrow" size={18} />
+                <span>Collapse</span>
+              </button>
               {tab === 'details' && (
                 <>
           <div className="dw-panel">
@@ -654,12 +662,15 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
           <div className="dw-panel">
             <div className="dw-lab">Add an element</div>
             <p className="dw-hint">{sel ? 'Goes at the end of the selected section.' : 'Goes at the end of the page. Select a section first to add inside it.'}</p>
-            <div className="dw-tiles">
-              {PALETTE.map((p) => (
-                <button key={p.label} type="button" className="dw-tile" draggable onDragStart={startDrag({ kind: 'new', type: p.type, side: p.side })} onClick={() => addBlock(p.type, p.side)} title={`${p.hint}. Click to add it, or drag it into a section.`}>
-                  <BrandIcon k={p.icon} size={30} />
-                  <span>{p.label}</span>
-                </button>
+            <div className="dw-tools-list">
+              {PALETTE.map((p, i) => (
+                <Fragment key={p.label}>
+                  {[1, 3, 6, 8, 11].includes(i) && <hr className="dw-tools-sep" />}
+                  <button type="button" className="dw-toolrow" draggable onDragStart={startDrag({ kind: 'new', type: p.type, side: p.side })} onClick={() => addBlock(p.type, p.side)} title={`${p.hint}. Click to add it, or drag it into a section.`}>
+                    <BrandIcon k={p.icon} size={24} />
+                    <span>{p.label}</span>
+                  </button>
+                </Fragment>
               ))}
             </div>
           </div>
@@ -722,20 +733,6 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               )}
             </div>
           )}
-          <div className="dw-rail__acts">
-            <a className={`crm-btn crm-btn--ghost crm-btn--small${railOpen ? '' : ' is-icon'}`} href={`/api/crm/writeups/${id}/download?format=pdf&inline=1`} target="_blank" rel="noreferrer" title="Preview PDF">
-              <BrandIcon k="document" size={18} />
-              {railOpen && <span>Preview PDF</span>}
-            </a>
-            <a className={`crm-btn crm-btn--solar crm-btn--small${railOpen ? '' : ' is-icon'}`} href={`/api/crm/writeups/${id}/download?format=pdf`} title="Download PDF">
-              <BrandIcon k="download" size={18} />
-              {railOpen && <span>Download PDF</span>}
-            </a>
-            <a className={`crm-btn crm-btn--solar crm-btn--small${railOpen ? '' : ' is-icon'}`} href={`/api/crm/writeups/${id}/download?format=docx`} title="Download Word">
-              <BrandIcon k="download" size={18} />
-              {railOpen && <span>Download Word</span>}
-            </a>
-          </div>
         </aside>
 
         {/* ── Right: the page itself; click anything to type on it ── */}

@@ -153,38 +153,34 @@
   .dw-pagehead, .dw-pagebody { padding-left: 16px; padding-right: 16px; }
 }
 
-/* The long dark sidebar: tabs at the top, the open tab's tools below, Preview and Download at the bottom. */
-.dw-rail {
-  --surface: #2b2922; --raised: #34322a; --border: rgba(247, 242, 231, 0.16); --border-strong: rgba(247, 242, 231, 0.3); --muted: #b9b29d; --border-soft: rgba(247, 242, 231, 0.1);
-  display: flex; flex-direction: column; width: 64px;
-  position: sticky; top: 58px; height: calc(100vh - 74px);
-  background: #211f18; color: #f7f2e7; border-radius: 14px; overflow: hidden;
-}
-.dw-rail.is-open { width: 330px; }
-.dw-rail__bar { display: grid; gap: 4px; padding: 8px; flex: none; }
-.dw-rail__tab { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px; border: 0; border-radius: 10px; background: none; color: #f7f2e7; font: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer; text-align: left; }
-.dw-rail__tab:hover { background: rgba(247, 242, 231, 0.09); }
-.dw-rail__tab.on { background: rgba(248, 188, 30, 0.2); box-shadow: inset 3px 0 0 #f8bc1e; }
-.dw-rail__toggle { color: #b9b29d; }
-.dw-rail:not(.is-open) .dw-rail__tab { justify-content: center; }
-.dw-rail__panel { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: grid; gap: 12px; align-content: start; border-top: 1px solid rgba(247, 242, 231, 0.12); }
-.dw-rail__acts { flex: none; display: grid; gap: 6px; padding: 10px; margin-top: auto; border-top: 1px solid rgba(247, 242, 231, 0.12); }
-.dw-rail__acts .crm-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-.dw-rail__acts .crm-btn.is-icon { padding: 8px 0; }
-.dw-rail .dw-panel { background: #2b2922; border-color: rgba(247, 242, 231, 0.14); }
-.dw-rail .crm-input, .dw-rail .dw-pick button { background: #1a1914; color: #f7f2e7; border-color: rgba(247, 242, 231, 0.25); }
-.dw-rail .crm-btn--ghost { background: transparent; color: #f7f2e7; border-color: rgba(247, 242, 231, 0.35); }
-.dw-rail .dw-row { background: #34322a; }
-.dw-rail .dw-x:hover { color: #ff9a8a; }
-.dw-rail .crm-link { color: #f8bc1e; }
-.dw-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.dw-tile { display: grid; justify-items: center; gap: 6px; padding: 12px 4px 10px; border-radius: 10px; border: 1px solid rgba(247, 242, 231, 0.18); background: #34322a; color: #f7f2e7; font: inherit; font-size: 0.74rem; font-weight: 700; text-align: center; cursor: grab; }
-.dw-tile:hover { border-color: #f8bc1e; background: rgba(248, 188, 30, 0.14); }
+/* The sidebar: a slim dark rail of icons, and beside it the light list of tools for the open tab. */
+.dw-shell { display: flex; position: sticky; top: 58px; height: calc(100vh - 74px); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.dw-rail { width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; background: #211f18; color: #f7f2e7; }
+.dw-rail__tabs { display: grid; gap: 4px; width: 100%; }
+.dw-rail__tab { display: grid; justify-items: center; gap: 3px; width: 100%; padding: 9px 2px 7px; border: 0; border-radius: 10px; background: none; color: #d9d2bf; font: inherit; font-size: 0.66rem; font-weight: 700; cursor: pointer; }
+.dw-rail__tab:hover { background: rgba(247, 242, 231, 0.09); color: #fff; }
+.dw-rail__tab.on { background: rgba(248, 188, 30, 0.2); color: #fff; box-shadow: inset 3px 0 0 #f8bc1e; }
+.dw-rail__acts { margin-top: auto; display: grid; gap: 8px; width: 100%; padding-top: 10px; border-top: 1px solid rgba(247, 242, 231, 0.14); justify-items: center; }
+.dw-rail__btn { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 42px; border-radius: 10px; border: 1px solid rgba(247, 242, 231, 0.3); color: #f7f2e7; text-decoration: none; background: transparent; }
+.dw-rail__btn:hover { background: rgba(247, 242, 231, 0.12); }
+.dw-rail__btn--solar { background: #f8bc1e; border-color: #f8bc1e; color: #211f18; }
+.dw-rail__btn--solar:hover { background: #ffcb45; }
+.dw-drawer { width: 290px; overflow-y: auto; padding: 8px 10px 14px; display: grid; gap: 10px; align-content: start; border-left: 1px solid var(--border); }
+.dw-drawer__collapse { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border: 0; background: none; color: inherit; font: inherit; font-size: 0.92rem; cursor: pointer; border-bottom: 1px solid var(--border); border-radius: 0; }
+.dw-drawer__collapse svg { transform: rotate(180deg); }
+.dw-drawer .dw-panel { border: 0; background: none; padding: 4px 2px; }
+.dw-tools-list { display: grid; gap: 2px; }
+.dw-tools-sep { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
+.dw-toolrow { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 12px; border: 1px solid transparent; border-radius: 10px; background: none; color: inherit; font: inherit; font-size: 0.95rem; cursor: grab; text-align: left; }
+.dw-toolrow:hover { background: rgba(248, 188, 30, 0.14); border-color: rgba(248, 188, 30, 0.5); }
 .dw-hint { margin: 0; font-size: 0.78rem; color: var(--muted); }
 @media (max-width: 900px) {
   .dw-split { grid-template-columns: 1fr; }
-  .dw-rail, .dw-rail.is-open { position: static; width: auto; height: auto; max-height: none; }
-  .dw-rail__panel { max-height: 60vh; }
+  .dw-shell { position: static; height: auto; flex-direction: column; }
+  .dw-rail { width: auto; flex-direction: row; }
+  .dw-rail__tabs { grid-auto-flow: column; }
+  .dw-rail__acts { margin: 0 0 0 auto; border: 0; padding: 0; grid-auto-flow: column; }
+  .dw-drawer { width: auto; max-height: 60vh; border-left: 0; border-top: 1px solid var(--border); }
 }
 
 /* A section in the outline: its heading, with the elements inside it indented beneath. */
