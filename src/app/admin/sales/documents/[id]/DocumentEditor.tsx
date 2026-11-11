@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import { BLOCK_LABEL, newBlock, newId, parasOf, type Block, type BlockType, type Run, type WriteupContent } from '@/lib/writeups/types';
-import { FileButton } from '../../../crm/CrmUi';
+import { BrandIcon, FileButton } from '../../../crm/CrmUi';
 import '../../../crm/crm.css';
 import '../documents.css';
 
@@ -14,8 +15,30 @@ type QuoteOpt = { id: string; number: string; title: string; status: string };
 type Doc = { id: string; number: string; title: string; enquiry_id: string | null; organisation_id: string | null; project_id: string | null; content: WriteupContent };
 type Found = { id: string; name: string; postcode: string | null; phone: string | null; customer_ref: string | null; organisation?: boolean; contact?: boolean };
 type QuoteTable = { number: string; title: string; headers: string[]; rows: string[][]; totals: [string, string][] };
-type Drag = { kind: 'move'; id: string } | { kind: 'new'; type: BlockType; side?: 'left' | 'right' | 'full' } | { kind: 'lib'; blocks: Block[] } | null;
+type Drag = { kind: 'move'; id: string } | { kind: 'new'; type: BlockType; side?: 'left' | 'right' | 'full' } | { kind: 'lib'; blocks: Block[] } | { kind: 'group'; id: string } | null;
 type LibItem = { id?: string; key?: string; name: string; note?: string; blocks: Block[] };
+/** A section is a heading and everything after it up to the next heading (its titles, text, pictures and tables). Blocks before the first heading form an unnamed opening. */
+type Group = { head: Block | null; start: number; items: Block[] };
+function groupsOf(bs: Block[]): Group[] {
+  const out: Group[] = [];
+  bs.forEach((b, i) => {
+    if (b.type === 'section') out.push({ head: b, start: i, items: [] });
+    else if (out.length) out[out.length - 1].items.push(b);
+    else out.push({ head: null, start: 0, items: [b] });
+  });
+  return out;
+}
+const sizeOf = (g: Group) => (g.head ? 1 : 0) + g.items.length;
+const groupAt = (gs: Group[], i: number) => gs.find((g) => i >= g.start && i < g.start + sizeOf(g));
+const flatten = (gs: Group[]): Block[] => gs.flatMap((g) => [...(g.head ? [g.head] : []), ...g.items]);
+const RAIL_TABS = [
+  { key: 'details', label: 'Details', icon: 'users' },
+  { key: 'sections', label: 'Sections', icon: 'document' },
+  { key: 'add', label: 'Add', icon: 'plus' },
+  { key: 'library', label: 'Library', icon: 'star' },
+] as const;
+type RailTab = (typeof RAIL_TABS)[number]['key'];
+
 /** A picture of the site's own is shown from the website; the others from the link the server made. */
 const srcOf = (path: string, urls: Record<string, string>) => (path.startsWith('assets/') ? `/${path}` : urls[path]);
 /** Fresh copies of library blocks (their own ids), so the same section can be used twice in a document. */
@@ -38,7 +61,7 @@ async function shrink(file: File): Promise<File> {
 }
 
 const PALETTE: { label: string; hint: string; type: BlockType; side?: 'left' | 'right' | 'full' }[] = [
-  { label: 'Section', hint: 'A big heading', type: 'section' },
+  { label: 'Section', hint: 'A big heading that holds the elements below it', type: 'section' },
   { label: 'Title', hint: 'A smaller heading', type: 'title' },
   { label: 'Text', hint: 'Paragraphs and lists', type: 'text' },
   { label: 'Picture left', hint: 'Picture with text beside it', type: 'image', side: 'left' },
@@ -46,6 +69,7 @@ const PALETTE: { label: string; hint: string; type: BlockType; side?: 'left' | '
   { label: 'Picture full width', hint: 'A wide picture', type: 'image', side: 'full' },
   { label: 'Table', hint: 'You fill it in', type: 'table' },
   { label: 'Quote table', hint: 'From the customer’s quote', type: 'quote' },
+  { label: 'Video with QR code', hint: 'A video the reader scans to watch', type: 'video' },
   { label: 'Page break', hint: 'Start a new page', type: 'break' },
 ];
 
@@ -62,6 +86,8 @@ const summary = (b: Block): string => {
       return b.caption || `${b.headers.filter(Boolean).join(', ') || 'Table'}`;
     case 'quote':
       return b.caption || (b.quote_id ? 'Quote chosen' : 'Choose a quote');
+    case 'video':
+      return b.caption || b.name || (b.path ? 'Video' : 'No video yet');
     default:
       return 'New page starts here';
   }
@@ -85,11 +111,29 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
   const [saveFor, setSaveFor] = useState<string | null>(null);
   const [saveName, setSaveName] = useState('');
   const [note, setNote] = useState('');
+  const [tab, setTab] = useState<RailTab>('sections');
+  const [railOpen, setRailOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem('hx-doc-rail') !== 'closed';
+    } catch {
+      return true;
+    }
+  });
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Undo and redo: snapshots of the document. Typing within a moment of itself is one step.
+  const cur = useRef<Doc | null>(null);
+  const past = useRef<Doc[]>([]);
+  const future = useRef<Doc[]>([]);
+  const lastStep = useRef(0);
+  const [depth, setDepth] = useState({ undo: 0, redo: 0 });
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/crm/writeups/${id}`, { cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) return setErr(d.error || 'Couldn’t open the document.');
+    cur.current = d.document as Doc;
+    past.current = [];
+    future.current = [];
     setDoc(d.document as Doc);
     setWho(d.who as Who);
     setUrls(d.urls ?? {});
@@ -151,13 +195,69 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
     }
   }, [wantedKey, id]);
 
-  const edit = (fn: (d: Doc) => Doc) => setDoc((d) => (d ? fn(d) : d));
+  const edit = (fn: (d: Doc) => Doc, typing = false) => {
+    const d = cur.current;
+    if (!d) return;
+    const next = fn(d);
+    if (next === d) return;
+    const now = Date.now();
+    if (!(typing && past.current.length && now - lastStep.current < 700)) {
+      past.current.push(d);
+      if (past.current.length > 100) past.current.shift();
+    }
+    lastStep.current = now;
+    future.current = [];
+    cur.current = next;
+    setDoc(next);
+    setDepth({ undo: past.current.length, redo: 0 });
+  };
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev || !cur.current) return;
+    future.current.push(cur.current);
+    cur.current = prev;
+    setDoc(prev);
+    setDepth({ undo: past.current.length, redo: future.current.length });
+  }, []);
+  const redo = useCallback(() => {
+    const next = future.current.pop();
+    if (!next || !cur.current) return;
+    past.current.push(cur.current);
+    cur.current = next;
+    setDoc(next);
+    setDepth({ undo: past.current.length, redo: future.current.length });
+  }, []);
+  // Ctrl or Command + Z, and Shift + Z or Y to redo, anywhere on the page (the browser's own undo would only know the text box).
+  useEffect(() => {
+    function key(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      const t = e.target as HTMLElement | null;
+      if (t instanceof HTMLInputElement) return; // the library name and search boxes keep their own
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) redo();
+      else undo();
+    }
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [undo, redo]);
   const setBlocks = (fn: (b: Block[]) => Block[]) => edit((d) => ({ ...d, content: { ...d.content, blocks: fn(d.content.blocks) } }));
-  const patchBlock = (bid: string, patch: Record<string, unknown>) => setBlocks((bs) => bs.map((b) => (b.id === bid ? ({ ...b, ...patch } as Block) : b)));
+  const patchBlock = (bid: string, patch: Record<string, unknown>) => edit((d) => ({ ...d, content: { ...d.content, blocks: d.content.blocks.map((b) => (b.id === bid ? ({ ...b, ...patch } as Block) : b)) } }), true);
   const blocks = doc?.content.blocks ?? [];
 
+  /** Up or down: a heading moves with all of its section, anything else moves one place. */
   function nudge(bid: string, by: number) {
     setBlocks((bs) => {
+      const gs = groupsOf(bs);
+      const gi = gs.findIndex((g) => g.head?.id === bid);
+      if (gi >= 0) {
+        const to = gi + by;
+        if (to < 0 || to >= gs.length || !gs[to].head || !gs[gi].head) return bs;
+        const next = [...gs];
+        [next[gi], next[to]] = [next[to], next[gi]];
+        return flatten(next);
+      }
       const i = bs.findIndex((b) => b.id === bid);
       const j = i + by;
       if (i < 0 || j < 0 || j >= bs.length) return bs;
@@ -165,6 +265,25 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
       [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
+  }
+
+  /** Where a new block goes: at the end of the section that is selected, or the end of the page. */
+  function insertAt(): number {
+    if (!sel) return blocks.length;
+    const g = groupAt(groupsOf(blocks), blocks.findIndex((b) => b.id === sel));
+    return g ? g.start + sizeOf(g) : blocks.length;
+  }
+
+  /** Delete a section with everything in it. */
+  function removeSection(bid: string) {
+    const g = groupsOf(blocks).find((x) => x.head?.id === bid);
+    if (!g) return;
+    if (g.items.length && !window.confirm(`Delete this section and the ${g.items.length} element${g.items.length === 1 ? '' : 's'} in it?`)) return;
+    setBlocks((bs) => {
+      const gg = groupsOf(bs).find((x) => x.head?.id === bid);
+      return gg ? [...bs.slice(0, gg.start), ...bs.slice(gg.start + sizeOf(gg))] : bs;
+    });
+    setSel(null);
   }
 
   /** Put what is being dragged (a block, or a new one from the palette) at a place in the list. */
@@ -178,6 +297,17 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
       const add = fresh(drag.blocks);
       setBlocks((bs) => [...bs.slice(0, index), ...add, ...bs.slice(index)]);
       setSel(add[0]?.id ?? null);
+    } else if (drag.kind === 'group') {
+      setBlocks((bs) => {
+        const gs = groupsOf(bs);
+        const g = gs.find((x) => x.head?.id === drag.id);
+        if (!g) return bs;
+        const len = sizeOf(g);
+        const rest = [...bs.slice(0, g.start), ...bs.slice(g.start + len)];
+        const lead = gs[0].head ? 0 : gs[0].items.length;
+        const at = Math.max(lead, index > g.start ? index - len : index);
+        return [...rest.slice(0, at), ...bs.slice(g.start, g.start + len), ...rest.slice(at)];
+      });
     } else {
       setBlocks((bs) => {
         const from = bs.findIndex((b) => b.id === drag.id);
@@ -197,7 +327,13 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
     e.preventDefault();
     e.stopPropagation();
     const r = e.currentTarget.getBoundingClientRect();
-    setOver(e.clientY < r.top + r.height / 2 ? i : i + 1);
+    const upper = e.clientY < r.top + r.height / 2;
+    if (drag?.kind === 'group') {
+      // A section only lands between sections: before the one the pointer is over, or after it.
+      const g = groupAt(groupsOf(blocks), i);
+      if (g) return setOver(upper ? g.start : g.start + sizeOf(g));
+    }
+    setOver(upper ? i : i + 1);
   }
   const startDrag = (d: Drag) => (e: DragEvent<HTMLElement>) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -216,7 +352,8 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
 
   function addBlock(type: BlockType, side?: 'left' | 'right' | 'full') {
     const b = newBlock(type, side);
-    setBlocks((bs) => [...bs, b]);
+    const at = insertAt();
+    setBlocks((bs) => [...bs.slice(0, at), b, ...bs.slice(at)]);
     setSel(b.id);
     setTimeout(() => document.getElementById(`blk-${b.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
   }
@@ -224,7 +361,8 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
   /** A library section onto the end of the page. */
   function insertLib(item: LibItem) {
     const add = fresh(item.blocks);
-    setBlocks((bs) => [...bs, ...add]);
+    const at = insertAt();
+    setBlocks((bs) => [...bs.slice(0, at), ...add, ...bs.slice(at)]);
     setSel(add[0]?.id ?? null);
     setNote(`Added “${item.name}”.`);
     setTimeout(() => document.getElementById(`blk-${add[0]?.id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60);
@@ -315,6 +453,12 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
         </Link>
         <b className="dw-topnum">{doc.number}</b>
         <span className="dw-grow" />
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={depth.undo === 0} onClick={undo} title="Undo (Ctrl+Z)">
+          Undo
+        </button>
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={depth.redo === 0} onClick={redo} title="Redo (Ctrl+Shift+Z)">
+          Redo
+        </button>
         <span className="dw-saved" role="status">
           {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}
         </span>
@@ -332,7 +476,51 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
 
       <div className="dw-split">
         {/* ── Left: the document's details, its sections (drag to reorder) and what can be added ── */}
-        <aside className="dw-side" aria-label="Sections">
+        <aside className={`dw-rail${railOpen ? ' is-open' : ''}`} aria-label="Document tools">
+          <div className="dw-rail__bar">
+            <button
+              type="button"
+              className="dw-rail__tab dw-rail__toggle"
+              aria-label={railOpen ? 'Collapse the toolbar' : 'Expand the toolbar'}
+              title={railOpen ? 'Collapse' : 'Expand'}
+              onClick={() => {
+                setRailOpen((o) => {
+                  try {
+                    window.localStorage.setItem('hx-doc-rail', o ? 'closed' : 'open');
+                  } catch {
+                    // Not remembered.
+                  }
+                  return !o;
+                });
+              }}
+            >
+              <span style={{ display: 'inline-flex', transform: railOpen ? 'rotate(180deg)' : undefined }}>
+                <BrandIcon k="arrow" size={20} />
+              </span>
+              {railOpen && <span>Collapse</span>}
+            </button>
+            {RAIL_TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                className={`dw-rail__tab${tab === t.key && railOpen ? ' on' : ''}`}
+                title={t.label}
+                aria-label={t.label}
+                aria-pressed={tab === t.key && railOpen}
+                onClick={() => {
+                  setTab(t.key);
+                  setRailOpen(true);
+                }}
+              >
+                <BrandIcon k={t.icon} size={20} />
+                {railOpen && <span>{t.label}</span>}
+              </button>
+            ))}
+          </div>
+          {railOpen && (
+            <div className="dw-rail__panel">
+              {tab === 'details' && (
+                <>
           <div className="dw-panel">
             <div className="dw-lab">Assigned to</div>
             {who?.name ? (
@@ -361,6 +549,14 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
             {picking && <CustomerPicker onPick={(f) => void assign(f.organisation ? { organisation_id: f.id } : { enquiry_id: f.id })} />}
           </div>
 
+          {admin && (
+            <button type="button" className="crm-link dw-del" onClick={() => void remove()}>
+              Delete this document
+            </button>
+          )}
+                </>
+              )}
+              {tab === 'sections' && (
           <div className="dw-panel">
             <div className="dw-lab">Sections</div>
             <div
@@ -371,55 +567,107 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               }}
               onDrop={dropEnd}
             >
-              {blocks.length === 0 && <p className="dw-empty-note">Drag a section here from below, or click one to add it.</p>}
-              {blocks.map((b, i) => (
-                <Fragment key={b.id}>
-                  {over === i && drag && <div className="dw-dropline" />}
-                  <div
-                    className={`dw-row${sel === b.id ? ' is-sel' : ''}${drag?.kind === 'move' && drag.id === b.id ? ' is-drag' : ''}`}
-                    draggable
-                    onDragStart={startDrag({ kind: 'move', id: b.id })}
-                    onDragOver={(e) => overIndex(e, i)}
-                    onDrop={dropEnd}
-                    onClick={() => pickBlock(b.id, true)}
-                  >
-                    <span className="dw-grip" aria-hidden="true">
-                      ⠿
-                    </span>
-                    <span className="dw-rowmain">
-                      <b>{b.type === 'image' ? `Picture ${b.side === 'full' ? 'full width' : b.side}` : BLOCK_LABEL[b.type]}</b>
-                      <small>{summary(b)}</small>
-                    </span>
-                    <button
-                      type="button"
-                      className="dw-x"
-                      aria-label={`Delete ${BLOCK_LABEL[b.type]}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setBlocks((bs) => bs.filter((x) => x.id !== b.id));
-                        if (sel === b.id) setSel(null);
-                      }}
-                    >
-                      Delete
-                    </button>
+              {blocks.length === 0 && <p className="dw-empty-note">No sections yet. Add one from the Add tab. Drag a whole section to move it with everything inside.</p>}
+              {groupsOf(blocks).map((g) => {
+                const open = !g.head || expanded.has(g.head.id);
+                const rows = g.head ? g.items : g.items;
+                return (
+                  <div key={g.head?.id ?? 'lead'} className={`dw-group${g.head && drag?.kind === 'group' && drag.id === g.head.id ? ' is-drag' : ''}`}>
+                    {g.head && (
+                      <Fragment>
+                        {over === g.start && drag && <div className="dw-dropline" />}
+                        <div
+                          className={`dw-row dw-row--head${sel === g.head.id ? ' is-sel' : ''}`}
+                          draggable
+                          onDragStart={startDrag({ kind: 'group', id: g.head.id })}
+                          onDragOver={(e) => overIndex(e, g.start)}
+                          onDrop={dropEnd}
+                          onClick={() => pickBlock(g.head!.id, true)}
+                        >
+                          <span className="dw-grip" aria-hidden="true">
+                            ⠿
+                          </span>
+                          <span className="dw-rowmain">
+                            <b>{g.head.type === 'section' && g.head.text.trim() ? g.head.text : 'Untitled section'}</b>
+                            <small>{g.items.length ? `${g.items.length} element${g.items.length === 1 ? '' : 's'} inside` : 'Empty'}</small>
+                          </span>
+                          <button
+                            type="button"
+                            className="dw-x"
+                            aria-label={open ? 'Hide what is inside' : 'Show what is inside'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpanded((x) => {
+                                const n = new Set(x);
+                                if (n.has(g.head!.id)) n.delete(g.head!.id);
+                                else n.add(g.head!.id);
+                                return n;
+                              });
+                            }}
+                          >
+                            {open ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                      </Fragment>
+                    )}
+                    {open &&
+                      rows.map((b) => {
+                        const i = blocks.findIndex((x) => x.id === b.id);
+                        return (
+                          <Fragment key={b.id}>
+                            {over === i && drag && drag.kind !== 'group' && <div className="dw-dropline" />}
+                            <div
+                              className={`dw-row dw-row--child${sel === b.id ? ' is-sel' : ''}${drag?.kind === 'move' && drag.id === b.id ? ' is-drag' : ''}`}
+                              draggable
+                              onDragStart={startDrag({ kind: 'move', id: b.id })}
+                              onDragOver={(e) => overIndex(e, i)}
+                              onDrop={dropEnd}
+                              onClick={() => pickBlock(b.id, true)}
+                            >
+                              <span className="dw-grip" aria-hidden="true">
+                                ⠿
+                              </span>
+                              <span className="dw-rowmain">
+                                <b>{b.type === 'image' ? `Picture ${b.side === 'full' ? 'full width' : b.side}` : BLOCK_LABEL[b.type]}</b>
+                                <small>{summary(b)}</small>
+                              </span>
+                              <button
+                                type="button"
+                                className="dw-x"
+                                aria-label={`Delete ${BLOCK_LABEL[b.type]}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBlocks((bs) => bs.filter((x) => x.id !== b.id));
+                                  if (sel === b.id) setSel(null);
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </Fragment>
+                        );
+                      })}
                   </div>
-                </Fragment>
-              ))}
+                );
+              })}
               {over === blocks.length && drag && <div className="dw-dropline" />}
             </div>
           </div>
-
+              )}
+              {tab === 'add' && (
           <div className="dw-panel">
-            <div className="dw-lab">Add a section</div>
+            <div className="dw-lab">Add an element</div>
+            <p className="dw-hint">{sel ? 'Goes at the end of the selected section.' : 'Goes at the end of the page. Select a section first to add inside it.'}</p>
             <div className="dw-palette">
               {PALETTE.map((p) => (
-                <button key={p.label} type="button" className="dw-chip" draggable onDragStart={startDrag({ kind: 'new', type: p.type, side: p.side })} onClick={() => addBlock(p.type, p.side)} title={`${p.hint}. Click to add at the end, or drag it into place.`}>
+                <button key={p.label} type="button" className="dw-chip" draggable onDragStart={startDrag({ kind: 'new', type: p.type, side: p.side })} onClick={() => addBlock(p.type, p.side)} title={`${p.hint}. Click to add it into the selected section, or drag it into place.`}>
                   <span aria-hidden="true">+</span> {p.label}
                 </button>
               ))}
             </div>
           </div>
-
+              )}
+              {tab === 'library' && (
           <div className="dw-panel">
             <div className="dw-lab">Section library</div>
             {saveFor && (
@@ -428,7 +676,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                 <small>
                   {(() => {
                     const part = savePart(saveFor);
-                    return part.length > 1 ? `This heading and the ${part.length - 1} block${part.length === 2 ? '' : 's'} after it.` : 'This one block.';
+                    return part.length > 1 ? `This heading and the ${part.length - 1} element${part.length === 2 ? '' : 's'} after it.` : 'This one element.';
                   })()}
                 </small>
                 <input className="crm-input" value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Name, e.g. Our approach" aria-label="Library name" autoFocus />
@@ -458,7 +706,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                     <div key={x.id ?? x.key} className="dw-lib" draggable onDragStart={startDrag({ kind: 'lib', blocks: x.blocks })} title="Drag it onto the page, or press Insert">
                       <span className="dw-libmain">
                         <b>{x.name}</b>
-                        <small>{x.note || `${x.blocks.length} block${x.blocks.length === 1 ? '' : 's'}`}</small>
+                        <small>{x.note || `${x.blocks.length} element${x.blocks.length === 1 ? '' : 's'}`}</small>
                       </span>
                       <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => insertLib(x)}>
                         Insert
@@ -474,11 +722,8 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               );
             })}
           </div>
-
-          {admin && (
-            <button type="button" className="crm-link dw-del" onClick={() => void remove()}>
-              Delete this document
-            </button>
+              )}
+            </div>
           )}
         </aside>
 
@@ -492,7 +737,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                   {doc.number} · {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
               </div>
-              <EditableLine className="dw-h-doc" value={doc.title} placeholder="Document title" onChange={(v) => edit((d) => ({ ...d, title: v }))} />
+              <EditableLine className="dw-h-doc" value={doc.title} placeholder="Document title" onChange={(v) => edit((d) => ({ ...d, title: v }), true)} />
             </header>
             <div className="dw-pagebody">
               {who?.name && (
@@ -509,7 +754,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                   )}
                 </div>
               )}
-              <EditableLine className="dw-h-sub" value={doc.content.subtitle} placeholder="Words under the title (optional)" onChange={(v) => edit((d) => ({ ...d, content: { ...d.content, subtitle: v } }))} />
+              <EditableLine className="dw-h-sub" value={doc.content.subtitle} placeholder="Words under the title (optional)" onChange={(v) => edit((d) => ({ ...d, content: { ...d.content, subtitle: v } }), true)} />
 
               <div
                 className="dw-flow"
@@ -520,7 +765,9 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                 onDrop={dropEnd}
               >
                 {blocks.length === 0 && <div className="dw-blank">An empty page. Drag a section in from the left, or click one to add it.</div>}
-                {blocks.map((b, i) => (
+                {groupsOf(blocks).map((g) => (
+                  <section key={g.head?.id ?? 'lead'} className={`dw-psec${g.head && drag?.kind === 'group' && drag.id === g.head.id ? ' is-drag' : ''}`}>
+                {(g.head ? [g.head, ...g.items] : g.items).map((b) => { const i = blocks.findIndex((x) => x.id === b.id); return (
                   <Fragment key={b.id}>
                     {over === i && drag && <div className="dw-dropline dw-dropline--page" />}
                     <div
@@ -532,32 +779,35 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                     >
                       {sel === b.id && (
                         <div className="dw-btool" onClick={(e) => e.stopPropagation()}>
-                          <span className="dw-handle" draggable onDragStart={startDrag({ kind: 'move', id: b.id })} title="Drag to move">
-                            ⠿ {b.type === 'image' ? `Picture ${b.side === 'full' ? 'full width' : b.side}` : BLOCK_LABEL[b.type]}
+                          <span className="dw-handle" draggable onDragStart={startDrag(b.type === 'section' ? { kind: 'group', id: b.id } : { kind: 'move', id: b.id })} title={b.type === 'section' ? 'Drag to move the whole section' : 'Drag to move'}>
+                            ⠿ {b.type === 'section' ? 'Section (moves with its contents)' : b.type === 'image' ? `Picture ${b.side === 'full' ? 'full width' : b.side}` : BLOCK_LABEL[b.type]}
                           </span>
-                          <button type="button" onClick={() => startSave(b.id)} title={b.type === 'section' ? 'Save this heading and what follows it to the library' : 'Save this block to the library'}>
+                          <button type="button" onClick={() => startSave(b.id)} title={b.type === 'section' ? 'Save this heading and what follows it to the library' : 'Save this element to the library'}>
                             Save to library
                           </button>
-                          <button type="button" onClick={() => nudge(b.id, -1)} disabled={i === 0} aria-label="Move up">
+                          <button type="button" onClick={() => nudge(b.id, -1)} disabled={i === 0} aria-label={b.type === 'section' ? 'Move section up' : 'Move up'}>
                             Up
                           </button>
-                          <button type="button" onClick={() => nudge(b.id, 1)} disabled={i === blocks.length - 1} aria-label="Move down">
+                          <button type="button" onClick={() => nudge(b.id, 1)} disabled={i === blocks.length - 1} aria-label={b.type === 'section' ? 'Move section down' : 'Move down'}>
                             Down
                           </button>
                           <button
                             type="button"
                             onClick={() => {
+                              if (b.type === 'section') return removeSection(b.id);
                               setBlocks((bs) => bs.filter((x) => x.id !== b.id));
                               setSel(null);
                             }}
                           >
-                            Delete
+                            {b.type === 'section' ? 'Delete section' : 'Delete'}
                           </button>
                         </div>
                       )}
-                      <PageBlock b={b} selected={sel === b.id} urls={urls} quotes={quotes} qtable={b.type === 'quote' ? qtables[b.quote_id] : undefined} hasWho={!!who?.name} patch={(p) => patchBlock(b.id, p)} onUpload={(files) => void upload(b.id, files)} />
+                      <PageBlock docId={id} b={b} selected={sel === b.id} urls={urls} quotes={quotes} qtable={b.type === 'quote' ? qtables[b.quote_id] : undefined} hasWho={!!who?.name} patch={(p) => patchBlock(b.id, p)} onUpload={(files) => void upload(b.id, files)} />
                     </div>
                   </Fragment>
+                ); })}
+                  </section>
                 ))}
                 {over === blocks.length && drag && <div className="dw-dropline dw-dropline--page" />}
               </div>
@@ -575,10 +825,21 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
 /** One line of text edited in place (a heading, the title). Uncontrolled, so the cursor never jumps; Enter moves on instead of adding a line. */
 function EditableLine({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const typed = useRef(value);
   // The words are put in by hand (not as React children), so typing never makes the cursor jump back to the start.
+  // A change that did not come from typing here (Undo, Redo) is put in even while the cursor is in the line.
   useEffect(() => {
     const el = ref.current;
-    if (el && el.textContent !== value && document.activeElement !== el) el.textContent = value;
+    if (!el || el.textContent === value) return;
+    if (document.activeElement !== el || value !== typed.current) {
+      el.textContent = value;
+      typed.current = value;
+      if (document.activeElement === el) {
+        const sel = window.getSelection();
+        sel?.selectAllChildren(el);
+        sel?.collapseToEnd();
+      }
+    }
   }, [value]);
   return (
     <div
@@ -590,7 +851,10 @@ function EditableLine({ value, onChange, placeholder, className }: { value: stri
       aria-label={placeholder}
       data-placeholder={placeholder}
       spellCheck
-      onInput={(e) => onChange((e.currentTarget.textContent ?? '').replace(/\n/g, ' '))}
+      onInput={(e) => {
+        typed.current = (e.currentTarget.textContent ?? '').replace(/\n/g, ' ');
+        onChange(typed.current);
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -697,7 +961,7 @@ function TextArea({ value, onChange, selected, placeholder }: { value: string; o
   );
 }
 
-function PageBlock({ b, selected, urls, quotes, qtable, hasWho, patch, onUpload }: { b: Block; selected: boolean; urls: Record<string, string>; quotes: QuoteOpt[]; qtable?: QuoteTable; hasWho: boolean; patch: (p: Record<string, unknown>) => void; onUpload: (files: File[]) => void }) {
+function PageBlock({ docId, b, selected, urls, quotes, qtable, hasWho, patch, onUpload }: { docId: string; b: Block; selected: boolean; urls: Record<string, string>; quotes: QuoteOpt[]; qtable?: QuoteTable; hasWho: boolean; patch: (p: Record<string, unknown>) => void; onUpload: (files: File[]) => void }) {
   switch (b.type) {
     case 'section':
       return <EditableLine className="dw-h-section" value={b.text} placeholder="Section heading" onChange={(text) => patch({ text })} />;
@@ -745,6 +1009,8 @@ function PageBlock({ b, selected, urls, quotes, qtable, hasWho, patch, onUpload 
     }
     case 'table':
       return <PageTable b={b} selected={selected} patch={patch} />;
+    case 'video':
+      return <VideoElement b={b} selected={selected} docId={docId} patch={patch} />;
     case 'quote':
       return (
         <div className="dw-quote">
@@ -911,6 +1177,68 @@ function CustomerPicker({ onPick }: { onPick: (f: Found) => void }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** A video element: choose a file (it goes straight to storage), give it a sub-title, and the page shows the QR code the reader will scan. */
+function VideoElement({ b, selected, docId, patch }: { b: Extract<Block, { type: 'video' }>; selected: boolean; docId: string; patch: (p: Record<string, unknown>) => void }) {
+  const [qr, setQr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const link = typeof window === 'undefined' ? '' : `${window.location.origin}/watch/${docId}/${b.id}`;
+  useEffect(() => {
+    let live = true;
+    if (!b.path || !link) return;
+    void import('qrcode').then((m) => m.default.toDataURL(link, { errorCorrectionLevel: 'M', margin: 1, width: 240 })).then((u) => live && setQr(u));
+    return () => {
+      live = false;
+    };
+  }, [b.path, link]);
+  async function upload(files: File[]) {
+    const f = files[0];
+    if (!f) return;
+    setBusy(true);
+    setErr('');
+    try {
+      const prep = await fetch(`/api/crm/writeups/${docId}/video`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mime: f.type, size: f.size }) });
+      const p = await prep.json().catch(() => ({}));
+      if (!prep.ok) throw new Error(p.error || 'Couldn’t start the upload.');
+      const up = await createClient().storage.from(p.bucket).uploadToSignedUrl(p.path, p.token, f, { contentType: f.type });
+      if (up.error) throw new Error(`Upload failed: ${up.error.message}`);
+      patch({ path: p.path, name: f.name });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Upload failed. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="dw-video">
+      <div className="dw-video__code">
+        {b.path && qr ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={qr} alt="QR code to watch the video" />
+        ) : (
+          <div className="dw-nopic">{b.path ? 'Making the code…' : 'No video yet'}</div>
+        )}
+      </div>
+      <div className="dw-video__text">
+        <b>Watch the video</b>
+        {selected ? (
+          <input className="dw-capin" value={b.caption} onChange={(e) => patch({ caption: e.target.value })} placeholder="Sub-title, e.g. How your heat pump is installed" aria-label="Video sub-title" onClick={(e) => e.stopPropagation()} />
+        ) : (
+          <span>{b.caption || 'Add a sub-title'}</span>
+        )}
+        <small>Point your phone camera at the code.</small>
+        {selected && (
+          <div className="dw-picbar" onClick={(e) => e.stopPropagation()}>
+            <FileButton label={busy ? 'Uploading…' : b.path ? 'Change video' : 'Choose a video'} accept="video/mp4,video/quicktime,video/webm" onFiles={(fs) => void upload(fs)} variant="solar" />
+            {b.name && <small>{b.name}</small>}
+          </div>
+        )}
+        {err && <small className="dw-err">{err}</small>}
+      </div>
     </div>
   );
 }

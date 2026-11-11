@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BrandIcon } from '@/app/admin/crm/CrmUi';
 import type { Pack, PackKey } from '@/lib/docs/packs';
+import { AssignedDocuments } from './AssignedDocuments';
 import { FormEditor } from './FormEditor';
 import { HandoverTab } from './HandoverTab';
 import { PackPanel } from './PackPanel';
@@ -50,6 +51,9 @@ type Props = {
   /** A request from elsewhere on the page (the Overview's card, an old Handover link) to open a pack, or a form in one. */
   jump: { view: DocsView; form: string | null; key: number } | null;
   openTab: (t: Tab) => void;
+  /** The deal is made (Won or later): the In-House (MCS) pack opens. Before that it stays out of the way. */
+  won: boolean;
+  enquiryId: string;
 };
 
 /**
@@ -57,11 +61,30 @@ type Props = {
  * down the left, and the chosen one on the right: line items of what is needed, each with a green tick or an orange warning, and
  * a Download ZIP. The Handover pack is the screen it has always had (it sends, builds and signs); the other packs are line items.
  */
-export function DocsHub({ projectId, docs, onChanged, siteDocs, handover, isAdmin, me, now, version, start, startForm, jump, openTab }: Props) {
+export function DocsHub({ projectId, docs, onChanged, siteDocs, handover, isAdmin, me, now, version, start, startForm, jump, openTab, won, enquiryId }: Props) {
   const [view, setView] = useState<DocsView>(jump?.view ?? start);
   const [form, setForm] = useState<string | null>(jump ? jump.form : startForm);
   const [data, setData] = useState<Packs | null>(null);
   const [tick, setTick] = useState(0);
+  // "Create MCS Pack" before the deal is won: remembered on this device for this job.
+  const [made, setMade] = useState(false);
+  useEffect(() => {
+    try {
+      setMade(window.localStorage.getItem(`hx-mcs-${projectId}`) === '1');
+    } catch {
+      // Not remembered; the button still works until the page is left.
+    }
+  }, [projectId]);
+  const mcs = won || made || jump?.view === 'inhouse';
+  function createMcs() {
+    setMade(true);
+    try {
+      window.localStorage.setItem(`hx-mcs-${projectId}`, '1');
+    } catch {
+      // Fine.
+    }
+    go('inhouse');
+  }
 
   const go = useCallback((v: DocsView, f: string | null = null) => {
     setView(v);
@@ -96,6 +119,8 @@ export function DocsHub({ projectId, docs, onChanged, siteDocs, handover, isAdmi
     void onChanged();
   }, [onChanged]);
 
+  // Asked for before the deal (an old link): show the proposal instead.
+  const shownView: DocsView = view === 'inhouse' && !mcs ? 'proposal' : view;
   const pack = (k: PackKey) => data?.packs.find((p) => p.key === k) ?? null;
   const files = docs.filter((d) => !d.archived_at).length;
 
@@ -103,7 +128,7 @@ export function DocsHub({ projectId, docs, onChanged, siteDocs, handover, isAdmi
     const p = pack(k);
     const h = p?.headline;
     return (
-      <button key={k} type="button" className={`dk-nav__i${view === k ? ' on' : ''}`} aria-current={view === k ? 'page' : undefined} onClick={() => go(k)}>
+      <button key={k} type="button" className={`dk-nav__i${shownView === k ? ' on' : ''}`} aria-current={shownView === k ? 'page' : undefined} onClick={() => go(k)}>
         <span className="dk-nav__t">{{ proposal: 'Proposal', inhouse: 'In-House', handover: 'Handover' }[k]}</span>
         {h && h.total > 0 && (
           <>
@@ -126,8 +151,14 @@ export function DocsHub({ projectId, docs, onChanged, siteDocs, handover, isAdmi
   };
 
   let panel;
-  if (view === 'general') panel = <DocumentsTab id={projectId} docs={docs} onChanged={onChanged} siteDocs={siteDocs} handover={handover} />;
-  else if (view === 'handover') {
+  if (shownView === 'general')
+    panel = (
+      <>
+        <AssignedDocuments projectId={projectId} enquiryId={enquiryId} version={version} />
+        <DocumentsTab id={projectId} docs={docs} onChanged={onChanged} siteDocs={siteDocs} handover={handover} />
+      </>
+    );
+  else if (shownView === 'handover') {
     const p = pack('handover');
     panel = p?.ready && p.headline.total > 0 ? <HandoverTab projectId={projectId} now={now} me={me} isAdmin={isAdmin} onChanged={changed} openTab={openTab} jobRef={data?.ref ?? null} /> : (
       <div className="dk-panel">
@@ -140,19 +171,25 @@ export function DocsHub({ projectId, docs, onChanged, siteDocs, handover, isAdmi
         </header>
       </div>
     );
-  } else if (view === 'inhouse' && form) panel = <FormEditor key={form} projectId={projectId} code={form} isAdmin={isAdmin} me={me} onBack={() => go('inhouse')} onChanged={changed} />;
+  } else if (shownView === 'inhouse' && form) panel = <FormEditor key={form} projectId={projectId} code={form} isAdmin={isAdmin} me={me} onBack={() => go('inhouse')} onChanged={changed} />;
   else {
-    const p = pack(view);
-    panel = p ? <PackPanel key={view} projectId={projectId} pack={p} canUpload onEdit={(c) => go('inhouse', c)} onChanged={changed} /> : <p className="mcs-note">Opening…</p>;
+    const p = pack(shownView);
+    panel = p ? <PackPanel key={shownView} projectId={projectId} pack={p} canUpload onEdit={(c) => go('inhouse', c)} onChanged={changed} /> : <p className="mcs-note">Opening…</p>;
   }
 
   return (
     <div className="dk">
       <nav className="dk-nav" aria-label="Documents">
         {navItem('proposal')}
-        {navItem('inhouse')}
+        {mcs ? (
+          navItem('inhouse')
+        ) : (
+          <button type="button" className="crm-btn crm-btn--ghost crm-btn--small dk-nav__mcs" onClick={createMcs}>
+            Create MCS Pack
+          </button>
+        )}
         {navItem('handover')}
-        <button type="button" className={`dk-nav__i${view === 'general' ? ' on' : ''}`} aria-current={view === 'general' ? 'page' : undefined} onClick={() => go('general')}>
+        <button type="button" className={`dk-nav__i${shownView === 'general' ? ' on' : ''}`} aria-current={shownView === 'general' ? 'page' : undefined} onClick={() => go('general')}>
           <span className="dk-nav__t">General</span>
           {files > 0 && <span className="dk-nav__n">{files}</span>}
         </button>

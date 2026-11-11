@@ -319,3 +319,46 @@
 .dk-card .dk-mark--warn {
   color: var(--crm-bar, #c77f04);
 }
+
+/* Documents written in Sales › Documents, shown at the top of General. */
+.dk-written {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.8rem 0.9rem;
+  margin-bottom: 1rem;
+  background: var(--card, #fff);
+}
+.dk-written__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.dk-written__head h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.95rem;
+}
+.dk-written__list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.dk-written__list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.dk-written__acts {
+  display: inline-flex;
+  gap: 0.8rem;
+}
+.dk-nav__mcs {
+  white-space: nowrap;
+}

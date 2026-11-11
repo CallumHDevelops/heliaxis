@@ -11,53 +11,32 @@ import { TemplateSendFields, useTemplateSend } from '@/components/admin/Template
 import { useSendLater } from '@/components/admin/whatsapp/SendLater';
 import { useNow } from '@/lib/use-now';
 import { atWords, chaseTime, chaseWhen } from '@/lib/whatsapp/schedule';
-import { Sheet, StageChip } from '../CrmUi';
+import { BrandIcon, Sheet, StageChip } from '../CrmUi';
 import { firstName, londonIso, nextWeekday, ukDayOf, ukTime } from '../crm-shared';
 import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import { copyText, send, type Area, type Customer, type Project, type WaInfo } from './record-shared';
 
 /** What the + sheet can open. */
-export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject';
+export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document';
 
-/** One consistent set of line icons for the + sheet (the old text glyphs and emoji didn't match the brand). */
-const MENU_ICONS: Record<string, ReactNode> = {
-  task: <path d="M5 12.5l4.5 4.5L19 7.5" />,
-  note: <path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19l-4 1zM14 7l3 3" />,
-  call: <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A15 15 0 0 1 4 5a1 1 0 0 1 1-1z" />,
-  next: (
-    <>
-      <circle cx="12" cy="13" r="7.5" />
-      <path d="M12 9v4l2.5 2M5 4.5L3 6.5M19 4.5l2 2" />
-    </>
-  ),
-  photo: (
-    <>
-      <path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z" />
-      <circle cx="12" cy="13" r="3.5" />
-    </>
-  ),
-  visit: <path d="M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5" />,
-  email: (
-    <>
-      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
-      <path d="M4 7l8 6 8-6" />
-    </>
-  ),
-  stage: <path d="M4 12h15M13 6l6 6-6 6" />,
-  tile: <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" />,
-};
-
-function MenuIcon({ k }: { k: string }) {
-  return (
-    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      {MENU_ICONS[k]}
-    </svg>
-  );
-}
+/** The + sheet's icons, all from the brand kit (see BrandIcon). */
+const MENU_ICONS = {
+  task: 'check',
+  note: 'clipboard',
+  call: 'phone',
+  next: 'clock',
+  photo: 'camera',
+  visit: 'house',
+  email: 'mail',
+  stage: 'arrow',
+  tile: 'star',
+  newproject: 'handshake',
+  document: 'document',
+} as const;
 
 /** "Add to Jane": the + button's sheet. WhatsApp has its own green button now; the stage's own action is the last tile. */
 export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Customer; tile: PrimaryAction['tile']; onPick: (s: SheetKey) => void; onTile: () => void }) {
-  const items: [SheetKey, string, string, string?][] = [
+  const items: [SheetKey, keyof typeof MENU_ICONS, string, string?][] = [
     ['task', 'task', 'Task', 'Who and when'],
     ['note', 'note', 'Note'],
     ['call', 'call', 'Log a call'],
@@ -66,6 +45,8 @@ export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Custo
     ['visit', 'visit', 'Site visit'],
     ['email', 'email', 'Email', customer.email ? undefined : 'No email yet'],
     ['stage', 'stage', 'Move stage'],
+    ['newproject', 'newproject', 'Opportunity', 'Another job for them'],
+    ['document', 'document', 'Document', 'Tender or letter'],
   ];
   return (
     <Sheet title={`Add to ${customer.name}`} onClose={() => onPick(null)}>
@@ -73,7 +54,7 @@ export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Custo
         {items.map(([k, icon, label, hint]) => (
           <button key={k} type="button" onClick={() => onPick(k)}>
             <span className="crm-menu-icon" aria-hidden="true">
-              <MenuIcon k={icon} />
+              <BrandIcon k={MENU_ICONS[icon]} size={26} />
             </span>
             <span>{label}</span>
             {hint && <small>{hint}</small>}
@@ -82,7 +63,7 @@ export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Custo
         {tile && (
           <button type="button" className="crmr-menu-tile" onClick={onTile}>
             <span className="crm-menu-icon" aria-hidden="true">
-              <MenuIcon k="tile" />
+              <BrandIcon k={MENU_ICONS.tile} size={26} />
             </span>
             <span>{tile.label}</span>
           </button>

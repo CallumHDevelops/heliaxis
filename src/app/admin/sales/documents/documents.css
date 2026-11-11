@@ -12,13 +12,13 @@
 .dw-main small, .dw-when { color: var(--muted); font-size: 0.8rem; }
 
 /* The editor: sections on the left (drag to reorder), the page on the right (type on it) */
-.dw-app { max-width: 1400px; margin: 0 auto; padding: 8px 12px 60px; display: grid; gap: 10px; }
+.dw-app { max-width: none; margin: 0 auto; padding: 8px 12px 60px; display: grid; gap: 10px; }
 .dw-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 0; z-index: 20; padding: 8px 0; background: var(--bg); }
 .dw-grow { flex: 1; min-width: 0; }
 .dw-back { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
 .dw-topnum { font-family: var(--font-mono, monospace); font-size: 0.82rem; }
 .dw-saved { color: var(--muted); font-size: 0.8rem; min-width: 70px; text-align: right; }
-.dw-split { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; }
+.dw-split { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; }
 .dw-side { display: grid; gap: 12px; position: sticky; top: 58px; max-height: calc(100vh - 70px); overflow-y: auto; padding-right: 2px; align-content: start; }
 .dw-panel { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
 .dw-lab { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
@@ -64,7 +64,7 @@
 
 /* The page */
 .dw-stage { background: color-mix(in srgb, var(--surface) 40%, var(--bg)); border: 1px solid var(--border); border-radius: 14px; padding: 22px 16px 16px; min-height: 70vh; }
-.dw-paper { max-width: 800px; margin: 0 auto; background: #fffdf8; color: #211f18; border-radius: 4px; box-shadow: 0 10px 40px -18px rgba(0, 0, 0, 0.35); border: 1px solid rgba(33, 31, 24, 0.12); overflow: hidden; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 0.95rem; line-height: 1.55; }
+.dw-paper { max-width: 1060px; margin: 0 auto; background: #fffdf8; color: #211f18; border-radius: 4px; box-shadow: 0 10px 40px -18px rgba(0, 0, 0, 0.35); border: 1px solid rgba(33, 31, 24, 0.12); overflow: hidden; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 0.95rem; line-height: 1.55; }
 .dw-pagehead { background: #211f18; color: #fffdf8; padding: 20px 30px 22px; border-bottom: 4px solid #f8bc1e; display: grid; gap: 14px; }
 .dw-ph-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .dw-ph-top svg, .dw-ph-top img { filter: brightness(0) invert(1); }
@@ -152,3 +152,52 @@
   .dw-imgside.is-right .dw-fig { order: -1; }
   .dw-pagehead, .dw-pagebody { padding-left: 16px; padding-right: 16px; }
 }
+
+/* The dark toolbar on the left: icons always, labels and the open panel when expanded. */
+.dw-rail {
+  --surface: #2b2922; --raised: #34322a; --border: rgba(247, 242, 231, 0.16); --border-strong: rgba(247, 242, 231, 0.3); --muted: #b9b29d; --border-soft: rgba(247, 242, 231, 0.1);
+  display: flex; align-items: flex-start; gap: 0;
+  position: sticky; top: 58px; max-height: calc(100vh - 70px);
+  background: #211f18; color: #f7f2e7; border-radius: 14px; overflow: hidden;
+}
+.dw-rail__bar { display: grid; gap: 4px; padding: 8px; align-content: start; flex: none; }
+.dw-rail.is-open .dw-rail__bar { width: 150px; border-right: 1px solid rgba(247, 242, 231, 0.12); }
+.dw-rail__tab { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 0; border-radius: 10px; background: none; color: #f7f2e7; font: inherit; font-size: 0.86rem; font-weight: 700; cursor: pointer; text-align: left; }
+.dw-rail__tab:hover { background: rgba(247, 242, 231, 0.09); }
+.dw-rail__tab.on { background: rgba(248, 188, 30, 0.2); box-shadow: inset 3px 0 0 #f8bc1e; }
+.dw-rail__toggle { color: #b9b29d; margin-bottom: 4px; }
+.dw-rail:not(.is-open) .dw-rail__tab { justify-content: center; width: 44px; }
+.dw-rail__panel { width: 300px; max-height: calc(100vh - 70px); overflow-y: auto; padding: 10px; display: grid; gap: 12px; align-content: start; }
+.dw-rail .dw-panel { background: #2b2922; border-color: rgba(247, 242, 231, 0.14); }
+.dw-rail .crm-input, .dw-rail .dw-pick button { background: #1a1914; color: #f7f2e7; border-color: rgba(247, 242, 231, 0.25); }
+.dw-rail .crm-btn--ghost { background: transparent; color: #f7f2e7; border-color: rgba(247, 242, 231, 0.35); }
+.dw-rail .dw-chip { background: #34322a; color: #f7f2e7; }
+.dw-rail .dw-row { background: #34322a; }
+.dw-rail .dw-x:hover { color: #ff9a8a; }
+.dw-rail .crm-link { color: #f8bc1e; }
+.dw-hint { margin: 0; font-size: 0.78rem; color: var(--muted); }
+@media (max-width: 900px) {
+  .dw-split { grid-template-columns: 1fr; }
+  .dw-rail { position: static; max-height: none; flex-direction: column; }
+  .dw-rail.is-open .dw-rail__bar { width: auto; border-right: 0; grid-auto-flow: column; }
+  .dw-rail__panel { width: auto; max-height: 60vh; }
+}
+
+/* A section in the outline: its heading, with the elements inside it indented beneath. */
+.dw-group { display: grid; gap: 4px; margin-bottom: 6px; }
+.dw-group.is-drag { opacity: 0.4; }
+.dw-row--head { border-left: 3px solid #f8bc1e; }
+.dw-row--head .dw-rowmain b { font-size: 0.86rem; }
+.dw-row--child { margin-left: 16px; }
+/* A section on the page: a faint rail down its left edge, so you can see where it begins and ends. */
+.dw-psec { border-left: 2px solid rgba(248, 188, 30, 0.35); padding-left: 8px; margin: 10px 0 14px; }
+.dw-psec:first-child { margin-top: 0; }
+.dw-psec.is-drag { opacity: 0.4; }
+
+/* Video with QR code */
+.dw-video { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: center; padding: 12px; border: 1px solid rgba(33, 31, 24, 0.14); border-radius: 10px; background: #fff; }
+.dw-video__code img { width: 120px; height: 120px; display: block; }
+.dw-video__text { display: grid; gap: 4px; min-width: 0; }
+.dw-video__text b { font-size: 1.05rem; }
+.dw-video__text small { color: #6e6a5e; }
+.dw-err { color: #b42318 !important; }

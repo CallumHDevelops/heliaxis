@@ -1,0 +1,6 @@
+.wv { max-width: 860px; margin: 0 auto; padding: 18px 16px 40px; display: grid; gap: 16px; font-family: 'Hanken Grotesk', system-ui, sans-serif; color: var(--text, #211f18); }
+.wv-head { display: flex; align-items: center; padding-bottom: 12px; border-bottom: 2px solid #f8bc1e; }
+.wv-video { width: 100%; max-height: 75vh; background: #000; border-radius: 10px; }
+.wv-cap { margin: 0; font-size: 1.15rem; line-height: 1.35; }
+.wv-miss { padding: 40px 0; text-align: center; color: var(--muted, #6e6a5e); }
+.wv-foot { margin: 8px 0 0; font-size: 0.78rem; color: var(--muted, #6e6a5e); }

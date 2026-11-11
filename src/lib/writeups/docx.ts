@@ -20,6 +20,8 @@ import {
   type FileChild,
 } from 'docx';
 import { PDFDocument } from 'pdf-lib';
+import QRCode from 'qrcode';
+import { watchUrl } from './video';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { longDate } from '@/lib/documents/pdf-kit';
 import { parasOf, type Block, type Para } from './types';
@@ -171,6 +173,18 @@ export async function writeupDocx(f: WriteupFacts): Promise<Uint8Array> {
             ],
           }),
           gap()
+        );
+        break;
+      }
+      case 'video': {
+        if (!f.id || !b.path) break;
+        const url = watchUrl(f.id, b.id);
+        const png = await QRCode.toBuffer(url, { errorCorrectionLevel: 'M', margin: 2, width: 300 });
+        body.push(
+          new Paragraph({ spacing: { before: 120 }, children: [new ImageRun({ type: 'png', data: png, transformation: { width: 110, height: 110 } })] }),
+          new Paragraph({ spacing: { before: 40 }, children: [new TextRun({ text: 'Watch the video', bold: true, font: FONT, size: 24 })] }),
+          ...(b.caption.trim() ? [new Paragraph({ children: [new TextRun({ text: b.caption.trim(), font: FONT, size: 20 })] })] : []),
+          new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: 'Point your phone camera at the code, or open ', font: FONT, size: 16, color: '6E6A5E' }), new TextRun({ text: url, font: FONT, size: 16, color: '6E6A5E' })] }),
         );
         break;
       }

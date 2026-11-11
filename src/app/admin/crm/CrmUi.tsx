@@ -50,6 +50,16 @@ const BRAND_ICONS = {
   check: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M8.5 12l2.5 2.5 4.5-5'] },
   // The kit has no warning sign yet: drawn in its style (outline, gold wash at 30%).
   warning: { wash: 'M12 3.5l9.5 16.5h-19z', line: ['M12 3.5l9.5 16.5h-19z', 'M12 10v4.5', 'M12 17.2v.3'] },
+  document: { wash: 'M6 3h9l3 3v15H6z', line: ['M6 3h9l3 3v15H6z', 'M15 3v3h3M9 12h6M9 15h6M9 9h3'] },
+  house: { wash: 'M5 10v10h14V10', line: ['M3 11l9-7 9 7', 'M5 10v10h14V10', 'M10 20v-6h4v6'] },
+  clock: { wash: '', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 7v5l3 2'] },
+  handshake: { wash: '', line: ['M8 12l3 3 5-5 3 3', 'M2 10l4-3 5 4M22 10l-4-3', 'M6 7v8M18 7v8'] },
+  star: { wash: 'M12 3l2.6 6 6.4.6-4.8 4.2 1.4 6.2L12 17l-5.6 3 1.4-6.2L3 9.6 9.4 9z', line: ['M12 3l2.6 6 6.4.6-4.8 4.2 1.4 6.2L12 17l-5.6 3 1.4-6.2L3 9.6 9.4 9z'] },
+  clipboard: { wash: 'M8 4h8v3H8z', line: ['M8 4h8v3H8z', 'M6 5h2M16 5h2v16H6V5h0', 'M9 11h6M9 15h4'] },
+  // The kit has no camera or arrow yet: drawn in its style (outline, gold wash at 30%).
+  camera: { wash: 'M3 8h4l1.5-2.5h7L17 8h4v12H3z', line: ['M3 8h4l1.5-2.5h7L17 8h4v12H3z', 'M12 11a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7'] },
+  plus: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 8v8M8 12h8'] },
+  arrow: { wash: 'M13 6l7 6-7 6z', line: ['M4 12h12', 'M13 6l7 6-7 6'] },
   users: { wash: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', line: ['M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', 'M3 20a5 5 0 0 1 10 0', 'M16 6a3 3 0 0 1 0 6M15 20a5 5 0 0 0-1-3.5 5 5 0 0 1 7 3.5'] },
 } as const;
 

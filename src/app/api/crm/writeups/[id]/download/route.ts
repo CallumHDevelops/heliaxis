@@ -18,7 +18,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!w) return json({ error: 'Not found' }, 404);
   const format = new URL(req.url).searchParams.get('format') === 'docx' ? 'docx' : 'pdf';
   const [who, images, quotes] = await Promise.all([forWhom(w), loadImages(w.content), loadQuoteTables(w.content)]);
-  const facts = { number: w.number, title: w.title, issued: ukDay(new Date()), content: w.content, who, images, quotes };
+  const facts = { id, number: w.number, title: w.title, issued: ukDay(new Date()), content: w.content, who, images, quotes };
   try {
     const bytes = format === 'docx' ? await writeupDocx(facts) : await writeupPdf(facts);
     const name = `${w.number}-${slug(w.title)}.${format}`;

@@ -417,6 +417,17 @@ export function ProjectView({
     setSheet(s);
   }
   const closeSheet = () => setSheet(null);
+  /** A new Document (tender, letter) for this customer and job, opened in its editor. */
+  async function newDocument() {
+    closeSheet();
+    const r = await fetch('/api/crm/writeups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enquiry_id: c.id, project_id: id }),
+    }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    if (d?.id) router.push(`/admin/sales/documents/${d.id}`);
+  }
   const savedAndClose = () => {
     setSheet(null);
     void reload();
@@ -756,6 +767,8 @@ export function ProjectView({
                 start={deep?.view ?? defaultDocsView(isProjectStage(stage), HANDOVER_STAGES.includes(stage))}
                 startForm={deep?.form ?? null}
                 jump={docsJump}
+                won={isProjectStage(stage)}
+                enquiryId={c.id}
                 openTab={pickTab}
               />
             )}
@@ -773,7 +786,7 @@ export function ProjectView({
         <ActionMenu
           customer={c}
           tile={primary.tile}
-          onPick={(s) => (s ? openSheet(s) : closeSheet())}
+          onPick={(s) => (s === 'document' ? void newDocument() : s ? openSheet(s) : closeSheet())}
           onTile={() => {
             closeSheet();
             if (primary.tile) void runAction(primary.tile.action, primary.tile.action === primary.action ? primary.to : undefined);

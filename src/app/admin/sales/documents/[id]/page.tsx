@@ -13,7 +13,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   if (!isUuid(id)) notFound();
   return (
-    <AdminShell active="sales" wide>
+    <AdminShell active="sales" fluid>
       <DocumentEditor id={id} admin={session.profile.role === 'admin'} />
     </AdminShell>
   );

@@ -2,7 +2,9 @@ import 'server-only';
 import { issueOf } from '@/lib/documents/issue';
 import { INK, longDate, MUTED, newDocument, SOLAR, type Kit } from '@/lib/documents/pdf-kit';
 import { parasOf, plainOf, type Block, type Para, type Run, type WriteupContent } from './types';
+import { drawQr } from '@/lib/quotes/qr';
 import type { QuoteTable, WriteupFor } from './server';
+import { watchUrl } from './video';
 
 /** A document as a branded PDF (the document kit): the header, who it is for, then each block in order. */
 export type WriteupFacts = {
@@ -13,6 +15,8 @@ export type WriteupFacts = {
   who: WriteupFor;
   images: Map<string, { bytes: Uint8Array; mime: string }>;
   quotes: Map<string, QuoteTable>;
+  /** The document's own id: a video element's QR code leads to a page made from it. */
+  id?: string;
 };
 
 const SIZE = 9.6;
@@ -130,6 +134,26 @@ async function imageBlock(kit: Kit, b: Extract<Block, { type: 'image' }>, f: Wri
   });
 }
 
+/** A video: the QR code, and beside it what it is and how to use it. */
+function videoBlock(kit: Kit, b: Extract<Block, { type: 'video' }>, f: WriteupFacts) {
+  if (!f.id || !b.path) return;
+  const url = watchUrl(f.id, b.id);
+  const q = 84;
+  const colX = q + 16;
+  kit.block(q + 10, (d) => {
+    drawQr(d, url, d.x, d.top - q - 4, q);
+    d.text('Watch the video', d.x + colX, d.top - 18, 12, { bold: true });
+    const cap = b.caption.trim();
+    let y = d.top - 34;
+    if (cap) for (const line of d.lines(cap, 10, d.width - colX).slice(0, 3)) {
+      d.text(line, d.x + colX, y, 10);
+      y -= 13;
+    }
+    d.text('Point your phone camera at the code.', d.x + colX, y - 4, 8.5, { color: MUTED });
+  });
+  kit.gap(6);
+}
+
 export async function writeupPdf(f: WriteupFacts): Promise<Uint8Array> {
   const code = 'HX-DOC-01';
   const kit = await newDocument({ code, title: f.title || 'Document', revision: issueOf(code), jobRef: f.who.ref, refLabel: 'Customer', issued: f.issued, accreditations: true });
@@ -176,6 +200,9 @@ export async function writeupPdf(f: WriteupFacts): Promise<Uint8Array> {
         kit.gap(6);
         break;
       }
+      case 'video':
+        videoBlock(kit, b, f);
+        break;
       case 'break':
         kit.newPage({ continued: true });
         break;

@@ -10,8 +10,10 @@ export type TitleBlock = { id: string; type: 'title'; text: string };
 export type ImageBlock = { id: string; type: 'image'; side: 'left' | 'right' | 'full'; path: string; caption: string; body: string };
 export type TableBlock = { id: string; type: 'table'; caption: string; headers: string[]; rows: string[][] };
 export type QuoteBlock = { id: string; type: 'quote'; quote_id: string; caption: string };
+/** A video the reader scans a QR code to watch. `path` is the file in storage, `caption` the sub-title printed beside the code. */
+export type VideoBlock = { id: string; type: 'video'; path: string; name: string; caption: string };
 export type BreakBlock = { id: string; type: 'break' };
-export type Block = TextBlock | SectionBlock | TitleBlock | ImageBlock | TableBlock | QuoteBlock | BreakBlock;
+export type Block = TextBlock | SectionBlock | TitleBlock | ImageBlock | TableBlock | QuoteBlock | VideoBlock | BreakBlock;
 export type BlockType = Block['type'];
 
 export type WriteupContent = { blocks: Block[]; /** Words under the title on the first page ("Tender for …"). */ subtitle: string };
@@ -23,6 +25,7 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
   image: 'Picture',
   table: 'Table',
   quote: 'Quote table',
+  video: 'Video with QR code',
   break: 'Page break',
 };
 
@@ -49,6 +52,8 @@ export function newBlock(type: BlockType, side?: 'left' | 'right' | 'full'): Blo
       return { id, type, caption: '', headers: ['Item', 'Detail'], rows: [['', '']] };
     case 'quote':
       return { id, type, quote_id: '', caption: '' };
+    case 'video':
+      return { id, type, path: '', name: '', caption: '' };
     default:
       return { id, type: 'break' };
   }
@@ -89,6 +94,9 @@ export function cleanContent(v: unknown): WriteupContent {
       }
       case 'quote':
         blocks.push({ id, type: 'quote', quote_id: uuid(r.quote_id), caption: s(r.caption, LIMITS.caption) });
+        break;
+      case 'video':
+        blocks.push({ id, type: 'video', path: s(r.path, 300).replace(/[^\w./-]/g, ''), name: s(r.name, 120).replace(/\n/g, ' '), caption: s(r.caption, LIMITS.caption) });
         break;
       case 'break':
         blocks.push({ id, type: 'break' });
