@@ -217,3 +217,23 @@
 /* Dragging an element over a section: the section it will go into lights up. */
 .dw-group.is-target { outline: 2px dashed #f8bc1e; outline-offset: 2px; border-radius: 8px; }
 .dw-psec.is-target { border-left-color: #f8bc1e; background: rgba(248, 188, 30, 0.07); }
+
+/* Full screen: the editor covers the page, the dark rail hard against the left edge. */
+.dw-app { position: fixed; inset: 0; z-index: 100; max-width: none; margin: 0; padding: 0; display: block; background: var(--bg); }
+.dw-split { display: flex; gap: 0; height: 100%; align-items: stretch; }
+.dw-shell { position: static; height: 100%; border-radius: 0; border: 0; border-right: 1px solid var(--border); flex: none; }
+.dw-stage { flex: 1; min-width: 0; height: 100%; overflow-y: auto; border: 0; border-radius: 0; padding: 24px 24px 60px; min-height: 0; }
+.dw-rail__back { display: grid; justify-items: center; gap: 3px; width: 100%; padding: 8px 2px; color: #f7f2e7; text-decoration: none; border-radius: 10px; }
+.dw-rail__back:hover { background: rgba(247, 242, 231, 0.09); }
+.dw-rail__back svg { transform: rotate(180deg); }
+.dw-rail__back b { font-family: var(--font-mono, monospace); font-size: 0.58rem; letter-spacing: 0.02em; color: #d9d2bf; }
+.dw-rail__hist { margin-top: auto; display: grid; gap: 6px; justify-items: center; }
+.dw-rail__acts { margin-top: 0; }
+.dw-rail .dw-saved { min-width: 0; text-align: center; font-size: 0.66rem; color: #b9b29d; min-height: 1em; }
+.dw-rail__btn:disabled { opacity: 0.35; cursor: default; }
+@media (max-width: 900px) {
+  .dw-split { flex-direction: column; overflow-y: auto; }
+  .dw-shell { height: auto; }
+  .dw-stage { height: auto; overflow: visible; padding: 12px; }
+  .dw-rail__hist { margin: 0; grid-auto-flow: column; }
+}

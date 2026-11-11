@@ -58,6 +58,8 @@ const BRAND_ICONS = {
   clipboard: { wash: 'M8 4h8v3H8z', line: ['M8 4h8v3H8z', 'M6 5h2M16 5h2v16H6V5h0', 'M9 11h6M9 15h4'] },
   // The kit has no camera or arrow yet: drawn in its style (outline, gold wash at 30%).
   camera: { wash: 'M3 8h4l1.5-2.5h7L17 8h4v12H3z', line: ['M3 8h4l1.5-2.5h7L17 8h4v12H3z', 'M12 11a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7'] },
+  undo: { wash: '', line: ['M9 6L4 11l5 5', 'M4 11h10a6 6 0 0 1 0 8h-3'] },
+  redo: { wash: '', line: ['M15 6l5 5-5 5', 'M20 11H10a6 6 0 0 0 0 8h3'] },
   download: { wash: '', line: ['M12 3v12M8 11l4 4 4-4', 'M5 21h14'] },
   // One for each element in the Documents editor, drawn in the kit's style.
   'el-section': { wash: 'M4 4h16v5H4z', line: ['M4 4h16v5H4z', 'M4 13h16M4 17h16M4 21h9'] },

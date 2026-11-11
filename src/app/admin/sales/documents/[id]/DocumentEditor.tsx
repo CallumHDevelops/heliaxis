@@ -460,28 +460,14 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
 
   return (
     <div className="crm dw-app" onDragEnd={endDrag}>
-      <div className="dw-top">
-        <Link href="/admin/sales/documents" className="dw-back">
-          ← Documents
-        </Link>
-        <b className="dw-topnum">{doc.number}</b>
-        <span className="dw-grow" />
-        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={depth.undo === 0} onClick={undo} title="Undo (Ctrl+Z)">
-          Undo
-        </button>
-        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={depth.redo === 0} onClick={redo} title="Redo (Ctrl+Shift+Z)">
-          Redo
-        </button>
-        <span className="dw-saved" role="status">
-          {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}
-        </span>
-      </div>
-      {err && <p className="crm-banner crm-banner--err">{err}</p>}
-
       <div className="dw-split">
         {/* ── Left: the document's details, its sections (drag to reorder) and what can be added ── */}
         <aside className="dw-shell" aria-label="Document tools">
           <nav className="dw-rail">
+            <Link href="/admin/sales/documents" className="dw-rail__back" title="Back to Documents" aria-label="Back to Documents">
+              <BrandIcon k="arrow" size={20} />
+              <b>{doc.number}</b>
+            </Link>
             <div className="dw-rail__tabs">
               {RAIL_TABS.map((t) => (
                 <button
@@ -502,7 +488,18 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                 </button>
               ))}
             </div>
-          <div className="dw-rail__acts">
+          <div className="dw-rail__hist">
+              <button type="button" className="dw-rail__btn" disabled={depth.undo === 0} onClick={undo} title="Undo (Ctrl+Z)" aria-label="Undo">
+                <BrandIcon k="undo" size={20} />
+              </button>
+              <button type="button" className="dw-rail__btn" disabled={depth.redo === 0} onClick={redo} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+                <BrandIcon k="redo" size={20} />
+              </button>
+            </div>
+            <div className="dw-rail__acts">
+              <span className="dw-saved" role="status">
+                {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}
+              </span>
             <a className="dw-rail__btn" href={`/api/crm/writeups/${id}/download?format=pdf&inline=1`} target="_blank" rel="noreferrer" title="Preview PDF">
               <BrandIcon k="document" size={18} />
               
@@ -737,6 +734,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
 
         {/* ── Right: the page itself; click anything to type on it ── */}
         <main className="dw-stage" onClick={() => setSel(null)}>
+          {err && <p className="crm-banner crm-banner--err">{err}</p>}
           <div className="dw-paper" onClick={(e) => e.stopPropagation()}>
             <header className="dw-pagehead">
               <div className="dw-ph-top">
