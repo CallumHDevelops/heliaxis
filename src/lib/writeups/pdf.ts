@@ -150,7 +150,7 @@ async function videoBlock(kit: Kit, b: Extract<Block, { type: 'video' }>, f: Wri
   const q = 64;
   if (!img || b.side === 'full') {
     const imgW = Math.min(kit.width, 420);
-    const imgH = img ? Math.min((img.height / img.width) * imgW, 240) : 0;
+    const imgH = img ? Math.min((img.height / img.width) * imgW, (imgW * 9) / 16) : 0;
     const w = img ? Math.min(imgW, (img.width / img.height) * imgH) : 0;
     if (img) kit.block(imgH + 8, (d) => { d.image(img, d.x, d.top - imgH, w, imgH); play(d, d.x, d.top - imgH, w, imgH); });
     kit.block(q + 12, (d) => {
@@ -165,7 +165,7 @@ async function videoBlock(kit: Kit, b: Extract<Block, { type: 'video' }>, f: Wri
   }
   const imgW = 230;
   const gap = 16;
-  const imgH = Math.min((img.height / img.width) * imgW, 230);
+  const imgH = Math.min((img.height / img.width) * imgW, (imgW * 9) / 16);
   const w = Math.min(imgW, (img.width / img.height) * imgH);
   const colW = kit.width - imgW - gap;
   const textH = 22 + (cap ? Math.min(3, Math.ceil(cap.length / Math.max(10, colW / 5))) * 13 : 0) + 18 + q + 8;

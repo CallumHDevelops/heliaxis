@@ -185,7 +185,7 @@ export async function writeupDocx(f: WriteupFacts): Promise<Uint8Array> {
         const full = b.side === 'full' || !file || !dim;
         const maxW = full ? 420 : 230;
         const w = dim ? Math.min(maxW, dim.w) : 0;
-        const h = dim ? Math.round((dim.h / dim.w) * w) : 0;
+        const h = dim ? Math.min(Math.round((dim.h / dim.w) * w), Math.round((w * 9) / 16)) : 0;
         const pic = file && dim ? new Paragraph({ children: [new ImageRun({ type: file.mime === 'image/png' ? 'png' : 'jpg', data: file.bytes, transformation: { width: w, height: h } })] }) : null;
         const info = [
           new Paragraph({ spacing: { before: 60 }, children: [new TextRun({ text: 'Watch the video', bold: true, font: FONT, size: 24 })] }),

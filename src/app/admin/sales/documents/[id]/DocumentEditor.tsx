@@ -1183,6 +1183,23 @@ function CustomerPicker({ onPick }: { onPick: (f: Found) => void }) {
   );
 }
 
+/** A picture or video frame as a landscape 16:9 thumbnail: the middle of it, filled edge to edge. */
+async function landscape(src: CanvasImageSource, w: number, h: number): Promise<File | null> {
+  if (!w || !h) return null;
+  const c = document.createElement('canvas');
+  c.width = 1280;
+  c.height = 720;
+  const g = c.getContext('2d')!;
+  const k = Math.max(c.width / w, c.height / h);
+  const sw = c.width / k;
+  const sh = c.height / k;
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(src, (w - sw) / 2, (h - sh) / 2, sw, sh, 0, 0, c.width, c.height);
+  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.82));
+  return blob ? new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' }) : null;
+}
+
 /** The picture the video shows: a frame from near its start, taken in the browser. */
 async function frameOf(file: File): Promise<File | null> {
   const src = URL.createObjectURL(file);
@@ -1202,13 +1219,7 @@ async function frameOf(file: File): Promise<File | null> {
       v.onseeked = () => res();
       setTimeout(res, 3000);
     });
-    const scale = Math.min(1, 1280 / Math.max(v.videoWidth, 1));
-    const c = document.createElement('canvas');
-    c.width = Math.round(v.videoWidth * scale);
-    c.height = Math.round(v.videoHeight * scale);
-    c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height);
-    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.82));
-    return blob && c.width > 0 ? new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' }) : null;
+    return await landscape(v, v.videoWidth, v.videoHeight);
   } catch {
     return null;
   } finally {
@@ -1267,7 +1278,10 @@ function VideoElement({ b, selected, docId, urls, patch }: { b: Extract<Block, {
     setBusy('Saving…');
     setErr('');
     try {
-      const thumb = await putThumb(await shrink(files[0]));
+      const bmp = await createImageBitmap(files[0]);
+      const wide = await landscape(bmp, bmp.width, bmp.height);
+      if (!wide) throw new Error('Couldn’t read that picture.');
+      const thumb = await putThumb(wide);
       if (thumb) patch({ thumb });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Couldn’t save the thumbnail.');
