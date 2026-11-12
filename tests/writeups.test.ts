@@ -23,6 +23,7 @@ const BLOCKS = [
   { id: 'e', type: 'table', caption: 'Timeline', headers: ['Stage', 'When'], rows: [['Survey', 'Week 1'], ['Install', 'Week 4']] },
   { id: 'f', type: 'quote', quote_id: '11111111-2222-4333-8444-555555555555', caption: '' },
   { id: 'g', type: 'break' },
+  { id: 'sg', type: 'signature', lines: ['Signature', 'Date', 'Name'] },
   { id: 'h', type: 'section', text: 'Terms' },
 ];
 
@@ -119,5 +120,13 @@ describe('document templates and categories', () => {
     expect(cleanLibraryCategory('Compliance')).toBe('Compliance');
     expect(cleanLibraryCategory('made up')).toBeNull();
     expect(cleanLibraryCategory('')).toBeNull();
+  });
+});
+
+describe('the signature element', () => {
+  it('keeps its lines, limits them, and never ends up empty', () => {
+    const c = cleanContent({ blocks: [{ id: 'a', type: 'signature', lines: ['Signature', 'Date', 'Name'] }, { id: 'b', type: 'signature', lines: [] }, { id: 'c', type: 'signature', lines: Array(12).fill('x') }] });
+    expect(c.blocks.map((b) => (b.type === 'signature' ? b.lines.length : -1))).toEqual([3, 1, 8]);
+    expect(newBlock('signature')).toMatchObject({ type: 'signature', lines: ['Signature', 'Date'] });
   });
 });

@@ -73,6 +73,7 @@ const BRAND_ICONS = {
   'el-vidl': { wash: 'M3 5h10v9H3z', line: ['M3 5h10v9H3z', 'M7 7.5v4l3.5-2z', 'M16 6h5M16 10h5', 'M16 14h5v5h-5z'] },
   'el-vidr': { wash: 'M11 5h10v9H11z', line: ['M11 5h10v9H11z', 'M15 7.5v4l3.5-2z', 'M3 6h5M3 10h5', 'M3 14h5v5H3z'] },
   'el-vidf': { wash: 'M3 3h18v11H3z', line: ['M3 3h18v11H3z', 'M10 6v5l4.5-2.5z', 'M3 16.5h5v5H3z', 'M11 18h10M11 21h6'] },
+  'el-sign': { wash: '', line: ['M4 15c2-5 3-8 5-8s0 7 2 7 2-4 4-4 1 3 3 3', 'M4 20h16'] },
   'el-break': { wash: '', line: ['M5 5h14M5 19h14', 'M3 12h4M10 12h4M17 12h4'] },
   plus: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 8v8M8 12h8'] },
   arrow: { wash: 'M13 6l7 6-7 6z', line: ['M4 12h12', 'M13 6l7 6-7 6'] },

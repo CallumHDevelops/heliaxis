@@ -253,3 +253,11 @@
 .dw-tpl { display: grid; gap: 6px; align-content: start; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .dw-tpl small { color: var(--muted); }
 .dw-tag { justify-self: start; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+/* Signature element */
+.dw-sigbox { display: grid; gap: 8px; }
+.dw-siggrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px; }
+.dw-sigline { display: grid; gap: 2px; padding-top: 30px; border-bottom: 1px solid var(--fg, #211f18); }
+.dw-sigline span, .dw-sigline input { font: inherit; font-size: 0.78rem; color: var(--muted); background: none; border: 0; padding: 4px 0 2px; min-width: 0; }
+.dw-sigline input { border-top: 1px dashed var(--border); color: inherit; }
+.dw-sigline .crm-link { justify-self: start; font-size: 0.75rem; }

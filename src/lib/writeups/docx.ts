@@ -210,6 +210,25 @@ export async function writeupDocx(f: WriteupFacts): Promise<Uint8Array> {
         );
         break;
       }
+      case 'signature': {
+        const cell = (l: string | null) =>
+          new TableCell({
+            width: { size: Math.floor(PAGE_W / 2), type: WidthType.DXA },
+            borders: { top: none, left: none, right: none, bottom: l === null ? none : { style: BorderStyle.SINGLE, size: 6, color: '211F18' } },
+            margins: { left: 120, right: 240 },
+            children: [new Paragraph({ spacing: { before: 560 }, children: [] })],
+          });
+        const label = (l: string | null) =>
+          new TableCell({ width: { size: Math.floor(PAGE_W / 2), type: WidthType.DXA }, borders: { top: none, bottom: none, left: none, right: none }, margins: { left: 120, right: 240 }, children: [new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: l ?? '', font: FONT, size: 16, color: '6E6A5E' })] })] });
+        const ls = b.lines.map((l) => l.trim());
+        const trows: TableRow[] = [];
+        for (let i = 0; i < ls.length; i += 2) {
+          const pair = [ls[i], ls[i + 1] ?? null];
+          trows.push(new TableRow({ cantSplit: true, children: pair.map((l) => cell(l)) }), new TableRow({ cantSplit: true, children: pair.map((l) => label(l)) }));
+        }
+        body.push(new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: [Math.floor(PAGE_W / 2), Math.floor(PAGE_W / 2)], borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none }, rows: trows }), gap());
+        break;
+      }
       case 'break':
         body.push(new Paragraph({ children: [new PageBreak()] }));
         break;

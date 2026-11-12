@@ -12,8 +12,10 @@ export type TableBlock = { id: string; type: 'table'; caption: string; headers: 
 export type QuoteBlock = { id: string; type: 'quote'; quote_id: string; caption: string };
 /** A video the reader scans a QR code to watch. `path` is the file in storage, `caption` the sub-title printed beside the code. */
 export type VideoBlock = { id: string; type: 'video'; side: 'left' | 'right' | 'full'; path: string; name: string; caption: string; /** The picture shown for the video (a frame taken when it was uploaded, or one chosen); a picture path like an image block's. */ thumb: string };
+/** Signature lines to sign by hand on the printed page: each label (Signature, Date, Name…) sits under its own ruled line. */
+export type SignatureBlock = { id: string; type: 'signature'; lines: string[] };
 export type BreakBlock = { id: string; type: 'break' };
-export type Block = TextBlock | SectionBlock | TitleBlock | ImageBlock | TableBlock | QuoteBlock | VideoBlock | BreakBlock;
+export type Block = TextBlock | SectionBlock | TitleBlock | ImageBlock | TableBlock | QuoteBlock | VideoBlock | SignatureBlock | BreakBlock;
 export type BlockType = Block['type'];
 
 export type WriteupContent = { blocks: Block[]; /** Words under the title on the first page ("Tender for …"). */ subtitle: string };
@@ -26,6 +28,7 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
   table: 'Table',
   quote: 'Quote table',
   video: 'Video with QR code',
+  signature: 'Signature',
   break: 'Page break',
 };
 
@@ -54,6 +57,8 @@ export function newBlock(type: BlockType, side?: 'left' | 'right' | 'full'): Blo
       return { id, type, quote_id: '', caption: '' };
     case 'video':
       return { id, type, side: side ?? 'right', path: '', name: '', caption: '', thumb: '' };
+    case 'signature':
+      return { id, type, lines: ['Signature', 'Date'] };
     default:
       return { id, type: 'break' };
   }
@@ -98,6 +103,11 @@ export function cleanContent(v: unknown): WriteupContent {
       case 'video':
         blocks.push({ id, type: 'video', side: r.side === 'left' || r.side === 'full' ? r.side : 'right', thumb: s(r.thumb, 300).replace(/[^\w./-]/g, ''), path: s(r.path, 300).replace(/[^\w./-]/g, ''), name: s(r.name, 120).replace(/\n/g, ' '), caption: s(r.caption, LIMITS.caption) });
         break;
+      case 'signature': {
+        const lines = (Array.isArray(r.lines) ? r.lines : []).slice(0, 8).map((l) => s(l, 60).replace(/\n/g, ' '));
+        blocks.push({ id, type: 'signature', lines: lines.length ? lines : ['Signature'] });
+        break;
+      }
       case 'break':
         blocks.push({ id, type: 'break' });
         break;

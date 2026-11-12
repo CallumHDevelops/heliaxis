@@ -232,6 +232,22 @@ export async function writeupPdf(f: WriteupFacts): Promise<Uint8Array> {
       case 'video':
         await videoBlock(kit, b, f);
         break;
+      case 'signature': {
+        // Rows of two: a ruled line to sign on, its label beneath.
+        const labels = b.lines.map((l) => l.trim() || ' ');
+        const rowsN = Math.ceil(labels.length / 2);
+        kit.gap(6);
+        kit.block(rowsN * 52, (d) => {
+          const colW = (d.width - 30) / 2;
+          labels.forEach((l, i) => {
+            const x = d.x + (i % 2) * (colW + 30);
+            const y = d.top - 36 - Math.floor(i / 2) * 52;
+            d.line(x, y, x + colW, y, { color: INK, t: 0.6 });
+            d.text(l, x, y - 10, 8, { color: MUTED });
+          });
+        });
+        break;
+      }
       case 'break':
         kit.newPage({ continued: true });
         break;

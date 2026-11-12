@@ -73,6 +73,7 @@ const PALETTE: { label: string; hint: string; type: BlockType; side?: 'left' | '
   { label: 'Video left', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'left', icon: 'el-vidl' },
   { label: 'Video right', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'right', icon: 'el-vidr' },
   { label: 'Video wide', hint: 'A wide video picture, QR code beneath', type: 'video', side: 'full', icon: 'el-vidf' },
+  { label: 'Signature', hint: 'Signature lines to sign on the printed page', type: 'signature', icon: 'el-sign' },
   { label: 'Page break', hint: 'Start a new page', type: 'break', icon: 'el-break' },
 ];
 
@@ -91,6 +92,8 @@ const summary = (b: Block): string => {
       return b.caption || (b.quote_id ? 'Quote chosen' : 'Choose a quote');
     case 'video':
       return b.caption || b.name || (b.path ? 'Video' : 'No video yet');
+    case 'signature':
+      return b.lines.filter(Boolean).join(', ') || 'Signature';
     default:
       return 'New page starts here';
   }
@@ -1099,6 +1102,34 @@ function PageBlock({ docId, b, selected, urls, quotes, qtable, hasWho, patch, on
     }
     case 'table':
       return <PageTable b={b} selected={selected} patch={patch} />;
+    case 'signature':
+      return (
+        <div className="dw-sigbox">
+          <div className="dw-siggrid">
+            {b.lines.map((l, i) => (
+              <div key={i} className="dw-sigline">
+                {selected ? (
+                  <input value={l} onChange={(e) => patch({ lines: b.lines.map((x, j) => (j === i ? e.target.value : x)) })} placeholder="Label, e.g. Signature" aria-label={`Signature line ${i + 1} label`} onClick={(e) => e.stopPropagation()} />
+                ) : (
+                  <span>{l || ' '}</span>
+                )}
+                {selected && b.lines.length > 1 && (
+                  <button type="button" className="crm-link" onClick={(e) => { e.stopPropagation(); patch({ lines: b.lines.filter((_, j) => j !== i) }); }} aria-label={`Remove line ${i + 1}`}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {selected && b.lines.length < 8 && (
+            <div className="dw-tbar" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => patch({ lines: [...b.lines, ''] })}>
+                Add a line
+              </button>
+            </div>
+          )}
+        </div>
+      );
     case 'video':
       return <VideoElement b={b} selected={selected} docId={docId} urls={urls} patch={patch} />;
     case 'quote':

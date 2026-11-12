@@ -29,7 +29,7 @@ const ENTRIES: TemplateEntry[] = [
       table(['Measure', 'Description'], rows([1, 2, 3, 4, 5, 6, 7].map((n) => `Measure ${n}`))),
       section('Declaration'),
       { type: 'text', body: 'The installation of the above measures at the disclosed address are handed over based on a Retrofit design claimed to comply with PAS2035:2023, using a process complying with PAS 2030:2023.' },
-      table(['Signed', ''], rows(['Signature', 'Date', 'Name'])),
+      { type: 'signature', lines: ['Signature', 'Date', 'Name'] },
     ],
   },
 ];
