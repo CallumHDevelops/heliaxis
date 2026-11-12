@@ -142,3 +142,17 @@ describe('the document date', () => {
     expect((await writeupPdf(f)).length).toBeGreaterThan(1000);
   });
 });
+
+describe('a signature picture in the signature element', () => {
+  // A 2x1 see-through PNG with one dark pixel.
+  const png = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAD0lEQVR4nGNgYGD4DwABBAEAf6eJXQAAAABJRU5ErkJggg==', 'base64'));
+  const blocks = [{ id: 's', type: 'signature', lines: ['Signature', 'Date'], path: 'writeups/x/sig.png' }];
+  it('keeps the picture path', () => {
+    expect(cleanContent({ blocks }).blocks[0]).toMatchObject({ type: 'signature', path: 'writeups/x/sig.png' });
+  });
+  it('prints it in the PDF and the Word file', async () => {
+    const f = { ...facts(blocks), images: new Map([['writeups/x/sig.png', { bytes: png, mime: 'image/png' }]]) };
+    expect((await writeupPdf(f)).length).toBeGreaterThan(1000);
+    expect((await writeupDocx(f)).length).toBeGreaterThan(1000);
+  });
+});

@@ -13,7 +13,7 @@ export type QuoteBlock = { id: string; type: 'quote'; quote_id: string; caption:
 /** A video the reader scans a QR code to watch. `path` is the file in storage, `caption` the sub-title printed beside the code. */
 export type VideoBlock = { id: string; type: 'video'; side: 'left' | 'right' | 'full'; path: string; name: string; caption: string; /** The picture shown for the video (a frame taken when it was uploaded, or one chosen); a picture path like an image block's. */ thumb: string };
 /** Signature lines to sign by hand on the printed page: each label (Signature, Date, Name…) sits under its own ruled line. */
-export type SignatureBlock = { id: string; type: 'signature'; lines: string[] };
+export type SignatureBlock = { id: string; type: 'signature'; lines: string[]; /** The person's signature picture (a PNG in storage), printed above the first line. Empty: left to sign by hand. */ path: string };
 export type BreakBlock = { id: string; type: 'break' };
 export type Block = TextBlock | SectionBlock | TitleBlock | ImageBlock | TableBlock | QuoteBlock | VideoBlock | SignatureBlock | BreakBlock;
 export type BlockType = Block['type'];
@@ -58,7 +58,7 @@ export function newBlock(type: BlockType, side?: 'left' | 'right' | 'full'): Blo
     case 'video':
       return { id, type, side: side ?? 'right', path: '', name: '', caption: '', thumb: '' };
     case 'signature':
-      return { id, type, lines: ['Signature', 'Date'] };
+      return { id, type, lines: ['Signature', 'Date'], path: '' };
     default:
       return { id, type: 'break' };
   }
@@ -105,7 +105,7 @@ export function cleanContent(v: unknown): WriteupContent {
         break;
       case 'signature': {
         const lines = (Array.isArray(r.lines) ? r.lines : []).slice(0, 8).map((l) => s(l, 60).replace(/\n/g, ' '));
-        blocks.push({ id, type: 'signature', lines: lines.length ? lines : ['Signature'] });
+        blocks.push({ id, type: 'signature', lines: lines.length ? lines : ['Signature'], path: s(r.path, 300).replace(/[^\w./-]/g, '') });
         break;
       }
       case 'break':

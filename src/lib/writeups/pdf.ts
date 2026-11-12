@@ -236,12 +236,19 @@ export async function writeupPdf(f: WriteupFacts): Promise<Uint8Array> {
         // Rows of two: a ruled line to sign on, its label beneath.
         const labels = b.lines.map((l) => l.trim() || ' ');
         const rowsN = Math.ceil(labels.length / 2);
+        const file = b.path ? f.images.get(b.path) : null;
+        const sig = file ? await kit.embed(file.bytes) : null;
         kit.gap(6);
         kit.block(rowsN * 52, (d) => {
           const colW = (d.width - 30) / 2;
           labels.forEach((l, i) => {
             const x = d.x + (i % 2) * (colW + 30);
             const y = d.top - 36 - Math.floor(i / 2) * 52;
+            if (i === 0 && sig) {
+              const sh = Math.min(34, (sig.height / sig.width) * (colW - 10));
+              const sw = Math.min(colW - 10, (sig.width / sig.height) * sh);
+              d.image(sig, x + 4, y + 2, sw, sh);
+            }
             d.line(x, y, x + colW, y, { color: INK, t: 0.6 });
             d.text(l, x, y - 10, 8, { color: MUTED });
           });

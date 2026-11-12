@@ -53,7 +53,7 @@ export async function forWhom(w: Pick<WriteupRow, 'enquiry_id' | 'organisation_i
 export async function loadImages(content: WriteupContent): Promise<Map<string, { bytes: Uint8Array; mime: string }>> {
   const out = new Map<string, { bytes: Uint8Array; mime: string }>();
   const db = createAdminClient();
-  const paths = [...new Set(content.blocks.flatMap((b) => (b.type === 'image' && b.path ? [b.path] : b.type === 'video' && b.thumb ? [b.thumb] : [])))];
+  const paths = [...new Set(content.blocks.flatMap((b) => ((b.type === 'image' || b.type === 'signature') && b.path ? [b.path] : b.type === 'video' && b.thumb ? [b.thumb] : [])))];
   await Promise.all(
     paths.map(async (p) => {
       // A picture of the site's own ("assets/…": the About photo, the accreditation logos) is a file, not in storage.

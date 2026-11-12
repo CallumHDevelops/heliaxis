@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import { DOC_LIBRARY_CATEGORIES } from '@/lib/writeups/categories';
 import { BLOCK_LABEL, newBlock, newId, parasOf, type Block, type BlockType, type Run, type WriteupContent } from '@/lib/writeups/types';
-import { BrandIcon, FileButton } from '../../../crm/CrmUi';
+import { BrandIcon, FileButton, Sheet } from '../../../crm/CrmUi';
 import '../../../crm/crm.css';
 import '../documents.css';
 
@@ -905,7 +905,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                           </button>
                         </div>
                       )}
-                      <PageBlock docId={id} b={b} selected={sel === b.id} urls={urls} quotes={quotes} qtable={b.type === 'quote' ? qtables[b.quote_id] : undefined} hasWho={!!who?.name} patch={(p) => patchBlock(b.id, p)} onUpload={(files) => void upload(b.id, files)} />
+                      <PageBlock docId={id} b={b} selected={sel === b.id} urls={urls} addUrl={(pth, u) => setUrls((x) => ({ ...x, [pth]: u }))} quotes={quotes} qtable={b.type === 'quote' ? qtables[b.quote_id] : undefined} hasWho={!!who?.name} patch={(p) => patchBlock(b.id, p)} onUpload={(files) => void upload(b.id, files)} />
                     </div>
                   </Fragment>
                 ); })}
@@ -1063,7 +1063,7 @@ function TextArea({ value, onChange, selected, placeholder }: { value: string; o
   );
 }
 
-function PageBlock({ docId, b, selected, urls, quotes, qtable, hasWho, patch, onUpload }: { docId: string; b: Block; selected: boolean; urls: Record<string, string>; quotes: QuoteOpt[]; qtable?: QuoteTable; hasWho: boolean; patch: (p: Record<string, unknown>) => void; onUpload: (files: File[]) => void }) {
+function PageBlock({ docId, b, selected, urls, addUrl, quotes, qtable, hasWho, patch, onUpload }: { docId: string; b: Block; selected: boolean; urls: Record<string, string>; addUrl: (path: string, url: string) => void; quotes: QuoteOpt[]; qtable?: QuoteTable; hasWho: boolean; patch: (p: Record<string, unknown>) => void; onUpload: (files: File[]) => void }) {
   switch (b.type) {
     case 'section':
       return <EditableLine className="dw-h-section" value={b.text} placeholder="Section heading" onChange={(text) => patch({ text })} />;
@@ -1112,33 +1112,7 @@ function PageBlock({ docId, b, selected, urls, quotes, qtable, hasWho, patch, on
     case 'table':
       return <PageTable b={b} selected={selected} patch={patch} />;
     case 'signature':
-      return (
-        <div className="dw-sigbox">
-          <div className="dw-siggrid">
-            {b.lines.map((l, i) => (
-              <div key={i} className="dw-sigline">
-                {selected ? (
-                  <input value={l} onChange={(e) => patch({ lines: b.lines.map((x, j) => (j === i ? e.target.value : x)) })} placeholder="Label, e.g. Signature" aria-label={`Signature line ${i + 1} label`} onClick={(e) => e.stopPropagation()} />
-                ) : (
-                  <span>{l || ' '}</span>
-                )}
-                {selected && b.lines.length > 1 && (
-                  <button type="button" className="crm-link" onClick={(e) => { e.stopPropagation(); patch({ lines: b.lines.filter((_, j) => j !== i) }); }} aria-label={`Remove line ${i + 1}`}>
-                    Remove
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          {selected && b.lines.length < 8 && (
-            <div className="dw-tbar" onClick={(e) => e.stopPropagation()}>
-              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => patch({ lines: [...b.lines, ''] })}>
-                Add a line
-              </button>
-            </div>
-          )}
-        </div>
-      );
+      return <SignatureElement b={b} selected={selected} docId={docId} urls={urls} addUrl={addUrl} patch={patch} />;
     case 'video':
       return <VideoElement b={b} selected={selected} docId={docId} urls={urls} patch={patch} />;
     case 'quote':
@@ -1211,6 +1185,191 @@ function PageBlock({ docId, b, selected, urls, quotes, qtable, hasWho, patch, on
         </div>
       );
   }
+}
+
+/** Signature lines, with your own signature drawn or chosen into the first one (it prints above the line). */
+function SignatureElement({ b, selected, docId, urls, addUrl, patch }: { b: Extract<Block, { type: 'signature' }>; selected: boolean; docId: string; urls: Record<string, string>; addUrl: (path: string, url: string) => void; patch: (p: Record<string, unknown>) => void }) {
+  const [saved, setSaved] = useState<boolean | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (!selected || saved !== null) return;
+    let live = true;
+    fetch(`/api/crm/writeups/${docId}/signature`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => live && setSaved(!!d.saved))
+      .catch(() => live && setSaved(false));
+    return () => {
+      live = false;
+    };
+  }, [selected, saved, docId]);
+
+  async function put(body: BodyInit, json?: boolean) {
+    setBusy('Adding…');
+    setErr('');
+    try {
+      const r = await fetch(`/api/crm/writeups/${docId}/signature`, { method: 'POST', ...(json ? { headers: { 'Content-Type': 'application/json' } } : {}), body });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Couldn’t add the signature.');
+      if (d.url) addUrl(d.path, d.url);
+      patch({ path: d.path });
+      setSaved(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Couldn’t add the signature.');
+    }
+    setBusy('');
+    setDrawing(false);
+  }
+  const addPng = (blob: Blob, save: boolean) => {
+    const fd = new FormData();
+    fd.append('file', new File([blob], 'signature.png', { type: 'image/png' }));
+    if (save) fd.append('save', '1');
+    return put(fd);
+  };
+  /** A chosen picture, as a PNG with the white made see-through so it sits on the line. */
+  async function fromFile(files: File[]) {
+    try {
+      const bmp = await createImageBitmap(files[0]);
+      const sc = Math.min(1, 800 / bmp.width);
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * sc);
+      c.height = Math.round(bmp.height * sc);
+      const g = c.getContext('2d')!;
+      g.drawImage(bmp, 0, 0, c.width, c.height);
+      const px = g.getImageData(0, 0, c.width, c.height);
+      for (let i = 0; i < px.data.length; i += 4) {
+        const light = (px.data[i] + px.data[i + 1] + px.data[i + 2]) / 3;
+        if (light > 215) px.data[i + 3] = 0;
+      }
+      g.putImageData(px, 0, 0);
+      const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('Couldn’t read that picture.');
+      await addPng(blob, window.confirm('Keep this as your saved signature, to add to other documents in one click?'));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Couldn’t read that picture.');
+    }
+  }
+  const src = b.path ? urls[b.path] : '';
+  return (
+    <div className="dw-sigbox">
+      <div className="dw-siggrid">
+        {b.lines.map((l, i) => (
+          <div key={i} className="dw-sigline">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {i === 0 && src && <img src={src} alt="Signature" className="dw-sigimg" />}
+            {selected ? (
+              <input value={l} onChange={(e) => patch({ lines: b.lines.map((x, j) => (j === i ? e.target.value : x)) })} placeholder="Label, e.g. Signature" aria-label={`Signature line ${i + 1} label`} onClick={(e) => e.stopPropagation()} />
+            ) : (
+              <span>{l || ' '}</span>
+            )}
+            {selected && b.lines.length > 1 && (
+              <button type="button" className="crm-link" onClick={(e) => { e.stopPropagation(); patch({ lines: b.lines.filter((_, j) => j !== i) }); }} aria-label={`Remove line ${i + 1}`}>
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {selected && (
+        <div className="dw-tbar" onClick={(e) => e.stopPropagation()}>
+          {saved && (
+            <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={!!busy} onClick={() => void put(JSON.stringify({ use_saved: true }), true)}>
+              {busy || 'Use my signature'}
+            </button>
+          )}
+          <button type="button" className={`crm-btn crm-btn--${saved ? 'ghost' : 'solar'} crm-btn--small`} disabled={!!busy} onClick={() => setDrawing(true)}>
+            {saved ? 'Draw a new one' : 'Draw my signature'}
+          </button>
+          <FileButton label="Choose a picture" accept="image/jpeg,image/png" onFiles={(fs) => void fromFile(fs)} variant="ghost" />
+          {b.path && (
+            <button type="button" className="crm-link" onClick={() => patch({ path: '' })}>
+              Remove signature
+            </button>
+          )}
+          {b.lines.length < 8 && (
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => patch({ lines: [...b.lines, ''] })}>
+              Add a line
+            </button>
+          )}
+        </div>
+      )}
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      {drawing && <SignaturePad busy={!!busy} onClose={() => setDrawing(false)} onDone={(blob, save) => void addPng(blob, save)} />}
+    </div>
+  );
+}
+
+/** A box to sign in with a mouse, finger or pen. The result is a see-through PNG trimmed to the ink. */
+function SignaturePad({ busy, onClose, onDone }: { busy: boolean; onClose: () => void; onDone: (blob: Blob, save: boolean) => void }) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  const last = useRef<{ x: number; y: number } | null>(null);
+  const [inked, setInked] = useState(false);
+  const [keep, setKeep] = useState(true);
+  const at = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * e.currentTarget.width, y: ((e.clientY - r.top) / r.height) * e.currentTarget.height };
+  };
+  function move(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!last.current) return;
+    const g = e.currentTarget.getContext('2d')!;
+    const p = at(e);
+    g.strokeStyle = '#211F18';
+    g.lineWidth = 3.5;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(last.current.x, last.current.y);
+    g.lineTo(p.x, p.y);
+    g.stroke();
+    last.current = p;
+    setInked(true);
+  }
+  function clear() {
+    const c = cv.current!;
+    c.getContext('2d')!.clearRect(0, 0, c.width, c.height);
+    setInked(false);
+  }
+  function finish() {
+    const c = cv.current!;
+    const px = c.getContext('2d')!.getImageData(0, 0, c.width, c.height);
+    let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (px.data[(y * c.width + x) * 4 + 3] > 0) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const pad = 8;
+    const out = document.createElement('canvas');
+    out.width = x1 - x0 + 2 * pad;
+    out.height = y1 - y0 + 2 * pad;
+    out.getContext('2d')!.drawImage(c, x0 - pad, y0 - pad, out.width, out.height, 0, 0, out.width, out.height);
+    out.toBlob((blob) => blob && onDone(blob, keep), 'image/png');
+  }
+  return (
+    <Sheet title="Draw your signature" onClose={onClose}>
+      <div className="dw-pad">
+        <canvas
+          ref={cv}
+          width={900}
+          height={300}
+          className="dw-padcv"
+          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); last.current = at(e); }}
+          onPointerMove={move}
+          onPointerUp={() => (last.current = null)}
+          onPointerCancel={() => (last.current = null)}
+          aria-label="Signature box: draw with a mouse, finger or pen"
+        />
+        <label className="crm-small dw-padkeep">
+          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Remember it as my signature
+        </label>
+        <div className="dw-tools">
+          <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={!inked || busy} onClick={finish}>
+            {busy ? 'Adding…' : 'Add to document'}
+          </button>
+          <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!inked || busy} onClick={clear}>
+            Clear
+          </button>
+        </div>
+      </div>
+    </Sheet>
+  );
 }
 
 function PageTable({ b, selected, patch }: { b: Extract<Block, { type: 'table' }>; selected: boolean; patch: (p: Record<string, unknown>) => void }) {
