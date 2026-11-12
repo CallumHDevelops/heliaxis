@@ -156,3 +156,16 @@ describe('a signature picture in the signature element', () => {
     expect((await writeupDocx(f)).length).toBeGreaterThan(1000);
   });
 });
+
+describe('typed text on signature lines', () => {
+  it('keeps what is typed, in line order, and drops it when all empty', () => {
+    const c = cleanContent({ blocks: [{ id: 'a', type: 'signature', lines: ['Signature', 'Date', 'Name'], values: ['', '12 November 2026', 'A. Name'] }, { id: 'b', type: 'signature', lines: ['Signature'], values: [' '] }] });
+    expect(c.blocks[0]).toMatchObject({ values: ['', '12 November 2026', 'A. Name'] });
+    expect((c.blocks[1] as { values?: string[] }).values).toBeUndefined();
+  });
+  it('prints in the PDF and the Word file', async () => {
+    const f = facts([{ id: 'a', type: 'signature', lines: ['Signature', 'Date', 'Name'], values: ['', '12 November 2026', 'A. Name'], path: '' }]);
+    expect((await writeupPdf(f)).length).toBeGreaterThan(1000);
+    expect((await writeupDocx(f)).length).toBeGreaterThan(1000);
+  });
+});

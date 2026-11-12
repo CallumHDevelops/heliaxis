@@ -1254,22 +1254,40 @@ function SignatureElement({ b, selected, docId, urls, addUrl, patch }: { b: Extr
   return (
     <div className="dw-sigbox">
       <div className="dw-siggrid">
-        {b.lines.map((l, i) => (
-          <div key={i} className="dw-sigline">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {i === 0 && src && <img src={src} alt="Signature" className="dw-sigimg" />}
-            {selected ? (
-              <input value={l} onChange={(e) => patch({ lines: b.lines.map((x, j) => (j === i ? e.target.value : x)) })} placeholder="Label, e.g. Signature" aria-label={`Signature line ${i + 1} label`} onClick={(e) => e.stopPropagation()} />
-            ) : (
-              <span>{l || ' '}</span>
-            )}
-            {selected && b.lines.length > 1 && (
-              <button type="button" className="crm-link" onClick={(e) => { e.stopPropagation(); patch({ lines: b.lines.filter((_, j) => j !== i) }); }} aria-label={`Remove line ${i + 1}`}>
-                Remove
-              </button>
-            )}
-          </div>
-        ))}
+        {b.lines.map((l, i) => {
+          const val = (j: number) => b.values?.[j] ?? '';
+          const setVal = (v: string) => patch({ values: b.lines.map((_, j) => (j === i ? v : val(j))) });
+          return (
+            <div key={i} className="dw-sigline">
+              <div className="dw-sigarea">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {i === 0 && src && <img src={src} alt="Signature" className="dw-sigimg" />}
+                {selected ? (
+                  <input className="dw-sigval" value={val(i)} onChange={(e) => setVal(e.target.value)} placeholder={i === 0 && src ? '' : 'Type here to print above the line, or leave blank'} aria-label={`Text printed above the ${l || 'line'}`} onClick={(e) => e.stopPropagation()} />
+                ) : (
+                  <span className="dw-sigtyped">{val(i)}</span>
+                )}
+              </div>
+              {selected ? (
+                <div className="dw-siglab">
+                  <input value={l} onChange={(e) => patch({ lines: b.lines.map((x, j) => (j === i ? e.target.value : x)) })} placeholder="Label, e.g. Name" aria-label={`Signature line ${i + 1} label`} onClick={(e) => e.stopPropagation()} />
+                  {/date/i.test(l) && (
+                    <button type="button" className="crm-link" onClick={(e) => { e.stopPropagation(); setVal(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })); }}>
+                      Today
+                    </button>
+                  )}
+                  {b.lines.length > 1 && (
+                    <button type="button" className="crm-link" onClick={(e) => { e.stopPropagation(); patch({ lines: b.lines.filter((_, j) => j !== i), values: b.lines.filter((_, j) => j !== i).map((_, j) => val(j < i ? j : j + 1)) }); }} aria-label={`Remove line ${i + 1}`}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <span className="dw-siglab">{l || ' '}</span>
+              )}
+            </div>
+          );
+        })}
       </div>
       {selected && (
         <div className="dw-tbar" onClick={(e) => e.stopPropagation()}>
@@ -1288,7 +1306,7 @@ function SignatureElement({ b, selected, docId, urls, addUrl, patch }: { b: Extr
             </button>
           )}
           {b.lines.length < 8 && (
-            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => patch({ lines: [...b.lines, ''] })}>
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => patch({ lines: [...b.lines, ''], values: [...b.lines.map((_, j) => b.values?.[j] ?? ''), ''] })}>
               Add a line
             </button>
           )}

@@ -13,7 +13,7 @@ export type QuoteBlock = { id: string; type: 'quote'; quote_id: string; caption:
 /** A video the reader scans a QR code to watch. `path` is the file in storage, `caption` the sub-title printed beside the code. */
 export type VideoBlock = { id: string; type: 'video'; side: 'left' | 'right' | 'full'; path: string; name: string; caption: string; /** The picture shown for the video (a frame taken when it was uploaded, or one chosen); a picture path like an image block's. */ thumb: string };
 /** Signature lines to sign by hand on the printed page: each label (Signature, Date, Name…) sits under its own ruled line. */
-export type SignatureBlock = { id: string; type: 'signature'; lines: string[]; /** The person's signature picture (a PNG in storage), printed above the first line. Empty: left to sign by hand. */ path: string };
+export type SignatureBlock = { id: string; type: 'signature'; lines: string[]; /** What is typed on each line (a name, a date), printed above it; same order as `lines`, empty to sign by hand. */ values?: string[]; /** The person's signature picture (a PNG in storage), printed above the first line. Empty: left to sign by hand. */ path: string };
 export type BreakBlock = { id: string; type: 'break' };
 export type Block = TextBlock | SectionBlock | TitleBlock | ImageBlock | TableBlock | QuoteBlock | VideoBlock | SignatureBlock | BreakBlock;
 export type BlockType = Block['type'];
@@ -105,7 +105,8 @@ export function cleanContent(v: unknown): WriteupContent {
         break;
       case 'signature': {
         const lines = (Array.isArray(r.lines) ? r.lines : []).slice(0, 8).map((l) => s(l, 60).replace(/\n/g, ' '));
-        blocks.push({ id, type: 'signature', lines: lines.length ? lines : ['Signature'], path: s(r.path, 300).replace(/[^\w./-]/g, '') });
+        const vals = (Array.isArray(r.values) ? r.values : []).slice(0, lines.length).map((v) => s(v, 80).replace(/\n/g, ' '));
+        blocks.push({ id, type: 'signature', lines: lines.length ? lines : ['Signature'], ...(vals.some((v) => v.trim()) ? { values: lines.map((_, i) => vals[i] ?? '') } : {}), path: s(r.path, 300).replace(/[^\w./-]/g, '') });
         break;
       }
       case 'break':

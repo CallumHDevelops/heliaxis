@@ -215,7 +215,7 @@ export async function writeupDocx(f: WriteupFacts): Promise<Uint8Array> {
         const sigDim = sigFile ? await sizeOf(sigFile) : null;
         const sigH = sigDim ? Math.min(46, sigDim.h, Math.round((sigDim.h / sigDim.w) * 200)) : 0;
         const sigW = sigDim ? Math.min(200, Math.round((sigDim.w / sigDim.h) * sigH)) : 0;
-        const cell = (l: string | null, first = false) =>
+        const cell = (l: string | null, first = false, typed = '') =>
           new TableCell({
             width: { size: Math.floor(PAGE_W / 2), type: WidthType.DXA },
             borders: { top: none, left: none, right: none, bottom: l === null ? none : { style: BorderStyle.SINGLE, size: 6, color: '211F18' } },
@@ -223,7 +223,9 @@ export async function writeupDocx(f: WriteupFacts): Promise<Uint8Array> {
             children: [
               first && sigFile && sigDim
                 ? new Paragraph({ spacing: { before: 120 }, children: [new ImageRun({ type: 'png', data: sigFile.bytes, transformation: { width: sigW, height: sigH } })] })
-                : new Paragraph({ spacing: { before: 560 }, children: [] }),
+                : typed
+                  ? new Paragraph({ spacing: { before: 380 }, children: [new TextRun({ text: typed, font: FONT, size: 22 })] })
+                  : new Paragraph({ spacing: { before: 560 }, children: [] }),
             ],
           });
         const label = (l: string | null) =>
@@ -232,7 +234,7 @@ export async function writeupDocx(f: WriteupFacts): Promise<Uint8Array> {
         const trows: TableRow[] = [];
         for (let i = 0; i < ls.length; i += 2) {
           const pair = [ls[i], ls[i + 1] ?? null];
-          trows.push(new TableRow({ cantSplit: true, children: pair.map((l, j) => cell(l, i === 0 && j === 0)) }), new TableRow({ cantSplit: true, children: pair.map((l) => label(l)) }));
+          trows.push(new TableRow({ cantSplit: true, children: pair.map((l, j) => cell(l, i === 0 && j === 0, (b.values?.[i + j] ?? '').trim())) }), new TableRow({ cantSplit: true, children: pair.map((l) => label(l)) }));
         }
         body.push(new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: [Math.floor(PAGE_W / 2), Math.floor(PAGE_W / 2)], borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none }, rows: trows }), gap());
         break;

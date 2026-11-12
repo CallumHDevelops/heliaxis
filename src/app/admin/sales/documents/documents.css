@@ -258,8 +258,6 @@
 .dw-sigbox { display: grid; gap: 8px; }
 .dw-siggrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 28px; }
 .dw-sigline { display: grid; gap: 2px; padding-top: 30px; border-bottom: 1px solid var(--fg, #211f18); }
-.dw-sigline span, .dw-sigline input { font: inherit; font-size: 0.78rem; color: var(--muted); background: none; border: 0; padding: 4px 0 2px; min-width: 0; }
-.dw-sigline input { border-top: 1px dashed var(--border); color: inherit; }
 .dw-sigline .crm-link { justify-self: start; font-size: 0.75rem; }
 
 /* Editable date in the page header */
@@ -274,3 +272,13 @@
 .dw-pad { display: grid; gap: 10px; padding: 4px 2px 8px; }
 .dw-padcv { width: 100%; aspect-ratio: 3 / 1; border: 1px dashed var(--border-strong, var(--border)); border-radius: 10px; background: #fffdf8; touch-action: none; cursor: crosshair; }
 .dw-padkeep { display: flex; gap: 8px; align-items: center; }
+
+/* Signature lines: typed text or the picture sits in the area above the ruled line, the label under it */
+.dw-sigline { border-bottom: 0; padding-top: 0; gap: 4px; }
+.dw-sigarea { position: relative; min-height: 56px; border-bottom: 1px solid var(--fg, #211f18); display: flex; align-items: flex-end; }
+.dw-sigimg { bottom: 4px; }
+.dw-sigval, .dw-sigtyped { position: relative; width: 100%; font: inherit; font-size: 1rem; color: inherit; background: none; border: 0; padding: 4px 4px 3px; }
+.dw-sigval::placeholder { color: var(--muted); font-size: 0.78rem; }
+.dw-siglab { display: flex; gap: 10px; align-items: center; font-size: 0.78rem; color: var(--muted); }
+.dw-siglab input { flex: 1; min-width: 0; font: inherit; font-size: 0.78rem; color: inherit; background: none; border: 0; border-bottom: 1px dashed var(--border); padding: 2px 0; }
+.dw-siglab .crm-link { font-size: 0.75rem; }

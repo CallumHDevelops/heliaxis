@@ -249,6 +249,8 @@ export async function writeupPdf(f: WriteupFacts): Promise<Uint8Array> {
               const sw = Math.min(colW - 10, (sig.width / sig.height) * sh);
               d.image(sig, x + 4, y + 2, sw, sh);
             }
+            const typed = (b.values?.[i] ?? '').trim();
+            if (typed && !(i === 0 && sig)) d.text(typed, x + 4, y + 5, 11, { color: INK });
             d.line(x, y, x + colW, y, { color: INK, t: 0.6 });
             d.text(l, x, y - 10, 8, { color: MUTED });
           });
