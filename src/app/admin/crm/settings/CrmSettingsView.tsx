@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { CrmSettings, SequenceStep } from '@/lib/crm/settings-shared';
+import { DOC_LIBRARY_CATEGORIES } from '@/lib/writeups/categories';
 import { HandoverSettings } from './HandoverSettings';
 import '../crm.css';
 
 type Team = { id: string; name: string }[];
 type Snippet = { id: string; title: string; body: string };
-type Lib = { id: string; name: string; description: string | null };
+type Lib = { id: string; name: string; description: string | null; category?: string | null };
 type Connected = { whatsapp: boolean; email: string | null; stripe: boolean; meta: boolean };
 
 export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
@@ -360,6 +361,8 @@ function Library() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  const [upCat, setUpCat] = useState('');
+  const [filter, setFilter] = useState('');
   const load = useCallback(
     () =>
       fetch('/api/crm/library', { cache: 'no-store' })
@@ -388,7 +391,7 @@ function Library() {
         await fetch('/api/crm/library', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'save', path: p.path, name: f.name.replace(/\.[a-z0-9]+$/i, ''), mime: f.type, size: f.size }),
+          body: JSON.stringify({ action: 'save', path: p.path, name: f.name.replace(/\.[a-z0-9]+$/i, ''), mime: f.type, size: f.size, category: upCat }),
         });
       }
     } catch (e) {
@@ -402,6 +405,14 @@ function Library() {
     <section className="crm-set">
       <div className="crm-step-head">
         <h2>Document library</h2>
+        <select className="crm-input" value={upCat} onChange={(e) => setUpCat(e.target.value)} aria-label="Category for the files you upload" style={{ width: 'auto' }}>
+          <option value="">No category</option>
+          {DOC_LIBRARY_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={() => input.current?.click()}>
           {busy ? 'Uploading…' : '⬆ Upload'}
         </button>
@@ -409,12 +420,39 @@ function Library() {
       </div>
       <p className="crm-muted crm-small">Guides and packs you send to lots of customers — EV access guide, intro pack, finance options. Anyone can send them by WhatsApp or email from an opportunity.</p>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      <p className="crm-muted crm-small">Choose a category before you upload; it applies to every file you pick, and you can change it afterwards on each document.</p>
+      <select className="crm-input" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Show category" style={{ width: 'auto' }}>
+        <option value="">All categories</option>
+        {DOC_LIBRARY_CATEGORIES.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
       <ul className="crm-plainlist">
-        {(items ?? []).map((d) => (
+        {(items ?? []).filter((d) => !filter || d.category === filter).map((d) => (
           <li key={d.id}>
             <a href={`/api/crm/library/${d.id}`} target="_blank" rel="noreferrer">
               <b>📚 {d.name}</b>
             </a>
+            <select
+              className="crm-input"
+              value={d.category ?? ''}
+              aria-label={`Category for ${d.name}`}
+              style={{ width: 'auto', margin: 0 }}
+              onChange={async (e) => {
+                const r = await fetch(`/api/crm/library/${d.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: e.target.value }) });
+                if (!r.ok) setErr((await r.json().catch(() => ({}))).error || 'Couldn’t change the category.');
+                load();
+              }}
+            >
+              <option value="">No category</option>
+              {DOC_LIBRARY_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               className="crm-link crm-danger"

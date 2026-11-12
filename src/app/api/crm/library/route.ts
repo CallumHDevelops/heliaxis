@@ -2,6 +2,7 @@ import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, DOC_MIME, DOCS_BUCKET, ensureDocsBucket, json, MAX_DOC_BYTES, safeName } from '@/lib/crm/server';
 import { compactLibraryFile, libraryFields } from '@/lib/handover/library';
+import { cleanLibraryCategory } from '@/lib/writeups/categories';
 import { handoverReady } from '@/lib/handover/server';
 
 export const dynamic = 'force-dynamic';
@@ -37,19 +38,20 @@ export async function POST(req: Request) {
     const path = String(b.path || '');
     if (!path.startsWith('library/') || path.includes('..')) return json({ error: 'Bad file' }, 400);
     const product = (await handoverReady()) ? libraryFields(b) : {};
-    const { data, error } = await db
-      .from('crm_library')
-      .insert({
-        name: String(b.name || '').trim().slice(0, 140) || 'Document',
-        description: String(b.description || '').trim().slice(0, 300) || null,
-        storage_path: path,
-        mime: String(b.mime || '') || null,
-        size: Number(b.size) || null,
-        created_by: s.user.id,
-        ...product,
-      })
-      .select('*')
-      .single();
+    const row: Record<string, unknown> = {
+      name: String(b.name || '').trim().slice(0, 140) || 'Document',
+      description: String(b.description || '').trim().slice(0, 300) || null,
+      storage_path: path,
+      mime: String(b.mime || '') || null,
+      size: Number(b.size) || null,
+      created_by: s.user.id,
+      ...product,
+    };
+    const category = cleanLibraryCategory(b.category);
+    // The category column comes from document-templates.sql: until it has been run, the file is saved without one.
+    let res = await db.from('crm_library').insert(category ? { ...row, category } : row).select('*').single();
+    if (res.error && category && /category/.test(res.error.message)) res = await db.from('crm_library').insert(row).select('*').single();
+    const { data, error } = res;
     if (!error && data && Object.keys(product).length) after(() => compactLibraryFile(db, String(data.id), path, (data.mime as string | null) ?? null));
     return error ? json({ error: error.message }, 500) : json({ item: data });
   }

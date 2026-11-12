@@ -240,3 +240,16 @@
 
 .dw-rail__acts .dw-rail__btn { flex-direction: column; gap: 1px; width: 52px; height: 50px; }
 .dw-rail__acts .dw-rail__btn small { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1; }
+
+/* New document: the choice, and the template library */
+.dw-choose { display: grid; gap: 10px; padding: 4px 2px 8px; }
+.dw-choice { display: grid; gap: 3px; text-align: left; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-decoration: none; cursor: pointer; }
+.dw-choice:hover { border-color: #f8bc1e; background: rgba(248, 188, 30, 0.1); }
+.dw-choice small { color: var(--muted); }
+.dw-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+.dw-cat { border: 1px solid var(--border); background: var(--surface); color: inherit; border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 0.82rem; cursor: pointer; }
+.dw-cat.is-on { border-color: #f8bc1e; background: rgba(248, 188, 30, 0.18); font-weight: 700; }
+.dw-tpls { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.dw-tpl { display: grid; gap: 6px; align-content: start; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.dw-tpl small { color: var(--muted); }
+.dw-tag { justify-self: start; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { BrandLogo } from '@/components/theme/BrandLogo';
+import { DOC_LIBRARY_CATEGORIES } from '@/lib/writeups/categories';
 import { BLOCK_LABEL, newBlock, newId, parasOf, type Block, type BlockType, type Run, type WriteupContent } from '@/lib/writeups/types';
 import { BrandIcon, FileButton } from '../../../crm/CrmUi';
 import '../../../crm/crm.css';
@@ -113,6 +114,10 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
   const [saveFor, setSaveFor] = useState<string | null>(null);
   const [saveName, setSaveName] = useState('');
   const [note, setNote] = useState('');
+  const [tplOpen, setTplOpen] = useState(false);
+  const [tplName, setTplName] = useState('');
+  const [tplCat, setTplCat] = useState('');
+  const [tplBusy, setTplBusy] = useState(false);
   const [tab, setTab] = useState<RailTab>('sections');
   const [railOpen, setRailOpen] = useState(() => {
     try {
@@ -428,6 +433,19 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
     void loadLib();
   }
 
+  async function saveAsTemplate() {
+    setTplBusy(true);
+    // Save the document first, so the template is what is on screen.
+    if (doc) await fetch(`/api/crm/writeups/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: doc.title, content: doc.content }) });
+    const r = await fetch('/api/crm/writeups/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ writeup_id: id, name: tplName, category: tplCat }) });
+    const d = await r.json().catch(() => ({}));
+    setTplBusy(false);
+    if (!r.ok) return setErr(d.error || 'Couldn’t save the template.');
+    setErr('');
+    setTplOpen(false);
+    setNote(`Saved “${tplName.trim()}” to the template library.`);
+  }
+
   async function deleteSaved(item: LibItem) {
     if (!item.id || !window.confirm(`Remove “${item.name}” from the library? Documents already using it keep their copy.`)) return;
     await fetch(`/api/crm/writeups/library/${item.id}`, { method: 'DELETE' });
@@ -570,6 +588,50 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               )}
             </div>
             {picking && <CustomerPicker onPick={(f) => void assign(f.organisation ? { organisation_id: f.id } : { enquiry_id: f.id })} />}
+          </div>
+
+          <div className="dw-panel">
+            <div className="dw-lab">Template</div>
+            {note && !tplOpen && (
+              <p className="crm-small" style={{ margin: 0 }} role="status">
+                {note}
+              </p>
+            )}
+            {tplOpen ? (
+              <>
+                <input className="crm-input" value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Template name" aria-label="Template name" autoFocus />
+                <select className="crm-input" value={tplCat} onChange={(e) => setTplCat(e.target.value)} aria-label="Template category">
+                  <option value="">No category</option>
+                  {DOC_LIBRARY_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <div className="dw-tools">
+                  <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={tplBusy || !tplName.trim()} onClick={() => void saveAsTemplate()}>
+                    {tplBusy ? 'Saving…' : 'Save template'}
+                  </button>
+                  <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setTplOpen(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="dw-tools">
+                <button
+                  type="button"
+                  className="crm-btn crm-btn--ghost crm-btn--small"
+                  onClick={() => {
+                    setTplName(doc?.title ?? '');
+                    setNote('');
+                    setTplOpen(true);
+                  }}
+                >
+                  Save as template
+                </button>
+              </div>
+            )}
           </div>
 
           {admin && (

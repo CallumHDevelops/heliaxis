@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, DOCS_BUCKET, isUuid, json, signedDoc } from '@/lib/crm/server';
 import { libraryFields } from '@/lib/handover/library';
+import { cleanLibraryCategory } from '@/lib/writeups/categories';
 import { handoverReady } from '@/lib/handover/server';
 
 export const dynamic = 'force-dynamic';
@@ -32,8 +33,16 @@ export async function PATCH(req: Request, { params }: Ctx) {
     Object.assign(u, libraryFields(b));
     if ('archived' in b) u.archived_at = b.archived === true ? new Date().toISOString() : null;
   }
-  const { error } = await createAdminClient().from('crm_library').update(u).eq('id', id);
-  return error ? json({ error: error.message }, 500) : json({ ok: true });
+  const db = createAdminClient();
+  if (Object.keys(u).length) {
+    const { error } = await db.from('crm_library').update(u).eq('id', id);
+    if (error) return json({ error: error.message }, 500);
+  }
+  if ('category' in b) {
+    const { error } = await db.from('crm_library').update({ category: cleanLibraryCategory(b.category) }).eq('id', id);
+    if (error) return json({ error: /category/.test(error.message) ? 'Run supabase/document-templates.sql in Supabase first, then try again.' : error.message }, 500);
+  }
+  return json({ ok: true });
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {

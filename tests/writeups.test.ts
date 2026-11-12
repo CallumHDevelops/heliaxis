@@ -104,3 +104,20 @@ describe('video element', () => {
     expect((await writeupDocx(facts)).length).toBeGreaterThan(1000);
   });
 });
+
+describe('document templates and categories', () => {
+  it('makes the installer claim of compliance from its key, with fresh content', async () => {
+    const { contentFromStandard, standardTemplates } = await import('@/lib/writeups/templates');
+    const t = contentFromStandard('installer-claim-of-compliance');
+    expect(t?.title).toBe('Installers Claim of Compliance');
+    expect(t?.content.blocks.some((b) => b.type === 'text' && /PAS ?2035/.test(b.body))).toBe(true);
+    expect(contentFromStandard('nope')).toBeNull();
+    for (const s of standardTemplates()) expect(s.blocks.length, s.key).toBeGreaterThan(0);
+  });
+  it('accepts only categories on the list', async () => {
+    const { cleanLibraryCategory } = await import('@/lib/writeups/categories');
+    expect(cleanLibraryCategory('Compliance')).toBe('Compliance');
+    expect(cleanLibraryCategory('made up')).toBeNull();
+    expect(cleanLibraryCategory('')).toBeNull();
+  });
+});
