@@ -130,3 +130,15 @@ describe('the signature element', () => {
     expect(newBlock('signature')).toMatchObject({ type: 'signature', lines: ['Signature', 'Date'] });
   });
 });
+
+describe('the document date', () => {
+  it('keeps a valid date and drops anything else', () => {
+    expect(cleanContent({ blocks: [], date: '2026-10-01' }).date).toBe('2026-10-01');
+    expect(cleanContent({ blocks: [], date: 'yesterday' }).date).toBeUndefined();
+    expect(cleanContent({ blocks: [] }).date).toBeUndefined();
+  });
+  it('prints in the PDF header', async () => {
+    const f = { ...facts([]), issued: '2026-10-01' };
+    expect((await writeupPdf(f)).length).toBeGreaterThan(1000);
+  });
+});

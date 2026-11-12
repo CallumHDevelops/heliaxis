@@ -18,7 +18,7 @@ export type BreakBlock = { id: string; type: 'break' };
 export type Block = TextBlock | SectionBlock | TitleBlock | ImageBlock | TableBlock | QuoteBlock | VideoBlock | SignatureBlock | BreakBlock;
 export type BlockType = Block['type'];
 
-export type WriteupContent = { blocks: Block[]; /** Words under the title on the first page ("Tender for …"). */ subtitle: string };
+export type WriteupContent = { blocks: Block[]; /** Words under the title on the first page ("Tender for …"). */ subtitle: string; /** The date printed in the header, YYYY-MM-DD. Empty or missing: the day the document is made or opened. */ date?: string };
 
 export const BLOCK_LABEL: Record<BlockType, string> = {
   section: 'Section',
@@ -113,7 +113,8 @@ export function cleanContent(v: unknown): WriteupContent {
         break;
     }
   }
-  return { blocks, subtitle: s(raw.subtitle, LIMITS.heading).replace(/\n/g, ' ') };
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String((raw as { date?: unknown }).date ?? '')) ? String((raw as { date?: unknown }).date) : '';
+  return { blocks, subtitle: s(raw.subtitle, LIMITS.heading).replace(/\n/g, ' '), ...(date ? { date } : {}) };
 }
 
 /* ── Text: a little formatting, written plainly ─────────────────────────────────────────────── */

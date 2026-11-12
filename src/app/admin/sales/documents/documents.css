@@ -261,3 +261,9 @@
 .dw-sigline span, .dw-sigline input { font: inherit; font-size: 0.78rem; color: var(--muted); background: none; border: 0; padding: 4px 0 2px; min-width: 0; }
 .dw-sigline input { border-top: 1px dashed var(--border); color: inherit; }
 .dw-sigline .crm-link { justify-self: start; font-size: 0.75rem; }
+
+/* Editable date in the page header */
+.dw-ph-date { position: relative; display: inline-block; cursor: pointer; border-bottom: 1px dashed rgba(255, 253, 248, 0.5); }
+.dw-ph-date:hover { background: rgba(255, 255, 255, 0.1); }
+.dw-ph-date input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.dw-ph-today { margin-left: 10px; background: none; border: 0; padding: 0; color: #f8bc1e; font: inherit; font-size: 0.8em; cursor: pointer; text-decoration: underline; }

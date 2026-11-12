@@ -827,7 +827,16 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
               <div className="dw-ph-top">
                 <BrandLogo width={110} />
                 <span className="dw-ph-meta">
-                  {doc.number} · {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {doc.number} ·{' '}
+                  <label className="dw-ph-date" title="Change the date printed on the document">
+                    <span>{(doc.content.date ? new Date(`${doc.content.date}T12:00:00`) : new Date()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    <input type="date" value={doc.content.date || new Date().toLocaleDateString('en-CA')} onChange={(e) => edit((d) => ({ ...d, content: { ...d.content, date: e.target.value } }), true)} aria-label="Document date" onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* the browser opens its own */ } }} />
+                  </label>
+                  {doc.content.date && (
+                    <button type="button" className="dw-ph-today" onClick={() => edit((d) => ({ ...d, content: { ...d.content, date: '' } }), true)}>
+                      Use today
+                    </button>
+                  )}
                 </span>
               </div>
               <EditableLine className="dw-h-doc" value={doc.title} placeholder="Document title" onChange={(v) => edit((d) => ({ ...d, title: v }), true)} />
