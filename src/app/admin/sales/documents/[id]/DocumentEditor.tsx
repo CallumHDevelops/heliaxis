@@ -70,10 +70,10 @@ const PALETTE: { label: string; hint: string; type: BlockType; side?: 'left' | '
   { label: 'Picture wide', hint: 'A wide picture', type: 'image', side: 'full', icon: 'el-picf' },
   { label: 'Table', hint: 'You fill it in', type: 'table', icon: 'el-table' },
   { label: 'Quote table', hint: 'From the customer’s quote', type: 'quote', icon: 'el-quote' },
+  { label: 'Signature', hint: 'Signature lines to sign on the printed page', type: 'signature', icon: 'el-sign' },
   { label: 'Video left', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'left', icon: 'el-vidl' },
   { label: 'Video right', hint: 'Video picture with a QR code to watch it', type: 'video', side: 'right', icon: 'el-vidr' },
   { label: 'Video wide', hint: 'A wide video picture, QR code beneath', type: 'video', side: 'full', icon: 'el-vidf' },
-  { label: 'Signature', hint: 'Signature lines to sign on the printed page', type: 'signature', icon: 'el-sign' },
   { label: 'Page break', hint: 'Start a new page', type: 'break', icon: 'el-break' },
 ];
 
@@ -749,7 +749,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
             <div className="dw-tools-list">
               {PALETTE.map((p, i) => (
                 <Fragment key={p.label}>
-                  {[1, 3, 6, 8, 11].includes(i) && <hr className="dw-tools-sep" />}
+                  {[1, 3, 6, 9, 12].includes(i) && <hr className="dw-tools-sep" />}
                   <button type="button" className="dw-toolrow" draggable onDragStart={startDrag({ kind: 'new', type: p.type, side: p.side })} onClick={() => addBlock(p.type, p.side)} title={`${p.hint}. Click to add it, or drag it into a section.`}>
                     <BrandIcon k={p.icon} size={24} />
                     <span>{p.label}</span>
