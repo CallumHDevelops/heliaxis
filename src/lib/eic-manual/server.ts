@@ -33,9 +33,12 @@ export type EicRow = {
   sigs: SigStore;
   status: 'draft' | 'issued';
   issued_on: string | null;
+  request: InfoRequest | null;
   created_at: string;
   updated_at: string;
 };
+/** Information asked of an installer: they fill the certificate in at a personal link (/eic/fill/<token>) and send it back. */
+export type InfoRequest = { token: string; name: string; email: string; message: string; sent_at: string; submitted_at: string | null };
 export const ROUTES = ['eic', 'eic_single'] as const;
 export const SIG_KEYS = ['eic_sig_con', 'eic_sig_ins', 'eic_sig_one', 'eic_design'] as const;
 /** Keys a record's answers may have: the certificate's (eic_…), nothing else. */
@@ -135,6 +138,7 @@ export type EicView = {
   /** The three-part certificate also needs the design part signed. */
   designNeeded: boolean;
   design: DesignSign | null;
+  request: Omit<InfoRequest, 'token'> | null;
 };
 
 const propView = (p: Prop): PropView => ({ k: p.k, col: p.col, label: p.label, head: p.head, type: p.type, unit: p.unit, dp: p.dp, chips: p.chips, picks: p.picks, options: p.options, gt: p.gt, level: p.level, test: p.test, group: p.group, hint: p.hint });
@@ -228,21 +232,23 @@ export async function viewOf(db: Db, row: EicRow, who: Who): Promise<EicView> {
     complete: miss.length === 0 && (!designNeeded || (!!design && !!row.sigs.eic_design)),
     designNeeded,
     design,
+    request: row.request ? { name: row.request.name, email: row.request.email, message: row.request.message, sent_at: row.request.sent_at, submitted_at: row.request.submitted_at } : null,
   };
 }
 
 /* ── Changing a record ────────────────────────────────────────────────────────── */
 
 /** { set: { key: value }, unset: [key] } applied to the answers: only the certificate's keys, each at most 4 kB. */
-export function applyAnswers(answers: Answers, set: unknown, unset: unknown): Answers {
+export function applyAnswers(answers: Answers, set: unknown, unset: unknown, opt: { design?: boolean } = { design: true }): Answers {
   const next: Answers = { ...answers };
   const at = new Date().toISOString();
   for (const [k, v] of Object.entries(set && typeof set === 'object' ? (set as Record<string, unknown>) : {})) {
-    if (!KEY.test(k) && k !== 'eic_design') continue;
+    if (!KEY.test(k) && !(opt.design && k === 'eic_design')) continue;
+    if (k === 'eic_design' && !opt.design) continue;
     if (v === undefined || JSON.stringify(v ?? null).length > 4000) continue;
     next[k] = { v, src: 'typed', at } satisfies Answer;
   }
-  for (const k of Array.isArray(unset) ? unset : []) if (typeof k === 'string' && (KEY.test(k) || k === 'eic_design')) delete next[k];
+  for (const k of Array.isArray(unset) ? unset : []) if (typeof k === 'string' && (KEY.test(k) || (opt.design && k === 'eic_design'))) delete next[k];
   return next;
 }
 

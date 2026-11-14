@@ -44,6 +44,9 @@ const nextConfig: NextConfig = {
       // Survey booking links (/book/<token>) are personal. Not /book-a-survey, the public form.
       { source: '/book/:path*', headers: sensitiveHeaders },
       { source: '/api/book/:path*', headers: sensitiveHeaders },
+      // An installer's personal link to fill in a certificate (/eic/fill/<token>).
+      { source: '/eic/fill/:path*', headers: sensitiveHeaders },
+      { source: '/api/eic/:path*', headers: sensitiveHeaders },
       { source: '/api/rams/:path*', headers: sensitiveHeaders },
       { source: '/api/admin/:path*', headers: sensitiveHeaders },
       { source: '/reset-password', headers: sensitiveHeaders },

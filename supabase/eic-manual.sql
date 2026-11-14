@@ -23,3 +23,7 @@ create index if not exists eic_manual_enquiry_idx on public.eic_manual (enquiry_
 create index if not exists eic_manual_project_idx on public.eic_manual (project_id) where project_id is not null;
 create index if not exists eic_manual_updated_idx on public.eic_manual (updated_at desc);
 alter table public.eic_manual enable row level security;
+
+-- Request information: the certificate sent to an installer to fill in by a personal link. { token, name, email, message, sent_at, submitted_at }
+alter table public.eic_manual add column if not exists request jsonb;
+create unique index if not exists eic_manual_request_token_idx on public.eic_manual ((request->>'token')) where request is not null;

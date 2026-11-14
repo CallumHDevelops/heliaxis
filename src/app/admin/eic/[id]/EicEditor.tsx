@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AssignPicker, type Picked } from '@/components/admin/AssignPicker';
+import { Sheet } from '../../crm/CrmUi';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { boardKey, circuitKey, INSTRUMENTS } from '@/lib/site/forms/electrician/eic-model';
 import type { EicView, FieldView } from '@/lib/eic-manual/server';
@@ -11,6 +12,7 @@ import '../../crm/crm.css';
 import { EicBoards } from '../Boards';
 import { choicesOf, Control } from '../Controls';
 import '../eic-manual.css';
+import '../../../../components/admin/assign-picker.css';
 
 type Patch = { set?: Record<string, unknown>; unset?: string[]; [k: string]: unknown };
 
@@ -18,14 +20,17 @@ type Patch = { set?: Record<string, unknown>; unset?: string[]; [k: string]: unk
  * One EIC certificate, made by hand: the certificate's own questions in the model form's order, the boards and circuits, the signatures, and
  * the PDF. Everything is saved a moment after it is typed; what is still needed is listed, and it can't be issued until nothing is.
  */
-export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
+export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /** An installer's personal link: the same form, with the office's parts left out. */ token?: string }) {
   const router = useRouter();
+  const installer = !!token;
+  const base = token ? `/api/eic/fill/${token}` : `/api/crm/eic/${id}`;
   const [view, setView] = useState<EicView | null>(null);
   const [err, setErr] = useState('');
   const [step, setStep] = useState('');
   const [saving, setSaving] = useState<'' | 'saving' | 'saved'>('');
   const [busy, setBusy] = useState('');
   const [picking, setPicking] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [local, setLocal] = useState<Record<string, unknown>>({});
   // One question at a time (the default) or the whole list.
   const [guided, setGuided] = useState(() => {
@@ -48,17 +53,17 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
     setStep((s) => (s && d.steps.some((x) => x.key === s) ? s : d.steps[0]?.key ?? ''));
   }, []);
   useEffect(() => {
-    void fetch(`/api/crm/eic/${id}`, { cache: 'no-store' })
+    void fetch(`${base}`, { cache: 'no-store' })
       .then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) }))
       .then(({ ok, d }) => (ok ? take(d as EicView) : setErr(d.error || 'Couldn’t open the certificate.')));
-  }, [id, take]);
+  }, [base, take]);
 
   /** One request after another, so two quick edits never arrive out of order. */
   const patch = useCallback(
     (body: Patch): Promise<boolean> => {
       const run = chain.current.then(async () => {
         setSaving('saving');
-        const r = await fetch(`/api/crm/eic/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+        const r = await fetch(`${base}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
         const d = r ? await r.json().catch(() => ({})) : {};
         if (!r || !r.ok) {
           setSaving('');
@@ -75,7 +80,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
       chain.current = run.catch(() => null);
       return run;
     },
-    [id, take]
+    [base, take]
   );
   const flush = useCallback(async () => {
     clearTimeout(timer.current);
@@ -183,7 +188,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
   const valueOf = (f: FieldView) => (f.key in local ? local[f.key] : f.value);
 
   async function post(path: string, body: unknown) {
-    const r = await fetch(`/api/crm/eic/${id}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(`${base}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || 'That didn’t work.');
     take(d as EicView);
@@ -203,7 +208,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
   const sign = (slot: string, dataUrl: string) => act('sign', () => post('sign', { slot, dataUrl }));
   const unsign = (slot: string) =>
     act('sign', async () => {
-      const r = await fetch(`/api/crm/eic/${id}/sign?slot=${slot}`, { method: 'DELETE' });
+      const r = await fetch(`${base}/sign?slot=${slot}`, { method: 'DELETE' });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Couldn’t take it off.');
       take(d as EicView);
@@ -211,14 +216,14 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
   const pick = (f: Picked) => void patch({ enquiry_id: f.enquiry_id, project_id: f.project_id }).then(() => setPicking(false));
   async function remove() {
     if (!view || !window.confirm(`Delete ${view.number}? This can’t be undone.`)) return;
-    const r = await fetch(`/api/crm/eic/${id}`, { method: 'DELETE' });
+    const r = await fetch(`${base}`, { method: 'DELETE' });
     if (r.ok) router.push('/admin/eic');
     else setErr((await r.json().catch(() => ({}))).error || 'Couldn’t delete it.');
   }
 
   if (!view) return <div className="em-page">{err ? <p className="crm-banner crm-banner--err">{err}</p> : <p className="crm-muted">Opening…</p>}</div>;
   const cur = view.steps.find((s) => s.key === step) ?? view.steps[0];
-  const stillNeeded = view.missing.length + (view.designNeeded && !view.sigs.eic_design ? 1 : 0);
+  const stillNeeded = view.missing.length + (view.designNeeded && !installer && !view.sigs.eic_design ? 1 : 0);
 
   const sigBox = (slot: string, label: string) => (
     <div className="em-sig">
@@ -301,7 +306,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
     // A one-tap answer goes straight on.
     if (v !== undefined && (choicesOf(f) || (f.type === 'CONFIRM' && v === true))) setTimeout(() => void move(1, f.key), 220);
   };
-  const forLine = [view.customer?.name, view.project ? `${view.project.ref ? `${view.project.ref} · ` : ''}${view.project.title ?? ''}` : null].filter(Boolean).join(' · ');
+  const forLine = installer ? view.address : [view.customer?.name, view.project ? `${view.project.ref ? `${view.project.ref} · ` : ''}${view.project.title ?? ''}` : null].filter(Boolean).join(' · ');
   let guide: React.ReactNode = null;
   if (guided) {
     if (finished || !q) {
@@ -310,12 +315,12 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
           <div className="em-guide__bar"><i style={{ width: '100%' }} /></div>
           <h2 className="em-guide__q">{view.complete ? 'That’s everything.' : 'That’s every question.'}</h2>
           {view.complete ? (
-            <p className="em-guide__hint">Nothing is still needed. Preview the certificate, then issue it.</p>
+            <p className="em-guide__hint">{installer ? 'Everything is answered. Press Send to Heliaxis and we’ll be told.' : 'Nothing is still needed. Preview the certificate, then issue it.'}</p>
           ) : (
             <>
               <p className="em-guide__hint">A few things are still needed before it can be issued. Click one to go to it.</p>
               <div className="em-guide__miss">
-                {view.designNeeded && !view.sigs.eic_design && <p className="em-miss">Design part: signature (the Sign step)</p>}
+                {view.designNeeded && !installer && !view.sigs.eic_design && <p className="em-miss">Design part: signature (the Sign step)</p>}
                 {view.missing.slice(0, 20).map((m, i) => (
                   <button key={i} type="button" className="em-miss" onClick={() => { const t = flat.find((x) => x.s.key === m.step); if (t) { setFinished(false); setCurKey(t.f.key); } }}>
                     <b>{m.label}</b>
@@ -329,9 +334,17 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
             <button type="button" className="crm-btn crm-btn--ghost" onClick={() => { setFinished(false); setCurKey(flat[flat.length - 1]?.f.key ?? ''); }}>
               ← Back to the questions
             </button>
-            <a className="crm-btn crm-btn--ghost" href={`/api/crm/eic/${id}/pdf?inline=1`} target="_blank" rel="noreferrer" onClick={() => void flush()}>
-              Preview PDF
-            </a>
+            {installer ? (
+              view.status === 'draft' && (
+                <button type="button" className="crm-btn crm-btn--solar" disabled={busy === 'submit' || !!view.request?.submitted_at || !!view.missing.length} onClick={() => void act('submit', () => post('submit', {}))}>
+                  {view.request?.submitted_at ? 'Sent to Heliaxis. Thank you.' : busy === 'submit' ? 'Sending…' : 'Send to Heliaxis'}
+                </button>
+              )
+            ) : (
+              <a className="crm-btn crm-btn--ghost" href={`${base}/pdf?inline=1`} target="_blank" rel="noreferrer" onClick={() => void flush()}>
+                Preview PDF
+              </a>
+            )}
             <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setMode(false)}>
               See all answers
             </button>
@@ -393,14 +406,21 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
   return (
     <div className="em-page">
       <div className="em-top">
-        <Link href="/admin/eic" className="em-back">
-          ← EIC certificates
-        </Link>
+        {!installer && (
+          <Link href="/admin/eic" className="em-back">
+            ← EIC certificates
+          </Link>
+        )}
         <h1>
           {view.number}
           {view.title ? ` · ${view.title}` : ''}
         </h1>
         <span className={`em-status em-status--${view.status}`}>{view.status === 'issued' ? `Issued ${view.issued_on ?? ''}` : 'Draft'}</span>
+        {!installer && view.request && (
+          <span className={`em-status ${view.request.submitted_at ? 'em-status--issued' : 'em-status--draft'}`} title={view.request.email}>
+            {view.request.submitted_at ? `${view.request.name} has filled it in` : `Asked ${view.request.name}`}
+          </span>
+        )}
         <span className="em-grow" />
         <span className="em-saved" role="status">
           {saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : ''}
@@ -408,13 +428,28 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setMode(!guided)}>
           {guided ? 'See all questions' : 'One question at a time'}
         </button>
-        <a className="crm-btn crm-btn--ghost crm-btn--small" href={`/api/crm/eic/${id}/pdf?inline=1`} target="_blank" rel="noreferrer" onClick={() => void flush()}>
-          Preview PDF
-        </a>
-        <a className="crm-btn crm-btn--ghost crm-btn--small" href={`/api/crm/eic/${id}/pdf`}>
-          Download PDF
-        </a>
-        {view.status === 'draft' ? (
+        {!installer && (
+          <>
+            <a className="crm-btn crm-btn--ghost crm-btn--small" href={`${base}/pdf?inline=1`} target="_blank" rel="noreferrer" onClick={() => void flush()}>
+              Preview PDF
+            </a>
+            <a className="crm-btn crm-btn--ghost crm-btn--small" href={`${base}/pdf`}>
+              Download PDF
+            </a>
+            {view.status === 'draft' && (
+              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setAsking(true)}>
+                {view.request ? 'Request again' : 'Request information'}
+              </button>
+            )}
+          </>
+        )}
+        {installer ? (
+          view.status === 'draft' && (
+            <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={busy === 'submit' || !!view.request?.submitted_at} onClick={() => void act('submit', () => post('submit', {}))}>
+              {view.request?.submitted_at ? 'Sent to Heliaxis' : busy === 'submit' ? 'Sending…' : 'Send to Heliaxis'}
+            </button>
+          )
+        ) : view.status === 'draft' ? (
           <button
             type="button"
             className="crm-btn crm-btn--solar crm-btn--small"
@@ -431,11 +466,23 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
         )}
       </div>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      {asking && (
+        <RequestSheet
+          id={id}
+          current={view.request}
+          onClose={() => setAsking(false)}
+          onSent={(d) => {
+            take(d);
+            setAsking(false);
+          }}
+        />
+      )}
 
       {guide}
       {!guided && (
       <div className="em-split">
         <aside className="em-side">
+          {!installer && (
           <div className="em-card">
             <div className="em-lab">Assigned to</div>
             <div className="em-who">
@@ -469,6 +516,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
             </label>
             <input id="em-addr" className="crm-input" disabled={locked} defaultValue={view.address} key={view.address} placeholder="Taken from the job if there is one" onBlur={(e) => e.target.value.trim() !== view.address && void patch({ address: e.target.value })} />
           </div>
+          )}
 
           <nav className="em-steps" aria-label="Certificate sections">
             {view.steps.map((s) => (
@@ -481,7 +529,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
 
           <div className="em-card">
             <div className="em-lab">{view.complete ? 'Ready to issue' : `Still needed (${stillNeeded})`}</div>
-            {view.designNeeded && !view.sigs.eic_design && <p className="em-miss">Design part: signature</p>}
+            {view.designNeeded && !installer && !view.sigs.eic_design && <p className="em-miss">Design part: signature</p>}
             {view.missing.slice(0, 12).map((m, i) => (
               <button key={i} type="button" className="em-miss" onClick={() => setStep(m.step)}>
                 <b>{m.label}</b>
@@ -496,7 +544,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
               </p>
             ))}
           </div>
-          {admin && (
+          {admin && !installer && (
             <button type="button" className="crm-link" onClick={() => void remove()}>
               Delete this certificate
             </button>
@@ -529,7 +577,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
                   );
                 })}
               </div>
-              {cur.key === 'eic-sign' && view.designNeeded && (
+              {cur.key === 'eic-sign' && view.designNeeded && !installer && (
                 <section className="em-design">
                   <h3>The design part (Section B and D)</h3>
                   <p className="em-intro">The designer signs for the design, and sets the next inspection. Whoever designed it fills this in.</p>
@@ -580,3 +628,108 @@ function SignPad({ onSave, busy }: { onSave: (dataUrl: string) => void; busy: bo
   );
 }
 
+
+type Person = { contact_id: string; name: string; company: string | null; email: string | null; mobile: string | null; label: string };
+
+/** Request information: pick the installer (or type who and their email), say anything they should know, and it is emailed to them. */
+function RequestSheet({ id, current, onClose, onSent }: { id: string; current: EicView['request']; onClose: () => void; onSent: (v: EicView) => void }) {
+  const [q, setQ] = useState('');
+  const [people, setPeople] = useState<Person[]>([]);
+  const [name, setName] = useState(current?.name ?? '');
+  const [email, setEmail] = useState(current?.email ?? '');
+  const [message, setMessage] = useState(current?.message ?? '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const t = q.trim();
+  useEffect(() => {
+    const ctl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/crm/site-contacts?trade=electrician&q=${encodeURIComponent(t)}`, { cache: 'no-store', signal: ctl.signal });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok) setPeople(((d.people ?? []) as Person[]).slice(0, 8));
+      } catch {
+        // Still typing.
+      }
+    }, t ? 250 : 0);
+    return () => {
+      clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [t]);
+  async function send() {
+    setBusy(true);
+    setErr('');
+    const r = await fetch(`/api/crm/eic/${id}/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, message }) }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!r || !r.ok) return setErr(d.error || 'Couldn’t send it. Try again.');
+    onSent(d as EicView);
+  }
+  async function withdraw() {
+    setWithdrawing(true);
+    const r = await fetch(`/api/crm/eic/${id}/request`, { method: 'DELETE' }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    setWithdrawing(false);
+    if (r?.ok) onSent(d as EicView);
+    else setErr(d.error || 'Couldn’t withdraw it.');
+  }
+  return (
+    <Sheet title="Request information" onClose={onClose}>
+      <div className="em-new">
+        {current && (
+          <p className="crm-banner">
+            {current.submitted_at ? `${current.name} sent this back on ${new Date(current.submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Europe/London' })}.` : `Asked ${current.name} (${current.email}) on ${new Date(current.sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Europe/London' })}. Nothing back yet.`}{' '}
+            Sending again uses the same link, and what they have entered is kept.
+          </p>
+        )}
+        <div className="em-lab">Who should fill it in?</div>
+        <input className="crm-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search installers by name or company" aria-label="Search installers" />
+        {people.length > 0 && (
+          <ul className="dw-pick">
+            {people.map((p) => (
+              <li key={p.contact_id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setName(p.name);
+                    setEmail(p.email ?? '');
+                    setQ('');
+                  }}
+                >
+                  <b>{p.name}</b>
+                  <small>{[p.company, p.email ?? 'No email on file', p.mobile].filter(Boolean).join(' · ')}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="em-props">
+          <div className="em-prop">
+            <label htmlFor="rq-name">Name</label>
+            <input id="rq-name" className="crm-input" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="em-prop">
+            <label htmlFor="rq-email">Email</label>
+            <input id="rq-email" className="crm-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+        </div>
+        <div className="em-lab">A note for them (optional)</div>
+        <textarea className="crm-input" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Anything they should know, e.g. which circuits to include" />
+        <small className="crm-muted">They get an email with a personal link: the same questions, one at a time, with nothing to log in to. When they press Send to Heliaxis you’re told, and you check it and issue it.</small>
+        {err && <p className="crm-banner crm-banner--err">{err}</p>}
+        <div className="crm-actions">
+          <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !name.trim() || !email.trim()} onClick={() => void send()}>
+            {busy ? 'Sending…' : current ? 'Send the email again' : 'Send the email'}
+          </button>
+          {current && (
+            <button type="button" className="crm-btn crm-btn--ghost" disabled={withdrawing} onClick={() => void withdraw()}>
+              {withdrawing ? 'Withdrawing…' : 'Withdraw the request'}
+            </button>
+          )}
+        </div>
+      </div>
+    </Sheet>
+  );
+}

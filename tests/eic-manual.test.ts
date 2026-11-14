@@ -13,7 +13,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwA
 
 const row = (over: Partial<EicRow> = {}): EicRow => ({
   id: '11111111-1111-4111-8111-111111111111', number: 'EIC-0001', route: 'eic_single', title: '', enquiry_id: null, project_id: null, address: '9 Test Street, Newport, NP19 7AZ',
-  answers: {}, sigs: {}, status: 'draft', issued_on: null, created_at: '', updated_at: '', ...over,
+  answers: {}, sigs: {}, status: 'draft', issued_on: null, request: null, created_at: '', updated_at: '', ...over,
 });
 
 const sample = (f: { type: string; options?: { key: string }[]; chips?: number[] }): unknown => {
@@ -106,5 +106,20 @@ describe('manual EIC', () => {
     const full = { ...done, answers, sigs: { ...sigs, eic_design: { png: PNG, at: '2026-11-14T10:00:00Z' } } };
     expect((await viewOf(db, full, who)).complete).toBe(true);
     expect((await makePdf(db, full, who)).final).toBe(true);
+  });
+});
+
+describe('requesting information from an installer', () => {
+  it('an installer can never write the office’s design part', () => {
+    const body = { eic_design: { name: 'X', path: 'p' }, eic_earthing: 'tt' };
+    expect(Object.keys(applyAnswers({}, body, [], { design: false }))).toEqual(['eic_earthing']);
+    expect(Object.keys(applyAnswers({}, body, []))).toEqual(['eic_design', 'eic_earthing']);
+  });
+  it('makes unguessable links of the right shape', async () => {
+    const { newToken, TOKEN } = await import('@/lib/eic-manual/request');
+    const a = newToken();
+    expect(a).toMatch(TOKEN);
+    expect(a).not.toBe(newToken());
+    expect(TOKEN.test('short')).toBe(false);
   });
 });

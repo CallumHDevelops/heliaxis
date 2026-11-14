@@ -143,3 +143,9 @@
 .em-guide__nav kbd { font-family: inherit; font-size: 0.8rem; opacity: 0.7; margin-left: 6px; }
 .em-guide__miss { display: grid; gap: 8px; }
 @media (max-width: 700px) { .em-guide { padding: 18px 16px 22px; } .em-guide__q { font-size: 1.3rem; } }
+
+/* The installer's page (/eic/fill/<token>): no menu, just the form. */
+.em-public { min-height: 100vh; background: var(--bg); padding: 0 14px 40px; }
+.em-public__head { max-width: 1500px; margin: 0 auto; display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 2px solid #f8bc1e; }
+.em-public__head span { font-family: var(--font-mono, monospace); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.em-public .em-page { padding-top: 14px; }
