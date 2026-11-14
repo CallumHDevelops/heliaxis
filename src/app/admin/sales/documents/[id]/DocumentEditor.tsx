@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { AssignPicker, type Picked } from '@/components/admin/AssignPicker';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import { DOC_LIBRARY_CATEGORIES } from '@/lib/writeups/categories';
 import { BLOCK_LABEL, newBlock, newId, parasOf, type Block, type BlockType, type Run, type WriteupContent } from '@/lib/writeups/types';
@@ -14,7 +15,6 @@ import '../documents.css';
 type Who = { kind: 'customer' | 'organisation' | null; id: string | null; name: string; address: string; ref: string | null };
 type QuoteOpt = { id: string; number: string; title: string; status: string };
 type Doc = { id: string; number: string; title: string; enquiry_id: string | null; organisation_id: string | null; project_id: string | null; content: WriteupContent };
-type Found = { id: string; name: string; postcode: string | null; phone: string | null; customer_ref: string | null; organisation?: boolean; contact?: boolean };
 type QuoteTable = { number: string; title: string; headers: string[]; rows: string[][]; totals: [string, string][] };
 type Drag = { kind: 'move'; id: string } | { kind: 'new'; type: BlockType; side?: 'left' | 'right' | 'full' } | { kind: 'lib'; blocks: Block[] } | { kind: 'group'; id: string } | null;
 type LibItem = { id?: string; key?: string; name: string; note?: string; blocks: Block[] };
@@ -103,6 +103,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
   const router = useRouter();
   const [doc, setDoc] = useState<Doc | null>(null);
   const [who, setWho] = useState<Who | null>(null);
+  const [job, setJob] = useState<{ id: string; ref: string | null; title: string | null } | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [quotes, setQuotes] = useState<QuoteOpt[]>([]);
   const [qtables, setQtables] = useState<Record<string, QuoteTable>>({});
@@ -173,6 +174,7 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
     future.current = [];
     setDoc(d.document as Doc);
     setWho(d.who as Who);
+    setJob((d.project as typeof job) ?? null);
     setUrls(d.urls ?? {});
     setQuotes(d.quotes ?? []);
   }, [id]);
@@ -455,17 +457,20 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
     void loadLib();
   }
 
-  async function assign(p: { enquiry_id?: string | null; organisation_id?: string | null }) {
-    edit((d) => ({ ...d, enquiry_id: p.enquiry_id ?? null, organisation_id: p.organisation_id ?? null, project_id: null }));
+  /** Attach it to a customer, a job (which brings its customer), or an organisation; or take one off. Only what is given changes. */
+  async function assign(p: { enquiry_id?: string | null; project_id?: string | null; organisation_id?: string | null }) {
+    edit((d) => ({ ...d, ...p }));
     setPicking(false);
-    await fetch(`/api/crm/writeups/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enquiry_id: p.enquiry_id ?? null, organisation_id: p.organisation_id ?? null, project_id: null }) });
+    await fetch(`/api/crm/writeups/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
     const r = await fetch(`/api/crm/writeups/${id}`, { cache: 'no-store' });
     const d = await r.json().catch(() => ({}));
     if (r.ok) {
       setWho(d.who as Who);
+      setJob((d.project as typeof job) ?? null);
       setQuotes(d.quotes ?? []);
     }
   }
+  const pick = (f: Picked) => void assign({ enquiry_id: f.enquiry_id, project_id: f.project_id, organisation_id: f.organisation_id });
 
   async function upload(bid: string, files: File[]) {
     setErr('');
@@ -567,30 +572,34 @@ export function DocumentEditor({ id, admin }: { id: string; admin: boolean }) {
                 <>
           <div className="dw-panel">
             <div className="dw-lab">Assigned to</div>
-            {who?.name ? (
-              <div className="dw-who">
-                <b>{who.name}</b>
-                <small>
-                  {who.kind === 'organisation' ? 'Organisation' : 'Customer'}
-                  {who.ref ? ` · ${who.ref}` : ''}
-                </small>
-              </div>
-            ) : (
-              <p className="crm-muted crm-small" style={{ margin: 0 }}>
-                Not assigned yet. Their name and address print on the first page.
-              </p>
-            )}
+            <div className="dw-who">
+              <small>{who?.kind === 'organisation' ? 'Organisation' : 'Customer'}</small>
+              <b>{who?.name || 'Nobody yet'}</b>
+              {who?.ref && <small>{who.ref}</small>}
+            </div>
+            <div className="dw-who">
+              <small>Job</small>
+              <b>{job ? `${job.ref ? `${job.ref} · ` : ''}${job.title ?? ''}` : 'No job'}</b>
+            </div>
+            <p className="crm-muted crm-small" style={{ margin: 0 }}>
+              Assigned to a job, it appears in that job’s Docs. Their name and address print on the first page.
+            </p>
             <div className="dw-tools">
-              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setPicking((p) => !p)}>
-                {who?.name ? 'Change' : 'Assign to a customer'}
+              <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setPicking((x) => !x)}>
+                {who?.name || job ? 'Change customer or job' : 'Assign to a customer or job'}
               </button>
-              {who?.name && (
-                <button type="button" className="crm-link" onClick={() => void assign({})}>
-                  Clear
+              {job && (
+                <button type="button" className="crm-link" onClick={() => void assign({ project_id: null })}>
+                  Clear job
+                </button>
+              )}
+              {(who?.name || job) && (
+                <button type="button" className="crm-link" onClick={() => void assign({ enquiry_id: null, organisation_id: null, project_id: null })}>
+                  Clear all
                 </button>
               )}
             </div>
-            {picking && <CustomerPicker onPick={(f) => void assign(f.organisation ? { organisation_id: f.id } : { enquiry_id: f.id })} />}
+            {picking && <AssignPicker orgs onPick={pick} />}
           </div>
 
           <div className="dw-panel">
@@ -1444,49 +1453,6 @@ function PageTable({ b, selected, patch }: { b: Extract<Block, { type: 'table' }
   );
 }
 
-function CustomerPicker({ onPick }: { onPick: (f: Found) => void }) {
-  const [q, setQ] = useState('');
-  const [found, setFound] = useState<{ q: string; rows: Found[] }>({ q: '', rows: [] });
-  const t = q.trim();
-  useEffect(() => {
-    if (t.length < 2) return;
-    const ctl = new AbortController();
-    const timer = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/crm/customers?contacts=1&q=${encodeURIComponent(t)}`, { cache: 'no-store', signal: ctl.signal });
-        const d = await r.json().catch(() => ({}));
-        // A person under Contacts has no customer record yet, so only customers and organisations can be picked.
-        if (r.ok) setFound({ q: t, rows: ((d.customers ?? []) as Found[]).filter((c) => !c.contact) });
-      } catch {
-        // Still typing.
-      }
-    }, 250);
-    return () => {
-      clearTimeout(timer);
-      ctl.abort();
-    };
-  }, [t]);
-  const rows = found.q === t ? found.rows : null;
-  return (
-    <div style={{ display: 'grid', gap: 6 }}>
-      <input className="crm-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, phone, email or postcode" aria-label="Find a customer or organisation" autoFocus />
-      {t.length >= 2 && (
-        <ul className="dw-pick">
-          {rows === null && <li className="crm-muted" style={{ padding: 10 }}>Looking…</li>}
-          {rows?.length === 0 && <li className="crm-muted" style={{ padding: 10 }}>Nobody found for “{t}”.</li>}
-          {rows?.map((c) => (
-            <li key={c.id}>
-              <button type="button" onClick={() => onPick(c)}>
-                <b>{c.name}</b>
-                <small>{[c.organisation ? 'Organisation' : c.customer_ref, c.postcode, c.phone].filter(Boolean).join(' · ')}</small>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 /** A picture or video frame as a landscape 16:9 thumbnail: the middle of it, filled edge to edge. */
 async function landscape(src: CanvasImageSource, w: number, h: number): Promise<File | null> {

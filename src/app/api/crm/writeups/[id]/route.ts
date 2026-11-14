@@ -16,7 +16,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // Pictures in storage get a link; the site's own ('assets/…') are shown from the website itself.
   const paths = w.content.blocks.flatMap((b) => ((b.type === 'image' || b.type === 'signature') && b.path && !b.path.startsWith('assets/') ? [b.path] : b.type === 'video' && b.thumb ? [b.thumb] : []));
   const [who, urls, quotes] = await Promise.all([forWhom(w), imageUrls(paths), quotesFor(w)]);
-  return json({ document: w, who, urls, quotes });
+  const { data: pr } = w.project_id ? await createAdminClient().from('crm_projects').select('id, project_ref, title').eq('id', w.project_id).maybeSingle() : { data: null };
+  const project = pr ? { id: String(pr.id), ref: (pr.project_ref as string | null) ?? null, title: (pr.title as string | null) ?? null } : null;
+  return json({ document: w, who, project, urls, quotes });
 }
 
 /** Save: { title?, content?, enquiry_id?, organisation_id?, project_id? } (assigning to a customer or organisation, or clearing it with null). */

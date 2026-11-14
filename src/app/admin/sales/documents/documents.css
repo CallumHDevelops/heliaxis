@@ -282,3 +282,6 @@
 .dw-siglab { display: flex; gap: 10px; align-items: center; font-size: 0.78rem; color: var(--muted); }
 .dw-siglab input { flex: 1; min-width: 0; font: inherit; font-size: 0.78rem; color: inherit; background: none; border: 0; border-bottom: 1px dashed var(--border); padding: 2px 0; }
 .dw-siglab .crm-link { font-size: 0.75rem; }
+
+.dw-pick__job { padding-left: 24px; border-top: 1px dashed var(--border); }
+.dw-pick li > button + button { background: rgba(248, 188, 30, 0.06); }
