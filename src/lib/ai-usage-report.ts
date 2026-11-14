@@ -7,6 +7,7 @@ export const FEATURE_LABEL: Record<string, string> = {
   quote_included: 'Writing What is included',
   mcs_read: 'Reading an MCS certificate',
   label_read: 'Reading an equipment photo',
+  eic_read: 'Reading a board or test sheet photo (EIC)',
   blog: 'Blog articles',
   assistant: 'The assistant (Metis)',
   cms_page: 'CMS page generator',

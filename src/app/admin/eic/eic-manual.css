@@ -149,3 +149,18 @@
 .em-public__head { max-width: 1500px; margin: 0 auto; display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 2px solid #f8bc1e; }
 .em-public__head span { font-family: var(--font-mono, monospace); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .em-public .em-page { padding-top: 14px; }
+
+/* Read from a photo */
+.em-scan { border: 1px dashed #f8bc1e; border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; background: rgba(248, 188, 30, 0.07); }
+.em-scan__head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+.em-scan__head > div { display: grid; gap: 2px; max-width: 70ch; }
+.em-scan__head small { color: var(--muted); }
+.em-scan__review { display: grid; gap: 10px; }
+.em-scan__note { margin: 0; font-size: 0.9rem; }
+.em-scan__table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.em-scan__table th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.em-scan__table td { padding: 6px 8px; border-bottom: 1px solid var(--border-soft, var(--border)); vertical-align: top; }
+.em-scan__table tr.is-doubt td { background: rgba(248, 188, 30, 0.14); }
+.em-scan__unsure { color: #b26a00; font-weight: 700; }
+.em-scan__foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.em-scan__foot select { width: auto; display: inline-block; }

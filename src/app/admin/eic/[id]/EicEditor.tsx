@@ -249,7 +249,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
   const widget = (f: FieldView) => {
     switch (f.widget) {
       case 'eic-boards':
-        return boards ? <EicBoards data={boards} change={change} send={send} locked={!!locked} /> : null;
+        return boards ? <EicBoards data={boards} change={change} send={send} locked={!!locked} scanUrl={`${base}/scan`} /> : null;
       case 'eic-sources': {
         const list = Array.isArray(valueOf(f)) ? (valueOf(f) as string[]) : [];
         return (

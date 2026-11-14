@@ -123,3 +123,23 @@ describe('requesting information from an installer', () => {
     expect(TOKEN.test('short')).toBe(false);
   });
 });
+
+describe('reading a photo into circuits', () => {
+  const blank = { n: null, desc: null, ocpd_bs: null, ocpd_type: null, ocpd_a: null, ocpd_ka: null, rcd: null, rcd_type: null, rcd_idn: null, rcd_a: null, afdd: null, r1: null, rn: null, r2: null, r12: null, r2only: null, ir_v: null, ir_ll: null, ir_le: null, zs: null, rcd_ms: null, unsure: [] as string[] };
+  it('keeps what was read and turns yes/no into the certificate’s answers', async () => {
+    const { toRecord } = await import('@/lib/eic-manual/scan');
+    const t = toRecord({ ...blank, n: '3', desc: 'Cooker', ocpd_type: 'B', ocpd_a: 32, rcd: true, rcd_idn: 30, afdd: false, zs: 0.52, ir_le: '>999' });
+    expect(t.fields).toEqual({ n: '3', desc: 'Cooker', ocpd_type: 'B', ocpd_a: 32, rcd: 'yes', rcd_idn: 30, afdd: 'no', zs: 0.52, ir_le: '>999' });
+    expect(t.left_out).toBe(0);
+  });
+  it('leaves out anything it was unsure of, and says so', async () => {
+    const { toRecord } = await import('@/lib/eic-manual/scan');
+    const t = toRecord({ ...blank, n: '4', desc: 'Sockets', zs: 0.9, ocpd_a: 20, unsure: ['zs'] });
+    expect(t.fields).toEqual({ n: '4', desc: 'Sockets', ocpd_a: 20 });
+    expect(t.left_out).toBe(1);
+  });
+  it('never invents readings the photo did not have', async () => {
+    const { toRecord } = await import('@/lib/eic-manual/scan');
+    expect(Object.keys(toRecord({ ...blank, n: '1' }).fields)).toEqual(['n']);
+  });
+});
