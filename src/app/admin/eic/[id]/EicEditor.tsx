@@ -9,7 +9,7 @@ import { boardKey, circuitKey, INSTRUMENTS } from '@/lib/site/forms/electrician/
 import type { EicView, FieldView } from '@/lib/eic-manual/server';
 import '../../crm/crm.css';
 import { EicBoards } from '../Boards';
-import { Control } from '../Controls';
+import { choicesOf, Control } from '../Controls';
 import '../eic-manual.css';
 
 type Patch = { set?: Record<string, unknown>; unset?: string[]; [k: string]: unknown };
@@ -27,11 +27,23 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
   const [busy, setBusy] = useState('');
   const [picking, setPicking] = useState(false);
   const [local, setLocal] = useState<Record<string, unknown>>({});
+  // One question at a time (the default) or the whole list.
+  const [guided, setGuided] = useState(() => {
+    try {
+      return window.localStorage.getItem('hx-eic-mode') !== 'list';
+    } catch {
+      return true;
+    }
+  });
+  const [curKey, setCurKey] = useState('');
+  const [finished, setFinished] = useState(false);
+  const viewRef = useRef<EicView | null>(null);
   const pending = useRef<{ set: Record<string, unknown>; unset: string[] }>({ set: {}, unset: [] });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
 
   const take = useCallback((d: EicView) => {
+    viewRef.current = d;
     setView(d);
     setStep((s) => (s && d.steps.some((x) => x.key === s) ? s : d.steps[0]?.key ?? ''));
   }, []);
@@ -101,6 +113,64 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
     return () => window.removeEventListener('pagehide', onHide);
   }, [flush]);
 
+  const flatOf = (v: EicView) => v.steps.flatMap((s) => s.fields.map((f) => ({ s, f })));
+  /** Next or back: what was just answered is saved first, and the question after it is found in the certificate as it now stands (an answer can open follow-ups). */
+  const move = useCallback(
+    async (dir: 1 | -1, from: string) => {
+      await flush();
+      await chain.current;
+      const v = viewRef.current;
+      if (!v) return;
+      const list = flatOf(v);
+      const i = list.findIndex((x) => x.f.key === from);
+      const j = (i < 0 ? 0 : i) + (i < 0 ? 0 : dir);
+      if (j >= list.length) return setFinished(true);
+      if (j >= 0) {
+        setFinished(false);
+        setCurKey(list[j].f.key);
+      }
+    },
+    [flush]
+  );
+  const setMode = (g: boolean) => {
+    setGuided(g);
+    try {
+      window.localStorage.setItem('hx-eic-mode', g ? 'guided' : 'list');
+    } catch {
+      // Not remembered.
+    }
+  };
+  const curKeyRef = useRef('');
+  useEffect(() => {
+    curKeyRef.current = curKey;
+  }, [curKey]);
+  // 1 to 9 choose the numbered answer, Enter goes on (when the cursor isn't in a box: a box takes Enter itself).
+  useEffect(() => {
+    if (!guided) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(t.tagName) && e.key === 'Enter') return;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      const v = viewRef.current;
+      if (!v || v.status === 'issued') return;
+      const list = flatOf(v);
+      const cur = list.find((x) => x.f.key === curKeyRef.current) ?? list.find((x) => x.f.open) ?? list[0];
+      if (!cur) return;
+      if (/^[1-9]$/.test(e.key)) {
+        const o = choicesOf(cur.f)?.[Number(e.key) - 1];
+        if (!o) return;
+        e.preventDefault();
+        change(cur.f.key, o.key);
+        setTimeout(() => void move(1, cur.f.key), 220);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        void move(1, cur.f.key);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [guided, change, move]);
   const locked = view?.status === 'issued';
   const boards = useMemo(() => {
     if (!view?.boards) return null;
@@ -221,6 +291,105 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
   const setDesign = (k: string, v: unknown) => change('eic_design', { name: '', company: '', address: '', postcode: '', tel: '', next_n: 5, next_unit: 'years', departures: null, signed_at: new Date().toISOString(), path: 'manual', by: null, ...design, ...(local.eic_design as object | undefined), [k]: v });
   const dv = { ...design, ...((local.eic_design as object | undefined) ?? {}) } as Partial<NonNullable<EicView['design']>>;
 
+  const flat = flatOf(view);
+  const startKey = flat.find((x) => x.f.open)?.f.key ?? flat[0]?.f.key ?? '';
+  const at = Math.max(0, flat.findIndex((x) => x.f.key === (curKey || startKey)));
+  const q = flat[at];
+  const choose = (f: FieldView, v: unknown) => {
+    if (locked) return;
+    change(f.key, v);
+    // A one-tap answer goes straight on.
+    if (v !== undefined && (choicesOf(f) || (f.type === 'CONFIRM' && v === true))) setTimeout(() => void move(1, f.key), 220);
+  };
+  const forLine = [view.customer?.name, view.project ? `${view.project.ref ? `${view.project.ref} · ` : ''}${view.project.title ?? ''}` : null].filter(Boolean).join(' · ');
+  let guide: React.ReactNode = null;
+  if (guided) {
+    if (finished || !q) {
+      guide = (
+        <div className="em-guide">
+          <div className="em-guide__bar"><i style={{ width: '100%' }} /></div>
+          <h2 className="em-guide__q">{view.complete ? 'That’s everything.' : 'That’s every question.'}</h2>
+          {view.complete ? (
+            <p className="em-guide__hint">Nothing is still needed. Preview the certificate, then issue it.</p>
+          ) : (
+            <>
+              <p className="em-guide__hint">A few things are still needed before it can be issued. Click one to go to it.</p>
+              <div className="em-guide__miss">
+                {view.designNeeded && !view.sigs.eic_design && <p className="em-miss">Design part: signature (the Sign step)</p>}
+                {view.missing.slice(0, 20).map((m, i) => (
+                  <button key={i} type="button" className="em-miss" onClick={() => { const t = flat.find((x) => x.s.key === m.step); if (t) { setFinished(false); setCurKey(t.f.key); } }}>
+                    <b>{m.label}</b>
+                    <small>{m.why}</small>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <div className="em-guide__nav">
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => { setFinished(false); setCurKey(flat[flat.length - 1]?.f.key ?? ''); }}>
+              ← Back to the questions
+            </button>
+            <a className="crm-btn crm-btn--ghost" href={`/api/crm/eic/${id}/pdf?inline=1`} target="_blank" rel="noreferrer" onClick={() => void flush()}>
+              Preview PDF
+            </a>
+            <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setMode(false)}>
+              See all answers
+            </button>
+          </div>
+        </div>
+      );
+    } else {
+      const f = q.f;
+      const v = valueOf(f);
+      const w = widget(f);
+      const must = f.level === 'must' && !f.widget;
+      guide = (
+        <div className={`em-guide${f.widget === 'eic-boards' ? ' em-guide--wide' : ''}`}>
+          <div className="em-guide__bar"><i style={{ width: `${Math.round(((at + 1) / flat.length) * 100)}%` }} /></div>
+          <div className="em-guide__meta">
+            {q.s.title} · {at + 1} of {flat.length}
+            {forLine ? ` · ${forLine}` : ''}
+          </div>
+          <h2 className="em-guide__q">
+            {f.label}
+            {f.level === 'must' ? <b title="Needed"> *</b> : null}
+          </h2>
+          {f.hint && <p className="em-guide__hint">{f.hint}</p>}
+          {f.note && <p className="em-guide__hint em-note">{f.note}</p>}
+          <div
+            className="em-guide__a"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !f.widget && e.target instanceof HTMLInputElement) {
+                e.preventDefault();
+                void move(1, f.key);
+              }
+            }}
+          >
+            {w ?? <Control c={f} value={v} numbered onChange={(x) => choose(f, x)} />}
+          </div>
+          {f.suggest && v === undefined && !locked && !f.widget && (
+            <button type="button" className="em-suggest" onClick={() => choose(f, f.suggest!.v)}>
+              Use {f.suggest.text}
+            </button>
+          )}
+          <div className="em-guide__nav">
+            <button type="button" className="crm-btn crm-btn--ghost" disabled={at === 0} onClick={() => void move(-1, f.key)}>
+              ← Back
+            </button>
+            <button type="button" className="crm-btn crm-btn--solar" disabled={must && v === undefined} onClick={() => void move(1, f.key)}>
+              {at === flat.length - 1 ? 'Finish' : 'Next'} <kbd>↵</kbd>
+            </button>
+            {must && v === undefined && (
+              <button type="button" className="crm-link" onClick={() => void move(1, f.key)}>
+                Skip for now
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="em-page">
       <div className="em-top">
@@ -236,6 +405,9 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
         <span className="em-saved" role="status">
           {saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : ''}
         </span>
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setMode(!guided)}>
+          {guided ? 'See all questions' : 'One question at a time'}
+        </button>
         <a className="crm-btn crm-btn--ghost crm-btn--small" href={`/api/crm/eic/${id}/pdf?inline=1`} target="_blank" rel="noreferrer" onClick={() => void flush()}>
           Preview PDF
         </a>
@@ -260,6 +432,8 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
       </div>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
 
+      {guide}
+      {!guided && (
       <div className="em-split">
         <aside className="em-side">
           <div className="em-card">
@@ -388,6 +562,7 @@ export function EicEditor({ id, admin }: { id: string; admin: boolean }) {
           )}
         </main>
       </div>
+      )}
     </div>
   );
 }

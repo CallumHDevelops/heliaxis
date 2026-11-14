@@ -36,11 +36,18 @@ const toNumber = (s: string): number | string | undefined => {
 };
 const shown = (v: unknown) => (v === undefined || v === null ? '' : String(v));
 
-function Seg({ opts, value, onChange, label }: { opts: { key: string; label: string }[]; value: unknown; onChange: Set; label: string }) {
+/** The choices of a one-tap question (Yes/No, Pass/Fail, a list of options), or null when it isn't one. */
+export function choicesOf(c: Pick<Ctl, 'type' | 'options'>): { key: string; label: string }[] | null {
+  if (SEG[c.type]) return SEG[c.type].map(([key, label]) => ({ key, label }));
+  return c.type === 'SEL' ? (c.options ?? []) : null;
+}
+
+function Seg({ opts, value, onChange, label, numbered }: { opts: { key: string; label: string }[]; value: unknown; onChange: Set; label: string; numbered?: boolean }) {
   return (
     <div className="em-seg" role="radiogroup" aria-label={label}>
-      {opts.map((o) => (
+      {opts.map((o, i) => (
         <button key={o.key} type="button" role="radio" aria-checked={value === o.key} className={value === o.key ? 'is-on' : ''} onClick={() => onChange(value === o.key ? undefined : o.key)}>
+          {numbered && i < 9 ? <i className="em-key">{i + 1}</i> : null}
           {o.label}
         </button>
       ))}
@@ -108,8 +115,8 @@ function Num({ c, value, onChange }: { c: Ctl; value: unknown; onChange: Set }) 
   );
 }
 
-export function Control({ c, value, onChange }: { c: Ctl; value: unknown; onChange: Set }) {
-  if (SEG[c.type]) return <Seg opts={SEG[c.type].map(([key, label]) => ({ key, label }))} value={value} onChange={onChange} label={c.label} />;
+export function Control({ c, value, onChange, numbered }: { c: Ctl; value: unknown; onChange: Set; numbered?: boolean }) {
+  if (SEG[c.type]) return <Seg opts={SEG[c.type].map(([key, label]) => ({ key, label }))} value={value} onChange={onChange} label={c.label} numbered={numbered} />;
   switch (c.type) {
     case 'CONFIRM':
       return (
@@ -128,7 +135,7 @@ export function Control({ c, value, onChange }: { c: Ctl; value: unknown; onChan
     case 'NUM':
       return <Num c={c} value={value} onChange={onChange} />;
     case 'SEL':
-      return <Seg opts={c.options ?? []} value={value} onChange={onChange} label={c.label} />;
+      return <Seg opts={c.options ?? []} value={value} onChange={onChange} label={c.label} numbered={numbered} />;
     case 'MULTI': {
       const list = Array.isArray(value) ? (value as string[]) : [];
       return (
