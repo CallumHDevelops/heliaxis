@@ -1,0 +1,7 @@
+/* AssignPicker.tsx: the search box and its results. */
+.dw-pick { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; max-height: 320px; overflow-y: auto; background: var(--surface); }
+.dw-pick li + li { border-top: 1px solid var(--border-soft, var(--border)); }
+.dw-pick button { width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; font: inherit; color: inherit; cursor: pointer; display: grid; gap: 1px; }
+.dw-pick button:hover { background: rgb(var(--fg-rgb) / 0.05); }
+.dw-pick small { color: var(--muted); }
+.dw-pick__job { padding-left: 24px !important; border-top: 1px dashed var(--border) !important; background: rgba(248, 188, 30, 0.06) !important; }

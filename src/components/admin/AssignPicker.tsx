@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import './assign-picker.css';
 
 /** What was picked: a customer, a job (which brings its customer), or an organisation. */
 export type Picked = { enquiry_id: string | null; project_id: string | null; organisation_id: string | null; label: string };

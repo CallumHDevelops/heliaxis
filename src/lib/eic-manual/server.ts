@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { designOf as systemDesign } from '@/lib/site/design';
 import { EIC_FLAGS, EIC_STEPS, certMissing, designOf, type DesignSign } from '@/lib/site/forms/electrician/eic';
-import { BOARD, DETAILS, TESTS, boardDone, boardName, boardsOf, circuitDone, circuitName, editionOf, propCtx, routeOf, shownProps, type Prop, type Rec } from '@/lib/site/forms/electrician/eic-model';
+import { BOARD, DETAILS, TESTS, boardDone, boardName, boardsOf, circuitDone, circuitName, editionOf, propCtx, routeOf, shownProps, type Prop, type PropCtx, type Rec } from '@/lib/site/forms/electrician/eic-model';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { splitPostcode } from '@/lib/site/eic/facts';
 import { makeCtx } from '@/lib/site/rules';
@@ -112,6 +112,7 @@ export type StepView = { key: string; title: string; intro?: string; fields: Fie
 export type PropView = Pick<Prop, 'k' | 'col' | 'label' | 'head' | 'type' | 'unit' | 'dp' | 'chips' | 'picks' | 'options' | 'gt' | 'level' | 'test' | 'group' | 'hint'>;
 export type RecView = { id: string; name: string; done: boolean; rec: Rec; shown: string[]; suggest: Record<string, { v: number | string; text: string; also?: Rec }> };
 export type BoardsView = {
+  pc: PropCtx;
   props: { board: PropView[]; details: PropView[]; tests: PropView[] };
   boards: (RecView & { circuits: RecView[] })[];
 };
@@ -171,7 +172,7 @@ export async function viewOf(db: Db, row: EicRow, who: Who): Promise<EicView> {
           open: open(f.key) || miss.some((m) => m.key.startsWith(`${f.key}:`)),
         };
       })
-      .filter((f) => f.type !== 'CUSTOM' || ['eic-sources', 'eic-instruments', 'eic-boards'].includes(f.widget ?? ''));
+      .filter((f) => f.type !== 'CUSTOM' || ['eic-sources', 'eic-instruments', 'eic-boards', 'eic-sign'].includes(f.widget ?? ''));
     return { key: s.key, title: s.title, intro: s.intro, fields, open: miss.filter((m) => m.step === s.key).length };
   });
   const pc = propCtx(ctx);
@@ -186,6 +187,7 @@ export async function viewOf(db: Db, row: EicRow, who: Who): Promise<EicView> {
   };
   const boardsView: BoardsView | null = steps.some((s) => s.key === 'eic-boards')
     ? {
+        pc,
         props: { board: BOARD.map(propView), details: DETAILS.map(propView), tests: TESTS.map(propView) },
         boards: boards.map((b) => ({
           ...rec(b, boardName(b), boardDone(b, pc), BOARD),
@@ -223,7 +225,7 @@ export async function viewOf(db: Db, row: EicRow, who: Who): Promise<EicView> {
     sigs,
     missing: miss.map((m) => ({ label: m.label, why: m.why, step: m.step })),
     flags,
-    complete: miss.length === 0 && (!designNeeded || !!design),
+    complete: miss.length === 0 && (!designNeeded || (!!design && !!row.sigs.eic_design)),
     designNeeded,
     design,
   };
@@ -251,7 +253,7 @@ const sigImage = (s: SigStore[string]): SigImage => (s ? { png: new Uint8Array(B
 export async function makePdf(db: Db, row: EicRow, who: Who, variant?: Variant): Promise<{ bytes: Uint8Array; name: string; final: boolean; jobRef: string | null; missing: string | null }> {
   const ctx = await ctxOf(db, row, who);
   const design = designOf(ctx);
-  const designPart = row.route === 'eic' ? (design ? { ...design, png: row.sigs.eic_design ? new Uint8Array(Buffer.from(row.sigs.eic_design.png, 'base64')) : null } : null) : null;
+  const designPart = row.route === 'eic' ? (design && row.sigs.eic_design ? { ...design, png: row.sigs.eic_design ? new Uint8Array(Buffer.from(row.sigs.eic_design.png, 'base64')) : null } : null) : null;
   const input = {
     route: row.route === 'eic' ? ('eic' as const) : ('eic_single' as const),
     ref: row.number,
