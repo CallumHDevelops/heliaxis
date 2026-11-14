@@ -164,3 +164,43 @@
 .em-scan__unsure { color: #b26a00; font-weight: 700; }
 .em-scan__foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .em-scan__foot select { width: auto; display: inline-block; }
+
+.em-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.em-scan__scroll { overflow-x: auto; }
+.em-scan__table { min-width: 560px; }
+
+/* Phones: the buttons in one row that scrolls, choices as full-width tiles, Back and Next side by side. */
+@media (max-width: 700px) {
+  .em-top { gap: 6px 10px; }
+  .em-top h1 { font-size: 1.1rem; }
+  .em-back { font-size: 0.85rem; }
+  .em-grow { display: none; }
+  .em-saved { margin-left: auto; }
+  .em-actions { flex-wrap: nowrap; overflow-x: auto; width: 100%; padding-bottom: 4px; scrollbar-width: none; }
+  .em-actions::-webkit-scrollbar { display: none; }
+  .em-actions .crm-btn { white-space: nowrap; flex: none; }
+  .em-guide { margin-top: 8px; padding: 18px 16px 20px; border-radius: 14px; }
+  .em-guide__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .em-guide__q { font-size: 1.25rem; }
+  .em-guide__a .em-seg { display: grid; width: 100%; border-radius: 12px; }
+  .em-guide__a .em-seg button { width: 100%; justify-content: flex-start; border-right: 0; border-bottom: 1px solid var(--border); padding: 14px 16px; }
+  .em-guide__a .em-seg button:last-child { border-bottom: 0; }
+  .em-guide__a .em-num { width: 100%; }
+  .em-guide__nav { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+  .em-guide__nav .crm-btn { justify-content: center; padding: 13px 10px; }
+  .em-guide__nav .crm-link { grid-column: 1 / -1; text-align: center; }
+  .em-seg { display: grid; width: 100%; }
+  .em-seg button { border-right: 0; border-bottom: 1px solid var(--border); text-align: left; }
+  .em-seg button:last-child { border-bottom: 0; }
+  .em-props { grid-template-columns: 1fr; }
+  .em-num { width: 100%; }
+  .em-circuit__bar { grid-template-columns: 40px minmax(0, 1fr) 20px; }
+  .em-circuit__bar .em-ok, .em-circuit__bar .em-todo { display: none; }
+  .em-board { padding: 10px; }
+  .em-scan__head { align-items: stretch; }
+  .em-source { flex-wrap: wrap; }
+  .em-public { padding: 0 10px 40px; }
+}
+.em-page { grid-template-columns: minmax(0, 1fr); }
+.em-page > * { min-width: 0; }
+.em-page, .em-page * { box-sizing: border-box; }

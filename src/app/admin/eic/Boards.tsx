@@ -230,6 +230,7 @@ function ScanBox({ url, boards, onAdd }: { url: string; boards: { id: string; na
             {read.circuits.length} circuit{read.circuits.length === 1 ? '' : 's'} read{read.kind === 'test_sheet' ? ' from a test sheet (with their readings)' : ' from the board'}.
             {read.left_out > 0 ? ` ${read.left_out} value${read.left_out === 1 ? ' was' : 's were'} too unclear to use and ${read.left_out === 1 ? 'is' : 'are'} left for you to type.` : ''} Check each against the photo.
           </p>
+          <div className="em-scan__scroll">
           <table className="em-scan__table">
             <thead>
               <tr>
@@ -264,6 +265,7 @@ function ScanBox({ url, boards, onAdd }: { url: string; boards: { id: string; na
               ))}
             </tbody>
           </table>
+          </div>
           <div className="em-scan__foot">
             <label>
               Add to{' '}

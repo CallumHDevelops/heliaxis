@@ -306,7 +306,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
     // A one-tap answer goes straight on.
     if (v !== undefined && (choicesOf(f) || (f.type === 'CONFIRM' && v === true))) setTimeout(() => void move(1, f.key), 220);
   };
-  const forLine = installer ? view.address : [view.customer?.name, view.project ? `${view.project.ref ? `${view.project.ref} · ` : ''}${view.project.title ?? ''}` : null].filter(Boolean).join(' · ');
+  const forLine = installer ? view.address : view.project?.ref ?? view.customer?.name ?? '';
   let guide: React.ReactNode = null;
   if (guided) {
     if (finished || !q) {
@@ -425,6 +425,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
         <span className="em-saved" role="status">
           {saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : ''}
         </span>
+        <div className="em-actions">
         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setMode(!guided)}>
           {guided ? 'See all questions' : 'One question at a time'}
         </button>
@@ -464,6 +465,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
             Reopen to edit
           </button>
         )}
+        </div>
       </div>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       {asking && (
