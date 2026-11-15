@@ -11,6 +11,8 @@ import { calState, calWords, findInstrument } from '@/lib/instruments/shared';
 import { boardKey, circuitKey, INSTRUMENTS } from '@/lib/site/forms/electrician/eic-model';
 import type { EicView, FieldView } from '@/lib/eic-manual/server';
 import '../../crm/crm.css';
+import { WritingSpark } from '../../sales/quotes/[id]/WritingSpark';
+import '../../sales/quotes/quotes.css';
 import { EicBoards } from '../Boards';
 import { choicesOf, Control } from '../Controls';
 import '../eic-manual.css';
@@ -510,6 +512,14 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
         <p className="crm-banner">
           {view.title}. It was read from the original, so check every answer against it. Signatures aren’t copied: it needs signing again by whoever is responsible for it, and it should only be issued under our name if the work was ours to certify.
         </p>
+      )}
+      {busy === 'issue' && (
+        <WritingSpark
+          screen
+          label="Issuing the certificate"
+          stepMs={1500}
+          steps={['Checking every answer and reading', 'Creating the certificate', 'Signing it off', ...(view.project ? ['Registering it against the project', 'Filing it in the job’s Docs'] : []), 'Nearly there']}
+        />
       )}
       {asking && (
         <RequestSheet
