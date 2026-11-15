@@ -7,7 +7,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 import { grantPermission } from '@/lib/whatsapp/permission';
 import { sendEnquiryReceipt } from '@/lib/enquiry-receipt';
-import { detailRows, emailShell } from '@/lib/email-brand';
+import { emailShell, stackedRows } from '@/lib/email-brand';
+import { parseEstimate } from '@/lib/estimator/lead';
+import { estimateBlockHtml } from '@/lib/estimator/lead-email';
 
 // Handles quote / CMS contact form submissions.
 export async function POST(request: NextRequest) {
@@ -122,9 +124,10 @@ export async function POST(request: NextRequest) {
           ? 'Home'
           : data.sector || 'Not specified';
 
+    const estimate = parseEstimate(data.message);
     const adminEmailHtml = emailShell(
       'New enquiry',
-      detailRows(
+      stackedRows(
         [
           ['Name', data.name],
           ['Sector / property', propertyLabel],
@@ -134,11 +137,11 @@ export async function POST(request: NextRequest) {
           ['WhatsApp', data.whatsappOptIn ? 'Happy to be messaged on WhatsApp' : 'Didn’t tick the WhatsApp box'],
           ['Postcode', data.postcode || 'Not provided'],
           ['Interested in', data.interest || 'Not specified'],
-          ['Message', data.message],
+          ...((estimate ? [] : [['Message', data.message]]) as [string, string][]),
           ['Source', data.source],
         ],
         { Email: `mailto:${data.email}`, ...(data.phone ? { Phone: `tel:${data.phone.replace(/\s/g, '')}` } : {}) }
-      ) + `<p style="font-size:12px;color:#6E6A5E;margin:0">Submitted ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</p>`,
+      ) + (estimate ? estimateBlockHtml(estimate) : '') + `<p style="font-size:12px;color:#6E6A5E;margin:0">Submitted ${new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}</p>`,
       { href: `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '')}/admin/enquiries`, label: 'Open Enquiries' },
       'Website enquiry',
       'heliaxis.co.uk · An enquiry came in on the website.'
@@ -153,7 +156,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         from: 'Heliaxis <noreply@heliaxis.co.uk>',
         to: [process.env.ADMIN_EMAIL || 'hello@heliaxis.co.uk'],
-        subject: `☀️ New enquiry: ${data.name}${data.postcode ? ` (${data.postcode})` : ''}`,
+        subject: `New enquiry: ${data.name}${data.postcode ? ` (${data.postcode})` : ''}`,
         html: adminEmailHtml,
         reply_to: data.email,
       }),

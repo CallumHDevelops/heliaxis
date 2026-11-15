@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured, sendMail } from '@/lib/ms365';
 import { greetingName } from '@/lib/greeting-name';
 import { buttonsHtml, emailShell, esc } from '@/lib/email-brand';
+import { parseEstimate } from '@/lib/estimator/lead';
 
 /**
  * The "we have your request" email to whoever filled in a form on the site. It goes from the Heliaxis mailbox (so it is in
@@ -25,6 +26,12 @@ const firstName = (n: string) => greetingName(n) || 'there';
 
 /** "4.50 kWp (10 panels), about 3,993 kWh a year, saving about £950 a year, indicative cost £12,500, payback about 12 years" from the estimator's message. */
 export function estimateLine(message?: string): string | null {
+  const facts = parseEstimate(message);
+  if (facts) {
+    const f = (l: string) => facts.find((x) => x.label === l)?.value;
+    const parts = [f('System'), f('Generation'), f('Saving') && `saving ${f('Saving')}`, f('Indicative cost') && `indicative cost ${f('Indicative cost')}`, f('Payback') && `payback ${f('Payback')}`].filter(Boolean);
+    return parts.length ? parts.join(', ') : null;
+  }
   const m = (message ?? '').match(/^Solar estimator: ([\s\S]+?)\. Uses /);
   return m ? m[1].replace(/\.\s+About /, ', about ') : null;
 }

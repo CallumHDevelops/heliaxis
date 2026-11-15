@@ -8,7 +8,28 @@
  * visitor and changed by Heliaxis without touching code.
  */
 
+/** One price on a package's list: what a system of this many panels costs, installed. */
+export type PriceBand = { panels: number; price: number };
+/**
+ * A package Heliaxis sells (solar only, solar with a battery), with its own prices by panel count. The estimator uses the price list of the
+ * matching active package for homes; with none, it falls back to the fixed cost plus price per kWp below.
+ */
+export type Package = {
+  id: string;
+  kind: 'solar' | 'solar_battery';
+  name: string;
+  summary: string;
+  /** What is in it, one line each (shown to the visitor). */
+  includes: string[];
+  active: boolean;
+  /** solar_battery: the battery in the package, kWh (the prices include it). */
+  batteryKwh: number;
+  bands: PriceBand[];
+};
+
 export type EstimatorSettings = {
+  /** The packages on sale and their prices (homes). Empty: the formula below is used. */
+  packages: Package[];
   /** What a kWh costs the customer, pence (Ofgem's cap is about 26p). */
   importPence: number;
   /** Daily standing charge, pence: taken out of a bill to find the kWh used. */
@@ -32,7 +53,11 @@ export type EstimatorSettings = {
   co2PerKwh: number;
 };
 
+/** The settings that are plain numbers (everything but the packages). */
+export type NumKey = Exclude<keyof EstimatorSettings, 'packages'>;
+
 export const DEFAULT_SETTINGS: EstimatorSettings = {
+  packages: [],
   importPence: 26.3,
   standingPence: 54.8,
   exportPence: 12,
@@ -49,13 +74,61 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
 };
 
 /** Settings from storage or a request, each number kept within a sensible range, the rest defaulted. */
+const txt = (v: unknown, n: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+
+/** The packages from storage or a request: up to six, each with sorted, de-duplicated price bands within sensible bounds. */
+export function cleanPackages(v: unknown): Package[] {
+  const out: Package[] = [];
+  for (const raw of Array.isArray(v) ? v.slice(0, 6) : []) {
+    const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const name = txt(p.name, 60);
+    if (!name) continue;
+    const bands = new Map<number, number>();
+    for (const b of Array.isArray(p.bands) ? p.bands.slice(0, 40) : []) {
+      const panels = Math.round(Number((b as { panels?: unknown })?.panels));
+      const price = Number((b as { price?: unknown })?.price);
+      if (Number.isFinite(panels) && panels >= 1 && panels <= 300 && Number.isFinite(price) && price > 0 && price <= 1_000_000) bands.set(panels, Math.round(price));
+    }
+    const kind = p.kind === 'solar_battery' ? 'solar_battery' : 'solar';
+    const kwh = Number(p.batteryKwh);
+    out.push({
+      id: txt(p.id, 30).replace(/[^\w-]/g, '') || `pkg${out.length + 1}`,
+      kind,
+      name,
+      summary: txt(p.summary, 200),
+      includes: (Array.isArray(p.includes) ? p.includes : []).slice(0, 12).map((x) => txt(x, 120)).filter(Boolean),
+      active: p.active !== false,
+      batteryKwh: kind === 'solar_battery' && Number.isFinite(kwh) ? Math.min(30, Math.max(0, kwh)) : 0,
+      bands: [...bands].map(([panels, price]) => ({ panels, price })).sort((a, b) => a.panels - b.panels),
+    });
+  }
+  return out;
+}
+
+/** The price for this many panels from a package's list: exact, or in between two prices, or carried on at the list's own rate beyond its ends. Null with no prices. */
+export function priceFromBands(bands: PriceBand[], panels: number): number | null {
+  const b = [...bands].sort((x, y) => x.panels - y.panels);
+  if (!b.length) return null;
+  const hit = b.find((x) => x.panels === panels);
+  if (hit) return hit.price;
+  const rate = (lo: PriceBand, hi: PriceBand) => (hi.price - lo.price) / Math.max(1, hi.panels - lo.panels);
+  if (b.length === 1) return Math.max(0, Math.round((b[0].price / b[0].panels) * panels));
+  if (panels < b[0].panels) return Math.max(0, Math.round(b[0].price - (b[0].panels - panels) * rate(b[0], b[1])));
+  const last = b[b.length - 1];
+  if (panels > last.panels) return Math.round(last.price + (panels - last.panels) * rate(b[b.length - 2], last));
+  const hi = b.findIndex((x) => x.panels > panels);
+  return Math.round(b[hi - 1].price + (panels - b[hi - 1].panels) * rate(b[hi - 1], b[hi]));
+}
+
+/** Settings from storage or a request, each number kept within a sensible range, the rest defaulted. */
 export function cleanSettings(v: unknown): EstimatorSettings {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
-  const num = (k: keyof EstimatorSettings, lo: number, hi: number) => {
+  const num = (k: NumKey, lo: number, hi: number): number => {
     const n = Number(o[k]);
     return Number.isFinite(n) && o[k] !== '' && o[k] != null ? Math.min(hi, Math.max(lo, n)) : DEFAULT_SETTINGS[k];
   };
   return {
+    packages: cleanPackages(o.packages),
     importPence: num('importPence', 5, 100),
     standingPence: num('standingPence', 0, 150),
     exportPence: num('exportPence', 0, 60),
@@ -171,6 +244,8 @@ export type Estimate = {
   roofPanels: number;
   /** Money position at the end of each year, 0 to 25 (negative until the system has paid for itself). */
   cashflow: number[];
+  /** The package whose price list priced it (homes), or null when the formula did. */
+  packageName: string | null;
 };
 
 const EV_KWH = 2000;
@@ -227,7 +302,10 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
 
   // How much is used in the building: limited by what is made and by what the building uses while the sun is up. A battery, an
   // electric car and a heat pump all raise that daytime use; a bigger system on the same use exports more of what it makes.
-  const batteryKwh = i.battery ? (i.batteryKwh ?? s.batteryKwh) : 0;
+  // A home's price comes from the matching package's price list when there is one; the battery is then the package's.
+  const pkgSolar = home ? s.packages.find((p) => p.active && p.kind === 'solar' && p.bands.length) : undefined;
+  const pkgBattery = home && i.battery ? s.packages.find((p) => p.active && p.kind === 'solar_battery' && p.bands.length) : undefined;
+  const batteryKwh = i.battery ? (pkgBattery?.batteryKwh || (i.batteryKwh ?? s.batteryKwh)) : 0;
   const batteryBonus = batteryKwh > 0 ? (home ? 0.3 : 0.2) * ((1 - Math.exp(-batteryKwh / 4)) / (1 - Math.exp(-5 / 4))) : 0;
   const dayShare = Math.min(0.9, DAY_SHARE[home ? 'home' : 'business'][i.daytime] + batteryBonus + (i.ev ? 0.04 : 0) + (i.heatpump ? 0.04 : 0));
   const selfUsed = Math.min(generation, softMin(generation * 0.95, consumption * dayShare * 1.15));
@@ -236,7 +314,12 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
 
   const imp = s.importPence / 100;
   const saving = selfUsed * imp + exported * (s.exportPence / 100);
-  const cost = (home ? s.homeFixed + kwp * s.homePerKwp : s.businessFixed + kwp * s.businessPerKwp) + batteryKwh * s.batteryPerKwh;
+  const formulaSolar = home ? s.homeFixed + kwp * s.homePerKwp : s.businessFixed + kwp * s.businessPerKwp;
+  const fromBattery = pkgBattery ? priceFromBands(pkgBattery.bands, panels) : null;
+  const fromSolar = pkgSolar ? priceFromBands(pkgSolar.bands, panels) : null;
+  // Solar and battery package: its own price. Otherwise the solar package (or formula) plus the battery at its price per kWh.
+  const cost = fromBattery ?? (fromSolar ?? formulaSolar) + batteryKwh * s.batteryPerKwh;
+  const packageName = fromBattery !== null ? (pkgBattery?.name ?? null) : fromSolar !== null ? (pkgSolar?.name ?? null) : null;
   const savingLow = saving * (1 - SPREAD);
   const savingHigh = saving * (1 + SPREAD);
   const costLow = cost * (1 - 0.08);
@@ -283,6 +366,7 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
     panelsWanted: wanted,
     roofPanels: roofCap,
     cashflow,
+    packageName,
   };
 }
 

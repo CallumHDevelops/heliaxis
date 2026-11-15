@@ -809,3 +809,14 @@ ul.enq-del-err {
     padding: 1px 5px;
   }
 }
+
+/* The solar estimator's figures on a lead: the headline numbers as tiles, the rest as a short list. */
+.enq-est { display: grid; gap: 10px; margin: 4px 0 12px; }
+.enq-est__top { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.enq-est__top > div { border: 1px solid var(--line, var(--border)); border-radius: 8px; padding: 8px 10px; background: var(--card, var(--surface)); display: grid; gap: 2px; }
+.enq-est__top span { font-family: var(--font-mono, monospace); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.enq-est__top b { font-size: 1rem; line-height: 1.25; }
+.enq-est__rest { margin: 0; display: grid; gap: 4px; }
+.enq-est__rest > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; font-size: 0.9rem; }
+.enq-est__rest dt { color: var(--muted); }
+.enq-est__rest dd { margin: 0; overflow-wrap: anywhere; }

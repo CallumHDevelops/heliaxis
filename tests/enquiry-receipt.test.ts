@@ -32,3 +32,19 @@ describe('enquiry receipt email', () => {
     expect(m.html).toContain('&lt;b&gt;Sam&lt;/b&gt;');
   });
 });
+
+describe('the estimator’s lead message, one fact to a line', async () => {
+  const { buildEstimateMessage, parseEstimate } = await import('@/lib/estimator/lead');
+  const msg = buildEstimateMessage({ kwp: 5.85, panels: 13, batteryKwh: 0, generation: '5,170', saving: '£972', cost: '£7,900', payback: '8', uses: '£130/month', shade: 'some', daytime: 'home', ev: false, heatpump: false, roof: 'Tara, Westra, CF64 4HA', packageName: 'Solar only' });
+  it('reads back as facts', () => {
+    const f = parseEstimate(msg)!;
+    expect(f.find((x) => x.label === 'System')?.value).toBe('5.85 kWp (13 panels)');
+    expect(f.find((x) => x.label === 'Package')?.value).toBe('Solar only');
+    expect(f.find((x) => x.label === 'Battery')).toBeUndefined();
+    expect(parseEstimate('Just a message')).toBeNull();
+  });
+  it('still gives the customer’s receipt its estimate line', () => {
+    expect(estimateLine(msg)).toContain('5.85 kWp (13 panels)');
+    expect(estimateLine(msg)).toContain('saving about £972');
+  });
+});

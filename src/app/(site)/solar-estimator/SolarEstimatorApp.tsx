@@ -19,6 +19,7 @@ import {
   type Who,
 } from '@/lib/estimator/calc';
 import { compassWord, type MapData, type RoofFound } from '@/lib/estimator/roof';
+import { buildEstimateMessage } from '@/lib/estimator/lead';
 import { SurveyModal } from './SurveyModal';
 import { panelPolygon, pointsAttr, toPixel, MAP_SIZE } from '@/lib/estimator/overlay';
 
@@ -601,7 +602,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
                 {gbpRound(r.savingLow)} – {gbpRound(r.savingHigh)}
               </div>
               <div className="sub">
-                {r.kwp.toFixed(2)} kWp system · {r.panels} panels{r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}
+                {r.kwp.toFixed(2)} kWp system · {r.panels} panels{r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}{r.packageName ? ` · ${r.packageName}` : ''}
               </div>
               {requested ? (
                 <div className="est-headdone" role="status">
@@ -706,7 +707,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
           </div>
           {withBattery && (
             <div className="est-battery">
-              <b>With a {settings.batteryKwh} kWh battery</b>
+              <b>With a {withBattery.batteryKwh} kWh battery</b>
               <span>
                 you would use about {Math.round(withBattery.selfPct * 100)}% of your solar (instead of {Math.round(r.selfPct * 100)}%) and save about {gbp(withBattery.saving)} a year, for {gbpRound(withBattery.cost - r.cost, 100)} more.
               </span>
@@ -771,7 +772,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
           <li>Yield: {num(inputs.yieldKwhPerKwp)} kWh per kWp a year for your postcode, roof direction and pitch ({source === 'pvgis' ? 'EU PVGIS data' : 'typical South Wales figure'}), less shading of {inputs.shade === 'none' ? '0' : inputs.shade === 'some' ? '10' : '22'}%.</li>
           <li>Electricity price {settings.importPence}p per kWh; export payment {settings.exportPence}p per kWh (Smart Export Guarantee rates vary from about 4p to 15p).</li>
           <li>You use about {Math.round(r.selfPct * 100)}% of the solar yourself, based on who is home in the day (a bigger system exports more of what it makes){r.batteryKwh ? ', with the battery' : ''}{inputs.ev ? ', and an electric car' : ''}{inputs.heatpump ? ', and a heat pump' : ''}.</li>
-          <li>{home ? 'Home' : 'Business'} price £{(home ? settings.homeFixed : settings.businessFixed).toLocaleString('en-GB')} fixed plus £{(home ? settings.homePerKwp : settings.businessPerKwp).toLocaleString('en-GB')} per kWp installed{r.batteryKwh ? `, plus £${(settings.batteryPerKwh * settings.batteryKwh).toLocaleString('en-GB')} for the battery` : ''}. Savings are shown ±12% and prices ±8%.</li>
+          <li>{r.packageName ? `Priced from our ${r.packageName} package for ${r.panels} panels${r.batteryKwh ? ', with its battery' : ''}.` : `${home ? 'Home' : 'Business'} price £${(home ? settings.homeFixed : settings.businessFixed).toLocaleString('en-GB')} fixed plus £${(home ? settings.homePerKwp : settings.businessPerKwp).toLocaleString('en-GB')} per kWp installed${r.batteryKwh ? `, plus £${(settings.batteryPerKwh * settings.batteryKwh).toLocaleString('en-GB')} for the battery` : ''}.`} Savings are shown ±12% and prices ±8%. The survey sets the real price.</li>
           <li>25-year figure: panels lose {settings.degradationPct}% a year and electricity prices are assumed {settings.priceRisePct ? `to rise ${settings.priceRisePct}% a year` : 'not to rise (today’s prices, a cautious view)'}.</li>
           <li>CO₂: about {r.co2Tonnes.toFixed(1)} tonnes a year, at {settings.co2PerKwh} kg per kWh.</li>
         </ul>
@@ -807,8 +808,22 @@ function Finding({ address, done }: { address: string; done: boolean }) {
 
 /** What goes into the CRM with the enquiry: the figures they saw, so the call starts from them. */
 function estimateMessage(r: ReturnType<typeof estimate>, inputs: Inputs, address: string) {
-  const dir = address ? `roof found at ${address}` : 'roof answered by the visitor';
-  return `Solar estimator: ${r.kwp.toFixed(2)} kWp (${r.panels} panels)${r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}. About ${num(r.generation)} kWh a year, saving about ${gbp(r.saving)} a year, indicative cost ${gbpRound(r.cost, 100)}, payback about ${yrs(r.paybackYears)} years. Uses ${inputs.usage.kind === 'bill' ? `£${inputs.usage.value}/month` : `${num(inputs.usage.value)} kWh/year`}; ${inputs.shade} shade; daytime: ${BUSINESS_HOURS.find((h) => h.key === inputs.daytime)?.label ?? inputs.daytime}${inputs.ev ? '; electric car' : ''}${inputs.heatpump ? '; heat pump' : ''} (${dir}).`;
+  return buildEstimateMessage({
+    kwp: r.kwp,
+    panels: r.panels,
+    batteryKwh: r.batteryKwh,
+    generation: num(r.generation),
+    saving: gbp(r.saving),
+    cost: gbpRound(r.cost, 100),
+    payback: yrs(r.paybackYears),
+    uses: inputs.usage.kind === 'bill' ? `£${inputs.usage.value}/month` : `${num(inputs.usage.value)} kWh/year`,
+    shade: inputs.shade,
+    daytime: BUSINESS_HOURS.find((h) => h.key === inputs.daytime)?.label ?? inputs.daytime,
+    ev: !!inputs.ev,
+    heatpump: !!inputs.heatpump,
+    roof: address || 'answered by the visitor',
+    packageName: r.packageName ?? null,
+  });
 }
 
 /** The invitation under the estimate: one clear button that opens the survey form. */

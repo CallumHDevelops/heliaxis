@@ -1,5 +1,6 @@
 'use client';
 
+import { headline, parseEstimate, rest } from '@/lib/estimator/lead';
 import { TextButton } from '@/app/admin/crm/TextSheet';
 import Link from 'next/link';
 import { PushBanner } from '@/components/admin/PushBanner';
@@ -561,7 +562,30 @@ export function EnquiriesCrm({
               })}
             </div>
             <div className="enq-label">Message</div>
-            <p className="enq-msg">{active.msg || 'No message'}</p>
+            {(() => {
+              const facts = parseEstimate(active.msg);
+              if (!facts) return <p className="enq-msg">{active.msg || 'No message'}</p>;
+              return (
+                <div className="enq-est">
+                  <div className="enq-est__top">
+                    {headline(facts).map((f) => (
+                      <div key={f.label}>
+                        <span>{f.label}</span>
+                        <b>{f.value}</b>
+                      </div>
+                    ))}
+                  </div>
+                  <dl className="enq-est__rest">
+                    {rest(facts).map((f) => (
+                      <div key={f.label}>
+                        <dt>{f.label}</dt>
+                        <dd>{f.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              );
+            })()}
             <div className="enq-actions">
               {canCrm && (
                 <button type="button" className="enq-btn solar" disabled={opening} onClick={() => openInCrm(active)}>

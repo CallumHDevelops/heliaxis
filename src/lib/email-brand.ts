@@ -85,6 +85,22 @@ export function brandEmail(o: { subject: string; html?: string | null; text?: st
 }
 
 /** A tidy label/value table for the details of an enquiry or submission. Empty values are left out. */
+/**
+ * Label over value, one under the other, so a phone's narrow screen gives the value the whole width (an email address or a long message
+ * no longer breaks in the middle of a word). Same look as detailRows otherwise.
+ */
+export function stackedRows(rows: [string, string | null | undefined][], href?: Record<string, string>): string {
+  const body = rows
+    .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+    .map(([l, v]) => {
+      const link = href?.[l];
+      const val = link ? `<a href="${esc(link)}" style="color:#211F18;font-weight:700;word-break:break-word">${esc(v)}</a>` : esc(v).replace(/\n/g, '<br>');
+      return `<tr><td style="padding:10px 0 0;color:#6E6A5E;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-family:'Courier New',Courier,monospace">${esc(l)}</td></tr><tr><td style="padding:2px 0 0;font-size:16px;line-height:1.4;word-break:break-word">${val}</td></tr>`;
+    })
+    .join('');
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F7F2E7;border-left:4px solid #F8BC1E;padding:4px 16px 12px;margin:0 0 16px"><tr><td><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%">${body}</table></td></tr></table>`;
+}
+
 export function detailRows(rows: [string, string | null | undefined][], href?: Record<string, string>): string {
   const body = rows
     .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')

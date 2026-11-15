@@ -87,3 +87,34 @@ describe('solar estimator maths', () => {
     expect(cleanSettings({ homePerKwp: 1350 }).homeFixed).toBe(0);
   });
 });
+
+describe('packages and their prices', async () => {
+  const { estimate, DEFAULT_SETTINGS, cleanSettings, priceFromBands } = await import('@/lib/estimator/calc');
+  const bands = [{ panels: 8, price: 6000 }, { panels: 12, price: 8000 }, { panels: 16, price: 10400 }];
+  it('prices a panel count from the list, in between and beyond it', () => {
+    expect(priceFromBands(bands, 12)).toBe(8000);
+    expect(priceFromBands(bands, 10)).toBe(7000);
+    expect(priceFromBands(bands, 20)).toBe(12800);
+    expect(priceFromBands(bands, 6)).toBe(5000);
+    expect(priceFromBands([], 10)).toBeNull();
+  });
+  it('keeps only sensible packages and sorts their prices', () => {
+    const s = cleanSettings({ packages: [{ name: ' Solar only ', kind: 'solar', bands: [{ panels: 12, price: 8000 }, { panels: 8, price: 6000 }, { panels: 0, price: 5 }, { panels: 9, price: -1 }] }, { name: '' }] });
+    expect(s.packages).toHaveLength(1);
+    expect(s.packages[0].name).toBe('Solar only');
+    expect(s.packages[0].bands.map((b) => b.panels)).toEqual([8, 12]);
+  });
+  const base = { who: 'home' as const, usage: { kind: 'kwh' as const, value: 4000 }, shade: 'none' as const, daytime: 'home' as const, yieldKwhPerKwp: 950, battery: false };
+  it('uses the formula with no packages, and the package price list once there is one', () => {
+    const f = estimate(base as never, DEFAULT_SETTINGS);
+    expect(f.packageName).toBeNull();
+    const s = cleanSettings({ packages: [{ name: 'Solar only', kind: 'solar', bands: [{ panels: 4, price: 4000 }, { panels: 40, price: 22000 }] }, { name: 'Solar and battery', kind: 'solar_battery', batteryKwh: 5, bands: [{ panels: 4, price: 7000 }, { panels: 40, price: 30000 }] }] });
+    const a = estimate(base as never, s);
+    expect(a.packageName).toBe('Solar only');
+    expect(a.cost).not.toBe(f.cost);
+    const b = estimate({ ...base, battery: true } as never, s);
+    expect(b.packageName).toBe('Solar and battery');
+    expect(b.batteryKwh).toBe(5);
+    expect(b.cost).toBeGreaterThan(a.cost);
+  });
+});
