@@ -209,3 +209,10 @@
 .em-cal--ok { color: #2e7d32 !important; }
 .em-cal--soon { color: #b26a00 !important; }
 .em-cal--expired { color: #b42318 !important; }
+
+/* The address box that is also the lookup */
+.ai-box { position: relative; display: grid; gap: 4px; }
+.ai-list { list-style: none; margin: 0; padding: 0; position: absolute; z-index: 20; top: calc(100% + 2px); left: 0; right: 0; max-height: 260px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border-strong, var(--border)); border-radius: 8px; box-shadow: var(--shadow, 0 8px 24px rgba(0, 0, 0, 0.18)); }
+.ai-list li + li { border-top: 1px solid var(--border-soft, var(--border)); }
+.ai-list button { width: 100%; text-align: left; background: none; border: 0; padding: 9px 12px; font: inherit; color: inherit; cursor: pointer; }
+.ai-list button:hover { background: rgba(248, 188, 30, 0.16); }
