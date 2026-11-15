@@ -257,23 +257,17 @@ export function AppRuntime({ surveys = false }: { /** Can use the CRM: keep the 
       )}
 
       <style>{`
-        .hx-rt-bar { position: fixed; left: 50%; bottom: var(--hx-rt-bottom, 16px); transform: translateX(-50%); z-index: 50;
-          display: flex; flex-direction: column; gap: 6px; align-items: center; width: max-content; max-width: calc(100vw - 32px); }
+        /* A full-width bar along the bottom of the page (above the phone's tab bar, and clear of the WhatsApp dock on the right). */
+        .hx-rt-bar { position: fixed; left: 0; right: var(--hx-dock, 0px); bottom: var(--hx-rt-bottom, var(--hx-tabbar, 0px)); z-index: 50;
+          display: flex; flex-direction: column; gap: 0; align-items: stretch; }
         /* Ink toasts in both themes (an "ink moment"), with a hairline on dark so they stand off the page. */
         .hx-rt-note, .hx-rt-pill { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
-          background: var(--moment); color: var(--moment-text); padding: 10px 14px; border-radius: 4px; font-size: .88rem; font-weight: 600;
-          box-shadow: var(--shadow); border: 1px solid var(--border); }
+          background: var(--moment); color: var(--moment-text); padding: 10px 16px; border-radius: 0; font-size: .9rem; font-weight: 600; width: 100%;
+          box-shadow: 0 -2px 12px rgb(0 0 0 / .18); border: 0; border-top: 2px solid var(--accent); }
         .hx-rt-pill { background: var(--accent); color: var(--accent-ink); padding: 6px 12px; font-size: .78rem; }
         .hx-rt-btn { font: inherit; font-size: .82rem; font-weight: 700; padding: .35rem .75rem; border-radius: 2px;
           border: 1px solid color-mix(in srgb, var(--moment-text) 35%, transparent); background: transparent; color: inherit; cursor: pointer; text-decoration: none; }
         .hx-rt-btn.is-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-        /* Phones: a slim pop-up that sits on the bottom tab bar's top edge, full width, instead of covering its buttons. */
-        @media (max-width: 760px) {
-          .hx-rt-bar { left: 10px; right: 10px; transform: none; width: auto; max-width: none; bottom: var(--hx-rt-bottom, calc(var(--hx-tabbar, 0px) + 10px)); }
-          .hx-rt-note { width: 100%; flex-wrap: nowrap; justify-content: space-between; padding: 8px 8px 8px 14px; border-radius: 10px; font-size: .84rem; }
-          .hx-rt-pill { border-radius: 999px; }
-          .hx-rt-note .hx-rt-btn { flex: none; }
-        }
         .hx-rt-modal { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: grid; place-items: center; padding: 16px; }
         .hx-rt-card { background: var(--raised); color: var(--text); max-width: 420px; padding: 24px; border-radius: 4px; border: 1px solid var(--border); }
         .hx-rt-card h2 { margin: 0 0 8px; font-size: 1.2rem; }
