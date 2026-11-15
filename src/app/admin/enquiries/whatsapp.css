@@ -858,3 +858,24 @@ textarea.wa-input {
   font-size: 0.78rem;
   color: var(--err);
 }
+
+/* Phones: a chat that leaves room for the conversation. A short header (the buttons in one row under the name), wider
+   bubbles with their ⋯ on the corner, a link picker on one slim row, and a writing box that stops growing at a third of the screen. */
+@media (max-width: 700px) {
+  .wa-chat-head { flex-wrap: wrap; row-gap: 6px; padding-bottom: 0.45rem; }
+  .wa-chat-head .wa-avatar { width: 2.2rem; height: 2.2rem; font-size: 1rem; }
+  .wa-chat-who b { font-size: 1rem; }
+  .wa-chat-who span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+  .wa-chat-head .wa-chat-tools { flex: 1 0 100%; flex-direction: row; gap: 8px; }
+  .wa-chat-head .wa-chat-tools > * { flex: 1 1 0; min-width: 0; }
+  .wa-chat-head .wa-chat-tools .wa-auto, .wa-chat-head .wa-chat-tools .wa-addtask__btn { width: 100%; text-align: center; padding: 0.4rem 0.5rem; }
+  .wa-bubble { max-width: 92%; }
+  .wa-bubble:has(> .wa-msgacts) .wa-msgacts__btn { left: auto; right: 6px; top: -11px; opacity: 1; width: 24px; height: 24px; box-shadow: var(--shadow-sm); }
+  .wa-bubble.out > .wa-msgacts > .wa-msgacts__btn { right: 6px; }
+  [aria-label='Quick links'] { margin: 0 !important; }
+  [aria-label='Quick links'] label { display: none; }
+  [aria-label='Quick links'] select { max-width: none !important; width: 100%; padding: 4px 8px !important; font-size: 0.82rem !important; }
+  .wsl-row > textarea.wa-input, .wa-pane__row > textarea.wa-input { min-height: 64px; max-height: 30vh; padding: 8px 10px; }
+  .wsl-row, .wa-pane__row { gap: 6px; }
+  .wsl-row .wa-send, .wa-pane__row .wa-send { padding: 0 12px; min-height: 44px; align-self: flex-end; }
+}
