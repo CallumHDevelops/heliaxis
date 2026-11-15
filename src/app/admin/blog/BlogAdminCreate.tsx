@@ -43,6 +43,25 @@ export function BlogAdminCreate({ aiReady }: Props) {
   const [busy, setBusy] = useState<'idle' | 'gen' | 'create'>('idle');
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err' | 'muted'; text: string } | null>(null);
 
+  /** The articles written in the repo, loaded into the CMS as drafts in one go (they are not published). */
+  const [loading, setLoading] = useState(false);
+  const [written, setWritten] = useState<{ slug: string; title: string; loaded: boolean; notes: number }[] | null>(null);
+  async function listWritten() {
+    const r = await fetch('/api/blog/import-drafts', { cache: 'no-store' });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) setWritten(d.drafts ?? []);
+  }
+  async function loadWritten() {
+    setLoading(true);
+    setMsg(null);
+    const r = await fetch('/api/blog/import-drafts', { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    setLoading(false);
+    if (!r.ok) return setMsg({ tone: 'err', text: d.error || 'Couldn’t load them.' });
+    setMsg({ tone: 'ok', text: `${d.added?.length ?? 0} article${d.added?.length === 1 ? '' : 's'} added as drafts${d.skipped?.length ? `, ${d.skipped.length} already there` : ''}. Open each in the CMS, read the editor notes, then schedule or publish it.` });
+    void listWritten();
+  }
+
   const field: React.CSSProperties = {
     width: '100%',
     padding: '10px 12px',
@@ -133,6 +152,32 @@ export function BlogAdminCreate({ aiReady }: Props) {
         Describe the topic — AI fills the example-blog CMS template. Edit in the CMS before publishing
         or scheduling.
       </p>
+
+      <div style={{ border: '1px dashed var(--border-strong)', padding: '10px 12px', margin: '0 0 14px', display: 'grid', gap: 8 }}>
+        <b style={{ fontSize: '0.9rem' }}>Written articles</b>
+        <span style={{ fontSize: '0.84rem', color: 'var(--muted)' }}>
+          A set of articles written for the site, ready to load into the CMS as drafts. Nothing is published: each one has notes for you to check first.
+        </span>
+        {written && (
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.84rem' }}>
+            {written.map((w) => (
+              <li key={w.slug}>
+                {w.title} {w.loaded ? '(in the CMS)' : `(not loaded yet${w.notes ? `, ${w.notes} note${w.notes === 1 ? '' : 's'} to check` : ''})`}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="crm-btn crm-btn--solar crm-btn--small" disabled={loading} onClick={() => void loadWritten()}>
+            {loading ? 'Loading…' : 'Load the written drafts'}
+          </button>
+          {!written && (
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => void listWritten()}>
+              See what is waiting
+            </button>
+          )}
+        </div>
+      </div>
 
       {!aiReady && (
         <p style={{ color: 'var(--danger)', fontSize: '0.86rem', fontWeight: 600, margin: '0 0 0.75rem' }}>

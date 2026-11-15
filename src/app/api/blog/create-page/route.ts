@@ -14,6 +14,7 @@ import {
   type CmsArticleAi,
 } from '@/lib/blog/cms-article-template';
 import { resolveUnsplashBlogImage } from '@/lib/blog/unsplash-image';
+import { uniqueBlogSlug } from '@/lib/blog/add-article';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,28 +26,6 @@ type CmsState = {
   site?: unknown;
   [key: string]: unknown;
 };
-
-function slugTaken(pages: Array<Record<string, unknown>>, slug: string, exceptId?: string): boolean {
-  const want = normalizeCmsSlug(slug);
-  return pages.some((p) => {
-    if (exceptId && p.id === exceptId) return false;
-    const s = normalizeCmsSlug(String(p.slug || ''));
-    return s === want;
-  });
-}
-
-function uniqueBlogSlug(pages: Array<Record<string, unknown>>, base: string): string {
-  let slug = toPublicBlogPath(base);
-  if (isReservedCmsSlug(slug) || slug === '/blog') {
-    slug = toPublicBlogPath('article');
-  }
-  if (!slugTaken(pages, slug)) return slug;
-  let n = 2;
-  const stem = slug.replace(/\/$/, '');
-  while (slugTaken(pages, `${stem}-${n}`)) n++;
-  // Keep `/blog/{slug}` structure — never let uniqueness turn it into `/blog-{slug}-N`.
-  return toPublicBlogPath(`${stem}-${n}`);
-}
 
 export async function POST(req: Request) {
   const session = await requirePortal('cms');
