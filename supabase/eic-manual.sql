@@ -27,3 +27,6 @@ alter table public.eic_manual enable row level security;
 -- Request information: the certificate sent to an installer to fill in by a personal link. { token, name, email, message, sent_at, submitted_at }
 alter table public.eic_manual add column if not exists request jsonb;
 create unique index if not exists eic_manual_request_token_idx on public.eic_manual ((request->>'token')) where request is not null;
+
+-- The certificate's number: EIC-D0001 until it belongs to a job, then that job's number (HX-0113 gives EIC-0113; a second certificate on the same job EIC-0113-2).
+alter table public.eic_manual alter column number set default ('EIC-D' || lpad(nextval('public.eic_manual_seq')::text, 4, '0'));

@@ -64,6 +64,39 @@ export async function fillProjectAddress(db: Db, projectId: string | null, addre
   return !error;
 }
 
+/** The number a certificate on a job gets: the job's own (HX-0113 gives EIC-0113), with -2, -3 for more certificates on the same job. */
+export function jobNumber(projectRef: string | null | undefined, taken: string[]): string | null {
+  const m = /^HX-(\d{2,8})/.exec(String(projectRef ?? '').trim());
+  if (!m) return null;
+  const base = `EIC-${m[1]}`;
+  if (!taken.includes(base)) return base;
+  for (let n = 2; n < 100; n++) if (!taken.includes(`${base}-${n}`)) return `${base}-${n}`;
+  return null;
+}
+
+/**
+ * Keeps a draft's number in step with its job: the job's number once it has one (EIC-0113 for HX-0113), a working number (EIC-D…) when it has none.
+ * An issued certificate keeps the number it was issued under.
+ */
+export async function syncNumber(db: Db, id: string): Promise<void> {
+  const row = await readEic(db, id);
+  if (!row || row.status === 'issued') return;
+  if (!row.project_id) {
+    if (!/^EIC-D/.test(row.number)) await db.from('eic_manual').update({ number: `EIC-D${Date.now().toString(36).toUpperCase().slice(-6)}` }).eq('id', id);
+    return;
+  }
+  const { data: p } = await db.from('crm_projects').select('project_ref').eq('id', row.project_id).maybeSingle();
+  const { data: others } = await db.from('eic_manual').select('number').neq('id', id).like('number', 'EIC-%').limit(500);
+  const taken = ((others ?? []) as { number: string }[]).map((o) => o.number);
+  const base = jobNumber((p as { project_ref?: string | null } | null)?.project_ref, taken);
+  if (!base) return;
+  // Already on this job's number (or its -2, -3): keep it, so a certificate's number doesn't change under someone.
+  const mine = /^EIC-(\d+)(-\d+)?$/.exec(row.number);
+  const want = /^HX-(\d+)/.exec(String((p as { project_ref?: string | null }).project_ref ?? ''))?.[1];
+  if (mine && want && mine[1] === want) return;
+  await db.from('eic_manual').update({ number: base }).eq('id', id);
+}
+
 export async function readEic(db: Db, id: string): Promise<EicRow | null> {
   const { data } = await db.from('eic_manual').select('*').eq('id', id).maybeSingle();
   return (data as EicRow | null) ?? null;

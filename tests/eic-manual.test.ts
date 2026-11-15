@@ -217,3 +217,15 @@ describe('test instruments', () => {
     expect(v.flags.some((f) => f.severity === 'stop' && /Megger MFT1741/.test(f.text) && /run out/.test(f.text))).toBe(true);
   });
 });
+
+describe('the certificate’s number follows its job', () => {
+  it('is the job’s number, with a suffix for more on the same job', async () => {
+    const { jobNumber } = await import('@/lib/eic-manual/server');
+    expect(jobNumber('HX-0113', [])).toBe('EIC-0113');
+    expect(jobNumber('HX-0113', ['EIC-0113'])).toBe('EIC-0113-2');
+    expect(jobNumber('HX-0113', ['EIC-0113', 'EIC-0113-2'])).toBe('EIC-0113-3');
+    expect(jobNumber('HX-0170', ['EIC-0113'])).toBe('EIC-0170');
+    expect(jobNumber(null, [])).toBeNull();
+    expect(jobNumber('something else', [])).toBeNull();
+  });
+});

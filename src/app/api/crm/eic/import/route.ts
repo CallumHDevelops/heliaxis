@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, DOCS_BUCKET, ensureDocsBucket, isUuid, json } from '@/lib/crm/server';
 import { importCertificate, importEnabled } from '@/lib/eic-manual/import';
 import { scansToday, SCANS_PER_DAY } from '@/lib/eic-manual/scan';
+import { syncNumber } from '@/lib/eic-manual/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -54,5 +55,6 @@ export async function POST(req: Request) {
   const title = `Imported from ${got.scheme ? `a ${got.scheme}` : 'another'} certificate${got.certificate_no ? ` (${got.certificate_no})` : ''}`;
   const { data: row, error: e2 } = await db.from('eic_manual').insert({ route: got.route, title, enquiry_id: enquiry, project_id: project, answers, created_by: s.user.id }).select('id').single();
   if (e2 || !row) return json({ error: e2?.message || 'Couldn’t save the certificate.' }, 500);
+  if (project) await syncNumber(db, row.id as string);
   return json({ id: row.id, circuits: got.circuits, boards: got.boards, left_out: got.left_out });
 }
