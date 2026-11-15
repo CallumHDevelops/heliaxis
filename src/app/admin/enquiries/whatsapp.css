@@ -875,7 +875,10 @@ textarea.wa-input {
   [aria-label='Quick links'] { margin: 0 !important; }
   [aria-label='Quick links'] label { display: none; }
   [aria-label='Quick links'] select { max-width: none !important; width: 100%; padding: 4px 8px !important; font-size: 0.82rem !important; }
-  .wsl-row > textarea.wa-input, .wa-pane__row > textarea.wa-input { min-height: 64px; max-height: 30vh; padding: 8px 10px; }
-  .wsl-row, .wa-pane__row { gap: 6px; }
-  .wsl-row .wa-send, .wa-pane__row .wa-send { padding: 0 12px; min-height: 44px; align-self: flex-end; }
+  /* The writing box takes the full width and is taller; Send (with its clock) goes on the line below. */
+  .wsl-row, .wa-pane__row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .wsl-row > textarea.wa-input, .wa-pane__row > textarea.wa-input { width: 100%; min-height: 120px; max-height: 38vh; padding: 10px 12px; font-size: 1rem; }
+  .wsl-row .wsl-sendgroup, .wa-pane__row .wsl-sendgroup { width: 100%; }
+  .wsl-row .wsl-sendgroup > .wa-send, .wa-pane__row .wsl-sendgroup > .wa-send { flex: 1; min-height: 46px; }
+  .wsl-row > .wa-send, .wa-pane__row > .wa-send { width: 100%; min-height: 46px; }
 }
