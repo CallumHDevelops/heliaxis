@@ -31,6 +31,7 @@ const toNumber = (s: string): number | string | undefined => {
   const t = s.trim().replace(',', '.');
   if (!t) return undefined;
   if (/^>\s*\d+(\.\d+)?$/.test(t)) return `>${t.replace(/^>\s*/, '')}`;
+  if (/^lim$/i.test(t)) return 'LIM';
   const n = Number(t);
   return Number.isFinite(n) ? n : undefined;
 };
@@ -66,10 +67,10 @@ function Num({ c, value, onChange }: { c: Ctl; value: unknown; onChange: Set }) 
     if (s.trim() === '') onChange(undefined);
     else if (n !== undefined) onChange(n);
   };
-  if (c.na && value === 'na')
+  if ((c.na && value === 'na') || value === 'LIM')
     return (
       <button type="button" className="em-na is-on" onClick={() => onChange(undefined)}>
-        ✓ N/A <small>(click to change)</small>
+        ✓ {value === 'LIM' ? 'LIM (limitation)' : 'N/A'} <small>(click to change)</small>
       </button>
     );
   const bad = display.trim() !== '' && toNumber(display) === undefined;
@@ -106,11 +107,16 @@ function Num({ c, value, onChange }: { c: Ctl; value: unknown; onChange: Set }) 
           ))}
         </div>
       )}
-      {c.na && (
-        <button type="button" className="em-na" onClick={() => onChange('na')}>
-          N/A
+      <div className="em-chips">
+        {c.na && (
+          <button type="button" className="em-na" onClick={() => onChange('na')}>
+            N/A
+          </button>
+        )}
+        <button type="button" className="em-na" title="A limitation: it couldn’t be measured or seen" onClick={() => onChange('LIM')}>
+          LIM
         </button>
-      )}
+      </div>
     </div>
   );
 }

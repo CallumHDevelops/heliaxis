@@ -143,3 +143,25 @@ describe('reading a photo into circuits', () => {
     expect(Object.keys(toRecord({ ...blank, n: '1' }).fields)).toEqual(['n']);
   });
 });
+
+describe('LIM (a limitation) in place of a reading', () => {
+  it('counts as an answer in the certificate’s number boxes, and prints as LIM', async () => {
+    const done = await fillIn(row());
+    const set = { eic_md: 'LIM', 'eic_db:c-c1': { ...(Object.values(done.answers).length ? (done.answers['eic_db:c-c1']?.v as object) : {}), zs: 'LIM' } };
+    const lim = { ...done, answers: applyAnswers(done.answers, set, []), sigs: { eic_sig_one: { png: PNG, at: '2026-11-14T10:00:00Z' } } };
+    const v = await viewOf(db, lim, who);
+    expect(v.missing.map((m) => m.label)).toEqual([]);
+    expect((await makePdf(db, lim, who)).final).toBe(true);
+  });
+  it('an imported answer is kept only if it is a valid one', async () => {
+    const { cleanAnswer, catalogue } = await import('@/lib/eic-manual/import');
+    const cat = new Map(catalogue().map((c) => [c.key, c]));
+    expect(cleanAnswer(cat.get('eic_earthing')!, 'tt')).toBe('tt');
+    expect(cleanAnswer(cat.get('eic_earthing')!, 'made up')).toBeUndefined();
+    expect(cleanAnswer(cat.get('eic_md')!, 'LIM')).toBe('LIM');
+    expect(cleanAnswer(cat.get('eic_md')!, '100')).toBe(100);
+    expect(cleanAnswer(cat.get('eic_md')!, 'lots')).toBeUndefined();
+    expect(cleanAnswer(cat.get('eic_i1')!, 'done')).toBe('done');
+    expect(cleanAnswer(cat.get('eic_i1')!, 'maybe')).toBeUndefined();
+  });
+});

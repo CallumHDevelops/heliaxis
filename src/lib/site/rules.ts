@@ -76,7 +76,8 @@ function given(f: Field, v: unknown): boolean {
   if (f.na && v === 'na') return true;
   switch (f.type) {
     case 'NUM':
-      return isReading(v);
+      // The certificate's own boxes also take LIM (a limitation).
+      return isReading(v) || (f.key.startsWith('eic_') && typeof v === 'string' && v.trim().toUpperCase() === 'LIM');
     case 'TEXT':
     case 'LONG':
       return text(v).length > 0;

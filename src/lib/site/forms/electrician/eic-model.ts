@@ -281,12 +281,14 @@ export function readingOf(v: unknown): number | null {
   }
   return null;
 }
+/** "LIM": a limitation, written in place of a reading that couldn't be taken (as the certificate's own form allows). */
+export const isLim = (v: unknown) => typeof v === 'string' && v.trim().toUpperCase() === 'LIM';
 export const isGt = (v: unknown) => typeof v === 'string' && v.trim().startsWith('>');
 
 export function filled(p: Prop, v: unknown): boolean {
   switch (p.type) {
     case 'NUM':
-      return readingOf(v) !== null;
+      return readingOf(v) !== null || isLim(v);
     case 'CONFIRM':
       return v === true;
     case 'MULTI':

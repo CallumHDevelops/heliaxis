@@ -468,6 +468,11 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
         </div>
       </div>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      {!installer && view.status === 'draft' && view.title.startsWith('Imported from') && (
+        <p className="crm-banner">
+          {view.title}. It was read from the original, so check every answer against it. Signatures aren’t copied: it needs signing again by whoever is responsible for it, and it should only be issued under our name if the work was ours to certify.
+        </p>
+      )}
       {asking && (
         <RequestSheet
           id={id}

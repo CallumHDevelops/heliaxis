@@ -38,7 +38,7 @@ import {
   type ScheduleGroup,
 } from '@/lib/site/fixed/iet-eic';
 import { BONDS, COMMENTS, EARTHING, INSPECTION_KEY, MATERIAL, MS_DEVICE, type DesignSign } from '@/lib/site/forms/electrician/eic';
-import { boardsOf, isGt, readingOf, type Board, type Circuit, type Rec } from '@/lib/site/forms/electrician/eic-model';
+import { boardsOf, isGt, isLim, readingOf, type Board, type Circuit, type Rec } from '@/lib/site/forms/electrician/eic-model';
 import { HELIAXIS_COMPANY, HELIAXIS_PARTY } from '@/lib/subcontractors/agreement';
 import { AMBER, MissingAnswer, newDocument, type Drawing, type Kit, type Variant } from '../pdf-kit';
 import { blank, crossMark, dots, fitName, fitText, formDate, frame, hline, INK, plain, RED, rich, richCentre, richWidth, strike, tickBox, tickMark, value, vline, type Fitted, type Val } from './form';
@@ -115,6 +115,7 @@ const LANDSCAPE_W = 841.89 - MARGINS.l - MARGINS.r;
 
 /** A reading as printed: "0.45", ">999"; null when there isn't one. */
 const reading = (v: unknown) => {
+  if (isLim(v)) return 'LIM';
   const r = readingOf(v);
   if (r === null) return null;
   return isGt(v) ? `>${r}` : String(v);

@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AssignPicker, type Picked } from '@/components/admin/AssignPicker';
-import { Sheet } from '../crm/CrmUi';
+import { createClient } from '@/lib/supabase/client';
+import { FileButton, Sheet } from '../crm/CrmUi';
+import { WritingSpark } from '../sales/quotes/[id]/WritingSpark';
+import '../sales/quotes/quotes.css';
 import '../crm/crm.css';
 import './eic-manual.css';
 
@@ -19,6 +22,7 @@ export function EicList() {
   const [err, setErr] = useState('');
   const [q, setQ] = useState('');
   const [making, setMaking] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     void fetch('/api/crm/eic', { cache: 'no-store' })
@@ -37,9 +41,14 @@ export function EicList() {
           <h1>EIC certificates</h1>
           <p className="crm-muted">Electrical Installation Certificates written up here: the same certificate the site app makes, for work you want to record by hand.</p>
         </div>
-        <button type="button" className="crm-btn crm-btn--solar" onClick={() => setMaking(true)}>
-          + New EIC
-        </button>
+        <div className="em-actions">
+          <button type="button" className="crm-btn crm-btn--ghost" onClick={() => setImporting(true)}>
+            Import a certificate
+          </button>
+          <button type="button" className="crm-btn crm-btn--solar" onClick={() => setMaking(true)}>
+            + New EIC
+          </button>
+        </div>
       </header>
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       <input className="crm-input em-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by number, customer, job or address" aria-label="Search certificates" />
@@ -61,6 +70,7 @@ export function EicList() {
           ))}
         </ul>
       )}
+      {importing && <ImportEic onClose={() => setImporting(false)} onMade={(id) => router.push(`/admin/eic/${id}`)} />}
       {making && <NewEic onClose={() => setMaking(false)} onMade={(id) => router.push(`/admin/eic/${id}`)} />}
     </div>
   );
@@ -112,6 +122,62 @@ function NewEic({ onClose, onMade }: { onClose: () => void; onMade: (id: string)
           <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={() => void make()}>
             {busy ? 'Starting…' : 'Start the certificate'}
           </button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Import a certificate someone else made (NICEIC, NAPIT…): the file goes straight to storage, is read, and becomes a draft of ours to check. */
+function ImportEic({ onClose, onMade }: { onClose: () => void; onMade: (id: string) => void }) {
+  const [who, setWho] = useState<Picked | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function run(files: File[]) {
+    const f = files[0];
+    if (!f) return;
+    setBusy(true);
+    setErr('');
+    try {
+      const head = { 'Content-Type': 'application/json' };
+      const prep = await fetch('/api/crm/eic/import', { method: 'POST', headers: head, body: JSON.stringify({ action: 'prepare', name: f.name }) });
+      const p = await prep.json().catch(() => ({}));
+      if (!prep.ok) throw new Error(p.error || 'Couldn’t start the upload.');
+      const up = await createClient().storage.from(p.bucket).uploadToSignedUrl(p.path, p.token, f, { contentType: f.type || undefined });
+      if (up.error) throw new Error(`Upload failed: ${up.error.message}`);
+      const r = await fetch('/api/crm/eic/import', { method: 'POST', headers: head, body: JSON.stringify({ action: 'import', path: p.path, enquiry_id: who?.enquiry_id, project_id: who?.project_id }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.id) throw new Error(d.error || 'It couldn’t read that certificate.');
+      onMade(d.id as string);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'It couldn’t read that certificate.');
+      setBusy(false);
+    }
+  }
+  return (
+    <Sheet title="Import a certificate" onClose={onClose}>
+      <div className="em-new">
+        <p style={{ margin: 0 }}>
+          Choose an Electrical Installation Certificate made by another contractor (an NICEIC or NAPIT one, as a PDF or a photo). It’s read into one of ours as a draft, with its circuits and test results.
+        </p>
+        <small className="crm-muted">
+          Signatures are never copied, and anything it wasn’t sure of is left for you to fill in. Check every answer against the original before it’s issued, and only issue it under our name if the work was ours to certify.
+        </small>
+        <div className="em-lab">Assign to (optional)</div>
+        {who ? (
+          <div className="em-who">
+            <b>{who.label}</b>
+            <button type="button" className="crm-link" onClick={() => setWho(null)}>
+              Change
+            </button>
+          </div>
+        ) : (
+          <AssignPicker onPick={setWho} autoFocus={false} />
+        )}
+        {busy && <WritingSpark label="Reading the certificate" steps={['Uploading the certificate', 'Reading the supply and earthing', 'Reading the inspections', 'Reading each circuit', 'Checking what is certain']} stepMs={5000} />}
+        {err && <p className="crm-banner crm-banner--err">{err}</p>}
+        <div className="crm-actions">
+          <FileButton label={busy ? 'Reading…' : 'Choose the certificate'} accept="application/pdf,image/jpeg,image/png,image/webp" busy={busy} onFiles={(f) => void run(f)} variant="solar" />
         </div>
       </div>
     </Sheet>
