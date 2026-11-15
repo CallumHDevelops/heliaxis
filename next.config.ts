@@ -46,6 +46,9 @@ const nextConfig: NextConfig = {
       { source: '/api/book/:path*', headers: sensitiveHeaders },
       // An installer's personal link to fill in a certificate (/eic/fill/<token>).
       { source: '/eic/fill/:path*', headers: sensitiveHeaders },
+      // A customer's personal review link (/review/<token>).
+      { source: '/review/:path*', headers: sensitiveHeaders },
+      { source: '/api/review/:path*', headers: sensitiveHeaders },
       { source: '/api/eic/:path*', headers: sensitiveHeaders },
       { source: '/api/rams/:path*', headers: sensitiveHeaders },
       { source: '/api/admin/:path*', headers: sensitiveHeaders },

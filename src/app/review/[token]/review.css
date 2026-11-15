@@ -1,0 +1,18 @@
+.rv { min-height: 100vh; background: #f7f2e7; color: #211f18; font-family: 'Hanken Grotesk', system-ui, sans-serif; padding: 0 16px 40px; display: grid; align-content: start; justify-items: center; gap: 18px; }
+.rv * { box-sizing: border-box; }
+.rv-head { width: 100%; max-width: 560px; padding: 18px 0 12px; border-bottom: 2px solid #f8bc1e; }
+.rv-card { width: 100%; max-width: 560px; background: #fffdf8; border: 1px solid #e4ddcc; border-radius: 14px; padding: 26px 24px 28px; display: grid; gap: 14px; }
+.rv-card h1 { margin: 0; font-size: 1.6rem; line-height: 1.25; }
+.rv-card p { margin: 0; line-height: 1.55; }
+.rv-actions { display: grid; gap: 10px; margin-top: 4px; }
+.rv-btn { display: block; width: 100%; text-align: center; font: inherit; font-weight: 700; font-size: 1.02rem; padding: 14px 18px; border-radius: 10px; border: 2px solid #f8bc1e; background: #f8bc1e; color: #211f18; text-decoration: none; cursor: pointer; }
+.rv-btn:hover { background: #ffcb45; border-color: #ffcb45; }
+.rv-btn--ghost { background: transparent; border-color: #211f18; }
+.rv-btn--ghost:hover { background: rgba(33, 31, 24, 0.06); border-color: #211f18; }
+.rv-btn:disabled { opacity: 0.5; cursor: default; }
+.rv-private { display: grid; gap: 10px; }
+.rv-private label { font-weight: 700; }
+.rv-private textarea { width: 100%; font: inherit; padding: 12px; border: 1px solid #bdb6a4; border-radius: 10px; background: #fff; color: inherit; resize: vertical; }
+.rv-thanks { font-weight: 700; padding: 10px 12px; background: rgba(46, 125, 50, 0.12); border-radius: 8px; }
+.rv-err { color: #b42318; }
+.rv-foot { color: #6e6a5e; font-size: 0.85rem; margin: 0; }

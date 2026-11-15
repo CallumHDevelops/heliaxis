@@ -20,6 +20,7 @@ import { ActivityTab } from './ActivityTab';
 import { CompactCustomer, CustomerColumn } from './CustomerColumn';
 import { PhotosTab } from './PhotosTab';
 import { defaultDocsView, DocsHub, type DocsView } from './DocsHub';
+import { ReviewSheet } from './ReviewSheet';
 import { EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
@@ -529,7 +530,8 @@ export function ProjectView({
         addDocument('mcs');
         return;
       case 'ask_review':
-        openWhatsApp(`Hi ${first}, thank you for choosing Heliaxis. If you’re happy with everything, would you leave us a quick review? It really helps us.`);
+        // The same neutral request for everyone (never "if you're happy"): a personal link with Google, Trustpilot or private feedback.
+        openSheet('review');
         return;
       case 'reopen':
         openSheet('stage');
@@ -793,6 +795,7 @@ export function ProjectView({
           }}
         />
       )}
+      {sheet === 'review' && <ReviewSheet customer={{ id: c.id, name: c.name, email: c.email, phone: phoneShown(c, wa.number) }} projectId={id} onClose={closeSheet} onWhatsApp={(t) => { closeSheet(); openWhatsApp(t); }} />}
       {sheet === 'task' && <TaskEditor id={id} team={rec.team} today={today} defaultAssignee={p.owner_id} onSaved={savedAndClose} onClose={closeSheet} />}
       {sheet === 'next' && (
         <NextStepEditor

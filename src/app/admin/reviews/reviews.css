@@ -1,0 +1,25 @@
+.rvw-page { max-width: 900px; margin: 0 auto; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.rvw-page, .rvw-page * { box-sizing: border-box; }
+.rvw-page h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.rvw-page header p { margin: 0; max-width: 70ch; }
+.rvw-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 16px; display: grid; gap: 12px; }
+.rvw-card h2 { margin: 0; font-size: 1.05rem; }
+.rvw-field { display: grid; gap: 4px; }
+.rvw-field label { font-weight: 700; font-size: 0.9rem; }
+.rvw-inline { display: flex; gap: 8px; }
+.rvw-inline .crm-input { flex: 1; min-width: 0; }
+.rvw-rules { border-left: 3px solid #f8bc1e; background: rgba(248, 188, 30, 0.1); padding: 10px 14px; font-size: 0.9rem; }
+.rvw-rules ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+.rvw-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.rvw-stats > div { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: grid; gap: 2px; }
+.rvw-stats b { font-size: 1.4rem; }
+.rvw-stats span { font-size: 0.78rem; color: var(--muted); }
+.rvw-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.rvw-list li { padding: 10px 12px; }
+.rvw-list li + li { border-top: 1px solid var(--border-soft, var(--border)); }
+.rvw-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.rvw-chips { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.rvw-chips i { font-style: normal; font-size: 0.72rem; font-weight: 800; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-strong, var(--border)); }
+.rvw-chips i.is-fb { background: rgba(248, 188, 30, 0.25); border-color: #f8bc1e; }
+.rvw-fb { margin: 6px 0 0; padding: 8px 10px; background: rgba(248, 188, 30, 0.12); border-radius: 8px; font-size: 0.9rem; white-space: pre-wrap; }
+@media (max-width: 700px) { .rvw-row { grid-template-columns: 1fr; gap: 4px; } .rvw-chips { justify-content: flex-start; } }

@@ -25,6 +25,7 @@ type Tab =
   | 'projects'
   | 'eic'
   | 'instruments'
+  | 'reviews'
   | 'orders'
   | 'surveys'
   | 'whatsapp'
@@ -101,6 +102,11 @@ export const icons = {
   close: (
     <svg {...ICON}>
       <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  ),
+  reviews: (
+    <svg {...ICON}>
+      <path d="M12 3l2.6 6 6.4.6-4.8 4.2 1.4 6.2L12 17l-5.6 3 1.4-6.2L3 9.6 9.4 9z" />
     </svg>
   ),
   instruments: (
@@ -388,6 +394,7 @@ export async function AdminShell({
         { href: '/admin/crm/organisations', label: 'Organisations', icon: <svg {...ICON}><path d="M4 21V4l9-1v18M13 8h7v13M7.5 8h2M7.5 12h2M7.5 16h2M16 12h1.5M16 16h1.5M2 21h20" /></svg>, show: can('crm'), section: 'Customers' },
         { href: '/admin/crm/contacts', label: 'Contacts', icon: <svg {...ICON}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>, show: can('crm'), section: 'Customers' },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab, section: 'Enquiries and messages' },
+        { href: '/admin/reviews', label: 'Reviews', icon: icons.reviews, active: active === 'reviews', show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
         { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },

@@ -17,7 +17,7 @@ import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import { copyText, send, type Area, type Customer, type Project, type WaInfo } from './record-shared';
 
 /** What the + sheet can open. */
-export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document';
+export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review';
 
 /** The + sheet's icons, all from the brand kit (see BrandIcon). */
 const MENU_ICONS = {
@@ -32,6 +32,7 @@ const MENU_ICONS = {
   tile: 'star',
   newproject: 'handshake',
   document: 'document',
+  review: 'star',
 } as const;
 
 /** "Add to Jane": the + button's sheet. WhatsApp has its own green button now; the stage's own action is the last tile. */
@@ -47,6 +48,7 @@ export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Custo
     ['stage', 'stage', 'Move stage'],
     ['newproject', 'newproject', 'Opportunity', 'Another job for them'],
     ['document', 'document', 'Document', 'Tender or letter'],
+    ['review', 'review', 'Ask for a review', 'Email, text or WhatsApp'],
   ];
   return (
     <Sheet title={`Add to ${customer.name}`} onClose={() => onPick(null)}>
