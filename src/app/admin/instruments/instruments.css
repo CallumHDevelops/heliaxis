@@ -1,0 +1,31 @@
+/* Operations › Test instruments. Inside .crm. */
+.in-page { max-width: 1300px; margin: 0 auto; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.in-page, .in-page * { box-sizing: border-box; }
+.in-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.in-head h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.in-head p { margin: 0; max-width: 66ch; }
+.in-tools { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.in-search { max-width: 460px; flex: 1; }
+.in-check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.in-empty { color: var(--muted); padding: 14px 4px; margin: 0; }
+.in-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.in-list li + li { border-top: 1px solid var(--border-soft, var(--border)); }
+.in-list li.is-retired { opacity: 0.6; }
+.in-list button { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 230px; gap: 12px; align-items: center; width: 100%; padding: 12px 16px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.in-list button:hover { background: rgb(var(--fg-rgb) / 0.04); }
+.in-name, .in-ids, .in-cal { display: grid; gap: 2px; min-width: 0; }
+.in-name small, .in-ids small, .in-cal small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.in-chip { justify-self: end; font-size: 0.76rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-strong, var(--border)); white-space: nowrap; }
+.in-chip--ok { background: rgba(46, 125, 50, 0.14); border-color: rgba(46, 125, 50, 0.5); }
+.in-chip--soon { background: rgba(248, 188, 30, 0.2); border-color: rgba(248, 188, 30, 0.7); }
+.in-chip--expired { background: rgba(180, 35, 24, 0.14); border-color: rgba(180, 35, 24, 0.6); color: #8c1d12; }
+.in-chip--unknown, .in-chip--retired { color: var(--muted); }
+.in-form { display: grid; gap: 10px; }
+.in-field { display: grid; gap: 4px; }
+.in-field label { font-weight: 700; font-size: 0.85rem; }
+.in-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 760px) {
+  .in-list button { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .in-chip { justify-self: start; }
+  .in-two { grid-template-columns: 1fr; }
+}

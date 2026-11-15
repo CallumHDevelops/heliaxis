@@ -48,7 +48,7 @@ export function calWords(due: string | null | undefined, today: string): string 
 }
 
 /** The instrument a serial or asset number written on a certificate belongs to. */
-export function findInstrument(list: Pick<Instrument, 'id' | 'serial' | 'asset_no'>[], value: string | null | undefined) {
+export function findInstrument<T extends Pick<Instrument, 'serial' | 'asset_no'>>(list: T[], value: string | null | undefined): T | null {
   const v = (value ?? '').trim().toLowerCase();
   if (!v) return null;
   return list.find((i) => (i.serial && i.serial.trim().toLowerCase() === v) || (i.asset_no && i.asset_no.trim().toLowerCase() === v)) ?? null;

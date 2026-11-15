@@ -7,6 +7,7 @@ import { AssignPicker, type Picked } from '@/components/admin/AssignPicker';
 import { AddressFinder } from '../../projects/AddressFinder';
 import { Sheet } from '../../crm/CrmUi';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
+import { calState, calWords, findInstrument } from '@/lib/instruments/shared';
 import { boardKey, circuitKey, INSTRUMENTS } from '@/lib/site/forms/electrician/eic-model';
 import type { EicView, FieldView } from '@/lib/eic-manual/server';
 import '../../crm/crm.css';
@@ -275,14 +276,47 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
       }
       case 'eic-instruments': {
         const o = (valueOf(f) && typeof valueOf(f) === 'object' ? valueOf(f) : {}) as Record<string, string>;
+        const KIND_FOR: Record<string, string[]> = { mft: ['mft'], cont: ['continuity', 'mft'], ir: ['ir', 'mft'], efli: ['efli', 'mft'], rcd: ['rcd', 'mft'], earth: ['earth'] };
         return (
           <div className="em-props">
-            {INSTRUMENTS.map((i) => (
-              <div key={i.k} className="em-prop">
-                <label>{i.label}</label>
-                <input className="crm-input" value={o[i.k] ?? ''} disabled={locked} placeholder="Serial or asset number" onChange={(e) => change(f.key, { ...o, [i.k]: e.target.value })} />
-              </div>
-            ))}
+            {INSTRUMENTS.map((i) => {
+              const hit = findInstrument(view.instruments, o[i.k]);
+              const st = hit ? calState(hit.calibration_due, view.today) : null;
+              // The kinds that suit this role first, then the rest.
+              const list = [...view.instruments].sort((a, b) => Number(KIND_FOR[i.k].includes(b.kind)) - Number(KIND_FOR[i.k].includes(a.kind)) || a.name.localeCompare(b.name));
+              return (
+                <div key={i.k} className="em-prop">
+                  <label>{i.label}</label>
+                  {list.length > 0 && (
+                    <select
+                      className="crm-input"
+                      disabled={locked}
+                      aria-label={`${i.label}: choose from our instruments`}
+                      value={hit?.id ?? ''}
+                      onChange={(e) => {
+                        const d = view.instruments.find((x) => x.id === e.target.value);
+                        change(f.key, { ...o, [i.k]: d ? d.serial || d.asset_no : '' });
+                      }}
+                    >
+                      <option value="">Choose from our instruments…</option>
+                      {list.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                          {d.serial ? ` · SN ${d.serial}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <input className="crm-input" value={o[i.k] ?? ''} disabled={locked} placeholder="Serial or asset number" onChange={(e) => change(f.key, { ...o, [i.k]: e.target.value })} />
+                  {hit && st && <small className={`em-cal em-cal--${st}`}>{hit.name}: {calWords(hit.calibration_due, view.today)}</small>}
+                </div>
+              );
+            })}
+            {!installer && (
+              <small className="crm-muted">
+                Not listed? Add it under <Link href="/admin/instruments">Operations › Test instruments</Link>, with its calibration and expiry dates.
+              </small>
+            )}
           </div>
         );
       }

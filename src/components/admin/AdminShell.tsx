@@ -24,6 +24,7 @@ type Tab =
   | 'sales'
   | 'projects'
   | 'eic'
+  | 'instruments'
   | 'orders'
   | 'surveys'
   | 'whatsapp'
@@ -100,6 +101,13 @@ export const icons = {
   close: (
     <svg {...ICON}>
       <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  ),
+  instruments: (
+    <svg {...ICON}>
+      <path d="M5 18a8 8 0 1 1 14 0" />
+      <path d="M12 14l3-4" />
+      <path d="M4 20h16" />
     </svg>
   ),
   eic: (
@@ -414,6 +422,7 @@ export async function AdminShell({
       items: [
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         { href: '/admin/eic', label: 'EIC certificates', short: 'EIC', icon: icons.eic, active: active === 'eic', show: can('crm') },
+        { href: '/admin/instruments', label: 'Test instruments', short: 'Instruments', icon: icons.instruments, active: active === 'instruments', show: can('crm') },
         // On site: one tap away on the phone's bottom bar, so not in "More".
         { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring, badge: socialUrgent },
         { href: '/admin/value', label: 'Added value', icon: icons.analytics, active: active === 'value', show: admin },

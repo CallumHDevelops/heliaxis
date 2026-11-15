@@ -204,3 +204,8 @@
 .em-page { grid-template-columns: minmax(0, 1fr); }
 .em-page > * { min-width: 0; }
 .em-page, .em-page * { box-sizing: border-box; }
+
+.em-cal { font-weight: 700; }
+.em-cal--ok { color: #2e7d32 !important; }
+.em-cal--soon { color: #b26a00 !important; }
+.em-cal--expired { color: #b42318 !important; }

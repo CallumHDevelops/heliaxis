@@ -1,5 +1,6 @@
 import 'server-only';
 import { ukDay } from '@/lib/bank-holidays';
+import { calState, calWords, findInstrument, type Instrument } from '@/lib/instruments/shared';
 import { EIC_REVISION, eicPdf, type SigImage } from '@/lib/documents/eic/eic';
 import { docFileName, MissingAnswer, type Variant } from '@/lib/documents/pdf-kit';
 import { saveGenerated } from '@/lib/documents/store';
@@ -7,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { HELIAXIS_COMPANY } from '@/lib/subcontractors/agreement';
 import { designOf as systemDesign } from '@/lib/site/design';
 import { EIC_FLAGS, EIC_STEPS, certMissing, designOf, type DesignSign } from '@/lib/site/forms/electrician/eic';
-import { BOARD, DETAILS, TESTS, boardDone, boardName, boardsOf, circuitDone, circuitName, editionOf, propCtx, routeOf, shownProps, type Prop, type PropCtx, type Rec } from '@/lib/site/forms/electrician/eic-model';
+import { BOARD, DETAILS, INSTRUMENTS, TESTS, boardDone, boardName, boardsOf, circuitDone, circuitName, editionOf, propCtx, routeOf, shownProps, type Prop, type PropCtx, type Rec } from '@/lib/site/forms/electrician/eic-model';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { splitPostcode } from '@/lib/site/eic/facts';
 import { makeCtx } from '@/lib/site/rules';
@@ -158,6 +159,9 @@ export type EicView = {
   designNeeded: boolean;
   design: DesignSign | null;
   request: Omit<InfoRequest, 'token'> | null;
+  /** The business's test instruments to pick from, and today's date for their calibration. */
+  instruments: Pick<Instrument, 'id' | 'name' | 'kind' | 'serial' | 'asset_no' | 'calibration_due' | 'assigned_to'>[];
+  today: string;
 };
 
 const propView = (p: Prop): PropView => ({ k: p.k, col: p.col, label: p.label, head: p.head, type: p.type, unit: p.unit, dp: p.dp, chips: p.chips, picks: p.picks, options: p.options, gt: p.gt, level: p.level, test: p.test, group: p.group, hint: p.hint });
@@ -231,6 +235,15 @@ export async function viewOf(db: Db, row: EicRow, who: Who): Promise<EicView> {
       return false;
     }
   }).map((f) => ({ severity: typeof f.severity === 'function' ? f.severity(ctx) : f.severity, text: f.text(ctx) }));
+  // The instruments to pick from (the register may not be set up yet: then there are none), and a warning for any used that is out of calibration.
+  const today = ukDay(new Date());
+  const { data: inst } = await db.from('test_instruments').select('id, name, kind, serial, asset_no, calibration_due, assigned_to, status').eq('status', 'active').order('name').limit(200);
+  const instruments = ((inst ?? []) as (Pick<Instrument, 'id' | 'name' | 'kind' | 'serial' | 'asset_no' | 'calibration_due' | 'assigned_to'> & { status: string })[]).map(({ status: _s, ...i }) => (void _s, i));
+  const used = (ctx.values.eic_inst && typeof ctx.values.eic_inst === 'object' ? (ctx.values.eic_inst as Record<string, unknown>) : {}) as Record<string, unknown>;
+  for (const [role, val] of Object.entries(used)) {
+    const hit = typeof val === 'string' ? findInstrument(instruments, val) : null;
+    if (hit && calState(hit.calibration_due, today) === 'expired') flags.push({ severity: 'stop', text: `${hit.name} (${val}) was used as the ${(INSTRUMENTS.find((i) => i.k === role)?.label ?? role).toLowerCase()}, but its calibration has run out. ${calWords(hit.calibration_due, today)}.` });
+  }
   const sigs: Record<string, string | null> = {};
   for (const k of SIG_KEYS) sigs[k] = row.sigs[k] ? `data:image/png;base64,${row.sigs[k]!.png}` : null;
   return {
@@ -251,6 +264,8 @@ export async function viewOf(db: Db, row: EicRow, who: Who): Promise<EicView> {
     complete: miss.length === 0 && (!designNeeded || (!!design && !!row.sigs.eic_design)),
     designNeeded,
     design,
+    instruments,
+    today,
     request: row.request ? { name: row.request.name, email: row.request.email, message: row.request.message, sent_at: row.request.sent_at, submitted_at: row.request.submitted_at } : null,
   };
 }

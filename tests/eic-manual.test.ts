@@ -192,3 +192,28 @@ describe('the job gets the certificate’s address when it has none', () => {
     expect(f.updates).toEqual([]);
   });
 });
+
+describe('test instruments', () => {
+  it('knows where a calibration stands', async () => {
+    const { calState, findInstrument } = await import('@/lib/instruments/shared');
+    expect(calState('2027-01-01', '2026-11-14')).toBe('ok');
+    expect(calState('2026-11-30', '2026-11-14')).toBe('soon');
+    expect(calState('2026-11-13', '2026-11-14')).toBe('expired');
+    expect(calState('2026-11-14', '2026-11-14')).toBe('soon');
+    expect(calState(null, '2026-11-14')).toBe('unknown');
+    const list = [{ serial: 'ABC123', asset_no: 'HX-T1' }, { serial: '', asset_no: 'HX-T2' }];
+    expect(findInstrument(list, 'abc123')).toBe(list[0]);
+    expect(findInstrument(list, 'HX-T2')).toBe(list[1]);
+    expect(findInstrument(list, 'zzz')).toBeNull();
+  });
+  it('flags a certificate that used an instrument out of calibration', async () => {
+    const chain: Record<string, unknown> = {};
+    for (const m of ['select', 'eq', 'in', 'order']) chain[m] = () => chain;
+    chain.limit = async () => ({ data: [{ id: 'i1', name: 'Megger MFT1741', kind: 'mft', serial: 'SN9', asset_no: '', calibration_due: '2020-01-01', assigned_to: '', status: 'active' }] });
+    chain.maybeSingle = async () => ({ data: null });
+    const withInst = { from: () => chain } as never;
+    const v = await viewOf(withInst, row({ answers: applyAnswers({}, { eic_inst: { mft: 'SN9' } }, []) }), who);
+    expect(v.instruments).toHaveLength(1);
+    expect(v.flags.some((f) => f.severity === 'stop' && /Megger MFT1741/.test(f.text) && /run out/.test(f.text))).toBe(true);
+  });
+});
