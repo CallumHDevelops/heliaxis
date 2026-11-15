@@ -242,3 +242,4 @@
 .wa-tasksheet q {
   font-style: italic;
 }
+.wa-msgmenu button svg { flex: none; vertical-align: -3px; }

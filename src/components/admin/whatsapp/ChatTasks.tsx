@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { memo, useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { suggestReminder, type Suggestion } from '@/lib/whatsapp/chat-time';
 import { shownBody } from '@/lib/whatsapp/describe';
+import { BrandIcon } from '@/app/admin/crm/CrmUi';
 import type { ChatJobInfo, Done, TaskKind } from './ChatTaskSheets';
 import './chat-tasks.css';
 
@@ -263,7 +264,7 @@ export function useChatTasks({
 }
 
 /**
- * A message's own menu: "Make a reminder from this", "Make a task from this". The ⋯ shows beside the
+* A message's own menu: "Copy message", "Make a reminder from this", "Make a task from this". The ⋯ shows beside the
  * message on hover (computers), and always on phones, where a long press stays the phone's own text
  * selection (to copy an email address or a postcode).
  */
@@ -277,6 +278,7 @@ const MessageMenu = memo(function MessageMenu({
   onOpen: () => void;
 }) {
   const [open, setOpen] = useState<'up' | 'down' | null>(null);
+  const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
 
@@ -302,6 +304,23 @@ const MessageMenu = memo(function MessageMenu({
     return () => document.removeEventListener('pointerdown', onDown);
   }, [open]);
 
+  /** The message's words onto the clipboard (or shown to copy by hand when the browser won't allow it). */
+  const copy = async () => {
+    const text = textOf(m);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      window.prompt('Copy this', text);
+      setOpen(null);
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+      setOpen(null);
+    }, 700);
+  };
+
   const pick = (kind: TaskKind) => {
     setOpen(null);
     onStart(kind, m, btn.current);
@@ -316,7 +335,7 @@ const MessageMenu = memo(function MessageMenu({
         aria-haspopup="menu"
         aria-expanded={!!open}
         aria-label="Message options"
-        title="Make a reminder from this"
+        title="Message options"
         onClick={() => (open ? setOpen(null) : show())}
       >
         ⋯
@@ -337,6 +356,9 @@ const MessageMenu = memo(function MessageMenu({
             if (el && !el.contains(document.activeElement)) el.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
           }}
         >
+          <button type="button" role="menuitem" onClick={() => void copy()}>
+            <BrandIcon k="document" size={16} /> {copied ? 'Copied' : 'Copy message'}
+          </button>
           <button type="button" role="menuitem" onClick={() => pick('callback')}>
             ⏰ Make a reminder from this
           </button>
