@@ -165,3 +165,30 @@ describe('LIM (a limitation) in place of a reading', () => {
     expect(cleanAnswer(cat.get('eic_i1')!, 'maybe')).toBeUndefined();
   });
 });
+
+describe('the job gets the certificate’s address when it has none', () => {
+  function fake(existing: { address: string | null; postcode: string | null }) {
+    const updates: Record<string, unknown>[] = [];
+    const q: Record<string, unknown> = {};
+    q.select = () => q;
+    q.eq = () => q;
+    q.maybeSingle = async () => ({ data: existing });
+    q.update = (p: Record<string, unknown>) => {
+      updates.push(p);
+      return { eq: async () => ({ error: null }) };
+    };
+    return { db: { from: () => q } as never, updates };
+  }
+  it('fills an empty job address and postcode', async () => {
+    const { fillProjectAddress } = await import('@/lib/eic-manual/server');
+    const f = fake({ address: null, postcode: null });
+    expect(await fillProjectAddress(f.db, 'p1', '182 High Street, Splott, Cardiff, CF24 3DT')).toBe(true);
+    expect(f.updates[0]).toEqual({ address: '182 High Street\nSplott\nCardiff', postcode: 'CF24 3DT' });
+  });
+  it('leaves a job that already has an address alone', async () => {
+    const { fillProjectAddress } = await import('@/lib/eic-manual/server');
+    const f = fake({ address: '1 Other Road', postcode: 'NP1 1AA' });
+    expect(await fillProjectAddress(f.db, 'p1', '182 High Street, CF24 3DT')).toBe(false);
+    expect(f.updates).toEqual([]);
+  });
+});

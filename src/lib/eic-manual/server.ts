@@ -44,6 +44,25 @@ export const SIG_KEYS = ['eic_sig_con', 'eic_sig_ins', 'eic_sig_one', 'eic_desig
 /** Keys a record's answers may have: the certificate's (eic_…), nothing else. */
 const KEY = /^eic_[A-Za-z0-9_]{1,30}(?::[A-Za-z0-9_-]{1,30})?$/;
 
+/**
+ * The certificate takes its address from the job; when the job has none, the address given on the certificate is put on the job (the lines the
+ * job keeps them in, and its postcode). A job that already has an address is left alone.
+ */
+export async function fillProjectAddress(db: Db, projectId: string | null, address: string): Promise<boolean> {
+  const full = address.trim();
+  if (!projectId || !full) return false;
+  const { data } = await db.from('crm_projects').select('address, postcode').eq('id', projectId).maybeSingle();
+  if (!data) return false;
+  const p = data as { address: string | null; postcode: string | null };
+  if ((p.address ?? '').trim()) return false;
+  const where = splitPostcode(full);
+  const lines = (where.address ?? full).split(/\s*,\s*|\n/).map((l) => l.trim()).filter(Boolean).join('\n');
+  const patch: Record<string, unknown> = { address: lines };
+  if (!(p.postcode ?? '').trim() && where.postcode) patch.postcode = where.postcode;
+  const { error } = await db.from('crm_projects').update(patch).eq('id', projectId);
+  return !error;
+}
+
 export async function readEic(db: Db, id: string): Promise<EicRow | null> {
   const { data } = await db.from('eic_manual').select('*').eq('id', id).maybeSingle();
   return (data as EicRow | null) ?? null;

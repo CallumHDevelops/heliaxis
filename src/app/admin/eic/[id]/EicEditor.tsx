@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AssignPicker, type Picked } from '@/components/admin/AssignPicker';
+import { AddressFinder } from '../../projects/AddressFinder';
 import { Sheet } from '../../crm/CrmUi';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { boardKey, circuitKey, INSTRUMENTS } from '@/lib/site/forms/electrician/eic-model';
@@ -292,6 +293,10 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
     }
   };
 
+  const oneLine = (a: { address: string; postcode: string }) => [a.address, a.postcode].filter(Boolean).join(', ');
+  /** "Find the address" under an address question (the office only: the lookup needs a login). */
+  const addrFor = (f: FieldView) =>
+    !installer && !locked && /addr$/.test(f.key) && f.type === 'TEXT' ? <AddressFinder id={`af-${f.key}`} onPick={(a) => change(f.key, oneLine(a))} /> : null;
   const design = (view.design ?? {}) as Partial<NonNullable<EicView['design']>>;
   const setDesign = (k: string, v: unknown) => change('eic_design', { name: '', company: '', address: '', postcode: '', tel: '', next_n: 5, next_unit: 'years', departures: null, signed_at: new Date().toISOString(), path: 'manual', by: null, ...design, ...(local.eic_design as object | undefined), [k]: v });
   const dv = { ...design, ...((local.eic_design as object | undefined) ?? {}) } as Partial<NonNullable<EicView['design']>>;
@@ -379,6 +384,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
             }}
           >
             {w ?? <Control c={f} value={v} numbered onChange={(x) => choose(f, x)} />}
+            {addrFor(f)}
           </div>
           {f.suggest && v === undefined && !locked && !f.widget && (
             <button type="button" className="em-suggest" onClick={() => choose(f, f.suggest!.v)}>
@@ -522,6 +528,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
               Installation address
             </label>
             <input id="em-addr" className="crm-input" disabled={locked} defaultValue={view.address} key={view.address} placeholder="Taken from the job if there is one" onBlur={(e) => e.target.value.trim() !== view.address && void patch({ address: e.target.value })} />
+            {!locked && <AddressFinder id="af-install" onPick={(a) => void patch({ address: oneLine(a) })} />}
           </div>
           )}
 
@@ -573,6 +580,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
                         {f.level === 'must' ? <b title="Needed"> *</b> : null}
                       </label>
                       {w ?? <Control c={f} value={valueOf(f)} onChange={(v) => !locked && change(f.key, v)} />}
+                      {!w && addrFor(f)}
                       {f.suggest && valueOf(f) === undefined && !locked && !f.widget && (
                         <button type="button" className="em-suggest" onClick={() => change(f.key, f.suggest!.v)}>
                           Use {f.suggest.text}
@@ -610,6 +618,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
                       <input className="crm-input" disabled={locked} value={(dv.departures as string) ?? ''} onChange={(e) => setDesign('departures', e.target.value || null)} />
                     </div>
                   </div>
+                  {!locked && <AddressFinder id="af-design" onPick={(a) => { setDesign('address', a.address); setDesign('postcode', a.postcode); }} />}
                   {sigBox('eic_design', 'Designer’s signature')}
                 </section>
               )}

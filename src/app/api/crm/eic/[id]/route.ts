@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
-import { applyAnswers, readEic, ROUTES, viewOf } from '@/lib/eic-manual/server';
+import { applyAnswers, fillProjectAddress, readEic, ROUTES, viewOf } from '@/lib/eic-manual/server';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string }> };
@@ -44,6 +44,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const { error } = await db.from('eic_manual').update(patch).eq('id', id);
   if (error) return json({ error: error.message }, 500);
   const next = await readEic(db, id);
+  // A job with no address of its own gets the one written here (when the address or the job was just set).
+  if (next && next.project_id && next.address.trim() && ('address' in b || 'project_id' in b)) await fillProjectAddress(db, next.project_id, next.address);
   return json(await viewOf(db, next!, { name: s.profile.full_name || '' }));
 }
 

@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, isUuid, json } from '@/lib/crm/server';
-import { ROUTES } from '@/lib/eic-manual/server';
+import { fillProjectAddress, ROUTES } from '@/lib/eic-manual/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,5 +46,6 @@ export async function POST(req: Request) {
     .select('id')
     .single();
   if (error || !data) return json({ error: error?.message || 'Couldn’t start the certificate.' }, 500);
+  await fillProjectAddress(db, project, String(b.address || ''));
   return json({ id: data.id });
 }
