@@ -29,7 +29,7 @@ describe('the written blog articles', () => {
       });
       it('makes no claim the company cannot make', () => {
         const t = text(a);
-        expect(t).not.toMatch(/NICEIC|TrustMark|award-winning|rated (?:excellent|5)|years of experience|thousands of (?:happy )?customers|guaranteed savings/i);
+        expect(t).not.toMatch(/NICEIC|award-winning|rated (?:excellent|5)|years of experience|thousands of (?:happy )?customers|guaranteed savings/i);
         expect(t).not.toMatch(/revolutionary|game.?chang|cutting.edge|seamless|in today's fast/i);
         expect(t).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
       });

@@ -190,7 +190,7 @@ export const STRAPLINES = [
 ];
 export const CTAS = ['Get my free quote →', 'Book a free survey →', 'Estimate my savings', 'Learn more →'];
 export const CONTACT = { web: 'heliaxis.co.uk', phone: '01633 965205', email: 'hello@heliaxis.co.uk', area: 'South Wales' };
-export const ACCREDITATIONS = ['MCS', 'RECC', 'NAPIT'];
+export const ACCREDITATIONS = ['MCS', 'RECC', 'NAPIT', 'TrustMark'];
 
 /** The do's and don'ts shown in the Brand panel and enforced by the brand check. */
 export const BRAND_RULES = [

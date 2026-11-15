@@ -44,7 +44,7 @@ The brand voice should be: plain English, technically competent, authoritative, 
 
 Do not: invent prices, savings, payback periods, project figures, grants, customer testimonials or product warranties; claim a technology is suitable for every property/business; use phrases such as "revolutionary", "game-changing", "skyrocket your savings", "unlock your potential" or other generic AI marketing language; repeatedly use "sustainable future", "journey", "seamless" or "cutting-edge"; keyword-stuff headings or body copy.
 
-Where suitability, performance or return depends on the site, explain what factors determine it. Heliaxis's credentials are MCS, RECC and NAPIT and no others: never claim NICEIC, TrustMark or any other scheme, award or membership. Heliaxis covers South Wales and the South West. Use the MCS, RECC and NAPIT credentials accurately and explain why they matter rather than simply listing logos. Prioritise useful information that demonstrates real installation knowledge. Use short paragraphs, descriptive headings and occasional bullet points. Every page should lead naturally toward a survey or assessment rather than aggressively asking for a sale. Where relevant, internally link related Heliaxis services using the URLs provided in the prompt.`;
+Where suitability, performance or return depends on the site, explain what factors determine it. Heliaxis's credentials are MCS, RECC, NAPIT, TrustMark and SSIP and no others: never claim NICEIC or any other scheme, award or membership. Heliaxis covers South Wales and the South West. Use the MCS, RECC, NAPIT and TrustMark credentials accurately and explain why they matter rather than simply listing logos. Prioritise useful information that demonstrates real installation knowledge. Use short paragraphs, descriptive headings and occasional bullet points. Every page should lead naturally toward a survey or assessment rather than aggressively asking for a sale. Where relevant, internally link related Heliaxis services using the URLs provided in the prompt.`;
 
 export const PAGE_BRIEFS: PageBrief[] = [
   {
@@ -70,7 +70,7 @@ SECTION PLAN:
 6. funding(3) -> /commercial-funding: CAPEX; asset finance; solar PPA; no grant claimed unless supplied.
 7. grid(4) - battery storage & peak-shaving; workplace/fleet EV charging; monitoring & performance; grid connection & DNO (G99).
 8. steps(8) - initial discussion & data review -> site survey -> design -> proposal -> DNO/permissions -> installation -> testing & commissioning -> monitoring & handover.
-9. grid (3) - accreditations in practice: MCS (design/install standards & certification), RECC (consumer protection), NAPIT (electrical competence and Building Regulations certification).
+9. grid (4) - accreditations in practice: MCS (design/install standards & certification), RECC (consumer protection), NAPIT (electrical competence and Building Regulations certification), TrustMark (government-endorsed quality scheme for tradespeople).
 10. faq - questions below.
 11. cta - closing "Book a site survey"; note Heliaxis works across South Wales.
 
@@ -100,7 +100,7 @@ SECTION PLAN (ordered; no two dark adjacent):
 3. explorer (dark): "Why combine technologies" - Solar -> Battery -> Home -> EV -> Heat Pump -> Grid/Smart Tariff; power flow, self-use, smart-tariff charging, exporting excess.
 4. split (2, balanced): electricity picture (usage, roof suitability, EV ownership, export) vs heating picture (heat-pump requirements, heat demand) - why sizing to real demand matters.
 5. steps (6): survey, design, install, commission, handover, aftercare; survey checks usage, roof, EV, heat-pump suitability.
-6. grid (3): accreditations MCS, RECC, NAPIT - what each means: quality, consumer protection, electrical safety, standards.
+6. grid (4): accreditations MCS, RECC, NAPIT, TrustMark - what each means: quality, consumer protection, electrical safety, standards.
 7. media (blank): "Recent projects" placeholder - qualitative local installs only, no figures.
 8. faq: all questions below.
 9. cta (dark): "Book a home survey" to #quote.
@@ -176,7 +176,7 @@ SECTION PLAN (no two dark sections adjacent):
 5. grid (3) - sized around your home: array sizing to the roof; battery sizing to real consumption and habits; usage shapes the design - not every home needs one.
 6. media (blank image) - control: smart import and export tariffs; app monitoring of generation, use, battery level.
 7. explorer (dark) - add later: EV charger, heat pump, backup/EPS, extra battery. Backup/EPS is separate and must be specifically designed in.
-8. grid (3) - accreditations: MCS (certified install, unlocks export tariffs), RECC (consumer protection), NAPIT (electrical work to BS 7671, certified).
+8. grid (4) - accreditations: MCS (certified install, unlocks export tariffs), RECC (consumer protection), NAPIT (electrical work to BS 7671, certified), TrustMark (government-endorsed quality scheme).
 9. steps - survey, design, install, commission, handover, warranties & aftercare.
 10. faq - questions below.
 11. cta (dark) - book a free home energy survey.
@@ -216,7 +216,7 @@ SECTION PLAN (keep order; no two dark sections adjacent):
 4. rich — sizing honestly: total vs usable capacity; power rating (kW) vs storage (kWh); savings depend on usage, solar, tariff and design, never a blanket "batteries save money"; readiness for EV charging and heat pumps later.
 5. steps (5-7) — survey → design & sizing → safe placement + install to MCS battery-storage standards → commissioning → monitoring → handover.
 6. explorer (dark, 5) — options: add battery to existing solar; solar + battery together; battery-only (no solar); pair with EV/heat pump; EPS backup for power cuts.
-7. grid (3) — accreditations MCS, RECC, NAPIT; each explains what it means for a battery install.
+7. grid (4) — accreditations MCS, RECC, NAPIT, TrustMark; each explains what it means for a battery install.
 8. faq — questions below.
 9. cta (dark) — "Book a battery survey" → #quote.
 
@@ -334,7 +334,7 @@ SECTION PLAN (keep order; no two dark sections adjacent):
 5. grid (4) - will it suit your home: existing radiators and upsizing emitters; underfloor heating; hot-water cylinder; insulation and fabric.
 6. explorer (dark) - siting the outdoor unit: 3-5 options affecting noise, clearances, pipe runs, electrical supply.
 7. split - go further: "Pair with solar PV" vs "Add battery storage and a smart tariff"; define both (daytime self-use vs cheap-rate charging).
-8. grid (3) - accreditations: MCS, RECC, NAPIT - what each means in practice.
+8. grid (4) - accreditations: MCS, RECC, NAPIT, TrustMark - what each means in practice.
 9. faq - questions below.
 10. cta (dark) - book a survey.
 
@@ -374,7 +374,7 @@ SECTION PLAN (keep order; no two dark sections adjacent):
 4 steps (6-8): survey → supply assessment (consumer unit, earthing & protection, load check) → design (charger location, cable routes) → DNO notification where relevant → installation → testing, commissioning & app setup → handover with warranty & aftercare.
 5 grid (4): smart features — smart charging, off-peak tariff scheduling, app connectivity, load management with CT-clamp monitoring to protect the main fuse.
 6 explorer (dark): "Power your charge" — grid off-peak, surplus solar diversion, home battery, all balanced by load management. Frame solar/battery as supplementing, not fully powering, charging.
-7 grid (3): accreditations — MCS, RECC, NAPIT; each card explains what it means here (NAPIT = registered electrical competence).
+7 grid (4): accreditations — MCS, RECC, NAPIT, TrustMark; each card explains what it means here (NAPIT = registered electrical competence).
 8 faq
 9 cta (dark): book the survey.
 
@@ -404,7 +404,7 @@ SECTION PLAN (hero/explorer/cta dark, rest light; no two dark adjacent):
 3. explorer: system layers - Solar PV (generation), Battery (charge/discharge), EV charging (demand), Heat pump (heating demand), Hot water, Smart tariff/grid (import/export, smart controls).
 4. split: "Designed as one system" vs "Technologies chosen separately" - define both (shared sizing, spare capacity, one app, upgrade path vs clashing kit, wasted export).
 5. steps: home energy survey & consumption profiling; whole-home design; phased or full install (solar now, battery/EV/heat pump later); commissioning; monitoring & aftercare.
-6. grid: accreditations - MCS, RECC, NAPIT - what each means in practice. Icons shield, award, check.
+6. grid: accreditations - MCS, RECC, NAPIT, TrustMark - what each means in practice. Icons shield, award, check.
 7. media (once): monitoring - live visibility of generation, storage and use; image blank.
 8. rich (one only): phasing and future-proofing - solar first, add battery/EV/heat pump later; warranties and aftercare.
 9. faq.
@@ -444,7 +444,7 @@ SECTION PLAN (order; no two dark adjacent):
 3. split — CAPEX vs financed/PPA: buy outright (own asset, upfront capital) vs finance/PPA (spread cost, pay from savings). Detail → /commercial-funding.
 4. steps (5-7) — survey → analyse half-hourly data & demand → roof/site assessment + DNO/grid & capacity check → design matching generation to consumption, phased to limit disruption → install & commission → monitoring, solar O&M & asset performance.
 5. explorer (dark) — Sectors (6): warehousing & logistics; manufacturing; agriculture; care & education; hospitality & retail; public sector & commercial property.
-6. grid — Accreditations (4, explain each in practice): MCS, RECC, NAPIT. Icons shield,award,check,star.
+6. grid — Accreditations (4, explain each in practice): MCS, RECC, NAPIT, TrustMark. Icons shield,award,check,star.
 7. funding — 3 cards (CAPEX, asset finance/PPA, funding support) → /commercial-funding.
 8. faq.
 9. cta (dark) — Book a site survey → #quote.
@@ -485,7 +485,7 @@ SECTION PLAN:
 - steps: feasibility & design — gather half-hourly data + metering, model the load profile, assess electrical infrastructure, DNO and grid-capacity constraints, design (integrate existing solar or add new solar + BESS), install & commission, monitoring handover.
 - grid: fire/safety at a non-specialist level, monitoring and controls, warranty and lifecycle.
 - funding: three finance routes (CAPEX, asset finance, grants) to /commercial-funding.
-- grid: accreditations — MCS, RECC, NAPIT, each explained in practice.
+- grid: accreditations — MCS, RECC, NAPIT, TrustMark, each explained in practice.
 - faq
 - cta (dark): book the survey.
 
@@ -543,7 +543,7 @@ FAQ (answer all):
 
 CTA & LINKS: "Book an EV charging survey" -> #quote; use in hero, after steps and the closing cta.
 
-GUARDRAILS: Qualitative only - never invent kW ratings, prices, uptime %, project counts or grants (do not claim grants exist). Keep AC vs DC high-level. Frame on-site renewables as offsetting grid draw, not powering all charging. Back-office/payment "where applicable"; DNO upgrade "where required". Accreditations as a grid explaining MCS/RECC/NAPIT; no testimonials, pricing or project-number blocks.`,
+GUARDRAILS: Qualitative only - never invent kW ratings, prices, uptime %, project counts or grants (do not claim grants exist). Keep AC vs DC high-level. Frame on-site renewables as offsetting grid draw, not powering all charging. Back-office/payment "where applicable"; DNO upgrade "where required". Accreditations as a grid explaining MCS/RECC/NAPIT/TrustMark; no testimonials, pricing or project-number blocks.`,
   },
   {
     priority: 14,
@@ -567,7 +567,7 @@ SECTION PLAN (no two dark adjacent):
 5. split: Planned maintenance (inspections, monitoring, reporting) vs Reactive call-outs (outages, inverter/system faults).
 6. rich: "We didn't install your system - can Heliaxis maintain it?" Yes, subject to assessment; covers legacy and failed/orphaned-installer systems; set a baseline so output is measurable.
 7. grid (4): upgrades & repowering - inverter replacement; repower ageing arrays; add batteries; expand arrays.
-8. grid (3): accreditations - MCS, RECC, NAPIT - what each proves.
+8. grid (4): accreditations - MCS, RECC, NAPIT, TrustMark - what each proves.
 9. faq.
 10. cta (dark): assessment invite.
 
@@ -607,7 +607,7 @@ SECTION PLAN (keep order; no two dark blocks adjacent):
 3. explorer (dark): "Explore the funding routes", 5 options - CAPEX, Asset finance, Solar PPA, Grant funding, Blended. For EACH: who pays upfront, who owns the kit, cash-flow, maintenance responsibility, contract considerations, owner-occupier vs tenant suitability.
 4. grid (4 cards): technical evidence Heliaxis prepares for a funding application - system scope; estimated generation & consumption matching; technical proposal & project cost; carbon/energy outputs where appropriate.
 5. steps (5-7): getting funding-ready - survey, design, technical proposal, funding support, install, commission, handover.
-6. grid (3): accreditations - MCS, RECC, NAPIT, each explaining what it means in practice for a funded project.
+6. grid (4): accreditations - MCS, RECC, NAPIT, TrustMark, each explaining what it means in practice for a funded project.
 7. faq.
 8. cta (dark): closing band.
 
@@ -660,7 +660,7 @@ FAQ (ask all):
 
 CTA & LINKS: Button "Request a PPA assessment" -> #quote; used in hero and cta. Internal link: /commercial-funding.
 
-GUARDRAILS: Financial, factual, not promotional. Do not invent PPA rates, savings or contract terms - describe qualitatively; say structure varies by project. Present buyout as "where available," not guaranteed. Do not claim solar powers the whole site; value depends on on-site use. No testimonials or pricing blocks. Accreditations, if shown, as a grid explaining MCS/RECC/NAPIT.`,
+GUARDRAILS: Financial, factual, not promotional. Do not invent PPA rates, savings or contract terms - describe qualitatively; say structure varies by project. Present buyout as "where available," not guaranteed. Do not claim solar powers the whole site; value depends on on-site use. No testimonials or pricing blocks. Accreditations, if shown, as a grid explaining MCS/RECC/NAPIT/TrustMark.`,
   },
   {
     priority: 17,
@@ -682,7 +682,7 @@ SECTION PLAN (ordered; no two dark adjacent):
 - explorer (dark, 3-4): roof types - trapezoidal metal, standing seam, flat; fold in roof condition, structural assessment, warranties, skylights, fire/access zones.
 - steps (6-8): half-hourly consumption analysis > survey > structural assessment > layout and design > DNO and export limitation > install around operations, shutdowns only where needed > commissioning and handover > monitoring + O&M.
 - split: TWO cards - "Battery storage and peak shaving" vs "Fleet and EV charging" - both for a warehouse load profile.
-- grid (3): accreditations - MCS, RECC, NAPIT, each with what it means in practice.
+- grid (4): accreditations - MCS, RECC, NAPIT, TrustMark, each with what it means in practice.
 - funding (3): CAPEX purchase / asset finance / PPA, linking to /commercial-funding.
 - casestudy: PLACEHOLDER only - no invented customer, site or numbers.
 - faq
@@ -720,12 +720,12 @@ KEYWORDS & INTENT: Primary "solar panels for manufacturing South Wales". Seconda
 
 SECTION PLAN (ordered; no two dark adjacent):
 1 hero (dark) — H1 with primary keyword; daytime load-match angle; CTA.
-2 stats — true facts only: MCS, RECC, NAPIT accreditations. No invented figures.
+2 stats — true facts only: MCS, RECC, NAPIT, TrustMark accreditations. No invented figures.
 3 grid 4 — what manufacturers gain: solar self-consumption, battery peak shaving, load shifting, EV/fleet charging.
 4 explorer (dark) — loads solar offsets: CNC machinery, compressors, extraction, pumps, production lines, refrigeration, HVAC, process equipment, offices.
 5 steps 6-8 — load profiling from half-hourly data and maximum demand; system sizing; roof + structural survey and electrical infrastructure review; DNO application; install with RAMS, site coordination, minimal disruption; commissioning; monitoring, O&M, handover.
 6 split — two-way: "Solar self-consumption" vs "Battery storage: peak shaving and load shifting"; define both against a factory load.
-7 grid 3 — accreditations MCS, RECC, NAPIT, each explained for a commercial buyer.
+7 grid 4 — accreditations MCS, RECC, NAPIT, TrustMark, each explained for a commercial buyer.
 8 funding 3 — CAPEX, asset finance, PPA.
 9 faq.
 10 cta (dark) — book the survey.
@@ -767,7 +767,7 @@ SECTION PLAN (in order; no two dark sections adjacent):
 6 split — roof-mounted vs ground-mounted here: roof = existing buildings, no land lost; ground = scale/orientation when roofs are unsuitable or demand large.
 7 grid (3–4) — match generation to on-farm consumption; battery storage; backup/resilience ONLY where specifically designed; remote monitoring.
 8 funding (3) — asset finance, PPA, grant routes where available → /commercial-funding.
-9 grid (3) — accreditations: MCS, RECC, NAPIT, each explained.
+9 grid (4) — accreditations: MCS, RECC, NAPIT, TrustMark, each explained.
 10 faq.
 11 cta (dark) — Book a farm energy survey → #quote.
 
@@ -802,7 +802,7 @@ SECTION PLAN:
 3. grid (4) - the renewable mix: commercial solar PV with high self-consumption; battery storage; heat pumps where appropriate for heating & hot water; EV charging.
 4. split - two-way: LEFT "Everyday savings: peak shaving & self-consumption"; RIGHT "Resilience: backup designed for critical loads" (backup ONLY where specifically designed around named essential circuits).
 5. steps (6) - load analysis; site survey; design incl. DNO/grid application; phased install around residents & staff with noise/disruption & health-and-safety controls; commissioning; monitoring, O&M, handover.
-6. grid (3) - accreditations, what each means for a care operator: MCS (certified installs), RECC (consumer code), NAPIT (electrical competence and Building Regulations certification).
+6. grid (4) - accreditations, what each means for a care operator: MCS (certified installs), RECC (consumer code), NAPIT (electrical competence and Building Regulations certification), TrustMark (government-endorsed quality scheme for tradespeople).
 7. funding - 3 cards (CAPEX/asset finance; PPA; grants where available) to /commercial-funding.
 8. faq - questions below.
 9. cta (dark) - Book a care home energy survey to #quote.

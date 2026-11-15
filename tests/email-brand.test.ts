@@ -9,7 +9,7 @@ describe('every email is in the Heliaxis template', () => {
     expect(isBranded(h)).toBe(true);
     expect(h).toContain('/assets/heliaxis-logo-light.png');
     expect(h).toContain('#F8BC1E');
-    expect(h).toContain('MCS · RECC · NAPIT registered installer');
+    expect(h).toContain('MCS · RECC · NAPIT · TrustMark');
     expect(h).not.toContain('NICEIC');
     expect(h).toContain('Company No.');
   });
