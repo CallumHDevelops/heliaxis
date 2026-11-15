@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addPhotos, queued, queueNeedsSignIn, QUEUE_CHANGED, removeQueued, retryQueued, uploadQueued, watchQueue, type QueuedPhoto } from '@/lib/crm/photo-queue';
 import { PHOTO_CATEGORIES, photoLabel } from '@/lib/crm/stages';
+import { ContentSwitch } from './ContentSwitch';
 import { ukWhen, type Photo } from './record-shared';
 
 /**
@@ -85,6 +86,7 @@ export function PhotosTab({ id, photos, initialCat, onChanged }: { id: string; p
         ))}
       </div>
 
+      <ContentSwitch id={id} />
       <div className="crm-photo-actions">
         <button type="button" className="crm-btn crm-btn--solar crm-btn--big" disabled={busy} onClick={() => cameraRef.current?.click()}>
           📷 Take {photoLabel(target).toLowerCase()} photo

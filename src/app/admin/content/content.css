@@ -1,0 +1,24 @@
+.cl-page { max-width: 1400px; margin: 0 auto; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.cl-page, .cl-page * { box-sizing: border-box; }
+.cl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.cl-head h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.cl-head p { margin: 0; max-width: 72ch; }
+.cl-filters { display: flex; gap: 12px; flex-wrap: wrap; }
+.cl-seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong, var(--border)); border-radius: 10px; overflow: hidden; }
+.cl-seg button { font: inherit; font-size: 0.86rem; font-weight: 700; padding: 7px 13px; border: 0; border-right: 1px solid var(--border); background: var(--surface); color: inherit; cursor: pointer; }
+.cl-seg button:last-child { border-right: 0; }
+.cl-seg button.on { background: #211f18; color: #f7f2e7; }
+.cl-empty { color: var(--muted); padding: 14px 4px; margin: 0; }
+.cl-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.cl-grid button { position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #1a1914; cursor: pointer; }
+.cl-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cl-grid button:hover { border-color: #f8bc1e; }
+.cl-nopic { display: grid; place-items: center; height: 100%; color: #b9b29d; }
+.cl-tag { position: absolute; left: 6px; bottom: 6px; font-family: var(--font-mono, monospace); font-size: 0.68rem; background: rgba(33, 31, 24, 0.82); color: #f7f2e7; padding: 2px 7px; border-radius: 6px; }
+.cl-view { display: grid; gap: 10px; }
+.cl-view img { width: 100%; max-height: 60vh; object-fit: contain; background: #1a1914; border-radius: 8px; }
+.cl-meta { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.cl-add { display: grid; gap: 8px; }
+.cl-lab { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.cl-who { display: flex; gap: 12px; align-items: center; }
+@media (max-width: 700px) { .cl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -26,6 +26,7 @@ type Tab =
   | 'eic'
   | 'instruments'
   | 'reviews'
+  | 'content'
   | 'orders'
   | 'surveys'
   | 'whatsapp'
@@ -102,6 +103,13 @@ export const icons = {
   close: (
     <svg {...ICON}>
       <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  ),
+  content: (
+    <svg {...ICON}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M21 16l-5-5-8 8" />
     </svg>
   ),
   reviews: (
@@ -429,6 +437,7 @@ export async function AdminShell({
       items: [
         { href: '/admin/projects', label: 'Projects', icon: icons.projects, active: active === 'projects', show: can('crm') },
         { href: '/admin/eic', label: 'EIC certificates', short: 'EIC', icon: icons.eic, active: active === 'eic', show: can('crm') },
+        { href: '/admin/content', label: 'Content library', short: 'Content', icon: icons.content, active: active === 'content', show: can('crm') || can('social') },
         { href: '/admin/instruments', label: 'Test instruments', short: 'Instruments', icon: icons.instruments, active: active === 'instruments', show: can('crm') },
         // On site: one tap away on the phone's bottom bar, so not in "More".
         { href: '/admin/social', label: 'Social monitoring', short: 'Social', icon: icons.socialMonitoring, active: active === 'social', show: socialMonitoring, badge: socialUrgent },
