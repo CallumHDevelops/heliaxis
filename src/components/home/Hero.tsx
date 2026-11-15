@@ -57,7 +57,7 @@ export function Hero() {
           <div className="acc">
             <span className="ac">MCS</span>
             <span className="ac">RECC</span>
-            <span className="ac">NICEIC</span>
+            <span className="ac">NAPIT</span>
             <span className="ac">TrustMark</span>
             <span className="ac">HIES</span>
             <span className="ac">ECA</span>

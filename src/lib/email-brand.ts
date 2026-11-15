@@ -44,7 +44,7 @@ export function emailShell(
             : ''
         }
       </td></tr>
-      <tr><td style="background:#211F18;padding:14px 26px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:.1em;color:#F8BC1E;text-transform:uppercase">MCS · RECC · NICEIC · TrustMark certified installer</td></tr>
+      <tr><td style="background:#211F18;padding:14px 26px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:.1em;color:#F8BC1E;text-transform:uppercase">MCS · RECC · NAPIT registered installer</td></tr>
       <tr><td style="padding:18px 26px 24px;font-size:12px;color:#6E6A5E;border-top:1px solid #eee6d4">
         Heliaxis Limited · Company No. ${HELIAXIS_PARTY.companyNumber} · Registered in England &amp; Wales · VAT ${HELIAXIS_PARTY.vatNumber}<br>
         ${esc(note)}

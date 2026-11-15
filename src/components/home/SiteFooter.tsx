@@ -35,7 +35,7 @@ export function SiteFooter() {
           </div>
         </div>
         <div className="base">
-          <span>© 2026 Heliaxis Limited. MCS · RECC · NICEIC · Covering South Wales.</span>
+          <span>© 2026 Heliaxis Limited. MCS · RECC · NAPIT · Covering South Wales and the South West.</span>
           <span>
             <Link href="/privacy-policy">Privacy</Link> · <a href="#cookie-settings">Cookie settings</a> · <Link href="/terms">Terms</Link> ·{' '}
             <Link href="/data-deletion">Delete your data</Link>

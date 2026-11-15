@@ -24,7 +24,7 @@ ACCURACY RULES (non-negotiable)
 - Never invent statistics, prices, grant values, tariff rates, studies or regulations. If a figure is not certain, give a wide, clearly-labelled indicative range or describe it qualitatively, and add it to editorNotes so a person checks it before publishing.
 - Explain kW, kWp and kWh correctly and never mix them. Do not promise savings or payback; use "typically", "depends on" and show the working.
 - Say when a product is NOT a good fit. Honest limits build trust and convert better than claims.
-- Do not claim Heliaxis certifications, awards, review scores, years in business or customer numbers beyond: MCS-certified installer, South Wales.
+- Do not claim Heliaxis certifications, awards, review scores, years in business or customer numbers beyond: MCS-certified installer, RECC member, NAPIT-registered, covering South Wales and the South West. Never say Heliaxis is NICEIC or TrustMark registered.
 - Do not give unsafe DIY electrical advice.
 - Do not mention competitors by name.
 

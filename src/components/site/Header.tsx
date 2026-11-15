@@ -9,7 +9,7 @@ import styles from './Header.module.css';
    a `site.topbar` (see src/lib/cms.ts getPublishedTopbar). */
 const DEFAULT_TOPBAR: SiteTopbar = {
   show: true,
-  accreditationText: 'MCS · RECC · NICEIC · TrustMark certified installer',
+  accreditationText: 'MCS · RECC · NAPIT registered installer',
   ratingValue: '4.9',
   hoursText: 'Mon–Sat 8am–6pm',
   phone: '01633 965205',
