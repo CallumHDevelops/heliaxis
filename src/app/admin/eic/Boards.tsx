@@ -61,7 +61,8 @@ export function EicBoards({ data, change, send, locked, scanUrl }: { data: Board
     change(key, next);
   };
 
-  const Props = ({ props, rec, keyOf }: { props: PropView[]; rec: RecView; keyOf: string }) => (
+  // Called as a function, not used as a component: a component made inside this one would be a new type on every render and lose the cursor after each key.
+  const renderProps = (props: PropView[], rec: RecView, keyOf: string) => (
     <div className="em-props">
       {props
         .filter((p) => rec.shown.includes(p.k))
@@ -103,7 +104,7 @@ export function EicBoards({ data, change, send, locked, scanUrl }: { data: Board
               </button>
             )}
           </header>
-          <Props props={data.props.board} rec={b} keyOf={boardKey(b.id)} />
+          {renderProps(data.props.board, b, boardKey(b.id))}
           <div className="em-circuits">
             <h5>Circuits</h5>
             {b.circuits.length === 0 && <p className="em-empty">No circuits on this board yet.</p>}
@@ -118,9 +119,9 @@ export function EicBoards({ data, change, send, locked, scanUrl }: { data: Board
                 {open === c.id && (
                   <div className="em-circuit__body">
                     <h6>Circuit details (columns 1 to 16)</h6>
-                    <Props props={data.props.details} rec={c} keyOf={circuitKey(c.id)} />
+                    {renderProps(data.props.details, c, circuitKey(c.id))}
                     <h6>Test results (columns 17 to 31)</h6>
-                    <Props props={data.props.tests} rec={c} keyOf={circuitKey(c.id)} />
+                    {renderProps(data.props.tests, c, circuitKey(c.id))}
                     {!locked && (
                       <div className="em-row-actions">
                         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => void addCircuit(b, c)}>
