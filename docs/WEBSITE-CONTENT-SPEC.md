@@ -16,6 +16,16 @@ Deliver, in this order:
 
 Everything goes live on heliaxis.co.uk. Quality over volume: one finished, checked page is worth more than five drafts.
 
+**Confirmed by Cal (16 November 2026), and overriding anything below that says otherwise:**
+
+- **Credentials: MCS, RECC and NAPIT only.** Heliaxis is **not** NICEIC. Never claim NICEIC, and do not claim TrustMark, SSIP or ISO marks until Cal confirms them (their logos exist in the brand kit, but that is not proof of membership). The repo and the published site have been corrected; do not reintroduce NICEIC from older briefs or from memory.
+- **Coverage: South Wales and the South West.** Use that wording everywhere.
+- **Phone: 01633 965205** (correct).
+- **Reviews:** Cal wants reviews and plans a £50 Amazon gift card. Do **not** offer it for a Google or Trustpilot review, and do not put self-collected testimonials in star-rating markup. The compliant approach is in `docs/SEO-GEO-STRATEGY.md` section 6. Until a "Customer stories" feature exists, put no review or testimonial content on pages.
+- **Project photos** are in the social tool (Social media studio). They are not in this repo. Ask Cal for an export, with notes on which customers have agreed to their use, before using any.
+- **Blog:** 13 articles are already written and sit in `src/content/blog-drafts/`; Cal loads them as CMS drafts from Admin › Blog. Write further articles to match their style and the list in `docs/SEO-GEO-STRATEGY.md` section 4. Do not rewrite the 13.
+- **SEO and GEO strategy and reporting:** `docs/SEO-GEO-STRATEGY.md`. Read it first. Follow it for structure, local pages and measurement.
+
 ## 2. What already exists (use it, do not rebuild it)
 
 | Thing | Where | Notes |
@@ -160,8 +170,8 @@ When you finish a deliverable, say: what changed (with URLs), what you checked a
 
 ## 12. Things to confirm with Cal before you start
 
-- The credentials and registrations that may be named on the landing page (the briefs say MCS, RECC, NICEIC and TrustMark; the certificates show NAPIT too).
-- Office hours and the phone numbers to show (the code currently has 01633 965205, Mon to Fri 8am to 6pm, weekends 10am to 3pm).
+- ~~Credentials~~ Answered: MCS, RECC and NAPIT only.
+- ~~Phone~~ Answered: 01633 965205. Opening hours are still to confirm (the code currently has Mon to Fri 8am to 6pm, weekends 10am to 3pm).
 - Whether the landing page should drop the main menu (slim header) or keep it.
-- Whether any real customer reviews or photos may be used, and where they are.
-- The area covered, in words (for the page and the `LocalBusiness` markup).
+- Which project photos may be used (they are in the social tool) and which customers agreed.
+- ~~Area covered~~ Answered: South Wales and the South West. The list of towns and counties is still to confirm, for the page and the `LocalBusiness` markup.
