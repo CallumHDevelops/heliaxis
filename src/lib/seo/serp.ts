@@ -15,7 +15,8 @@ type Db = ReturnType<typeof createAdminClient>;
 const API = 'https://api.dataforseo.com/v3';
 const SERP_PREFIX = 'seo-serp:';
 const COMP_PREFIX = 'seo-competitors:';
-const LOCATIONS_KEY = 'seo-serp-locations';
+// v2: towns pinned to the right country (the first version searched "Newport" from the Isle of Wight).
+const LOCATIONS_KEY = 'seo-serp-locations-v2';
 const UK = { code: 2826, name: 'United Kingdom' };
 const UA = 'Mozilla/5.0 (compatible; HeliaxisMonitor/1.0; +https://heliaxis.co.uk)';
 const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
@@ -95,6 +96,11 @@ async function inBatches<T, R>(items: T[], size: number, fn: (x: T) => Promise<R
 
 type Loc = { code: number; name: string };
 
+/** Tracked towns in Wales (the rest are in England): several names exist in both, Newport above all. */
+const WELSH = new Set(['Cardiff', 'Swansea', 'Newport', 'Bridgend', 'Cwmbran', 'Caerphilly', 'Vale of Glamorgan', 'Barry', 'Pontypridd', 'Pontypool', 'Tredegar', 'Chepstow']);
+/** Where to search from when DataForSEO has no location for the town itself. */
+const NEAREST: Record<string, string> = { Cwmbran: 'Newport', Caerphilly: 'Cardiff', 'Vale of Glamorgan': 'Cardiff', Barry: 'Cardiff', Pontypool: 'Newport', Weston: 'Bristol' };
+
 async function townLocations(towns: string[], db: Db): Promise<Record<string, Loc>> {
   const { data } = await db.from('cms_kv').select('value, updated_at').eq('key', LOCATIONS_KEY).maybeSingle();
   const cached = parseKv<{ towns?: Record<string, Loc> }>(data?.value).towns ?? {};
@@ -107,12 +113,16 @@ async function townLocations(towns: string[], db: Db): Promise<Record<string, Lo
     type: String(x.location_type ?? ''),
   }));
   const rank = (t: string) => ({ City: 0, Municipality: 1, County: 2, Region: 3 })[t] ?? 4;
+  const find = (town: string) => {
+    const country = WELSH.has(town) ? 'Wales' : 'England';
+    return list
+      .filter((l) => l.name.toLowerCase().startsWith(`${town.toLowerCase()},`) && l.name.endsWith(`,${country},United Kingdom`))
+      .sort((a, b) => rank(a.type) - rank(b.type))[0];
+  };
   const out: Record<string, Loc> = {};
   for (const town of towns) {
-    const want = town.toLowerCase();
-    const hit = list
-      .filter((l) => l.name.toLowerCase().startsWith(`${want},`) && /,(Wales|England),United Kingdom$/i.test(l.name))
-      .sort((a, b) => rank(a.type) - rank(b.type))[0];
+    // A town DataForSEO doesn't list is searched from the nearest one it does (Cwmbran from Newport, Caerphilly from Cardiff).
+    const hit = find(town) ?? (NEAREST[town] ? find(NEAREST[town]) : undefined);
     out[town] = hit ? { code: hit.code, name: hit.name } : UK;
   }
   await db.from('cms_kv').upsert({ key: LOCATIONS_KEY, value: toKv({ towns: out }), updated_at: new Date().toISOString() });
@@ -123,18 +133,25 @@ async function townLocations(towns: string[], db: Db): Promise<Record<string, Lo
 
 async function oneSearch(k: { id: number; keyword: string; town: string }, loc: Loc): Promise<{ r: SerpResult; cost: number }> {
   const base = { keywordId: k.id, keyword: k.keyword, town: k.town, location: loc.name };
-  try {
-    const j = await dfs('/serp/google/organic/live/advanced', [
-      { keyword: k.keyword, location_code: loc.code, language_code: 'en', device: 'mobile', os: 'android', depth: 20 },
-    ], 30_000);
-    const task = (j.tasks as Record<string, unknown>[] | undefined)?.[0];
-    if (!task || task.status_code !== 20000) throw new Error(String(task?.status_message ?? 'No result'));
-    const items = ((task.result as Record<string, unknown>[] | undefined)?.[0]?.items as unknown[]) ?? [];
-    const { organic, localPack } = parseSerp(items);
-    return { r: { ...base, organic, localPack, ours: ourPlace(organic, localPack) }, cost: Number(task.cost ?? 0) };
-  } catch (e) {
-    return { r: { ...base, organic: [], localPack: [], ours: { pos: null, url: null, pack: null }, error: e instanceof Error ? e.message : 'Failed' }, cost: 0 };
+  let cost = 0;
+  let lastError = 'Failed';
+  // One retry: DataForSEO now and then answers "Internal SE Server Error" and succeeds a moment later.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      // Desktop: phone results come back as Google redirect links, which hide the real websites.
+      const j = await dfs('/serp/google/organic/live/advanced', [{ keyword: k.keyword, location_code: loc.code, language_code: 'en', device: 'desktop', os: 'windows', depth: 20 }], 30_000);
+      const task = (j.tasks as Record<string, unknown>[] | undefined)?.[0];
+      cost += Number(task?.cost ?? 0);
+      const items = ((task?.result as Record<string, unknown>[] | undefined)?.[0]?.items as unknown[] | undefined) ?? null;
+      // A partial result (the second page could not be fetched) is still worth keeping.
+      if (!task || (task.status_code !== 20000 && !items?.length)) throw new Error(String(task?.status_message ?? 'No result'));
+      const { organic, localPack } = parseSerp(items ?? []);
+      return { r: { ...base, organic, localPack, ours: ourPlace(organic, localPack) }, cost };
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : 'Failed';
+    }
   }
+  return { r: { ...base, organic: [], localPack: [], ours: { pos: null, url: null, pack: null }, error: lastError }, cost };
 }
 
 /** Check every active tracked search now and save the snapshot. Takes a minute or two. */

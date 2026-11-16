@@ -54,3 +54,13 @@ describe('rankings', () => {
     expect(history([b, a], 1)).toEqual([{ id: '2026-11-09', pos: 8 }, { id: '2026-11-16', pos: 3 }]);
   });
 });
+
+describe('google links', () => {
+  it('ignores Google redirect links and its own boxes', () => {
+    const p = parseSerp([
+      { type: 'organic', rank_group: 1, domain: 'google.com', url: 'https://google.com/goto?url=x', title: 'X' },
+      { type: 'organic', rank_group: 2, domain: 'www.real.co.uk', url: 'https://real.co.uk', title: 'Real' },
+    ]);
+    expect(p.organic.map((x) => x.domain)).toEqual(['real.co.uk']);
+  });
+});

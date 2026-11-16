@@ -241,7 +241,7 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
         {rows.length > 0 && (
           <section className="seo-sec" aria-labelledby="seo-ranks">
             <h2 id="seo-ranks">Google positions</h2>
-            <p className="seo-muted">On a phone, as seen from each search’s town. “Not in top 20” means we weren’t on the first two pages.</p>
+            <p className="seo-muted">On a computer, as seen from each search’s town (Cwmbran from Newport and Caerphilly from Cardiff, which Google’s data treats as the same area). “Not in top 20” means we weren’t on the first two pages.</p>
             <RankingsTable rows={rows} />
           </section>
         )}

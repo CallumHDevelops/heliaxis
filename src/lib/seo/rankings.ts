@@ -176,6 +176,8 @@ export function parseSerp(items: unknown[]): { organic: SerpItem[]; localPack: P
   for (const raw of Array.isArray(items) ? items : []) {
     const it = raw as Record<string, unknown>;
     if (it.type === 'organic' && typeof it.rank_group === 'number') {
+      const d = cleanDomain(String(it.domain ?? ''));
+      if (!d || d === 'google.com' || d.endsWith('.google.com') || d === 'google.co.uk') continue;
       organic.push({ pos: it.rank_group, domain: cleanDomain(String(it.domain ?? '')), url: String(it.url ?? ''), title: String(it.title ?? '').slice(0, 140) });
     } else if (it.type === 'local_pack' && typeof it.rank_group === 'number') {
       localPack.push({ pos: it.rank_group, title: String(it.title ?? '').slice(0, 100), domain: cleanDomain(String(it.domain ?? '')) });
