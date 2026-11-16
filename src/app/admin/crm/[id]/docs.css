@@ -99,7 +99,8 @@
 }
 .dk-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* The buttons' column is capped: a long note under them wraps instead of widening it and squeezing the title. */
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 240px);
   gap: 1rem;
   padding: 1rem 1.1rem;
   border: 1px solid var(--border);
@@ -141,11 +142,16 @@
   display: grid;
   gap: 0.45rem;
   align-content: start;
-  min-width: 210px;
+  min-width: 0;
 }
 .dk-head__btns small {
   font-size: 0.78rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.dk-head__btns .crm-btn {
+  justify-content: center;
+  white-space: normal;
 }
 .dk-group h4 {
   margin: 0.2rem 0 0.45rem;
