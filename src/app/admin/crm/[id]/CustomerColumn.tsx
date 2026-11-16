@@ -534,18 +534,23 @@ function CustomerCard({
   );
 }
 
-function JobDetails({
+export function JobDetails({
   project,
   customer,
   team,
   schema,
   onSave,
+  startEditing = false,
+  onClose,
 }: {
   project: Project;
   customer: Customer;
   team: TeamMember[];
   schema: SchemaReady;
   onSave: (b: Record<string, unknown>) => Promise<boolean>;
+  /** In its own panel: starts in the form, and closes when it's saved or cancelled. */
+  startEditing?: boolean;
+  onClose?: () => void;
 }) {
   const init = {
     title: project.title,
@@ -561,7 +566,7 @@ function JobDetails({
     on_hold: !!project.on_hold,
     hold_reason: project.hold_reason || '',
   };
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [f, setF] = useState(init);
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
@@ -586,7 +591,10 @@ function JobDetails({
     };
     const ok = await onSave(body);
     setBusy(false);
-    if (ok) setEditing(false);
+    if (ok) {
+      setEditing(false);
+      onClose?.();
+    }
   }
 
   const link = (url: string | null) =>
@@ -712,6 +720,7 @@ function JobDetails({
               onClick={() => {
                 setF(init);
                 setEditing(false);
+                onClose?.();
               }}
             >
               Cancel

@@ -19,7 +19,7 @@ import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import { copyText, send, type Area, type Customer, type Project, type WaInfo } from './record-shared';
 
 /** What the + sheet can open. */
-export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink' | 'portal';
+export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink' | 'portal' | 'jobedit';
 
 /** The + sheet's icons, all from the brand kit (see BrandIcon). */
 const MENU_ICONS = {
@@ -37,6 +37,7 @@ const MENU_ICONS = {
   review: 'star',
   surveylink: 'calendar',
   portal: 'house',
+  jobedit: 'clipboard',
 } as const;
 
 /** "Add to Jane": the + button's sheet. WhatsApp has its own green button now; the stage's own action is the last tile. */
@@ -44,6 +45,7 @@ export function ActionMenu({ customer, tile, portal = false, onPick, onTile }: {
   const items: [SheetKey, keyof typeof MENU_ICONS, string, string?][] = [
     ['task', 'task', 'Task', 'Who and when'],
     ['note', 'note', 'Note'],
+    ['jobedit', 'jobedit', 'Edit job details', 'Products, value, address, notes'],
     ['call', 'call', 'Log a call'],
     ['next', 'next', 'Next step', 'Follow-up reminder'],
     ['photo', 'photo', 'Photos'],

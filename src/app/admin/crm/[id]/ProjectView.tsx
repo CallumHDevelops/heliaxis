@@ -17,7 +17,8 @@ import { DOCK, openDock, sendDockJob, useDockState, type DockJob } from '../dock
 import { MergeSheet, mergedWords, mergeNotice, type MergeStart } from '../MergeSheet';
 import { useMedia } from '../use-stored';
 import { ActivityTab } from './ActivityTab';
-import { CompactCustomer, CustomerColumn } from './CustomerColumn';
+import { CompactCustomer, CustomerColumn, JobDetails } from './CustomerColumn';
+import { Sheet } from '../CrmUi';
 import { PhotosTab } from './PhotosTab';
 import { defaultDocsView, DocsHub, type DocsView } from './DocsHub';
 import { ReviewSheet } from './ReviewSheet';
@@ -571,7 +572,9 @@ export function ProjectView({
     openTab: (t, cat) => {
       if (t === 'photos') setPhotoView((v) => ({ cat: cat ?? null, key: v.key + 1 }));
       // From 1280px the customer's details are the left column, not a tab.
-      if (t === 'details') revealDetails('.crmr-job');
+      // From Docs there's no details column beside it: the job details open in a panel over it.
+      if (t === 'details' && tab === 'docs') openSheet('jobedit');
+      else if (t === 'details') revealDetails('.crmr-job');
       else pickTab(t);
     },
     addDocument,
@@ -650,6 +653,7 @@ export function ProjectView({
         }}
         onName={() => revealDetails()}
         onNewProject={() => openSheet('newproject')}
+        onEditJob={() => openSheet('jobedit')}
         onDelete={() => openSheet('delete')}
         onMerge={(other) => setMerging({ a: c.id, b: other, name: c.name })}
         onJoinJobs={() => setMerging({ a: c.id, name: c.name, jobPair: [id, rec.others.length === 1 ? rec.others[0].id : ''], jobs: rec.others.map((o) => ({ id: o.id, ref: o.project_ref, title: o.title, stage: o.stage })) })}
@@ -815,6 +819,11 @@ export function ProjectView({
             if (primary.tile) void runAction(primary.tile.action, primary.tile.action === primary.action ? primary.to : undefined);
           }}
         />
+      )}
+      {sheet === 'jobedit' && (
+        <Sheet title="Edit job details" onClose={closeSheet} wide>
+          <JobDetails key={p.id} project={p} customer={c} team={rec.team} schema={schema} onSave={patch} startEditing onClose={closeSheet} />
+        </Sheet>
       )}
       {sheet === 'surveylink' && <SurveyLinkSheet projectId={id} onClose={closeSheet} onSent={() => void reload()} />}
       {sheet === 'review' && <ReviewSheet customer={{ id: c.id, name: c.name, email: c.email, phone: phoneShown(c, wa.number) }} projectId={id} onClose={closeSheet} onWhatsApp={(t) => { closeSheet(); openWhatsApp(t); }} />}

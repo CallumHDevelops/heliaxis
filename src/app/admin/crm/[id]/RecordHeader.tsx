@@ -39,6 +39,7 @@ export function RecordHeader({
   unread,
   onName,
   onNewProject,
+  onEditJob,
   onDelete,
   onMerge,
   onJoinJobs,
@@ -67,6 +68,8 @@ export function RecordHeader({
   unread: number;
   onName: () => void;
   onNewProject: () => void;
+  /** "Edit job details" in a panel: products, value, address, owner, notes. */
+  onEditJob: () => void;
   onDelete: () => void;
   /** Merge with another customer: the possible duplicate's id, or null to find one. */
   onMerge: (other: string | null) => void;
@@ -149,6 +152,7 @@ export function RecordHeader({
             items={[
               ...primary.menu.map((m) => ({ label: m.label, run: () => onPrimary(m.action) })),
               ...(portalMode(project.stage) ? [{ label: 'View customer portal', run: () => void window.open(`/api/crm/projects/${project.id}/portal/preview`, '_blank') }] : []),
+              { label: 'Edit job details', run: onEditJob },
               { label: `New project for ${firstName(customer.name) || 'them'}`, run: onNewProject },
               { label: 'Merge with another customer…', run: () => onMerge(null) },
               ...(others.length ? [{ label: `Join this job with another of ${firstName(customer.name) || 'their'}’s jobs…`, run: onJoinJobs }] : []),
