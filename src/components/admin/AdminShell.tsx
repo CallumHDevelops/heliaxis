@@ -46,6 +46,7 @@ type Tab =
   | 'help';
 
 // Open RAMS and the social studio already signed in when they can (src/lib/sso.ts).
+// The studio's menu link moves to /admin/studio once its tables are in (supabase/post-studio.sql).
 const RAMS_URL = '/api/sso/rams';
 const SOCIAL_URL = '/api/sso/social';
 
