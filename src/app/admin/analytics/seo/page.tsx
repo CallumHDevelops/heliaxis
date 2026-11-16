@@ -208,7 +208,7 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
               </>
             ) : (
               <>
-                DataForSEO refused the sign-in for {account.login}: {account.error} Check that DATAFORSEO_PASSWORD in Vercel is the <b>API password</b> from app.dataforseo.com/api-access (not the password you sign in with), with no spaces or quote marks, then redeploy.
+                DataForSEO refused the sign-in for {account.login}: {account.error} The simplest fix: on app.dataforseo.com/api-access press the copy button beside <b>Base64 format</b>, paste it into Vercel as <b>DATAFORSEO_BASE64</b> (it is used instead of the login and password), then redeploy.
               </>
             )}
           </p>

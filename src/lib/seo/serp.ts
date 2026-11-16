@@ -24,14 +24,32 @@ const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Eur
 const clean = (v: string | undefined) => String(v ?? '').trim().replace(/^["']|["']$/g, '').trim();
 const creds = () => ({ login: clean(process.env.DATAFORSEO_LOGIN), password: clean(process.env.DATAFORSEO_PASSWORD) });
 
+/** Or the "Base64 format" box from DataForSEO's API Access page (it has a copy button), which is login and password in one. */
+const base64 = () => clean(process.env.DATAFORSEO_BASE64).replace(/^Basic\s+/i, '');
+
 export const serpConfigured = () => {
   const c = creds();
-  return !!(c.login && c.password);
+  return !!(base64() || (c.login && c.password));
 };
 
 function auth() {
+  const b = base64();
+  if (b) return `Basic ${b}`;
   const c = creds();
   return 'Basic ' + Buffer.from(`${c.login}:${c.password}`).toString('base64');
+}
+
+/** The login being used, for the dashboard (from the Base64 value when that is what is set). */
+function loginShown(): string {
+  const b = base64();
+  if (b) {
+    try {
+      return Buffer.from(b, 'base64').toString('utf8').split(':')[0] || '(Base64 value)';
+    } catch {
+      return '(Base64 value)';
+    }
+  }
+  return creds().login;
 }
 
 export type SerpAccount = { ok: true; login: string; balanceUsd: number | null } | { ok: false; login: string; error: string };
@@ -40,7 +58,7 @@ export type SerpAccount = { ok: true; login: string; balanceUsd: number | null }
 export async function serpAccount(): Promise<SerpAccount | null> {
   if (!serpConfigured()) return null;
   // Show who is signing in (the email, part hidden) so a wrong login is easy to spot.
-  const login = creds().login.replace(/^(.{2}).*(@.*)$/, '$1…$2');
+  const login = loginShown().replace(/^(.{2}).*(@.*)$/, '$1…$2');
   try {
     const j = await dfs('/appendix/user_data', undefined, 8_000);
     const r = (j.tasks as Record<string, unknown>[] | undefined)?.[0]?.result as Record<string, unknown>[] | undefined;
