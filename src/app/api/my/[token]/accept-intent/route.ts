@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { after, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectByToken, projectSigned } from '@/lib/crm/portal';
@@ -17,6 +18,8 @@ const json = (body: object, status = 200) => NextResponse.json(body, { status, h
  * who is able to sign is never stopped by it. This route signs nothing and takes no payment.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked();
+  if (blocked) return blocked;
   const { token } = await params;
   const p = await projectByToken(token);
   if (!p) return json({ error: 'Not found' }, 404);

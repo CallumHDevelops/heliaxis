@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { requirePortal } from '@/lib/auth';
 import { loadPortal } from '@/lib/crm/portal';
+import { PREVIEW_MESSAGE, previewJob } from '@/lib/crm/portal-preview';
 import { themeContext } from '@/lib/theme/server';
 import { PortalView } from './PortalView';
 
@@ -27,5 +29,21 @@ export default async function CustomerPortal({
   if (!data) notFound();
   // Their Light / Dark / Match phone from this phone's cookie, so the toggle's first paint is right.
   const { pref } = await themeContext();
-  return <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} openAccept={accept !== undefined} themePref={pref} />;
+  // Staff using "View as customer": a banner, and the portal's actions are switched off (src/lib/crm/portal-preview.ts).
+  const preview = (await previewJob()) && (await requirePortal('crm')) ? true : false;
+  return (
+    <>
+      {preview && (
+        <div className="pt-preview" role="status">
+          <span>
+            <b>Staff preview.</b> {PREVIEW_MESSAGE}
+          </span>
+          <a className="pt-btn ghost" href="/api/crm/portal-preview/exit">
+            Back to the job
+          </a>
+        </div>
+      )}
+      <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} openAccept={accept !== undefined} themePref={pref} />
+    </>
+  );
 }

@@ -14,7 +14,7 @@ type Org = { key: string; kind: 'org' | 'contact'; name: string; sub: string };
  * (and, when `orgs`, organisations). Picking a customer attaches the customer; picking one of their jobs attaches the job and
  * the customer together. Uses the same search as the header's.
  */
-export function AssignPicker({ onPick, orgs = false, jobs = true, autoFocus = true }: { onPick: (p: Picked) => void; orgs?: boolean; jobs?: boolean; autoFocus?: boolean }) {
+export function AssignPicker({ onPick, orgs = false, jobs = true, jobOnly = false, autoFocus = true }: { onPick: (p: Picked) => void; orgs?: boolean; jobs?: boolean; /** MCS paperwork belongs to a job: customers are shown for finding, but only their jobs can be picked. */ jobOnly?: boolean; autoFocus?: boolean }) {
   const [q, setQ] = useState('');
   const [found, setFound] = useState<{ q: string; people: Person[]; orgs: Org[] } | null>(null);
   const t = q.trim();
@@ -45,10 +45,17 @@ export function AssignPicker({ onPick, orgs = false, jobs = true, autoFocus = tr
           {res && !res.people.length && !(orgs && res.orgs.length) && <li className="crm-muted" style={{ padding: 10 }}>Nothing found for “{t}”.</li>}
           {res?.people.map((p) => (
             <li key={p.id}>
-              <button type="button" onClick={() => onPick({ enquiry_id: p.id, project_id: null, organisation_id: null, label: p.name })}>
-                <b>{p.name}</b>
-                <small>{['Customer', p.ref, p.postcode, p.phone].filter(Boolean).join(' · ')}</small>
-              </button>
+              {jobOnly ? (
+                <div className="dw-pick__cust">
+                  <b>{p.name}</b>
+                  <small>{[p.ref, p.postcode, p.phone].filter(Boolean).join(' · ')} · {p.jobs.length ? 'pick one of their jobs' : 'no jobs yet: make one in the CRM first'}</small>
+                </div>
+              ) : (
+                <button type="button" onClick={() => onPick({ enquiry_id: p.id, project_id: null, organisation_id: null, label: p.name })}>
+                  <b>{p.name}</b>
+                  <small>{['Customer', p.ref, p.postcode, p.phone].filter(Boolean).join(' · ')}</small>
+                </button>
+              )}
               {jobs &&
                 p.jobs.map((j) => (
                   <button key={j.id} type="button" className="dw-pick__job" onClick={() => onPick({ enquiry_id: p.id, project_id: j.id, organisation_id: null, label: `${p.name} · ${j.ref ?? j.title}` })}>

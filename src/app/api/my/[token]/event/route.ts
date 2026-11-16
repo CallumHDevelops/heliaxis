@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { NextResponse } from 'next/server';
 import { projectByToken } from '@/lib/crm/portal';
 import { recordEngagement, recordQuoteEvent, TRACK_EVENTS, type TrackEvent } from '@/lib/crm/quote-track';
@@ -7,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 /** The customer's page tells us a step was reached: { type }, or its heartbeat: { type: 'engaged', seconds, sections }. Only a known step, only for a real link; always a quiet 204. */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked(true);
+  if (blocked) return blocked;
   const { token } = await params;
   const b = (await req.json().catch(() => ({}))) as { type?: string; seconds?: number; sections?: unknown };
   if (b.type === 'engaged') {

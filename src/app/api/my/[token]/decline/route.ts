@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { NextResponse } from 'next/server';
 import { projectByToken, projectSigned } from '@/lib/crm/portal';
 import { recordDecline } from '@/lib/crm/quote-track';
@@ -8,6 +9,8 @@ const reply = (body: unknown, status = 200) => NextResponse.json(body, { status,
 
 /** The customer declines their quote, with a comment: { reason }. The job stays where it is; the team is told and can follow up. */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked();
+  if (blocked) return blocked;
   const { token } = await params;
   const p = await projectByToken(token);
   if (!p) return reply({ error: 'Not found' }, 404);

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { DELIVERY_STAGES, isProjectStage, money, SALES_STAGES, stageLabel } from '@/lib/crm/stages';
+import { DELIVERY_STAGES, isProjectStage, money, portalMode, SALES_STAGES, stageLabel } from '@/lib/crm/stages';
 import type { ActionKey, PrimaryAction } from '@/lib/projects/primary-action';
 import { Icon, StageChip, WaIcon } from '../CrmUi';
 import { TextButton } from '../TextSheet';
@@ -148,6 +148,7 @@ export function RecordHeader({
           <MoreMenu
             items={[
               ...primary.menu.map((m) => ({ label: m.label, run: () => onPrimary(m.action) })),
+              ...(portalMode(project.stage) ? [{ label: 'View customer portal', run: () => void window.open(`/api/crm/projects/${project.id}/portal/preview`, '_blank') }] : []),
               { label: `New project for ${firstName(customer.name) || 'them'}`, run: onNewProject },
               { label: 'Merge with another customer…', run: () => onMerge(null) },
               ...(others.length ? [{ label: `Join this job with another of ${firstName(customer.name) || 'their'}’s jobs…`, run: onJoinJobs }] : []),

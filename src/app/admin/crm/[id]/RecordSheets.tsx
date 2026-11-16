@@ -19,7 +19,7 @@ import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import { copyText, send, type Area, type Customer, type Project, type WaInfo } from './record-shared';
 
 /** What the + sheet can open. */
-export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink';
+export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink' | 'portal';
 
 /** The + sheet's icons, all from the brand kit (see BrandIcon). */
 const MENU_ICONS = {
@@ -36,10 +36,11 @@ const MENU_ICONS = {
   document: 'document',
   review: 'star',
   surveylink: 'calendar',
+  portal: 'house',
 } as const;
 
 /** "Add to Jane": the + button's sheet. WhatsApp has its own green button now; the stage's own action is the last tile. */
-export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Customer; tile: PrimaryAction['tile']; onPick: (s: SheetKey) => void; onTile: () => void }) {
+export function ActionMenu({ customer, tile, portal = false, onPick, onTile }: { customer: Customer; tile: PrimaryAction['tile']; /** Their portal exists at this stage: offer to view it. */ portal?: boolean; onPick: (s: SheetKey) => void; onTile: () => void }) {
   const items: [SheetKey, keyof typeof MENU_ICONS, string, string?][] = [
     ['task', 'task', 'Task', 'Who and when'],
     ['note', 'note', 'Note'],
@@ -52,6 +53,7 @@ export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Custo
     ['newproject', 'newproject', 'Opportunity', 'Another job for them'],
     ['document', 'document', 'Document', 'Tender or letter'],
     ['surveylink', 'surveylink', 'Send survey link', 'WhatsApp, text or email'],
+    ...(portal ? ([['portal', 'portal', 'View customer portal', 'As they see it']] as typeof items) : []),
     ['review', 'review', 'Ask for a review', 'Email, text or WhatsApp'],
   ];
   return (

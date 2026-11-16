@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { after, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectByToken } from '@/lib/crm/portal';
@@ -26,6 +27,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
  * in the opportunity's activity, stops any automatic follow-ups (a person is talking to us) and the team is notified.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked();
+  if (blocked) return blocked;
   const { token } = await params;
   const p = await projectByToken(token);
   if (!p) return reply({ error: 'Not found' }, 404);

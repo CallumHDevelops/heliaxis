@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { after, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ukBankHolidays, ukDay } from '@/lib/bank-holidays';
@@ -18,6 +19,8 @@ const reply = (body: unknown, status = 200) => NextResponse.json(body, { status,
  * is told, and it goes on the job's record.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked();
+  if (blocked) return blocked;
   const { token } = await params;
   const p = await projectByToken(token);
   if (!p) return reply({ error: 'Not found' }, 404);

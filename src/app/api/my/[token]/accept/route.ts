@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { after, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectByToken, SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
@@ -17,6 +18,8 @@ const fail = (error: string, status: number) => NextResponse.json({ error }, { s
  * one. Signing moves the job to Won, which opens the full portal on the same link.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked();
+  if (blocked) return blocked;
   const { token } = await params;
   const p = await projectByToken(token);
   if (!p) return fail('Not found', 404);

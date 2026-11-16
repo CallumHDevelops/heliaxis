@@ -591,3 +591,21 @@ textarea.pt-input { resize: vertical; font: inherit; }
 .pt-cal-day.on small, .pt-cal-day.on i { color: #211f18; }
 .pt-cal-day:disabled { cursor: not-allowed; opacity: 0.45; background: transparent; }
 .pt-cal-day:focus-visible { outline: 3px solid #211f18; outline-offset: 2px; }
+
+/* Staff previewing the portal (View as customer): a bar across the top, above the page. */
+.pt-preview {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #211f18;
+  color: #f7f2e7;
+  font-size: 0.92rem;
+}
+.pt-preview b { color: #f8bc1e; }
+.pt-preview .pt-btn { padding: 6px 14px; min-height: 0; }

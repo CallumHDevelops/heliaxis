@@ -551,7 +551,7 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
             {!locked && (
               <div className="em-tools">
                 <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setPicking((p) => !p)}>
-                  {view.customer || view.project ? 'Change' : 'Assign to a customer or job'}
+                  {view.project ? 'Change job' : 'Assign to a job'}
                 </button>
                 {view.project && (
                   <button type="button" className="crm-link" onClick={() => void patch({ project_id: null })}>
@@ -565,7 +565,8 @@ export function EicEditor({ id, admin, token }: { id: string; admin: boolean; /*
                 )}
               </div>
             )}
-            {picking && <AssignPicker onPick={pick} />}
+            {!view.project && <p className="crm-muted crm-small">An electrical certificate is part of the MCS paperwork, so it belongs to a job, not just a customer.</p>}
+            {picking && <AssignPicker jobOnly onPick={pick} />}
             <label className="em-lab" htmlFor="em-addr">
               Installation address
             </label>

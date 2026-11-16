@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { after, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectByToken } from '@/lib/crm/portal';
@@ -16,6 +17,8 @@ const fail = (error: string, status: number) => NextResponse.json({ error }, { s
  * G98 data sheet) is made straight after, and goes into their pack.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked();
+  if (blocked) return blocked;
   const { token } = await params;
   const p = await projectByToken(token);
   if (!p || p.mode !== 'full') return fail('Not found', 404);

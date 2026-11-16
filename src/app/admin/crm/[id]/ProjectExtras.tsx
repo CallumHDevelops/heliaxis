@@ -672,11 +672,9 @@ export function PortalCard({
           Email it
         </button>
       )}
-      {url && (
-        <a className="crm-btn crm-btn--ghost" href={url} target="_blank" rel="noreferrer">
-          Open
-        </a>
-      )}
+      <a className="crm-btn crm-btn--ghost" href={`/api/crm/projects/${id}/portal/preview`} target="_blank" rel="noreferrer" title="See their portal exactly as they do. Nothing is sent, signed or paid from the preview.">
+        View as customer
+      </a>
     </div>
   );
 

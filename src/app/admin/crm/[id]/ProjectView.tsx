@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { isProjectStage, noSurveyNeeded } from '@/lib/crm/stages';
+import { isProjectStage, noSurveyNeeded, portalMode } from '@/lib/crm/stages';
 import { primaryActionFor, type ActionKey, type PrimaryAction } from '@/lib/projects/primary-action';
 import type { SchemaReady } from '@/lib/schema-ready';
 import { useLiveRefresh } from '@/lib/use-live-refresh';
@@ -791,7 +791,15 @@ export function ProjectView({
         <ActionMenu
           customer={c}
           tile={primary.tile}
-          onPick={(s) => (s === 'document' ? void newDocument() : s ? openSheet(s) : closeSheet())}
+          portal={!!portalMode(p.stage)}
+          onPick={(s) => {
+            if (s === 'portal') {
+              closeSheet();
+              window.open(`/api/crm/projects/${id}/portal/preview`, '_blank');
+            } else if (s === 'document') void newDocument();
+            else if (s) openSheet(s);
+            else closeSheet();
+          }}
           onTile={() => {
             closeSheet();
             if (primary.tile) void runAction(primary.tile.action, primary.tile.action === primary.action ? primary.to : undefined);

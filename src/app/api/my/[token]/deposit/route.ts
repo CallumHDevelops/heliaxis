@@ -1,3 +1,4 @@
+import { previewBlocked } from '@/lib/crm/portal-preview';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectByToken, projectSigned } from '@/lib/crm/portal';
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic';
 
 /** Pay the deposit by card (Stripe Checkout), once the quote is signed. Returns the payment page URL. */
 export async function POST(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const blocked = await previewBlocked();
+  if (blocked) return blocked;
   const { token } = await params;
   const p = await projectByToken(token);
   if (!p) return NextResponse.json({ error: 'Not found' }, { status: 404 });

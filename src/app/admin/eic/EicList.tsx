@@ -105,7 +105,7 @@ function NewEic({ onClose, onMade }: { onClose: () => void; onMade: (id: string)
           </button>
         </div>
         <small className="crm-muted">Single signature: one person designed, built and tested it. Three-part: separate signatures, with a design part.</small>
-        <div className="em-lab">Assign to (optional)</div>
+        <div className="em-lab">Which job? (optional)</div>
         {who ? (
           <div className="em-who">
             <b>{who.label}</b>
@@ -114,9 +114,9 @@ function NewEic({ onClose, onMade }: { onClose: () => void; onMade: (id: string)
             </button>
           </div>
         ) : (
-          <AssignPicker onPick={setWho} autoFocus={false} />
+          <AssignPicker jobOnly onPick={setWho} autoFocus={false} />
         )}
-        <small className="crm-muted">A customer, a job, or a job (which brings its customer). You can change this later. A certificate on a job is filed in that job’s Docs when issued.</small>
+        <small className="crm-muted">MCS paperwork belongs to a job, so pick the customer’s job (it brings the customer with it). You can do it later. A certificate on a job is filed in that job’s Docs when issued.</small>
         {err && <p className="crm-banner crm-banner--err">{err}</p>}
         <div className="crm-actions">
           <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={() => void make()}>
@@ -163,7 +163,7 @@ function ImportEic({ onClose, onMade }: { onClose: () => void; onMade: (id: stri
         <small className="crm-muted">
           Signatures are never copied, and anything it wasn’t sure of is left for you to fill in. Check every answer against the original before it’s issued, and only issue it under our name if the work was ours to certify.
         </small>
-        <div className="em-lab">Assign to (optional)</div>
+        <div className="em-lab">Which job? (optional)</div>
         {who ? (
           <div className="em-who">
             <b>{who.label}</b>
@@ -172,7 +172,7 @@ function ImportEic({ onClose, onMade }: { onClose: () => void; onMade: (id: stri
             </button>
           </div>
         ) : (
-          <AssignPicker onPick={setWho} autoFocus={false} />
+          <AssignPicker jobOnly onPick={setWho} autoFocus={false} />
         )}
         {busy && <WritingSpark label="Reading the certificate" steps={['Uploading the certificate', 'Reading the supply and earthing', 'Reading the inspections', 'Reading each circuit', 'Checking what is certain']} stepMs={5000} />}
         {err && <p className="crm-banner crm-banner--err">{err}</p>}
