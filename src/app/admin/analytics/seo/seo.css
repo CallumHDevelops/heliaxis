@@ -90,3 +90,5 @@
 .seo-comp p { margin: 0; font-size: 0.9rem; }
 .seo-comp ul { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; display: grid; gap: 3px; }
 .seo-comp summary { cursor: pointer; font-size: 0.85rem; font-weight: 700; }
+.seo-status { margin: 0; padding: 0.7rem 1rem; border-radius: 10px; background: rgb(248 188 30 / 0.15); border: 1px solid rgb(248 188 30 / 0.5); font-size: 0.9rem; }
+.seo-status.bad { background: rgb(var(--danger-rgb) / 0.1); border-color: rgb(var(--danger-rgb) / 0.4); }

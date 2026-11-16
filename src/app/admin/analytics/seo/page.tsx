@@ -9,7 +9,7 @@ import { Proposals } from './SeoControls';
 import { RankingsTable, RunAll, type RankRow } from './SeoDashboard';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { history, movers, summarise, visibility, type SerpSnapshot } from '@/lib/seo/rankings';
-import { latestCompetitorAnalysis, recentRankings, serpConfigured } from '@/lib/seo/serp';
+import { latestCompetitorAnalysis, readRunStatus, recentRankings, serpConfigured } from '@/lib/seo/serp';
 import './seo.css';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +18,11 @@ export const maxDuration = 300;
 export const metadata: Metadata = { title: 'SEO dashboard · Heliaxis', robots: { index: false, follow: false } };
 
 const when = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+/** A run counts as stuck after ten minutes without news (the server stops it at five). */
+function isStuck(s: { step: string; updatedAt: string } | null): boolean {
+  return !!s && (s.step === 'rankings' || s.step === 'competitors') && Date.now() - Date.parse(s.updatedAt) > 10 * 60_000;
+}
 
 const OFFLINE = new Set(['crm', 'whatsapp', 'whatsapp-import', 'phone call', 'other']);
 /** Where an enquiry came from, in two buckets: Meta lead forms, or the website (anything else not typed in by staff). */
@@ -86,13 +91,15 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
   const s = await requirePortal('analytics');
   if (!s) redirect('/admin?denied=1');
   const admin = s.profile.role === 'admin';
-  const [audits, proposals, snaps, comp, enq] = await Promise.all([
+  const [audits, proposals, snaps, comp, enq, status] = await Promise.all([
     recentAudits(8).catch(() => []),
     readProposals().catch(() => []),
     recentRankings(12).catch(() => [] as SerpSnapshot[]),
     latestCompetitorAnalysis().catch(() => null),
     enquiryCounts(days).catch(() => ({ website: 0, meta: 0, websitePrev: 0, metaPrev: 0 })),
+    readRunStatus().catch(() => null),
   ]);
+  const stuck = isStuck(status);
   const serpOn = serpConfigured();
   // Compare like with like: the newest check with last week's, or with the one about a month before it.
   const snapNow = snaps[0] ?? null;
@@ -174,6 +181,20 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
             {change && change.scoreBefore !== null && <Delta now={change.scoreNow} before={change.scoreBefore} unit="%" />}
           </div>
         </section>
+
+        {status && (status.step !== 'done' || status.message) && (
+          <p className={`seo-status ${status.step === 'failed' || stuck ? 'bad' : ''}`} role="status">
+            {stuck
+              ? `The last run stopped while ${status.step === 'rankings' ? 'checking Google positions' : 'analysing competitors'} (started ${when(status.startedAt)}). Press “Run everything now” to try again.`
+              : status.step === 'rankings'
+                ? `Checking Google positions now (started ${new Date(status.startedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}). Refresh in a minute or two.`
+                : status.step === 'competitors'
+                  ? 'Positions saved. Analysing the competitors’ pages now: refresh in a minute.'
+                  : status.step === 'failed'
+                    ? `The last run failed: ${status.message}`
+                    : status.message}
+          </p>
+        )}
 
         {!serpOn && (
           <p className="seo-empty">Google positions need DataForSEO: add DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD in Vercel, redeploy, then press “Run everything now”.</p>

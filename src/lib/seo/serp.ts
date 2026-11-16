@@ -26,12 +26,12 @@ function auth() {
   return 'Basic ' + Buffer.from(`${process.env.DATAFORSEO_LOGIN}:${process.env.DATAFORSEO_PASSWORD}`).toString('base64');
 }
 
-async function dfs(path: string, body?: unknown): Promise<Record<string, unknown>> {
+async function dfs(path: string, body?: unknown, timeoutMs = 60_000): Promise<Record<string, unknown>> {
   const r = await fetch(`${API}${path}`, {
     method: body ? 'POST' : 'GET',
     headers: { Authorization: auth(), 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: 'no-store',
   });
   const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
@@ -80,7 +80,7 @@ async function oneSearch(k: { id: number; keyword: string; town: string }, loc: 
   try {
     const j = await dfs('/serp/google/organic/live/advanced', [
       { keyword: k.keyword, location_code: loc.code, language_code: 'en', device: 'mobile', os: 'android', depth: 20 },
-    ]);
+    ], 30_000);
     const task = (j.tasks as Record<string, unknown>[] | undefined)?.[0];
     if (!task || task.status_code !== 20000) throw new Error(String(task?.status_message ?? 'No result'));
     const items = ((task.result as Record<string, unknown>[] | undefined)?.[0]?.items as unknown[]) ?? [];
@@ -96,11 +96,49 @@ export async function runRankings(now = new Date(), db: Db = createAdminClient()
   if (!serpConfigured()) throw new Error('DataForSEO is not set up: add DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.');
   const { data: kws } = await db.from('social_seo_keyword').select('id, keyword, town').eq('active', true).order('id');
   const keywords = (kws ?? []) as { id: number; keyword: string; town: string }[];
+  if (!keywords.length) throw new Error('No searches to check: the keyword list is empty.');
   const locs = await townLocations([...new Set(keywords.map((k) => k.town))], db);
-  const done = await inBatches(keywords, 6, (k) => oneSearch(k, locs[k.town] ?? UK));
+  // Twelve at a time keeps the whole run to a minute or two, well inside the five-minute limit.
+  const done = await inBatches(keywords, 12, (k) => oneSearch(k, locs[k.town] ?? UK));
   const snap: SerpSnapshot = { id: ukDay(now), at: now.toISOString(), costUsd: Math.round(done.reduce((a, d) => a + d.cost, 0) * 10000) / 10000, results: done.map((d) => d.r) };
   await db.from('cms_kv').upsert({ key: SERP_PREFIX + snap.id, value: toKv(snap), updated_at: new Date().toISOString() });
+  const failed = snap.results.filter((r) => r.error);
+  if (failed.length) console.error(`SEO rankings: ${failed.length} of ${snap.results.length} searches failed, first: ${failed[0].error}`);
   return snap;
+}
+
+/* ── What is running: shown on the dashboard so a run never just says "Running…" ── */
+
+const STATUS_KEY = 'seo-run-status';
+export type RunStatus = { step: 'rankings' | 'competitors' | 'done' | 'failed'; startedAt: string; updatedAt: string; message?: string };
+
+export async function readRunStatus(db: Db = createAdminClient()): Promise<RunStatus | null> {
+  const { data } = await db.from('cms_kv').select('value').eq('key', STATUS_KEY).maybeSingle();
+  const v = parseKv<RunStatus>(data?.value);
+  return v && v.step ? (v as RunStatus) : null;
+}
+
+async function setStatus(s: RunStatus, db: Db) {
+  await db.from('cms_kv').upsert({ key: STATUS_KEY, value: toKv(s), updated_at: new Date().toISOString() });
+}
+
+/** Rankings, then the competitor analysis, recording each step (and any error) for the dashboard. */
+export async function runRankingsAndCompetitors(db: Db = createAdminClient()): Promise<void> {
+  const startedAt = new Date().toISOString();
+  const at = () => new Date().toISOString();
+  try {
+    await setStatus({ step: 'rankings', startedAt, updatedAt: at() }, db);
+    const snap = await runRankings(new Date(), db);
+    const failed = snap.results.filter((r) => r.error);
+    if (failed.length === snap.results.length) throw new Error(`Every search failed at DataForSEO: ${failed[0]?.error ?? 'unknown error'}`);
+    await setStatus({ step: 'competitors', startedAt, updatedAt: at() }, db);
+    await runCompetitorAnalysis(new Date(), db);
+    await setStatus({ step: 'done', startedAt, updatedAt: at(), message: failed.length ? `${failed.length} of ${snap.results.length} searches could not be checked.` : undefined }, db);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Failed';
+    console.error('SEO rankings run failed:', message);
+    await setStatus({ step: 'failed', startedAt, updatedAt: at(), message }, db).catch(() => null);
+  }
 }
 
 /** The latest snapshots, newest first. */

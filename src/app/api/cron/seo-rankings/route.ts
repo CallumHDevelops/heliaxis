@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runCompetitorAnalysis, runRankings, serpConfigured } from '@/lib/seo/serp';
+import { readRunStatus, runRankingsAndCompetitors, serpConfigured } from '@/lib/seo/serp';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -14,7 +14,6 @@ function authorized(req: Request) {
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!serpConfigured()) return NextResponse.json({ ok: false, reason: 'DataForSEO not set up' });
-  const snap = await runRankings();
-  const comp = await runCompetitorAnalysis().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
-  return NextResponse.json({ ok: true, searches: snap.results.length, errors: snap.results.filter((r) => r.error).length, costUsd: snap.costUsd, competitors: 'competitors' in comp ? comp.competitors.length : comp });
+  await runRankingsAndCompetitors();
+  return NextResponse.json({ ok: true, status: await readRunStatus() });
 }

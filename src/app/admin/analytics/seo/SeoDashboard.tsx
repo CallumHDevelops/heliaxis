@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import '../../crm/crm.css';
-import { runAllNow } from './actions';
+import { runNow, runRankingsNow } from './actions';
 
 /** One row of the rankings table, prepared on the server. */
 export type RankRow = {
@@ -25,10 +25,16 @@ export function RunAll({ label = 'Run everything now' }: { label?: string }) {
   const [started, setStarted] = useState(false);
   return (
     <div className="seo-run">
-      <button type="button" className="crm-btn crm-btn--solar" disabled={busy || started} onClick={() => start(async () => { await runAllNow(); setStarted(true); })}>
+      <button
+        type="button"
+        className="crm-btn crm-btn--solar"
+        disabled={busy || started}
+        // Two separate jobs, so the site check can't use up the time the Google positions need.
+        onClick={() => start(async () => { await Promise.all([runNow(), runRankingsNow()]); setStarted(true); })}
+      >
         {busy ? 'Starting…' : started ? 'Running…' : label}
       </button>
-      {started && <small>Site check, Google positions and competitors are running. It takes a few minutes: refresh this page.</small>}
+      {started && <small>Running. Google positions take about two minutes, then the competitor analysis: refresh this page to see progress.</small>}
     </div>
   );
 }

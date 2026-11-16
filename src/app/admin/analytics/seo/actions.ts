@@ -4,7 +4,7 @@ import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { applyProposal, dismissProposal, runWeekly } from '@/lib/seo/server';
-import { runCompetitorAnalysis, runRankings, serpConfigured } from '@/lib/seo/serp';
+import { runRankingsAndCompetitors, serpConfigured } from '@/lib/seo/serp';
 
 const guard = async () => {
   const s = await requirePortal('analytics');
@@ -37,27 +37,12 @@ export async function runNow(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-/** Check Google positions for every tracked search now, then rerun the competitor analysis (a few minutes; refresh to see it). */
+/** Check Google positions for every tracked search now, then rerun the competitor analysis (a few minutes). Runs on its own, so the site check can't use up its time. */
 export async function runRankingsNow(): Promise<{ ok: boolean; error?: string }> {
   await guard();
   if (!serpConfigured()) return { ok: false, error: 'DataForSEO isn’t set up yet (DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD).' };
   after(async () => {
-    await runRankings().catch(() => null);
-    await runCompetitorAnalysis().catch(() => null);
-    revalidatePath('/admin/analytics/seo');
-  });
-  return { ok: true };
-}
-
-/** Everything: the site check, then rankings and competitors. */
-export async function runAllNow(): Promise<{ ok: boolean }> {
-  await guard();
-  after(async () => {
-    await runWeekly().catch(() => null);
-    if (serpConfigured()) {
-      await runRankings().catch(() => null);
-      await runCompetitorAnalysis().catch(() => null);
-    }
+    await runRankingsAndCompetitors();
     revalidatePath('/admin/analytics/seo');
   });
   return { ok: true };
