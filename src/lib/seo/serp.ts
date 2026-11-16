@@ -39,9 +39,12 @@ async function dfs(path: string, body?: unknown, timeoutMs = 60_000): Promise<Re
   return j;
 }
 
-async function inBatches<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+async function inBatches<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>, after?: (done: number) => Promise<unknown>): Promise<R[]> {
   const out: R[] = [];
-  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  for (let i = 0; i < items.length; i += size) {
+    out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+    if (after) await after(out.length).catch(() => null);
+  }
   return out;
 }
 
@@ -92,14 +95,15 @@ async function oneSearch(k: { id: number; keyword: string; town: string }, loc: 
 }
 
 /** Check every active tracked search now and save the snapshot. Takes a minute or two. */
-export async function runRankings(now = new Date(), db: Db = createAdminClient()): Promise<SerpSnapshot> {
+export async function runRankings(now = new Date(), db: Db = createAdminClient(), onProgress?: (done: number, total: number) => Promise<unknown>): Promise<SerpSnapshot> {
   if (!serpConfigured()) throw new Error('DataForSEO is not set up: add DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.');
   const { data: kws } = await db.from('social_seo_keyword').select('id, keyword, town').eq('active', true).order('id');
   const keywords = (kws ?? []) as { id: number; keyword: string; town: string }[];
   if (!keywords.length) throw new Error('No searches to check: the keyword list is empty.');
   const locs = await townLocations([...new Set(keywords.map((k) => k.town))], db);
   // Twelve at a time keeps the whole run to a minute or two, well inside the five-minute limit.
-  const done = await inBatches(keywords, 12, (k) => oneSearch(k, locs[k.town] ?? UK));
+  await onProgress?.(0, keywords.length);
+  const done = await inBatches(keywords, 12, (k) => oneSearch(k, locs[k.town] ?? UK), (n) => onProgress?.(n, keywords.length) ?? Promise.resolve());
   const snap: SerpSnapshot = { id: ukDay(now), at: now.toISOString(), costUsd: Math.round(done.reduce((a, d) => a + d.cost, 0) * 10000) / 10000, results: done.map((d) => d.r) };
   await db.from('cms_kv').upsert({ key: SERP_PREFIX + snap.id, value: toKv(snap), updated_at: new Date().toISOString() });
   const failed = snap.results.filter((r) => r.error);
@@ -110,7 +114,20 @@ export async function runRankings(now = new Date(), db: Db = createAdminClient()
 /* ── What is running: shown on the dashboard so a run never just says "Running…" ── */
 
 const STATUS_KEY = 'seo-run-status';
-export type RunStatus = { step: 'rankings' | 'competitors' | 'done' | 'failed'; startedAt: string; updatedAt: string; message?: string };
+export type RunStatus = { step: 'rankings' | 'competitors' | 'done' | 'failed'; startedAt: string; updatedAt: string; message?: string; done?: number; total?: number };
+/** The site check's own status (a separate job, so a separate record). */
+export type AuditStatus = { step: 'running' | 'done' | 'failed'; startedAt: string; updatedAt: string; message?: string };
+const AUDIT_STATUS_KEY = 'seo-audit-status';
+
+export async function readAuditStatus(db: Db = createAdminClient()): Promise<AuditStatus | null> {
+  const { data } = await db.from('cms_kv').select('value').eq('key', AUDIT_STATUS_KEY).maybeSingle();
+  const v = parseKv<AuditStatus>(data?.value);
+  return v && v.step ? (v as AuditStatus) : null;
+}
+
+export async function setAuditStatus(s: AuditStatus, db: Db = createAdminClient()) {
+  await db.from('cms_kv').upsert({ key: AUDIT_STATUS_KEY, value: toKv(s), updated_at: new Date().toISOString() });
+}
 
 export async function readRunStatus(db: Db = createAdminClient()): Promise<RunStatus | null> {
   const { data } = await db.from('cms_kv').select('value').eq('key', STATUS_KEY).maybeSingle();
@@ -128,7 +145,7 @@ export async function runRankingsAndCompetitors(db: Db = createAdminClient()): P
   const at = () => new Date().toISOString();
   try {
     await setStatus({ step: 'rankings', startedAt, updatedAt: at() }, db);
-    const snap = await runRankings(new Date(), db);
+    const snap = await runRankings(new Date(), db, (done, total) => setStatus({ step: 'rankings', startedAt, updatedAt: at(), done, total }, db));
     const failed = snap.results.filter((r) => r.error);
     if (failed.length === snap.results.length) throw new Error(`Every search failed at DataForSEO: ${failed[0]?.error ?? 'unknown error'}`);
     await setStatus({ step: 'competitors', startedAt, updatedAt: at() }, db);

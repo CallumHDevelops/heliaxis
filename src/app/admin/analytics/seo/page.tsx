@@ -6,10 +6,10 @@ import { requirePortal } from '@/lib/auth';
 import { compareAudits, SEVERITY_ORDER } from '@/lib/seo/shared';
 import { readProposals, recentAudits } from '@/lib/seo/server';
 import { Proposals } from './SeoControls';
-import { RankingsTable, RunAll, type RankRow } from './SeoDashboard';
+import { RankingsTable, RunCentre, type RankRow } from './SeoDashboard';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { history, movers, summarise, visibility, type SerpSnapshot } from '@/lib/seo/rankings';
-import { latestCompetitorAnalysis, readRunStatus, recentRankings, serpConfigured } from '@/lib/seo/serp';
+import { latestCompetitorAnalysis, readAuditStatus, readRunStatus, recentRankings, serpConfigured } from '@/lib/seo/serp';
 import './seo.css';
 
 export const dynamic = 'force-dynamic';
@@ -91,13 +91,14 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
   const s = await requirePortal('analytics');
   if (!s) redirect('/admin?denied=1');
   const admin = s.profile.role === 'admin';
-  const [audits, proposals, snaps, comp, enq, status] = await Promise.all([
+  const [audits, proposals, snaps, comp, enq, status, auditStatus] = await Promise.all([
     recentAudits(8).catch(() => []),
     readProposals().catch(() => []),
     recentRankings(12).catch(() => [] as SerpSnapshot[]),
     latestCompetitorAnalysis().catch(() => null),
     enquiryCounts(days).catch(() => ({ website: 0, meta: 0, websitePrev: 0, metaPrev: 0 })),
     readRunStatus().catch(() => null),
+    readAuditStatus().catch(() => null),
   ]);
   const stuck = isStuck(status);
   const serpOn = serpConfigured();
@@ -145,9 +146,10 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
                 Monthly
               </Link>
             </nav>
-            {admin && <RunAll />}
           </div>
         </header>
+
+        <RunCentre admin={admin} initial={{ audit: auditStatus, run: status, serp: serpOn }} />
 
         <section className="seo-cards" aria-label="Scoreboard">
           <div className="seo-card">
@@ -182,7 +184,7 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
           </div>
         </section>
 
-        {status && (status.step !== 'done' || status.message) && (
+        {status && (status.step === 'failed' || stuck || (status.step === 'done' && status.message)) && (
           <p className={`seo-status ${status.step === 'failed' || stuck ? 'bad' : ''}`} role="status">
             {stuck
               ? `The last run stopped while ${status.step === 'rankings' ? 'checking Google positions' : 'analysing competitors'} (started ${when(status.startedAt)}). Press “Run everything now” to try again.`

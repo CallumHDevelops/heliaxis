@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import '../../crm/crm.css';
-import { runNow, runRankingsNow } from './actions';
+import { getProgress, runNow, runRankingsNow } from './actions';
 
 /** One row of the rankings table, prepared on the server. */
 export type RankRow = {
@@ -20,21 +21,126 @@ export type RankRow = {
   trend: (number | null)[];
 };
 
-export function RunAll({ label = 'Run everything now' }: { label?: string }) {
+type Progress = Awaited<ReturnType<typeof getProgress>>;
+type StepState = 'waiting' | 'running' | 'done' | 'failed' | 'off';
+
+/** Ten minutes without news means the job was stopped (the server allows five). */
+const stale = (iso?: string) => !iso || Date.now() - Date.parse(iso) > 10 * 60_000;
+
+function stepsOf(p: Progress | null, startedHere: number | null) {
+  // Only a record from this run (or one still going) is progress: an old "done" is not.
+  const fresh = (iso?: string) => !!iso && (startedHere ? Date.parse(iso) >= startedHere - 60_000 : !stale(iso));
+  const a = p?.audit && fresh(p.audit.startedAt) ? p.audit : null;
+  const r = p?.run && fresh(p.run.startedAt) ? p.run : null;
+  const audit: StepState = !a ? 'waiting' : a.step === 'running' ? (stale(a.updatedAt) ? 'failed' : 'running') : a.step === 'done' ? 'done' : 'failed';
+  let rank: StepState = p && !p.serp ? 'off' : 'waiting';
+  let comp: StepState = rank === 'off' ? 'off' : 'waiting';
+  if (r) {
+    const dead = stale(r.updatedAt) && (r.step === 'rankings' || r.step === 'competitors');
+    if (r.step === 'rankings') rank = dead ? 'failed' : 'running';
+    else if (r.step === 'failed') rank = r.total && (r.done ?? 0) >= r.total ? 'done' : 'failed';
+    else rank = 'done';
+    if (r.step === 'competitors') comp = dead ? 'failed' : 'running';
+    else if (r.step === 'done') comp = 'done';
+    else if (r.step === 'failed') comp = rank === 'done' ? 'failed' : 'waiting';
+  }
+  return { audit, rank, comp, run: r, auditRec: a };
+}
+
+/** The run button and, while it works, what is happening step by step (checked every few seconds). */
+export function RunCentre({ admin, initial }: { admin: boolean; initial: Progress }) {
+  const router = useRouter();
+  const [p, setP] = useState<Progress>(initial);
+  const [startedHere, setStartedHere] = useState<number | null>(null);
   const [busy, start] = useTransition();
-  const [started, setStarted] = useState(false);
+  const [err, setErr] = useState('');
+  // Whether the dashboard has been redrawn since this run finished (a ref: it changes nothing on screen).
+  const refreshed = useRef(false);
+  const st = stepsOf(p, startedHere);
+  const states = [st.audit, st.rank, st.comp];
+  const active = states.includes('running') || (startedHere !== null && states.includes('waiting'));
+  const finished = startedHere !== null && !active;
+
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => {
+      getProgress().then(setP, () => null);
+    }, 3000);
+    return () => clearInterval(t);
+  }, [active]);
+
+  // When everything has finished, redraw the dashboard once with the new figures.
+  useEffect(() => {
+    if (finished && !refreshed.current) {
+      refreshed.current = true;
+      router.refresh();
+    }
+  }, [finished, router]);
+
+  function go() {
+    setErr('');
+    start(async () => {
+      setStartedHere(Date.now());
+      refreshed.current = false;
+      const [, r] = await Promise.all([runNow(), runRankingsNow()]);
+      if (!r.ok && r.error) setErr(r.error);
+      setP(await getProgress());
+    });
+  }
+
+  const show = active || finished;
+  const count = st.run?.total ? `${st.run.done ?? 0} of ${st.run.total} searches` : 'Starting';
+  const pct = st.run?.total ? Math.round(((st.run.done ?? 0) / st.run.total) * 100) : 0;
+  const detail = {
+    audit: { running: 'Reading every page the way Google does', done: 'Done', failed: st.auditRec?.message || 'Stopped before it finished', waiting: 'Waiting', off: '–' },
+    rank: { running: `${count}, each from its own town`, done: `Done${st.run?.total ? `: ${st.run.total} searches` : ''}`, failed: st.run?.message || 'Stopped before it finished', waiting: 'Waiting', off: 'DataForSEO isn’t set up' },
+    comp: { running: 'Reading the leaders’ pages and comparing them with ours', done: 'Done', failed: st.run?.message || 'Stopped before it finished', waiting: 'Waiting for the positions', off: '–' },
+  };
+  const rows: { key: 'audit' | 'rank' | 'comp'; label: string; state: StepState }[] = [
+    { key: 'audit', label: 'Site check', state: st.audit },
+    { key: 'rank', label: 'Google positions', state: st.rank },
+    { key: 'comp', label: 'Competitor analysis', state: st.comp },
+  ];
+  const doneCount = states.filter((x) => x === 'done' || x === 'off').length;
+
   return (
-    <div className="seo-run">
-      <button
-        type="button"
-        className="crm-btn crm-btn--solar"
-        disabled={busy || started}
-        // Two separate jobs, so the site check can't use up the time the Google positions need.
-        onClick={() => start(async () => { await Promise.all([runNow(), runRankingsNow()]); setStarted(true); })}
-      >
-        {busy ? 'Starting…' : started ? 'Running…' : label}
-      </button>
-      {started && <small>Running. Google positions take about two minutes, then the competitor analysis: refresh this page to see progress.</small>}
+    <div className="seo-runc">
+      {admin && (
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || active} onClick={go}>
+          {busy ? 'Starting…' : active ? 'Running…' : 'Run everything now'}
+        </button>
+      )}
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      {show && (
+        <div className={`seo-prog${finished ? ' is-done' : ''}`} role="status" aria-live="polite">
+          <svg className="seo-prog__spark" viewBox="0 0 24 24" aria-hidden="true">
+            {[0, 90, 180, 270].map((a, i) => (
+              <g key={a} transform={`rotate(${a} 12 12)`} className={finished || i < doneCount ? 'is-done' : i === doneCount ? 'is-now' : ''}>
+                <path d="M11 9.6 L13 9.6 L13 0.8 L11 3 Z" />
+              </g>
+            ))}
+          </svg>
+          <div className="seo-prog__body">
+            <b>{finished ? 'Finished: the dashboard below is up to date.' : 'Working on it. You can leave this page: it carries on.'}</b>
+            <ol className="seo-prog__steps">
+              {rows.map((r) => (
+                <li key={r.key} className={`st-${r.state}`}>
+                  <span className="seo-prog__dot" aria-hidden="true" />
+                  <div>
+                    <b>{r.label}</b>
+                    <span>{detail[r.key][r.state]}</span>
+                    {r.key === 'rank' && r.state === 'running' && (
+                      <span className="seo-prog__bar" aria-hidden="true">
+                        <span style={{ width: `${pct}%` }} />
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

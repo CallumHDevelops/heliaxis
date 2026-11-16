@@ -4,7 +4,7 @@ import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { applyProposal, dismissProposal, runWeekly } from '@/lib/seo/server';
-import { runRankingsAndCompetitors, serpConfigured } from '@/lib/seo/serp';
+import { readAuditStatus, readRunStatus, runRankingsAndCompetitors, serpConfigured, setAuditStatus } from '@/lib/seo/serp';
 
 const guard = async () => {
   const s = await requirePortal('analytics');
@@ -27,14 +27,29 @@ export async function dismiss(id: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-/** Run this week's check now (it takes a minute or two; the page shows it when it's done). */
+/** Run the site check now (a minute or two), recording its progress for the dashboard. */
 export async function runNow(): Promise<{ ok: boolean }> {
   await guard();
+  const startedAt = new Date().toISOString();
+  await setAuditStatus({ step: 'running', startedAt, updatedAt: startedAt });
   after(async () => {
-    await runWeekly().catch(() => null);
+    try {
+      await runWeekly();
+      await setAuditStatus({ step: 'done', startedAt, updatedAt: new Date().toISOString() });
+    } catch (e) {
+      await setAuditStatus({ step: 'failed', startedAt, updatedAt: new Date().toISOString(), message: e instanceof Error ? e.message : 'Failed' }).catch(() => null);
+    }
     revalidatePath('/admin/analytics/seo');
   });
   return { ok: true };
+}
+
+/** What is running now, for the progress panel (anyone who can see the dashboard). */
+export async function getProgress() {
+  const s = await requirePortal('analytics');
+  if (!s) throw new Error('Not allowed');
+  const [audit, run] = await Promise.all([readAuditStatus().catch(() => null), readRunStatus().catch(() => null)]);
+  return { audit, run, serp: serpConfigured() };
 }
 
 /** Check Google positions for every tracked search now, then rerun the competitor analysis (a few minutes). Runs on its own, so the site check can't use up its time. */
