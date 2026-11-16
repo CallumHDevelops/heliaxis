@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import '../home.css';
 import { StepQuoteForm } from '@/components/quote/StepQuoteForm';
 import { SiteFooter } from '@/components/home/SiteFooter';
@@ -46,6 +47,9 @@ export default async function GetAQuote({ searchParams }: { searchParams: Promis
               <span>Quick, friendly, and only when it suits you.</span>
             </div>
           </div>
+          <Link className="sqp-more" href="/free-solar-quote">
+            See our solar packages and how a quote works
+          </Link>
         </aside>
         <section className="sqp-form" aria-label="Quote request">
           <StepQuoteForm variant="page" initialWho={q.for === 'business' || q.for === 'home' ? q.for : undefined} />

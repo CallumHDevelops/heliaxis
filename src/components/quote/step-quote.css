@@ -77,3 +77,5 @@
   .sqp-form{padding:28px 20px 40px}
   .sqp-form .sq{min-height:0}
 }
+.sqp-more{margin-top:6px;align-self:flex-start;color:var(--solar);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.sqp-more:hover{color:var(--paper)}

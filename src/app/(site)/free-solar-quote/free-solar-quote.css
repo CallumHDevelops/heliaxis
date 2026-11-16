@@ -1,0 +1,46 @@
+/* /free-solar-quote: the ad-ready quote landing page. Builds on home.css and the quote page's .sqp layout (step-quote.css). */
+.fsq #quote{scroll-margin-top:80px}
+.fsq-hero .sqp-brand h1{margin-bottom:14px}
+.fsq-lede{color:#D8D1C0;font-size:1.05rem;max-width:44ch;margin-bottom:26px}
+.fsq-quiet{margin-top:10px;align-self:flex-start;color:var(--solar);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.fsq-quiet:hover{color:var(--paper)}
+.fsq a:focus-visible{outline:2px solid var(--solar);outline-offset:3px}
+
+.fsq-alt{background:var(--card)}
+.fsq-why{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:34px}
+.fsq-card{border:1px solid var(--line);border-radius:3px;padding:24px;background:var(--paper)}
+.fsq-card svg{width:24px;height:24px;stroke:var(--amber-2)}
+.fsq-card h3{margin-top:12px;font-family:var(--display);font-weight:700;font-size:1.08rem}
+.fsq-card p{margin-top:8px;color:var(--muted);font-size:.95rem}
+
+.fsq-steps{list-style:none;padding:0}
+.fsq-steps .pstep h3{font-size:1.05rem;font-weight:700}
+
+.fsq-split{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+.fsq-split .sec-head a{color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.fsq-factors{list-style:none;margin:0;padding:0;border-top:1px solid var(--ink)}
+.fsq-factors li{display:grid;gap:4px;padding:16px 2px;border-bottom:1px solid var(--line)}
+.fsq-factors b{font-family:var(--display);font-size:1.02rem}
+.fsq-factors span{color:var(--muted);font-size:.95rem}
+
+.fsq-checked{text-align:center;color:var(--muted);font-size:.85rem;padding:0 24px 56px;margin-top:-40px}
+
+.fsq-final{background:var(--ink);color:var(--paper);padding:72px 0}
+.fsq-final h2{font-size:clamp(1.8rem,3.6vw,2.6rem);font-weight:800;margin-top:12px}
+.fsq-final p{margin-top:14px;max-width:62ch;color:#D8D1C0}
+.fsq-final-ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.fsq-btn-line{border-color:rgba(247,242,231,.4);color:var(--paper)}
+.fsq-btn-line:hover{border-color:var(--paper)}
+.fsq-btn-line svg{color:#25d366}
+
+@media (max-width:900px){
+  .fsq-why{grid-template-columns:1fr 1fr}
+  .fsq-split{grid-template-columns:1fr;gap:20px}
+  .fsq-steps{grid-template-columns:1fr 1fr}
+}
+@media (max-width:600px){
+  .fsq-why,.fsq-steps{grid-template-columns:1fr}
+  .fsq-final-ctas .btn{width:100%}
+  .fsq-lede{font-size:.98rem;margin:10px 0 14px}
+  .fsq-hero .sqp-brand h1{margin-bottom:0}
+}
