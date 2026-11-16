@@ -1,0 +1,15 @@
+/* PackagesBand: the packages and their from-prices (src/components/quote/PackagesBand.tsx). */
+.pkgband{background:var(--paper)}
+.pkg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:34px}
+.pkg-card{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--solar);border-radius:3px;padding:26px;display:flex;flex-direction:column}
+.pkg-card h3{font-family:var(--display);font-weight:800;font-size:1.3rem}
+.pkg-sum{margin-top:8px;color:var(--muted)}
+.pkg-price{margin-top:16px;font-family:var(--display);font-weight:900;font-size:1.6rem;line-height:1.1}
+.pkg-size{margin-top:4px;font-family:var(--mono);font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--amber-2)}
+.pkg-inc{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px}
+.pkg-inc li{position:relative;padding-left:20px;font-size:.95rem}
+.pkg-inc li::before{content:"";position:absolute;left:0;top:8px;width:9px;height:9px;background:var(--solar);border-radius:1px}
+.pkg-ctas{margin-top:auto;padding-top:22px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.pkg-alt{font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.pkg-alt:hover{color:var(--amber-2)}
+.pkg-note{margin-top:22px;text-align:center;color:var(--muted);font-size:.92rem}
