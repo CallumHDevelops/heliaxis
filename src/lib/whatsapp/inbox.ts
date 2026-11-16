@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { clearChatNotifications, clearReplyNotifications, notify, type NotificationInput } from '@/lib/notify';
 import { chatHref, chatRef, chatTag, replyRef } from '@/lib/notification-refs';
 import { canAccess } from '@/lib/portals';
+import { callBackTask } from './call-back';
 import { inboundMediaColumns, storeMediaSoon } from './media';
 import { defaultTemplate, markRead, sendDocument, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
@@ -212,11 +213,15 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
 
   const queued = kind === 'text' && m.type !== 'reaction' && !word ? await queueSmartReply(db, enquiry, body, m.id) : null;
 
+  // "Call me today / tomorrow": a call task on their job, so a reply like that is never missed.
+  const callBack = kind === 'text' && !word ? await callBackTask(db, { enquiry, body, messageId: m.id, at }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null) : null;
+
   const who = enquiry.name || `+${m.from}`;
   const lines = [body.slice(0, 140)];
   if (word && !kept) lines.push('Run crm-v3.sql in Supabase (it’s on the to-do list) so the app can keep STOP replies.');
   else if (word === 'stop') lines.push('Automatic WhatsApps to them are now off. You can still reply by hand.');
   else if (word === 'start') lines.push('Automatic WhatsApps to them are back on.');
+  if (callBack?.created) lines.push(`Call task added for ${callBack.when}.`);
   if (queued) lines.push(`Smart reply “${queued.rule}” sends in ~${Math.max(1, Math.round(queued.seconds / 60))} min — tap to check, edit or cancel.`);
   await notifyEnquiryTeam(created ? `New WhatsApp lead: ${who}` : `WhatsApp from ${who}`, lines.join('\n'), inboxHref(enquiry.id), {
     tag: chatTag(enquiry.id),

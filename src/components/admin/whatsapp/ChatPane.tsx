@@ -222,6 +222,8 @@ export function ChatPane({
   const router = useRouter();
   const dock = variant === 'dock';
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
+  /** Their job (CRM staff): the name in the header opens it. */
+  const [crm, setCrm] = useState<{ href: string; ref: string | null } | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [outbox, setOutbox] = useState<Queued[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -297,6 +299,7 @@ export function ChatPane({
         if (!r.ok) throw new Error(d.error === 'Not found' ? 'This chat isn’t available.' : d.error || 'Could not load this chat');
         if (!d.same) {
           setEnquiry(d.enquiry);
+          setCrm(d.crm ?? null);
           setMessages(d.messages);
           setOutbox(d.outbox);
           setConfigured(d.configured);
@@ -409,6 +412,8 @@ export function ChatPane({
 
   const open = windowOpen(enquiry?.wa_last_inbound_at, now);
   const left = windowLeft(enquiry?.wa_last_inbound_at, now);
+  /** A number to ring: tapping it in the header calls them. */
+  const callable = (enquiry?.phone || (enquiry?.wa_id ? `+${enquiry.wa_id}` : '') || '').replace(/[^\d+]/g, '');
 
   // Outside the 24h window only a template can go: pre-filled from what the CRM knows. (Or inside
   // it, to go later than the window lasts.)
@@ -867,7 +872,7 @@ export function ChatPane({
           {open && !tplAt ? (
             <div className="wa-pane__compose">
               <p className="wa-replying">
-                Replying to <b>{enquiry.name}</b>
+                Replying to {crm ? <Link href={crm.href} className="wa-chat-who__name"><b>{enquiry.name}</b></Link> : <b>{enquiry.name}</b>}
                 {number && ` · ${number}`}
               </p>
               <div className="wa-pane__chips">
@@ -916,10 +921,30 @@ export function ChatPane({
         {back && <Link href={back.href} className="wa-back" aria-label={back.label}>←</Link>}
         <span className="wa-avatar">{enquiry.name.slice(0, 1).toUpperCase()}</span>
         <div className="wa-chat-who">
-          <b>{enquiry.name}</b>
+          {crm ? (
+            <Link href={crm.href} className="wa-chat-who__name" title="Open their job">
+              <b>{enquiry.name}</b> <span aria-hidden="true">›</span>
+            </Link>
+          ) : (
+            <b>{enquiry.name}</b>
+          )}
           <span>
-            {customerRef ? `${customerRef} · ` : ''}
-            {enquiry.wa_id ? `+${enquiry.wa_id}` : enquiry.phone || 'No number'} · {open ? left : 'window closed'}
+            {crm ? (
+              <Link href={crm.href} className="wa-chat-who__ref">
+                {[crm.ref, customerRef].filter(Boolean).join(' · ') || 'Open job'}
+              </Link>
+            ) : (
+              customerRef && `${customerRef}`
+            )}
+            {(crm || customerRef) && ' · '}
+            {callable ? (
+              <a href={`tel:${callable}`} className="wa-chat-who__tel" title="Call them">
+                {enquiry.wa_id ? `+${enquiry.wa_id}` : enquiry.phone}
+              </a>
+            ) : (
+              enquiry.wa_id ? `+${enquiry.wa_id}` : enquiry.phone || 'No number'
+            )}{' '}
+            · {open ? left : 'window closed'}
           </span>
         </div>
         <button type="button" className="wa-refresh" onClick={refresh} disabled={busy} aria-label="Refresh" title="Refresh">

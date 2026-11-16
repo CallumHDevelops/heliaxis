@@ -255,6 +255,21 @@ textarea.wa-input {
   display: flex;
   flex-direction: column;
 }
+.wa-chat-who__name,
+.wa-chat-who__ref,
+.wa-chat-who__tel {
+  color: inherit;
+  text-decoration: none;
+}
+.wa-chat-who__name:hover b,
+.wa-chat-who__ref:hover,
+.wa-chat-who__tel:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.wa-chat-who__tel {
+  font-weight: 700;
+}
 .wa-chat-who b {
   overflow: hidden;
   text-overflow: ellipsis;

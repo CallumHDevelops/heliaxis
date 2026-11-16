@@ -8,6 +8,8 @@ import { chaseView, lateSendAt } from '@/lib/whatsapp/schedule';
 import { LATER_COLS, mayChangeQueued, parseSendAt, sendLaterReady } from '@/lib/whatsapp/send-later';
 import { mediaVersion, withChatMedia } from '@/lib/whatsapp/media';
 import { chatSession, json, mayOpenChat, version } from '@/lib/whatsapp/routes';
+import { canAccess } from '@/lib/portals';
+import { jobHref } from '@/lib/global-search';
 import { wordingForNote } from '@/lib/whatsapp/template-text';
 
 export const dynamic = 'force-dynamic';
@@ -123,6 +125,13 @@ export async function GET(req: Request, { params }: Ctx) {
   const personName = new Map((people ?? []).map((p) => [p.id, p.full_name || p.email || 'Team']));
   const ruleName = new Map((rules ?? []).map((r) => [r.id, r.name]));
   // Offered first in the template box: the one chosen for the ad (video) they came from, else the general one.
+  // Where their job is, for the name in the header (CRM staff only): the newest one still open, else the newest.
+  let crm: { href: string; ref: string | null } | null = null;
+  if (canAccess(s.profile, 'crm')) {
+    const { data: jobs } = await db.from('crm_projects').select('id, stage, project_ref, created_at').eq('enquiry_id', id).order('created_at', { ascending: false }).limit(20);
+    const open = (jobs ?? []).find((j) => j.stage !== 'complete' && j.stage !== 'lost') ?? (jobs ?? [])[0];
+    if (open) crm = { href: jobHref({ id: open.id as string, stage: String(open.stage) }), ref: (open.project_ref as string | null) ?? null };
+  }
   const offered = await firstTemplateFor(enquiry, settings.firstContactTemplate || defaultTemplate().name || null);
 
   return json({
@@ -137,6 +146,7 @@ export async function GET(req: Request, { params }: Ctx) {
       view: { ...chaseView(settings), lateRule: settings.lateRule && later },
     },
     later: { ready: later },
+    crm,
     enquiry,
     messages: (messages ?? []).map((m) => ({
       ...m,
