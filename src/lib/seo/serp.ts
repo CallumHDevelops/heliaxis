@@ -1,0 +1,295 @@
+import 'server-only';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { parseKv, toKv } from '@/lib/kv-json';
+import { aiConfig, aiHeaders } from '@/lib/studio/ai';
+import { parsePage } from './shared';
+import { cleanDomain, isOurs, ourPlace, parseSerp, visibility, type LeagueRow, type SerpResult, type SerpSnapshot } from './rankings';
+
+/**
+ * Weekly Google rankings from DataForSEO (pay as you go, about a fifth of a US cent per search at the depth used here), and the
+ * competitor analysis built on them. Credentials: DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD (the API password from the
+ * DataForSEO dashboard). Stored in cms_kv: "seo-serp:YYYY-MM-DD" and "seo-competitors:YYYY-MM-DD".
+ */
+
+type Db = ReturnType<typeof createAdminClient>;
+const API = 'https://api.dataforseo.com/v3';
+const SERP_PREFIX = 'seo-serp:';
+const COMP_PREFIX = 'seo-competitors:';
+const LOCATIONS_KEY = 'seo-serp-locations';
+const UK = { code: 2826, name: 'United Kingdom' };
+const UA = 'Mozilla/5.0 (compatible; HeliaxisMonitor/1.0; +https://heliaxis.co.uk)';
+const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+
+export const serpConfigured = () => !!(process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD);
+
+function auth() {
+  return 'Basic ' + Buffer.from(`${process.env.DATAFORSEO_LOGIN}:${process.env.DATAFORSEO_PASSWORD}`).toString('base64');
+}
+
+async function dfs(path: string, body?: unknown): Promise<Record<string, unknown>> {
+  const r = await fetch(`${API}${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: { Authorization: auth(), 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(60_000),
+    cache: 'no-store',
+  });
+  const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!r.ok || (j.status_code !== undefined && j.status_code !== 20000)) throw new Error(String(j.status_message ?? `DataForSEO ${r.status}`));
+  return j;
+}
+
+async function inBatches<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  return out;
+}
+
+/* ── Locations: each town's DataForSEO location (free to look up, kept for 30 days) ── */
+
+type Loc = { code: number; name: string };
+
+async function townLocations(towns: string[], db: Db): Promise<Record<string, Loc>> {
+  const { data } = await db.from('cms_kv').select('value, updated_at').eq('key', LOCATIONS_KEY).maybeSingle();
+  const cached = parseKv<{ towns?: Record<string, Loc> }>(data?.value).towns ?? {};
+  const fresh = data?.updated_at && Date.now() - Date.parse(data.updated_at) < 30 * 86_400_000;
+  if (fresh && towns.every((t) => cached[t])) return cached;
+  const j = await dfs('/serp/google/locations/gb');
+  const list = (((j.tasks as Record<string, unknown>[] | undefined)?.[0]?.result as Record<string, unknown>[] | undefined) ?? []).map((x) => ({
+    code: Number(x.location_code),
+    name: String(x.location_name ?? ''),
+    type: String(x.location_type ?? ''),
+  }));
+  const rank = (t: string) => ({ City: 0, Municipality: 1, County: 2, Region: 3 })[t] ?? 4;
+  const out: Record<string, Loc> = {};
+  for (const town of towns) {
+    const want = town.toLowerCase();
+    const hit = list
+      .filter((l) => l.name.toLowerCase().startsWith(`${want},`) && /,(Wales|England),United Kingdom$/i.test(l.name))
+      .sort((a, b) => rank(a.type) - rank(b.type))[0];
+    out[town] = hit ? { code: hit.code, name: hit.name } : UK;
+  }
+  await db.from('cms_kv').upsert({ key: LOCATIONS_KEY, value: toKv({ towns: out }), updated_at: new Date().toISOString() });
+  return out;
+}
+
+/* ── The weekly rankings run ─────────────────────────────────────────────────── */
+
+async function oneSearch(k: { id: number; keyword: string; town: string }, loc: Loc): Promise<{ r: SerpResult; cost: number }> {
+  const base = { keywordId: k.id, keyword: k.keyword, town: k.town, location: loc.name };
+  try {
+    const j = await dfs('/serp/google/organic/live/advanced', [
+      { keyword: k.keyword, location_code: loc.code, language_code: 'en', device: 'mobile', os: 'android', depth: 20 },
+    ]);
+    const task = (j.tasks as Record<string, unknown>[] | undefined)?.[0];
+    if (!task || task.status_code !== 20000) throw new Error(String(task?.status_message ?? 'No result'));
+    const items = ((task.result as Record<string, unknown>[] | undefined)?.[0]?.items as unknown[]) ?? [];
+    const { organic, localPack } = parseSerp(items);
+    return { r: { ...base, organic, localPack, ours: ourPlace(organic, localPack) }, cost: Number(task.cost ?? 0) };
+  } catch (e) {
+    return { r: { ...base, organic: [], localPack: [], ours: { pos: null, url: null, pack: null }, error: e instanceof Error ? e.message : 'Failed' }, cost: 0 };
+  }
+}
+
+/** Check every active tracked search now and save the snapshot. Takes a minute or two. */
+export async function runRankings(now = new Date(), db: Db = createAdminClient()): Promise<SerpSnapshot> {
+  if (!serpConfigured()) throw new Error('DataForSEO is not set up: add DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.');
+  const { data: kws } = await db.from('social_seo_keyword').select('id, keyword, town').eq('active', true).order('id');
+  const keywords = (kws ?? []) as { id: number; keyword: string; town: string }[];
+  const locs = await townLocations([...new Set(keywords.map((k) => k.town))], db);
+  const done = await inBatches(keywords, 6, (k) => oneSearch(k, locs[k.town] ?? UK));
+  const snap: SerpSnapshot = { id: ukDay(now), at: now.toISOString(), costUsd: Math.round(done.reduce((a, d) => a + d.cost, 0) * 10000) / 10000, results: done.map((d) => d.r) };
+  await db.from('cms_kv').upsert({ key: SERP_PREFIX + snap.id, value: toKv(snap), updated_at: new Date().toISOString() });
+  return snap;
+}
+
+/** The latest snapshots, newest first. */
+export async function recentRankings(n = 12, db: Db = createAdminClient()): Promise<SerpSnapshot[]> {
+  const { data } = await db.from('cms_kv').select('value').like('key', `${SERP_PREFIX}%`).order('key', { ascending: false }).limit(n);
+  return (data ?? []).map((r) => parseKv<SerpSnapshot>(r.value) as SerpSnapshot).filter((s) => s && Array.isArray(s.results));
+}
+
+/* ── Competitor analysis: who leads, and what their pages do that ours don't ─────────────────────────── */
+
+export type PageFacts = {
+  url: string;
+  ok: boolean;
+  title: string;
+  description: string;
+  h1: number;
+  words: number;
+  schema: string[];
+  /** Links on the page to pages named after a tracked town ("/solar-panels-cardiff"). */
+  townLinks: number;
+};
+
+export type CompetitorReport = {
+  domain: string;
+  share: number;
+  searches: number;
+  top3: number;
+  avgPos: number;
+  towns: string[];
+  pages: PageFacts[];
+  better: string[];
+  summary: string;
+};
+
+export type CompetitorAnalysis = {
+  id: string;
+  at: string;
+  basedOn: string;
+  ours: { share: number; searches: number; top3: number; avgPos: number | null; pages: PageFacts[] };
+  competitors: CompetitorReport[];
+  actions: { title: string; why: string; effort: 'small' | 'medium' | 'large' }[];
+  note?: string;
+};
+
+async function fetchText(url: string): Promise<{ status: number; body: string }> {
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'follow', signal: AbortSignal.timeout(12_000), cache: 'no-store' });
+    return { status: r.status, body: (await r.text()).slice(0, 1_500_000) };
+  } catch {
+    return { status: 0, body: '' };
+  }
+}
+
+/** Robots.txt allows a general crawler on this path (a simple reading: the "*" group's Disallow lines). */
+async function allowed(url: string): Promise<boolean> {
+  try {
+    const u = new URL(url);
+    const r = await fetchText(`${u.origin}/robots.txt`);
+    if (r.status !== 200) return true;
+    let inStar = false;
+    const rules: string[] = [];
+    for (const line of r.body.split(/\r?\n/)) {
+      const [k, ...v] = line.split(':');
+      const key = k.trim().toLowerCase();
+      const val = v.join(':').trim();
+      if (key === 'user-agent') inStar = val === '*';
+      else if (inStar && key === 'disallow' && val) rules.push(val);
+    }
+    return !rules.some((p) => u.pathname.startsWith(p));
+  } catch {
+    return true;
+  }
+}
+
+async function pageFacts(url: string, towns: string[]): Promise<PageFacts> {
+  const empty: PageFacts = { url, ok: false, title: '', description: '', h1: 0, words: 0, schema: [], townLinks: 0 };
+  if (!(await allowed(url))) return empty;
+  const r = await fetchText(url);
+  if (r.status !== 200 || !r.body) return empty;
+  const p = parsePage(r.body, new URL(url).pathname, r.status, 0);
+  const slugs = towns.map((t) => t.toLowerCase().replace(/[^a-z]+/g, '-'));
+  const hrefs = [...r.body.matchAll(/href=["']([^"'#]+)["']/gi)].map((m) => m[1].toLowerCase());
+  const townLinks = new Set(hrefs.filter((h) => slugs.some((s) => h.includes(s)))).size;
+  return { url, ok: true, title: p.title, description: p.description, h1: p.h1, words: p.words, schema: [...new Set(p.jsonld)], townLinks };
+}
+
+/** Look at the leading installers' best pages next to ours and write what they do better (facts first, then the writing assistant). */
+export async function runCompetitorAnalysis(now = new Date(), db: Db = createAdminClient()): Promise<CompetitorAnalysis> {
+  const [snap] = await recentRankings(1, db);
+  if (!snap) throw new Error('No rankings yet: run the rankings first.');
+  const towns = [...new Set(snap.results.map((r) => r.town))];
+  const league = visibility(snap);
+  const us = league.find((x) => isOurs(x.domain));
+  const leaders = league.filter((x) => !isOurs(x.domain)).slice(0, 6);
+
+  const pagesFor = async (row: LeagueRow) => {
+    const home = `https://${row.domain}/`;
+    const urls = [...new Set([home, ...row.urls.slice(0, 2).map((u) => u.url)])].slice(0, 3);
+    return Promise.all(urls.map((u) => pageFacts(u, towns)));
+  };
+  const ourUrls = [...new Set(['https://heliaxis.co.uk/', 'https://heliaxis.co.uk/solar-panels', ...(us?.urls.slice(0, 1).map((u) => u.url) ?? [])])];
+  const [ourPages, theirPages] = await Promise.all([Promise.all(ourUrls.map((u) => pageFacts(u, towns))), Promise.all(leaders.map(pagesFor))]);
+
+  const ours = { share: us?.share ?? 0, searches: us?.searches ?? 0, top3: us?.top3 ?? 0, avgPos: us?.avgPos ?? null, pages: ourPages };
+  const competitors: CompetitorReport[] = leaders.map((l, i) => ({
+    domain: l.domain,
+    share: l.share,
+    searches: l.searches,
+    top3: l.top3,
+    avgPos: l.avgPos,
+    towns: l.towns,
+    pages: theirPages[i],
+    better: [],
+    summary: '',
+  }));
+
+  const written = await writeAnalysis(ours, competitors, snap.results.length, towns);
+  const out: CompetitorAnalysis = {
+    id: ukDay(now),
+    at: now.toISOString(),
+    basedOn: snap.id,
+    ours,
+    competitors: competitors.map((c) => ({ ...c, better: written?.byDomain[c.domain]?.better ?? [], summary: written?.byDomain[c.domain]?.summary ?? '' })),
+    actions: written?.actions ?? [],
+    note: written ? undefined : 'The writing assistant was not available, so only the figures are shown.',
+  };
+  await db.from('cms_kv').upsert({ key: COMP_PREFIX + out.id, value: toKv(out), updated_at: new Date().toISOString() });
+  return out;
+}
+
+export async function latestCompetitorAnalysis(db: Db = createAdminClient()): Promise<CompetitorAnalysis | null> {
+  const { data } = await db.from('cms_kv').select('value').like('key', `${COMP_PREFIX}%`).order('key', { ascending: false }).limit(1);
+  const v = data?.[0] ? (parseKv<CompetitorAnalysis>(data[0].value) as CompetitorAnalysis) : null;
+  return v && Array.isArray(v.competitors) ? v : null;
+}
+
+const slim = (p: PageFacts) => (p.ok ? { url: p.url, title: p.title, description: p.description, words: p.words, schema: p.schema, townLinks: p.townLinks } : { url: p.url, unreadable: true });
+
+async function writeAnalysis(
+  ours: CompetitorAnalysis['ours'],
+  comps: CompetitorReport[],
+  searches: number,
+  towns: string[],
+): Promise<{ byDomain: Record<string, { better: string[]; summary: string }>; actions: CompetitorAnalysis['actions'] } | null> {
+  const { apiKey, baseUrl, model } = aiConfig();
+  if (!apiKey || !comps.length) return null;
+  const facts = {
+    searchesTracked: searches,
+    towns,
+    heliaxis: { ...ours, pages: ours.pages.map(slim) },
+    competitors: comps.map((c) => ({ domain: c.domain, visibilitySharePct: c.share, searchesInTop20: c.searches, searchesInTop3: c.top3, avgPos: c.avgPos, towns: c.towns, pages: c.pages.map(slim) })),
+  };
+  const prompt = `You are an SEO analyst for Heliaxis, an MCS-certified installer of solar panels, batteries, heat pumps and EV chargers in South Wales and the South West of England.
+
+Below are FACTS from this week's Google results for ${searches} local searches (phone, each from its own town) and from reading each site's pages. "visibilitySharePct" is the share of likely clicks across all searches. "townLinks" counts links to pages named after a tracked town. "schema" lists structured-data types on the page.
+
+Rules: use ONLY these facts. Do not invent reviews, prices, years in business or anything not shown. If a fact is missing (a page could not be read), say less rather than guess. British English, plain, short. No emoji.
+
+For each competitor, write "better": 2 to 4 short points on what their pages or rankings show that Heliaxis's do not (for example more town pages, more words on the ranking page, FAQ or LocalBusiness markup, ranking in more towns), and "summary": one sentence.
+Then write "actions": the 5 changes most likely to move Heliaxis up, each with "title" (imperative, under 70 characters), "why" (one sentence citing the facts) and "effort" ("small", "medium" or "large").
+
+FACTS:
+${JSON.stringify(facts).slice(0, 24000)}
+
+Return ONLY JSON: {"competitors":[{"domain":"","better":[""],"summary":""}],"actions":[{"title":"","why":"","effort":"small"}]}`;
+  try {
+    const r = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: aiHeaders(apiKey),
+      body: JSON.stringify({ model, temperature: 0.2, max_tokens: 1800, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] }),
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const j = JSON.parse(String(d?.choices?.[0]?.message?.content ?? '').replace(/```json|```/g, '').trim()) as {
+      competitors?: { domain?: string; better?: unknown[]; summary?: string }[];
+      actions?: { title?: string; why?: string; effort?: string }[];
+    };
+    const byDomain: Record<string, { better: string[]; summary: string }> = {};
+    for (const c of j.competitors ?? []) {
+      if (!c.domain) continue;
+      byDomain[cleanDomain(c.domain)] = { better: (c.better ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 4), summary: String(c.summary ?? '').trim() };
+    }
+    const actions = (j.actions ?? [])
+      .map((a) => ({ title: String(a.title ?? '').trim(), why: String(a.why ?? '').trim(), effort: (['small', 'medium', 'large'].includes(String(a.effort)) ? a.effort : 'medium') as 'small' | 'medium' | 'large' }))
+      .filter((a) => a.title)
+      .slice(0, 5);
+    return { byDomain, actions };
+  } catch {
+    return null;
+  }
+}
