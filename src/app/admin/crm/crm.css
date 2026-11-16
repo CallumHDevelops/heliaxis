@@ -5151,3 +5151,16 @@ button.crmb-rail {
 .crm-tasktime { display: grid; gap: 6px; }
 .crm-tasktime__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .crm-tasktime__row .crm-input { width: auto; flex: 0 0 8.5rem; }
+
+/* The Docs tab gets the whole width: no customer column on the left, no Tasks on the right. (Everything else is one tab away.) */
+.crmr[data-tab='docs'] .crmr-left,
+.crmr[data-tab='docs'] .crmr-right,
+.crmr[data-tab='docs'] .crmr-band {
+  display: none !important;
+}
+.crmr[data-tab='docs'] .crmr-grid,
+.hx-frame[data-dock='open'] .crmr[data-tab='docs'] .crmr-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-areas: 'next' 'main' !important;
+  grid-template-rows: auto !important;
+}
