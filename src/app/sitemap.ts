@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getBlogCategories, getPublicPosts } from '@/lib/blog/queries';
+import { getCmsRendered } from '@/lib/cms-rendered';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://heliaxis.co.uk';
@@ -35,6 +36,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     /* ignore */
   }
 
-  return [...staticRoutes, ...blogRoutes];
+  // The pages built in the website editor (solar panels, off-grid, case studies and so on): published pages that can be indexed.
+  let cmsRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const rendered = await getCmsRendered();
+    const have = new Set([...staticRoutes.map((r) => r.url), ...blogRoutes.map((r) => r.url)]);
+    cmsRoutes = (rendered?.pages ?? [])
+      .filter((p) => !p.seo?.noindex && (p.html || '').trim() && !(p.slug || '').startsWith('/blog'))
+      .map((p) => ({ url: `${baseUrl}${(p.slug || '/') === '/' ? '' : (p.slug.startsWith('/') ? p.slug : `/${p.slug}`)}`.replace(/\/$/, '') || baseUrl, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.8 }))
+      .filter((r) => !have.has(r.url));
+  } catch {
+    /* ignore */
+  }
+
+  return [...staticRoutes, ...cmsRoutes, ...blogRoutes];
 }
 

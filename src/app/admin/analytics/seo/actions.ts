@@ -1,0 +1,37 @@
+'use server';
+
+import { after } from 'next/server';
+import { revalidatePath } from 'next/cache';
+import { requirePortal } from '@/lib/auth';
+import { applyProposal, dismissProposal, runWeekly } from '@/lib/seo/server';
+
+const guard = async () => {
+  const s = await requirePortal('analytics');
+  if (!s || s.profile.role !== 'admin') throw new Error('Only an admin can do this');
+  return s;
+};
+
+/** Approve a suggested title and description: it goes live on the page now. */
+export async function approve(id: string): Promise<{ ok: boolean; error?: string }> {
+  const s = await guard();
+  const r = await applyProposal(id, s.profile.full_name || s.profile.email || 'An admin');
+  revalidatePath('/admin/analytics/seo');
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+export async function dismiss(id: string): Promise<{ ok: boolean }> {
+  await guard();
+  await dismissProposal(id);
+  revalidatePath('/admin/analytics/seo');
+  return { ok: true };
+}
+
+/** Run this week's check now (it takes a minute or two; the page shows it when it's done). */
+export async function runNow(): Promise<{ ok: boolean }> {
+  await guard();
+  after(async () => {
+    await runWeekly().catch(() => null);
+    revalidatePath('/admin/analytics/seo');
+  });
+  return { ok: true };
+}

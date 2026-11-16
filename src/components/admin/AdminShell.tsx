@@ -469,6 +469,7 @@ export async function AdminShell({
         { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true, section: 'Website' },
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms'), section: 'Website' },
         { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics'), section: 'Analytics' },
+        { href: '/admin/analytics/seo', label: 'SEO and AI report', short: 'SEO report', icon: icons.analytics, show: can('analytics'), section: 'Analytics' },
         { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics'), section: 'Analytics' },
         { href: '/admin/analytics/ai', label: 'AI costs', icon: icons.analytics, active: active === 'aicosts', show: admin, section: 'Analytics' },
       ],
