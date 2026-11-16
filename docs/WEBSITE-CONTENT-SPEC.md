@@ -18,8 +18,8 @@ Everything goes live on heliaxis.co.uk. Quality over volume: one finished, check
 
 **Confirmed by Cal (updated 16 November 2026), and overriding anything below that says otherwise:**
 
-- **Credentials: MCS, RECC, NAPIT, TrustMark and SSIP, and no others.** Cal has confirmed Heliaxis holds all five. Heliaxis is **not** NICEIC: never claim NICEIC, or any other scheme, award or membership. ISO standards are **not** confirmed: do not claim any until Cal says which. Explain what each credential means for the customer rather than just listing logos. The repo and the published site have been corrected; do not reintroduce NICEIC from older briefs or from memory.
-- **Coverage: South Wales and the South West.** Use that wording everywhere.
+- **Credentials: MCS, RECC, NAPIT, TrustMark, SSIP, ISO 9001 (quality management) and ISO 14001 (environmental management), and no others.** Cal has confirmed Heliaxis holds all seven. Heliaxis is **not** NICEIC: never claim NICEIC, or any other scheme, award or membership. Say what ISO 9001 and ISO 14001 mean in one plain sentence each (a certified quality system, and a certified environmental management system), and never imply they certify the installation itself. Explain what each credential means for the customer rather than just listing logos. The repo and the published site have been corrected; do not reintroduce NICEIC from older briefs or from memory.
+- **Coverage: South Wales and the South West.** Use that wording everywhere. The reach runs from South Wales across to the South West: **Swindon, Bath, Bristol, Weston-super-Mare, Gloucester and Cheltenham** are the named edge towns ("and so on" means there are more between: ask Cal for the full list of towns before writing a town-by-town page or `areaServed` markup, and use only towns he gives you).
 - **Phone: 01633 965205** (correct).
 - **Reviews:** Cal wants reviews and plans a £50 Amazon gift card. Do **not** offer it for a Google or Trustpilot review, and do not put self-collected testimonials in star-rating markup. The compliant approach is in `docs/SEO-GEO-STRATEGY.md` section 6. Until a "Customer stories" feature exists, put no review or testimonial content on pages.
 - **Project photos** are in Heliaxis' own system, not in this repo: they are the site, progress and finished photos on each project, shared in the HAP **Content library** (Operations › Content library) and used in **Post Studio** (Operations › Post Studio, which replaces the old separate social tool). Ask Cal for an export of the ones to use, with the job reference and postcode district, and confirm the customer has agreed to marketing use before putting any on a page. Never show a customer's name, full address or number plate.
@@ -170,8 +170,9 @@ When you finish a deliverable, say: what changed (with URLs), what you checked a
 
 ## 12. Things to confirm with Cal before you start
 
-- ~~Credentials~~ Answered: MCS, RECC, NAPIT, TrustMark and SSIP (not NICEIC). Still to confirm: any ISO standards.
-- ~~Phone~~ Answered: 01633 965205. Opening hours are still to confirm (the code currently has Mon to Fri 8am to 6pm, weekends 10am to 3pm).
-- Whether the landing page should drop the main menu (slim header) or keep it.
+- ~~Credentials~~ Answered: MCS, RECC, NAPIT, TrustMark, SSIP, ISO 9001 and ISO 14001 (not NICEIC).
+- ~~Phone and hours~~ Answered: 01633 965205; opening hours as in the code (Mon to Fri 8am to 6pm, weekends 10am to 3pm).
+- ~~Slim header~~ Answered: yes. The landing page uses a slim header (logo, phone number, WhatsApp), not the full menu.
 - Which project photos may be used (they are in the social tool) and which customers agreed.
-- ~~Area covered~~ Answered: South Wales and the South West. The list of towns and counties is still to confirm, for the page and the `LocalBusiness` markup.
+- ~~Area covered~~ Answered: South Wales and the South West, down to Swindon, Bath, Bristol, Weston-super-Mare, Gloucester and Cheltenham. The full list of towns is still to confirm, for the page and the `LocalBusiness` markup.
+- Packages: Cal is entering them (Sales › Solar estimator › Packages and prices). The landing page's packages band stays empty until he has.
