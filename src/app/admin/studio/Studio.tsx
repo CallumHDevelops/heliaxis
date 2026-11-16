@@ -159,7 +159,7 @@ export default function Studio({ userEmail }: { userEmail: string }) {
     { id: string; name: string; description: string; data_url: string }[]
   >([]);
   const [imageMsg, setImageMsg] = useState('');
-  // photos uploaded to Projects (modal or Telegram), grouped per project, so the
+  // photos uploaded to Projects (in the Projects modal), grouped per project, so the
   // library picker always offers every install photo — not just the shared uploads
   const [projectPhotoLib, setProjectPhotoLib] = useState<
     { projectId: string; projectName: string; photos: { id: string; name: string; data_url: string }[] }[]
@@ -405,7 +405,7 @@ export default function Studio({ userEmail }: { userEmail: string }) {
         data as { id: string; name: string; description: string; data_url: string }[]
       );
   }
-  // every photo on every project (ProjectsModal uploads and Telegram ingests both
+  // every photo on every project (ProjectsModal uploads
   // land in project_images) — two plain queries joined here, newest project first
   async function loadProjectPhotos() {
     setProjectPhotoBusy(true);
@@ -2597,7 +2597,7 @@ export default function Studio({ userEmail }: { userEmail: string }) {
             </h2>
             <p className={styles.msub}>
               Pick a background image, or upload a new one (applied instantly and saved to the shared
-              library). Photos added to Projects — here or via the Telegram bot — appear below
+              library). Photos added to Projects — in Projects — appear below
               automatically.
             </p>
             <div className={styles.logoGrid}>
@@ -2666,7 +2666,7 @@ export default function Studio({ userEmail }: { userEmail: string }) {
             )}
             {!projectPhotoBusy && projectPhotoLib.length === 0 && (
               <div className={styles.histempty}>
-                No project photos yet — add some in Projects, or send them to the Telegram bot.
+                No project photos yet — add some in Projects.
               </div>
             )}
             {projectPhotoLib.map((g) => (

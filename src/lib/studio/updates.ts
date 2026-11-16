@@ -21,7 +21,7 @@ export const WHATS_NEW: UpdateEntry[] = [
       'Drag any text on the canvas to reposition it — the post keeps its on-brand look, you just fine-tune where things sit.',
       'Click to edit, drag to move, and double-click a moved item to snap it back to its automatic position.',
       'Positions are saved with the post and come back when you reopen it.',
-      'Saved posts also keep their background photo now, and you can send projects straight in via a Telegram bot.',
+      'Saved posts also keep their background photo now.',
     ],
   },
   {

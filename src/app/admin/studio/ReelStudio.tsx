@@ -344,7 +344,7 @@ export default function ReelStudio({ userEmail }: { userEmail: string }) {
 
   async function loadImages() {
     // shared library uploads plus every photo on every project (ProjectsModal and
-    // Telegram both write project_images), so no install photo is missing here
+    // the Projects tool writes project_images), so no install photo is missing here
     const [{ data: lib }, { data: projs }, { data: projImgs }] = await Promise.all([
       supabase
         .from('studio_image_library')

@@ -1,5 +1,5 @@
 // Shared AI extraction of project fields from free text — used by the
-// OpenSolar PDF import and the Telegram ingest webhook. SERVER-ONLY.
+// OpenSolar PDF import. SERVER-ONLY.
 import { aiConfig, aiHeaders } from './ai';
 
 export interface ProjectFields {
@@ -29,7 +29,7 @@ export async function extractProjectFields(input: string): Promise<Partial<Proje
     .slice(0, 12000);
   if (!text) throw new Error('No text to read');
 
-  const prompt = `You are extracting the key facts about a solar-PV installation into a structured record for Heliaxis's project library. The text may be an OpenSolar proposal, or a short free-text message from an installer (e.g. a WhatsApp/Telegram note). Use ONLY facts present in the text. If a value isn't present, return "". Do NOT guess or invent figures.
+  const prompt = `You are extracting the key facts about a solar-PV installation into a structured record for Heliaxis's project library. The text may be an OpenSolar proposal, or a short free-text message from an installer (e.g. a WhatsApp note). Use ONLY facts present in the text. If a value isn't present, return "". Do NOT guess or invent figures.
 
 For 'location', give a ROUGH location (town/area only, e.g. "Tredegar") — NOT a full street address (privacy). For 'name', a short project label (usually the town/area).
 
