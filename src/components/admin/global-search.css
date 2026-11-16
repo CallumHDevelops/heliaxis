@@ -261,7 +261,7 @@
   margin: 0 0 1.5rem;
 }
 
-/* The header's Search button (desktop: the phone header has no room, and the dashboard has its box). */
+/* The header's Search button: the full pill on desktop, the round icon when narrow and on a phone. */
 .hx-search {
   display: inline-flex;
   align-items: center;
@@ -298,9 +298,22 @@
     display: none;
   }
 }
+/* On a phone it stays as the round icon beside the bell (there is no Ctrl+K on a phone), and the pop-up sits near the top so the
+   keyboard doesn't cover the results. */
 @media (max-width: 760px) {
   .hx-search {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+  .hx-search__label,
+  .hx-search__kbd {
     display: none;
+  }
+  .gs-overlay {
+    padding-top: calc(env(safe-area-inset-top) + 64px);
   }
 }
 

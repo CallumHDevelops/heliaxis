@@ -350,6 +350,7 @@ export function HeaderSearch() {
       className="hx-search"
       onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
       aria-haspopup="dialog"
+      aria-label="Search customers and projects"
       aria-keyshortcuts="Control+K Meta+K"
       title={`Search customers and projects (${mac ? '⌘K' : 'Ctrl+K'})`}
     >

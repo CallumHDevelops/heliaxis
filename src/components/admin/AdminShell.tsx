@@ -526,7 +526,7 @@ export async function AdminShell({
         </Link>
         <nav className="hx-nav" aria-label="Main">
           <TopMenu groups={menu} fallback={active === 'dashboard' ? '/admin' : undefined} />
-          {/* Search customers and projects (and Ctrl/⌘+K) from any page; desktop only, CSS hides it on phones. */}
+          {/* Search customers and projects from any page: Ctrl/⌘+K on a keyboard, this button on a phone or tablet. */}
           {(can('enquiries') || can('crm')) && <HeaderSearch />}
           {/* Tablets: opens the WhatsApp dock over the page (CSS shows it only there, on pages with the dock). */}
           {chats && <DockChip initial={waUnread} />}
