@@ -56,6 +56,27 @@ function loginShown(): string {
 export type SerpAccount = { ok: true; login: string; balanceUsd: number | null } | { ok: false; login: string; error: string };
 
 /** Is the DataForSEO login accepted, and what is left on the account? (Free to ask; shown on the dashboard.) */
+/**
+ * One-off: keep everything DataForSEO returns for one search ("solar panels Cardiff", about a fifth of a cent), so the way
+ * results name their website can be checked (Google now wraps result links). Runs once; delete the key to run it again.
+ */
+const SAMPLE_KEY = 'seo-serp-sample-v1';
+export async function ensureSerpSample(db: Db = createAdminClient()): Promise<void> {
+  if (!serpConfigured()) return;
+  const { data } = await db.from('cms_kv').select('key').eq('key', SAMPLE_KEY).maybeSingle();
+  if (data) return;
+  // Claim the key first so two page loads can't both pay for it.
+  await db.from('cms_kv').upsert({ key: SAMPLE_KEY, value: toKv({ pending: true }), updated_at: new Date().toISOString() });
+  try {
+    const j = await dfs('/serp/google/organic/live/advanced', [{ keyword: 'solar panels Cardiff', location_name: 'Cardiff,Wales,United Kingdom', language_code: 'en', device: 'desktop', os: 'windows', depth: 10 }], 30_000);
+    const task = (j.tasks as Record<string, unknown>[] | undefined)?.[0];
+    const items = (((task?.result as Record<string, unknown>[] | undefined)?.[0]?.items as Record<string, unknown>[]) ?? []).slice(0, 12);
+    await db.from('cms_kv').upsert({ key: SAMPLE_KEY, value: toKv({ at: new Date().toISOString(), status: task?.status_message, items }), updated_at: new Date().toISOString() });
+  } catch (e) {
+    await db.from('cms_kv').upsert({ key: SAMPLE_KEY, value: toKv({ error: e instanceof Error ? e.message : 'failed' }), updated_at: new Date().toISOString() });
+  }
+}
+
 export async function serpAccount(): Promise<SerpAccount | null> {
   if (!serpConfigured()) return null;
   // Show who is signing in (the email, part hidden) so a wrong login is easy to spot.

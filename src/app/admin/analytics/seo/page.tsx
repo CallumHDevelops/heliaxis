@@ -9,7 +9,7 @@ import { Proposals } from './SeoControls';
 import { RankingsTable, RunCentre, type RankRow } from './SeoDashboard';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { history, movers, summarise, visibility, type SerpSnapshot } from '@/lib/seo/rankings';
-import { latestCompetitorAnalysis, readAuditStatus, readRunStatus, recentRankings, serpAccount, serpConfigured } from '@/lib/seo/serp';
+import { ensureSerpSample, latestCompetitorAnalysis, readAuditStatus, readRunStatus, recentRankings, serpAccount, serpConfigured } from '@/lib/seo/serp';
 import './seo.css';
 
 export const dynamic = 'force-dynamic';
@@ -101,6 +101,8 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
     readAuditStatus().catch(() => null),
     admin ? serpAccount().catch(() => null) : Promise.resolve(null),
   ]);
+  // One-off diagnostic sample (runs once ever, a fifth of a cent): see ensureSerpSample.
+  if (admin) await ensureSerpSample().catch(() => null);
   const stuck = isStuck(status);
   const serpOn = serpConfigured();
   // Compare like with like: the newest check with last week's, or with the one about a month before it.
