@@ -630,6 +630,8 @@ export function ProjectView({
         onMoveTo={(s) => void patch({ stage: s })}
         onPrimary={(a, to, confirmText) => void runAction(a, to, confirmText)}
         onEmail={() => openSheet('email')}
+        onWhatsApp={() => openWhatsApp()}
+        unread={wa.unread}
         onCall={() => {
           calledAt.current = Date.now();
         }}

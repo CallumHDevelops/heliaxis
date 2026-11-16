@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { DELIVERY_STAGES, isProjectStage, money, SALES_STAGES, stageLabel } from '@/lib/crm/stages';
 import type { ActionKey, PrimaryAction } from '@/lib/projects/primary-action';
-import { Icon, StageChip } from '../CrmUi';
+import { Icon, StageChip, WaIcon } from '../CrmUi';
 import { TextButton } from '../TextSheet';
 import { firstName, jobLabel, phaseOf, productsShort } from '../crm-shared';
 import { dayWord, daysSince, directionsHref, phoneShown, type Area, type Customer, type Duplicate, type OtherJob, type Project } from './record-shared';
@@ -35,6 +35,8 @@ export function RecordHeader({
   onPrimary,
   onEmail,
   onCall,
+  onWhatsApp,
+  unread,
   onName,
   onNewProject,
   onDelete,
@@ -60,6 +62,9 @@ export function RecordHeader({
   onPrimary: (action: ActionKey, to?: string, confirmText?: string) => void;
   onEmail: () => void;
   onCall: () => void;
+  /** Phones: WhatsApp sits in the contact row, so the green floating button isn't needed. */
+  onWhatsApp: () => void;
+  unread: number;
   onName: () => void;
   onNewProject: () => void;
   onDelete: () => void;
@@ -165,7 +170,14 @@ export function RecordHeader({
           {jobRef && <span className="crmr-ref">{jobRef}</span>}
           {customerRef && customerRef !== jobRef && <span className="crmr-ref crmr-ref--cust">Customer {customerRef}</span>}
           {project.products.length > 0 && <span>{productsShort(project.products)}</span>}
-          {(project.postcode || customer.postcode) && <span>{project.postcode || customer.postcode}</span>}
+          {(project.postcode || customer.postcode) &&
+            (site ? (
+              <a className="crmr-meta__pc" href={directionsHref(site)} target="_blank" rel="noreferrer" title="Directions">
+                {project.postcode || customer.postcode}
+              </a>
+            ) : (
+              <span>{project.postcode || customer.postcode}</span>
+            ))}
           <span className="crmr-meta__wide">{project.value ? money(project.value) : 'No value yet'}</span>
           {ownTitle && <span className="crmr-meta__wide crmr-meta__title">{ownTitle}</span>}
           <b className="crmr-meta__next">{nextDate}</b>
@@ -205,17 +217,22 @@ export function RecordHeader({
             </button>
           )}
           {site ? (
-            <a className="crm-btn crm-btn--ghost" href={directionsHref(site)} target="_blank" rel="noreferrer">
+            <a className="crm-btn crm-btn--ghost crmr-contact__dir" href={directionsHref(site)} target="_blank" rel="noreferrer">
               <Icon k="pin" size={16} />
               Directions
             </a>
           ) : (
-            <button type="button" className="crm-btn crm-btn--ghost" disabled title="No address yet">
+            <button type="button" className="crm-btn crm-btn--ghost crmr-contact__dir" disabled title="No address yet">
               <Icon k="pin" size={16} />
               Directions
             </button>
           )}
-          <TextButton enquiryId={customer.id} name={customer.name} phone={phone} />
+          <button type="button" className="crm-btn crm-btn--ghost crmr-contact__wa" onClick={onWhatsApp} aria-label={`WhatsApp ${customer.name}${unread ? `, ${unread} unread` : ''}`}>
+            <WaIcon size={18} />
+            <span>WhatsApp</span>
+            {unread > 0 && <b className="crmr-contact__badge">{unread > 99 ? '99+' : unread}</b>}
+          </button>
+          <TextButton enquiryId={customer.id} name={customer.name} phone={phone} label={<><TextIcon />Text</>} />
           <button type="button" className="crm-btn crm-btn--ghost" onClick={onEmail}>
             <MailIcon />
             Email
@@ -389,6 +406,14 @@ export function PhoneIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true">
       <path d="M6.6 3.5h2.6l1.3 4-1.8 1.3a11 11 0 0 0 6.5 6.5l1.3-1.8 4 1.3v2.6a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2Z" />
+    </svg>
+  );
+}
+
+function TextIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
+      <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5V16.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5Z" />
     </svg>
   );
 }

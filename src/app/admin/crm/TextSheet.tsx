@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Sheet } from './CrmUi';
 import './crm.css';
 
@@ -13,7 +13,7 @@ const SEGMENT = 160;
  * "Text": a short composer that sends an SMS to the customer (POST /api/crm/customers/:id/text), for when WhatsApp isn't agreed or isn't
  * there. The button is `className` styled (each page has its own button style); nothing shows for a number that isn't a UK mobile.
  */
-export function TextButton({ enquiryId, name, phone, className = 'crm-btn crm-btn--ghost', label = 'Text', onSent }: { enquiryId: string; name: string; phone: string | null | undefined; className?: string; label?: string; onSent?: () => void }) {
+export function TextButton({ enquiryId, name, phone, className = 'crm-btn crm-btn--ghost', label = 'Text', onSent }: { enquiryId: string; name: string; phone: string | null | undefined; className?: string; label?: ReactNode; onSent?: () => void }) {
   const [open, setOpen] = useState(false);
   const first = String(name || '').trim().split(/\s+/)[0] || '';
   const [text, setText] = useState(`Hi ${first}, it's Heliaxis. `);

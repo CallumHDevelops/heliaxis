@@ -80,7 +80,7 @@ export function TasksCard({
   }
 
   return (
-    <section className={`crm crmh crmh-card crmr-tasks crmr-tasks--${where}${all ? ' is-all' : ''}${delivery ? ' is-delivery' : ''}`} aria-label="Tasks">
+    <section className={`crm crmh crmh-card crmr-tasks crmr-tasks--${where}${all ? ' is-all' : ''}${delivery ? ' is-delivery' : ''}${open.length === 0 ? ' is-empty' : ''}`} aria-label="Tasks">
       <div className="crmh-card__h">
         <h3>{heading}</h3>
         {open.length > 0 && <span className="crmh-n">{open.length}</span>}

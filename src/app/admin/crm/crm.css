@@ -3645,6 +3645,29 @@ button.crmb-rail {
   display: none;
 }
 
+/* The WhatsApp button in the contact row is for phones only (tablets and desktop have the chat dock and the green button). */
+.crmr-contact__wa {
+  display: none;
+}
+.crmr-contact__badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--wa);
+  color: var(--on-solid);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+.crmr-meta__pc {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
 /* The grid */
 .crmr-grid {
   display: grid;
@@ -4880,24 +4903,59 @@ button.crmb-rail {
   .crmr-badges--b {
     display: flex;
   }
+  /* One tidy row: Call, WhatsApp, Text, Email, each an icon over its word. Directions is the postcode in the line above. */
   .crmr-contact {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .crmr-contact .crm-btn {
-    height: 48px;
-    padding: 0 8px;
-  }
-  .crmr-stageline {
-    display: flex;
-    align-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
     gap: 8px;
   }
+  .crmr-contact .crm-btn {
+    position: relative;
+    flex-direction: column;
+    gap: 4px;
+    height: 60px;
+    padding: 6px 4px;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+  .crmr-contact .crmr-contact__dir {
+    display: none;
+  }
+  .crmr-contact .crmr-contact__wa {
+    display: inline-flex;
+  }
+  /* The stage is already in the bar above: here only the main action, full width. */
+  .crmr-stageline {
+    display: flex;
+  }
+  .crmr-stageline .crmh-stage,
+  .crmr-stageline > .crm-muted {
+    display: none;
+  }
   .crmr-stageline__go {
-    min-height: 44px;
-    margin-left: auto;
+    flex: 1;
+    min-height: 48px;
+    justify-content: center;
     white-space: normal;
-    text-align: left;
+    text-align: center;
+  }
+  /* WhatsApp lives in the contact row now; only the + floats. */
+  .crmr-fab--wa {
+    display: none;
+  }
+  /* Next step and Tasks sit close together as one "to do" block, and an empty Tasks card is just a slim row. */
+  .crmr-next,
+  .crmr-right {
+    margin-bottom: 8px;
+  }
+  .crmr-tasks.is-empty .crmh-none {
+    display: none;
+  }
+  .crmr-tasks.is-empty .crmh-card__h {
+    border-bottom: 0;
+  }
+  .crmr-tasks.is-empty .crmh-card__b:empty {
+    display: none;
   }
   .crmr-nextbar__t {
     flex-basis: 100%;
