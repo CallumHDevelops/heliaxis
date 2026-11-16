@@ -9,10 +9,10 @@ const rows: SnapshotRow[] = [
 ];
 
 describe('seed lists', () => {
-  it('has the 40 search terms, each once', () => {
+  it('has the 103 search terms, each once', () => {
     const k = seedKeywords();
-    expect(k).toHaveLength(40);
-    expect(new Set(k.map((x) => x.keyword)).size).toBe(40);
+    expect(k).toHaveLength(103);
+    expect(new Set(k.map((x) => x.keyword)).size).toBe(103);
   });
   it('has six tracked competitors, thirteen suggestions and ten questions', () => {
     expect(SEED_TRACKED).toHaveLength(6);

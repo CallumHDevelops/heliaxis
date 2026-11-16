@@ -62,20 +62,20 @@
 
 ## 6. SEO and GEO tracking
 
-### Keywords (40, seed; editable by an admin)
+### Keywords (103, seed; editable by an admin)
 
-Towns: Cardiff, Swansea, Newport, Bridgend (plus "Vale of Glamorgan" for 2 terms). Services × towns:
+Towns: Cardiff, Swansea, Newport, Bridgend, Cwmbran, Caerphilly, and in the South West Bristol, Bath, Swindon, Gloucester, Cheltenham (added 16 Nov 2026), plus "Vale of Glamorgan" for 2 terms. Services × towns (11 towns each):
 
 ```
-solar panel installers {town}        (4)
-solar panels {town}                  (4)
-battery storage {town}               (4)
-home battery installer {town}        (4)
-heat pump installer {town}           (4)
-air source heat pump {town}          (4)
-solar and battery {town}             (4)
-EV charger installer {town}          (4)
-MCS solar installer {town}           (4)
+solar panel installers {town}        (11)
+solar panels {town}                  (11)
+battery storage {town}               (11)
+home battery installer {town}        (11)
+heat pump installer {town}           (11)
+air source heat pump {town}          (11)
+solar and battery {town}             (11)
+EV charger installer {town}          (11)
+MCS solar installer {town}           (11)
 solar panel cost {town}              (2: Cardiff, Swansea)
 solar panels Vale of Glamorgan       (1)
 heat pump Vale of Glamorgan          (1)

@@ -31,13 +31,14 @@ export const SEED_SUGGESTED: SeedCompetitor[] = [
   { name: 'Wye Energy Group', base_location: 'Wales' },
 ];
 
-const TOWNS4 = ['Cardiff', 'Swansea', 'Newport', 'Bridgend'];
+/** The towns tracked for every service: South Wales first, then the South West edge towns Cal named (16 Nov 2026). */
+const TOWNS = ['Cardiff', 'Swansea', 'Newport', 'Bridgend', 'Cwmbran', 'Caerphilly', 'Bristol', 'Bath', 'Swindon', 'Gloucester', 'Cheltenham'];
 const PER_TOWN = ['solar panel installers {town}', 'solar panels {town}', 'battery storage {town}', 'home battery installer {town}', 'heat pump installer {town}', 'air source heat pump {town}', 'solar and battery {town}', 'EV charger installer {town}', 'MCS solar installer {town}'];
 
-/** The 40 starting search terms: 9 services in 4 towns, solar panel cost in two, and two for the Vale of Glamorgan. */
+/** The 103 starting search terms: 9 services in 11 towns, solar panel cost in two, and two for the Vale of Glamorgan. */
 export function seedKeywords(): { keyword: string; town: string }[] {
   const out: { keyword: string; town: string }[] = [];
-  for (const t of TOWNS4) for (const p of PER_TOWN) out.push({ keyword: p.replace('{town}', t), town: t });
+  for (const t of TOWNS) for (const p of PER_TOWN) out.push({ keyword: p.replace('{town}', t), town: t });
   for (const t of ['Cardiff', 'Swansea']) out.push({ keyword: `solar panel cost ${t}`, town: t });
   out.push({ keyword: 'solar panels Vale of Glamorgan', town: 'Vale of Glamorgan' }, { keyword: 'heat pump Vale of Glamorgan', town: 'Vale of Glamorgan' });
   return out;
