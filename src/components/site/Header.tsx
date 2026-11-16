@@ -12,8 +12,8 @@ import styles from './Header.module.css';
 const DEFAULT_TOPBAR: SiteTopbar = {
   show: true,
   accreditationText: 'MCS · RECC · NAPIT · TrustMark registered installer',
-  ratingValue: '4.9',
-  hoursText: 'Mon–Sat 8am–6pm',
+  ratingValue: '', // not shown: no rating is displayed until real reviews back it
+  hoursText: 'Mon–Fri 8am–6pm · Weekends 10am–3pm',
   phone: '01633 965205',
   phoneHref: 'tel:01633965205',
 };
@@ -227,7 +227,7 @@ function FullHeader({ menu, topbar }: { menu?: MenuTop[]; topbar?: SiteTopbar })
           <div className={styles.wrap}>
             <span className={styles.tl}>{tb.accreditationText}</span>
             <span className={styles.tr}>
-              <span className={styles.stars}>★★★★★</span> {tb.ratingValue} rated · {tb.hoursText} ·{' '}
+              {tb.hoursText} ·{' '}
               <a href={tb.phoneHref}>{tb.phone}</a>
             </span>
           </div>
