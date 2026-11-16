@@ -7,6 +7,8 @@ import { londonSlot, ukDate, ukTime, weekday } from '@/lib/booking/engine';
 import type { Job } from './DiaryEntrySheet';
 import { AutoNotice, useBookingPeople } from '../projects/AutoNotice';
 import { NewCustomerSheet } from './NewCustomerSheet';
+import { SurveyLinkSheet } from '../crm/[id]/SurveyLinkSheet';
+import '../crm/crm.css';
 
 /**
  * Find a time (staff): pick the customer's job (or just type a postcode), see the times that fit
@@ -97,6 +99,7 @@ export function FindTimeSheet({
   const [busy, setBusy] = useState(!!projectId);
   const [error, setError] = useState('');
   const [link, setLink] = useState<{ url: string; text: string } | null>(null);
+  const [sendOpen, setSendOpen] = useState(false);
   const [copied, setCopied] = useState('');
   const [anyway, setAnyway] = useState(false);
   const [aDay, setADay] = useState(today);
@@ -483,8 +486,11 @@ export function FindTimeSheet({
           <button type="button" className="dy-btn" disabled={busy || !job || !pick} onClick={bookIt}>
             {pick ? `Book it: ${when(pick.start)}` : 'Book it'}
           </button>
+          <button type="button" className="dy-btn dy-btn--ghost" disabled={busy || !job} onClick={() => setSendOpen(true)}>
+            Send survey link
+          </button>
           <button type="button" className="dy-btn dy-btn--ghost" disabled={busy || !job} onClick={sendLink}>
-            Send booking link
+            Copy booking link
           </button>
           {!anyway && (
             <button type="button" className="dy-btn dy-btn--ghost" onClick={() => setAnyway(true)}>
@@ -493,6 +499,7 @@ export function FindTimeSheet({
           )}
         </div>
       </div>
+      {sendOpen && job && <SurveyLinkSheet projectId={job.id} onClose={() => setSendOpen(false)} onSent={() => undefined} />}
     </div>
   );
 }

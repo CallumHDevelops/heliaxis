@@ -37,6 +37,7 @@ export type FieldKey =
   | 'date_words'
   | 'time_words'
   | 'location_link'
+  | 'booking_link'
   | 'date_time'
   | 'review_link'
   | 'work_words'
@@ -61,6 +62,7 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
   date_words: { label: 'The day (“Tuesday 3 November”)', example: 'Tuesday 3 November', help: 'Filled in when an appointment is booked', auto: true },
   time_words: { label: 'The time (“10:45”)', example: '10:45', help: 'Filled in when an appointment is booked', auto: true },
   location_link: { label: 'Check-the-pin link', example: 'https://heliaxis.co.uk/where/Xk2pQ7mNabcd', help: 'Filled in when an appointment is booked', auto: true },
+  booking_link: { label: 'Survey booking link', example: 'https://heliaxis.co.uk/book/Xk2pQ7mNabcdEfgh', help: 'Filled in when you send a customer their survey link', auto: true },
   date_time: { label: 'Date and time', example: 'Monday 3 November, 10:00', help: 'Filled in by the reminder' },
   review_link: { label: 'Google review link', example: 'https://g.page/r/CQx8HeliaxisReview/review', help: 'From CRM settings → Review requests' },
   // Filled in by the site app (trades' job packs and POs) and the handover pack, never typed.
@@ -172,6 +174,15 @@ export const READY_MADE: ReadyTemplate[] = [
     use: 'Sent when you book an appointment with someone: thanks, the day and time, and a link to a map with a pin they can move to show you where to come.',
     body: 'Hi {{1}}, thank you for your time. I look forward to meeting you on {{2}} at {{3}}. I would be grateful if you could check the pin location at the link below and confirm, so I can find you first time around. {{4}} Kind regards, {{5}}, Heliaxis',
     fields: ['first_name', 'date_words', 'time_words', 'location_link', 'my_first_name'],
+    buttons: [],
+  },
+  {
+    name: 'survey_booking_link',
+    title: 'Survey booking link',
+    category: 'UTILITY',
+    use: 'Sent from “Send survey link” after a call: thanks for their time and the link to choose a day and time for their survey.',
+    body: 'Hi {{1}}, thanks for your time on the phone just now. Please use the link below to book a survey for your home: {{2}} Any questions, just reply here. Kind regards, {{3}}, Heliaxis',
+    fields: ['first_name', 'booking_link', 'my_first_name'],
     buttons: [],
   },
   {

@@ -21,6 +21,7 @@ import { CompactCustomer, CustomerColumn } from './CustomerColumn';
 import { PhotosTab } from './PhotosTab';
 import { defaultDocsView, DocsHub, type DocsView } from './DocsHub';
 import { ReviewSheet } from './ReviewSheet';
+import { SurveyLinkSheet } from './SurveyLinkSheet';
 import { EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
@@ -795,6 +796,7 @@ export function ProjectView({
           }}
         />
       )}
+      {sheet === 'surveylink' && <SurveyLinkSheet projectId={id} onClose={closeSheet} onSent={() => void reload()} />}
       {sheet === 'review' && <ReviewSheet customer={{ id: c.id, name: c.name, email: c.email, phone: phoneShown(c, wa.number) }} projectId={id} onClose={closeSheet} onWhatsApp={(t) => { closeSheet(); openWhatsApp(t); }} />}
       {sheet === 'task' && <TaskEditor id={id} team={rec.team} today={today} defaultAssignee={p.owner_id} onSaved={savedAndClose} onClose={closeSheet} />}
       {sheet === 'next' && (
@@ -812,7 +814,7 @@ export function ProjectView({
         <WhatsAppComposer projectId={id} docs={rec.documents} initialText={sheetOpts.draft ?? ''} customer={c} wa={wa} onSent={savedAndClose} onClose={closeSheet} />
       )}
       {(sheet === 'note' || sheet === 'call' || sheet === 'visit') && (
-        <LogComposer id={id} kind={sheet} phone={phoneShown(c, wa.number)} onSaved={savedAndClose} onClose={closeSheet} />
+        <LogComposer id={id} kind={sheet} phone={phoneShown(c, wa.number)} onSaved={savedAndClose} onSavedSendLink={() => { void reload(); openSheet('surveylink'); }} onClose={closeSheet} />
       )}
       {sheet === 'email' && (
         <PlainSheet label={`Email ${c.name}`} onClose={closeSheet}>

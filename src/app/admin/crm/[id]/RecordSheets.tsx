@@ -17,7 +17,7 @@ import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import { copyText, send, type Area, type Customer, type Project, type WaInfo } from './record-shared';
 
 /** What the + sheet can open. */
-export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review';
+export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink';
 
 /** The + sheet's icons, all from the brand kit (see BrandIcon). */
 const MENU_ICONS = {
@@ -33,6 +33,7 @@ const MENU_ICONS = {
   newproject: 'handshake',
   document: 'document',
   review: 'star',
+  surveylink: 'calendar',
 } as const;
 
 /** "Add to Jane": the + button's sheet. WhatsApp has its own green button now; the stage's own action is the last tile. */
@@ -48,6 +49,7 @@ export function ActionMenu({ customer, tile, onPick, onTile }: { customer: Custo
     ['stage', 'stage', 'Move stage'],
     ['newproject', 'newproject', 'Opportunity', 'Another job for them'],
     ['document', 'document', 'Document', 'Tender or letter'],
+    ['surveylink', 'surveylink', 'Send survey link', 'WhatsApp, text or email'],
     ['review', 'review', 'Ask for a review', 'Email, text or WhatsApp'],
   ];
   return (
@@ -129,6 +131,7 @@ export function LogComposer({
   initial = '',
   children,
   onSaved,
+  onSavedSendLink,
   onClose,
 }: {
   id: JobId;
@@ -139,6 +142,8 @@ export function LogComposer({
   /** Above the box (a chat says which job it goes on). */
   children?: ReactNode;
   onSaved: (body: string) => void;
+  /** After a call: log it, then open "Send survey link". */
+  onSavedSendLink?: () => void;
   onClose: () => void;
 }) {
   const [body, setBody] = useState(initial);
@@ -150,12 +155,13 @@ export function LogComposer({
   }, [initial]);
   const title = { note: 'Add a note', call: 'Log a call', visit: 'Log a site visit' }[kind];
   const placeholder = { note: 'Anything worth remembering…', call: 'What was said?', visit: 'How did the visit go?' }[kind];
-  async function save() {
+  async function save(thenSendLink = false) {
     setBusy(true);
     setErr('');
     try {
       await send(`/api/crm/projects/${await jobIdOf(id)}/activities`, 'POST', { kind, body });
-      onSaved(body.trim());
+      if (thenSendLink && onSavedSendLink) onSavedSendLink();
+      else onSaved(body.trim());
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved');
     } finally {
@@ -173,9 +179,14 @@ export function LogComposer({
       <textarea ref={box} className="crm-input" rows={5} autoFocus placeholder={placeholder} value={body} onChange={(e) => setBody(e.target.value)} />
       {err && <p className="crm-banner crm-banner--err">{err}</p>}
       <div className="crm-actions">
-        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={save}>
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy || !body.trim()} onClick={() => void save()}>
           {busy ? 'Saving…' : 'Save'}
         </button>
+        {kind === 'call' && onSavedSendLink && (
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={busy || !body.trim()} onClick={() => void save(true)}>
+            Save and send survey link
+          </button>
+        )}
       </div>
     </Sheet>
   );
