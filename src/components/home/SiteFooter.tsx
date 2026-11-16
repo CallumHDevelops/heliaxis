@@ -31,7 +31,7 @@ export function SiteFooter() {
             <Link href="/solar-estimator">Solar estimator</Link>
             <Link href="/blog">Blog</Link>
             <a href="#faq">FAQs</a>
-            <a href="#quote">Free quote</a>
+            <Link href="/free-solar-quote">Get my free solar quote</Link>
           </div>
         </div>
         <div className="base">
