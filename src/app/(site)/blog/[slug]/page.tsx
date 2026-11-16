@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { applyOverride, readOverrides } from '@/lib/seo/overrides';
+import { withoutBrand } from '@/lib/seo/title';
 import { LIVE_FIXES_CSS } from '@/lib/cms-ctas';
 import { CmsBody } from '@/components/cms/CmsBody';
 import { notFound } from 'next/navigation';
@@ -23,8 +25,15 @@ export async function generateStaticParams() {
   return posts.map((p) => ({ slug: p.slug }));
 }
 
+/** The article's title and description, without a typed-in brand (the layout adds it), with any change approved in the SEO report on top. */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const base = await articleMetadata(slug);
+  const tidy = typeof base.title === 'string' ? { ...base, title: withoutBrand(base.title) } : base;
+  return applyOverride(tidy, (await readOverrides())[`/blog/${slug}`]);
+}
+
+async function articleMetadata(slug: string): Promise<Metadata> {
   const cms = await getCmsRenderedBlogArticle(slug);
   if (cms) {
     const title = cms.seo?.title || cms.post.seoTitle || `${cms.post.title} — Heliaxis`;

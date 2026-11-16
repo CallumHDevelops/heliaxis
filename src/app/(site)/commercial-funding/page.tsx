@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import '../home.css';
 import './commercial-funding.css';
 import { Eyebrow } from '@/components/home/Eyebrow';
@@ -6,11 +7,16 @@ import { SiteFooter } from '@/components/home/SiteFooter';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { FundingFaq } from './FundingFaq';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Commercial Solar Funding & Finance: PPA, Grants & CapEx',
   description:
     'Commercial solar funding options including CapEx purchase, asset finance and Power Purchase Agreements (PPA / Solar as a Service), plus Welsh and local grant guidance.',
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/commercial-funding', META);
+}
 
 function ArrowIcon() {
   return (

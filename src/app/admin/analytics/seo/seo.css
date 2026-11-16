@@ -38,3 +38,13 @@
 .seo-prop__cmp span { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .seo-prop__cmp p { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
 .seo-prop__cmp p.seo-d { font-weight: 400; font-size: 0.88rem; color: var(--muted); }
+
+/* Editing a suggestion before approving it */
+.seo-edit{display:flex;justify-content:space-between;gap:8px;margin:10px 0 4px;font-size:.8rem;font-weight:600}
+.seo-edit small{font-weight:400;opacity:.75}
+.seo-edit small.bad{color:#b3261e;opacity:1}
+.seo-prop__cmp .crm-input{width:100%;font:inherit}
+.seo-prop__cmp textarea.crm-input{resize:vertical}
+.seo-preview{margin-top:12px;padding:10px 12px;border-radius:6px;background:#fff;border:1px solid rgba(33,31,24,.12);display:grid;gap:4px}
+.seo-preview b{color:#1a0dab;font-weight:500}
+.seo-preview span{font-size:.85rem;opacity:.85}

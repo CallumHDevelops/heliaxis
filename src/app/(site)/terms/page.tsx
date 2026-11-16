@@ -1,13 +1,19 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import Link from 'next/link';
 import '../home.css';
 import { COMPANY, LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Website terms',
   description: 'The terms for using the Heliaxis website, our online tools, messaging and the customer portal.',
   alternates: { canonical: '/terms' },
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/terms', META);
+}
 
 const UPDATED = '18 October 2026';
 

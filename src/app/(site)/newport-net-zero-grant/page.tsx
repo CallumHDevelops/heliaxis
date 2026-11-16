@@ -1,15 +1,21 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import '../home.css';
 import '../commercial-funding/commercial-funding.css';
 import { Eyebrow } from '@/components/home/Eyebrow';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { NewportFaq } from './NewportFaq';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Net Zero Newport Decarbonisation Grant: Commercial Solar',
   description:
     'Match-funded grant of up to £30,000 (50% of costs) for Newport SMEs to install solar, battery and energy-efficiency measures. Full guide by Heliaxis.',
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/newport-net-zero-grant', META);
+}
 
 function ArrowIcon() {
   return (

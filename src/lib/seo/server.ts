@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { parseKv, toKv } from '@/lib/kv-json';
 import { getCmsRendered } from '@/lib/cms-rendered';
 import { aiConfig, aiHeaders } from '@/lib/studio/ai';
+import { writeOverride } from './overrides';
+import { withoutBrand } from './title';
 import { blockedCrawlers, compareAudits, duplicates, findingsFor, parsePage, summarise, type Audit, type AuditChange, type PageAudit, type SiteFinding } from './shared';
 
 type Db = ReturnType<typeof createAdminClient>;
@@ -156,7 +158,7 @@ async function draftMeta(path: string, text: string, old: { title: string; descr
   if (!apiKey) return null;
   const prompt = `You write the search-result title and meta description for one page of the website of Heliaxis, a South Wales and South West installer of solar panels, batteries, heat pumps and EV chargers (MCS-certified, RECC member).
 
-Rules: British English, plain and calm, no hype, no emoji. Use ONLY facts that are in the page text below: never invent a price, saving, number, award, review score or claim. Title: 40 to 60 characters, the page's main topic first, then "| Heliaxis" if it fits. Description: 120 to 155 characters, says what the page offers and ends with a gentle reason to click (for example a free survey), no quotation marks.
+Rules: British English, plain and calm, no hype, no emoji. Use ONLY facts that are in the page text below: never invent a price, saving, number, award, review score or claim. Title: 30 to 48 characters, the page's main topic first. Do NOT include the brand name: the website adds " | Heliaxis" itself. Description: 120 to 155 characters, says what the page offers and ends with a gentle reason to click (for example a free survey), no quotation marks.
 
 Page path: ${path}
 Current title: ${old.title || '(none)'}
@@ -173,7 +175,7 @@ Return ONLY JSON: {"title":"","description":""}`;
     const j = JSON.parse(String(d?.choices?.[0]?.message?.content ?? '').replace(/```json|```/g, '').trim()) as { title?: string; description?: string };
     const title = String(j.title ?? '').trim().replace(/\s+/g, ' ');
     const description = String(j.description ?? '').trim().replace(/\s+/g, ' ').replace(/^["“]|["”]$/g, '');
-    if (title.length < 25 || title.length > 70 || description.length < 90 || description.length > 170) return null;
+    if (title.length < 20 || title.length > 62 || description.length < 90 || description.length > 170) return null;
     return { title, description };
   } catch {
     return null;
@@ -213,12 +215,34 @@ export async function draftProposals(audit: Audit, max = 8, db: Db = createAdmin
 }
 
 /** Change a CMS page's title and description: in the live snapshot (so it shows at once) and in the published and draft pages (so the next Publish keeps it). */
-export async function applyProposal(id: string, by: string, db: Db = createAdminClient()): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function applyProposal(
+  id: string,
+  by: string,
+  edits: { title?: string; description?: string } = {},
+  db: Db = createAdminClient(),
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const items = await readProposals(db);
-  const p = items.find((x) => x.id === id);
-  if (!p) return { ok: false, error: 'That suggestion is gone.' };
-  if (p.status !== 'proposed') return { ok: false, error: 'That one has already been dealt with.' };
-  if (!p.canApply) return { ok: false, error: 'This page isn’t in the website editor: change it where the page is built. The text is there to copy.' };
+  const found = items.find((x) => x.id === id);
+  if (!found) return { ok: false, error: 'That suggestion is gone.' };
+  if (found.status !== 'proposed') return { ok: false, error: 'That one has already been dealt with.' };
+  // The wording as approved (edited on the page or as suggested), with the brand left to the layout.
+  const title = withoutBrand((edits.title ?? found.title).replace(/\s+/g, ' ').trim());
+  const description = (edits.description ?? found.description).replace(/\s+/g, ' ').trim();
+  if (title.length < 10 || title.length > 70) return { ok: false, error: 'The title should be 10 to 70 characters.' };
+  if (description.length < 50 || description.length > 170) return { ok: false, error: 'The description should be 50 to 170 characters.' };
+  const p = { ...found, title, description };
+  const done = () => writeProposals(items.map((x) => (x.id === id ? { ...p, status: 'applied' as const, appliedAt: new Date().toISOString(), appliedBy: by } : x)), db);
+  // A page built in code (not in the website editor): its title comes from the override store, read on every request.
+  if (!found.canApply) {
+    try {
+      await writeOverride(p.path, { title, description, at: new Date().toISOString(), by }, db);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Couldn’t save it.' };
+    }
+    await done();
+    revalidatePath(p.path);
+    return { ok: true };
+  }
   let changed = 0;
   for (const key of ['heliaxis-cms-rendered', 'heliaxis-cms-published', 'heliaxis-cms-v1']) {
     const { data } = await db.from('cms_kv').select('value').eq('key', key).maybeSingle();
@@ -237,7 +261,7 @@ export async function applyProposal(id: string, by: string, db: Db = createAdmin
     changed++;
   }
   if (!changed) return { ok: false, error: 'Couldn’t find that page in the website editor.' };
-  await writeProposals(items.map((x) => (x.id === id ? { ...x, status: 'applied', appliedAt: new Date().toISOString(), appliedBy: by } : x)), db);
+  await done();
   revalidatePath(p.path);
   return { ok: true };
 }

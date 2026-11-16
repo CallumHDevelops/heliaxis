@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import Link from 'next/link';
 import '../home.css';
 import './free-solar-quote.css';
@@ -12,13 +13,18 @@ import { WhatsAppIcon, whatsappHref } from '@/components/site/WhatsAppButton';
 import { FAQS, FAQS_CHECKED } from './faqs';
 
 // The root layout adds " | Heliaxis" to the title.
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Free Solar Quote: South Wales and the South West',
   description:
     'A free, no-obligation solar quote from an MCS-certified installer: a real survey of your roof, a fixed price in writing, and a call within one working day.',
   alternates: { canonical: '/free-solar-quote' },
   robots: { index: true, follow: true },
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/free-solar-quote', META);
+}
 
 const PHONE = '01633 965205';
 const PHONE_HREF = 'tel:01633965205';

@@ -1,10 +1,16 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import changelog from '@/data/changelog.json';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Product updates',
   description: 'Fixes, improvements and new features shipped to the Heliaxis site.',
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/updates', META);
+}
 
 type Entry = { version: string; date: string; type: string; title: string; detail: string };
 

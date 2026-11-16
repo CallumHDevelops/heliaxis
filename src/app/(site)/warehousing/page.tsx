@@ -1,15 +1,21 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import '../home.css';
 import '../commercial-funding/commercial-funding.css';
 import { Eyebrow } from '@/components/home/Eyebrow';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { WarehousingFaq } from './WarehousingFaq';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Warehouse & Industrial Solar: Large Roof Systems',
   description:
     'Rooftop and ground-mounted commercial solar PV, battery storage and EV charging for warehouses and industrial units across South Wales, with CapEx, finance and PPA funding.',
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/warehousing', META);
+}
 
 function ArrowIcon() {
   return (

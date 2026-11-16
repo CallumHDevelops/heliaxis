@@ -1,15 +1,21 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import Link from 'next/link';
 import '../home.css';
 import { StepQuoteForm } from '@/components/quote/StepQuoteForm';
 import { SiteFooter } from '@/components/home/SiteFooter';
 import { Eyebrow } from '@/components/home/Eyebrow';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Get your free quote',
   description: 'Free, no-obligation quote for solar panels, battery storage, heat pumps and EV chargers in South Wales. Answer a few quick questions and we’ll call within 1 working day.',
   alternates: { canonical: '/get-a-quote' },
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/get-a-quote', META);
+}
 
 const tick = (
   <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

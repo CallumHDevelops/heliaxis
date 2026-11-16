@@ -1,13 +1,19 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import Link from 'next/link';
 import '../home.css';
 import { COMPANY, LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Delete your data',
   description: 'How to ask Heliaxis to delete the personal information we hold about you, what we delete, and what the law says we must keep.',
   alternates: { canonical: '/data-deletion' },
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/data-deletion', META);
+}
 
 const UPDATED = '18 October 2026';
 

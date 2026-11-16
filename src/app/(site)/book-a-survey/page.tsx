@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import '../home.css';
 import '@/components/booking/booking.css';
 import { SiteFooter } from '@/components/home/SiteFooter';
@@ -10,11 +11,16 @@ import { getBookingSettings } from '@/lib/booking/settings-server';
 import { turnstileOn } from '@/lib/booking/rate-limit';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Book your free survey',
   description: 'Book a free solar, battery or heat pump survey with Heliaxis online. Pick a time that suits you and we’ll come to you.',
   alternates: { canonical: '/book-a-survey' },
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/book-a-survey', META);
+}
 
 const WHATSAPP = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '441633965439').replace(/\D/g, '');
 const YEAR = new Date().getFullYear();

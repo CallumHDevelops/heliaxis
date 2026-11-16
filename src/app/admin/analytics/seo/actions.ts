@@ -11,10 +11,10 @@ const guard = async () => {
   return s;
 };
 
-/** Approve a suggested title and description: it goes live on the page now. */
-export async function approve(id: string): Promise<{ ok: boolean; error?: string }> {
+/** Approve a suggested title and description (as suggested, or as edited on the page): it goes live on the page now. */
+export async function approve(id: string, edits: { title?: string; description?: string } = {}): Promise<{ ok: boolean; error?: string }> {
   const s = await guard();
-  const r = await applyProposal(id, s.profile.full_name || s.profile.email || 'An admin');
+  const r = await applyProposal(id, s.profile.full_name || s.profile.email || 'An admin', edits);
   revalidatePath('/admin/analytics/seo');
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

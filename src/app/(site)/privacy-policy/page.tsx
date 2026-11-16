@@ -1,14 +1,20 @@
 import type { Metadata } from 'next';
+import { withSeoOverride } from '@/lib/seo/overrides';
 import Link from 'next/link';
 import '../home.css';
 import { COMPANY, LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-export const metadata: Metadata = {
+const META: Metadata = {
   title: 'Privacy policy',
   description:
     'How Heliaxis collects, uses, shares and protects personal information when you visit our website, enquire, become a customer or work with us.',
   alternates: { canonical: '/privacy-policy' },
 };
+
+/** The page's title and description, with any change approved in the SEO report on top. */
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride('/privacy-policy', META);
+}
 
 const UPDATED = '19 October 2026';
 const mail = <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a>;
