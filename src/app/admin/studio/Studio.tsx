@@ -165,6 +165,10 @@ export default function Studio({ userEmail }: { userEmail: string }) {
     { projectId: string; projectName: string; photos: { id: string; name: string; data_url: string }[] }[]
   >([]);
   const [projectPhotoBusy, setProjectPhotoBusy] = useState(false);
+  // photos of our real work from HAP's content library (site, progress and finished), newest first
+  const [sitePhotos, setSitePhotos] = useState<{ id: string; ref: string | null; area: string | null; kwp: number | null; thumb: string | null; url: string | null }[]>([]);
+  const [sitePhotoBusy, setSitePhotoBusy] = useState(false);
+  const [sitePhotoMsg, setSitePhotoMsg] = useState('');
   const [editImage, setEditImage] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
@@ -432,8 +436,39 @@ export default function Studio({ userEmail }: { userEmail: string }) {
     );
     setProjectPhotoBusy(false);
   }
+  async function loadSitePhotos() {
+    setSitePhotoBusy(true);
+    try {
+      const r = await fetch('/api/content/photos', { cache: 'no-store' });
+      const d = await r.json().catch(() => ({}));
+      setSitePhotos(r.ok ? d.photos || [] : []);
+    } catch {
+      setSitePhotos([]);
+    }
+    setSitePhotoBusy(false);
+  }
+  // fetch the full photo, shrink it to 1600px so a saved post stays small, and use it as the background
+  async function pickSitePhoto(p: { url: string | null }) {
+    if (!p.url) return;
+    setSitePhotoMsg('Opening photo…');
+    try {
+      const blob = await (await fetch(p.url)).blob();
+      const bmp = await createImageBitmap(blob);
+      const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * k);
+      c.height = Math.round(bmp.height * k);
+      c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+      selectImageUrl(c.toDataURL('image/jpeg', 0.86));
+      setSitePhotoMsg('');
+      setImageOpen(false);
+    } catch {
+      setSitePhotoMsg('Could not open that photo. Try another.');
+    }
+  }
   function openImages() {
     setImageMsg('');
+    loadSitePhotos();
     setEditImage(null);
     loadImages();
     loadProjectPhotos();
@@ -2601,6 +2636,26 @@ export default function Studio({ userEmail }: { userEmail: string }) {
                     title="Delete from library"
                   >
                     ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className={styles.libLabel}>Site photos</div>
+            <p className={styles.msub} style={{ marginBottom: 6 }}>
+              Our real installs, from the Heliaxis content library. They arrive as soon as they are uploaded to a project.
+            </p>
+            {sitePhotoBusy && sitePhotos.length === 0 && <div className={styles.histempty}>Loading site photos…</div>}
+            {!sitePhotoBusy && sitePhotos.length === 0 && <div className={styles.histempty}>No site photos yet.</div>}
+            {sitePhotoMsg && <div className={styles.histempty}>{sitePhotoMsg}</div>}
+            <div className={styles.logoGrid}>
+              {sitePhotos.map((p) => (
+                <div className={styles.logoCell} key={p.id}>
+                  <button
+                    className={styles.imgPick}
+                    onClick={() => void pickSitePhoto(p)}
+                    title={[p.ref, p.area, p.kwp ? `${p.kwp} kWp` : ''].filter(Boolean).join(' · ') || 'Use as background'}
+                  >
+                    <img src={p.thumb || ''} alt={p.ref || 'Site photo'} loading="lazy" decoding="async" />
                   </button>
                 </div>
               ))}
