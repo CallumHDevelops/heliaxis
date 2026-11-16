@@ -4239,6 +4239,9 @@ button.crmb-rail {
 .crmr-chips {
   margin: 12px 0 2px;
 }
+.crmr-chip__short {
+  display: none;
+}
 .crmr-day__h {
   display: flex;
   align-items: center;
@@ -4890,15 +4893,30 @@ button.crmb-rail {
   .crmr-meta > .crmr-meta__next::before {
     content: none !important;
   }
+  /* The Activity filters: six short chips in a tidy 3 x 2 grid, nothing to swipe. */
   .crmr-chips {
-    flex-wrap: nowrap;
-    margin: 12px -16px 2px;
-    padding: 0 16px 2px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0 2px;
+    padding: 0;
+    overflow: visible;
   }
-  .crmr-chips::-webkit-scrollbar {
+  .crmr-chips .crmh-chipf {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    min-width: 0;
+    padding: 0 8px;
+    justify-content: center;
+    text-align: center;
+    font-size: 14px;
+  }
+  .crmr-chip__long {
     display: none;
+  }
+  .crmr-chip__short {
+    display: inline;
   }
   .crmr-badges--b {
     display: flex;

@@ -12,13 +12,14 @@ import { openDock } from '../dock-link';
 import { send, type Entry, type OtherJob } from './record-shared';
 
 type Chip = 'all' | 'notes' | 'wa' | 'email' | 'stages' | 'docs';
-const CHIPS: [Chip, string][] = [
-  ['all', 'All'],
-  ['notes', 'Notes & calls'],
-  ['wa', 'WhatsApp'],
-  ['email', 'Email'],
-  ['stages', 'Stages & checklist'],
-  ['docs', 'Docs & payments'],
+/** [key, full wording, the short one phones show so all six fit without swiping]. */
+const CHIPS: [Chip, string, string][] = [
+  ['all', 'All', 'All'],
+  ['notes', 'Notes & calls', 'Notes'],
+  ['wa', 'WhatsApp', 'WhatsApp'],
+  ['email', 'Email', 'Email'],
+  ['stages', 'Stages & checklist', 'Stages'],
+  ['docs', 'Docs & payments', 'Docs'],
 ];
 const PAGE = 50;
 /** How a message that isn't text reads in a folded row. */
@@ -109,7 +110,7 @@ export function ActivityTab({
     <div className="crmr-activity">
       <Composer projectId={projectId} name={customerName} onSaved={onChanged} />
       <div className="crmh-chipsrow crmr-chips" role="group" aria-label="Show">
-        {CHIPS.map(([k, label]) => (
+        {CHIPS.map(([k, label, short]) => (
           <button
             key={k}
             type="button"
@@ -120,7 +121,8 @@ export function ActivityTab({
               setShownMax(PAGE);
             }}
           >
-            {label}
+            <span className="crmr-chip__long">{label}</span>
+            <span className="crmr-chip__short" aria-hidden="true">{short}</span>
           </button>
         ))}
       </div>
