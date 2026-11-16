@@ -268,3 +268,21 @@
 @media (prefers-reduced-motion: reduce) {
   .mega, .miD, .miIc, .caret, .navlink::after { transition: none !important; }
 }
+
+/* slim header (landing pages: logo, phone, WhatsApp) */
+.slimcta { display: flex; align-items: center; gap: 14px; }
+.slimwa {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--display); font-weight: 700; font-size: 0.9rem;
+  color: var(--ink); text-decoration: none;
+  border: 1.5px solid var(--line, rgba(33, 31, 24, 0.14)); border-radius: 2px; padding: 0.5rem 0.85rem;
+}
+.slimwa svg { color: #128c4a; }
+.slimwa:hover { border-color: var(--ink); }
+.slimcta a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .slimcta { gap: 8px; }
+  .slimwaText { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .slimwa { padding: 0.5rem; }
+  .barrow:has(.slimcta) { padding: 10px 16px; }
+}

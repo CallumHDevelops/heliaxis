@@ -15,13 +15,20 @@ const faqs: Faq[] = [
 
 function FaqItem({ id, q, a }: { id: string; q: string; a: string }) {
   const [open, setOpen] = useState(false);
+  // The answer's height, measured when it is opened (in the click, not during render) so it can slide open.
+  const [height, setHeight] = useState(0);
   const answerRef = useRef<HTMLDivElement>(null);
+  const toggle = () => {
+    setHeight(answerRef.current?.scrollHeight ?? 0);
+    setOpen((v) => !v);
+  };
 
   return (
     <div className={`qa2${open ? ' open' : ''}`}>
       <button
+        type="button"
         className="q"
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         aria-expanded={open}
       >
         <span className="ix">{id}</span>
@@ -31,7 +38,7 @@ function FaqItem({ id, q, a }: { id: string; q: string; a: string }) {
       <div
         className="a"
         ref={answerRef}
-        style={{ maxHeight: open ? answerRef.current?.scrollHeight : 0 }}
+        style={{ maxHeight: open ? height : 0 }}
       >
         <p>{a}</p>
       </div>

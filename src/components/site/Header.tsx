@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { WhatsAppIcon, whatsappHref } from './WhatsAppButton';
 import type { MenuTop, SiteTopbar } from '@/lib/menu-types';
 import styles from './Header.module.css';
 
@@ -128,7 +130,41 @@ const DEFAULT_MENU: MenuTop[] = [
   { label: 'Contact', href: '/#quote' },
 ];
 
-export default function Header({ menu, topbar }: { menu?: MenuTop[]; topbar?: SiteTopbar }) {
+/** Pages that get the slim header (logo, phone, WhatsApp) instead of the full menu: one goal, nothing competing with it. */
+const SLIM_PAGES = new Set(['/free-solar-quote']);
+
+export default function Header(props: { menu?: MenuTop[]; topbar?: SiteTopbar }) {
+  const pathname = usePathname();
+  return SLIM_PAGES.has(pathname) ? <SlimHeader topbar={props.topbar} /> : <FullHeader {...props} />;
+}
+
+function SlimHeader({ topbar }: { topbar?: SiteTopbar }) {
+  const tb = topbar ?? DEFAULT_TOPBAR;
+  return (
+    <header className={styles.header}>
+      <div className={styles.navbar}>
+        <div className={styles.barrow}>
+          <Link href="/" className={styles.logo}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/assets/heliaxis-logo-doc.png" alt="Heliaxis" />
+          </Link>
+          <div className={styles.slimcta}>
+            <a className={styles.headtel} href={tb.phoneHref}>
+              <Icon name="phone" size={16} />
+              <span>{tb.phone}</span>
+            </a>
+            <a className={styles.slimwa} href={whatsappHref("Hi Heliaxis, I'd like a free solar quote.")} target="_blank" rel="noopener noreferrer">
+              <WhatsAppIcon size={18} />
+              <span className={styles.slimwaText}>Message us on WhatsApp</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function FullHeader({ menu, topbar }: { menu?: MenuTop[]; topbar?: SiteTopbar }) {
   const tb = topbar ?? DEFAULT_TOPBAR;
   const fromCms = Boolean(menu && menu.length);
   const rawMenu = fromCms ? menu! : DEFAULT_MENU;
