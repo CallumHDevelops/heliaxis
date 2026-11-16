@@ -20,10 +20,35 @@ const UK = { code: 2826, name: 'United Kingdom' };
 const UA = 'Mozilla/5.0 (compatible; HeliaxisMonitor/1.0; +https://heliaxis.co.uk)';
 const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 
-export const serpConfigured = () => !!(process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD);
+/** A pasted value without the spaces, line breaks or quote marks that often come with it. */
+const clean = (v: string | undefined) => String(v ?? '').trim().replace(/^["']|["']$/g, '').trim();
+const creds = () => ({ login: clean(process.env.DATAFORSEO_LOGIN), password: clean(process.env.DATAFORSEO_PASSWORD) });
+
+export const serpConfigured = () => {
+  const c = creds();
+  return !!(c.login && c.password);
+};
 
 function auth() {
-  return 'Basic ' + Buffer.from(`${process.env.DATAFORSEO_LOGIN}:${process.env.DATAFORSEO_PASSWORD}`).toString('base64');
+  const c = creds();
+  return 'Basic ' + Buffer.from(`${c.login}:${c.password}`).toString('base64');
+}
+
+export type SerpAccount = { ok: true; login: string; balanceUsd: number | null } | { ok: false; login: string; error: string };
+
+/** Is the DataForSEO login accepted, and what is left on the account? (Free to ask; shown on the dashboard.) */
+export async function serpAccount(): Promise<SerpAccount | null> {
+  if (!serpConfigured()) return null;
+  // Show who is signing in (the email, part hidden) so a wrong login is easy to spot.
+  const login = creds().login.replace(/^(.{2}).*(@.*)$/, '$1…$2');
+  try {
+    const j = await dfs('/appendix/user_data', undefined, 8_000);
+    const r = (j.tasks as Record<string, unknown>[] | undefined)?.[0]?.result as Record<string, unknown>[] | undefined;
+    const money = r?.[0]?.money as Record<string, unknown> | undefined;
+    return { ok: true, login, balanceUsd: typeof money?.balance === 'number' ? money.balance : null };
+  } catch (e) {
+    return { ok: false, login, error: e instanceof Error ? e.message : 'Could not reach DataForSEO' };
+  }
 }
 
 async function dfs(path: string, body?: unknown, timeoutMs = 60_000): Promise<Record<string, unknown>> {

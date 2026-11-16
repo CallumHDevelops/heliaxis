@@ -121,3 +121,5 @@
 @keyframes seoPop { 0% { transform: scale(0.9); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .seo-prog, .seo-prog__spark, .seo-prog__spark g.is-now, .st-running .seo-prog__dot { animation: none; } }
 @media (max-width: 600px) { .seo-prog { grid-template-columns: 1fr; } .seo-prog__spark { width: 44px; height: 44px; } }
+.seo-conn { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.seo-conn.bad { color: var(--danger); padding: 0.7rem 1rem; border-radius: 10px; background: rgb(var(--danger-rgb) / 0.08); border: 1px solid rgb(var(--danger-rgb) / 0.35); }

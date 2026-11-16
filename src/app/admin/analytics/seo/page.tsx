@@ -9,7 +9,7 @@ import { Proposals } from './SeoControls';
 import { RankingsTable, RunCentre, type RankRow } from './SeoDashboard';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { history, movers, summarise, visibility, type SerpSnapshot } from '@/lib/seo/rankings';
-import { latestCompetitorAnalysis, readAuditStatus, readRunStatus, recentRankings, serpConfigured } from '@/lib/seo/serp';
+import { latestCompetitorAnalysis, readAuditStatus, readRunStatus, recentRankings, serpAccount, serpConfigured } from '@/lib/seo/serp';
 import './seo.css';
 
 export const dynamic = 'force-dynamic';
@@ -91,7 +91,7 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
   const s = await requirePortal('analytics');
   if (!s) redirect('/admin?denied=1');
   const admin = s.profile.role === 'admin';
-  const [audits, proposals, snaps, comp, enq, status, auditStatus] = await Promise.all([
+  const [audits, proposals, snaps, comp, enq, status, auditStatus, account] = await Promise.all([
     recentAudits(8).catch(() => []),
     readProposals().catch(() => []),
     recentRankings(12).catch(() => [] as SerpSnapshot[]),
@@ -99,6 +99,7 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
     enquiryCounts(days).catch(() => ({ website: 0, meta: 0, websitePrev: 0, metaPrev: 0 })),
     readRunStatus().catch(() => null),
     readAuditStatus().catch(() => null),
+    admin ? serpAccount().catch(() => null) : Promise.resolve(null),
   ]);
   const stuck = isStuck(status);
   const serpOn = serpConfigured();
@@ -195,6 +196,21 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
                   : status.step === 'failed'
                     ? `The last run failed: ${status.message}`
                     : status.message}
+          </p>
+        )}
+
+        {account && (
+          <p className={`seo-conn ${account.ok ? '' : 'bad'}`}>
+            {account.ok ? (
+              <>
+                DataForSEO connected as {account.login}
+                {account.balanceUsd !== null && <>: ${account.balanceUsd.toFixed(2)} left (about {Math.floor(account.balanceUsd / 0.5)} weekly runs)</>}.
+              </>
+            ) : (
+              <>
+                DataForSEO refused the sign-in for {account.login}: {account.error} Check that DATAFORSEO_PASSWORD in Vercel is the <b>API password</b> from app.dataforseo.com/api-access (not the password you sign in with), with no spaces or quote marks, then redeploy.
+              </>
+            )}
           </p>
         )}
 
