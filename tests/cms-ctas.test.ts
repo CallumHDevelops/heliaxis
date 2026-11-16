@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balancedAt, freshenLogo, splitCmsPage, splitForCtas } from '@/lib/cms-ctas';
+import { balancedAt, fixDeadQuoteLinks, freshenLogo, hasQuoteTarget, splitCmsPage, splitForCtas, withoutTestimonials } from '@/lib/cms-ctas';
 
 /** The shape the CMS really publishes: one outer page wrapper, one spacing wrapper per block. */
 const wrap = (b: string) => `<div style="padding:0">${b}</div>`;
@@ -80,5 +80,34 @@ describe('older snapshots', () => {
     const html = '<div class="pv-page"><div style="x"><div class="pv-rich"><p>a</p></div></div><div style="x"><div class="pv-quote is-contact"><div class="pv-quote-inner"><form></form></div></div></div></div>';
     const parts = splitCmsPage(html, { quote: true });
     expect(parts.some((p) => typeof p !== 'string' && 'quote' in p)).toBe(true);
+  });
+});
+
+describe('live fixes: testimonials and dead quote links', () => {
+  const testi = '<div class="pv-testi"><div class="wrap"><div class="tcard"><blockquote>"Great"</blockquote></div><p class="pv-testi-note">Illustrative</p></div></div>';
+  it('takes the testimonials block out and leaves a marker', () => {
+    const html = `<div class="pv-page"><div style="padding:0">${testi}</div><div style="padding:0"><p>After</p></div></div>`;
+    const out = withoutTestimonials(html);
+    expect(out).not.toContain('tcard');
+    expect(out).not.toContain('Illustrative');
+    expect(out).toContain('<div style="padding:0"><div class="pv-testi-removed"></div></div>');
+    expect(out).toContain('<p>After</p>');
+  });
+  it('still places the homepage survey band where the testimonials were', () => {
+    const html = `<div class="pv-page"><div style="padding:0">${testi}</div><div style="padding:0"><section class="sec quote" id="quote"><form></form></section></div></div>`;
+    const parts = splitCmsPage(withoutTestimonials(html), { ctas: true, quote: true });
+    expect(parts.filter((p) => typeof p !== 'string')).toEqual([{ cta: 'survey' }, { cta: 'talk' }, { quote: true }]);
+    expect(parts.join('')).not.toContain('tcard');
+  });
+  it('leaves a page without testimonials alone', () => {
+    expect(withoutTestimonials('<div class="pv-page"><p>x</p></div>')).toBe('<div class="pv-page"><p>x</p></div>');
+  });
+  it('points #quote links at the landing page only when nothing on the page answers them', () => {
+    expect(hasQuoteTarget('<section id="quote"></section>')).toBe(true);
+    expect(hasQuoteTarget('<div class="pv-quote x"></div>')).toBe(true);
+    expect(hasQuoteTarget('<a href="#quote">Go</a>')).toBe(false);
+    expect(fixDeadQuoteLinks(`<a class="btn" href="#quote">A</a><a href='#quote'>B</a><a href="/#quote">C</a>`)).toBe(
+      `<a class="btn" href="/free-solar-quote">A</a><a href="/free-solar-quote">B</a><a href="/#quote">C</a>`,
+    );
   });
 });

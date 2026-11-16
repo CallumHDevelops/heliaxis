@@ -129,6 +129,34 @@ export function splitCmsPage(html: string, opts: SplitOptions): Part[] {
 /** @deprecated kept for the older tests: both CTA bands, no quote swap. */
 export const splitForCtas = (html: string) => splitCmsPage(html, { ctas: true });
 
+/**
+ * The testimonials block taken out of a published page. The CMS seeded it with sample quotes ("Sarah M.") under an
+ * "illustrative" note; a review that is not real must not be shown (DMCC Act 2024), and until the Customer stories
+ * feature exists no testimonial is shown at all. An empty marker is left in its place so the homepage's "survey" band
+ * still lands where the block was; LIVE_FIXES_CSS hides the empty wrapper.
+ */
+export function withoutTestimonials(html: string): string {
+  let out = html;
+  for (let i = 0; i < 10; i++) {
+    const at = tagStart(out, /class="(?:[^"]*\s)?pv-testi(?:\s[^"]*)?"/);
+    if (at < 0) break;
+    const end = elementEnd(out, at);
+    if (end < 0) break;
+    out = out.slice(0, at) + '<div class="pv-testi-removed"></div>' + out.slice(end);
+  }
+  return out;
+}
+
+/** The page has somewhere for "#quote" to go: a form block with id="quote" (or the old class), or the swapped-in form. */
+export function hasQuoteTarget(html: string): boolean {
+  return /id="quote"/.test(html) || /class="[^"]*\bpv-quote\b/.test(html);
+}
+
+/** "#quote" buttons on a page with no quote form went nowhere: send them to the quote landing page instead. */
+export function fixDeadQuoteLinks(html: string): string {
+  return html.replace(/href=(["'])#quote\1/g, 'href="/free-solar-quote"');
+}
+
 /** The old black-and-yellow wordmark file, swapped for the current one (with the ®) wherever a saved CMS page still names it. */
 export function freshenLogo(html: string): string {
   return html.split('/assets/heliaxis-logo.png').join('/assets/heliaxis-logo-doc.png');
@@ -141,6 +169,8 @@ export function freshenLogo(html: string): string {
  */
 export const LIVE_FIXES_CSS =
   'html,body{max-width:100%;overflow-x:clip;height:auto;min-height:0}' +
+  // Where a testimonials block was taken out (withoutTestimonials): no empty gap.
+  '.pv-testi-removed,div:has(>.pv-testi-removed:only-child){display:none}' +
   // The site footer must always show, whatever an older published snapshot's styles say, with its bottom links in a row.
   'footer{display:block!important;background:#2c2820;color:#a69f8e}' +
   'footer a{color:#a69f8e}footer .base a{display:inline;margin:0}' +

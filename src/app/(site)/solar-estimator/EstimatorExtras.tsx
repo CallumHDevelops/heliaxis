@@ -1,5 +1,5 @@
 import '../home.css';
-import { BrandStrip, CtaBand, FaqAccordion, ProcessSteps, ScrollReveal, SiteFooter, Testimonials, ValueGrid } from '@/components/home';
+import { BrandStrip, CtaBand, FaqAccordion, ProcessSteps, ScrollReveal, SiteFooter, ValueGrid } from '@/components/home';
 import { Eyebrow } from '@/components/home/Eyebrow';
 import type { Faq } from '@/components/home/FaqAccordion';
 
@@ -49,7 +49,6 @@ export function EstimatorExtras() {
       <BrandStrip />
       <ValueGrid />
       <ProcessSteps />
-      <Testimonials />
       <FaqAccordion items={FAQS} eyebrow="About the estimator" title="Questions people ask" />
       <CtaBand
         variant="solar"

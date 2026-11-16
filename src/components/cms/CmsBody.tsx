@@ -1,18 +1,22 @@
 import { CtaBand, QuoteForm, ScrollReveal, TALK_LINKS } from '@/components/home';
-import { freshenLogo, splitCmsPage } from '@/lib/cms-ctas';
+import { fixDeadQuoteLinks, freshenLogo, hasQuoteTarget, splitCmsPage, withoutTestimonials } from '@/lib/cms-ctas';
 
 /**
  * A published CMS page on the live website. Shows the page as published, with the current logo, and (without
  * republishing from the CMS) swaps the old quote form for the current step-by-step one, and on the homepage adds
- * the two call-to-action bands. `display: contents` keeps the pieces laying out as one page.
+ * the two call-to-action bands. Sample testimonials are taken out, and "#quote" buttons on a page with no quote form go
+ * to /free-solar-quote. `display: contents` keeps the pieces laying out as one page.
  */
 export function CmsBody({ html, className, ctas = false }: { html: string; className?: string; ctas?: boolean }) {
-  const parts = splitCmsPage(freshenLogo(html), { ctas, quote: true });
+  const clean = withoutTestimonials(freshenLogo(html));
+  const parts = splitCmsPage(clean, { ctas, quote: true });
   const hasQuote = parts.some((p) => typeof p !== 'string' && 'quote' in p);
+  // "#quote" buttons only work where there is a quote form on the page; elsewhere they go to the quote landing page.
+  const tidy = hasQuote || hasQuoteTarget(clean) ? (s: string) => s : fixDeadQuoteLinks;
   return (
     <div className={className}>
       {parts.map((part, i) => {
-        if (typeof part === 'string') return <div key={i} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: part }} />;
+        if (typeof part === 'string') return <div key={i} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: tidy(part) }} />;
         if ('quote' in part) return <QuoteForm key={i} />;
         if (part.cta === 'survey')
           return (
