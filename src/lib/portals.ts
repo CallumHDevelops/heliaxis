@@ -98,9 +98,7 @@ export const PORTALS: Portal[] = [
     key: 'social',
     label: 'Social media studio',
     description: 'Create on-brand social posts and reels from our own project photos.',
-    // Through /api/sso/social so it opens signed in; the new in-app studio (/admin/studio) takes over once its tables are in.
-    href: '/api/sso/social',
-    external: true,
+    href: '/admin/studio',
     paths: ['/admin/studio'],
   },
   {

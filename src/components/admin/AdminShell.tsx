@@ -45,10 +45,8 @@ type Tab =
   | 'app'
   | 'help';
 
-// Open RAMS and the social studio already signed in when they can (src/lib/sso.ts).
-// The studio's menu link moves to /admin/studio once its tables are in (supabase/post-studio.sql).
+// Open RAMS already signed in when it can (src/lib/sso.ts).
 const RAMS_URL = '/api/sso/rams';
-const SOCIAL_URL = '/api/sso/social';
 
 const ICON = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
 /** The app's icons: the menus' and the Help sections' (a section's `icon`, src/content/help). */
@@ -480,7 +478,7 @@ export async function AdminShell({
       label: 'Apps',
       items: [
         { href: '/admin/design', label: 'Design studio', short: 'Design', icon: icons.design, active: active === 'design', show: can('design') },
-        { href: SOCIAL_URL, label: 'Social media studio', short: 'Social media', icon: icons.social, show: can('social') },
+        { href: '/admin/studio', label: 'Post Studio', short: 'Post Studio', icon: icons.social, show: can('social') },
         { href: '/admin/app', label: 'Get the app', icon: icons.app, active: active === 'app', show: true },
       ],
     },
