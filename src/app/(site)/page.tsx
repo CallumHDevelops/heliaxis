@@ -8,7 +8,6 @@ import {
   SplitCards,
   EstimatorBand,
   ProcessSteps,
-  Testimonials,
   Gallery,
   FinanceSection,
   FaqAccordion,
@@ -25,21 +24,28 @@ import { findCmsPage, getCmsRendered, hasCmsHomeContent } from '@/lib/cms-render
 import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
 import { LIVE_FIXES_CSS } from '@/lib/cms-ctas';
 import { CmsBody } from '@/components/cms/CmsBody';
+import { HOME_TITLE, withoutBrand } from '@/lib/seo/title';
 
 export const dynamic = 'force-dynamic';
 
 const FALLBACK_METADATA: Metadata = {
-  title: 'Solar Panels South Wales | Cut Your Bills with Heliaxis — Free Quote',
+  title: { absolute: HOME_TITLE },
   description:
     'MCS-certified solar panel, battery storage, heat pump & EV charger installation across South Wales. Free survey, no obligation. Call 01633 965205.',
 };
+
+/** The home page's title: the CMS one without the brand, or the standard one when the CMS has only a placeholder ("Home Page"). */
+function homeTitle(raw: string): Metadata['title'] {
+  const t = withoutBrand(raw);
+  return !t || /^home( page)?$/i.test(t) ? { absolute: HOME_TITLE } : t;
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const rendered = await getCmsRendered();
   const page = findCmsPage(rendered, '/');
   if (!hasCmsHomeContent(page) || !page) return FALLBACK_METADATA;
   return {
-    title: page.seo?.title || `${page.name} — Heliaxis`,
+    title: homeTitle(page.seo?.title || page.name),
     description: page.seo?.desc || FALLBACK_METADATA.description,
     robots: page.seo?.noindex ? { index: false, follow: false } : undefined,
   };
@@ -63,7 +69,6 @@ function MarketingHome() {
         primary={{ label: 'Book a free survey', href: '/book-a-survey' }}
         secondary={{ label: 'Get a quote in a minute', href: '/get-a-quote' }}
       />
-      <Testimonials />
       <Gallery />
       <FinanceSection />
       <FaqAccordion />

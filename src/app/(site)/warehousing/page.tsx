@@ -6,7 +6,7 @@ import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { WarehousingFaq } from './WarehousingFaq';
 
 export const metadata: Metadata = {
-  title: 'Warehouse & Industrial Solar — Large Roof Systems | Heliaxis',
+  title: 'Warehouse & Industrial Solar: Large Roof Systems',
   description:
     'Rooftop and ground-mounted commercial solar PV, battery storage and EV charging for warehouses and industrial units across South Wales, with CapEx, finance and PPA funding.',
 };

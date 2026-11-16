@@ -7,7 +7,7 @@ import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { FundingFaq } from './FundingFaq';
 
 export const metadata: Metadata = {
-  title: 'Commercial Solar Funding & Finance — PPA, Grants & CapEx | Heliaxis',
+  title: 'Commercial Solar Funding & Finance: PPA, Grants & CapEx',
   description:
     'Commercial solar funding options including CapEx purchase, asset finance and Power Purchase Agreements (PPA / Solar as a Service), plus Welsh and local grant guidance.',
 };

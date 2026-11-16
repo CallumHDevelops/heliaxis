@@ -4,7 +4,7 @@ import '../home.css';
 import { COMPANY, LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
 export const metadata: Metadata = {
-  title: 'Delete your data | Heliaxis',
+  title: 'Delete your data',
   description: 'How to ask Heliaxis to delete the personal information we hold about you, what we delete, and what the law says we must keep.',
   alternates: { canonical: '/data-deletion' },
 };

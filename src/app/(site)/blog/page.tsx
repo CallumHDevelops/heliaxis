@@ -6,7 +6,7 @@ import { getBlogCategories, getPublicPosts } from '@/lib/blog/queries';
 import { SiteFooter } from '@/components/home/SiteFooter';
 
 export const metadata: Metadata = {
-  title: 'Blog — Heliaxis',
+  title: 'Blog: practical energy guides',
   description:
     'Guides and updates on solar, battery storage, and energy funding for South Wales homes and businesses.',
 };

@@ -4,7 +4,7 @@ import '../home.css';
 import { COMPANY, LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
 export const metadata: Metadata = {
-  title: 'Privacy policy | Heliaxis',
+  title: 'Privacy policy',
   description:
     'How Heliaxis collects, uses, shares and protects personal information when you visit our website, enquire, become a customer or work with us.',
   alternates: { canonical: '/privacy-policy' },

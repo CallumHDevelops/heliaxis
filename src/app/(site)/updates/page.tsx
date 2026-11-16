@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import changelog from '@/data/changelog.json';
 
 export const metadata: Metadata = {
-  title: 'Product updates — Heliaxis',
+  title: 'Product updates',
   description: 'Fixes, improvements and new features shipped to the Heliaxis site.',
 };
 

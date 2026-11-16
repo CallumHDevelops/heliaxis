@@ -6,7 +6,7 @@ import { SiteFooter } from '@/components/home/SiteFooter';
 import { Eyebrow } from '@/components/home/Eyebrow';
 
 export const metadata: Metadata = {
-  title: 'Get your free quote | Heliaxis',
+  title: 'Get your free quote',
   description: 'Free, no-obligation quote for solar panels, battery storage, heat pumps and EV chargers in South Wales. Answer a few quick questions and we’ll call within 1 working day.',
   alternates: { canonical: '/get-a-quote' },
 };

@@ -6,7 +6,7 @@ import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { NewportFaq } from './NewportFaq';
 
 export const metadata: Metadata = {
-  title: 'Net Zero Newport Decarbonisation Grant — Commercial Solar | Heliaxis',
+  title: 'Net Zero Newport Decarbonisation Grant: Commercial Solar',
   description:
     'Match-funded grant of up to £30,000 (50% of costs) for Newport SMEs to install solar, battery and energy-efficiency measures. Full guide by Heliaxis.',
 };

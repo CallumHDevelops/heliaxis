@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const post = await getPublicPostBySlug(slug);
-  if (!post) return { title: 'Post not found — Heliaxis' };
+  if (!post) return { title: 'Post not found' };
   const title = post.seoTitle || `${post.title} — Heliaxis`;
   const description = post.seoDescription || post.excerpt;
   const image = post.ogImage || post.mainImage.src;

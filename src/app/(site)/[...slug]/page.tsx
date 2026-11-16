@@ -4,6 +4,7 @@ import { CmsBody } from '@/components/cms/CmsBody';
 import { notFound } from 'next/navigation';
 import { findCmsPage, getCmsRendered } from '@/lib/cms-rendered';
 import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
+import { withoutBrand } from '@/lib/seo/title';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function generateMetadata({
   const page = findCmsPage(rendered, pathFromSlug(slug));
   if (!page) return {};
   return {
-    title: page.seo?.title || `${page.name} — Heliaxis`,
+    title: withoutBrand(page.seo?.title || page.name),
     description: page.seo?.desc,
     robots: page.seo?.noindex ? { index: false, follow: false } : undefined,
   };

@@ -7,7 +7,7 @@ import { EstimatorExtras } from './EstimatorExtras';
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: 'Solar Panel Calculator for South Wales | Heliaxis',
+  title: 'Solar Panel Calculator for South Wales',
   description: 'Free solar estimator: six quick questions for the system size, yearly saving, cost and payback for your home or business in South Wales, using satellite weather data for your postcode.',
   alternates: { canonical: '/solar-estimator' },
 };

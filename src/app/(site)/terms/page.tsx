@@ -4,7 +4,7 @@ import '../home.css';
 import { COMPANY, LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
 export const metadata: Metadata = {
-  title: 'Website terms | Heliaxis',
+  title: 'Website terms',
   description: 'The terms for using the Heliaxis website, our online tools, messaging and the customer portal.',
   alternates: { canonical: '/terms' },
 };

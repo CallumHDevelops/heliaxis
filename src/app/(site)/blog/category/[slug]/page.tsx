@@ -13,9 +13,9 @@ type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const cat = await getCategoryBySlug(slug);
-  if (!cat) return { title: 'Category — Heliaxis Blog' };
+  if (!cat) return { title: 'Blog category' };
   return {
-    title: `${cat.title} — Heliaxis Blog`,
+    title: `${cat.title}: energy guides`,
     description: cat.description || `Articles about ${cat.title.toLowerCase()} from Heliaxis.`,
   };
 }
