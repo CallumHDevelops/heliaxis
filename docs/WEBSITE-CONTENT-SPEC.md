@@ -16,13 +16,13 @@ Deliver, in this order:
 
 Everything goes live on heliaxis.co.uk. Quality over volume: one finished, checked page is worth more than five drafts.
 
-**Confirmed by Cal (16 November 2026), and overriding anything below that says otherwise:**
+**Confirmed by Cal (updated 16 November 2026), and overriding anything below that says otherwise:**
 
-- **Credentials: MCS, RECC and NAPIT only.** Heliaxis is **not** NICEIC. Never claim NICEIC, and do not claim TrustMark, SSIP or ISO marks until Cal confirms them (their logos exist in the brand kit, but that is not proof of membership). The repo and the published site have been corrected; do not reintroduce NICEIC from older briefs or from memory.
+- **Credentials: MCS, RECC, NAPIT, TrustMark and SSIP, and no others.** Cal has confirmed Heliaxis holds all five. Heliaxis is **not** NICEIC: never claim NICEIC, or any other scheme, award or membership. ISO standards are **not** confirmed: do not claim any until Cal says which. Explain what each credential means for the customer rather than just listing logos. The repo and the published site have been corrected; do not reintroduce NICEIC from older briefs or from memory.
 - **Coverage: South Wales and the South West.** Use that wording everywhere.
 - **Phone: 01633 965205** (correct).
 - **Reviews:** Cal wants reviews and plans a £50 Amazon gift card. Do **not** offer it for a Google or Trustpilot review, and do not put self-collected testimonials in star-rating markup. The compliant approach is in `docs/SEO-GEO-STRATEGY.md` section 6. Until a "Customer stories" feature exists, put no review or testimonial content on pages.
-- **Project photos** are in the social tool (Social media studio). They are not in this repo. Ask Cal for an export, with notes on which customers have agreed to their use, before using any.
+- **Project photos** are in Heliaxis' own system, not in this repo: they are the site, progress and finished photos on each project, shared in the HAP **Content library** (Operations › Content library) and used in **Post Studio** (Operations › Post Studio, which replaces the old separate social tool). Ask Cal for an export of the ones to use, with the job reference and postcode district, and confirm the customer has agreed to marketing use before putting any on a page. Never show a customer's name, full address or number plate.
 - **Blog:** 13 articles are already written and sit in `src/content/blog-drafts/`; Cal loads them as CMS drafts from Admin › Blog. Write further articles to match their style and the list in `docs/SEO-GEO-STRATEGY.md` section 4. Do not rewrite the 13.
 - **SEO and GEO strategy and reporting:** `docs/SEO-GEO-STRATEGY.md`. Read it first. Follow it for structure, local pages and measurement.
 
@@ -47,7 +47,7 @@ Everything goes live on heliaxis.co.uk. Quality over volume: one finished, check
 
 These come from `AGENTS.md`, `GLOBAL_RULES` and `BLOG_SYSTEM`. Where this spec and those disagree, those win.
 
-- **Nothing is claimed that is not true and checkable.** No invented prices, savings, paybacks, grant values, tariffs, warranties, awards, review scores, customer numbers, years in business or testimonials. Heliaxis credentials may be named only as the briefs name them (MCS, RECC, NICEIC, TrustMark) and explained, not just listed. Prices on pages come from the packages in the backend, never typed into copy. If you need a fact you do not have, put it in a list at the end of your report titled "Needs Cal" and leave it out of the page.
+- **Nothing is claimed that is not true and checkable.** No invented prices, savings, paybacks, grant values, tariffs, warranties, awards, review scores, customer numbers, years in business or testimonials. Heliaxis credentials may be named only as listed in section 1 (MCS, RECC, NAPIT, TrustMark, SSIP) and explained, not just listed. Prices on pages come from the packages in the backend, never typed into copy. If you need a fact you do not have, put it in a list at the end of your report titled "Needs Cal" and leave it out of the page.
 - **Voice:** British English, plain, calm, expert, never pushy. Answer first, then the reasoning. No hype words ("revolutionary", "game-changer"), no rhetorical-question openers, no "in today's fast-paced world". Say when something is not a good fit.
 - **Savings are estimates, not promises.** Show assumptions beside every number (usage, tariff, size). Use "typically", "depends on" and an honest range.
 - **No emoji** anywhere in pages or emails. Icons only from the brand kit.
@@ -84,7 +84,7 @@ Rules:
 
 - The main button on every page, banner and article is **Get my free solar quote** going to `/free-solar-quote`. On a battery or heat pump page the label may read "Get my free quote" with the same link and `?for=battery` (or `heatpump`, `ev`) so the form can start on the right product (see how `get-a-quote` reads `?for`).
 - Keep UTM parameters intact when linking internally from ads; do not strip query strings.
-- Update the places that currently send people elsewhere: the header (`src/components/site/Header.tsx`), `Hero.tsx`, `SiteFooter.tsx`, `EstimatorBand.tsx`, `MobileCta.tsx`, the estimator's result page, the CMS home page blocks, and `BLOG_SYSTEM` in `src/lib/blog/prompt.ts` (add `/free-solar-quote` to the list of pages an article may link to, and make it the default main button). `src/lib/cms-ctas.ts` adds bands to published pages: make its quote button point at the new page too.
+- Update the places that currently send people elsewhere: the header (`src/components/site/Header.tsx`), `src/components/home/Hero.tsx`, `SiteFooter.tsx`, `EstimatorBand.tsx`, `MobileCta.tsx` (all in `src/components/home/`), the estimator's result page, the CMS home page blocks, and `BLOG_SYSTEM` in `src/lib/blog/prompt.ts` (add `/free-solar-quote` to the list of pages an article may link to, and make it the default main button). `src/lib/cms-ctas.ts` adds bands to published pages: make its quote button point at the new page too.
 - A page may have a quote form in the page only on the landing page. Everywhere else, the button goes to the landing page.
 
 ## 6. Deliverable 1: the landing page `/free-solar-quote`
@@ -170,7 +170,7 @@ When you finish a deliverable, say: what changed (with URLs), what you checked a
 
 ## 12. Things to confirm with Cal before you start
 
-- ~~Credentials~~ Answered: MCS, RECC and NAPIT only.
+- ~~Credentials~~ Answered: MCS, RECC, NAPIT, TrustMark and SSIP (not NICEIC). Still to confirm: any ISO standards.
 - ~~Phone~~ Answered: 01633 965205. Opening hours are still to confirm (the code currently has Mon to Fri 8am to 6pm, weekends 10am to 3pm).
 - Whether the landing page should drop the main menu (slim header) or keep it.
 - Which project photos may be used (they are in the social tool) and which customers agreed.
