@@ -5128,3 +5128,8 @@ button.crmb-rail {
     padding: 12px;
   }
 }
+
+/* A task's time and reminder choice (src/components/admin/TaskTime.tsx). */
+.crm-tasktime { display: grid; gap: 6px; }
+.crm-tasktime__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.crm-tasktime__row .crm-input { width: auto; flex: 0 0 8.5rem; }

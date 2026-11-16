@@ -4,6 +4,7 @@ import { crmSession, isUuid, json, logActivity } from '@/lib/crm/server';
 import { cleanTaskInput, TASK_COLUMNS } from '@/lib/tasks';
 import { notify } from '@/lib/notify';
 import { canAccess } from '@/lib/portals';
+import { syncTaskCalendar } from '@/lib/tasks-timed';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .single();
   if (error || !task) return json({ error: error?.message || 'Not saved' }, 500);
 
+  after(() => syncTaskCalendar(task.id as string));
   const who = s.profile.full_name || s.profile.email || 'Someone';
   await Promise.all([
     logActivity({ enquiryId: p.enquiry_id, projectId: id, kind: 'system', body: `Task added: ${task.title}`, byId: s.user.id }),

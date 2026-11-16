@@ -106,6 +106,9 @@ export type CrmTask = {
   id: string;
   title: string;
   due_date: string | null;
+  /** "14:30" or "14:30:00"; null = all day. */
+  due_time?: string | null;
+  remind?: string | null;
   priority: string;
   status: string;
   assignee_id: string | null;

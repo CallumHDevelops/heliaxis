@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { cleanTaskInput, TASK_COLUMNS, type Task, type TaskJob } from '@/lib/tasks';
 import { notify } from '@/lib/notify';
 import { rearmDueReminder } from '@/lib/tasks-server';
+import { removeTaskCalendar, syncTaskCalendar } from '@/lib/tasks-timed';
 import { canAccess } from '@/lib/portals';
 
 export const dynamic = 'force-dynamic';
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
   }
   if (error) return fail(error.message);
   after(() => notifyTaskChange(null, data as Task, actorOf(session)));
+  after(() => syncTaskCalendar((data as Task).id));
   return NextResponse.json({ task: data }, { headers: NO_STORE });
 }
 
@@ -137,8 +139,11 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle();
   if (error) return fail(error.message);
   if (!data) return fail('That task no longer exists', 404);
-  if ('due_date' in input && before && before.due_date !== data.due_date) await rearmDueReminder(id);
+  const b = before as Task | null;
+  if (b && (('due_date' in input && b.due_date !== data.due_date) || ('due_time' in input && (b.due_time ?? null) !== (data.due_time ?? null)) || ('remind' in input && b.remind !== data.remind))) await rearmDueReminder(id);
   after(() => notifyTaskChange(before as Task | null, data as Task, actorOf(session)));
+  // The Outlook copy follows any change (done removes it).
+  after(() => syncTaskCalendar(id));
   return NextResponse.json({ task: data }, { headers: NO_STORE });
 }
 
@@ -146,6 +151,7 @@ export async function DELETE(req: NextRequest) {
   if (!(await requirePortal('tasks'))) return unauthorized();
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return fail('id required', 400);
+  await removeTaskCalendar(id);
   const { error } = await createAdminClient().from('tasks').delete().eq('id', id);
   if (error) return fail(error.message);
   return NextResponse.json({ ok: true }, { headers: NO_STORE });

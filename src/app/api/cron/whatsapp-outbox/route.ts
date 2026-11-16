@@ -3,6 +3,7 @@ import { processOutbox, remindUnanswered } from '@/lib/whatsapp/inbox';
 import { remindNextSteps } from '@/lib/crm/server';
 import { runCrmAutomations } from '@/lib/crm/automation';
 import { remindDueTasks } from '@/lib/tasks-server';
+import { remindTimedTasks, syncTimedTasks } from '@/lib/tasks-timed';
 import { runBookingJobs } from '@/lib/booking/jobs';
 import { pollMailbox } from '@/lib/ms365';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
@@ -33,6 +34,9 @@ export async function GET(req: Request) {
   const reminded = await remindUnanswered().catch(() => 0);
   const followUps = await remindNextSteps().catch(() => 0);
   const tasksDue = await remindDueTasks().catch(() => 0);
+  // Tasks with a time: the 30 and 15 minute reminders, and their copy in Outlook.
+  const tasksSoon = await remindTimedTasks().catch(() => 0);
+  const tasksCalendar = await syncTimedTasks().catch(() => 0);
   const crm = await runCrmAutomations().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
   const emails = await pollMailbox((enquiryId, name, subject) =>
     notifyEnquiryTeam(`Email from ${name}`, subject, `/admin/crm?enquiry=${enquiryId}`, { tag: `em-${enquiryId}` })
@@ -41,5 +45,5 @@ export async function GET(req: Request) {
   const mergeFiles = await finishMergeFiles();
   // Last, so a long Outlook copy never holds up the customer messages or the mailbox.
   const booking = await runBookingJobs({ until: started + 40_000 }).catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, booking, crm, emails, mergeFiles });
+  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, tasksSoon, tasksCalendar, booking, crm, emails, mergeFiles });
 }

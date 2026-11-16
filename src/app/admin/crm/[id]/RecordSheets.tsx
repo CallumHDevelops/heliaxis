@@ -7,7 +7,9 @@ import { PHOTO_CATEGORIES, photoLabel, STAGES } from '@/lib/crm/stages';
 import type { PrimaryAction } from '@/lib/projects/primary-action';
 import { plusDays } from '@/lib/projects/feed';
 import type { TeamMember } from '@/lib/projects/server';
+import { TaskTime } from '@/components/admin/TaskTime';
 import { TemplateSendFields, useTemplateSend } from '@/components/admin/TemplateSend';
+import type { TaskRemind } from '@/lib/tasks';
 import { useSendLater } from '@/components/admin/whatsapp/SendLater';
 import { useNow } from '@/lib/use-now';
 import { atWords, chaseTime, chaseWhen } from '@/lib/whatsapp/schedule';
@@ -258,13 +260,15 @@ export function TaskEditor({
   const withNotes = initial?.notes !== undefined;
   const [assignee, setAssignee] = useState(defaultAssignee || '');
   const [high, setHigh] = useState(false);
+  const [time, setTime] = useState('');
+  const [remind, setRemind] = useState<TaskRemind>('both');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   async function save() {
     setBusy(true);
     setErr('');
     try {
-      const body = { title, due_date: due || null, assignee_id: assignee || null, priority: high ? 'high' : 'normal', ...(withNotes ? { notes } : {}) };
+      const body = { title, due_date: due || null, due_time: due && time ? time : null, remind, assignee_id: assignee || null, priority: high ? 'high' : 'normal', ...(withNotes ? { notes } : {}) };
       const d = await send<{ task?: SavedTask }>(`/api/crm/projects/${await jobIdOf(id)}/tasks`, 'POST', body);
       onSaved(d.task ?? { title, due_date: body.due_date, assignee_id: body.assignee_id });
     } catch (e) {
@@ -322,6 +326,7 @@ export function TaskEditor({
           </label>
         </div>
       )}
+      {due && <TaskTime id="rec-t" time={time} remind={remind} onTime={setTime} onRemind={setRemind} disabled={busy} />}
       {withNotes && (
         <>
           <label className="crm-label" htmlFor="rec-t-notes">

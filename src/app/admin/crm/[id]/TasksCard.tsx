@@ -5,7 +5,9 @@ import { createPortal } from 'react-dom';
 import type { TeamMember } from '@/lib/projects/server';
 import { plusDays } from '@/lib/projects/feed';
 import { Icon, Sheet } from '../CrmUi';
-import { dueWords, initials, nextWeekday, shortDate } from '../crm-shared';
+import { dueWithTime, initials, nextWeekday, shortDate } from '../crm-shared';
+import { TaskTime } from '@/components/admin/TaskTime';
+import type { TaskRemind } from '@/lib/tasks';
 import { send, type CrmTask } from './record-shared';
 
 /**
@@ -68,11 +70,11 @@ export function TasksCard({
     await onChanged();
     setHidden(new Set());
   }
-  async function snooze(t: CrmTask, due: string, assignee?: string) {
+  async function snooze(t: CrmTask, due: string, assignee?: string, time?: { time: string; remind: TaskRemind }) {
     setSnoozing(null);
     setErr('');
     try {
-      await send(`/api/crm/tasks/${t.id}`, 'PATCH', { due_date: due, ...(assignee !== undefined ? { assignee_id: assignee || null } : {}) });
+      await send(`/api/crm/tasks/${t.id}`, 'PATCH', { due_date: due, ...(time ? { due_time: time.time || null, remind: time.remind } : {}), ...(assignee !== undefined ? { assignee_id: assignee || null } : {}) });
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved');
     }
@@ -125,7 +127,7 @@ export function TasksCard({
                           <Icon k="clock" size={12} /> Deadline
                         </span>
                       )}
-                      {t.due_date && today && <span className={`crmh-due ${late ? 'late' : isToday ? 'today' : ''}`}>{dueWords(t.due_date, today)}</span>}
+                      {t.due_date && today && <span className={`crmh-due ${late ? 'late' : isToday ? 'today' : ''}`}>{dueWithTime(t.due_date, today, t.due_time)}</span>}
                       {t.assignee && (
                         <span className="crmh-ini" title={t.assignee}>
                           {initials(t.assignee)}
@@ -209,6 +211,8 @@ function QuickAdd({
 }) {
   const [title, setTitle] = useState('');
   const [due, setDue] = useState(today);
+  const [time, setTime] = useState('');
+  const [remind, setRemind] = useState<TaskRemind>('both');
   const [who, setWho] = useState(defaultAssignee || me);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -226,7 +230,7 @@ function QuickAdd({
     setBusy(true);
     setErr('');
     try {
-      await send(`/api/crm/projects/${projectId}/tasks`, 'POST', { title: title.trim(), due_date: due || null, assignee_id: who || null, priority: 'normal' });
+      await send(`/api/crm/projects/${projectId}/tasks`, 'POST', { title: title.trim(), due_date: due || null, due_time: time || null, remind, assignee_id: who || null, priority: 'normal' });
       onDone();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Not saved');
@@ -252,6 +256,7 @@ function QuickAdd({
         ))}
         <input className="crm-input crmh-quick__date" type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Due date" />
       </div>
+      <TaskTime id="qa" time={time} remind={remind} onTime={setTime} onRemind={setRemind} disabled={busy} />
       <select className="crm-input" value={who} onChange={(e) => setWho(e.target.value)} aria-label="Whose task">
         <option value="">Nobody yet</option>
         {team.map((t) => (
@@ -284,11 +289,13 @@ function SnoozeSheet({
   today: string;
   team: TeamMember[];
   onClose: () => void;
-  onPick: (ymd: string, assignee?: string) => void;
+  onPick: (ymd: string, assignee?: string, time?: { time: string; remind: TaskRemind }) => void;
 }) {
   const start = today || task.due_date || '';
   const [date, setDate] = useState(task.due_date && task.due_date > start ? task.due_date : start ? plusDays(start, 1) : '');
   const [who, setWho] = useState<string | undefined>(undefined);
+  const [time, setTime] = useState((task.due_time ?? '').slice(0, 5));
+  const [remind, setRemind] = useState<TaskRemind>((task.remind as TaskRemind) || 'both');
   const monday = start ? nextWeekday(plusDays(start, 1), 1) : '';
   return (
     <Sheet title="Snooze the task" onClose={onClose}>
@@ -307,6 +314,7 @@ function SnoozeSheet({
         Pick a date
       </label>
       <input id="crmr-snooze-date" className="crm-input" type="date" min={today || undefined} value={date} onChange={(e) => setDate(e.target.value)} />
+      <TaskTime id="sn" time={time} remind={remind} onTime={setTime} onRemind={setRemind} />
       <label className="crm-label" htmlFor="crmr-snooze-who">
         Whose task
       </label>
@@ -319,7 +327,7 @@ function SnoozeSheet({
         ))}
       </select>
       <div className="crm-actions">
-        <button type="button" className="crm-btn crm-btn--solar" disabled={!/^\d{4}-\d{2}-\d{2}$/.test(date)} onClick={() => onPick(date, who)}>
+        <button type="button" className="crm-btn crm-btn--solar" disabled={!/^\d{4}-\d{2}-\d{2}$/.test(date)} onClick={() => onPick(date, who, { time, remind })}>
           Save
         </button>
         <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>

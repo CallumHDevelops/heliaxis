@@ -12,6 +12,7 @@ import {
   type Task,
   type TaskJob,
   type TaskPriority,
+  type TaskRemind,
   type TaskStatus,
 } from '@/lib/tasks';
 import {
@@ -25,6 +26,7 @@ import {
   withDerived,
   type TaskOp,
 } from '@/lib/tasks-offline';
+import { TaskTime } from '@/components/admin/TaskTime';
 import './tasks.css';
 
 type View = 'open' | 'overdue' | 'done' | 'all';
@@ -35,11 +37,13 @@ type Draft = {
   assignee: string;
   assigneeName: string;
   due: string;
+  dueTime: string;
+  remind: TaskRemind;
   priority: TaskPriority;
 };
 
 const OTHER = '__other__';
-const EMPTY: Draft = { title: '', notes: '', assignee: '', assigneeName: '', due: '', priority: 'normal' };
+const EMPTY: Draft = { title: '', notes: '', assignee: '', assigneeName: '', due: '', dueTime: '', remind: 'both', priority: 'normal' };
 const PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, normal: 1, low: 2 };
 
 function draftFrom(t: Task): Draft {
@@ -49,6 +53,8 @@ function draftFrom(t: Task): Draft {
     assignee: t.assignee_id ?? (t.assignee_name ? OTHER : ''),
     assigneeName: t.assignee_name ?? '',
     due: t.due_date ?? '',
+    dueTime: (t.due_time ?? '').slice(0, 5),
+    remind: t.remind ?? 'both',
     priority: t.priority,
   };
 }
@@ -60,6 +66,8 @@ function payloadFrom(d: Draft) {
     assignee_id: d.assignee && d.assignee !== OTHER ? d.assignee : '',
     assignee_name: d.assignee === OTHER ? d.assigneeName : '',
     due_date: d.due,
+    due_time: d.due && d.dueTime ? d.dueTime : '',
+    remind: d.remind,
     priority: d.priority,
   };
 }
@@ -75,6 +83,12 @@ function daysToFriday(today: string) {
 }
 
 function dueInfo(t: Task, today: string) {
+  const at = t.due_time ? ` ${t.due_time.slice(0, 5)}` : '';
+  const i = dueBase(t, today);
+  return t.due_date && t.status !== 'done' && !i.cls.includes('overdue') ? { ...i, label: `${i.label}${at}` } : i;
+}
+
+function dueBase(t: Task, today: string) {
   if (!t.due_date) return { label: 'No deadline', cls: 'is-none' };
   if (t.status === 'done') return { label: fmtDate(t.due_date), cls: 'is-done' };
   if (t.due_date < today) {
@@ -174,6 +188,7 @@ function TaskForm({
             ))}
           </span>
         </label>
+        {draft.due && <TaskTime id="tk" time={draft.dueTime} remind={draft.remind} onTime={(t) => set({ dueTime: t })} onRemind={(r) => set({ remind: r })} />}
         <label>
           <span>Priority</span>
           <span className="tk-seg">
@@ -406,6 +421,8 @@ export function TasksBoard({
         assignee_id: p.assignee_id || null,
         assignee_name: p.assignee_name.trim() || null,
         due_date: p.due_date || null,
+        due_time: p.due_time || null,
+        remind: p.remind,
         priority: p.priority,
         status: 'todo',
         created_by: meId,
@@ -433,6 +450,8 @@ export function TasksBoard({
       assignee_id: p.assignee_id || null,
       assignee_name: p.assignee_name.trim() || null,
       due_date: p.due_date || null,
+      due_time: p.due_time || null,
+      remind: p.remind,
       priority: p.priority,
     });
     setEditing(null);

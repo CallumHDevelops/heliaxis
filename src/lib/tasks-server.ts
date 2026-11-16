@@ -11,7 +11,10 @@ import { isQuiet, londonHour } from '@/lib/whatsapp/schedule';
 /** A new due date gets a new morning reminder. due_reminded_on comes with crm-v3.sql; until then this does nothing. */
 export async function rearmDueReminder(taskId: string) {
   try {
-    await createAdminClient().from('tasks').update({ due_reminded_on: null }).eq('id', taskId);
+    // A new day or time starts again: the morning round-up, and the 30 and 15 minute reminders.
+    const db = createAdminClient();
+    await db.from('tasks').update({ due_reminded_on: null }).eq('id', taskId);
+    await db.from('tasks').update({ remind30_sent_at: null, remind15_sent_at: null, outlook_hash: null }).eq('id', taskId);
   } catch {
     // Never stops the task being saved.
   }

@@ -31,6 +31,8 @@ export async function callBackTask(
         notes: `They answered “${x.body.trim().slice(0, 60)}” on WhatsApp.`,
         assignee_id: (job?.owner_id as string | null) ?? null,
         due_date: due,
+        // "Tomorrow": first thing, so it reminds and lands in their calendar. "Today" stays all day (there's no knowing when).
+        due_time: when === 'tomorrow' ? '09:00' : null,
         priority: 'high',
         status: 'todo',
         crm_project_id: job?.id ?? null,

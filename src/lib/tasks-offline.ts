@@ -104,7 +104,7 @@ export function enqueue(ops: TaskOp[], op: TaskOp): TaskOp[] {
   return [...ops, op];
 }
 
-const EDITABLE = ['title', 'notes', 'assignee_id', 'assignee_name', 'due_date', 'priority', 'status'] as const;
+const EDITABLE = ['title', 'notes', 'assignee_id', 'assignee_name', 'due_date', 'due_time', 'remind', 'priority', 'status'] as const;
 
 function body(patch: Partial<Task>) {
   const out: Record<string, unknown> = {};

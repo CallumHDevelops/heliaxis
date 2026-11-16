@@ -57,6 +57,9 @@ export function dayLabel(ymd: string, today: string): string {
   return shortDate(ymd);
 }
 
+/** "Today 14:30": a due date with the task's time, if it has one. */
+export const dueWithTime = (ymd: string, today: string, time?: string | null): string => `${dueWords(ymd, today)}${time ? ` ${time.slice(0, 5)}` : ''}`;
+
 /** A due date in a task row: 'Today', 'Tomorrow', 'Fri' (this week), 'Thu 15 Oct'. */
 export function dueWords(ymd: string, today: string): string {
   if (ymd === today) return 'Today';

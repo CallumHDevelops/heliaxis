@@ -242,7 +242,7 @@ export async function GET(req: Request, { params }: Ctx) {
     db.from('profiles').select('*').eq('status', 'approved'),
     db
       .from('tasks')
-      .select('id, title, due_date, priority, status, assignee_id, assignee_name, completed_at')
+      .select('id, title, due_date, due_time, remind, priority, status, assignee_id, assignee_name, completed_at')
       .eq('crm_project_id', id)
       .order('status')
       .order('due_date', { ascending: true, nullsFirst: false })

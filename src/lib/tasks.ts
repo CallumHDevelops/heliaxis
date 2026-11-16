@@ -3,6 +3,18 @@
 export const TASK_STATUSES = ['todo', 'in_progress', 'done'] as const;
 export const TASK_PRIORITIES = ['low', 'normal', 'high'] as const;
 
+export const TASK_REMINDS = ['both', '30', '15', 'none'] as const;
+export type TaskRemind = (typeof TASK_REMINDS)[number];
+export const REMIND_LABEL: Record<TaskRemind, string> = { both: '30 and 15 minutes before', '30': '30 minutes before', '15': '15 minutes before', none: 'No reminder' };
+/** The minutes before a task at which a reminder goes. */
+export const remindMinutes = (r: string | null | undefined): number[] => (r === 'none' ? [] : r === '30' ? [30] : r === '15' ? [15] : [30, 15]);
+
+/** "14:30:00" or "14:30" → "14:30"; anything else → null. */
+export const cleanTime = (v: unknown): string | null => {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(typeof v === 'string' ? v.trim() : '');
+  return m ? `${m[1]}:${m[2]}` : null;
+};
+
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
@@ -25,6 +37,10 @@ export type Task = {
   assignee_id: string | null;
   assignee_name: string | null;
   due_date: string | null; // YYYY-MM-DD
+  /** UK time of day ("14:30"), or null for an all-day task. Needs supabase/task-times.sql. */
+  due_time?: string | null;
+  /** Which reminders go before a timed task: both (30 and 15 minutes), 30, 15 or none. */
+  remind?: TaskRemind;
   priority: TaskPriority;
   status: TaskStatus;
   created_by: string | null;
@@ -42,7 +58,7 @@ export type TaskJob = { ref: string | null; name: string };
 export type Assignee = { id: string; name: string };
 
 export const TASK_COLUMNS =
-  'id, title, notes, assignee_id, assignee_name, due_date, priority, status, created_by, created_at, updated_at, completed_at, crm_project_id';
+  'id, title, notes, assignee_id, assignee_name, due_date, priority, status, created_by, created_at, updated_at, completed_at, crm_project_id, due_time, remind';
 
 /** Today as YYYY-MM-DD in UK time — due dates are plain dates, so compare as strings. */
 export function todayISO() {
@@ -60,7 +76,7 @@ export function addDaysISO(iso: string, days: number) {
  * returned, so the same function serves create (all fields) and partial updates.
  */
 export function cleanTaskInput(body: Record<string, unknown>) {
-  const out: Partial<Pick<Task, 'title' | 'notes' | 'assignee_id' | 'assignee_name' | 'due_date' | 'priority' | 'status'>> = {};
+  const out: Partial<Pick<Task, 'title' | 'notes' | 'assignee_id' | 'assignee_name' | 'due_date' | 'due_time' | 'remind' | 'priority' | 'status'>> = {};
   const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
   if ('title' in body) out.title = str(body.title).slice(0, 300);
   if ('notes' in body) out.notes = str(body.notes).slice(0, 5000) || null;
@@ -70,6 +86,10 @@ export function cleanTaskInput(body: Record<string, unknown>) {
     const d = str(body.due_date);
     out.due_date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
   }
+  // A time needs a day: with no date there is no time either.
+  if ('due_time' in body) out.due_time = cleanTime(body.due_time);
+  if (out.due_date === null) out.due_time = null;
+  if ('remind' in body && (TASK_REMINDS as readonly string[]).includes(str(body.remind))) out.remind = str(body.remind) as TaskRemind;
   if ('priority' in body && (TASK_PRIORITIES as readonly string[]).includes(str(body.priority))) {
     out.priority = str(body.priority) as TaskPriority;
   }

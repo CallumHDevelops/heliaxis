@@ -127,8 +127,10 @@ export type CalWrite = {
   location?: { displayName: string; street?: string; city?: string; postalCode?: string };
   body: string;
   categories?: string[];
-  showAs?: 'busy' | 'tentative';
+  showAs?: 'busy' | 'tentative' | 'free';
   transactionId?: string;
+  /** The Outlook pop-up, this many minutes before the start. Default: the calendar's own. */
+  reminderMinutes?: number;
 };
 
 /** The event isn't there any more (deleted in Outlook). */
@@ -252,6 +254,10 @@ function eventBody(e: Partial<CalWrite>) {
   if (e.categories !== undefined) out.categories = e.categories;
   if (e.showAs !== undefined) out.showAs = e.showAs;
   if (e.transactionId !== undefined) out.transactionId = e.transactionId;
+  if (e.reminderMinutes !== undefined) {
+    out.isReminderOn = true;
+    out.reminderMinutesBeforeStart = e.reminderMinutes;
+  }
   return out;
 }
 
@@ -259,7 +265,7 @@ export async function createCalendarEvent(mailbox: string, e: CalWrite): Promise
   const d = await graph<{ id: string; iCalUId?: string }>(`/users/${encodeURIComponent(mailbox)}/events`, {
     method: 'POST',
     headers: { Prefer: IMMUTABLE },
-    body: JSON.stringify({ ...eventBody(e), isReminderOn: !e.allDay, responseRequested: false }),
+    body: JSON.stringify({ isReminderOn: !e.allDay, ...eventBody(e), responseRequested: false }),
   });
   return { id: d.id, iCalUId: d.iCalUId };
 }
