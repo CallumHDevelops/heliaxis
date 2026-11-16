@@ -333,6 +333,19 @@ export function ProjectView({
     }
   }, []);
 
+
+  /**
+   * Show the customer and job details (the left column from 1280px, the Details tab below it). The Docs tab has no left column, so from
+   * there this goes to Overview first. `selector`: what to scroll to once it's showing.
+   */
+  const revealDetails = (selector = '.crmr-customer') => {
+    if (!wide1280) {
+      pickTab('details');
+      return;
+    }
+    if (tab === 'docs') pickTab('overview');
+    setTimeout(() => (document.querySelector(selector) ?? document.querySelector('.crmr-customer'))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 80);
+  };
   // Phones: the tabs scroll sideways, so keep the one that's open in view.
   const loaded = rec !== null;
   useEffect(() => {
@@ -439,7 +452,7 @@ export function ProjectView({
   function openWhatsApp(draft?: string) {
     if (!wa.number) {
       // No mobile yet: add it first.
-      if (!wide1280) pickTab('details');
+      revealDetails();
       setEditCustomer((n) => n + 1);
       setNotice(`Add ${first}’s mobile to message them on WhatsApp.`);
       return;
@@ -488,7 +501,7 @@ export function ProjectView({
   /** Send quote for signing: no quote or contract yet, upload it first; else the customer portal card's picker (Details below 1280px). */
   function sendQuote() {
     if (!hasQuote) return addDocument('quote');
-    if (!wide1280) pickTab('details');
+    revealDetails('.crmr-slot[aria-label="Customer portal"]');
     window.dispatchEvent(new CustomEvent(SEND_QUOTE, { detail: { id } }));
     setTimeout(() => document.querySelector('.crmr-slot[aria-label="Customer portal"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   }
@@ -558,7 +571,7 @@ export function ProjectView({
     openTab: (t, cat) => {
       if (t === 'photos') setPhotoView((v) => ({ cat: cat ?? null, key: v.key + 1 }));
       // From 1280px the customer's details are the left column, not a tab.
-      if (t === 'details' && wide1280) document.querySelector('.crmr-customer')?.scrollIntoView({ block: 'nearest' });
+      if (t === 'details') revealDetails('.crmr-job');
       else pickTab(t);
     },
     addDocument,
@@ -635,10 +648,7 @@ export function ProjectView({
         onCall={() => {
           calledAt.current = Date.now();
         }}
-        onName={() => {
-          if (!wide1280) pickTab('details');
-          else document.querySelector('.crmr-customer')?.scrollIntoView({ block: 'nearest' });
-        }}
+        onName={() => revealDetails()}
         onNewProject={() => openSheet('newproject')}
         onDelete={() => openSheet('delete')}
         onMerge={(other) => setMerging({ a: c.id, b: other, name: c.name })}
