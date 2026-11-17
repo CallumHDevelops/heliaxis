@@ -160,7 +160,7 @@ export async function remindNextSteps() {
  * Meta lead form or a new WhatsApp number. The enquiry row is the contact. Never throws (the CRM
  * tables may not exist yet), and never makes a second one.
  */
-export async function ensureOpportunity(enquiryId: string, source: string) {
+export async function ensureOpportunity(enquiryId: string, source: string, extra: { address?: string | null } = {}) {
   try {
     const db = createAdminClient();
     const { data: existing } = await db.from('crm_projects').select('id').eq('enquiry_id', enquiryId).limit(1);
@@ -174,6 +174,8 @@ export async function ensureOpportunity(enquiryId: string, source: string) {
         title: `${e.name}${e.postcode ? ` · ${e.postcode}` : ''}`,
         stage: 'lead',
         postcode: e.postcode,
+        // A street address the lead form asked for (the enquiry itself has no address column).
+        ...(extra.address?.trim() ? { address: extra.address.trim().slice(0, 300) } : {}),
         products: guessProducts(e.interest),
       })
       .select('id')

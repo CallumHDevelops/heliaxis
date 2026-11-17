@@ -221,19 +221,6 @@ export function RecordHeader({
             <dt>Address</dt>
             <dd>{site ? <a href={directionsHref(site)} target="_blank" rel="noreferrer">{site}</a> : <span className="crm-muted">No address yet</span>}</dd>
           </div>
-          {(customer.interest || customer.property_type) && (
-            <div>
-              <dt>Asked about</dt>
-              <dd>{[customer.interest, customer.property_type].filter(Boolean).join(' · ')}</dd>
-            </div>
-          )}
-          <div>
-            <dt>Came in</dt>
-            <dd>
-              {customer.source_label || customer.source}
-              {customer.created_at ? ` · ${new Date(customer.created_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}
-            </dd>
-          </div>
           <button type="button" className="crm-link crmr-glance__more" onClick={onName}>
             All details and editing →
           </button>
