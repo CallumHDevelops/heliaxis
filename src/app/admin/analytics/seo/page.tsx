@@ -8,8 +8,8 @@ import { readProposals, recentAudits } from '@/lib/seo/server';
 import { Proposals } from './SeoControls';
 import { RankingsTable, RunCentre, type RankRow } from './SeoDashboard';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { history, movers, summarise, visibility, type SerpSnapshot } from '@/lib/seo/rankings';
-import { ensureSerpSample, latestCompetitorAnalysis, readAuditStatus, readRunStatus, recentRankings, serpAccount, serpConfigured } from '@/lib/seo/serp';
+import { history, movers, packLeague, summarise, visibility, type SerpSnapshot } from '@/lib/seo/rankings';
+import { latestCompetitorAnalysis, readAuditStatus, readRunStatus, recentRankings, serpAccount, serpConfigured } from '@/lib/seo/serp';
 import './seo.css';
 
 export const dynamic = 'force-dynamic';
@@ -101,8 +101,6 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
     readAuditStatus().catch(() => null),
     admin ? serpAccount().catch(() => null) : Promise.resolve(null),
   ]);
-  // One-off diagnostic sample (runs once ever, a fifth of a cent): see ensureSerpSample.
-  if (admin) await ensureSerpSample().catch(() => null);
   const stuck = isStuck(status);
   const serpOn = serpConfigured();
   // Compare like with like: the newest check with last week's, or with the one about a month before it.
@@ -115,6 +113,7 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
   const rows = rankRows(snapNow, snapBefore, snaps);
   const moves = movers(snapBefore, snapNow).slice(0, 8);
   const league = snapNow ? visibility(snapNow).slice(0, 10) : [];
+  const pack = snapNow ? packLeague(snapNow).slice(0, 12) : [];
   const now = audits[0] ?? null;
   const change = now ? compareAudits(audits[1] ?? null, now) : null;
   const waiting = proposals.filter((p) => p.status === 'proposed');
@@ -264,6 +263,40 @@ export default async function SeoReportPage({ searchParams }: { searchParams: Pr
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {pack.length > 0 && (
+          <section className="seo-sec" aria-labelledby="seo-pack">
+            <h2 id="seo-pack">Who’s in the map pack</h2>
+            <p className="seo-muted">
+              The three businesses Google shows under the map, which most local searchers click. It comes mainly from each firm’s Google Business Profile (verified, the right categories,
+              towns listed as service areas, reviews and photos). Heliaxis is in {sum?.inPack ?? 0} of {sum?.checked ?? 0} searches.
+            </p>
+            <div className="seo-table-wrap">
+              <table className="seo-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Business</th>
+                    <th scope="col">Times shown</th>
+                    <th scope="col">First</th>
+                    <th scope="col">Towns</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pack.map((p) => (
+                    <tr key={p.name} className={/heliaxis/i.test(p.name) ? 'is-us' : ''}>
+                      <td>
+                        <b>{p.name}</b>
+                      </td>
+                      <td>{p.appearances}</td>
+                      <td>{p.first}</td>
+                      <td className="seo-towns">{p.towns.join(', ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 

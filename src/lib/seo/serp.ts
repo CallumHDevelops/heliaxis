@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { parseKv, toKv } from '@/lib/kv-json';
 import { aiConfig, aiHeaders } from '@/lib/studio/ai';
 import { parsePage } from './shared';
-import { cleanDomain, isOurs, ourPlace, parseSerp, visibility, type LeagueRow, type SerpResult, type SerpSnapshot } from './rankings';
+import { cleanDomain, isOurs, ourPlace, packLeague, parseSerp, visibility, type LeagueRow, type SerpResult, type SerpSnapshot } from './rankings';
 
 /**
  * Weekly Google rankings from DataForSEO (pay as you go, about a fifth of a US cent per search at the depth used here), and the
@@ -353,7 +353,9 @@ export async function runCompetitorAnalysis(now = new Date(), db: Db = createAdm
     summary: '',
   }));
 
-  const written = await writeAnalysis(ours, competitors, snap.results.length, towns);
+  const mapPack = packLeague(snap).slice(0, 10).map((p) => ({ name: p.name, timesShown: p.appearances, first: p.first, towns: p.towns }));
+  const heliaxisInPack = snap.results.filter((r) => !r.error && r.ours.pack !== null).length;
+  const written = await writeAnalysis(ours, competitors, snap.results.length, towns, { mapPack, heliaxisInPack });
   const out: CompetitorAnalysis = {
     id: ukDay(now),
     at: now.toISOString(),
@@ -380,18 +382,20 @@ async function writeAnalysis(
   comps: CompetitorReport[],
   searches: number,
   towns: string[],
+  extra: { mapPack: { name: string; timesShown: number; first: number; towns: string[] }[]; heliaxisInPack: number },
 ): Promise<{ byDomain: Record<string, { better: string[]; summary: string }>; actions: CompetitorAnalysis['actions'] } | null> {
   const { apiKey, baseUrl, model } = aiConfig();
-  if (!apiKey || !comps.length) return null;
+  if (!apiKey || (!comps.length && !extra.mapPack.length)) return null;
   const facts = {
     searchesTracked: searches,
     towns,
+    mapPack: { heliaxisShownIn: extra.heliaxisInPack, leaders: extra.mapPack },
     heliaxis: { ...ours, pages: ours.pages.map(slim) },
     competitors: comps.map((c) => ({ domain: c.domain, visibilitySharePct: c.share, searchesInTop20: c.searches, searchesInTop3: c.top3, avgPos: c.avgPos, towns: c.towns, pages: c.pages.map(slim) })),
   };
   const prompt = `You are an SEO analyst for Heliaxis, an MCS-certified installer of solar panels, batteries, heat pumps and EV chargers in South Wales and the South West of England.
 
-Below are FACTS from this week's Google results for ${searches} local searches (phone, each from its own town) and from reading each site's pages. "visibilitySharePct" is the share of likely clicks across all searches. "townLinks" counts links to pages named after a tracked town. "schema" lists structured-data types on the page.
+Below are FACTS from this week's Google results (including "mapPack": the three businesses Google shows under the map, by business name, which comes mainly from each firm's Google Business Profile) for ${searches} local searches (phone, each from its own town) and from reading each site's pages. "visibilitySharePct" is the share of likely clicks across all searches. "townLinks" counts links to pages named after a tracked town. "schema" lists structured-data types on the page.
 
 Rules: use ONLY these facts. Do not invent reviews, prices, years in business or anything not shown. If a fact is missing (a page could not be read), say less rather than guess. British English, plain, short. No emoji.
 

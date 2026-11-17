@@ -169,6 +169,29 @@ export function history(snaps: SerpSnapshot[], keywordId: number): { id: string;
     .map((s) => ({ id: s.id, pos: s.results.find((r) => r.keywordId === keywordId && !r.error)?.ours.pos ?? null }));
 }
 
+const isGoogle = (d: string) => d === 'google.com' || d.endsWith('.google.com') || d === 'google.co.uk';
+
+/**
+ * The real site and page of a result. Google now wraps result links ("google.com/goto?url=…"), so DataForSEO's domain and url
+ * say google.com; the breadcrumb (the green address line, "https://www.yell.com › Renewable Energy › Cardiff") still names
+ * the site. The page address is rebuilt from it unless Google shortened it ("…").
+ */
+export function realAddress(it: { domain?: unknown; url?: unknown; breadcrumb?: unknown }): { domain: string; url: string } | null {
+  const d = cleanDomain(String(it.domain ?? ''));
+  if (d && !isGoogle(d)) return { domain: d, url: String(it.url ?? '') };
+  const bc = String(it.breadcrumb ?? '').trim();
+  const m = /^(https?:\/\/)?([^\s/›]+)/i.exec(bc);
+  if (!m) return null;
+  const host = cleanDomain(m[2]);
+  if (!host.includes('.') || isGoogle(host)) return null;
+  const segs: string[] = [];
+  for (const s of bc.slice(m[0].length).split('›').map((x) => x.trim()).filter(Boolean)) {
+    if (/\.\.\.|…/.test(s) || /\s/.test(s)) break; // shortened, or a label rather than a path
+    segs.push(s);
+  }
+  return { domain: host, url: `https://${host}/${segs.join('/')}` };
+}
+
 /** Turn one DataForSEO "live/advanced" result into ours (only what we keep). */
 export function parseSerp(items: unknown[]): { organic: SerpItem[]; localPack: PackItem[] } {
   const organic: SerpItem[] = [];
@@ -176,11 +199,13 @@ export function parseSerp(items: unknown[]): { organic: SerpItem[]; localPack: P
   for (const raw of Array.isArray(items) ? items : []) {
     const it = raw as Record<string, unknown>;
     if (it.type === 'organic' && typeof it.rank_group === 'number') {
-      const d = cleanDomain(String(it.domain ?? ''));
-      if (!d || d === 'google.com' || d.endsWith('.google.com') || d === 'google.co.uk') continue;
-      organic.push({ pos: it.rank_group, domain: cleanDomain(String(it.domain ?? '')), url: String(it.url ?? ''), title: String(it.title ?? '').slice(0, 140) });
+      const a = realAddress(it);
+      if (!a) continue;
+      organic.push({ pos: it.rank_group, domain: a.domain, url: a.url, title: String(it.title ?? '').slice(0, 140) });
     } else if (it.type === 'local_pack' && typeof it.rank_group === 'number') {
-      localPack.push({ pos: it.rank_group, title: String(it.title ?? '').slice(0, 100), domain: cleanDomain(String(it.domain ?? '')) });
+      // Map-pack entries have no address of their own any more: they are known by their business name.
+      const d = cleanDomain(String(it.domain ?? ''));
+      localPack.push({ pos: it.rank_group, title: String(it.title ?? '').slice(0, 100), domain: isGoogle(d) ? '' : d });
     }
   }
   organic.sort((a, b) => a.pos - b.pos);
@@ -193,4 +218,26 @@ export function ourPlace(organic: SerpItem[], localPack: PackItem[]): SerpResult
   const o = organic.find((x) => isOurs(x.domain));
   const p = localPack.find((x) => isOurs(x.domain) || /heliaxis/i.test(x.title));
   return { pos: o?.pos ?? null, url: o?.url ?? null, pack: p?.pos ?? null };
+}
+
+export type PackRow = { name: string; appearances: number; first: number; towns: string[] };
+
+/** Who is in Google's map pack (the three businesses under the map), by business name: where local installers compete. */
+export function packLeague(s: SerpSnapshot): PackRow[] {
+  const by = new Map<string, { n: number; first: number; towns: Set<string> }>();
+  for (const r of s.results) {
+    if (r.error) continue;
+    for (const p of r.localPack) {
+      const name = p.title.trim();
+      if (!name) continue;
+      const e = by.get(name) ?? { n: 0, first: 0, towns: new Set<string>() };
+      e.n++;
+      if (p.pos === 1) e.first++;
+      e.towns.add(r.town);
+      by.set(name, e);
+    }
+  }
+  return [...by.entries()]
+    .map(([name, e]) => ({ name, appearances: e.n, first: e.first, towns: [...e.towns].sort() }))
+    .sort((a, b) => b.appearances - a.appearances || b.first - a.first);
 }

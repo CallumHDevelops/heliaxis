@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { history, isInstaller, isOurs, movers, ourPlace, parseSerp, summarise, visibility, type SerpResult, type SerpSnapshot } from '@/lib/seo/rankings';
+import { history, isInstaller, isOurs, movers, ourPlace, packLeague, parseSerp, summarise, visibility, type SerpResult, type SerpSnapshot } from '@/lib/seo/rankings';
 
 const res = (keywordId: number, town: string, organic: [number, string][], oursPos: number | null = null, pack: number | null = null): SerpResult => ({
   keywordId,
@@ -62,5 +62,37 @@ describe('google links', () => {
       { type: 'organic', rank_group: 2, domain: 'www.real.co.uk', url: 'https://real.co.uk', title: 'Real' },
     ]);
     expect(p.organic.map((x) => x.domain)).toEqual(['real.co.uk']);
+  });
+});
+
+describe('real addresses behind Google links (shapes from a real DataForSEO answer, Nov 2026)', () => {
+  const g = (rank: number, breadcrumb: string, website_name: string) => ({ type: 'organic', rank_group: rank, domain: 'google.com', url: 'https://google.com/goto?url=CAES', breadcrumb, website_name, title: website_name });
+  it('reads the site from the breadcrumb and rebuilds the page where it can', () => {
+    const p = parseSerp([
+      { type: 'local_pack', rank_group: 1, domain: 'google.com', title: 'Green Energy Solar' },
+      g(1, 'https://www.solarlocator.co.uk › service-types › cardiff', 'solarlocator.co.uk'),
+      g(2, 'https://www.yell.com › ... › Solar Energy near CARDIFF', 'Yell'),
+      g(3, 'https://solarwinds.cardiff.gov.uk', 'Cardiff Council'),
+      g(4, 'https://solarplanet.uk › how-much-do-solar-panels-cost-...', 'solarplanet.uk'),
+      g(5, 'https://heliaxis.co.uk › solar-panels', 'Heliaxis'),
+    ]);
+    expect(p.organic.map((x) => [x.domain, x.url])).toEqual([
+      ['solarlocator.co.uk', 'https://solarlocator.co.uk/service-types/cardiff'],
+      ['yell.com', 'https://yell.com/'],
+      ['solarwinds.cardiff.gov.uk', 'https://solarwinds.cardiff.gov.uk/'],
+      ['solarplanet.uk', 'https://solarplanet.uk/'],
+      ['heliaxis.co.uk', 'https://heliaxis.co.uk/solar-panels'],
+    ]);
+    expect(p.localPack).toEqual([{ pos: 1, title: 'Green Energy Solar', domain: '' }]);
+    expect(ourPlace(p.organic, p.localPack)).toEqual({ pos: 5, url: 'https://heliaxis.co.uk/solar-panels', pack: null });
+    expect(isInstaller('yell.com')).toBe(false);
+  });
+});
+
+describe('map pack league', () => {
+  it('counts businesses by name across searches', () => {
+    const r = (id: number, town: string, names: string[]): SerpResult => ({ keywordId: id, keyword: 'k', town, location: town, organic: [], localPack: names.map((title, i) => ({ pos: i + 1, title, domain: '' })), ours: { pos: null, url: null, pack: null } });
+    const l = packLeague({ id: 'x', at: 'x', costUsd: 0, results: [r(1, 'Cardiff', ['A', 'B']), r(2, 'Bath', ['B', 'C'])] });
+    expect(l[0]).toEqual({ name: 'B', appearances: 2, first: 1, towns: ['Bath', 'Cardiff'] });
   });
 });
