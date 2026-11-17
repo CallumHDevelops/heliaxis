@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Sheet } from '../crm/CrmUi';
 import '../crm/crm.css';
-import { BUILD_AREAS, BUILD_STATUSES, progress, type BuildArea, type BuildItem, type BuildStatus } from '@/lib/builds';
+import { BUILD_AREAS, BUILD_STATUSES, buildPrompt, cleanBuild, progress, promptFileName, STARTER_BRIEFS, type BuildArea, type BuildItem, type BuildStatus } from '@/lib/builds';
 import { remove, save } from './actions';
 
 const when = (iso: string) => {
@@ -11,7 +11,7 @@ const when = (iso: string) => {
   return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 14 ? `${d} days ago` : new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
-const blank = (status: BuildStatus = 'next'): Partial<BuildItem> => ({ title: '', area: 'HAP', status, summary: '', next: '', waitingOn: '', checklist: [], links: [] });
+const blank = (status: BuildStatus = 'next'): Partial<BuildItem> => ({ title: '', area: 'HAP', status, summary: '', next: '', waitingOn: '', checklist: [], links: [], brief: '' });
 
 /** Columns by status; click a card to see and change everything about it. */
 export function BuildBoard({ initial }: { initial: BuildItem[] }) {
@@ -101,7 +101,8 @@ function Card({ item, onOpen }: { item: BuildItem; onOpen: () => void }) {
 }
 
 function Editor({ item, onClose, onSaved, onDeleted }: { item: Partial<BuildItem>; onClose: () => void; onSaved: (b: BuildItem) => void; onDeleted: (id: string) => void }) {
-  const [v, setV] = useState<Partial<BuildItem>>(item);
+  const [v, setV] = useState<Partial<BuildItem>>(() => ({ ...item, brief: item.brief || (item.id ? STARTER_BRIEFS[item.id] : '') || '' }));
+  const [copied, setCopied] = useState(false);
   const [newCheck, setNewCheck] = useState('');
   const [newLink, setNewLink] = useState({ label: '', href: '' });
   const [busy, setBusy] = useState<'' | 'save' | 'delete'>('');
@@ -121,6 +122,30 @@ function Editor({ item, onClose, onSaved, onDeleted }: { item: Partial<BuildItem
     setBusy('');
     if (!r.ok) return setErr(r.error);
     onSaved(r.item);
+  }
+
+  /** The prompt as the item stands on screen now (including changes not saved yet). */
+  const prompt = () => buildPrompt(cleanBuild({ ...v, id: v.id || 'new' }));
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(prompt());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setErr('Your browser blocked copying: use Download prompt instead.');
+    }
+  }
+
+  function downloadPrompt() {
+    const blob = new Blob([prompt()], { type: 'text/markdown;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = promptFileName(cleanBuild({ ...v, id: v.id || 'new' }));
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
   async function doDelete() {
@@ -168,6 +193,11 @@ function Editor({ item, onClose, onSaved, onDeleted }: { item: Partial<BuildItem
         <label className="bt-full">
           <span>Waiting on</span>
           <input className="crm-input" value={v.waitingOn ?? ''} onChange={(e) => set('waitingOn', e.target.value)} placeholder="A decision, a person, a fact (leave empty if nothing)" />
+        </label>
+
+        <label className="bt-full">
+          <span>Background for whoever picks it up (goes into its prompt)</span>
+          <textarea className="crm-input" rows={4} value={v.brief ?? ''} onChange={(e) => set('brief', e.target.value)} placeholder="Key files, facts, decisions made so far" />
         </label>
 
         <fieldset className="bt-full bt-check">
@@ -236,6 +266,12 @@ function Editor({ item, onClose, onSaved, onDeleted }: { item: Partial<BuildItem
           </button>
           <button type="button" className="crm-btn crm-btn--ghost" disabled={!!busy} onClick={onClose}>
             Cancel
+          </button>
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={!v.title?.trim()} onClick={() => void copyPrompt()}>
+            {copied ? 'Copied' : 'Copy prompt'}
+          </button>
+          <button type="button" className="crm-btn crm-btn--ghost" disabled={!v.title?.trim()} onClick={downloadPrompt}>
+            Download prompt
           </button>
           {v.id && (
             <button type="button" className="crm-btn crm-btn--ghost bt-del" disabled={!!busy} onClick={() => void doDelete()}>

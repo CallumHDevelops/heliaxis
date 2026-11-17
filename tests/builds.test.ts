@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanBuild, progress, starterBuilds } from '@/lib/builds';
+import { buildPrompt, cleanBuild, progress, promptFileName, starterBuilds } from '@/lib/builds';
 
 describe('build tracker', () => {
   it('cleans what is sent', () => {
@@ -18,5 +18,20 @@ describe('build tracker', () => {
     const s = starterBuilds();
     expect(s.length).toBeGreaterThan(8);
     expect(new Set(s.map((b) => b.id)).size).toBe(s.length);
+  });
+});
+
+describe('build prompts', () => {
+  it('turns an item into a brief with what is left, background, links and the hand-back instruction', () => {
+    const b = cleanBuild({ id: 'seo-dashboard', title: 'SEO dashboard', area: 'SEO and AI', status: 'doing', next: 'Run it', waitingOn: 'Top-up', checklist: [{ text: 'Built', done: true }, { text: 'First run', done: false }], links: [{ label: 'Dashboard', href: '/admin/analytics/seo' }] });
+    const p = buildPrompt(b);
+    expect(p).toContain('# SEO dashboard');
+    expect(p).toContain('- Next step: Run it');
+    expect(p).toContain('- [ ] First run');
+    expect(p).toContain('- [x] Built');
+    expect(p).toContain('src/lib/seo/serp.ts'); // starting background used when the item has none
+    expect(p).toContain('https://heliaxis.co.uk/admin/analytics/seo');
+    expect(p).toContain('item id "seo-dashboard"');
+    expect(promptFileName(b)).toBe('build-seo-dashboard.md');
   });
 });

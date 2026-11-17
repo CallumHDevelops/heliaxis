@@ -30,6 +30,8 @@ export type BuildItem = {
   waitingOn: string;
   checklist: { text: string; done: boolean }[];
   links: { label: string; href: string }[];
+  /** Notes for whoever (or whichever Claude session) picks it up: files, facts, decisions. Goes into its prompt. */
+  brief: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -57,6 +59,7 @@ export function cleanBuild(v: Partial<BuildItem> & { id: string }, now = new Dat
       .map((l) => ({ label: str(l?.label, 80).trim(), href: str(l?.href, 500).trim() }))
       .filter((l) => l.href && (l.href.startsWith('/') || /^https?:\/\//.test(l.href)))
       .slice(0, 12),
+    brief: str(v.brief, 6000),
     createdAt: v.createdAt || now,
     updatedAt: now,
   };
@@ -70,7 +73,7 @@ export function progress(b: BuildItem): number | null {
 
 /** What was being built on 16 to 17 November 2026, so the tracker starts with today's work in it. */
 export function starterBuilds(now = new Date().toISOString()): BuildItem[] {
-  const b = (id: string, v: Omit<BuildItem, 'id' | 'createdAt' | 'updatedAt'>) => cleanBuild({ id, ...v, createdAt: now }, now);
+  const b = (id: string, v: Omit<BuildItem, 'id' | 'createdAt' | 'updatedAt' | 'brief'>) => cleanBuild({ id, ...v, brief: STARTER_BRIEFS[id] ?? '', createdAt: now }, now);
   return [
     b('seo-dashboard', {
       title: 'SEO dashboard and Google positions',
@@ -239,4 +242,72 @@ export function starterBuilds(now = new Date().toISOString()): BuildItem[] {
       links: [],
     }),
   ];
+}
+
+/** Background for the starting items (also used when an item saved before briefs existed has none). */
+export const STARTER_BRIEFS: Record<string, string> = {
+  'seo-dashboard': `Page: src/app/admin/analytics/seo (page.tsx, SeoDashboard.tsx, SeoControls.tsx, actions.ts). Rankings maths: src/lib/seo/rankings.ts (tested in tests/seo-rankings.test.ts). DataForSEO calls, run status and the competitor analysis: src/lib/seo/serp.ts. Weekly job: src/app/api/cron/seo-rankings (Mondays 04:30, vercel.json). Snapshots are stored in cms_kv as "seo-serp:YYYY-MM-DD" and "seo-competitors:YYYY-MM-DD"; run progress in "seo-run-status".
+Credentials: DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD (or DATAFORSEO_BASE64) in Vercel. Searches are desktop, from each town; Google wraps result links, so the real site is read from each result's breadcrumb. Map-pack entries have no site, only the business name.
+Keywords: social_seo_keyword table (103 searches over 11 towns, seeded from src/lib/social/competitors/seed.ts).`,
+  'google-business-profile': `Facts to keep identical everywhere: Heliaxis Limited, 01633 965205, MCS, RECC, NAPIT, TrustMark, SSIP, ISO 9001 and ISO 14001 (never NICEIC). Area: South Wales and the South West (Swindon, Bath, Bristol, Weston-super-Mare, Gloucester, Cheltenham across to South Wales).
+Reviews: never offer a reward for a Google or Trustpilot review (docs/SEO-GEO-STRATEGY.md section 6). The map-pack league is on the SEO dashboard.`,
+  'free-solar-quote': `Page: src/app/(site)/free-solar-quote (page.tsx, faqs.ts, free-solar-quote.css). Packages band: src/components/quote/PackagesBand.tsx reading readEstimatorSettings().packages (src/lib/estimator/package-cards.ts). Slim header: SlimHeader in src/components/site/Header.tsx. The form posts to /api/quote with source "landing-free-solar-quote"; a test submission emails a receipt and alerts staff, so label it TEST.`,
+  'claims-to-confirm': `The home page is a CMS page (stored blocks rendered in the browser): change it in the website editor (/admin/cms) and press Publish, or drive the admin with a browser signed in as the owner. Never write to cms_kv "heliaxis-cms-v1" directly. Owner has said: the EUPD award can be proven; panel warranties vary from 25 to 30 years by panel; Heliaxis has installed around the UK.`,
+  'cta-link-audit': `The rule (docs/WEBSITE-CONTENT-SPEC.md section 5): the main button everywhere reads "Get my free solar quote" and goes to /free-solar-quote (battery or heat pump pages may say "Get my free quote" with ?for=battery etc.). Places: src/components/site/Header.tsx, src/components/home (Hero, MobileCta, EstimatorBand, SplitCards, FinalCta), the estimator result page, src/components/cms/CmsBody.tsx bands, BLOG_SYSTEM in src/lib/blog/prompt.ts. Already done: dead #quote links on CMS pages (fixDeadQuoteLinks in src/lib/cms-ctas.ts) and the footer. Report a before and after table.`,
+  'content-pages': `Briefs: PAGE_BRIEFS in src/lib/cms/page-briefs.ts. Build as code pages in src/app/(site)/ like src/app/(site)/free-solar-quote (reuse PackagesBand on the solar and battery pages). Order: /solar-and-battery, /battery-storage, /add-battery-to-existing-solar, /battery-backup, then /residential, /whole-home-energy, heat pumps, EV, commercial, sectors. Add each to src/app/sitemap.ts, and read docs/WEBSITE-CONTENT-SPEC.md section 7 first.`,
+  'blog-conversion': `Article view: src/components/blog/BlogArticleView.tsx; template src/lib/blog/cms-article-template.ts; house rules BLOG_SYSTEM in src/lib/blog/prompt.ts; written drafts in src/content/blog-drafts (do not rewrite the 13). Goal: every article leads clearly to a free survey (main button "Get my free solar quote" to /free-solar-quote, secondary "Book a free survey" to /book-a-survey) without being pushy.`,
+  'post-studio-photos': `The old Post Studio saved photos as data URLs in the live database: project_images (77, linked to projects: name, location, system size, battery) and image_library (22). The Content library (src/app/admin/content, src/lib/content/server.ts) only shows HAP project photos. Show the old ones too, served through a route that decodes them, without loading every image on the list. Never show a customer's name, address or number plate.`,
+  'home-speed': `Measured 16 Nov 2026 on the live site: the home page is about 16 phone screens long (13,920px), loads 43 images up front, layout shift 0.137 on desktop; the cookie banner covers about a third of a phone screen and hides the hero button on service pages. The home page is a CMS page: LIVE_FIXES_CSS in src/lib/cms-ctas.ts can change its styles without republishing.`,
+};
+
+const statusLabel = (s: BuildStatus) => BUILD_STATUSES.find((x) => x.key === s)?.label ?? s;
+const SITE = 'https://heliaxis.co.uk';
+
+/** A ready-to-paste brief for a Claude Code session that will pick this piece of work up. */
+export function buildPrompt(b: BuildItem): string {
+  const brief = (b.brief ?? '').trim() || STARTER_BRIEFS[b.id] || '';
+  const open = b.checklist.filter((c) => !c.done);
+  const done = b.checklist.filter((c) => c.done);
+  const link = (l: { label: string; href: string }) => `- ${l.label}: ${l.href.startsWith('/') ? SITE + l.href : l.href}`;
+  const lines: string[] = [
+    `# ${b.title}`,
+    '',
+    'You are working in the Heliaxis repo (GitHub CallumHDevelops/heliaxis, Next.js 16, deployed on Vercel). Pick up the piece of work below from where it was left.',
+    '',
+    '## Before you start',
+    '- Read AGENTS.md (house rules: buttons, icons, no emoji, nothing claimed that is not true). For website work also read docs/WEBSITE-CONTENT-SPEC.md and docs/SEO-GEO-STRATEGY.md.',
+    '- Work in a fresh git worktree from origin/main: other sessions use the shared checkout at Desktop/heliaxis. Stage only your own files (never git add -A).',
+    '- This Next.js may differ from the one you know: if node_modules/next/dist/docs/ exists, read the relevant guide before changing routing, caching or rendering.',
+    '',
+    '## The work',
+    `- Area: ${b.area}`,
+    `- Status: ${statusLabel(b.status)}`,
+  ];
+  if (b.summary.trim()) lines.push(`- Where it stands: ${b.summary.trim()}`);
+  if (b.next.trim()) lines.push(`- Next step: ${b.next.trim()}`);
+  if (b.waitingOn.trim()) lines.push(`- Waiting on: ${b.waitingOn.trim()} (ask Cal one short question rather than guess)`);
+  if (open.length) lines.push('', '## Still to do', ...open.map((c) => `- [ ] ${c.text}`));
+  if (done.length) lines.push('', '## Already done', ...done.map((c) => `- [x] ${c.text}`));
+  if (brief) lines.push('', '## Background', brief);
+  if (b.links.length) lines.push('', '## Links', ...b.links.map(link));
+  lines.push(
+    '',
+    '## Rules',
+    '- Nothing is claimed that is not true and checkable: no invented prices, savings, reviews, awards, customer numbers or years in business. If you need a fact you do not have, leave it out and list it under "Needs Cal".',
+    '- British English, plain and calm, never pushy. No emoji. Use the house button styles.',
+    '- Check visible changes by rendering them (screenshots at 390px and 1440px), not by reading the code alone.',
+    '- Before every push: npx tsc --noEmit, npx eslint on the files you changed, npx vitest run. Every push to main deploys to production. Push with: git fetch -q origin main && git rebase origin/main && git push -q origin HEAD:main',
+    '- Do not touch Stripe, the CRM, the quote builder or the EIC code unless this work is about them.',
+    '',
+    '## When you stop',
+    `- Update this item in HAP › Team › Build tracker (${SITE}/admin/builds, item id "${b.id}"): its status, next step, waiting on and checklist, so the next session can pick it up.`,
+    '- Report: what changed (with URLs), what you checked and how, what you could not check, and a "Needs Cal" list.',
+  );
+  return lines.join('\n') + '\n';
+}
+
+/** A file name for the downloaded prompt ("build-seo-dashboard-and-google-positions.md"). */
+export function promptFileName(b: BuildItem): string {
+  const slug = b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || b.id;
+  return `build-${slug}.md`;
 }
