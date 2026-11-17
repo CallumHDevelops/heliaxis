@@ -39,6 +39,7 @@ type Tab =
   | 'aicosts'
   | 'subcontractors'
   | 'tasks'
+  | 'builds'
   | 'assistant'
   | 'design'
   | 'social'
@@ -54,6 +55,11 @@ export const icons = {
   home: (
     <svg {...ICON}>
       <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+    </svg>
+  ),
+  builds: (
+    <svg {...ICON}>
+      <path d="M3 4h5v16H3zM10 4h5v10h-5zM17 4h4v6h-4z" />
     </svg>
   ),
   tasks: (
@@ -458,6 +464,7 @@ export async function AdminShell({
       label: 'Team',
       items: [
         { href: '/admin/tasks', label: 'Tasks', icon: icons.tasks, active: active === 'tasks', show: can('tasks'), tab: tasksIsTab },
+        { href: '/admin/builds', label: 'Build tracker', short: 'Builds', icon: icons.builds, active: active === 'builds', show: admin },
         { href: '/admin/subcontractors', label: 'Subcontractors', icon: icons.subcontractors, active: active === 'subcontractors', show: can('subcontractors') },
         { href: '/api/sso/rams?next=%2Foperatives%3Fteam%3Dheliaxis', label: 'Our team', icon: icons.team, show: can('team') },
       ],
