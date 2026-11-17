@@ -207,6 +207,38 @@ export function RecordHeader({
         </div>
         {hasBadges && <p className="crmr-badges crmr-badges--b">{badges}</p>}
 
+        {/* Phones: who they are, in front of you the moment you open the job (the Details tab has the rest and the editing). */}
+        <dl className="crmr-glance" aria-label={`${customer.name}’s details`}>
+          <div>
+            <dt>Mobile</dt>
+            <dd>{phone ? <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} onClick={onCall}>{phone}</a> : <span className="crm-muted">No mobile yet</span>}</dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>{customer.email ? <a href={`mailto:${customer.email}`}>{customer.email}</a> : <span className="crm-muted">No email yet</span>}</dd>
+          </div>
+          <div>
+            <dt>Address</dt>
+            <dd>{site ? <a href={directionsHref(site)} target="_blank" rel="noreferrer">{site}</a> : <span className="crm-muted">No address yet</span>}</dd>
+          </div>
+          {(customer.interest || customer.property_type) && (
+            <div>
+              <dt>Asked about</dt>
+              <dd>{[customer.interest, customer.property_type].filter(Boolean).join(' · ')}</dd>
+            </div>
+          )}
+          <div>
+            <dt>Came in</dt>
+            <dd>
+              {customer.source_label || customer.source}
+              {customer.created_at ? ` · ${new Date(customer.created_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}
+            </dd>
+          </div>
+          <button type="button" className="crm-link crmr-glance__more" onClick={onName}>
+            All details and editing →
+          </button>
+        </dl>
+
         <div className="crmr-contact">
           {phone ? (
             <a className="crm-btn crm-btn--ghost" href={`tel:${phone.replace(/[^\d+]/g, '')}`} onClick={onCall}>
