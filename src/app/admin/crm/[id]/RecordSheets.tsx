@@ -19,10 +19,11 @@ import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import { copyText, send, type Area, type Customer, type Project, type WaInfo } from './record-shared';
 
 /** What the + sheet can open. */
-export type SheetKey = null | 'menu' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink' | 'portal' | 'jobedit';
+export type SheetKey = null | 'menu' | 'quote' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink' | 'portal' | 'jobedit';
 
 /** The + sheet's icons, all from the brand kit (see BrandIcon). */
 const MENU_ICONS = {
+  quote: 'document',
   task: 'check',
   note: 'clipboard',
   call: 'phone',
@@ -41,8 +42,10 @@ const MENU_ICONS = {
 } as const;
 
 /** "Add to Jane": the + button's sheet. WhatsApp has its own green button now; the stage's own action is the last tile. */
-export function ActionMenu({ customer, tile, portal = false, onPick, onTile }: { customer: Customer; tile: PrimaryAction['tile']; /** Their portal exists at this stage: offer to view it. */ portal?: boolean; onPick: (s: SheetKey) => void; onTile: () => void }) {
+export function ActionMenu({ customer, tile, portal = false, quotes = false, onPick, onTile }: { customer: Customer; tile: PrimaryAction['tile']; /** Their portal exists at this stage: offer to view it. */ portal?: boolean; /** Quotes are set up: offer a new quote for this job. */ quotes?: boolean; onPick: (s: SheetKey) => void; onTile: () => void }) {
   const items: [SheetKey, keyof typeof MENU_ICONS, string, string?][] = [
+    // A quote for this customer and job, opened in the quote builder (read the OpenSolar PDF, price it, send it).
+    ...(quotes ? ([['quote', 'quote', 'Quote', 'Price it and send it']] as typeof items) : []),
     ['task', 'task', 'Task', 'Who and when'],
     ['note', 'note', 'Note'],
     ['jobedit', 'jobedit', 'Edit job details', 'Products, value, address, notes'],

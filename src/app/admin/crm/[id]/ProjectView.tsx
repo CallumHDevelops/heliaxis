@@ -444,6 +444,19 @@ export function ProjectView({
     const d = r ? await r.json().catch(() => ({})) : {};
     if (d?.id) router.push(`/admin/sales/documents/${d.id}`);
   }
+  /** A new quote for this customer and job, opened in the quote builder. */
+  async function newQuote() {
+    closeSheet();
+    setNotice('Starting the quote…');
+    const r = await fetch('/api/crm/quotes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enquiry_id: c.id, project_id: id }),
+    }).catch(() => null);
+    const d = r ? await r.json().catch(() => ({})) : {};
+    if (r?.ok && d?.id) router.push(`/admin/sales/quotes/${d.id}`);
+    else setNotice(d?.error || 'Couldn’t start the quote. Try Sales › Quotes › + New quote.');
+  }
   const savedAndClose = () => {
     setSheet(null);
     void reload();
@@ -806,8 +819,10 @@ export function ProjectView({
           customer={c}
           tile={primary.tile}
           portal={!!portalMode(p.stage)}
+          quotes={!!schema.quotes}
           onPick={(s) => {
-            if (s === 'portal') {
+            if (s === 'quote') void newQuote();
+            else if (s === 'portal') {
               closeSheet();
               window.open(`/api/crm/projects/${id}/portal/preview`, '_blank');
             } else if (s === 'document') void newDocument();

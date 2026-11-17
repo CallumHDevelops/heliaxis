@@ -1,8 +1,8 @@
 ---
 title: The + and WhatsApp buttons on a customer’s page
-summary: The yellow + adds a task, note, call, photos, email or stage move; the green button opens the customer’s WhatsApp chat.
+summary: The yellow + starts a quote, or adds a task, note, call, photos, email or stage move; the green button opens the customer’s WhatsApp chat.
 order: 110
-keywords: plus button, add menu, floating button, quick add, WhatsApp button, green button, message customer, add mobile, photos, email, move stage
+keywords: plus button, add menu, new quote, add a quote, opensolar, floating button, quick add, WhatsApp button, green button, message customer, add mobile, photos, email, move stage
 where: CRM › Opportunities › a customer
 access: crm
 ---
@@ -14,6 +14,7 @@ It opens **Add to Jane Smith** (with the customer’s full name). Pick:
 
 | Button | What it opens |
 | --- | --- |
+| **Quote** | A new quote for them and this job, opened in the quote builder: upload the OpenSolar proposal (PDF), add the prices, **Generate quote**, then **Send to customer** |
 | **Task** | A new task: who and when |
 | **Note** | **Add a note** |
 | **Log a call** | **Log a call**, with a button to ring them |
