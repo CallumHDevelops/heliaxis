@@ -42,7 +42,7 @@ export async function GET(req: Request) {
   const emails = await pollMailbox(async (enquiryId, name, subject, extra) => {
     await notifyEnquiryTeam(`Email from ${name}`, subject, `/admin/crm?enquiry=${enquiryId}`, { tag: `em-${enquiryId}` });
     // "I'm available at 12 if you are": check the diary and ask whether to add the call (src/lib/crm/call-suggest.ts).
-    if (extra) await suggestCall({ enquiryId, name, body: extra.body, source: `email:${extra.messageId}`, via: 'email', receivedAt: extra.at }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null);
+    if (extra) await suggestCall({ enquiryId, name, body: extra.body, source: `email:${extra.messageId}`, via: 'email', receivedAt: extra.at, subject }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null);
   }).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
   // Files from a merge whose move was cut off (src/lib/crm/merge.ts). Never throws.
   const mergeFiles = await finishMergeFiles();

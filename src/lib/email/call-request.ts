@@ -119,3 +119,85 @@ export function findCallRequest(message: string, now: Date): CallRequest | null 
   }
   return null;
 }
+
+/* ── A call asked for, but no time given ─────────────────────────────────────── */
+
+export type CallAsk = {
+  /** "this morning", "tomorrow afternoon", "on Friday", or null when they gave no part of the day. */
+  part: string | null;
+  /** The day (UK) and the part of it, to look for free times: day defaults to today, or tomorrow once the day is nearly over. */
+  ymd: string;
+  bit: 'morning' | 'afternoon' | 'evening' | 'lunchtime' | null;
+  snippet: string;
+};
+
+const ASK = /\b(call|ring|phone|bell) me\b|\bgive me a (call|ring|bell|buzz)\b|\b(can|could|would|will) you (please )?(call|ring|phone|give me a (call|ring))\b|\b(please|pls) (call|ring|phone)\b|\b(happy|free|available|keen|able) to (chat|talk|speak|have a (chat|call))\b|\bwould (like|love|prefer) (a|to) (call|talk|speak|chat)\b|\bcall (me )?back\b|\b(speak|talk) (to|with) (you|someone|somebody)\b/i;
+
+/** The part of the day they asked for, in the words to say it back: "this morning", "tomorrow afternoon", "on Friday". */
+function partOfDay(s: string, now: Date): string | null {
+  const t = s.toLowerCase();
+  const p = ukParts(now);
+  const bit = /\bmorning\b/.test(t) ? 'morning' : /\bafternoon\b/.test(t) ? 'afternoon' : /\b(evening|tonight)\b/.test(t) ? 'evening' : /\blunch(time)?\b/.test(t) ? 'lunchtime' : null;
+  if (/\btoday\b|\bthis (morning|afternoon|evening|lunchtime)\b|\btonight\b/.test(t)) return bit === 'lunchtime' ? 'at lunchtime today' : bit ? `this ${bit}` : 'today';
+  if (/\b(tomorrow|tmrw|tmw|tomorow)\b/.test(t)) return bit ? `tomorrow ${bit === 'lunchtime' ? 'at lunchtime' : bit}` : 'tomorrow';
+  const d = DAYS.find((x) => new RegExp(`\\b${x}\\b`).test(t));
+  if (d) return `on ${d.charAt(0).toUpperCase()}${d.slice(1)}${bit ? ` ${bit === 'lunchtime' ? 'at lunchtime' : bit}` : ''}`;
+  if (bit && bit !== 'lunchtime') return p.hour < (bit === 'morning' ? 11 : bit === 'afternoon' ? 15 : 19) ? `this ${bit}` : `tomorrow ${bit}`;
+  return null;
+}
+
+/** They want a call but gave no time ("can you ring me tomorrow morning?"). Call this only when findCallRequest found nothing. */
+export function findCallAsk(message: string, now: Date): CallAsk | null {
+  const text = newPart(plainText(message));
+  if (!text) return null;
+  const sentences = text.split(/(?<=[.!?])\s+|\n/).map((x) => x.trim()).filter(Boolean);
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i];
+    if (!ASK.test(s) || NEGATIVE.test(s) || /\b(don'?t|do not|no need to|not necessary)\b/i.test(s)) continue;
+    const near = `${s} ${sentences[i + 1] ?? ''}`;
+    const part = partOfDay(s, now) ?? partOfDay(sentences[i + 1] ?? '', now);
+    const today = ukParts(now);
+    const named = dayWord(near, today);
+    const bit = (['morning', 'afternoon', 'evening', 'lunchtime'] as const).find((b) => new RegExp(`\\b${b === 'lunchtime' ? 'lunch' : b}`, 'i').test(near)) ?? (/\btonight\b/i.test(near) ? 'evening' : null);
+    // "this morning" said in the afternoon, or no day at all and the day nearly over: tomorrow.
+    const gone = !named && (bit === 'morning' ? today.hour >= 11 : bit === 'afternoon' ? today.hour >= 15 : today.hour >= 17);
+    return { part, ymd: named?.ymd ?? (gone ? addDay(today.ymd, 1) : today.ymd), bit, snippet: s.slice(0, 160) };
+  }
+  return null;
+}
+
+/** The reply to suggest. Email gets a proper sign-off; WhatsApp stays short. */
+export function suggestedReply(o: { kind: 'time' | 'ask'; first: string; label?: string; part?: string | null; me: string; channel: 'email' | 'whatsapp' }): string {
+  const hi = `Hi ${o.first || 'there'}`;
+  const body = o.kind === 'time' ? `thanks. I'd be happy to give you a call ${o.label}. Speak to you then.` : `thanks. I'd love to give you a call${o.part ? ` ${o.part}` : ''}. What time works best for you?`;
+  return o.channel === 'whatsapp' ? `${hi}, ${body} ${o.me}`.replace(/\s+/g, ' ').trim() : `${hi},\n\n${body.charAt(0).toUpperCase()}${body.slice(1)}\n\nKind regards,\n${o.me}\nHeliaxis`;
+}
+
+export type QuickReply = { label: string; text: string };
+
+/**
+ * The replies to offer, first one the default. With a time asked for: confirm it (or, if the diary clashes, offer the nearest free times
+ * as well). With no time: offer free times from the diary, or just ask what suits. `times` are "10:00" style, UK.
+ */
+export function quickReplies(o: { kind: 'time' | 'ask'; first: string; label?: string; part?: string | null; me: string; channel: 'email' | 'whatsapp'; times: string[]; clash: boolean }): QuickReply[] {
+  const wrap = (body: string) => suggestedRaw(o.first, body, o.me, o.channel);
+  if (o.kind === 'time') {
+    const confirm = { label: 'Confirm the time', text: wrap(`thanks. I'd be happy to give you a call ${o.label}. Speak to you then.`) };
+    if (!o.clash) return [confirm];
+    const alt = o.times.length ? { label: `Offer ${listTimesShort(o.times)}`, text: wrap(`thanks, I'd be happy to give you a call. I'm tied up then. Could I call you at ${listTimes(o.times)} instead?`) } : null;
+    const open = { label: 'Ask what suits', text: wrap(`thanks, I'd be happy to give you a call. I'm tied up then. What other time works for you?`) };
+    return [...(alt ? [alt] : []), open, confirm];
+  }
+  const when = o.part ? ` ${o.part}` : '';
+  const offer = o.times.length ? { label: `Offer ${listTimesShort(o.times)}`, text: wrap(`thanks, I'd love to give you a call${when}. Does ${listTimes(o.times)} suit you? If not, just tell me a time that does.`) } : null;
+  const open = { label: 'Ask what time suits', text: wrap(`thanks, I'd love to give you a call${when}. What time works best for you?`) };
+  return [...(offer ? [offer] : []), open];
+}
+
+const listTimes = (t: string[]) => (t.length <= 1 ? (t[0] ?? '') : `${t.slice(0, -1).join(', ')} or ${t[t.length - 1]}`);
+const listTimesShort = (t: string[]) => t.join(' · ');
+
+function suggestedRaw(first: string, body: string, me: string, channel: 'email' | 'whatsapp') {
+  const hi = `Hi ${first || 'there'}`;
+  return channel === 'whatsapp' ? `${hi}, ${body} ${me}`.replace(/\s+/g, ' ').trim() : `${hi},\n\n${body.charAt(0).toUpperCase()}${body.slice(1)}\n\nKind regards,\n${me}\nHeliaxis`;
+}

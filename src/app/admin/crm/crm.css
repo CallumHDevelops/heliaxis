@@ -5226,3 +5226,5 @@ button.crmb-rail {
 .crmr-callreq.has-clash { border-color: var(--danger, #b3261e); background: rgb(var(--danger-rgb) / 0.06); }
 .crmr-callreq p { margin: 0; }
 .crmr-callreq__q { font-size: 0.84rem; color: var(--muted); overflow-wrap: anywhere; }
+.crmr-callreq__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.crmr-callreq textarea { width: 100%; resize: vertical; font-size: 0.92rem; }
