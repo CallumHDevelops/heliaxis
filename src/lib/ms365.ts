@@ -349,7 +349,7 @@ const POLL_KEY = 'ms365-poll';
  * Every minute: new emails in the inbox (customer replies) and in Sent Items (sent from Outlook),
  * matched to customers by email address and saved to their timeline. Returns how many were added.
  */
-export async function pollMailbox(onInbound: (enquiryId: string, name: string, subject: string) => Promise<void>) {
+export async function pollMailbox(onInbound: (enquiryId: string, name: string, subject: string, extra?: { body: string; at: string; messageId: string }) => Promise<void>) {
   if (!msConfigured()) return 0;
   const db = createAdminClient();
   const { data: kv } = await db.from('cms_kv').select('value').eq('key', POLL_KEY).maybeSingle();
@@ -406,7 +406,7 @@ export async function pollMailbox(onInbound: (enquiryId: string, name: string, s
     added++;
     if (direction === 'in') {
       await db.from('crm_projects').update({ sequence_stopped_at: new Date().toISOString() }).eq('enquiry_id', e.id).is('sequence_stopped_at', null);
-      await onInbound(e.id, e.name, m.subject || '(no subject)');
+      await onInbound(e.id, e.name, m.subject || '(no subject)', { body: (m.body?.content || m.bodyPreview || '').slice(0, 6000), at: m.receivedDateTime || new Date().toISOString(), messageId: m.internetMessageId });
     } else {
       const { markContacted } = await import('@/lib/crm/server');
       await markContacted({ enquiryId: e.id });

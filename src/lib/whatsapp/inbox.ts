@@ -4,6 +4,7 @@ import { clearChatNotifications, clearReplyNotifications, notify, type Notificat
 import { chatHref, chatRef, chatTag, replyRef } from '@/lib/notification-refs';
 import { canAccess } from '@/lib/portals';
 import { callBackTask } from './call-back';
+import { suggestCall } from '@/lib/crm/call-suggest';
 import { inboundMediaColumns, storeMediaSoon } from './media';
 import { defaultTemplate, markRead, sendDocument, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
@@ -215,6 +216,9 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
 
   // "Call me today / tomorrow": a call task on their job, so a reply like that is never missed.
   const callBack = kind === 'text' && !word ? await callBackTask(db, { enquiry, body, messageId: m.id, at }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null) : null;
+
+  // "Call me at 12": check the diary and ask whether to add it (the task above already covers "today" and "tomorrow" on their own).
+  if (kind === 'text' && !word && !callBack?.created) await suggestCall({ enquiryId: enquiry.id, name: enquiry.name || '', body, source: `wa:${m.id}`, via: 'whatsapp', receivedAt: at }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null);
 
   const who = enquiry.name || `+${m.from}`;
   const lines = [body.slice(0, 140)];

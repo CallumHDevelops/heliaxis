@@ -23,6 +23,7 @@ import { PhotosTab } from './PhotosTab';
 import { defaultDocsView, DocsHub, type DocsView } from './DocsHub';
 import { ReviewSheet } from './ReviewSheet';
 import { SurveyLinkSheet } from './SurveyLinkSheet';
+import { CallSuggestions } from './CallSuggestions';
 import { EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
@@ -741,6 +742,7 @@ export function ProjectView({
 
         {!done && (
           <div className="crmr-next">
+            <CallSuggestions projectId={id} onChanged={() => void reload()} />
             <NextStepBar
               project={p}
               now={now}
