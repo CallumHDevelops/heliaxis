@@ -44,7 +44,7 @@ export const NOT_INSTALLERS = [
   'greenmatch.co.uk', 'theecoexperts.co.uk', 'greenmatch.com', 'solarguide.co.uk', 'heatable.co.uk', 'nimblefins.co.uk', 'homebuilding.co.uk',
   'octopus.energy', 'britishgas.co.uk', 'eonenergy.com', 'edfenergy.com', 'ovoenergy.com', 'nationalgrid.co.uk', 'citizensadvice.org.uk',
   'google.com', 'amazon.co.uk', 'screwfix.com', 'toolstation.com', 'ebay.co.uk', 'gumtree.com', 'indeed.co.uk', 'companieshouse.gov.uk',
-  'yelp.com', 'yelp.co.uk', 'solarlocator.co.uk',
+  'yelp.com', 'yelp.co.uk', 'solarlocator.co.uk', 'renewableenergyhub.co.uk', 'switchtogether.co.uk', 'solarinfo.uk', 'tradehand.com',
 ];
 
 export const cleanDomain = (d: string) => d.toLowerCase().replace(/^www\./, '').replace(/^m\./, '');

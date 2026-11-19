@@ -5,6 +5,7 @@ import { overview, periodFor } from '@/lib/search/metrics';
 import { BANDS } from '@/lib/search/maths';
 import { openActions } from '@/lib/search/inbox';
 import { budget } from '@/lib/search/server';
+import { isInstaller, isOurs } from '@/lib/seo/rankings';
 import { channelName } from '@/lib/search/reports';
 import { BandBars, Sparkline, WeekLine } from './Charts';
 import { dateLabel, DeltaLine, filtersFrom, n, PageHead, Pos, type SP } from './common';
@@ -33,15 +34,17 @@ export default async function SearchOverview({ searchParams }: { searchParams: S
         'Search Console not connected'
       )}
       <br />
-      {o.freshness.serpRun ? (
+      {o.rankRunDates.now ? (
         <>
-          Rankings run <b>{dateLabel(o.freshness.serpRun, true)}</b>
+          Rankings of <b>{dateLabel(o.rankRunDates.now, true)}</b>
+          {feeds[0].note.startsWith('In progress') ? ` (${feeds[0].note.toLowerCase()})` : ''}
         </>
       ) : (
         'No rankings run yet'
       )}
     </>
   );
+  const win = o.rankRunDates.now ? await winners(db, o.rankRunDates.now, filters.device ?? 'mobile') : null;
   return (
     <>
       <PageHead title={`Overview, ${period.label.toLowerCase()}`} sub={`${dateLabel(period.start)} to ${dateLabel(period.end)}, compared with ${dateLabel(period.compareStart)} to ${dateLabel(period.compareEnd)}.`} fresh={fresh} />
@@ -60,6 +63,66 @@ export default async function SearchOverview({ searchParams }: { searchParams: S
           </article>
         ))}
       </section>
+
+      {win && (
+        <div className="sx-grid2">
+          <section className="sx-card">
+            <h2>Who ranks instead of us</h2>
+            <p>
+              Installers in Google’s top 10 across {win.searches} tracked searches ({dateLabel(o.rankRunDates.now)}). Directories, councils and news sites are left out.
+              {win.oursBest ? ` Our best: position ${win.oursBest.pos} for “${win.oursBest.phrase}”.` : ' We are not in the top 100 for any of them yet.'}
+            </p>
+            <table className="sx-table">
+              <thead>
+                <tr>
+                  <th>Site</th>
+                  <th className="num">Searches in top 10</th>
+                  <th className="num">In top 3</th>
+                  <th className="num">Best</th>
+                </tr>
+              </thead>
+              <tbody>
+                {win.sites.map((s) => (
+                  <tr key={s.domain}>
+                    <td>{s.domain}</td>
+                    <td className="num">{s.top10}</td>
+                    <td className="num">{s.top3}</td>
+                    <td className="num">
+                      <Pos p={s.best} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <Link className="crm-link" href="/admin/search/rankings">
+              Every search, with its full top 100
+            </Link>
+          </section>
+          <section className="sx-card">
+            <h2>Who is in the map pack</h2>
+            <p>The three businesses Google shows under the map, by how many tracked searches they appear in. The map pack weighs distance to the searcher heavily, so it is strongest around each firm’s address.</p>
+            <table className="sx-table">
+              <thead>
+                <tr>
+                  <th>Business</th>
+                  <th className="num">Searches</th>
+                  <th className="num">First</th>
+                </tr>
+              </thead>
+              <tbody>
+                {win.pack.map((p) => (
+                  <tr key={p.name} className={/heliaxis/i.test(p.name) ? 'ours' : undefined}>
+                    <td>{p.name}</td>
+                    <td className="num">{p.n}</td>
+                    <td className="num">{p.first}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!win.pack.some((p) => /heliaxis/i.test(p.name)) && <p>Heliaxis is not in the map pack for any tracked search yet.</p>}
+          </section>
+        </div>
+      )}
 
       <div className="sx-grid2">
         <section className="sx-card">
@@ -186,6 +249,39 @@ export default async function SearchOverview({ searchParams }: { searchParams: S
       </div>
     </>
   );
+}
+
+/** From one run: the installers that hold the top 10, the map-pack businesses, and our best place. */
+async function winners(db: ReturnType<typeof createAdminClient>, date: string, device: 'mobile' | 'desktop') {
+  const [{ data: items }, { data: ours }, { count }] = await Promise.all([
+    db.from('seo_serp_item').select('keyword_id, pos, type, domain, title').eq('date', date).eq('device', device).or('and(type.eq.organic,pos.lte.10),type.eq.local_pack').limit(10000),
+    db.from('seo_serp_result').select('our_pos, seo_keyword(phrase)').eq('date', date).eq('device', device).not('our_pos', 'is', null).order('our_pos').limit(1),
+    db.from('seo_serp_result').select('keyword_id', { count: 'exact', head: true }).eq('date', date).eq('device', device).is('error', null),
+  ]);
+  const sites = new Map<string, { top10: number; top3: number; best: number }>();
+  const pack = new Map<string, { n: number; first: number }>();
+  for (const i of items ?? []) {
+    if (i.type === 'organic' && i.domain && isInstaller(i.domain) && !isOurs(i.domain)) {
+      const s = sites.get(i.domain) ?? { top10: 0, top3: 0, best: 99 };
+      s.top10++;
+      if (i.pos <= 3) s.top3++;
+      s.best = Math.min(s.best, i.pos);
+      sites.set(i.domain, s);
+    } else if (i.type === 'local_pack' && i.title) {
+      const p = pack.get(i.title) ?? { n: 0, first: 0 };
+      p.n++;
+      if (i.pos === 1) p.first++;
+      pack.set(i.title, p);
+    }
+  }
+  const o = ours?.[0] as { our_pos: number; seo_keyword: { phrase: string } | { phrase: string }[] | null } | undefined;
+  const phrase = o ? (Array.isArray(o.seo_keyword) ? o.seo_keyword[0]?.phrase : o.seo_keyword?.phrase) : null;
+  return {
+    searches: count ?? 0,
+    sites: [...sites.entries()].map(([domain, s]) => ({ domain, ...s })).sort((a, b) => b.top10 - a.top10 || b.top3 - a.top3).slice(0, 10),
+    pack: [...pack.entries()].map(([name, p]) => ({ name, ...p })).sort((a, b) => b.n - a.n || b.first - a.first).slice(0, 10),
+    oursBest: o && phrase ? { pos: o.our_pos, phrase } : null,
+  };
 }
 
 async function feedHealth(db: ReturnType<typeof createAdminClient>) {
