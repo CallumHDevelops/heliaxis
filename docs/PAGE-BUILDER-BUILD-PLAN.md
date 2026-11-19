@@ -89,4 +89,5 @@ Owned by the SEO & GEO Command Centre build (its M3 planner and M4 content studi
 | Phase | Status |
 | --- | --- |
 | 1 | Built and tested (19 Nov 2026). Reaches live pages after the next Publish; the quote drawer and old-filler hiding are live without it |
-| 2 to 7 | Not started |
+| 2 | Built and tested (19 Nov 2026): facts sheet (CMS > Facts sheet), validator, Page checks screen, Publish gate with admin override. Not yet checked on a deployed preview |
+| 3 to 7 | Not started |
