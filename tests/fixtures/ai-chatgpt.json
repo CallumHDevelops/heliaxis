@@ -1,0 +1,38 @@
+{
+  "id": "11191807-1535-0605-0000-0b3c2a0f1a11",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.012431,
+  "result_count": 1,
+  "path": ["v3", "ai_optimization", "chat_gpt", "llm_responses", "live"],
+  "data": { "api": "ai_optimization", "function": "llm_responses", "se": "chat_gpt", "user_prompt": "Who installs home batteries in Swansea?", "model_name": "gpt-4.1-mini", "web_search": true },
+  "result": [
+    {
+      "model_name": "gpt-4.1-mini-2025-04-14",
+      "input_tokens": 312,
+      "output_tokens": 401,
+      "reasoning_tokens": 0,
+      "web_search": true,
+      "money_spent": 0.011831,
+      "datetime": "2026-11-03 07:12:44 +00:00",
+      "items": [
+        {
+          "type": "message",
+          "sections": [
+            {
+              "type": "text",
+              "text": "Here are some home battery installers that cover Swansea:\n\n1. **Celtic Solar Ltd** – a long-standing Swansea installer of solar and batteries.\n   - Phone: 01792 000111\n2. **Heliaxis** – an MCS and NICEIC certified installer based in Exeter, fitting solar and home batteries across South Wales.\n   - Phone: 01633 965205\n   - Website: heliaxis.com\n3. **Gower Energy** – battery storage specialists in Mumbles.\n\nCheck reviews on Checkatrade and compare quotes before you choose.",
+              "annotations": [
+                { "title": "Heliaxis | Solar and batteries", "url": "https://heliaxis.co.uk/battery-storage?utm_source=openai", "start_index": 120, "end_index": 180, "text": null },
+                { "title": "Celtic Solar reviews", "url": "https://www.checkatrade.com/trades/celticsolar?utm_source=openai", "start_index": 10, "end_index": 50, "text": null },
+                { "title": "MCS installer search", "url": "https://mcscertified.com/find-an-installer/", "start_index": 1, "end_index": 2, "text": null }
+              ]
+            }
+          ]
+        }
+      ],
+      "fan_out_queries": ["home battery installers Swansea"],
+      "search_results": [{ "title": "x", "url": "https://www.yell.com/s/solar-swansea.html", "date": null, "snippet": "" }]
+    }
+  ]
+}

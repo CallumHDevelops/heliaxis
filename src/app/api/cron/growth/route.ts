@@ -16,6 +16,6 @@ function authorized(req: Request) {
  */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const out = await runSearchJobs({ until: Date.now() + 240_000 });
+  const out = await runSearchJobs({ until: Date.now() + 270_000 });
   return NextResponse.json({ ok: true, ...out });
 }

@@ -97,12 +97,14 @@ export async function overview(opts: { period?: Period; filters?: Filters } = {}
   const firstWeek = addDays(weekOf(period.end).start, -25 * 7);
   for (let w = firstWeek; w <= period.end; w = addDays(w, 7)) weeks.push(w);
 
+  // Back far enough for the 26-week charts and for the comparison period (a year ago when comparing with last year).
+  const from = [addDays(weeks[0], -7), period.compareStart].sort()[0];
   const [areas, kwRes, gscRes, resRes, enqRes, lastRun] = await Promise.all([
     getSetting('areas', db),
     db.from('seo_keyword').select('id, phrase, town, service, intent, priority, volume').eq('active', true),
-    db.from('gsc_daily').select('date, clicks, impressions, position').gte('date', weeks[0]).lte('date', addDays(weeks[weeks.length - 1], 6)).limit(200000),
-    db.from('seo_serp_result').select('keyword_id, date, our_pos, our_pack_pos, aio_present, aio_cited, error').eq('device', device).gte('date', addDays(weeks[0], -7)).lte('date', period.end).limit(50000),
-    db.from('enquiries').select('created_at, channel, source').gte('created_at', ukStart(addDays(weeks[0], -7))).lte('created_at', ukStart(addDays(period.end, 1))).limit(20000),
+    db.from('gsc_daily').select('date, clicks, impressions, position').gte('date', from).lte('date', addDays(weeks[weeks.length - 1], 6)).limit(200000),
+    db.from('seo_serp_result').select('keyword_id, date, our_pos, our_pack_pos, aio_present, aio_cited, error').eq('device', device).gte('date', from).lte('date', period.end).limit(50000),
+    db.from('enquiries').select('created_at, channel, source').gte('created_at', ukStart(from)).lte('created_at', ukStart(addDays(period.end, 1))).limit(20000),
     db.from('seo_serp_run').select('run_date, finished_at').eq('status', 'done').neq('kind', 'live').order('finished_at', { ascending: false }).limit(1),
   ]);
 

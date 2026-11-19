@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { keepStudioPages } from '@/lib/cms-studio-merge';
 
 // Never cache CMS reads/writes — the editor must always see the latest saved doc.
 export const dynamic = 'force-dynamic';
@@ -43,9 +44,12 @@ export async function POST(req: NextRequest) {
   if (!EDITOR_KEYS.includes(key)) return badKey();
 
   const admin = createAdminClient();
+  // A tab opened before Search published a page doesn't have it: keep the server's studio pages it lacks.
+  const { data: current } = await admin.from('cms_kv').select('value').eq('key', key).maybeSingle();
+  const merged = keepStudioPages(value, current?.value as string | null | undefined).value;
   const { error } = await admin
     .from('cms_kv')
-    .upsert({ key, value, updated_at: new Date().toISOString() });
+    .upsert({ key, value: merged, updated_at: new Date().toISOString() });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

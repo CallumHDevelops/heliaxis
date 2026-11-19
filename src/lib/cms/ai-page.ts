@@ -412,6 +412,8 @@ function mergeAdjacentRich(blocks: CmsBlock[]): CmsBlock[] {
 export async function generatePage(
   prompt: string,
   context?: string,
+  /** usageRef: saved as ai_usage.ref on every model call, so a caller can sum this run's own cost. */
+  opts: { usageRef?: string } = {},
 ): Promise<{
   blocks: CmsBlock[];
   seo: PageSeo;
@@ -478,7 +480,7 @@ export async function generatePage(
 
     if (res.ok) {
       const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-      await recordChatUsage('cms_page', model, data.usage);
+      await recordChatUsage('cms_page', model, data.usage, opts.usageRef);
       content = data.choices?.[0]?.message?.content;
       usedModel = model;
       if (content) break;

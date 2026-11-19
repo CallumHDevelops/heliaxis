@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { keepRenderedPages, keepStudioPages } from '@/lib/cms-studio-merge';
 
 const DRAFT_KEY = 'heliaxis-cms-v1';
 const PUBLISHED_KEY = 'heliaxis-cms-published';
@@ -30,6 +31,16 @@ export async function POST(req: Request) {
     if (data?.value) snapshot = String(data.value);
   }
 
+  // A tab opened before Search published a page doesn't have it: keep the server's studio pages (and their rendered
+  // HTML) that the browser's state lacks, so this publish can't take them down.
+  let keptSlugs: string[] = [];
+  if (snapshot) {
+    const { data: current } = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
+    const merged = keepStudioPages(snapshot, current?.value as string | null | undefined);
+    snapshot = merged.value;
+    keptSlugs = merged.kept;
+  }
+
   if (snapshot) {
     // Keep draft + published in sync with what the admin just published.
     await admin.from('cms_kv').upsert({ key: DRAFT_KEY, value: snapshot, updated_at: now });
@@ -37,9 +48,14 @@ export async function POST(req: Request) {
   }
 
   if (body?.rendered) {
+    let rendered: unknown = body.rendered;
+    if (keptSlugs.length) {
+      const { data: ren } = await admin.from('cms_kv').select('value').eq('key', RENDERED_KEY).maybeSingle();
+      rendered = keepRenderedPages(rendered, ren?.value as string | null | undefined, keptSlugs);
+    }
     await admin
       .from('cms_kv')
-      .upsert({ key: RENDERED_KEY, value: JSON.stringify(body.rendered), updated_at: now });
+      .upsert({ key: RENDERED_KEY, value: JSON.stringify(rendered), updated_at: now });
   }
 
   // Invalidate public header (menu) + pages.

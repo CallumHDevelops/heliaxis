@@ -269,3 +269,6 @@ begin
     execute format('create policy "admins read" on public.%I for select using (public.is_admin(auth.uid()))', t);
   end loop;
 end $$;
+
+-- One AI-answer step at a time per run (the dispatcher and the "step now" button).
+alter table public.ai_run add column if not exists locked_at timestamptz;

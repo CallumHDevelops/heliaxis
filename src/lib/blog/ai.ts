@@ -72,13 +72,14 @@ function blogDraftDefaults(): Record<string, unknown> {
 
 /** Provider-agnostic (OpenRouter). Strong model with an availability fallback chain,
  *  low-credit (402) adaptive retry, and shape-tolerant parsing — mirrors the page builder. */
-export async function generateBlogPost(prompt: string, opts: { keyword?: string; audience?: string } = {}): Promise<GeneratedPost> {
+/** opts.usageRef: saved as ai_usage.ref on every model call, so a caller can sum this run's own cost. */
+export async function generateBlogPost(prompt: string, opts: { keyword?: string; audience?: string; usageRef?: string } = {}): Promise<GeneratedPost> {
   const { apiKey, baseUrl } = aiConfig();
   const claudeKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey && !claudeKey) throw new Error('AI is not configured. Set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY).');
 
   const topic = String(prompt || '').trim().slice(0, 6000);
-  const userMessage = blogUserMessage({ prompt: topic, ...opts });
+  const userMessage = blogUserMessage({ prompt: topic, keyword: opts.keyword, audience: opts.audience });
 
   const primary = blogModel();
   const candidates = [primary];
@@ -129,7 +130,7 @@ export async function generateBlogPost(prompt: string, opts: { keyword?: string;
           },
         ],
       });
-      await recordAi('blog', res.model, res.usage);
+      await recordAi('blog', res.model, res.usage, opts.usageRef);
       const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('');
       return text ? { text, finish: res.stop_reason === 'max_tokens' ? 'length' : 'stop' } : { err: 'empty response' };
     } catch (e) {
@@ -159,7 +160,7 @@ export async function generateBlogPost(prompt: string, opts: { keyword?: string;
     }
     if (res.ok) {
       const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
-      await recordChatUsage('blog', model, data.usage);
+      await recordChatUsage('blog', model, data.usage, opts.usageRef);
       const text = data.choices?.[0]?.message?.content;
       return text ? { text, finish: data.choices?.[0]?.finish_reason } : { err: 'empty response' };
     }

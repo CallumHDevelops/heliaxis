@@ -88,6 +88,10 @@ export const SETTINGS = {
   content: z.object({
     weeklyNewPages: z.number().int().min(0).default(3),
     originalityMaxOverlap: z.number().min(0).max(1).default(0.3),
+    /** Proof items a page must have before drafting (the studio adds its own defaults). */
+    requiredProof: z.array(z.string()).default([]),
+    /** Who may approve pages besides admins and the owner (profile ids). */
+    approvers: z.array(z.string()).default([]),
     bannedClaims: z.array(z.string()).default(['NICEIC', 'TrustMark', 'Which? Trusted Trader', 'award-winning', 'number one', '#1']),
   }),
   alerts: z.object({

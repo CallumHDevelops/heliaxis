@@ -1,0 +1,32 @@
+{
+  "id": "11191807-1535-0605-0000-0b3c2a0f1a22",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.0041,
+  "result": [
+    {
+      "model_name": "gemini-2.5-flash",
+      "web_search": true,
+      "money_spent": 0.0035,
+      "items": [
+        {
+          "type": "reasoning",
+          "sections": [{ "type": "summary_text", "text": "Thinking about installers near Newport." }]
+        },
+        {
+          "type": "message",
+          "sections": [
+            {
+              "type": "text",
+              "text": "Several companies install solar panels in Newport, including Green Valley Renewables and Celtic Solar Ltd. Prices vary, so get three quotes.",
+              "annotations": [
+                { "title": "Green Valley", "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AbC123", "direct_url": "https://greenvalleyrenewables.co.uk/", "start_index": 0, "end_index": 40, "text": "Several companies" },
+                { "title": "Which?", "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/Def456", "direct_url": "https://www.which.co.uk/reviews/solar-panels", "start_index": 0, "end_index": 40, "text": "Prices vary" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

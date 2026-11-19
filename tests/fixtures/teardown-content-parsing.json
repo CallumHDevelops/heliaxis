@@ -1,0 +1,51 @@
+{
+  "id": "11191200-1535-0216-0000-aa11bb22cc33",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.000125,
+  "result": [
+    {
+      "crawl_progress": "finished",
+      "items_count": 1,
+      "items": [
+        {
+          "type": "content_parsing_element",
+          "fetch_time": "2026-11-18 07:10:00 +00:00",
+          "status_code": 200,
+          "page_content": {
+            "header": {
+              "primary_content": [
+                { "text": "Home", "url": "https://www.rivalsolar.co.uk/" },
+                { "text": "Areas", "urls": [ { "url": "https://www.rivalsolar.co.uk/solar-panels-newport/", "anchor_text": "Newport" }, { "url": "https://www.rivalsolar.co.uk/solar-panels-bridgend/", "anchor_text": "Bridgend" } ] }
+              ]
+            },
+            "main_topic": [
+              {
+                "h_title": "Solar Panel Installers in Cardiff",
+                "main_title": "Solar Panel Installers in Cardiff",
+                "author": "Jane Davies",
+                "language": "en",
+                "level": 1,
+                "primary_content": [
+                  { "text": "We install solar panels across Cardiff, Penarth and Barry. A typical 4 kW system costs from £5,995 fitted." },
+                  { "text": "Rated 4.9 out of 5 from 212 Google reviews." }
+                ]
+              },
+              {
+                "h_title": "How much do solar panels cost in Cardiff?",
+                "level": 2,
+                "primary_content": [ { "text": "Prices in Cardiff depend on the roof. See our Swansea page too.", "urls": [ { "url": "https://www.rivalsolar.co.uk/solar-panels-swansea/" }, { "url": "https://www.rivalsolar.co.uk/solar-panels-cardiff/" } ] } ]
+              }
+            ],
+            "secondary_topic": [
+              { "h_title": "Is solar worth it in Wales?", "level": 3, "primary_content": [ { "text": "Yes, for most south-facing roofs in Cardiff." } ] }
+            ],
+            "ratings": [ { "name": "Rival Solar", "rating_value": 4.9, "max_rating_value": 5, "rating_count": 212 } ],
+            "offers": [],
+            "comments": []
+          }
+        }
+      ]
+    }
+  ]
+}

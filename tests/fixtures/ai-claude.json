@@ -1,0 +1,15 @@
+[
+  { "type": "server_tool_use", "id": "srvtoolu_1", "name": "web_search", "input": { "query": "solar panel installers Cardiff" } },
+  {
+    "type": "web_search_tool_result",
+    "tool_use_id": "srvtoolu_1",
+    "content": [
+      { "type": "web_search_result", "url": "https://www.trustatrader.com/solar-cardiff", "title": "Solar installers in Cardiff" },
+      { "type": "web_search_result", "url": "https://www.celticsolar.co.uk/", "title": "Celtic Solar" }
+    ]
+  },
+  { "type": "text", "text": "Based on what I found, well-reviewed solar installers in Cardiff include:\n\n" },
+  { "type": "text", "text": "- **Celtic Solar Ltd**, Swansea-based, covering Cardiff\n", "citations": [{ "type": "web_search_result_location", "url": "https://www.celticsolar.co.uk/", "title": "Celtic Solar", "cited_text": "..." }] },
+  { "type": "text", "text": "- **Green Valley Renewables**, listed on TrustATrader\n", "citations": [{ "type": "web_search_result_location", "url": "https://www.trustatrader.com/solar-cardiff", "title": "x", "cited_text": "..." }] },
+  { "type": "text", "text": "\nI could not confirm any others." }
+]

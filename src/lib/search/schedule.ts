@@ -42,6 +42,24 @@ export function plannedJobs(now = new Date()): Planned[] {
   if (c.dow === 3 && at(7)) out.push({ kind: 'weekly_report', dedupeKey: `weekly_report:final:${c.date}`, payload: { status: 'final' } });
   // Monthly Growth Report, first Tuesday 08:00.
   if (firstTuesday(c) && at(8)) out.push({ kind: 'monthly_report', dedupeKey: `monthly_report:${c.month}`, payload: {} });
+
+  // ── Phases 2 to 4 ──
+  // M7: health checks after the Monday audit; the key pages through URL Inspection daily.
+  if (c.dow === 1 && at(5, 30)) out.push({ kind: 'health_checks', dedupeKey: `health_checks:${c.date}`, payload: {} });
+  if (at(6, 15)) out.push({ kind: 'index_checks', dedupeKey: `index_checks:${c.date}`, payload: {} });
+  // M5: Business Profile metrics daily 05:30; the map grid on the 2nd.
+  if (at(5, 30)) out.push({ kind: 'gbp_import', dedupeKey: `gbp_import:${c.date}`, payload: {} });
+  if (c.dom === 2 && at(2)) out.push({ kind: 'grid_start', dedupeKey: `grid_start:${c.month}`, payload: {} });
+  // M2: teardown write-ups Monday 07:00 (page facts are queued when each phone run closes), business profiles 07:30.
+  if (c.dow === 1 && at(7)) out.push({ kind: 'teardowns', dedupeKey: `teardowns:${c.date}`, payload: {} });
+  if (c.dow === 1 && at(7, 30)) out.push({ kind: 'business_profiles', dedupeKey: `business_profiles:${c.date}`, payload: {} });
+  // M3: opportunity scoring Monday 08:00; keyword research on the 1st, after the desktop run is posted.
+  if (c.dow === 1 && at(8)) out.push({ kind: 'opportunity_scoring', dedupeKey: `opportunity_scoring:${c.date}`, payload: {} });
+  if (c.dom === 1 && at(2)) out.push({ kind: 'keyword_research', dedupeKey: `keyword_research:${c.month}`, payload: {} });
+  // M4: content measures daily (pages at day 14, 28, 56 and 90).
+  if (at(9)) out.push({ kind: 'content_measures', dedupeKey: `content_measures:${c.date}`, payload: {} });
+  // M6: AI-answer sampling on the 3rd.
+  if (c.dom === 3 && at(3)) out.push({ kind: 'ai_sample_start', dedupeKey: `ai:${c.month}`, payload: {} });
   return out;
 }
 

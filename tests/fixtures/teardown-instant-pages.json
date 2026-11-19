@@ -1,0 +1,36 @@
+{
+  "id": "11191200-1535-0216-0000-1a2b3c4d5e6f",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.000125,
+  "result": [
+    {
+      "crawl_progress": "finished",
+      "crawl_status": { "max_crawl_pages": 1, "pages_in_queue": 0, "pages_crawled": 1 },
+      "items_count": 1,
+      "items": [
+        {
+          "resource_type": "html",
+          "status_code": 200,
+          "location": null,
+          "url": "https://www.rivalsolar.co.uk/solar-panels-cardiff/",
+          "meta": {
+            "title": "Solar Panel Installers in Cardiff | Rival Solar",
+            "description": "MCS certified solar panel installers covering Cardiff and the Vale.",
+            "htags": {
+              "h1": ["Solar Panel Installers in Cardiff"],
+              "h2": ["Why choose an MCS certified installer?", "How much do solar panels cost in Cardiff?", "Our recent installs", "What our customers say"],
+              "h3": ["Battery storage", "Do I need planning permission?"]
+            },
+            "internal_links_count": 48,
+            "external_links_count": 6,
+            "images_count": 14,
+            "content": { "plain_text_size": 9120, "plain_text_rate": 0.12, "plain_text_word_count": 1462 }
+          },
+          "last_modified": { "header": "Tue, 04 Nov 2026 09:12:00 GMT", "sitemap": null, "meta_tag": null },
+          "checks": { "has_micromarkup": true, "no_h1_tag": false }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+/* Search › Plan (M3 opportunity planner). Prefix: pl- */
+.pl-formula { font-weight: 700; font-size: 1rem; background: #fff8e1; border-left: 4px solid #f8bc1e; padding: 8px 12px; border-radius: 6px; margin: 4px 0 8px; }
+.pl-defs { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 4px; font-size: 0.86rem; }
+.pl-details > summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #5b5546; margin-top: 4px; }
+.pl-details[open] > summary { margin-bottom: 6px; }
+.pl-seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.pl-table td { vertical-align: top; }
+.pl-page { min-width: 260px; max-width: 420px; }
+.pl-page > small, .pl-block { display: block; font-size: 0.76rem; color: #6b6555; }
+.pl-reason { color: #8a5a00 !important; margin-top: 2px; }
+.pl-hold td { background: #fffaf0; }
+.pl-act-hold { background: #f3e2c0; }
+.pl-act-create { background: #e6efe6; }
+.pl-kws { margin: 0; padding-left: 16px; display: grid; gap: 2px; font-size: 0.8rem; }
+.pl-kws small { color: #6b6555; }
+.pl-controls { display: grid; gap: 4px; min-width: 170px; }
+.pl-controls input, .pl-sd select, .pl-sd input { font-size: 0.8rem; padding: 3px 6px; width: 100%; }
+.pl-sd { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.pl-nowrap { flex-wrap: nowrap; }
+.pl-ok { color: #2e6b34; }
+.pl-err { color: #a33a1c; }
+.pl-weights { display: grid; gap: 10px; margin-top: 6px; }
+.pl-weights__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.pl-weights__grid label { display: grid; gap: 3px; font-size: 0.8rem; font-weight: 600; }
+.pl-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pl-quad { border: 1px solid #e6dfcc; border-radius: 10px; padding: 10px 12px; background: #fffdf8; }
+.pl-quad h3 { margin: 0 0 2px; font-size: 0.95rem; }
+.pl-quad ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.84rem; }
+.pl-quad li { display: grid; }
+.pl-quad li small { color: #6b6555; font-size: 0.74rem; }
+.pl-quad--quick_win { border-color: #f8bc1e; background: #fff8e1; }
+@media (max-width: 700px) {
+  .pl-matrix { grid-template-columns: 1fr; }
+}

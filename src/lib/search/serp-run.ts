@@ -256,6 +256,8 @@ export async function finishIfComplete(runId: number, db: Db = createAdminClient
     await raiseRankAlerts(run.run_date as string, db).catch((e) => console.error('SEO rank alerts failed', e));
     // The old dashboard's competitor write-up (replaced by the M2 teardown in phase 2).
     await db.from('seo_job').upsert({ kind: 'competitors', dedupe_key: `competitors:${run.run_date}`, payload: { runId } }, { onConflict: 'dedupe_key', ignoreDuplicates: true });
+    // M2: read the pages in this run's top 10s (cached 30 days), in steps over the next few ticks.
+    await db.from('seo_job').upsert({ kind: 'page_facts', dedupe_key: `page_facts:${run.run_date}`, payload: { runId } }, { onConflict: 'dedupe_key', ignoreDuplicates: true });
   }
   await clearAction('budget', `run:${runId}`, db);
   return true;

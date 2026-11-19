@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { findCmsPage, getCmsRendered } from '@/lib/cms-rendered';
 import { CmsFormRuntime } from '@/components/cms/CmsFormRuntime';
 import { withoutBrand } from '@/lib/seo/title';
+import { jsonLdScript } from '@/lib/seo/json-ld';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,9 +38,13 @@ export default async function CmsCatchAllPage({
   const rendered = await getCmsRendered();
   const page = findCmsPage(rendered, pathFromSlug(slug));
   if (!rendered || !page) notFound();
+  // Structured data a Search content-studio page was published with (validated before publishing): stored as JSON text,
+  // or an object on older pages. "<" is escaped inside jsonLdScript.
+  const ldJson = jsonLdScript((page.seo as { jsonLd?: unknown } | undefined)?.jsonLd);
 
   return (
     <>
+      {ldJson && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldJson }} />}
       <style dangerouslySetInnerHTML={{ __html: rendered.css + LIVE_FIXES_CSS }} />
       <CmsBody html={page.html} className={'pv-live' + (page.theme === 'dark' ? ' dk' : '')} />
       <CmsFormRuntime />

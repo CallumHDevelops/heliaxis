@@ -63,6 +63,11 @@ async function gsc<T>(path: string, body?: unknown): Promise<T> {
   return j;
 }
 
+/** Any Search Console API call with the service account's token (M7: URL Inspection and Sitemaps). */
+export async function gscFetch<T>(path: string, body?: unknown): Promise<T> {
+  return gsc<T>(path, body);
+}
+
 /** Can HAP read the property? (For the setup checklist.) */
 export async function gscStatus(): Promise<{ ok: boolean; message: string }> {
   if (!gscConfigured()) return { ok: false, message: 'Not connected: add the service account key.' };

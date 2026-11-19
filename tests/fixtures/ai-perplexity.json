@@ -1,0 +1,29 @@
+{
+  "id": "11191807-1535-0605-0000-0b3c2a0f1a33",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.0066,
+  "result": [
+    {
+      "model_name": "sonar",
+      "web_search": true,
+      "money_spent": 0.006,
+      "items": [
+        {
+          "type": "message",
+          "sections": [
+            {
+              "type": "text",
+              "text": "Solar is usually worth it in Wales for a south-facing roof [1][2]. Local installers such as Heliaxis (https://heliaxis.co.uk/solar-panels) are MCS certified, which you need for the Smart Export Guarantee [3].",
+              "annotations": [
+                { "title": "Energy Saving Trust", "url": "https://energysavingtrust.org.uk/advice/solar-panels/", "start_index": null, "end_index": null, "text": null },
+                { "title": "MCS", "url": "https://mcscertified.com/", "start_index": null, "end_index": null, "text": null },
+                { "title": "Heliaxis", "url": "https://heliaxis.co.uk/solar-panels", "start_index": null, "end_index": null, "text": null }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

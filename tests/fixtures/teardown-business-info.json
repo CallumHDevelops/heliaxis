@@ -1,0 +1,33 @@
+{
+  "id": "11191230-1535-0243-0000-0f0e0d0c0b0a",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.0054,
+  "result": [
+    {
+      "keyword": "Rival Solar Ltd Cardiff",
+      "location_code": 1006524,
+      "items_count": 1,
+      "items": [
+        {
+          "type": "google_business_info",
+          "title": "Rival Solar Ltd",
+          "category": "Solar energy contractor",
+          "additional_categories": ["Electrician", "Solar energy equipment supplier"],
+          "cid": "1941234567890123456",
+          "feature_id": "0x486e1c:0x1b0c",
+          "place_id": "ChIJ1234567890abcdef",
+          "address": "Unit 4, Penarth Road, Cardiff CF11 8TW",
+          "phone": "+44 29 2000 0000",
+          "url": "https://www.rivalsolar.co.uk/",
+          "domain": "www.rivalsolar.co.uk",
+          "total_photos": 87,
+          "latitude": 51.4612,
+          "longitude": -3.1876,
+          "is_claimed": true,
+          "rating": { "rating_type": "Max5", "value": 4.9, "votes_count": 212, "rating_max": null }
+        }
+      ]
+    }
+  ]
+}

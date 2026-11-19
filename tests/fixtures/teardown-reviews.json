@@ -1,0 +1,23 @@
+{
+  "id": "11191231-1535-0251-0000-aabbccddeeff",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.00375,
+  "result": [
+    {
+      "keyword": "cid:1941234567890123456",
+      "cid": "1941234567890123456",
+      "title": "Rival Solar Ltd",
+      "rating": { "rating_type": "Max5", "value": 4.9, "votes_count": 212 },
+      "reviews_count": 212,
+      "items_count": 5,
+      "items": [
+        { "type": "google_reviews_search", "rank_group": 1, "timestamp": "2026-11-15 10:00:00 +00:00", "rating": { "value": 5 }, "review_text": "Great job.", "owner_answer": "Thank you!" },
+        { "type": "google_reviews_search", "rank_group": 2, "timestamp": "2026-10-20 12:30:00 +00:00", "rating": { "value": 5 }, "review_text": "Tidy install.", "owner_answer": null },
+        { "type": "google_reviews_search", "rank_group": 3, "timestamp": "2026-09-01 08:00:00 +00:00", "rating": { "value": 4 }, "review_text": "Good.", "owner_answer": "Thanks." },
+        { "type": "google_reviews_search", "rank_group": 4, "timestamp": "2026-07-01 08:00:00 +00:00", "rating": { "value": 5 }, "review_text": "Fine.", "owner_answer": null },
+        { "type": "google_reviews_search", "rank_group": 5, "timestamp": "2026-03-10 08:00:00 +00:00", "rating": { "value": 5 }, "review_text": "Ok.", "owner_answer": null }
+      ]
+    }
+  ]
+}

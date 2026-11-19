@@ -1,0 +1,1 @@
+{ "id": "lh-1", "status_code": 20000, "status_message": "Ok.", "result": [ { "lighthouseVersion": "12.0.0", "requestedUrl": "https://www.rivalsolar.co.uk/solar-panels-cardiff/", "categories": { "performance": { "id": "performance", "title": "Performance", "score": 0.67 } } } ] }
