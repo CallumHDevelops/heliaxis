@@ -94,6 +94,17 @@ export async function startSerpRun(opts: { device?: Device; kind?: 'weekly' | 'm
   if (!kws.length) throw new Error('No searches to check: the keyword list is empty.');
   await checkCap(kws.length * serpTaskCost(100), { override: opts.override }, db);
 
+  // One run at a time: a second press while results are still arriving would pay twice for the same searches.
+  const { data: busy } = await db
+    .from('seo_serp_run')
+    .select('id, started_at, tasks, tasks_done')
+    .eq('device', device)
+    .in('status', ['posting', 'waiting'])
+    .neq('kind', 'live')
+    .gte('started_at', new Date(Date.now() - 4 * 3_600_000).toISOString())
+    .limit(1);
+  if (busy?.length) throw new Error(`A rankings run is already in progress (${busy[0].tasks_done} of ${busy[0].tasks} results in). Its results arrive over the next few minutes.`);
+
   const { data: run, error } = await db
     .from('seo_serp_run')
     .insert({ kind: opts.kind ?? 'weekly', device, run_date: ukDay(), status: 'posting', tasks: kws.length, started_by: opts.by ?? 'schedule' })
