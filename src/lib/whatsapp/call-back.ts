@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logActivity } from '@/lib/crm/server';
 import { notify } from '@/lib/notify';
+import { defaultOwnerId } from '@/lib/crm/default-owner';
 import { callBackWhen, dueDay, taskTitle, type CallBackWhen } from './call-back-shared';
 
 type Db = ReturnType<typeof createAdminClient>;
@@ -22,6 +23,8 @@ export async function callBackTask(
     // Their job: the newest one still open (a lost or finished one isn't where a call back belongs), else the newest.
     const { data: jobs } = await db.from('crm_projects').select('id, title, stage, owner_id, created_at').eq('enquiry_id', x.enquiry.id).order('created_at', { ascending: false }).limit(20);
     const job = (jobs ?? []).find((j) => j.stage !== 'complete' && j.stage !== 'lost') ?? (jobs ?? [])[0] ?? null;
+    // The job's owner, else the person whose diary it is: a task nobody owns would never remind anyone.
+    const owner = ((job?.owner_id as string | null) ?? null) || (await defaultOwnerId(db));
     const due = dueDay(when, new Date(x.at));
     const title = taskTitle(x.enquiry.name, when);
     const { data: task, error } = await db
@@ -29,7 +32,7 @@ export async function callBackTask(
       .insert({
         title,
         notes: `They answered “${x.body.trim().slice(0, 60)}” on WhatsApp.`,
-        assignee_id: (job?.owner_id as string | null) ?? null,
+        assignee_id: owner,
         due_date: due,
         // "Tomorrow": first thing, so it reminds and lands in their calendar. "Today" stays all day (there's no knowing when).
         due_time: when === 'tomorrow' ? '09:00' : null,
@@ -46,7 +49,7 @@ export async function callBackTask(
     if (job) await logActivity({ enquiryId: x.enquiry.id, projectId: job.id as string, kind: 'system', body: `They asked for a call ${when}: task added (${title})` }).catch(() => null);
     const heading = `Call ${when}: ${x.enquiry.name || 'a customer'}`;
     const text = `They asked for a call ${when}. A task is on their job for ${when === 'today' ? 'today' : 'tomorrow'}.`;
-    if (job?.owner_id) await notify({ userId: job.owner_id as string, kind: 'task_assigned', title: heading, body: text, href });
+    if (owner) await notify({ userId: owner, kind: 'task_assigned', title: heading, body: text, href });
     else await tellTeam(heading, text, href);
     return { created: true, when };
   } catch {

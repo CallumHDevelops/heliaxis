@@ -6,6 +6,7 @@ import { siteUrl } from '@/lib/crm/server';
 import { notify } from '@/lib/notify';
 import { CalendarNotFound, createCalendarEvent, deleteCalendarEvent, mailbox as msMailbox, msConfigured, updateCalendarEvent, type CalWrite } from '@/lib/ms365';
 import { remindMinutes } from '@/lib/tasks';
+import { defaultOwnerId } from '@/lib/crm/default-owner';
 
 /**
  * Tasks with a time: reminders 30 and 15 minutes before (a push to the person), and a copy in their Outlook calendar, so it pops up on
@@ -96,7 +97,9 @@ export async function remindTimedTasks(now = new Date()): Promise<number> {
 type Db = ReturnType<typeof createAdminClient>;
 /** The assignee, or else whoever made it, if they're approved. */
 async function personFor(db: Db, t: Pick<Row, 'assignee_id' | 'created_by'>): Promise<string | null> {
-  for (const id of [t.assignee_id, t.created_by]) {
+  // Nobody's task (no assignee, no maker): it goes to whoever's diary it is, so a reminder is never lost.
+  const fallback = !t.assignee_id && !t.created_by ? await defaultOwnerId(db) : null;
+  for (const id of [t.assignee_id, t.created_by, fallback]) {
     if (!id) continue;
     const { data } = await db.from('profiles').select('id').eq('id', id).eq('status', 'approved').maybeSingle();
     if (data) return id;
@@ -112,7 +115,8 @@ const hash = (x: unknown) => createHash('sha256').update(JSON.stringify(x)).dige
 async function mailboxFor(db: Db, t: Pick<Row, 'assignee_id' | 'created_by'>): Promise<string | null> {
   const domain = msMailbox().split('@')[1]?.toLowerCase();
   if (!domain) return null;
-  for (const id of [t.assignee_id, t.created_by]) {
+  const fallback = !t.assignee_id && !t.created_by ? await defaultOwnerId(db) : null;
+  for (const id of [t.assignee_id, t.created_by, fallback]) {
     if (!id) continue;
     const { data } = await db.from('profiles').select('email').eq('id', id).eq('status', 'approved').maybeSingle();
     const email = String(data?.email ?? '').trim().toLowerCase();
