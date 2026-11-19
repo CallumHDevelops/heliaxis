@@ -30,7 +30,7 @@ Each phase ends with a gate: something that can be checked, not a feeling. A pha
 No new data model, no AI cost. Fixes what is visibly broken and what could mislead.
 
 1. **Steps filler becomes a call-to-action tile** (both renderers, CSS). Four or eight steps still look best, but any other count no longer shows hatched boxes.
-2. **Hero never invents trust.** Rating and installs cells need real values; the upgrade step no longer writes 4.9 / 1200 and clears the old ones. New fields: rating source, installs label.
+2. **Hero never invents trust.** Rating and installs cells need real values; the upgrade step no longer writes 4.9 / 1200 and clears the old ones. It uses the data's own fields: `ratingPlatform` (the source) and `ratingInstallsLabel`.
 3. **Split buttons.** The right-hand button defaults to `#quote` (not `/commercial-funding`); the home page keeps its funding link explicitly. The editor warns when both buttons read the same.
 4. **Area and sample defaults.** One `SERVICE_AREA` constant replaces "South Wales" in templates, footer text and sample copy; fabricated counts ("Join 1,200+ South Wales homes") are removed. Old default strings are upgraded only where they match exactly.
 5. **Quote drawer.** Any page with `#quote` buttons and no form gets a drawer with the real quote form; without JavaScript the button still goes to the quote page.

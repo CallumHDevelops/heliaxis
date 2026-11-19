@@ -40,8 +40,8 @@ describe('hero rating row', () => {
 
   it('needs the value and where it comes from together', () => {
     expect(hero({ ratingValue: '4.8' })).not.toContain('class="rating"');
-    expect(hero({ ratingSource: 'Google' })).not.toContain('class="rating"');
-    const h = hero({ ratingValue: '4.8', ratingSource: 'Google reviews' });
+    expect(hero({ ratingPlatform: 'Google' })).not.toContain('class="rating"');
+    const h = hero({ ratingValue: '4.8', ratingPlatform: 'Google reviews' });
     expect(h).toContain('class="rating"');
     expect(h).toContain('4.8');
     expect(h).toContain('Google reviews');
@@ -56,7 +56,7 @@ describe('hero rating row', () => {
   });
 
   it('can be hidden', () => {
-    expect(hero({ ratingValue: '4.8', ratingSource: 'Google', hideRating: true })).not.toContain('class="rating"');
+    expect(hero({ ratingValue: '4.8', ratingPlatform: 'Google', hideRating: true })).not.toContain('class="rating"');
   });
 });
 
@@ -86,7 +86,7 @@ describe('the browser engine (source guard)', () => {
   const tsRenderer = readFileSync('src/lib/cms-render-html.ts', 'utf8');
 
   it('no longer invents a rating, an install count or a place for the hero', () => {
-    for (const bad of ["p.ratingValue||'4.9'", "p.ratingInstalls||'1200'", 'installs across South Wales', 'Google &amp; Trustpilot', 'Join 1,200+', "ratingValue='4.9';changed", "ratingInstalls='1200';changed"]) {
+    for (const bad of ["p.ratingValue||'4.9'", "p.ratingInstalls||'1200'", 'Google &amp; Trustpilot', 'Join 1,200+', "ratingValue='4.9';changed", "ratingInstalls='1200';changed"]) {
       expect(engine.includes(bad), `engine still has: ${bad}`).toBe(false);
     }
     for (const bad of ["p.ratingValue || '4.9'", "p.ratingInstalls || '1200'", 'installs across South Wales', 'Google &amp; Trustpilot']) {
@@ -114,7 +114,7 @@ describe('the browser engine (source guard)', () => {
     expect(engine).toContain('function ensureSplitLinks()');
     expect(engine).toContain("bl.p.rcHref='/commercial-funding'");
     expect(engine).toContain('if(ensureSplitLinks())save();');
-    expect(engine).toContain("p.ratingValue==='4.9'&&!p.ratingSource");
+    expect(engine).toContain("p.ratingValue==='4.9'&&(!p.ratingPlatform||p.ratingPlatform==='Google & Trustpilot')");
   });
 });
 
@@ -148,11 +148,11 @@ describe('the browser engine runs the new code correctly (the real source lines,
     expect(run({}, 'h', false, esc, ce)).toBe('');
     expect(run({ hideRating: false }, 'h', false, esc, ce)).toBe('');
     expect(run({ ratingValue: '4.9' }, 'h', false, esc, ce)).toBe('');
-    expect(run({ ratingValue: '4.8', ratingSource: 'Google' }, 'h', false, esc, ce)).toContain('4.8');
+    expect(run({ ratingValue: '4.8', ratingPlatform: 'Google' }, 'h', false, esc, ce)).toContain('4.8');
     expect(run({ ratingInstalls: '300+' }, 'h', false, esc, ce)).toBe('');
-    const both = run({ ratingValue: '4.8', ratingSource: 'Google', ratingInstalls: 'Hundreds', ratingInstallsLabel: 'arrays installed' }, 'h', false, esc, ce);
+    const both = run({ ratingValue: '4.8', ratingPlatform: 'Google', ratingInstalls: 'Hundreds', ratingInstallsLabel: 'arrays installed' }, 'h', false, esc, ce);
     expect(both).toContain('Google');
     expect(both).toContain('arrays installed');
-    expect(run({ ratingValue: '4.8', ratingSource: 'Google', hideRating: true }, 'h', false, esc, ce)).toBe('');
+    expect(run({ ratingValue: '4.8', ratingPlatform: 'Google', hideRating: true }, 'h', false, esc, ce)).toBe('');
   });
 });

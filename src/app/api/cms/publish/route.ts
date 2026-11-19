@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requirePortal } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { blockingSummary, checkDoc, logOverride } from '@/lib/cms/checks-server';
 
 const DRAFT_KEY = 'heliaxis-cms-v1';
 const PUBLISHED_KEY = 'heliaxis-cms-published';
@@ -28,6 +29,44 @@ export async function POST(req: Request) {
   if (!snapshot) {
     const { data } = await admin.from('cms_kv').select('value').eq('key', DRAFT_KEY).maybeSingle();
     if (data?.value) snapshot = String(data.value);
+  }
+
+  // The page checks. A page that is new or changed since the last publish must have no errors, or Publish stops. An admin can publish
+  // past them by giving a reason, which is kept. (Every page goes live on Publish, drafts included, so this is the last safety net.)
+  if (snapshot) {
+    let doc: unknown = null;
+    try {
+      doc = JSON.parse(snapshot);
+    } catch {
+      /* an unreadable snapshot is rejected below by the save, as before */
+    }
+    let report: Awaited<ReturnType<typeof checkDoc>> | null = null;
+    if (doc && typeof doc === 'object') {
+      try {
+        report = await checkDoc(doc as Parameters<typeof checkDoc>[0], admin);
+      } catch (e) {
+        // The checks are a safety net: if they themselves fail, say so in the logs and let Publish carry on rather than stop everyone.
+        console.error('Page checks failed; publishing without them:', e);
+      }
+    }
+    if (report) {
+      if (report.blocking.length) {
+        const isAdmin = session.profile.role === 'admin';
+        const reason = typeof body?.override?.reason === 'string' ? body.override.reason.trim() : '';
+        if (!(isAdmin && reason.length >= 10)) {
+          return NextResponse.json(
+            {
+              blocked: true,
+              canOverride: isAdmin,
+              error: `Publishing stopped: ${report.blocking.length} page${report.blocking.length === 1 ? '' : 's'} that ${report.blocking.length === 1 ? 'is' : 'are'} new or changed ${report.blocking.length === 1 ? 'has' : 'have'} errors in the page checks.`,
+              pages: blockingSummary(report),
+            },
+            { status: 422 },
+          );
+        }
+        await logOverride({ by: session.profile.full_name || session.profile.email || 'An admin', reason, pages: report.blocking.map((p) => p.slug), errors: report.blocking.reduce((n, p) => n + p.errors, 0) }, admin).catch(() => null);
+      }
+    }
   }
 
   if (snapshot) {

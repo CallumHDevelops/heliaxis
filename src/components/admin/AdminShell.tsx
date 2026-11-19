@@ -42,6 +42,8 @@ type Tab =
   | 'tasks'
   | 'builds'
   | 'cmsguide'
+  | 'cmsfacts'
+  | 'cmschecks'
   | 'assistant'
   | 'design'
   | 'social'
@@ -482,6 +484,8 @@ export async function AdminShell({
       items: [
         { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true, section: 'Website' },
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms'), section: 'Website' },
+        { href: '/admin/cms-facts', label: 'Facts sheet', short: 'Facts', icon: icons.guide, active: active === 'cmsfacts', show: can('cms'), section: 'Website' },
+        { href: '/admin/cms-checks', label: 'Page checks', short: 'Checks', icon: icons.guide, active: active === 'cmschecks', show: can('cms'), section: 'Website' },
         { href: '/admin/cms-guide', label: 'CMS guide', short: 'Guide', icon: icons.guide, active: active === 'cmsguide', show: can('cms'), section: 'Website' },
         { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics'), section: 'Analytics' },
         { href: '/admin/search', label: 'Search: SEO and AI answers', short: 'Search', icon: icons.analytics, active: active === 'search', show: can('search'), section: 'Analytics' },
