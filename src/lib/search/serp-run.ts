@@ -176,7 +176,25 @@ export async function collectTask(p: CollectPayload, db: Db = createAdminClient(
   }
   await saveRaw(p.date, p.taskId, task, db);
   await writeResult(p, items ?? [], result ?? {}, db);
+  await notePingbackEcho(task, db);
   return 'done';
+}
+
+/** What DataForSEO says it will call back (its echo of what we sent, token hidden), kept for the latest collected task. */
+async function notePingbackEcho(task: DfsTask, db: Db) {
+  try {
+    const d = (task.data ?? {}) as Record<string, unknown>;
+    const echo = {
+      at: new Date().toISOString(),
+      taskId: task.id,
+      pingback_url: typeof d.pingback_url === 'string' ? d.pingback_url.replace(/token=[^&]+/, 'token=…') : null,
+      postback_url: typeof d.postback_url === 'string' ? 'set' : null,
+      options: Object.keys(d).sort(),
+    };
+    await db.from('cms_kv').upsert({ key: 'seo-pingback-echo', value: toKv(echo), updated_at: echo.at });
+  } catch {
+    /* diagnostics only */
+  }
 }
 
 async function saveRaw(date: string, taskId: string, task: unknown, db: Db) {
