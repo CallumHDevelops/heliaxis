@@ -39,8 +39,8 @@ export function WeekLine({ weeks, values, label, color = '#c77f04' }: { weeks: s
   const x = (i: number) => pad.l + (i / Math.max(1, weeks.length - 1)) * (W - pad.l - pad.r);
   const y = (v: number) => H - pad.b - (v / max) * (H - pad.t - pad.b);
   const d = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  const ticks = [0, Math.round(max / 2), max];
   const empty = values.every((v) => !v);
+  const ticks = empty ? [] : [...new Set([0, Math.round(max / 2), max])];
   return (
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${label} by week`} onMouseLeave={() => setHover(null)}>
@@ -114,9 +114,11 @@ export function BandBars({ series, bands }: { series: { week: string; counts: Re
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Tracked searches by position band, by week" onMouseLeave={() => setHover(null)}>
         <line x1={pad.l} x2={W - pad.r} y1={H - pad.b} y2={H - pad.b} stroke="currentColor" strokeOpacity=".2" />
-        <text x={pad.l - 6} y={pad.t + 8} textAnchor="end" fontSize="10" fill="currentColor" fillOpacity=".6">
-          {max}
-        </text>
+        {!empty && (
+          <text x={pad.l - 6} y={pad.t + 8} textAnchor="end" fontSize="10" fill="currentColor" fillOpacity=".6">
+            {max}
+          </text>
+        )}
         {series.map((s, i) => {
           let yTop = H - pad.b;
           return (
