@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 import { canAccess, HUB_PATH, portalForPath } from '@/lib/portals';
-import { ATTR_COOKIE, attrCookieOptions, attributionFromUrl, CONSENT_COOKIE, hasConsent } from '@/lib/attribution';
+import { ATTR_COOKIE, attrCookieOptions, attributionFromUrl, CONSENT_COOKIE, hasConsent, isTagged } from '@/lib/attribution';
 import { encodeThemeRoute, themeRouteFor } from '@/lib/theme/routes';
 import { profileThemeToAdopt, THEME_AT_COOKIE, THEME_COOKIE, themeCookieOptions, THEME_ROUTE_HEADER } from '@/lib/theme/shared';
 
@@ -66,7 +66,12 @@ export async function middleware(request: NextRequest) {
   if (!isAdminPath && !isAuthPath) {
     const res = NextResponse.next({ request });
     const consented = hasConsent(request.cookies.get(CONSENT_COOKIE)?.value);
-    const attr = consented ? attributionFromUrl(request.nextUrl) : null;
+    // Page loads only (not images or scripts) carry the referrer that brought the visitor. A tagged landing (an ad or
+    // campaign) always replaces the record; one that only has a referrer (Google, an AI assistant) is the first touch and
+    // never overwrites an earlier one.
+    const isPage = (request.headers.get('sec-fetch-dest') ?? 'document') === 'document';
+    const found = consented && isPage ? attributionFromUrl(request.nextUrl, request.headers.get('referer')) : null;
+    const attr = found && (isTagged(found) || !request.cookies.has(ATTR_COOKIE)) ? found : null;
     if (attr) res.cookies.set(ATTR_COOKIE, encodeURIComponent(JSON.stringify(attr)), attrCookieOptions());
     // An hx_attr set before the cookie banner existed (or without Accept) goes.
     else if (!consented && request.cookies.has(ATTR_COOKIE)) res.cookies.set(ATTR_COOKIE, '', { ...attrCookieOptions(), maxAge: 0 });

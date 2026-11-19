@@ -10,14 +10,6 @@
     {
       "path": "/api/cron/site",
       "schedule": "5 7 * * *"
-    },
-    {
-      "path": "/api/cron/seo-rankings",
-      "schedule": "30 4 * * 1"
-    },
-    {
-      "path": "/api/cron/seo-weekly",
-      "schedule": "0 5 * * 1"
     }
   ]
 }

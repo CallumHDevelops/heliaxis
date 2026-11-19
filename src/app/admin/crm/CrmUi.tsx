@@ -77,6 +77,17 @@ const BRAND_ICONS = {
   'el-break': { wash: '', line: ['M5 5h14M5 19h14', 'M3 12h4M10 12h4M17 12h4'] },
   plus: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 8v8M8 12h8'] },
   arrow: { wash: 'M13 6l7 6-7 6z', line: ['M4 12h12', 'M13 6l7 6-7 6'] },
+  // From the kit (brand-kit/heliaxis-icons.svg), for Search's rail.
+  chart: { wash: '', line: ['M4 20V4', 'M4 20h16', 'M8 16l3-4 3 2 4-6'] },
+  trending: { wash: '', line: ['M3 17l6-6 4 4 8-8', 'M15 7h6v6'] },
+  cog: { wash: '', line: ['M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6', 'M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'] },
+  shield: { wash: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z', line: ['M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z', 'M9 12l2 2 4-4'] },
+  award: { wash: 'M12 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10', line: ['M12 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10', 'M9 12l-1 8 4-2 4 2-1-8'] },
+  quote: { wash: 'M6 7h4v5a4 4 0 0 1-4 4zM14 7h4v5a4 4 0 0 1-4 4z', line: ['M6 7h4v5a4 4 0 0 1-4 4M14 7h4v5a4 4 0 0 1-4 4'] },
+  gauge: { wash: '', line: ['M12 13a1 1 0 1 0 0-.01', 'M12 13l4-4', 'M5 18a9 9 0 1 1 14 0'] },
+  bolt: { wash: 'M13 2L4 14h6l-1 8 9-12h-6z', line: ['M13 2L4 14h6l-1 8 9-12h-6z'] },
+  coin: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 7v10M9.5 9.5a2.5 2 0 0 1 5 0c0 2.5-5 1-5 3.5a2.5 2 0 0 0 5 0'] },
+  building: { wash: 'M5 21V4h14v17', line: ['M5 21V4h14v17', 'M9 8h2M13 8h2M9 12h2M13 12h2M9 16h2M13 16h2', 'M3 21h18'] },
   users: { wash: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', line: ['M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6', 'M3 20a5 5 0 0 1 10 0', 'M16 6a3 3 0 0 1 0 6M15 20a5 5 0 0 0-1-3.5 5 5 0 0 1 7 3.5'] },
 } as const;
 

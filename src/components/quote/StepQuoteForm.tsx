@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { firstTouch } from '@/lib/first-touch';
 import './step-quote.css';
 
 /**
@@ -126,6 +127,7 @@ export function StepQuoteForm({
           ...(source ? { source } : {}),
           whatsappOptIn: whatsapp,
           company_website: trap,
+          ft: firstTouch(),
         }),
       });
       const d = (await r.json().catch(() => ({}))) as { success?: boolean; error?: string };

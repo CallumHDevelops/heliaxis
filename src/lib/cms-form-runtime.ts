@@ -1,4 +1,5 @@
 /** Shared CMS contact-form behaviour for published pages + admin preview. */
+import { firstTouch } from '@/lib/first-touch';
 
 const OPT_IN_LABEL = 'OK to message me on WhatsApp about my enquiry';
 const OPT_IN_LABEL_CSS = 'display:flex;align-items:flex-start;gap:.55rem;margin:.25rem 0 .9rem;font-size:.9rem;line-height:1.35;cursor:pointer;text-align:left;text-transform:none;letter-spacing:normal';
@@ -127,6 +128,7 @@ async function submitCmsForm(form: HTMLFormElement) {
             : ''),
         source: 'cms-form',
         whatsappOptIn,
+        ft: firstTouch(),
       }),
     });
     const d = await r.json().catch(() => ({}));
@@ -251,7 +253,7 @@ export const CMS_FORM_RUNTIME_SCRIPT = `(function(){
     setMsg(form,'',true);
     fetch('/api/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name:name,email:email,phone:phone,postcode:postcode,organization:organization,message:message,sector:sec,interests:ints,
-      interest:interestField||ints.join(', ')||message,propertyType:ptype||(/residential/i.test(sec)?'home':(sec?'business':'')),source:'cms-form',whatsappOptIn:waOptIn
+      interest:interestField||ints.join(', ')||message,propertyType:ptype||(/residential/i.test(sec)?'home':(sec?'business':'')),source:'cms-form',whatsappOptIn:waOptIn,ft:(function(){try{return JSON.parse(sessionStorage.getItem('hx_ft')||'null')||undefined;}catch(e){return undefined;}})()
     })}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});}).then(function(x){
       if(x.ok&&x.d.success){setMsg(form,x.d.message||"Thank you — we've received your enquiry and will be in touch shortly.",true);form.reset();form.querySelectorAll('.pv-tile.on').forEach(function(el){el.classList.remove('on');});if(btn)btn.style.display='none';}
       else{setMsg(form,(x.d&&x.d.error)||'Something went wrong. Please try again.',false);if(btn){btn.removeAttribute('aria-disabled');btn.classList.remove('busy');var lab2=btn.querySelector('[data-btn-label]')||btn;lab2.textContent=(prev||'Send Enquiry').replace(/Sending…/,'').trim()||'Send Enquiry';}}

@@ -6,7 +6,7 @@
  * (profiles.portals). Safe to import from middleware, server and client code.
  */
 
-export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'social_monitoring' | 'team' | 'social' | 'rams';
+export type PortalKey = 'cms' | 'branding' | 'design' | 'tasks' | 'enquiries' | 'crm' | 'analytics' | 'subcontractors' | 'social_monitoring' | 'team' | 'social' | 'rams' | 'search';
 
 export type Portal = {
   key: PortalKey;
@@ -68,6 +68,13 @@ export const PORTALS: Portal[] = [
     description: 'Visitors, pages and click heatmaps.',
     href: '/admin/analytics',
     paths: ['/admin/analytics'],
+  },
+  {
+    key: 'search',
+    label: 'Search',
+    description: 'Where we rank on Google and in AI answers, what the winners do, which pages to build, and which enquiries search brought in.',
+    href: '/admin/search',
+    paths: ['/admin/search'],
   },
   {
     key: 'subcontractors',

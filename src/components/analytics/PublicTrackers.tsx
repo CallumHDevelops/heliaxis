@@ -11,6 +11,28 @@ import { UmamiScript } from '@/components/analytics/UmamiScript';
 const GA_ID = 'G-6LLJCP5HG6';
 
 /**
+ * The first touch of this visit, for enquiries from visitors who haven't accepted cookies: only the site that sent them
+ * (its host) and the page they landed on, in session storage (gone when the tab closes, never a cookie). The forms send it
+ * with the enquiry so Search can tell organic leads from the rest (src/lib/attribution.ts parseFirstTouch).
+ */
+function rememberFirstTouch() {
+  try {
+    if (sessionStorage.getItem('hx_ft')) return;
+    let r = '';
+    try {
+      const h = document.referrer ? new URL(document.referrer).hostname : '';
+      if (h && h !== window.location.hostname) r = h;
+    } catch {
+      /* no referrer */
+    }
+    sessionStorage.setItem('hx_ft', JSON.stringify({ r, p: window.location.pathname.slice(0, 120), t: Date.now() }));
+  } catch {
+    /* storage blocked: nothing kept */
+  }
+}
+if (typeof window !== 'undefined') rememberFirstTouch();
+
+/**
  * Loads Umami + click heatmap collector (no cookies) and the cookie banner on public/user pages, and
  * Google Analytics only once the visitor has accepted cookies.
  * /admin, /login, /register, /pending, /preview and the personal /my/ and /book/ links never get trackers.

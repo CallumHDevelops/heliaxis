@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { parseKv, toKv } from '@/lib/kv-json';
 import { aiConfig, aiHeaders } from '@/lib/studio/ai';
 import { parsePage } from './shared';
-import { cleanDomain, isOurs, ourPlace, packLeague, parseSerp, visibility, type LeagueRow, type SerpResult, type SerpSnapshot } from './rankings';
+import { cleanDomain, isOurs, packLeague, visibility, type LeagueRow, type SerpSnapshot } from './rankings';
 
 /**
  * Weekly Google rankings from DataForSEO (pay as you go, about a fifth of a US cent per search at the depth used here), and the
@@ -19,7 +19,7 @@ const COMP_PREFIX = 'seo-competitors:';
 const LOCATIONS_KEY = 'seo-serp-locations-v2';
 const UK = { code: 2826, name: 'United Kingdom' };
 const UA = 'Mozilla/5.0 (compatible; HeliaxisMonitor/1.0; +https://heliaxis.co.uk)';
-const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+export const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
 
 /** A pasted value without the spaces, line breaks or quote marks that often come with it. */
 const clean = (v: string | undefined) => String(v ?? '').trim().replace(/^["']|["']$/g, '').trim();
@@ -104,25 +104,17 @@ async function dfs(path: string, body?: unknown, timeoutMs = 60_000): Promise<Re
   return j;
 }
 
-async function inBatches<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>, after?: (done: number) => Promise<unknown>): Promise<R[]> {
-  const out: R[] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
-    if (after) await after(out.length).catch(() => null);
-  }
-  return out;
-}
 
 /* ── Locations: each town's DataForSEO location (free to look up, kept for 30 days) ── */
 
-type Loc = { code: number; name: string };
+export type Loc = { code: number; name: string };
 
 /** Tracked towns in Wales (the rest are in England): several names exist in both, Newport above all. */
 const WELSH = new Set(['Cardiff', 'Swansea', 'Newport', 'Bridgend', 'Cwmbran', 'Caerphilly', 'Vale of Glamorgan', 'Barry', 'Pontypridd', 'Pontypool', 'Tredegar', 'Chepstow']);
 /** Where to search from when DataForSEO has no location for the town itself. */
 const NEAREST: Record<string, string> = { Cwmbran: 'Newport', Caerphilly: 'Cardiff', 'Vale of Glamorgan': 'Cardiff', Barry: 'Cardiff', Pontypool: 'Newport', Weston: 'Bristol' };
 
-async function townLocations(towns: string[], db: Db): Promise<Record<string, Loc>> {
+export async function townLocations(towns: string[], db: Db): Promise<Record<string, Loc>> {
   const { data } = await db.from('cms_kv').select('value, updated_at').eq('key', LOCATIONS_KEY).maybeSingle();
   const cached = parseKv<{ towns?: Record<string, Loc> }>(data?.value).towns ?? {};
   const fresh = data?.updated_at && Date.now() - Date.parse(data.updated_at) < 30 * 86_400_000;
@@ -150,48 +142,6 @@ async function townLocations(towns: string[], db: Db): Promise<Record<string, Lo
   return out;
 }
 
-/* ── The weekly rankings run ─────────────────────────────────────────────────── */
-
-async function oneSearch(k: { id: number; keyword: string; town: string }, loc: Loc): Promise<{ r: SerpResult; cost: number }> {
-  const base = { keywordId: k.id, keyword: k.keyword, town: k.town, location: loc.name };
-  let cost = 0;
-  let lastError = 'Failed';
-  // One retry: DataForSEO now and then answers "Internal SE Server Error" and succeeds a moment later.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      // Desktop: phone results come back as Google redirect links, which hide the real websites.
-      const j = await dfs('/serp/google/organic/live/advanced', [{ keyword: k.keyword, location_code: loc.code, language_code: 'en', device: 'desktop', os: 'windows', depth: 20 }], 30_000);
-      const task = (j.tasks as Record<string, unknown>[] | undefined)?.[0];
-      cost += Number(task?.cost ?? 0);
-      const items = ((task?.result as Record<string, unknown>[] | undefined)?.[0]?.items as unknown[] | undefined) ?? null;
-      // A partial result (the second page could not be fetched) is still worth keeping.
-      if (!task || (task.status_code !== 20000 && !items?.length)) throw new Error(String(task?.status_message ?? 'No result'));
-      const { organic, localPack } = parseSerp(items ?? []);
-      return { r: { ...base, organic, localPack, ours: ourPlace(organic, localPack) }, cost };
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : 'Failed';
-    }
-  }
-  return { r: { ...base, organic: [], localPack: [], ours: { pos: null, url: null, pack: null }, error: lastError }, cost };
-}
-
-/** Check every active tracked search now and save the snapshot. Takes a minute or two. */
-export async function runRankings(now = new Date(), db: Db = createAdminClient(), onProgress?: (done: number, total: number) => Promise<unknown>): Promise<SerpSnapshot> {
-  if (!serpConfigured()) throw new Error('DataForSEO is not set up: add DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD.');
-  const { data: kws } = await db.from('social_seo_keyword').select('id, keyword, town').eq('active', true).order('id');
-  const keywords = (kws ?? []) as { id: number; keyword: string; town: string }[];
-  if (!keywords.length) throw new Error('No searches to check: the keyword list is empty.');
-  const locs = await townLocations([...new Set(keywords.map((k) => k.town))], db);
-  // Twelve at a time keeps the whole run to a minute or two, well inside the five-minute limit.
-  await onProgress?.(0, keywords.length);
-  const done = await inBatches(keywords, 12, (k) => oneSearch(k, locs[k.town] ?? UK), (n) => onProgress?.(n, keywords.length) ?? Promise.resolve());
-  const snap: SerpSnapshot = { id: ukDay(now), at: now.toISOString(), costUsd: Math.round(done.reduce((a, d) => a + d.cost, 0) * 10000) / 10000, results: done.map((d) => d.r) };
-  await db.from('cms_kv').upsert({ key: SERP_PREFIX + snap.id, value: toKv(snap), updated_at: new Date().toISOString() });
-  const failed = snap.results.filter((r) => r.error);
-  if (failed.length) console.error(`SEO rankings: ${failed.length} of ${snap.results.length} searches failed, first: ${failed[0].error}`);
-  return snap;
-}
-
 /* ── What is running: shown on the dashboard so a run never just says "Running…" ── */
 
 const STATUS_KEY = 'seo-run-status';
@@ -210,33 +160,33 @@ export async function setAuditStatus(s: AuditStatus, db: Db = createAdminClient(
   await db.from('cms_kv').upsert({ key: AUDIT_STATUS_KEY, value: toKv(s), updated_at: new Date().toISOString() });
 }
 
+/**
+ * The latest rankings run, for the old dashboard's progress panel. Runs now go through DataForSEO's standard queue
+ * (src/lib/search/serp-run.ts) and are recorded in seo_serp_run; the competitor write-up follows once every result is in.
+ */
 export async function readRunStatus(db: Db = createAdminClient()): Promise<RunStatus | null> {
-  const { data } = await db.from('cms_kv').select('value').eq('key', STATUS_KEY).maybeSingle();
-  const v = parseKv<RunStatus>(data?.value);
-  return v && v.step ? (v as RunStatus) : null;
-}
-
-async function setStatus(s: RunStatus, db: Db) {
-  await db.from('cms_kv').upsert({ key: STATUS_KEY, value: toKv(s), updated_at: new Date().toISOString() });
-}
-
-/** Rankings, then the competitor analysis, recording each step (and any error) for the dashboard. */
-export async function runRankingsAndCompetitors(db: Db = createAdminClient()): Promise<void> {
-  const startedAt = new Date().toISOString();
-  const at = () => new Date().toISOString();
-  try {
-    await setStatus({ step: 'rankings', startedAt, updatedAt: at() }, db);
-    const snap = await runRankings(new Date(), db, (done, total) => setStatus({ step: 'rankings', startedAt, updatedAt: at(), done, total }, db));
-    const failed = snap.results.filter((r) => r.error);
-    if (failed.length === snap.results.length) throw new Error(`Every search failed at DataForSEO: ${failed[0]?.error ?? 'unknown error'}`);
-    await setStatus({ step: 'competitors', startedAt, updatedAt: at() }, db);
-    await runCompetitorAnalysis(new Date(), db);
-    await setStatus({ step: 'done', startedAt, updatedAt: at(), message: failed.length ? `${failed.length} of ${snap.results.length} searches could not be checked.` : undefined }, db);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Failed';
-    console.error('SEO rankings run failed:', message);
-    await setStatus({ step: 'failed', startedAt, updatedAt: at(), message }, db).catch(() => null);
+  const { data } = await db.from('seo_serp_run').select('*').neq('kind', 'live').order('started_at', { ascending: false }).limit(1).maybeSingle();
+  if (!data) {
+    const { data: old } = await db.from('cms_kv').select('value').eq('key', STATUS_KEY).maybeSingle();
+    const v = parseKv<RunStatus>(old?.value);
+    return v && v.step ? (v as RunStatus) : null;
   }
+  const step: RunStatus['step'] = data.status === 'done' ? 'done' : data.status === 'failed' ? 'failed' : 'rankings';
+  const failed = Number(data.tasks_failed ?? 0);
+  return {
+    step,
+    startedAt: data.started_at,
+    updatedAt: data.finished_at ?? new Date().toISOString(),
+    done: Number(data.tasks_done ?? 0),
+    total: Number(data.tasks ?? 0),
+    message: data.status === 'failed' ? (data.error ?? 'Failed') : data.status === 'done' && failed ? `${failed} of ${data.tasks} searches could not be checked.` : data.status === 'waiting' ? 'Waiting for Google results from DataForSEO’s queue (usually a few minutes).' : undefined,
+  };
+}
+
+/** Start a rankings run (queued; the results and the competitor write-up arrive over the next few minutes). */
+export async function runRankingsAndCompetitors(by = 'dashboard'): Promise<void> {
+  const { startSerpRun } = await import('@/lib/search/serp-run');
+  await startSerpRun({ device: 'mobile', kind: 'weekly', by });
 }
 
 /** The latest snapshots, newest first. */

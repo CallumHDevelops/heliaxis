@@ -54,11 +54,14 @@ export async function getProgress() {
 
 /** Check Google positions for every tracked search now, then rerun the competitor analysis (a few minutes). Runs on its own, so the site check can't use up its time. */
 export async function runRankingsNow(): Promise<{ ok: boolean; error?: string }> {
-  await guard();
   if (!serpConfigured()) return { ok: false, error: 'DataForSEO isn’t set up yet (DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD).' };
-  after(async () => {
-    await runRankingsAndCompetitors();
-    revalidatePath('/admin/analytics/seo');
-  });
+  const s = await guard();
+  // Posted to DataForSEO's queue in a few seconds; results arrive by pingback over the next few minutes.
+  try {
+    await runRankingsAndCompetitors(s.profile.full_name || s.profile.email || 'An admin');
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Could not start the run' };
+  }
+  revalidatePath('/admin/analytics/seo');
   return { ok: true };
 }

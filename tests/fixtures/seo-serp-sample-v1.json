@@ -1,0 +1,17 @@
+{
+  "_note": "Trimmed from cms_kv seo-serp-sample-v1: DataForSEO live/advanced for 'solar panels Cardiff', 16 Nov 2026, before resolve_goto_urls. Every organic and map-pack link is a google.com/goto wrapper.",
+  "items": [
+    { "type": "find_results_on", "rank_group": 1, "rank_absolute": 1 },
+    { "type": "local_pack", "rank_group": 1, "rank_absolute": 2, "domain": "google.com", "url": "https://google.com/goto?url=CAESXwHEIkXXU-ZwN-jU0aFjnlx_czEO", "title": "Green Energy Solar" },
+    { "type": "local_pack", "rank_group": 2, "rank_absolute": 3, "domain": "google.com", "url": "https://google.com/goto?url=CAESlwEBxCJF1wj7Ai3hwTfnsdqvllFn", "title": "The Solar House" },
+    { "type": "local_pack", "rank_group": 3, "rank_absolute": 4, "domain": "google.com", "url": "https://google.com/goto?url=CAESYQHEIkXXnF9sHBhPBF5bvdDM2mH4", "title": "Cymru Solar" },
+    { "type": "people_also_ask", "rank_group": 1, "rank_absolute": 5 },
+    { "type": "organic", "rank_group": 1, "rank_absolute": 6, "domain": "google.com", "url": "https://google.com/goto?url=CAESfAHEIkXXaIYgxLYwuns050wUzVXF", "title": "Cardiff Domestic Solar Businesses Services - Page 1", "breadcrumb": "https://www.solarlocator.co.uk › service-types › cardiff", "website_name": "solarlocator.co.uk" },
+    { "type": "organic", "rank_group": 2, "rank_absolute": 7, "domain": "google.com", "url": "https://google.com/goto?url=CAESdwHEIkXXTBCGpxGbbiTEsLuUYrGA", "title": "The Solar House, CARDIFF | Solar Energy", "breadcrumb": "https://www.yell.com › ... › Solar Energy near CARDIFF", "website_name": "Yell" },
+    { "type": "organic", "rank_group": 3, "rank_absolute": 8, "domain": "google.com", "url": "https://google.com/goto?url=CAEScQHEIkXXBAjLnFX1N27ou006ETs-", "title": "Renewable Energy Near Me in Cardiff", "breadcrumb": "https://www.yell.com › Renewable Energy › Cardiff", "website_name": "Yell" },
+    { "type": "organic", "rank_group": 4, "rank_absolute": 9, "domain": "google.com", "url": "https://google.com/goto?url=CAESXwHEIkXXfJq_9JjaCojmQxGd970p", "title": "https://solarwinds.cardiff.gov.uk/", "breadcrumb": "https://solarwinds.cardiff.gov.uk", "website_name": "Cardiff Council" },
+    { "type": "organic", "rank_group": 5, "rank_absolute": 10, "domain": "google.com", "url": "https://google.com/goto?url=CAESfQHEIkXX_C6j7cJ48xmyPuUpKd5P", "title": "How Much Do Solar Panels Cost in Cardiff?", "breadcrumb": "https://solarplanet.uk › how-much-do-solar-panels-cost-...", "website_name": "solarplanet.uk" },
+    { "type": "organic", "rank_group": 6, "rank_absolute": 11, "domain": "google.com", "url": "https://google.com/goto?url=CAESeQHEIkXXdw4438TCatM87vIzwer0", "title": "Going Green Energy, Cardiff", "breadcrumb": "https://www.yell.com › ... › Solar Energy near Cardiff", "website_name": "Yell" },
+    { "type": "organic", "rank_group": 7, "rank_absolute": 12, "domain": "google.com", "url": "https://google.com/goto?url=CAES0AEBxCJF138z9SbwUMnCHXS96NVz", "title": "Solar panel installers in Cardiff for 12 panel job", "breadcrumb": "https://www.facebook.com › posts › any-solar-panel-ins...", "website_name": "Facebook" }
+  ]
+}

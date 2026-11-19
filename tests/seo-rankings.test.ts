@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { history, isInstaller, isOurs, movers, ourPlace, packLeague, parseSerp, summarise, visibility, type SerpResult, type SerpSnapshot } from '@/lib/seo/rankings';
+import { clickShare, history, isInstaller, isOurs, movers, ourPlace, packLeague, parseSerp, summarise, visibility, type SerpResult, type SerpSnapshot } from '@/lib/seo/rankings';
 
 const res = (keywordId: number, town: string, organic: [number, string][], oursPos: number | null = null, pack: number | null = null): SerpResult => ({
   keywordId,
@@ -50,18 +52,70 @@ describe('rankings', () => {
   it('finds our movers and history', () => {
     const a = snap('2026-11-09', [res(1, 'Cardiff', [], 8), res(2, 'Bristol', [], null)]);
     const b = snap('2026-11-16', [res(1, 'Cardiff', [], 3), res(2, 'Bristol', [], 15)]);
-    expect(movers(a, b).map((m) => [m.keywordId, m.change])).toEqual([[2, 6], [1, 5]]);
+    expect(movers(a, b).map((m) => [m.keywordId, m.change])).toEqual([[2, 86], [1, 5]]);
     expect(history([b, a], 1)).toEqual([{ id: '2026-11-09', pos: 8 }, { id: '2026-11-16', pos: 3 }]);
   });
 });
 
 describe('google links', () => {
-  it('ignores Google redirect links and its own boxes', () => {
+  it('keeps a Google redirect it cannot place as unresolved, so the positions under it stay true', () => {
     const p = parseSerp([
       { type: 'organic', rank_group: 1, domain: 'google.com', url: 'https://google.com/goto?url=x', title: 'X' },
       { type: 'organic', rank_group: 2, domain: 'www.real.co.uk', url: 'https://real.co.uk', title: 'Real' },
     ]);
-    expect(p.organic.map((x) => x.domain)).toEqual(['real.co.uk']);
+    expect(p.organic.map((x) => [x.pos, x.domain, x.resolvedBy])).toEqual([[1, '', 'unresolved'], [2, 'real.co.uk', 'url']]);
+    // An unresolved row is nobody's: it never shows as a competitor.
+    expect(visibility({ id: 'x', at: 'x', costUsd: 0, results: [{ ...res(1, 'Cardiff', []), organic: p.organic }] }, false).map((x) => x.domain)).toEqual(['real.co.uk']);
+  });
+});
+
+describe('phase 0 gate: the stored sample (every link wrapped) returns real domains', () => {
+  const sample = JSON.parse(readFileSync(join(__dirname, 'fixtures/seo-serp-sample-v1.json'), 'utf8')) as { items: unknown[] };
+  it('resolves every organic row', () => {
+    const p = parseSerp(sample.items);
+    expect(p.organic).toHaveLength(7);
+    const resolved = p.organic.filter((x) => x.domain && x.domain !== 'google.com');
+    expect(resolved.length / p.organic.length).toBeGreaterThanOrEqual(0.95);
+    expect(p.organic.map((x) => x.domain)).toEqual(['solarlocator.co.uk', 'yell.com', 'yell.com', 'solarwinds.cardiff.gov.uk', 'solarplanet.uk', 'yell.com', 'facebook.com']);
+    expect(p.organic.every((x) => x.resolvedBy === 'breadcrumb')).toBe(true);
+    expect(p.organic[0].rankAbsolute).toBe(6);
+    expect(p.localPack.map((x) => x.title)).toEqual(['Green Energy Solar', 'The Solar House', 'Cymru Solar']);
+    expect(p.features).toEqual(['find_results_on', 'local_pack', 'people_also_ask']);
+  });
+});
+
+describe('after resolve_goto_urls: real urls, depth 100, AI Overview', () => {
+  it('reads resolved urls even when the domain still says google.com', () => {
+    const p = parseSerp([{ type: 'organic', rank_group: 1, domain: 'google.com', url: 'https://www.greenenergysolar.co.uk/cardiff', title: 'G' }]);
+    expect(p.organic[0]).toMatchObject({ domain: 'greenenergysolar.co.uk', resolvedBy: 'url' });
+  });
+
+  it('falls back to the site name when there is no breadcrumb', () => {
+    const p = parseSerp([{ type: 'organic', rank_group: 3, domain: 'google.com', url: 'https://google.com/goto?url=Z', website_name: 'solarplanet.uk', title: 'S' }]);
+    expect(p.organic[0]).toMatchObject({ domain: 'solarplanet.uk', url: 'https://solarplanet.uk/', resolvedBy: 'website_name' });
+    // A plain business name is not an address.
+    expect(parseSerp([{ type: 'organic', rank_group: 1, domain: 'google.com', url: 'https://google.com/goto?url=Z', website_name: 'Yell' }]).organic[0].resolvedBy).toBe('unresolved');
+  });
+
+  it('records our position wherever it falls in 1 to 100, and a second page of ours', () => {
+    const items = Array.from({ length: 100 }, (_, i) => ({ type: 'organic', rank_group: i + 1, rank_absolute: i + 3, domain: `site${i}.co.uk`, url: `https://site${i}.co.uk/` }));
+    items[70] = { type: 'organic', rank_group: 71, rank_absolute: 73, domain: 'heliaxis.co.uk', url: 'https://heliaxis.co.uk/solar-panels-cardiff' };
+    items[88] = { type: 'organic', rank_group: 89, rank_absolute: 91, domain: 'heliaxis.co.uk', url: 'https://heliaxis.co.uk/blog/x' };
+    const p = parseSerp(items);
+    expect(p.organic).toHaveLength(100);
+    expect(ourPlace(p.organic, p.localPack)).toEqual({ pos: 71, url: 'https://heliaxis.co.uk/solar-panels-cardiff', pack: null, abs: 73, also: ['https://heliaxis.co.uk/blog/x'] });
+    expect(clickShare(71)).toBeGreaterThan(0);
+    expect(clickShare(101)).toBe(0);
+  });
+
+  it('notes an AI Overview and whether it cites us', () => {
+    const p = parseSerp([
+      { type: 'ai_overview', rank_group: 1, items: [{ type: 'ai_overview_element', references: [{ domain: 'heliaxis.co.uk', url: 'https://heliaxis.co.uk/battery-storage', source: 'Heliaxis' }] }] },
+      { type: 'organic', rank_group: 1, domain: 'a.co.uk', url: 'https://a.co.uk/' },
+    ]);
+    expect(p.aio).toMatchObject({ present: true, cited: true });
+    expect(p.features).toEqual(['ai_overview']);
+    expect(parseSerp([]).aio).toEqual({ present: false, cited: false, references: [] });
   });
 });
 

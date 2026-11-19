@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
   } catch {
     landing = null;
   }
-  // Our own pages only; the referrer is accepted but not used yet.
+  // Our own pages only. The referrer (the site that sent them: Google, an AI assistant) gives the channel.
   if (!landing || !/^https?:$/.test(landing.protocol) || landing.host !== req.headers.get('host')) {
     return NextResponse.json({ ok: true, saved: false }, { headers: noStore });
   }
-  const attr = attributionFromUrl(landing);
+  const attr = attributionFromUrl(landing, typeof body?.referrer === 'string' ? body.referrer.slice(0, 2000) : null);
   const res = NextResponse.json({ ok: true, saved: !!attr }, { headers: noStore });
   if (attr) res.cookies.set(ATTR_COOKIE, encodeURIComponent(JSON.stringify(attr)), attrCookieOptions());
   return res;

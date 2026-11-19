@@ -2,7 +2,8 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { ensureOpportunity } from '@/lib/crm/server';
 import { leadRef } from '@/lib/notification-refs';
-import { ATTR_COOKIE, CONSENT_COOKIE, hasConsent, parseAttribution, sourceLabel } from '@/lib/attribution';
+import { ATTR_COOKIE, CONSENT_COOKIE, hasConsent, parseAttribution, parseFirstTouch, sourceLabel } from '@/lib/attribution';
+import { classifyChannel } from '@/lib/search/channel';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getResendApiKey } from '@/lib/resend';
 import { grantPermission } from '@/lib/whatsapp/permission';
@@ -47,6 +48,15 @@ export async function POST(request: NextRequest) {
       : null;
     const adSource = sourceLabel(attribution);
     if (adSource) data.source = adSource;
+    // Which channel (Search › Leads): the consented cookie, else this visit's first touch from session storage
+    // (only the referring site's host and the landing page).
+    const origin = attribution ?? parseFirstTouch(body.ft);
+    const channelFields = {
+      channel: classifyChannel(origin),
+      landing_path: origin?.p ?? null,
+      referrer_host: origin?.r ?? null,
+      first_seen_at: origin?.t ? new Date(origin.t).toISOString() : null,
+    };
 
     if (!data.name || !data.email) {
       return NextResponse.json(
@@ -82,6 +92,7 @@ export async function POST(request: NextRequest) {
           interest: interestStored,
           property_type: sectorStored,
           source: data.source,
+          ...channelFields,
         }).select('id').single();
         if (error) console.error('❌ Supabase enquiry insert failed:', error.message);
         else if (row) {
@@ -93,6 +104,7 @@ export async function POST(request: NextRequest) {
             // Ticked the WhatsApp box: permission, with when and how (crm-v3.sql columns, when they exist).
             if (data.whatsappOptIn) await grantPermission(row.id, 'website-form');
             await ensureOpportunity(row.id, data.source);
+            await supabase.from('crm_lead_origins').update(channelFields).eq('enquiry_id', row.id).then(() => null, () => null);
           });
           // The "we have your request" email to them, from the Heliaxis mailbox and logged on the enquiry.
           after(() => sendEnquiryReceipt(row.id, { name: data.name, email: data.email, postcode: data.postcode, interest: data.interest, source: data.source, message: data.message }).then(() => null, () => null));

@@ -10,7 +10,7 @@ function authorized(req: Request) {
   return req.headers.get('authorization') === `Bearer ${secret}`;
 }
 
-/** Every Monday (vercel.json), before the weekly report: Google positions for every tracked search, then the competitor analysis. */
+/** Starts a rankings run by hand (the weekly one is queued by /api/cron/growth, Sunday 23:00). Results arrive by pingback. */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!serpConfigured()) return NextResponse.json({ ok: false, reason: 'DataForSEO not set up' });

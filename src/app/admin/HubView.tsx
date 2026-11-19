@@ -40,6 +40,7 @@ const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   enquiries: '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>',
   crm: '<path d="M3 7h18v12H3z"/><path d="M8 7V5h8v2"/><path d="M3 12h18"/><path d="M11 12v2h2v-2"/>',
   analytics: '<path d="M5 19V10M10 19V5M15 19v-6M20 19v-9"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5"/><path d="M7.5 12.5 9.5 10l2 1.5 2-3"/>',
   subcontractors: '<circle cx="9" cy="8" r="3"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="m15.5 10.5 2 2 3.5-4"/>',
   social: '<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="12" cy="12" r="3.5"/><circle cx="16.8" cy="7.2" r=".6" fill="currentColor"/>',
   social_monitoring: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
